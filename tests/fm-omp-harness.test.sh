@@ -1356,6 +1356,15 @@ if (scenario === "external") {
       await end();
       await until(() => wakes().length === 2, "outstanding vendor queue release lost owed work");
       expectWake(1, "check: trigger-3");
+    } else if (scenario === "consumed") {
+      await accept(wake);
+      acknowledge(drain());
+      await end();
+      await sleep(1200);
+      if (queries() !== count) throw new Error("consumed wake triggered an extra queue query");
+      append("B", "check: unrelated later row");
+      await sleep(1200);
+      if (queries() !== count || wakes().length !== 1) throw new Error("consumed wake left a phantom pending mark");
     } else {
       await accept(wake);
       acknowledge(drain());
@@ -1366,6 +1375,7 @@ if (scenario === "external") {
   }
 }
 await handlers.get("session_shutdown")({}, ctx);
+if (scenario === "consumed" && existsSync(handoff) && JSON.parse(readFileSync(handoff, "utf8")).pending.length !== 0) throw new Error("consumed wake persisted a new pending handoff");
 process.exit(0);
 EOF
   status=$?
@@ -1375,7 +1385,7 @@ EOF
 
 test_watch_extension_queue_read_delivery() {
   local scenario out status
-  for scenario in drained owed mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued; do
+  for scenario in drained owed consumed mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued; do
     out=$(run_watch_queue_read_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp queue-read scenario $scenario: $out"
