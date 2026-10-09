@@ -14,8 +14,7 @@
 # guard checks the recorded core bucket locally: quota refusal exits 75 with its reason on stdout;
 # otherwise it exits 0 silently. get --floor checks before every page and exits 75 with its reason on
 # stderr and no partial JSON output on refusal. Plain get does not enforce the floor.
-# FM_GH_RATE_FLOOR_PERCENT sets the floor as a percent of the limit (default 15; unparsable values or
-# values outside 0..100 use 15). An expired window or missing quota record does not refuse a read.
+# The floor is 15 percent of the limit. An expired window or missing quota record does not refuse a read.
 #
 # <state> is FM_STATE_OVERRIDE, else $FM_HOME/state, else $FM_ROOT_OVERRIDE/state, else the code root's
 # state/. docs/configuration.md "GitHub REST reads and the quota floor" owns conditional-cache behavior,
@@ -40,8 +39,7 @@ quota_low() { # resource
   local file
   file=$(ratelimit_file "$1")
   [ -f "$file" ] || return 1
-  jq -er --arg raw "${FM_GH_RATE_FLOOR_PERCENT:-}" '
-    (try ($raw | tonumber) catch 15 | if . < 0 or . > 100 then 15 else . end) as $floor
+  jq -er '15 as $floor
     | (now | floor) as $now
     | select((.limit | type) == "number" and (.remaining | type) == "number" and (.reset | type) == "number"
       and .limit > 0 and .reset > $now and (.remaining * 100) < ($floor * .limit))
@@ -120,13 +118,21 @@ record_response() (
   mv -f -- "$staged" "$entry"
 )
 
-# fetch_page <endpoint> <body-out> : prints the next endpoint (or nothing) on stdout; returns 1 on a forge error.
+# Succeeds when the cached body is a list holding exactly per_page items (GitHub's default is 30).
+full_page() { # endpoint snapshot
+  local per_page
+  per_page=$(printf '%s' "$1" | sed -n 's/.*[?&]per_page=\([0-9][0-9]*\).*/\1/p')
+  jq -e --argjson per_page "${per_page:-30}" '.body | fromjson | type == "array" and length == $per_page' "$2" >/dev/null 2>&1
+}
+
+# fetch_page <endpoint> <body-out> [paginate|unconditional] : prints the next endpoint (or nothing) on stdout;
+# returns 1 on a forge error. unconditional sends no If-None-Match.
 fetch_page() {
-  local endpoint=$1 body_out=$2 entry snapshot etag='' raw hdr err status next staged=''
+  local endpoint=$1 body_out=$2 mode=${3:-} entry snapshot etag='' raw hdr err status next staged=''
   entry=$(cache_path "$endpoint")
   raw="$work/raw.$RANDOM$RANDOM"
   hdr="$raw.hdr"; err="$raw.err"; snapshot="$raw.cache"
-  if cat "$entry" > "$snapshot" 2>/dev/null && jq -e '(.etag | type == "string" and length > 0) and (.body | type == "string") and (.body | fromjson | true)' \
+  if [ "$mode" != unconditional ] && cat "$entry" > "$snapshot" 2>/dev/null && jq -e '(.etag | type == "string" and length > 0) and (.body | type == "string") and (.body | fromjson | true)' \
     "$snapshot" >/dev/null 2>&1; then
     etag=$(jq -r .etag "$snapshot")
   fi
@@ -149,6 +155,12 @@ fetch_page() {
     jq -r .body "$snapshot" > "$body_out"
     if [ "$has_link" -eq 0 ]; then
       next=$(jq -r '.next // empty' "$snapshot")
+      if [ -z "$next" ] && [ "$mode" = paginate ] && full_page "$endpoint" "$snapshot"; then
+        record_response "$hdr" || true
+        rm -f -- "$raw" "$hdr" "$err"
+        fetch_page "$endpoint" "$body_out" unconditional
+        return
+      fi
     fi
     if staged=$(mktemp "$CACHE/.entry.XXXXXX" 2>/dev/null); then
       if ! { jq --arg next "$next" '.next = (if $next == "" then null else $next end)' "$snapshot" > "$staged" \
@@ -217,7 +229,7 @@ cmd_get() {
     case "$endpoint" in *\?*) endpoint="$endpoint&$query" ;; *) endpoint="$endpoint?$query" ;; esac
   fi
   endpoint=${endpoint#/}
-  local pages=() next
+  local pages=()
   work=$(mktemp -d "${TMPDIR:-/tmp}/fm-gh-rest.XXXXXX") || die 'cannot create a temporary directory'
   trap '[ -z "$work" ] || rm -rf -- "$work"' EXIT
   while [ -n "$endpoint" ]; do
@@ -226,9 +238,13 @@ cmd_get() {
       exit "$EX_TEMPFAIL"
     fi
     i=$((i + 1))
-    next=$(fetch_page "$endpoint" "$work/page.$i") || exit 1
+    if [ "$paginate" -eq 1 ]; then
+      endpoint=$(fetch_page "$endpoint" "$work/page.$i" paginate) || exit 1
+    else
+      fetch_page "$endpoint" "$work/page.$i" >/dev/null || exit 1
+      endpoint=''
+    fi
     pages+=("$work/page.$i")
-    if [ "$paginate" -eq 1 ]; then endpoint=$next; else endpoint=''; fi
   done
   if [ "$slurp" -eq 1 ]; then
     jq -sc . "${pages[@]}"

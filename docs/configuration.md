@@ -690,22 +690,22 @@ A malformed configuration is reported as an error rather than ignored.
 
 ### GitHub REST reads and the quota floor
 
-`bin/fm-contributions.sh`, `bin/fm_open_loops.py`, `bin/fm-pr-state.sh`, and `bin/fm-pr-reviewers.sh` read GitHub REST through `bin/fm-gh-rest.sh`.
+`bin/fm-contributions.sh` and `bin/fm_open_loops.py` read GitHub REST through `bin/fm-gh-rest.sh`.
 It sends `If-None-Match` from its per-URL ETag cache and serves the cached body on a 304, which GitHub does not count against the rate limit.
 Each conditional request snapshots the cache entry before sending its ETag; a 304 serves that snapshot's body and uses its pagination metadata when the Link header is omitted, even if another request replaces the shared entry.
 A supplied Link header updates pagination for the current read; cached metadata is updated only if the shared entry still matches the requested generation.
+A paginated read whose 304 omits the Link header for a full cached last page (item count equal to `per_page`) repeats that page as one unconditional GET, so a page added behind it is not missed.
 Cache publication shares the existing serialized response-recording boundary.
 A missing, corrupt, or unparsable cache entry is a normal GET, and entries unused for a week are pruned.
 Only REST is conditional; GraphQL reads (`gh pr view`, `gh pr checks`) have no equivalent.
 The contributions poll also checks the recorded core quota before its final GraphQL head read.
-The PR-state and reviewer advisory commands remain available below the sweep floor; their shared REST reads still update the quota record.
 Responses carrying valid `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `X-RateLimit-Resource` headers update the recorded quota, including on a 304 or an error.
 Writers serialize the update, keeping the lowest remaining value within the newest observed reset window; older-window responses cannot replace it.
 Cache and quota recording is best-effort: an unwritable state directory or a recording lock unavailable within a two-second wait silently skips recording without changing the read result.
 The enforcing response headers, not `gh api rate_limit`, are the quota evidence used by the sweeps.
 
-When the recorded core remaining quota is below the configured floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
-The helper's header owns the floor setting and refusal interface; floor-protected REST reads check before every page and publish no partial response when refused.
+When the recorded core remaining quota is below the fixed 15 percent floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
+The helper's header owns the refusal interface; floor-protected REST reads check before every page and publish no partial response when refused.
 The contributions poll checks the local quota record before budget exits and after incomplete observations.
 It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode.
 Completed observations remain measured.
@@ -2917,7 +2917,6 @@ FM_POLL=15              # seconds between watcher poll cycles
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
-FM_GH_RATE_FLOOR_PERCENT=15   # sweep quota threshold; bin/fm-gh-rest.sh's header owns the setting
 FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
 FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-session sweeps (bin/fm-idle-session-reap.sh); 0 turns the sweep off without changing its deadline; an unscheduled home waits one full interval, and watcher handoffs retain the deadline; invalid values use 900
 # Fixed reap policy and safety gates are owned by bin/fm-idle-session-reap.sh's header, not configurable overrides.

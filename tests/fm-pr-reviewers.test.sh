@@ -11,21 +11,21 @@ FAKEBIN=$(fm_fakebin "$TMP_ROOT")
 command -v jq >/dev/null 2>&1 \
   || fail "these tests run the script's own jq programs over API-shaped JSON with the real jq, which was not found"
 
-# The fake gh answers every query with the JSON shape GitHub returns; the script's
-# own jq programs select the fields, so field selection is what is under test.
-# fm_gh_http_shim wraps it in the HTTP response `gh api -i` prints.
+# The fake gh answers every query with the JSON shape GitHub returns and runs
+# the --jq program it received with the real jq, so field selection is what is
+# under test.
 cat > "$FAKEBIN/gh" <<'SH'
 #!/usr/bin/env bash
 set -o pipefail
 serve() {
   case "$*" in
-    "api repos/o/r/pulls/7")
+    "api /repos/o/r/pulls/7 --jq "*)
       printf '%s\n' '{"user":{"login":"prauthor"},"base":{"sha":"base123"}}'
       ;;
-    "api repos/o/r/pulls/7/files?per_page=100")
+    "api /repos/o/r/pulls/7/files?per_page=100 --paginate --jq .[].filename")
       printf '%s\n' '[{"filename":"a.ts"},{"filename":"dir/b.ts"}]'
       ;;
-    "api repos/o/r/commits?sha=base123&path=a.ts&per_page=100")
+    "api --method GET /repos/o/r/commits -f sha=base123 -f path=a.ts -F per_page=100 --jq "*)
       if [ "${FM_TEST_ONLY_AUTHOR:-0}" = 1 ]; then
         printf '%s\n' '[
           {"sha":"own1","author":{"login":"prauthor","type":"User"}},
@@ -41,7 +41,7 @@ serve() {
           {"sha":"unmapped1","author":null}]'
       fi
       ;;
-    "api repos/o/r/commits?sha=base123&path=dir%2Fb.ts&per_page=100")
+    "api --method GET /repos/o/r/commits -f sha=base123 -f path=dir/b.ts -F per_page=100 --jq "*)
       if [ "${FM_TEST_ONLY_AUTHOR:-0}" = 1 ]; then
         printf '%s\n' '[{"sha":"own2","author":{"login":"prauthor","type":"User"}}]'
       else
@@ -56,12 +56,15 @@ serve() {
       ;;
   esac
 }
-serve "$@"
+prog=
+prev=
+for arg in "$@"; do
+  [ "$prev" != --jq ] || prog=$arg
+  prev=$arg
+done
+serve "$@" | jq -r "$prog"
 SH
 chmod +x "$FAKEBIN/gh"
-fm_gh_http_shim "$FAKEBIN"
-export FM_STATE_OVERRIDE="$TMP_ROOT/state"
-mkdir -p "$FM_STATE_OVERRIDE"
 
 run_reviewers() {
   PATH="$FAKEBIN:$PATH" "$SCRIPT" https://github.com/o/r/pull/7
@@ -108,29 +111,6 @@ test_refusals_exit_nonzero() {
   pass "argument and lookup refusals exit nonzero"
 }
 
-test_http_shim_preserves_backend_failures() {
-  local mode status
-  for mode in http passthrough nonapi; do
-    case "$mode" in
-      http) set -- api -i repos/o/r/unexpected ;;
-      passthrough) set -- api repos/o/r/unexpected ;;
-      nonapi) set -- pr -i unexpected ;;
-    esac
-    status=0
-    GH_SHIM_LOG="$TMP_ROOT/shim-failure-$mode.log" "$FAKEBIN/gh" "$@" \
-      >"$TMP_ROOT/shim-failure-$mode.out" 2>"$TMP_ROOT/shim-failure-$mode.err" || status=$?
-    assert_equals 91 "$status" "$mode shim lost the backend's exit status"
-    assert_contains "$(cat "$TMP_ROOT/shim-failure-$mode.err")" 'unexpected gh call:' \
-      "$mode shim swallowed the backend's error"
-    assert_equals '' "$(cat "$TMP_ROOT/shim-failure-$mode.out")" \
-      "$mode shim emitted a successful response for a backend failure"
-    assert_equals "counted $*" "$(cat "$TMP_ROOT/shim-failure-$mode.log")" \
-      "$mode shim did not log the failed call"
-  done
-  pass 'HTTP and passthrough shims preserve backend failures without a successful response'
-}
-
 test_candidates_use_api_logins_and_unique_commit_counts
 test_only_author_evidence_says_no_candidates
 test_refusals_exit_nonzero
-test_http_shim_preserves_backend_failures

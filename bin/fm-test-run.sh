@@ -1508,8 +1508,6 @@ families_for_changed_path() {
       ;;
     tests/assets/gh-http-shim.sh)
       # The HTTP-faithful gh double behind fm_gh_http_shim.
-      printf '%s\n' "__script__:fm-pr-state.test.sh"
-      printf '%s\n' "__script__:fm-pr-reviewers.test.sh"
       printf '%s\n' snapshot-bearings
       ;;
     bin/fm-test-run.sh)
@@ -1588,8 +1586,6 @@ families_for_changed_path() {
       # The conditional-read helper serves every REST reader.
       printf '%s\n' "__script__:fm-gh-rest.test.sh"
       printf '%s\n' "__script__:fm-open-loops.test.sh"
-      printf '%s\n' "__script__:fm-pr-state.test.sh"
-      printf '%s\n' "__script__:fm-pr-reviewers.test.sh"
       printf '%s\n' snapshot-bearings
       ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\

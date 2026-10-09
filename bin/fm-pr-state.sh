@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Report the blockers this command can see on one GitHub pull request.
 #
-# This is a one-shot command, read-only over GitHub. It reads the current pull request,
+# This is a one-shot, read-only command. It reads the current pull request,
 # reported checks, submitted reviews, and review decision from GitHub at
 # invocation time. It never posts, requests, approves, or merges.
 # It reports on checks that have reported. A required context that has never
@@ -17,9 +17,6 @@
 # STALE when it was left at a superseded head.
 # A closed or merged pull request reports that terminal state and nothing else.
 # Unresolved review-thread state is out of this command's scope.
-#
-# The review-list read uses fm-gh-rest.sh; shared read behavior is owned by
-# docs/configuration.md "GitHub REST reads and the quota floor".
 #
 # Usage: fm-pr-state.sh <pr-url>
 #   Prints one line per blocker it can see and nothing when it sees none.
@@ -47,7 +44,6 @@ if [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
 fi
 [ "$#" -eq 1 ] || die "usage: fm-pr-state.sh <pr-url>"
 command -v gh >/dev/null 2>&1 || die "gh is required"
-command -v jq >/dev/null 2>&1 || die "jq is required"
 
 URL=$1
 if ! fm_pr_url_parse "$URL" || [ "$FM_PR_PROVIDER" != github ]; then
@@ -132,10 +128,8 @@ fi
 
 if [ "$REVIEW_DECISION" = CHANGES_REQUESTED ]; then
   printf 'REVIEW DECISION: CHANGES_REQUESTED\n'
-  REVIEW_PAGES=$("$SCRIPT_DIR/fm-gh-rest.sh" get "$ENDPOINT/reviews?per_page=100" --paginate --slurp) \
-    || die "could not read reviews for $URL"
-  REVIEWS=$(printf '%s\n' "$REVIEW_PAGES" | jq -r '
-    .[][]
+  REVIEWS=$(gh api "$ENDPOINT/reviews?per_page=100" --paginate --jq '
+    .[]
     | select(.user.login != null and .commit_id != null and .submitted_at != null)
     | [.user.login, .state, .commit_id, .submitted_at]
     | @tsv') || die "could not read reviews for $URL"

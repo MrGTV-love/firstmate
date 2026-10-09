@@ -37,10 +37,12 @@ etag = '"' + hashlib.sha1(body.encode()).hexdigest()[:16] + '"'
 rate = ('X-Ratelimit-Limit: 5000\r\nX-Ratelimit-Remaining: ' + os.environ.get('FAKE_GH_REMAINING', open(site + '/remaining').read().strip())
         + '\r\nX-Ratelimit-Reset: ' + os.environ.get('FAKE_GH_RESET', open(site + '/reset').read().strip()) + '\r\nX-Ratelimit-Resource: core\r\n')
 link = ''
+per_page = re.search(r'[?&]per_page=(\d+)', endpoint)
+per_page = per_page[1] if per_page else '2'
 if index + 1 < len(pages):
-    link = 'Link: <https://api.github.com/repositories/1/items?per_page=2&page=%d>; rel="next"\r\n' % (index + 2)
+    link = 'Link: <https://api.github.com/repositories/1/items?per_page=%s&page=%d>; rel="next"\r\n' % (per_page, index + 2)
 elif os.path.exists(site + '/terminal-link'):
-    link = 'Link: <https://api.github.com/repositories/1/items?per_page=2&page=1>; rel="prev"\r\n'
+    link = 'Link: <https://api.github.com/repositories/1/items?per_page=%s&page=1>; rel="prev"\r\n' % per_page
 delay = os.environ.get('FAKE_GH_DELAY') if index == 0 else None
 if delay:
     open(site + '/' + delay + '.ready', 'w').close()
@@ -156,6 +158,27 @@ test_304_updates_pagination_and_retains_omitted_metadata() {
   out=$(get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp) || fail 'repeated contracted read failed'
   assert_equals '[[{"id":1},{"id":2}]]' "$out" 'cleared pagination metadata was not cached'
   pass '304 pagination metadata adds and removes pages, and survives omitted headers'
+}
+
+test_full_last_page_without_304_link_finds_the_next_page() {
+  local site out endpoint='repos/o/r/issues/1/comments?per_page=100'
+  site=$(new_site full_last_page)
+  : > "$site/omit-304-link"
+  jq -nc '[[range(1; 100) | {id: .}]]' > "$site/pages.json"
+  get "$site" "$endpoint" --paginate --slurp >/dev/null || fail 'seed read of 99 comments failed'
+  get "$site" "$endpoint" --paginate --slurp >/dev/null || fail 'repeated read of 99 comments failed'
+  assert_equals 1 "$(counted "$site")" 'a partial last page was re-read unconditionally'
+  jq -nc '[[range(1; 101) | {id: .}]]' > "$site/pages.json"
+  get "$site" "$endpoint" --paginate --slurp >/dev/null || fail 'seed read of 100 comments failed'
+  out=$(get "$site" "$endpoint" --paginate --slurp) || fail 'repeated read of 100 comments failed'
+  assert_equals 100 "$(printf '%s' "$out" | jq 'add | length')" 'the full page of 100 comments was not served'
+  get "$site" "$endpoint" >/dev/null || fail 'single-page read of 100 comments failed'
+  assert_equals 3 "$(counted "$site")" 'a full last page costs one unconditional GET per paginated read only'
+  jq -nc '[[range(1; 101) | {id: .}], [{id: 101}]]' > "$site/pages.json"
+  out=$(get "$site" "$endpoint" --paginate --slurp) || fail 'read of 101 comments failed'
+  assert_equals 101 "$(printf '%s' "$out" | jq 'add | length')" 'comment 101 behind an unchanged full page was missed'
+  assert_equals 101 "$(printf '%s' "$out" | jq '.[1][0].id')" 'the new page did not carry comment 101'
+  pass 'a full cached last page whose 304 omits Link is re-read, so comment 101 is found'
 }
 
 test_304_uses_its_generation_during_concurrent_replacement() {
@@ -297,7 +320,7 @@ test_the_quota_floor_reads_headers_from_calls_already_made() {
   guard "$site" || fail 'with nothing recorded the guard must not refuse'
   printf '800\n' > "$site/remaining"
   get "$site" repos/o/r/items >/dev/null || fail 'read failed'
-  guard "$site" || fail '16% remaining is above the default 15% floor'
+  guard "$site" || fail '16% remaining is above the 15% floor'
   printf '700\n' > "$site/remaining"
   printf '[[{"id":9}]]\n' > "$site/pages.json"
   get "$site" repos/o/r/items >/dev/null || fail 'read failed'
@@ -306,12 +329,10 @@ test_the_quota_floor_reads_headers_from_calls_already_made() {
   reset=$(cat "$site/reset")
   assert_contains "$out" "700 of 5000" 'the reason must state the remaining quota'
   assert_contains "$out" "$(jq -rn --argjson r "$reset" '$r | todate')" 'the reason must state the reset time'
-  FM_GH_RATE_FLOOR_PERCENT=10 guard "$site" || fail 'the floor is not overridable by environment'
-  FM_GH_RATE_FLOOR_PERCENT=nonsense guard "$site" >/dev/null && fail 'an unparsable floor must fall back to 15%'
   jq --argjson past "$(( $(date +%s) - 5 ))" '.reset = $past' "$site/state/gh-ratelimit.core.json" > "$site/past.json"
   mv "$site/past.json" "$site/state/gh-ratelimit.core.json"
   guard "$site" || fail 'a window that has reset must not refuse'
-  pass 'the floor comes from response headers, is overridable, and ends at the reset'
+  pass 'the floor comes from response headers and ends at the reset'
 }
 
 test_parallel_responses_keep_the_lowest_remaining() {
@@ -432,6 +453,7 @@ test_changed_data_replaces_the_cache
 test_missing_or_corrupt_cache_falls_back_to_a_normal_get
 test_pagination_follows_link_and_caches_every_page
 test_304_updates_pagination_and_retains_omitted_metadata
+test_full_last_page_without_304_link_finds_the_next_page
 test_304_uses_its_generation_during_concurrent_replacement
 test_query_fields_are_encoded_and_distinct_cache_keys
 test_a_failed_read_exits_nonzero_and_caches_nothing
