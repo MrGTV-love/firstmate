@@ -829,12 +829,21 @@ test_checkpoint_carries_onto_a_snapshot_copy_only_when_it_describes_it() {
   pass "a fold checkpoint rides onto a snapshot copy only when it describes that copy"
 }
 
+UTF8_LOCALE=
+for CANDIDATE in C.UTF-8 C.utf8 en_US.UTF-8 en_US.utf8; do
+  if locale -a 2>/dev/null | grep -qx "$CANDIDATE"; then UTF8_LOCALE=$CANDIDATE; break; fi
+done
+
 test_utf8_whitespace_uses_full_fold_locale() {
   local dir state out
+  if [ -z "$UTF8_LOCALE" ]; then
+    printf 'SKIP: UTF-8 fold locale: no UTF-8 locale is installed\n'
+    return 0
+  fi
   dir=$(make_case utf8-locale); state="$dir/state"
   printf 'kind=secondmate\n' > "$state/task.meta"
   mkdir -p "$dir/copy"
-  out=$(LC_ALL=en_US.UTF-8 bash -c '
+  out=$(LC_ALL="$UTF8_LOCALE" bash -c '
     . "$1"
     f=$2 copy=$3 cf="$(dirname "$2")/.task.open-decisions-cursor"
     printf "needs-decision:\342\200\203[key=api] choose café" > "$f"
@@ -866,12 +875,16 @@ test_utf8_whitespace_uses_full_fold_locale() {
 
 test_checkpoint_rejects_a_previous_parsing_locale() {
   local dir state out from to
+  if [ -z "$UTF8_LOCALE" ]; then
+    printf 'SKIP: cross-locale checkpoint reuse: no UTF-8 locale is installed\n'
+    return 0
+  fi
   dir=$(make_case cross-locale); state="$dir/state"
   printf 'kind=secondmate\n' > "$state/task.meta"
   mkdir -p "$dir/copy"
   printf 'kind=secondmate\n' > "$dir/copy/task.meta"
-  for from in C en_US.UTF-8; do
-    if [ "$from" = C ]; then to=en_US.UTF-8; else to=C; fi
+  for from in C "$UTF8_LOCALE"; do
+    if [ "$from" = C ]; then to=$UTF8_LOCALE; else to=C; fi
     printf 'needs-decision:\342\200\203[key=api] choose a plan\n' > "$state/task.status"
     rm -f "$state/.task.open-decisions-cursor" "$dir/copy/.task.open-decisions-cursor"
     LC_ALL="$from" bash -c '. "$1"; status_open_decisions_incremental "$2" >/dev/null' \
