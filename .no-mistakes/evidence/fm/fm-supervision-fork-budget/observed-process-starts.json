@@ -1,0 +1,25 @@
+{
+  "method": "Workspace-local DYLD interposer records successful fork/posix_spawn/posix_spawnp calls in an ad-hoc signed copy of system Bash and injectable descendants. Protected tool internals are not instrumented; this is not a host-global process count. Root interpreter launches excluded equally. Four-start nested calibration passed.",
+  "workload": "Public fm-crew-state.sh for eight frozen task records, with the same stopped private tmux endpoint on both versions. All outputs identical. Separate from the earlier live-endpoint behavior checks.",
+  "samples": [
+    {
+      "version": "base",
+      "fork_posix_spawn_calls": 553
+    },
+    {
+      "version": "target",
+      "fork_posix_spawn_calls": 425
+    }
+  ],
+  "output": [
+    "state: unknown \u00b7 source: none \u00b7 backend target gone: fm-lab-supervision:0\n",
+    "state: unknown \u00b7 source: none \u00b7 backend target gone: fm-lab-supervision:0\n",
+    "state: unknown \u00b7 source: none \u00b7 backend target gone: fm-lab-supervision:0\n",
+    "state: unknown \u00b7 source: none \u00b7 backend target gone: fm-lab-supervision:0\n",
+    "state: unknown \u00b7 source: none \u00b7 backend target gone: fm-lab-supervision:0\n",
+    "state: unknown \u00b7 source: none \u00b7 backend target gone: fm-lab-supervision:0\n",
+    "state: unknown \u00b7 source: none \u00b7 backend target gone: fm-lab-supervision:0\n",
+    "state: unknown \u00b7 source: none \u00b7 backend target gone: fm-lab-supervision:0\n"
+  ],
+  "discarded_experiment": "Snapshot instrumentation failed its stdin-shell bootstrap, then timed out; no snapshot performance claim is based on it. DTrace host-global measurement requires privileges unavailable to this agent."
+}

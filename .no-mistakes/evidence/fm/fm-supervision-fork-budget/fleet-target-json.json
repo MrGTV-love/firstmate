@@ -1,0 +1,693 @@
+{
+  "schema": "fm-fleet-snapshot.v1",
+  "generated": "2026-10-09T05:00:00Z",
+  "fm_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet",
+  "roots": {
+    "fm_root": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5",
+    "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state",
+    "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data",
+    "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/config",
+    "projects": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/projects"
+  },
+  "backlog": {
+    "records": [],
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/backlog.md",
+    "present": true
+  },
+  "tasks": [
+    {
+      "id": "blocked",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "direct",
+      "yolo": "",
+      "branch": null,
+      "project": "fixture",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/blocked.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/blocked.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "blocked",
+            "note": "needs artifact",
+            "raw": "blocked: needs artifact",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/task-worktree",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/blocked/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "blocked",
+        "source": "status-log",
+        "detail": "needs artifact",
+        "raw": "state: blocked · source: status-log · needs artifact",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": true,
+        "open_decisions": [
+          {
+            "key": "default",
+            "verb": "blocked",
+            "summary": "needs artifact"
+          }
+        ],
+        "scout_report_present": false,
+        "last_event_text": "blocked: needs artifact"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-blocked",
+        "steer": "bin/fm-send.sh fm-blocked '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "busy",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "direct",
+      "yolo": "",
+      "branch": null,
+      "project": "fixture",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/busy.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/busy.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "blocked",
+            "note": "old blocker",
+            "raw": "blocked: old blocker",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/task-worktree",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/busy/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "working",
+        "source": "pane",
+        "detail": "harness busy (fm-recovery)",
+        "raw": "state: working · source: pane · harness busy (fm-recovery)",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "blocked: old blocker"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-busy",
+        "steer": "bin/fm-send.sh fm-busy '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "done",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "direct",
+      "yolo": "",
+      "branch": null,
+      "project": "fixture",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/done.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/done.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "report published",
+            "raw": "done: report published",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/task-worktree",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/done/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "done",
+        "source": "status-log",
+        "detail": "report published",
+        "raw": "state: done · source: status-log · report published",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "done: report published"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-done",
+        "steer": "bin/fm-send.sh fm-done '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "failed",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "direct",
+      "yolo": "",
+      "branch": null,
+      "project": "fixture",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/failed.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/failed.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "failed",
+            "note": "command returned 7",
+            "raw": "failed: command returned 7",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/task-worktree",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/failed/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "failed",
+        "source": "status-log",
+        "detail": "command returned 7",
+        "raw": "state: failed · source: status-log · command returned 7",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "failed: command returned 7"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-failed",
+        "steer": "bin/fm-send.sh fm-failed '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "last-key",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "direct",
+      "yolo": "",
+      "branch": null,
+      "project": "fixture",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/last-key.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/last-key.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "last metadata wins",
+            "raw": "done: last metadata wins",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/task-worktree",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/last-key/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "done",
+        "source": "status-log",
+        "detail": "last metadata wins",
+        "raw": "state: done · source: status-log · last metadata wins",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "done: last metadata wins"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-last-key",
+        "steer": "bin/fm-send.sh fm-last-key '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "paused",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "direct",
+      "yolo": "",
+      "branch": null,
+      "project": "fixture",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/paused.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/paused.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "paused",
+            "note": "waiting on upstream",
+            "raw": "paused: waiting on upstream",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/task-worktree",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/paused/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "paused",
+        "source": "status-log",
+        "detail": "waiting on upstream",
+        "raw": "state: paused · source: status-log · waiting on upstream",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "paused: waiting on upstream"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-paused",
+        "steer": "bin/fm-send.sh fm-paused '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "unknown-busy",
+      "kind": "scout",
+      "harness": "claude",
+      "mode": "direct",
+      "yolo": "",
+      "branch": null,
+      "project": "fixture",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/unknown-busy.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/unknown-busy.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "no reliable semantic signal",
+            "raw": "working: no reliable semantic signal",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/task-worktree",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/unknown-busy/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown fm-recovery)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown fm-recovery)",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working: no reliable semantic signal"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-unknown-busy",
+        "steer": "bin/fm-send.sh fm-unknown-busy '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    },
+    {
+      "id": "unpreserved-ship",
+      "kind": "ship",
+      "harness": "claude",
+      "mode": "direct-PR",
+      "yolo": "",
+      "branch": null,
+      "project": "fixture",
+      "spawn_gen": null,
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/unpreserved-ship.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/state/unpreserved-ship.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "done",
+            "note": "unpublished local head",
+            "raw": "done: unpublished local head",
+            "age_seconds": null
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/task-worktree",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/unpreserved-ship/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "blocked",
+        "source": "status-log",
+        "detail": "named head ae16fe2415627baf930d6dce924df5b6464ac8f0 is unreachable outside the worker copy",
+        "raw": "state: blocked · source: status-log · named head ae16fe2415627baf930d6dce924df5b6464ac8f0 is unreachable outside the worker copy",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "done: unpublished local head"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-unpreserved-ship",
+        "steer": "bin/fm-send.sh fm-unpreserved-ship '<instruction>'",
+        "return_channel_note": null
+      },
+      "backlog": null
+    }
+  ],
+  "main_inventory": {
+    "valid": true,
+    "reason": null,
+    "orphan_in_flight": [],
+    "unstructured_current_count": 0
+  },
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "scout_reports": [],
+  "secondmate_current": {
+    "registry": {
+      "present": false,
+      "available": true,
+      "complete": true,
+      "reason": null,
+      "provenance": "registered-table",
+      "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet/data/secondmates.md",
+      "freshness": {
+        "status": "fresh",
+        "observed_at": "2026-10-09T05:00:00Z"
+      },
+      "records": [],
+      "input_truncated": false,
+      "records_truncated": false,
+      "reasons": [],
+      "lines_in_window": 0,
+      "records_in_window": 0
+    },
+    "records": [],
+    "total_registered": 0,
+    "total": 0,
+    "shown": 0,
+    "truncated": 0
+  },
+  "secondmate_landed": {
+    "records": [],
+    "truncated": [],
+    "unreadable": [],
+    "partial": []
+  },
+  "secondmate_guidance": {
+    "note": "For kind=secondmate, bearings selects validated structured state from that registered home; parent events and bounded terminal evidence are fallback-only supplements and never current-state authority."
+  }
+}

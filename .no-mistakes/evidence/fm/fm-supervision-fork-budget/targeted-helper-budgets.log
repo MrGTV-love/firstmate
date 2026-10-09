@@ -1,0 +1,8 @@
+ok - a 201-row run ledger is read in 4 subshells (bound 20)
+ok - the TOON field, sync-state and parked readers match the sed, grep and trim pipelines they replaced
+ok - the reported-state signature is byte-identical to the od pipeline for every file kind
+ok - a quiet scan of 12 status logs enters 17 subshells (bound 40)
+ok - listing 20 task windows enters 0 subshells (bound 4)
+ok - five owner-watchdog ticks enter 50 subshells (bound 80)
+ok - the state-root checks work under a tab-and-newline IFS
+ok - a multi-line ps command column is trimmed line by line, exactly as sed did

@@ -1,0 +1,46 @@
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-bad bin/fm-procevent.sh ('register', 'lavish', 'owner-proof-0', '--', '/bin/sh', '-c', 'printf "%s\\n" "$$" > "$1"; while [ ! -f "$2" ]; do sleep 0.2; done; printf "owner source completed\\n"', 'owner-source', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-bad/child.pid', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-bad/release')
+registered: owner-proof-0 (lavish)
+exit=0
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-bad bin/fm-procevent.sh ('reconcile',)
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+exit=0
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-bad bin/fm-procevent.sh ('list',)
+SOURCE                       ADAPTER      OWNER      PENDING
+owner-proof-0                lavish       live       0
+exit=0
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-good bin/fm-procevent.sh ('register', 'lavish', 'owner-proof-1', '--', '/bin/sh', '-c', 'printf "%s\\n" "$$" > "$1"; while [ ! -f "$2" ]; do sleep 0.2; done; printf "owner source completed\\n"', 'owner-source', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-good/child.pid', '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-good/release')
+registered: owner-proof-1 (lavish)
+exit=0
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-good bin/fm-procevent.sh ('reconcile',)
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+exit=0
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-good bin/fm-procevent.sh ('list',)
+SOURCE                       ADAPTER      OWNER      PENDING
+owner-proof-1                lavish       live       0
+exit=0
+
+Changed only owner-bad/state permissions 0700 -> 0777. Its runner and source child both stopped; owner-good runner and source child remained live.
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-good bin/fm-procevent.sh ('list',)
+SOURCE                       ADAPTER      OWNER      PENDING
+owner-proof-1                lavish       none       1
+exit=0
+
+Captured source output (procevent-inbox/owner-proof-1.1.result):
+owner source completed
+
+Persisted queue:
+1791522701	1	check	procevent:owner-proof-1:1	check: procevent lavish owner-proof-1 1
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-bad bin/fm-procevent.sh ('retire', 'owner-proof-0')
+retired: owner-proof-0
+exit=0
+
+$ FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/owner-good bin/fm-procevent.sh ('retire', 'owner-proof-1')
+retired: owner-proof-1
+exit=0

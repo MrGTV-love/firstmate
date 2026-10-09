@@ -1,0 +1,4 @@
+--json: byte-identical after JSON object-key normalization; no fields dropped; SHA-256 e9ec80a74ddebfb35ebefdadd8021a2e5d27dba5e6e0dfabb5648014ec3b6ac7
+--secondmate-home-summary: byte-identical after JSON object-key normalization; no fields dropped; SHA-256 cf75ae26b3c9b77517402c333c0e8d5344277879576726fbd7ab39f5c5c1a966
+Target task states: {"blocked": "blocked", "busy": "working", "done": "done", "failed": "failed", "last-key": "done", "paused": "paused", "unknown-busy": "unknown", "unpreserved-ship": "blocked"}
+Observation time pinned through the public FM_SNAPSHOT_NOW setting; all other fields preserved. Raw --secondmate-home-summary stdout also matched byte-for-byte. Raw --json object-key order differed, not its values.

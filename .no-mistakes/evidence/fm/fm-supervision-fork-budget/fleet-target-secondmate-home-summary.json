@@ -1,0 +1,171 @@
+{
+  "schema": "fm-secondmate-home-summary.v1",
+  "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+  "contributions": {
+    "known": 0,
+    "checked": 0,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 0
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 900,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "generated": "2026-10-09T05:00:00Z",
+  "generated_epoch": 1791522000,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/frozen-fleet",
+  "valid": false,
+  "reason": "live child state has no in-flight backlog item: blocked=blocked, busy=working, done=done, failed=failed, last-key=done, paused=paused, unknown-busy=unknown, unpreserved-ship=blocked",
+  "invalidity": {
+    "kind": "unowned_current",
+    "ids": [
+      "blocked",
+      "busy",
+      "done",
+      "failed",
+      "last-key",
+      "paused",
+      "unknown-busy",
+      "unpreserved-ship"
+    ]
+  },
+  "state": "unknown",
+  "active_children": [],
+  "decisions_open": [
+    {
+      "id": "blocked",
+      "key": "default",
+      "verb": "blocked",
+      "summary": "needs artifact",
+      "reason": null,
+      "source": "status"
+    }
+  ],
+  "holds": [],
+  "queued": [],
+  "landed": [],
+  "endpoints": [
+    {
+      "id": "blocked",
+      "state": "blocked",
+      "source": "status-log",
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "busy",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "done",
+      "state": "done",
+      "source": "status-log",
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "failed",
+      "state": "failed",
+      "source": "status-log",
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "last-key",
+      "state": "done",
+      "source": "status-log",
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "paused",
+      "state": "paused",
+      "source": "status-log",
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "unknown-busy",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "unpreserved-ship",
+      "state": "blocked",
+      "source": "status-log",
+      "endpoint": {
+        "target": "fm-lab-supervision:0",
+        "exists": false,
+        "agent_alive": "missing",
+        "status": "absent",
+        "observed_at": "2026-10-09T05:00:00Z",
+        "freshness": "fresh"
+      }
+    }
+  ],
+  "counts": {
+    "active_children": 0,
+    "decisions_open": 1,
+    "holds": 0,
+    "queued": 0,
+    "landed": 0,
+    "endpoints": 8
+  },
+  "omitted": []
+}

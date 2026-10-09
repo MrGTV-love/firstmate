@@ -1,0 +1,11 @@
+Public fm-crew-state.sh output on a private tmux shell endpoint and records seeded through real fm-busy-event.sh arm (not a harness-login proof).
+Base fd9b8b02 and target outputs compared as bytes; all eight matched. Metadata includes repeated worktree/kind/harness keys and an unterminated final line. Ship fixture uses supported direct-PR mode (initial fixture used unsupported direct).
+
+busy: state: working · source: pane · harness busy (fm-recovery)
+blocked: state: blocked · source: status-log · needs artifact
+failed: state: failed · source: status-log · command returned 7
+done: state: done · source: status-log · report published
+paused: state: paused · source: status-log · waiting on upstream
+unpreserved-ship: state: blocked · source: status-log · named head ae16fe2415627baf930d6dce924df5b6464ac8f0 is unreachable outside the worker copy
+last-key: state: done · source: status-log · last metadata wins
+unknown-busy: state: unknown · source: pane · harness state unavailable (unknown fm-recovery)

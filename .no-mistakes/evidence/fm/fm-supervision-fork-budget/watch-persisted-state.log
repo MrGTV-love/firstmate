@@ -1,0 +1,11 @@
+Initial background obligation collector finished before writing status.
+Quiet restart: watcher remained alive for 8 seconds with no stdout and empty wake queue.
+Same-size replacement: b'failed: original run failed\n' -> b'failed: replaced run failed\n'; both 28 bytes; inode 159290626 -> 159314992.
+signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/watch-clean-home/state/task.status
+
+Persisted queue:
+1791522643	3	signal	task.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/watch-clean-home/state/task.status
+1791522644	4	signal	task.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/watch-clean-home/state/task.status
+
+Presentation marker:
+v2	r1:3238007374726f6e673a31363737373233323a3135393331343939323a313739313532323633342e31373431383535313800526567756c61722046696c653a313030363434002d007265616461626c65007265616461626c65	28@strong:16777232:159314992:1791522634.174185518

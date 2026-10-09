@@ -1,0 +1,5 @@
+1791522594	2	signal	task.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/watch-clean-home/state/task.status
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: failed: original run failed
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+task failed: original run failed
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 83420.1791522582.Oufxnw

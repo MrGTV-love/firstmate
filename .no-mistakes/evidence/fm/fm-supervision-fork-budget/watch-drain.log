@@ -1,0 +1,6 @@
+1791522419	2	signal	task.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F956C4Y2YNXZ7JMB6MP9M5/.live-supervision/watch-home/state/task.status
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: blocked: dependency missing
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task blocked: dependency missing
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 4286.1791522419.rsdp4t

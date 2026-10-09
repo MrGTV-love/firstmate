@@ -1,0 +1,4 @@
+$ dtrace -q -n "syscall::fork:entry { @starts = count(); }" -c /usr/bin/true
+dtrace: system integrity protection is on, some features will not be available
+dtrace: failed to initialize dtrace: DTrace requires additional privileges
+exit=1
