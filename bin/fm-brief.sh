@@ -603,6 +603,23 @@ else
   SETUP_BASE="You are in a disposable git worktree of $REPO, at a detached HEAD on a clean default branch."
 fi
 
+# Private services outlive the worker that started them: a launchd agent
+# survives reboots and restarts its daemon after every kill, so teardown cannot
+# prove custody of what it leaves running (fm-teardown.sh Fix 3 is the backstop,
+# this rule is the first line). Shared by the ship and scout scaffolds only; a
+# secondmate charter has its own lifecycle.
+IFS= read -r -d '' PRIVATE_SERVICE_RULE <<'EOF' || true
+8. Stop every private service you start. A private service is any daemon, server, or watcher that
+   only your task needs, including a `no-mistakes` home whose `NO_MISTAKES_HOME` sits inside your
+   worktree: that home installs its own launchd agent that keeps running and restarts after a kill
+   or a reboot. Before you append a `__PAUSED_VERB__`, `blocked`, `needs-decision`, `done`, or `failed`
+   line that ends your turn, stop each one and name it in that status line. Stop a launchd agent
+   with `launchctl bootout gui/$(id -u)/<label>` once its `--root` is confirmed to be inside your
+   worktree. Never use `no-mistakes daemon stop` for this: it stops the shared daemon (rule 7).
+EOF
+PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE%$'\n'}
+PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE//__PAUSED_VERB__/$PAUSED_VERB}
+
 if [ "$KIND" = scout ]; then
 if "$SCRIPT_DIR/fm-bootstrap.sh" lavish-compatible >/dev/null 2>&1; then
   LAVISH_LINE='If your deliverable is a visual artifact the captain will review and iterate on, use the lavish-axi rule: arm your board with bin/fm-procevent-lavish.sh arm <artifact.html> --for <task-id>; never run lavish-axi poll yourself. Re-arm with the reply after each nonterminal round to acknowledge it, route the board feedback through your steering inbox, write needs-decision [key=board-review] with the live board URL when the captain owes a decision, and stop at session_ended or an empty End without re-arming - acknowledge that final round with bin/fm-procevent.sh handled <source-id> <sequence> to conclude and retire your board.'
@@ -643,6 +660,7 @@ $CREWMATE_PAUSE_INSTRUCTIONS
    A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
    Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
+$PRIVATE_SERVICE_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 
@@ -723,6 +741,7 @@ $ASK_USER_BLOCK
    A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
    Firstmate's reply normally writes that closing line at answer time; when a blocker or wait clears WITHOUT a firstmate reply, append \`resolved [at=<epoch>]: {how it cleared}\` yourself (same \`[key=<slug>]\` if you opened it with one) as you resume.
 $SHARED_INFRA_RULE
+$PRIVATE_SERVICE_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 
