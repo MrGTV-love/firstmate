@@ -1902,6 +1902,75 @@ SH
   pass "default and done keyed answers choose their mode after cleanup releases the lock"
 }
 
+test_interrupted_keyed_release_closes_after_teardown() {
+  local home id mode row show out
+  for mode in default done; do
+    home=$(make_home "interrupted-keyed-release-$mode")
+    id=sample-interrupted-keyed-release
+    tasks_in "$home" add "$id" "Investigate interrupted answer recovery" \
+      --kind scout --repo sample --start >/dev/null || fail "could not create the interrupted release task"
+    write_origin_meta "$home" "$id"
+    mkdir -p "$home/data/$id"
+    printf 'done: report complete\n' > "$home/state/$id.status"
+    printf '# Interrupted answer report\n' > "$home/data/$id/report.md"
+    run_captain "$home" hold "$id" --reason "captain report choice pending" >/dev/null \
+      || fail "could not hold the interrupted release task"
+    complete_through_sibling "$home" "$id" >/dev/null \
+      || fail "could not complete the interrupted release task's inventory"
+    cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = unhold ] && [ "${2:-}" = sample-interrupted-keyed-release ] \
+  && [ ! -e "$FM_HOME/unhold-failed-once" ]; then
+  : > "$FM_HOME/unhold-failed-once"
+  exit 93
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+    chmod +x "$home/fakebin/tasks-axi"
+    row=$(printf '%s\tgo\tProceed' "$id")
+    [ "$mode" != done ] || row=$(printf '%s\tdone' "$row")
+    if printf '%s\n' "$row" | run_captain "$home" answers \
+      --source "interrupted release fixture" > "$home/answer.out" 2> "$home/answer.err"; then
+      fail "the interrupted unhold reported success"
+    fi
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: in_flight" "the failed release completed live work"
+    assert_contains "$show" "held: yes" "the failed release lost its hold"
+    assert_contains "$show" "Resolution mode: released" "the failure did not persist its release"
+    REAL_TASKS_AXI="$TASKS_AXI_BIN" run_teardown "$home" "$id" \
+      > "$home/teardown.out" 2> "$home/teardown.err" \
+      || fail "cleanup after interrupted release failed: $(cat "$home/teardown.err")"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: queued" "cleanup did not queue the held finished work"
+    assert_contains "$show" "held: yes" "cleanup released the unresolved hold"
+    assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"
+    printf 'Captain answered this call through interrupted release fixture.\nTask: %s\nAnswer: go\nAnswer as shown to the captain: Proceed\n' \
+      "$id" > "$home/decision.txt"
+    if run_captain "$home" answer "$id" --decision-file "$home/decision.txt" \
+      > "$home/direct.out" 2> "$home/direct.err"; then
+      fail "an explicit close accepted a recorded release"
+    fi
+    assert_contains "$(cat "$home/direct.err")" "retry with --release" \
+      "the explicit close lost its strict mode check"
+    out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+      --source "interrupted release fixture" 2>&1) \
+      || fail "the automatic retry did not close finished held work: $out"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: done" "the automatic retry made finished work runnable"
+    assert_contains "$show" "held: no" "the automatic retry left finished work held"
+    assert_contains "$show" 'Resolution mode: answered\n' "the retry did not record its fresh close"
+    assert_contains "$show" "Answer: go" "the retry lost the captain's answer"
+    assert_contains "$show" "Deliverable of the finished work: report data/$id/report.md" \
+      "the retry lost the finished report"
+    out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+      --source "interrupted release fixture" 2>&1) \
+      || fail "the closed automatic retry was not idempotent: $out"
+    assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+      "replaying the reconciled close changed the finished work"
+  done
+  pass "interrupted default and done releases close finished work while explicit mode checks stay strict"
+}
+
 # Answer-time closure is opt-in per source. A channel with no binding must behave
 # exactly as it always did: capture, announce, close nothing.
 # A reconcile is "go re-check reality", never the captain's answer. The value is
@@ -3306,9 +3375,10 @@ SH
 }
 
 test_relocated_report_does_not_wedge_an_answer_before_replay() {
-  local home data id wt rc show bootstrap json
-  home=$(make_home relocated-answer-before-replay)
-  data="$home/données"
+  local home data id wt rc show bootstrap json intake=${1:-close}
+  local -a release_args=()
+  home=$(make_home "relocated-answer-before-replay-$intake")
+  if [ "$intake" = close ]; then data="$home/données"; else data="$home/records"; fi
   mv "$home/data" "$data"
   id=sample-relocated-answer-before-replay
   wt="$home/projects/$id"
@@ -3360,13 +3430,28 @@ SH
     "the interrupted relocated cleanup lost its pending record"
 
   printf 'Proceed despite the reporting limitation.\n' > "$home/answer.txt"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
-    "$ROOT/bin/fm-captain-hold.sh" answer "$id" --decision-file "$home/answer.txt" \
-    >/dev/null || fail "the unsupported relocated report wedged the captain's answer"
+  if [ "$intake" = keyed ]; then
+    printf '%s\tgo\tProceed despite the reporting limitation.\n' "$id" \
+      | PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+        FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+        "$ROOT/bin/fm-captain-hold.sh" answers --source "relocated cleanup fixture" \
+        >/dev/null || fail "the relocated task could not be released by a keyed answer"
+  else
+    [ "$intake" != release ] || release_args=(--release)
+    PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+      FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+      "$ROOT/bin/fm-captain-hold.sh" answer "$id" --decision-file "$home/answer.txt" \
+      "${release_args[@]+"${release_args[@]}"}" \
+      >/dev/null || fail "the unsupported relocated report wedged the captain's answer"
+  fi
   show=$(cd "$home" && tasks-axi show "$id" --full --file "$data/backlog.md") \
     || fail "the answered relocated row disappeared"
-  assert_contains "$show" "state: done" "the relocated report kept the answered call open"
+  if [ "$intake" = close ]; then
+    assert_contains "$show" "state: done" "the relocated report kept the answered call open"
+  else
+    assert_contains "$show" "state: in_flight" "the release completed work before cleanup replay"
+    assert_contains "$show" "Resolution mode: released" "the answer did not record its release"
+  fi
   assert_contains "$show" "held: no" "the relocated report kept the answered call held"
 
   fm_fake_exit0 "$home/fakebin" treehouse
@@ -3377,6 +3462,10 @@ SH
     || fail "session start could not replay relocated cleanup after the answer: $bootstrap"
   assert_absent "$home/state/$id.meta" "session start left the relocated task record behind"
   assert_absent "$home/state/$id.backlog-close" "session start left the relocated pending record behind"
+  show=$(cd "$home" && tasks-axi show "$id" --full --file "$data/backlog.md") \
+    || fail "the relocated row disappeared after replay"
+  assert_contains "$show" "state: done" "the relocated report blocked cleanup completion"
+  assert_contains "$show" "held: no" "cleanup replay left the answered task held"
   json=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_DATA_OVERRIDE="$data" \
     FM_BEARINGS_NOW=2026-07-14T12:00:00Z "$BEARINGS" --json) \
     || fail "Bearings failed after the relocated answer-before-replay lifecycle"
@@ -3384,6 +3473,11 @@ SH
     '.landed | any(.id == $id) | not' >/dev/null \
     || fail "the unsupported relocated report was published as a landed delivery: $json"
   pass "an unsupported relocated report does not wedge the captain's answer"
+}
+
+test_relocated_report_does_not_wedge_released_cleanup_replay() {
+  test_relocated_report_does_not_wedge_an_answer_before_replay keyed
+  test_relocated_report_does_not_wedge_an_answer_before_replay release
 }
 
 # A home whose data directory is relocated keeps one backlog; the predicate and
@@ -4865,6 +4959,7 @@ test_secondmate_reconcile_publishes_before_request_retirement
 test_bound_channel_answers_close_at_answer_time
 test_keyed_answer_releases_a_live_work_item
 test_keyed_answer_waits_for_cleanup_before_selecting_its_mode
+test_interrupted_keyed_release_closes_after_teardown
 test_reconcile_never_closes_through_the_keyed_answer_intake
 test_normal_answers_retire_pending_reconcile_requests
 test_reconcile_closes_with_evidence_or_keeps_the_call_open
@@ -4883,6 +4978,7 @@ test_answer_before_cleanup_replay_preserves_the_retained_report
 test_answer_before_cleanup_replay_notes_a_retained_gerrit_change
 test_unusable_pending_close_record_names_its_reason
 test_relocated_report_does_not_wedge_an_answer_before_replay
+test_relocated_report_does_not_wedge_released_cleanup_replay
 test_teardown_retains_captain_calls_in_a_relocated_backlog
 test_teardown_retains_a_gerrit_captain_call_with_its_change_url
 test_merge_approval_releases_before_zero_done_retention

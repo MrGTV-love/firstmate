@@ -1397,6 +1397,10 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
     if [ "${row_state%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
       mode=retain
     elif [ "${row_state%% *}" != "done" ]; then
+      if [ "$mode" = retain ] && [ "${args[0]-}" = --report ] \
+        && ! fm_backlog_row_artifact_supported "$id" "${args[@]}"; then
+        args=()
+      fi
       mode=close
     fi
   else

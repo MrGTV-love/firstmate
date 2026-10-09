@@ -173,7 +173,7 @@ They are recorded for separate upstream work rather than representing defects in
 - A relocated retained report cannot reach the row, because tasks-axi accepts only `data/<id>/report.md`.
   `done` reports `Task report link must be a data/<id>/report.md path`, and `update` reports `--report must be a data/<id>/report.md path`.
 
-When an interrupted retention leaves such a relocated report in the validated pending-close record, `answer` skips only that known-unsupported row artifact and closes normally.
+When an interrupted retention leaves such a relocated report in the validated pending-close record, `answer`, or cleanup replay converting retention to completion after a release, skips only that known-unsupported row artifact and closes normally.
 The delivery then remains absent from Recently Landed instead of wedging the captain's answer.
 
 A pending-close record that fails validation outright is a different case, and it still refuses the answer.
@@ -206,6 +206,7 @@ A task whose worker still owns it, shown by a live runtime record or an In fligh
 If teardown finishes first and returns the held item to Queued without a runtime record, the answer closes it.
 Completing live work would record a landing that has not happened, so only cleanup closes it; interrupted cleanup replay closes the finished item once its captain hold has been resolved.
 A replay of that answer on an unheld, open item after the worker has ended stays a release.
+If a release was recorded but interrupted before lifting the hold, an automatic retry after teardown records a close and completes the finished held item instead; explicit direct-answer callers still require matching modes.
 
 Each key is reported as follows:
 

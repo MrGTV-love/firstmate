@@ -1188,7 +1188,13 @@ command_answer() {
       && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
       recorded_mode=$(recorded_resolution_mode "$body" || true)
       case "$recorded_mode" in
-        released) [ "$release" = 1 ] || fail "task $id records this answer as a release; retry with --release" ;;
+        released)
+          if [ "$release" = 0 ]; then
+            [ "$auto_release" = 1 ] || fail "task $id records this answer as a release; retry with --release"
+            write_resolution_record "$id" "$outcome" "$body"
+            occurrence=$((occurrence + 1))
+          fi
+          ;;
         answered|routed) [ "$release" = 0 ] || fail "task $id records this answer as a close; retry without --release" ;;
         *) fail "task $id records this resolution with mode ${recorded_mode:-unknown}; it is not a captain-answer replay" ;;
       esac
