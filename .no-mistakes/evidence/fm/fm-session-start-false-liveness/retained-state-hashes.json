@@ -1,0 +1,25 @@
+{
+  "before": {
+    "state/window-prefix.meta": "50078808fa496837c5a8d7d4bc2e2f361bcb890b43989fcf4c429df81b7e4be8",
+    "state/alive.meta": "c016aea4ff997b52828d03d172f1e2217aa0bf1c959cea3d2ad0009a0dd083c3",
+    "state/missing-session.meta": "eec94f620f99fa8ac512833b7ef54fa17161a07ed75276ddc63b5f2a416e85be",
+    "state/APIguard.meta": "d381c51b53cdef14928d6daa6e7306a13ab4fab758891847a8b36f35c98e6abb",
+    "state/window-prefix.status": "9ed7e581fba476e9142e197f4afaf7f1708c708118299b895bd9c2126ed01d5d",
+    "state/APIguard.status": "9ed7e581fba476e9142e197f4afaf7f1708c708118299b895bd9c2126ed01d5d",
+    "state/missing-session.status": "9ed7e581fba476e9142e197f4afaf7f1708c708118299b895bd9c2126ed01d5d",
+    "state/alive.status": "9ed7e581fba476e9142e197f4afaf7f1708c708118299b895bd9c2126ed01d5d",
+    "retained/retained-source.txt": "fdebceadaa7c5bd65d006ebae57491985ae29913c2f7641a74eb1c5da63bf1dd"
+  },
+  "after": {
+    "state/window-prefix.meta": "50078808fa496837c5a8d7d4bc2e2f361bcb890b43989fcf4c429df81b7e4be8",
+    "state/alive.meta": "c016aea4ff997b52828d03d172f1e2217aa0bf1c959cea3d2ad0009a0dd083c3",
+    "state/missing-session.meta": "eec94f620f99fa8ac512833b7ef54fa17161a07ed75276ddc63b5f2a416e85be",
+    "state/APIguard.meta": "d381c51b53cdef14928d6daa6e7306a13ab4fab758891847a8b36f35c98e6abb",
+    "state/window-prefix.status": "9ed7e581fba476e9142e197f4afaf7f1708c708118299b895bd9c2126ed01d5d",
+    "state/APIguard.status": "9ed7e581fba476e9142e197f4afaf7f1708c708118299b895bd9c2126ed01d5d",
+    "state/missing-session.status": "9ed7e581fba476e9142e197f4afaf7f1708c708118299b895bd9c2126ed01d5d",
+    "state/alive.status": "9ed7e581fba476e9142e197f4afaf7f1708c708118299b895bd9c2126ed01d5d",
+    "retained/retained-source.txt": "fdebceadaa7c5bd65d006ebae57491985ae29913c2f7641a74eb1c5da63bf1dd"
+  },
+  "unchanged": true
+}

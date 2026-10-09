@@ -1,0 +1,5 @@
+Real tmux calls during remote-only reemit:
+(none)
+Herdr safety-interlock calls during remote-only reemit:
+(none)
+No remote endpoint was probed locally; retained metadata, status, and source hashes unchanged.

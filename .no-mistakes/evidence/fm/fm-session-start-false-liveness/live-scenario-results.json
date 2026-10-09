@@ -1,0 +1,37 @@
+[
+  {
+    "name": "Reemit after stopping a recorded task: startup reports its closed window dead, crew-state reports gone, and retained source is untouched",
+    "result": "pass",
+    "live": true,
+    "evidence": "baseline-startup-digest.txt; current-startup-digest.txt; missing-endpoint-crew-state.txt",
+    "reason": ""
+  },
+  {
+    "name": "Reemit with a missing recorded session beside work-other: neighboring windows cannot make stale work current",
+    "result": "pass",
+    "live": true,
+    "evidence": "neighboring-session-reconciliation.txt; current-startup-digest.txt",
+    "reason": ""
+  },
+  {
+    "name": "Check named, indexed, ID, and exact-qualified pane targets: real panes stay present and absent selectors stay absent",
+    "result": "pass",
+    "live": true,
+    "evidence": "real-tmux-selector-presence.txt; pane-selector-startup-digest.txt",
+    "reason": ""
+  },
+  {
+    "name": "Reemit while the tmux transport is unreadable: a still-existing endpoint remains unknown, never dead",
+    "result": "pass",
+    "live": true,
+    "evidence": "unreadable-startup-digest.txt; unreadable-backend-reconciliation.txt",
+    "reason": ""
+  },
+  {
+    "name": "Reemit remote secondmate records without a local remote session: host-marked and remote-prefix endpoints remain unknown without local probes",
+    "result": "pass",
+    "live": true,
+    "evidence": "remote-startup-digest.txt; remote-backend-call-audit.txt",
+    "reason": ""
+  }
+]
