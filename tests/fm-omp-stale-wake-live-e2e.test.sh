@@ -97,6 +97,7 @@ while :; do
     rm -f "$f"
     reason="signal: $name"
     fm_wake_append signal "$name" "$reason" || exit 1
+    fm_wake_actor_rows main | awk -F '\\t' '{ printf "wake-row: %s\\t%s\\n", $2, $5 }'
     printf '%s\\n' "$reason"
     exit 0
   done

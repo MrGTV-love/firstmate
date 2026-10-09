@@ -1062,7 +1062,7 @@ printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
 if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ]; then
   : > "$FM_HOME/state/.e2e-fired"
   sleep 1
-  printf 'signal: omp-e2e done\n'
+  printf 'wake-row: 1\tsignal: omp-e2e done\n'
   exit 0
 fi
 sleep 30
@@ -1109,6 +1109,80 @@ EOF
   expect_code 0 "$status" "omp watch extension contract: $out"
   [ -z "$out" ] || fail "omp watch extension test printed output: $out"
   pass ".omp watch extension: fm_watch_arm_omp arms once, repeats as a no-op, and delivers an actionable close as one follow-up"
+}
+
+test_watch_extension_matches_durable_sequences() {
+  local kind repo home out status
+  for kind in decision merged multiline stale; do
+    repo="$TMP_ROOT/watch-identity-$kind/repo"; home="$TMP_ROOT/watch-identity-$kind/home"
+    install_omp_extension_fixture "$repo"
+    cp -R "$ROOT/bin/." "$repo/bin/"
+    mkdir -p "$home/state"
+    cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" != --handling-delivered ] || exit 0
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-1\n' "$$"
+if [ -e "$FM_HOME/state/.e2e-fired" ]; then exec sleep 30; fi
+: > "$FM_HOME/state/.e2e-fired"
+sleep 1
+. "$FM_ROOT_OVERRIDE/bin/fm-push-transition-lib.sh"
+case "$ROW_KIND" in
+  decision)
+    reason='signal: decision.status'
+    fm_wake_append signal decision.status 'needs-decision: decision.status' || exit 1
+    ;;
+  merged)
+    reason='check: poll-file: merged'
+    fm_wake_append check merged-demo 'check: merge landed: demo https://example.test/pull/1' || exit 1
+    ;;
+  multiline)
+    reason=$'check: custom: ready\nsecond line'
+    fm_wake_append check custom "$reason" || exit 1
+    ;;
+  stale)
+    printf 'wake-row: 1\tsignal: already handled\n'
+    exit 0
+    ;;
+esac
+wake "$reason"
+SH
+    chmod +x "$repo/bin/fm-watch-arm.sh"
+    out=$(ROW_KIND="$kind" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
+      EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, existsSync } from "node:fs";
+const state = `${process.env.FM_HOME}/state`;
+writeFileSync(`${state}/.lock`, `${process.pid}\n`);
+const handlers = new Map(); const sent = []; const ctx = { isIdle: () => true };
+const pi = { on(e, h) { handlers.set(e, h); }, registerCommand() {}, registerTool() {},
+  sendUserMessage(m, o) { sent.push({ m, o }); } };
+(await import(pathToFileURL(process.env.EXT).href)).default(pi);
+await handlers.get("session_start")({}, ctx);
+if (process.env.ROW_KIND === "stale") await new Promise((resolve) => setTimeout(resolve, 3000));
+else for (let i = 0; i < 60 && sent.length === 0; i += 1) await new Promise((resolve) => setTimeout(resolve, 100));
+if (process.env.ROW_KIND === "stale") {
+  if (sent.length !== 0) throw new Error(`an unqueued watcher row was injected: ${JSON.stringify(sent)}`);
+} else {
+  const payloads = {
+    decision: "needs-decision: decision.status",
+    merged: "check: merge landed: demo https://example.test/pull/1",
+    multiline: "check: custom: ready second line",
+  };
+  if (sent.length !== 1 || !sent[0].m.includes(`FIRSTMATE WATCHER WAKE: ${payloads[process.env.ROW_KIND]}\nwake-seq: 1`)) {
+    throw new Error(`durable ${process.env.ROW_KIND} row was not delivered intact: ${JSON.stringify(sent)}`);
+  }
+  if (sent[0].o?.deliverAs !== undefined) throw new Error("durable watcher wake bypassed idle delivery");
+  await handlers.get("message_start")({ message: { role: "user", content: sent[0].m } }, ctx);
+}
+await handlers.get("session_shutdown")({}, ctx);
+if (existsSync(`${state}/extensions/omp-primary-watch/session-replacement-actionable.json`)) throw new Error("completed correlation retained its handoff");
+process.exit(0);
+EOF
+)
+    status=$?
+    expect_code 0 "$status" "omp durable sequence ($kind): $out"
+  done
+  pass ".omp watch extension: decision, merge and multiline rows retain their sequence identity; unqueued watcher rows are dropped"
 }
 
 # An opted-in home spawns the supervision host in the arm's place; its streamed
@@ -1258,12 +1332,13 @@ EOF
   pass ".omp watch extension: a home without config/supervision-host or with an off file keeps the plain arm"
 }
 
-test_watch_extension_drops_a_host_only_boundary_without_a_queued_headline() {
-  local repo home log out status
-  repo="$TMP_ROOT/watch-host-handoff/repo"; home="$TMP_ROOT/watch-host-handoff/home"; log="$TMP_ROOT/watch-host-handoff/arm.log"
+test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy>
+  local kind=${1:-outcome} repo home log out status
+  repo="$TMP_ROOT/watch-host-handoff-$kind/repo"; home="$TMP_ROOT/watch-host-handoff-$kind/home"; log="$TMP_ROOT/watch-host-handoff-$kind/arm.log"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-wake-drain.sh"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = --handling-delivered ] && exit 0
@@ -1275,13 +1350,16 @@ printf 'host=%s\n' "$$" >> "${FM_ARM_LOG:?}"
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
 if [ "$(grep -c '^host=' "$FM_ARM_LOG")" -eq 1 ]; then
   sleep 1
-  printf 'supervision-host: outcome 1 for demo [captain]: fixture boundary\n'
+  case "$HAND_BACK_KIND" in
+    away-return) printf 'signal: already handled original\nsupervision-host: the captain returned while the away session was handling this wake; relay its visible outcomes\n' ;;
+    *) printf 'supervision-host: branch-outcome: the supervision session handled this wake and recorded captain outcomes for you (store rows 1)\n' ;;
+  esac
   exit 0
 fi
 sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
-  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+  out=$(HAND_BACK_KIND="$kind" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
@@ -1296,19 +1374,24 @@ const pi = {
 };
 const mod = await import(pathToFileURL(process.env.EXT).href);
 mod.default(pi);
-await handlers.get("before_agent_start")({}, { isIdle: () => true });
+const ctx = { isIdle: () => process.env.HAND_BACK_KIND !== "busy" };
+await handlers.get("before_agent_start")({}, ctx);
 await tool.execute();
 for (let i = 0; i < 60 && sent.length < 1; i += 1) await new Promise((r) => setTimeout(r, 100));
-if (sent.length !== 0) throw new Error(`a host-only boundary injected an unqueued headline: ${JSON.stringify(sent)}`);
+if (sent.length !== 1 || !sent[0].m.includes("FIRSTMATE SUPERVISION HOST:")) throw new Error(`host hand-back was not delivered once: ${JSON.stringify(sent)}`);
+const expected = process.env.HAND_BACK_KIND === "away-return" ? "signal: already handled original" : "branch-outcome:";
+if (!sent[0].m.includes(expected)) throw new Error(`host hand-back lost its outcome: ${sent[0].m}`);
+if (process.env.HAND_BACK_KIND === "busy" ? sent[0].o?.deliverAs !== "followUp" : sent[0].o?.deliverAs !== undefined) throw new Error("host hand-back changed its idle/busy delivery routing");
+await handlers.get("message_start")({ message: { role: "user", content: sent[0].m } }, ctx);
 await handlers.get("session_shutdown")({}, {});
-if (existsSync(handoff)) throw new Error("an unqueued host-only boundary retained its handoff");
+if (existsSync(handoff)) throw new Error("a consumed host hand-back retained its handoff");
 process.exit(0);
 EOF
 )
   status=$?
   expect_code 0 "$status" "omp watch extension host-only handoff: $out"
   [ -z "$out" ] || fail "omp watch extension host-only handoff test printed output: $out"
-  pass ".omp watch extension: a host-only boundary without a durable headline is dropped"
+  pass ".omp watch extension: an unqueued host hand-back is delivered once ($kind)"
 }
 
 # A host whose exit reaches the extension in separate stream chunks is
@@ -1406,8 +1489,8 @@ if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ]; then
   : > "$FM_HOME/state/.e2e-fired"
   sleep 1
   case "${SCENARIO:-}" in
-    editor-normalized*) printf 'signal: omp-restore ready\tdetail\rcarriage\001control\013vertical\037unit done\n' ;;
-    *) printf 'signal: omp-restore done\n' ;;
+    editor-normalized*) printf 'wake-row: 1\tsignal: omp-restore ready detail carriage\001control\013vertical\037unit done\r\n' ;;
+    *) printf 'wake-row: 1\tsignal: omp-restore done\n' ;;
   esac
   exit 0
 fi
@@ -1563,7 +1646,7 @@ switch (process.env.SCENARIO) {
   case "editor-normalized-message":
   case "editor-normalized-edited": {
     composer.text = wake;
-    if (composer.text !== wake || !wake.includes("ready   detail\ncarriagecontrolverticalunit done")) throw new Error("emitted wake is not editor-stable");
+    if (composer.text !== wake) throw new Error("emitted wake is not editor-stable");
     if (process.env.SCENARIO === "editor-normalized-edited") {
       composer.text = composer.text.replace("detail", "operator edit");
       const edited = composer.text;
@@ -1653,7 +1736,7 @@ switch (process.env.SCENARIO) {
     process.exit(0);
   }
   case "acknowledged": {
-    writeFileSync(`${process.env.FM_HOME}/state/.owed`, "signal: unrelated pending B");
+    writeFileSync(`${process.env.FM_HOME}/state/.owed`, "2");
     composer.text = `${wake}\n\noperator draft`;
     await settle();
     if (sent.length !== 1 || composer.text !== "operator draft") throw new Error("an acknowledged restored wake was reinjected or changed the draft");
@@ -1798,7 +1881,7 @@ while :; do
     [ -e "$f" ] || continue
     name=${f##*/}
     rm -f "$f"
-    printf 'signal: %s\n' "$name"
+    printf 'wake-row: %s\tsignal: %s\n' "${name#trigger-}" "$name"
     exit 0
   done
   sleep 0.1
@@ -1812,7 +1895,7 @@ SH
 printf '%s\n' "$2" >> "${FM_HOME:?}/state/.owed-asked"
 case "$(cat "$FM_HOME/state/.owed" 2>/dev/null)" in
   drained) exit 1 ;;
-  mixed) [ "$2" = 'signal: trigger-2' ] || exit 1 ;;
+  mixed) [ "$2" = 2 ] || exit 1 ;;
 esac
 exit 0
 SH
@@ -1827,7 +1910,9 @@ writeFileSync(`${state}/.lock`, `${process.pid}\n`);
 const handoff = `${state}/extensions/omp-primary-watch/session-replacement-actionable.json`;
 const handlers = new Map(); let tool = null; const sent = [];
 let idle = false;
-const ctx = { hasUI: false, isIdle: () => idle, hasPendingMessages: () => false };
+let editor = ""; let editorSets = 0;
+const ctx = { hasUI: true, isIdle: () => idle, hasPendingMessages: () => false,
+  ui: { getEditorText: () => editor, setEditorText: (text) => { editor = text; editorSets += 1; } } };
 const pi = {
   on(e, h) { handlers.set(e, h); },
   registerCommand() {},
@@ -1837,7 +1922,7 @@ const pi = {
     // omp's prompt flow starts a turn at once; a follow-up waits behind the run.
     if (!o?.deliverAs && idle) {
       idle = false;
-      handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: m }] } }, ctx);
+      if (!process.env.SCENARIO.startsWith("unconsumed-") || sent.length > 1) handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: m }] } }, ctx);
     }
     return undefined;
   },
@@ -1848,10 +1933,10 @@ const fire = async (name) => {
   for (let i = 0; i < 100 && existsSync(`${state}/${name}`); i += 1) await sleep(50);
   await sleep(500);
 };
-const waitForQueries = async (names) => {
+const waitForQueries = async (names, settled = () => true) => {
   for (let i = 0; i < 150; i += 1) {
     const asked = existsSync(`${state}/.owed-asked`) ? readFileSync(`${state}/.owed-asked`, "utf8").split("\n") : [];
-    if (names.every((name) => asked.includes(`signal: ${name}`))) {
+    if (names.every((name) => asked.includes(name.replace("trigger-", ""))) && settled()) {
       await sleep(500);
       return;
     }
@@ -1865,6 +1950,27 @@ await handlers.get("session_start")({ type: "session_start" }, ctx);
 await tool.execute();
 // The lane is inside a long turn while three watcher cycles close.
 await fire("trigger-1");
+if (process.env.SCENARIO.startsWith("unconsumed-")) {
+  idle = true;
+  for (let i = 0; i < 100 && sent.length === 0; i += 1) await sleep(100);
+  if (sent.length !== 1) throw new Error("A was not accepted before cancellation");
+  await handlers.get("before_agent_start")({ prompt: sent[0].m }, ctx);
+  editor = process.env.SCENARIO === "unconsumed-edited" ? sent[0].m.replace("trigger-1", "operator edit") : "";
+  const preservedEditor = editor;
+  idle = false;
+  await handlers.get("message_start")({ message: { role: "user", content: "ordinary turn" } }, ctx);
+  writeFileSync(`${state}/.owed`, "mixed");
+  await fire("trigger-2");
+  if (sent.length !== 1) throw new Error("B was delivered behind the ordinary turn");
+  idle = true;
+  await handlers.get("agent_end")({}, ctx);
+  for (let i = 0; i < 100 && sent.length < 2; i += 1) await sleep(100);
+  if (sent.length !== 2 || !sent[1].m.includes("signal: trigger-2")) throw new Error(`acknowledged unconsumed A blocked B: ${JSON.stringify(sent)}`);
+  if (editor !== preservedEditor || editorSets !== 0) throw new Error("stale retirement changed operator edits");
+  await handlers.get("session_shutdown")({}, ctx);
+  if (existsSync(handoff)) throw new Error("acknowledged A retained its handoff");
+  process.exit(0);
+}
 if (process.env.SCENARIO === "handoff" || process.env.SCENARIO === "handoff-mixed") {
   if (sent.length !== 0) throw new Error(`a wake was queued behind the running turn: ${JSON.stringify(sent)}`);
   await handlers.get("session_shutdown")({}, ctx);
@@ -1874,7 +1980,7 @@ if (process.env.SCENARIO === "handoff" || process.env.SCENARIO === "handoff-mixe
   writeFileSync(`${state}/.owed`, process.env.SCENARIO === "handoff-mixed" ? "mixed" : "drained");
   idle = true;
   await handlers.get("session_start")({ type: "session_start" }, ctx);
-  await waitForQueries(["trigger-1"]);
+  await waitForQueries(["trigger-1"], () => !existsSync(handoff));
   if (sent.length !== 0) throw new Error(`a drained wake was replayed by the replacement session: ${JSON.stringify(sent)}`);
   await handlers.get("session_shutdown")({}, ctx);
   if (existsSync(handoff)) throw new Error("a drained wake stayed in the replacement handoff");
@@ -1940,7 +2046,7 @@ EOF
 
 test_watch_extension_delivers_a_wake_only_to_an_idle_lane_that_is_still_owed_one() {
   local scenario out status
-  for scenario in drained owed handoff mixed handoff-mixed long; do
+  for scenario in drained owed handoff mixed handoff-mixed long unconsumed-removed unconsumed-edited; do
     out=$(run_watch_hold_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch hold scenario $scenario: $out"
@@ -2408,10 +2514,13 @@ test_control_composer_and_model_tables
 test_ownership_proof_is_omp_keyed
 test_turnend_guard_extension_compels_one_continuation
 test_watch_extension_arms_and_delivers
+test_watch_extension_matches_durable_sequences
 test_watch_extension_runs_the_supervision_host
 test_watch_extension_runs_the_supervision_host quiet
 test_watch_extension_keeps_the_arm_without_the_file_or_with_off
-test_watch_extension_drops_a_host_only_boundary_without_a_queued_headline
+test_watch_extension_delivers_host_handbacks outcome
+test_watch_extension_delivers_host_handbacks away-return
+test_watch_extension_delivers_host_handbacks busy
 test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
 test_watch_extension_delivers_a_wake_only_to_an_idle_lane_that_is_still_owed_one

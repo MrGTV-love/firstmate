@@ -97,7 +97,7 @@ wake() {
   esac
   trap '' HUP INT TERM
   [ -z "$FM_WAKE_POST_OUTPUT_ACTION" ] || trap '' PIPE
-  if echo "$1"; then
+  if echo "$1" && fm_wake_actor_rows main | awk -F '\t' '{ printf "wake-row: %s\t%s\n", $2, $5 }' >&2; then
     output_status=0
     watch_delivery_publish "$1" || true
     # shellcheck disable=SC2034 # Read by bin/fm-watch.sh's EXIT cleanup.

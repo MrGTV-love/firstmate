@@ -69,7 +69,7 @@ The [omp extension header](../.omp/extensions/fm-primary-omp-watch.ts) owns repl
 ### omp idle wake delivery
 
 omp starts no turn for an explicit follow-up that reaches an idle session unless its own auto-continue gate passes, and that gate refuses while the context tail is not an assistant or tool result, such as an advisor note posted after the turn ended.
-`.omp/extensions/fm-primary-omp-watch.ts` sends an actionable wake through omp's prompt-starting message API only when the latest extension context returns exactly `true` from `isIdle()`; busy, missing, or unreadable idle state holds the wake pending.
+`.omp/extensions/fm-primary-omp-watch.ts` sends a watcher wake through omp's prompt-starting message API only when the latest extension context returns exactly `true` from `isIdle()`; busy, missing, or unreadable idle state holds the watcher wake pending.
 The latest context is retained across shutdown and transferred to a replacement extension factory, so missing-successor recovery can still start an idle wake's turn.
 Arm commands and tools refresh that context when supplied; each delivery rechecks live idle state rather than caching an idle verdict across recovery.
 The prompt flow never touches the composer, so an operator draft stays unsent, and it also flushes any follow-up already stranded in omp's queue.
@@ -94,21 +94,23 @@ Both suites use `tests/watch-lifecycle-expiry.mjs` for shutdown child-close, suc
 
 omp cannot retract a queued follow-up, and a lane drains and acknowledges every durable row inside the turn a follow-up was queued behind.
 Each follow-up queued that way then started one more turn that found nothing to drain, so a lane saw old watcher headlines with no queued wake and answered each with a no-op.
-`.omp/extensions/fm-primary-omp-watch.ts` therefore queues no actionable wake behind a running turn.
+`.omp/extensions/fm-primary-omp-watch.ts` therefore queues no watcher wake behind a running turn.
 After the successor watcher is verified and the handling handoff is confirmed, the extension reads the session's idle state:
 
 - A busy session holds the wake, still pending and still carried by the replacement handoff, and a fixed 1000ms timer re-reads the idle state while any wake is held.
 - An idle session receives one wake at a time through the prompt flow, and the next held wake waits for that wake's turn.
-- Initial delivery, held-wake flush, replacement replay, and restored-wake resubmission all validate every actionable headline with `bin/fm-wake-drain.sh --owed HEADLINE`; only exit 0 authorizes delivery.
+- Initial delivery, held-wake flush, replacement replay, and restored-wake resubmission validate each watcher row with `bin/fm-wake-drain.sh --owed SEQUENCE`; only exit 0 authorizes delivery.
 
-`fm_wake_owed(actor, headline)` in `bin/fm-wake-lib.sh` matches the headline, serialized with `fm_wake_clean_field`, literally against field 5 of a structurally valid currently queued row owned by that actor.
-A live branch grant reserves its listed sequence numbers for branch; main owns valid rows outside that grant. An acknowledged headline A cannot be validated by a different pending headline B.
+At the shared `wake()` output boundary, `bin/fm-push-transition-lib.sh` emits `wake-row: SEQUENCE<TAB>PAYLOAD` lines on stderr for main-owned durable queued rows, preserving the existing stdout reason for other consumers. The omp extension uses those canonical payloads as its headlines and retains `wake-seq: SEQUENCE` in the existing pending message, including replacement handoffs. Decision-owned signals, merged-PR checks, and multiline custom checks therefore do not depend on reconstructing display text.
+`fm_wake_owed(actor, sequence)` in `bin/fm-wake-lib.sh` matches field 2 of a structurally valid currently queued row owned by that actor.
+A live branch grant reserves its listed sequence numbers for branch; main owns valid rows outside that grant. An acknowledged row A cannot be validated by a different pending row B, even when their payloads are identical.
 The query takes exactly two CLI arguments, is read-only and silent, and rejects missing or unreadable queues, failed reads, and absent matches. A recovery marker alone is never sufficient evidence.
-Messages containing several `signal:`, `stale:`, `check:`, or `heartbeat` headlines require an individual match for each; supervision-host metadata and away notes are not themselves actionable headlines and cannot authorize delivery.
+Every row named in a watcher message requires its own sequence match. A watcher notification without row identity cannot authorize delivery.
 
-All actionable paths use the same gate, including messages carrying continuity failures or supervision-host metadata. There is no hold expiry, disable setting, or busy/unreadable-idle follow-up exception.
+The same gate applies to every watcher delivery path, including watcher messages carrying continuity failures. There is no hold expiry, disable setting, or busy/unreadable-idle watcher follow-up exception. Supervision-host branch-outcome and away-return hand-backs are operational input, not watcher queue rows: they retain prompt delivery when idle and follow-up delivery when busy, without adding durable relay records.
+Before outstanding watcher tokens can block another wake, their own durable identities are revalidated. Acknowledged tokens are retired even if restored editor text was removed or edited, or recovery attempts were exhausted; operator edits remain untouched.
 The owed subprocess timeout is fixed at 10000ms; timeout, spawn failure, and any nonzero exit do not authorize delivery. Continuity errors not attached to pending actionable work may still surface independently.
-`tests/fm-omp-harness.test.sh` covers held, drained, owed, replacement-handoff, and restored-resubmission paths over a fake omp API; `tests/fm-wake-queue.test.sh` covers exact per-headline matching, actor grants, literal serialization, marker-only refusal, read-only behavior, and invalid argument counts.
+`tests/fm-omp-harness.test.sh` covers durable decision, merge and multiline rows, unqueued watcher refusal, unqueued host hand-backs, stale unconsumed-token retirement, held, drained, owed, replacement-handoff, and restored-resubmission paths; `tests/fm-wake-queue.test.sh` covers exact sequence identity, actor grants, identical payloads across acknowledgement, marker-only refusal, read-only behavior, and invalid argument counts.
 The live guard and its evidence are recorded in [omp stale wake gating](verification/runtime-backends.md#2026-10-08-omp-stale-wake-gating).
 The Pi and OpenCode extensions still queue every wake as a follow-up and are not covered by this gating.
 
@@ -120,7 +122,7 @@ Consumption still matches the emitted text exactly.
 Only an accepted user `message_start` carrying the exact emitted text consumes one pending token. `before_agent_start` records context and the loaded build but does not consume a wake: preparation can still be cancelled by Escape. A second identical wake therefore remains recoverable and eligible for replacement handoff, and shutdown during cancelled preparation retains the pending record until the replacement accepts its user message.
 While a wake remains unconsumed, `agent_end` schedules one editor check after two seconds; this is not continuous polling.
 The check requires the current generation to be live, a UI editor, positive idle state, and no pending messages.
-Immediately before removing the editable copy and resubmitting, recovery validates each original actionable headline against the actor-owned durable queue; an absent match or failed query retires the stale wake without resubmission.
+Before editor matching or attempt-limit checks, recovery revalidates each outstanding watcher token's durable sequence identities and retires stale tokens. Immediately before resubmission, the shared gate checks them again; an absent match or failed query never authorizes watcher delivery. Supervision-host operational hand-backs do not require watcher rows.
 Recovery accepts only a complete unchanged emitted wake segment bounded by editor edges or omp's blank-line joins, with only its leading invisible transport mark allowed to be present or absent.
 Direct prefix, suffix, or internal edits are left untouched and not submitted.
 The extension removes only the wake and one transport blank-line separator, preserves operator draft bytes including invisible marks and leading/trailing newlines, and resends the wake alone through omp's prompt-starting message API.
@@ -208,12 +210,12 @@ A failed confirmation is never swallowed.
 ### Readiness timeout and retry
 
 The adapter waits at most one readiness timeout per attempt.
-omp uses a fixed 10000ms readiness timeout; its separate actionable owed query is also bounded at 10000ms. There are no wake-gating timing configuration options.
+omp uses FM_OMP_ARM_READY_TIMEOUT_MS for arm readiness, defaulting to 12000ms on non-Windows platforms and 35000ms on Windows; host readiness uses the greater of that arm timeout and 30000ms. Its separate actionable owed query remains fixed at 10000ms.
 If the successor is not ready in that time, the adapter sends TERM and waits a bounded retirement confirmation before the next lock-verified exponential retry.
 
-If the unready arm does not retire within that bound, the adapter keeps ownership, starts no overlapping retry, and surfaces the typed fallback; omp still holds any pending actionable work until idle and validates each headline before delivery.
+If the unready arm does not retire within that bound, the adapter keeps ownership, starts no overlapping retry, and surfaces the typed fallback; omp still holds watcher work until idle and validates its durable sequence identities before delivery.
 When that retained arm later closes, its actual close is classified as a new supervised event without replaying the earlier fallback.
-After the configured retry bound is exhausted, the adapter delivers the original wake with a typed continuity-restoration failure, even if every successor arm hung without reporting readiness; omp still requires idle state and current per-headline queued evidence for pending actionable delivery.
+After the configured retry bound is exhausted, the adapter delivers the original wake with a typed continuity-restoration failure, even if every successor arm hung without reporting readiness; omp still requires idle state and current queued sequence evidence for watcher delivery.
 
 This is deliberate Option B ordering.
 Whenever restoration succeeds, the fleet is protected before the model handles the wake.

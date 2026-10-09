@@ -286,14 +286,23 @@ function markLoaded(): void {
   writeFileSync(marker, record);
 }
 
+function watcherRowsMessage(output: string): string {
+  let message = "";
+  for (const line of output.split(/\r?\n/)) {
+    const row = /^wake-row: ([0-9]+)\t(.*)$/.exec(line);
+    if (row) message += `${message ? "\n" : ""}${row[2]}\nwake-seq: ${row[1]}`;
+  }
+  return message;
+}
+
 function actionableLine(output: string): string {
   const lines = output.split(/\r?\n/);
-  return lines.find((line) => /^(signal:|stale:|check:|heartbeat($|:))/.test(line)) || "";
+  return watcherRowsMessage(output) || lines.find((line) => /^(signal:|stale:|check:|heartbeat($|:))/.test(line)) || "";
 }
 
 function completedActionableLine(output: string): string {
   const newline = output.lastIndexOf("\n");
-  return newline < 0 ? "" : actionableLine(output.slice(0, newline + 1));
+  return newline < 0 ? "" : watcherRowsMessage(output.slice(0, newline + 1));
 }
 
 // An away record, never quiet mode's (bin/fm-afk-contract.sh mode owns that
@@ -332,7 +341,7 @@ function hostWakeMessage(output: string): string {
   if (awayRecordPresent()) {
     lines.push("This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.");
   }
-  return lines.join("\n");
+  return `FIRSTMATE SUPERVISION HOST: ${lines.join("\n")}`;
 }
 
 // The text omp carries in a user message_start: sendUserMessage wraps a string
@@ -375,8 +384,8 @@ function validatePendingActionable(value: unknown): PendingActionableClose {
     typeof (value as { token?: unknown }).token !== "string" ||
     !/^[0-9]+-[0-9]+-[0-9]+$/.test((value as { token: string }).token) ||
     typeof (value as { message?: unknown }).message !== "string" ||
-    (!actionableLine((value as { message: string }).message) &&
-      !/^supervision-host:/m.test((value as { message: string }).message)) ||
+    (!/^wake-seq: [0-9]+$/m.test((value as { message: string }).message) &&
+      !/^FIRSTMATE SUPERVISION HOST: /.test((value as { message: string }).message)) ||
     typeof (value as { predecessorArmPid?: unknown }).predecessorArmPid !== "string" ||
     !/^[0-9]*$/.test((value as { predecessorArmPid: string }).predecessorArmPid) ||
     ((value as { delivered?: unknown }).delivered !== undefined &&
@@ -745,7 +754,7 @@ export default function (pi: ExtensionAPI) {
     if (!generationIsLive(owner)) return false;
     const content = encodeFirstmateOperationalInput(
       "watcher",
-      `FIRSTMATE WATCHER WAKE: ${message}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
+      `${message.startsWith("FIRSTMATE SUPERVISION HOST: ") ? message : `FIRSTMATE WATCHER WAKE: ${message}`}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
     ).replace(/\r\n?/g, "\n").replaceAll("\t", "   ").replace(/[\x00-\x09\x0b-\x1f]/g, "");
     const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
     return submitWake(owner, token, { content, pending });
@@ -757,18 +766,21 @@ export default function (pi: ExtensionAPI) {
     wake: UnconsumedWake,
     prepare?: () => boolean,
   ): Promise<"sent" | "held" | "dropped" | false> {
+    const watcher = wake.pending && !wake.pending.message.startsWith("FIRSTMATE SUPERVISION HOST: ");
     const owed = !wake.pending || await wakeOwed(wake.pending.message);
     if (!generationIsLive(owner)) return false;
-    if (wake.pending && judgeWake(owner, wake.pending) === "hold") return "held";
-    if (prepare && !prepare()) return false;
     if (!owed) {
-      owner.unconsumedWakes.delete(token);
+      if (prepare && !prepare()) return false;
       retireStalePending(owner, wake.pending!);
       return "dropped";
     }
+    if (watcher && await judgeWake(owner, wake.pending!) === "hold") return "held";
+    if (!generationIsLive(owner)) return false;
+    if (prepare && !prepare()) return false;
+    if (watcher && !sessionIsIdle()) return "held";
     owner.unconsumedWakes.set(token, wake);
     try {
-      if (wake.pending || sessionIsIdle()) await pi.sendUserMessage(wake.content);
+      if (watcher || sessionIsIdle()) await pi.sendUserMessage(wake.content);
       else await pi.sendUserMessage(wake.content, { deliverAs: "followUp" });
     } catch (error) {
       owner.unconsumedWakes.delete(token);
@@ -819,12 +831,13 @@ export default function (pi: ExtensionAPI) {
   }
 
   async function wakeOwed(message: string): Promise<boolean> {
-    const headlines = message.split(/\r?\n/).filter((line) => /^(signal:|stale:|check:|heartbeat($|:))/.test(line));
-    if (headlines.length === 0) return false;
-    for (const headline of headlines) {
+    if (message.startsWith("FIRSTMATE SUPERVISION HOST: ")) return true;
+    const sequences = [...message.matchAll(/^wake-seq: ([0-9]+)$/gm)].map((match) => match[1]);
+    if (sequences.length === 0) return false;
+    for (const sequence of sequences) {
       const owed = await new Promise<boolean>((resolveOwed) => {
         try {
-          const child = spawn("bash", [drainScript, "--owed", headline], {
+          const child = spawn("bash", [drainScript, "--owed", sequence], {
             cwd: fmRoot,
             env: { ...process.env, FM_HOME: fmHome, FM_STATE_OVERRIDE: state, FM_ROOT_OVERRIDE: fmRoot },
             stdio: "ignore",
@@ -851,14 +864,35 @@ export default function (pi: ExtensionAPI) {
     return true;
   }
 
-  function judgeWake(owner: SessionGeneration, pending: PendingActionableClose): "hold" | "send" {
+  async function judgeWake(owner: SessionGeneration, pending: PendingActionableClose): Promise<"hold" | "send"> {
+    await retireUnowedWakes(owner, pending);
     const another = [...owner.unconsumedWakes.values()].some(
-      (wake) => wake.pending && wake.pending !== pending && !wake.pending.delivered,
+      (wake) => wake.pending && !wake.pending.message.startsWith("FIRSTMATE SUPERVISION HOST: ") && wake.pending !== pending && !wake.pending.delivered,
     );
     return !sessionIsIdle() || another ? "hold" : "send";
   }
 
+  async function retireUnowedWakes(owner: SessionGeneration, except?: PendingActionableClose): Promise<void> {
+    for (const [token, wake] of [...owner.unconsumedWakes]) {
+      if (!wake.pending || wake.pending === except || wake.pending.delivered) continue;
+      const owed = await wakeOwed(wake.pending.message);
+      if (!generationIsLive(owner)) return;
+      if (!owed && owner.unconsumedWakes.get(token) === wake) retireStalePending(owner, wake.pending);
+    }
+  }
+
   function retireStalePending(owner: SessionGeneration, pending: PendingActionableClose): void {
+    const wake = owner.unconsumedWakes.get(pending.token);
+    try {
+      const ctx = latestContext;
+      if (wake && ctx?.hasUI && ctx.isIdle?.() && !ctx.hasPendingMessages?.()) {
+        const remainder = removeRestoredWake(String(ctx.ui.getEditorText() ?? ""), wake.content);
+        if (remainder !== null) ctx.ui.setEditorText(remainder);
+      }
+    } catch {}
+    owner.unconsumedWakes.delete(pending.token);
+    owner.heldWakes.delete(pending.token);
+    restoreAttempts.delete(pending.token);
     pending.delivered = true;
     try {
       finishPendingActionable(owner, pending);
@@ -873,8 +907,9 @@ export default function (pi: ExtensionAPI) {
     message: string,
     pending: PendingActionableClose,
   ): Promise<"sent" | "held" | "dropped" | false> {
+    if (pending.message.startsWith("FIRSTMATE SUPERVISION HOST: ")) return await sendWake(owner, message, pending);
     const held: HeldWake = { pending, message };
-    const verdict = owner.heldWakes.size > 0 ? "hold" : judgeWake(owner, pending);
+    const verdict = owner.heldWakes.size > 0 ? "hold" : await judgeWake(owner, pending);
     if (!generationIsLive(owner)) return false;
     if (verdict === "hold") {
       owner.heldWakes.set(pending.token, held);
@@ -904,7 +939,7 @@ export default function (pi: ExtensionAPI) {
     owner.flushing = true;
     try {
       for (const [token, held] of [...owner.heldWakes]) {
-        const verdict = judgeWake(owner, held.pending);
+        const verdict = await judgeWake(owner, held.pending);
         if (!generationIsLive(owner) || !owner.heldWakes.has(token)) return;
         if (verdict === "hold") break;
         owner.heldWakes.delete(token);
@@ -924,6 +959,8 @@ export default function (pi: ExtensionAPI) {
 
   async function recoverRestoredWake(owner: SessionGeneration): Promise<void> {
     if (!generationIsLive(owner) || owner.unconsumedWakes.size === 0) return;
+    await retireUnowedWakes(owner);
+    if (!generationIsLive(owner)) return;
     const ctx = latestContext;
     if (!ctx?.hasUI || typeof ctx.isIdle !== "function" || typeof ctx.ui?.getEditorText !== "function" || typeof ctx.ui?.setEditorText !== "function") return;
     try {
@@ -1394,8 +1431,9 @@ export default function (pi: ExtensionAPI) {
       }
       if (hostMode) return;
       const reason = completedActionableLine(stdout) || completedActionableLine(stderr);
-      if (reason && !armPendingActionable.has(armChild)) {
-        const pending = createPendingActionable(reason, String(armChild.pid ?? ""));
+      if (reason) {
+        const pending = armPendingActionable.get(armChild) ?? createPendingActionable(reason, String(armChild.pid ?? ""));
+        pending.message = reason;
         armPendingActionable.set(armChild, pending);
         enqueuePendingActionable(owner, pending);
       }
@@ -1421,6 +1459,7 @@ export default function (pi: ExtensionAPI) {
       const predecessor = String(armChild.pid ?? "");
       if (classification.kind === "actionable") {
         const pending = armPendingActionable.get(armChild) ?? createPendingActionable(classification.message, predecessor);
+        pending.message = classification.message;
         enqueuePendingActionable(owner, pending);
         if (!generationIsLive(owner)) return;
         owner.retryFailures = 0;
