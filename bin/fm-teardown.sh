@@ -332,6 +332,11 @@
 #     Not run for a standalone secondmate; forced cleanup still applies each
 #     descendant's own metadata. A reassigned pool slot contributes no path
 #     evidence, only the task's own label and names.
+#     Forced descendants also abort their attributed running, fixing, or ci
+#     pipeline and confirm it terminal or not found before Docker cleanup.
+#     Residual: top-level teardown leaves autonomous pipelines and the endpoint
+#     live; a still-live producer can create a stack after the final listing.
+#     Snapshot cleanup cannot stop a live producer.
 # After Fix 1, Fix 3, Fix 2, and Fix 4, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
@@ -2047,8 +2052,8 @@ case "$NM_TEARDOWN_TIMEOUT" in ''|*[!0-9]*) NM_TEARDOWN_TIMEOUT=10 ;; esac
 NM_TEARDOWN_RUNS_LIMIT=${FM_TEARDOWN_NM_RUNS_LIMIT:-200}
 case "$NM_TEARDOWN_RUNS_LIMIT" in ''|*[!0-9]*) NM_TEARDOWN_RUNS_LIMIT=200 ;; esac
 TASK_RUN_ID=
-task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
-  local wt=$1 out=$2 branch run_id run_branch run_head status outcome awaiting has_gate ledger
+task_status_is_own_run_to_conclude() {
+  local wt=$1 out=$2 scope=${3:-parked} branch run_id run_branch run_head status outcome awaiting has_gate ledger
   TASK_RUN_ID=
   branch=$(git -C "$wt" symbolic-ref --quiet --short HEAD 2>/dev/null) || return 1
   [ -n "$branch" ] || return 1
@@ -2063,7 +2068,8 @@ task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
   status=$(fm_nm_strip_quotes "$(fm_nm_field "$out" status)")
   [ -n "$status" ] || return 1
   case "$status" in
-    completed|failed|cancelled|passed|checks-passed|running|fixing|ci) return 1 ;;
+    completed|failed|cancelled|passed|checks-passed) return 1 ;;
+    running|fixing|ci) [ "$scope" = forced-child ] || return 1 ;;
   esac
   if ! fm_nm_head_matches_worktree "$wt" "$run_head"; then
     # The strict object-local rule rejected this run head. That rejection is
@@ -2083,6 +2089,9 @@ task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
     ledger=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" runs --limit "$NM_TEARDOWN_RUNS_LIMIT")
     [ "$(fm_nm_runs_status_for_worktree "$wt" "$branch" "$ledger" "$run_head")" = running ] || return 1
   fi
+  case "$status" in
+    running|fixing|ci) TASK_RUN_ID=$run_id; return 0 ;;
+  esac
   awaiting=$(printf '%s\n' "$out" | grep -E '^[[:space:]]*awaiting_agent:' | head -1 || true)
   has_gate=$(printf '%s\n' "$out" | grep -Eq '^[[:space:]]*gate:[[:space:]]*' && echo 1 || echo 0)
   case "$status" in
@@ -2095,12 +2104,12 @@ task_status_is_own_parked_run() {  # <worktree> <axi-status-output>
   return 1
 }
 
-task_run_is_own_parked_run() {  # <worktree>
-  local wt=$1 out
+task_run_is_own_run_to_conclude() {
+  local wt=$1 scope=${2:-parked} out
   # Accepted best-effort residual: query failures stay fail-open because making
   # no-mistakes availability a prerequisite would block ship tasks with no run.
   out=$(fm_nm_run "$wt" "$NM_TEARDOWN_TIMEOUT" axi status)
-  task_status_is_own_parked_run "$wt" "$out"
+  task_status_is_own_run_to_conclude "$wt" "$out" "$scope"
 }
 
 task_status_is_terminal_run() {  # <axi-status-output> <run-id>
@@ -2127,13 +2136,17 @@ task_status_is_run_not_found() {  # <status-error> <run-id>
 # worktree (scouts and secondmates never do, mirroring bin/fm-crew-state.sh);
 # a run not attributed to this exact branch+head is left completely alone.
 conclude_task_no_mistakes_run() {  # <worktree>
-  local wt=$1 out run_id
+  local wt=$1 scope=${2:-parked} out run_id state_description="parked at a gate" refusal_state=parked
   [ "$KIND" = ship ] || return 0
   [ -d "$wt" ] || return 0
   command -v no-mistakes >/dev/null 2>&1 || return 0
-  task_run_is_own_parked_run "$wt" || return 0
+  task_run_is_own_run_to_conclude "$wt" "$scope" || return 0
   run_id=$TASK_RUN_ID
-  echo "teardown: no-mistakes run for $ID is parked at a gate; aborting before the worker is removed" >&2
+  if [ "$scope" = forced-child ]; then
+    state_description=active
+    refusal_state=active
+  fi
+  echo "teardown: no-mistakes run for $ID is $state_description; aborting before the worker is removed" >&2
   # Accepted best-effort residual: abort supports run-id targeting but no atomic
   # live-state condition; fully closing the resume race needs upstream compare-and-cancel.
   fm_nm_run_checked "$wt" "$NM_TEARDOWN_TIMEOUT" axi abort --run "$run_id" >/dev/null 2>&1 || true
@@ -2142,7 +2155,7 @@ conclude_task_no_mistakes_run() {  # <worktree>
   elif task_status_is_run_not_found "$out" "$run_id"; then
     return 0
   fi
-  echo "REFUSED: no-mistakes run for $ID is still parked after axi abort; confirm it stopped (no-mistakes axi status) or abort it manually (no-mistakes axi abort --run <id>) before retrying teardown." >&2
+  echo "REFUSED: no-mistakes run for $ID is still $refusal_state after axi abort; confirm it stopped (no-mistakes axi status) or abort it manually (no-mistakes axi abort --run <id>) before retrying teardown." >&2
   return 1
 }
 
@@ -3681,7 +3694,7 @@ cleanup_firstmate_home_children() {
         if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
           reap_task_worktree_processes tasktmp "$TASK_TMP" || exit 1
         else
-          conclude_task_no_mistakes_run "$WT" || exit 1
+          conclude_task_no_mistakes_run "$WT" forced-child || exit 1
           reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
         fi
       ) || return 1

@@ -3277,6 +3277,7 @@ test_forced_secondmate_herdr_child_retains_records_when_close_unconfirmed() {
 
 configure_nested_secondmate_with_herdr_grandchild() {  # <case-dir>
   local case_dir=$1 home="$1/secondmate-home" nested_home="$1/secondmate-home/nested-home"
+  local grandchild_wt=${2:-$case_dir/wt}
   mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
   mkdir -p "$nested_home/state" "$nested_home/data" "$nested_home/config" "$nested_home/projects"
   printf '%s\n' task-x1 > "$home/.fm-secondmate-home"
@@ -3293,7 +3294,7 @@ configure_nested_secondmate_with_herdr_grandchild() {  # <case-dir>
   fm_write_meta "$nested_home/state/grandchild-herdr.meta" \
     "window=grandchildsession:wG:p1" \
     "endpoint_task_id=grandchild-herdr" \
-    "worktree=$case_dir/wt" \
+    "worktree=$grandchild_wt" \
     "project=$case_dir/project" \
     "kind=ship" \
     "mode=local-only" \
@@ -6367,9 +6368,14 @@ configure_child_docker_race() {
   local case_dir=$1
   mkdir -p "$case_dir/child-producers"
   cp "$case_dir/fakebin/docker" "$case_dir/fakebin/docker-store"
+  mkdir -p "$case_dir/child-resource-listings"
   cat > "$case_dir/fakebin/docker" <<EOF
 #!/usr/bin/env bash
 if [ "\${1:-} \${2:-}" = "network ls" ]; then
+  if [ -f "$case_dir/current-child" ]; then
+    child=\$(cat "$case_dir/current-child")
+    : > "$case_dir/child-resource-listings/\$child"
+  fi
   if [ -f "$case_dir/current-child" ]; then
     child=\$(cat "$case_dir/current-child")
     if [ -e "$case_dir/child-producers/\$child.live" ]; then
@@ -6382,13 +6388,69 @@ if [ "\${1:-} \${2:-}" = "network ls" ]; then
     rm "$case_dir/arriving-containers"
   fi
 fi
+if [ "\${1:-}" = ps ] && [ -f "$case_dir/current-child" ]; then
+  child=\$(cat "$case_dir/current-child")
+  if [ -f "$case_dir/child-resource-listings/\$child" ]; then
+    "$case_dir/fakebin/docker-store" "\$@" || exit \$?
+    if [ -f "$case_dir/\$child-pipeline-status" ] && [ ! -e "$case_dir/\$child-pipeline-aborted" ]; then
+      printf 'container\tc-pipeline-%s\tpipeline-%s\tfm.task=%s\t\n' "\$child" "\$child" "\$child" >> "\${FM_FAKE_DOCKER_STORE:?}"
+      printf '%s\n' "\$child" >> "$case_dir/pipeline-race-created"
+    fi
+    exit 0
+  fi
+fi
 exec "$case_dir/fakebin/docker-store" "\$@"
 EOF
   chmod +x "$case_dir/fakebin/docker"
 }
 
+configure_child_pipeline() {
+  local case_dir=$1 child=$2 wt=$3 status=$4 out
+  out=$(running_axi_status_toon "$(git -C "$wt" symbolic-ref --short HEAD)" \
+    "$(git -C "$wt" rev-parse HEAD)" "$child-run")
+  printf '%s\n' "${out/status: running/status: $status}" > "$case_dir/$child-pipeline-status"
+  if [ -e "$case_dir/fakebin/no-mistakes-default" ]; then
+    return 0
+  fi
+  cp "$case_dir/fakebin/no-mistakes" "$case_dir/fakebin/no-mistakes-default"
+  cat > "$case_dir/fakebin/no-mistakes" <<EOF
+#!/usr/bin/env bash
+child=\${PWD##*/}
+child=\${child%-wt}
+if [ ! -f "$case_dir/\$child-pipeline-status" ]; then
+  exec "$case_dir/fakebin/no-mistakes-default" "\$@"
+fi
+case "\${1:-} \${2:-}" in
+  "axi status")
+    if [ "\${3:-}" = --run ]; then
+      [ "\${4:-}" = "\$child-run" ] || exit 1
+      case "\${FM_FAKE_CHILD_ABORT_RESULT:-terminal}" in
+        wrong-run) printf 'run:\n  id: foreign-run\n  outcome: cancelled\n'; exit 0 ;;
+        empty) exit 0 ;;
+        error) exit 1 ;;
+        not-found) printf 'error: "run \\\\"%s\\\\" not found"\n' "\$child-run" >&2; exit 1 ;;
+      esac
+    fi
+    if [ -e "$case_dir/\$child-pipeline-aborted" ]; then
+      printf 'run:\n  id: "%s-run"\n  outcome: cancelled\n' "\$child"
+    else
+      cat "$case_dir/\$child-pipeline-status"
+    fi
+    ;;
+  "axi abort")
+    [ "\${3:-} \${4:-}" = "--run \$child-run" ] || exit 1
+    printf '%s\n' "\$*" >> "$case_dir/pipeline-abort.log"
+    case "\${FM_FAKE_CHILD_ABORT_RESULT:-terminal}" in
+      terminal|not-found) : > "$case_dir/\$child-pipeline-aborted" ;;
+    esac
+    ;;
+esac
+EOF
+  chmod +x "$case_dir/fakebin/no-mistakes"
+}
+
 assert_forced_child_docker_cleanup_and_retry() {
-  local backend=$1 case_dir home store child rc pid head
+  local backend=$1 case_dir home store child rc pid result status
   case_dir=$(make_case "docker-children-$backend")
   write_meta "$case_dir" local-only secondmate
   configure_secondmate_with_tmux_children "$case_dir"
@@ -6410,8 +6472,9 @@ assert_forced_child_docker_cleanup_and_retry() {
     printf '%s\n' "$TEARDOWN_FIXTURE_PID" > "$case_dir/$child-worktree.pid"
     teardown_fixture_start "$case_dir/$child-tmp" KILL sleep 300
     printf '%s\n' "$TEARDOWN_FIXTURE_PID" > "$case_dir/$child-tasktmp.pid"
-    head=$(git -C "$case_dir/$child-wt" rev-parse HEAD)
-    parked_axi_status_toon "fm/$child" "$head" "$child-run" > "$case_dir/$child-pipeline-status"
+    status=running
+    [ "$child" != child-b ] || status=fixing
+    configure_child_pipeline "$case_dir" "$child" "$case_dir/$child-wt" "$status"
     if [ "$backend" = orca ]; then
       fm_write_meta "$home/state/$child.meta" \
         "window=fm-$child" "endpoint_task_id=$child" \
@@ -6421,28 +6484,6 @@ assert_forced_child_docker_cleanup_and_retry() {
         "tasktmp=$case_dir/$child-tmp"
     fi
   done
-  cp "$case_dir/fakebin/no-mistakes" "$case_dir/fakebin/no-mistakes-default"
-  cat > "$case_dir/fakebin/no-mistakes" <<EOF
-#!/usr/bin/env bash
-child=\${PWD##*/}
-child=\${child%-wt}
-case "\$child" in
-  child-a|child-b)
-    case "\${1:-} \${2:-}" in
-      "axi status")
-        if [ -e "$case_dir/\$child-pipeline-aborted" ]; then
-          printf 'run:\n  id: "%s-run"\n  outcome: cancelled\n' "\$child"
-        else
-          cat "$case_dir/\$child-pipeline-status"
-        fi
-        ;;
-      "axi abort") : > "$case_dir/\$child-pipeline-aborted" ;;
-    esac
-    ;;
-  *) exec "$case_dir/fakebin/no-mistakes-default" "\$@" ;;
-esac
-EOF
-  chmod +x "$case_dir/fakebin/no-mistakes"
   cat > "$case_dir/fakebin/child-boundary" <<EOF
 #!/usr/bin/env bash
 for child in child-a child-b; do
@@ -6490,6 +6531,22 @@ esac
 printf '%s\n' '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}'
 EOF
   chmod +x "$case_dir/fakebin/child-boundary" "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse" "$case_dir/fakebin/orca"
+  for result in active wrong-run empty error; do
+    rc=0
+    FM_FAKE_CHILD_ABORT_RESULT="$result" FM_FAKE_DOCKER_STORE="$store" \
+      FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
+      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/abort-$result.stdout" 2> "$case_dir/abort-$result.stderr" || rc=$?
+    expect_code 1 "$rc" "$backend child: unconfirmed $result abort allowed retirement"
+    assert_present "$home/state/child-a.meta" "$backend child: unconfirmed abort retired identity"
+    assert_present "$home/state/child-a.status" "$backend child: unconfirmed abort retired status"
+    assert_present "$case_dir/state/task-x1.meta" "$backend child: unconfirmed abort retired parent"
+    assert_present "$case_dir/child-a-wt" "$backend child: unconfirmed abort removed worktree"
+    assert_absent "$case_dir/docker.log" "$backend child: Docker ran before confirmed pipeline stop"
+    assert_absent "$case_dir/destructive.log" "$backend child: worktree retirement preceded pipeline stop"
+    assert_grep "axi abort --run child-a-run" "$case_dir/pipeline-abort.log" \
+      "$backend child: abort was not targeted to the child's run"
+  done
   rc=0
   FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_RM_FAIL=owned-child-a \
     run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
@@ -6499,7 +6556,7 @@ EOF
   assert_present "$home/state/child-a.status" "$backend child: child status retired"
   assert_present "$case_dir/child-a-wt" "$backend child: child worktree removed"
   assert_grep child-a "$case_dir/closed.log" "$backend child: endpoint was not quiesced before Docker failure"
-  assert_present "$case_dir/child-a-pipeline-aborted" "$backend child: pipeline remained parked"
+  assert_present "$case_dir/child-a-pipeline-aborted" "$backend child: active pipeline survived"
   for child in worktree tasktmp; do
     pid=$(cat "$case_dir/child-a-$child.pid")
     if kill -0 "$pid" 2>/dev/null; then
@@ -6521,7 +6578,8 @@ EOF
   assert_present "$home/state/child-a.status" "$backend child: network failure retired status"
   assert_absent "$case_dir/destructive.log" "$backend child: network failure allowed worktree retirement"
   rc=0
-  FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+  FM_FAKE_DOCKER_STORE="$store" FM_FAKE_CHILD_ABORT_RESULT=not-found \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
     > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
   expect_code 0 "$rc" "$backend child: retry failed: $(cat "$case_dir/retry.stderr")"
   assert_absent "$home" "$backend child: retry retained secondmate home"
@@ -6530,7 +6588,8 @@ EOF
   assert_equals "" "$(docker_store_names "$store" network)" "$backend child: child network survived"
   assert_equals "" "$(docker_store_names "$store" volume)" "$backend child: child volume survived"
   assert_absent "$case_dir/race-created" "$backend child: a live endpoint created a container during network cleanup"
-  assert_present "$case_dir/child-b-pipeline-aborted" "$backend child: child-b pipeline remained parked"
+  assert_absent "$case_dir/pipeline-race-created" "$backend child: active pipeline created a container after the final listing"
+  assert_present "$case_dir/child-b-pipeline-aborted" "$backend child: fixing pipeline survived"
   for child in worktree tasktmp; do
     pid=$(cat "$case_dir/child-b-$child.pid")
     if kill -0 "$pid" 2>/dev/null; then
@@ -6553,22 +6612,39 @@ test_forced_orca_children_quiesce_before_docker_and_worktree_removal() {
 }
 
 test_forced_nested_secondmate_cleans_grandchild_docker_before_retirement_and_retries() {
-  local case_dir home nested_home store rc
+  local case_dir home nested_home grandchild_wt store rc
   case_dir=$(make_case docker-grandchild)
   write_meta "$case_dir" local-only secondmate
-  configure_nested_secondmate_with_herdr_grandchild "$case_dir"
+  grandchild_wt="$case_dir/grandchild-herdr-wt"
+  git -C "$case_dir/project" worktree add -q -b fm/grandchild-herdr "$grandchild_wt" main
+  configure_nested_secondmate_with_herdr_grandchild "$case_dir" "$grandchild_wt"
   home="$case_dir/secondmate-home"
   nested_home="$home/nested-home"
   store="$case_dir/docker-store"
   configure_child_docker_race "$case_dir"
   : > "$case_dir/child-producers/grandchild-herdr.live"
   printf '%s\n' grandchild-herdr > "$case_dir/current-child"
+  configure_child_pipeline "$case_dir" grandchild-herdr "$grandchild_wt" ci
   : > "$store"
   docker_store_add "$store" container c-grandchild owned-grandchild "fm.task=grandchild-herdr" ""
-  docker_store_add "$store" container c-path grandchild-path "com.docker.compose.project.working_dir=$case_dir/wt" ""
+  docker_store_add "$store" container c-path grandchild-path "com.docker.compose.project.working_dir=$grandchild_wt" ""
   docker_store_add "$store" container c-foreign foreign-grandchild "fm.task=other" ""
   docker_store_add "$store" network n-grandchild grandchild-network "fm.task=grandchild-herdr"
   docker_store_add "$store" volume grandchild-volume "fm.task=grandchild-herdr"
+  rc=0
+  FM_FAKE_CHILD_ABORT_RESULT=active FM_FAKE_DOCKER_STORE="$store" FM_FAKE_HERDR_CONFIRMED_GONE=1 \
+    FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+      > "$case_dir/abort.stdout" 2> "$case_dir/abort.stderr" || rc=$?
+  expect_code 1 "$rc" "grandchild: active pipeline allowed recursive retirement"
+  assert_present "$home/state/nested-sm.meta" "grandchild: active pipeline retired nested identity"
+  assert_present "$nested_home/state/grandchild-herdr.meta" "grandchild: active pipeline retired identity"
+  assert_present "$nested_home/state/grandchild-herdr.status" "grandchild: active pipeline retired status"
+  assert_present "$grandchild_wt" "grandchild: active pipeline removed worktree"
+  assert_grep "axi abort --run grandchild-herdr-run" "$case_dir/pipeline-abort.log" \
+    "grandchild: abort was not targeted to the grandchild's run"
+  assert_grep "owned-grandchild" "$store" "grandchild: owned container was removed before pipeline stop"
+  assert_grep "grandchild-path" "$store" "grandchild: path-owned container was removed before pipeline stop"
   rc=0
   FM_FAKE_DOCKER_STORE="$store" FM_FAKE_DOCKER_RM_FAIL=owned-grandchild FM_FAKE_HERDR_CONFIRMED_GONE=1 \
     FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
@@ -6580,6 +6656,7 @@ test_forced_nested_secondmate_cleans_grandchild_docker_before_retirement_and_ret
   assert_present "$nested_home/state/grandchild-herdr.status" "grandchild: grandchild status retired"
   assert_present "$nested_home" "grandchild: nested home removed"
   assert_present "$case_dir/closed" "grandchild: endpoint was not quiesced before Docker cleanup"
+  assert_present "$case_dir/grandchild-herdr-pipeline-aborted" "grandchild: ci pipeline survived Docker cleanup"
   assert_equals "foreign-grandchild owned-grandchild " "$(docker_store_names "$store" container)" \
     "grandchild: containers produced before quiescence survived the cleanup attempt"
   rc=0
