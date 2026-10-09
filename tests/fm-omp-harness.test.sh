@@ -967,6 +967,9 @@ run_watch_restore_scenario() {  # <scenario>
 # at once keeps its synchronous call from blocking the whole run.
 [ "${1:-}" != --handling-delivered ] || exit 0
 printf 'watcher: started pid=%s (beacon 0s) recovery-generation=gen-1\n' "$$"
+if [[ "${SCENARIO:-}" = idle-recovery-* ]]; then
+  while [ ! -e "$FM_HOME/state/.e2e-ready" ]; do sleep 0.05; done
+fi
 if [ ! -e "${FM_HOME:?}/state/.e2e-fired" ] || { [[ "${SCENARIO:-}" = duplicates* ]] && [ ! -e "$FM_HOME/state/.e2e-fired-again" ]; }; then
   if [ -e "$FM_HOME/state/.e2e-fired" ]; then
     : > "$FM_HOME/state/.e2e-fired-again"
@@ -986,19 +989,23 @@ SH
   # Output goes to a file, not a pipe: the fixture's long-lived arm child would
   # otherwise hold a command substitution open for its whole sleep.
   FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+    FM_OMP_SUCCESSOR_GRACE_MS=100 \
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
-const handlers = new Map(); let tool = null; const sent = []; const turns = [];
+const handlers = new Map(); const commands = new Map(); let tool = null; const sent = []; const turns = [];
+let receiveWake;
+const wakeReceived = new Promise((resolve) => { receiveWake = resolve; });
 const transcript = [{ role: "assistant" }];
 const pi = {
   on(e, h) { handlers.set(e, h); },
-  registerCommand() {},
+  registerCommand(name, command) { commands.set(name, command); },
   registerTool(t) { tool = t; },
   sendUserMessage(m, o) {
     sent.push({ m, o });
+    receiveWake();
     if (process.env.SCENARIO === "sync-consumed") {
       handlers.get("before_agent_start")({ prompt: m }, ctx);
       handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
@@ -1032,7 +1039,7 @@ const composer = {
 let idle = process.env.SCENARIO.startsWith("idle-"); let queued = false;
 const ctx = {
   hasUI: true,
-  isIdle: () => { if (process.env.SCENARIO === "idle-stale-context") throw new Error("stale context"); return idle; },
+  isIdle: () => { if (process.env.SCENARIO === "idle-stale-context" || process.env.SCENARIO === "idle-recovery-stale") throw new Error("stale context"); return idle; },
   hasPendingMessages: () => queued,
   ui: { getEditorText: () => composer.text, setEditorText: (t) => { composer.sets.push(t); composer.text = t; } },
 };
@@ -1051,8 +1058,27 @@ const advisorTail = { role: "custom", customType: "advisor", content: "advisor n
 if (process.env.SCENARIO.startsWith("idle-")) transcript.push(advisorTail);
 if (process.env.SCENARIO === "idle-draft") composer.text = "my unsent draft";
 const editorBefore = composer.text;
-await handlers.get("session_start")({ type: "session_start" }, ctx);
-if (!["nonpending", "failed-send"].includes(process.env.SCENARIO)) await tool.execute();
+const scenario = process.env.SCENARIO;
+const recovery = scenario.startsWith("idle-recovery-");
+const repairContext = scenario.endsWith("-context");
+const initialContext = scenario === "idle-recovery-missing" ? undefined
+  : repairContext ? { isIdle() { throw new Error("retired context"); } } : ctx;
+await handlers.get("session_start")({ type: "session_start" }, initialContext);
+if (recovery) {
+  const predecessorTool = tool;
+  if (scenario !== "idle-recovery-live-factory") await handlers.get("session_shutdown")({}, undefined);
+  if (scenario.includes("factory") || scenario === "idle-recovery-forwarded") mod.default(pi);
+  if (scenario.includes("command")) await commands.get("fm-watch-arm-omp").handler("", ctx);
+  else if (scenario.includes("tool")) await tool.execute("repair", {}, undefined, undefined, repairContext ? ctx : undefined);
+  else if (scenario === "idle-recovery-forwarded") await predecessorTool.execute("repair", {}, undefined, undefined, ctx);
+  else {
+    const log = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/lifecycle.log`;
+    for (let i = 0; i < 60 && !readFileSync(log, "utf8").includes("event=self-heal "); i++) await sleep(50);
+    if (!readFileSync(log, "utf8").includes("event=self-heal ")) throw new Error("missing automatic recovery");
+  }
+  if (scenario === "idle-recovery-busy") idle = false;
+  writeFileSync(`${process.env.FM_HOME}/state/.e2e-ready`, "");
+} else if (!["nonpending", "failed-send"].includes(scenario)) await tool.execute();
 if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   await sleep(50);
   if (sent.length !== 1 || !sent[0].m.includes("could not load a replacement-session actionable wake")) throw new Error("expected nonpending load-failure wake");
@@ -1069,16 +1095,20 @@ if (["nonpending", "failed-send"].includes(process.env.SCENARIO)) {
   process.exit(0);
 }
 const expectedWakes = process.env.SCENARIO.startsWith("duplicates") ? 2 : 1;
-for (let i = 0; i < 600 && sent.length < expectedWakes; i += 1) await sleep(100);
+if (recovery) await wakeReceived;
+else for (let i = 0; i < 600 && sent.length < expectedWakes; i += 1) await sleep(100);
 if (sent.length !== expectedWakes) throw new Error(`expected ${expectedWakes} wakes, saw ${sent.length}`);
 const wake = sent[0].m;
-if (process.env.SCENARIO === "idle-stale-context") {
-  if (sent[0].o?.deliverAs !== "followUp" || !queued || turns.length !== 0) throw new Error("a stale context must keep follow-up delivery");
+if (recovery && !wake.includes("signal: omp-restore done")) throw new Error(`recovery did not deliver its actionable close: ${wake}`);
+if (["idle-stale-context", "idle-recovery-stale", "idle-recovery-busy", "idle-recovery-missing"].includes(scenario)) {
+  if (sent[0].o?.deliverAs !== "followUp" || !queued || turns.length !== 0) throw new Error("delivery without positive idle evidence must remain a follow-up");
   await handlers.get("session_shutdown")({}, ctx);
   process.exit(0);
 }
 if (process.env.SCENARIO.startsWith("idle-")) {
   if (sent[0].o?.deliverAs !== undefined || queued) throw new Error(`an idle wake was queued as a follow-up: ${JSON.stringify(sent[0].o)}`);
+  const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
+  if (existsSync(handoff)) throw new Error("a consumed idle wake retained its replacement handoff");
   if (turns.length !== 1 || turns[0].prompt !== wake || turns[0].tail !== advisorTail) throw new Error("an idle wake behind an advisor tail did not start its own turn");
   if (composer.sets.length !== 0 || composer.text !== editorBefore) throw new Error("idle delivery touched the composer");
   idle = true;
@@ -1343,7 +1373,7 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context idle-recovery-timer idle-recovery-factory idle-recovery-live-factory idle-recovery-tool idle-recovery-command idle-recovery-forwarded idle-recovery-tool-context idle-recovery-command-context idle-recovery-busy idle-recovery-stale idle-recovery-missing draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"

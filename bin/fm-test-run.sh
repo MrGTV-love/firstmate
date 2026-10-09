@@ -388,6 +388,7 @@ family_for_basename() {
     fm-worker-account-live-e2e.test.sh|fm-teamclaude-launch-live-e2e.test.sh|\
     fm-opencode-primary-live-e2e.test.sh|fm-pi-branch-live-e2e.test.sh|\
     fm-pi-branch-responsiveness-live-e2e.test.sh|\
+    fm-pi-watch-loader-live.test.sh|\
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|\
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
@@ -1478,6 +1479,13 @@ families_for_changed_path() {
       # Vendored upstream jev-guard (see SOURCE.md there) and its Firstmate
       # report.ts are exercised only through the jev-guard behavior suite.
       printf '%s\n' "__script__:fm-jev-guard.test.sh"
+      ;;
+    tests/fm-pi-watch-loader-live.test.mjs)
+      printf '%s\n' __script__:fm-pi-watch-loader-live.test.sh
+      ;;
+    tests/watch-lifecycle-expiry.mjs)
+      printf '%s\n' __script__:fm-pi-watch-extension.test.sh
+      printf '%s\n' __script__:fm-omp-harness.test.sh
       ;;
     bin/fm-test-run.sh)
       # Deliberately the WHOLE family, not just the two contract tests. This

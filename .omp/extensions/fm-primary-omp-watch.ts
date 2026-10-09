@@ -611,8 +611,8 @@ const cleanupOnProcessExit = () => {
 process.once("exit", cleanupOnProcessExit);
 
 type OmpWatchInstanceApi = {
-  activate: () => Promise<ArmResult>;
-  retire: () => { recovery: boolean; stopped: Promise<void> };
+  activate: (ctx?: unknown) => Promise<ArmResult>;
+  retire: () => { recovery: boolean; stopped: Promise<void>; context: unknown };
 };
 
 export default function (pi: ExtensionAPI) {
@@ -627,11 +627,13 @@ export default function (pi: ExtensionAPI) {
   let generationStopped: Promise<void> = Promise.resolve();
   let healTimer: ReturnType<typeof setTimeout> | null = null;
   let recoveryPending = false;
+  let latestContext: any = null;
   lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
   if (instance.previous?.api) {
     const predecessor = instance.previous.api.retire();
     generationStopped = predecessor.stopped;
     recoveryPending = predecessor.recovery;
+    rememberContext(predecessor.context);
     if (recoveryPending) scheduleSelfHeal(generation);
     void generationStopped.catch(() => {});
   }
@@ -692,13 +694,14 @@ export default function (pi: ExtensionAPI) {
   // The arm tool and command. A superseded instance forwards to the current
   // one; a stopped generation is healed first, because the call itself proves
   // the session is live.
-  async function armFromSession(): Promise<ArmResult> {
+  async function armFromSession(ctx?: unknown): Promise<ArmResult> {
     if (!instance.isCurrent()) {
       const current = instance.current();
       lifecycle("arm-forwarded", { to: current?.id });
-      if (current?.api) return await current.api.activate();
+      if (current?.api) return await current.api.activate(ctx);
       return { ok: false, message: shuttingDownMessage };
     }
+    rememberContext(ctx);
     const stopped = generation;
     const retirement = generationStopped;
     await retirement;
@@ -762,7 +765,6 @@ export default function (pi: ExtensionAPI) {
   const restoreAttemptLimit = 3;
   const restoreAttempts = new Map<string, number>();
   let restoreTimer: ReturnType<typeof setTimeout> | null = null;
-  let latestContext: any = null;
 
   function rememberContext(ctx: unknown): void {
     if (typeof ctx === "object" && ctx !== null) latestContext = ctx;
@@ -1363,7 +1365,7 @@ export default function (pi: ExtensionAPI) {
     if (lockOwnership() !== "owned") return;
     activateOwnedWatch(generation);
   });
-  pi.on?.("session_shutdown", async () => {
+  pi.on?.("session_shutdown", async (_event, ctx) => {
     // omp carries no shutdown reason (verified: `reason` is undefined), so the
     // replacement handoff is always persisted when anything is pending; a
     // terminal quit then merely replays an already-drained wake next start.
@@ -1375,7 +1377,7 @@ export default function (pi: ExtensionAPI) {
     if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
     if (restoreTimer) clearTimeout(restoreTimer);
     restoreTimer = null;
-    latestContext = null;
+    rememberContext(ctx);
     const stopped = generation;
     recoveryPending = true;
     generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, true, lifecycle)]).then(() => {});
@@ -1390,7 +1392,7 @@ export default function (pi: ExtensionAPI) {
   pi.registerCommand?.("fm-watch-arm-omp", {
     description: "Arm firstmate watcher supervision through the omp extension instead of foreground bash.",
     handler: async (_args, ctx) => {
-      const result = await armFromSession();
+      const result = await armFromSession(ctx);
       ctx?.ui?.notify?.(result.message, result.ok ? "info" : "warning");
     },
   });
@@ -1404,8 +1406,8 @@ export default function (pi: ExtensionAPI) {
       "Call fm_watch_arm_omp only for the first required cycle or after a notification says the cycle is missing, failed, or unhealthy. Do not call it after ordinary work, turn completion, or ordinary signal, stale, check, or heartbeat handling because the omp extension owns re-arming. Never run bin/fm-watch-arm.sh through bash.",
     ],
     parameters: Type.Object({}),
-    execute: async () => {
-      const result = await armFromSession();
+    execute: async (_toolCallId: unknown, _params: unknown, _signal: unknown, _onUpdate: unknown, ctx: unknown) => {
+      const result = await armFromSession(ctx);
       return {
         content: [{ type: "text", text: result.message }],
         details: result,
@@ -1429,7 +1431,7 @@ export default function (pi: ExtensionAPI) {
       const retirement = generationStopped.finally(() => {
         lifecycle("generation-stop", { generation: stopped.id, cause: "factory-retire" });
       });
-      return { recovery: recoveryPending, stopped: retirement };
+      return { recovery: recoveryPending, stopped: retirement, context: latestContext };
     },
   });
 

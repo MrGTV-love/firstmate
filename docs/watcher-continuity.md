@@ -79,6 +79,7 @@ omp's replacement follows its own generation-owner contract in `.omp/extensions/
 
 omp starts no turn for an explicit follow-up that reaches an idle session unless its own auto-continue gate passes, and that gate refuses while the context tail is not an assistant or tool result, such as an advisor note posted after the turn ended.
 `.omp/extensions/fm-primary-omp-watch.ts` sends a wake through omp's prompt-starting message API only when the latest extension context returns exactly `true` from `isIdle()`; busy, missing, or unreadable idle state keeps follow-up delivery.
+The latest context is retained across shutdown and transferred to a replacement extension factory, so missing-successor recovery can still start an idle wake's turn. Arm commands and tools refresh that context when supplied; each delivery rechecks live idle state rather than caching an idle verdict across recovery.
 The prompt flow never touches the composer, so an operator draft stays unsent, and it also flushes any follow-up already stranded in omp's queue.
 `tests/fm-omp-harness.test.sh` covers idle delivery behind an advisor tail with an empty composer and with a draft, plus the follow-up fallback for an unreadable idle state; the live guard's idle step and its evidence are recorded in [omp idle wake behind an advisor note](verification/runtime-backends.md#2026-10-08-omp-idle-wake-behind-an-advisor-note).
 
@@ -93,7 +94,7 @@ Recovery remains pending until watcher activation successfully hands off to a tr
 Each extension header owns its exact rule, `.pi/extensions/lib/fm-watch-lifecycle.ts` owns the shared registry, and every lifecycle transition, including factory generation creation, activation, and retirement, and expired bound is recorded in `state/extensions/<extension>/lifecycle.log`.
 Shutdown child-close, successor readiness (including omp host mode), and unready-arm retirement deadlines each append one `bound-expired` record per expiry with waiter, waited-on, bound, and actual elapsed duration. They use the same rotated lifecycle log and do not change the wait outcome or timeout.
 
-`FM_PI_PACKAGE_DIR=<installed-pi-package> node tests/fm-pi-watch-loader-live.test.mjs` exercises the real Pi resource loader and session runtime without provider calls. It loads the watcher plus a re-exporting entrypoint, verifies successful startup and idempotent arm-tool execution, and reloads with exactly one live successor and no duplicate tool registration. All homes and agent configuration are disposable.
+`FM_PI_WATCH_LOADER_LIVE_E2E=1 FM_PI_PACKAGE_DIR=<installed-pi-package> bin/fm-test-run.sh tests/fm-pi-watch-loader-live.test.sh` exercises the real Pi resource loader and session runtime without provider calls. The runner discovers it in the `live-harness-optin` family and selects it when its JavaScript test changes; changes to the shared lifecycle-expiry helper select both Pi and omp consumer suites. It loads the watcher plus a re-exporting entrypoint, verifies successful startup and idempotent arm-tool execution, and reloads with exactly one live successor and no duplicate tool registration. All homes and agent configuration are disposable.
 
 ### omp restored-wake recovery
 
