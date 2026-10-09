@@ -815,13 +815,9 @@ export default function (pi: ExtensionAPI) {
     restoreTimer = timer;
   }
 
-  // An idle omp raises no event when text lands in its composer, so wake text
-  // left there unsubmitted (typed by older wiring, for one) is found by this
-  // low-rate poll. It acts only on a complete Firstmate watcher wake that
-  // stayed unchanged across two polls while omp was idle, sends it through the
-  // prompt-starting API, and removes just that wake from the editor. Operator
-  // text, an edited or partial wake, and a wake this extension still tracks
-  // (the bounded restored-wake recovery owns those) are left exactly as found.
+  // Tracked wakes retain ownership even when their composer copies are missing
+  // or edited; template matching must not bypass exact restored recovery.
+  // docs/watcher-continuity.md#omp-stranded-wake-text owns polling behavior.
   function pollStrandedWake(owner: SessionGeneration): void {
     if (!generationIsLive(owner) || lockOwnership() !== "owned") return;
     const ctx = editorContext();
