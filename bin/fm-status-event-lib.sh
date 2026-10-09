@@ -310,19 +310,19 @@ _fm_status_declared_wait_scan() {  # <resolve-verb> <legacy-captain-re>
 # The identity of the declared wait status_declared_wait_line names, for a
 # consumer that must tell a RESTATED wait from a REPLACEMENT one. Prints
 # `<key>:<cksum>:<line>` and returns 0 while a wait is declared; returns 1 when
-# none is, so the caller falls back to the whole-log signature and can only ever
-# re-alarm more, never less.
-# A worker restates a long wait with fresh progress text under the same phase key,
-# and the log signature changes on every such append, so a throttle bound to the
-# signature treated each restatement as a new wait and re-opened its first-sight
-# alarm. The identity is the FIRST line of the contiguous episode instead: the
-# declared line plus the earlier lines of the same verb and key, reaching back past
+# none is declared or the read fails. declared_wait_scope in bin/fm-watch.sh owns
+# the fail-open fallback. The identity is the FIRST line of the contiguous episode:
+# the declared line plus earlier lines of the same verb and key, reaching back past
 # resolved lines for other keys, and stopping at any other event or at a resolved
 # line for this key. A key re-declared after its own resolved line is therefore a
 # new episode even when both landed between two polls. A keyless line has no key
 # to compare, so it is its own episode (key `-`) and any new keyless text is a
 # replacement. <cksum> and <line> bind the identity to that first line's text and
 # position, so two identical lines in different episodes stay distinct.
+# Declaration, line count, and episode position all come from one captured byte
+# endpoint, so an append during the read cannot change the episode's position.
+# The tail scan widens to that same snapshot's whole file when it finds no opener
+# or the episode remains open at the window's start.
 status_declared_wait_identity() {  # <status-file>
   local f=$1 declared verb key resolve legacy_re total window rec idx text endpoint snapshot
   [ -f "$f" ] && [ -r "$f" ] || return 1
