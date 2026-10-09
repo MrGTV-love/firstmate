@@ -1324,7 +1324,7 @@ The idle-session steps use a scripted local OpenAI-compatible model and spend no
   The guard's earlier panel parse could therefore not see the queued wake unless something else had redrawn the panel.
 - **Escape restores every queued follow-up, and recovery takes one wake per run end.**
   The lane also queues its own outcome checks, so Escape can restore a signal wake and a `check:` wake together; the extension submits the first and the second returns after the next `agent_end`.
-  A restored wake stays in the editor for about two seconds, while one rendered composer read through the pane took one to five seconds on this host, so the guard reads omp's editor text and queued state through a lab-only probe extension and keeps the pane readers as a second signal.
+  A restored wake stays in the editor for about two seconds, while one rendered composer read through the pane took one to five seconds on this host, so the guard records omp's editor text through a lab-only probe extension and retains the pane reader as a second restoration signal. Queue readiness requires the probe's fresh `hasPendingMessages()` answer, bracketed by busy-state and tracked-wake checks; the queue panel is not an acceptance signal, and screen captures remain available for failure diagnostics.
 
 [Watcher continuity](../watcher-continuity.md#omp-stranded-wake-text) owns the delivery contract, and [restored-wake recovery](../watcher-continuity.md#omp-restored-wake-recovery) owns the wait on queued messages.
 The guard exercises the extension under review on the installed omp:

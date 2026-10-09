@@ -30,12 +30,7 @@
 #      empty composer was refused. The watch extension must deliver that wake as
 #      its own turn, clear only that wake, and leave an operator draft beside it
 #      exactly as typed. Same scripted model, no tokens.
-# omp's follow-up queue panel is redrawn only when omp itself queues or consumes a
-# message, never for a follow-up an extension queued (omp 18.8.1: the panel stays
-# empty while the wake is queued). The guard therefore reads two independent
-# signals for "the wake is queued behind the running turn" and lets either carry:
-# the panel, and omp's own hasPendingMessages() through a lab-only probe extension.
-# The same probe records every change of the editor text: a restored wake sits in
+# The lab-only probe records every change of the editor text: a restored wake sits in
 # the composer for only a moment, and one rendered read takes seconds on a busy
 # host, so the pane alone cannot be relied on to catch it.
 # Steps 1-3 submit model prompts, so the guard is opt-in; it fails naming omp
@@ -302,27 +297,10 @@ probe_says_queued() {
   return 1
 }
 
-# omp's queue panel; it names the wake only once omp has redrawn it.
-panel_shows_wake() {
-  local queued
-  queued=$(screen | awk '
-    /After yield.*[1-9][0-9]*/ { in_queue = 1; next }
-    in_queue && /to edit/ { printf "%s", rows; exit }
-    in_queue { rows = rows $0 }
-  ' | tr -d '[:space:]')
-  case "$queued" in
-    *"FIRSTMATEWATCHERWAKE:"*"$WAKE_TASK.status"*) return 0 ;;
-  esac
-  return 1
-}
-
-# The watcher wrote the wake while the turn ran, and either independent signal
-# says omp holds a queued follow-up (this wake, or another watcher wake already
-# in line behind the turn).
 wake_is_queued() {
   is_busy || return 1
   wake_row_queued || return 1
-  probe_says_queued || panel_shows_wake || return 1
+  probe_says_queued || return 1
   is_busy && wake_row_queued
 }
 
