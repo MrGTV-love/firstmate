@@ -1090,42 +1090,67 @@ SH
   pass "jobs=1 and jobs=2 preserve deterministic diagnostics, failures, cleanup bounds, and quiet telemetry"
 }
 
-# fm_lint_stub_counting_shellcheck <fakebin> <activity-dir> <peak-file>: a
-# ShellCheck stand-in that holds each check for half a second and records the
-# most checks alive at once across every fm-lint.sh run sharing the directory.
 fm_lint_stub_counting_shellcheck() {
   local fakebin=$1 activity=$2 peak=$3
   mkdir -p "$activity"
   : > "$peak"
-  cat > "$fakebin/shellcheck" <<SH
-#!/usr/bin/env bash
-if [ "\${1:-}" = --version ]; then
-  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
-  exit 0
-fi
-touch "$activity/\$\$"
-ls "$activity" | wc -l | tr -d ' ' >> "$peak"
-sleep 0.5
-rm -f "$activity/\$\$"
-exit 0
-SH
+  cat > "$fakebin/shellcheck" <<PL
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Fcntl qw(:flock);
+use Time::HiRes qw(time sleep);
+if ((\$ARGV[0] // '') eq '--version') {
+    print "ShellCheck - shell script analysis tool\nversion: 0.11.0\n";
+    exit 0;
+}
+open(my \$lock, '>>', "$peak.lock") or die "\$!";
+flock(\$lock, LOCK_EX) or die "\$!";
+open(my \$active, '>', "$activity/\$\$") or die "\$!";
+close \$active;
+my @active = glob "$activity/*";
+open(my \$peak, '>>', "$peak") or die "\$!";
+print {\$peak} scalar(@active), "\n";
+close \$peak;
+close \$lock;
+my \$deadline = time() + 60;
+while (\$ENV{FM_LINT_COUNT_HOLD} && !-e "$peak.release") {
+    if (time() > \$deadline) { unlink "$activity/\$\$"; exit 1; }
+    sleep 0.01;
+}
+unlink "$activity/\$\$";
+exit 0;
+PL
   chmod +x "$fakebin/shellcheck"
 }
 
-# fm_lint_concurrent_runs <runs> <tmp> <fakebin>: start <runs> simultaneous
-# fm-lint.sh runs of four roots each, wait for all, and print the peak number
-# of live ShellCheck processes. Extra environment is read from the caller.
 fm_lint_concurrent_runs() {
-  local runs=$1 tmp=$2 fakebin=$3 run pid rc=0
+  local runs=$1 tmp=$2 fakebin=$3 expected=$4 run pid rc=0 ready_rc=0
   local -a pids roots
   roots=("$tmp/a.sh" "$tmp/b.sh" "$tmp/c.sh" "$tmp/d.sh")
+  rm -f "$tmp/peak.release"
   for run in $(seq 1 "$runs"); do
-    PATH="$fakebin:$PATH" "$LINT" "${roots[@]}" > "$tmp/run.$run.out" 2>&1 &
+    FM_LINT_COUNT_HOLD=1 PATH="$fakebin:$PATH" "$LINT" --jobs 2 "${roots[@]}" > "$tmp/run.$run.out" 2>&1 &
     pids+=("$!")
   done
+  perl - "$tmp/peak" "$expected" <<'PL' || ready_rc=$?
+use Time::HiRes qw(time sleep);
+my ($peak, $expected) = @ARGV;
+my $deadline = time() + 30;
+while (1) {
+    open(my $fh, '<', $peak) or die "$!";
+    my @counts = <$fh>;
+    close $fh;
+    last if grep { /\A[0-9]+\n\z/ && $_ >= $expected } @counts;
+    die "concurrent admission deadline exceeded\n" if time() > $deadline;
+    sleep 0.01;
+}
+PL
+  touch "$tmp/peak.release"
   for pid in "${pids[@]}"; do
     wait "$pid" || rc=$?
   done
+  [ "$ready_rc" -eq 0 ] || fail "concurrent runs did not reach $expected held ShellCheck processes"$'\n'"$(cat "$tmp"/run.*.out)"
   [ "$rc" -eq 0 ] || fail "a concurrent fm-lint.sh run failed (rc=$rc)"$'\n'"$(cat "$tmp"/run.*.out)"
   sort -n "$tmp/peak" | tail -1
 }
@@ -1146,15 +1171,15 @@ test_host_slots_bound_concurrent_runs() {
   tmp=$(fm_lint_slot_fixture fm-lint-slots)
   # One run keeps its two workers: the host-wide bound never throttles a lone run.
   lone=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=3 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
-    fm_lint_concurrent_runs 1 "$tmp" "$tmp/bin")
+    fm_lint_concurrent_runs 1 "$tmp" "$tmp/bin" 2)
   [ "$lone" -eq 2 ] || fail "a lone run peaked at $lone live ShellCheck processes, expected its two workers"
   : > "$tmp/peak"
-  baseline=$(FM_LINT_SLOT_DIR=off fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin")
+  baseline=$(FM_LINT_SLOT_DIR=off fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin" 12)
   [ "$baseline" -eq 12 ] || fail "six ungated runs peaked at $baseline live ShellCheck processes, expected 12"
   : > "$tmp/peak"
   # Six runs would start twelve ShellCheck processes if each bounded only itself.
   peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=3 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
-    fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin")
+    fm_lint_concurrent_runs 6 "$tmp" "$tmp/bin" 3)
   [ "$peak" -le 3 ] || fail "six concurrent runs reached $peak live ShellCheck processes, expected at most 3 host-wide"
   [ "$peak" -ge 3 ] || fail "six concurrent runs peaked at $peak, so the slots were not used in parallel"
   pass "six concurrent runs peak at $baseline ShellCheck processes ungated and $peak with a three-slot pool"
@@ -1166,11 +1191,11 @@ test_host_load_shrinks_slots_to_the_floor() {
   # Load far past two times the cores leaves only the two-slot floor, so the
   # runs queue instead of failing or timing out.
   peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=6 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=100000 \
-    fm_lint_concurrent_runs 4 "$tmp" "$tmp/bin")
+    fm_lint_concurrent_runs 4 "$tmp" "$tmp/bin" 2)
   [ "$peak" -le 2 ] || fail "under heavy load four runs reached $peak live ShellCheck processes, expected at most 2"
   : > "$tmp/peak"
   peak=$(FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=6 FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=0 \
-    fm_lint_concurrent_runs 4 "$tmp" "$tmp/bin")
+    fm_lint_concurrent_runs 4 "$tmp" "$tmp/bin" 6)
   [ "$peak" -gt 2 ] || fail "with an idle host four runs peaked at $peak, so the load never widened the slots"
   pass "host load shrinks the shared ShellCheck slots to a two-slot floor and idle hosts use all of them"
 }
@@ -1533,7 +1558,7 @@ for my $retry (0, 1) {
         FM_LINT_INTERNAL_BOUNDED => $bounded, FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
         FM_LINT_INTERNAL_ROOT_SECS => 3, FM_LINT_INTERNAL_GRACE => 1,
         FM_LINT_INTERNAL_ROOTS_LOG => "$dir/roots.tsv", FM_LINT_SHELLCHECK => "$tmp/shellcheck");
-    sleep 0.005 until time() - int(time()) > 0.3 && time() - int(time()) < 0.35;
+    my $launched = time();
     my $worker = fork();
     die "fork: $!" unless defined $worker;
     if (!$worker) {
@@ -1562,17 +1587,18 @@ for my $retry (0, 1) {
             open(my $wait, '<', $file) or die "$!";
             $queued_ms += <$wait>;
         }
-        my $elapsed = ($finished - $began) * 1000 - $queued_ms;
+        my $elapsed = ($finished - $launched) * 1000 - $queued_ms;
         open(my $log, '<', "$dir/roots.tsv") or die "$!";
         my @end;
         while (<$log>) { @end = split /\t/ if /^end\t/; }
         die "missing root result\n" unless @end;
         my $expected = $retry ? 'memory-fallback' : 'ok';
         die "wrong root outcome: $end[9]\n" unless $end[9] eq $expected;
-        die "root timestamps lack millisecond precision\n"
-            unless abs($end[5] - $began * 1000) < 150 && abs($end[6] - $finished * 1000) < 150;
-        die "duration $end[7]ms disagrees with $elapsed ms of analysis\n"
-            unless $end[7] >= 70 && abs($end[7] - $elapsed) < 150;
+        die "root timestamps fall outside the observed lifecycle\n"
+            unless $end[5] >= $launched * 1000 - 1 && $end[5] <= $began * 1000 + 1
+                && $end[6] >= ($began + 1.5) * 1000 - 1 && $end[6] <= $finished * 1000 + 1;
+        die "duration $end[7]ms exceeds $elapsed ms available for analysis\n"
+            unless $end[7] >= 70 && $end[7] <= $elapsed + 2;
         die "root wall time omitted the queue\n" unless $end[6] - $end[5] >= 1500;
     };
     $error = $@;

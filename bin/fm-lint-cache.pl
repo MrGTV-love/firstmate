@@ -52,11 +52,14 @@ if (($ARGV[0] // '') eq 'gate') {
         }
         return 0;
     };
-    my ($slot, $waited_from);
+    my ($slot, $waited_from, $recheck_at);
     my $available = eval { make_path($slot_dir, {mode => 0700}); -d $slot_dir && -w _ };
     if ($available) {
         $waited_from = Time::HiRes::time();
         ACQUIRE: while (!$slot) {
+            exit 128 + $signal_number{$caught} if $caught;
+            my $delay = ($recheck_at // 0) - Time::HiRes::time();
+            Time::HiRes::sleep($delay) if $delay > 0;
             exit 128 + $signal_number{$caught} if $caught;
             my (@free, $occupied);
             $occupied = 0;
@@ -70,16 +73,14 @@ if (($ARGV[0] // '') eq 'gate') {
                 $occupied++;
             }
             my $allowed = int($cap + 2 * $ncpu - $slot_load->() + 0.5);
+            $recheck_at = Time::HiRes::time() + 2;
             $allowed = $floor if $allowed < $floor;
             $allowed = $cap if $allowed > $cap;
             $slot = shift @free if @free && $occupied < $allowed;
             my $has_free = @free;
             close $_ for @free;
             next if $slot || $caught;
-            if ($has_free) {
-                Time::HiRes::sleep(0.1);
-                next;
-            }
+            next if $has_free;
             if (open(my $fh, '>>', "$slot_dir/slot.@{[ int(rand($cap)) ]}")) {
                 eval {
                     local $SIG{ALRM} = sub { die "gate-recheck\n" };
