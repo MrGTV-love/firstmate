@@ -226,9 +226,9 @@ case "${1:-}" in
     [ "$#" -eq 1 ] || { echo "wake drain: unexpected re-emit arguments" >&2; exit 2; }
     REEMIT=true
     ;;
-  --owed)
-    [ "$#" -eq 2 ] || { echo "wake drain: unexpected owed arguments" >&2; exit 2; }
-    fm_wake_owed "$ACTOR" "$2"
+  --queued)
+    [ "$#" -eq 1 ] || { echo "wake drain: unexpected queued arguments" >&2; exit 2; }
+    fm_wake_actor_rows "$ACTOR"
     exit $?
     ;;
   --ack-through)
@@ -240,7 +240,7 @@ case "${1:-}" in
     case "$ACK_GENERATION" in ''|*[!A-Za-z0-9._-]*) echo "wake drain: invalid recovery generation" >&2; exit 2 ;; esac
     [ "$#" -eq 4 ] || { echo "wake drain: unexpected acknowledgement arguments" >&2; exit 2; }
     ;;
-  *) echo "usage: fm-wake-drain.sh [--reemit | --owed SEQUENCE | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
+  *) echo "usage: fm-wake-drain.sh [--reemit | --queued | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
 esac
 
 [ "$ACTOR" != branch ] || require_branch_eligible_rows || exit 1

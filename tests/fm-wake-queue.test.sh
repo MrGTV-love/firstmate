@@ -1770,87 +1770,36 @@ test_main_is_never_told_to_drain_rows_only_the_branch_owns() {
   pass "a branch-held row raises no queued-wake warning for main, and the same row is presented and acknowledged once the grant clears"
 }
 
-# The pending-warning condition must also survive a queue nobody could read: a
-# queue that exists but cannot be counted is not evidence that it was drained.
-# The per-actor count runs awk over the queue, and awk implementations differ on
-# whether a failed input open aborts before the END rule; one that reaches END
-# reports a 0 count for a queue that was never proved empty.
-test_owed_reports_whether_a_drain_would_still_hand_over_work() {
-  local dir state ack_line ack_seq ack_gen out rc before after marker literal actor
-  dir=$(make_case owed-predicate)
+test_queued_preserves_rows_and_state_until_acknowledgement() {
+  local dir state literal query_pid
+  dir=$(make_case queued-read-only)
   state="$dir/state"
-  owed() { FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR="${actor:-main}" "$DRAIN" --owed "$1" > "$dir/owed.out" 2> "$dir/owed.err"; }
-
-  owed 1 && fail "missing queue was reported as owed"
-  append_wake "$state" signal A.status "needs-decision: A" || fail "seed wake failed"
-  owed 1 || fail "queued A was not owed"
-  owed 2 && fail "another queued sequence satisfied B"
-  out=$(FM_STATE_OVERRIDE="$state" "$DRAIN" 2>&1) || fail "drain failed"
-  ack_line=$(printf '%s\n' "$out" | grep '^WAKE_ACK_REQUIRED:') || fail "drain printed no acknowledgement command"
-  ack_seq=$(printf '%s\n' "$ack_line" | sed 's/.*--ack-through \([0-9]*\).*/\1/')
-  ack_gen=$(printf '%s\n' "$ack_line" | sed 's/.*--recovery-generation \([A-Za-z0-9._-]*\).*/\1/')
-  owed 1 || fail "presented but unacknowledged A was not owed"
-  append_wake "$state" signal B.status "needs-decision: A" || fail "B append failed"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$ack_seq" --recovery-generation "$ack_gen" >/dev/null 2>&1 \
-    || fail "acknowledgement failed"
-  owed 1 && fail "acknowledged A was owed while an identical B remained pending"
-  owed 2 || fail "pending B was not owed after A acknowledgement"
-
-  FM_STATE_OVERRIDE="$state" "$GRANT" activate "$$" owed-actor || fail "branch activation failed"
-  FM_STATE_OVERRIDE="$state" "$GRANT" publish owed-actor 2 || fail "branch grant failed"
-  owed 2 && fail "main was owed a branch-reserved sequence"
-  actor=branch
-  owed 2 || fail "branch was not owed its granted sequence"
-  append_wake "$state" signal C.status "signal: C" || fail "C append failed"
-  owed 3 && fail "branch was owed a main-owned sequence"
-  actor=main
-  owed 3 || fail "main was not owed its unreserved sequence"
-  FM_STATE_OVERRIDE="$state" "$GRANT" deactivate "$$" owed-actor || fail "branch deactivation failed"
-  owed 2 || fail "main did not reclaim the released sequence"
-  actor=branch
-  owed 2 && fail "branch without a grant was owed a sequence"
-  actor=main
-
   literal=$'signal: literal \\n \\t \\123 "quote" [.*] $dollar\tab\rcr\nline'
-  append_wake "$state" signal literal.status "$literal" || fail "literal append failed"
-  owed 4 || fail "serialized multiline payload changed its row identity"
-  owed 'signal: literal' && fail "headline text was accepted instead of a sequence"
-  owed 04 && fail "a different sequence spelling matched"
-  before=$(cat "$state"/.wake-* "$state"/.branch-* "$state/.watcher-down" 2>/dev/null; ls -A "$state")
-  owed 4 || fail "read-only query failed"
-  after=$(cat "$state"/.wake-* "$state"/.branch-* "$state/.watcher-down" 2>/dev/null; ls -A "$state")
-  [ "$before" = "$after" ] || fail "--owed changed the durable record"
-  [ ! -s "$dir/owed.out" ] && [ ! -s "$dir/owed.err" ] || fail "--owed was not silent"
+  append_wake "$state" signal same.status "$literal" || fail "first append failed"
+  append_wake "$state" signal same.status "signal: newer same-key row" || fail "second append failed"
+  cp "$state/.wake-queue" "$dir/expected"
+  mkdir "$state/.wake-queue.lock"
+  printf '%s\n' "$$" > "$state/.wake-queue.lock/pid"
+  printf 'leftover scratch\n' > "$state/.wake-queue.retire.abandoned"
+  cp -R "$state" "$dir/state.before"
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued \
+    > "$dir/queued.out" 2> "$dir/queued.err" &
+  query_pid=$!
+  wait_for_exit "$query_pid" 100 || fail "read-only query waited for the queue lock"
+  cmp -s "$dir/expected" "$dir/queued.out" || fail "query changed TSV bytes, append order, or same-key rows"
+  [ ! -s "$dir/queued.err" ] || fail "successful query emitted presentation diagnostics"
+  diff -r "$dir/state.before" "$state" >/dev/null || fail "query changed durable state or scratch/lock ownership"
+  rm -rf "$state/.wake-queue.lock"
 
-  mkdir "$dir/failed-awk"
-  cat > "$dir/failed-awk/awk" <<'SH'
-#!/usr/bin/env bash
-printf '1\n'
-exit 2
-SH
-  chmod +x "$dir/failed-awk/awk"
-  PATH="$dir/failed-awk:$PATH" owed 4 && fail "a failed queue read authorized delivery"
-
-  chmod 000 "$state/.wake-queue" || fail "could not make queue unreadable"
-  owed 4 && { chmod 600 "$state/.wake-queue"; fail "unreadable queue was owed"; }
-  chmod 600 "$state/.wake-queue" || fail "could not restore queue"
-  printf '1\tbad\tsignal\tkey\tsignal: A\ninvalid\n' > "$state/.wake-queue"
-  owed 1 && fail "structurally invalid row satisfied a sequence"
-  : > "$state/.wake-queue"
-  for marker in pending:downtime:g1 announced:downtime:g2 pending:handling:g3 announced:handling:g4 acked:downtime:g5 'not a marker'; do
-    printf '%s\n' "$marker" > "$state/.watcher-down"
-    owed 1 && fail "marker-only state $marker was owed"
-  done
-  for out in missing extra; do
-    rc=0
-    if [ "$out" = missing ]; then
-      FM_STATE_OVERRIDE="$state" "$DRAIN" --owed >/dev/null 2>&1 || rc=$?
-    else
-      FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 1 extra >/dev/null 2>&1 || rc=$?
-    fi
-    [ "$rc" -eq 2 ] || fail "--owed $out arguments were not refused (rc=$rc)"
-  done
-  pass "fm-wake-drain --owed SEQUENCE: exact actor-owned queued identity, silent and read-only"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" || fail "presentation failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" || fail "presented query failed"
+  cmp -s "$dir/expected" "$dir/queued.out" || fail "presentation consumed unacknowledged rows"
+  append_wake "$state" signal late.status "$literal" || fail "late append failed"
+  awk -F '\t' '$2 == 3' "$state/.wake-queue" > "$dir/late.expected"
+  ack_drain_err "$state" "$dir/drain.err" > "$dir/ack.out" 2> "$dir/ack.err" || fail "acknowledgement failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" || fail "post-ack query failed"
+  cmp -s "$dir/late.expected" "$dir/queued.out" || fail "partial acknowledgement hid or changed the late row"
+  pass "--queued returns exact append-order rows without presentation, locks, or acknowledgement side effects"
 }
 
 test_uncountable_queue_still_raises_the_pending_alarm() {
@@ -2005,120 +1954,119 @@ test_main_ack_leaves_a_row_that_arrived_after_its_drain_unclaimed() {
   pass "main's acknowledgement leaves a row that arrived after its drain for whichever actor takes it next"
 }
 
-test_watcher_close_emits_only_its_committed_rows() {
-  local dir state mode seq
-  for mode in single decision-batch multiline merge; do
-    dir=$(make_case "close-rows-$mode")
-    state="$dir/state"
-    mkdir -p "$dir/config" "$dir/data"
-    append_wake "$state" check prior "check: A already being handled" || fail "A append failed"
-    FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/A.out" 2> "$dir/A.err" || fail "A drain failed"
-    FM_STATE_OVERRIDE="$state" FM_HOME="$dir" bash -c '
-      . "$1/bin/fm-push-transition-lib.sh"
-      FM_WATCH_DELIVERY_PID=${BASHPID:-$$}
-      case "$2" in
-        single)
-          fm_wake_append signal B.status "signal: B" || exit 1
-          wake "signal: B"
-          ;;
-        decision-batch)
-          fm_wake_append signal B.status "needs-decision: B.status C.status" || exit 1
-          fm_wake_append signal C.status "signal: B.status C.status" || exit 1
-          wake "signal: B.status C.status"
-          ;;
-        multiline)
-          reason=$(printf "check: B.check.sh: first\nsecond\tthird\rfourth")
-          fm_wake_append check B.check.sh "$reason" || exit 1
-          wake "$reason"
-          ;;
-        merge)
-          . "$1/bin/fm-merge-outcome-lib.sh"
-          fm_merge_outcome_report "$FM_HOME" "$STATE" B https://github.com/o/r/pull/7 poll external || exit 1
-          wake "check: B.check.sh: merged"
-          ;;
-      esac
-    ' _ "$ROOT" "$mode" > "$dir/B.out" 2> "$dir/B.err" || fail "$mode close failed"
-    FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 1 || fail "$mode close consumed A before its acknowledgement"
-    awk -F '\t' '$2 != 1 { printf "wake-row: %s\t%s\n", $2, $5 }' "$state/.wake-queue" > "$dir/expected.err"
-    awk -F '\t' '$2 != 1 { print $2 }' "$state/.wake-queue" > "$dir/B.seqs"
-    [ -s "$dir/expected.err" ] || fail "$mode close did not commit any row"
-    cmp -s "$dir/expected.err" "$dir/B.err" \
-      || fail "$mode notification was not exactly its own canonical committed rows: $(cat "$dir/B.err")"
-    ack_drain_err "$state" "$dir/A.err" > "$dir/A-ack.out" 2> "$dir/A-ack.err" \
-      || fail "$mode acknowledgement of A failed: $(cat "$dir/A-ack.err")"
-    FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 1 && fail "$mode acknowledgement left A owed"
-    while IFS= read -r seq; do
-      FM_STATE_OVERRIDE="$state" "$DRAIN" --owed "$seq" || fail "$mode acknowledgement of A swallowed B row $seq"
-    done < "$dir/B.seqs"
+test_queued_empty_and_missing_state_succeed_without_writes() {
+  local dir state actor marker
+  dir=$(make_case queued-empty)
+  state="$dir/missing-state"
+  for actor in main branch; do
+    FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR="$actor" "$DRAIN" --queued \
+      > "$dir/queued.out" 2> "$dir/queued.err" || fail "$actor missing-state query failed"
+    [ ! -e "$state" ] || fail "missing-state query created state"
+    [ ! -s "$dir/queued.out" ] && [ ! -s "$dir/queued.err" ] || fail "missing-state query was not empty"
   done
-  pass "watcher closes publish only their own sequence-correlated canonical rows while earlier work remains queued"
+  state="$dir/state"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" || fail "missing-queue query failed"
+  [ ! -s "$dir/queued.out" ] && [ ! -e "$state/.wake-queue" ] || fail "missing queue was created or returned work"
+  : > "$state/.wake-queue"
+  for marker in pending:downtime:g1 announced:downtime:g2 pending:handling:g3 announced:handling:g4 acked:downtime:g5 'not a marker'; do
+    printf '%s\n' "$marker" > "$state/.watcher-down"
+    FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" || fail "empty query failed for $marker"
+    [ ! -s "$dir/queued.out" ] && [ ! -s "$dir/queued.err" ] || fail "marker-only state returned work or diagnostics"
+    [ "$(cat "$state/.watcher-down")" = "$marker" ] || fail "empty query changed recovery state"
+  done
+  pass "--queued succeeds empty for missing state/queue and marker-only state without creating records"
 }
 
-test_process_event_close_emits_only_surfaced_keys() {
-  local dir state pid
-  dir=$(make_case close-process-event-rows)
+test_queued_respects_live_and_stale_branch_grants() {
+  local dir state owner
+  dir=$(make_case queued-actor-grants)
   state="$dir/state"
-  mkdir -p "$dir/config" "$dir/data"
-  printf '{"rows":[]}\n' > "$state/open-loops.json"
-  append_wake "$state" check prior "check: A already being handled" || fail "A append failed"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/A.out" 2> "$dir/A.err" || fail "A drain failed"
-  append_wake "$state" check procevent:B:1 "check: captured B" || fail "captured process event append failed"
-  append_wake "$state" check procevent:C:stranded:1 "check: stranded C" || fail "stranded process event append failed"
-  PATH="$dir/fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_HOME="$dir" \
-    FM_WATCH_HANDLING_SUCCESSOR=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
-    "$WATCH" > "$dir/B.out" 2> "$dir/B.err" &
-  pid=$!
-  wait_for_exit "$pid" 100 || fail "watcher did not surface the queued process events"
-  grep -F 'process-event result captured: procevent:B:1' "$dir/B.out" >/dev/null \
-    || fail "captured process event was not surfaced"
-  grep -F 'process-event source stranded: procevent:C:stranded:1' "$dir/B.out" >/dev/null \
-    || fail "stranded process event was not surfaced"
-  awk -F '\t' '$2 != 1 { printf "wake-row: %s\t%s\n", $2, $5 }' "$state/.wake-queue" > "$dir/expected.err"
-  awk '/^wake-row: / { print }' "$dir/B.err" > "$dir/rows.err"
-  cmp -s "$dir/expected.err" "$dir/rows.err" \
-    || fail "process-event close included an unrelated row or omitted a surfaced key: $(cat "$dir/B.err")"
-  ack_drain_err "$state" "$dir/A.err" > "$dir/A-ack.out" 2> "$dir/A-ack.err" \
-    || fail "process-event fixture acknowledgement of A failed"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 2 || fail "A acknowledgement swallowed captured B"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 3 || fail "A acknowledgement swallowed stranded C"
-  pass "process-event close publishes every surfaced key and no previously queued unrelated row"
+  append_wake "$state" signal branch.status "signal: branch" || fail "branch row append failed"
+  sleep 30 &
+  owner=$!
+  FM_STATE_OVERRIDE="$state" "$GRANT" activate "$owner" queued-grant || {
+    kill "$owner" 2>/dev/null || true
+    fail "branch activation failed"
+  }
+  FM_STATE_OVERRIDE="$state" "$GRANT" publish queued-grant 1 || {
+    kill "$owner" 2>/dev/null || true
+    fail "branch grant failed"
+  }
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued > "$dir/main.out" || fail "held-only query failed"
+  [ ! -s "$dir/main.out" ] || fail "main received a live branch-reserved row"
+  append_wake "$state" signal main.status "signal: main" || fail "main row append failed"
+  awk -F '\t' '$2 == 1' "$state/.wake-queue" > "$dir/branch.expected"
+  awk -F '\t' '$2 == 2' "$state/.wake-queue" > "$dir/main.expected"
+  cp -R "$state" "$dir/live.before"
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued > "$dir/main.out" || fail "main query failed"
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=branch "$DRAIN" --queued > "$dir/branch.out" || fail "branch query failed"
+  cmp -s "$dir/main.expected" "$dir/main.out" || fail "main query did not return exactly its unreserved row"
+  cmp -s "$dir/branch.expected" "$dir/branch.out" || fail "branch query did not return exactly its granted row"
+  diff -r "$dir/live.before" "$state" >/dev/null || fail "live-grant queries changed ownership state"
+  kill "$owner" 2>/dev/null || true
+  wait "$owner" 2>/dev/null || true
+  cp -R "$state" "$dir/stale.before"
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued > "$dir/main.out" || fail "stale-grant main query failed"
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=branch "$DRAIN" --queued > "$dir/branch.out" || fail "stale-grant branch query failed"
+  cmp -s "$state/.wake-queue" "$dir/main.out" || fail "stale grant did not return all rows to main"
+  [ ! -s "$dir/branch.out" ] || fail "stale branch received rows"
+  diff -r "$dir/stale.before" "$state" >/dev/null || fail "query reclaimed stale-grant files rather than only reading"
+  pass "--queued filters live branch ownership and reads stale grants without repairing state"
 }
 
-test_contribution_close_emits_only_reported_keys() {
-  local dir state pid
-  dir=$(make_case close-contribution-rows)
+test_queued_refuses_invalid_arguments_and_failed_or_malformed_reads() {
+  local dir state rc record
+  dir=$(make_case queued-failures)
   state="$dir/state"
-  mkdir -p "$dir/config" "$dir/data"
-  printf '{"rows":[]}\n' > "$state/open-loops.json"
-  append_wake "$state" check prior "check: A already being handled" || fail "A append failed"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/A.out" 2> "$dir/A.err" || fail "A drain failed"
-  cat > "$state/contributions.check.sh" <<'SH'
+  append_wake "$state" signal valid.status "signal: valid" || fail "seed append failed"
+  cp "$state/.wake-queue" "$dir/valid.queue"
+  cp -R "$state" "$dir/state.before"
+  for record in extra --reemit; do
+    rc=0
+    FM_STATE_OVERRIDE="$state" "$DRAIN" --queued "$record" > "$dir/queued.out" 2> "$dir/queued.err" || rc=$?
+    [ "$rc" -eq 2 ] || fail "query accepted extra argument $record (rc=$rc)"
+    [ ! -s "$dir/queued.out" ] || fail "invalid arguments returned rows"
+  done
+  rc=0
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=invalid "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" || rc=$?
+  [ "$rc" -eq 2 ] || fail "query accepted an invalid actor (rc=$rc)"
+  diff -r "$dir/state.before" "$state" >/dev/null || fail "argument failures changed state"
+
+  mkdir "$dir/failed-awk"
+  cat > "$dir/failed-awk/awk" <<'SH'
 #!/usr/bin/env bash
-. "$FM_CLOSE_ROWS_ROOT/bin/fm-wake-lib.sh"
-for key in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc; do
-  fm_wake_append check "contribution-$key" "check: contributions B $key" || exit 1
-  printf 'contribution-wake: check: contributions B %s\n' "$key"
-done
+printf '1\t1\tsignal\tkey\tsignal: false read\n'
+exit 2
 SH
-  chmod 0700 "$state/contributions.check.sh"
-  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" contributions >/dev/null \
-    || fail "could not register contribution check fixture"
-  PATH="$dir/fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_HOME="$dir" FM_CLOSE_ROWS_ROOT="$ROOT" \
-    FM_WATCH_HANDLING_SUCCESSOR=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 \
-    "$WATCH" > "$dir/B.out" 2> "$dir/B.err" &
-  pid=$!
-  wait_for_exit "$pid" 100 || fail "watcher did not surface contribution check output"
-  [ "$(awk '/^check: contributions B / { n++ } END { print n+0 }' "$dir/B.out")" -eq 2 ] \
-    || fail "contribution close did not report both external rows: $(cat "$dir/B.out")"
-  awk -F '\t' '$2 != 1 { printf "wake-row: %s\t%s\n", $2, $5 }' "$state/.wake-queue" > "$dir/expected.err"
-  awk '/^wake-row: / { print }' "$dir/B.err" > "$dir/rows.err"
-  cmp -s "$dir/expected.err" "$dir/rows.err" \
-    || fail "contribution close included an unrelated row or omitted a reported key: $(cat "$dir/B.err")"
-  ack_drain_err "$state" "$dir/A.err" > "$dir/A-ack.out" 2> "$dir/A-ack.err" \
-    || fail "contribution fixture acknowledgement of A failed"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 2 || fail "A acknowledgement swallowed the first contribution row"
-  FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 3 || fail "A acknowledgement swallowed the second contribution row"
-  pass "contribution close publishes its reported external rows without expanding the queue"
+  chmod +x "$dir/failed-awk/awk"
+  PATH="$dir/failed-awk:$PATH" FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+    && fail "failed queue read succeeded"
+  [ ! -s "$dir/queued.out" ] || fail "failed read leaked rows"
+  chmod 000 "$state/.wake-queue" || fail "could not make queue unreadable"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+    && { chmod 600 "$state/.wake-queue"; fail "unreadable queue succeeded"; }
+  chmod 600 "$state/.wake-queue" || fail "could not restore queue permissions"
+  [ ! -s "$dir/queued.out" ] || fail "unreadable query returned rows"
+  chmod 000 "$state" || fail "could not make state inaccessible"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+    && { chmod 700 "$state"; fail "inaccessible queue path succeeded as empty"; }
+  chmod 700 "$state" || fail "could not restore state permissions"
+  [ ! -s "$dir/queued.out" ] || fail "inaccessible queue path returned rows"
+  for record in $'1\tbad\tsignal\tkey\tpayload' 'invalid' $'1\t9\tsignal\tkey' $'1\t9\tsignal\tkey\tpayload\textra' $'bad\t9\tsignal\tkey\tpayload' $'1\t9\tunknown\tkey\tpayload'; do
+    cat "$dir/valid.queue" > "$state/.wake-queue"
+    printf '%s\n' "$record" >> "$state/.wake-queue"
+    cp "$state/.wake-queue" "$dir/malformed.before"
+    FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+      && fail "malformed record query succeeded: $record"
+    [ ! -s "$dir/queued.out" ] || fail "malformed queue leaked its valid prefix"
+    cmp -s "$dir/malformed.before" "$state/.wake-queue" || fail "query repaired malformed records"
+  done
+  rm "$state/.wake-queue"
+  mkdir "$state/.wake-queue"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+    && fail "queue directory succeeded as an empty queue"
+  [ ! -s "$dir/queued.out" ] || fail "invalid queue path returned rows"
+  pass "--queued rejects invalid arguments, unreadable paths, failed reads, and malformed rows without returning work"
 }
 
 test_actor_filter_precedes_same_key_deduplication() {
@@ -3985,16 +3933,18 @@ SH
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
-if [ "${1:-}" = --close-row-emission ]; then
-  test_watcher_close_emits_only_its_committed_rows
-  test_process_event_close_emits_only_surfaced_keys
-  test_contribution_close_emits_only_reported_keys
+if [ "${1:-}" = --queued-query ]; then
+  test_queued_preserves_rows_and_state_until_acknowledgement
+  test_queued_empty_and_missing_state_succeed_without_writes
+  test_queued_respects_live_and_stale_branch_grants
+  test_queued_refuses_invalid_arguments_and_failed_or_malformed_reads
   exit 0
 fi
 
-test_watcher_close_emits_only_its_committed_rows
-test_process_event_close_emits_only_surfaced_keys
-test_contribution_close_emits_only_reported_keys
+test_queued_preserves_rows_and_state_until_acknowledgement
+test_queued_empty_and_missing_state_succeed_without_writes
+test_queued_respects_live_and_stale_branch_grants
+test_queued_refuses_invalid_arguments_and_failed_or_malformed_reads
 test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking
 test_lock_wait_ends_when_the_lock_directory_is_gone
@@ -4037,7 +3987,6 @@ test_main_drain_excludes_rows_already_granted_to_branch
 test_branch_ack_commits_secondmate_stall_receipts
 test_main_is_never_told_to_drain_rows_only_the_branch_owns
 test_uncountable_queue_still_raises_the_pending_alarm
-test_owed_reports_whether_a_drain_would_still_hand_over_work
 test_unconsumable_rows_are_retired_instead_of_wedging_the_queue
 test_branch_grant_refuses_rows_already_claimed_by_main
 test_main_ack_leaves_a_row_that_arrived_after_its_drain_unclaimed
