@@ -47,10 +47,10 @@ _fm_open_decisions_cursor_path() {  # <status-file> [<out-var>]
 # Identity/size reader seams bypass batching and keep their per-file calls.
 # An unavailable batch or unrepresentable path falls back to per-file metadata.
 _fm_status_stat_batch_into() {  # <state> <out-var>
-  local __fm_sb_file __fm_sb_data='' __fm_sb_files=()
+  local __fm_sb_file __fm_sb_data='' __fm_sb_files=() __fm_sb_manifest="$1/.status-presentation-cursor"
   printf -v "$2" '%s' ''
-  [ -z "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ] || return 0
-  for __fm_sb_file in "$1"/*.status; do
+  for __fm_sb_file in "$__fm_sb_manifest" "$1"/*.status; do
+    if [ "$__fm_sb_file" != "$__fm_sb_manifest" ] && [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then continue; fi
     [ -f "$__fm_sb_file" ] && [ -r "$__fm_sb_file" ] && [ ! -L "$__fm_sb_file" ] || continue
     # Unusual path bytes cannot be represented in this private row format.
     case "$__fm_sb_file" in *$'\t'*|*$'\n'*) return 0 ;; esac
@@ -165,8 +165,11 @@ _fm_status_stat_into() {  # <file> <ident-var> <size-var> <mtime-var>
 # drain's processes. Fails when the file cannot be opened. Trailing newlines
 # are kept, and the line loops that consume the text skip blank rows.
 _fm_read_file_into() {  # <file> <out-var>
-  local __fm_rf_data=
-  { IFS= read -r -d '' __fm_rf_data || :; } 2>/dev/null < "$1" || return 1
+  local __fm_rf_data= __fm_rf_size LC_ALL=C
+  _fm_status_stat_raw "$1" '' __fm_rf_size '' || return 1
+  case "$__fm_rf_size" in ''|*[!0-9]*) return 1 ;; esac
+  { [ "$__fm_rf_size" -eq 0 ] || IFS= read -r -d '' -n "$__fm_rf_size" __fm_rf_data; } 2>/dev/null < "$1" || return 1
+  [ "${#__fm_rf_data}" -eq "$__fm_rf_size" ] || return 1
   printf -v "$2" '%s' "$__fm_rf_data"
 }
 

@@ -369,6 +369,88 @@ test_snapshot_failure_is_visible() {
   pass "snapshot failures are reported visibly"
 }
 
+test_manifest_read_failure_does_not_replay_or_replace_receipts() {
+  local dir state out err owner mode prefix
+  dir=$(make_case manifest-read-failure); state="$dir/state"
+  out="$dir/drain.out"; err="$dir/drain.err"
+  printf 'note: handled neighboring note\n' > "$state/a-neighbor.status"
+  printf 'note: handled answer note\n' > "$state/b-answer.status"
+  printf 'done: handled completion\n' > "$state/c-done.status"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2>/dev/null \
+    || fail "could not establish handled note and completion receipts"
+  cp "$state/.status-presentation-cursor" "$dir/original.cursor"
+  IFS= read -r prefix < "$dir/original.cursor"
+  prefix+=$'\n'
+  printf 'note: new answer after the receipt\n' >> "$state/b-answer.status"
+  for owner in status_acknowledge_presented_snapshot print_status_outcome_backstop_section status_commit_presentation_snapshot fm_wake_print_annotations; do
+    if [ "$owner" = fm_wake_print_annotations ]; then
+      append_wake "$state" signal b-answer.status 'signal: b-answer.status' \
+        || fail "could not queue the manifest-failure signal annotation"
+    fi
+    for mode in empty prefix; do
+      FM_STATE_OVERRIDE="$state" FM_MANIFEST_FAULT_OWNER="$owner" FM_MANIFEST_FAULT_MODE="$mode" \
+        FM_MANIFEST_FAULT_PREFIX="$prefix" FM_MANIFEST_FAULT_LOG="$dir/fault.log" bash -c '
+        read() {
+          local __test_frame
+          if [ "${FUNCNAME[1]:-}" = _fm_read_file_into ]; then
+            for __test_frame in "${FUNCNAME[@]}"; do
+              if [ "$__test_frame" = "$FM_MANIFEST_FAULT_OWNER" ]; then
+                printf "read failure\n" >> "$FM_MANIFEST_FAULT_LOG"
+                case "$FM_MANIFEST_FAULT_MODE" in
+                  empty) printf -v "${!#}" "%s" "" ;;
+                  prefix) printf -v "${!#}" "%s" "$FM_MANIFEST_FAULT_PREFIX" ;;
+                esac
+                return 1
+              fi
+            done
+          fi
+          builtin read "$@"
+        }
+        drain=$1; shift
+        . "$drain"
+      ' _ "$DRAIN" > "$out" 2> "$err" \
+        || fail "drain exited instead of reporting incomplete presentation"
+      [ -s "$dir/fault.log" ] || fail "manifest failure was not exercised for $owner/$mode"
+      rm -f "$dir/fault.log"
+      if [ "$owner" = fm_wake_print_annotations ]; then
+        if grep -F 'wake annotation:' "$out" >/dev/null; then fail "failed manifest read published a signal annotation"; fi
+      elif [ "$owner" != status_commit_presentation_snapshot ] && [ -s "$out" ]; then
+        fail "manifest read failure published an incomplete presentation for $owner/$mode: $(cat "$out")"
+      fi
+      cmp -s "$dir/original.cursor" "$state/.status-presentation-cursor" \
+        || fail "manifest read failure replaced a handled receipt for $owner/$mode"
+      if grep -E 'handled neighboring note|handled answer note|handled completion' "$out" >/dev/null; then
+        fail "manifest read failure replayed handled status for $owner/$mode: $(cat "$out")"
+      fi
+    done
+  done
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$out" 2> "$err" \
+    || fail "drain did not recover after the manifest read failure"
+  grep -F 'b-answer note: new answer after the receipt' "$out" >/dev/null \
+    || fail "the failed presentation swallowed the new note"
+  if grep -E 'handled neighboring note|handled answer note|handled completion' "$out" >/dev/null; then
+    fail "recovery replayed previously handled status: $(cat "$out")"
+  fi
+  pass "failed or partial manifest reads abort all receipt consumers without replay or replacement"
+}
+
+test_manifest_reader_preserves_complete_bytes() {
+  . "$ROOT/bin/fm-status-io-lib.sh"
+  local dir input actual
+  dir=$(make_case manifest-reader-bytes)
+  for input in '' $'row\tidentity\t42\t42\n' $'row\tidentity\t42\t42\n\n' $'row\tidentité\t42\t42'; do
+    printf '%s' "$input" > "$dir/manifest"
+    actual=unchanged
+    _fm_read_file_into "$dir/manifest" actual || fail "complete manifest read failed"
+    [ "$actual" = "$input" ] || fail "complete manifest read changed persisted bytes"
+  done
+  printf 'row\tidentity\t42\t42\000another\tidentity\t1\t1\n' > "$dir/manifest"
+  actual=unchanged
+  if _fm_read_file_into "$dir/manifest" actual; then fail "manifest reader accepted an incomplete NUL-delimited prefix"; fi
+  [ "$actual" = unchanged ] || fail "failed manifest read published partial bytes"
+  pass "manifest reader preserves empty, unterminated, multibyte and trailing-newline bytes"
+}
+
 test_open_decisions_fold_is_unchanged() {
   local dir state out
   dir=$(make_case open-decisions-regression)
@@ -673,6 +755,8 @@ test_snapshot_does_not_ack_a_later_append
 test_retired_task_id_starts_new_status_unread
 test_weak_identity_still_presents_and_advances
 test_snapshot_failure_is_visible
+test_manifest_read_failure_does_not_replay_or_replace_receipts
+test_manifest_reader_preserves_complete_bytes
 test_open_decisions_fold_is_unchanged
 test_empty_queue_does_not_swallow_later_signal_annotation
 test_routine_working_and_covered_done_stay_silent_on_the_empty_queue
