@@ -23,7 +23,8 @@
 //   - The arming tool is fm_watch_arm_omp and its human fallback
 //     /fm-watch-arm-omp; the loaded-build marker is state/.omp-watch-extension-loaded.
 //   - Supervision host: a home opted in with config/supervision-host
-//     (docs/configuration.md "Supervision host" owns the opt-in) spawns
+//     (docs/configuration.md "Supervision host" owns the gate, which
+//     bin/fm-supervision-engine-lib.sh enabled answers; config/supervision-host-off opts out) spawns
 //     bin/fm-supervision-host.sh park --restart in the arm's place, which
 //     takes away-posture wakes itself and closes only when main is needed; its
 //     header owns the output read here. A "supervision-host:" line is
@@ -32,8 +33,8 @@
 //     eight-line cap. The host
 //     prints the first cycle's status line as soon as it is verified, so
 //     readiness and the handling handoff work as they do for the arm, with a
-//     longer readiness budget for the host's own startup. Without the file
-//     nothing below changes.
+//     longer readiness budget for the host's own startup. On a home that does
+//     not run the host nothing below changes.
 //
 // Session-generation ownership (stated once here):
 // omp emits session_shutdown for ordinary same-process replacements (/new,
@@ -131,6 +132,8 @@ type SessionGeneration = {
   // replacement began still needs to distinguish unconsumed wakes from
   // consumed ones.
   unconsumedWakes: Map<string, UnconsumedWake>;
+  restorePendingWaits: number;
+  queueStuckReported: boolean;
   // A verified successor's failure close that arrived while the pipeline was
   // still delivering the wake it was started for; its bounded retry runs once
   // that delivery settles instead of being skipped by the single-flight guard.
@@ -263,8 +266,28 @@ function completedActionableLine(output: string): string {
   return newline < 0 ? "" : actionableLine(output.slice(0, newline + 1));
 }
 
+// An away record, never quiet mode's (bin/fm-afk-contract.sh mode owns that
+// reading): a record whose mode cannot be read as quiet reads as away.
+function awayRecordPresent(): boolean {
+  if (!existsSync(`${state}/.afk-contract`)) return false;
+  const result = spawnSync("bash", [`${fmRoot}/bin/fm-afk-contract.sh`, "mode"], {
+    encoding: "utf8",
+    env: { ...process.env, FM_STATE_OVERRIDE: state },
+  });
+  return String(result.stdout || "").trim() !== "quiet";
+}
+
+// Whether this home runs the supervision host for an omp primary; the gate's
+// owner answers, and a query that cannot run reads as no host.
+function hostModeEnabled(): boolean {
+  const result = spawnSync("bash", [`${fmRoot}/bin/fm-supervision-engine-lib.sh`, "enabled", config, "omp"], {
+    stdio: "ignore",
+  });
+  return result.status === 0;
+}
+
 // The host-mode wake message: every "supervision-host:" line in order, wake
-// lines capped at eight, and the away note while the posture record exists.
+// lines capped at eight, and the away note while an away record exists.
 function hostWakeMessage(output: string): string {
   let shown = 0;
   const lines = output.split(/\r?\n/).filter((line) => {
@@ -276,7 +299,7 @@ function hostWakeMessage(output: string): string {
     return false;
   });
   if (lines.length === 0) return "";
-  if (existsSync(`${state}/.afk-contract`)) {
+  if (awayRecordPresent()) {
     lines.push("This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.");
   }
   return lines.join("\n");
@@ -472,6 +495,8 @@ function createGeneration(): SessionGeneration {
     pendingActionables: [],
     cleanupFailure: "",
     unconsumedWakes: new Map(),
+    restorePendingWaits: 0,
+    queueStuckReported: false,
     deferredClose: null,
   };
 }
@@ -565,12 +590,7 @@ type StrandedWake = {
   remainder: string;
 };
 
-// Finds the first complete Firstmate watcher wake in the editor text: envelope
-// header, wake body, and the fixed closing sentence, bounded by editor edges or
-// omp's blank-line joins, with the leading transport mark present or absent.
-// Anything else - an edited, truncated, prefixed, or suffixed wake and every
-// byte of operator text - is not a wake and is never reported as one.
-function findStrandedWake(editor: string): StrandedWake | null {
+function findStrandedWake(editor: string, eligible: (content: string) => boolean): StrandedWake | null {
   if (!editor.includes(wakeBodyPrefix)) return null;
   const header = watcherEnvelopeHeader();
   if (!header) return null;
@@ -588,12 +608,14 @@ function findStrandedWake(editor: string): StrandedWake | null {
     if (editor.slice(from, closing).includes(opening)) continue;
     const stop = closing + wakeBodySuffix.length;
     if (stop !== editor.length && editor.slice(stop, stop + 2) !== "\n\n") continue;
+    const content = mark + editor.slice(at, stop);
+    if (!eligible(content)) continue;
     let cutStart = start;
     let cutEnd = stop;
     if (cutStart >= 2 && editor.slice(cutStart - 2, cutStart) === "\n\n") cutStart -= 2;
     else if (editor.slice(cutEnd, cutEnd + 2) === "\n\n") cutEnd += 2;
     return {
-      content: mark + editor.slice(at, stop),
+      content,
       remainder: editor.slice(0, cutStart) + editor.slice(cutEnd),
     };
   }
@@ -670,18 +692,16 @@ export default function (pi: ExtensionAPI) {
   // Restored-wake recovery state. The context is whichever one omp passed to
   // the latest event: timers run outside any handler, and a context that went
   // stale with a replaced session throws on use, which only skips the check.
-  const restoreCheckMs = positiveInteger("FM_OMP_RESTORE_CHECK_MS", 2000);
+  const restoreCheckMs = 2000;
   const restoreAttemptLimit = 3;
   // Further checks that wait for omp's queue to drain into a run before an idle
   // session's queue counts as stuck; a compaction can hold the queue for a while.
-  const restorePendingWaitLimit = positiveInteger("FM_OMP_RESTORE_PENDING_WAITS", 15);
-  const strandedPollMs = positiveInteger("FM_OMP_STRANDED_WAKE_POLL_MS", 3000);
+  const restorePendingWaitLimit = 15;
+  const strandedPollMs = 3000;
   const restoreAttempts = new Map<string, number>();
   const strandedAttempts = new Map<string, number>();
   let restoreTimer: ReturnType<typeof setTimeout> | null = null;
   let strandedTimer: ReturnType<typeof setInterval> | null = null;
-  let restorePendingWaits = 0;
-  let queueStuckReported = false;
   let strandedSeen = "";
   let nextStrandedId = 0;
   let latestContext: any = null;
@@ -726,8 +746,8 @@ export default function (pi: ExtensionAPI) {
       scheduleRestoredWakeCheck(owner);
       return;
     }
-    if (queueStuckReported) return;
-    queueStuckReported = true;
+    if (owner.queueStuckReported) return;
+    owner.queueStuckReported = true;
     reportWait(
       ctx,
       `watcher: wake not delivered - omp is idle with queued messages it will not run, and ${restoreAttemptLimit} resubmissions did not start a turn; the wake stays in the durable queue for bin/fm-wake-drain.sh`,
@@ -735,13 +755,14 @@ export default function (pi: ExtensionAPI) {
   }
 
   function recoverRestoredWake(owner: SessionGeneration): void {
-    if (!generationIsLive(owner) || owner.unconsumedWakes.size === 0) return;
+    if (!generationIsLive(owner)) return;
     const ctx = editorContext();
     if (!ctx) return;
     try {
       // A turn that already started will consume the wake itself.
       if (!ctx.isIdle()) {
-        restorePendingWaits = 0;
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
         return;
       }
       // Queued messages normally drain into the next run within moments, so the
@@ -749,10 +770,12 @@ export default function (pi: ExtensionAPI) {
       // never run; after the bounded wait the stuck queue is handled below.
       const queued = ctx.hasPendingMessages?.() === true;
       if (!queued) {
-        restorePendingWaits = 0;
-        queueStuckReported = false;
-      } else if (restorePendingWaits < restorePendingWaitLimit) {
-        restorePendingWaits += 1;
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
+      }
+      if (owner.unconsumedWakes.size === 0) return;
+      if (queued && owner.restorePendingWaits < restorePendingWaitLimit) {
+        owner.restorePendingWaits += 1;
         scheduleRestoredWakeCheck(owner);
         return;
       }
@@ -792,26 +815,41 @@ export default function (pi: ExtensionAPI) {
     restoreTimer = timer;
   }
 
-  // An idle omp raises no event when text lands in its composer, so wake text
-  // left there unsubmitted (typed by older wiring, for one) is found by this
-  // low-rate poll. It acts only on a complete Firstmate watcher wake that
-  // stayed unchanged across two polls while omp was idle, sends it through the
-  // prompt-starting API, and removes just that wake from the editor. Operator
-  // text, an edited or partial wake, and a wake this extension still tracks
-  // (the bounded restored-wake recovery owns those) are left exactly as found.
+  // Tracked wakes retain ownership even when their composer copies are missing
+  // or edited; template matching must not bypass exact restored recovery.
+  // docs/watcher-continuity.md#omp-stranded-wake-text owns polling behavior.
   function pollStrandedWake(owner: SessionGeneration): void {
     if (!generationIsLive(owner) || lockOwnership() !== "owned") return;
     const ctx = editorContext();
     if (!ctx) return;
     try {
       if (ctx.isIdle() !== true) {
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
         strandedSeen = "";
         return;
       }
+      if (ctx.hasPendingMessages?.() !== true) {
+        owner.restorePendingWaits = 0;
+        owner.queueStuckReported = false;
+      }
       const editor = String(ctx.ui.getEditorText() ?? "");
-      const found = findStrandedWake(editor);
+      const tracked = [...owner.unconsumedWakes.values()];
+      let unownedEditor = editor;
+      for (const wake of tracked) {
+        const remainder = removeRestoredWake(unownedEditor, wake.content);
+        if (remainder === null) {
+          strandedSeen = "";
+          return;
+        }
+        unownedEditor = remainder;
+      }
       const bare = (text: string): string => (text.startsWith("\u2063") ? text.slice(1) : text);
-      if (!found || [...owner.unconsumedWakes.values()].some((wake) => bare(wake.content) === bare(found.content))) {
+      const found = findStrandedWake(editor, (content) =>
+        !tracked.some((wake) => bare(wake.content) === bare(content)) &&
+        (strandedAttempts.get(content) ?? 0) < restoreAttemptLimit,
+      );
+      if (!found) {
         strandedSeen = "";
         return;
       }
@@ -820,7 +858,6 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       const attempts = strandedAttempts.get(found.content) ?? 0;
-      if (attempts >= restoreAttemptLimit) return;
       strandedAttempts.set(found.content, attempts + 1);
       const token = `stranded-${process.pid}-${++nextStrandedId}`;
       owner.unconsumedWakes.set(token, { content: found.content });
@@ -1208,7 +1245,7 @@ export default function (pi: ExtensionAPI) {
       };
     }
     const id = ++owner.seq;
-    const hostMode = existsSync(`${config}/supervision-host`);
+    const hostMode = hostModeEnabled();
     const env: NodeJS.ProcessEnv = {
       ...process.env,
       FM_HOME: fmHome,
@@ -1357,12 +1394,16 @@ export default function (pi: ExtensionAPI) {
     rememberContext(ctx);
     const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
     if (!message || message.role !== "user") return;
+    generation.restorePendingWaits = 0;
+    generation.queueStuckReported = false;
     consumeWake(generation, userMessageText(message.content));
   });
   // A run that ends with a wake still unconsumed either drains it into the next
   // run at once or left it in the composer; the delayed check tells the two apart.
   pi.on?.("agent_end", (_event, ctx) => {
     rememberContext(ctx);
+    generation.restorePendingWaits = 0;
+    generation.queueStuckReported = false;
     scheduleRestoredWakeCheck(generation, true);
   });
 

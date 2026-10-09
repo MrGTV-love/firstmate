@@ -12,6 +12,10 @@
 #   fm-lab-home.sh tmux-dir <dir>     create or print its private tmux socket dir
 #   fm-lab-home.sh teardown <dir>     remove its private tmux socket dir
 #
+# A lab home must live outside every git work tree: an agent running inside a
+# lab inside the repository writes scratch files there, and a catch-all stage
+# step then commits them. create refuses such a directory; use
+# mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX".
 # A lab home is the stock layout only - state/, data/, config/, projects/ - and
 # callers remove it with ordinary rm -rf when done. Drive it with plain
 # FM_HOME=<dir>; any FM_*_OVERRIDE relocation defeats the allowance.
@@ -44,6 +48,15 @@ case "${1:-}" in
     [ -n "$dir" ] || { fm_lab_home_error "create requires a directory path"; exit 2; }
     if [ -e "$dir" ] && [ ! -d "$dir" ]; then
       fm_lab_home_error "refusing '$dir': exists and is not a directory"
+      exit 1
+    fi
+    probe=$dir
+    case "$probe" in /*) ;; *) probe="$PWD/$probe" ;; esac
+    while [ ! -d "$probe" ]; do
+      probe=$(dirname "$probe")
+    done
+    if env -u GIT_DIR -u GIT_WORK_TREE git -C "$probe" rev-parse --show-toplevel >/dev/null 2>&1; then
+      fm_lab_home_error "refusing '$dir': a lab home must live outside the repository; use mktemp -d \"\${TMPDIR:-/tmp}/fm-lab.XXXXXX\""
       exit 1
     fi
     mkdir -p "$dir" || exit 1

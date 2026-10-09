@@ -452,7 +452,7 @@ install_omp_extension_fixture() {  # <repo>
   mkdir -p "$repo/.omp/extensions" "$repo/.pi/extensions/lib" "$repo/bin" "$repo/node_modules/typebox"
   cp "$ROOT/.omp/extensions/fm-primary-turnend-guard.ts" "$ROOT/.omp/extensions/fm-primary-omp-watch.ts" "$repo/.omp/extensions/"
   cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" "$repo/.pi/extensions/lib/"
-  cp "$ROOT/bin/fm-operational-input.sh" "$repo/bin/"
+  cp "$ROOT/bin/fm-operational-input.sh" "$ROOT/bin/fm-supervision-engine-lib.sh" "$repo/bin/"
   chmod +x "$repo/bin/fm-operational-input.sh"
   printf '{"name":"typebox","type":"module","exports":"./index.js"}\n' > "$repo/node_modules/typebox/package.json"
   printf 'export const Type = { Object(p) { return { type: "object", properties: p }; } };\n' > "$repo/node_modules/typebox/index.js"
@@ -582,13 +582,22 @@ EOF
 # An opted-in home spawns the supervision host in the arm's place; its streamed
 # status line drives readiness and the handling handoff, and a handed-back
 # wake is delivered with every host line and the away note.
-test_watch_extension_runs_the_supervision_host() {
-  local repo home log out status
-  repo="$TMP_ROOT/watch-host/repo"; home="$TMP_ROOT/watch-host/home"; log="$TMP_ROOT/watch-host/arm.log"
+test_watch_extension_runs_the_supervision_host() {  # [away|quiet]
+  local kind=${1:-away} repo home log out status f
+  repo="$TMP_ROOT/watch-host-$kind/repo"; home="$TMP_ROOT/watch-host-$kind/home"; log="$TMP_ROOT/watch-host-$kind/arm.log"
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state" "$home/config"
   : > "$home/config/supervision-host"
-  : > "$home/state/.afk-contract"
+  if [ "$kind" = quiet ]; then
+    # Quiet mode's record is a present captain (bin/fm-afk-contract.sh AWAY OR
+    # QUIET): the extension asks the record owner, so the same handback carries
+    # no away note.
+    for f in fm-afk-contract.sh fm-classify-lib.sh fm-timeout-lib.sh; do cp "$ROOT/bin/$f" "$repo/bin/$f"; done
+    FM_HOME="$home" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter --words 'keep routine wakes off my main' >/dev/null 2>&1 \
+      || fail "fixture: could not record quiet mode"
+  else
+    : > "$home/state/.afk-contract"
+  fi
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
 if [ "${1:-}" = --handling-delivered ]; then
@@ -613,7 +622,7 @@ sleep 30
 SH
   chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
   out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
-    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+    RECORD_KIND="$kind" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync } from "node:fs";
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
@@ -642,9 +651,12 @@ for (const needle of [
   "signal: omp-host done",
   "supervision-host: the away session could not take this wake: fixture; this wake is yours",
   "supervision-host: outcome 1 for demo [captain]: fixture",
-  "not from the captain: it is not a return",
 ]) {
   if (!sent[0].m.includes(needle)) throw new Error(`the follow-up lacks '${needle}': ${sent[0].m}`);
+}
+const awayNote = sent[0].m.includes("not from the captain: it is not a return");
+if (process.env.RECORD_KIND === "quiet" ? awayNote : !awayNote) {
+  throw new Error(`the away note must appear exactly under an away record (${process.env.RECORD_KIND}): ${sent[0].m}`);
 }
 await handlers.get("before_agent_start")({ type: "before_agent_start", prompt: sent[0].m }, {});
 await handlers.get("message_start")({ message: { role: "user", content: sent[0].m } }, {});
@@ -653,9 +665,64 @@ process.exit(0);
 EOF
 )
   status=$?
-  expect_code 0 "$status" "omp watch extension host mode: $out"
+  expect_code 0 "$status" "omp watch extension host mode ($kind record): $out"
   [ -z "$out" ] || fail "omp watch extension host test printed output: $out"
-  pass ".omp watch extension: an opted-in home runs the supervision host and relays every host line"
+  pass ".omp watch extension: an opted-in home runs the supervision host and relays every host line ($kind record)"
+}
+
+# The omp owner stays file-gated: a home without config/supervision-host, or
+# one opted out by config/supervision-host-off, spawns the plain arm and never the host.
+test_watch_extension_keeps_the_arm_without_the_file_or_with_off() {
+  local line label repo home log out status
+  for line in - off; do
+    label=${line#-}; label=${label:-absent}
+    repo="$TMP_ROOT/watch-host-gate-$label/repo"; home="$TMP_ROOT/watch-host-gate-$label/home"; log="$TMP_ROOT/watch-host-gate-$label/arm.log"
+    install_omp_extension_fixture "$repo"
+    mkdir -p "$home/state" "$home/config"
+    [ "$line" = - ] || : > "$home/config/supervision-host-off"
+    cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+printf 'plain-arm=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+sleep 30
+SH
+    cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'host=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+sleep 30
+SH
+    chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
+    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_ARM_LOG="$log" \
+      EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { existsSync, writeFileSync, readFileSync } from "node:fs";
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
+const handlers = new Map(); let tool = null;
+const pi = {
+  on(e, h) { handlers.set(e, h); },
+  registerCommand() {},
+  registerTool(t) { tool = t; },
+  sendUserMessage() { return undefined; },
+};
+const mod = await import(pathToFileURL(process.env.EXT).href);
+mod.default(pi);
+await tool.execute();
+for (let i = 0; i < 60 && !existsSync(process.env.FM_ARM_LOG); i += 1) await new Promise((r) => setTimeout(r, 100));
+const rows = existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8").trim().split("\n") : [];
+if (rows.length === 0 || !rows.every((row) => row.startsWith("plain-arm="))) {
+  throw new Error(`a home that does not run the host must spawn only the plain arm: ${rows.join(" | ")}`);
+}
+await handlers.get("session_shutdown")({}, {});
+process.exit(0);
+EOF
+)
+    status=$?
+    expect_code 0 "$status" "omp watch extension gate ($label): $out"
+    [ -z "$out" ] || fail "omp watch extension gate test printed output ($label): $out"
+  done
+  pass ".omp watch extension: a home without config/supervision-host or with an off file keeps the plain arm"
 }
 
 # A host cycle boundary can close with only a "supervision-host:" line; left
@@ -806,13 +873,8 @@ EOF
 # Each scenario runs in its own process because the arm fixture fires exactly
 # one actionable close.
 run_watch_restore_scenario() {  # <scenario>
-  local scenario=$1 repo home stranded_poll_ms=3600000 restore_check_ms=2000
+  local scenario=$1 repo home
   repo="$TMP_ROOT/watch-restore-$scenario/repo"; home="$TMP_ROOT/watch-restore-$scenario/home"
-  # The stranded-wake poll is off (an hour) except where a scenario exercises it,
-  # and the restored-wake check keeps its two-second delay except for the
-  # scenarios that wait out several of its rounds.
-  case "$scenario" in stranded-*|limit-polled) stranded_poll_ms=100 ;; esac
-  case "$scenario" in pending-*|limit-polled) restore_check_ms=100 ;; esac
   install_omp_extension_fixture "$repo"
   mkdir -p "$home/state"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
@@ -841,10 +903,32 @@ SH
   # otherwise hold a command substitution open for its whole sleep.
   FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
-    FM_OMP_STRANDED_WAKE_POLL_MS="$stranded_poll_ms" FM_OMP_RESTORE_CHECK_MS="$restore_check_ms" FM_OMP_RESTORE_PENDING_WAITS=3 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, existsSync, unlinkSync } from "node:fs";
+const realSetTimeout = globalThis.setTimeout;
+const realSetInterval = globalThis.setInterval;
+const realClearTimeout = globalThis.clearTimeout;
+const manualQueue = process.env.SCENARIO === "queue-episodes";
+const restoreChecks = new Set();
+let pollCheck = null;
+const fastRestore = process.env.SCENARIO.startsWith("pending-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled"].includes(process.env.SCENARIO);
+const pollWake = process.env.SCENARIO.startsWith("stranded-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled", "editor-normalized-edited", "prepended", "appended", "appended-newline", "prepended-mark", "appended-mark", "internal-mark", "edited"].includes(process.env.SCENARIO);
+globalThis.setTimeout = (callback, delay, ...args) => {
+  if (manualQueue && delay === 2000) {
+    const timer = { callback: () => callback(...args), unref() {} };
+    restoreChecks.add(timer);
+    return timer;
+  }
+  return realSetTimeout(callback, delay === 2000 && fastRestore ? 100 : delay, ...args);
+};
+globalThis.clearTimeout = (timer) => {
+  if (!restoreChecks.delete(timer)) realClearTimeout(timer);
+};
+globalThis.setInterval = (callback, delay, ...args) => {
+  if (manualQueue && delay === 3000) pollCheck = () => callback(...args);
+  return realSetInterval(callback, delay === 3000 ? (pollWake ? 100 : 3600000) : delay, ...args);
+};
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); let tool = null; const sent = []; const turns = [];
 const transcript = [{ role: "assistant" }];
@@ -1024,7 +1108,8 @@ if (process.env.SCENARIO.startsWith("stranded-")) {
       if (!await waitFor(() => sent.length === 2)) throw new Error("settled wake text was never delivered");
       break;
     }
-    case "stranded-bounded": {
+    case "stranded-bounded":
+    case "stranded-bounded-unmarked": {
       // Text that keeps coming back must not turn delivery into a loop.
       const typed = wakeWith("signal: stranded-again");
       for (let i = 0; i < 6; i += 1) {
@@ -1033,6 +1118,11 @@ if (process.env.SCENARIO.startsWith("stranded-")) {
         turnEnds();
       }
       if (sent.length !== 4) throw new Error(`delivery was not bounded to three attempts: ${sent.length}`);
+      const later = wakeWith("signal: stranded-later");
+      const exhausted = process.env.SCENARIO === "stranded-bounded" ? typed : typed.slice(1);
+      composer.text = `${exhausted}\n\n${later}`;
+      if (!await waitFor(() => sent.length === 5)) throw new Error("an exhausted stranded wake blocked a later eligible wake");
+      if (!delivered(5, later) || composer.text !== exhausted) throw new Error("recovering a later wake changed the exhausted wake");
       break;
     }
     default:
@@ -1073,6 +1163,135 @@ const settle = async () => { await handlers.get("agent_end")({ type: "agent_end"
 const same = (item) => item.m === wake && item.o?.deliverAs === undefined;
 
 switch (process.env.SCENARIO) {
+  case "queue-episodes": {
+    const check = () => {
+      if (restoreChecks.size !== 1) throw new Error(`expected one recovery check, saw ${restoreChecks.size}`);
+      const timer = restoreChecks.values().next().value;
+      restoreChecks.delete(timer);
+      timer.callback();
+      return timer.callback;
+    };
+    const episode = (label, attempts = 3) => {
+      const count = sent.length;
+      const warnings = notices.length;
+      const content = sent.at(-1).m;
+      queued = true;
+      idle = true;
+      for (let i = 0; i < 15; i += 1) {
+        check();
+        if (sent.length !== count || notices.length !== warnings) throw new Error(`${label}: recovery acted before fifteen checks`);
+      }
+      for (let i = 1; i <= attempts; i += 1) {
+        check();
+        if (sent.length !== count + i || sent.at(-1).m !== content || sent.at(-1).o?.deliverAs !== undefined || notices.length !== warnings) throw new Error(`${label}: recovery did not submit exactly ${attempts} prompt attempts`);
+      }
+      const recheck = check();
+      const notice = notices.at(-1);
+      if (notices.length !== warnings + 1 || notice.level !== "warning" || !notice.m.includes("wake not delivered")) throw new Error(`${label}: exhausted episode did not warn`);
+      recheck();
+      if (sent.length !== count + attempts || notices.length !== warnings + 1) throw new Error(`${label}: recovery or warning repeated`);
+      if (composer.text !== "operator draft" || composer.sets.length !== 0) throw new Error(`${label}: recovery disturbed the composer`);
+    };
+    const nextWake = async () => {
+      const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(`${dir}/session-replacement-actionable.json`, "invalid");
+      idle = false;
+      const count = sent.length;
+      await tool.execute();
+      unlinkSync(`${dir}/session-replacement-actionable.json`);
+      if (sent.length !== count + 1 || sent.at(-1).o?.deliverAs !== "followUp") throw new Error("expected a fresh queued failure wake");
+    };
+    composer.text = "operator draft";
+    episode("first session");
+    await handlers.get("session_shutdown")({}, ctx);
+    idle = false;
+    const beforeReplacement = sent.length;
+    await handlers.get("session_start")({}, ctx);
+    for (let i = 0; i < 60 && sent.length === beforeReplacement; i += 1) await sleep(100);
+    if (sent.length !== beforeReplacement + 1 || sent.at(-1).m !== wake || sent.at(-1).o?.deliverAs !== "followUp") throw new Error("replacement did not replay its unconsumed wake");
+    await nextWake();
+    episode("replacement session");
+
+    await nextWake();
+    idle = true;
+    queued = false;
+    check();
+    await nextWake();
+    episode("queue drained observed by recovery", 6);
+
+    queued = false;
+    pollCheck();
+    await nextWake();
+    episode("queue drained observed by polling");
+
+    await nextWake();
+    check();
+    await nextWake();
+    episode("running turn observed by recovery", 6);
+
+    idle = false;
+    pollCheck();
+    await nextWake();
+    episode("running turn observed by polling");
+
+    await nextWake();
+    await handlers.get("before_agent_start")({ prompt: wake }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: wake }] } }, ctx);
+    episode("short accepted wake turn before completion");
+
+    await nextWake();
+    await handlers.get("before_agent_start")({ prompt: "continue work" }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: "continue work" } }, ctx);
+    episode("short accepted ordinary turn before completion");
+
+    idle = false;
+    await handlers.get("before_agent_start")({ prompt: "continue work" }, ctx);
+    await handlers.get("message_start")({ message: { role: "assistant", content: "done" } }, ctx);
+    idle = true;
+    await handlers.get("agent_end")({}, ctx);
+    await nextWake();
+    episode("short turn completion between checks");
+    break;
+  }
+  case "ownership-marked":
+  case "ownership-unmarked": {
+    const before = "\n\nbefore\u2063 draft\n\n";
+    const after = "\noperator\u2063 draft\n\n";
+    const edited = (process.env.SCENARIO === "ownership-marked" ? wake : bare).replace("signal:", "edited:");
+    composer.text = `${before}\n\n${edited}\n\n${after}`;
+    const original = composer.text;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== original) throw new Error("template matching took ownership of an edited tracked wake");
+    composer.text = `${before}\n\n${process.env.SCENARIO === "ownership-marked" ? wake : bare}\n\n${after}`;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== `${before}\n\n${after}`) throw new Error("exact restored recovery no longer preserved both drafts");
+    break;
+  }
+  case "ownership-missing": {
+    const older = wake.replace("signal: omp-restore done", "signal: older-wiring");
+    composer.text = older;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== older) throw new Error("an unaccounted tracked wake allowed template submission");
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    for (let i = 0; i < 40 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || sent[1].m !== older || sent[1].o?.deliverAs !== undefined || composer.text !== "") throw new Error("resolved ownership did not release the stranded wake");
+    break;
+  }
+  case "duplicates-edited-polled": {
+    if (sent[1].m !== wake) throw new Error("expected two identical tracked wakes");
+    const edited = bare.replace("signal:", "edited:");
+    composer.text = `${wake}\n\n${edited}`;
+    await settle();
+    if (sent.length !== 3 || !same(sent[2]) || composer.text !== edited) throw new Error("an edited duplicate bypassed restored ownership");
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    await sleep(600);
+    if (sent.length !== 3 || composer.text !== edited) throw new Error("consuming one duplicate authorized the edited duplicate");
+    composer.text = bare;
+    await settle();
+    if (sent.length !== 4 || !same(sent[3]) || composer.text !== "") throw new Error("the unchanged duplicate was no longer recoverable");
+    break;
+  }
   case "duplicates":
   case "duplicates-handoff":
   case "duplicates-streaming": {
@@ -1324,7 +1543,7 @@ switch (process.env.SCENARIO) {
     // wait is reported once and the bound holds.
     queued = true;
     await handlers.get("agent_end")({ type: "agent_end" }, ctx);
-    await sleep(1800);
+    await sleep(2800);
     if (sent.length !== 4 || !sent.slice(1).every(same)) throw new Error(`resubmission was not bounded to three attempts: ${sent.length}`);
     if (notices.length !== 1 || notices[0].level !== "warning" || !notices[0].m.includes("wake not delivered")) throw new Error(`the undelivered wake was not reported once: ${JSON.stringify(notices)}`);
     await sleep(600);
@@ -1340,6 +1559,24 @@ switch (process.env.SCENARIO) {
       await sleep(500);
     }
     if (sent.length !== 4) throw new Error(`recovery was not bounded to three resubmissions with the poll running: ${sent.length}`);
+    break;
+  }
+  case "blocked-tracked-marked":
+  case "blocked-tracked-unmarked": {
+    for (let i = 0; i < 3; i += 1) {
+      composer.text = wake;
+      await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+      await sleep(500);
+    }
+    if (sent.length !== 4) throw new Error("tracked recovery did not reach its attempt limit");
+    const exhausted = process.env.SCENARIO === "blocked-tracked-marked" ? wake : bare;
+    const older = wake.replace("signal: omp-restore done", "signal: older-wiring");
+    const before = "\n\nbefore\u2063 draft\n\n";
+    const after = "\noperator\u2063 draft\n\n";
+    composer.text = `${before}\n\n${exhausted}\n\n${older}\n\n${after}`;
+    for (let i = 0; i < 40 && sent.length < 5; i += 1) await sleep(50);
+    if (sent.length !== 5 || sent[4].m !== older || sent[4].o?.deliverAs !== undefined) throw new Error("an exhausted tracked wake blocked a later stranded wake");
+    if (composer.text !== `${before}\n\n${exhausted}\n\n${after}`) throw new Error("recovering a later wake changed tracked wake or draft bytes");
     break;
   }
   case "restore-window": {
@@ -1377,9 +1614,18 @@ EOF
   return "$status"
 }
 
+test_watch_queue_episodes_reset_across_sessions_and_completion() {
+  local out status
+  out=$(run_watch_restore_scenario queue-episodes)
+  status=$?
+  expect_code 0 "$status" "omp stuck-queue episode lifecycle: $out"
+  [ -z "$out" ] || fail "omp stuck-queue episode lifecycle printed output: $out"
+  pass ".omp watch extension: isolated replacement, queue drain, running observations, accepted messages, and turn completion each restart the fifteen-check wait and once-only warning"
+}
+
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context stranded-alone stranded-unmarked stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded pending-persistent pending-drains pending-stuck pending-unflushable limit-polled restore-window draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in duplicates duplicates-handoff duplicates-streaming duplicates-edited-polled preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context stranded-alone stranded-unmarked stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-bounded-unmarked ownership-marked ownership-unmarked ownership-missing blocked-tracked-marked blocked-tracked-unmarked pending-persistent pending-drains pending-stuck pending-unflushable limit-polled restore-window draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
@@ -1501,8 +1747,11 @@ test_ownership_proof_is_omp_keyed
 test_turnend_guard_extension_compels_one_continuation
 test_watch_extension_arms_and_delivers
 test_watch_extension_runs_the_supervision_host
+test_watch_extension_runs_the_supervision_host quiet
+test_watch_extension_keeps_the_arm_without_the_file_or_with_off
 test_watch_extension_replays_a_host_only_boundary_across_replacement
 test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
+test_watch_queue_episodes_reset_across_sessions_and_completion
 test_primary_extensions_ignore_a_descendant_session
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries

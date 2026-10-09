@@ -9,7 +9,7 @@ done
 herdr_forget_inherited_pane
 HERDR_LAB_HELPER=${HERDR_LAB_HELPER:-$ROOT/bin/fm-herdr-lab.sh}
 LAB_HOME_HELPER=${LAB_HOME_HELPER:-$ROOT/bin/fm-lab-home.sh}
-TEST_DIR=$(mktemp -d "$ROOT/.fm-herdr-recovery-lock.XXXXXX")
+TEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-herdr-recovery-lock.XXXXXX")
 TEST_DIR=$(cd "$TEST_DIR" && pwd -P)
 # This standalone suite does not source tests/lib.sh; ordinary-work teardown --force needs the captain's words.
 fm_test_drop_file() {
