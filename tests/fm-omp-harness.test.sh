@@ -1169,6 +1169,7 @@ switch (process.env.SCENARIO) {
       const timer = restoreChecks.values().next().value;
       restoreChecks.delete(timer);
       timer.callback();
+      return timer.callback;
     };
     const episode = async (label) => {
       const count = sent.length;
@@ -1185,11 +1186,10 @@ switch (process.env.SCENARIO) {
         check();
         if (sent.length !== count + i || sent.at(-1).m !== content || sent.at(-1).o?.deliverAs !== undefined || notices.length !== warnings) throw new Error(`${label}: recovery did not submit exactly three prompt attempts`);
       }
-      check();
+      const recheck = check();
       const notice = notices.at(-1);
       if (notices.length !== warnings + 1 || notice.level !== "warning" || !notice.m.includes("wake not delivered")) throw new Error(`${label}: exhausted episode did not warn`);
-      await handlers.get("agent_end")({}, ctx);
-      check();
+      recheck();
       if (sent.length !== count + 3 || notices.length !== warnings + 1) throw new Error(`${label}: recovery or warning repeated`);
       if (composer.text !== "operator draft" || composer.sets.length !== 0) throw new Error(`${label}: recovery disturbed the composer`);
       return content;
@@ -1234,7 +1234,21 @@ switch (process.env.SCENARIO) {
     pollCheck();
     await consume(content);
     await nextWake();
-    await episode("running turn observed by polling");
+    content = await episode("running turn observed by polling");
+    idle = false;
+    await handlers.get("before_agent_start")({ prompt: content }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: content }] } }, ctx);
+    idle = true;
+    await handlers.get("agent_end")({}, ctx);
+    await nextWake();
+    content = await episode("short accepted wake turn between checks");
+    idle = false;
+    await handlers.get("before_agent_start")({ prompt: "continue work" }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: "continue work" } }, ctx);
+    idle = true;
+    await handlers.get("agent_end")({}, ctx);
+    await nextWake();
+    await episode("short accepted ordinary turn between checks");
     break;
   }
   case "ownership-marked":

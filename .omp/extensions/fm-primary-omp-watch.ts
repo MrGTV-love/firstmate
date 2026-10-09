@@ -1398,12 +1398,16 @@ export default function (pi: ExtensionAPI) {
     rememberContext(ctx);
     const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
     if (!message || message.role !== "user") return;
+    generation.restorePendingWaits = 0;
+    generation.queueStuckReported = false;
     consumeWake(generation, userMessageText(message.content));
   });
   // A run that ends with a wake still unconsumed either drains it into the next
   // run at once or left it in the composer; the delayed check tells the two apart.
   pi.on?.("agent_end", (_event, ctx) => {
     rememberContext(ctx);
+    generation.restorePendingWaits = 0;
+    generation.queueStuckReported = false;
     scheduleRestoredWakeCheck(generation, true);
   });
 
