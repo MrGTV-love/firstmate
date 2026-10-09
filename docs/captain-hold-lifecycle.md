@@ -468,6 +468,8 @@ Three legacy inputs are resolved in place:
 - A channel key that names no task resolves the same way when the source's binding carries a concrete legacy origin.
 - Resolution records written by the old script are recognized wherever a record is read.
 
+Listener retirement uses the shared resolver through the read-only `open-bound` predicate; the [captain-hold header and help](../bin/fm-captain-hold.sh) own its results and binding-read contract.
+
 ### Legacy ids on the Beads backend
 
 On the Beads backend, an attested legacy markdown id that resolves to no task is accepted through the row the markdown-to-beads hold migration produced.

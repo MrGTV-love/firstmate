@@ -633,6 +633,7 @@ A snapshot invalidated with `current_state.detail` equal to `task generation cha
 A source that cannot be read adds the single `coverage` row named `ledger degraded` and sets `complete: false`; it is never read as an empty fleet, and the other sources still report.
 The shared task/status state directory is explicitly enumerated before reading either source; an unreadable inventory remains degraded even when shell globs would otherwise yield no task or question rows.
 Status questions age from their stamped opening.
+The dated reader folds each log once without per-transition subshells, normalizes each transition once for key and note parsing, and dates only surviving openings; compact opening-record IDs keep later transitions from rereading every open summary.
 Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`, the existing hold reason, and the hold-set timestamp (falling back to `since`); they remain visible without status or task metadata.
 Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
 For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
@@ -2442,6 +2443,12 @@ This start-to-start governor is a no-op after a normally blocking poll but caps 
 
 Real feedback, ended and missing sessions, any other `SERVER_ERROR`, and that same interruption still standing once the bound is spent are all captured and announced normally; `FM_LAVISH_POLL_RETRY_DELAY` is a bounded 1 to 60 second test override for the interval only, and the runner itself stays adapter-agnostic.
 An already-armed Lavish source keeps its registered listener command until it is retired and armed again, so retire the source, then arm it again to adopt this retry policy.
+
+**Retire finished Lavish listeners**
+
+Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
+For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
+The [process-event runner header](../bin/fm-procevent.sh) owns conditional retirement's generation checks, inbox revalidation, and capture-race limits.
 
 ### Crew-hosted Lavish review boards
 
