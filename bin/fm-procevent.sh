@@ -2200,7 +2200,7 @@ cmd_retire() {
       fm_procevent_source_lock_release "$id"
       die "cannot read source $id inbox evidence"
     fi
-    IFS=$'\t' read -r inbox_id activity captured evidence <<< "$inbox_facts"
+    IFS=$'\t' read -r inbox_id activity captured evidence <<< "$inbox_facts" && : "$activity"
     if [ "$inbox_id" != "$id" ] || [ "$evidence" != - ]; then
       fm_procevent_source_lock_release "$id"
       die "cannot retire source $id: ${evidence:-inbox evidence cannot be read}"

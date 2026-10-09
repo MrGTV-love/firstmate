@@ -5564,10 +5564,10 @@ test_sweep_resolves_bound_captain_keys() {
   before=$(cksum < "$home/data/backlog.md")
   for session in idle ended nosession; do
     for route in legacy-open legacy-closed exact-open exact-closed missing any-origin bad-binding; do
-      origin=origin-open; expected=0
+      origin="origin-open"; expected=0
       case "$route" in
         legacy-open) key=third-choice ;;
-        legacy-closed) key=third-choice; origin=origin-closed; expected=1 ;;
+        legacy-closed) key="third-choice"; origin="origin-closed"; expected=1 ;;
         exact-open) key=sweep-bound-open; origin=--any-origin ;;
         exact-closed) key=exact-choice; expected=1 ;;
         missing) key=missing-choice; expected=2 ;;
@@ -5625,7 +5625,7 @@ test_sweep_resolves_migrated_captain_keys() {
     home=$(make_home "board-sweep-migrated-$mode")
     fm_test_track_procevent_home "$home" "$home/procevent-claims"
     store="$home/lavish-state"
-    key=legacy-choice; origin=migration-origin; expected=0; identity=$key
+    key="legacy-choice"; origin="migration-origin"; expected=0; identity=$key
     case "$mode" in derived-note|derived-prefix) identity="$origin-decision-$key" ;; esac
     cat > "$home/.tasks.toml" <<EOF
 backend = "beads"
