@@ -5679,6 +5679,93 @@ test_private_nm_launch_agent_is_retired_before_teardown() {
   pass "a no-mistakes launch agent rooted in the task's copy is booted out and archived, then teardown finishes"
 }
 
+test_forced_children_retire_private_nm_launch_agents() {
+  local backend case_dir home child wt store pid label rc
+  for backend in tmux orca recursive; do
+    case_dir=$(make_case "forced-private-nm-agent-$backend")
+    write_meta "$case_dir" local-only secondmate
+    if [ "$backend" = recursive ]; then
+      child=grandchild-herdr
+      wt="$case_dir/$child-wt"
+      git -C "$case_dir/project" worktree add -q -b "fm/$child" "$wt" main
+      configure_nested_secondmate_with_herdr_grandchild "$case_dir" "$wt"
+      home="$case_dir/secondmate-home/nested-home"
+    else
+      configure_secondmate_with_tmux_children "$case_dir"
+      home="$case_dir/secondmate-home"
+      child=child-a
+      wt="$case_dir/$child-wt"
+      if [ "$backend" = orca ]; then
+        fm_write_meta "$home/state/$child.meta" \
+          "window=fm-$child" "endpoint_task_id=$child" \
+          "worktree=$wt" "project=$case_dir/project" \
+          "kind=ship" "mode=local-only" "backend=orca" \
+          "terminal=$child-terminal" "orca_worktree_id=$case_dir/project::$wt"
+        cat > "$case_dir/fakebin/orca" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}'
+SH
+        chmod +x "$case_dir/fakebin/orca"
+      fi
+    fi
+    configure_child_pipeline "$case_dir" "$child" "$wt" running
+    add_fake_launchctl "$case_dir"
+    mv "$case_dir/fakebin/launchctl" "$case_dir/fakebin/launchctl-default"
+    cat > "$case_dir/fakebin/launchctl" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = bootout ] && [ ! -e "$case_dir/$child-pipeline-aborted" ]; then
+  exit 5
+fi
+exec "$case_dir/fakebin/launchctl-default" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/launchctl"
+    mkdir -p "$wt/.no-mistakes/h"
+    teardown_fixture_start "$wt/.no-mistakes/h" KILL sleep 300
+    pid=$TEARDOWN_FIXTURE_PID
+    label="$NM_AGENT_PREFIX.3baa54c9"
+    add_nm_launch_agent "$case_dir" 3baa54c9 "$(cd "$wt" && pwd -P)/.no-mistakes/h" "$pid"
+    store="$case_dir/docker-store"
+    : > "$store"
+    docker_store_add "$store" container c-child owned-child "fm.task=$child" ""
+    rc=0
+    FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" FM_FAKE_DOCKER_STORE="$store" \
+      FM_FAKE_DOCKER_RM_FAIL=owned-child FM_FAKE_HERDR_CONFIRMED_GONE=1 \
+      FM_FAKE_DOCKER_LOG="$case_dir/docker.log" \
+      FM_FAKE_HERDR_LOG="$case_dir/herdr.log" FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
+      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "$backend private agent: Docker failure must retain the child"
+    assert_present "$case_dir/$child-pipeline-aborted" "$backend private agent: pipeline survived"
+    if kill -0 "$pid" 2>/dev/null; then
+      teardown_fixture_stop "$pid"
+      fail "$backend private agent: private daemon survived child quiescence"
+    fi
+    assert_absent "$case_dir/launchctl-loaded/$label" "$backend private agent: agent stayed loaded"
+    assert_absent "$case_dir/launchagents/$label.plist" "$backend private agent: plist stayed installed"
+    assert_present "$home/data/$child/launchagent-backup/$label.plist" \
+      "$backend private agent: plist was not archived in the child's own home"
+    assert_absent "$case_dir/data/$child/launchagent-backup/$label.plist" \
+      "$backend private agent: plist was archived in the parent home"
+    assert_present "$home/state/$child.meta" "$backend private agent: Docker failure retired identity"
+    assert_present "$wt" "$backend private agent: Docker failure removed the worktree"
+    assert_equals 'owned-child ' "$(docker_store_names "$store" container)" \
+      "$backend private agent: failed Docker removal was not exercised"
+    assert_grep 'docker rm -f -v c-child' "$case_dir/docker.log" \
+      "$backend private agent: cleanup stopped before Docker removal"
+    rc=0
+    FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" FM_FAKE_DOCKER_STORE="$store" \
+      FM_FAKE_HERDR_CONFIRMED_GONE=1 FM_FAKE_HERDR_LOG="$case_dir/herdr.log" \
+      FM_FAKE_HERDR_CLOSED="$case_dir/closed" \
+      run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+        > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+    expect_code 0 "$rc" "$backend private agent: retry failed: $(cat "$case_dir/retry.stderr")"
+    assert_absent "$case_dir/secondmate-home" "$backend private agent: retry retained child homes"
+    assert_absent "$case_dir/state/task-x1.meta" "$backend private agent: retry retained parent identity"
+    assert_equals '' "$(docker_store_names "$store" container)" "$backend private agent: Docker stack survived"
+  done
+  pass "forced ordinary, Orca and recursive children retire private agents before Docker cleanup and retry"
+}
+
 test_private_nm_launch_agent_equivalent_roots_are_retired() {
   local spelling case_dir wt root pid label rc
   for spelling in dot separators parent symlink; do
@@ -7492,6 +7579,7 @@ test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_private_nm_launch_agent_is_retired_before_teardown
+test_forced_children_retire_private_nm_launch_agents
 test_private_nm_launch_agent_equivalent_roots_are_retired
 test_foreign_nm_launch_agents_are_left_alone
 test_nested_nm_launch_agents_are_left_alone

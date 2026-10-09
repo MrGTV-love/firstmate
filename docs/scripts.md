@@ -190,6 +190,7 @@ Teardown refuses cleanup when any present local Firstmate registry cannot be rea
 Absent registries and shared Supabase configs remain valid when their absence can be proved.
 Differently named metadata hardlinks remain sibling identities; only matching basenames and inodes identify the same record.
 Forced-child cleanup treats the recorded nonzero `repo not initialized` status response as confirmed pipeline absence, not a discovery failure.
+For owned forced-child worktrees, teardown retires private no-mistakes launch agents after pipeline conclusion and before process reaping, archiving their plists under the child's own home; reassigned slots remain untouched.
 
 Residual: a still-live top-level producer can create a stack after the final listing; snapshot cleanup cannot stop a live producer.
 

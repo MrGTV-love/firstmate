@@ -3679,13 +3679,14 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
 quiesce_firstmate_home_child() {
   local ID=$1 KIND=$2 STATE=$3 PROJ=$4 WT=$5 TASK_TMP
   TASK_TMP=$(meta_value "$6" tasktmp)
-  local FM_HOME=$7 FM_STATE_OVERRIDE=$3 FM_DATA_OVERRIDE="$7/data" FM_CONFIG_OVERRIDE="$7/config"
+  local FM_HOME=$7 FM_STATE_OVERRIDE=$3 DATA="$7/data" FM_DATA_OVERRIDE="$7/data" FM_CONFIG_OVERRIDE="$7/config"
   (
     export FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_CONFIG_OVERRIDE
     if [ "$8" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
       reap_task_worktree_processes tasktmp "$TASK_TMP" || exit 1
     else
       conclude_task_no_mistakes_run "$WT" forced-child || exit 1
+      retire_task_private_nm_launch_agents "$WT" || exit 1
       reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
     fi
   )
