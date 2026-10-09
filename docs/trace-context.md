@@ -52,6 +52,9 @@ Because ambient `TRACEPARENT` is never read, the environment a supervisor happen
 Disabling propagation is an intentional trace boundary: a disabled home injects no carrier into a newly launched or relaunched agent even when the task meta already contains a valid `traceparent=`.
 An actual disabled relaunch regenerates the task meta without `traceparent=`, so a later enabled relaunch roots a new trace instead of resuming the identity from before the boundary; reusing an already-alive remote endpoint is not a relaunch and preserves the carrier that agent already holds.
 
+Carrier publication removes prior `traceparent=` lines and writes one replacement before the first `pr=` line, or at the end of a record without a PR.
+This keeps the trailing PR identity block parseable for monitoring after a traced relaunch.
+
 ### Enablement is home-session-scoped
 
 Each locked `bin/fm-session-start.sh` run resolves that home's `config/trace-context` plus `FM_TRACE_CONTEXT` exactly once into session-scoped effective state.

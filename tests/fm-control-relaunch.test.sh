@@ -730,26 +730,40 @@ test_relaunch_preserves_durable_task_metadata() {
 }
 
 test_relaunch_keeps_a_recorded_pr_parseable_for_monitoring() {
-  local dir out rc parsed
-  dir=$(new_case pr-parse rl90)
-  add_ship_task "$dir" rl90 claude
-  {
-    printf '%s\n' 'pr=https://github.com/example/repo/pull/90'
-    printf '%s\n' 'pr_head=0123456789abcdef0123456789abcdef01234567'
-    printf '%s\n' 'x_request=request-90'
-  } >> "$dir/home/state/rl90.meta"
+  local dir out rc parsed tracing
+  for tracing in off on; do
+    dir=$(new_case "pr-parse-$tracing" rl90)
+    add_ship_task "$dir" rl90 claude
+    printf '%s\n' "$$" > "$dir/home/state/.lock"
+    printf '%s %s\n' "$$" "$tracing" > "$dir/home/state/.trace-context-effective"
+    {
+      printf '%s\n' 'traceparent=00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01'
+      printf '%s\n' 'pr=https://github.com/example/repo/pull/90'
+      printf '%s\n' 'pr_head=0123456789abcdef0123456789abcdef01234567'
+      printf '%s\n' 'x_request=request-90'
+    } >> "$dir/home/state/rl90.meta"
 
-  out=$(run_control "$dir" rl90 relaunch --note "keep PR monitoring alive"); rc=$?
-  expect_code 0 "$rc" "relaunch of a task with a recorded PR should succeed"$'\n'"$out"
-  [ -n "$(meta_field "$dir" rl90 control_relaunch_tx)" ] \
-    || fail "the published record should still identify its relaunch transaction"
-  parsed=$(bash -c '
-    . "$1/bin/fm-pr-lib.sh"
-    fm_pr_metadata_identity_parse "$2" && printf "%s\n" "$FM_PR_META_URL"
-  ' _ "$ROOT" "$dir/home/state/rl90.meta")
-  [ "$parsed" = "https://github.com/example/repo/pull/90" ] \
-    || fail "PR monitoring must still parse the relaunched task record (got: ${parsed:-rejected})"
-  pass "fm-control relaunch: a recorded PR stays parseable for PR monitoring after relaunch"
+    out=$(run_control "$dir" rl90 relaunch --note "keep PR monitoring alive"); rc=$?
+    expect_code 0 "$rc" "relaunch of a task with a recorded PR and tracing $tracing should succeed"$'\n'"$out"
+    [ -n "$(meta_field "$dir" rl90 control_relaunch_tx)" ] \
+      || fail "the published record should still identify its relaunch transaction"
+    parsed=$(bash -c '
+      . "$1/bin/fm-pr-lib.sh"
+      fm_pr_metadata_identity_parse "$2" && printf "%s\n" "$FM_PR_META_URL"
+    ' _ "$ROOT" "$dir/home/state/rl90.meta")
+    [ "$parsed" = "https://github.com/example/repo/pull/90" ] \
+      || fail "PR monitoring must still parse the relaunched task record with tracing $tracing (got: ${parsed:-rejected})"
+    if [ "$tracing" = on ]; then
+      [ "$(awk -F= '$1 == "traceparent" { count++ } END { print count+0 }' "$dir/home/state/rl90.meta")" = 1 ] \
+        || fail "traced relaunch must publish exactly one trace carrier"
+      [ "$(meta_field "$dir" rl90 traceparent)" = "00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01" ] \
+        || fail "traced relaunch must preserve the task's recorded carrier"
+    else
+      [ -z "$(meta_field "$dir" rl90 traceparent)" ] \
+        || fail "untraced relaunch must remove the task's recorded carrier"
+    fi
+    pass "fm-control relaunch: a recorded PR stays parseable for PR monitoring with tracing $tracing"
+  done
 }
 
 test_relaunch_serializes_concurrent_durable_metadata_publication() {
