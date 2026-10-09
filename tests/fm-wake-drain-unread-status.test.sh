@@ -496,7 +496,7 @@ build_routine_fleet() {
 }
 
 test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow() {
-  local dir small_hist large_hist few many per_task
+  local dir small_hist large_hist few many per_task warm_few warm_many warm_per_task
   dir=$(make_case drain-subshell-entries)
   mkdir -p "$dir/h-small/state" "$dir/h-large/state" "$dir/f-few/state" "$dir/f-many/state"
   build_routine_fleet "$dir/h-small/state" 3 3
@@ -513,7 +513,19 @@ test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow() {
   per_task=$(( (many - few) / 8 ))
   [ "$per_task" -le 40 ] \
     || fail "drain subshell entries grow too fast with the fleet: $few for 3 tasks, $many for 11 ($per_task per added task, limit 40)"
-  pass "drain subshell entries stay flat as unread history grows and linear in the fleet ($per_task per task)"
+  build_routine_fleet "$dir/f-many/state" 35 3
+  FM_STATE_OVERRIDE="$dir/f-many/state" "$DRAIN" >/dev/null 2>/dev/null \
+    || fail "the larger warm-fleet priming drain failed"
+  [ "$(wc -l < "$dir/f-few/state/.status-presentation-cursor")" -eq 3 ] \
+    || fail "the few-task priming drain did not populate its presentation manifest"
+  [ "$(wc -l < "$dir/f-many/state/.status-presentation-cursor")" -eq 35 ] \
+    || fail "the many-task priming drain did not populate its presentation manifest"
+  warm_few=$(subshell_entries "$dir/f-few/state" "$dir/f-few-warm.count")
+  warm_many=$(subshell_entries "$dir/f-many/state" "$dir/f-many-warm.count")
+  warm_per_task=$(( (warm_many - warm_few) / 32 ))
+  [ "$warm_per_task" -le 40 ] \
+    || fail "drain subshell entries grow too fast with populated presentation manifests: $warm_few for 3 tasks, $warm_many for 35 ($warm_per_task per added task, limit 40)"
+  pass "drain subshell entries stay flat as unread history grows and linear in cold/warm fleets ($per_task/$warm_per_task per task)"
 }
 
 # Reference the original command-substitution fold's byte contract, independently
