@@ -1,0 +1,264 @@
+[
+  {
+    "scenario": "empty home proves clear coverage",
+    "pending_exit": 0,
+    "pending_stdout": "[]\n",
+    "pending_stderr": "",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": true,
+      "proven_clear": true,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 0,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "record exactly at 1 MiB accepted",
+    "pending_exit": 0,
+    "pending_stdout": "[]\n",
+    "pending_stderr": "",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": true,
+      "proven_clear": true,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 0,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "record cap plus one refused",
+    "pending_exit": 1,
+    "pending_stdout": "",
+    "pending_stderr": "fm-contributions: 1 unreadable contribution record(s); pending signals are unverified\n",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": false,
+      "proven_clear": false,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 1,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "oversized record in mode 0111 directory refused",
+    "pending_exit": 1,
+    "pending_stdout": "",
+    "pending_stderr": "fm-contributions: 1 unreadable contribution record(s); pending signals are unverified\n",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": false,
+      "proven_clear": false,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 1,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "capped record in mode 0111 directory accepted",
+    "pending_exit": 0,
+    "pending_stdout": "[]\n",
+    "pending_stderr": "",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": true,
+      "proven_clear": true,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 0,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "unreadable record refuses verified inbox",
+    "pending_exit": 1,
+    "pending_stdout": "",
+    "pending_stderr": "fm-contributions: 1 unreadable contribution record(s); pending signals are unverified\n",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": false,
+      "proven_clear": false,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 1,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "symlink data root refused ''",
+    "pending_exit": 1,
+    "pending_stdout": "",
+    "pending_stderr": "fm-contributions: 1 unreadable contribution record(s); pending signals are unverified\n",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": false,
+      "proven_clear": false,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 1,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "symlink data root refused '/'",
+    "pending_exit": 1,
+    "pending_stdout": "",
+    "pending_stderr": "fm-contributions: 1 unreadable contribution record(s); pending signals are unverified\n",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": false,
+      "proven_clear": false,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 1,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "symlink data root refused '////'",
+    "pending_exit": 1,
+    "pending_stdout": "",
+    "pending_stderr": "fm-contributions: 1 unreadable contribution record(s); pending signals are unverified\n",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": false,
+      "proven_clear": false,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 1,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "normal data root with trailing slashes accepted",
+    "pending_exit": 0,
+    "pending_stdout": "[]\n",
+    "pending_stderr": "",
+    "snapshot": {
+      "known": 0,
+      "checked": 0,
+      "counts": {
+        "captain": 0,
+        "fleet": 0,
+        "maintainer": 0,
+        "nobody": 0
+      },
+      "unmeasured": 0,
+      "complete": true,
+      "proven_clear": true,
+      "stale_verdicts": 0,
+      "missing_verdicts": 0,
+      "unreadable_records": 0,
+      "valid_until": 900,
+      "captain": [],
+      "captain_omitted": 0
+    }
+  },
+  {
+    "scenario": "oversized replacement after listing pending",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "fm-contributions: 1 unreadable contribution record(s); pending signals are unverified\n"
+  },
+  {
+    "scenario": "oversized replacement after listing snapshot",
+    "exit": 0,
+    "stdout": "{\n  \"known\": 0,\n  \"checked\": 0,\n  \"counts\": {\n    \"captain\": 0,\n    \"fleet\": 0,\n    \"maintainer\": 0,\n    \"nobody\": 0\n  },\n  \"unmeasured\": 0,\n  \"complete\": false,\n  \"proven_clear\": false,\n  \"stale_verdicts\": 0,\n  \"missing_verdicts\": 0,\n  \"unreadable_records\": 1,\n  \"valid_until\": 900,\n  \"captain\": [],\n  \"captain_omitted\": 0\n}\n",
+    "stderr": ""
+  }
+]

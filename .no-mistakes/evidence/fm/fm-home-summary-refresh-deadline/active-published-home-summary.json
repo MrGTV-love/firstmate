@@ -1,0 +1,499 @@
+{
+  "schema": "fm-secondmate-home-summary.v1",
+  "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+  "contributions": {
+    "known": 53,
+    "checked": 53,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 53
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 1791548100,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "generated": "2026-10-09T12:00:00Z",
+  "generated_epoch": 1791547200,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/home",
+  "valid": true,
+  "reason": null,
+  "invalidity": {
+    "kind": null,
+    "ids": []
+  },
+  "state": "active_child_work",
+  "active_children": [
+    {
+      "id": "task-01",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 1",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-02",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 2",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-03",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 3",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-04",
+      "kind": "scout",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 4",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-05",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 5",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-06",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 6",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-07",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 7",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-08",
+      "kind": "scout",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 8",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-09",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 9",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-10",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 10",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-11",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 11",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-12",
+      "kind": "scout",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 12",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-13",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 13",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-14",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 14",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-15",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 15",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-16",
+      "kind": "scout",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 16",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-17",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 17",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-18",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 18",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-19",
+      "kind": "ship",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 19",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    },
+    {
+      "id": "task-20",
+      "kind": "scout",
+      "state": "working",
+      "repo": "alpha",
+      "name": "Task 20",
+      "source": "pane",
+      "doing": "harness busy (claude-hook)"
+    }
+  ],
+  "decisions_open": [],
+  "holds": [],
+  "queued": [],
+  "landed": [],
+  "endpoints": [
+    {
+      "id": "task-01",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-01",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-02",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-02",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-03",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-03",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-04",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-04",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-05",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-05",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-06",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-06",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-07",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-07",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-08",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-08",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-09",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-09",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-10",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-10",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-11",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-11",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-12",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-12",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-13",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-13",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-14",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-14",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-15",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-15",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-16",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-16",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-17",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-17",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-18",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-18",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-19",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-19",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-20",
+      "state": "working",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-20",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    }
+  ],
+  "counts": {
+    "active_children": 27,
+    "decisions_open": 0,
+    "holds": 0,
+    "queued": 0,
+    "landed": 0,
+    "endpoints": 27
+  },
+  "omitted": [
+    {
+      "surface": "active_children",
+      "count": 7
+    },
+    {
+      "surface": "endpoints",
+      "count": 7
+    }
+  ]
+}

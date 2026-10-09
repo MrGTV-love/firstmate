@@ -1,0 +1,333 @@
+$ bin/fm-contributions.sh pending
+exit=0
+stdout=[]
+
+stderr=
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": true,
+  "proven_clear": true,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+$ bin/fm-contributions.sh pending
+exit=0
+stdout=[]
+
+stderr=
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": true,
+  "proven_clear": true,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+$ bin/fm-contributions.sh pending
+exit=1
+stdout=
+stderr=fm-contributions: 1 unreadable contribution record(s); pending signals are unverified
+
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 1,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+Permission fixture enumeration fails as intended:
+find: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/contribution-home/data/visible: Permission denied
+
+
+$ bin/fm-contributions.sh pending
+exit=1
+stdout=
+stderr=fm-contributions: 1 unreadable contribution record(s); pending signals are unverified
+
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 1,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+$ bin/fm-contributions.sh pending
+exit=0
+stdout=[]
+
+stderr=
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": true,
+  "proven_clear": true,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+$ bin/fm-contributions.sh pending
+exit=1
+stdout=
+stderr=fm-contributions: 1 unreadable contribution record(s); pending signals are unverified
+
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 1,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+$ bin/fm-contributions.sh pending
+exit=1
+stdout=
+stderr=fm-contributions: 1 unreadable contribution record(s); pending signals are unverified
+
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 1,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+$ bin/fm-contributions.sh pending
+exit=1
+stdout=
+stderr=fm-contributions: 1 unreadable contribution record(s); pending signals are unverified
+
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 1,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+$ bin/fm-contributions.sh pending
+exit=1
+stdout=
+stderr=fm-contributions: 1 unreadable contribution record(s); pending signals are unverified
+
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 1,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+$ bin/fm-contributions.sh pending
+exit=0
+stdout=[]
+
+stderr=
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": true,
+  "proven_clear": true,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 0,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=
+
+$ bin/fm-contributions.sh pending
+exit=1
+stdout=
+stderr=fm-contributions: 1 unreadable contribution record(s); pending signals are unverified
+
+
+$ bin/fm-contributions.sh snapshot .lv/contribution-home/input.json
+exit=0
+stdout={
+  "known": 0,
+  "checked": 0,
+  "counts": {
+    "captain": 0,
+    "fleet": 0,
+    "maintainer": 0,
+    "nobody": 0
+  },
+  "unmeasured": 0,
+  "complete": false,
+  "proven_clear": false,
+  "stale_verdicts": 0,
+  "missing_verdicts": 0,
+  "unreadable_records": 1,
+  "valid_until": 900,
+  "captain": [],
+  "captain_omitted": 0
+}
+
+stderr=

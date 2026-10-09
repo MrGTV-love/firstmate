@@ -1,0 +1,103 @@
+$ tmux -S .lv/r -f /dev/null new-session -d -s fm-lab-window -x 120 -y 40 -n anchor -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.295s
+stderr=
+
+$ tmux -S .lv/r display-message -p -t fm-lab-window:anchor #{socket_path},#{pid},0
+exit=0 elapsed=0.129s
+stderr=
+
+$ tmux -S .lv/r new-window -d -t fm-lab-window: -n fm-task-01 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.032s
+stderr=
+
+$ tmux -S .lv/r set-window-option -t fm-lab-window:fm-task-01 automatic-rename off
+exit=0 elapsed=0.041s
+stderr=
+
+$ tmux -S .lv/r new-window -d -t fm-lab-window: -n fm-task-02 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.057s
+stderr=
+
+$ tmux -S .lv/r set-window-option -t fm-lab-window:fm-task-02 automatic-rename off
+exit=0 elapsed=0.101s
+stderr=
+
+$ tmux -S .lv/r new-window -d -t fm-lab-window: -n fm-task-03 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.027s
+stderr=
+
+$ tmux -S .lv/r set-window-option -t fm-lab-window:fm-task-03 automatic-rename off
+exit=0 elapsed=0.055s
+stderr=
+
+$ tmux -S .lv/r new-window -d -t fm-lab-window: -n fm-task-04 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.018s
+stderr=
+
+$ tmux -S .lv/r set-window-option -t fm-lab-window:fm-task-04 automatic-rename off
+exit=0 elapsed=0.021s
+stderr=
+
+$ tmux -S .lv/r new-window -d -t fm-lab-window: -n fm-task-05 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.026s
+stderr=
+
+$ tmux -S .lv/r set-window-option -t fm-lab-window:fm-task-05 automatic-rename off
+exit=0 elapsed=0.163s
+stderr=
+
+$ tmux -S .lv/r new-window -d -t fm-lab-window: -n fm-task-06 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.026s
+stderr=
+
+$ tmux -S .lv/r set-window-option -t fm-lab-window:fm-task-06 automatic-rename off
+exit=0 elapsed=0.098s
+stderr=
+
+$ tmux -S .lv/r new-window -d -t fm-lab-window: -n fm-task-07 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.023s
+stderr=
+
+$ tmux -S .lv/r set-window-option -t fm-lab-window:fm-task-07 automatic-rename off
+exit=0 elapsed=0.026s
+stderr=
+
+$ tmux -S .lv/r new-window -d -t fm-lab-window: -n fm-task-08 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.221s
+stderr=
+
+$ tmux -S .lv/r set-window-option -t fm-lab-window:fm-task-08 automatic-rename off
+exit=0 elapsed=0.045s
+stderr=
+
+$ tmux -S .lv/r new-window -d -t fm-lab-window: -n fm-task-09 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.170s
+stderr=
+
+$ tmux -S .lv/r set-window-option -t fm-lab-window:fm-task-09 automatic-rename off
+exit=0 elapsed=0.241s
+stderr=
+
+$ bin/fm-fleet-snapshot.sh --home-input
+exit=0 elapsed=19.809s
+stderr=
+
+$ .lv/baseline/bin/fm-fleet-snapshot.sh --home-input
+exit=0 elapsed=23.785s
+stderr=
+
+$ bin/fm-fleet-snapshot.sh --home-input
+exit=0 elapsed=5.243s
+stderr=
+
+$ bin/fm-fleet-snapshot.sh --home-input
+exit=1 elapsed=7.870s
+stderr=fm-fleet-snapshot: task observation failed
+
+
+$ bin/fm-fleet-snapshot.sh --home-input
+exit=1 elapsed=4.151s
+stderr=fm-fleet-snapshot: task snapshot failed
+
+
+Private tmux teardown exit=0

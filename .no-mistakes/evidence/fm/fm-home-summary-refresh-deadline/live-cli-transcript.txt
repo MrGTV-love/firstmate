@@ -1,0 +1,193 @@
+$ tmux -S .lv/s -f /dev/null new-session -d -s fm-lab-summary -x 120 -y 40 -n anchor -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.626s
+
+$ tmux -S .lv/s display-message -p -t fm-lab-summary:anchor #{socket_path},#{pid},0
+exit=0 elapsed=1.214s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-01 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=1.932s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-01 automatic-rename off
+exit=0 elapsed=1.073s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-02 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.700s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-02 automatic-rename off
+exit=0 elapsed=0.451s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-03 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.206s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-03 automatic-rename off
+exit=0 elapsed=0.568s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-04 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=2.947s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-04 automatic-rename off
+exit=0 elapsed=0.473s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-05 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=2.808s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-05 automatic-rename off
+exit=0 elapsed=1.703s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-06 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.914s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-06 automatic-rename off
+exit=0 elapsed=1.335s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-07 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.977s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-07 automatic-rename off
+exit=0 elapsed=0.108s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-08 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.157s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-08 automatic-rename off
+exit=0 elapsed=0.053s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-09 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.083s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-09 automatic-rename off
+exit=0 elapsed=0.047s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-10 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.212s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-10 automatic-rename off
+exit=0 elapsed=0.195s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-11 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=1.002s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-11 automatic-rename off
+exit=0 elapsed=0.409s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-12 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=2.082s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-12 automatic-rename off
+exit=0 elapsed=1.460s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-13 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.594s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-13 automatic-rename off
+exit=0 elapsed=1.721s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-14 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.353s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-14 automatic-rename off
+exit=0 elapsed=0.153s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-15 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.244s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-15 automatic-rename off
+exit=0 elapsed=0.277s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-16 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.510s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-16 automatic-rename off
+exit=0 elapsed=0.193s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-17 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.196s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-17 automatic-rename off
+exit=0 elapsed=0.122s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-18 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.140s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-18 automatic-rename off
+exit=0 elapsed=0.115s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-19 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.096s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-19 automatic-rename off
+exit=0 elapsed=0.081s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-20 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.177s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-20 automatic-rename off
+exit=0 elapsed=0.026s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-21 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.032s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-21 automatic-rename off
+exit=0 elapsed=0.314s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-22 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.032s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-22 automatic-rename off
+exit=0 elapsed=0.031s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-23 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.038s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-23 automatic-rename off
+exit=0 elapsed=0.273s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-24 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.088s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-24 automatic-rename off
+exit=0 elapsed=0.148s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-25 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.037s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-25 automatic-rename off
+exit=0 elapsed=0.044s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-26 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.213s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-26 automatic-rename off
+exit=0 elapsed=0.118s
+
+$ tmux -S .lv/s new-window -d -t fm-lab-summary: -n fm-task-27 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.049s
+
+$ tmux -S .lv/s set-window-option -t fm-lab-summary:fm-task-27 automatic-rename off
+exit=0 elapsed=0.123s
+
+$ .lv/baseline/bin/fm-fleet-snapshot.sh --secondmate-home-summary
+exit=0 elapsed=86.661s
+
+$ bin/fm-fleet-snapshot.sh --secondmate-home-summary
+exit=0 elapsed=10.813s
+
+{"baseline_seconds": 86.66122891695704, "target_seconds": 10.813038541004062, "baseline_jq_starts": 521, "target_jq_starts": 116, "jq_bound": 200, "byte_identical": true, "endpoints": 27, "contribution_records": 53}
+
+$ bin/fm-home-summary-refresh.sh --best-effort
+exit=0 elapsed=12.124s
+
+{"elapsed_seconds": 12.124333125015255, "deadline_seconds": 60, "cpu_pressure_workers": 4, "published_schema": "fm-secondmate-home-summary.v1", "endpoints": 27, "contribution_records": 53, "failure_streak_cleared": true, "ledger_mode": "0600"}
+
+$ bin/fm-home-summary-refresh.sh --detach
+exit=0 elapsed=0.054s
+
+{"trigger_seconds": 0.054437292041257024, "republished": true}
+
+$ bin/fm-fleet-snapshot.sh --home-input
+exit=0 elapsed=67.717s
+
+$ bin/fm-fleet-snapshot.sh --home-input
+exit=0 elapsed=49.819s
+
+Private tmux server teardown exit=0

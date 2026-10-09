@@ -1,0 +1,32 @@
+[
+  {
+    "case": "active-early",
+    "mode": "--secondmate-home-summary",
+    "exit": 1,
+    "contribution_pid": 78702,
+    "signalled_pids": [
+      "78702"
+    ]
+  },
+  {
+    "case": "completed-early",
+    "mode": "--secondmate-home-summary",
+    "exit": 1,
+    "contribution_pid": 89565,
+    "signalled_pids": []
+  },
+  {
+    "case": "success",
+    "mode": "--json",
+    "exit": 0,
+    "contribution_pid": 96602,
+    "signalled_pids": []
+  },
+  {
+    "case": "success",
+    "mode": "--secondmate-home-summary",
+    "exit": 0,
+    "contribution_pid": 4062,
+    "signalled_pids": []
+  }
+]

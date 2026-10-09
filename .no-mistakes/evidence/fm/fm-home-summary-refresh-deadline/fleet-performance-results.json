@@ -1,0 +1,26 @@
+[
+  {
+    "baseline_seconds": 86.66122891695704,
+    "target_seconds": 10.813038541004062,
+    "baseline_jq_starts": 521,
+    "target_jq_starts": 116,
+    "jq_bound": 200,
+    "byte_identical": true,
+    "endpoints": 27,
+    "contribution_records": 53
+  },
+  {
+    "elapsed_seconds": 12.124333125015255,
+    "deadline_seconds": 60,
+    "cpu_pressure_workers": 4,
+    "published_schema": "fm-secondmate-home-summary.v1",
+    "endpoints": 27,
+    "contribution_records": 53,
+    "failure_streak_cleared": true,
+    "ledger_mode": "0600"
+  },
+  {
+    "trigger_seconds": 0.054437292041257024,
+    "republished": true
+  }
+]

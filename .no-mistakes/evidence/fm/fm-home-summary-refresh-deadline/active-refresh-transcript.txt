@@ -1,0 +1,319 @@
+$ tmux -S .lv/a -f /dev/null new-session -d -s fm-lab-summary -x 120 -y 40 -n anchor -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.301s
+stdout=
+stderr=
+
+$ tmux -S .lv/a display-message -p -t fm-lab-summary:anchor #{socket_path},#{pid},0
+exit=0 elapsed=0.025s
+stdout=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/a,36691,0
+
+stderr=
+
+$ tmux -S .lv/a set-window-option -g automatic-rename off
+exit=0 elapsed=0.028s
+stdout=
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-01 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.036s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-01 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.214s
+stdout=g1791529133.37976.10186
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-02 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.028s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-02 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.144s
+stdout=g1791529133.38708.15058
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-03 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.036s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-03 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.219s
+stdout=g1791529133.39339.23198
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-04 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.033s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-04 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.179s
+stdout=g1791529134.40236.5181
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-05 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.028s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-05 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.219s
+stdout=g1791529134.40968.10053
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-06 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.028s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-06 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.122s
+stdout=g1791529134.41586.28670
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-07 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.028s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-07 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.091s
+stdout=g1791529134.41995.1490
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-08 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.028s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-08 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.105s
+stdout=g1791529134.42435.4776
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-09 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.021s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-09 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.094s
+stdout=g1791529134.42860.17632
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-10 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.047s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-10 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.120s
+stdout=g1791529135.43324.15893
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-11 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.044s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-11 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.118s
+stdout=g1791529135.43791.15062
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-12 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.043s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-12 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.149s
+stdout=g1791529135.44297.15565
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-13 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.052s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-13 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.121s
+stdout=g1791529135.45068.21771
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-14 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.034s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-14 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.134s
+stdout=g1791529135.45523.15489
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-15 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.042s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-15 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.197s
+stdout=g1791529135.46061.30529
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-16 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.070s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-16 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.103s
+stdout=g1791529136.46710.30917
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-17 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.029s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-17 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.149s
+stdout=g1791529136.47181.31903
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-18 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.075s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-18 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.290s
+stdout=g1791529136.47796.5
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-19 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.067s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-19 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.097s
+stdout=g1791529136.48677.23417
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-20 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.026s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-20 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.091s
+stdout=g1791529137.49105.21252
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-21 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.036s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-21 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.110s
+stdout=g1791529137.49491.16845
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-22 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.017s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-22 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.073s
+stdout=g1791529137.49838.27033
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-23 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.014s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-23 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.088s
+stdout=g1791529137.50118.23167
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-24 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.034s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-24 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.419s
+stdout=g1791529137.50532.14642
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-25 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.032s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-25 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.115s
+stdout=g1791529137.51269.5402
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-26 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.036s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-26 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.148s
+stdout=g1791529138.51774.5905
+
+stderr=
+
+$ tmux -S .lv/a new-window -d -t fm-lab-summary: -n fm-task-27 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y sleep 600
+exit=0 elapsed=0.041s
+stdout=
+stderr=
+
+$ bin/fm-busy-event.sh arm .lv/home/state task-27 --state busy --source claude-hook --event user-prompt-submit
+exit=0 elapsed=0.225s
+stdout=g1791529138.52439.29490
+
+stderr=
+
+$ bin/fm-home-summary-refresh.sh --best-effort
+exit=0 elapsed=26.484s
+stdout=
+stderr=
+
+Private tmux teardown exit=0

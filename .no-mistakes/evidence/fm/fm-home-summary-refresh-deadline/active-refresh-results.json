@@ -1,0 +1,17 @@
+{
+  "elapsed_seconds": 26.484,
+  "deadline_seconds": 60,
+  "cpu_pressure_workers": 4,
+  "valid": true,
+  "state": "active_child_work",
+  "counts": {
+    "active_children": 27,
+    "decisions_open": 0,
+    "holds": 0,
+    "queued": 0,
+    "landed": 0,
+    "endpoints": 27
+  },
+  "contribution_records": 53,
+  "fixture_inputs": "Real tmux windows; persisted semantic busy inputs seeded through real fm-busy-event.sh. No harness login or harness executable substitution."
+}

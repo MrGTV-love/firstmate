@@ -1,0 +1,342 @@
+{
+  "schema": "fm-secondmate-home-summary.v1",
+  "hold_classifier_schema": "fm-captain-hold-buckets.v1",
+  "contributions": {
+    "known": 53,
+    "checked": 53,
+    "counts": {
+      "captain": 0,
+      "fleet": 0,
+      "maintainer": 0,
+      "nobody": 53
+    },
+    "unmeasured": 0,
+    "complete": true,
+    "proven_clear": true,
+    "stale_verdicts": 0,
+    "missing_verdicts": 0,
+    "unreadable_records": 0,
+    "valid_until": 1791548100,
+    "captain": [],
+    "captain_omitted": 0
+  },
+  "generated": "2026-10-09T12:00:00Z",
+  "generated_epoch": 1791547200,
+  "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/home",
+  "valid": false,
+  "reason": "child current state unavailable: task-01, task-02, task-03, task-04, task-05, task-06, task-07, task-08, task-09, task-10, task-11, task-12, task-13, task-14, task-15, task-16, task-17, task-18, task-19, task-20, task-21, task-22, task-23, task-24, task-25, task-26, task-27",
+  "invalidity": {
+    "kind": "child_current_unavailable",
+    "ids": [
+      "task-01",
+      "task-02",
+      "task-03",
+      "task-04",
+      "task-05",
+      "task-06",
+      "task-07",
+      "task-08",
+      "task-09",
+      "task-10",
+      "task-11",
+      "task-12",
+      "task-13",
+      "task-14",
+      "task-15",
+      "task-16",
+      "task-17",
+      "task-18",
+      "task-19",
+      "task-20",
+      "task-21",
+      "task-22",
+      "task-23",
+      "task-24",
+      "task-25",
+      "task-26",
+      "task-27"
+    ]
+  },
+  "state": "unknown",
+  "active_children": [],
+  "decisions_open": [],
+  "holds": [],
+  "queued": [],
+  "landed": [],
+  "endpoints": [
+    {
+      "id": "task-01",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-01",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-02",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-02",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-03",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-03",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-04",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-04",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-05",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-05",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-06",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-06",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-07",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-07",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-08",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-08",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-09",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-09",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-10",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-10",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-11",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-11",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-12",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-12",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-13",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-13",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-14",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-14",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-15",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-15",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-16",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-16",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-17",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-17",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-18",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-18",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-19",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-19",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    },
+    {
+      "id": "task-20",
+      "state": "unknown",
+      "source": "pane",
+      "endpoint": {
+        "target": "fm-lab-summary:fm-task-20",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      }
+    }
+  ],
+  "counts": {
+    "active_children": 0,
+    "decisions_open": 0,
+    "holds": 0,
+    "queued": 0,
+    "landed": 0,
+    "endpoints": 27
+  },
+  "omitted": [
+    {
+      "surface": "endpoints",
+      "count": 7
+    }
+  ]
+}

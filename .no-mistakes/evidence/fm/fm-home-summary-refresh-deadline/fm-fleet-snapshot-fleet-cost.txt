@@ -1,0 +1,3 @@
+$ /bin/bash tests/fm-fleet-snapshot-fleet-cost.test.sh
+exit=0
+ok - the producer summarizes a 27-task fleet with 115 jq starts (bound 200)

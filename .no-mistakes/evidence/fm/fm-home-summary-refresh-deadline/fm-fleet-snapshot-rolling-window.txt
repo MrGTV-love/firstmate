@@ -1,0 +1,6 @@
+$ /bin/bash tests/fm-fleet-snapshot-rolling-window.test.sh
+exit=0
+ok - both windows start task 9 before the first read ends within the eight-worker bound
+ok - completion-order scheduling preserves byte-identical ID-sorted output
+ok - observations retains a failed child's status after replenishing its slot
+ok - composition retains a failed child's status after replenishing its slot

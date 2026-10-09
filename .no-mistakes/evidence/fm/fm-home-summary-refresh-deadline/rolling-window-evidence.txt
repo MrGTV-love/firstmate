@@ -1,0 +1,65 @@
+Default crew-state read timeout; real tmux backend; lightweight tool wrappers forward to real cp/jq.
+
+{
+  "observations": {
+    "peak_active": 5,
+    "tasks_started": 9,
+    "ninth_started_before_first_ended": true
+  },
+  "composition": {
+    "peak_active": 7,
+    "tasks_started": 9,
+    "ninth_started_before_first_ended": true
+  },
+  "byte_identical_serial_parallel_and_base": true,
+  "failure_observations": {
+    "exit": 1,
+    "stdout_bytes": 0,
+    "stderr": "fm-fleet-snapshot: task observation failed"
+  },
+  "failure_composition": {
+    "exit": 1,
+    "stdout_bytes": 0,
+    "stderr": "fm-fleet-snapshot: task snapshot failed"
+  }
+}
+
+Observation trace:
+start task-01
+start task-02
+start task-05
+start task-03
+start task-04
+end task-02
+end task-03
+end task-05
+start task-06
+start task-07
+start task-08
+end task-04
+end task-06
+end task-07
+end task-08
+start task-09
+end task-09
+end task-01
+
+Composition trace:
+start task-05
+start task-04
+start task-03
+start task-07
+start task-01
+start task-08
+start task-06
+end task-06
+end task-08
+start task-02
+end task-02
+start task-09
+end task-09
+end task-07
+end task-01
+end task-05
+end task-03
+end task-04

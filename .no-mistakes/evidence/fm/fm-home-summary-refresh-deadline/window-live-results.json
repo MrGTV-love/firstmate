@@ -1,0 +1,23 @@
+{
+  "observations": {
+    "peak_active": 5,
+    "tasks_started": 9,
+    "ninth_started_before_first_ended": true
+  },
+  "composition": {
+    "peak_active": 7,
+    "tasks_started": 9,
+    "ninth_started_before_first_ended": true
+  },
+  "byte_identical_serial_parallel_and_base": true,
+  "failure_observations": {
+    "exit": 1,
+    "stdout_bytes": 0,
+    "stderr": "fm-fleet-snapshot: task observation failed"
+  },
+  "failure_composition": {
+    "exit": 1,
+    "stdout_bytes": 0,
+    "stderr": "fm-fleet-snapshot: task snapshot failed"
+  }
+}

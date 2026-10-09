@@ -1,0 +1,8 @@
+$ /bin/bash tests/fm-fleet-snapshot-contribution-cleanup.test.sh
+exit=0
+ok - completed-early --secondmate-home-summary preserves contribution job ownership
+ok - active-early --secondmate-home-summary preserves contribution job ownership
+ok - failed-wait --json preserves contribution job ownership
+ok - success --json preserves contribution job ownership
+ok - failed-wait --secondmate-home-summary preserves contribution job ownership
+ok - success --secondmate-home-summary preserves contribution job ownership

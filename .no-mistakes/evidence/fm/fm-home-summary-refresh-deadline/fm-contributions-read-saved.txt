@@ -1,0 +1,10 @@
+$ /bin/bash tests/fm-contributions-read-saved.test.sh
+exit=0
+ok - records at the 1 MiB cap preserve normal output bytes
+ok - bounded reads refuse records above the cap
+ok - bounded reads refuse oversized records in searchable unreadable directories
+ok - bounded reads accept capped records and preserve readable sibling output
+ok - failed record reads cannot prove clear coverage
+ok - symlink data roots are refused with or without trailing slashes
+ok - ordinary data roots retain byte-identical output with trailing slashes
+ok - pending and snapshot refuse oversized replacements after record listing

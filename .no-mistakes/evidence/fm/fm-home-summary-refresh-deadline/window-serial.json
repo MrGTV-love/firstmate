@@ -1,0 +1,686 @@
+{
+  "schema": "fm-fleet-home-input.v1",
+  "fm_home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home",
+  "backlog": {
+    "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/backlog.md",
+    "present": false,
+    "records": []
+  },
+  "tasks": [
+    {
+      "id": "task-01",
+      "kind": "ship",
+      "harness": "codex",
+      "mode": "ship",
+      "yolo": "",
+      "branch": "worker-1",
+      "project": "alpha",
+      "spawn_gen": "fixture",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-01.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-01.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "task 1",
+            "raw": "working [at=1791547100]: task 1",
+            "age_seconds": 100
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/task-01/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown codex-unverified)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown codex-unverified)",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-window:fm-task-01",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working [at=1791547100]: task 1"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-task-01",
+        "steer": "bin/fm-send.sh fm-task-01 '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "task-02",
+      "kind": "ship",
+      "harness": "codex",
+      "mode": "ship",
+      "yolo": "off",
+      "branch": "worker-2",
+      "project": "α-beta",
+      "spawn_gen": "fixture",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-02.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-02.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "needs-decision",
+            "note": "choose API https://github.com/o/r/pull/23",
+            "raw": "needs-decision [at=1791547150]: [key=api] choose API https://github.com/o/r/pull/23",
+            "age_seconds": 50
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/task-02/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown codex-unverified)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown codex-unverified)",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-window:fm-task-02",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": "https://github.com/o/r/pull/23",
+        "source": "status_event",
+        "head": "0123456789abcdef"
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "needs-decision [at=1791547150]: [key=api] choose API https://github.com/o/r/pull/23"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-task-02",
+        "steer": "bin/fm-send.sh fm-task-02 '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "task-03",
+      "kind": "ship",
+      "harness": "codex",
+      "mode": "ship",
+      "yolo": "",
+      "branch": "worker-3",
+      "project": "alpha",
+      "spawn_gen": "fixture",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-03.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-03.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "task 3",
+            "raw": "working [at=1791547100]: task 3",
+            "age_seconds": 100
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/task-03/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown codex-unverified)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown codex-unverified)",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-window:fm-task-03",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working [at=1791547100]: task 3"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-task-03",
+        "steer": "bin/fm-send.sh fm-task-03 '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "task-04",
+      "kind": "ship",
+      "harness": "codex",
+      "mode": "ship",
+      "yolo": "",
+      "branch": "worker-4",
+      "project": "alpha",
+      "spawn_gen": "fixture",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-04.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-04.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "task 4",
+            "raw": "working [at=1791547100]: task 4",
+            "age_seconds": 100
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/task-04/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown codex-unverified)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown codex-unverified)",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-window:fm-task-04",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working [at=1791547100]: task 4"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-task-04",
+        "steer": "bin/fm-send.sh fm-task-04 '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "task-05",
+      "kind": "ship",
+      "harness": "codex",
+      "mode": "ship",
+      "yolo": "",
+      "branch": "worker-5",
+      "project": "alpha",
+      "spawn_gen": "fixture",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-05.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-05.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "task 5",
+            "raw": "working [at=1791547100]: task 5",
+            "age_seconds": 100
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/task-05/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown codex-unverified)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown codex-unverified)",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-window:fm-task-05",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working [at=1791547100]: task 5"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-task-05",
+        "steer": "bin/fm-send.sh fm-task-05 '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "task-06",
+      "kind": "ship",
+      "harness": "codex",
+      "mode": "ship",
+      "yolo": "",
+      "branch": "worker-6",
+      "project": "alpha",
+      "spawn_gen": "fixture",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-06.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-06.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "task 6",
+            "raw": "working [at=1791547100]: task 6",
+            "age_seconds": 100
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/task-06/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown codex-unverified)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown codex-unverified)",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-window:fm-task-06",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working [at=1791547100]: task 6"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-task-06",
+        "steer": "bin/fm-send.sh fm-task-06 '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "task-07",
+      "kind": "ship",
+      "harness": "codex",
+      "mode": "ship",
+      "yolo": "",
+      "branch": "worker-7",
+      "project": "alpha",
+      "spawn_gen": "fixture",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-07.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-07.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "task 7",
+            "raw": "working [at=1791547100]: task 7",
+            "age_seconds": 100
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/task-07/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown codex-unverified)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown codex-unverified)",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-window:fm-task-07",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working [at=1791547100]: task 7"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-task-07",
+        "steer": "bin/fm-send.sh fm-task-07 '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "task-08",
+      "kind": "ship",
+      "harness": "codex",
+      "mode": "ship",
+      "yolo": "",
+      "branch": "worker-8",
+      "project": "alpha",
+      "spawn_gen": "fixture",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-08.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-08.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "task 8",
+            "raw": "working [at=1791547100]: task 8",
+            "age_seconds": 100
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/task-08/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown codex-unverified)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown codex-unverified)",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-window:fm-task-08",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working [at=1791547100]: task 8"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-task-08",
+        "steer": "bin/fm-send.sh fm-task-08 '<instruction>'",
+        "return_channel_note": null
+      }
+    },
+    {
+      "id": "task-09",
+      "kind": "ship",
+      "harness": "codex",
+      "mode": "ship",
+      "yolo": "",
+      "branch": "worker-9",
+      "project": "alpha",
+      "spawn_gen": "fixture",
+      "backend": "tmux",
+      "remote": null,
+      "paths": {
+        "meta": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-09.meta",
+          "present": true
+        },
+        "status_log": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/state/task-09.status",
+          "present": true,
+          "kind": "event_history",
+          "last_event": {
+            "state": "working",
+            "note": "task 9",
+            "raw": "working [at=1791547100]: task 9",
+            "age_seconds": 100
+          }
+        },
+        "worktree": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/wt",
+          "present": true
+        },
+        "home": {
+          "path": null,
+          "present": false
+        },
+        "report": {
+          "path": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4EXCPRHTRH93K0CGS9YW44Y/.lv/rolling-home/data/task-09/report.md",
+          "present": false
+        }
+      },
+      "secondmate_projects": [],
+      "current_state": {
+        "state": "unknown",
+        "source": "pane",
+        "detail": "harness state unavailable (unknown codex-unverified)",
+        "raw": "state: unknown · source: pane · harness state unavailable (unknown codex-unverified)",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "endpoint": {
+        "target": "fm-lab-window:fm-task-09",
+        "exists": true,
+        "agent_alive": "ambiguous",
+        "status": "unknown",
+        "observed_at": "2026-10-09T12:00:00Z",
+        "freshness": "fresh"
+      },
+      "pr": {
+        "url": null,
+        "source": "absent",
+        "head": null
+      },
+      "hints": {
+        "pending_decision": false,
+        "blocked_event": false,
+        "open_decisions": [],
+        "scout_report_present": false,
+        "last_event_text": "working [at=1791547100]: task 9"
+      },
+      "actions": {
+        "watch": "bin/fm-peek.sh fm-task-09",
+        "steer": "bin/fm-send.sh fm-task-09 '<instruction>'",
+        "return_channel_note": null
+      }
+    }
+  ]
+}
