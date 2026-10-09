@@ -1546,12 +1546,39 @@ test_crewmate_scaffolds_route_scratch_scripts_through_the_process_budget() {
   pass "fm-brief.sh: every crewmate scaffold routes scratch scripts through the process budget"
 }
 
+test_process_budget_command_quotes_foreign_firstmate_path() {
+  local home="$TMP_ROOT/budget-foreign-home" mode id brief rule command got
+  local foreign_root="$TMP_ROOT/budget helper's root"
+  mkdir -p "$home/data" "$foreign_root/bin"
+  cp "$ROOT/bin/fm-proc-budget.sh" "$foreign_root/bin/"
+  for mode in no-mistakes direct-PR local-only scout; do
+    id="brief-budget-foreign-$mode"
+    if [ "$mode" = scout ]; then
+      FM_HOME="$home" FM_ROOT_OVERRIDE="$foreign_root" "$ROOT/bin/fm-brief.sh" "$id" foreign --scout >/dev/null 2>&1 \
+        || fail "foreign-root scout brief failed"
+    else
+      FM_HOME="$home" FM_ROOT_OVERRIDE="$foreign_root" "$ROOT/bin/fm-brief.sh" "$id" foreign --mode "$mode" >/dev/null 2>&1 \
+        || fail "foreign-root $mode brief failed"
+    fi
+    brief="$home/data/$id/brief.md"
+    rule=$(grep '^9\. Run any shim' "$brief")
+    command=${rule#*\`}
+    command=${command%%\`*}
+    command=${command% -- <command...>}
+    got=$(bash -c "$command -- printf '%s' 'budget command executed'") \
+      || fail "the emitted $mode budget command could not execute from a quoted root"
+    assert_equals "budget command executed" "$got" "the emitted $mode command must execute the wrapper"
+  done
+  pass "fm-brief.sh: emitted process-budget commands execute from foreign paths"
+}
+
 test_script_parses
 test_no_heredoc_in_command_substitution
 test_help_includes_entire_header
 test_ship_modes_generate_clean_briefs
 test_ship_mode_is_required_and_closed_set
 test_crewmate_scaffolds_route_scratch_scripts_through_the_process_budget
+test_process_budget_command_quotes_foreign_firstmate_path
 test_ship_mode_is_explicit_not_registry
 test_delivery_flags_are_refused_where_they_do_not_apply
 test_faster_paths_use_configured_authority_without_stacked_review

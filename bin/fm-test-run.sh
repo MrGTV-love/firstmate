@@ -138,9 +138,9 @@
 # Every executed script also runs under a per-tree process budget
 # (bin/fm-proc-budget.sh owns it): a script that forks without bound stops at its
 # own limit instead of filling the user's process table for every other lane.
-# The budget is taken when the script starts, after any pass wait. FM_PROC_BUDGET=off
-# disables it, FM_PROC_BUDGET_EXTRA sizes it, and a host that cannot set one runs
-# scripts without it and says so on stderr.
+# The budget is taken when the script starts, after any pass wait. If the budget
+# cannot be set, that script fails with wrapper exit 125 rather than running
+# unbudgeted.
 # With a usable pool, --jobs above its size still starts that many workers,
 # but only pool-size scripts run at once.
 #
@@ -2476,11 +2476,8 @@ elif ! command -v python3 >/dev/null 2>&1; then
   log "running without CPU passes: python3 not found"
 fi
 PROC_BUDGET_ACTIVE=1
-if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ] || [ "${FM_PROC_BUDGET:-}" = off ]; then
+if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ]; then
   PROC_BUDGET_ACTIVE=0
-elif ! proc_budget_note=$("$ROOT/bin/fm-proc-budget.sh" --check 2>&1); then
-  PROC_BUDGET_ACTIVE=0
-  log "running without process budgets: $proc_budget_note"
 fi
 if [ "$JOBS" -gt 1 ] || [ "$MODE" = changed ] || [ "$MODE" = scripts ]; then
   SELECTION_DESC="${SELECTION_DESC};jobs=$JOBS"

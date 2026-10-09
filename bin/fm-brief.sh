@@ -600,7 +600,7 @@ SHARED_INFRA_RULE=${SHARED_INFRA_RULE%$'\n'}
 # The kernel counts the user's whole process table, so one runaway scratch tree
 # starves every lane; bin/fm-proc-budget.sh owns the budget, this is the one
 # line that reaches ad-hoc scripts no runner wraps.
-SHARED_PROC_BUDGET_RULE="9. Run any shim, lab, or measurement script through \`$FM_ROOT/bin/fm-proc-budget.sh -- <command...>\`: a runaway process tree then stops at its own limit instead of starving every lane of fork."
+SHARED_PROC_BUDGET_RULE="9. Run any shim, lab, or measurement script through \`$(shell_quote "$FM_ROOT/bin/fm-proc-budget.sh") -- <command...>\`: a runaway process tree then stops at its own limit instead of starving every lane of fork."
 
 if [ -n "$BASE_BRANCH" ]; then
   SETUP_BASE="You are in a disposable git worktree of $REPO, at a detached HEAD on a clean copy of its base branch.

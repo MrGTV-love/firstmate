@@ -10,6 +10,7 @@
 # Child commands are single-quoted on purpose: they expand in the child bash.
 # shellcheck disable=SC2016
 set -u
+set -o pipefail
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -18,7 +19,6 @@ set -u
 
 WRAP="$ROOT/bin/fm-proc-budget.sh"
 TMP_ROOT=$(fm_test_tmproot fm-proc-budget)
-unset FM_PROC_BUDGET FM_PROC_BUDGET_EXTRA
 
 assert_present "$WRAP" "bin/fm-proc-budget.sh is missing"
 [ -x "$WRAP" ] || fail "bin/fm-proc-budget.sh must be executable"
@@ -45,38 +45,65 @@ limit_with_stub() {  # <ps-count> <wrapper args...>
     "$WRAP" "$@" -- bash -c 'ulimit -u'
 }
 
+effective_limit() {
+  local limit=$1 inherited
+  for inherited in "$(ulimit -S -u)" "$(ulimit -H -u)"; do
+    case "$inherited" in
+      ''|*[!0-9]*) ;;
+      *) [ "$limit" -lt "$inherited" ] || limit=$inherited ;;
+    esac
+  done
+  printf '%s\n' "$limit"
+}
+
 test_default_extra_is_added_to_the_count() {
   local got
   got=$(limit_with_stub 7) || fail "wrapper refused a plain command"
-  assert_equals 1507 "$got" "the default budget is the process count plus 1500"
+  assert_equals "$(effective_limit 1507)" "$got" "the default budget is the process count plus 1500, capped by inheritance"
   pass "default budget is the current count plus 1500"
 }
 
-test_explicit_and_env_extra() {
+test_explicit_extra() {
   local got
   got=$(limit_with_stub 7 40) || fail "wrapper refused an explicit extra"
-  assert_equals 47 "$got" "an explicit extra replaces the default"
-  got=$(FM_PROC_BUDGET_EXTRA=90 limit_with_stub 7) || fail "wrapper refused FM_PROC_BUDGET_EXTRA"
-  assert_equals 97 "$got" "FM_PROC_BUDGET_EXTRA replaces the default"
-  got=$(FM_PROC_BUDGET_EXTRA=90 limit_with_stub 7 40) || fail "wrapper refused both extras"
-  assert_equals 47 "$got" "an explicit extra wins over FM_PROC_BUDGET_EXTRA"
-  pass "explicit extra and FM_PROC_BUDGET_EXTRA set the budget"
+  assert_equals "$(effective_limit 47)" "$got" "an explicit extra replaces the default, capped by inheritance"
+  pass "explicit extra sets the budget"
 }
 
 test_budget_never_widens_the_inherited_limit() {
   local real low got
-  real=$("$WRAP" --count) || fail "--count failed"
-  low=$((real + 1500))
+  case "$(uname -s)" in
+    Linux) real=$(ps -L -U "$(id -u)" -o lwp= | wc -l) || fail "cannot read the baseline task count" ;;
+    *) real=$(ps -U "$(id -u)" -o pid= | wc -l) || fail "cannot read the baseline process count" ;;
+  esac
+  low=$(effective_limit "$((real + 1500))")
   got=$(PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
-    bash -c 'ulimit -u "$1"; shift; exec "$@"' _ "$low" "$WRAP" 1500 -- bash -c 'ulimit -u') \
+    bash -c 'ulimit -u "$1" || exit 125; shift; exec "$@"' _ "$low" "$WRAP" 1500 -- \
+    bash -c 'printf "%s %s\n" "$(ulimit -S -u)" "$(ulimit -H -u)"') \
     || fail "wrapper failed under a lower inherited limit"
-  assert_equals "$low" "$got" "a budget above the inherited limit leaves it unchanged"
+  assert_equals "$low $low" "$got" "a budget above the inherited limit leaves both limits unchanged"
   got=$(PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=7 \
-    bash -c 'ulimit -u "$1"; shift; exec "$@"' _ "$low" "$WRAP" 40 -- \
+    bash -c 'ulimit -u "$1" || exit 125; shift; exec "$@"' _ "$low" "$WRAP" 40 -- \
     bash -c 'ulimit -u 99999 2>/dev/null && echo raised; ulimit -u') \
     || fail "wrapper failed under a higher inherited limit"
-  assert_equals 47 "$got" "a budget below the inherited limit lowers it, and the child cannot raise it again"
+  assert_equals "$(effective_limit 47)" "$got" "a budget below the inherited limit lowers it, and the child cannot raise it again"
   pass "a budget only ever tightens the limit it inherits"
+}
+
+test_retained_soft_limit_seals_the_hard_limit() {
+  local real low got
+  case "$(uname -s)" in
+    Linux) real=$(ps -L -U "$(id -u)" -o lwp= | wc -l) || fail "cannot read the baseline task count" ;;
+    *) real=$(ps -U "$(id -u)" -o pid= | wc -l) || fail "cannot read the baseline process count" ;;
+  esac
+  low=$(effective_limit "$((real + 500))")
+  low=$((low - 1))
+  got=$(PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=100000 \
+    bash -c 'ulimit -S -u "$1" || exit 125; shift; exec "$@"' _ "$low" "$WRAP" -- \
+    bash -c 'ulimit -S -u "$1" 2>/dev/null && echo raised; printf "%s %s\n" "$(ulimit -S -u)" "$(ulimit -H -u)"' _ "$((low + 1))") \
+    || fail "wrapper failed under a lower inherited soft limit"
+  assert_equals "$low $low" "$got" "a retained soft limit must also seal the hard limit and prevent raising it"
+  pass "a retained soft limit seals the inherited hard limit"
 }
 
 test_exit_status_and_arguments_pass_through() {
@@ -89,15 +116,6 @@ test_exit_status_and_arguments_pass_through() {
   out=$("$WRAP" -- printf 'x') || fail "omitting the extra must use the default"
   assert_equals x "$out" "-- alone selects the default budget"
   pass "exit status and arguments pass through"
-}
-
-test_kill_switch_runs_the_command_unbudgeted() {
-  local inherited got
-  inherited=$(ulimit -u)
-  got=$(FM_PROC_BUDGET=off PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=7 \
-    "$WRAP" 40 -- bash -c 'ulimit -u') || fail "FM_PROC_BUDGET=off refused the command"
-  assert_equals "$inherited" "$got" "FM_PROC_BUDGET=off leaves the limit alone"
-  pass "FM_PROC_BUDGET=off runs the command without a budget"
 }
 
 test_refusals_never_run_the_command() {
@@ -130,15 +148,6 @@ test_refusals_never_run_the_command() {
   expect_code 125 "$rc" "a failing ps"
   assert_absent "$marker" "a failing ps must not run the command"
   pass "bad calls and an unreadable process count never run the command"
-}
-
-test_check_reports_whether_a_budget_can_be_set() {
-  "$WRAP" --check >"$TMP_ROOT/check.out" 2>&1 || fail "--check failed on this host: $(cat "$TMP_ROOT/check.out")"
-  if PATH="$TMP_ROOT/stub-ps:$PATH" FM_TEST_PS_COUNT=0 "$WRAP" --check >"$TMP_ROOT/check.out" 2>&1; then
-    fail "--check must fail when the process count is unreadable"
-  fi
-  [ -s "$TMP_ROOT/check.out" ] || fail "--check must say why it failed"
-  pass "--check reports whether a budget can be set"
 }
 
 # The incident, leashed. Worker fm-board-listener-retire linked `basename` to a
@@ -197,10 +206,9 @@ test_budget_stops_a_runaway_tree_inside_the_tree() {
 }
 
 test_default_extra_is_added_to_the_count
-test_explicit_and_env_extra
+test_explicit_extra
 test_budget_never_widens_the_inherited_limit
+test_retained_soft_limit_seals_the_hard_limit
 test_exit_status_and_arguments_pass_through
-test_kill_switch_runs_the_command_unbudgeted
 test_refusals_never_run_the_command
-test_check_reports_whether_a_budget_can_be_set
 test_budget_stops_a_runaway_tree_inside_the_tree
