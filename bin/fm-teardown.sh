@@ -2121,9 +2121,15 @@ task_status_is_own_run_to_conclude() {
 }
 
 task_run_is_own_run_to_conclude() {
-  local wt=$1 scope=${2:-parked} out
+  local wt=$1 scope=${2:-parked} out query_rc
   out=$(fm_nm_run_checked "$wt" "$NM_TEARDOWN_TIMEOUT" axi status) || {
-    [ "$scope" != forced-child ] || return 2
+    query_rc=$?
+    if [ "$scope" = forced-child ]; then
+      if [ "$query_rc" -eq 1 ] && [ "${out%%$'\n'*}" = "error: repo not initialized (run 'no-mistakes init' first)" ]; then
+        return 1
+      fi
+      return 2
+    fi
   }
   task_status_is_own_run_to_conclude "$wt" "$out" "$scope"
 }
@@ -2561,20 +2567,16 @@ teardown_docker_stacks() {
   command -v docker >/dev/null 2>&1 || return 0
   WT=$(meta_value "$META" worktree)
   PROJ=$(meta_value "$META" project)
-  if collect_local_firstmate_states "$STATE" 2>/dev/null; then
-    for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
-      for other in "$state_dir"/*.meta; do
-        [ -f "$other" ] || continue
-        [ ! "$other" -ef "$META" ] || continue
-        other_id=$(basename "$other" .meta)
-        [ "$other_id" != "$ID" ] || ambiguous=1
-        siblings="$siblings $other_id"
-      done
+  collect_local_firstmate_states "$STATE" || return 1
+  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
+    for other in "$state_dir"/*.meta; do
+      [ -f "$other" ] || continue
+      [ "${other##*/}" = "${META##*/}" ] && [ "$other" -ef "$META" ] && continue
+      other_id=$(basename "$other" .meta)
+      [ "$other_id" != "$ID" ] || ambiguous=1
+      siblings="$siblings $other_id"
     done
-  else
-    ambiguous=1
-    echo "warning: the other local Firstmate homes could not be enumerated, so Docker objects are matched to $ID only by a compose working directory under its own copy" >&2
-  fi
+  done
   if [ "$(meta_value "$META" kind)" != secondmate ] && [ "$reassigned" != 1 ] && [ -n "$WT" ]; then
     if canon=$(task_canonical_path "$WT" 2>/dev/null); then
       roots+=("$canon")
@@ -2724,11 +2726,26 @@ teardown_live_slot_path() {
 # task's slot might also be; bin/fm-wake-lib.sh's fm_local_firstmate_state_dirs
 # owns the walk and what it refuses.
 collect_local_firstmate_states() {
+  local state_dir meta
   fm_local_firstmate_state_dirs "$1" || {
     echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
     return 1
   }
   TREEHOUSE_OWNER_STATES=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
+  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
+    [ -e "$state_dir" ] || [ -L "$state_dir" ] || continue
+    if ! { [ -d "$state_dir" ] && [ -r "$state_dir" ] && [ -x "$state_dir" ] && ls -A "$state_dir" >/dev/null; }; then
+      echo "REFUSED: cannot enumerate local Firstmate state $state_dir; retaining task records" >&2
+      return 1
+    fi
+    for meta in "$state_dir"/*.meta; do
+      [ -e "$meta" ] || [ -L "$meta" ] || continue
+      if ! { [ -f "$meta" ] && cat "$meta" >/dev/null; }; then
+        echo "REFUSED: cannot read local Firstmate task record $meta; retaining task records" >&2
+        return 1
+      fi
+    done
+  done
 }
 
 require_exclusive_worktree_slot_record() {
