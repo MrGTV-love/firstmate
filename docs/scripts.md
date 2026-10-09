@@ -181,70 +181,10 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 
 ## Task-owned Docker teardown
 
-`fm-task-docker-lib.sh` owns Docker attribution and removal. An unambiguous
-`fm.task=<task-id>` label is authoritative on containers, networks and volumes.
-Without that marker, container names must be the exact task id or begin with the
-id followed by `-` or `_`; the longest matching **live** sibling task wins.
-Compose and Supabase project-label heuristics require the exact task id, not a
-prefixed project name. The actual primary project's `supabase/config.toml`
-`project_id` vetoes every heuristic on an object carrying that protected identity
-in either project label, including name and working-directory matches.
-Explicit task markers remain authoritative.
+[`fm-task-docker-lib.sh`'s header](../bin/fm-task-docker-lib.sh) owns object attribution, protected-stack precedence, volume safety, retry metadata, and the Docker call timeout.
+[`fm-teardown.sh`'s header](../bin/fm-teardown.sh) owns cleanup ordering, forced-child pipeline cancellation, reassigned-slot handling, prerequisites, and failure/retry behavior.
+The worker Docker instructions rendered by [`fm-brief.sh`](../bin/fm-brief.sh) own how ship and scout workers mark resources and isolate Supabase configuration.
 
-Compose working directories are canonicalized against the task's worktree roots,
-never its temporary directory. Nested registered Git lanes and linked worktrees
-are excluded, including paths reached through symlinks. A heuristic network claim
-is vetoed if any container in the latest successful container listing carries
-either corresponding project label but is foreign, even without an endpoint on
-the network. Compose project ownership can propagate from owned containers only
-when every carrier is owned; Supabase networks require their own marker or exact
-task-id project label. An explicit network marker does not depend on heuristic
-project ownership. Named volumes require the task marker.
+Residual: a still-live top-level producer can create a stack after the final listing; snapshot cleanup cannot stop a live producer.
 
-Teardown completes only after Docker listing, container removal and post-removal
-listing, network removal, volume removal, and a final container listing succeed.
-Any listing or removal failure retains task identity records and prevents
-destructive worktree retirement; `--force` does not waive Docker cleanup.
-Standalone secondmate retirement skips its own Docker cleanup. Forced secondmate
-cleanup first closes each child's endpoint, aborts its own parked or executing
-(`running`, `fixing`, or `ci`) pipeline attributed to its branch and head, confirms
-that exact run is terminal or not found, and reaps its owned worktree and
-temporary-directory processes before taking the Docker snapshot. A failed initial
-status query, failed required ledger query, or unconfirmed abort refuses child
-retirement and keeps its identity records and worktree.
-Reassigned worktree slots are not reaped or used for pipeline
-cleanup. Nested secondmate process events are swept before Docker cleanup and
-recursive descendant retirement. Docker cleanup uses each child's own metadata;
-failures retain that identity and worktree for retry even though its endpoint and
-processes have already stopped. A final listing refuses completion if an owned
-container appears during network or volume cleanup.
-Before removing containers, teardown retains their derived Compose/Supabase
-project identities in the task's `docker_projects` metadata field. Retries read
-that field even after the containers are gone; task-record retirement removes it.
-A retry can complete after the failure is resolved.
-Docker absent is a silent skip; Docker installed but unreachable is a refusal
-on paths that perform Docker cleanup.
-`FM_TASK_DOCKER_TIMEOUT_SECS` continues to bound each Docker call.
-Residual: top-level teardown retains best-effort discovery queries, parked-only
-pipeline cancellation, and its live endpoint during Docker cleanup. A still-live
-producer can create a stack after the final listing; snapshot cleanup cannot stop
-a live producer.
-Path attribution requires `python3`; reading a present shared Supabase config
-requires its standard-library `tomllib` parser.
-
-Ship and scout workers must label `docker run`, `docker create`, `docker network
-create`, and `docker volume create` with `--label fm.task=$FM_TASK_ID`. Compose
-services and every declared network and volume need `fm.task: ${FM_TASK_ID}`
-labels. Use `docker compose -p "$FM_TASK_ID"` only if the exact id is a valid
-Compose project name (lowercase letters, digits, `-` and `_`, beginning with a
-lowercase letter or digit). For Supabase, set `project_id` to the exact task id in
-an isolated task-local `supabase/config.toml`, then run `supabase start` there;
-never alter or start the primary project's shared configuration.
-
-Prefix-name protection uses live task records only. Once a longer sibling's
-record has been retired, an unlabelled container matching both ids can be
-attributed to the remaining shorter id. No historical sibling identities are
-persisted. Workers must use explicit markers rather than relying on historical
-prefix protection.
-Failed cleanup keeps the longer sibling's record, preserving its prefix guard
-until its Docker objects have been removed.
+[`tests/fm-teardown.test.sh`](../tests/fm-teardown.test.sh) provides portable regression coverage; [`tests/fm-task-docker-live-e2e.test.sh`](../tests/fm-task-docker-live-e2e.test.sh) checks the library against a real Docker daemon.

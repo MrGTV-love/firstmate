@@ -234,10 +234,11 @@
 #     (awaiting_approval/fix_review/any awaiting_agent field), with no worker
 #     left to ever answer it - the run then sits there holding a fleet slot
 #     indefinitely (observed 2026-08-03: runs parked 7h39m and parked at a
-#     post-CI approval gate after the worker was already cleaned up). A run
-#     with an autonomous step still under way (running/fixing/ci) is left
-#     alone: no-mistakes drives those against its own gate-repo clone, not the
-#     crew's worktree, so they are not orphaned by removing the worktree.
+#     post-CI approval gate after the worker was already cleaned up).
+#     In top-level teardown, a run with an autonomous step still under way
+#     (running/fixing/ci) is left alone: no-mistakes drives those against its own
+#     gate-repo clone, not the crew's worktree. Fix 3 below owns the Docker residual
+#     and the stricter forced-descendant cancellation scope.
 #     conclude_task_no_mistakes_run attributes the active-or-most-recent run to
 #     THIS task only when its branch AND code identity (bin/fm-nm-run-lib.sh's
 #     strict fm_nm_head_matches_worktree rule) both match this worktree, then
@@ -252,9 +253,9 @@
 #     finished history, never an abort authorization (observed 2026-09-03: a
 #     run parked at a post-CI gate after fix rounds advanced its head past
 #     the submitted head stayed parked forever once the task was cleaned up).
-#     A run already terminal
-#     (an outcome is set) or not parked at a gate is left untouched. Idempotent:
-#     an already-aborted run reads back terminal and is skipped on retry.
+#     A run already terminal (an outcome is set), or outside the cancellation
+#     scope above, is left untouched. Idempotent: an already-aborted run reads
+#     back terminal and is skipped on retry.
 #   Fix 2 - reap leaked descendant processes. A backgrounded/disowned process
 #     started under the worktree (or its per-task tasktmp) does not receive the
 #     SIGHUP/SIGTERM that closing the backend pane sends to its own foreground
@@ -290,24 +291,35 @@
 #     only when a changed birth identity or kernel ESRCH proves it replaced or
 #     vanished; a live matching target or uncertain result refuses, as do authorization
 #     and write failures. Idempotent: nothing left to find is a silent no-op.
-#   Fix 3 - remove the task's own Docker stacks. A worker's throwaway database
-#     or compose stack is a container no process-reap sees, so it outlived its
-#     task for days (observed 2026-09-30 to 2026-10-06). After the process reap,
-#     teardown removes the Docker containers, networks, and marker-labelled
-#     volumes that bin/fm-task-docker-lib.sh attributes to this task - by an
-#     fm.task=<id> label, the id in a name or compose project, or a compose
-#     working directory under the task's worktree - and nothing else. That
-#     library owns the ownership rules and what is never removed. Any Docker
-#     listing, verification, or removal failure stops teardown with the task's
-#     records kept, even under --force; the next teardown retries. A missing
-#     Docker CLI is silent; an unlistable daemon warns and stops teardown.
-#     Not run for a standalone secondmate; forced cleanup still applies each
-#     descendant's own metadata. A reassigned pool slot contributes no path
-#     evidence, only the task's own label and names.
-#     Forced descendants also abort their attributed running, fixing, or ci
-#     pipeline and confirm it terminal or not found before Docker cleanup.
-#     Initial status or required ledger query failures refuse forced child
-#     retirement with its identity records kept; top-level queries stay best effort.
+#   Fix 3 - remove the task's own Docker stacks. Docker resources survive process
+#     exit, so after the process reap teardown calls bin/fm-task-docker-lib.sh,
+#     whose header owns object attribution, removal, and retry metadata.
+#     Any Docker listing, verification, or removal failure stops teardown with
+#     task identity records and the worktree kept, even under --force; rerun
+#     teardown after resolving the failure. A missing Docker CLI is silent;
+#     an unlistable daemon warns and stops teardown on Docker-cleanup paths.
+#     Standalone secondmate retirement skips its own Docker cleanup.
+#     Forced cleanup closes each child's endpoint before its Docker snapshot.
+#     For ship children with an owned copy, it aborts an attributed parked or
+#     executing (running/fixing/ci) pipeline and confirms that exact run terminal
+#     or not found, then reaps owned worktree and tasktmp processes. Attribution
+#     uses the branch/head proof in Fix 1. An initial status failure, required
+#     ledger query failure, or unconfirmed abort refuses child retirement with
+#     its identity records and worktree kept; top-level discovery stays best effort.
+#     Ordinary, Orca, and recursive descendants use their own metadata for Docker
+#     cleanup. Nested secondmate process events are swept before that secondmate's
+#     Docker cleanup and recursive descendant retirement. A Docker refusal retains
+#     the child's retry records even though its endpoint and processes may have
+#     already stopped. A reassigned slot is not reaped or used to attribute a
+#     pipeline or Docker workdir; its tasktmp is still reaped, and the library's
+#     remaining non-path ownership rules still apply.
+#     Docker path roots are owned worktrees only, never tasktmp; nested registered
+#     Git lanes and linked worktrees are excluded, including through symlinks.
+#     The shared-stack identity comes from the primary project's
+#     supabase/config.toml project_id. Reading a present config requires python3's
+#     standard-library tomllib parser; unreadable or invalid configuration refuses
+#     cleanup before Docker removal.
+#     tests/fm-teardown.test.sh covers failure/retry and forced-child quiescence.
 #     Residual: top-level teardown leaves autonomous pipelines and the endpoint
 #     live; a still-live producer can create a stack after the final listing.
 #     Snapshot cleanup cannot stop a live producer.
@@ -2020,7 +2032,7 @@ validate_worktree_teardown_safety() {
 # this copy cannot resolve at all.
 NM_TEARDOWN_TIMEOUT=${FM_TEARDOWN_NM_TIMEOUT:-10}
 case "$NM_TEARDOWN_TIMEOUT" in ''|*[!0-9]*) NM_TEARDOWN_TIMEOUT=10 ;; esac
-# How many of the most recent `no-mistakes runs` rows the parked-run
+# How many of the most recent `no-mistakes runs` rows the unresolved-head
 # continuation proof may scan, mirroring bin/fm-crew-state.sh's limit posture
 # (generous: rows of other branches interleave freely in the real ledger).
 NM_TEARDOWN_RUNS_LIMIT=${FM_TEARDOWN_NM_RUNS_LIMIT:-200}
@@ -2055,7 +2067,7 @@ task_status_is_own_run_to_conclude() {
     # nothing for any ledger shape it cannot prove, so the run stays
     # untouched unless the ledger proves this exact continuation. Cleanup
     # consumes only an explicitly active (`running`) proved word: a terminal
-    # newest row is finished history, never this parked run's abort
+    # newest row is finished history, never this run's abort
     # authorization (the read path classifies the same owner's answer; the
     # abort here must never fire for a run that already ended).
     [ -n "$run_head" ] || return 1
@@ -2106,11 +2118,8 @@ task_status_is_run_not_found() {  # <status-error> <run-id>
   [ "$actual" = "$expected" ]
 }
 
-# Abort THIS task's own parked no-mistakes run before the worker that would
-# have answered its gate is removed, so no run is left orphaned holding a
-# fleet slot. Only KIND=ship drives a no-mistakes validation of its own
-# worktree (scouts and secondmates never do, mirroring bin/fm-crew-state.sh);
-# a run not attributed to this exact branch+head is left completely alone.
+# Keep branch/head attribution before any abort; Fix 1 and Fix 3 in the script
+# header own the top-level and forced-child cancellation scopes.
 conclude_task_no_mistakes_run() {  # <worktree>
   local wt=$1 scope=${2:-parked} out run_id query_rc state_description="parked at a gate" refusal_state=parked
   [ "$KIND" = ship ] || return 0
@@ -3839,9 +3848,8 @@ if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend"
     || echo "warning: could not record $ID's no-mistakes pipeline spend; cleanup continues" >&2
 fi
 
-# Fix 3 (see script header): the task's own Docker stacks go in this same
-# pre-destructive cleanup, before any record or endpoint is touched, so a
-# refusal leaves everything for a rerun.
+# Fix 3 (see script header): keep task identity records and the worktree until
+# Docker cleanup succeeds, so a partial removal can be retried.
 if [ "$KIND" != secondmate ] && ! teardown_docker_stacks "$ID" "$META" "$STATE" "$TEARDOWN_SLOT_REASSIGNED"; then
   echo "error: stopping this cleanup without removing the task's records, so the Docker objects still named for $ID can be reconciled and a rerun can retry." >&2
   exit 1

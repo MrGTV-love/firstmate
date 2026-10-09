@@ -603,10 +603,9 @@ else
   SETUP_BASE="You are in a disposable git worktree of $REPO, at a detached HEAD on a clean default branch."
 fi
 
-# Teardown removes a task's Docker stacks only when they carry evidence of the
-# task (bin/fm-task-docker-lib.sh owns the rules), and an unmarked container has
-# none: the three throwaway databases left behind for days in 2026-09/10 carried
-# no label, mount, or task id. FM_TASK_ID is exported by bin/fm-spawn.sh.
+# Explicit task markers avoid depending on the library's name/project/path
+# heuristics; bin/fm-task-docker-lib.sh owns attribution. FM_TASK_ID is exported
+# by bin/fm-spawn.sh.
 IFS= read -r -d '' DOCKER_MARKER_RULE <<'EOF' || true
 8. Mark every Docker object you start with your task id, so teardown removes it with your task:
    pass `--label fm.task=$FM_TASK_ID` to `docker run`, `docker create`, `docker network create`, and

@@ -2,11 +2,8 @@
 # fm-task-docker-lib.sh - the single owner of which Docker objects belong to a
 # task and of their removal when the task is torn down.
 #
-# Sourced, never executed. bin/fm-teardown.sh calls fm_task_docker_cleanup in
-# the same pre-destructive cleanup that reaps leaked worktree processes, so a
-# worker's throwaway database or compose stack does not outlive its task
-# (observed 2026-09-30 to 2026-10-06: three stopped throwaway Postgres
-# containers survived 1.5 to 8 days because teardown had no Docker step).
+# Sourced, never executed. bin/fm-teardown.sh's header owns the lifecycle ordering,
+# forced-descendant handling, refusal-and-retry behavior, and top-level residual.
 #
 #   fm_task_docker_cleanup <task-id> <sibling-ids> <ambiguous> <protected> <meta> [<root>...]
 #       Removes the Docker containers, then the compose/labelled networks and
@@ -22,21 +19,46 @@
 #       fm_task_docker_path_excluded <root> <path>, when the caller defines it,
 #       returns 0 for a path that sits in a nested lane the task does not own.
 #
-# Ownership is decided per object, from evidence the object carries itself.
-# Nothing here infers ownership from timing or from "looks unused", because
-# both are shared across lanes (a window test put 15 of 36 live containers
-# inside the lifetime of two or more live tasks on 2026-10-08).
-#   1. Marker label: the object carries `fm.task=<id>`.
-#      The worker brief (bin/fm-brief.sh) tells workers to set it from the
-#      FM_TASK_ID that bin/fm-spawn.sh exports into every ship and scout pane.
-#   2. Name: a container name that is the id, or the id followed by - or _.
-#   3. Project: a compose or Supabase CLI project label equal to the task id.
-#   4. Path: a compose project whose canonical working directory is under a <root>.
+# Ownership is decided per object, never from age or whether it looks unused.
+# A marker naming another task vetoes every container and network claim.
+# When the task id is unambiguous, container evidence is considered in order:
+#   1. Marker label: `fm.task=<id>` is authoritative, even on a protected project.
+#   2. Name: the exact id, or the id followed by - or _; a longer matching live
+#      sibling id vetoes the shorter id's claim.
+#   3. Project: a Compose or Supabase CLI project label equal to the exact id,
+#      never a project name that merely starts with the id.
+#   4. Path: a canonical Compose working directory under an owned <root>, unless
+#      fm_task_docker_path_excluded rejects the path.
+# Either project label matching a <protected> identity vetoes all heuristics,
+# including name and path evidence, but not an unambiguous explicit marker.
+# A container name equal to a protected identity is not name evidence either.
+# If the id is ambiguous across homes, only path evidence can claim a container.
+# Path attribution requires python3 to resolve both the workdir and roots.
 #
-# Never removed: an object no rule claims (the shared local Supabase stack, other
-# tasks' stacks, containers a worker started without any marker); a named volume
-# that does not carry the marker label, because `docker rm -v` drops only a
-# container's anonymous volumes.
+# Prefix-name protection uses current live sibling records only, not historical
+# identities. After a longer sibling's record is retired, its unlabelled leftovers
+# can match a remaining shorter id. The worker Docker instructions rendered by
+# bin/fm-brief.sh require explicit markers rather than historical prefix protection.
+#
+# Networks need an unambiguous marker, an exact task-id project label, or a Compose
+# project identity retained from owned containers. The derived-project rule applies
+# only when the network has a Compose project label and no Supabase project label.
+# Protected identities veto heuristic network claims. So does either network
+# project identity carried in either project label by a foreign container in the
+# latest successful container listing, even if that container has no endpoint on
+# the network. An unambiguous marker bypasses both heuristic vetoes.
+# Named volumes require an unambiguous task marker; names and project labels do
+# not establish volume ownership. `docker rm -v` also removes anonymous volumes.
+# Objects with no qualifying ownership evidence are left alone.
+#
+# Before removing containers, cleanup atomically retains their Compose and Supabase
+# project identities in the task record's docker_projects field. Retries read that
+# field after the containers are gone; task-record retirement removes it.
+# Listing, metadata read/publication, removal, or verification failures return
+# nonzero. After container removal, any surviving owned container refuses cleanup;
+# a final container listing also rejects arrivals during network or volume cleanup.
+# Portable regression coverage: tests/fm-teardown.test.sh; real Docker CLI guard:
+# tests/fm-task-docker-live-e2e.test.sh.
 #
 # A Docker call is bounded by FM_TASK_DOCKER_TIMEOUT_SECS (default 120) through
 # bin/fm-timeout-lib.sh. A missing docker binary is silent.
