@@ -6,22 +6,21 @@
 #   fm-gh-rest.sh guard
 #
 # get makes one REST GET per page through `gh api -i` and prints the JSON body (one document per page;
-# --slurp prints a single array of page bodies). It sends If-None-Match from a per-URL ETag cache under
-# <state>/gh-rest-cache/ and serves the cached body on a 304, which GitHub does not count against the rate
-# limit. A missing, corrupt, or unparsable cache entry is a normal GET; entries unused for a week are
-# pruned. -f adds a URL-encoded query parameter. --paginate follows Link rel="next", each page cached on its
-# own. A forge error exits 1 with the forge's message on stderr and caches nothing. REST only: GraphQL has no
-# conditional request.
-# Every response, including a 304 and an error, records its X-RateLimit-Limit/Remaining/Reset/Resource
-# headers in <state>/gh-ratelimit.<resource>.json as {resource,limit,remaining,reset,observed}; within one
-# window the lowest remaining wins, so parallel readers finishing out of order cannot raise it.
-# guard exits 75 and prints the reason when the recorded bucket is below the floor and its window has not
-# reset; otherwise it exits 0 silently. get --floor runs the same check before any network call, so a sweep
-# that passes --floor stops at the first read. The floor is FM_GH_RATE_FLOOR_PERCENT percent of the limit
-# (default 15; values outside 0..100 use 15). Neither reads the network.
+# --slurp prints a single array of page bodies). -f adds a URL-encoded query parameter, and --paginate
+# follows Link rel="next". A forge error exits 1 with its message on stderr; error responses are not cached.
+# The per-URL cache is <state>/gh-rest-cache/, with JSON entries {etag,body,next}; body is JSON text stored
+# as a string and next is the next endpoint or null. Quota records are <state>/gh-ratelimit.<resource>.json
+# with {resource,limit,remaining,reset,observed}; reset and observed are Unix epoch seconds.
+# guard checks the recorded core bucket locally: quota refusal exits 75 with its reason on stdout;
+# otherwise it exits 0 silently. get --floor checks before every page and exits 75 with its reason on
+# stderr and no partial JSON output on refusal. Plain get does not enforce the floor.
+# FM_GH_RATE_FLOOR_PERCENT sets the floor as a percent of the limit (default 15; unparsable values or
+# values outside 0..100 use 15). An expired window or missing quota record does not refuse a read.
 #
-# <state> is FM_STATE_OVERRIDE, else $FM_HOME/state, else the code root's state/. docs/configuration.md
-# owns the contract this header summarizes.
+# <state> is FM_STATE_OVERRIDE, else $FM_HOME/state, else $FM_ROOT_OVERRIDE/state, else the code root's
+# state/. docs/configuration.md "GitHub REST reads and the quota floor" owns conditional-cache behavior,
+# quota-recording invariants, and sweep degradation; this header owns the helper's interface.
+#
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 STATE=${FM_STATE_OVERRIDE:-${FM_HOME:-${FM_ROOT_OVERRIDE:-$SCRIPT_DIR/..}}/state}

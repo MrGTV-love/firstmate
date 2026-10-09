@@ -106,7 +106,7 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 
 - `bin/fm-contributions.sh` owns durable published-contribution records under each task, observation bounds, equivalent triage-label configuration, and the authenticated contribution check.
 
-- `bin/fm-gh-rest.sh` owns conditional GitHub REST reads and the shared quota floor: its header and `--help` own the commands, file formats, and exit codes, and the section below owns the behavior.
+- [`bin/fm-gh-rest.sh`](../bin/fm-gh-rest.sh)'s header and `--help` own the commands, file formats, environment overrides, and exit codes; [GitHub REST reads and the quota floor](#github-rest-reads-and-the-quota-floor) owns the shared read and degradation behavior.
 
 - The producing PR and Relay helpers own the fields they append, [`bin/fm-status-event-lib.sh`](../bin/fm-status-event-lib.sh) owns status-event vocabulary, [`bin/fm-status-record-lib.sh`](../bin/fm-status-record-lib.sh) owns optional emission-time syntax and legacy unknown-time handling, and `bin/fm-crew-state.sh` owns current-state reconciliation.
 
@@ -601,7 +601,8 @@ An existing ledger is left untouched while recording is disabled.
 ## Open-work ledger (config/open-loops.json)
 
 `bin/fm-open-loops.sh` reconciles this home's recorded obligations against live worker and delivery evidence.
-`bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository.
+`bin/fm-open-loops.sh --json` normally collects current evidence for this home; [quota refusal](#github-rest-reads-and-the-quota-floor) can instead retain the last published ledger.
+It never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
 Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
 Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
 For a non-informational row, an unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
@@ -664,10 +665,10 @@ The human ledger table and both Bearings representations preserve recorded evide
 Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
 No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
 
-When the recorded GitHub core quota is below the floor, the reconciler makes no further forge read.
-It republishes the last published rows, each marked `stale: true`, with `complete: false`, top-level `stale`, `stale_reason`, and `stale_until_epoch`, and one informational `ledger stale` coverage row stating the reset time.
-The rows keep the generation time of the run that produced them, and the republication tells the watcher the reconciler is alive.
-A home with no earlier ledger gets the ordinary `ledger degraded` coverage row carrying the same reason.
+On [quota refusal](#github-rest-reads-and-the-quota-floor), the reconciler discards the partial collection rather than presenting it as current evidence.
+It returns the last published rows, each marked `stale: true`, with `complete: false`, top-level `stale`, `stale_reason`, and `stale_until_epoch`, and one informational `ledger stale` coverage row stating the reset time.
+The rows keep the generation time of the run that produced them; `--heartbeat` publishes this retained result so the watcher knows the reconciler is alive.
+A home with no usable earlier ledger gets the ordinary `ledger degraded` coverage row carrying the same reason.
 The next run after the window resets collects normally and clears every mark.
 
 Create the optional local `config/open-loops.json` to override the limits:
@@ -689,18 +690,27 @@ A malformed configuration is reported as an error rather than ignored.
 ### GitHub REST reads and the quota floor
 
 `bin/fm-contributions.sh`, `bin/fm_open_loops.py`, `bin/fm-pr-state.sh`, and `bin/fm-pr-reviewers.sh` read GitHub REST through `bin/fm-gh-rest.sh`.
-It sends `If-None-Match` from a per-URL ETag cache under the home's `state/gh-rest-cache/` and serves the cached body on a 304, which GitHub does not count against the rate limit.
+It sends `If-None-Match` from its per-URL ETag cache and serves the cached body on a 304, which GitHub does not count against the rate limit.
 Each conditional request snapshots the cache entry before sending its ETag; a 304 serves that snapshot's body and uses its pagination metadata when the Link header is omitted, even if another request replaces the shared entry.
-A supplied Link header updates pagination for the current read; cached metadata is updated only if the shared entry still matches the requested generation. Cache publication shares the existing serialized response-recording boundary.
+A supplied Link header updates pagination for the current read; cached metadata is updated only if the shared entry still matches the requested generation.
+Cache publication shares the existing serialized response-recording boundary.
 A missing, corrupt, or unparsable cache entry is a normal GET, and entries unused for a week are pruned.
-Only REST is conditional; GraphQL reads (`gh pr view`, `gh pr checks`) have no equivalent. The contributions poll also checks the recorded core quota before its final GraphQL head read.
-Every response, including a 304 and an error, records its `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset` headers in `state/gh-ratelimit.<resource>.json`. Writers serialize the update, keeping the lowest remaining value within the newest observed reset window; older-window responses cannot replace it.
-`gh api rate_limit` is not evidence: on the fleet's account it has reported an unused core bucket while the enforcing headers showed thousands of calls spent.
+Only REST is conditional; GraphQL reads (`gh pr view`, `gh pr checks`) have no equivalent.
+The contributions poll also checks the recorded core quota before its final GraphQL head read.
+The PR-state and reviewer advisory commands remain available below the sweep floor; their shared REST reads still update the quota record.
+Responses carrying valid `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `X-RateLimit-Resource` headers update the recorded quota, including on a 304 or an error.
+Writers serialize the update, keeping the lowest remaining value within the newest observed reset window; older-window responses cannot replace it.
+The enforcing response headers, not `gh api rate_limit`, are the quota evidence used by the sweeps.
 
-When the recorded core remaining quota is below `FM_GH_RATE_FLOOR_PERCENT` of its limit (default 15) and its window has not reset, the contributions poll and the open-work ledger make no further forge read. Floor-protected REST reads check before every page and exit 75 without publishing a partial response when refused.
-The contributions poll checks the local quota record before budget exits and after incomplete observations. It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode. Completed observations remain measured. Changes to the remaining quota update the reason without another announcement; announcement eligibility spans saved owners, so late owners do not restart the episode.
-The ledger behavior is in the open-work ledger section above.
+When the recorded core remaining quota is below the configured floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
+The helper's header owns the floor setting and refusal interface; floor-protected REST reads check before every page and publish no partial response when refused.
+The contributions poll checks the local quota record before budget exits and after incomplete observations.
+It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode.
+Completed observations remain measured.
+Changes to the remaining quota update the reason without another announcement; announcement eligibility spans saved owners, so late owners do not restart the episode.
+The [open-work ledger section](#open-work-ledger-configopen-loopsjson) owns its retained-result behavior.
 The check needs no call of its own because it reads headers from calls the sweeps were already making.
+Focused regressions are in [`tests/fm-gh-rest.test.sh`](../tests/fm-gh-rest.test.sh), [`tests/fm-contributions.test.sh`](../tests/fm-contributions.test.sh), and [`tests/fm-open-loops.test.sh`](../tests/fm-open-loops.test.sh).
 
 ### Completion and discard
 
@@ -2899,7 +2909,7 @@ FM_POLL=15              # seconds between watcher poll cycles
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
-FM_GH_RATE_FLOOR_PERCENT=15   # percent of GitHub's core limit below which contribution and ledger sweeps stop reading the forge until the window resets; values outside 0..100 use 15
+FM_GH_RATE_FLOOR_PERCENT=15   # sweep quota threshold; bin/fm-gh-rest.sh's header owns the setting
 FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding home-summary state initialization, refresh-lock acquisition, validation, and atomic publication; independent post-attempt deadlines are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
