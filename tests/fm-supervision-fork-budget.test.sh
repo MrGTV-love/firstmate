@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# tests/fm-supervision-fork-budget.test.sh - the supervision loops start a
-# bounded number of processes per cycle.
+# tests/fm-supervision-fork-budget.test.sh - helper-level supervision budgets.
+# The counter measures subshell-depth transitions, not all process starts;
+# its bounds are helper-level budgets. For exact fork and spawn counts and
+# host process-creation rates before/after, see:
+# data/fm-supervision-fork-budget/evidence/R1-evidence.md
 #
 # A loaded host pays for every process a bash loop starts, and the loops that
 # run all day (the watcher's signal scan and its per-task checks, the crew
