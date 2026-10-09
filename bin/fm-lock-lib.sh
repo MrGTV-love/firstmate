@@ -24,6 +24,8 @@ fm_lock_log() {
 # no wake-queue machinery when a caller only needs the staleness proof.
 _FM_LOCK_UNAME=${_FM_UNAME:-$(uname 2>/dev/null)}
 fm_lock_path_mtime() {
+  # Read the name again when the variable did not come along (an exported-function runner).
+  [ -n "$_FM_LOCK_UNAME" ] || _FM_LOCK_UNAME=$(uname 2>/dev/null)
   if [ "$_FM_LOCK_UNAME" = Darwin ]; then
     /usr/bin/stat -f %m "$1" 2>/dev/null
   else

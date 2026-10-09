@@ -172,6 +172,7 @@ EOF
   cat > "$script" <<'SH'
 root=$1 cases=$2
 . "$root/bin/fm-nm-run-lib.sh"
+IFS=$'\t\n'
 
 # The replaced pipelines, verbatim.
 ref_field() { printf '%s\n' "$1" | sed -n "s/^[[:space:]]*$2:[[:space:]]*\(.*\)/\1/p" | head -1; }
@@ -267,6 +268,8 @@ root=$1 dir=$2
 . "$root/bin/fm-wake-lib.sh"
 . "$root/bin/fm-classify-lib.sh"
 _fm_wake_require_status
+# A runner can carry any IFS; the helpers must not depend on the default one.
+IFS=$'\t\n'
 
 # The replaced signature, verbatim: separate stats and an od pipeline.
 ref_signature() {
@@ -407,6 +410,27 @@ SH
   pass "five owner-watchdog ticks enter $count subshells (bound 80)"
 }
 
+# A detached runner is started with its own IFS. The state-root checks split one
+# stat line into fields, and a split that trusted the default IFS read a
+# one-field line, saw no owner, and refused every claim.
+test_state_root_checks_do_not_depend_on_ifs() {
+  local dir="$TMP_ROOT/ifs" script="$TMP_ROOT/ifs.sh"
+  mkdir -p "$dir/state"
+  chmod 700 "$dir/state"
+  cat > "$script" <<'SH'
+root=$1 dir=$2
+. "$root/bin/fm-wake-lib.sh"
+. "$root/bin/fm-pr-lib.sh"
+. "$root/bin/fm-procevent-lib.sh"
+IFS=$'\t\n'
+fm_procevent_state_root_resolve "$dir/state" > /dev/null || echo "resolve refused the state root under a tab-and-newline IFS"
+identity=$(fm_procevent_claim_state_root_identity "$dir/state") || echo "identity refused the state root under a tab-and-newline IFS"
+case "$identity" in *"$dir/state"*) ;; *) echo "identity did not name the state root: $identity" ;; esac
+SH
+  run_everywhere "state root checks" "$script" "$dir"
+  pass "the state-root checks work under a tab-and-newline IFS"
+}
+
 # --- process identity ---------------------------------------------------------
 
 test_pid_identity_trim_matches_sed_for_multiline_commands() {
@@ -440,5 +464,6 @@ else
   test_quiet_signal_scan_costs_one_stat_per_log
   test_recorded_windows_reads_each_task_without_a_subshell
   test_owner_watchdog_tick_subshell_budget
+  test_state_root_checks_do_not_depend_on_ifs
   test_pid_identity_trim_matches_sed_for_multiline_commands
 fi
