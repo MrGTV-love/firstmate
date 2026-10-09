@@ -223,16 +223,6 @@ test_304_uses_its_generation_during_concurrent_replacement() {
   pass 'a concurrent 304 serves its ETag generation without rewriting the replacement body or links'
 }
 
-test_query_fields_are_encoded_and_distinct_cache_keys() {
-  local site
-  site=$(new_site query)
-  get "$site" repos/o/r/commits -f sha=abc -f path='dir/a b.ts' -f per_page=100 >/dev/null || fail 'query read failed'
-  assert_contains "$(cat "$site/calls")" 'repos/o/r/commits?sha=abc&path=dir%2Fa%20b.ts&per_page=100' 'query fields were not encoded'
-  get "$site" repos/o/r/commits -f sha=abc -f path='other.ts' -f per_page=100 >/dev/null || fail 'second query failed'
-  assert_equals 2 "$(counted "$site")" 'different queries must not share a cache entry'
-  pass 'query fields are URL-encoded and keyed separately'
-}
-
 test_a_failed_read_exits_nonzero_and_caches_nothing() {
   local site status=0 err
   site=$(new_site failing)
@@ -345,7 +335,7 @@ test_parallel_responses_keep_the_lowest_remaining() {
 #!/usr/bin/env bash
 set -eu
 case "${FAKE_GH_REMAINING:-}:$*" in
-  749:*gh-ratelimit.core.json|750:*gh-ratelimit.core.json)
+  749:-r\ *gh-ratelimit.core.json|750:-r\ *gh-ratelimit.core.json)
     out=$("$REAL_JQ" "$@")
     : > "$FAKE_GH_SITE/read.$FAKE_GH_REMAINING"
     peer=749
@@ -391,15 +381,16 @@ test_older_windows_cannot_replace_newer_quota() {
   local site reset out status=0
   site=$(new_site older_window)
   reset=$(cat "$site/reset")
-  FAKE_GH_REMAINING=700 get "$site" repos/o/r/new >/dev/null || fail 'new window read failed'
-  FAKE_GH_REMAINING=900 FAKE_GH_RESET="$((reset - 3600))" get "$site" repos/o/r/old >/dev/null || fail 'old response failed'
-  out=$(guard "$site") || status=$?
-  assert_equals 75 "$status" 'an older window replaced the newer quota'
-  assert_contains "$out" '700 of 5000' 'an older response changed the newer remaining value'
+  FAKE_GH_REMAINING=4000 get "$site" repos/o/r/new >/dev/null || fail 'new window read failed'
+  FAKE_GH_REMAINING=100 FAKE_GH_RESET="$((reset - 3600))" get "$site" repos/o/r/old >/dev/null || fail 'old response failed'
+  guard "$site" || fail 'an older window replaced the newer quota'
+  assert_equals 4000 "$(jq -r .remaining "$site/state/gh-ratelimit.core.json")" 'an older response changed the newer remaining value'
   assert_equals "$reset" "$(jq -r .reset "$site/state/gh-ratelimit.core.json")" 'the newest reset was lost'
-  FAKE_GH_REMAINING=4000 FAKE_GH_RESET="$((reset + 3600))" get "$site" repos/o/r/next >/dev/null || fail 'next window read failed'
-  guard "$site" || fail 'a newer window must accept replenished quota'
-  pass 'older windows cannot replace newer quota, and new windows replenish it'
+  FAKE_GH_REMAINING=700 FAKE_GH_RESET="$((reset + 3600))" get "$site" repos/o/r/next >/dev/null || fail 'next window read failed'
+  out=$(guard "$site") || status=$?
+  assert_equals 75 "$status" 'a newer window did not replace the recorded quota'
+  assert_contains "$out" '700 of 5000' 'the newer window remaining value was not recorded'
+  pass 'older windows cannot replace newer quota, and newer windows replace it'
 }
 
 test_304_responses_also_record_headers() {
@@ -414,21 +405,20 @@ test_304_responses_also_record_headers() {
   pass 'a 304 response still updates the recorded quota'
 }
 
-test_get_with_floor_refuses_before_any_network_call() {
+test_get_refuses_below_the_floor_before_any_network_call() {
   local site status=0 err before
   site=$(new_site floor_get)
   printf '100\n' > "$site/remaining"
   get "$site" repos/o/r/items >/dev/null || fail 'seed read failed'
   before=$(wc -l < "$site/calls")
-  err=$(get "$site" repos/o/r/items --floor 2>&1 >/dev/null) || status=$?
-  assert_equals 75 "$status" 'get --floor below the floor must exit 75'
+  err=$(get "$site" repos/o/r/items 2>&1 >/dev/null) || status=$?
+  assert_equals 75 "$status" 'get below the floor must exit 75'
   assert_contains "$err" 'quota low (100 of 5000' 'the refusal must state the remaining quota'
-  assert_equals "$before" "$(wc -l < "$site/calls")" 'get --floor made a network call below the floor'
-  get "$site" repos/o/r/items >/dev/null || fail 'a read without --floor must still be allowed'
-  pass 'get --floor refuses below the floor before any network call, and a plain get still reads'
+  assert_equals "$before" "$(wc -l < "$site/calls")" 'get made a network call below the floor'
+  pass 'get refuses below the floor before any network call'
 }
 
-test_get_with_floor_stops_between_pages() {
+test_get_stops_between_pages_at_the_floor() {
   local site mode status out
   for mode in fresh cached; do
     site=$(new_site "floor-pages-$mode")
@@ -439,7 +429,7 @@ test_get_with_floor_stops_between_pages() {
     : > "$site/calls"
     printf '500\n' > "$site/remaining"
     status=0
-    out=$(get "$site" 'repos/o/r/items?per_page=2' --floor --paginate --slurp 2>"$site/error") || status=$?
+    out=$(get "$site" 'repos/o/r/items?per_page=2' --paginate --slurp 2>"$site/error") || status=$?
     assert_equals 75 "$status" "a $mode response did not stop the next page at the floor"
     assert_equals '' "$out" 'a refused paginated read published incomplete data'
     assert_equals 1 "$(wc -l < "$site/calls" | tr -d ' ')" 'a page was fetched after quota fell below the floor'
@@ -455,12 +445,11 @@ test_pagination_follows_link_and_caches_every_page
 test_304_updates_pagination_and_retains_omitted_metadata
 test_full_last_page_without_304_link_finds_the_next_page
 test_304_uses_its_generation_during_concurrent_replacement
-test_query_fields_are_encoded_and_distinct_cache_keys
 test_a_failed_read_exits_nonzero_and_caches_nothing
 test_recording_failures_do_not_block_reads
 test_the_quota_floor_reads_headers_from_calls_already_made
 test_parallel_responses_keep_the_lowest_remaining
 test_older_windows_cannot_replace_newer_quota
 test_304_responses_also_record_headers
-test_get_with_floor_refuses_before_any_network_call
-test_get_with_floor_stops_between_pages
+test_get_refuses_below_the_floor_before_any_network_call
+test_get_stops_between_pages_at_the_floor

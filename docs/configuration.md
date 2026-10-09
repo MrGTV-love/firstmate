@@ -705,7 +705,7 @@ Cache and quota recording is best-effort: an unwritable state directory or a rec
 The enforcing response headers, not `gh api rate_limit`, are the quota evidence used by the sweeps.
 
 When the recorded core remaining quota is below the fixed 15 percent floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
-The helper's header owns the refusal interface; floor-protected REST reads check before every page and publish no partial response when refused.
+The helper's header owns the refusal interface; every REST read checks the floor before each page and publishes no partial response when refused.
 The contributions poll checks the local quota record before budget exits and after incomplete observations.
 It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode.
 Completed observations remain measured.

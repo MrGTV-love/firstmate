@@ -2,18 +2,18 @@
 # Conditional GitHub REST reads and the shared quota floor.
 #
 # Usage:
-#   fm-gh-rest.sh get <endpoint> [--paginate] [--slurp] [--floor] [-f key=value]...
+#   fm-gh-rest.sh get <endpoint> [--paginate] [--slurp]
 #   fm-gh-rest.sh guard
 #
 # get makes one REST GET per page through `gh api -i` and prints the JSON body (one document per page;
-# --slurp prints a single array of page bodies). -f adds a URL-encoded query parameter, and --paginate
-# follows Link rel="next". A forge error exits 1 with its message on stderr; error responses are not cached.
+# --slurp prints a single array of page bodies; --paginate follows Link rel="next"). get checks the quota floor
+# before every page. A forge error exits 1 with its message on stderr; error responses are not cached.
 # The per-URL cache is <state>/gh-rest-cache/, with JSON entries {etag,body,next}; body is JSON text stored
 # as a string and next is the next endpoint or null. Quota records are <state>/gh-ratelimit.<resource>.json
 # with {resource,limit,remaining,reset,observed}; reset and observed are Unix epoch seconds.
 # guard checks the recorded core bucket locally: quota refusal exits 75 with its reason on stdout;
-# otherwise it exits 0 silently. get --floor checks before every page and exits 75 with its reason on
-# stderr and no partial JSON output on refusal. Plain get does not enforce the floor.
+# otherwise it exits 0 silently. A get below the floor exits 75 with its reason on stderr and no partial
+# JSON output.
 # The floor is 15 percent of the limit. An expired window or missing quota record does not refuse a read.
 #
 # <state> is FM_STATE_OVERRIDE, else $FM_HOME/state, else $FM_ROOT_OVERRIDE/state, else the code root's
@@ -203,21 +203,12 @@ fetch_page() {
   return 1
 }
 
-urlencode() { jq -rn --arg v "$1" '$v | @uri'; }
-
 cmd_get() {
-  local endpoint='' paginate=0 slurp=0 floor=0 query='' key value reason i=0
+  local endpoint='' paginate=0 slurp=0 reason i=0
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --paginate) paginate=1 ;;
       --slurp) slurp=1 ;;
-      --floor) floor=1 ;;
-      -f)
-        shift
-        [ "$#" -gt 0 ] || die 'missing value for -f'
-        key=${1%%=*}; value=${1#*=}
-        query="$query${query:+&}$(urlencode "$key")=$(urlencode "$value")"
-        ;;
       -*) die "unknown option: $1" ;;
       *) [ -z "$endpoint" ] || die 'one endpoint only'; endpoint=$1 ;;
     esac
@@ -225,15 +216,12 @@ cmd_get() {
   done
   [ -n "$endpoint" ] || die 'an endpoint is required'
   command -v gh >/dev/null 2>&1 || die 'gh is required'
-  if [ -n "$query" ]; then
-    case "$endpoint" in *\?*) endpoint="$endpoint&$query" ;; *) endpoint="$endpoint?$query" ;; esac
-  fi
   endpoint=${endpoint#/}
   local pages=()
   work=$(mktemp -d "${TMPDIR:-/tmp}/fm-gh-rest.XXXXXX") || die 'cannot create a temporary directory'
   trap '[ -z "$work" ] || rm -rf -- "$work"' EXIT
   while [ -n "$endpoint" ]; do
-    if [ "$floor" -eq 1 ] && reason=$(quota_low core); then
+    if reason=$(quota_low core); then
       printf '%s\n' "$reason" >&2
       exit "$EX_TEMPFAIL"
     fi

@@ -1230,6 +1230,13 @@ test_repeated_poll_reads_unchanged_prs_conditionally() {
   pass 'a repeated poll answers unchanged PR reads with 304s and still sees a changed resource'
 }
 
+# Record the quota a response reported, in the documented gh-ratelimit.<resource>.json format.
+# A read below the floor is refused, so a test cannot lower the record by reading.
+set_quota() { # home remaining reset
+  jq -n --argjson remaining "$2" --argjson reset "$3" --argjson now "$(date +%s)" \
+    '{resource:"core",limit:5000,remaining:$remaining,reset:$reset,observed:$now}' > "$1/state/gh-ratelimit.core.json"
+}
+
 test_low_quota_poll_keeps_last_observation_marked_stale() {
   local home out before reset
   home=$(new_home low-quota)
@@ -1246,16 +1253,14 @@ test_low_quota_poll_keeps_last_observation_marked_stale() {
   assert_contains "$out" "$(jq -rn --argjson r "$reset" '$r | todate')" 'the sweep did not state the reset time'
   jq -e --arg head "$HEAD_A" '.records[0].observation.head == $head and (.records[0].error | contains("quota low"))' \
     "$home/data/delivery/contributions.json" >/dev/null || fail 'the last observation was not kept and marked stale with the reason'
-  GH_SHIM_REMAINING=400 GH_SHIM_RESET="$reset" with_home "$home" "$ROOT/bin/fm-gh-rest.sh" get repos/o/r >/dev/null \
-    || fail 'foreground quota update failed'
+  set_quota "$home" 400 "$reset"
   before=$(wc -l < "$home/forge/shim.log")
   out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'repeat low-quota poll failed'
   [ -z "$out" ] || fail "the low-quota episode was announced twice: $out"
   assert_equals "$before" "$(wc -l < "$home/forge/shim.log")" 'a poll below the floor still called the forge'
   jq -e '.records[0].error | contains("400 of 5000")' "$home/data/delivery/contributions.json" >/dev/null \
     || fail 'the stale reason did not track changed quota within the episode'
-  GH_SHIM_REMAINING=300 GH_SHIM_RESET="$((reset + 3600))" with_home "$home" "$ROOT/bin/fm-gh-rest.sh" get repos/o/r >/dev/null \
-    || fail 'new-window quota update failed'
+  set_quota "$home" 300 "$((reset + 3600))"
   out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'new low-quota window poll failed'
   assert_contains "$out" 'quota low (300 of 5000' 'a new reset window did not announce its low-quota episode'
   before=$(wc -l < "$home/forge/shim.log")

@@ -229,7 +229,7 @@ forge() {
   if [ "$1" = api ]; then
     shift # REST reads are conditional, record the quota headers, and refuse below the floor
     fm_run_timed "$remaining" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
-      "$SCRIPT_DIR/fm-gh-rest.sh" get --floor "$@" 2> "$forge_err" || rc=$?
+      "$SCRIPT_DIR/fm-gh-rest.sh" get "$@" 2> "$forge_err" || rc=$?
   else
     "$SCRIPT_DIR/fm-gh-rest.sh" guard > "$forge_err" 2>&1 || rc=$?
     if [ "$rc" -eq 0 ]; then

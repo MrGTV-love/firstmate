@@ -477,7 +477,7 @@ class Collector:
 
     def forge(self, path):
         """Pages of one conditional REST read, flattened; fm-gh-rest.sh owns the ETag cache and quota headers."""
-        pages = json.loads(self.run([GH_REST, "get", path, "--floor", "--paginate", "--slurp"]))
+        pages = json.loads(self.run([GH_REST, "get", path, "--paginate", "--slurp"]))
         return [row for page in pages for row in (page if isinstance(page, list) else [page])]
 
     def quota_reset(self):
