@@ -481,6 +481,7 @@ subshell_entries() {
 # <history> routine lines, half of them `resolved` closes under a non-reserved
 # key. Routine lines stay unread (and so are rescanned by every drain) until a
 # signal needs them, which makes this the steady state of a busy fleet.
+# Leave checkpoints absent: priming them first hides per-line cold-fold forks.
 build_routine_fleet() {
   local state=$1 tasks=$2 history=$3 t i
   for ((t = 0; t < tasks; t++)); do
@@ -492,8 +493,6 @@ build_routine_fleet() {
       done
     } > "$state/fleet$t.status"
   done
-  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2>&1 \
-    || fail "priming drain failed over the routine fleet"
 }
 
 test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow() {

@@ -182,7 +182,7 @@ status_key_closing_verb() {  # <status-file> <key>
     esac
     was=0
     _fm_open_set_has "$open" "$want" && was=1
-    open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+    _fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind" open
     if [ "$was" = 1 ] && ! _fm_open_set_has "$open" "$want"; then
       verb=$event
     fi
@@ -361,7 +361,7 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
       status_line_verb "$line" verb
       case "$verb" in
         needs-decision|blocked|done|failed|"$resolve"|"$held")
-          open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+          _fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind" open
           ;;
       esac
     done < "$chunk_file"
@@ -782,12 +782,12 @@ _fm_status_open_activities_stream() {
     case "$verb" in
       working|"$pause")
         note=$(status_line_note "$line")
-        open=$(_fm_decision_drop "$open" "$key")
+        _fm_decision_drop "$open" "$key" open
         [ -n "$open" ] && open="${open}"$'\n'
         open="${open}${key}"$'\t'"${verb}"$'\t'"${note}"$'\n'
         ;;
       done|failed|needs-decision|blocked|"$resolve"|"$held")
-        open=$(_fm_decision_drop "$open" "$key")
+        _fm_decision_drop "$open" "$key" open
         [ -n "$open" ] && open="${open}"$'\n'
         ;;
     esac
