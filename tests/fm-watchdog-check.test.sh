@@ -160,8 +160,12 @@ PY
   expect_code 1 "$CODE" "bound rewake at 3700 seconds exit"
   assert_contains "$OUT" "watchdog: stale-watcher - recovery failed" "bound rewake expires"
   assert_present "$home/state/.watchdog-episode" "an expired turn remains a failed episode"
+  run_check "$home" FM_WATCHDOG_NOW=1300 FM_WATCHDOG_STALE_SECS=7200
+  expect_code 1 "$CODE" "bound rewake at 3700 seconds with extended stale threshold exit"
+  assert_contains "$OUT" "watchdog: stale-watcher - recovery failed (attempt 2)" "ordinary freshness cannot bypass the handling cap or clear the episode"
+  assert_present "$home/state/.watchdog-episode" "extended stale threshold preserves the failed episode"
   write_stubs "$home" "$(healing_resume "$home")"
-  run_check "$home" FM_WATCHDOG_NOW=1300
+  run_check "$home" FM_WATCHDOG_NOW=1600 FM_WATCHDOG_STALE_SECS=7200
   expect_code 0 "$CODE" "expired bound rewake recovery exit"
   assert_equals "stale-watcher" "$(cat "$dir/resume.calls")" "expired turn resumes as stale"
   assert_absent "$home/state/.watchdog-episode" "a fresh beacon clears the expired episode"

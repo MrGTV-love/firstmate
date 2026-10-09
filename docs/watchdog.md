@@ -28,7 +28,7 @@ Pi and omp homes use the extension model and are not covered by the derivation.
 The ordinary stale threshold is 900 seconds (`FM_WATCHDOG_STALE_SECS`).
 A live session with a rewake ledger bound to its session lock and current recovery generation gets a longer fixed limit of 3600 seconds for a legitimate handling turn.
 The bound ledger must be at least as new as the beacon and have no exhausted-failure marker.
-At or beyond that limit, the watchdog reports `stale-watcher` even when the pull guard's separate mid-turn policy still considers the session healthy.
+At or beyond that limit, the watchdog reports `stale-watcher` even when `FM_WATCHDOG_STALE_SECS` is larger or the pull guard's separate mid-turn policy still considers the session healthy.
 
 ## Recovery
 

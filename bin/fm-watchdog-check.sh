@@ -161,10 +161,10 @@ watchdog_verdict() {
   fm_watcher_supervision_verdict "$STATE" "$WATCH" "$STALE_SECS" "$FM_HOME" "$FM_ROOT"
   if [ "$FM_WATCHER_VERDICT_OK" = true ]; then
     age=$(fm_path_age "$STATE/.last-watcher-beat")
-    if [ "$age" -lt "$STALE_SECS" ] \
-      || { [ "$FM_SUPERVISION_MODEL" = autoarm ] \
-        && [ "$age" -lt "$MIDTURN_STALE_SECS" ] \
-        && fm_autoarm_midturn_healthy "$STATE"; }; then
+    if [ "$FM_SUPERVISION_MODEL" = autoarm ] \
+      && fm_autoarm_midturn_healthy "$STATE"; then
+      [ "$age" -lt "$MIDTURN_STALE_SECS" ] && return 0
+    elif [ "$age" -lt "$STALE_SECS" ]; then
       return 0
     fi
   fi
