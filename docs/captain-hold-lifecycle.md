@@ -579,7 +579,7 @@ It uses a stubbed tasks-axi that fails any markdown file override, and proves th
 
 The reconcile path is pinned in the same suite:
 
-- A reconcile answer arriving through the keyed-answer intake is refused, in the default close mode and in the `release` mode a captain-gated work card declares.
+- A reconcile answer arriving through the keyed-answer intake is refused, in the default automatic-resolution mode and in the `release` mode a captain-gated work card declares.
   It leaves both tasks held with no resolution record or request.
 - Only the separately bound captured-source intake records one durable request per task, idempotently across a replay.
 
