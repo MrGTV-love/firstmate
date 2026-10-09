@@ -2094,6 +2094,32 @@ fm_autoarm_release_abandoned() {  # <state-dir> [grace]
 fm_wake_clean_field() {
   LC_ALL=C tr '\t\r\n' '   '
 }
+fm_wake_publish_row() {
+  [ -n "${FM_WATCH_DELIVERY_PID:-}" ] || return 0
+  printf 'wake-row: %s\t%s\n' "$1" "$2" >&2
+}
+
+fm_wake_publish_queued() {
+  local status=0
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  fm_wake_publish_queued_locked "$@" || status=$?
+  fm_lock_release "$FM_WAKE_QUEUE_LOCK"
+  return "$status"
+}
+
+fm_wake_publish_queued_locked() {
+  local kind=$1 key=$2 clean_key
+  [ -n "${FM_WATCH_DELIVERY_PID:-}" ] || return 0
+  [ -f "$FM_WAKE_QUEUE" ] || return 0
+  clean_key=$(printf '%s' "$key" | fm_wake_clean_field)
+  FM_WAKE_PUBLISH_KIND="$kind" FM_WAKE_PUBLISH_KEY="$clean_key" awk -F '\t' '
+    NF >= 5 && $2 ~ /^[0-9]+$/ && $3 == ENVIRON["FM_WAKE_PUBLISH_KIND"] \
+      && "k" $4 == "k" ENVIRON["FM_WAKE_PUBLISH_KEY"] {
+      printf "wake-row: %s\t%s\n", $2, $5
+    }
+  ' "$FM_WAKE_QUEUE" >&2
+}
+
 
 fm_wake_append() {
   local status=0
@@ -2141,6 +2167,7 @@ fm_wake_append_locked() {
   else
     FM_WAKE_APPEND_RECOVERY_PREVIOUS_TOKEN=
     FM_WAKE_APPEND_RECOVERY_PUBLISHED_TOKEN=
+    fm_wake_publish_row "$seq" "$clean_payload" || status=$?
   fi
   return "$status"
 }

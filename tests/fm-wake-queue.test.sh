@@ -2005,6 +2005,122 @@ test_main_ack_leaves_a_row_that_arrived_after_its_drain_unclaimed() {
   pass "main's acknowledgement leaves a row that arrived after its drain for whichever actor takes it next"
 }
 
+test_watcher_close_emits_only_its_committed_rows() {
+  local dir state mode seq
+  for mode in single decision-batch multiline merge; do
+    dir=$(make_case "close-rows-$mode")
+    state="$dir/state"
+    mkdir -p "$dir/config" "$dir/data"
+    append_wake "$state" check prior "check: A already being handled" || fail "A append failed"
+    FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/A.out" 2> "$dir/A.err" || fail "A drain failed"
+    FM_STATE_OVERRIDE="$state" FM_HOME="$dir" bash -c '
+      . "$1/bin/fm-push-transition-lib.sh"
+      FM_WATCH_DELIVERY_PID=${BASHPID:-$$}
+      case "$2" in
+        single)
+          fm_wake_append signal B.status "signal: B" || exit 1
+          wake "signal: B"
+          ;;
+        decision-batch)
+          fm_wake_append signal B.status "needs-decision: B.status C.status" || exit 1
+          fm_wake_append signal C.status "signal: B.status C.status" || exit 1
+          wake "signal: B.status C.status"
+          ;;
+        multiline)
+          reason=$(printf "check: B.check.sh: first\nsecond\tthird\rfourth")
+          fm_wake_append check B.check.sh "$reason" || exit 1
+          wake "$reason"
+          ;;
+        merge)
+          . "$1/bin/fm-merge-outcome-lib.sh"
+          fm_merge_outcome_report "$FM_HOME" "$STATE" B https://github.com/o/r/pull/7 poll external || exit 1
+          wake "check: B.check.sh: merged"
+          ;;
+      esac
+    ' _ "$ROOT" "$mode" > "$dir/B.out" 2> "$dir/B.err" || fail "$mode close failed"
+    FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 1 || fail "$mode close consumed A before its acknowledgement"
+    awk -F '\t' '$2 != 1 { printf "wake-row: %s\t%s\n", $2, $5 }' "$state/.wake-queue" > "$dir/expected.err"
+    awk -F '\t' '$2 != 1 { print $2 }' "$state/.wake-queue" > "$dir/B.seqs"
+    [ -s "$dir/expected.err" ] || fail "$mode close did not commit any row"
+    cmp -s "$dir/expected.err" "$dir/B.err" \
+      || fail "$mode notification was not exactly its own canonical committed rows: $(cat "$dir/B.err")"
+    ack_drain_err "$state" "$dir/A.err" > "$dir/A-ack.out" 2> "$dir/A-ack.err" \
+      || fail "$mode acknowledgement of A failed: $(cat "$dir/A-ack.err")"
+    FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 1 && fail "$mode acknowledgement left A owed"
+    while IFS= read -r seq; do
+      FM_STATE_OVERRIDE="$state" "$DRAIN" --owed "$seq" || fail "$mode acknowledgement of A swallowed B row $seq"
+    done < "$dir/B.seqs"
+  done
+  pass "watcher closes publish only their own sequence-correlated canonical rows while earlier work remains queued"
+}
+
+test_process_event_close_emits_only_surfaced_keys() {
+  local dir state pid
+  dir=$(make_case close-process-event-rows)
+  state="$dir/state"
+  mkdir -p "$dir/config" "$dir/data"
+  printf '{"rows":[]}\n' > "$state/open-loops.json"
+  append_wake "$state" check prior "check: A already being handled" || fail "A append failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/A.out" 2> "$dir/A.err" || fail "A drain failed"
+  append_wake "$state" check procevent:B:1 "check: captured B" || fail "captured process event append failed"
+  append_wake "$state" check procevent:C:stranded:1 "check: stranded C" || fail "stranded process event append failed"
+  PATH="$dir/fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_HOME="$dir" \
+    FM_WATCH_HANDLING_SUCCESSOR=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
+    "$WATCH" > "$dir/B.out" 2> "$dir/B.err" &
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "watcher did not surface the queued process events"
+  grep -F 'process-event result captured: procevent:B:1' "$dir/B.out" >/dev/null \
+    || fail "captured process event was not surfaced"
+  grep -F 'process-event source stranded: procevent:C:stranded:1' "$dir/B.out" >/dev/null \
+    || fail "stranded process event was not surfaced"
+  awk -F '\t' '$2 != 1 { printf "wake-row: %s\t%s\n", $2, $5 }' "$state/.wake-queue" > "$dir/expected.err"
+  awk '/^wake-row: / { print }' "$dir/B.err" > "$dir/rows.err"
+  cmp -s "$dir/expected.err" "$dir/rows.err" \
+    || fail "process-event close included an unrelated row or omitted a surfaced key: $(cat "$dir/B.err")"
+  ack_drain_err "$state" "$dir/A.err" > "$dir/A-ack.out" 2> "$dir/A-ack.err" \
+    || fail "process-event fixture acknowledgement of A failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 2 || fail "A acknowledgement swallowed captured B"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 3 || fail "A acknowledgement swallowed stranded C"
+  pass "process-event close publishes every surfaced key and no previously queued unrelated row"
+}
+
+test_contribution_close_emits_only_reported_keys() {
+  local dir state pid
+  dir=$(make_case close-contribution-rows)
+  state="$dir/state"
+  mkdir -p "$dir/config" "$dir/data"
+  printf '{"rows":[]}\n' > "$state/open-loops.json"
+  append_wake "$state" check prior "check: A already being handled" || fail "A append failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/A.out" 2> "$dir/A.err" || fail "A drain failed"
+  cat > "$state/contributions.check.sh" <<'SH'
+#!/usr/bin/env bash
+. "$FM_CLOSE_ROWS_ROOT/bin/fm-wake-lib.sh"
+for key in bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc; do
+  fm_wake_append check "contribution-$key" "check: contributions B $key" || exit 1
+  printf 'contribution-wake: check: contributions B %s\n' "$key"
+done
+SH
+  chmod 0700 "$state/contributions.check.sh"
+  FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-check-register.sh" contributions >/dev/null \
+    || fail "could not register contribution check fixture"
+  PATH="$dir/fakebin:$PATH" FM_STATE_OVERRIDE="$state" FM_HOME="$dir" FM_CLOSE_ROWS_ROOT="$ROOT" \
+    FM_WATCH_HANDLING_SUCCESSOR=1 FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=0 FM_HEARTBEAT=999999 \
+    "$WATCH" > "$dir/B.out" 2> "$dir/B.err" &
+  pid=$!
+  wait_for_exit "$pid" 100 || fail "watcher did not surface contribution check output"
+  [ "$(awk '/^check: contributions B / { n++ } END { print n+0 }' "$dir/B.out")" -eq 2 ] \
+    || fail "contribution close did not report both external rows: $(cat "$dir/B.out")"
+  awk -F '\t' '$2 != 1 { printf "wake-row: %s\t%s\n", $2, $5 }' "$state/.wake-queue" > "$dir/expected.err"
+  awk '/^wake-row: / { print }' "$dir/B.err" > "$dir/rows.err"
+  cmp -s "$dir/expected.err" "$dir/rows.err" \
+    || fail "contribution close included an unrelated row or omitted a reported key: $(cat "$dir/B.err")"
+  ack_drain_err "$state" "$dir/A.err" > "$dir/A-ack.out" 2> "$dir/A-ack.err" \
+    || fail "contribution fixture acknowledgement of A failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 2 || fail "A acknowledgement swallowed the first contribution row"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --owed 3 || fail "A acknowledgement swallowed the second contribution row"
+  pass "contribution close publishes its reported external rows without expanding the queue"
+}
+
 test_actor_filter_precedes_same_key_deduplication() {
   local dir state main_sequence main_generation branch_sequence branch_generation
   dir=$(make_case actor-dedup-order)
@@ -3773,6 +3889,16 @@ SH
   pass "watch liveness: an unreachable remote secondmate is probed, preserved, and never failed over"
 }
 
+if [ "${1:-}" = --close-row-emission ]; then
+  test_watcher_close_emits_only_its_committed_rows
+  test_process_event_close_emits_only_surfaced_keys
+  test_contribution_close_emits_only_reported_keys
+  exit 0
+fi
+
+test_watcher_close_emits_only_its_committed_rows
+test_process_event_close_emits_only_surfaced_keys
+test_contribution_close_emits_only_reported_keys
 test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking
 test_subshell_lock_ownership_without_bashpid
