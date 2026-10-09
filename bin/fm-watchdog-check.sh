@@ -101,6 +101,7 @@ positive_int() {  # <value> <default>
 }
 
 STALE_SECS=$(positive_int "${FM_WATCHDOG_STALE_SECS:-}" 900)
+MIDTURN_STALE_SECS=3600
 VERIFY_SECS=$(positive_int "${FM_WATCHDOG_VERIFY_SECS:-}" 90)
 RETRY_SECS=$(positive_int "${FM_WATCHDOG_RETRY_SECS:-}" 240)
 ALARM_AFTER=$(positive_int "${FM_WATCHDOG_ALARM_AFTER:-}" 2)
@@ -145,7 +146,7 @@ fi
 
 WATCHDOG_VERDICT=
 watchdog_verdict() {
-  local lock_pid
+  local lock_pid age
   WATCHDOG_VERDICT=healthy
   fm_supervision_status "$STATE" "$STALE_SECS"
   if [ "$FM_SUP_NEEDED" != true ]; then
@@ -158,7 +159,15 @@ watchdog_verdict() {
     return 0
   fi
   fm_watcher_supervision_verdict "$STATE" "$WATCH" "$STALE_SECS" "$FM_HOME" "$FM_ROOT"
-  [ "$FM_WATCHER_VERDICT_OK" = true ] && return 0
+  if [ "$FM_WATCHER_VERDICT_OK" = true ]; then
+    age=$(fm_path_age "$STATE/.last-watcher-beat")
+    if [ "$age" -lt "$STALE_SECS" ] \
+      || { [ "$FM_SUPERVISION_MODEL" = autoarm ] \
+        && [ "$age" -lt "$MIDTURN_STALE_SECS" ] \
+        && fm_autoarm_midturn_healthy "$STATE"; }; then
+      return 0
+    fi
+  fi
   WATCHDOG_VERDICT="stale-watcher"
   if fm_autoarm_ledger_read "$STATE" \
     && [ "$FM_AUTOARM_OUTCOME" = arming ] \

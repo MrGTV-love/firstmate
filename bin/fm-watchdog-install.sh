@@ -26,6 +26,8 @@ set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
+case "$FM_ROOT" in /*) ;; *) FM_ROOT="$PWD/$FM_ROOT" ;; esac
+case "$FM_HOME" in /*) ;; *) FM_HOME="$PWD/$FM_HOME" ;; esac
 TEMPLATE="$FM_ROOT/docs/examples/fm-watchdog.plist"
 AGENT_DIR="$HOME/Library/LaunchAgents"
 LAUNCHCTL=launchctl

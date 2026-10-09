@@ -12,6 +12,7 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
+command -v python3 >/dev/null 2>&1 || { echo "skip: python3 not found (plist and heartbeat fixtures)"; exit 0; }
 TMP_ROOT=$(fm_test_tmproot fm-watchdog-check)
 SESSION_PIDS=()
 cleanup_sessions() {
@@ -130,6 +131,42 @@ test_missing_home_is_idle() {
   assert_contains "$OUT" "watchdog: idle" "missing home verdict"
   assert_absent "$TMP_ROOT/nowhere" "a missing home must not be created"
   pass "a missing home reads idle and is not created"
+}
+
+test_bound_rewake_has_finite_grace() {
+  local home dir pid
+  home=$(make_home boundrewake)
+  dir=$(dirname "$home")
+  pid=$(cat "$home/state/.lock")
+  printf 'epoch=7 owner_pid=1 outcome=rewake updated_at=1 session_pid=%s recovery_generation=watchdog-test\n' \
+    "$pid" > "$home/state/.claude-autoarm-epoch"
+  printf 'acked:handling:watchdog-test\n' > "$home/state/.watcher-down"
+  write_stubs "$home" 'true'
+  python3 - "$home/state/.last-watcher-beat" <<'PY'
+import os, sys, time
+stamp = time.time() - 1000
+os.utime(sys.argv[1], (stamp, stamp))
+PY
+  run_check "$home"
+  expect_code 0 "$CODE" "bound rewake at 1000 seconds exit"
+  assert_equals "watchdog: healthy" "$OUT" "bound rewake gets longer handling grace"
+  assert_absent "$dir/resume.calls" "a legitimate long turn is not resumed"
+  assert_absent "$home/state/.watchdog-episode" "a legitimate long turn leaves no episode"
+  python3 - "$home/state/.last-watcher-beat" <<'PY'
+import os, sys, time
+stamp = time.time() - 3700
+os.utime(sys.argv[1], (stamp, stamp))
+PY
+  run_check "$home" FM_WATCHDOG_NOW=1000
+  expect_code 1 "$CODE" "bound rewake at 3700 seconds exit"
+  assert_contains "$OUT" "watchdog: stale-watcher - recovery failed" "bound rewake expires"
+  assert_present "$home/state/.watchdog-episode" "an expired turn remains a failed episode"
+  write_stubs "$home" "$(healing_resume "$home")"
+  run_check "$home" FM_WATCHDOG_NOW=1300
+  expect_code 0 "$CODE" "expired bound rewake recovery exit"
+  assert_equals "stale-watcher" "$(cat "$dir/resume.calls")" "expired turn resumes as stale"
+  assert_absent "$home/state/.watchdog-episode" "a fresh beacon clears the expired episode"
+  pass "a bound rewake is healthy at 1000 seconds and stale at 3700 seconds"
 }
 
 test_stale_watcher_recovers() {
@@ -269,10 +306,44 @@ test_recovery_after_failures_clears_episode() {
   pass "a healthy verdict after failures clears the episode"
 }
 
+assert_watchdog_plist_contract() {
+  python3 - "$@" <<'PY' || fail "generated watchdog plist violates its launchd contract"
+import plistlib, sys
+plist, home, root, label, interval, path = sys.argv[1:]
+with open(plist, "rb") as stream:
+    model = plistlib.load(stream)
+expected = {
+    "Label": label,
+    "ProgramArguments": ["/bin/bash", root + "/bin/fm-watchdog-check.sh"],
+    "EnvironmentVariables": {"FM_HOME": home, "PATH": path},
+    "WorkingDirectory": home,
+    "RunAtLoad": True,
+    "StartInterval": int(interval),
+    "ProcessType": "Background",
+    "StandardOutPath": home + "/state/.watchdog.launchd.log",
+    "StandardErrorPath": home + "/state/.watchdog.launchd.log",
+}
+def check(actual, expected, key):
+    assert type(actual) is type(expected), (key, type(actual), type(expected))
+    if isinstance(expected, dict):
+        for name, value in expected.items():
+            check(actual[name], value, key + "." + name)
+    elif isinstance(expected, list):
+        assert len(actual) == len(expected), (key, actual, expected)
+        for index, value in enumerate(expected):
+            check(actual[index], value, key + "[" + str(index) + "]")
+    else:
+        assert actual == expected, (key, actual, expected)
+check(model, expected, "plist")
+PY
+}
+
 test_installer_renders_and_registers() {
-  local dir calls plist
+  local dir calls plist home label
   dir="$TMP_ROOT/installer"
-  mkdir -p "$dir/agents" "$dir/home/state"
+  home="$dir/home & <main>"
+  label="com.firstmate.watchdog.$(printf '%s' "$home" | cksum | cut -d' ' -f1)"
+  mkdir -p "$dir/agents" "$home/state"
   cat > "$dir/launchctl.sh" <<STUB
 #!/bin/sh
 echo "\$@" >> "$dir/launchctl.calls"
@@ -280,20 +351,46 @@ case "\$1" in print) exit 1 ;; esac
 exit 0
 STUB
   chmod +x "$dir/launchctl.sh"
-  OUT=$(env FM_HOME="$dir/home" FM_TEST_SEAM=1 FM_WATCHDOG_AGENT_DIR="$dir/agents" \
+  OUT=$(env FM_HOME="$home" FM_TEST_SEAM=1 FM_WATCHDOG_AGENT_DIR="$dir/agents" \
     FM_WATCHDOG_LAUNCHCTL="$dir/launchctl.sh" "$ROOT/bin/fm-watchdog-install.sh" install --interval 60 2>&1)
   expect_code 0 "$?" "install exit"
-  plist=$(ls "$dir/agents"/com.firstmate.watchdog.*.plist)
-  assert_grep "<string>$dir/home</string>" "$plist" "plist names the home"
-  assert_grep "<integer>60</integer>" "$plist" "plist carries the interval"
-  assert_grep "$ROOT/bin/fm-watchdog-check.sh" "$plist" "plist runs the check script"
-  ! grep -E '@[A-Z_]+@' "$plist" >/dev/null || fail "plist has an unfilled token"
+  plist="$dir/agents/$label.plist"
+  assert_watchdog_plist_contract "$plist" "$home" "$ROOT" "$label" 60 "$PATH"
   calls=$(cat "$dir/launchctl.calls")
   assert_contains "$calls" "bootstrap gui/" "install bootstraps into the user domain"
-  OUT=$(env FM_HOME="$dir/home" FM_TEST_SEAM=1 FM_WATCHDOG_AGENT_DIR="$dir/agents" \
+  OUT=$(env FM_HOME="$home" FM_TEST_SEAM=1 FM_WATCHDOG_AGENT_DIR="$dir/agents" \
     FM_WATCHDOG_LAUNCHCTL="$dir/launchctl.sh" "$ROOT/bin/fm-watchdog-install.sh" install --interval 5 2>&1)
   expect_code 1 "$?" "too-short interval exit"
   pass "install renders the plist for the home and bootstraps it"
+}
+
+test_installer_resolves_relative_paths() {
+  local dir home root label plist
+  dir="$TMP_ROOT/relative-installer"
+  home="$dir/homes/main"
+  root="$dir/checkout"
+  label="com.firstmate.watchdog.$(printf '%s' "$home" | cksum | cut -d' ' -f1)"
+  plist="$dir/agents/$label.plist"
+  mkdir -p "$home/state" "$dir/agents"
+  ln -s "$ROOT" "$root"
+  printf '#!/bin/sh\ncase "$1" in print) exit 1 ;; esac\nexit 0\n' > "$dir/launchctl.sh"
+  chmod +x "$dir/launchctl.sh"
+  OUT=$(cd "$dir" && env FM_HOME=homes/main FM_ROOT_OVERRIDE=checkout \
+    FM_WATCHDOG_AGENT_DIR="$dir/agents" FM_WATCHDOG_LAUNCHCTL="$dir/launchctl.sh" \
+    "$ROOT/bin/fm-watchdog-install.sh" install --interval 60 2>&1)
+  expect_code 0 "$?" "relative install exit"
+  assert_watchdog_plist_contract "$plist" "$home" "$root" "$label" 60 "$PATH"
+  OUT=$(env FM_HOME="$home" FM_ROOT_OVERRIDE="$root" \
+    FM_WATCHDOG_AGENT_DIR="$dir/agents" FM_WATCHDOG_LAUNCHCTL="$dir/launchctl.sh" \
+    "$ROOT/bin/fm-watchdog-install.sh" status 2>&1)
+  expect_code 0 "$?" "absolute status exit"
+  assert_equals "$label plist=present launchd=not-loaded" "$OUT" "relative and absolute homes share agent identity"
+  OUT=$(cd "$dir" && env FM_HOME=homes/main FM_ROOT_OVERRIDE=checkout \
+    FM_WATCHDOG_AGENT_DIR="$dir/agents" FM_WATCHDOG_LAUNCHCTL="$dir/launchctl.sh" \
+    "$ROOT/bin/fm-watchdog-install.sh" uninstall 2>&1)
+  expect_code 0 "$?" "relative uninstall exit"
+  assert_absent "$plist" "relative uninstall removes the same agent"
+  pass "installer resolves relative roots before rendering and identity generation"
 }
 
 test_installer_uninstall_removes_plist() {
@@ -309,7 +406,7 @@ esac
 exit 0
 STUB
   chmod +x "$dir/launchctl-loaded.sh"
-  OUT=$(env FM_HOME="$dir/home" FM_TEST_SEAM=1 FM_WATCHDOG_AGENT_DIR="$dir/agents" \
+  OUT=$(env FM_HOME="$dir/home & <main>" FM_TEST_SEAM=1 FM_WATCHDOG_AGENT_DIR="$dir/agents" \
     FM_WATCHDOG_LAUNCHCTL="$dir/launchctl-loaded.sh" "$ROOT/bin/fm-watchdog-install.sh" uninstall 2>&1)
   expect_code 0 "$?" "uninstall exit"
   assert_contains "$(cat "$dir/launchctl-loaded.calls")" "bootout gui/" "uninstall boots the agent out"
@@ -320,6 +417,7 @@ STUB
 test_fresh_state_does_nothing
 test_idle_home_does_nothing
 test_missing_home_is_idle
+test_bound_rewake_has_finite_grace
 test_stale_watcher_recovers
 test_stale_watcher_with_live_pid_is_stopped_first
 test_dead_arm_owner_is_named
@@ -330,4 +428,5 @@ test_failed_recovery_alarms_after_threshold
 test_missing_resume_command_fails_and_logs
 test_recovery_after_failures_clears_episode
 test_installer_renders_and_registers
+test_installer_resolves_relative_paths
 test_installer_uninstall_removes_plist

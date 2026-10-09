@@ -25,8 +25,10 @@ A launchd job runs outside every harness, so the check derives the supervision m
 `FM_SUPERVISION_MODEL` pins the model when that guess is wrong.
 Pi and omp homes use the extension model and are not covered by the derivation.
 
-Staleness uses `FM_WATCHDOG_STALE_SECS`, 900 seconds by default.
-That is longer than the 300-second guard grace so a long handling turn does not read as a lapse.
+The ordinary stale threshold is 900 seconds (`FM_WATCHDOG_STALE_SECS`).
+A live session with a rewake ledger bound to its session lock and current recovery generation gets a longer fixed limit of 3600 seconds for a legitimate handling turn.
+The bound ledger must be at least as new as the beacon and have no exhausted-failure marker.
+At or beyond that limit, the watchdog reports `stale-watcher` even when the pull guard's separate mid-turn policy still considers the session healthy.
 
 ## Recovery
 
@@ -68,6 +70,7 @@ The agent label is home-scoped, so two homes never share an agent.
 The agent runs every 120 seconds by default and at load, and it logs to `state/.watchdog.launchd.log`.
 The check itself logs to `state/.watchdog.log`, and an open episode is recorded in `state/.watchdog-episode`.
 The installer bakes the `PATH` of the shell that runs it into the agent, because launchd starts agents with a minimal one.
+Relative `FM_HOME` and `FM_ROOT_OVERRIDE` paths are resolved against the installing shell's working directory before label generation and plist rendering; absolute spellings are preserved.
 
 ## Limits
 
