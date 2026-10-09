@@ -2892,7 +2892,7 @@ test_relocation_rebinds_a_vanished_worktree_to_a_fresh_copy() {
 
 test_relocation_checks_every_recorded_head_and_requires_evidence() {
   local dir id out rc variant source
-  for variant in meta-head registered journal pr-head all; do
+  for variant in registered journal pr-head all; do
     id="rl101$variant"
     dir=$(new_case "relocate-evidence-$variant" "$id")
     if [ "$variant" = registered ] || [ "$variant" = all ]; then
@@ -2901,7 +2901,6 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
       make_relocation_case "$dir" "$id"
     fi
     case "$variant" in
-      meta-head) printf 'worktree_head=%s\n' "$(cat "$dir/first-head")" >> "$dir/home/state/$id.meta"; source=meta-worktree_head,meta-pr_head ;;
       registered) source=registered-worktree,meta-pr_head ;;
       journal)
         printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/first-head")" > "$dir/home/state/$id.control-relaunch"
@@ -2909,9 +2908,8 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
         ;;
       pr-head) source=meta-pr_head ;;
       all)
-        printf 'worktree_head=%s\n' "$(cat "$dir/first-head")" >> "$dir/home/state/$id.meta"
         printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/first-head")" > "$dir/home/state/$id.control-relaunch"
-        source=meta-worktree_head,registered-worktree,journal-worktree_head,meta-pr_head
+        source=registered-worktree,journal-worktree_head,meta-pr_head
         ;;
     esac
     out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
@@ -2924,7 +2922,7 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
 
   # A branch moved BACK to an older commit (a reset while recreating the copy)
   # silently drops the task's commits. Every recorded head must catch that.
-  for variant in meta-head registered journal journal-pr journal-relocation; do
+  for variant in registered journal journal-pr journal-relocation; do
     id="rl102$variant"
     dir=$(new_case "relocate-reset-$variant" "$id")
     if [ "$variant" = registered ]; then
@@ -2934,7 +2932,6 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
     fi
     [ "$variant" = journal-pr ] || set_case_meta_field "$dir" "$id" pr_head "$(cat "$dir/first-head")"
     case "$variant" in
-      meta-head) set_case_meta_field "$dir" "$id" worktree_head "$(cat "$dir/committed-head")" ;;
       journal)
         printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/committed-head")" > "$dir/home/state/$id.control-relaunch"
         ;;
@@ -2954,6 +2951,9 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
   make_relocation_case "$dir" "$id"
   set_case_meta_field "$dir" "$id" pr_head ""
   run_relocation_refusal "$dir" "$id" "no recorded head exists" "no surviving recorded head"
+  run_relocation_refusal "$dir" "$id" "git worktree add -f <path> task-$id" "no-head refusal names the forced add"
+  run_relocation_refusal "$dir" "$id" "do not run 'git worktree prune' first" "no-head refusal warns against pruning"
+  run_relocation_refusal "$dir" "$id" "pr_head=" "no-head refusal names the existing evidence route"
   pass "relocation: every surviving recorded head must be contained, and no evidence refuses"
 }
 
@@ -3050,14 +3050,14 @@ test_relocation_refuses_every_unsafe_destination() {
       detached) git -C "$dir/dest" checkout -q --detach; fragment="does not equal the recorded branch" ;;
       head-unrelated)
         foreign=$(printf 'unrelated\n' | git -C "$dir/proj" -c user.name=t -c user.email=t@example.com commit-tree "$(git -C "$dir/proj" rev-parse 'HEAD^{tree}')")
-        printf 'worktree_head=%s\n' "$foreign" >> "$dir/home/state/$id.meta"
+        set_case_meta_field "$dir" "$id" pr_head "$foreign"
         fragment="does not contain"
         ;;
       head-missing)
-        printf 'worktree_head=%s\n' 0123456789abcdef0123456789abcdef01234567 >> "$dir/home/state/$id.meta"
+        set_case_meta_field "$dir" "$id" pr_head 0123456789abcdef0123456789abcdef01234567
         fragment="not in the repository"
         ;;
-      head-malformed) printf 'worktree_head=not-a-commit\n' >> "$dir/home/state/$id.meta"; fragment="full commit id" ;;
+      head-malformed) set_case_meta_field "$dir" "$id" pr_head not-a-commit; fragment="full commit id" ;;
       owned) printf 'worktree=%s\n' "$dir/dest" > "$dir/home/state/other.meta"; fragment="recorded by another task" ;;
       owned-alias)
         ln -s "$dir/dest" "$dir/alias"
