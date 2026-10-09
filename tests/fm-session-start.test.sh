@@ -1390,8 +1390,8 @@ EOF
     "SECONDMATE_LIVENESS: secondmate $SESSION_START_SECOND_MATE_ID: skipped: endpoint probe unreadable (backend=tmux)" \
     "session start did not distinguish transient unreadability from absence"
   [ ! -s "$log" ] || fail "session start touched a transiently unreadable target: $(cat "$log")"
-  assert_contains "$out" "endpoint: dead (backend=tmux window=firstmate:fm-$SESSION_START_SECOND_MATE_ID)" \
-    "the later cheap presence read should preserve the visible offline symptom"
+  assert_contains "$out" "endpoint: unknown (backend=tmux window=firstmate:fm-$SESSION_START_SECOND_MATE_ID - endpoint inventory unreadable)" \
+    "the fleet digest must not report an unreadable endpoint as dead"
   pass "session start: transient tmux unreadability never licenses a relaunch"
 }
 

@@ -1173,12 +1173,17 @@ fm_busy_classify() {  # <backend> <target> <harness> <id> <state-dir> [tail40]
 # override - a gone endpoint is dead, never busy. Requires fm-backend.sh to
 # be sourced for fm_backend_target_exists.
 fm_busy_classify_live() {  # <backend> <target> <harness> <id> <state-dir> [expected-label]
-  local backend=$1 target=$2 harness=$3 id=$4 state=$5 label=${6-}
+  local backend=$1 target=$2 harness=$3 id=$4 state=$5 label=${6-} endpoint_rc=0
   if [ -z "$target" ]; then
     printf 'unknown no-target'
     return 0
   fi
-  if ! fm_backend_target_exists "$backend" "$target" "$label" 2>/dev/null; then
+  fm_backend_target_exists "$backend" "$target" "$label" 2>/dev/null || endpoint_rc=$?
+  if [ "$backend" = tmux ] && [ "$endpoint_rc" -eq 2 ]; then
+    printf 'unknown endpoint-unreadable'
+    return 0
+  fi
+  if [ "$endpoint_rc" -ne 0 ]; then
     printf 'dead endpoint-gone'
     return 0
   fi

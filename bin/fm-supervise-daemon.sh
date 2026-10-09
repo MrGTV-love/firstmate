@@ -1440,7 +1440,7 @@ inject_msg() {  # <message> [state]
   # discovery), matching this function's pre-existing default assumption.
   backend="${FM_SUPERVISOR_BACKEND:-tmux}"
   fm_backend_target_exists "$backend" "$target" \
-    || { INJECT_LAST_FAILURE="supervisor target $target not found on $backend"; return 1; }
+    || { INJECT_LAST_FAILURE="supervisor target $target presence could not be verified on $backend"; return 1; }
   # (3) Busy-guard: never inject into an in-use supervisor pane.
   if pane_is_busy "$target" "$backend"; then
     INJECT_LAST_FAILURE="deferred: supervisor pane busy (agent mid-turn)"
@@ -1853,8 +1853,8 @@ fm_super_main() {
   # backend=tmux this runs the exact same `tmux display-message -p -t "$TARGET"
   # '#{pane_id}'` call as before.
   if ! fm_backend_target_exists "$BACKEND" "$TARGET"; then
-    echo "error: supervisor target '$TARGET' does not resolve to a $BACKEND pane; set FM_SUPERVISOR_TARGET" >&2
-    log "startup failed: target '$TARGET' not found (backend=$BACKEND)"
+    echo "error: supervisor target '$TARGET' presence could not be verified on $BACKEND; check FM_SUPERVISOR_TARGET and backend availability" >&2
+    log "startup failed: target '$TARGET' presence could not be verified (backend=$BACKEND)"
     fm_lock_release "$LOCK" 2>/dev/null || true
     rm -f "$PIDFILE" 2>/dev/null || true
     exit 1
@@ -1921,7 +1921,7 @@ fm_super_main() {
     # Catch-up signals persist in state/*.status and flow on the next run, so
     # this delays rather than loses work.
     if ! fm_backend_target_exists "$BACKEND" "$TARGET"; then
-      log "warn: supervisor target '$TARGET' gone; backing off ${INJECT_FAIL_SLEEP}s, will retry"
+      log "warn: supervisor target '$TARGET' presence could not be verified; backing off ${INJECT_FAIL_SLEEP}s, will retry"
       # Flush is pointless with no pane; preserve any buffered escalations.
       sleep "$INJECT_FAIL_SLEEP"
       continue

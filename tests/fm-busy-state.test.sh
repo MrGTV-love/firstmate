@@ -493,15 +493,17 @@ test_cursor_ignores_rendered_and_native_signals() {
 # --- endpoint death and native fallbacks ----------------------------------------
 
 test_dead_endpoint_overrides() {
-  local state gen out
+  local state gen out fixture_presence_rc=1
   state=$(new_state_dir dead)
   gen=$("$EV" arm "$state" t1)
   # shellcheck disable=SC2329 # invoked indirectly through fm_busy_classify_live
-  fm_backend_target_exists() { return 1; }
+  fm_backend_target_exists() { return "$fixture_presence_rc"; }
   out=$(fm_busy_classify_live tmux w1 claude t1 "$state")
   [ "$out" = "dead endpoint-gone" ] || fail "gone endpoint must classify dead, got '$out'"
-  # shellcheck disable=SC2329 # invoked indirectly through fm_busy_classify_live
-  fm_backend_target_exists() { return 0; }
+  fixture_presence_rc=2
+  out=$(fm_busy_classify_live tmux w1 claude t1 "$state")
+  [ "$out" = "unknown endpoint-unreadable" ] || fail "unreadable endpoint must not override the busy record as dead, got '$out'"
+  fixture_presence_rc=0
   out=$(fm_busy_classify_live tmux w1 claude t1 "$state")
   [ "$out" = "busy fm-spawn" ] || fail "live endpoint must fall through to the record, got '$out'"
   out=$(fm_busy_classify_live tmux '' claude t1 "$state")

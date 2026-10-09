@@ -48,6 +48,8 @@ Verify setup by spawning a small task and confirming its `fm-<id>` window appear
 
 A target-existence check proves only that the window exists.
 It matches the recorded `session:window` name against the exact session's window inventory, because tmux answers an addressed call for an absent window or session with success while any server runs.
+For recorded window-name targets, the shared presence check returns 0 for present, 1 for proven absent, and 2 when the inventory is unreadable. Only a readable inventory omitting the window or a definitive missing-session/server response proves absence; other read failures remain unknown.
+Session-start reports those unreadable endpoints as `unknown`, and live busy classification likewise preserves `unknown` rather than reporting `dead`. Send, control, and supervisor actions still require positive presence evidence.
 The deeper tmux agent-liveness probe first verifies exact window membership, then reads process names to distinguish a running harness from a bare idle shell.
 It classifies recognized Claude, Codex, OpenCode, Pi, pi-signed, Grok, Kimi, Cursor, Muse, Rovo, and AGY process identities as `alive`, common shells as `dead`, a window not found through the addressed server as `missing`, unreadable state as `unreadable`, and every other process as `ambiguous`.
 The process-name vocabulary behind those verdicts is owned by `bin/fm-agent-process-lib.sh` and shared with the Herdr adapter, which proves a registered agent against the same names ([herdr-backend.md](herdr-backend.md) "Restart and liveness behavior").
