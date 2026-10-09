@@ -633,8 +633,9 @@ IFS= read -r -d '' DOCKER_MARKER_RULE <<'EOF' || true
    For Supabase, use an isolated task-local `supabase/config.toml` with `project_id` set to the exact
    task id, then run `supabase start` from that task-local project. Never edit or start the shared
    project's Supabase configuration; configure the project id in the file, not a command-line flag.
-   An unmarked container cannot be attributed to you and outlives your task. Remove what you finish
-   with as you go; teardown only catches what is left, and never touches another task's stacks.
+   A container with no task marker, no name starting with your task id (followed by - or _), and no
+   Compose project in your worktree cannot be attributed to you and outlives your task. Remove what
+   you finish with as you go; teardown only catches what is left, and never touches another task's stacks.
 EOF
 DOCKER_MARKER_RULE=${DOCKER_MARKER_RULE%$'\n'}
 
