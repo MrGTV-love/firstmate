@@ -188,17 +188,6 @@ case "${1:-}" in
         *cursor_y*) printf '1\n'; exit 0 ;;
         *pane_current_command*) cat "$D/command"; printf '\n'; exit 0 ;;
         *pane_current_path*)
-          if [ -n "${FM_FAKE_CWD_RACE_READY:-}" ] && [ ! -e "$FM_FAKE_CWD_RACE_READY" ]; then
-            : > "$FM_FAKE_CWD_RACE_READY"
-            deadline=$((SECONDS + ${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
-            while [ ! -e "$FM_FAKE_CWD_RACE_RELEASE" ]; do
-              if [ "$SECONDS" -ge "$deadline" ]; then
-                : > "$FM_FAKE_CWD_RACE_READY.expired"
-                exit 1
-              fi
-              /bin/sleep 0.05
-            done
-          fi
           cat "$D/cwd"; printf '\n'; exit 0 ;;
       esac
     done
@@ -464,6 +453,42 @@ fi
 exec "$FM_REAL_MV" "$@"
 SH
   chmod +x "$1/fakebin/mv"
+}
+
+make_spawn_return_barrier_stub() {
+  local dir=$1 real_bash
+  real_bash=$(command -v bash)
+  cat > "$dir/fakebin/bash" <<SH
+#!/bin/bash
+if [ "\${1:-}" != "$SPAWN" ]; then
+  exec "$real_bash" "\$@"
+fi
+"$real_bash" "\$@"
+rc=\$?
+printf '%s\n' "\$rc" > "\$FM_FAKE_SPAWN_RETURN_READY"
+deadline=\$((SECONDS + \${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
+while [ ! -e "\$FM_FAKE_SPAWN_RETURN_RELEASE" ]; do
+  if [ "\$SECONDS" -ge "\$deadline" ]; then
+    : > "\$FM_FAKE_SPAWN_RETURN_READY.expired"
+    exit 124
+  fi
+  /bin/sleep 0.05
+done
+exit "\$rc"
+SH
+  chmod +x "$dir/fakebin/bash"
+}
+
+wait_fixture_process() {
+  local pid=$1 deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      kill -KILL "$pid" 2>/dev/null || true
+      return 124
+    fi
+    /bin/sleep 0.05
+  done
+  wait "$pid"
 }
 
 make_rm_failure_stub() {  # <case-dir>
@@ -1885,39 +1910,44 @@ test_launch_failure_keeps_the_prior_record_and_reports_it() {
 }
 
 test_prepublication_failure_keeps_concurrent_durable_metadata() {
-  local dir control_pid link_pid link_out rc deadline
+  local dir control_pid link_pid link_out rc control_rc deadline
   dir=$(new_case rollback-race rl30)
   add_ship_task "$dir" rl30 claude
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
-  FM_FAKE_CWD_RACE_READY="$dir/cwd-race-ready" \
-    FM_FAKE_CWD_RACE_RELEASE="$dir/cwd-race-release" \
+  make_spawn_return_barrier_stub "$dir"
+  FM_FAKE_SPAWN_RETURN_READY="$dir/spawn-return-ready" \
+    FM_FAKE_SPAWN_RETURN_RELEASE="$dir/spawn-return-release" \
     run_control "$dir" rl30 relaunch --harness codex --note "preserve concurrent metadata" \
       > "$dir/control.out" &
   control_pid=$!
   deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
-  while [ ! -e "$dir/cwd-race-ready" ] && [ "$SECONDS" -lt "$deadline" ] && kill -0 "$control_pid" 2>/dev/null; do
+  while [ ! -s "$dir/spawn-return-ready" ] && [ "$SECONDS" -lt "$deadline" ] && kill -0 "$control_pid" 2>/dev/null; do
     /bin/sleep 0.05
   done
-  [ -e "$dir/cwd-race-ready" ] || {
-    : > "$dir/cwd-race-release"
-    kill "$control_pid" 2>/dev/null || true
-    wait "$control_pid" 2>/dev/null || true
-    fail "relaunch did not reach its pre-publication endpoint check: $(cat "$dir/control.out")"
+  [ -s "$dir/spawn-return-ready" ] || {
+    : > "$dir/spawn-return-release"
+    wait_fixture_process "$control_pid" 2>/dev/null || true
+    fail "relaunch did not reach its post-spawn rollback barrier: $(cat "$dir/control.out")"
   }
-  # The publisher can finish only after spawn releases its metadata lock.
-  # Start it concurrently, then release spawn before waiting for publication.
+  if [ "$(cat "$dir/spawn-return-ready")" != 1 ] \
+     || [ -e "$dir/home/state/.meta-rl30.lock" ] \
+     || [ "$(journal_field "$dir" rl30 phase)" != launching ]; then
+    : > "$dir/spawn-return-release"
+    wait_fixture_process "$control_pid" 2>/dev/null || true
+    fail "spawn did not fail and release its metadata lock before rollback: $(cat "$dir/control.out")"
+  fi
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
     "$X_LINK" rl30 request-30 --carry-count 2 --carry-ts 1700000000 \
       --carry-platform x --carry-max 280 > "$dir/link.out" 2>&1 &
   link_pid=$!
-  : > "$dir/cwd-race-release"
-  wait "$link_pid"; rc=$?
+  wait_fixture_process "$link_pid"; rc=$?
   link_out=$(cat "$dir/link.out")
+  : > "$dir/spawn-return-release"
+  wait_fixture_process "$control_pid"; control_rc=$?
   expect_code 0 "$rc" "concurrent durable metadata publication should succeed"$'\n'"$link_out"
-  wait "$control_pid"; rc=$?
-  expect_code 1 "$rc" "the staged pre-publication launch failure should fail closed"
-  assert_absent "$dir/cwd-race-ready.expired" \
-    "the concurrent metadata race must finish by release, not by fixture timeout"
+  expect_code 1 "$control_rc" "the staged pre-publication launch failure should fail closed"
+  assert_absent "$dir/spawn-return-ready.expired" \
+    "rollback must wait for publication by release, not by fixture timeout"
   [ "$(meta_field "$dir" rl30 x_request)" = request-30 ] \
     || fail "rollback erased the concurrent X request"
   [ "$(meta_field "$dir" rl30 x_followups)" = 2 ] \

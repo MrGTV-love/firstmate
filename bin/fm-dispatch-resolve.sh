@@ -232,7 +232,7 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   else empty end
 ' "$RULES" 2>/dev/null) || die "malformed rules file: $RULES_PATH (not JSON)"
 [ -z "$rules_err" ] || die "malformed rules file: $RULES_PATH - $rules_err"
-fm_dispatch_fallbacks "$CONFIG" "" "" "" "" "$RULES" >/dev/null || die "malformed rules file: $RULES_PATH - invalid fallback configuration"
+fm_dispatch_fallbacks "$MODEL_CONFIG" "" "" "" "" "$RULES" >/dev/null || die "malformed rules file: $RULES_PATH - invalid fallback configuration"
 
 missing_provider=$(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
@@ -464,7 +464,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       {profile: $c, provider: "codex", capacity: $pool, eligible: ($pool.status != "exhausted"),
        exhausted: ($pool.status == "exhausted"), unranked: true,
        reason: ("OMP pooled Codex capacity " + $pool.status + "; no pool spendPriority")}
-      + (if $c.floor != null then {unknown: true, reason: "OMP pool profile floor is unverifiable"}
+      + (if $c.floor != null then {exhausted: false, unknown: true, reason: "OMP pool profile floor is unverifiable"}
          elif $pool.status != "usable" then {unknown: true} else {} end)
     elif $c.harness == "claude" and $claude_quota_unbound then
       {profile: $c, provider: $p, capacity: {status: "unknown"}, eligible: true,
@@ -488,10 +488,10 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
         {profile: $c, provider: $p, bounds: $bounds, scope: ($floor_row.scope // $c.floor.scope), pct: ($floor_row.effectivePercentRemaining // null), runway: ($floor_row.runway.status // null), eligible: false, reason: "profile floor \($c.floor.scope) below \($c.floor.min_percent)%"}
       elif any($rows[]; (.runway.status // "") == "exhausted_now") then
         ($rows | map(select((.runway.status // "") == "exhausted_now")) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, exhausted: true, reason: "runway exhausted_now at \($bad.scope)"}
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: ($bad.effectivePercentRemaining // null), runway: $bad.runway.status, eligible: false, exhausted: ($profile_floor_state != "unknown"), reason: "runway exhausted_now at \($bad.scope)"}
       elif any($rows[]; .status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0) then
         ($rows | map(select(.status == "known" and (.effectivePercentRemaining | type) == "number" and .effectivePercentRemaining <= 0)) | first) as $bad |
-        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, exhausted: true, reason: "0% remaining at \($bad.scope)"}
+        {profile: $c, provider: $p, bounds: $bounds, scope: $bad.scope, pct: $bad.effectivePercentRemaining, runway: $bad.runway.status, eligible: false, exhausted: ($profile_floor_state != "unknown"), reason: "0% remaining at \($bad.scope)"}
       elif (measured($p; $lane) | not) then
         ($rows | first) as $row |
         {profile: $c, provider: $p, bounds: $bounds, scope: ($row.scope // null), pct: ($row.effectivePercentRemaining // null), runway: ($row.runway.status // null), eligible: true, unranked: true, unknown: true, reason: "provider \($p) unmeasured (\(prov($p; $lane).quotaSemantics.status))"}
@@ -610,9 +610,9 @@ if jq -e '.status == "escalate" and .reason == "no rankable eligible candidate" 
   (.candidates | length) > 0 and all(.candidates[]; .exhausted == true)' <<<"$RESULT" >/dev/null; then
   dispatch_rule=$(jq -r .dispatch_rule <<<"$RESULT")
   primary=$(jq -c '.candidates[0].profile' <<<"$RESULT")
-  fallbacks=$(fm_dispatch_fallbacks "$CONFIG" "$dispatch_rule" "$(jq -r .harness <<<"$primary")" \
+  fallbacks=$(fm_dispatch_fallbacks "$MODEL_CONFIG" "$dispatch_rule" "$(jq -r .harness <<<"$primary")" \
     "$(jq -r '.model // ""' <<<"$primary")" "$(jq -r '.effort // ""' <<<"$primary")" "$RULES") || emit_error "invalid fallback configuration"
-  if selected=$(fm_dispatch_select "$CONFIG" "$dispatch_rule" "$primary" "$(jq -c .fallback <<<"$fallbacks")" '{"status":"exhausted","reason":"captured primary capacity"}' 2>/dev/null); then
+  if selected=$(fm_dispatch_select "$CONFIG" "$dispatch_rule" "$primary" "$(jq -c .fallback <<<"$fallbacks")" '{"status":"exhausted","reason":"captured primary capacity"}' "$MODEL_CONFIG" 2>/dev/null); then
     if [ "$(jq -r .switched <<<"$selected")" = true ]; then
       RESULT=$(jq -c --argjson selected "$selected" '.status = "clear" | del(.reason) |
         .fallback = "primary capacity exhausted; declared model-matrix fallback" |

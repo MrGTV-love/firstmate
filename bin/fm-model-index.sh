@@ -259,8 +259,15 @@ case "$VERB" in
       else error("dispatch must contain exactly one JSON object") end' "$1" > "$TMP/dispatch.json" \
       || die "malformed dispatch: $1"
     jq --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ
-      if (.rules | type) == \"array\" then .rules |= map(if type == \"object\" and has(\"use\") then .use |= profile_set else . end) else . end |
-      if type == \"object\" and has(\"default\") then .default |= profile_set else . end" "$TMP/dispatch.json"
+      if (.rules | type) == \"array\" then .rules |= map(
+        if type == \"object\" then
+          (if has(\"use\") then .use |= profile_set else . end) |
+          (if (.fallback | type) == \"array\" then .fallback |= map(retired_guard) else . end)
+        else . end) else . end |
+      if type == \"object\" then
+        (if has(\"default\") then .default |= profile_set else . end) |
+        (if (.default_fallback | type) == \"array\" then .default_fallback |= map(retired_guard) else . end)
+      else . end" "$TMP/dispatch.json"
     [ "$HAVE_INDEX" = 0 ] || jq -r --slurpfile idx "$TMP/index.json" "$RESOLVE_JQ
       [(.rules[]? | objects | .use), .default] | .[] | (if type == \"array\" then .[] else . end) | literal_warning" "$TMP/dispatch.json" >&2
     ;;

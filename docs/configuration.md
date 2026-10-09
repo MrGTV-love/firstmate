@@ -1510,6 +1510,7 @@ Those routes remain eligible with unranked, unknown quota until a mapping is est
 
 Each fallback profile requires `harness`, `model`, and `effort`.
 An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
+Every fallback destination must also satisfy the home's session launch policy.
 A bare `claude` executable or a shell alias is not proof of that route.
 For example, a rule may declare `"fallback": [{"harness": "omp", "model": "openrouter/deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only the named stand-in, not a general downgrade.
 The operator must preserve the task's required reasoning class in each list; an exhausted strongest route without a supported equal-class stand-in stops and reports the unavailable route.
@@ -1517,13 +1518,15 @@ Natural-language `why` text does not authorize an executable fallback.
 
 `fm-dispatch-resolve.sh`, `fm-spawn.sh`, and `fm-control.sh relaunch` share the same fallback list.
 Only proven primary exhaustion activates it; approval, confidence, unknown capacity, and floor decisions are not bypassed.
-Spawn and recovery validate fallback fields even when typed resolution is off.
-The rule identifier is recorded with the task and follows recovery; without it, identical matching lists are safe, but differing lists require an explicit `--dispatch-rule`.
+Spawn and recovery resolve profiles and validate fallback retirement against their frozen model-index and dispatch pair, even when typed resolution is off.
+The rule identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
+Without the identifier, identical matching lists are safe, but differing lists require an explicit `--dispatch-rule`.
 OMP workers receive a later per-task configuration overlay with exact model-and-effort chains, preventing ambient chains from weakening the task.
+Those chains contain only the order-preserving eligible native prefix; the first supported cross-harness destination ends the prefix and leaves the transition to recovery.
 Native OMP account rotation precedes model fallback, and successful native model switches publish the serving selector.
 An idle terminal quota error after native rotation is handled by the existing bounded recovery scan through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
 Launch and successful replacement append the selected route to task status.
-No account pin, saved reset, or global reviewer configuration is changed.
+Account pins and saved resets are unchanged; reviewer model selection remains owned by no-mistakes, not these worker controls.
 
 
 **Fields applied only by typed resolution**

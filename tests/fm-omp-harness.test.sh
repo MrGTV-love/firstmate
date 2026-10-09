@@ -328,6 +328,68 @@ JSON
   pass "launch preserves healthy pooled accounts and uses only the selected rule's stand-in"
 }
 
+test_spawn_native_fallback_preserves_destination_order() {
+  local rec id out status ordering expected
+  for ordering in cross-first native-first restricted; do
+    id="omp-order-$ordering"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/config"
+    printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
+    fm_test_fake_teamclaude "$FAKEBIN_DIR"
+    jq -n --arg order "$ordering" '
+      {harness:"omp",model:"openrouter/z-ai/glm-5.3-flash",effort:"high"} as $native |
+      {harness:"claude",model:"claude-opus-5-5[1m]",effort:"high",requires:"teamclaude"} as $cross |
+      {harness:"omp",model:"ollama/qwen3:8b",effort:"high"} as $last |
+      {rules:[{when:"work",use:{harness:"omp",model:"openai-codex/gpt-6-luna",effort:"high"},
+        fallback:(if $order == "native-first" then [$native,$cross,$last] else [$cross,$native] end)}]}
+    ' > "$HOME_DIR/config/crew-dispatch.json"
+    if [ "$ordering" = restricted ]; then
+      printf 'omp-or-tc\n' > "$HOME_DIR/config/session-launch-policy"
+    fi
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
+    out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+    status=$?
+    expect_code 0 "$status" "ordered native fallback launch: $out"
+    expected='["openrouter/z-ai/glm-5.3-flash:high"]'
+    [ "$ordering" != cross-first ] || expected='[]'
+    assert_equals "$expected" "$(jq -c '.retry.fallbackChains["openai-codex/gpt-6-luna:high"]' "$HOME_DIR/state/$id.omp-fallback.yml")" \
+      "native fallback stops at the first supported cross-harness destination"
+    if [ "$ordering" = restricted ]; then
+      jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$CASE_DIR/usage.json" > "$CASE_DIR/exhausted.json"
+      fm_test_spawn_brief "$HOME_DIR" "$id-empty"
+      out=$(OMP_USAGE_FIXTURE="$CASE_DIR/exhausted.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id-empty" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+      status=$?
+      expect_code 0 "$status" "restricted exhaustion must select the allowed native destination: $out"
+      assert_grep 'harness=omp' "$HOME_DIR/state/$id-empty.meta" "fallback must not bypass launch policy"
+      assert_grep 'model=openrouter/z-ai/glm-5.3-flash' "$HOME_DIR/state/$id-empty.meta" "fallback uses the next policy-eligible destination"
+    fi
+  done
+  pass "native chains preserve fallback order and shared launch policy"
+}
+
+test_spawn_rejects_retired_fallbacks_before_publication() {
+  local rec id out status capacity
+  for capacity in usable exhausted; do
+    id="omp-retired-$capacity"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/config"
+    printf '%s\n' '{"version":1,"roles":{},"retired":["glm-5.3-flash"]}' > "$HOME_DIR/config/model-index.json"
+    printf '%s\n' '{"rules":[{"when":"work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+    jq -n --arg state "$capacity" --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:($state=="usable"),limitReached:($state=="exhausted")}}}}]}' > "$CASE_DIR/usage.json"
+    out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+    status=$?
+    expect_code 1 "$status" "a retired fallback must refuse for $capacity capacity: $out"
+    assert_absent "$HOME_DIR/state/$id.meta" "retired fallback refusal must precede task publication"
+    assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "retired fallback refusal must precede native chain emission"
+  done
+  pass "retired fallback refusal covers launch-time selection and runtime chains"
+}
+
+
 test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
   local rec id=omp-strongest-q3 out status
   rec=$(make_spawn_case strongest omp "$id")
@@ -2743,6 +2805,8 @@ test_spawn_launch_line_and_worker_wiring
 test_worker_replace_mode_environment
 test_worker_guard_project_scope
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
+test_spawn_native_fallback_preserves_destination_order
+test_spawn_rejects_retired_fallbacks_before_publication
 test_spawn_exhausted_strongest_route_preserves_unlanded_work
 test_spawn_model_validation_scoped_to_listed_providers
 test_spawn_refuses_a_missing_or_unlisted_default_role

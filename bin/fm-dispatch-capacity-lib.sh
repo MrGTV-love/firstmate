@@ -17,6 +17,7 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-timeout-lib.sh"
 # shellcheck source=bin/fm-quota-axi-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-quota-axi-lib.sh"
+. "$FM_DISPATCH_CAPACITY_DIR/fm-session-launch-policy-lib.sh"
 
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
@@ -94,11 +95,13 @@ fm_dispatch_capacity() {
 }
 
 fm_dispatch_fallbacks() {
-  local config=$1 rule=$2 harness=$3 model=$4 effort=$5 file result
+  local config=$1 rule=$2 harness=$3 model=$4 effort=$5 file resolved result
   file=${6:-"$config/crew-dispatch.json"}
   [ -f "$file" ] || { printf '%s\n' '{"rule":"","fallback":[]}'; return; }
+  resolved=$(FM_CONFIG_OVERRIDE="$config" "$FM_DISPATCH_CAPACITY_DIR/fm-model-index.sh" profiles "$file") || return 1
   result=$(jq -ce --arg rule "$rule" --arg h "$harness" --arg m "$model" --arg e "$effort" '
     def profiles: if type == "array" then . else [.] end;
+    def axis: if . == null or . == "default" then "" else . end;
     def valid_fallback:
       type == "array" and all(.[];
         type == "object" and (.harness == "omp" or .harness == "claude") and
@@ -111,21 +114,23 @@ fm_dispatch_fallbacks() {
     ([((.rules // []) | to_entries[] | {rule: ("rule_" + ((.key + 1) | tostring)), use: .value.use, fallback: (.value.fallback // [])})] +
      [{rule: "default", use: (.default // []), fallback: (.default_fallback // [])}]) as $rules |
     [$rules[] | select($rule == "" or .rule == $rule) |
-      select(any((.use | profiles)[]; .harness == $h and (.model // "") == $m and (.effort // "") == $e) or
-             any(.fallback[]; .harness == $h and .model == $m and .effort == $e))] as $matches |
+      select(any((.use | profiles)[]; .harness == $h and (.model | axis) == ($m | axis) and (.effort | axis) == ($e | axis)) or
+             any(.fallback[]; .harness == $h and (.model | axis) == ($m | axis) and (.effort | axis) == ($e | axis)))] as $matches |
     if ($matches | length) == 0 then
       if $rule != "" then error("dispatch rule does not contain the requested profile")
       else {rule: "", fallback: []} end
     elif ($matches | map(.fallback) | unique | length) > 1 then error("different fallback lists match this profile; pass --dispatch-rule")
     else {rule: (if ($matches | length) == 1 then $matches[0].rule else "" end), fallback: $matches[0].fallback} end
-  ' "$file" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$result" >&2; return 1; }
+  ' <<<"$resolved" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$result" >&2; return 1; }
   printf '%s\n' "$result"
 }
 
 fm_dispatch_fallback_supported() {
-  local config=$1 profile=$2 harness model catalog launcher
+  local config=$1 profile=$2 routing_config=${3:-$1} harness model catalog launcher
   harness=$(jq -r .harness <<<"$profile")
   model=$(jq -r .model <<<"$profile")
+  fm_session_launch_policy_check "$config" "$harness" 2>/dev/null || return 1
+  FM_CONFIG_OVERRIDE="$routing_config" "$FM_DISPATCH_CAPACITY_DIR/fm-model-index.sh" model "$harness" "$model" >/dev/null || return 1
   case "$harness" in
     omp)
       catalog=$(fm_run_timed 20 omp models --json 2>/dev/null </dev/null) || return 1
@@ -147,7 +152,7 @@ fm_dispatch_fallback_supported() {
 }
 
 fm_dispatch_select() {
-  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} candidate state
+  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} routing_config=${6:-$1} candidate state
   if [ -z "$evidence" ]; then
     evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")" "$config")
   fi
@@ -159,7 +164,7 @@ fm_dispatch_select() {
   fi
   while IFS= read -r candidate; do
     [ "$candidate" != "$profile" ] || continue
-    fm_dispatch_fallback_supported "$config" "$candidate" || continue
+    fm_dispatch_fallback_supported "$config" "$candidate" "$routing_config" || continue
     evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")" "$config")
     [ "$(jq -r .status <<<"$evidence")" != exhausted ] || continue
     jq -cn --argjson profile "$candidate" --argjson capacity "$evidence" --arg rule "$rule" \

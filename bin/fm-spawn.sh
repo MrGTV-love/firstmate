@@ -2860,7 +2860,7 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
-if [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+if { [ -n "$MODEL" ] && [ "$MODEL" != default ]; } || { [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; }; then
   SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || exit 1
   FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
     fm_config_inherit_pair_stage "$CONFIG" "$SPAWN_ROUTING_PAIR" || exit 1
@@ -2888,21 +2888,25 @@ fi
 # may replace a proven exhausted route; unknown OMP quota is never single-account
 # quota-axi exhaustion. Secondmate and raw launch identities remain unchanged.
 if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
-  dispatch_set=$(fm_dispatch_fallbacks "$CONFIG" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
+  dispatch_set=$(fm_dispatch_fallbacks "$SPAWN_ROUTING_PAIR" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
   DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
   DISPATCH_FALLBACK=$(jq -c .fallback <<<"$dispatch_set")
   if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
     dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "$MODEL" --arg e "$EFFORT" '{harness:$h, model:$m, effort:$e}')
-    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK") || exit 1
+    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$SPAWN_ROUTING_PAIR") || exit 1
     DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
     if [ "$DISPATCH_SWITCHED" = true ]; then
       HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
       MODEL=$(jq -r .profile.model <<<"$dispatch_result")
       EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
+      MODEL=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+      MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
+      if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
       LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
     fi
   fi
 fi
+fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 
 if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
   echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
@@ -5565,11 +5569,22 @@ EOF
     rm -f "$STATE/$ID.live-model"
     # Exact model and effort keys override ambient default or provider chains.
     # This per-task overlay travels to all local backends through --config.
-    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$DISPATCH_FALLBACK" '
+    native_fallback='[]'
+    while IFS= read -r candidate; do
+      fm_dispatch_fallback_supported "$CONFIG" "$candidate" "$SPAWN_ROUTING_PAIR" || continue
+      candidate_harness=$(jq -r .harness <<<"$candidate")
+      candidate_model=$(jq -r .model <<<"$candidate")
+      candidate_capacity=$(fm_dispatch_capacity "$candidate_harness" "$candidate_model" "$CONFIG")
+      [ "$(jq -r .status <<<"$candidate_capacity")" != exhausted ] || continue
+      [ "$candidate_harness" = omp ] || break
+      [ "$candidate_model" != "$MODEL" ] || continue
+      native_fallback=$(jq -cn --argjson prefix "$native_fallback" --argjson profile "$candidate" '$prefix + [$profile]') || exit 1
+    done < <(jq -c '.[]' <<<"$DISPATCH_FALLBACK")
+    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" '
       def effort_key($m; $e): if $e == "" then $m else $m + ":" + $e end;
-      ([$fallback[] | select(.harness == "omp" and .model != $model) | effort_key(.model; .effort)]) as $chain |
+      ([$fallback[] | effort_key(.model; .effort)]) as $chain |
       {retry: {modelFallback: ($model | contains("/")), fallbackChains:
-        (reduce ([{model:$model, effort:$effort}] + [$fallback[] | select(.harness == "omp")])[] as $p
+        (reduce ([{model:$model, effort:$effort}] + $fallback)[] as $p
           ({default: []}; if ($p.model | contains("/")) then
             .[$p.model] = [] | .[effort_key($p.model; $p.effort)] = [] else . end)
          | if ($model | contains("/")) then

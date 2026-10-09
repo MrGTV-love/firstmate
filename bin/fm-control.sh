@@ -1121,12 +1121,14 @@ resolve_relaunch_profile() {
   fi
   # A role reference, or a model the index has since retired, is resolved or
   # refused here, before the stop, exactly as the launch owner would.
-  if [ "$TARGET_MODEL" != default ]; then
+  if [ "$TARGET_MODEL" != default ] || [ "$KIND" != secondmate ]; then
     RELAUNCH_PAIR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-control-pair.XXXXXX") || return 1
     FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
       fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$RELAUNCH_PAIR_DIR" || return 1
-    TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
-      "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
+    if [ "$TARGET_MODEL" != default ]; then
+      TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
+        "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
+    fi
   fi
   if [ "$KIND" != secondmate ]; then
     local dispatch_set dispatch_profile dispatch_result config_dir
@@ -1135,7 +1137,7 @@ resolve_relaunch_profile() {
     if [ "$HARNESS_SET" = 1 ] || [ "$MODEL_SET" = 1 ] || [ "$EFFORT_SET" = 1 ]; then
       TARGET_DISPATCH_RULE=
     fi
-    dispatch_set=$(fm_dispatch_fallbacks "$config_dir" "$TARGET_DISPATCH_RULE" \
+    dispatch_set=$(fm_dispatch_fallbacks "$RELAUNCH_PAIR_DIR" "$TARGET_DISPATCH_RULE" \
       "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
     TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
     if [ "$TARGET_HARNESS" = omp ] && [[ "$TARGET_MODEL" == openai-codex/* ]] \
@@ -1143,7 +1145,7 @@ resolve_relaunch_profile() {
       dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
         --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
       dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
-        "$dispatch_profile" "$(jq -c .fallback <<<"$dispatch_set")") || return 1
+        "$dispatch_profile" "$(jq -c .fallback <<<"$dispatch_set")" "" "$RELAUNCH_PAIR_DIR") || return 1
       TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
       TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
       TARGET_MODEL=$(jq -r .profile.model <<<"$dispatch_result")
