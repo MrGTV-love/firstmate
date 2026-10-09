@@ -46,6 +46,7 @@ set -u
 HARNESS="$ROOT/bin/fm-harness.sh"
 TMP_ROOT=$(fm_test_tmproot fm-omp-harness)
 export NODE_NO_WARNINGS=1
+export PI_CODING_AGENT_DIR=
 
 # A process whose kernel-recorded identity is the bare name `omp`: a SYMLINK to
 # the system shell, never a copy (a copied platform binary fails macOS code
@@ -115,14 +116,6 @@ case "$1" in
   models)
     printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
     ;;
-  config)
-    # `omp config get modelRoles --json` prints the shared roles record; a
-    # roles.json beside this fake stands in for the captain's global config, and
-    # no such file models an unreadable config.
-    roles="$(dirname "$0")/roles.json"
-    [ -f "$roles" ] || exit 1
-    printf '{"key":"modelRoles","value":%s,"type":"record","description":""}\n' "$(cat "$roles")"
-    ;;
 esac
 exit 0
 SH
@@ -149,6 +142,8 @@ read_case_record() {
   IFS='|' read -r CASE_DIR HOME_DIR PROJ_DIR WT_DIR FAKEBIN_DIR LAUNCH_LOG <<EOF
 $1
 EOF
+  GLOBAL_CONFIG="$HOME_DIR/user-home/.omp/agent/config.yml"
+  mkdir -p "$(dirname "$GLOBAL_CONFIG")"
 }
 
 run_scout_spawn() {  # <home> <wt> <fakebin> <launch-log> <spawn-args...>
@@ -225,7 +220,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   rec=$(make_spawn_case role-missing omp omp-role-missing-q5)
   read_case_record "$rec"
   id=omp-role-missing-q5
-  printf '%s' '{"advisor":"openai-codex/gpt-6-astra:high"}' > "$FAKEBIN_DIR/roles.json"
+  printf 'modelRoles:\n  advisor: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
   expect_code 1 "$status" "an omp launch with no model and no default role must refuse: $out"
@@ -237,7 +232,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   rec=$(make_spawn_case role-unlisted omp omp-role-unlisted-q6)
   read_case_record "$rec"
   id=omp-role-unlisted-q6
-  printf '%s' '{"default":"openai-codex/gpt-gone:high"}' > "$FAKEBIN_DIR/roles.json"
+  printf 'modelRoles:\n  default: openai-codex/gpt-gone:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
   expect_code 1 "$status" "a default role naming an unlisted id must refuse: $out"
@@ -247,7 +242,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   rec=$(make_spawn_case role-listed omp omp-role-listed-q7)
   read_case_record "$rec"
   id=omp-role-listed-q7
-  printf '%s' '{"default":"openai-codex/gpt-6-astra:high"}' > "$FAKEBIN_DIR/roles.json"
+  printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
   expect_code 0 "$status" "a listed default role (thinking suffix included) must launch: $out"
@@ -255,7 +250,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   rec=$(make_spawn_case role-pinned omp omp-role-pinned-q8)
   read_case_record "$rec"
   id=omp-role-pinned-q8
-  printf '%s' '{}' > "$FAKEBIN_DIR/roles.json"
+  printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-astra)
   status=$?
   expect_code 0 "$status" "a launch that passes --model never reads the default role: $out"
@@ -263,7 +258,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   rec=$(make_spawn_case role-bridge omp omp-role-bridge-q10)
   read_case_record "$rec"
   id=omp-role-bridge-q10
-  printf '%s' '{"default":"claude-bridge/claude-opus-4-8:high"}' > "$FAKEBIN_DIR/roles.json"
+  printf 'modelRoles:\n  default: claude-bridge/claude-opus-4-8:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
   expect_code 0 "$status" "an unknown default-role provider must pass through: $out"
@@ -280,6 +275,65 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   pass "fm-spawn: an omp launch with no model refuses a missing or unlisted default role and names the remedy"
 }
 
+test_spawn_global_config_is_read_only_and_unlayered() {
+  local rec id out status agent_dir
+  id=omp-role-project-q11
+  rec=$(make_spawn_case role-project omp "$id")
+  read_case_record "$rec"
+  printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
+  mkdir -p "$PROJ_DIR/.omp"
+  printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$PROJ_DIR/.omp/config.yml"
+  out=$(cd "$PROJ_DIR" && run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  status=$?
+  expect_code 1 "$status" "a project-layer default must not mask a missing global default: $out"
+  assert_contains "$out" "omp modelRoles.default is not set in the shared omp config" "project-layer refusal did not identify the missing global role"
+  assert_contains "$out" "pass --model <provider>/<id> (or a dispatch profile) so this launch stops depending on the shared default, or restore the Default role in omp with /model" "project-layer refusal lost the exact remedy"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused project-layer spawn must publish no record"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused project-layer spawn must record no launch"
+
+  id=omp-role-malformed-q12
+  rec=$(make_spawn_case role-malformed omp "$id")
+  read_case_record "$rec"
+  printf 'modelRoles:\n  default: [unterminated\n' > "$GLOBAL_CONFIG"
+  cp "$GLOBAL_CONFIG" "$CASE_DIR/original-config.yml"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  status=$?
+  expect_code 0 "$status" "a malformed global config establishes nothing and must pass through: $out"
+  cmp -s "$CASE_DIR/original-config.yml" "$GLOBAL_CONFIG" || fail "the malformed global config must remain byte-identical"
+  for out in "$GLOBAL_CONFIG".broken-*; do
+    assert_absent "$out" "the global config must not be quarantined"
+  done
+  assert_present "$HOME_DIR/state/$id.meta" "malformed-config pass-through must publish the task"
+  assert_contains "$(cat "$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "malformed-config pass-through must reach the launch"
+
+  id=omp-role-agent-dir-q13
+  rec=$(make_spawn_case role-agent-dir omp "$id")
+  read_case_record "$rec"
+  printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
+  agent_dir="$CASE_DIR/custom-agent"
+  mkdir -p "$agent_dir"
+  printf 'modelRoles:\n  default: ollama/qwen3:8b:max\n' > "$agent_dir/config.yml"
+  out=$(PI_CODING_AGENT_DIR="$agent_dir" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  status=$?
+  expect_code 0 "$status" "the selected agent dir must supply the global default, preserving model-id colons: $out"
+  assert_present "$HOME_DIR/state/$id.meta" "a listed agent-dir default must publish the task"
+
+  id=omp-role-agent-dir-missing-q14
+  rec=$(make_spawn_case role-agent-dir-missing omp "$id")
+  read_case_record "$rec"
+  printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
+  agent_dir="$CASE_DIR/custom-agent"
+  mkdir -p "$agent_dir"
+  printf '{}\n' > "$agent_dir/config.yml"
+  out=$(PI_CODING_AGENT_DIR="$agent_dir" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  status=$?
+  expect_code 1 "$status" "the HOME default must not mask a missing default in the selected agent dir: $out"
+  assert_contains "$out" "omp modelRoles.default is not set" "agent-dir refusal did not identify the missing role"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused agent-dir spawn must publish no record"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused agent-dir spawn must record no launch"
+  pass "fm-spawn: global role inspection is read-only, unlayered, and honors PI_CODING_AGENT_DIR"
+}
+
 test_spawn_raw_omp_guard_uses_the_launch_model() {
   local rec id out status command expected index=0
   local model_args=()
@@ -288,7 +342,7 @@ test_spawn_raw_omp_guard_uses_the_launch_model() {
     id="omp-raw-role-$index"
     rec=$(make_spawn_case "raw-role-$index" omp "$id")
     read_case_record "$rec"
-    printf '%s' '{}' > "$FAKEBIN_DIR/roles.json"
+    printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
     model_args=()
     case "$command" in
       *'__MODELFLAG__'* | 'omp --auto-approve') model_args=(--model openai-codex/gpt-6-astra) ;;
@@ -326,6 +380,8 @@ test_secondmate_launch_relies_on_discovery() {
   world="$TMP_ROOT/secondmate"
   home="$world/sm"
   mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
+  mkdir -p "$world/user-home/.omp/agent"
+  printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$world/user-home/.omp/agent/config.yml"
   printf '# Firstmate\n' > "$home/AGENTS.md"
   printf 'sm\n' > "$home/.fm-secondmate-home"
   printf 'charter\n' > "$home/data/charter.md"
@@ -338,7 +394,7 @@ test_secondmate_launch_relies_on_discovery() {
   # FM_BACKEND=tmux pins the fake tmux even where the developer shell carries a
   # live Herdr environment; without it auto-detection would spawn a real pane.
   out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" \
+    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" HOME="$world/user-home" \
     FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
     FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
@@ -367,6 +423,7 @@ test_secondmate_config_pinned_model_is_validated() {
   world="$TMP_ROOT/secondmate-config-model"
   home="$world/sm"
   mkdir -p "$world/home/state" "$world/home/data" "$world/home/config" "$home/bin" "$home/data"
+  mkdir -p "$world/user-home"
   printf '# Firstmate\n' > "$home/AGENTS.md"
   printf 'sm\n' > "$home/.fm-secondmate-home"
   printf 'charter\n' > "$home/data/charter.md"
@@ -378,7 +435,7 @@ test_secondmate_config_pinned_model_is_validated() {
   launchlog="$world/launch.log"
   : > "$launchlog"
   out=$(PATH="$fakebin:$PATH" TMUX='fake,1,0' FM_BACKEND=tmux CLAUDECODE=1 \
-    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" \
+    FM_ROOT_OVERRIDE='' FM_HOME="$world/home" HOME="$world/user-home" \
     FM_STATE_OVERRIDE="$world/home/state" FM_DATA_OVERRIDE="$world/home/data" \
     FM_PROJECTS_OVERRIDE="$world/home/projects" FM_CONFIG_OVERRIDE="$world/home/config" \
     FM_SPAWN_NO_GUARD=1 FM_FAKE_LAUNCH_LOG="$launchlog" \
@@ -1483,6 +1540,7 @@ test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_spawn_model_validation_scoped_to_listed_providers
 test_spawn_refuses_a_missing_or_unlisted_default_role
+test_spawn_global_config_is_read_only_and_unlayered
 test_spawn_raw_omp_guard_uses_the_launch_model
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated

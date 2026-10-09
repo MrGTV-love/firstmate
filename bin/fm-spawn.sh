@@ -274,9 +274,9 @@
 #   own matcher. An omp launch that resolves no model reads the shared
 #   modelRoles.default, which any interactive omp session can clear and which
 #   omp replaces with the first credentialed model when it is missing or
-#   unlisted; that launch is refused with the remedy when `omp config get
-#   modelRoles --json` shows the role unset or `omp models --json` shows it
-#   unlisted, and an unreadable config or listing establishes nothing. Indexed
+#   unlisted; that launch is refused with the remedy when the global config
+#   shows the role unset or `omp models --json` shows it unlisted, and an
+#   unreadable config or listing establishes nothing. Indexed
 #   selections follow docs/configuration.md "Fleet model
 #   index". A crewmate or scout loads its per-task busy-state extension with -e
 #   from state/ (outside the worktree, so
@@ -2274,7 +2274,7 @@ omp_catalog_verdict() { # <omp-bin> <provider/id>
 # know or a bare pattern is omp's own matcher's job (same scope as
 # omp_model_validate).
 omp_default_role_validate() {
-  local bin=$1 model=$2 raw=${3:-} roles role selector verdict remedy model_flag dependency
+  local bin=$1 model=$2 raw=${3:-} role selector verdict remedy model_flag dependency
   if [ -n "$raw" ]; then
     model_flag=$(model_flag_for_harness omp "$model")
     raw=${raw//__MODELFLAG__/$model_flag}
@@ -2311,10 +2311,17 @@ JS
   else
     { [ -z "$model" ] || [ "$model" = default ]; } || return 0
   fi
-  command -v jq >/dev/null 2>&1 || return 0
-  roles=$(OMP_SKIP_SETUP=1 "$bin" config get modelRoles --json 2>/dev/null) || return 0
-  printf '%s' "$roles" | jq -e '.value | type == "object"' >/dev/null 2>&1 || return 0
-  role=$(printf '%s' "$roles" | jq -r '.value.default // empty' 2>/dev/null) || return 0
+  role=$(ruby -ryaml -e '
+config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
+config = {} if config.nil?
+exit 1 unless config.is_a?(Hash)
+roles = config["modelRoles"]
+roles = {} if roles.nil?
+exit 1 unless roles.is_a?(Hash)
+role = roles["default"]
+exit 1 unless role.nil? || role.is_a?(String)
+print role.to_s
+' "${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/config.yml" 2>/dev/null) || return 0
   remedy="pass --model <provider>/<id> (or a dispatch profile) so this launch stops depending on the shared default, or restore the Default role in omp with /model"
   if [ -z "$role" ]; then
     echo "error: omp modelRoles.default is not set in the shared omp config, so an omp launch with no --model would silently run on the first model with credentials (a free-tier model that answers HTTP 429); $remedy" >&2
