@@ -101,7 +101,7 @@ fm_nm_state_db() {  # <worktree>
   printf '%s/state.sqlite\n' "$root"
 }
 
-# Scalar value of a TOON key in captured `axi status` output $1: the text after
+# Scalar value of a TOON key in captured `axi status` output $2: the text after
 # the key on the FIRST line that starts with it, indentation allowed. Returns 1
 # and assigns nothing when no line carries the key, so the printing form can
 # tell an absent key (no output) from an empty value (one empty line).
@@ -347,7 +347,7 @@ PY
   esac
 }
 
-# branch_sync.state from captured `axi status` TOON $1: the scalar directly
+# branch_sync.state from captured `axi status` TOON $2: the scalar directly
 # under the top-level `branch_sync:` block. The first `state:` inside the
 # block is the direct child (the nested local/pipeline/target/remote
 # sub-blocks carry no `state:` key). Empty when the block is absent: no run
