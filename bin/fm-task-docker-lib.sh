@@ -64,6 +64,8 @@
 # After container removal, any surviving owned container refuses cleanup and
 # prints the removal's own error; a failed removal with no survivor is not a failure.
 # A failed network or volume removal prints Docker's own error with its warning.
+# A failed container, network, or volume listing names itself and prints Docker's
+# own error.
 # A final container listing also rejects arrivals during network or volume cleanup.
 # Portable regression coverage: tests/fm-teardown.test.sh; real Docker CLI guard:
 # tests/fm-task-docker-live-e2e.test.sh.
@@ -82,6 +84,17 @@ fm_task_docker_run() {
   local secs=${FM_TASK_DOCKER_TIMEOUT_SECS:-120}
   case "$secs" in ''|*[!0-9]*|0) secs=120 ;; esac
   fm_run_timed "$secs" docker "$@"
+}
+
+# Print a Docker listing; a failure names the listing and prints Docker's own error.
+fm_task_docker_list() {  # <what> <docker-arg>...
+  local what=$1 err rc=0
+  shift
+  { err=$(fm_task_docker_run "$@" 2>&1 >&3); } 3>&1 || rc=$?
+  [ "$rc" -ne 0 ] || return 0
+  echo "warning: Docker $what listing failed" >&2
+  [ -z "$err" ] || printf '%s\n' "$err" >&2
+  return 1
 }
 
 # True when <value> names task <id>: the id itself, or the id then - or _ and
@@ -174,9 +187,9 @@ fm_task_docker_claim() {  # <id> <siblings> <ambiguous> <protected> <label> <nam
 fm_task_docker_containers() {
   local id=$1 siblings=$2 ambiguous=$3 protected=$4 sep=$_FM_TASK_DOCKER_SEP out cid names label project supabase workdir why
   shift 4
-  out=$(fm_task_docker_run ps -a --no-trunc --format \
-    "{{.ID}}${sep}{{.Names}}${sep}{{.Label \"$FM_TASK_DOCKER_MARKER_LABEL\"}}${sep}{{.Label \"com.docker.compose.project\"}}${sep}{{.Label \"com.supabase.cli.project\"}}${sep}{{.Label \"com.docker.compose.project.working_dir\"}}" \
-    2>/dev/null) || return 2
+  out=$(fm_task_docker_list container ps -a --no-trunc --format \
+    "{{.ID}}${sep}{{.Names}}${sep}{{.Label \"$FM_TASK_DOCKER_MARKER_LABEL\"}}${sep}{{.Label \"com.docker.compose.project\"}}${sep}{{.Label \"com.supabase.cli.project\"}}${sep}{{.Label \"com.docker.compose.project.working_dir\"}}") \
+    || return 2
   while IFS="$sep" read -r cid names label project supabase workdir; do
     [ -n "$cid" ] || continue
     why=$(fm_task_docker_claim "$id" "$siblings" "$ambiguous" "$protected" "$label" "$names" "$project" "$supabase" "$workdir" "$@") || why=
@@ -288,9 +301,9 @@ EOF
 
 fm_task_docker_remove_networks() {
   local id=$1 ambiguous=$2 protected=$3 projects=$4 foreign_projects=$5 sep=$_FM_TASK_DOCKER_SEP out nid nname label proj supabase claim rm_err
-  out=$(fm_task_docker_run network ls --no-trunc --format \
-    "{{.ID}}${sep}{{.Name}}${sep}{{.Label \"$FM_TASK_DOCKER_MARKER_LABEL\"}}${sep}{{.Label \"com.docker.compose.project\"}}${sep}{{.Label \"com.supabase.cli.project\"}}" \
-    2>/dev/null) || return 1
+  out=$(fm_task_docker_list network network ls --no-trunc --format \
+    "{{.ID}}${sep}{{.Name}}${sep}{{.Label \"$FM_TASK_DOCKER_MARKER_LABEL\"}}${sep}{{.Label \"com.docker.compose.project\"}}${sep}{{.Label \"com.supabase.cli.project\"}}") \
+    || return 1
   while IFS="$sep" read -r nid nname label proj supabase; do
     [ -n "$nid" ] || continue
     claim=0
@@ -335,9 +348,9 @@ EOF
 fm_task_docker_remove_volumes() {  # <id> <ambiguous> <protected> <foreign-projects>
   local id=$1 ambiguous=$2 protected=$3 foreign_projects=$4 sep=$_FM_TASK_DOCKER_SEP out vol label proj supabase rm_err
   [ "$ambiguous" != 1 ] || return 0
-  out=$(fm_task_docker_run volume ls --format \
-    "{{.Name}}${sep}{{.Label \"$FM_TASK_DOCKER_MARKER_LABEL\"}}${sep}{{.Label \"com.docker.compose.project\"}}${sep}{{.Label \"com.supabase.cli.project\"}}" \
-    2>/dev/null) || return 1
+  out=$(fm_task_docker_list volume volume ls --format \
+    "{{.Name}}${sep}{{.Label \"$FM_TASK_DOCKER_MARKER_LABEL\"}}${sep}{{.Label \"com.docker.compose.project\"}}${sep}{{.Label \"com.supabase.cli.project\"}}") \
+    || return 1
   while IFS="$sep" read -r vol label proj supabase; do
     [ -n "$vol" ] || continue
     if [ "$label" != "$id" ]; then

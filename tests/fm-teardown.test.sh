@@ -6222,6 +6222,10 @@ test_stopped_docker_daemon_blocks_teardown() {
           run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
       fi
       assert_equals "$before" "$(cat "$store")" "daemon-down $path $retained: Docker state changed"
+      assert_grep "warning: Docker container listing failed" "$case_dir/stderr" \
+        "daemon-down $path $retained: the failed container listing was not named"
+      assert_grep "Cannot connect to the Docker daemon" "$case_dir/stderr" \
+        "daemon-down $path $retained: Docker's own listing error was hidden"
       if [ "$retained" = yes ]; then
         expect_code 1 "$rc" "daemon-down $path: a record with docker_projects must stop teardown"
         assert_present "$meta" "daemon-down $path: task identity was retired"
@@ -6639,6 +6643,18 @@ EOF
     assert_grep 'docker_projects= derived derived-supa' "$case_dir/state/task-x1.meta" \
       "$channel: retained task record lost its derived project identities"
     case "$channel" in
+      verify-ps|final-ps)
+        assert_grep "warning: Docker container listing failed" "$case_dir/stderr" \
+          "$channel: the failed container listing was not named"
+        assert_grep "fake docker: ps failed" "$case_dir/stderr" \
+          "$channel: Docker's own container listing error was hidden"
+        ;;
+      network-ls|volume-ls)
+        assert_grep "warning: Docker ${channel%-ls} listing failed" "$case_dir/stderr" \
+          "$channel: the failed listing was not named"
+        assert_grep "fake docker: $channel failed" "$case_dir/stderr" \
+          "$channel: Docker's own listing error was hidden"
+        ;;
       network-rm)
         assert_grep "Error: cannot remove network owned-network" "$case_dir/stderr" \
           "$channel: Docker's own network removal error was hidden"
