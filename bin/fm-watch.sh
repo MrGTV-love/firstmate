@@ -3222,6 +3222,10 @@ signal_phase() {
   # hook land seconds apart, and reporting them as separate actionable wakes
   # costs a full firstmate turn each. The re-scan also picks up a newer
   # signature for an already-pending file (last write wins below).
+  # The linger never runs while this watcher holds the wake-queue lock: every
+  # queue writer and drain would wait out the grace, so that flush only
+  # re-scans the race window (procevent_surface_queued flushes before locking;
+  # test_procevent_wake_never_lingers_under_the_queue_lock).
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
     [ "$signal_append" = fm_wake_append_locked ] || sleep "$SIGNAL_GRACE"
