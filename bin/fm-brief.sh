@@ -610,8 +610,13 @@ fi
 IFS= read -r -d '' DOCKER_MARKER_RULE <<'EOF' || true
 8. Mark every Docker object you start with your task id, so teardown removes it with your task:
    pass `--label fm.task=$FM_TASK_ID` to `docker run`, `docker create`, `docker network create`, and
-   `docker volume create`; start compose stacks with `docker compose -p $FM_TASK_ID` (or a project name
-   starting `$FM_TASK_ID-`); give a Supabase CLI stack `--project-id $FM_TASK_ID`.
+   `docker volume create`. In Compose, add `fm.task: ${FM_TASK_ID}` to every service's labels and to
+   the labels of every declared network and volume. Use `docker compose -p "$FM_TASK_ID"` only when
+   the exact task id is a valid Compose project name: lowercase letters, digits, hyphens and
+   underscores, starting with a lowercase letter or digit. Do not substitute a task-id prefix.
+   For Supabase, use an isolated task-local `supabase/config.toml` with `project_id` set to the exact
+   task id, then run `supabase start` from that task-local project. Never edit or start the shared
+   project's Supabase configuration; configure the project id in the file, not a command-line flag.
    An unmarked container cannot be attributed to you and outlives your task. Remove what you finish
    with as you go; teardown only catches what is left, and never touches another task's stacks.
 EOF

@@ -1484,8 +1484,20 @@ test_crewmate_scaffolds_teach_the_docker_task_marker() {
     # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
     assert_grep '--label fm.task=$FM_TASK_ID' "$brief" "$mode ship brief did not teach the Docker task label"
     # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
-    assert_grep 'docker compose -p $FM_TASK_ID' "$brief" "$mode ship brief did not teach the compose project name"
-    assert_grep "--project-id" "$brief" "$mode ship brief did not teach the Supabase project id"
+    assert_grep 'docker compose -p "$FM_TASK_ID"' "$brief" "$mode ship brief did not teach the exact compose project name"
+    # shellcheck disable=SC2016
+    assert_grep 'fm.task: ${FM_TASK_ID}' "$brief" "$mode ship brief did not teach Compose object labels"
+    assert_grep "every declared network and volume" "$brief" "$mode ship brief omitted Compose resource labels"
+    assert_grep "valid Compose project name" "$brief" "$mode ship brief omitted the Compose naming constraint"
+    assert_grep "starting with a lowercase letter or digit" "$brief" "$mode ship brief omitted the Compose initial-character constraint"
+    assert_grep "isolated task-local" "$brief" "$mode ship brief did not isolate Supabase configuration"
+    assert_grep 'supabase/config.toml' "$brief" "$mode ship brief did not name the Supabase config"
+    assert_grep 'project_id' "$brief" "$mode ship brief did not teach Supabase project configuration"
+    assert_grep 'supabase start' "$brief" "$mode ship brief did not teach the supported Supabase command"
+    assert_grep "Never edit or start the shared" "$brief" "$mode ship brief did not protect shared Supabase"
+    assert_no_grep "--project-id" "$brief" "$mode ship brief emitted an unsupported Supabase option"
+    # shellcheck disable=SC2016
+    assert_no_grep 'starting `$FM_TASK_ID-' "$brief" "$mode ship brief permitted prefixed Compose projects"
   done
 
   FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-docker-scout alpha --scout >/dev/null 2>&1 \
@@ -1493,6 +1505,19 @@ test_crewmate_scaffolds_teach_the_docker_task_marker() {
   brief="$home/data/brief-docker-scout/brief.md"
   # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
   assert_grep '--label fm.task=$FM_TASK_ID' "$brief" "scout brief did not teach the Docker task label"
+  # shellcheck disable=SC2016
+  assert_grep 'fm.task: ${FM_TASK_ID}' "$brief" "scout brief did not teach Compose object labels"
+  # shellcheck disable=SC2016
+  assert_grep 'docker compose -p "$FM_TASK_ID"' "$brief" "scout brief did not teach the exact compose project name"
+  assert_grep "every declared network and volume" "$brief" "scout brief omitted Compose resource labels"
+  assert_grep "valid Compose project name" "$brief" "scout brief omitted the Compose naming constraint"
+  assert_grep "starting with a lowercase letter or digit" "$brief" "scout brief omitted the Compose initial-character constraint"
+  assert_grep "isolated task-local" "$brief" "scout brief did not isolate Supabase configuration"
+  assert_grep 'supabase/config.toml' "$brief" "scout brief did not name the Supabase config"
+  assert_grep 'project_id' "$brief" "scout brief did not teach Supabase project configuration"
+  assert_grep 'supabase start' "$brief" "scout brief did not teach the supported Supabase command"
+  assert_grep "Never edit or start the shared" "$brief" "scout brief did not protect shared Supabase"
+  assert_no_grep "--project-id" "$brief" "scout brief emitted an unsupported Supabase option"
 
   FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
     FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-docker-mate --secondmate alpha >/dev/null 2>&1 \

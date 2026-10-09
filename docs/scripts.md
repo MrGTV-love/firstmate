@@ -178,3 +178,53 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-voice-client.py`     | The laptop end of the spoken interface: capture, playback, and turn timing over SSH; audio devices unverified |
 | `fm_voice_frame.py`      | The wire format both machines share, copied to the laptop beside the client          |
 | `fm_voice_records.py`    | What a spoken answer may read, and the handover that queues real work                |
+
+## Task-owned Docker teardown
+
+`fm-task-docker-lib.sh` owns Docker attribution and removal. An unambiguous
+`fm.task=<task-id>` label is authoritative on containers, networks and volumes.
+Without that marker, container names must be the exact task id or begin with the
+id followed by `-` or `_`; the longest matching **live** sibling task wins.
+Compose and Supabase project-label heuristics require the exact task id, not a
+prefixed project name. The actual primary project's `supabase/config.toml`
+`project_id` vetoes every heuristic on an object carrying that protected identity
+in either project label, including name and working-directory matches.
+Explicit task markers remain authoritative.
+
+Compose working directories are canonicalized against the task's worktree roots,
+never its temporary directory. Nested registered Git lanes and linked worktrees
+are excluded, including paths reached through symlinks. A heuristic network claim
+is vetoed if any container carrying either corresponding project label is foreign,
+even when that container has no endpoint on the network. Compose project ownership
+can propagate from owned containers only when every carrier is owned; Supabase
+networks require their own marker or exact task-id project label. An explicit
+network marker does not depend on heuristic project ownership. Named volumes
+require the task marker.
+
+Teardown completes only after Docker listing, container removal and post-removal
+listing, network removal, and volume removal succeed. Any listing or removal
+failure retains task identity records and prevents destructive worktree retirement;
+`--force` does not waive Docker cleanup. Forced secondmate and Orca cleanup applies
+each child's own metadata before retiring the child, including recursive
+secondmate descendants. A retry can complete after the failure is resolved.
+Docker absent is a silent skip; Docker installed but unreachable is a refusal.
+`FM_TASK_DOCKER_TIMEOUT_SECS` continues to bound each Docker call.
+Path attribution requires `python3`; reading a present shared Supabase config
+requires its standard-library `tomllib` parser.
+
+Ship and scout workers must label `docker run`, `docker create`, `docker network
+create`, and `docker volume create` with `--label fm.task=$FM_TASK_ID`. Compose
+services and every declared network and volume need `fm.task: ${FM_TASK_ID}`
+labels. Use `docker compose -p "$FM_TASK_ID"` only if the exact id is a valid
+Compose project name (lowercase letters, digits, `-` and `_`, beginning with a
+lowercase letter or digit). For Supabase, set `project_id` to the exact task id in
+an isolated task-local `supabase/config.toml`, then run `supabase start` there;
+never alter or start the primary project's shared configuration.
+
+Prefix-name protection uses live task records only. Once a longer sibling's
+record has been retired, an unlabelled container matching both ids can be
+attributed to the remaining shorter id. No historical sibling identities are
+persisted. Workers must use explicit markers rather than relying on historical
+prefix protection.
+Failed cleanup keeps the longer sibling's record, preserving its prefix guard
+until its Docker objects have been removed.

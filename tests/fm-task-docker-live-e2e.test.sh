@@ -75,7 +75,7 @@ volume_exists() { docker volume ls -q | grep -Fxq "$1"; }
 
 test_real_docker_removes_only_the_tasks_own_objects() {
   local wt="$TMP_ROOT/wt" elsewhere="$TMP_ROOT/elsewhere" rc=0
-  mkdir -p "$wt" "$elsewhere"
+  mkdir -p "$wt/stack" "$elsewhere/stack"
 
   # The task's own: marker label, name, compose project, compose working dir.
   create_container "$TASK-pg"
@@ -166,7 +166,7 @@ test_real_docker_never_claims_the_projects_own_shared_stack() {
   exists "$RUN-shared-db" || fail "real docker protected: the project's shared stack container was removed"
   network_exists "$RUN-shared-net" || fail "real docker protected: the project's shared stack network was removed"
   ! exists "$RUN-shared-path" || fail "real docker protected: the worktree compose container survived"
-  pass "real Docker: a stack named for the project is never claimed by name or project, only by marker label or worktree"
+  pass "real Docker: protected project identity vetoes every heuristic while an isolated worktree stack is removed"
 }
 
 test_real_docker_removes_only_the_tasks_own_objects
