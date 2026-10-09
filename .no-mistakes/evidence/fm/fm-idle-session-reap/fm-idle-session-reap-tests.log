@@ -1,0 +1,17 @@
+ok - scan selects exactly the finished, idle, landed tasks and reports parked ones with their reason
+ok - reap hands only reap-ready tasks to teardown, by id, without --force, and publishes parked reasons
+ok - the fixed three-task budget bounds each pass
+ok - a teardown refusal is remembered, retried on a status change or after the retry interval, and cleared on success
+ok - the real fm-teardown.sh refuses without touching the task, and the sweep records why
+ok - a lease refusal is skipped without a memo and retried next pass
+ok - both terminal timestamps must be known and the grace remains fixed
+ok - canonical merge identities work across all supported forges
+ok - the sweep uses semantic harness classification and source trust
+ok - durable and unreadable captain holds prevent automatic cleanup
+ok - locked automatic admission rejects eligibility made stale by an earlier teardown
+ok - automatic admission observes inbox delivery before the metadata lock is released
+ok - automatic admission rechecks all selection gates for ships and scouts
+ok - the fixed teardown timeout cuts a hung command and records its refusal
+ok - overlapping sweeps are single-flight
+ok - refusal memos for retired tasks are pruned
+ok - unknown subcommands exit 2

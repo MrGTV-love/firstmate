@@ -1,0 +1,40 @@
+{
+  "removed_worktree_fixture": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation",
+  "observations": [
+    {
+      "owned_test": "fm-idle-session-reap",
+      "exit": 0
+    },
+    {
+      "owned_test": "fm-watch-idle-reap",
+      "exit": 0
+    },
+    {
+      "owned_watcher_pid": 73224,
+      "exit": 0
+    },
+    {
+      "owned_watcher_pid": 87554,
+      "exit": 0
+    },
+    {
+      "owned_watcher_pid": 10395,
+      "exit": -15
+    },
+    {
+      "owned_watcher_pid": 83609,
+      "exit": -15
+    },
+    {
+      "owned_sweep_pid": 91991,
+      "exit": 0
+    },
+    {
+      "owned_lock_holder_pid": 91617,
+      "exit": 0
+    }
+  ],
+  "source_changes": false,
+  "lifecycle_lab_created": false,
+  "interrupted_collection_children": []
+}

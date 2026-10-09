@@ -1,0 +1,6 @@
+ok - the poll loop starts the sweep detached, on its interval, for this home, without a wake
+ok - a fresh watcher leaves session start alone: the first sweep waits one full interval
+ok - FM_IDLE_REAP_INTERVAL=0 turns the sweep off
+ok - a failing sweep is retried quietly and never stops the poll
+ok - a sweep still running is never started twice, and the poll keeps running
+ok - actionable watcher handoffs preserve the initial and subsequent sweep deadlines, including disabled and repeated ticks

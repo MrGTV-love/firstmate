@@ -1,0 +1,80 @@
+{
+  "command": "bin/fm-watch.sh",
+  "environment": {
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-round2/watch-home",
+    "FM_POLL": "1",
+    "FM_SIGNAL_GRACE": "1",
+    "FM_IDLE_REAP_INTERVAL": "15",
+    "FM_CHECK_INTERVAL": "99999999",
+    "FM_HEARTBEAT": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_SECONDMATE_LIVENESS_SECS": "99999999",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1"
+  },
+  "observations": [
+    {
+      "event": "start",
+      "label": "first",
+      "pid": 85651,
+      "epoch": 1791527265.347497,
+      "interval": "15"
+    },
+    {
+      "event": "full-initial-interval",
+      "epoch": 1791527268.517605,
+      "deadline": 1791527283,
+      "report_exists": false
+    },
+    {
+      "event": "actionable-handoff",
+      "exit": 0,
+      "epoch": 1791527273.403998,
+      "deadline_retained": 1791527283
+    },
+    {
+      "event": "start",
+      "label": "successor",
+      "pid": 8461,
+      "epoch": 1791527273.412131,
+      "interval": "15"
+    },
+    {
+      "event": "fixture-correction",
+      "reason": "Added the required empty markdown backlog and removed the degraded ledger. Successor had correctly surfaced missing backlog; no product change."
+    },
+    {
+      "event": "start",
+      "label": "successor-corrected",
+      "pid": 16378,
+      "epoch": 1791527421.064368,
+      "interval": "15"
+    },
+    {
+      "event": "successor-real-reap",
+      "epoch": 1791527422.827086,
+      "original_deadline": 1791527283,
+      "report": "# fm-idle-session-reap 1791527422\n",
+      "watcher_alive": true
+    },
+    {
+      "event": "repeated-detached-real-reap",
+      "epoch": 1791527439.4570282,
+      "report": "# fm-idle-session-reap 1791527439\n",
+      "watcher_alive": true
+    },
+    {
+      "event": "start",
+      "label": "disabled",
+      "pid": 65235,
+      "epoch": 1791527439.7184,
+      "interval": "0"
+    },
+    {
+      "event": "interval-zero-disabled",
+      "epoch": 1791527461.8352551,
+      "report_unchanged": true,
+      "watcher_alive": true
+    }
+  ]
+}

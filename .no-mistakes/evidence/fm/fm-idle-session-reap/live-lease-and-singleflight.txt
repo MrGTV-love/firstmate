@@ -1,0 +1,35 @@
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+parked	parked	scout	-	paused: awaiting captain review
+refused	ready-1	scout	8149	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-3	scout	8149	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-4	scout	8149	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-5	scout	8150	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+teardown-refused	ready-2	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/lease-home/state leased --state idle --source claude-hook --event Stop
+exit=0
+g1791521499.13911.10665
+
+$ bin/fm-lease.sh claim leased
+exit=0
+
+$ bin/fm-lease.sh check leased
+exit=0
+branch 31994 1791521499 live
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+lease-skipped	leased	-	-	another supervision actor holds the task lease
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+lease-skipped	leased	-	-	another supervision actor holds the task lease
+
+$ bin/fm-lease.sh release leased
+exit=0
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+
+OBSERVATION: while a real sweep was blocked on the held lease-command lock, a second real sweep exited 0 without output or report mutation; first sweep remained running.

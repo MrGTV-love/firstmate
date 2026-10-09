@@ -1,0 +1,191 @@
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state scout-ready --state idle --source claude-hook --event Stop
+exit=0
+g1791520549.19502.21494
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state scout-fresh-status --state idle --source claude-hook --event Stop
+exit=0
+g1791520550.24299.22639
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state scout-fresh-report --state idle --source claude-hook --event Stop
+exit=0
+g1791520550.26026.4410
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state scout-unstamped --state idle --source claude-hook --event Stop
+exit=0
+g1791520553.28062.28712
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state scout-noreport --state idle --source claude-hook --event Stop
+exit=0
+g1791520555.36494.10546
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state busy --state busy --source claude-hook --event Stop
+exit=0
+g1791520555.38598.205
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state unknown --state unknown --source claude-hook --event Stop
+exit=0
+g1791520556.40068.29513
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state foreign-hook --state idle --source claude-hook --event Stop
+exit=0
+g1791520557.40986.20583
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state steered --state idle --source claude-hook --event Stop
+exit=0
+g1791520560.46299.10843
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state paused --state idle --source claude-hook --event Stop
+exit=0
+g1791520561.53844.15237
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state blocked --state idle --source claude-hook --event Stop
+exit=0
+g1791520566.59248.30456
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state decision --state idle --source claude-hook --event Stop
+exit=0
+g1791520572.74385.12353
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state open-decision --state idle --source claude-hook --event Stop
+exit=0
+g1791520576.85367.22626
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state secondmate --state idle --source claude-hook --event Stop
+exit=0
+g1791520580.96290.6550
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state remote --state idle --source claude-hook --event Stop
+exit=0
+g1791520584.6556.20963
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state ship-ready --state idle --source claude-hook --event Stop
+exit=0
+g1791520586.15260.28064
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state ship-unmerged --state idle --source claude-hook --event Stop
+exit=0
+g1791520588.21587.3401
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state ship-nopr --state idle --source claude-hook --event Stop
+exit=0
+g1791520588.24125.26389
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state ship-wrong-marker --state idle --source claude-hook --event Stop
+exit=0
+g1791520588.25388.26738
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state ship-paused --state idle --source claude-hook --event Stop
+exit=0
+g1791520589.25687.15119
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state gitlab-ready --state idle --source claude-hook --event Stop
+exit=0
+g1791520589.25890.9494
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state gerrit-ready --state idle --source claude-hook --event Stop
+exit=0
+g1791520589.26140.24767
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/scan-home/state captain-held --state idle --source claude-hook --event Stop
+exit=0
+g1791520589.26601.21210
+
+$ bin/fm-captain-hold.sh hold captain-held --title Disposable captain call --reason Choose next action --repo lab
+exit=0
+captain-held
+
+$ bin/fm-idle-session-reap.sh scan
+exit=0
+parked	blocked	scout	-	blocked: deployment permission unavailable
+active	busy	scout	-	busy state busy claude-hook
+parked	captain-held	scout	-	captain-held: waiting for captain answer
+parked	decision	scout	-	needs-decision: captain choose option
+active	foreign-hook	scout	-	busy state unknown source-mismatch
+reap	gerrit-ready	ship	7692	finished and idle
+reap	gitlab-ready	ship	7697	finished and idle
+active	missing-busy	scout	-	busy state unknown missing
+reap	open-decision	scout	7719	finished and idle
+parked	paused	scout	-	paused: waiting for dependency fix
+remote	remote	scout	-	remote task on unreachable.example.test; its host owns cleanup
+wait-grace	scout-fresh-report	scout	524	finished 524s ago; grace is 1800s
+wait-grace	scout-fresh-status	scout	531	finished 531s ago; grace is 1800s
+scout-noreport	scout-noreport	scout	-	done without a nonempty data/scout-noreport/report.md
+reap	scout-ready	scout	7742	finished and idle
+wait-grace	scout-unstamped	scout	0	finished 0s ago; grace is 1800s
+secondmate	secondmate	secondmate	-	persistent; never reaped here
+awaiting-pipeline	ship-nopr	ship	-	done; no pull request recorded yet
+parked	ship-paused	ship	-	paused: waiting for dependency fix
+reap	ship-ready	ship	7769	finished and idle
+awaiting-merge	ship-unmerged	ship	-	done; https://github.com/lab/widget/pull/41 not recorded merged
+awaiting-merge	ship-wrong-marker	ship	-	done; https://github.com/lab/widget/pull/41 not recorded merged
+steer-pending	steered	scout	-	unhandled instruction 001.msg
+active	unknown	scout	-	busy state unknown claude-hook
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/reap-home/state ready-1 --state idle --source claude-hook --event Stop
+exit=0
+g1791521200.15049.14996
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/reap-home/state ready-2 --state idle --source claude-hook --event Stop
+exit=0
+g1791521200.15303.32086
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/reap-home/state ready-3 --state idle --source claude-hook --event Stop
+exit=0
+g1791521200.15562.2295
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/reap-home/state ready-4 --state idle --source claude-hook --event Stop
+exit=0
+g1791521200.15768.30346
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/reap-home/state ready-5 --state idle --source claude-hook --event Stop
+exit=0
+g1791521201.16038.6007
+
+$ bin/fm-busy-event.sh arm /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/reap-home/state parked --state idle --source claude-hook --event Stop
+exit=0
+g1791521201.16311.15345
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+parked	parked	scout	-	paused: awaiting captain review
+reap	ready-4	scout	7855	finished and idle
+reap	ready-5	scout	7856	finished and idle
+teardown-refused	ready-1	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+teardown-refused	ready-2	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+teardown-refused	ready-3	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+parked	parked	scout	-	paused: awaiting captain review
+refused	ready-1	scout	7862	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-2	scout	7862	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-3	scout	7863	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+teardown-refused	ready-4	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+teardown-refused	ready-5	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+parked	parked	scout	-	paused: awaiting captain review
+refused	ready-1	scout	7870	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-2	scout	7870	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-3	scout	7873	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-4	scout	7875	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-5	scout	7875	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+parked	parked	scout	-	paused: awaiting captain review
+refused	ready-2	scout	8119	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-3	scout	8125	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-4	scout	8129	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-5	scout	8135	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+teardown-refused	ready-1	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+parked	parked	scout	-	paused: awaiting captain review
+refused	ready-1	scout	8149	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-3	scout	8149	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-4	scout	8149	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+refused	ready-5	scout	8150	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+teardown-refused	ready-2	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)

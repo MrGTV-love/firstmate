@@ -1,0 +1,7 @@
+# fm-idle-session-reap 1791521201
+parked	parked	scout	-	paused: awaiting captain review
+reap	ready-4	scout	7855	finished and idle
+reap	ready-5	scout	7856	finished and idle
+teardown-refused	ready-1	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+teardown-refused	ready-2	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+teardown-refused	ready-3	-	-	error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)

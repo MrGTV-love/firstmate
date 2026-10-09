@@ -1,0 +1,82 @@
+{
+  "command": "bin/fm-watch.sh",
+  "environment": {
+    "FM_HOME": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/watch-home",
+    "FM_POLL": "1",
+    "FM_SIGNAL_GRACE": "1",
+    "FM_IDLE_REAP_INTERVAL": "15",
+    "FM_CHECK_INTERVAL": "99999999",
+    "FM_HEARTBEAT": "99999999",
+    "FM_HOME_SUMMARY_INTERVAL": "99999999",
+    "FM_OPEN_LOOPS_INTERVAL": "99999999",
+    "FM_SECONDMATE_LIVENESS_SECS": "99999999",
+    "FM_WATCH_HANDLING_SUCCESSOR": "1"
+  },
+  "observations": [
+    {
+      "event": "start",
+      "label": "first",
+      "pid": 73224,
+      "epoch": 1791521251.092663,
+      "interval": "15"
+    },
+    {
+      "event": "initial-deadline",
+      "epoch": 1791521252.4807081,
+      "deadline": 1791521267,
+      "report_exists": false
+    },
+    {
+      "event": "actionable-handoff",
+      "epoch": 1791521255.388567,
+      "exit": 0,
+      "output": "signal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/.idle-reap-validation/watch-home/state/handoff.status\n",
+      "retained_deadline": "1791521267",
+      "report_exists": false
+    },
+    {
+      "event": "start",
+      "label": "successor",
+      "pid": 87554,
+      "epoch": 1791521255.391535,
+      "interval": "15"
+    },
+    {
+      "event": "fixture-correction",
+      "detail": "removed handled handoff status and stale generated open-loop ledger; successor had correctly reported an overdue obligation"
+    },
+    {
+      "event": "start",
+      "label": "successor-corrected",
+      "pid": 10395,
+      "epoch": 1791521371.1480908,
+      "interval": "15"
+    },
+    {
+      "event": "real-sweep-report",
+      "epoch": 1791521374.248207,
+      "original_deadline": 1791521267,
+      "report": "# fm-idle-session-reap 1791521373\n",
+      "next_deadline": "1791521387"
+    },
+    {
+      "event": "second-real-sweep",
+      "epoch": 1791521390.468975,
+      "report": "# fm-idle-session-reap 1791521389\n",
+      "watcher_running": true
+    },
+    {
+      "event": "start",
+      "label": "disabled",
+      "pid": 83609,
+      "epoch": 1791521391.8706508,
+      "interval": "0"
+    },
+    {
+      "event": "disabled-after-interval",
+      "epoch": 1791521410.008157,
+      "report_unchanged": true,
+      "watcher_running": true
+    }
+  ]
+}

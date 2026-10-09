@@ -1,0 +1,24 @@
+parked	blocked	scout	-	blocked: Awaiting an authorized answer
+active	busy	scout	-	busy state busy claude-hook
+parked	captain-held	scout	-	captain-held: Awaiting an authorized answer
+parked	decision-still-open	scout	-	needs-decision: choose an option
+parked	failed	scout	-	failed: Awaiting an authorized answer
+active	foreign-source	scout	-	busy state unknown source-mismatch
+wait-grace	fresh-report	scout	76	finished 76s ago; grace is 1800s
+wait-grace	fresh-status	scout	81	finished 81s ago; grace is 1800s
+reap	gerrit	ship	7282	finished and idle
+reap	github	ship	7283	finished and idle
+reap	gitlab	ship	7284	finished and idle
+parked	merged-paused	ship	-	paused: Waiting for dependency fix
+parked	needs-decision	scout	-	needs-decision: Awaiting an authorized answer
+awaiting-pipeline	no-pr	ship	-	done; no pull request recorded yet
+scout-noreport	no-report	scout	-	done without a nonempty data/no-report/report.md
+parked	paused	scout	-	paused: Awaiting an authorized answer
+remote	remote	scout	-	remote task on disposable.invalid; its host owns cleanup
+reap	scout-ready	scout	7287	finished and idle
+secondmate	secondmate	secondmate	-	persistent; never reaped here
+steer-pending	steered	scout	-	unhandled instruction 001.msg
+active	unknown	scout	-	busy state unknown claude-hook
+awaiting-merge	unmerged	ship	-	done; https://github.com/disposable/notes/pull/41 not recorded merged
+wait-grace	unstamped	scout	0	finished 0s ago; grace is 1800s
+awaiting-merge	wrong-marker	ship	-	done; https://github.com/disposable/notes/pull/41 not recorded merged

@@ -1,0 +1,31 @@
+Candidates were all reap-ready before instructions and captain hold.
+reap	a-delay	scout	7819	finished and idle
+reap	b-steered	scout	7823	finished and idle
+reap	c-held	scout	7828	finished and idle
+refused	g-dirty	ship	7831	REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+refused	h-unlanded	ship	7834	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+active	i-fourth	ship	-	busy state busy fm-recovery
+Real teardown blocked with control PID 80710
+while metadata lock owner 38264 remains alive.
+Actual fm-send durable message:
+schema=fm-task-inbox.v1
+at=2026-10-09T06:12:04Z
+--
+New instruction delivered after sweep selection. Keep this worker open.
+Actual captain hold added while first teardown blocked; latest done status remains unchanged.
+refused	g-dirty	ship	7851	REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+refused	h-unlanded	ship	7857	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+active	i-fourth	ship	-	busy state busy fm-recovery
+teardown-refused	a-delay	-	-	REFUSED: scout task a-delay has not passed the captain-call completion gate.
+teardown-refused	b-steered	-	-	REFUSED: automatic reap ineligible: steer-pending: unhandled instruction 001.msg
+teardown-refused	c-held	-	-	REFUSED: automatic reap ineligible: parked: captain-held: waiting for captain answer
+Sweep exit=0 elapsed=229.0390044999658
+Published report:
+# fm-idle-session-reap 1791526242
+refused	g-dirty	ship	7851	REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+refused	h-unlanded	ship	7857	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+active	i-fourth	ship	-	busy state busy fm-recovery
+teardown-refused	a-delay	-	-	REFUSED: scout task a-delay has not passed the captain-call completion gate.
+teardown-refused	b-steered	-	-	REFUSED: automatic reap ineligible: steer-pending: unhandled instruction 001.msg
+teardown-refused	c-held	-	-	REFUSED: automatic reap ineligible: parked: captain-held: waiting for captain answer
+PASS: late real steering and durable captain hold both refuse locked automatic admission; endpoints, metadata, inbox and captain call survive.

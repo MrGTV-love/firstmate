@@ -1,0 +1,19 @@
+$ bin/fm-lease.sh claim leased
+exit=0
+
+$ bin/fm-lease.sh check leased
+exit=0
+branch 29536 1791527500 live
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+lease-skipped	leased	-	-	another supervision actor holds the task lease
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+lease-skipped	leased	-	-	another supervision actor holds the task lease
+
+$ bin/fm-lease.sh release leased
+exit=0
+
+Task retained; no refusal memo created on either pass. Public lease release completed.

@@ -1,0 +1,232 @@
+$ git init -b main /tmp/fm-lab-01M4FA81-nykt_a45/projects/notes
+exit=0
+Initialized empty Git repository in /private/tmp/fm-lab-01M4FA81-nykt_a45/projects/notes/.git/
+
+$ git -C /tmp/fm-lab-01M4FA81-nykt_a45/projects/notes add notes.txt
+exit=0
+
+$ git -C /tmp/fm-lab-01M4FA81-nykt_a45/projects/notes commit -m 'disposable baseline'
+exit=0
+[main (root-commit) 93e46c4] disposable baseline
+ 1 file changed, 1 insertion(+)
+ create mode 100644 notes.txt
+
+$ git clone --local /tmp/fm-lab-01M4FA81-nykt_a45/projects/notes /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty
+exit=0
+Cloning into '/tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty'...
+done.
+
+$ git -C /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty checkout -b fm/g-dirty
+exit=0
+Switched to a new branch 'fm/g-dirty'
+
+$ tmux -L fm-lab new-window -d -t primary -n fm-g-dirty -c /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty 'sleep 3600'
+exit=0
+
+$ git clone --local /tmp/fm-lab-01M4FA81-nykt_a45/projects/notes /tmp/fm-lab-01M4FA81-nykt_a45/scratch-h-unlanded
+exit=0
+Cloning into '/tmp/fm-lab-01M4FA81-nykt_a45/scratch-h-unlanded'...
+done.
+
+$ git -C /tmp/fm-lab-01M4FA81-nykt_a45/scratch-h-unlanded checkout -b fm/h-unlanded
+exit=0
+Switched to a new branch 'fm/h-unlanded'
+
+$ git -C /tmp/fm-lab-01M4FA81-nykt_a45/scratch-h-unlanded add notes.txt
+exit=0
+
+$ git -C /tmp/fm-lab-01M4FA81-nykt_a45/scratch-h-unlanded commit -m 'unlanded h-unlanded'
+exit=0
+[fm/h-unlanded 2677d51] unlanded h-unlanded
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+$ tmux -L fm-lab new-window -d -t primary -n fm-h-unlanded -c /tmp/fm-lab-01M4FA81-nykt_a45/scratch-h-unlanded 'sleep 3600'
+exit=0
+
+$ git clone --local /tmp/fm-lab-01M4FA81-nykt_a45/projects/notes /tmp/fm-lab-01M4FA81-nykt_a45/scratch-i-fourth
+exit=0
+Cloning into '/tmp/fm-lab-01M4FA81-nykt_a45/scratch-i-fourth'...
+done.
+
+$ git -C /tmp/fm-lab-01M4FA81-nykt_a45/scratch-i-fourth checkout -b fm/i-fourth
+exit=0
+Switched to a new branch 'fm/i-fourth'
+
+$ git -C /tmp/fm-lab-01M4FA81-nykt_a45/scratch-i-fourth add notes.txt
+exit=0
+
+$ git -C /tmp/fm-lab-01M4FA81-nykt_a45/scratch-i-fourth commit -m 'unlanded i-fourth'
+exit=0
+[fm/i-fourth 52b4aa4] unlanded i-fourth
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+$ tmux -L fm-lab new-window -d -t primary -n fm-i-fourth -c /tmp/fm-lab-01M4FA81-nykt_a45/scratch-i-fourth 'sleep 3600'
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-finished
+exit=0
+ ▐▛███▛█   Claude Code v2.1.295
+▝▜██████▀  Sonnet 5.5 · Claude Max
+ ▝▝   ▝▝   ~/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG
+
+
+❯ Calculate 7*9. Reply exactly LAB_REPORT 63.
+
+⏺ LAB_REPORT 63
+
+✻ Churned for 36s · done 1:05 AM
+
+───────────────────────────────────────────────────────────────────────────────────────────────── fm-lab-idle-finished ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ bin/fm-idle-session-reap.sh scan
+exit=0
+reap	finished	scout	7562	finished and idle
+reap	g-dirty	ship	7563	finished and idle
+reap	h-unlanded	ship	7564	finished and idle
+reap	i-fourth	ship	7568	finished and idle
+
+$ tmux -L fm-lab list-panes -t primary:fm-finished -F '#{pane_pid} #{pane_current_command} #{pane_width}x#{pane_height}'
+exit=0
+26419 2.1.295 120x40
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+reap	i-fourth	ship	7598	finished and idle
+reaped	finished	-	-	teardown completed
+teardown-refused	g-dirty	-	-	REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+teardown-refused	h-unlanded	-	-	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+
+Published report:
+# fm-idle-session-reap 1791525992
+reap	i-fourth	ship	7598	finished and idle
+reaped	finished	-	-	teardown completed
+teardown-refused	g-dirty	-	-	REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+teardown-refused	h-unlanded	-	-	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+
+$ tmux -L fm-lab list-windows -t primary -F '#{window_name} #{pane_pid} #{pane_current_command}'
+exit=0
+2.1.295 41001 2.1.295
+fm-g-dirty 84211 sleep
+fm-h-unlanded 89251 sleep
+fm-i-fourth 1604 sleep
+
+Finished worker PID 26419 alive after reap=False; metadata remains=False
+PASS: real finished Claude worker terminated and report retained; dirty and committed unlanded ships preserved; fourth eligible task not attempted despite budget override.
+$ bin/fm-busy-event.sh apply /tmp/fm-lab-01M4FA81-nykt_a45/state i-fourth busy --current-gen --source fm-recovery --event validation-active
+exit=0
+
+$ tmux -L fm-lab new-window -d -t primary -n fm-a-delay -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG 'sleep 3600'
+exit=0
+
+$ tmux -L fm-lab new-window -d -t primary -n fm-b-steered -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG 'sleep 3600'
+exit=0
+
+$ tmux -L fm-lab new-window -d -t primary -n fm-c-held -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG 'sleep 3600'
+exit=0
+
+$ bin/fm-idle-session-reap.sh scan
+exit=0
+reap	a-delay	scout	7819	finished and idle
+reap	b-steered	scout	7823	finished and idle
+reap	c-held	scout	7828	finished and idle
+refused	g-dirty	ship	7831	REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+refused	h-unlanded	ship	7834	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+active	i-fourth	ship	-	busy state busy fm-recovery
+
+$ bin/fm-send.sh b-steered 'New instruction delivered after sweep selection. Keep this worker open.'
+exit=0
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab-01M4FA81-nykt_a45
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+$ bin/fm-captain-hold.sh hold c-held --title 'Disposable captain decision' --reason 'Waiting for a captain answer after sweep selection' --repo notes
+exit=0
+c-held
+
+$ tmux -L fm-lab list-windows -t primary -F '#{window_name} #{pane_current_command}'
+exit=0
+2.1.295 2.1.295
+fm-a-delay sleep
+fm-g-dirty sleep
+fm-h-unlanded sleep
+fm-i-fourth sleep
+fm-b-steered sleep
+fm-c-held sleep
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+parked	a-delay	scout	-	captain hold unreadable; cleanup ineligible
+steer-pending	b-steered	scout	-	unhandled instruction 001.msg
+parked	c-held	scout	-	captain hold unreadable; cleanup ineligible
+refused	g-dirty	ship	8248	REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+refused	h-unlanded	ship	8262	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+active	i-fourth	ship	-	busy state busy fm-recovery
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+refused	a-delay	scout	8272	REFUSED: scout task a-delay has not passed the captain-call completion gate.
+steer-pending	b-steered	scout	-	unhandled instruction 001.msg
+parked	c-held	scout	-	captain-held: waiting for captain answer
+refused	h-unlanded	ship	8315	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+active	i-fourth	ship	-	busy state busy fm-recovery
+teardown-refused	g-dirty	-	-	REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+
+Exact long status identity in refusal memo:
+fm-idle-reap-refused-v1
+1791526667
+done [at=1791518403]: Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. Unchanged long refusal identity. 	Preserve exact tab.
+REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+
+$ bin/fm-idle-session-reap.sh reap
+exit=0
+parked	a-delay	scout	-	captain hold unreadable; cleanup ineligible
+steer-pending	b-steered	scout	-	unhandled instruction 001.msg
+parked	c-held	scout	-	captain-held: waiting for captain answer
+refused	g-dirty	ship	8500	REFUSED: worktree /tmp/fm-lab-01M4FA81-nykt_a45/scratch-g-dirty has uncommitted changes.
+refused	h-unlanded	ship	8550	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+active	i-fourth	ship	-	busy state busy fm-recovery
+
+$ bin/fm-idle-session-reap.sh scan
+exit=0
+refused	a-delay	scout	8573	REFUSED: scout task a-delay has not passed the captain-call completion gate.
+steer-pending	b-steered	scout	-	unhandled instruction 001.msg
+parked	c-held	scout	-	captain-held: waiting for captain answer
+reap	g-dirty	ship	8622	finished and idle
+refused	h-unlanded	ship	8635	REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+active	i-fourth	ship	-	busy state busy fm-recovery
+
+PASS: unchanged refusals suppress retries, exact long/tabbed status identity survives persistence, changed status reattempts real teardown, expired six-hour memo admits candidate again.
+$ tmux -L fm-lab kill-server
+exit=0
+
+$ bin/fm-lab-home.sh teardown /tmp/fm-lab-01M4FA81-nykt_a45
+exit=0
+
+Cleanup proof: /tmp/fm-lab-01M4FA81-nykt_a45 exists=False; private lab tmux server stopped.

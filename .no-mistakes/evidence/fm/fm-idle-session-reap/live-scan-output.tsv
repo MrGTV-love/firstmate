@@ -1,0 +1,26 @@
+$ bin/fm-idle-session-reap.sh scan
+exit=0
+parked	blocked	scout	-	blocked: deployment permission unavailable
+active	busy	scout	-	busy state busy claude-hook
+parked	captain-held	scout	-	captain-held: waiting for captain answer
+parked	decision	scout	-	needs-decision: captain choose option
+active	foreign-hook	scout	-	busy state unknown source-mismatch
+reap	gerrit-ready	ship	7692	finished and idle
+reap	gitlab-ready	ship	7697	finished and idle
+active	missing-busy	scout	-	busy state unknown missing
+reap	open-decision	scout	7719	finished and idle
+parked	paused	scout	-	paused: waiting for dependency fix
+remote	remote	scout	-	remote task on unreachable.example.test; its host owns cleanup
+wait-grace	scout-fresh-report	scout	524	finished 524s ago; grace is 1800s
+wait-grace	scout-fresh-status	scout	531	finished 531s ago; grace is 1800s
+scout-noreport	scout-noreport	scout	-	done without a nonempty data/scout-noreport/report.md
+reap	scout-ready	scout	7742	finished and idle
+wait-grace	scout-unstamped	scout	0	finished 0s ago; grace is 1800s
+secondmate	secondmate	secondmate	-	persistent; never reaped here
+awaiting-pipeline	ship-nopr	ship	-	done; no pull request recorded yet
+parked	ship-paused	ship	-	paused: waiting for dependency fix
+reap	ship-ready	ship	7769	finished and idle
+awaiting-merge	ship-unmerged	ship	-	done; https://github.com/lab/widget/pull/41 not recorded merged
+awaiting-merge	ship-wrong-marker	ship	-	done; https://github.com/lab/widget/pull/41 not recorded merged
+steer-pending	steered	scout	-	unhandled instruction 001.msg
+active	unknown	scout	-	busy state unknown claude-hook

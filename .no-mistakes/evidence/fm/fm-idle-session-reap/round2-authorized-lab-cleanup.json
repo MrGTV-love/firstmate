@@ -1,0 +1,17 @@
+{
+  "lifecycle_lab": "/tmp/fm-lab-01M4FA81-nykt_a45",
+  "lifecycle_lab_exists": false,
+  "private_tmux_server_stopped": true,
+  "initial_timeout_lab": "/tmp/fm-lab-01M4FA81-a8p8ubqy",
+  "initial_timeout_lab_exists": false,
+  "timeout_lab": "/tmp/fm-lab-01M4FA81-hn0csege",
+  "timeout_lab_exists": false,
+  "worktree_fixture_removed": true,
+  "watcher_pids_stopped": [
+    85651,
+    8461,
+    16378,
+    65235
+  ],
+  "metadata_lock_owners_stopped": true
+}

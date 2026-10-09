@@ -1,0 +1,25 @@
+fm-lab-home create: /tmp/fm-lab-01M4FA81-hn0csege
+
+Before stalled teardown: reap	slow	scout	7205	finished and idle
+
+Real teardown acquired its control lock and waits on live metadata-lock owner 21004
+34999 34962 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FA81EERMX11BSETH10XNDG/bin/fm-teardown.sh slow
+
+Overlapping sweep: exit=0 output=''
+Elapsed real monotonic seconds: 604.792; sweep exit=0
+Reap result:
+teardown-timeout	slow	-	-	teardown exceeded 600s
+
+Published report:
+# fm-idle-session-reap 1791525808
+teardown-timeout	slow	-	-	teardown exceeded 600s
+
+Refusal memo:
+fm-idle-reap-refused-v1
+1791525808
+done [at=1791518602]: completed disposable report
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab-01M4FA81-hn0csege
+
+Task retained=True; real teardown PID terminated=True
+PASS: actual fm-teardown was terminated at the unchanged 600-second bound; task and refusal evidence preserved.
+Cleanup proof: /tmp/fm-lab-01M4FA81-hn0csege exists=False
