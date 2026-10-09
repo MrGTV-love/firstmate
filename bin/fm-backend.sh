@@ -936,17 +936,20 @@ fm_backend_composer_state() {  # <backend> <target> [expected-label] -> empty|pe
 # going through fm_backend_herdr_target_ready (which auto-starts the herdr
 # server as a side effect via fm_backend_herdr_server_ensure - fine for an
 # operation that is about to use the pane, wrong for a passive liveness
-# probe). A gone tmux window or an unqueryable herdr pane (server down, pane
-# closed), missing zellij pane, or unreadable Orca terminal simply fails, which
-# IS "does not exist" for this purpose.
-# Mirrors fm-crew-state.sh's pane_readable check; exists here as one shared
-# primitive so callers that only need a fast alive/dead read (recovery
+# probe). A gone tmux window (judged from the session's window inventory, since
+# tmux answers an addressed call for an absent window with success) or an
+# unqueryable herdr pane (server down, pane closed), missing zellij pane, or
+# unreadable Orca terminal simply fails, which IS "does not exist" for this
+# purpose.
+# Backs fm-crew-state.sh's pane_readable check for tmux; exists here as one
+# shared primitive so callers that only need a fast alive/dead read (recovery
 # digests, the session-start fleet digest) do not re-derive it inline.
 fm_backend_target_exists() {  # <backend> <target> [expected-label]
   local backend=$1 target=$2 expected_label=${3:-} session pane
   case "$backend" in
     tmux)
-      tmux display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1
+      fm_backend_source tmux || return 1
+      fm_backend_tmux_target_exists "$target"
       ;;
     herdr)
       fm_backend_source herdr || return 1

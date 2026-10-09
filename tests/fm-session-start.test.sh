@@ -295,9 +295,12 @@ SH
   chmod +x "$fakebin/ps"
 }
 
-# make_fake_tmux <fakebin> <live-target>: display-message succeeds only for
-# the given "session:window" target - the exact primitive
-# fm_backend_target_exists uses for a tmux endpoint liveness read.
+# make_fake_tmux <fakebin> <live-target>: a tmux server holding exactly one
+# "session:window" target. It models what real tmux does (verified on 3.5a),
+# not what a naive probe would like: `display-message -t` answers success for
+# ANY target while a server runs, falling back to some other pane when the
+# named window or session is absent. Only the window inventory is truthful, and
+# a session the server does not hold answers "can't find session" on it.
 make_fake_tmux() {
   local fakebin=$1 live=$2
   cat > "$fakebin/tmux" <<SH
@@ -305,13 +308,22 @@ make_fake_tmux() {
 set -u
 case "\${1:-}" in
   display-message)
+    printf '%%1\n'
+    exit 0
+    ;;
+  list-windows)
     target=""
     prev=""
     for a in "\$@"; do
       [ "\$prev" = "-t" ] && target="\$a"
       prev="\$a"
     done
-    [ "\$target" = "$live" ] && { printf '%%1\n'; exit 0; }
+    session=\${target#=}
+    if [ "\$session" = "${live%%:*}" ]; then
+      printf '%s\n' "${live#*:}"
+      exit 0
+    fi
+    printf "can't find session: %s\n" "\$session" >&2
     exit 1
     ;;
 esac
@@ -1434,12 +1446,16 @@ EOF
 
   printf 'window=fm-sess:live-window\nkind=ship\n' > "$home/state/task-live.meta"
   printf 'window=fm-sess:dead-window\nkind=ship\n' > "$home/state/task-dead.meta"
+  printf 'window=fm-gone:live-window\nkind=ship\n' > "$home/state/task-nosession.meta"
 
   out=$(run_session_start "$home" "$root" "$fakebin:$BASE_PATH")
   assert_contains "$out" "endpoint: alive (backend=tmux window=fm-sess:live-window)" "live tmux endpoint not reported alive"
-  assert_contains "$out" "endpoint: dead (backend=tmux window=fm-sess:dead-window)" "dead tmux endpoint not reported dead"
+  assert_contains "$out" "endpoint: dead (backend=tmux window=fm-sess:dead-window)" \
+    "a closed window in a session tmux still holds was reported alive: the probe answered through tmux's active-window fallback"
+  assert_contains "$out" "endpoint: dead (backend=tmux window=fm-gone:live-window)" \
+    "a window in a session tmux no longer holds was reported alive"
 
-  pass "tmux endpoint liveness is reported per task: alive for a live window, dead for a gone one"
+  pass "tmux endpoint liveness is reported per task: alive for a live window, dead for a closed window or a gone session"
 }
 
 test_endpoint_liveness_herdr() {

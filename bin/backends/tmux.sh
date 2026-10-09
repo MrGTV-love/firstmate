@@ -157,6 +157,40 @@ fm_backend_tmux_window_inventory() {  # <session-target>
   return 1
 }
 
+# fm_backend_tmux_target_exists: cheap, READ-ONLY presence check for one
+# recorded target. `tmux display-message -t` cannot serve as one: while any
+# server runs it answers success for an absent window, an absent session, and an
+# unused window index alike, falling back to some other pane (verified on tmux
+# 3.5a; the same fallback fm_backend_tmux_agent_state and fm-spawn.sh already
+# guard against). Only the window inventory is truthful, so a recorded
+# `session:window` name is present only when the exact session
+# (`=session`) lists a whole line equal to the window - never a prefix. An
+# inventory that could not be read is not presence either, so a missing session,
+# a missing server, and a tmux that failed to answer all read as absent here,
+# the same "failure IS does not exist" contract as fm_backend_target_exists.
+# A target that is not a plain `session:name` (a window or pane id, a window
+# index, or a malformed shape) cannot be matched against window names, so it
+# keeps the direct probe; firstmate records only `session:name` targets.
+fm_backend_tmux_target_exists() {  # <target>
+  local target=$1 session window windows
+  case "$target" in
+    *:*:*|'':*|*:'') ;;
+    *:*)
+      session=${target%%:*}
+      window=${target#*:}
+      case "$window" in
+        @*|%*) ;;
+        *[!0-9]*)
+          windows=$(fm_backend_tmux_window_inventory "=$session") || return 1
+          printf '%s\n' "$windows" | grep -qxF -- "$window"
+          return
+          ;;
+      esac
+      ;;
+  esac
+  tmux display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1
+}
+
 # fm_backend_tmux_kill: remove one explicitly named task window.
 # Empty, omitted, and malformed targets return nonzero before invoking tmux so
 # tmux can never interpret an empty target as the caller's current window.

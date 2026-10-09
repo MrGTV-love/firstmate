@@ -414,5 +414,28 @@ fi
   || fail "a dead-shell pane still showing Cursor's composer must never read empty"
 pass "cursor composer: a stale Cursor screen over a dead shell never reads empty"
 
+# --- target presence: tmux's addressed calls never fail for an absent window --
+# The defect: session start printed `endpoint: alive` for a recorded
+# `session:window` whose window had closed, because the presence probe ran
+# `display-message -t` and read its success as presence. This pins the premise
+# on the real tmux first, so the cases below cannot go quietly vacuous when a
+# tmux release changes the fallback, then asserts the verdict follows the
+# window inventory instead.
+"$REAL_TMUX" -L "$SOCKET" display-message -p -t "$SESSION:fm-gone-window" '#{pane_id}' >/dev/null 2>&1 \
+  || fail "premise changed: tmux now fails an addressed call for an absent window, so the fallback this suite guards against needs re-verifying"
+"$REAL_TMUX" -L "$SOCKET" display-message -p -t "fm-gone-session:idle" '#{pane_id}' >/dev/null 2>&1 \
+  || fail "premise changed: tmux now fails an addressed call for an absent session, so the fallback this suite guards against needs re-verifying"
+fm_backend_target_exists tmux "$SESSION:idle" \
+  || fail "a window the session lists must read as present"
+fm_backend_target_exists tmux "$SESSION:fm-gone-window" \
+  && fail "a closed window in a live session read as present through tmux's active-window fallback"
+fm_backend_target_exists tmux "$SESSION:idl" \
+  && fail "a prefix of a listed window name read as present; presence is a whole-name match"
+fm_backend_target_exists tmux "fm-gone-session:idle" \
+  && fail "a window in a session tmux does not hold read as present"
+fm_backend_target_exists tmux "$SESSION:@0" \
+  || fail "a window id keeps the direct probe, which answers for it"
+pass "target presence: a recorded window is present only when its exact session lists it"
+
 cleanup_all
 trap - EXIT
