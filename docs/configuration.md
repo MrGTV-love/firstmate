@@ -2877,7 +2877,7 @@ FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work 
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
 FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
 FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-session sweeps (bin/fm-idle-session-reap.sh); 0 turns the sweep off without changing its deadline; an unscheduled home waits one full interval, and watcher handoffs retain the deadline; invalid values use 900
-# Finished-session reap policy is fixed: 1800-second grace, 21600-second refusal retry, at most 3 teardowns per pass, and a 600-second teardown timeout.
+# Fixed reap policy and safety gates are owned by bin/fm-idle-session-reap.sh's header, not configurable overrides.
 FM_IDLE_REAP_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-idle-session-reap.sh
 FM_IDLE_REAP_TEARDOWN_BIN=   # test seam: the teardown the sweep runs instead of bin/fm-teardown.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding home-summary state initialization, refresh-lock acquisition, validation, and atomic publication; independent post-attempt deadlines are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 60

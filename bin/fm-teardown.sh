@@ -30,6 +30,9 @@
 # lift the deferral (it authorizes discarding unlanded WORK, never the
 # captain's question), and bin/fm-captain-hold.sh answer stays the only act
 # that closes the call.
+# Automatic sweep calls additionally require reap eligibility before cleanup;
+# bin/fm-idle-session-reap.sh's header owns that admission contract.
+# The captain-call retention path below applies to ordinary teardown admission.
 # REFUSES if a ship's deliverable has not LANDED, because cleanup
 # hard-resets/removes the worktree and kills its processes.
 # A pushed branch is recoverable work, not a delivered result.

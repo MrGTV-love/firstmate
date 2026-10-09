@@ -134,9 +134,10 @@ The `--force` path remains the explicit captain-approved discard escape hatch.
 The policy prefers holding the very work item a question gates.
 So the backlog row a finished task's cleanup is about to close is routinely the captain's own call.
 
-`bin/fm-teardown.sh` therefore asks the read-only `open` subcommand before its automatic close:
+An ordinary `bin/fm-teardown.sh` invocation therefore asks the read-only `open` subcommand before its automatic backlog close:
+The finished-session sweep's stricter admission is owned by [`bin/fm-idle-session-reap.sh`](../bin/fm-idle-session-reap.sh)'s header, not this retention path.
 
-| `open` exit | Meaning | What teardown does |
+| `open` exit | Meaning | What ordinary teardown does |
 | --- | --- | --- |
 | 0 | The row is still an open captain call (not Done, `hold_kind: captain`). | Retains the row, as described below. |
 | 1 | The row is not an open captain call. | Proceeds with its automatic close. |

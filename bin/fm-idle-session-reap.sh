@@ -2,16 +2,14 @@
 # fm-idle-session-reap.sh - clean up finished worker sessions whose work has landed.
 #
 # Usage:
-#   fm-idle-session-reap.sh scan   Print one row per ordinary task in this home; never run teardown.
+#   fm-idle-session-reap.sh scan   Print one row per task metadata record in this home; never run teardown or publish the report.
 #   fm-idle-session-reap.sh reap   Scan, then run bin/fm-teardown.sh on each reap-ready task.
 #
-# WHY. A finished worker keeps its agent process, and several hundred MB of
-# memory, until someone runs bin/fm-teardown.sh for it. That someone is the
-# supervising model, and on an overloaded host it can lag by a day. This sweep
-# makes the cleanup of the unambiguous cases mechanical. It decides nothing about
-# landing: bin/fm-teardown.sh is the sole authority, and this script only picks
-# which tasks are worth asking it about. It never passes --force, never edits a
-# project, and never touches a worker that could still be waiting on something.
+# A finished worker keeps its agent process until bin/fm-teardown.sh runs.
+# This sweep makes cleanup of the unambiguous cases independent of the
+# supervising model. It decides nothing about landing: bin/fm-teardown.sh is
+# the sole authority, and this script only picks which tasks are worth asking
+# it about. It never passes --force or bypasses teardown's safety gates.
 #
 # A task is reap-ready only when ALL of these hold:
 #   - it is an ordinary ship or scout (never a secondmate, never a remote task);
@@ -21,16 +19,22 @@
 #   - its newest status event is `done` and the keyed decision fold has nothing
 #     open (a paused, blocked, needs-decision, captain-held, or failed task is
 #     PARKED and only reported, with its reason);
+#   - the durable captain-hold `open` predicate confirms no open captain call
+#     (an open call or an inconclusive read is parked, not reaped);
 #   - landing evidence exists locally, without any forge call: a scout needs a
 #     nonempty regular data/<id>/report.md, and a ship needs the merge poll's
 #     state/<id>.pr-poll-merge-notified marker for the PR recorded in its meta;
-#   - the `done` line and the evidence are older than 30 minutes,
-#     so the supervising mate has had time to read the outcome;
+#   - both the `done` timestamp and the evidence mtime are known and at least
+#     30 minutes old; an unknown or future age remains ineligible;
 #   - no refusal from a recent teardown attempt still stands (see below).
 # A ship that is done but has no merge marker is awaiting its pipeline or its
 # merge and is reported, not reaped.
+# Automatic teardown admission uses this same classifier from
+# bin/fm-idle-reap-lib.sh under the task control and metadata locks, before
+# destructive cleanup, so a scan verdict cannot authorize stale eligibility.
+# The sweep sets the internal FM_IDLE_REAP_ADMISSION=1 marker for that check.
 #
-# A teardown that refuses is not an error: it is the landed-work test working.
+# A teardown refusal is reported, not bypassed.
 # The refusal reason is recorded in state/.idle-reap/<id>.refused together with
 # the status line it was made against, and the task is not offered to teardown
 # again until its newest status line changes or six hours pass.
@@ -45,11 +49,10 @@
 # state/idle-sessions.report so the parked sessions and their pause reasons
 # can be read without rerunning the scan.
 #
-# At most 3 teardowns start
-# per `reap` run, each bounded by 600 seconds, and a
-# home-local single-flight lock keeps overlapping sweeps from queuing.
-# bin/fm-watch.sh starts `reap` detached every FM_IDLE_REAP_INTERVAL seconds
-# (default 900, 0 disables).
+# At most 3 teardowns start per `reap` run, each bounded by 600 seconds.
+# A home-local single-flight lock keeps overlapping sweeps from queuing.
+# bin/fm-watch.sh starts `reap` detached; docs/configuration.md owns the
+# FM_IDLE_REAP_INTERVAL setting and deadline behavior.
 #
 # Test seam: FM_IDLE_REAP_TEARDOWN_BIN replaces bin/fm-teardown.sh.
 # Regression coverage: tests/fm-idle-session-reap.test.sh.
