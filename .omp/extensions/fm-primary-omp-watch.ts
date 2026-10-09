@@ -28,10 +28,10 @@
 //     bin/fm-supervision-engine-lib.sh enabled answers; config/supervision-host-off opts out) spawns
 //     bin/fm-supervision-host.sh park --restart in the arm's place, which
 //     takes away-posture wakes itself and closes only when main is needed; its
-//     header owns the output read here. A "supervision-host:" line is
-//     actionable like a wake line, and the message delivered at the host's
-//     close carries every such line in order while wake lines keep an
-//     eight-line cap. The host
+//     header owns the output read here. Operational hand-backs preserve every
+//     "supervision-host:" line in order while wake lines keep an eight-line cap.
+//     Main-only watcher closes instead use the queue-read delivery contract in
+//     docs/watcher-continuity.md#omp-stale-wake-gating. The host
 //     prints the first cycle's status line as soon as it is verified, so
 //     readiness and the handling handoff work as they do for the arm, with a
 //     longer readiness budget for the host's own startup. On a home that does
@@ -67,8 +67,8 @@
 //
 // Delivery versus consumption (stated once here):
 // A main wake is delivered once omp accepts it (sendUserMessage returns).
-// docs/watcher-continuity.md#omp-idle-wake-delivery owns idle delivery and
-// composer safety.
+// docs/watcher-continuity.md owns idle queue-read delivery, consumption, and
+// restored-editor safety; accepted watcher text is never replay authority.
 //
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -309,8 +309,8 @@ function operationalHandback(message: string): boolean {
   return /^(?:FIRSTMATE SUPERVISION HOST: )?supervision-host: (?:branch-outcome:|outcome [0-9]+\b|.*\bthe captain returned\b)/m.test(message);
 }
 
-// The host-mode wake message: every "supervision-host:" line in order, wake
-// lines capped at eight, and the away note while an away record exists.
+// Operational hand-backs carry outcomes even without a durable wake row;
+// ordinary host watcher headlines are only hints until the queue is read.
 function hostWakeMessage(output: string): string {
   if (!operationalHandback(output)) {
     const wake = actionableLine(output);

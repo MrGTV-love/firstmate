@@ -92,13 +92,14 @@ Both suites use `tests/watch-lifecycle-expiry.mjs` for shutdown child-close, suc
 
 ### omp stale wake gating
 
-omp cannot retract a queued follow-up, and a lane drains and acknowledges every durable row inside the turn a follow-up was queued behind.
-Each follow-up queued that way then started one more turn that found nothing to drain, so a lane saw old watcher headlines with no queued wake and answered each with a no-op.
+omp cannot retract a queued follow-up, so a watcher headline queued behind a running turn can outlive the durable rows that turn drains and acknowledges.
 `.omp/extensions/fm-primary-omp-watch.ts` therefore queues no watcher wake behind a running turn.
-After the successor watcher is verified and the handling handoff is confirmed, every watcher close marks only **a wake may be due**. Closes during a busy turn collapse into one mark, regardless of their headline or whether they carry an identity.
+After the successor restoration attempt, every actionable watcher close marks only **a wake may be due**.
+Successful restoration verifies the successor and confirms the handling handoff before that mark reaches delivery.
+Closes during a busy turn collapse into one mark, regardless of their headline or whether they carry an identity.
 
 - Busy, missing, or unreadable idle state holds the mark. The extension checks again on a fixed 1000ms timer; it never sends watcher work as a follow-up.
-- When idle, one subprocess runs `bin/fm-wake-drain.sh --queued` as main. This read-only query returns main-owned TSV queue rows in append order, excluding rows reserved by a live branch grant. Missing or empty queues return no rows without creating state; unreadable or malformed queues fail.
+- When idle, one subprocess queries current main-owned rows through the read-only interface owned by the [`fm-wake-drain.sh` header](../bin/fm-wake-drain.sh).
 - Pending vendor messages alone do not block an idle queue-read or prompt send: that prompt flushes a stranded advisor-tail queue without submitting the composer. They block editor manipulation and another send while an unconsumed watcher wake remains outstanding.
 - With rows, the extension injects one wake naming the oldest owed row's payload and, when applicable, `and N more queued`. With no rows, it clears the mark and sends nothing. A recovery marker alone is not a queued row.
 - Session preparation, message start, or turn completion during a query invalidates its snapshot, even if the whole turn finishes before the query returns. The mark remains for a fresh idle query.
@@ -107,7 +108,9 @@ After the successor watcher is verified and the handling handoff is confirmed, e
 Initial delivery, held flush, replacement handoff, and restored-editor recovery all use this same queue-read/send boundary. There is no per-headline or sequence matching, hold expiry, disable setting, or error-as-empty fallback. Partial acknowledgement leaves remaining rows eligible even within a single watcher close; display differences for decision, merge, multiline, or recovery notifications cannot suppress queued work.
 Supervision-host branch-outcome and away-return hand-backs remain operational input: they retain prompt delivery when idle and follow-up delivery when busy, without new durable relay records. Main-only checks passed through the host are ordinary watcher closes, not operational hand-backs.
 The existing version-2 replacement handoff stores one `check: wake may be due` message plus any operational hand-backs. Old stored watcher messages become the same mark at the read boundary; old operational records retain their hand-back routing. A late close republishes the mark even after the bounded shutdown wait.
-An unconsumed watcher wake serializes sends until the next `agent_end`, when its pending mark becomes eligible for another queue read. Consumption removes the token; turn completion alone creates no pending mark and runs no queue query. Preparation that reaches `before_agent_start` but returns idle without user `message_start` also releases the outstanding wake, unless pending vendor messages still accompany that unconsumed watcher; operator edits remain untouched.
+An unconsumed watcher wake serializes sends until the next `agent_end`, when its pending mark becomes eligible for another queue read.
+Preparation that reaches `before_agent_start` but returns idle without user `message_start` also releases the outstanding wake, unless pending vendor messages still accompany that unconsumed watcher; operator edits remain untouched.
+[Restored-wake recovery](#omp-restored-wake-recovery) owns consumption and removal of the outstanding token.
 `tests/fm-omp-harness.test.sh --watch-queue` exercises the queue-read delivery paths, partial acknowledgement, external recovery, late replacement closes, host routing, token release, editor safety, failed queries, timeouts and slow queries. `tests/fm-wake-queue.test.sh --queued-query` exercises the public read-only queue interface and actor ownership.
 The live guard and its evidence are recorded in [omp stale wake gating](verification/runtime-backends.md#2026-10-08-omp-stale-wake-gating).
 The Pi and OpenCode extensions still queue every wake as a follow-up and are not covered by this gating.
@@ -117,7 +120,10 @@ The Pi and OpenCode extensions still queue every wake as a follow-up and are not
 omp restores queued user follow-ups to the composer when a run is interrupted with Escape or a message is dequeued with Alt+Up, so accepting a wake as a follow-up does not prove a turn consumed it.
 Before recording or sending a wake, `.omp/extensions/fm-primary-omp-watch.ts` normalizes CRLF and CR to LF, expands each tab to three spaces, and strips other C0 controls to match omp's editor restoration.
 Consumption still matches the emitted text exactly.
-An accepted user `message_start` carrying the exact emitted text consumes its pending handoff record and removes its unconsumed token. Busy session state holds any separately pending watcher work until the turn ends. `before_agent_start` alone does not consume it.
+An accepted user `message_start` carrying the exact emitted text consumes its pending handoff record and removes its unconsumed token.
+With no separately pending watcher work, later turn completion creates no pending mark and runs no queue query.
+Busy session state holds any separately pending watcher work until the turn ends.
+`before_agent_start` alone does not consume it.
 The fixed one-second poll checks stranded text even without `agent_end`. It requires a live generation, a UI editor, positive idle state, and no pending vendor messages.
 Only a complete unchanged emitted wake segment, bounded by editor edges or omp's blank-line joins, may be removed; only its leading invisible transport mark may be present or absent. Prefix, suffix, and internal edits stay untouched. Removing a template preserves operator draft bytes, including invisible marks and leading/trailing newlines.
 For watcher text, the poll never submits the composer copy: it removes only unchanged template text, releases the outstanding token, and marks that a wake may be due. The same queue-read boundary then builds fresh text from current owed rows, or sends nothing if the queue is empty. Operational hand-backs retain their existing delivery path.
@@ -187,7 +193,7 @@ After an actionable Pi, omp, or OpenCode child close, the adapter:
 1. Waits for the predecessor process to close.
 2. Starts and verifies one singleton successor.
 3. Confirms the handling handoff before scheduling the wake: Pi confirms against the restoration's own recovery token, while omp and OpenCode confirm against the current successor.
-4. Delivers the original wake.
+4. Delivers the original wake on Pi and OpenCode; omp applies its [queue-read delivery boundary](#omp-stale-wake-gating) instead.
 
 A complete Pi reason line can be observed while the predecessor is still finishing durable cleanup.
 That line is retained for replacement handoff, but the adapter never treats that already-ready predecessor as its own successor.
@@ -209,7 +215,8 @@ If the successor is not ready in that time, the adapter sends TERM and waits a b
 
 If the unready arm does not retire within that bound, the adapter keeps ownership, starts no overlapping retry, and surfaces the typed fallback; omp still holds watcher work until idle and reads current main-owned queued rows before delivery.
 When that retained arm later closes, its actual close is classified as a new supervised event without replaying the earlier fallback.
-After the configured retry bound is exhausted, the adapter delivers the original wake with a typed continuity-restoration failure, even if every successor arm hung without reporting readiness; omp still requires idle state and a fresh queue read that finds main-owned rows for watcher delivery.
+After the configured retry bound is exhausted, Pi and OpenCode deliver the original wake with a typed continuity-restoration failure, even if every successor arm hung without reporting readiness.
+omp surfaces that failure separately from watcher work, which still follows its [queue-read delivery boundary](#omp-stale-wake-gating).
 
 This is deliberate Option B ordering.
 Whenever restoration succeeds, the fleet is protected before the model handles the wake.
