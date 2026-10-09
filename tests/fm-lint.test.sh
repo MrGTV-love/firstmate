@@ -1254,6 +1254,277 @@ test_slot_pool_can_be_disabled_or_misconfigured() {
   pass "the slot pool can be disabled, rejects bad settings, and never fails lint when unusable"
 }
 
+test_slot_file_failures_run_ungated() {
+  local tmp
+  tmp=$(fm_test_tmproot fm-lint-slot-errors)
+  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "slot I/O fallback regression failed"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+open(my $module, '>', "$tmp/FailLock.pm") or die "$!";
+print {$module} <<'MODULE';
+package FailLock;
+use Errno qw(EIO EWOULDBLOCK);
+use Fcntl qw(LOCK_NB);
+BEGIN {
+    *CORE::GLOBAL::flock = sub {
+        $! = $ENV{FAIL_LOCK} eq 'wait' && ($_[1] & LOCK_NB) ? EWOULDBLOCK : EIO;
+        return 0;
+    };
+}
+1;
+MODULE
+close $module;
+for my $failure (qw(open scan wait)) {
+    my $dir = "$tmp/$failure";
+    make_path("$dir/slots");
+    make_path("$dir/slots/slot.0") if $failure eq 'open';
+    local $ENV{FM_LINT_HOST_SLOTS} = 1;
+    local $ENV{FM_TEST_SEAM} = 1;
+    local $ENV{FM_LINT_SLOT_LOAD} = 0;
+    local $ENV{FAIL_LOCK} = $failure;
+    my @inject = $failure eq 'open' ? () : ("-I$tmp", '-MFailLock');
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+        open STDERR, '>', "$dir/err" or die "$!";
+        exec $^X, @inject, $gate, 'gate', "$dir/slots", 18, "$dir/wait",
+            '--', $^X, '-e', 'print "analysis ran\n"; exit 23';
+        die "exec: $!";
+    }
+    my $deadline = time() + 4;
+    while (waitpid($pid, WNOHANG) == 0) {
+        if (time() > $deadline) {
+            kill 'KILL', $pid;
+            waitpid($pid, 0);
+            die "$failure failure queued instead of running ungated\n";
+        }
+        sleep 0.01;
+    }
+    die "$failure fallback lost the command exit status: $?\n" unless $? == (23 << 8);
+    open(my $err, '<', "$dir/err") or die "$!";
+    local $/;
+    my $warning = <$err>;
+    die "$failure fallback omitted the warning\n"
+        unless $warning =~ /running without the host-wide ShellCheck bound/;
+}
+PL
+  pass "slot open and non-contention scan/wait lock failures warn and run ungated"
+}
+
+test_slot_survives_gate_death() {
+  local tmp bounded=none
+  if fm_lint_bounds_supported; then bounded=perl; fi
+  tmp=$(fm_test_tmproot fm-lint-slot-inheritance)
+  perl - "$LINT" "$ROOT/bin/fm-lint-cache.pl" "$tmp" "$bounded" <<'PL' || fail "slot lifetime regression failed"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($lint, $gate_script, $tmp, $bound_mechanism) = @ARGV;
+open(my $stub, '>', "$tmp/shellcheck") or die "$!";
+print {$stub} "#!/usr/bin/env perl\n", <<'STUB';
+use Time::HiRes qw(time sleep);
+$SIG{TERM} = $SIG{HUP} = $SIG{INT} = 'IGNORE';
+my $child = fork();
+die "fork: $!" unless defined $child;
+if (!$child) {
+    my $deadline = time() + 15;
+    until (-e "$ENV{CASE_DIR}/release") { last if time() > $deadline; sleep 0.01; }
+    exit 0;
+}
+open(my $fh, '>', "$ENV{CASE_DIR}/started") or die "$!";
+print {$fh} "$$ $child\n";
+close $fh;
+waitpid($child, 0);
+STUB
+close $stub;
+chmod 0755, "$tmp/shellcheck";
+for my $bounded ('none', $bound_mechanism eq 'perl' ? ('perl') : ()) {
+    my $dir = "$tmp/$bounded";
+    make_path("$dir/out");
+    open(my $root, '>', "$dir/root.sh") or die "$!";
+    print {$root} "#!/bin/bash\nexit 0\n";
+    close $root;
+    open(my $manifest, '>', "$dir/manifest") or die "$!";
+    print {$manifest} "0\t$dir/root.sh\n";
+    close $manifest;
+    local %ENV = (%ENV, FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => 'off',
+        FM_LINT_INTERNAL_SLOT_DIR => "$dir/slots", FM_LINT_INTERNAL_NCPU => 18,
+        FM_LINT_HOST_SLOTS => 1, FM_TEST_SEAM => 1, FM_LINT_SLOT_LOAD => 0,
+        FM_LINT_INTERNAL_BOUNDED => $bounded, FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
+        FM_LINT_INTERNAL_ROOT_SECS => 10, FM_LINT_INTERNAL_GRACE => 1,
+        FM_LINT_SHELLCHECK => "$tmp/shellcheck", CASE_DIR => $dir);
+    my $worker = fork();
+    die "fork: $!" unless defined $worker;
+    if (!$worker) {
+        open STDOUT, '>', "$dir/output" or die "$!";
+        open STDERR, '>&', \*STDOUT or die "$!";
+        exec '/bin/bash', $lint, '--internal-worker', "$dir/manifest", "$dir/out", 0;
+        die "exec: $!";
+    }
+    my ($command, $descendant, $gate, $queued, $error);
+    eval {
+        my $deadline = time() + 5;
+        until (-s "$dir/started") { die "command never started\n" if time() > $deadline; sleep 0.01; }
+        open(my $started, '<', "$dir/started") or die "$!";
+        ($command, $descendant) = split / /, <$started>;
+        open(my $ps, '-|', 'ps', '-axo', 'pid=,ppid=,args=') or die "$!";
+        my (%parent, %args);
+        while (<$ps>) {
+            next unless /^\s*(\d+)\s+(\d+)\s+(.*)$/;
+            $parent{$1} = $2; $args{$1} = $3;
+        }
+        close $ps;
+        my $ancestor = $command;
+        while ($ancestor && $ancestor != $worker) {
+            if (($args{$ancestor} // '') =~ /\Q$dir\/slots\E/) { $gate = $ancestor; last; }
+            $ancestor = $parent{$ancestor};
+        }
+        die "gate not found in command ancestry\n" unless $gate;
+        $queued = fork();
+        die "fork: $!" unless defined $queued;
+        if (!$queued) {
+            exec $^X, $gate_script, 'gate', "$dir/slots", 18, "$dir/queued.wait",
+                '--', $^X, '-e', 'open(my $fh, ">", $ARGV[0]) or die "$!"', "$dir/admitted";
+            die "exec: $!";
+        }
+        kill 'KILL', $gate;
+        sleep 0.2;
+        die "queued command started while protected tree survived\n" if -e "$dir/admitted";
+        kill 'KILL', $command;
+        sleep 0.2;
+        die "queued command started while protected descendant survived\n" if -e "$dir/admitted";
+        die "protected descendant exited before release\n" unless kill 0, $descendant;
+    };
+    $error = $@;
+    open(my $release, '>', "$dir/release") or die "$!";
+    close $release;
+    my $deadline = time() + 5;
+    if ($queued) {
+        while (waitpid($queued, WNOHANG) == 0) {
+            if (time() > $deadline) { kill 'KILL', $queued; waitpid($queued, 0); $error ||= "slot never released\n"; last; }
+            sleep 0.01;
+        }
+        $error ||= "queued command failed: $?\n" if $?;
+        $error ||= "queued command never admitted\n" unless -e "$dir/admitted";
+    }
+    kill 'KILL', $command if $command;
+    kill 'KILL', $descendant if $descendant;
+    kill 'TERM', $worker;
+    waitpid($worker, 0);
+    if ($error) {
+        open(my $output, '<', "$dir/output") or die "$!";
+        open(my $analysis, '<', "$dir/out/shard.0.out") or die "$!";
+        local $/;
+        die "$bounded: $error", <$output>, <$analysis>;
+    }
+}
+PL
+  pass "commands retain slots through gate and command death until descendants exit (bounded where supported)"
+}
+
+test_queued_roots_use_high_resolution_timings() {
+  local tmp bounded=none
+  if fm_lint_bounds_supported; then bounded=perl; fi
+  tmp=$(fm_test_tmproot fm-lint-slot-clock)
+  perl - "$LINT" "$tmp" "$bounded" <<'PL' || fail "queued root clock regression failed"
+use strict;
+use warnings;
+use Fcntl qw(:flock);
+use File::Path qw(make_path);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($lint, $tmp, $bounded) = @ARGV;
+open(my $env, '>', "$tmp/bash-env") or die "$!";
+print {$env} "unset EPOCHREALTIME\n";
+close $env;
+open(my $stub, '>', "$tmp/shellcheck") or die "$!";
+print {$stub} "#!/usr/bin/env perl\n", <<'STUB';
+use Time::HiRes qw(sleep);
+sleep 0.08;
+if ($ENV{RETRY} && grep { $_ eq '--external-sources' } @ARGV) {
+    print STDERR "shellcheck: Heap exhausted;\n";
+    exit 251;
+}
+exit 0;
+STUB
+close $stub;
+chmod 0755, "$tmp/shellcheck";
+for my $retry (0, 1) {
+    my $dir = "$tmp/$retry";
+    make_path("$dir/out", "$dir/slots");
+    open(my $slot, '>>', "$dir/slots/slot.0") or die "$!";
+    flock($slot, LOCK_EX) or die "$!";
+    open(my $manifest, '>', "$dir/manifest") or die "$!";
+    print {$manifest} "0\t$dir/root.sh\n";
+    close $manifest;
+    open(my $root, '>', "$dir/root.sh") or die "$!";
+    print {$root} "#!/bin/bash\nexit 0\n";
+    close $root;
+    local %ENV = (%ENV, BASH_ENV => "$tmp/bash-env", RETRY => $retry,
+        FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => 'off',
+        FM_LINT_INTERNAL_SLOT_DIR => "$dir/slots", FM_LINT_INTERNAL_NCPU => 18,
+        FM_LINT_HOST_SLOTS => 1, FM_TEST_SEAM => 1, FM_LINT_SLOT_LOAD => 0,
+        FM_LINT_INTERNAL_BOUNDED => $bounded, FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
+        FM_LINT_INTERNAL_ROOT_SECS => 3, FM_LINT_INTERNAL_GRACE => 1,
+        FM_LINT_INTERNAL_ROOTS_LOG => "$dir/roots.tsv", FM_LINT_SHELLCHECK => "$tmp/shellcheck");
+    sleep 0.005 until time() - int(time()) > 0.3 && time() - int(time()) < 0.35;
+    my $worker = fork();
+    die "fork: $!" unless defined $worker;
+    if (!$worker) {
+        close $slot;
+        open STDOUT, '>', "$dir/output" or die "$!";
+        open STDERR, '>&', \*STDOUT or die "$!";
+        exec '/bin/bash', $lint, '--internal-worker', "$dir/manifest", "$dir/out", 0;
+        die "exec: $!";
+    }
+    my $error;
+    eval {
+        my $deadline = time() + 5;
+        until (-s "$dir/roots.tsv") { die "root never began\n" if time() > $deadline; sleep 0.01; }
+        my $began = time();
+        sleep 1.5;
+        close $slot;
+        $deadline = time() + 5;
+        while (waitpid($worker, WNOHANG) == 0) {
+            die "queued root timed out\n" if time() > $deadline;
+            sleep 0.01;
+        }
+        die "queued root failed: $?\n" if $?;
+        my $finished = time();
+        my $queued_ms = 0;
+        for my $file (glob "$dir/out/*.rss.wait") {
+            open(my $wait, '<', $file) or die "$!";
+            $queued_ms += <$wait>;
+        }
+        my $elapsed = ($finished - $began) * 1000 - $queued_ms;
+        open(my $log, '<', "$dir/roots.tsv") or die "$!";
+        my @end;
+        while (<$log>) { @end = split /\t/ if /^end\t/; }
+        die "missing root result\n" unless @end;
+        my $expected = $retry ? 'memory-fallback' : 'ok';
+        die "wrong root outcome: $end[9]\n" unless $end[9] eq $expected;
+        die "root timestamps lack millisecond precision\n"
+            unless abs($end[5] - $began * 1000) < 150 && abs($end[6] - $finished * 1000) < 150;
+        die "duration $end[7]ms disagrees with $elapsed ms of analysis\n"
+            unless $end[7] >= 70 && abs($end[7] - $elapsed) < 150;
+        die "root wall time omitted the queue\n" unless $end[6] - $end[5] >= 1500;
+    };
+    $error = $@;
+    close $slot if defined fileno($slot);
+    kill 'KILL', $worker;
+    waitpid($worker, 0);
+    die "retry=$retry: $error" if $error;
+}
+PL
+  pass "queued roots and memory retries record precise analysis durations without EPOCHREALTIME"
+}
+
 test_worker_trees_stop_on_signal() {
   local tmp fakebin fixture jobs telemetry lint_tmp pid_file out_file telemetry_file
   local parent_pid shellcheck_pid i parent_rc survivor
@@ -2914,6 +3185,17 @@ SH
   pass "unproved transitive runtime closures never reuse successful analysis"
 }
 
+if [ "${1:-}" = --host-slots ]; then
+  test_host_slots_bound_concurrent_runs
+  test_host_load_shrinks_slots_to_the_floor
+  test_host_load_preserves_the_cap_until_the_threshold
+  test_slot_pool_can_be_disabled_or_misconfigured
+  test_slot_file_failures_run_ungated
+  test_slot_survives_gate_death
+  test_queued_roots_use_high_resolution_timings
+  exit 0
+fi
+
 test_command_words_exclude_inert_source_text
 test_child_shell_imports_select_and_invalidate_callers
 test_stdin_heredoc_imports_select_and_invalidate_callers
@@ -2955,6 +3237,9 @@ test_host_slots_bound_concurrent_runs
 test_host_load_shrinks_slots_to_the_floor
 test_host_load_preserves_the_cap_until_the_threshold
 test_slot_pool_can_be_disabled_or_misconfigured
+test_slot_file_failures_run_ungated
+test_slot_survives_gate_death
+test_queued_roots_use_high_resolution_timings
 test_worker_trees_stop_on_signal
 test_root_deadline_names_the_root_and_reaps_the_tree
 test_root_memory_limit_reports_a_named_death

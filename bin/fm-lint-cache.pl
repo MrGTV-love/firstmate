@@ -9,7 +9,7 @@ use Cwd qw(abs_path);
 use strict;
 use warnings;
 use Digest::SHA qw(sha256_hex);
-use Fcntl qw(:flock);
+use Fcntl qw(:flock F_SETFD);
 use File::Path qw(make_path);
 use File::Basename qw(dirname basename);
 
@@ -53,17 +53,21 @@ if (($ARGV[0] // '') eq 'gate') {
         return 0;
     };
     my ($slot, $waited_from);
-    if (eval { make_path($slot_dir, {mode => 0700}); -d $slot_dir && -w _ }) {
+    my $available = eval { make_path($slot_dir, {mode => 0700}); -d $slot_dir && -w _ };
+    if ($available) {
         $waited_from = Time::HiRes::time();
-        while (!$slot) {
+        ACQUIRE: while (!$slot) {
             exit 128 + $signal_number{$caught} if $caught;
             my $allowed = int($cap + 2 * $ncpu - $slot_load->() + 0.5);
             $allowed = $floor if $allowed < $floor;
             $allowed = $cap if $allowed > $cap;
             for my $index (0 .. $allowed - 1) {
-                open(my $fh, '>>', "$slot_dir/slot.$index") or next;
+                open(my $fh, '>>', "$slot_dir/slot.$index")
+                    or do { $available = 0; last ACQUIRE; };
                 if (flock($fh, LOCK_EX | LOCK_NB)) { $slot = $fh; last; }
+                my $busy = $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
                 close $fh;
+                unless ($busy) { $available = 0; last ACQUIRE; }
             }
             next if $slot || $caught;
             # Every allowed slot is busy: block on one so a freed slot wakes this
@@ -73,16 +77,27 @@ if (($ARGV[0] // '') eq 'gate') {
                     local $SIG{ALRM} = sub { die "gate-recheck\n" };
                     alarm 2;
                     my $got = flock($fh, LOCK_EX);
+                    my $interrupted = $!{EINTR};
                     alarm 0;
+                    die "gate-lock: $!\n" unless $got || $interrupted;
                     $got;
                 };
                 alarm 0;
+                my $error = $@;
                 if ($locked) { $slot = $fh; } else { close $fh; }
+                if ($error && $error ne "gate-recheck\n") { $available = 0; last ACQUIRE; }
             } else {
-                Time::HiRes::sleep(1);
+                $available = 0;
+                last ACQUIRE;
             }
         }
-    } else {
+    }
+    if ($slot && !defined fcntl($slot, F_SETFD, 0)) {
+        close $slot;
+        undef $slot;
+        $available = 0;
+    }
+    unless ($available) {
         warn "fm-lint: host slot directory unavailable; running without the host-wide ShellCheck bound\n";
     }
     if (open(my $fh, '>', $wait_file)) {
