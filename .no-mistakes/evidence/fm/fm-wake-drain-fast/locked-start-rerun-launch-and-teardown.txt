@@ -1,0 +1,62 @@
+Real Claude, private tmux server, 120x40 terminal; inherited settings excluded; one invocation-local SessionStart hook; 25 cold logs with 60 routine pairs each; unchanged 20-second acceptance bound.
+Launch load: (45.435546875, 46.52685546875, 53.82470703125)
+Primary pane:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Deferred ('wait', '150') exit=0
+
+
+Deferred ('report',) exit=0
+completed off the startup path in 4s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1148    elapsed=691
+  phase       secondmate-liveness                        start=+1937    elapsed=83
+  phase       secondmate-sync                            start=+2111    elapsed=73
+  phase       handoff-delivery                           start=+2208    elapsed=17
+  phase       fleet-sync                                 start=+1927    elapsed=1225
+  stage       network-checks probe_sweeps                start=+392     elapsed=2889
+  slowest: stage network-checks probe_sweeps 2889ms, phase fleet-sync 1225ms, phase gh-auth 691ms
+
+
+Private tmux teardown exit=0: 
+Disposable fixture removed.

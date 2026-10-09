@@ -1,0 +1,6 @@
+Real Claude SessionStart → bin/fm-session-start.sh --source startup; 25 cold status logs, each containing 60 keyed resolved/working pairs. No primed cursor, mocked harness, inherited hooks, relaxed bound, or credential modification.
+
+Run 1: 28.925 seconds (required <20). Load at start 69.90/70.13/67.93; end 101.67/78.07/70.90. Lock and completion match live Claude PID 22835; digest complete, no truncation.
+Run 2: 12.574 seconds (required <20). Load at start 86.20/76.64/70.63; end 84.87/76.69/70.72. Lock and completion match live Claude PID 83117; digest complete, no truncation.
+
+Conclusion: first run fails the latency criterion; second passes. Timing varies under observed host load; these measurements do not isolate drain CPU cost from scheduling. All disposable homes and private servers removed.

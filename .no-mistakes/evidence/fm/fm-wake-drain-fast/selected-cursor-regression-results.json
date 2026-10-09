@@ -1,0 +1,13 @@
+{
+  "selectors": [
+    "test_terminal_supersession_reaches_cached_drains",
+    "test_kind_changes_invalidate_folded_decisions",
+    "test_truncated_log_falls_back_to_a_full_refold_not_a_dropped_decision",
+    "test_same_size_rewrite_is_detected_via_inode_identity",
+    "test_read_failure_preserves_state_for_retry",
+    "test_cursor_cache_read_failure_refolds_without_replaying_unread_status",
+    "test_buried_decision_survives_many_growing_drains_and_resolution_clears_it"
+  ],
+  "returncode": "driver-timeout",
+  "elapsed_seconds": 907.6632825839915
+}

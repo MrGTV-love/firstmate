@@ -1,0 +1,60 @@
+Launch: env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE TMUX_TMPDIR="$LAB/tmux" tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c "$PWD" -e FM_HOME="$LAB" claude --setting-sources "" --settings <one invocation-local SessionStart measurement hook> --strict-mcp-config --tools "" --no-session-persistence --max-budget-usd 0.10 -p "Reply exactly LAB_STARTUP_OK. Do not use tools."
+Primary pane capture:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Deferred stage wait exit=0
+
+
+Deferred stage report:
+completed off the startup path in 21s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+4658    elapsed=1068
+  phase       secondmate-liveness                        start=+5772    elapsed=1297
+  phase       secondmate-sync                            start=+7209    elapsed=523
+  phase       handoff-delivery                           start=+7940    elapsed=50
+  phase       fleet-sync                                 start=+5768    elapsed=6098
+  stage       network-checks probe_sweeps                start=+1264    elapsed=14467
+  slowest: stage network-checks probe_sweeps 14467ms, phase fleet-sync 6098ms, phase secondmate-liveness 1297ms
+
+Private tmux kill-server exit=0: 
+Disposable lab home removed; only the private fm-lab socket was controlled.

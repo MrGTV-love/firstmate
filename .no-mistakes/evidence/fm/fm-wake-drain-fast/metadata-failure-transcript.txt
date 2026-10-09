@@ -1,0 +1,12 @@
+$ FM_STATUS_IDENTITY_READER=<failing reader> bin/fm-wake-drain.sh
+STATUS PRESENTATION INCOMPLETE: status snapshot could not be read.
+Both cursor byte contracts unchanged.
+$ FM_STATUS_SIZE_READER=<failing reader> bin/fm-wake-drain.sh
+STATUS PRESENTATION INCOMPLETE: status snapshot could not be read.
+Both cursor byte contracts unchanged.
+$ bin/fm-wake-drain.sh # restore real metadata I/O
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: waiting for metadata recovery
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=kept] blocked: already trusted
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'

@@ -1,0 +1,23 @@
+{
+  "elapsed_seconds": 12.57405724999262,
+  "limit_seconds": 20,
+  "load_start": [
+    86.20166015625,
+    76.6396484375,
+    70.6337890625
+  ],
+  "load_end": [
+    84.87255859375,
+    76.6943359375,
+    70.724609375
+  ],
+  "exit_code": 0,
+  "lock": "83117\n",
+  "completion": "83117\n",
+  "live_lock_process": "83117 83091 claude claude --setting-sources  --settings /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/startup-settings.json --strict-mcp-config --tools  --print --no-session-persistence Reply only READY. Do not use tools or take any actions.\n",
+  "cold_status_logs": 25,
+  "keyed_resolutions_per_log": 60,
+  "digest_complete": true,
+  "truncated": false,
+  "status_cursor_count": 25
+}

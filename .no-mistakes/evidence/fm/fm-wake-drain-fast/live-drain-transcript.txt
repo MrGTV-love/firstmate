@@ -1,0 +1,147 @@
+Real drain CLI, private tmux socket, disposable marked FM_HOME. Includes first-driver setup correction and retry.
+
+=== Unread buried answer and open decision are both presented ===
+$ bin/fm-wake-drain.sh
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: captain said REST
+task note: reread acknowledged
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=api] needs-decision: choose REST or RPC
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+=== Second drain does not replay handled notes; open decision persists ===
+$ bin/fm-wake-drain.sh
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=api] needs-decision: choose REST or RPC
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+=== Reserved-key mismatch is rejected; stamped blocker is held; same key reopens at the end ===
+$ bin/fm-wake-drain.sh
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=pending-reply-7] needs-decision: pending-reply-missed: still waiting
+task [key=api] needs-decision: reopened with REST
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+PERSISTED DECISION CURSOR (hex shows no trailing newline):
+version=10:secondmate
+offset=377
+ident=strong:16777232:168579503:1791549717.401453685
+pending-reply-7	needs-decision	pending-reply-missed: still waiting
+api	needs-decision	reopened with REST
+open-set hex=70656e64696e672d7265706c792d37096e656564732d6465636973696f6e0970656e64696e672d7265706c792d6d69737365643a207374696c6c2077616974696e670a617069096e656564732d6465636973696f6e0972656f70656e656420776974682052455354
+
+=== Matching reserved close surfaces once and both open decisions close ===
+$ bin/fm-wake-drain.sh
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task resolved [key=pending-reply-7]: pending-reply-resolved: via=status
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+=== Presented reserved close is not replayed ===
+$ bin/fm-wake-drain.sh
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+=== Routine-only history remains quiet before a delayed signal ===
+$ bin/fm-wake-drain.sh
+
+STDERR:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+=== Delayed queued signal still annotates the previously quiet working line ===
+$ bin/fm-wake-drain.sh
+1791549741	1	signal	task.status	signal: task.status
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: working: delayed signal sees this step
+
+STDERR:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 23480.1791549741.aryfni
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+=== Same-size inode replacement exposes the new decision instead of trusting old cursor ===
+$ bin/fm-wake-drain.sh
+1791549741	1	signal	task.status	signal: task.status
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: blocked [key=rotated]: replacement needs captain
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=rotated] blocked: replacement needs captain
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 23480.1791549741.aryfni
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+=== Span-read failure reports incomplete delivery without advancing presentation ===
+$ bin/fm-wake-drain.sh
+1791549741	1	signal	task.status	signal: task.status
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: note: delivery after failed read
+
+STDERR:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 23480.1791549741.aryfni
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+Driver correction: queued annotation is independently readable. Inject span failure on an empty queue to test presentation cursor safety.
+
+=== Prime empty-queue presentation ===
+$ bin/fm-wake-drain.sh
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: bootstrap
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=kept] needs-decision: choose the release
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+=== Empty-queue span read failure presents no uncertain bytes ===
+$ bin/fm-wake-drain.sh
+
+STDERR:
+Both persisted cursors remain byte-identical after failed span read.
+
+=== Recovery presents pending note and retained decision ===
+$ bin/fm-wake-drain.sh
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: delivery after failed read
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=kept] needs-decision: choose the release
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+Recovered presentation manifest:
+task	strong:16777232:168853496:1791550143.912798142	95	0
+
+=== Append during latest-event read is not committed as a stable completion ===
+$ bin/fm-wake-drain.sh
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=kept] needs-decision: choose the release
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+=== Retry presents only final completion after the race ===
+$ bin/fm-wake-drain.sh
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+racing done: completion appended during read
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=kept] needs-decision: choose the release
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:

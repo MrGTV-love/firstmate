@@ -1,0 +1,206 @@
+HOST LOAD AT START: 1:18  up 3 days,  1:27, 3 users, load averages: 179.76 173.97 159.56
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.ZCn6jr
+elapsed=0.412s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.ZCn6jr
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=17.348s exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: already handled
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=cache] needs-decision: preserved decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=9.333s exit=0
+stdout:
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=30.057s exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=cache] needs-decision: preserved decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=38.371s exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=cache] needs-decision: preserved decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=33.840s exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: reset
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=48.041s exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: replacement unread
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=new] needs-decision: replacement decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=11.190s exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: rotated unread
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=rotated] needs-decision: rotated decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+SCENARIO PASS: Recover cursor read failures, truncation, and inode replacement without losing decisions — Failed span preserved the checkpoint, failing checkpoint cat rebuilt the authoritative open set without informational replay, and truncation/inode replacement refolded new decisions.
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.JucI5Q
+elapsed=8.804s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.JucI5Q
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=73.124s exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: real seam context
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=release] needs-decision: select release
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=22.161s exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=release] needs-decision: select release
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+REAL METADATA READER CALLS:
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+identity /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+size /Users/charlesabrooker/tmp/fm-lab.JucI5Q/state/task.status
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=35.785s exit=0
+stdout:
+STATUS PRESENTATION INCOMPLETE: status snapshot could not be read.
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=15.978s exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: recover after metadata failure
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=release] needs-decision: select release
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+SCENARIO PASS: Preserve actual metadata reader seams and retry after metadata failure — Identity and size seams read actual file metadata per file; metadata failure was visible and preserved the receipt; retry recovered the pending note and open decision.
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.Z0XyJJ
+elapsed=0.224s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.Z0XyJJ
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=17.325s exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+matetask [key=access] blocked: still pending
+scouttask [key=access] blocked: still pending
+shiptask [key=access] blocked: still pending
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  3 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=9.208s exit=0
+stdout:
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+matetask done: task completed
+scouttask done: task completed
+shiptask done: task completed
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+matetask [key=access] blocked: still pending
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=19.376s exit=0
+stdout:
+
+stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+
+SCENARIO PASS: Preserve ship, scout, and secondmate terminal decision semantics in cached drains — Cached ship/scout terminal events superseded old decisions; secondmate terminal events retained unrelated decisions until explicit resolution.
+All disposable lab homes removed.

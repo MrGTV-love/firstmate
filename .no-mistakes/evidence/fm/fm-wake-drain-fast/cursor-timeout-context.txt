@@ -1,0 +1,3 @@
+Full cursor regression file: driver TimeoutExpired after 900 seconds.
+Selected cursor run: driver-timeout after 907.663 seconds; completed terminal-supersession, kind-change, and truncation scenarios before termination. The driver signaled only its own process group and removed its generated script and fixtures. Subsequent process inspection found no selected-cursor fixture processes remaining.
+Host load sampled afterward: 145.60, 154.59, 161.13. These driver deadlines are not assertions of a product failure. Separate narrow real-drain checks exercise the checkpoint cat and span reader faults and equally sized inode rotation.

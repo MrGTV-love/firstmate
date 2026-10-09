@@ -1,0 +1,28 @@
+{
+  "elapsed_seconds": 17.25813179195393,
+  "acceptance_bound_seconds": 20,
+  "passed": true,
+  "returncode": 0,
+  "lock_pid": "83965",
+  "completion_pid": "83965",
+  "lock_process": "83965 83944 claude",
+  "initial_state": {
+    "logs": 25,
+    "decision_checkpoints": 0,
+    "presentation_manifest_exists": false
+  },
+  "load_before": [
+    45.435546875,
+    46.52685546875,
+    53.82470703125
+  ],
+  "load_after": [
+    44.3779296875,
+    46.2392578125,
+    53.59423828125
+  ],
+  "child_user_seconds": 2.755293,
+  "child_system_seconds": 3.979818,
+  "truncated": false,
+  "complete_digest": true
+}

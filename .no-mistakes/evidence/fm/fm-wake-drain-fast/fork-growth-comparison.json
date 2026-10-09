@@ -1,0 +1,42 @@
+{
+  "method": "Real cold drain sourced under Bash 3.2 set -T; DEBUG trap records first command at each new BASH_SUBSHELL depth. All cursors initially absent.",
+  "base_commit": "fd9b8b020201a029880b3980b545f352ae357a39",
+  "target_commit": "ab89692ee9be21aba8997cdd4b857c40209a23c1",
+  "regression_allowance_entries": 40,
+  "measurements": [
+    {
+      "version": "base",
+      "history_pairs_per_task": 3,
+      "tasks": 3,
+      "subshell_entries": 403,
+      "exit_code": 0,
+      "elapsed_instrumented_seconds": 3.734986833005678
+    },
+    {
+      "version": "base",
+      "history_pairs_per_task": 60,
+      "tasks": 3,
+      "subshell_entries": 1771,
+      "exit_code": 0,
+      "elapsed_instrumented_seconds": 5.448116791958455
+    },
+    {
+      "version": "target",
+      "history_pairs_per_task": 3,
+      "tasks": 3,
+      "subshell_entries": 95,
+      "exit_code": 0,
+      "elapsed_instrumented_seconds": 1.7034797499654815
+    },
+    {
+      "version": "target",
+      "history_pairs_per_task": 60,
+      "tasks": 3,
+      "subshell_entries": 95,
+      "exit_code": 0,
+      "elapsed_instrumented_seconds": 2.0689627500250936
+    }
+  ],
+  "base_history_growth_exceeds_bound": true,
+  "target_history_growth_within_bound": true
+}

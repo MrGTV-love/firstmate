@@ -1,0 +1,56 @@
+### Prime fold and presentation independently
+elapsed=113.227s exit=0
+STDOUT:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: already presented information
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=cache] needs-decision: recover authoritative decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+### Inject FM_STATUS_SPAN_READER failure
+elapsed=11.997s exit=0
+STDOUT:
+
+STDERR:
+
+
+### Recover trusted open decision after span reads resume
+elapsed=60.043s exit=0
+STDOUT:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=cache] needs-decision: recover authoritative decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+### Inject checkpoint cat failure and refold authoritative status
+elapsed=15.308s exit=0
+STDOUT:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=cache] needs-decision: recover authoritative decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+Checkpoint cat seam invocations:
+checkpoint cat failure invoked
+Full-refold probe (status bytes=206):
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/.live-validation/checkpoint-home/state/task.status	206
+
+
+### Rotate to an equally sized log with a different blocker
+elapsed=34.750s exit=0
+STDOUT:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=release] blocked: new rotation blocker
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+Equal-sized rotation: before_bytes=206 after_bytes=206 old_inode=163135195 new_inode=163201252

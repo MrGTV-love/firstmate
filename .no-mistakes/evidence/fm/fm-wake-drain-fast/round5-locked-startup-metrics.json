@@ -1,0 +1,29 @@
+{
+  "elapsed_seconds": 30.04722995799966,
+  "acceptance_bound_seconds": 20,
+  "returncode": 0,
+  "lock_pid": "48559",
+  "completion_pid": "48559",
+  "lock_process": "48559 48543 claude",
+  "initial_state": {
+    "logs": 25,
+    "decision_checkpoints": 0,
+    "presentation_manifest_exists": false
+  },
+  "load_before": [
+    53.857421875,
+    45.2587890625,
+    49.173828125
+  ],
+  "load_after": [
+    46.24560546875,
+    44.27978515625,
+    48.68505859375
+  ],
+  "child_user_seconds": 2.766102,
+  "child_system_seconds": 3.9943049999999998,
+  "truncated": false,
+  "complete_digest": true,
+  "result": "fail",
+  "measurement_note": "Truncation detection corrected to match the emitted failure banner, not the read-once instruction mentioning it. Raw digest and measured elapsed time are unchanged."
+}

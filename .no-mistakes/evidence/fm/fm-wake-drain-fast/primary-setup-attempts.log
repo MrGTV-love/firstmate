@@ -1,0 +1,6 @@
+Two interactive Claude attempts did not submit the Bash-mode timing command; both private tmux servers and marked homes were removed.
+A subsequent real Claude print-mode attempt failed before startup: SSL certificate verification failed (UNABLE_TO_VERIFY_LEAF_SIGNATURE).
+A read-only public macOS System.keychain export returned two certificates. The retry supplies that workspace-local bundle via NODE_EXTRA_CA_CERTS; system trust and credential stores remain unchanged.
+The public system trust bundle did not resolve the Claude API TLS failure. Native Claude SessionStart hooks supplied a local, real-primary route without a model/API call or fake harness.
+Timed locked startups over 25 logs truncated in wake-queue after 120.40s and 121.92s. The latter used --setting-sources "" to eliminate inherited hook contention. Both acquired real Claude locks; neither published a startup completion record.
+All private tmux servers and marked homes were stopped/removed, and both temporary driver scripts and the workspace-local public CA bundle were removed.

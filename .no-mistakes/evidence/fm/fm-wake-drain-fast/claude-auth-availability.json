@@ -1,0 +1,5 @@
+{
+  "command": "claude auth status | jq '{loggedIn, authMethod}'",
+  "loggedIn": true,
+  "authMethod": "claude.ai"
+}

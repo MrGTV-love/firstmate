@@ -1,0 +1,21 @@
+### Prime valid presentation
+exit=0
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: previously presented
+
+STDERR:
+
+
+### Inject FM_STATUS_SIZE_READER failure
+exit=0
+STATUS PRESENTATION INCOMPLETE: status snapshot could not be read.
+
+STDERR:
+
+
+### Retry with real metadata reader
+exit=0
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: appended before size fault
+
+STDERR:

@@ -1,0 +1,6 @@
+ok - terminal supersession reaches whole-file reads, incremental drains, old caches, and captured spans
+ok - folded decisions are rebuilt when task-kind evidence changes
+ok - a truncated/rewritten log falls back to a full re-fold instead of dropping or misreading the decision
+
+STDERR:
+Terminated: 15

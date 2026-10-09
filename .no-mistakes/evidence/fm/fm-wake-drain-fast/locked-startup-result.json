@@ -1,0 +1,6 @@
+{
+  "name": "Complete a real Claude locked session start over 25 logs in under 20 seconds",
+  "live": true,
+  "result": "fail",
+  "reason": "Required locked-start under-20-second target not established: {\"tasks\": 25, \"routine_pairs_per_task\": 60, \"elapsed_seconds\": 121.92, \"exit\": \"0\", \"lock_pid\": \"55690\", \"completion_pid\": \"\", \"lock_process\": \"55690 claude claude -p --setting-sources  --settings {\\\"hooks\\\": {\\\"SessionStart\\\": [{\\\"hooks\\\": [{\\\"type\\\": \\\"command\\\", \\\"command\\\": \\\"/usr/bin/time -p bin/fm-session-start.sh > \\\\\\\"$FM_HOME/startup.out\\\\\\\" 2> \\\\\\\"$FM_HOME/startup.time\\\\\\\"; printf \\\\\\\"%s\\\\\\\\n\\\\\\\" \\\\\\\"$?\\\\\\\" > \\\\\\\"$FM_HOME/startup.rc\\\\\\\"\\\", \\\"timeout\\\": 180}]}]}} -- Isolated lab timing: do not call tools or operate any fleet. Reply only done.\\n\", \"digest_completed\": false, \"read_only\": false, \"truncated\": true}"
+}

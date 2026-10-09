@@ -1,0 +1,119 @@
+{
+  "findings": [
+    {
+      "id": "locked-start-latency",
+      "severity": "error",
+      "file": "bin/fm-wake-drain.sh",
+      "description": "The requested lower-load rerun still exceeded the unchanged under-20-second locked-start target: a real Claude primary completed startup over 25 cold status logs in 30.047 seconds. Load averages were 53.86/45.26/49.17 at start and 46.25/44.28/48.69 at end. Lock and completion records matched the live Claude PID; the digest was complete, not truncated. The earlier recorded 17.258-second rerun and this failure demonstrate variability rather than reliable attainment. Diagnose that variability and obtain repeatable under-20-second end-to-end evidence before accepting the latency goal; this measurement alone does not isolate product cost from host scheduling.",
+      "action": "no-op"
+    }
+  ],
+  "summary": "Eight live drain scenarios passed; the fresh lower-load locked-start check exceeded the required latency bound. No product source changes were made.",
+  "tested": [
+    "`git diff --stat fd9b8b020201a029880b3980b545f352ae357a39 0ff4032e5f2c53734f51401d113177a73007a0a7` and scoped behavioral diff inspection.",
+    "`command -v claude tmux python3 bash perl jq`, `uptime`, `/bin/bash --version`, `claude --help`, and `claude auth status --json` established existing tools, Bash 3.2.57, host load, and the normal authenticated Claude login.",
+    "`python3 /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-drain-driver.py` drove the executable `/bin/bash bin/fm-wake-drain.sh` against disposable homes for presentation, keyed decisions, checkpoint recovery, metadata faults, concurrent append, delayed signals, span faults, fake-cat fallback, equal-size rotation, and cold-history/fleet subshell growth.",
+    "`python3 /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-startup-driver.py` created a marked disposable lab home, enabled supervision-host, seeded 25 unprimed logs, and launched real Claude through a private 120x40 tmux primary with one invocation-local SessionStart hook running `bin/fm-session-start.sh --source startup`.",
+    "Captured monotonic startup elapsed time, load averages immediately before and after startup, the generated digest, live lock-owner process, and matching persisted completion PID; corrected the evidence driver to recognize only the emitted truncation banner rather than its mention in instructions.",
+    "`FM_HOME=\"$LAB\" bin/fm-startup-network.sh wait 150`, `FM_HOME=\"$LAB\" bin/fm-startup-network.sh report`, and `TMUX_TMPDIR=\"$LAB/tmux\" tmux -L fm-lab kill-server` completed deferred-worker observation and isolated teardown; cleanup checks found no remaining current-run fixtures."
+  ],
+  "testing_summary": "Baseline tool, Bash 3.2, and normal-login checks succeeded. Eight disposable-home drain scenarios passed, including adversarial cursor/read checks and flat cold-history fork growth. A real Claude locked startup completed in 30.05 seconds with start/end load below 60, failing the unchanged 20-second bound. CLI digests, fault/retry transcripts, metrics, and teardown evidence were saved; all current-run fixtures were removed. No full suite, lint, formatter, or other pipeline phase ran.",
+  "artifacts": [
+    {
+      "kind": "log",
+      "label": "Live drain presentation, recovery, race, delayed-signal, and fork-growth transcript",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-drain-live-transcript.txt"
+    },
+    {
+      "kind": "log",
+      "label": "Span failure, checkpoint-cat fallback, and equal-size rotation transcript",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-checkpoint-seams-live-transcript.txt"
+    },
+    {
+      "kind": "log",
+      "label": "Size-reader failure and recovery transcript",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-size-reader-live-transcript.txt"
+    },
+    {
+      "kind": "log",
+      "label": "Real Claude locked-start digest",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-locked-startup-digest.txt"
+    },
+    {
+      "kind": "other",
+      "label": "Locked-start elapsed time, start/end load, and ownership evidence",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-locked-startup-metrics.json"
+    },
+    {
+      "kind": "log",
+      "label": "Private primary launch, deferred-worker report, and teardown",
+      "path": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-startup-launch-and-teardown.txt"
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "Present buried notes and reserved replies once while keeping decisions open until explicitly answered",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-drain-live-transcript.txt",
+      "reason": "Both buried notes surfaced once; independent keys remained open until explicit closes; reserved close surfaced once."
+    },
+    {
+      "name": "Recover keyed decisions across cold history, append growth, damaged checkpoints, truncation, and replacement",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-drain-live-transcript.txt",
+      "reason": "Cold, incremental, damaged-checkpoint, truncated-file, and replacement-file folds preserved current keyed state."
+    },
+    {
+      "name": "Preserve unacknowledged status and show an incomplete warning when metadata reads fail",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-drain-live-transcript.txt",
+      "reason": "Read failure emitted incomplete-presentation warning, preserved cursor bytes, and retried pending note exactly once."
+    },
+    {
+      "name": "Defer a completion appended during the latest-event read and surface its final value on retry",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-drain-live-transcript.txt",
+      "reason": "Fresh post-read metadata deferred changing latest-event snapshot; next drain presented final completion."
+    },
+    {
+      "name": "Keep empty-queue routine history silent without losing a later signal annotation",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-drain-live-transcript.txt",
+      "reason": "Routine-only drain was silent, but later real durable wake retained all routine annotations and raw signal row."
+    },
+    {
+      "name": "Keep cold-drain subshell entries flat with history and bounded per added task on Bash 3.2",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-drain-live-transcript.txt",
+      "reason": "{\"small\": 95, \"large\": 95, \"many\": 143, \"per_added_task\": 6, \"history_growth\": 0}"
+    },
+    {
+      "name": "Preserve cursors on span-read failure, refold after checkpoint-cat failure, and detect equal-size log rotation",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-checkpoint-seams-live-transcript.txt",
+      "reason": "Both persisted cursors survived the failed span read; the checkpoint cat seam forced a full authoritative refold without informational replay; equal-size inode replacement exposed the new blocker."
+    },
+    {
+      "name": "Preserve unread status when the size reader fails and recover it on retry",
+      "result": "pass",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-size-reader-live-transcript.txt",
+      "reason": "The real drain emitted an incomplete-presentation warning, preserved the cursor, and presented the pending note after restoring real metadata reads."
+    },
+    {
+      "name": "Complete a real Claude locked startup over 25 cold status logs in under 20 seconds",
+      "result": "fail",
+      "live": true,
+      "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-locked-startup-metrics.json; /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-locked-startup-digest.txt",
+      "reason": "Completed in 30.047 seconds, exceeding the unchanged 20-second bound. The live Claude PID matched both lock and completion records. Start load averages: 53.86/45.26/49.17; end: 46.25/44.28/48.69. No actual truncation banner was emitted."
+    }
+  ],
+  "verdict": "no-go"
+}

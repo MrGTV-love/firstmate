@@ -1,0 +1,51 @@
+$ tmux -L fm-lab new-session -d -s primary -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V -x 120 -y 40 -e FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/lab claude
+
+Sent to the real Claude primary:
+Isolated live validation only. This session has a disposable FM_HOME. Do not inspect other sessions, spawn workers, repair supervision, run pipelines, change files in the repository, or access production data. Run exactly this Bash command from the current worktree: /usr/bin/time -p bin/fm-session-start.sh > "$FM_HOME/locked-start.log" 2> "$FM_HOME/locked-start.time" ; then display only the timing file and the LOCK section plus the final NEXT STEP line from that generated log. Do not take any actions recommended by the digest. Finish after reporting those outputs.
+
+Initial setup result: Claude shell stripped FM_HOME; output redirection failed before the product ran. No lifecycle call ran.
+Corrected explicit lab-home command:
+cd /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V && FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/lab /usr/bin/time -p /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-session-start.sh > /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/lab/locked-start.log 2> /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/lab/locked-start.time
+
+=== Corrected real primary result ===
+
+⏺ Captain, the timed run in the lab home finished. The script exited with code 0. I read only the two files it made. I
+  took no other step.
+
+  Timing file (lab/locked-start.time):
+  real 64.61
+  user 5.38
+  sys 15.59
+  The run took 64.61 seconds in total. Most of that time was waiting. Only about 21 seconds was CPU work (user 5.38 +
+  sys 15.59).
+
+  LOCK section (from lab/locked-start.log):
+  lock acquired: harness pid 65894
+  The script got the lock. It did not refuse.
+
+  Last NEXT STEP line:
+  The READ-ONCE CONTRACT
+  section near the top of it governs what may still be read from disk.
+  I did not follow it, as you asked.
+
+  Other notes:
+  1. The wake queue was empty: (no queued wakes).
+  2. The bootstrap section gave one notice. It said the installed lavish-axi is older than 0.1.80 and should be
+     upgraded. I did not change anything.
+  3. My first try failed with no effect, because FM_HOME was empty in my shell. This second run used your exact command
+     with the full paths.
+
+  What to do now: nothing on my side. Both files are in
+  /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/lab/.
+
+  result: The timed session start in the disposable lab home took 64.61 s (user 5.38 s, sys 15.59 s), got the lock (lock
+  acquired: harness pid 65894), and exited with code 0.
+
+✻ Baked for 1m 24s · done 10:33 PM
+
+────────────────────────────────────────────────────────────────────────────────── isolated fm-session live validation ─
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 6% 67k/1.0M 01M4F9B87M5A8ZB6B0YDWF5A7V:a8b6a410
+  ⏵⏵ auto mode on (shift+tab to cycle) · ← for agents
+

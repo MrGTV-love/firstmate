@@ -1,0 +1,9 @@
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/.wake-drain-validation/cursor-selected.sh
+ok - a truncated/rewritten log falls back to a full re-fold instead of dropping or misreading the decision
+ok - a same-size file rotation (new inode) is detected and falls back to a full re-fold
+ok - a failed presentation read preserves status state for retry
+ok - a cursor-cache read failure refolds decisions without replaying handled unread status
+ok - boundary IO failure preserves live fold state, fails legacy export, refuses carry, and recovers on the next read
+ok - a buried decision survives many growing drains with bounded read cost, and resolution durably clears it at bounded cost too
+
+exit=0; elapsed=219.870s

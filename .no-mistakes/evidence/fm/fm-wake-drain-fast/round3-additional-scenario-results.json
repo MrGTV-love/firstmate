@@ -1,0 +1,23 @@
+[
+  {
+    "name": "Recover cursor read failures, truncation, and inode replacement without losing decisions",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round3-additional-live-drain-transcript.log",
+    "reason": "Failed span preserved the checkpoint, failing checkpoint cat rebuilt the authoritative open set without informational replay, and truncation/inode replacement refolded new decisions."
+  },
+  {
+    "name": "Preserve actual metadata reader seams and retry after metadata failure",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round3-additional-live-drain-transcript.log",
+    "reason": "Identity and size seams read actual file metadata per file; metadata failure was visible and preserved the receipt; retry recovered the pending note and open decision."
+  },
+  {
+    "name": "Preserve ship, scout, and secondmate terminal decision semantics in cached drains",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round3-additional-live-drain-transcript.log",
+    "reason": "Cached ship/scout terminal events superseded old decisions; secondmate terminal events retained unrelated decisions until explicit resolution."
+  }
+]

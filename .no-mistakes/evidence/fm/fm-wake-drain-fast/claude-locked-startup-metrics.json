@@ -1,0 +1,27 @@
+{
+  "elapsed_seconds": 82.38975337496959,
+  "returncode": 0,
+  "lock_pid": "41863",
+  "completion_pid": "41863",
+  "lock_process": "41863 41817 claude",
+  "initial_state": {
+    "logs": 25,
+    "decision_checkpoints": 0,
+    "presentation_manifest_exists": false
+  },
+  "load_before": [
+    148.1689453125,
+    138.3134765625,
+    126.07275390625
+  ],
+  "load_after": [
+    119.4609375,
+    130.8994140625,
+    124.35302734375
+  ],
+  "child_user_seconds": 2.894712,
+  "child_system_seconds": 5.352313,
+  "truncated": false,
+  "complete_digest": true,
+  "truncation_detection": "Matched the actual banner, not the conditional read-once guidance's mention."
+}

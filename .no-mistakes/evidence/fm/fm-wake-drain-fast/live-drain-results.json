@@ -1,0 +1,27 @@
+[
+  {
+    "name": "Present unread notes and reply resolutions once without swallowing a delayed signal",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Recover buried decisions, close answered keys, and refold replaced or truncated logs",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Fail status reads and checkpoint reads without losing trusted decisions or unread bytes",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Defer a completion that changes during reading and present the final event on retry",
+    "result": "pass",
+    "live": true
+  },
+  {
+    "name": "Grow unread history and a 25-task fleet without per-line subshell fan-out",
+    "result": "pass",
+    "live": true
+  }
+]

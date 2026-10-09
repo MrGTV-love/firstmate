@@ -1,0 +1,10 @@
+import pathlib
+root=pathlib.Path.cwd()
+ev=pathlib.Path('/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V')
+source=(ev/'driver-drain.py').read_text().replace("ROOT / '.live-validation' / 'homes'", "ROOT / '.live-validation-round5' / 'homes'").replace('drain-live-', 'round5-drain-live-')
+exec(compile(source,str(ev/'driver-drain.py'),'exec'),{})
+source=(ev/'driver-checkpoint-seams.py').read_text().replace("root/'.live-validation/checkpoint-home'", "root/'.live-validation-round5/checkpoint-home'").replace('checkpoint-seams-live-transcript.txt','round5-checkpoint-seams-live-transcript.txt')
+exec(compile(source,str(ev/'driver-checkpoint-seams.py'),'exec'),{})
+source=(ev/'driver-size-reader.py').read_text().replace('.live-validation/', '.live-validation-round5/').replace('size-reader-live-transcript.txt','round5-size-reader-live-transcript.txt')
+exec(compile(source,str(ev/'driver-size-reader.py'),'exec'),{})
+(root/'.live-validation-round5').rmdir()

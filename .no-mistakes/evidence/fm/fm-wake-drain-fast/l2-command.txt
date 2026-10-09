@@ -1,0 +1,4 @@
+Session command: claude --setting-sources '' --settings /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/startup-settings.json --strict-mcp-config --tools '' --print --no-session-persistence 'Reply only READY. Do not use tools or take any actions.'
+Private TMUX_TMPDIR: /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/l2/t
+Fresh marked FM_HOME: /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/l2
+Deleted after capture.

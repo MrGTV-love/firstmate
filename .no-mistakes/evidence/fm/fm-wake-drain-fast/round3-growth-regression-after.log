@@ -1,0 +1,5 @@
+Selector: tests/fm-wake-drain-unread-status.test.sh::test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow
+Executable: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+ok - drain subshell entries stay flat as unread history grows and linear in the fleet (6 per task)
+
+{"label": "after", "exit": 0, "elapsed": 107.715}

@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Present buried notes and reserved replies once while keeping decisions open until explicitly answered",
+    "result": "pass",
+    "live": true,
+    "evidence": "drain-live-transcript.txt",
+    "reason": "Both buried notes surfaced once; independent keys remained open until explicit closes; reserved close surfaced once."
+  },
+  {
+    "name": "Recover keyed decisions across cold history, append growth, damaged checkpoints, truncation, and replacement",
+    "result": "pass",
+    "live": true,
+    "evidence": "drain-live-transcript.txt",
+    "reason": "Cold, incremental, damaged-checkpoint, truncated-file, and replacement-file folds preserved current keyed state."
+  },
+  {
+    "name": "Preserve unacknowledged status and show an incomplete warning when metadata reads fail",
+    "result": "pass",
+    "live": true,
+    "evidence": "drain-live-transcript.txt",
+    "reason": "Read failure emitted incomplete-presentation warning, preserved cursor bytes, and retried pending note exactly once."
+  },
+  {
+    "name": "Defer a completion appended during the latest-event read and surface its final value on retry",
+    "result": "pass",
+    "live": true,
+    "evidence": "drain-live-transcript.txt",
+    "reason": "Fresh post-read metadata deferred changing latest-event snapshot; next drain presented final completion."
+  },
+  {
+    "name": "Keep empty-queue routine history silent without losing a later signal annotation",
+    "result": "pass",
+    "live": true,
+    "evidence": "drain-live-transcript.txt",
+    "reason": "Routine-only drain was silent, but later real durable wake retained all routine annotations and raw signal row."
+  },
+  {
+    "name": "Keep cold-drain subshell entries flat with history and bounded per added task on Bash 3.2",
+    "result": "pass",
+    "live": true,
+    "evidence": "drain-live-transcript.txt",
+    "reason": "{\"small\": 95, \"large\": 95, \"many\": 143, \"per_added_task\": 6, \"history_growth\": 0}"
+  }
+]

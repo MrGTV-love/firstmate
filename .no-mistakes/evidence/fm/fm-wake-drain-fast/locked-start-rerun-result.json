@@ -1,0 +1,26 @@
+{
+  "finding": "test-2",
+  "scenario": "Complete a real Claude locked startup over 25 cold status logs in under 20 seconds",
+  "result": "pass",
+  "elapsed_seconds": 17.25813179195393,
+  "acceptance_bound_seconds": 20,
+  "load_before": [
+    45.435546875,
+    46.52685546875,
+    53.82470703125
+  ],
+  "load_after": [
+    44.3779296875,
+    46.2392578125,
+    53.59423828125
+  ],
+  "source_changes": false,
+  "evidence": [
+    "locked-start-rerun-metrics.json",
+    "locked-start-rerun-digest.txt",
+    "locked-start-rerun-launch-and-teardown.txt"
+  ],
+  "scope": "Only the previously failing live locked-start scenario; no full suite, linters, formatters, static analysis, or other pipeline phases.",
+  "diagnosis": "The unchanged executable passes the requested lower-load rerun. No product failure reproduced; previous failing measurements occurred under substantially higher host contention.",
+  "cleanup": "Disposable home, private tmux server and socket, and transient driver removed."
+}

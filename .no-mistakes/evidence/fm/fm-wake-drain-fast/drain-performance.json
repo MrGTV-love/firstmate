@@ -1,0 +1,62 @@
+{
+  "target_commit": "9412e9a4211d7aee5327f19c78c420900823d305",
+  "base_commit": "fd9b8b020201a029880b3980b545f352ae357a39",
+  "bash": "/bin/bash 3.2.57",
+  "workload": "real drain, isolated homes, durable primed presentation cursors, empty queues, routine history; no product replacements or reader seams",
+  "target": [
+    {
+      "tasks": 3,
+      "history_pairs_per_task": 3,
+      "subshell_entries": 131,
+      "uninstrumented_seconds": [
+        1.824362374987686
+      ],
+      "instrumented_seconds": 2.073185499990359
+    },
+    {
+      "tasks": 3,
+      "history_pairs_per_task": 60,
+      "subshell_entries": 131,
+      "uninstrumented_seconds": [
+        4.449288500007242
+      ],
+      "instrumented_seconds": 3.508462708996376
+    },
+    {
+      "tasks": 11,
+      "history_pairs_per_task": 3,
+      "subshell_entries": 275,
+      "uninstrumented_seconds": [
+        9.045309042005101
+      ],
+      "instrumented_seconds": 10.11487608400057
+    },
+    {
+      "tasks": 25,
+      "history_pairs_per_task": 60,
+      "subshell_entries": 527,
+      "uninstrumented_seconds": [
+        19.71850445898599,
+        30.247919291985454,
+        29.437617542018415
+      ],
+      "instrumented_seconds": 34.772643584001344
+    }
+  ],
+  "base": [
+    {
+      "tasks": 3,
+      "history_pairs_per_task": 3,
+      "subshell_entries": 421,
+      "instrumented_seconds": 5.838132249977207
+    },
+    {
+      "tasks": 3,
+      "history_pairs_per_task": 60,
+      "subshell_entries": 1105,
+      "instrumented_seconds": 32.200939208007185
+    }
+  ],
+  "subshell_entries_per_added_task": 18.0,
+  "scope": "Drain timings are standalone; these do not claim full locked-session startup latency."
+}

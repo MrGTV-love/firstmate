@@ -1,0 +1,2 @@
+Command: /bin/bash tests/fm-wake-drain-open-decisions-cursor.test.sh
+The validation driver stopped this invocation after its 900-second wall-clock limit. This was not a product runtime bound. The same serial runner had already completed the unread-status and outcome-backstop files successfully. No cursor-test or fixture-path processes remained on the subsequent cleanup check. Selected executable-interface cursor scenarios were rerun separately, excluding the exhaustive helper offset matrix.

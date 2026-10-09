@@ -1,0 +1,152 @@
+=== prime unread cursor ===
+exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: bootstrap
+stderr:
+
+=== present buried note and pending reply ===
+exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: captain chose REST
+task note: acknowledgment
+task resolved [key=pending-reply-abcdef0123456789]: pending-reply-resolved: answer delivered
+stderr:
+
+=== already presented information does not replay ===
+exit=0
+stdout:
+stderr:
+
+=== routine empty-queue silence ===
+exit=0
+stdout:
+stderr:
+
+=== delayed queued signal still presents routine event ===
+exit=0
+stdout:
+1791520058	1	signal	task.status	signal: task.status
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: working: routine event retained for delayed signal
+stderr:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 37199.1791520061.AkvbC6
+
+=== buried open decision ===
+exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=release] needs-decision: select release target
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+stderr:
+
+=== explicit resolution closes decision ===
+exit=0
+stdout:
+stderr:
+
+=== inode replacement invalidates cached fold ===
+exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=rotate] needs-decision: replacement must be read
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+stderr:
+
+=== truncation refolds authoritative log ===
+exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=truncate] needs-decision: truncated log must be refolded
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+stderr:
+
+=== prime fault-recovery state ===
+exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: already presented
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=keep] needs-decision: retained decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+stderr:
+
+=== injected span failure ===
+exit=0
+stdout:
+stderr:
+
+=== retry after span failure ===
+exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: append must survive read failure
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=keep] needs-decision: retained decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+stderr:
+
+=== checkpoint cat failure refolds without replay ===
+exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=keep] needs-decision: retained decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+stderr:
+
+=== identity failure reports incomplete presentation ===
+exit=0
+stdout:
+STATUS PRESENTATION INCOMPLETE: status snapshot could not be read.
+stderr:
+
+=== size failure reports incomplete presentation ===
+exit=0
+stdout:
+STATUS PRESENTATION INCOMPLETE: status snapshot could not be read.
+stderr:
+
+=== metadata fault retry ===
+exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=keep] needs-decision: retained decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+stderr:
+
+=== append during bounded latest-event read ===
+exit=0
+stdout:
+stderr:
+
+=== stable retry presents final completion ===
+exit=0
+stdout:
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+racing done: completion appended during read
+stderr:
+
+=== prime small-history ===
+exit=0
+stdout:
+stderr:
+
+subshell entries small-history: 102 (tasks=3, routine pairs=3)
+=== prime large-history ===
+exit=0
+stdout:
+stderr:
+
+subshell entries large-history: 102 (tasks=3, routine pairs=60)
+=== prime few-tasks ===
+exit=0
+stdout:
+stderr:
+
+subshell entries few-tasks: 102 (tasks=3, routine pairs=3)
+=== prime many-tasks ===
+exit=0
+stdout:
+stderr:
+
+subshell entries many-tasks: 256 (tasks=25, routine pairs=60)

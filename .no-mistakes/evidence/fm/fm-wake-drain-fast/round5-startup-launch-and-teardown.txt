@@ -1,0 +1,61 @@
+Disposable lab: /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/l.CmNWgo; 25 cold status logs, 60 routine close/working pairs per log; no pre-primed cursor or checkpoint.
+Launch (inherited gate, override, task-file, multiplexer, and nested Claude markers removed): TMUX_TMPDIR="$LAB/tmux" tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c "$PWD" -e FM_HOME="$LAB" claude --setting-sources '' --settings '{"hooks": {"SessionStart": [{"hooks": [{"type": "command", "command": "/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3 /Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round5-startup-driver.py --hook", "timeout": 180}]}]}}' --strict-mcp-config --tools '' --no-session-persistence --max-budget-usd 0.10 -p 'Reply exactly LAB_STARTUP_OK. Do not use tools.'
+Primary pane:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Deferred worker wait exit=0
+
+
+Deferred worker report:
+completed off the startup path in 5s: GitHub authentication, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, project clone refresh with its drift reporting, and inactive terminal-outcome reconciliation.
+(silent - no problems found)
+TIMINGS - where the deferred network checks spent their time (ms):
+  phase       gh-auth                                    start=+1344    elapsed=475
+  phase       secondmate-liveness                        start=+1873    elapsed=44
+  phase       secondmate-sync                            start=+1967    elapsed=130
+  phase       handoff-delivery                           start=+2134    elapsed=17
+  phase       fleet-sync                                 start=+1863    elapsed=1251
+  stage       network-checks probe_sweeps                start=+259     elapsed=3527
+  slowest: stage network-checks probe_sweeps 3527ms, phase fleet-sync 1251ms, phase gh-auth 475ms
+
+Private fm-lab kill-server exit=0: 
+Disposable home and its private tmux socket removed in this evidence turn. Default tmux/Herdr sessions were not controlled.

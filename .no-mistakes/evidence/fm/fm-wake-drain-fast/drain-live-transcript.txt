@@ -1,0 +1,201 @@
+
+### Present buried answers and independent keyed decisions
+$ FM_HOME=<isolated presentation> /bin/bash bin/fm-wake-drain.sh
+elapsed=8.632s exit=0
+STDOUT:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: captain answer is REST
+task note: routine acknowledgement
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=api] needs-decision: choose REST or RPC
+task [key=pending-reply-abcdef0123456789] blocked: pending-reply-missed: task=task pending-reply-id=abcdef0123456789 request=ship it
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+### Keep decisions open without replaying presented notes
+$ FM_HOME=<isolated presentation> /bin/bash bin/fm-wake-drain.sh
+elapsed=6.424s exit=0
+STDOUT:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=api] needs-decision: choose REST or RPC
+task [key=pending-reply-abcdef0123456789] blocked: pending-reply-missed: task=task pending-reply-id=abcdef0123456789 request=ship it
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+### Resolve both keyed decisions and present reserved close exactly once
+$ FM_HOME=<isolated presentation> /bin/bash bin/fm-wake-drain.sh
+elapsed=11.193s exit=0
+STDOUT:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task resolved [key=pending-reply-abcdef0123456789]: pending-reply-resolved: task=task pending-reply-id=abcdef0123456789 via=status
+task note: new answer after acknowledgement
+
+STDERR:
+
+
+### No replay after reserved close
+$ FM_HOME=<isolated presentation> /bin/bash bin/fm-wake-drain.sh
+elapsed=18.118s exit=0
+STDOUT:
+
+STDERR:
+
+
+### Fold cold buried decision
+$ FM_HOME=<isolated cursor> /bin/bash bin/fm-wake-drain.sh
+elapsed=14.325s exit=0
+STDOUT:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=api] needs-decision: choose API
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+### Retain buried decision after history growth
+$ FM_HOME=<isolated cursor> /bin/bash bin/fm-wake-drain.sh
+elapsed=22.136s exit=0
+STDOUT:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=api] needs-decision: choose API
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+### Rebuild invalid decision checkpoint
+$ FM_HOME=<isolated cursor> /bin/bash bin/fm-wake-drain.sh
+elapsed=32.891s exit=0
+STDOUT:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=api] needs-decision: choose API
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+### Refold truncated status without old decision
+$ FM_HOME=<isolated cursor> /bin/bash bin/fm-wake-drain.sh
+elapsed=11.837s exit=0
+STDOUT:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=release] blocked: truncated new blocker
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+### Detect inode replacement and surface new decision
+$ FM_HOME=<isolated cursor> /bin/bash bin/fm-wake-drain.sh
+elapsed=19.168s exit=0
+STDOUT:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=deploy] needs-decision: replaced log decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+STDERR:
+
+
+### Explicit resolution durably clears replacement decision
+$ FM_HOME=<isolated cursor> /bin/bash bin/fm-wake-drain.sh
+elapsed=6.976s exit=0
+STDOUT:
+
+STDERR:
+
+
+### Prime presentation before read failure
+$ FM_HOME=<isolated fault> /bin/bash bin/fm-wake-drain.sh
+elapsed=7.289s exit=0
+STDOUT:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: bootstrap
+
+STDERR:
+
+
+### Fail identity read without silently acknowledging pending bytes
+$ FM_HOME=<isolated fault> /bin/bash bin/fm-wake-drain.sh
+elapsed=7.861s exit=0
+STDOUT:
+STATUS PRESENTATION INCOMPLETE: status snapshot could not be read.
+
+STDERR:
+
+
+### Retry identity failure and recover unacknowledged note
+$ FM_HOME=<isolated fault> /bin/bash bin/fm-wake-drain.sh
+elapsed=9.844s exit=0
+STDOUT:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: must survive uncertain read
+
+STDERR:
+
+
+### Recovered note is not replayed
+$ FM_HOME=<isolated fault> /bin/bash bin/fm-wake-drain.sh
+elapsed=13.782s exit=0
+STDOUT:
+
+STDERR:
+
+
+### Append completion during bounded latest-event read
+$ FM_HOME=<isolated race> /bin/bash bin/fm-wake-drain.sh
+elapsed=46.076s exit=0
+STDOUT:
+
+STDERR:
+
+
+### Retry captures final completion instead of superseded completion
+$ FM_HOME=<isolated race> /bin/bash bin/fm-wake-drain.sh
+elapsed=31.145s exit=0
+STDOUT:
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+task done: completion appended during read
+
+STDERR:
+
+
+### Routine working and non-reserved close stay silent on empty queue
+$ FM_HOME=<isolated delayed> /bin/bash bin/fm-wake-drain.sh
+elapsed=7.233s exit=0
+STDOUT:
+
+STDERR:
+
+
+### Publish delayed signal after empty-queue scan
+$ FM_HOME=<isolated delayed> /bin/bash bin/fm-wake-drain.sh
+elapsed=16.325s exit=0
+STDOUT:
+1791528540	1	signal	task.status	signal: task.status
+wake annotation: unread wake-EVENT since last drain, not current state: task.status: working: first routine event
+wake annotation: unread wake-EVENT since last drain, not current state: task.status: resolved [key=side-1]: ordinary close
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: working: latest routine event
+
+STDERR:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 99328.1791528542.UCFVPg
+
+
+### Cold drain process instrumentation
+tasks=3 routine-pairs-per-task=3 subshell_entries=95 exit=0
+stdout=
+stderr=
+
+### Cold drain process instrumentation
+tasks=3 routine-pairs-per-task=60 subshell_entries=95 exit=0
+stdout=
+stderr=
+
+### Cold drain process instrumentation
+tasks=11 routine-pairs-per-task=3 subshell_entries=143 exit=0
+stdout=
+stderr=
+Measured cold-history growth: {"small": 95, "large": 95, "many": 143, "per_added_task": 6}

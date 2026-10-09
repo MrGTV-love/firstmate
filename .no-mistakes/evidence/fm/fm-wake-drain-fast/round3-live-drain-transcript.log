@@ -1,0 +1,239 @@
+HOST LOAD AT START: 0:59  up 3 days,  1:08, 3 users, load averages: 152.00 138.36 131.46
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.8AqHEp
+elapsed=2.339s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.8AqHEp
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=82.373s exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: captain answered REST
+task note: acknowledgement
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=api] needs-decision: REST or RPC
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=96.583s exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task resolved [key=pending-reply-abcdef0123456789]: pending-reply-resolved: accepted
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=19.648s exit=0
+stdout:
+
+stderr:
+
+SCENARIO PASS: Present buried notes and pending-reply resolutions once while keeping keyed decisions correct — Buried notes surfaced together, explicit resolutions closed both keys, and handled informational lines did not replay.
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.aOIVeD
+elapsed=0.264s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.aOIVeD
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=57.211s exit=0
+stdout:
+
+stderr:
+
+$ /bin/bash -c '. "$1"; fm_wake_append signal task.status "signal: task.status"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-lib.sh
+elapsed=1.879s exit=0
+stdout:
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=51.577s exit=0
+stdout:
+1791525807	1	signal	task.status	signal: task.status
+wake annotation: unread wake-EVENT since last drain, not current state: task.status: working: first step
+wake annotation: unread wake-EVENT since last drain, not current state: task.status: resolved [key=side]: routine closed
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: working: next step
+
+stderr:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 28412.1791525808.6KZ9wh
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.hyxKZT
+elapsed=0.490s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.hyxKZT
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=43.889s exit=0
+stdout:
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+task done: completion before delayed signal
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=47.655s exit=0
+stdout:
+
+stderr:
+
+$ /bin/bash -c '. "$1"; fm_wake_append signal task.status "signal: task.status"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-lib.sh
+elapsed=2.250s exit=0
+stdout:
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=20.417s exit=0
+stdout:
+1791525953	1	signal	task.status	signal: task.status
+wake annotation: latest wake-EVENT observed at drain, not current state: task.status: done: completion before delayed signal
+
+stderr:
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 78400.1791525953.2QkaP1
+
+SCENARIO PASS: Keep routine history and terminal completions available for delayed signals — Empty-queue scans retained routine history for the later raw signal; completion backstop presented once without consuming its later signal annotation.
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.ptfmh2
+elapsed=2.509s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.ptfmh2
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=15.773s exit=0
+stdout:
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task note: already handled
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=cache] needs-decision: preserved decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=10.683s exit=0
+stdout:
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=11.748s exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=cache] needs-decision: preserved decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=21.105s exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=cache] needs-decision: preserved decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=15.549s exit=0
+stdout:
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task [key=new] needs-decision: replacement decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+
+stderr:
+
+SCENARIO FAIL: Recover cursor read failures, truncation, and inode replacement without losing decisions — AssertionError("OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=new] needs-decision: replacement decision\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n")
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.BDvyyB
+elapsed=0.302s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.BDvyyB
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=80.769s exit=0
+stdout:
+
+stderr:
+
+$ /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-wake-drain.sh
+elapsed=64.597s exit=0
+stdout:
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+racing done: completion appended during read
+
+stderr:
+
+SCENARIO PASS: Defer concurrent latest-event appends without acknowledging unseen bytes — Real append during the 64-KiB latest-event read was deferred; next drain presented only the final completion.
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.UwWd2Z
+elapsed=0.638s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.UwWd2Z
+
+stderr:
+
+$ /bin/bash -c 'set -T; seen_depth=0; trap '"'"'if [ "$BASH_SUBSHELL" != "$seen_depth" ]; then seen_depth=$BASH_SUBSHELL; printf x >> "$SUBSHELL_ENTRY_COUNT"; fi'"'"' DEBUG; . "$SUBSHELL_ENTRY_DRAIN"'
+elapsed=42.946s exit=0
+stdout:
+
+stderr:
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.SNo9Xw
+elapsed=0.453s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.SNo9Xw
+
+stderr:
+
+$ /bin/bash -c 'set -T; seen_depth=0; trap '"'"'if [ "$BASH_SUBSHELL" != "$seen_depth" ]; then seen_depth=$BASH_SUBSHELL; printf x >> "$SUBSHELL_ENTRY_COUNT"; fi'"'"' DEBUG; . "$SUBSHELL_ENTRY_DRAIN"'
+elapsed=82.072s exit=0
+stdout:
+
+stderr:
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.vh7Hz2
+elapsed=1.775s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.vh7Hz2
+
+stderr:
+
+$ /bin/bash -c 'set -T; seen_depth=0; trap '"'"'if [ "$BASH_SUBSHELL" != "$seen_depth" ]; then seen_depth=$BASH_SUBSHELL; printf x >> "$SUBSHELL_ENTRY_COUNT"; fi'"'"' DEBUG; . "$SUBSHELL_ENTRY_DRAIN"'
+elapsed=60.454s exit=0
+stdout:
+
+stderr:
+
+MEASURED SUBSHELL COUNTS: {"small-history": 95, "large-history": 95, "large-fleet": 143}, per added task=6.0
+SCENARIO PASS: Keep cold-history subshell entries flat and fleet growth bounded on Bash 3.2 — Cold-history and fleet growth bounded under actual Bash 3.2: {"small-history": 95, "large-history": 95, "large-fleet": 143}; 6.00 subshells per added task.
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V/bin/fm-lab-home.sh create /Users/charlesabrooker/tmp/fm-lab.R7T6iM
+elapsed=0.155s exit=0
+stdout:
+/Users/charlesabrooker/tmp/fm-lab.R7T6iM
+
+stderr:
+
+$ env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE TMUX_TMPDIR=/Users/charlesabrooker/tmp/fm-lab.R7T6iM/tmux tmux -L fm-lab new-session -d -s primary -x 120 -y 40 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4F9B87M5A8ZB6B0YDWF5A7V -e FM_HOME=/Users/charlesabrooker/tmp/fm-lab.R7T6iM 'claude --setting-sources '"'"''"'"' --settings /Users/charlesabrooker/tmp/fm-lab.R7T6iM/settings.json --strict-mcp-config --mcp-config '"'"'{"mcpServers":{}}'"'"' --tools '"'"''"'"''
+elapsed=0.065s exit=0
+stdout:
+
+stderr:
+
+REAL CLAUDE STARTUP METRICS: {"elapsed_seconds": 128.975, "exit": 0, "user_seconds": 0.015, "system_seconds": 0.067, "lock": "54407\n", "completion": null, "status_logs": 26}
+$ tmux -L fm-lab kill-server
+elapsed=1.701s exit=0
+stdout:
+
+stderr:
+
+SCENARIO FAIL: Complete a real Claude locked startup over 25 cold status logs in under 20 seconds — AssertionError({'elapsed_seconds': 128.975, 'exit': 0, 'user_seconds': 0.015, 'system_seconds': 0.067, 'lock': '54407\n', 'completion': None, 'status_logs': 26})
+All disposable lab homes removed.

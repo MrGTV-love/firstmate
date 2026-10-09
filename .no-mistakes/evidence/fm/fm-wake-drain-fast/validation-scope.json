@@ -1,0 +1,123 @@
+{
+  "targeted_regressions": [
+    {
+      "test": "tests/fm-wake-drain-unread-status.test.sh",
+      "exit": 0,
+      "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/fm-wake-drain-unread-status.test.sh.log"
+    },
+    {
+      "test": "cursor-selected",
+      "exit": 0,
+      "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/cursor-selected.log"
+    },
+    {
+      "test": "outcome-backstop",
+      "exit": 0,
+      "log": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/outcome-backstop.log"
+    }
+  ],
+  "cursor_selection": [
+    "test_truncated_log_falls_back_to_a_full_refold_not_a_dropped_decision",
+    "test_same_size_rewrite_is_detected_via_inode_identity",
+    "test_read_failure_preserves_state_for_retry",
+    "test_cursor_cache_read_failure_refolds_without_replaying_unread_status",
+    "test_boundary_read_failure_never_advances_or_exports_a_checkpoint",
+    "test_buried_decision_survives_many_growing_drains_and_resolution_clears_it"
+  ],
+  "initial_cursor_file_attempt": {
+    "command": "/bin/bash tests/fm-wake-drain-open-decisions-cursor.test.sh",
+    "outcome": "runner timeout after 360 seconds; no assertion failure observed; subsequent focused cursor selectors completed successfully"
+  },
+  "live_scenarios": [
+    {
+      "name": "Present appended notes once without burying older answers",
+      "pass": true
+    },
+    {
+      "name": "Keep and resolve buried decisions; recover rotated and truncated logs",
+      "pass": true
+    },
+    {
+      "name": "Recover a lost completion once while preserving its delayed signal",
+      "pass": true
+    },
+    {
+      "name": "Preserve pending status across corrupt receipts and failed output consumers",
+      "pass": true
+    },
+    {
+      "name": "Complete a real locked session start in under 20 seconds",
+      "pass": false,
+      "seconds": 64.61
+    }
+  ],
+  "performance": {
+    "target_commit": "9412e9a4211d7aee5327f19c78c420900823d305",
+    "base_commit": "fd9b8b020201a029880b3980b545f352ae357a39",
+    "bash": "/bin/bash 3.2.57",
+    "workload": "real drain, isolated homes, durable primed presentation cursors, empty queues, routine history; no product replacements or reader seams",
+    "target": [
+      {
+        "tasks": 3,
+        "history_pairs_per_task": 3,
+        "subshell_entries": 131,
+        "uninstrumented_seconds": [
+          1.824362374987686
+        ],
+        "instrumented_seconds": 2.073185499990359
+      },
+      {
+        "tasks": 3,
+        "history_pairs_per_task": 60,
+        "subshell_entries": 131,
+        "uninstrumented_seconds": [
+          4.449288500007242
+        ],
+        "instrumented_seconds": 3.508462708996376
+      },
+      {
+        "tasks": 11,
+        "history_pairs_per_task": 3,
+        "subshell_entries": 275,
+        "uninstrumented_seconds": [
+          9.045309042005101
+        ],
+        "instrumented_seconds": 10.11487608400057
+      },
+      {
+        "tasks": 25,
+        "history_pairs_per_task": 60,
+        "subshell_entries": 527,
+        "uninstrumented_seconds": [
+          19.71850445898599,
+          30.247919291985454,
+          29.437617542018415
+        ],
+        "instrumented_seconds": 34.772643584001344
+      }
+    ],
+    "base": [
+      {
+        "tasks": 3,
+        "history_pairs_per_task": 3,
+        "subshell_entries": 421,
+        "instrumented_seconds": 5.838132249977207
+      },
+      {
+        "tasks": 3,
+        "history_pairs_per_task": 60,
+        "subshell_entries": 1105,
+        "instrumented_seconds": 32.200939208007185
+      }
+    ],
+    "subshell_entries_per_added_task": 18.0,
+    "scope": "Drain timings are standalone; these do not claim full locked-session startup latency."
+  },
+  "teardown": {
+    "private_tmux_server_stopped": true,
+    "owned_lab_processes_remaining": false,
+    "lab_removed": true,
+    "worktree_fixture_removed": true
+  },
+  "source_changes": false
+}

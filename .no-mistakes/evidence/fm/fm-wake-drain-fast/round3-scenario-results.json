@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Present buried notes and pending-reply resolutions once while keeping keyed decisions correct",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round3-live-drain-transcript.log",
+    "reason": "Buried notes surfaced together, explicit resolutions closed both keys, and handled informational lines did not replay."
+  },
+  {
+    "name": "Keep routine history and terminal completions available for delayed signals",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round3-live-drain-transcript.log",
+    "reason": "Empty-queue scans retained routine history for the later raw signal; completion backstop presented once without consuming its later signal annotation."
+  },
+  {
+    "name": "Recover cursor read failures, truncation, and inode replacement without losing decisions",
+    "result": "fail",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round3-live-drain-transcript.log",
+    "reason": "OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):\ntask [key=new] needs-decision: replacement decision\nOPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'\n"
+  },
+  {
+    "name": "Defer concurrent latest-event appends without acknowledging unseen bytes",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round3-live-drain-transcript.log",
+    "reason": "Real append during the 64-KiB latest-event read was deferred; next drain presented only the final completion."
+  },
+  {
+    "name": "Keep cold-history subshell entries flat and fleet growth bounded on Bash 3.2",
+    "result": "pass",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round3-live-drain-transcript.log",
+    "reason": "Cold-history and fleet growth bounded under actual Bash 3.2: {\"small-history\": 95, \"large-history\": 95, \"large-fleet\": 143}; 6.00 subshells per added task."
+  },
+  {
+    "name": "Complete a real Claude locked startup over 25 cold status logs in under 20 seconds",
+    "result": "fail",
+    "live": true,
+    "evidence": "/Users/charlesabrooker/.no-mistakes/evidence/01M4F9B87M5A8ZB6B0YDWF5A7V/round3-live-drain-transcript.log",
+    "reason": "{'elapsed_seconds': 128.975, 'exit': 0, 'user_seconds': 0.015, 'system_seconds': 0.067, 'lock': '54407\\n', 'completion': None, 'status_logs': 26}"
+  }
+]
