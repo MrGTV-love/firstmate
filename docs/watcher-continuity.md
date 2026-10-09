@@ -113,9 +113,11 @@ Once the extension owns the watch for the lock-holding session, at session start
 A poll acts only when omp is idle and the editor holds a complete Firstmate watcher wake: the watcher envelope header from `bin/fm-operational-input.sh`, the wake body, and its fixed closing sentence, bounded by editor edges or omp's blank-line joins, with the leading transport mark present or absent.
 The same wake text must be in the editor, unchanged, on two consecutive polls, so text still being pasted is never taken.
 The extension sends the wake alone through omp's prompt-starting message API, restores the transport mark, and then removes only that wake and one blank-line separator from the editor.
-Any other text is left exactly as found: operator drafts, a wake that was edited, truncated, prefixed, or followed on its line, and a wake this extension still tracks, which the bounded restored-wake recovery above owns.
+Any other text is left exactly as found: operator drafts, a structurally edited or truncated wake, and a wake this extension still tracks, which the bounded restored-wake recovery above owns.
+Before template-based recovery, every tracked wake must be accounted for by its own exact composer segment, allowing only omission of the leading transport mark. If any tracked copy is missing or edited, polling waits for exact restored recovery or accepted-message consumption to resolve ownership rather than treating an exact-match refusal as permission to submit a template match.
+The scan skips unchanged tracked wakes and stranded text that has exhausted its attempts, so neither can block a later eligible wake; recovering that later wake preserves the skipped text and operator drafts.
 Delivery is bounded to three attempts per distinct wake text, and a wake sent this way is tracked until an accepted user `message_start` consumes it.
-`tests/fm-omp-harness.test.sh` covers delivery with and without the transport mark, operator drafts on both sides, several wakes, text that is not a whole wake, a running turn, text still changing, and the attempt bound.
+`tests/fm-omp-harness.test.sh` covers delivery with and without the transport mark, operator drafts on both sides, several wakes, text that is not a whole wake, a running turn, text still changing, the attempt bound, edited tracked copies with polling active, duplicate ownership, and later eligible wakes behind exhausted tracked or stranded text.
 The live guard's stranded-wake step and its evidence are recorded in [omp stranded wake text and the queue panel](verification/runtime-backends.md#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
 
 ### Cursor stop hook

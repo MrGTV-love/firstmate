@@ -586,12 +586,7 @@ type StrandedWake = {
   remainder: string;
 };
 
-// Finds the first complete Firstmate watcher wake in the editor text: envelope
-// header, wake body, and the fixed closing sentence, bounded by editor edges or
-// omp's blank-line joins, with the leading transport mark present or absent.
-// Anything else - an edited, truncated, prefixed, or suffixed wake and every
-// byte of operator text - is not a wake and is never reported as one.
-function findStrandedWake(editor: string): StrandedWake | null {
+function findStrandedWake(editor: string, eligible: (content: string) => boolean): StrandedWake | null {
   if (!editor.includes(wakeBodyPrefix)) return null;
   const header = watcherEnvelopeHeader();
   if (!header) return null;
@@ -609,12 +604,14 @@ function findStrandedWake(editor: string): StrandedWake | null {
     if (editor.slice(from, closing).includes(opening)) continue;
     const stop = closing + wakeBodySuffix.length;
     if (stop !== editor.length && editor.slice(stop, stop + 2) !== "\n\n") continue;
+    const content = mark + editor.slice(at, stop);
+    if (!eligible(content)) continue;
     let cutStart = start;
     let cutEnd = stop;
     if (cutStart >= 2 && editor.slice(cutStart - 2, cutStart) === "\n\n") cutStart -= 2;
     else if (editor.slice(cutEnd, cutEnd + 2) === "\n\n") cutEnd += 2;
     return {
-      content: mark + editor.slice(at, stop),
+      content,
       remainder: editor.slice(0, cutStart) + editor.slice(cutEnd),
     };
   }
@@ -830,9 +827,22 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       const editor = String(ctx.ui.getEditorText() ?? "");
-      const found = findStrandedWake(editor);
+      const tracked = [...owner.unconsumedWakes.values()];
+      let unownedEditor = editor;
+      for (const wake of tracked) {
+        const remainder = removeRestoredWake(unownedEditor, wake.content);
+        if (remainder === null) {
+          strandedSeen = "";
+          return;
+        }
+        unownedEditor = remainder;
+      }
       const bare = (text: string): string => (text.startsWith("\u2063") ? text.slice(1) : text);
-      if (!found || [...owner.unconsumedWakes.values()].some((wake) => bare(wake.content) === bare(found.content))) {
+      const found = findStrandedWake(editor, (content) =>
+        !tracked.some((wake) => bare(wake.content) === bare(content)) &&
+        (strandedAttempts.get(content) ?? 0) < restoreAttemptLimit,
+      );
+      if (!found) {
         strandedSeen = "";
         return;
       }
@@ -841,7 +851,6 @@ export default function (pi: ExtensionAPI) {
         return;
       }
       const attempts = strandedAttempts.get(found.content) ?? 0;
-      if (attempts >= restoreAttemptLimit) return;
       strandedAttempts.set(found.content, attempts + 1);
       const token = `stranded-${process.pid}-${++nextStrandedId}`;
       owner.unconsumedWakes.set(token, { content: found.content });

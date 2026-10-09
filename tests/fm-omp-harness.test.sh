@@ -908,8 +908,8 @@ import { pathToFileURL } from "node:url";
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
 const realSetTimeout = globalThis.setTimeout;
 const realSetInterval = globalThis.setInterval;
-const fastRestore = process.env.SCENARIO.startsWith("pending-") || process.env.SCENARIO === "limit-polled";
-const pollWake = process.env.SCENARIO.startsWith("stranded-") || process.env.SCENARIO === "limit-polled";
+const fastRestore = process.env.SCENARIO.startsWith("pending-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled"].includes(process.env.SCENARIO);
+const pollWake = process.env.SCENARIO.startsWith("stranded-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled", "editor-normalized-edited", "prepended", "appended", "appended-newline", "prepended-mark", "appended-mark", "internal-mark", "edited"].includes(process.env.SCENARIO);
 globalThis.setTimeout = (callback, delay, ...args) =>
   realSetTimeout(callback, delay === 2000 && fastRestore ? 100 : delay, ...args);
 globalThis.setInterval = (callback, delay, ...args) =>
@@ -1093,7 +1093,8 @@ if (process.env.SCENARIO.startsWith("stranded-")) {
       if (!await waitFor(() => sent.length === 2)) throw new Error("settled wake text was never delivered");
       break;
     }
-    case "stranded-bounded": {
+    case "stranded-bounded":
+    case "stranded-bounded-unmarked": {
       // Text that keeps coming back must not turn delivery into a loop.
       const typed = wakeWith("signal: stranded-again");
       for (let i = 0; i < 6; i += 1) {
@@ -1102,6 +1103,11 @@ if (process.env.SCENARIO.startsWith("stranded-")) {
         turnEnds();
       }
       if (sent.length !== 4) throw new Error(`delivery was not bounded to three attempts: ${sent.length}`);
+      const later = wakeWith("signal: stranded-later");
+      const exhausted = process.env.SCENARIO === "stranded-bounded" ? typed : typed.slice(1);
+      composer.text = `${exhausted}\n\n${later}`;
+      if (!await waitFor(() => sent.length === 5)) throw new Error("an exhausted stranded wake blocked a later eligible wake");
+      if (!delivered(5, later) || composer.text !== exhausted) throw new Error("recovering a later wake changed the exhausted wake");
       break;
     }
     default:
@@ -1142,6 +1148,44 @@ const settle = async () => { await handlers.get("agent_end")({ type: "agent_end"
 const same = (item) => item.m === wake && item.o?.deliverAs === undefined;
 
 switch (process.env.SCENARIO) {
+  case "ownership-marked":
+  case "ownership-unmarked": {
+    const before = "\n\nbefore\u2063 draft\n\n";
+    const after = "\noperator\u2063 draft\n\n";
+    const edited = (process.env.SCENARIO === "ownership-marked" ? wake : bare).replace("signal:", "edited:");
+    composer.text = `${before}\n\n${edited}\n\n${after}`;
+    const original = composer.text;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== original) throw new Error("template matching took ownership of an edited tracked wake");
+    composer.text = `${before}\n\n${process.env.SCENARIO === "ownership-marked" ? wake : bare}\n\n${after}`;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== `${before}\n\n${after}`) throw new Error("exact restored recovery no longer preserved both drafts");
+    break;
+  }
+  case "ownership-missing": {
+    const older = wake.replace("signal: omp-restore done", "signal: older-wiring");
+    composer.text = older;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== older) throw new Error("an unaccounted tracked wake allowed template submission");
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    for (let i = 0; i < 40 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || sent[1].m !== older || sent[1].o?.deliverAs !== undefined || composer.text !== "") throw new Error("resolved ownership did not release the stranded wake");
+    break;
+  }
+  case "duplicates-edited-polled": {
+    if (sent[1].m !== wake) throw new Error("expected two identical tracked wakes");
+    const edited = bare.replace("signal:", "edited:");
+    composer.text = `${wake}\n\n${edited}`;
+    await settle();
+    if (sent.length !== 3 || !same(sent[2]) || composer.text !== edited) throw new Error("an edited duplicate bypassed restored ownership");
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    await sleep(600);
+    if (sent.length !== 3 || composer.text !== edited) throw new Error("consuming one duplicate authorized the edited duplicate");
+    composer.text = bare;
+    await settle();
+    if (sent.length !== 4 || !same(sent[3]) || composer.text !== "") throw new Error("the unchanged duplicate was no longer recoverable");
+    break;
+  }
   case "duplicates":
   case "duplicates-handoff":
   case "duplicates-streaming": {
@@ -1411,6 +1455,24 @@ switch (process.env.SCENARIO) {
     if (sent.length !== 4) throw new Error(`recovery was not bounded to three resubmissions with the poll running: ${sent.length}`);
     break;
   }
+  case "blocked-tracked-marked":
+  case "blocked-tracked-unmarked": {
+    for (let i = 0; i < 3; i += 1) {
+      composer.text = wake;
+      await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+      await sleep(500);
+    }
+    if (sent.length !== 4) throw new Error("tracked recovery did not reach its attempt limit");
+    const exhausted = process.env.SCENARIO === "blocked-tracked-marked" ? wake : bare;
+    const older = wake.replace("signal: omp-restore done", "signal: older-wiring");
+    const before = "\n\nbefore\u2063 draft\n\n";
+    const after = "\noperator\u2063 draft\n\n";
+    composer.text = `${before}\n\n${exhausted}\n\n${older}\n\n${after}`;
+    for (let i = 0; i < 40 && sent.length < 5; i += 1) await sleep(50);
+    if (sent.length !== 5 || sent[4].m !== older || sent[4].o?.deliverAs !== undefined) throw new Error("an exhausted tracked wake blocked a later stranded wake");
+    if (composer.text !== `${before}\n\n${exhausted}\n\n${after}`) throw new Error("recovering a later wake changed tracked wake or draft bytes");
+    break;
+  }
   case "restore-window": {
     // The run ends well after omp accepted the wake. The editor is read two full
     // seconds after the run ended, not two seconds after the wake was accepted.
@@ -1448,7 +1510,7 @@ EOF
 
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context stranded-alone stranded-unmarked stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded pending-persistent pending-drains pending-stuck pending-unflushable limit-polled restore-window draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in duplicates duplicates-handoff duplicates-streaming duplicates-edited-polled preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context stranded-alone stranded-unmarked stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-bounded-unmarked ownership-marked ownership-unmarked ownership-missing blocked-tracked-marked blocked-tracked-unmarked pending-persistent pending-drains pending-stuck pending-unflushable limit-polled restore-window draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
