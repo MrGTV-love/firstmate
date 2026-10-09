@@ -27,7 +27,7 @@ A copy nested under a firstmate home reaches that dialog through the home's own 
 Every claude launch therefore carries `claudeMdExcludes` in its per-launch `--settings` JSON for the memory files of each firstmate home that is a strict ancestor of the pane directory, so the worker never loads them and this dialog does not render for that cause.
 `../../../bin/fm-claude-memory-lib.sh` owns the exclusion and `../../../tests/fm-claude-nested-home-live-e2e.test.sh` proves it against the installed binary.
 A home that is the pane directory itself, such as a secondmate or a ship of the firstmate repo, is not an ancestor and keeps loading its own `AGENTS.md`.
-Never answer this dialog with the allow option for a worker: a person who sees it on a worker pane should decline it, not allow it.
+If this dialog lists an ancestor firstmate home's supervisor contract (`AGENTS.md` or `CLAUDE.md`) on a worker pane, decline that import; legitimate project imports and the operator's RTK import remain allowed through interactive consent.
 
 `../../../bin/fm-claude-trust.sh` records `hasTrustDialogAccepted` for both the worktree and its primary checkout in `${CLAUDE_CONFIG_DIR:-$HOME}/.claude.json`, where a home's worker account pin decides `CLAUDE_CONFIG_DIR` (`../../../docs/configuration.md` "Worker account pin"), for a ship or scout spawn.
 For worktrees belonging to a sibling clone of the same repository (common when sharing a treehouse pool across homes), trust is recorded against that sibling checkout rather than the spawning home's own clone.

@@ -1682,6 +1682,64 @@ test_claude_worker_keeps_its_own_root_memory_files() {
   pass "a worker keeps the CLAUDE.md and AGENTS.md at the root of its own directory"
 }
 
+test_raw_claude_nested_launches_exclude_supervisor_memory() {
+  local launcher source rec id wt out status raw settings env_out flag model_flag model brief
+  for launcher in direct teamclaude; do
+    for source in none inline file; do
+      id="nested-raw-$launcher-$source-z1"
+      rec=$(make_spawn_case "$id" claude "$id")
+      read_case_record "$rec"
+      fm_test_fake_teamclaude "$FAKEBIN_DIR"
+      [ "$launcher" != teamclaude ] || printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
+      make_firstmate_home_shape "$CASE_DIR/firstmate home"
+      wt="$CASE_DIR/firstmate home/projects/proj/.claude/worktrees/task"
+      mkdir -p "$(dirname "$wt")"
+      git -C "$PROJ_DIR" worktree add --quiet -b "$id" "$wt"
+      WT_DIR=$wt
+      raw='RAW_TEST=kept claude --model opus '
+      case "$source" in
+      inline)
+        raw="$raw"'--settings='\'' {"feedbackDrafts":"off","claudeMdExcludes":["project/**"]}'\'' '
+        ;;
+      file)
+        printf '%s\n' '{"feedbackDrafts":"off","claudeMdExcludes":["project/**"]}' > "$CASE_DIR/worker-settings.json"
+        raw="RAW_TEST=kept $FAKEBIN_DIR/claude --model opus --settings '$CASE_DIR/worker-settings.json' "
+        ;;
+      esac
+      raw="${raw}__BRIEFDOORBELL__"
+      out=$(run_ship_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$raw")
+      status=$?
+      expect_code 0 "$status" "$launcher raw Claude spawn with $source settings should succeed"$'\n'"$out"
+      env_out="$CASE_DIR/raw-claude-env"
+      fm_eval_launch "$(cat "$LAUNCH_LOG")" "$WT_DIR" "$FAKEBIN_DIR" "FM_FAKE_CLAUDE_ENV_LOG=$env_out" \
+        || fail "$launcher raw Claude launch with $source settings failed"
+      {
+        IFS= read -r flag
+        IFS= read -r settings
+        IFS= read -r model_flag
+        IFS= read -r model
+        IFS= read -r brief
+      } < "$env_out.args"
+      [ "$flag" = --settings ] && [ "$model_flag" = --model ] && [ "$model" = opus ] \
+        || fail "raw launch lost its model arguments: $(cat "$env_out.args")"
+      [ "$(printf '%s' "$brief" | "$ROOT/bin/fm-operational-input.sh" doorbell-kind)" = launch-brief ] \
+        || fail "raw launch lost its brief doorbell"
+      printf '%s' "$settings" | jq -e --arg home "$CASE_DIR/firstmate home" \
+        '.claudeMdExcludes | contains([$home + "/CLAUDE.md", $home + "/CLAUDE.local.md", $home + "/AGENTS.md", $home + "/.claude/CLAUDE.md", $home + "/.claude/rules/**"])' >/dev/null \
+        || fail "$launcher raw launch did not exclude ancestor supervisor memory: $settings"
+      if [ "$source" != none ]; then
+        printf '%s' "$settings" | jq -e '.feedbackDrafts == "off" and (.claudeMdExcludes | contains(["project/**"]))' >/dev/null \
+          || fail "raw launch replaced the caller's settings: $settings"
+      fi
+      grep -Fxq 'RAW_TEST=kept' "$env_out" || fail "raw launch lost its environment assignment"
+      if [ "$launcher" = teamclaude ]; then
+        grep -Fxq "HTTPS_PROXY=$FM_TEST_TEAMCLAUDE_PROXY" "$env_out" || fail "raw launch lost the TeamClaude proxy"
+      fi
+    done
+  done
+  pass "direct and TeamClaude raw nested launches exclude supervisor memory and preserve caller settings"
+}
+
 test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks() {
   local rec id out status launch
   id=profile-claude-keep-attribution-z25
@@ -2342,6 +2400,7 @@ test_claude_worker_nested_under_a_secondmate_home_excludes_its_memory_files
 test_claude_worker_exclusion_survives_special_characters_in_the_home_path
 test_claude_worker_outside_any_firstmate_home_gets_no_exclusion
 test_claude_worker_keeps_its_own_root_memory_files
+test_raw_claude_nested_launches_exclude_supervisor_memory
 test_keep_ai_trailers_omits_attribution_settings_and_strip_hooks
 test_home_local_keep_ai_trailers_reaches_secondmate_crew_launches
 test_claude_secondmate_launch_carries_the_attribution_policy

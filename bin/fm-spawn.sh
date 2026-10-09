@@ -2547,12 +2547,18 @@ case "$ARG3" in
   RAW_LAUNCH=1
   LAUNCH=$ARG3
   HARNESS=""
+  RAW_LAUNCH_TAIL=$LAUNCH
   for word in $LAUNCH; do
+    RAW_LAUNCH_TAIL=${RAW_LAUNCH_TAIL#*"$word"}
     case "$word" in
     CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=*) RAW_FUNCTION_HOOKS_SET=1 ;;
     [A-Za-z_]*=*) continue ;;
     *)
       HARNESS=$(basename "$word")
+      if [ "$HARNESS" = claude ]; then
+        RAW_PROGRAM_PREFIX=${LAUNCH:0:${#LAUNCH}-${#RAW_LAUNCH_TAIL}-${#word}}
+        LAUNCH="$RAW_PROGRAM_PREFIX"'__CLAUDERAWPREFIX__'"${LAUNCH:${#RAW_PROGRAM_PREFIX}}"
+      fi
       break
       ;;
     esac
@@ -5715,9 +5721,6 @@ LAUNCH=${LAUNCH//__CLAUDEPERMFLAG__/$CLAUDE_PERM_FLAG}
 # launcher setting existed; only the wrapper's path needs quoting.
 [ "$CLAUDE_LAUNCH_BIN" = claude ] || CLAUDE_LAUNCH_BIN=$(shell_quote "$CLAUDE_LAUNCH_BIN")
 LAUNCH=${LAUNCH//__CLAUDEBIN__/$CLAUDE_LAUNCH_BIN}
-if [ "$RAW_LAUNCH" = 1 ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
-  LAUNCH="$CLAUDE_LAUNCH_BIN --exec /bin/sh -c $(shell_quote "$LAUNCH")"
-fi
 if [ "$KEEP_AI_TRAILERS" = 1 ]; then
   LAUNCH=${LAUNCH//__CLAUDEATTRIBUTION__/}
 else
@@ -5728,6 +5731,14 @@ case "$LAUNCH" in
   LAUNCH=${LAUNCH//__CLAUDEMDEXCLUDES__/$(fm_claude_md_excludes_json "$WT")}
   ;;
 esac
+if [ "$RAW_LAUNCH" = 1 ] && [ "$HARNESS" = claude ]; then
+  CLAUDE_MD_EXCLUDES=$(fm_claude_md_excludes_json "$WT")
+  CLAUDE_RAW_PREFIX=
+  if [ -n "$CLAUDE_MD_EXCLUDES" ]; then
+    CLAUDE_RAW_PREFIX="bash $(shell_quote "$SCRIPT_DIR/fm-claude-memory-lib.sh") '{${CLAUDE_MD_EXCLUDES#,}}' "
+  fi
+  LAUNCH=${LAUNCH//__CLAUDERAWPREFIX__/"$CLAUDE_RAW_PREFIX"}
+fi
 if [ "$HARNESS" = rovo ]; then
   ROVOCONFIGOVERRIDE=$(rovo_config_override_flag "$EFFORT" "$DATA" "$STATE" "$ID") || {
     echo "error: could not resolve this task's home paths for rovo's allowedExternalPaths grant" >&2
@@ -5781,6 +5792,9 @@ case "$LAUNCH" in
   LAUNCH=${LAUNCH//__CLAUDEADDDIRS__/$CLAUDE_ADD_DIRS}
   ;;
 esac
+if [ "$RAW_LAUNCH" = 1 ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
+  LAUNCH="$CLAUDE_LAUNCH_BIN --exec /bin/sh -c $(shell_quote "$LAUNCH")"
+fi
 case "$HARNESS" in
 claude | codex | opencode | pi | pi-signed | grok | kimi | gemini | muse | rovo | agy | devin)
   LAUNCH="env -u CURSOR_AGENT -u CURSOR_INVOKED_AS -u GEMINI_CLI $LAUNCH"

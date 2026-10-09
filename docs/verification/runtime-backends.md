@@ -804,7 +804,7 @@ Portable launch-command coverage lives in `tests/fm-spawn-dispatch-profile.test.
 A Claude task copy nested under a firstmate home (`<home>/projects/<project>/.claude/worktrees/<task>`) reads the home's `CLAUDE.md` (`@AGENTS.md`) as a parent file, parks on "Allow external CLAUDE.md file imports?", and, once the import is allowed, loads the supervisor contract into a project worker.
 `bin/fm-claude-memory-lib.sh` excludes the memory files of every firstmate home that is a strict ancestor of the pane directory through the documented `claudeMdExcludes` setting, carried in the launch's per-launch `--settings` JSON.
 `tests/fm-claude-nested-home-live-e2e.test.sh` drives the installed binary in a scratch config with no prompt submitted and no dialog answered, so it spends no model tokens: a copy outside any home reaches the composer, the nested copy without the exclusion parks on the imports dialog, and the same copy with the production fragment reaches the composer with no dialog.
-`tests/fm-spawn-dispatch-profile.test.sh` pins that the launch carries the fragment for a nested copy and not for a copy outside a home or a pane directory that is itself the home.
+`tests/fm-spawn-dispatch-profile.test.sh` executes canonical and raw launches to verify the delivered settings for nested copies, while copies outside a home and panes at the home root retain their own memory. Focused argv probes passed for direct and TeamClaude raw commands with absent, inline, and file-based settings: the exclusions merge without dropping caller keys or exclusions, and the model arguments, brief doorbell, environment assignments, and TeamClaude proxy remain intact.
 
 Verified 2026-10-08 on Claude Code 2.1.294.
 

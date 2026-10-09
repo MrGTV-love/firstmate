@@ -47,3 +47,29 @@ fm_claude_md_excludes_json() {
   [ -n "$list" ] || return 0
   printf ',"claudeMdExcludes":[%s]' "${list//\'/$sq}"
 }
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  excludes=$1 program=$2
+  shift 2
+  args=() settings='{}'
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+    --) args+=("$@"); break ;;
+    --settings)
+      [ "$#" -ge 2 ] || { printf '%s\n' 'error: --settings requires a value' >&2; exit 1; }
+      settings=$2
+      shift 2
+      ;;
+    --settings=*) settings=${1#*=}; shift ;;
+    *) args+=("$1"); shift ;;
+    esac
+  done
+  if [ -f "$settings" ]; then
+    settings=$(jq -ce 'select(type == "object")' "$settings") || exit 1
+  else
+    settings=$(printf '%s' "$settings" | jq -ce 'select(type == "object")') || exit 1
+  fi
+  settings=$(printf '%s' "$settings" | jq -ce --argjson required "$excludes" \
+    '.claudeMdExcludes = (((.claudeMdExcludes // []) + $required.claudeMdExcludes) | unique)') || exit 1
+  exec "$program" --settings "$settings" "${args[@]}"
+fi
