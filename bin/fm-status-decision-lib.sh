@@ -136,7 +136,7 @@ _fm_classify_is_corr_token() {  # <word>
 # word) would be assigned here and lost, so callers pass a distinct name.
 status_line_verb() {  # <status-line> [<out-var>] -> leading verb word
   local v out='' word head_re='^([^:[]*)'
-  [[ "$1" =~ $head_re ]] && v=${BASH_REMATCH[1]}
+  _fm_status_bytes_match "$1" "$head_re" && v=${BASH_REMATCH[1]}
   v=${v#"${v%%[![:space:]]*}"}
   v=${v%"${v##*[![:space:]]}"}
   # Fast path, and the whole no-regression guarantee: a prefix that cannot
@@ -166,7 +166,7 @@ status_line_verb() {  # <status-line> [<out-var>] -> leading verb word
 # the line's first colon (or anywhere on a line that has no colon at all).
 _fm_key_before_colon() {  # <status-line>
   local __fm_key_head_re='^[^:]*\[key=[^]:]*\]'
-  [[ "$1" =~ $__fm_key_head_re ]]
+  _fm_status_bytes_match "$1" "$__fm_key_head_re"
 }
 # Raw slug of a complete "[key=<slug>]" token at the head of the note (the
 # first thing after the line's first colon, ignoring whitespace). Fails when
@@ -174,8 +174,11 @@ _fm_key_before_colon() {  # <status-line>
 # the caller's check via _fm_decision_slug_ok, exactly as for the before-colon
 # position.
 _fm_key_at_note_head() {  # <status-line> [<out-var>] -> raw slug
-  local __fm_head_re='^[^:]*:[[:space:]]*\[key=([^]]*)\]' __fm_head_key
-  [[ "$1" =~ $__fm_head_re ]] || return 1
+  local __fm_head_note_re='^[^:]*:(.*)$' __fm_head_re='^\[key=([^]]*)\]' __fm_head_key
+  _fm_status_bytes_match "$1" "$__fm_head_note_re" || return 1
+  __fm_head_key=${BASH_REMATCH[1]}
+  __fm_head_key=${__fm_head_key#"${__fm_head_key%%[![:space:]]*}"}
+  _fm_status_bytes_match "$__fm_head_key" "$__fm_head_re" || return 1
   __fm_head_key=${BASH_REMATCH[1]}
   if [ "$#" -gt 1 ]; then printf -v "$2" '%s' "$__fm_head_key"; else printf '%s' "$__fm_head_key"; fi
 }
@@ -192,14 +195,15 @@ _fm_decision_slug_ok() {  # <slug>
 # and a key sliced out of the timestamp. The line's own bytes are never altered.
 status_line_note() {  # <status-line> [<out-var>] [<unstamped-line>] -> text after the first colon, trimmed
   local __fm_note_text __fm_note_key __fm_note_unstamped
-  local __fm_note_re='^[^:]*:([[:space:]]*)(.*)$' __fm_note_trim_re='^([[:space:]]*)(.*)$'
+  local __fm_note_re='^[^:]*:(.*)$'
   if [ "$#" -gt 2 ]; then
     __fm_note_unstamped=$3
   else
     _fm_status_unstamped "$1" __fm_note_unstamped
   fi
-  if [[ "$__fm_note_unstamped" =~ $__fm_note_re ]]; then
-    __fm_note_text=${BASH_REMATCH[2]}
+  if _fm_status_bytes_match "$__fm_note_unstamped" "$__fm_note_re"; then
+    __fm_note_text=${BASH_REMATCH[1]}
+    __fm_note_text=${__fm_note_text#"${__fm_note_text%%[![:space:]]*}"}
   else
     __fm_note_text=$__fm_note_unstamped
   fi
@@ -209,7 +213,7 @@ status_line_note() {  # <status-line> [<out-var>] [<unstamped-line>] -> text aft
   if ! _fm_key_before_colon "$__fm_note_unstamped" && _fm_key_at_note_head "$__fm_note_unstamped" __fm_note_key \
     && _fm_decision_slug_ok "$__fm_note_key"; then
     __fm_note_text=${__fm_note_text#"[key=$__fm_note_key]"}
-    [[ "$__fm_note_text" =~ $__fm_note_trim_re ]] && __fm_note_text=${BASH_REMATCH[2]}
+    __fm_note_text=${__fm_note_text#"${__fm_note_text%%[![:space:]]*}"}
   fi
   if [ "$#" -gt 1 ]; then printf -v "$2" '%s' "$__fm_note_text"; else printf '%s' "$__fm_note_text"; fi
 }
@@ -221,7 +225,7 @@ _fm_decision_key() {  # <status-line> [<keyless>] [<out-var>] [<unstamped-line>]
     _fm_status_unstamped "$1" __fm_key_unstamped
   fi
   if _fm_key_before_colon "$__fm_key_unstamped"; then
-    [[ "$__fm_key_unstamped" =~ $__fm_key_head_re ]] && __fm_key_value=${BASH_REMATCH[1]}
+    _fm_status_bytes_match "$__fm_key_unstamped" "$__fm_key_head_re" && __fm_key_value=${BASH_REMATCH[1]}
     __fm_key_value=${__fm_key_value#*\[key=}
     __fm_key_value=${__fm_key_value%%\]*}
     _fm_decision_slug_ok "$__fm_key_value" || return 1
@@ -240,7 +244,7 @@ _fm_decision_drop() {  # <open-set> <key> <out-var>
   # their dots, and capture the neighboring records in one regex match: bash
   # 3.2's glob substitutions and bytewise read loops are costly on wide sets.
   __fm_drop_re='^((.*)'$'\n'')?'"$__fm_drop_key"$'\t''[^'$'\n'']*('$'\n''(.*))?$'
-  if [[ "$1" =~ $__fm_drop_re ]]; then
+  if _fm_status_bytes_match "$1" "$__fm_drop_re"; then
     __fm_drop_prefix=${BASH_REMATCH[2]}
     __fm_drop_suffix=${BASH_REMATCH[4]}
     __fm_drop_suffix=${__fm_drop_suffix%$'\n'}

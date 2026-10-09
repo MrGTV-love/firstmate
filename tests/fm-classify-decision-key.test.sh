@@ -681,6 +681,57 @@ test_dated_decisions_close_only_the_exact_key_record() {
 
 test_dated_decisions_close_only_the_exact_key_record
 
+# A byte cap can cut a multibyte character, so a recorded note can hold a byte
+# run that is not valid UTF-8. Under a UTF-8 locale such a line must fold like
+# any other: its key still closes, its neighbors still close, and a reserved
+# key still reads its note. The case runs in a subshell so the locale it forces
+# cannot leak into another case.
+test_invalid_utf8_note_folds_like_any_other_line() {
+  local dir f utf8 probe=$'\xc3\xa9'
+  dir=$(case_dir invalid-utf8-note)
+  f="$dir/lane.status"
+  printf 'kind=secondmate\n' > "$dir/lane.meta"
+  utf8=$(locale -a 2>/dev/null | grep -i -E '^(C|en_US)\.utf-?8$' | head -1)
+  [ -n "$utf8" ] || fail "no UTF-8 locale is installed to fold an invalid byte under"
+  (
+    LC_ALL=$utf8
+    [ "${#probe}" = 1 ] || fail "locale $utf8 did not read a two-byte character as one"
+    printf 'needs-decision [key=a] [at=100]: bad \xff byte\n' > "$f"
+    assert_fold "$f" "$(printf 'a\tneeds-decision\tbad \xff byte')" "an open note holding an invalid byte"
+    assert_equals "$(printf 'a\tneeds-decision\t100\tbad \xff byte')" "$(status_open_decisions_dated "$f")" \
+      "an invalid byte in the note cost the opening its key, date, or summary"
+    printf 'resolved [key=a]: done\n' >> "$f"
+    assert_fold "$f" "" "a resolved line after an invalid-byte note"
+    assert_equals "" "$(status_open_decisions_dated "$f")" "an invalid-byte note stayed open and dated after its resolve"
+    assert_equals "resolved" "$(status_key_closing_verb "$f" a)" "an invalid-byte note hid its key's closing verb"
+
+    {
+      printf 'needs-decision [key=a] [at=100]: bad \xff byte\n'
+      printf 'needs-decision [key=b]: clean question\n'
+      printf 'resolved [key=b]: answered\n'
+      printf 'needs-decision [key=c] [at=10:30]: trunc \xe2\x80\n'
+      printf 'resolved [key=c]: done\n'
+      printf 'resolved [key=a]: done\n'
+      printf 'needs-decision [key=pending-reply-x1]: pending-reply-missed: caf\xe9\n'
+      printf 'blocked \xff[key=d] [at=200]: [key=e] a bad byte in the verb opens nothing\n'
+      printf 'needs-decision: \xff [key=f] not a stated key\n'
+    } > "$f"
+    assert_fold "$f" "$(printf '%s\n' \
+      "$(printf 'pending-reply-x1\tneeds-decision\tpending-reply-missed: caf\xe9')" \
+      "$(printf 'default\tneeds-decision\t\xff [key=f] not a stated key')")" \
+      "invalid bytes across notes, a stamp, a reserved key, and a head"
+    assert_equals "$(printf '%s\n' \
+      "$(printf 'pending-reply-x1\tneeds-decision\t\tpending-reply-missed: caf\xe9')" \
+      "$(printf 'default\tneeds-decision\t\t\xff [key=f] not a stated key')")" \
+      "$(status_open_decisions_dated "$f")" "the dated fold disagreed with the ordinary fold on invalid bytes"
+    assert_equals $'blocked \xff' "$(status_line_verb $'blocked \xff[key=d] [at=200]: x')" \
+      "an invalid byte before the colon changed the verb text"
+  ) || exit 1
+  pass "status lines holding invalid UTF-8 bytes fold, close, and date like any other line under $utf8"
+}
+
+test_invalid_utf8_note_folds_like_any_other_line
+
 test_dated_decisions_ignore_rejected_openers
 test_dated_decisions_follow_valid_reopenings
 test_dated_decisions_pair_each_open_key_with_its_own_last_opening() {
