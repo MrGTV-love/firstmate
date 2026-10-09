@@ -62,19 +62,23 @@ done
 pass "saved omp 18.6.3 native empty and command draft bands agree across public APIs and locales"
 
 # The live 18.8.1 meter fills the remaining width and marks its limit with ╎.
-screen=$(cat "$ROOT/tests/fixtures/omp-native-band-18.8.1-empty.ansi")
-floor=$(printf '%s\n' "$screen" | fm_composer_strip_ansi | awk '/^╰─/ {print NR - 1}')
-[ -n "$floor" ] || fail "captured 18.8.1 surface has no input floor"
-assert_screen "saved 18.8.1 idle band" empty "$CAPS_STYLED" "$screen"
-assert_content "saved 18.8.1 idle band" '' "$CAPS_STYLED" "$screen"
-assert_screen "saved 18.8.1 idle band with Pi identity" empty \
-  "$CAPS_STYLED"$'\nidentity=1' "$screen" '' $'pi\tidle'
-assert_screen "saved 18.8.1 idle band cursor" empty "$CAPS_TMUX" "$screen" "$floor" $'pi\tidle'
-# Without styling, the right-aligned hint cannot prove the input is empty.
-assert_screen "saved 18.8.1 unstyled hint" pending "$CAPS_PLAIN" "$screen"
-assert_content "saved 18.8.1 unstyled hint" '⇧⇥ to change thinking effort' "$CAPS_PLAIN" "$screen"
+# Its linked-worktree path uses 🌳 rather than the ordinary directory's 📁.
+for layout in '' '-worktree'; do
+  screen=$(cat "$ROOT/tests/fixtures/omp-native-band-18.8.1${layout}-empty.ansi")
+  floor=$(printf '%s\n' "$screen" | fm_composer_strip_ansi | awk '/^╰─/ {print NR - 1}')
+  [ -n "$floor" ] || fail "captured 18.8.1${layout} surface has no input floor"
+  assert_screen "saved 18.8.1${layout} idle band" empty "$CAPS_STYLED" "$screen"
+  assert_content "saved 18.8.1${layout} idle band" '' "$CAPS_STYLED" "$screen"
+  assert_screen "saved 18.8.1${layout} idle band with Pi identity" empty \
+    "$CAPS_STYLED"$'\nidentity=1' "$screen" '' $'pi\tidle'
+  assert_screen "saved 18.8.1${layout} idle band cursor" empty "$CAPS_TMUX" "$screen" "$floor" $'pi\tidle'
+  # Without styling, the right-aligned hint cannot prove the input is empty.
+  assert_screen "saved 18.8.1${layout} unstyled hint" pending "$CAPS_PLAIN" "$screen"
+  assert_content "saved 18.8.1${layout} unstyled hint" '⇧⇥ to change thinking effort' "$CAPS_PLAIN" "$screen"
+done
 
-CURRENT_HEADER='π > ⬢ GPT-4.1 > 📁 /work > ⑂ main ?1 ▶─0.2%─────────────────────────────╎─┃─────1M─'
+for path_segment in '📁 /work' '🌳 project/wt'; do
+CURRENT_HEADER="π > ⬢ GPT-4.1 > $path_segment > ⑂ main ?1 ▶─0.2%─────────────────────────────╎─┃─────1M─"
 CURRENT_BAND=$' '"$CURRENT_HEADER"$'\n╰─'
 for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
   assert_screen "current band empty floor" empty "$caps" "$CURRENT_BAND"
@@ -100,7 +104,8 @@ screen=$'────────\n'"$CURRENT_BAND"$'\n────────'
 assert_screen "Pi draft owns pasted current band" pending "$CAPS_TMUX" "$screen" 2 $'pi\tidle'
 assert_content "Pi draft owns pasted current band" "$CURRENT_HEADER ╰─" "$CAPS_PLAIN" "$screen"
 assert_refused "current band without token meter" $' '"${CURRENT_HEADER%┃*}"$'\n╰─'
-pass "captured omp 18.8.1 meter admits idle input without discarding typed hints or pasted frames"
+pass "captured omp 18.8.1 $path_segment meter admits idle input without discarding typed hints or pasted frames"
+done
 
 for draft in '!git diff' '!!git diff' '!python print(1)' '#' '>' '$' '%' '❯' '|draft|' '⇧⇥ to change thinking effort'; do
   screen="$BAND $draft"

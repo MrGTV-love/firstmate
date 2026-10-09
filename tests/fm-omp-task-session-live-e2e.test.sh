@@ -32,6 +32,7 @@ with (lab / 'stderr.log').open('w+') as errors:
     process = subprocess.Popen(['omp', '--mode', 'rpc', '--no-ui', '--no-extensions',
                                 '--no-skills', '--no-rules', '--no-tools', '--no-lsp',
                                 '--no-title', '--model', 'openai/gpt-4.1',
+                                '--system-prompt', 'Model-free task-session proof verification.',
                                 '--resume', str(session), '-e', str(extension)],
                                cwd=project, env=env, stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, stderr=errors, text=True)

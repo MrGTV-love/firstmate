@@ -57,6 +57,7 @@ omp sends no clear key; queued follow-ups can return to its composer, with watch
 
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `unknown-draft`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
 The [shared composer classifier and its shape catalogue](../bin/fm-composer-lib.sh) own continuation containment, draft-risk verdicts, extraction, and known limits; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
+The native omp band accepts both the ordinary `📁` path and linked-worktree `🌳` path, while still requiring its model, branch, usage meters, and empty input floor; typed hints and pasted frames remain drafts.
 The [inbox ring owner](../bin/fm-task-inbox-lib.sh) separately defines the advisory doorbell pre-check.
 `exit` also refuses, naming the dialog as `blocked on a prompt`, when the screen shows a recognised dialog that a further Enter would answer, whether the dialog was open before the exit command was typed or the submitting Enter opened it; it sends no Escape and chooses no option, so closing the dialog is left to the operator.
 A stopped agent whose pane still shows the dialog text is not refused.

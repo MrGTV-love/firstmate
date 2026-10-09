@@ -833,7 +833,7 @@ _fm_composer_pi_separator_row() {  # <trimmed-row>
 # Native omp's default band has no corners. Require its model/path/branch
 # structure AND the usage meters before admitting its adjacent input floor.
 _fm_composer_omp_band_header() {  # <trimmed-row>
-  [[ "$1" =~ ^π\ \>\ .+\ \>\ 📁\ .+\ \>\ ⑂\ .+\ ▶(─)*[0-9]+(\.[0-9]+)?%((─)*╎(─)*)?┃(─)*[0-9]+(\.[0-9]+)?[KMGT]?(─)*$ ]]
+  [[ "$1" =~ ^π\ \>\ .+\ \>\ (📁|🌳)\ .+\ \>\ ⑂\ .+\ ▶(─)*[0-9]+(\.[0-9]+)?%((─)*╎(─)*)?┃(─)*[0-9]+(\.[0-9]+)?[KMGT]?(─)*$ ]]
 }
 
 # _fm_composer_titled_rule_row: 0 when the trimmed row is a `─` rule that
