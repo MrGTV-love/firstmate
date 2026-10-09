@@ -222,6 +222,69 @@ test_a_failed_read_exits_nonzero_and_caches_nothing() {
   pass 'a failed read exits nonzero, names the error, and caches nothing'
 }
 
+test_recording_failures_do_not_block_reads() {
+  local mode response site out status previous
+  for mode in readonly contended; do
+    for response in fresh cached error; do
+      site=$(new_site "recording-$mode-$response")
+      previous=''
+      if [ "$response" = cached ]; then
+        get "$site" repos/o/r/items >/dev/null || fail 'seed read failed'
+        previous=$(cat "$site/state/gh-ratelimit.core.json")
+      elif [ "$response" = error ]; then
+        : > "$site/fail"
+      fi
+      printf '3000\n' > "$site/remaining"
+      if [ "$mode" = readonly ]; then
+        chmod 0500 "$site/state"
+      else
+        mkdir "$site/state/gh-ratelimit.core.json.lock"
+        printf '%s\n' "$$" > "$site/state/gh-ratelimit.core.json.lock/pid"
+      fi
+      status=0
+      out=$(PATH="$FAKEBIN:$PATH" FAKE_GH_SITE="$site" FM_STATE_OVERRIDE="$site/state" \
+        python3 - "$HELPER" 2>"$site/error" <<'PY'
+import os, signal, subprocess, sys
+process = subprocess.Popen(
+    [sys.argv[1], 'get', 'repos/o/r/items'],
+    stdout=subprocess.PIPE, stderr=subprocess.PIPE, start_new_session=True,
+)
+try:
+    stdout, stderr = process.communicate(timeout=5)
+except subprocess.TimeoutExpired:
+    os.killpg(process.pid, signal.SIGKILL)
+    process.communicate()
+    sys.stderr.write('REST read exceeded five seconds\n')
+    sys.exit(124)
+sys.stdout.buffer.write(stdout)
+sys.stderr.buffer.write(stderr)
+sys.exit(process.returncode)
+PY
+      ) || status=$?
+      chmod 0700 "$site/state"
+      if [ "$response" = error ]; then
+        assert_equals 1 "$status" "a $mode recording failure hid or delayed the forge error"
+        assert_equals '' "$out" 'a forge error published a response body'
+        assert_equals 'gh: HTTP 502' "$(cat "$site/error")" 'recording changed the forge error'
+      else
+        assert_equals 0 "$status" "a $mode recording failure blocked the $response read"
+        assert_equals '[{"id":1},{"id":2}]' "$out" 'recording failure changed the response body'
+        assert_equals '' "$(cat "$site/error")" 'best-effort recording was not silent'
+      fi
+      assert_equals "$previous" "$(cat "$site/state/gh-ratelimit.core.json" 2>/dev/null || true)" \
+        'a refused recording changed the quota record'
+      if [ "$response" = cached ]; then
+        assert_equals 1 "$(unmodified "$site")" 'the cached read did not exercise a 304'
+      fi
+      if [ "$mode" = contended ]; then
+        assert_equals "$$" "$(cat "$site/state/gh-ratelimit.core.json.lock/pid")" \
+          'a refused recording disturbed the live lock holder'
+      fi
+    done
+  done
+  pass 'unwritable state and contended recording locks preserve prompt reads and forge errors'
+}
+
 guard() { # site args... : run guard against the recorded buckets
   local site=$1
   shift
@@ -252,7 +315,7 @@ test_the_quota_floor_reads_headers_from_calls_already_made() {
 }
 
 test_parallel_responses_keep_the_lowest_remaining() {
-  local site out status=0 low_pid high_pid
+  local site out status=0 low_pid high_pid n
   site=$(new_site lowest)
   printf '800\n' > "$site/remaining"
   get "$site" repos/o/r/items >/dev/null || fail 'seed read failed'
@@ -288,6 +351,11 @@ SH
     : > "$site/low-finished"
   ) &
   low_pid=$!
+  for ((n=0; n<500; n++)); do
+    [ ! -e "$site/read.749" ] || break
+    sleep 0.01
+  done
+  [ "$n" -lt 500 ] || fail 'low response did not reach quota recording'
   FAKE_GH_REMAINING=750 REAL_JQ="$(command -v jq)" PATH="$site/bin:$PATH" get "$site" repos/o/r/high >/dev/null &
   high_pid=$!
   wait "$low_pid" || fail 'low response failed'
@@ -367,6 +435,7 @@ test_304_updates_pagination_and_retains_omitted_metadata
 test_304_uses_its_generation_during_concurrent_replacement
 test_query_fields_are_encoded_and_distinct_cache_keys
 test_a_failed_read_exits_nonzero_and_caches_nothing
+test_recording_failures_do_not_block_reads
 test_the_quota_floor_reads_headers_from_calls_already_made
 test_parallel_responses_keep_the_lowest_remaining
 test_older_windows_cannot_replace_newer_quota

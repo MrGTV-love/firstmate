@@ -700,6 +700,7 @@ The contributions poll also checks the recorded core quota before its final Grap
 The PR-state and reviewer advisory commands remain available below the sweep floor; their shared REST reads still update the quota record.
 Responses carrying valid `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `X-RateLimit-Resource` headers update the recorded quota, including on a 304 or an error.
 Writers serialize the update, keeping the lowest remaining value within the newest observed reset window; older-window responses cannot replace it.
+Cache and quota recording is best-effort: an unwritable state directory or a recording lock unavailable within a two-second wait silently skips recording without changing the read result.
 The enforcing response headers, not `gh api rate_limit`, are the quota evidence used by the sweeps.
 
 When the recorded core remaining quota is below the configured floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
