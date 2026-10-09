@@ -226,12 +226,7 @@ meta_value_to() {  # <output-variable> <key>
   printf -v "$1" '%s' "$_value"
 }
 
-meta_value() {  # <key>
-  local _out
-  meta_value_to _out "$1"
-  printf '%s' "$_out"
-}
-
+WT='' KIND='' HARNESS='' REMOTE_HOST='' META_MODE='' META_PROJECT=''
 meta_value_to WT worktree
 meta_value_to KIND kind
 meta_value_to HARNESS harness
