@@ -22,6 +22,7 @@ command -v tasks-axi >/dev/null 2>&1 || { echo "skip: tasks-axi not found"; exit
 make_home() {  # <name>
   local home="$TMP_ROOT/$1" fakebin
   mkdir -p "$home/data" "$home/state" "$home/config" "$home/projects"
+  git init -q -b main "$home/projects/sample" || fail "could not initialize sample project fixture"
   cp "$ROOT/.tasks.toml" "$home/.tasks.toml"
   cat > "$home/data/backlog.md" <<'EOF'
 ## In flight
@@ -2924,7 +2925,6 @@ test_interrupted_cleanup_keeps_the_captain_call_recoverable() {
   id=sample-held-cleanup-failure
   wt="$home/projects/$id"
   mkdir -p "$home/data/$id" "$wt" "$home/projects/sample"
-  git -C "$home/projects/sample" init -q || fail "could not initialize cleanup-failure project fixture"
   tasks_in "$home" add "$id" "Investigate failed sample cleanup" --kind scout \
     --repo sample --start >/dev/null || fail "could not create the cleanup-failure fixture"
   fm_write_meta "$home/state/$id.meta" \
@@ -2950,6 +2950,8 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
+  assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
+    "cleanup failed before the injected worktree return failure"
   assert_present "$home/state/$id.meta" "a failed cleanup removed the task record"
   assert_present "$home/state/$id.backlog-close" \
     "a failed cleanup lost the pending record that replays the retention"
@@ -3009,6 +3011,8 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
+  assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
+    "cleanup failed before the injected worktree return failure"
   assert_present "$home/state/$id.backlog-close" \
     "the interrupted cleanup lost its retained-artifact record"
 
@@ -3075,6 +3079,8 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
+  assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
+    "cleanup failed before the injected worktree return failure"
   assert_present "$home/state/$id.backlog-close" \
     "the interrupted cleanup lost its retained-artifact record"
 
@@ -3120,6 +3126,8 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
+  assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
+    "cleanup failed before the injected worktree return failure"
   assert_present "$marker" "the interrupted cleanup lost its retained-artifact record"
   sed "s|^data=.*$|data=$home/elsewhere|" "$marker" > "$marker.rewritten" \
     || fail "could not rewrite the pending-close record"
@@ -3189,6 +3197,8 @@ SH
   rc=$?
   set -e
   [ "$rc" -ne 0 ] || fail "relocated cleanup succeeded despite the failed worktree return"
+  assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
+    "cleanup failed before the injected worktree return failure"
   assert_present "$home/state/$id.backlog-close" \
     "the interrupted relocated cleanup lost its pending record"
 

@@ -278,12 +278,16 @@ import pathlib, sys
 source = pathlib.Path(sys.argv[1]).read_text()
 start = source.index("pids_with_cwd_under() {")
 end = source.index("\n}\n", source.index("reap_task_worktree_processes() {", start)) + 3
-pathlib.Path(sys.argv[2]).write_text(source[start:end])
+runtime = source[start:end]
+start = source.index("collect_local_firstmate_states() {")
+end = source.index("\n}\n", start) + 3
+pathlib.Path(sys.argv[2]).write_text(runtime + source[start:end])
 PY
 (
   . "$ROOT/bin/fm-nm-run-lib.sh"
   . "$ROOT/bin/fm-backlog-transition-lib.sh"
   export PROJ="$TEST_DIR/project-primary" STATE="$TEST_DIR/home-primary/state"
+  . "$ROOT/bin/fm-wake-lib.sh"
   # shellcheck source=/dev/null
   . "$TEST_DIR/runtime-cleanup.sh"
   task_pids_under_roots "$TEST_DIR/offline-owned" || fail "offline owned inventory failed"
