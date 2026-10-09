@@ -1,0 +1,4 @@
+{
+  "key": "literal \"quote\" [.*] $dollar; `backtick` \\key ☃.status",
+  "payload": "signal: UTF-8 café 雪 🧭; literal \\n \\t \\123 \"quote\" [.*] $dollar $(touch NEVER) `echo nope`\\end\tTAB\rCR\nLINE"
+}

@@ -1,0 +1,21 @@
+{
+  "scenario": "consumed",
+  "query_count_after_consumption": 1,
+  "query_count_after_later_row": 1,
+  "turns": [
+    {
+      "t": 1791574036.471814,
+      "last": "<system-reminder>\nToday: 2026-10-09; current working directory: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ/.gate-wake-live/rpc-consumed/consumed/home'. Do not repeat this information in your reply.\n</system-reminder> \u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: trigger-1\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+      "drain": {
+        "returncode": 0,
+        "stdout": "1791574036\t1\tsignal\ttrigger-1\tsignal: trigger-1\n",
+        "stderr": "WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 56036.1791574036.yXi627\n"
+      }
+    }
+  ],
+  "queued_after_observation": {
+    "returncode": 0,
+    "stdout": "1791574039\t2\tcheck\tunrelated\tcheck: unrelated later row\n",
+    "stderr": ""
+  }
+}

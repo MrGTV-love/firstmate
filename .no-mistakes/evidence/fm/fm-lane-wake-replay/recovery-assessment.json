@@ -1,0 +1,18 @@
+{
+  "scope": "One authorized follow-up attempt for the previously untested interactive recovery scenario; no earlier scenarios rerun.",
+  "scenario": "A real interactive primary recovers restored watcher text using current owed rows while preserving the operator draft",
+  "result": "untested",
+  "live": false,
+  "product_launched": "Real omp 18.8.1 TUI at 180x42 on a private fm-lab tmux socket in one marked out-of-worktree home.",
+  "observed": "The real watcher extension emitted session_start with idle=true, pending=false, editor empty. No primary lock appeared within 70 seconds. No model request, watcher wake, Escape restoration, or draft-preservation stimulus was reached.",
+  "diagnostic": {
+    "command": "env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS FM_HOME=\"$PWD/.nm-startup-diagnostic\" bin/fm-sessionstart-run.sh --source startup --pi-prerequisite",
+    "returncode": 3,
+    "stdout": "",
+    "stderr": "",
+    "home_created": false
+  },
+  "reason": "The public startup wrapper intentionally stands down in a gate checkout. The one-attempt cap prevents another live recovery attempt. Authorize one further attempt that explicitly runs the real bin/fm-session-start.sh from the primary to acquire the marked lab home lock before arming. No bypass or product change is proposed.",
+  "cleanup": "Private tmux server stopped; real fm-watch-arm.sh --stop returned 0 and reported no watcher; lab-home teardown returned 0; lab home, fixture data, disposable driver, and probe removed.",
+  "visual_evidence": "recovery-terminal.html renders the actual captured startup TUI, not recovery behavior."
+}

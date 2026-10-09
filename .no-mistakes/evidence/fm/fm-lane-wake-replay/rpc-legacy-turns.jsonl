@@ -1,0 +1,3 @@
+{"t": 1791573929.312208, "last": "FIRSTMATE WATCHER WAKE\nsignal: trigger-1", "drain": {"returncode": 0, "stdout": "", "stderr": ""}}
+{"t": 1791573930.000418, "last": "FIRSTMATE WATCHER WAKE\nsignal: trigger-2", "drain": {"returncode": 0, "stdout": "", "stderr": ""}}
+{"t": 1791573930.929117, "last": "FIRSTMATE WATCHER WAKE\nsignal: trigger-3", "drain": {"returncode": 0, "stdout": "", "stderr": ""}}

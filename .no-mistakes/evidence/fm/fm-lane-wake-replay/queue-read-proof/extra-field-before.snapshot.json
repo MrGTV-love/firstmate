@@ -1,0 +1,67 @@
+{
+  ".": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078529,
+    "mtime_ns": 1791574014207985159,
+    "size": 192
+  },
+  "config": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078531,
+    "mtime_ns": 1791574014194263983,
+    "size": 64
+  },
+  "data": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078532,
+    "mtime_ns": 1791574014194298608,
+    "size": 64
+  },
+  "state": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078534,
+    "mtime_ns": 1791574014386802952,
+    "size": 160
+  },
+  "state/.wake-queue": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180078581,
+    "mtime_ns": 1791574014641142610,
+    "size": 86,
+    "sha256": "142be2a32aaf9bc0c15179831a81a3a1c7c9d1919efdbcf18d24883f4afeaa8e",
+    "bytes_base64": "MTc5MTU3NDAxNAkxCXNpZ25hbAl2YWxpZC5zdGF0dXMJc2lnbmFsOiB2YWxpZCBVVEYtOCDpm6oKMQk5CXNpZ25hbAlrZXkJcGF5bG9hZAlleHRyYQo=",
+    "text": "1791574014\t1\tsignal\tvalid.status\tsignal: valid UTF-8 雪\n1\t9\tsignal\tkey\tpayload\textra\n"
+  },
+  "state/.wake-queue.seq": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180078580,
+    "mtime_ns": 1791574014359030681,
+    "size": 2,
+    "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "bytes_base64": "MQo=",
+    "text": "1\n"
+  },
+  "state/.watcher-down": {
+    "mode": 384,
+    "type": 32768,
+    "inode": 180078564,
+    "mtime_ns": 1791574014319591742,
+    "size": 41,
+    "sha256": "8ea8661518a994a4f85a23c3a0758c0649990509d2e416a1191bbb1efbe08373",
+    "bytes_base64": "cGVuZGluZzpkb3dudGltZToxMDI2My4xNzkxNTc0MDE0LmtQTHpoeAo=",
+    "text": "pending:downtime:10263.1791574014.kPLzhx\n"
+  },
+  "user-home": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078530,
+    "mtime_ns": 1791574014194222816,
+    "size": 64
+  }
+}

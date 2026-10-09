@@ -1,0 +1,77 @@
+{
+  ".": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076435,
+    "mtime_ns": 1791574009780194419,
+    "size": 192
+  },
+  "config": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076437,
+    "mtime_ns": 1791574009763741441,
+    "size": 64
+  },
+  "data": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076438,
+    "mtime_ns": 1791574009763785191,
+    "size": 64
+  },
+  "state": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076449,
+    "mtime_ns": 1791574010691444238,
+    "size": 192
+  },
+  "state/.main-eligible-rows": {
+    "mode": 384,
+    "type": 32768,
+    "inode": 180076829,
+    "mtime_ns": 1791574010363311470,
+    "size": 4,
+    "sha256": "a6e2b7a040683432de03a18fd8a1939a2fdf82585b364bfc874bdd4095c4cae1",
+    "bytes_base64": "MQoyCg==",
+    "text": "1\n2\n"
+  },
+  "state/.wake-queue": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180076509,
+    "mtime_ns": 1791574010176123230,
+    "size": 305,
+    "sha256": "4472fc50a2f8d5b7c953cb572f279a8cb97e1fd17fcea637a9359539b05cfddd",
+    "bytes_base64": "MTc5MTU3NDAwOQkxCXNpZ25hbAlsaXRlcmFsICJxdW90ZSIgWy4qXSAkZG9sbGFyOyBgYmFja3RpY2tgIFxrZXkg4piDLnN0YXR1cwlzaWduYWw6IFVURi04IGNhZsOpIOmbqiDwn6etOyBsaXRlcmFsIFxuIFx0IFwxMjMgInF1b3RlIiBbLipdICRkb2xsYXIgJCh0b3VjaCBORVZFUikgYGVjaG8gbm9wZWBcZW5kIFRBQiBDUiBMSU5FCjE3OTE1NzQwMTAJMglzaWduYWwJbGl0ZXJhbCAicXVvdGUiIFsuKl0gJGRvbGxhcjsgYGJhY2t0aWNrYCBca2V5IOKYgy5zdGF0dXMJc2lnbmFsOiBuZXdlciBzYW1lLWtleSByb3cg4oCUIG5hw692ZQo=",
+    "text": "1791574009\t1\tsignal\tliteral \"quote\" [.*] $dollar; `backtick` \\key ☃.status\tsignal: UTF-8 café 雪 🧭; literal \\n \\t \\123 \"quote\" [.*] $dollar $(touch NEVER) `echo nope`\\end TAB CR LINE\n1791574010\t2\tsignal\tliteral \"quote\" [.*] $dollar; `backtick` \\key ☃.status\tsignal: newer same-key row — naïve\n"
+  },
+  "state/.wake-queue.seq": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180076508,
+    "mtime_ns": 1791574010176011063,
+    "size": 2,
+    "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+    "bytes_base64": "Mgo=",
+    "text": "2\n"
+  },
+  "state/.watcher-down": {
+    "mode": 384,
+    "type": 32768,
+    "inode": 180076846,
+    "mtime_ns": 1791574010471952960,
+    "size": 41,
+    "sha256": "be523f73dcd72cc4ebbcbc176a246716a67098a576623d52a90ef573eea8ec19",
+    "bytes_base64": "cGVuZGluZzpoYW5kbGluZzo5NjI4Mi4xNzkxNTc0MDA5LkFiQnBsTwo=",
+    "text": "pending:handling:96282.1791574009.AbBplO\n"
+  },
+  "user-home": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076436,
+    "mtime_ns": 1791574009763691399,
+    "size": 64
+  }
+}

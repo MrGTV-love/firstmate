@@ -1,0 +1,57 @@
+{
+  ".": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180077845,
+    "mtime_ns": 1791574012843784482,
+    "size": 192
+  },
+  "config": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180077847,
+    "mtime_ns": 1791574012772100715,
+    "size": 64
+  },
+  "data": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180077848,
+    "mtime_ns": 1791574012772136215,
+    "size": 64
+  },
+  "state": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180077862,
+    "mtime_ns": 1791574012881101955,
+    "size": 128
+  },
+  "state/.wake-queue": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180077867,
+    "mtime_ns": 1791574012881057788,
+    "size": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "bytes_base64": "",
+    "text": ""
+  },
+  "state/.watcher-down": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180077868,
+    "mtime_ns": 1791574012881134330,
+    "size": 20,
+    "sha256": "f0aba0c46529fcdffcb5cea5902ae88eea440f6d6974d69a53df7650dbfdf913",
+    "bytes_base64": "cGVuZGluZzpkb3dudGltZTpnMQo=",
+    "text": "pending:downtime:g1\n"
+  },
+  "user-home": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180077846,
+    "mtime_ns": 1791574012772055256,
+    "size": 64
+  }
+}

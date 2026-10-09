@@ -1,0 +1,8 @@
+{
+  "attempts": 1,
+  "result": "untested",
+  "reason": "Timed out waiting for real primary session lock",
+  "live": true,
+  "traceback": "Traceback (most recent call last):\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ/.nm-restore-driver.py\", line 108, in <module>\n    wait_for(lambda: (LAB / 'state/.lock').exists(), 'real primary session lock')\n    ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ/.nm-restore-driver.py\", line 46, in wait_for\n    raise RuntimeError(f'Timed out waiting for {label}')\nRuntimeError: Timed out waiting for real primary session lock\n",
+  "lab_removed": true
+}

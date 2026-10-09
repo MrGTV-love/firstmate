@@ -1,0 +1,18 @@
+{
+  "runtime": "omp/18.8.1",
+  "existing_guard": "bash tests/fm-omp-stale-wake-live-e2e.test.sh",
+  "existing_guard_result": "pass: stale, owed, legacy control",
+  "focused_regression": "bash tests/fm-omp-harness.test.sh --watch-queue",
+  "focused_regression_result": "pass (not live: executable fixture API)",
+  "supplemental_runtime_modes": [
+    "consumed",
+    "replacement-empty",
+    "replacement-owed",
+    "query-failure"
+  ],
+  "live_fixture_scope": "Installed omp and production watcher extension, wake queue and drain; scripted local model and stimulus watcher arm. The real primary/watcher lifecycle and interactive UI were not exercised.",
+  "supplemental_setup_correction": "Initial replacement checks allowed delivery before new_session. A strengthened check holds the actual queue chmod-000 until after new_session returns. An unsupported fixture assertion requiring a persisted handoff at that instant was removed; final assertions check public response ordering, exact owed drain and absence of stale turns.",
+  "expected_fixture_cancellation": "A replacement abort can make the local HTTP model responder log BrokenPipeError; final product behavior assertions passed.",
+  "interactive_blocker": "bin/fm-lab-home.sh create refused an in-worktree primary home. Approved primary mechanics require an out-of-repository marked home, which the workspace write boundary does not authorize.",
+  "cleanup": "All owned transient fixture processes stopped; no source, test, docs or memory changes."
+}

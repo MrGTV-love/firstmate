@@ -1,0 +1,87 @@
+{
+  ".": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078007,
+    "mtime_ns": 1791574013376935098,
+    "size": 192
+  },
+  "config": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078009,
+    "mtime_ns": 1791574013364480843,
+    "size": 64
+  },
+  "data": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078010,
+    "mtime_ns": 1791574013364512301,
+    "size": 64
+  },
+  "state": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078015,
+    "mtime_ns": 1791574013987262043,
+    "size": 224
+  },
+  "state/.branch-eligible-owner": {
+    "mode": 384,
+    "type": 32768,
+    "inode": 180078044,
+    "mtime_ns": 1791574013574956087,
+    "size": 96,
+    "sha256": "acbec70434e1b5de807fcbe6cc464f622dd754d786c573191612387533400172",
+    "bytes_base64": "Zm0tYnJhbmNoLWVsaWdpYmxlLW93bmVyLXYxCjgwNzUKRnJpIE9jdCAgOSAxNDoyNjo1MyAyMDI2ICAgICAvYmluL3NsZWVwIDYwCnF1ZXVlZC1wdWJsaWMtcHJvb2YK",
+    "text": "fm-branch-eligible-owner-v1\n8075\nFri Oct  9 14:26:53 2026     /bin/sleep 60\nqueued-public-proof\n"
+  },
+  "state/.branch-eligible-rows": {
+    "mode": 384,
+    "type": 32768,
+    "inode": 180078067,
+    "mtime_ns": 1791574013673917832,
+    "size": 2,
+    "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865",
+    "bytes_base64": "MQo=",
+    "text": "1\n"
+  },
+  "state/.wake-queue": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180078031,
+    "mtime_ns": 1791574013957383556,
+    "size": 125,
+    "sha256": "51889704298af05838d15f7354a76be0ed6bc33b9365eb122e45edd67ac6992c",
+    "bytes_base64": "MTc5MTU3NDAxMwkxCXNpZ25hbAlzYW1lLnN0YXR1cwlzaWduYWw6IHJlc2VydmVkIGJyYW5jaCDpm6oKMTc5MTU3NDAxMwkyCXNpZ25hbAlzYW1lLnN0YXR1cwlzaWduYWw6IG1haW4gc2FtZS1rZXkgbmV3ZXIg8J+nrQo=",
+    "text": "1791574013\t1\tsignal\tsame.status\tsignal: reserved branch 雪\n1791574013\t2\tsignal\tsame.status\tsignal: main same-key newer 🧭\n"
+  },
+  "state/.wake-queue.seq": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180078030,
+    "mtime_ns": 1791574013957293598,
+    "size": 2,
+    "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+    "bytes_base64": "Mgo=",
+    "text": "2\n"
+  },
+  "state/.watcher-down": {
+    "mode": 384,
+    "type": 32768,
+    "inode": 180078210,
+    "mtime_ns": 1791574013919391789,
+    "size": 40,
+    "sha256": "d6ca402b0dd14f2bc36597b8e900764a27fc314ef73ff704902fc7c0dda19050",
+    "bytes_base64": "cGVuZGluZzpkb3dudGltZTo3NTM5LjE3OTE1NzQwMTMuVHc3N2VMCg==",
+    "text": "pending:downtime:7539.1791574013.Tw77eL\n"
+  },
+  "user-home": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078008,
+    "mtime_ns": 1791574013364449384,
+    "size": 64
+  }
+}

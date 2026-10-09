@@ -1,0 +1,94 @@
+{
+  ".": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076435,
+    "mtime_ns": 1791574009780194419,
+    "size": 192
+  },
+  "config": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076437,
+    "mtime_ns": 1791574009763741441,
+    "size": 64
+  },
+  "data": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076438,
+    "mtime_ns": 1791574009763785191,
+    "size": 64
+  },
+  "state": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076449,
+    "mtime_ns": 1791574010214834083,
+    "size": 224
+  },
+  "state/.wake-queue": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180076509,
+    "mtime_ns": 1791574010176123230,
+    "size": 305,
+    "sha256": "4472fc50a2f8d5b7c953cb572f279a8cb97e1fd17fcea637a9359539b05cfddd",
+    "bytes_base64": "MTc5MTU3NDAwOQkxCXNpZ25hbAlsaXRlcmFsICJxdW90ZSIgWy4qXSAkZG9sbGFyOyBgYmFja3RpY2tgIFxrZXkg4piDLnN0YXR1cwlzaWduYWw6IFVURi04IGNhZsOpIOmbqiDwn6etOyBsaXRlcmFsIFxuIFx0IFwxMjMgInF1b3RlIiBbLipdICRkb2xsYXIgJCh0b3VjaCBORVZFUikgYGVjaG8gbm9wZWBcZW5kIFRBQiBDUiBMSU5FCjE3OTE1NzQwMTAJMglzaWduYWwJbGl0ZXJhbCAicXVvdGUiIFsuKl0gJGRvbGxhcjsgYGJhY2t0aWNrYCBca2V5IOKYgy5zdGF0dXMJc2lnbmFsOiBuZXdlciBzYW1lLWtleSByb3cg4oCUIG5hw692ZQo=",
+    "text": "1791574009\t1\tsignal\tliteral \"quote\" [.*] $dollar; `backtick` \\key ☃.status\tsignal: UTF-8 café 雪 🧭; literal \\n \\t \\123 \"quote\" [.*] $dollar $(touch NEVER) `echo nope`\\end TAB CR LINE\n1791574010\t2\tsignal\tliteral \"quote\" [.*] $dollar; `backtick` \\key ☃.status\tsignal: newer same-key row — naïve\n"
+  },
+  "state/.wake-queue.lock": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076665,
+    "mtime_ns": 1791574010214646957,
+    "size": 96
+  },
+  "state/.wake-queue.lock/pid": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180076666,
+    "mtime_ns": 1791574010214765249,
+    "size": 6,
+    "sha256": "5df6db9dba6e744a8dce830e66a2a24a5e1c7582265d8160520687e5571a6ea6",
+    "bytes_base64": "OTU3NDMK",
+    "text": "95743\n"
+  },
+  "state/.wake-queue.retire.abandoned": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180076668,
+    "mtime_ns": 1791574010214873374,
+    "size": 17,
+    "sha256": "0a1ed2a2c4d60e1fa47d73b493c979f9be3acd8a6d44af3a5bcba48b23067e8d",
+    "bytes_base64": "bGVmdG92ZXIgc2NyYXRjaAo=",
+    "text": "leftover scratch\n"
+  },
+  "state/.wake-queue.seq": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180076508,
+    "mtime_ns": 1791574010176011063,
+    "size": 2,
+    "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3",
+    "bytes_base64": "Mgo=",
+    "text": "2\n"
+  },
+  "state/.watcher-down": {
+    "mode": 384,
+    "type": 32768,
+    "inode": 180076540,
+    "mtime_ns": 1791574010140023803,
+    "size": 41,
+    "sha256": "b7f0c39b95fa27cc728bf333d0b61975373c5345b477960edcc29fa72832b2d4",
+    "bytes_base64": "cGVuZGluZzpkb3dudGltZTo5NjI4Mi4xNzkxNTc0MDA5LkFiQnBsTwo=",
+    "text": "pending:downtime:96282.1791574009.AbBplO\n"
+  },
+  "user-home": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076436,
+    "mtime_ns": 1791574009763691399,
+    "size": 64
+  }
+}

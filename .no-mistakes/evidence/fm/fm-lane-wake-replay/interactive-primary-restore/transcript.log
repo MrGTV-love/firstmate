@@ -1,0 +1,158 @@
+$ bash bin/fm-lab-home.sh create /tmp/fm-lab-primary-restore-xcir5hak
+exit=0
+/tmp/fm-lab-primary-restore-xcir5hak
+
+$ bash bin/fm-lab-home.sh tmux-dir /tmp/fm-lab-primary-restore-xcir5hak
+exit=0
+/tmp/fml.D9FuaT
+
+$ /Users/charlesabrooker/.bun/bin/omp --version
+exit=0
+omp/18.8.1
+
+$ tmux -L fm-lab-primary-restore -f /dev/null new-session -d -s primary -n main -x 260 -y 50 -c /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ -e FM_HOME=/tmp/fm-lab-primary-restore-xcir5hak /Users/charlesabrooker/.bun/bin/omp --no-session --model lab/m1 --no-title --no-skills --no-rules --no-lsp --no-tools --no-extensions -e /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ/.gate-primary-restore-probe.ts
+exit=0
+
+$ tmux -L fm-lab-primary-restore capture-pane -p -t primary -S -150
+exit=0
+
+                                                                                                                  ████████████
+                                                                                                                     ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                                                     ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                                                     ▒▒  ██                  █
+                                                                                                                         ██       v18.8.1
+
+                                                                                               Tip: `/shake` rips heavy tool results out of context to reclaim tokens
+                                                                                                    without a full /compact — `/shake images` drops just images
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.7 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+╭── π > ⬢ m1 > 🌳 32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ > ⑂ detached ?2 ▶─────────────7%─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╎─────────────────┃──────────────────────────200K───╮
+╰─                                                                                                                                                                                                                                   ⇧⇥ to change thinking effort ─╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ bash bin/fm-wake-drain.sh --queued
+$ bash bin/fm-wake-drain.sh
+exit=0
+1791574774	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ/.gate-primary-restore-driver.py", line 117, in <module>
+    assert queued_before and 'restoreprobe.status' in capture['content'], capture
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'content': '\u2063FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: watcher: FAILED - handling delivery confirmation was rejected (status=1 generation=54026.1791574774.2IGEBP watcherPid=64811)\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.', 'idle': True, 'options': None}
+$ tmux -L fm-lab-primary-restore capture-pane -p -t primary -S -150
+exit=0
+
+                                                                                                                  ████████████
+                                                                                                                     ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                                                                                                     ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                                                                                                     ▒▒  ██                  █
+                                                                                                                         ██       v18.8.1
+
+                                                                                               Tip: `/shake` rips heavy tool results out of context to reclaim tokens
+                                                                                                    without a full /compact — `/shake images` drops just images
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.8.7 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+ ⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+
+ Run bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.
+
+
+  ⎋ Working…
+
+╭── ⠼ 0s > ⬢ m1 > 🌳 32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ > ⑂ detached ?2 ▶─────────────7%──────────────────────────────────────────────────────────────────────────────────────────────────────────────────╎──────────────────┃─────────────────────────200K───╮
+╰─                                                                                                                                                                                                                                                                ─╯
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+$ tmux -L fm-lab-primary-restore display-message -p -t primary '#{pane_pid}'
+exit=0
+51735
+
+$ tmux -L fm-lab-primary-restore kill-server
+exit=0
+
+exit=0
+1791574774	1	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+restoreprobe done: old restoration payload
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 54026.1791574774.2IGEBP
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, source '/tmp/fm-lab-primary-restore-xcir5hak/config/x-mode.env' first, then repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bash bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 54026.1791574774.2IGEBP
+exit=0
+
+$ bash bin/fm-lab-home.sh teardown /tmp/fm-lab-primary-restore-xcir5hak
+exit=0
+

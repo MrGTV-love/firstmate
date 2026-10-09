@@ -1,0 +1,38 @@
+{
+  ".": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078529,
+    "mtime_ns": 1791574014207985159,
+    "size": 192
+  },
+  "config": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078531,
+    "mtime_ns": 1791574014194263983,
+    "size": 64
+  },
+  "data": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078532,
+    "mtime_ns": 1791574014194298608,
+    "size": 64
+  },
+  "state": {
+    "mode": 0,
+    "type": 16384,
+    "inode": 180078534,
+    "mtime_ns": 1791574014386802952,
+    "size": 160,
+    "list_error": "PermissionError"
+  },
+  "user-home": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180078530,
+    "mtime_ns": 1791574014194222816,
+    "size": 64
+  }
+}

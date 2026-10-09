@@ -1,0 +1,67 @@
+{
+  ".": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076435,
+    "mtime_ns": 1791574009780194419,
+    "size": 192
+  },
+  "config": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076437,
+    "mtime_ns": 1791574009763741441,
+    "size": 64
+  },
+  "data": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076438,
+    "mtime_ns": 1791574009763785191,
+    "size": 64
+  },
+  "state": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076449,
+    "mtime_ns": 1791574011607126032,
+    "size": 160
+  },
+  "state/.wake-queue": {
+    "mode": 384,
+    "type": 32768,
+    "inode": 180077158,
+    "mtime_ns": 1791574011507597035,
+    "size": 66,
+    "sha256": "acb8cd16485a5992b9d02baba6d06541ec34e268ab623004f0ead98287dfd698",
+    "bytes_base64": "MTc5MTU3NDAxMQkzCWNoZWNrCWxhdGUta2V5CWNoZWNrOiBhcnJpdmVkIGFmdGVyIHByZXNlbnRhdGlvbiDpm6oK",
+    "text": "1791574011\t3\tcheck\tlate-key\tcheck: arrived after presentation 雪\n"
+  },
+  "state/.wake-queue.seq": {
+    "mode": 420,
+    "type": 32768,
+    "inode": 180076508,
+    "mtime_ns": 1791574011279640017,
+    "size": 2,
+    "sha256": "1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2",
+    "bytes_base64": "Mwo=",
+    "text": "3\n"
+  },
+  "state/.watcher-down": {
+    "mode": 384,
+    "type": 32768,
+    "inode": 180077086,
+    "mtime_ns": 1791574011226332818,
+    "size": 41,
+    "sha256": "b7f0c39b95fa27cc728bf333d0b61975373c5345b477960edcc29fa72832b2d4",
+    "bytes_base64": "cGVuZGluZzpkb3dudGltZTo5NjI4Mi4xNzkxNTc0MDA5LkFiQnBsTwo=",
+    "text": "pending:downtime:96282.1791574009.AbBplO\n"
+  },
+  "user-home": {
+    "mode": 493,
+    "type": 16384,
+    "inode": 180076436,
+    "mtime_ns": 1791574009763691399,
+    "size": 64
+  }
+}

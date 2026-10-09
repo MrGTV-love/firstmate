@@ -1,0 +1,7 @@
+{
+  "command": "env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS FM_HOME=\"$PWD/.nm-startup-diagnostic\" bin/fm-sessionstart-run.sh --source startup --pi-prerequisite",
+  "returncode": 3,
+  "stdout": "",
+  "stderr": "",
+  "home_created": false
+}

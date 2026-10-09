@@ -1,0 +1,3 @@
+ok - live omp stale wake: omp (omp/18.8.1) delivered no wake turn after the lane drained and acknowledged every row inside a long turn (stale: no wake turn after the lane drained and acknowledged every row)
+ok - live omp owed wake: omp (omp/18.8.1) delivered exactly one wake turn to a lane that had not drained, and none after the drain that turn ran (owed: one wake turn, and none after the drain it triggered covered every row)
+ok - live omp control: omp (omp/18.8.1) with the fixture-only legacy injector still shows the stale wake turns the guard exists to prevent (legacy: 3 stale wake turns from the fixture-only ungated injector)

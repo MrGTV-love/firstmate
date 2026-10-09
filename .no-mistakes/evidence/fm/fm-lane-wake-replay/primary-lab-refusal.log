@@ -1,0 +1,4 @@
+Command: bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ/.gate-wake-live/primary-home
+Exit: 1
+fm-lab-home: refusing: a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+Workspace policy allows intentional writes outside the worktree only for evidence files, not a disposable operational home.

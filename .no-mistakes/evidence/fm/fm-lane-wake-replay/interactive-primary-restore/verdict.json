@@ -1,0 +1,58 @@
+{
+  "verdict": "inconclusive",
+  "attempts": 1,
+  "lab": "/tmp/fm-lab-primary-restore-xcir5hak",
+  "scenario": "Interactive primary restores tracked wake, uses current owed rows, and preserves operator draft",
+  "product_changes": false,
+  "limitations": [
+    "Local scripted model; only watcher extension loaded; vendor follow-up stimulus is fixture-only and was not reached."
+  ],
+  "socket_dir": "/tmp/fml.D9FuaT",
+  "omp_version": "omp/18.8.1",
+  "reason": "The primary and real watcher started, but the first capture was a handling-confirmation failure notification rather than the intended restoreprobe signal. An unrelated open-loop-ledger wake was also delivered. The attempt stopped before a busy turn, queued-follow-up interruption, or editor restoration was exercised.",
+  "failure_type": "setup interference; restoration behavior remains untested; no product change made",
+  "teardown_exit": 0,
+  "lab_removed": true,
+  "socket_removed": true,
+  "owned_pids": [
+    51735,
+    64648,
+    64811,
+    67519,
+    67522,
+    67649,
+    67653,
+    67656
+  ],
+  "root_cause": "[INFERENCE] confirmHandlingDelivery passes nonempty FM_ROOT_OVERRIDE, FM_STATE_OVERRIDE and FM_CONFIG_OVERRIDE directly to fm-watch-arm.sh; its disposable-checkout guard rejects relocated lab layouts. The x-mode.env sanitation used by the normal arm launch does not run on that direct confirmation path. The confirmation's stdout was not captured, so the exact refusal diagnostic is not observed.",
+  "root_cause_sources": [
+    ".omp/extensions/fm-primary-omp-watch.ts:805-824",
+    "bin/fm-watch-arm.sh:103-120",
+    "bin/fm-gate-refuse-lib.sh:103-115"
+  ],
+  "observed_live": [
+    "omp/18.8.1 interactive UI",
+    "public fm-lock.sh acquisition by PID 51735",
+    "real watcher lock and durable open-loop-ledger row",
+    "production emitted confirmation failure and drain-backed open-loop-ledger prompt"
+  ],
+  "not_exercised": [
+    "Escape restoration",
+    "fresh owed-row regeneration",
+    "operator draft preservation"
+  ],
+  "no_retry": "Honored the selected human decision's one-attempt-only instruction.",
+  "owned_processes_stopped": true,
+  "worktree_scaffolds_removed": true,
+  "evidence": [
+    "transcript.log",
+    "probe.jsonl",
+    "model-calls.json",
+    "ready.screen.txt",
+    "failure.screen.txt",
+    "wake-queue",
+    "watch-cycle-exits.log",
+    "primary-restore-driver.py",
+    "primary-restore-probe.ts"
+  ]
+}

@@ -1,0 +1,27 @@
+replacement-empty: public new_session completed before any wake; restored queue access delivered only currently owed rows
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 51103)
+Traceback (most recent call last):
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 766, in __init__
+    self.handle()
+    ~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/http/server.py", line 436, in handle
+    self.handle_one_request()
+    ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/http/server.py", line 424, in handle_one_request
+    method()
+    ~~~~~~^^
+  File "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4FKBPP79Q9T9PVBFG7F1ETZ/.gate-wake-live/supplement.py", line 130, in do_POST
+    self.wfile.write(b"data: " + json.dumps(body).encode() + b"\n\n")
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/charlesabrooker/.pyenv/versions/3.13.6/lib/python3.13/socketserver.py", line 845, in write
+    self._sock.sendall(b)
+    ~~~~~~~~~~~~~~~~~~^^^
+BrokenPipeError: [Errno 32] Broken pipe
+----------------------------------------

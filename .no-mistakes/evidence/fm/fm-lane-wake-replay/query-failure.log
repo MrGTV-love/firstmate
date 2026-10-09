@@ -1,0 +1,1 @@
+query-failure: malformed queue emitted no watcher wake, surfaced a typed notice, then delivered exactly one owed wake after repair
