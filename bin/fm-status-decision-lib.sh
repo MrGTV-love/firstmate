@@ -239,6 +239,7 @@ _fm_decision_key() {  # <status-line> [<keyless>] -> key slug, or <keyless> (def
 # Portable (no associative arrays) so the fold runs on bash 3.2 as well as 4+.
 _fm_decision_drop() {  # <open-set> <key> <out-var>
   local __fm_drop_line __fm_drop_out=''
+  [ -n "$1" ] || { printf -v "$3" '%s' ''; return 0; }
   while IFS= read -r __fm_drop_line || [ -n "$__fm_drop_line" ]; do
     [ -n "$__fm_drop_line" ] || continue
     case "$__fm_drop_line" in
@@ -317,6 +318,12 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
   local __fm_fold_open=$1 __fm_fold_verb __fm_fold_key __fm_fold_note __fm_fold_unstamped
   # Initialize the caller's result for every non-transition early return.
   printf -v "$6" '%s' "$1"
+  status_line_verb "$2" __fm_fold_verb
+  # Only an opener can change an empty set; routine closes need no key/note parse.
+  case "$__fm_fold_verb" in
+    needs-decision|blocked) ;;
+    *) [ -n "$__fm_fold_open" ] || return 0 ;;
+  esac
   # Both colon tests below ask where the head ends, the same question the note
   # and key readers ask, so they read the same unstamped copy those readers do.
   # A worker-written time tag must never decide whether a decision opens or
@@ -336,7 +343,6 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
     *:*|*\[key=*\]*) ;;
     *) return 0 ;;
   esac
-  status_line_verb "$2" __fm_fold_verb
   case "$__fm_fold_unstamped" in
     *:*) case "$__fm_fold_verb:$5" in
       done:ship|done:scout|failed:ship|failed:scout) printf -v "$6" '%s' ''; return 0 ;;
