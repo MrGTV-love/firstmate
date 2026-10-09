@@ -2274,14 +2274,22 @@ omp_catalog_verdict() { # <omp-bin> <provider/id>
 # know or a bare pattern is omp's own matcher's job (same scope as
 # omp_model_validate).
 omp_default_role_validate() {
-  local bin=$1 model=$2 raw=${3:-} role selector verdict remedy model_flag dependency
+  local bin=$1 model=$2 raw=${3:-} agent_dir=${4:-} role selector verdict remedy model_flag dependency
   if [ -n "$raw" ]; then
     model_flag=$(model_flag_for_harness omp "$model")
     raw=${raw//__MODELFLAG__/$model_flag}
     dependency=$(node --input-type=module - "$SCRIPT_DIR/fm-arm-command-policy.mjs" "$raw" 2>/dev/null <<'JS'
 import { pathToFileURL } from "node:url";
 const { Lexer } = await import(pathToFileURL(process.argv[2]).href);
-const { tokens, error } = new Lexer(process.argv[3]).tokenize();
+class LaunchLexer extends Lexer {
+  readWord() {
+    const start = this.index;
+    const word = super.readWord();
+    if (word) word.source = this.source.slice(start, this.index);
+    return word;
+  }
+}
+const { tokens, error } = new LaunchLexer(process.argv[3]).tokenize();
 if (error) process.exit(1);
 const words = [];
 for (let i = 0; i < tokens.length; i++) {
@@ -2291,26 +2299,39 @@ for (let i = 0; i < tokens.length; i++) {
     if (!token.inlineTarget) i++;
     continue;
   }
-  words.push(token.value);
+  words.push(token);
 }
 let i = 0;
-while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i] || "")) i++;
+let agentDir = "";
+let certain = tokens.every(token => token.type === "word");
+while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]?.value || "")) {
+  const word = words[i++];
+  if (!/^[A-Za-z_][A-Za-z0-9_]*=/.test(word.source) || !word.literal ||
+      word.unquotedExpansion || word.source.includes("\\")) certain = false;
+  if (word.value.startsWith("PI_CODING_AGENT_DIR=")) {
+    agentDir = word.value.slice("PI_CODING_AGENT_DIR=".length);
+  }
+}
+if (!words[i]?.literal || !/(^|\/)omp$/.test(words[i]?.value || "")) certain = false;
+if (!certain || !agentDir.startsWith("/") || /[\n\r]/.test(agentDir)) agentDir = "";
 let pinned = false;
 for (i++; i < words.length; i++) {
-  if (words[i] === "--") break;
-  if (/^--model=.+/.test(words[i]) ||
-      ((words[i] === "--model" || words[i] === "-m") && words[i + 1])) {
+  if (words[i].value === "--") break;
+  if (/^--model=.+/.test(words[i].value) ||
+      ((words[i].value === "--model" || words[i].value === "-m") && words[i + 1]?.value)) {
     pinned = true;
     break;
   }
 }
-process.stdout.write(pinned ? "pinned" : "default");
+process.stdout.write(JSON.stringify({ pinned, agentDir }));
 JS
     ) || return 0
-    [ "$dependency" = default ] || return 0
+    agent_dir=$(printf '%s' "$dependency" | jq -r '.agentDir' 2>/dev/null) || return 0
+    [ "$(printf '%s' "$dependency" | jq -r '.pinned' 2>/dev/null)" = false ] || return 0
   else
     { [ -z "$model" ] || [ "$model" = default ]; } || return 0
   fi
+  [ -n "$agent_dir" ] || return 0
   role=$(ruby -ryaml -e '
 config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
 config = {} if config.nil?
@@ -2321,7 +2342,7 @@ exit 1 unless roles.is_a?(Hash)
 role = roles["default"]
 exit 1 unless role.nil? || role.is_a?(String)
 print role.to_s
-' "${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}/config.yml" 2>/dev/null) || return 0
+' "$agent_dir/config.yml" 2>/dev/null) || return 0
   remedy="pass --model <provider>/<id> (or a dispatch profile) so this launch stops depending on the shared default, or restore the Default role in omp with /model"
   if [ -z "$role" ]; then
     echo "error: omp modelRoles.default is not set in the shared omp config, so an omp launch with no --model would silently run on the first model with credentials (a free-tier model that answers HTTP 429); $remedy" >&2
@@ -2332,7 +2353,7 @@ print role.to_s
   *:off | *:minimal | *:low | *:medium | *:high | *:xhigh | *:max | *:auto) selector=${role%:*} ;;
   esac
   case "$selector" in */*) ;; *) return 0 ;; esac
-  verdict=$(omp_catalog_verdict "$bin" "$selector")
+  verdict=$(PI_CODING_AGENT_DIR="$agent_dir" omp_catalog_verdict "$bin" "$selector")
   case "$verdict" in
   unknown-provider)
     echo "notice: omp provider '${selector%%/*}' is not in 'omp models --json' (extension-registered providers are never listed); launching '$role' unvalidated" >&2
@@ -2884,7 +2905,15 @@ if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
   omp_model_validate "$OMP_BIN" "$MODEL" || exit 1
 fi
 if [ "$HARNESS" = omp ]; then
-  omp_default_role_validate "$OMP_BIN" "$MODEL" "$RAW_COMMAND" || exit 1
+  OMP_AGENT_DIR=
+  if [ "$RAW_LAUNCH" = 0 ]; then
+    OMP_AGENT_DIR=$(ruby -e 'print File.expand_path(ARGV.fetch(0))' \
+      "${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}" 2>/dev/null) || OMP_AGENT_DIR=
+    if [ -n "$OMP_AGENT_DIR" ]; then
+      LAUNCH="PI_CODING_AGENT_DIR=$(shell_quote "$OMP_AGENT_DIR") $LAUNCH"
+    fi
+  fi
+  omp_default_role_validate "$OMP_BIN" "$MODEL" "$RAW_COMMAND" "$OMP_AGENT_DIR" || exit 1
 fi
 if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
   agy_model_validate "$AGY_BIN" "$MODEL" || exit 1

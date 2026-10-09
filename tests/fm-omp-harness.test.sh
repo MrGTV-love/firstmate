@@ -112,8 +112,15 @@ test_lock_identity_and_liveness_classification() {
 make_fake_omp() {  # <fakebin>
   cat > "$1/omp" <<'SH'
 #!/usr/bin/env bash
+if [ -n "${FM_FAKE_OMP_ENV_LOG:-}" ]; then
+  printf '%s:%s\n' "${1:-launch}" "${PI_CODING_AGENT_DIR:-}" >> "$FM_FAKE_OMP_ENV_LOG"
+fi
 case "$1" in
   models)
+    if [ -f "${PI_CODING_AGENT_DIR:-}/catalog.json" ]; then
+      cat "$PI_CODING_AGENT_DIR/catalog.json"
+      exit 0
+    fi
     printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
     ;;
 esac
@@ -313,10 +320,19 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   agent_dir="$CASE_DIR/custom-agent"
   mkdir -p "$agent_dir"
   printf 'modelRoles:\n  default: ollama/qwen3:8b:max\n' > "$agent_dir/config.yml"
-  out=$(PI_CODING_AGENT_DIR="$agent_dir" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  printf 'FM_FAKE_OMP_ENV_LOG\n' > "$HOME_DIR/config/launch-env-allowlist"
+  out=$(PI_CODING_AGENT_DIR="$agent_dir" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
+    run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
   expect_code 0 "$status" "the selected agent dir must supply the global default, preserving model-id colons: $out"
   assert_present "$HOME_DIR/state/$id.meta" "a listed agent-dir default must publish the task"
+  HOME="$HOME_DIR/user-home" PI_CODING_AGENT_DIR="$CASE_DIR/pane-agent" \
+    PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
+    bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1
+  status=$?
+  expect_code 0 "$status" "the canonical launch must execute in a pane with a different agent directory"
+  assert_grep "models:$agent_dir" "$CASE_DIR/omp-env.log" "catalog inspection must use the canonical launch directory"
+  assert_grep "--config:$agent_dir" "$CASE_DIR/omp-env.log" "the launched omp must receive the checked directory despite pane inheritance and filtering"
 
   id=omp-role-agent-dir-missing-q14
   rec=$(make_spawn_case role-agent-dir-missing omp "$id")
@@ -334,6 +350,66 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   pass "fm-spawn: global role inspection is read-only, unlayered, and honors PI_CODING_AGENT_DIR"
 }
 
+test_spawn_raw_omp_guard_uses_the_launch_agent_dir() {
+  local rec id out status caller_dir launch_dir mode command
+  for mode in missing listed unlisted uncertain; do
+    id="omp-raw-agent-$mode"
+    rec=$(make_spawn_case "raw-agent-$mode" omp "$id")
+    read_case_record "$rec"
+    caller_dir="$CASE_DIR/caller-agent"
+    launch_dir="$CASE_DIR/launch-agent"
+    mkdir -p "$caller_dir" "$launch_dir"
+    printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\n' > "$caller_dir/config.yml"
+    printf 'modelRoles: {}\n' > "$launch_dir/config.yml"
+    case "$mode" in
+      listed)
+        printf 'modelRoles: {}\n' > "$caller_dir/config.yml"
+        printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\n' > "$launch_dir/config.yml"
+        ;;
+      unlisted)
+        printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\n' > "$launch_dir/config.yml"
+        printf '%s\n' '{"models":[{"provider":"openai-codex","id":"other","selector":"openai-codex/other"}]}' > "$launch_dir/catalog.json"
+        ;;
+      uncertain)
+        printf 'modelRoles: {}\n' > "$caller_dir/config.yml"
+        ;;
+    esac
+    command="PI_CODING_AGENT_DIR='$launch_dir' omp --auto-approve"
+    [ "$mode" != uncertain ] || command='PI_CODING_AGENT_DIR="$PANE_AGENT_DIR" omp --auto-approve'
+    out=$(PI_CODING_AGENT_DIR="$caller_dir" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
+      run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
+    status=$?
+    case "$mode" in
+      missing | unlisted)
+        expect_code 1 "$status" "raw omp must refuse the launch directory's invalid role ($mode): $out"
+        assert_absent "$HOME_DIR/state/$id.meta" "a refused raw-directory launch must publish no record"
+        [ ! -s "$LAUNCH_LOG" ] || fail "a refused raw-directory launch must record no launch"
+        if [ "$mode" = missing ]; then
+          assert_contains "$out" "omp modelRoles.default is not set" "raw assignment must not read the caller's listed role"
+        else
+          assert_contains "$out" "is not listed by 'omp models --json'" "raw catalog must use the launch directory"
+          assert_grep "models:$launch_dir" "$CASE_DIR/omp-env.log" "raw catalog must receive the launch directory"
+        fi
+        ;;
+      listed | uncertain)
+        expect_code 0 "$status" "raw omp must launch with a listed or uncertain directory ($mode): $out"
+        HOME="$HOME_DIR/user-home" PI_CODING_AGENT_DIR="$caller_dir" PANE_AGENT_DIR="$launch_dir" \
+          PATH="$FAKEBIN_DIR:$PATH" FM_FAKE_OMP_ENV_LOG="$CASE_DIR/omp-env.log" \
+          bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1
+        status=$?
+        expect_code 0 "$status" "the raw command must execute unchanged"
+        assert_grep "--auto-approve:$launch_dir" "$CASE_DIR/omp-env.log" "raw omp must receive its assignment rather than the caller directory"
+        if [ "$mode" = listed ]; then
+          assert_grep "models:$launch_dir" "$CASE_DIR/omp-env.log" "the role and catalog must inspect the same directory"
+        else
+          ! grep -q '^models:' "$CASE_DIR/omp-env.log" || fail "uncertain directory must establish no catalog evidence"
+        fi
+        ;;
+    esac
+  done
+  pass "fm-spawn: raw role and catalog inspection honor the actual launch directory and uncertain evidence passes through"
+}
+
 test_spawn_raw_omp_guard_uses_the_launch_model() {
   local rec id out status command expected index=0
   local model_args=()
@@ -347,6 +423,7 @@ test_spawn_raw_omp_guard_uses_the_launch_model() {
     case "$command" in
       *'__MODELFLAG__'* | 'omp --auto-approve') model_args=(--model openai-codex/gpt-6-astra) ;;
     esac
+    command="PI_CODING_AGENT_DIR='$(dirname "$GLOBAL_CONFIG")' $command"
     out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command" ${model_args[@]+"${model_args[@]}"})
     status=$?
     expect_code "$expected" "$status" "raw omp guard must follow the effective model in '$command': $out"
@@ -1542,6 +1619,7 @@ test_spawn_model_validation_scoped_to_listed_providers
 test_spawn_refuses_a_missing_or_unlisted_default_role
 test_spawn_global_config_is_read_only_and_unlayered
 test_spawn_raw_omp_guard_uses_the_launch_model
+test_spawn_raw_omp_guard_uses_the_launch_agent_dir
 test_secondmate_launch_relies_on_discovery
 test_secondmate_config_pinned_model_is_validated
 test_busy_extension_lifecycle
