@@ -91,6 +91,7 @@ After the successor watcher is verified and the handling handoff is confirmed, e
 - Busy, missing, or unreadable idle state holds the mark. The extension checks again on a fixed 1000ms timer; it never sends watcher work as a follow-up.
 - When idle, one subprocess runs `bin/fm-wake-drain.sh --queued` as main. This read-only query returns main-owned TSV queue rows in append order, excluding rows reserved by a live branch grant. Missing or empty queues return no rows without creating state; unreadable or malformed queues fail.
 - With rows, the extension injects one wake naming the oldest owed row's payload and, when applicable, `and N more queued`. With no rows, it clears the mark and sends nothing. A recovery marker alone is not a queued row.
+- Session preparation, message start, or turn completion during a query invalidates its snapshot, even if the whole turn finishes before the query returns. The mark remains for a fresh idle query.
 - Failed or timed-out queries retain the mark and retry on the timer. After three consecutive failures, the existing failure path surfaces `watcher: FAILED - could not read the wake queue`; retries continue. The subprocess deadline is fixed at 10000ms.
 
 Initial delivery, held flush, replacement handoff, and restored-editor recovery all use this same queue-read/send boundary. There is no per-headline or sequence matching, hold expiry, disable setting, or error-as-empty fallback. Partial acknowledgement leaves remaining rows eligible even within a single watcher close; display differences for decision, merge, multiline, or recovery notifications cannot suppress queued work.
@@ -110,6 +111,7 @@ An accepted user `message_start` carrying the exact emitted text consumes its pe
 The fixed one-second poll checks stranded text even without `agent_end`. It requires a live generation, a UI editor, positive idle state, and no pending vendor messages.
 Only a complete unchanged emitted wake segment, bounded by editor edges or omp's blank-line joins, may be removed; only its leading invisible transport mark may be present or absent. Prefix, suffix, and internal edits stay untouched. Removing a template preserves operator draft bytes, including invisible marks and leading/trailing newlines.
 For watcher text, the poll never submits the composer copy: it removes only unchanged template text, releases the outstanding token, and marks that a wake may be due. The same queue-read boundary then builds fresh text from current owed rows, or sends nothing if the queue is empty. Operational hand-backs retain their existing delivery path.
+Turn-end release stops serialization but retains unconsumed emitted text until an idle editor check can remove an unchanged template before the next queue-read delivery.
 [Architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary, secondmate stalled-queue escalation, and idle-ring eligibility.
 `tests/fm-omp-harness.test.sh --watch-queue` covers restored-template removal, draft-byte preservation, refusal of edited, busy or queued editor text, and regeneration from a different still-owed payload.
 The opt-in live guard and its evidence limits are recorded in [omp injected text through Herdr](verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr).
@@ -192,12 +194,12 @@ A failed confirmation is never swallowed.
 ### Readiness timeout and retry
 
 The adapter waits at most one readiness timeout per attempt.
-omp uses FM_OMP_ARM_READY_TIMEOUT_MS for arm readiness, defaulting to 12000ms on non-Windows platforms and 35000ms on Windows; host readiness uses the greater of that arm timeout and 30000ms. Its separate actionable owed query remains fixed at 10000ms.
+omp uses FM_OMP_ARM_READY_TIMEOUT_MS for arm readiness, defaulting to 12000ms on non-Windows platforms and 35000ms on Windows; host readiness uses the greater of that arm timeout and 30000ms. Its separate idle queue-read deadline remains fixed at 10000ms.
 If the successor is not ready in that time, the adapter sends TERM and waits a bounded retirement confirmation before the next lock-verified exponential retry.
 
-If the unready arm does not retire within that bound, the adapter keeps ownership, starts no overlapping retry, and surfaces the typed fallback; omp still holds watcher work until idle and validates its durable sequence identities before delivery.
+If the unready arm does not retire within that bound, the adapter keeps ownership, starts no overlapping retry, and surfaces the typed fallback; omp still holds watcher work until idle and reads current main-owned queued rows before delivery.
 When that retained arm later closes, its actual close is classified as a new supervised event without replaying the earlier fallback.
-After the configured retry bound is exhausted, the adapter delivers the original wake with a typed continuity-restoration failure, even if every successor arm hung without reporting readiness; omp still requires idle state and current queued sequence evidence for watcher delivery.
+After the configured retry bound is exhausted, the adapter delivers the original wake with a typed continuity-restoration failure, even if every successor arm hung without reporting readiness; omp still requires idle state and a fresh queue read that finds main-owned rows for watcher delivery.
 
 This is deliberate Option B ordering.
 Whenever restoration succeeds, the fleet is protected before the model handles the wake.

@@ -250,7 +250,7 @@ function markLoaded(): void {
 }
 
 function actionableLine(output: string): string {
-  return output.split(/\r?\n/).find((line) => /^(signal:|stale:|check:|heartbeat($|:)|wake-row:)/.test(line)) || "";
+  return output.split(/\r?\n/).find((line) => /^(signal:|stale:|check:|heartbeat($|:))/.test(line)) || "";
 }
 
 function completedActionableLine(output: string): string {
@@ -654,6 +654,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   let latestContext: any = null;
+  let sessionActivity = 0;
 
   function rememberContext(ctx: unknown): void {
     if (typeof ctx === "object" && ctx !== null) latestContext = ctx;
@@ -680,7 +681,8 @@ export default function (pi: ExtensionAPI) {
         rejectRows(new Error("wake queue query timed out"));
       }, 10000);
       timer.unref();
-      child.stdout.on("data", (chunk: Buffer) => { output += chunk.toString(); });
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => { output += chunk; });
       child.once("error", (error: Error) => {
         clearTimeout(timer);
         rejectRows(error);
@@ -702,8 +704,8 @@ export default function (pi: ExtensionAPI) {
     for (const [token, wake] of [...owner.unconsumedWakes]) {
       if (!wake.pending || operationalHandback(wake.pending.message)) continue;
       if (droppedOnly && (!wake.prepared || wake.pending.delivered)) continue;
-      owner.unconsumedWakes.delete(token);
       if (wake.pending.delivered) {
+        owner.unconsumedWakes.delete(token);
         const pending = owner.heldWakes.values().next().value?.pending
           ?? createPendingActionable(wakeDueMessage, "");
         enqueuePendingActionable(owner, pending);
@@ -741,12 +743,13 @@ export default function (pi: ExtensionAPI) {
     if (owner.flushing) return "held";
     owner.flushing = true;
     try {
-      if (!sessionIsIdle()) return "held";
+      if (!sessionIsIdle() || latestContext?.hasPendingMessages?.()) return "held";
       recoverRestoredWake(owner);
-      if (!latestContext?.hasPendingMessages?.()) releaseWatcherWakes(owner, true);
-      const outstanding = [...owner.unconsumedWakes.values()].some((wake) => wake.pending && !operationalHandback(wake.pending.message));
+      releaseWatcherWakes(owner, true);
+      const outstanding = [...owner.unconsumedWakes].some(([token, wake]) => wake.pending && !operationalHandback(wake.pending.message) && !owner.heldWakes.has(token));
       if (outstanding || owner.heldWakes.size === 0) return "held";
       const held = [...owner.heldWakes.values()];
+      const activity = sessionActivity;
       let rows: string[];
       try {
         rows = await readWakeQueue();
@@ -758,7 +761,7 @@ export default function (pi: ExtensionAPI) {
       }
       if (!generationIsLive(owner)) return false;
       owner.queueReadFailures = 0;
-      if (!sessionIsIdle()) return "held";
+      if (activity !== sessionActivity || !sessionIsIdle() || latestContext?.hasPendingMessages?.()) return "held";
       if (rows.length === 0) {
         for (const { pending } of held) retirePending(owner, pending);
         return "dropped";
@@ -1237,12 +1240,14 @@ export default function (pi: ExtensionAPI) {
     const releaseChild = (): void => {
       if (owner.child === armChild) owner.child = null;
     };
-    armChild.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
+    armChild.stdout.setEncoding("utf8");
+    armChild.stderr.setEncoding("utf8");
+    armChild.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
       observeEstablishedArm();
     });
-    armChild.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
+    armChild.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
       observeEstablishedArm();
     });
     armChild.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
@@ -1323,6 +1328,7 @@ export default function (pi: ExtensionAPI) {
   }
 
   pi.on?.("before_agent_start", (_event, ctx) => {
+    sessionActivity += 1;
     rememberContext(ctx);
     markLoaded();
     for (const wake of generation.unconsumedWakes.values()) {
@@ -1330,12 +1336,14 @@ export default function (pi: ExtensionAPI) {
     }
   });
   pi.on?.("message_start", (event, ctx) => {
+    sessionActivity += 1;
     rememberContext(ctx);
     const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
     if (!message || message.role !== "user") return;
     consumeWake(generation, userMessageText(message.content));
   });
   pi.on?.("agent_end", (_event, ctx) => {
+    sessionActivity += 1;
     rememberContext(ctx);
     recoverRestoredWake(generation);
     releaseWatcherWakes(generation);
