@@ -4859,6 +4859,8 @@ test_sweep_retires_only_finished_board_listeners() {
   local home store out rc list before after unreadable unreadable_id
   local gone ended nosession dormant closed openheld fresh queued owned standing pending
   local gone_id ended_id nosession_id dormant_id closed_id openheld_id fresh_id queued_id owned_id standing_id pending_id
+  local session syntax board sid kept_count
+  local -a protected_ids=()
   home=$(make_home board-sweep)
   fm_test_track_procevent_home "$home" "$home/procevent-claims"
   store="$home/lavish-state"
@@ -4906,6 +4908,30 @@ test_sweep_retires_only_finished_board_listeners() {
     "$ROOT/bin/fm-procevent-lavish.sh" poll "$owned" >/dev/null \
     || fail "could not register the worker-owned board"
 
+  for session in ended nosession idle; do
+    for syntax in quoted single unquoted uppercase hex decimal invalid unreadable; do
+      board=$(sweep_board "$home" "$session-$syntax" new)
+      case "$syntax" in
+        quoted) printf '<form data-lavish-question="sweep-open-call"></form>\n' > "$board" ;;
+        single) printf "<form data-lavish-question='sweep-open-call'></form>\n" > "$board" ;;
+        unquoted) printf '<form data-lavish-question=sweep-open-call></form>\n' > "$board" ;;
+        uppercase) printf '<form DATA-LAVISH-QUESTION="sweep-open-call"></form>\n' > "$board" ;;
+        hex) printf '<form data-lavish-question="sweep&#x2d;open-call"></form>\n' > "$board" ;;
+        decimal) printf '<form data-lavish-question="sweep&#45;open-call"></form>\n' > "$board" ;;
+        invalid) printf '<form data-lavish-question="sweep-closed-call"></form><form data-lavish-question="bad&amp;key"></form>\n' > "$board" ;;
+      esac
+      [ "$session" != idle ] || touch -t 200001010000 "$board"
+      sid=$(sweep_register "$home" "$board")
+      protected_ids+=("$sid")
+      case "$session" in
+        ended) sweep_session "$store" "$board" ended 0 - ;;
+        idle) sweep_session "$store" "$board" open 0 2000-01-01T00:00:00.000Z ;;
+      esac
+      [ "$syntax" != unreadable ] || chmod 000 "$board"
+    done
+  done
+  kept_count=$((6 + ${#protected_ids[@]}))
+
   sweep_session "$store" "$gone" open 0 2000-01-01T00:00:00.000Z
   sweep_session "$store" "$ended" ended 0 -
   sweep_session "$store" "$dormant" open 0 2000-01-01T00:00:00.000Z
@@ -4928,7 +4954,7 @@ test_sweep_retires_only_finished_board_listeners() {
   out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run) \
     || fail "the dry-run sweep failed: $out"
   assert_contains "$out" "would-retire: $gone_id" "the dry run missed a board whose file is gone"
-  assert_contains "$out" "sweep: would-retire=5 kept=6" "the dry run counted the wrong verdicts: $out"
+  assert_contains "$out" "sweep: would-retire=5 kept=$kept_count" "the dry run counted the wrong verdicts: $out"
   list=$(run_procevent "$home" list)
   assert_contains "$list" "$dormant_id" "a dry run retired a registration"
 
@@ -4945,34 +4971,49 @@ test_sweep_retires_only_finished_board_listeners() {
   assert_contains "$out" "kept: $owned_id" "a worker-owned board lost its listener to a dormancy rule"
   assert_contains "$out" "kept: $standing_id" "the standing Bearings board lost its listener"
   assert_contains "$out" "kept: $pending_id" "a board with an unread captured answer lost its listener"
-  assert_contains "$out" "sweep: retired=5 kept=6" "the sweep counted the wrong verdicts: $out"
+  for after in "${protected_ids[@]}"; do
+    assert_contains "$out" "kept: $after" "a board with an open or unreadable captain card lost its listener: $out"
+  done
+  assert_contains "$out" "sweep: retired=5 kept=$kept_count" "the sweep counted the wrong verdicts: $out"
 
   list=$(run_procevent "$home" list)
   for after in "$gone_id" "$ended_id" "$nosession_id" "$dormant_id" "$closed_id"; do
     assert_not_contains "$list" "$after" "a retired board is still registered"
   done
-  for after in "$openheld_id" "$fresh_id" "$queued_id" "$owned_id" "$standing_id" "$pending_id"; do
+  for after in "$openheld_id" "$fresh_id" "$queued_id" "$owned_id" "$standing_id" "$pending_id" "${protected_ids[@]}"; do
     assert_contains "$list" "$after" "a kept board lost its registration"
   done
   [ "$before" = "$(cksum < "$store/state.json")" ] \
     || fail "the sweep changed the Lavish session store; retiring a listener must not end a board"
 
+  sweep_session "$store" "$owned" ended 0 -
+  sweep_session "$store" "$standing" ended 0 -
+  sweep_session "$store" "$queued" ended 2 -
   out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the repeat sweep failed: $out"
-  assert_contains "$out" "sweep: retired=0 kept=6" "a repeat sweep retired more than the first"
+  assert_contains "$out" "kept: $owned_id" "a worker-owned board with an ended session lost its listener"
+  assert_contains "$out" "kept: $standing_id" "the standing board with an ended session lost its listener"
+  assert_contains "$out" "kept: $queued_id" "an ended board with queued feedback lost its listener"
+  assert_contains "$out" "sweep: retired=0 kept=$kept_count" "a repeat sweep retired more than the first"
 
   # A store the sweep cannot read proves nothing about any board's session, so
   # a board that would otherwise be retired keeps its listener.
   unreadable=$(sweep_board "$home" unreadable old)
   unreadable_id=$(sweep_register "$home" "$unreadable")
   sweep_session "$store" "$unreadable" open 0 2000-01-01T00:00:00.000Z
+  gone=$(sweep_board "$home" gone-store-unreadable old)
+  gone_id=$(sweep_register "$home" "$gone")
+  sweep_session "$store" "$gone" open 0 2000-01-01T00:00:00.000Z
+  rm -f "$gone"
   cp "$store/state.json" "$home/state-good.json"
   printf 'not json\n' > "$store/state.json"
   out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the unreadable-store sweep failed: $out"
   assert_contains "$out" "kept: $unreadable_id" "an unreadable Lavish store retired a listener"
-  assert_contains "$out" "sweep: retired=0 kept=7" "an unreadable Lavish store changed the verdicts: $out"
+  assert_contains "$out" "kept: $gone_id" "a missing-file board was retired while the Lavish store was unreadable"
+  assert_contains "$out" "sweep: retired=0 kept=$((kept_count + 2))" "an unreadable Lavish store changed the verdicts: $out"
   cp "$home/state-good.json" "$store/state.json"
   out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep) || fail "the restored-store sweep failed: $out"
   assert_contains "$out" "retired: $unreadable_id" "the same board was not retired once its session was readable"
+  assert_contains "$out" "retired: $gone_id" "a missing-file board was not retired once the store was readable"
 
   set +e
   out=$(FM_BOARD_LISTENER_IDLE_HOURS=0 LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep 2>&1)

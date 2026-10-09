@@ -2442,6 +2442,11 @@ An already-armed Lavish source keeps its registered listener command until it is
 `bin/fm-procevent-lavish.sh sweep [--dry-run]` retires the listeners of boards that are finished, and its header owns the rules.
 A listener otherwise lives as long as its Lavish session, and a captain's choice answers never end the session.
 `bin/fm-bearings-board.sh build` runs the sweep after every successful build, and it can be run by hand at any time.
+The sweep first keeps the standing Bearings board, every board when the Lavish store is unreadable, boards with queued feedback or status `feedback`, and worker-owned boards.
+After those guards, a missing board file permits retirement; a present board with a missing or ended session permits retirement only when every card key is known not to name an open captain call.
+Other present boards must also pass the idle window below.
+Unquoted and quoted card keys, case-insensitive attribute names, and HTML entities are recognized; an unreadable board or invalid decoded key keeps the listener.
+An open or uncheckable captain call keeps the listener, and an unacknowledged captured round blocks every retirement.
 
 `FM_BOARD_LISTENER_IDLE_HOURS` (default 48, whole hours 1..8760) sets how long a board must sit untouched before the sweep may retire it.
 An unusable value makes the sweep refuse by name.

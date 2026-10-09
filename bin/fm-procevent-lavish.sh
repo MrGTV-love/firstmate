@@ -42,25 +42,22 @@
 #            long as its Lavish session, and the captain answers a board with
 #            choice forms that never end the session, so without a sweep every
 #            board ever armed keeps its resident processes and its owner guard
-#            until the session is ended by hand. A board is FINISHED, in this
-#            order, when:
-#              1. its artifact file is gone, or Lavish holds no session or an
-#                 ended session for it, so the poll can never produce a result
-#                 (the exact case a task-owned source may also retire on); or
-#              2. it has been idle for FM_BOARD_LISTENER_IDLE_HOURS (default 48,
-#                 whole hours 1..8760) - no change to the artifact, the Lavish
-#                 session or a captured round - and carries no open captain call.
-#            A board is KEPT while any of these holds: it is the standing
-#            Bearings board; Lavish reports queued feedback for it; a captured
-#            round of it is unacknowledged; it is owned by a worker task (only
-#            rule 1 retires those); or one of its `data-lavish-question` card
-#            keys names a task `bin/fm-captain-hold.sh open` reports as an open
-#            captain call (exit 0) or cannot establish (exit 2). A card key that
-#            names no task in this home's backlog (exit 3) or a closed one
-#            (exit 1) is not an open call: the durable record of a captain call
-#            is its held task, and the standing board lists every held call.
-#            A call held in another home's backlog is invisible here, which is
-#            why dormancy is required as well as the absence of an open hold.
+#            until the session is ended by hand. Keep guards run first: the
+#            standing Bearings board, an unreadable Lavish store, queued
+#            feedback or status feedback, then worker-task ownership.
+#            Otherwise a board is FINISHED when its artifact file is gone, or
+#            when Lavish holds no session or an ended session for it and every
+#            card key is known not to name an open captain call. Other boards
+#            must also be idle for FM_BOARD_LISTENER_IDLE_HOURS (default 48,
+#            whole hours 1..8760): no change to the artifact, the Lavish session
+#            or a captured round. Unreadable card keys keep a present board.
+#            `bin/fm-captain-hold.sh open` exit 0 (open), exit 2 (cannot tell),
+#            or any unexpected exit keeps the board; exit 1 (closed) and exit 3
+#            (absent from this home's backlog) permit retirement. The durable
+#            record of a captain call is its held task, and the standing board
+#            lists every held call. A call held in another home's backlog is
+#            invisible here, so dormancy is the safeguard for live sessions.
+#            An unacknowledged captured round blocks every retirement.
 #            Retiring stops the listener and releases its claim through the
 #            generic `retire`; it never ends the Lavish session, so the board
 #            stays readable and `arm` brings the listener back. Cost: one perl
@@ -1076,25 +1073,50 @@ sweep_facts() {  # <state-dir> <lavish-store>
       }
     }
     my $newest = sub { my $m = 0; for (@_) { my $t = (stat $_)[9]; $m = $t if defined $t && $t > $m } $m };
+    sub unescape {
+      my ($v) = @_;
+      $v =~ s/&#[xX]([0-9a-fA-F]+);/chr(hex($1))/ge;
+      $v =~ s/&#([0-9]+);/chr($1)/ge;
+      $v =~ s/&quot;/"/g;
+      $v =~ s/&apos;/\x27/g;
+      $v =~ s/&lt;/</g;
+      $v =~ s/&gt;/>/g;
+      $v =~ s/&amp;/&/g;
+      return $v;
+    }
     while (my $line = <STDIN>) {
       chomp $line;
       my ($id, $art) = split /\t/, $line, 2;
       next unless defined $art;
       my $real = -f $art ? realpath($art) : undef;
       my ($sessions, $status, $pending, @keys) = ("unknown", "", 0);
+      my $keys_unknown = 0;
       my $activity = $newest->(glob("$state/procevent-inbox/$id.*"));
       if (defined $real) {
         my $t = $newest->($real);
         $activity = $t if $t > $activity;
         if (open my $in, "<:raw", $real) {
           local $/;
+          local $! = 0;
           my $html = <$in>;
-          close $in;
-          my %seen;
-          while ($html =~ /\bdata-lavish-question\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27)/g) {
-            my $k = $1 // $2;
-            push @keys, $k if $k =~ /\A[A-Za-z0-9._-]{1,128}\z/ && !$seen{$k}++;
+          my $read_ok = !$!;
+          my $close_ok = close $in;
+          if ($read_ok && $close_ok) {
+            $html //= "";
+            my %seen;
+            while ($html =~ /\bdata-lavish-question\s*=\s*(?:"([^"]*)"|\x27([^\x27]*)\x27|([^\s"\x27=<>`]+))/gi) {
+              my $k = unescape($1 // $2 // $3);
+              if ($k !~ /\A[A-Za-z0-9._-]{1,128}\z/) {
+                $keys_unknown = 1;
+                last;
+              }
+              push @keys, $k unless $seen{$k}++;
+            }
+          } else {
+            $keys_unknown = 1;
           }
+        } else {
+          $keys_unknown = 1;
         }
       }
       if ($store_ok) {
@@ -1111,15 +1133,40 @@ sweep_facts() {  # <state-dir> <lavish-store>
           }
         }
       }
-      print join("\t", $id, $art, defined $real ? $real : "-", $sessions, $status || "-", $pending, $activity, join(",", @keys) || "-"), "\n";
+      print join("\t", $id, $art, defined $real ? $real : "-", $sessions, $status || "-", $pending, $activity, $keys_unknown ? "?" : (join(",", @keys) || "-")), "\n";
     }
   ' "$1" "$2"
 }
 
+sweep_cards_closed() {
+  local keys=$1 key rc IFS=,
+  if [ "$keys" = '?' ]; then
+    reason="the board's card keys cannot be read"
+    return 1
+  fi
+  for key in $keys; do
+    [ "$key" != - ] || continue
+    case "$open_cache" in
+      *$'\n'"$key="[0-3]$'\n'*) ;;
+      *)
+        FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open "$key" --distinguish-absent \
+          >/dev/null 2>&1 </dev/null
+        rc=$?
+        open_cache="$open_cache$key=$rc"$'\n'
+        ;;
+    esac
+    case "$open_cache" in
+      *$'\n'"$key=1"$'\n'*|*$'\n'"$key=3"$'\n'*) ;;
+      *) reason="card $key is an open captain call or cannot be checked"; return 1 ;;
+    esac
+  done
+  return 0
+}
+
 cmd_sweep() {
   local dry=0 idle state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
-  local pending_ids facts real sessions status queued activity keys reason verdict key rc out
-  local open_cache=$'\n' retired=0 kept=0 idx saved_ifs
+  local pending_ids facts real sessions status queued activity keys reason verdict out
+  local open_cache=$'\n' retired=0 kept=0 idx
   local -a ids=() kinds=()
   case "${1-}" in
     '') ;;
@@ -1174,13 +1221,7 @@ cmd_sweep() {
       [ "${ids[$idx]}" = "$id" ] && { kind=${kinds[$idx]}; break; }
     done
     verdict=keep
-    if [ "$real" = - ]; then
-      verdict=retire; reason='the board file is gone'
-    elif [ "$sessions" = 0 ]; then
-      verdict=retire; reason='Lavish holds no session for the board'
-    elif [ "$status" = ended ]; then
-      verdict=retire; reason='the Lavish session has ended'
-    elif [ -n "$standing" ] && [ "$real" = "$standing" ]; then
+    if [ -n "$standing" ] && [ "$real" = "$standing" ]; then
       reason='the standing Bearings board'
     elif [ "$sessions" = unknown ]; then
       reason='the Lavish session store cannot be read'
@@ -1188,30 +1229,21 @@ cmd_sweep() {
       reason='Lavish holds queued feedback for the board'
     elif [ "$kind" = task-owned ]; then
       reason='owned by a worker task'
-    elif [ $((now - activity)) -lt "$idle" ]; then
+    elif [ "$real" = - ]; then
+      verdict=retire; reason='the board file is gone'
+    elif [ "$sessions" != 0 ] && [ "$status" != ended ] && [ $((now - activity)) -lt "$idle" ]; then
       reason="active within the last $((idle / 3600)) hours"
     else
-      verdict=retire
-      reason="idle for $(((now - activity) / 3600)) hours with no open captain call"
-      saved_ifs=$IFS
-      IFS=,
-      for key in $keys; do
-        [ "$key" != - ] || continue
-        case "$open_cache" in
-          *$'\n'"$key="[0-3]$'\n'*) ;;
-          *)
-            FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-captain-hold.sh" open "$key" --distinguish-absent \
-              >/dev/null 2>&1 </dev/null
-            rc=$?
-            open_cache="$open_cache$key=$rc"$'\n'
-            ;;
-        esac
-        case "$open_cache" in
-          *$'\n'"$key=1"$'\n'*|*$'\n'"$key=3"$'\n'*) ;;
-          *) verdict=keep; reason="card $key is an open captain call or cannot be checked"; break ;;
-        esac
-      done
-      IFS=$saved_ifs
+      if [ "$sessions" = 0 ]; then
+        reason='Lavish holds no session for the board'
+      elif [ "$status" = ended ]; then
+        reason='the Lavish session has ended'
+      else
+        reason="idle for $(((now - activity) / 3600)) hours with no open captain call"
+      fi
+      if sweep_cards_closed "$keys"; then
+        verdict=retire
+      fi
     fi
     if [ "$verdict" = retire ]; then
       case $'\n'"$pending_ids"$'\n' in
