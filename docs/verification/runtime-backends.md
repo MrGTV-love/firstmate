@@ -1290,7 +1290,7 @@ The guard plays the lane's part by running the real drain and acknowledgement at
   With the gate on, the same closes produced no wake turn after the lane drained.
   When the lane did not drain during the long turn, exactly one wake turn followed, the lane drained inside it, and no further wake turn followed.
 
-[Watcher continuity](../watcher-continuity.md#omp-stale-wake-gating) owns the current stricter contract: exact actor-owned per-headline queue validation at initial delivery, held flush, replacement replay, and restored resubmission; no recovery-marker fallback, fail-open errors, exceptions, disable setting, or hold expiry. Busy or unreadable idle state holds actionable work; flush and owed-query timing are fixed at 1000ms and 10000ms.
+[Watcher continuity](../watcher-continuity.md#omp-stale-wake-gating) owns the current contract: exact actor-owned queued sequence validation at initial watcher delivery, held flush, replacement replay, and restored resubmission; no recovery-marker fallback, fail-open errors, disable setting, or hold expiry. Busy or unreadable idle state holds watcher work; flush and owed-query timing are fixed at 1000ms and 10000ms. Supervision-host operational hand-backs retain their prior delivery routing and are not watcher queue rows.
 The guard spends no model tokens, so it runs by default wherever omp is installed:
 
 ```sh

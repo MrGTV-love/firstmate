@@ -2406,12 +2406,10 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
   printf '%s\n' "$count"
 }
 
-fm_wake_owed() {
-  [ "$#" -eq 2 ] || return 1
-  local actor=$1 headline rows="$STATE/.branch-eligible-rows"
-  local owner="$STATE/.branch-eligible-owner" grant='' matched
+fm_wake_actor_rows() {
+  local actor=$1 rows="$STATE/.branch-eligible-rows"
+  local owner="$STATE/.branch-eligible-owner" grant=''
   [ -f "$FM_WAKE_QUEUE" ] && [ -r "$FM_WAKE_QUEUE" ] || return 1
-  headline=$(printf '%s' "$2" | fm_wake_clean_field) || return 1
   if fm_wake_branch_grant_live "$rows" "$owner" 2>/dev/null; then
     grant=$rows
   fi
@@ -2420,22 +2418,30 @@ fm_wake_owed() {
     branch) [ -n "$grant" ] || return 1 ;;
     *) return 1 ;;
   esac
-  matched=$(FM_WAKE_OWED_HEADLINE="$headline" FM_WAKE_OWED_GRANT="$grant" FM_WAKE_OWED_ACTOR="$actor" \
-    awk -F '\t' '
-      BEGIN {
-        seqs = ENVIRON["FM_WAKE_OWED_GRANT"]
-        if (seqs != "") {
-          while ((status = getline line < seqs) > 0) reserved[line] = 1
-          if (status < 0) { failed = 1; exit 1 }
-          close(seqs)
-        }
+  FM_WAKE_ROW_GRANT="$grant" FM_WAKE_ROW_ACTOR="$actor" awk -F '\t' '
+    BEGIN {
+      seqs = ENVIRON["FM_WAKE_ROW_GRANT"]
+      if (seqs != "") {
+        while ((status = getline line < seqs) > 0) reserved[line] = 1
+        if (status < 0) exit 1
+        close(seqs)
       }
-      NF >= 5 && $2 ~ /^[0-9]+$/ && $5 == ENVIRON["FM_WAKE_OWED_HEADLINE"] {
-        if (ENVIRON["FM_WAKE_OWED_ACTOR"] == "branch" ? ($2 in reserved) : !($2 in reserved)) found = 1
-      }
-      END { print (failed ? 0 : found + 0) }
-    ' "$FM_WAKE_QUEUE" 2>/dev/null) || return 1
-  [ "$matched" = 1 ]
+    }
+    NF >= 5 && $2 ~ /^[0-9]+$/ {
+      if (ENVIRON["FM_WAKE_ROW_ACTOR"] == "branch" ? ($2 in reserved) : !($2 in reserved)) print
+    }
+  ' "$FM_WAKE_QUEUE" 2>/dev/null
+}
+
+fm_wake_owed() {
+  [ "$#" -eq 2 ] || return 1
+  local queued
+  case "$2" in ''|*[!0-9]*) return 1 ;; esac
+  queued=$(fm_wake_actor_rows "$1") || return 1
+  printf '%s\n' "$queued" | FM_WAKE_OWED_SEQ="$2" awk -F '\t' '
+    "s" $2 == "s" ENVIRON["FM_WAKE_OWED_SEQ"] { found = 1 }
+    END { exit !found }
+  '
 }
 
 # Print which of the given sequence numbers are still queued, one per line.
