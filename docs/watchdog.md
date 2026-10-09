@@ -32,6 +32,9 @@ At or beyond that limit, the watchdog reports `stale-watcher` even when the pull
 
 ## Recovery
 
+The singleton records its PID and process start identity before publishing the lock.
+A live PID suppresses another check only when `fm_pid_identity` matches the recorded identity; missing or mismatched identity is stale and reclaimed without signalling that PID.
+
 For any verdict other than `idle` or `healthy`, the check runs these steps in order under the home's watchdog lock:
 
 1. If the watcher lock names a live process, stop that watcher with `bin/fm-watch-arm.sh --stop`.

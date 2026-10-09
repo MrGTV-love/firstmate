@@ -300,7 +300,7 @@ watchdog_main() {
   return 1
 }
 
-if ! fm_lock_try_acquire "$LOCKDIR"; then
+if ! fm_lock_try_acquire "$LOCKDIR" identity; then
   echo "watchdog: another check is running"
   exit 0
 fi

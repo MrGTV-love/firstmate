@@ -305,6 +305,117 @@ test_recovery_after_failures_clears_episode() {
   pass "a healthy verdict after failures clears the episode"
 }
 
+test_reused_watchdog_pid_is_reclaimed() {
+  local home dir holder layout evidence lock owner mutex_owner
+  holder=$(start_session)
+  for layout in directory symlink; do
+    for evidence in mismatched missing; do
+      home=$(make_home "reused-$layout-$evidence")
+      dir=$(dirname "$home")
+      stale_beat "$home"
+      write_ledger "$home" rewake "$(dead_pid)"
+      write_stubs "$home" "$(healing_resume "$home")"
+      lock="$home/state/.watchdog.lock"
+      if [ "$layout" = symlink ]; then
+        owner="$lock.owner.fixture"
+        mkdir "$owner"
+        ln -s "$owner" "$lock"
+      else
+        owner=$lock
+        mkdir "$lock"
+      fi
+      printf '%s\n' "$holder" > "$lock/pid"
+      if [ "$evidence" = mismatched ]; then
+        printf 'previous-boot %s\n' "$(fm_test_pid_identity "$holder")" > "$lock/pid-identity"
+      fi
+      mutex_owner="$lock.steal.owner.fixture"
+      mkdir "$mutex_owner"
+      ln -s "$mutex_owner" "$lock.steal"
+      printf '%s\n' "$holder" > "$lock.steal/pid"
+      fm_test_pid_identity "$holder" > "$lock.steal/pid-identity"
+      run_check "$home"
+      expect_code 0 "$CODE" "live reclaim mutex contention exit"
+      assert_equals "watchdog: another check is running" "$OUT" "matching reclaim owner excludes a check"
+      assert_absent "$dir/resume.calls" "a live reclaim mutex prevents concurrent recovery"
+      printf 'previous-boot\n' > "$lock.steal/pid-identity"
+      run_check "$home"
+      expect_code 0 "$CODE" "reused watchdog pid recovery exit"
+      assert_equals "watchdog: recovered from stale-watcher" "$OUT" "reused pid cannot suppress supervision"
+      assert_equals "stale-watcher" "$(cat "$dir/resume.calls")" "reclaimed watchdog runs recovery"
+      kill -0 "$holder" 2>/dev/null || fail "reclaim must not signal the reused pid"
+      assert_absent "$lock" "reclaimed watchdog releases its lock"
+      assert_absent "$owner" "reclaim removes the stale owner"
+      assert_absent "$lock.steal" "reclaim releases its mutex"
+      assert_absent "$mutex_owner" "reclaim removes the stale mutex owner"
+    done
+  done
+  pass "reused and unbound watchdog pids are reclaimed for both lock layouts"
+}
+
+test_reused_reaper_pid_is_reclaimed() {
+  local home dir holder lock owner tomb
+  home=$(make_home reused-reaper)
+  dir=$(dirname "$home")
+  holder=$(start_session)
+  stale_beat "$home"
+  write_ledger "$home" rewake "$(dead_pid)"
+  write_stubs "$home" "$(healing_resume "$home")"
+  lock="$home/state/.watchdog.lock"
+  mkdir "$lock"
+  printf '%s\n' "$holder" > "$lock/pid"
+  owner="$lock.steal.owner.fixture"
+  tomb="$owner.reaped.$holder"
+  mkdir "$tomb"
+  ln -s "$owner" "$lock.steal"
+  fm_test_pid_identity "$holder" > "$tomb/reaper-$holder-identity"
+  run_check "$home"
+  assert_equals "watchdog: another check is running" "$OUT" "a matching elected reaper excludes a check"
+  assert_absent "$dir/resume.calls" "a live elected reaper prevents concurrent recovery"
+  printf 'previous-boot\n' > "$tomb/reaper-$holder-identity"
+  run_check "$home"
+  expect_code 0 "$CODE" "reused reaper pid recovery exit"
+  assert_equals "watchdog: recovered from stale-watcher" "$OUT" "a reused elected reaper cannot suppress supervision"
+  assert_absent "$tomb" "reclaim removes the interrupted reaper's tombstone"
+  assert_absent "$lock.steal" "reclaim releases the interrupted mutex"
+  kill -0 "$holder" 2>/dev/null || fail "reclaim must not signal the reused reaper pid"
+  pass "a reused elected reaper pid cannot block watchdog recovery"
+}
+
+test_live_watchdog_identity_preserves_singleton() {
+  local home dir pid pidfile i
+  home=$(make_home watchdog-singleton)
+  dir=$(dirname "$home")
+  stale_beat "$home"
+  write_ledger "$home" rewake "$(dead_pid)"
+  write_stubs "$home" "touch '$dir/entered'; while [ ! -e '$dir/release' ]; do sleep 0.1; done; touch '$home/state/.last-watcher-beat'"
+  pidfile="$dir/watchdog.pid"
+  fm_test_track_process "$pidfile" fm-watchdog-check.sh || fail "register watchdog fixture"
+  env FM_HOME="$home" FM_WATCHDOG_VERIFY_SECS=1 FM_WATCHDOG_STEP_SECS=20 \
+    "$ROOT/bin/fm-watchdog-check.sh" > "$dir/check.out" 2>&1 &
+  pid=$!
+  fm_test_record_process "$pidfile" "$pid" || fail "record watchdog fixture"
+  i=0
+  while [ ! -e "$dir/entered" ] && [ "$i" -lt 100 ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  assert_present "$dir/entered" "first watchdog enters recovery"
+  assert_equals "$pid" "$(cat "$home/state/.watchdog.lock/pid")" "singleton records its actual pid"
+  assert_equals "$(fm_test_pid_identity "$pid")" "$(cat "$home/state/.watchdog.lock/pid-identity")" "singleton binds the process start identity"
+  run_check "$home"
+  expect_code 0 "$CODE" "contending watchdog exit"
+  assert_equals "watchdog: another check is running" "$OUT" "matching identity preserves singleton"
+  assert_present "$home/state/.watchdog.lock" "contender cannot release the owner's lock"
+  : > "$dir/release"
+  wait "$pid"
+  expect_code 0 "$?" "original watchdog recovery exit"
+  assert_equals "watchdog: recovered from stale-watcher" "$(cat "$dir/check.out")" "original watchdog completes recovery"
+  assert_absent "$home/state/.watchdog.lock" "owner releases its identity-bound lock"
+  run_check "$home"
+  assert_equals "watchdog: healthy" "$OUT" "next scheduled check can acquire after release"
+  pass "a live identity-bound watchdog excludes contenders and releases normally"
+}
+
 assert_watchdog_plist_contract() {
   python3 - "$@" <<'PY' || fail "generated watchdog plist violates its launchd contract"
 import plistlib, sys
@@ -426,6 +537,9 @@ test_absent_lock_is_missing_session
 test_failed_recovery_alarms_after_threshold
 test_missing_resume_command_fails_and_logs
 test_recovery_after_failures_clears_episode
+test_reused_watchdog_pid_is_reclaimed
+test_reused_reaper_pid_is_reclaimed
+test_live_watchdog_identity_preserves_singleton
 test_installer_renders_and_registers
 test_installer_resolves_relative_paths
 test_installer_uninstall_removes_plist
