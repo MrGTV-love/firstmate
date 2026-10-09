@@ -44,6 +44,7 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 
 SOURCE_ID=proc-guard
 
+# shellcheck source=bin/fm-procevent-lib.sh
 . "$SCRIPT_DIR/fm-procevent-lib.sh"
 
 usage() {

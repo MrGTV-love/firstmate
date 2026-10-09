@@ -67,6 +67,7 @@ grep -qx 'limit: 1' "$changed_result" || fail "the replacement sampler retained 
 kill -0 "$prior_runner" 2>/dev/null && fail "changed rearm left the obsolete listener alive"
 in_home "$HOME_A" "$ADAPTER" arm --hold 1.5 --interval 0.25 --limit 1000000000 >/dev/null \
   || fail "restoring the quiet sampler failed"
+# shellcheck disable=SC2016 # $1 expands in the child shell.
 fm_test_wait_until 100 bash -c 'test ! -e "$1/proc-guard.episode"' _ "$FM_PROCEVENT_CLAIM_ROOT" \
   || fail "the quiet replacement never cleared the episode"
 in_home "$HOME_A" "$ADAPTER" retire >/dev/null || fail "quiet retire failed"
@@ -119,6 +120,7 @@ result="$STATE_E/procevent-inbox/proc-guard.1.result"
 [ "$("$ADAPTER" classify "$result")" = pileup ] || fail "captured result is not a pile-up: $(cat "$result")"
 census=$(sed -n 's/^census: //p' "$result")
 [ -f "$census" ] || fail "the captured result names a missing census: $census"
+# shellcheck disable=SC2016 # $3 and $4 are awk field references.
 fm_test_wait_until 300 awk -F '\t' '$3 == "check" && $4 == "procevent:proc-guard:1" { found = 1 } END { exit !found }' "$STATE_E/.wake-queue" \
   || fail "no durable wake was queued for the pile-up: $(cat "$STATE_E/.wake-queue" 2>/dev/null)"
 [ "$(awk -F '\t' '$3 == "check"' "$STATE_E/.wake-queue" | grep -c .)" = 1 ] || fail "more than one wake for one pile-up"

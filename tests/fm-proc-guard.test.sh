@@ -94,10 +94,7 @@ for command in check census watch; do
     if "$GUARD" "$command" $bad >/dev/null 2>&1; then fail "$command accepted $bad"; fi
   done
 done
-for bad in "--limit x"; do
-  # shellcheck disable=SC2086
-  if "$GUARD" check $bad >/dev/null 2>&1; then fail "check accepted $bad"; fi
-done
+if "$GUARD" check --limit x >/dev/null 2>&1; then fail "check accepted --limit x"; fi
 for bad in "--hold 0" "--interval 0"; do
   # shellcheck disable=SC2086
   if "$GUARD" watch --state-dir "$STATE" $bad >/dev/null 2>&1; then fail "watch accepted $bad"; fi
