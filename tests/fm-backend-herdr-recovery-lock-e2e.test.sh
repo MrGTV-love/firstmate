@@ -278,11 +278,16 @@ import pathlib, sys
 source = pathlib.Path(sys.argv[1]).read_text()
 start = source.index("pids_with_cwd_under() {")
 end = source.index("\n}\n", source.index("reap_task_worktree_processes() {", start)) + 3
-pathlib.Path(sys.argv[2]).write_text(source[start:end])
+runtime = source[start:end]
+start = source.index("collect_local_firstmate_states() {")
+end = source.index("\n}\n", start) + 3
+pathlib.Path(sys.argv[2]).write_text(runtime + source[start:end])
 PY
+. "$ROOT/bin/fm-nm-run-lib.sh"
+. "$ROOT/bin/fm-backlog-transition-lib.sh"
+STATE="$TEST_DIR/home-primary/state"
+. "$ROOT/bin/fm-wake-lib.sh"
 (
-  . "$ROOT/bin/fm-nm-run-lib.sh"
-  . "$ROOT/bin/fm-backlog-transition-lib.sh"
   export PROJ="$TEST_DIR/project-primary" STATE="$TEST_DIR/home-primary/state"
   # shellcheck source=/dev/null
   . "$TEST_DIR/runtime-cleanup.sh"
@@ -298,8 +303,6 @@ echo 'ok - offline executable inventory and reaper remove only generated owned p
 LAB_READY=1
 PATH="$HERDR_ORIGINAL_PATH" "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION"
 echo "# herdr $(lab status --json | jq -r '.server.version') recovery custody lab"
-# shellcheck source=/dev/null
-. "$ROOT/bin/fm-wake-lib.sh"
 TEST_SESSION_LOCK=$(fm_backend_herdr_presentation_session_lock_path "$HERDR_LAB_SESSION")
 export TEST_SESSION_LOCK
 # The focus-safe close may end a proved idle shell instead of issuing pane

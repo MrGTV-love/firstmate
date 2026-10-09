@@ -503,6 +503,8 @@ A fire-and-forget record, such as a reconcile ask, gets its single retry ring on
 
 `fm-peek.sh` and `fm-crew-state.sh` route remote-secondmate reads to the endpoint's host instead of consulting local worktree or backend state.
 An unreachable or unreadable remote read is unknown, not evidence that the endpoint is dead.
+The session-start fleet digest recognizes a nonempty `remote_host` value or a `window=remote:...` prefix before any local backend probe and reports `endpoint: unknown`, because the digest does not query the recorded remote route.
+[`tests/fm-session-start.test.sh`](../tests/fm-session-start.test.sh) covers these remote records, including absent backend metadata, and verifies that neither local tmux nor local Herdr is probed.
 
 ### Replies and the parent channel
 

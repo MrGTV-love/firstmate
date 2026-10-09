@@ -92,7 +92,8 @@ status_current_line() {  # <status-file> <kind>
   local open key verb note current=''
   open=$(status_open_decisions "$1" "$2")
   while IFS=$'\t' read -r key verb note; do
-    case "$verb" in ?*) current="$verb [key=$key]: $note" ;; esac
+    case "$verb" in ?*) ;; *) continue ;; esac
+    current="$verb [key=$key]: $note"
   done <<EOF
 $open
 EOF
@@ -248,8 +249,8 @@ EOF
 #
 # status_open_decisions in bin/fm-status-decision-lib.sh is a read-only fold;
 # this incremental sibling persists the checkpoint that lets later readers
-# avoid re-folding consumed history. Both use the same _fm_decision_fold_line
-# rule. With a valid checkpoint, each call folds only new appends plus a
+# avoid re-folding consumed history. Both use the shared fold implementation in
+# bin/fm-status-decision-lib.sh. With a valid checkpoint, each call folds only new appends plus a
 # one-byte boundary check; a cold or refused checkpoint requires a byte-0 rebuild.
 #
 # Correctness invariant (unchanged from the whole-file fold): cursor advancement,
@@ -292,7 +293,7 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local version='' size actual_size cur_ident resolve held chunk_file chunk_size line cursor_dirty=0
   local target_cursor kind fold_version boundary_rc verb
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
-  kind=$(_fm_status_kind "$f")
+  _fm_status_kind "$f" '' kind
   _fm_open_decisions_fold_signature "$kind" fold_version
   _fm_open_decisions_cursor_path "$f" cf
   offset=0
@@ -361,7 +362,7 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
       status_line_verb "$line" verb
       case "$verb" in
         needs-decision|blocked|done|failed|"$resolve"|"$held")
-          open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+          _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open
           ;;
       esac
     done < "$chunk_file"
@@ -444,6 +445,8 @@ EOF
 status_presentation_snapshot() {  # <state>
   local state=$1 f task size ident exclude
   exclude=$(status_scan_parent_channel_exclude "$state")
+  local _FM_STATUS_STAT_BATCH=''
+  _fm_status_stat_batch_into "$state" _FM_STATUS_STAT_BATCH
   for f in "$state"/*.status; do
     [ -e "$f" ] || continue
     [ "$f" = "$exclude" ] && continue
@@ -583,42 +586,43 @@ EOF
   return "$rc"
 }
 
-status_acknowledge_presented_snapshot() {  # <state> <snapshot> [<fully-presented-task-ids>]
-  local state=$1 snapshot=$2 fully_presented=${3:-} task endpoint ident f offset lines line safe
+status_acknowledge_presented_snapshot() {  # <state> <snapshot> <fully-presented-task-ids> <ack-out-var> <unread-out-var>
+  local state=$1 snapshot=$2 fully_presented=$3 task endpoint ident f offset lines line safe
+  local __fm_ack_rows='' __fm_ack_unread='' _FM_STATUS_STAT_BATCH=''
+  _fm_status_stat_batch_into "$state" _FM_STATUS_STAT_BATCH
   while IFS=$'\t' read -r task endpoint ident; do
     [ -n "$task" ] || continue
     safe=false
     case "
 $fully_presented
 " in *$'\n'"$task"$'\n'*) safe=true ;; esac
-    if [ "$safe" = false ]; then
-      f="$state/$task.status"
-      status_presentation_cursor_offset "$f" offset || return 1
-      status_new_lines_since_cursor "$f" "$endpoint" lines || return 1
-      # Once any informational line in this span is presented fleet-wide, the
-      # contiguous cursor may advance through the captured endpoint. Routine
-      # lines remain unacknowledged only while they are the sole unread content,
-      # preserving delayed signal annotations without replaying a handled note
-      # that happened to follow a routine line.
-      while IFS= read -r line || [ -n "$line" ]; do
-        case "$line" in
-          *[![:space:]]*)
-            if status_line_is_unread_surface "$line"; then safe=true; break; fi
-            ;;
-        esac
-      done <<EOF
+    f="$state/$task.status"
+    status_presentation_cursor_offset "$f" offset || return 1
+    status_new_lines_since_cursor "$f" "$endpoint" lines || return 1
+    # Classify the captured span once for both presentation and acknowledgement.
+    # Routine-only spans stay pending for delayed signal annotations.
+    while IFS= read -r line || [ -n "$line" ]; do
+      [ -n "$line" ] || continue
+      if status_line_is_unread_surface "$line"; then
+        safe=true
+        __fm_ack_unread+="$task"$'\t'"$line"$'\n'
+      fi
+    done <<EOF
 $lines
 EOF
-      if [ "$safe" = false ]; then endpoint=$offset; fi
-    fi
-    printf '%s\t%s\t%s\n' "$task" "$endpoint" "$ident" || return 1
+    if [ "$safe" = false ]; then endpoint=$offset; fi
+    __fm_ack_rows+="$task"$'\t'"$endpoint"$'\t'"$ident"$'\n'
   done <<EOF
 $snapshot
 EOF
+  printf -v "$4" '%s' "$__fm_ack_rows"
+  printf -v "$5" '%s' "$__fm_ack_unread"
 }
 
 status_commit_presentation_snapshot() {  # <state> <snapshot>
   local state=$1 snapshot=$2 task endpoint ident f cur_ident size tmp backstop acknowledged_task acknowledged_endpoint
+  local _FM_STATUS_STAT_BATCH=''
+  _fm_status_stat_batch_into "$state" _FM_STATUS_STAT_BATCH
   tmp="$state/.status-presentation-cursor.tmp.$$"
   : > "$tmp" || return 1
   while IFS=$'\t' read -r task endpoint ident; do
@@ -650,6 +654,8 @@ EOF
 
 scan_open_decisions_snapshot() {  # <state> <task-and-endpoint-snapshot>
   local state=$1 snapshot=$2 task endpoint ident f open line
+  local _FM_STATUS_STAT_BATCH=''
+  _fm_status_stat_batch_into "$state" _FM_STATUS_STAT_BATCH
   while IFS=$'\t' read -r task endpoint ident; do
     [ -n "$task" ] || continue
     f="$state/$task.status"
@@ -694,6 +700,8 @@ EOF
 scan_unread_surface_lines() {  # <state>
   local state=$1 f task lines line exclude
   exclude=$(status_scan_parent_channel_exclude "$state")
+  local _FM_STATUS_STAT_BATCH=''
+  _fm_status_stat_batch_into "$state" _FM_STATUS_STAT_BATCH
   for f in "$state"/*.status; do
     [ -e "$f" ] || continue
     [ "$f" = "$exclude" ] && continue
@@ -713,6 +721,8 @@ EOF
 
 scan_unread_surface_snapshot() {  # <state> <task-and-endpoint-snapshot>
   local state=$1 snapshot=$2 task endpoint ident f lines line
+  local _FM_STATUS_STAT_BATCH=''
+  _fm_status_stat_batch_into "$state" _FM_STATUS_STAT_BATCH
   while IFS=$'\t' read -r task endpoint ident; do
     [ -n "$task" ] || continue
     f="$state/$task.status"

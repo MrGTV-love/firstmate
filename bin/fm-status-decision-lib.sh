@@ -30,7 +30,9 @@ fi
 # 10: refuse partial-line checkpoint endpoints, including when the line has
 # since completed; older checkpoints can already contain polluted fold state
 # even at a now-valid boundary and must be rebuilt from byte 0.
-FM_OPEN_DECISIONS_FOLD_VERSION=10
+# 11: include parsing locales in the shared signature so a checkpoint folded
+# under another character or collation interpretation is rebuilt from byte 0.
+FM_OPEN_DECISIONS_FOLD_VERSION=11
 
 # The resolution verb and durable-backlog-transfer verb that CLOSE a keyed
 # status decision opened by needs-decision or blocked. See status_open_decisions
@@ -235,28 +237,37 @@ _fm_decision_key() {  # <status-line> [<keyless>] -> key slug, or <keyless> (def
   _fm_decision_key_into "$1" "${2-default}" __fm_dk_out || return 1
   printf '%s' "$__fm_dk_out"
 }
-# Drop the record for <key> from a newline-terminated "<key>\t<verb>\t<note>" set.
-# Portable (no associative arrays) so the fold runs on bash 3.2 as well as 4+.
-_fm_decision_drop() {  # <open-set> <key>
-  local set=$1 key=$2 line out=''
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    case "$line" in
-      "$key"$'\t'*) : ;;
-      *) out="${out}${line}"$'\n' ;;
-    esac
-  done <<EOF
-$set
+# Drop the record for <key> from a newline-separated "<key>\t<verb>\t<note>" set.
+# Stdout terminates a nonempty result with a newline; <out-var> strips trailing
+# newlines to match command substitution. Portable on bash 3.2 (no associative arrays).
+_fm_decision_drop() {  # <open-set> <key> [<out-var>]
+  local __fm_drop_line __fm_drop_out=$1
+  while [[ "$__fm_drop_out" == *$'\n' ]]; do __fm_drop_out=${__fm_drop_out%$'\n'}; done
+  # Most routine resolutions name no open key; leave the set alone in that case.
+  if _fm_open_set_has "$__fm_drop_out" "$2"; then
+    __fm_drop_out=''
+    while IFS= read -r __fm_drop_line || [ -n "$__fm_drop_line" ]; do
+      [ -n "$__fm_drop_line" ] || continue
+      case "$__fm_drop_line" in
+        "$2"$'\t'*) : ;;
+        *) __fm_drop_out+="${__fm_drop_line}"$'\n' ;;
+      esac
+    done <<EOF
+$1
 EOF
-  printf '%s' "$out"
+    __fm_drop_out=${__fm_drop_out%$'\n'}
+  fi
+  if [ "$#" -gt 2 ]; then
+    printf -v "$3" '%s' "$__fm_drop_out"
+  elif [ -n "$__fm_drop_out" ]; then
+    printf '%s\n' "$__fm_drop_out"
+  fi
 }
-# Fold ONE status line into an existing "<key>\t<verb>\t<note>\n"-per-line open
-# set, applying the same needs-decision/blocked-opens, resolved/captain-held-closes
-# rule the status-fold contract above documents. Pure text transform, no file I/O.
-# This is the ONE place the per-line open/resolved rule is written; both the
-# whole-file fold (status_open_decisions) and the incremental cursor-backed fold
-# (status_open_decisions_incremental in bin/fm-classify-lib.sh) call this instead of re-deriving the
-# rule, so the two consumption strategies can never drift apart on semantics.
+# Fold one status line into a newline-separated "<key>\t<verb>\t<note>" open set.
+# status_open_decisions below owns the transition contract; the whole-file fold
+# uses the stdout wrapper and the incremental fold calls the out-var form.
+# Both return the same set with no trailing newlines, preserving the bytes the
+# original command-substitution callers stored in checkpoints. No file I/O.
 # Reserved decision-key namespaces, and the rule that makes them mean something.
 #
 # A key like `pending-reply-<id>` names a decision that one library raises and is
@@ -301,20 +312,33 @@ _fm_is_pending_reply_escalation() {  # <key> <note>
   esac
 }
 
-_fm_status_kind() {
-  local meta=${1%.status}.meta kind=${2:-} line
-  if [ -z "$kind" ]; then
-    [ -f "$meta" ] && [ -r "$meta" ] && [ ! -L "$meta" ] || { printf unknown; return 0; }
-    while IFS= read -r line || [ -n "$line" ]; do
-      case "$line" in kind=*) kind=${line#kind=} ;; esac
-    done < "$meta"
-    kind=${kind:-ship}
+_fm_status_kind() {  # <status-file> [<kind>] [<out-var>]
+  local __fm_kind_meta=${1%.status}.meta __fm_kind=${2:-} __fm_kind_line
+  if [ -z "$__fm_kind" ]; then
+    if [ -f "$__fm_kind_meta" ] && [ -r "$__fm_kind_meta" ] && [ ! -L "$__fm_kind_meta" ]; then
+      while IFS= read -r __fm_kind_line || [ -n "$__fm_kind_line" ]; do
+        case "$__fm_kind_line" in kind=*) __fm_kind=${__fm_kind_line#kind=} ;; esac
+      done < "$__fm_kind_meta"
+      __fm_kind=${__fm_kind:-ship}
+    else
+      __fm_kind=unknown
+    fi
   fi
-  case "$kind" in ship|scout|secondmate) printf '%s' "$kind" ;; *) printf unknown ;; esac
+  case "$__fm_kind" in ship|scout|secondmate) ;; *) __fm_kind=unknown ;; esac
+  if [ -n "${3:-}" ]; then printf -v "$3" '%s' "$__fm_kind"; else printf '%s' "$__fm_kind"; fi
 }
 
-_fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb> <kind>
-  local open=$1 line=$2 resolve=$3 held=$4 kind=$5 verb key note unstamped
+_fm_decision_fold_line_into() {  # <open-set> <status-line> <resolve-verb> <held-verb> <kind> <out-var>
+  local __fm_fl_open=$1 __fm_fl_verb __fm_fl_key __fm_fl_note __fm_fl_unstamped
+  # Match the old command substitution, including on non-transition returns.
+  while [[ "$__fm_fl_open" == *$'\n' ]]; do __fm_fl_open=${__fm_fl_open%$'\n'}; done
+  printf -v "$6" '%s' "$__fm_fl_open"
+  status_line_verb "$2" __fm_fl_verb
+  # Only an opener can change an empty set; routine closes need no key/note parse.
+  case "$__fm_fl_verb" in
+    needs-decision|blocked) ;;
+    *) [ -n "$__fm_fl_open" ] || return 0 ;;
+  esac
   # Both colon tests below ask where the head ends, the same question the note
   # and key readers ask, so they read the same unstamped copy those readers do.
   # A worker-written time tag must never decide whether a decision opens or
@@ -322,7 +346,7 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
   # prose look like a transition, or make a keyless line open a phantom
   # decision no later line could close. The stored and surfaced bytes stay the
   # caller's own.
-  _fm_status_unstamped "$line" unstamped
+  _fm_status_unstamped "$2" __fm_fl_unstamped
   # Declaration guard. A transition's verb ends at a colon, or - in the colonless
   # form _fm_decision_key still accepts above - at a complete "[key=...]" token.
   # A line holding neither is continuation prose, a bare word, or blank, and can
@@ -330,42 +354,44 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
   # equivalent parameter expansion costs tens of milliseconds per line under bash
   # 3.2's global bracket-class substitution, which is the whole per-line cost of
   # both folds on a status log of ordinary width. Same verdict, bounded cost.
-  case "$unstamped" in
+  case "$__fm_fl_unstamped" in
     *:*|*\[key=*\]*) ;;
-    *) printf '%s' "$open"; return 0 ;;
+    *) return 0 ;;
   esac
-  status_line_verb "$line" verb
-  case "$unstamped" in
-    *:*) case "$verb:$kind" in done:ship|done:scout|failed:ship|failed:scout) return 0 ;; esac ;;
+  case "$__fm_fl_unstamped" in
+    *:*) case "$__fm_fl_verb:$5" in
+      done:ship|done:scout|failed:ship|failed:scout) printf -v "$6" '%s' ''; return 0 ;;
+    esac ;;
   esac
-  case "$verb" in
-    needs-decision|blocked|"$resolve"|"$held") ;;
-    *) printf '%s' "$open"; return 0 ;;
+  case "$__fm_fl_verb" in
+    needs-decision|blocked|"$3"|"$4") ;;
+    *) return 0 ;;
   esac
-  key=$(_fm_decision_key "$line") || { printf '%s' "$open"; return 0; }
-  _fm_decision_key_transition_allowed "$key" "$(status_line_note "$line")" \
-    || { printf '%s' "$open"; return 0; }
-  case "$verb" in
+  _fm_decision_key_into "$2" default __fm_fl_key || return 0
+  status_line_note "$2" __fm_fl_note
+  while [[ "$__fm_fl_note" == *$'\n' ]]; do __fm_fl_note=${__fm_fl_note%$'\n'}; done
+  _fm_decision_key_transition_allowed "$__fm_fl_key" "$__fm_fl_note" || return 0
+  _fm_decision_drop "$__fm_fl_open" "$__fm_fl_key" __fm_fl_open
+  case "$__fm_fl_verb" in
     needs-decision|blocked)
-      note=$(status_line_note "$line")
-      open=$(_fm_decision_drop "$open" "$key")
-      [ -n "$open" ] && open="${open}"$'\n'
-      open="${open}${key}"$'\t'"${verb}"$'\t'"${note}"$'\n'
-      ;;
-    "$resolve"|"$held")
-      open=$(_fm_decision_drop "$open" "$key")
-      [ -n "$open" ] && open="${open}"$'\n'
+      [ -n "$__fm_fl_open" ] && __fm_fl_open+=$'\n'
+      __fm_fl_open+="${__fm_fl_key}"$'\t'"${__fm_fl_verb}"$'\t'"${__fm_fl_note}"
       ;;
   esac
-  printf '%s' "$open"
+  printf -v "$6" '%s' "$__fm_fl_open"
+}
+_fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb> <kind>
+  local __fm_fl_out
+  _fm_decision_fold_line_into "$1" "$2" "$3" "$4" "$5" __fm_fl_out
+  printf '%s' "$__fm_fl_out"
 }
 
 # Fold the WHOLE status stream into the set of decisions still open. Prints one
 # TAB-separated "<key>\t<verb>\t<summary>" line per still-open decision, in
 # most-recently-opened-last order; prints nothing when none are open. Reads the
 # status file, its sibling `.meta` for the task kind when the caller passes no
-# <kind>, and a sibling fold checkpoint when available. The fold signature
-# includes the optional verb and reserved-key overrides. This is the durable open-set the fleet
+# <kind>, and a sibling fold checkpoint when available; the signature contract
+# is owned by _fm_open_decisions_fold_signature below. This is the durable open-set the fleet
 # snapshot and any point-in-time consumer must use instead of trusting the last
 # status line.
 # The scan_open_decisions wrapper in bin/fm-classify-lib.sh enumerates a whole directory rather than
@@ -396,7 +422,7 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 status_open_decisions() {  # <status-file> [<kind>]
   local f=$1 kind=${2:-} line resolve held open='' verb offset=0 span seeded=0
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
-  kind=$(_fm_status_kind "$f" "$kind")
+  _fm_status_kind "$f" "$kind" kind
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   if _fm_open_decisions_checkpoint_seed "$f" "$kind"; then
@@ -482,18 +508,23 @@ EOF
 }
 
 # The signature a fold checkpoint must carry to be reused for <kind>: the fold
-# version and the task kind, plus every fold-affecting override when one is set,
-# so a checkpoint folded under the default verbs is never reused by a read that
-# overrides them (and the default signature stays the historical one).
+# version, task kind, effective parsing locales, and every fold-affecting
+# override, so readers never reuse a checkpoint under a different interpretation.
+# Parsing retains the caller's locale in full and incremental folds; byte-offset
+# measurement uses LC_ALL=C without changing the interpretation of status lines.
+# Effective LC_CTYPE and LC_COLLATE each use the first nonempty value among
+# LC_ALL, their category variable, LANG, and C. Missing or different locale fields
+# therefore refuse reuse in incremental, read-only, wake-cursor, and snapshot reads.
 _fm_open_decisions_fold_signature() {  # <kind> [<out-var>]
-  local __fm_fs_sig="$FM_OPEN_DECISIONS_FOLD_VERSION:$1"
+  local __fm_sig="$FM_OPEN_DECISIONS_FOLD_VERSION:$1"
+  __fm_sig="$__fm_sig:ctype=${LC_ALL:-${LC_CTYPE:-${LANG:-C}}}:collate=${LC_ALL:-${LC_COLLATE:-${LANG:-C}}}"
   if [ -n "${FM_CLASSIFY_RESOLVE_VERB:-}" ] || [ -n "${FM_CLASSIFY_CAPTAIN_HELD_VERB:-}" ] \
     || [ -n "${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-}" ]; then
-    __fm_fs_sig="$__fm_fs_sig:${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}"
-    __fm_fs_sig="$__fm_fs_sig:${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}"
-    __fm_fs_sig="$__fm_fs_sig:${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}"
+    __fm_sig="$__fm_sig:${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}"
+    __fm_sig="$__fm_sig:${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}"
+    __fm_sig="$__fm_sig:${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}"
   fi
-  _fm_emit_value "${2-}" "$__fm_fs_sig"
+  if [ -n "${2:-}" ]; then printf -v "$2" '%s' "$__fm_sig"; else printf '%s' "$__fm_sig"; fi
 }
 
 # Parse one checkpoint file: `version=`, `offset=`, `ident=` header lines, then
@@ -502,6 +533,8 @@ _fm_open_decisions_fold_signature() {  # <kind> [<out-var>]
 # checkpoint. Shared by the writer in bin/fm-classify-lib.sh and the whole-file
 # readers here; the legacy offset/export reader in bin/fm-status-wake-lib.sh
 # applies the same signature, identity, size, and boundary checks.
+# Keep the cat read as the checkpoint fault-injection seam: a failed read must
+# never seed a fold, even when the checkpoint header and file metadata are valid.
 _fm_open_decisions_checkpoint_parse() {  # <checkpoint-file>
   local cf=$1 data first rest line
   _FM_ODC_VERSION='' _FM_ODC_OFFSET=0 _FM_ODC_IDENT='' _FM_ODC_OPEN=''
@@ -535,13 +568,14 @@ _fm_open_decisions_checkpoint_boundary() {  # <status-file> <offset>
 # _FM_ODC_OPEN / _FM_ODC_OFFSET and the current file size in _FM_ODC_SIZE.
 # Read-only; status_open_decisions above owns every rejection reason.
 _fm_open_decisions_checkpoint_seed() {  # <status-file> <kind>
-  local f=$1 kind=$2 cur_ident
+  local f=$1 kind=$2 cur_ident cf fold_version
   _FM_ODC_SIZE=0
-  _fm_open_decisions_checkpoint_parse "$(_fm_open_decisions_cursor_path "$f")" || return 1
-  [ "$_FM_ODC_VERSION" = "$(_fm_open_decisions_fold_signature "$kind")" ] || return 1
-  cur_ident=$(_fm_open_decisions_file_ident "$f" 2>/dev/null) || return 1
+  _fm_open_decisions_cursor_path "$f" cf
+  _fm_open_decisions_fold_signature "$kind" fold_version
+  _fm_open_decisions_checkpoint_parse "$cf" || return 1
+  [ "$_FM_ODC_VERSION" = "$fold_version" ] || return 1
+  _fm_open_decisions_file_ident "$f" cur_ident _FM_ODC_SIZE 2>/dev/null || return 1
   [ -n "$cur_ident" ] && [ "$cur_ident" = "$_FM_ODC_IDENT" ] || return 1
-  _FM_ODC_SIZE=$(_fm_status_file_size "$f" 2>/dev/null) || return 1
   _FM_ODC_SIZE=${_FM_ODC_SIZE//[[:space:]]/}
   case "$_FM_ODC_SIZE" in ''|*[!0-9]*) return 1 ;; esac
   [ "$_FM_ODC_OFFSET" -le "$_FM_ODC_SIZE" ] || return 1

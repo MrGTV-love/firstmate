@@ -369,6 +369,88 @@ test_snapshot_failure_is_visible() {
   pass "snapshot failures are reported visibly"
 }
 
+test_manifest_read_failure_does_not_replay_or_replace_receipts() {
+  local dir state out err owner mode prefix
+  dir=$(make_case manifest-read-failure); state="$dir/state"
+  out="$dir/drain.out"; err="$dir/drain.err"
+  printf 'note: handled neighboring note\n' > "$state/a-neighbor.status"
+  printf 'note: handled answer note\n' > "$state/b-answer.status"
+  printf 'done: handled completion\n' > "$state/c-done.status"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2>/dev/null \
+    || fail "could not establish handled note and completion receipts"
+  cp "$state/.status-presentation-cursor" "$dir/original.cursor"
+  IFS= read -r prefix < "$dir/original.cursor"
+  prefix+=$'\n'
+  printf 'note: new answer after the receipt\n' >> "$state/b-answer.status"
+  for owner in status_acknowledge_presented_snapshot print_status_outcome_backstop_section status_commit_presentation_snapshot fm_wake_print_annotations; do
+    if [ "$owner" = fm_wake_print_annotations ]; then
+      append_wake "$state" signal b-answer.status 'signal: b-answer.status' \
+        || fail "could not queue the manifest-failure signal annotation"
+    fi
+    for mode in empty prefix; do
+      FM_STATE_OVERRIDE="$state" FM_MANIFEST_FAULT_OWNER="$owner" FM_MANIFEST_FAULT_MODE="$mode" \
+        FM_MANIFEST_FAULT_PREFIX="$prefix" FM_MANIFEST_FAULT_LOG="$dir/fault.log" bash -c '
+        read() {
+          local __test_frame
+          if [ "${FUNCNAME[1]:-}" = _fm_read_file_into ]; then
+            for __test_frame in "${FUNCNAME[@]}"; do
+              if [ "$__test_frame" = "$FM_MANIFEST_FAULT_OWNER" ]; then
+                printf "read failure\n" >> "$FM_MANIFEST_FAULT_LOG"
+                case "$FM_MANIFEST_FAULT_MODE" in
+                  empty) printf -v "${!#}" "%s" "" ;;
+                  prefix) printf -v "${!#}" "%s" "$FM_MANIFEST_FAULT_PREFIX" ;;
+                esac
+                return 1
+              fi
+            done
+          fi
+          builtin read "$@"
+        }
+        drain=$1; shift
+        . "$drain"
+      ' _ "$DRAIN" > "$out" 2> "$err" \
+        || fail "drain exited instead of reporting incomplete presentation"
+      [ -s "$dir/fault.log" ] || fail "manifest failure was not exercised for $owner/$mode"
+      rm -f "$dir/fault.log"
+      if [ "$owner" = fm_wake_print_annotations ]; then
+        if grep -F 'wake annotation:' "$out" >/dev/null; then fail "failed manifest read published a signal annotation"; fi
+      elif [ "$owner" != status_commit_presentation_snapshot ] && [ -s "$out" ]; then
+        fail "manifest read failure published an incomplete presentation for $owner/$mode: $(cat "$out")"
+      fi
+      cmp -s "$dir/original.cursor" "$state/.status-presentation-cursor" \
+        || fail "manifest read failure replaced a handled receipt for $owner/$mode"
+      if grep -E 'handled neighboring note|handled answer note|handled completion' "$out" >/dev/null; then
+        fail "manifest read failure replayed handled status for $owner/$mode: $(cat "$out")"
+      fi
+    done
+  done
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$out" 2> "$err" \
+    || fail "drain did not recover after the manifest read failure"
+  grep -F 'b-answer note: new answer after the receipt' "$out" >/dev/null \
+    || fail "the failed presentation swallowed the new note"
+  if grep -E 'handled neighboring note|handled answer note|handled completion' "$out" >/dev/null; then
+    fail "recovery replayed previously handled status: $(cat "$out")"
+  fi
+  pass "failed or partial manifest reads abort all receipt consumers without replay or replacement"
+}
+
+test_manifest_reader_preserves_complete_bytes() {
+  . "$ROOT/bin/fm-status-io-lib.sh"
+  local dir input actual
+  dir=$(make_case manifest-reader-bytes)
+  for input in '' $'row\tidentity\t42\t42\n' $'row\tidentity\t42\t42\n\n' $'row\tidentité\t42\t42'; do
+    printf '%s' "$input" > "$dir/manifest"
+    actual=unchanged
+    _fm_read_file_into "$dir/manifest" actual || fail "complete manifest read failed"
+    [ "$actual" = "$input" ] || fail "complete manifest read changed persisted bytes"
+  done
+  printf 'row\tidentity\t42\t42\000another\tidentity\t1\t1\n' > "$dir/manifest"
+  actual=unchanged
+  if _fm_read_file_into "$dir/manifest" actual; then fail "manifest reader accepted an incomplete NUL-delimited prefix"; fi
+  [ "$actual" = unchanged ] || fail "failed manifest read published partial bytes"
+  pass "manifest reader preserves empty, unterminated, multibyte and trailing-newline bytes"
+}
+
 test_open_decisions_fold_is_unchanged() {
   local dir state out
   dir=$(make_case open-decisions-regression)
@@ -481,6 +563,7 @@ subshell_entries() {
 # <history> routine lines, half of them `resolved` closes under a non-reserved
 # key. Routine lines stay unread (and so are rescanned by every drain) until a
 # signal needs them, which makes this the steady state of a busy fleet.
+# Leave checkpoints absent: priming them first hides per-line cold-fold forks.
 build_routine_fleet() {
   local state=$1 tasks=$2 history=$3 t i
   for ((t = 0; t < tasks; t++)); do
@@ -492,12 +575,10 @@ build_routine_fleet() {
       done
     } > "$state/fleet$t.status"
   done
-  FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2>&1 \
-    || fail "priming drain failed over the routine fleet"
 }
 
 test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow() {
-  local dir small_hist large_hist few many per_task
+  local dir small_hist large_hist few many per_task warm_few warm_many warm_per_task
   dir=$(make_case drain-subshell-entries)
   mkdir -p "$dir/h-small/state" "$dir/h-large/state" "$dir/f-few/state" "$dir/f-many/state"
   build_routine_fleet "$dir/h-small/state" 3 3
@@ -514,7 +595,153 @@ test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow() {
   per_task=$(( (many - few) / 8 ))
   [ "$per_task" -le 40 ] \
     || fail "drain subshell entries grow too fast with the fleet: $few for 3 tasks, $many for 11 ($per_task per added task, limit 40)"
-  pass "drain subshell entries stay flat as unread history grows and linear in the fleet ($per_task per task)"
+  build_routine_fleet "$dir/f-many/state" 35 3
+  FM_STATE_OVERRIDE="$dir/f-many/state" "$DRAIN" >/dev/null 2>/dev/null \
+    || fail "the larger warm-fleet priming drain failed"
+  [ "$(wc -l < "$dir/f-few/state/.status-presentation-cursor")" -eq 3 ] \
+    || fail "the few-task priming drain did not populate its presentation manifest"
+  [ "$(wc -l < "$dir/f-many/state/.status-presentation-cursor")" -eq 35 ] \
+    || fail "the many-task priming drain did not populate its presentation manifest"
+  warm_few=$(subshell_entries "$dir/f-few/state" "$dir/f-few-warm.count")
+  warm_many=$(subshell_entries "$dir/f-many/state" "$dir/f-many-warm.count")
+  warm_per_task=$(( (warm_many - warm_few) / 32 ))
+  [ "$warm_per_task" -le 40 ] \
+    || fail "drain subshell entries grow too fast with populated presentation manifests: $warm_few for 3 tasks, $warm_many for 35 ($warm_per_task per added task, limit 40)"
+  pass "drain subshell entries stay flat as unread history grows and linear in cold/warm fleets ($per_task/$warm_per_task per task)"
+}
+
+# Reference the original command-substitution fold's byte contract, independently
+# of the optimized fold/drop helpers. This is deliberately slow and test-only.
+legacy_decision_fold_line() {
+  local open=$1 line=$2 resolve=$3 held=$4 kind=$5 verb key note row kept=''
+  verb=$(status_line_verb "$line")
+  _fm_status_unstamped "$line" line
+  case "$line" in *:*|*\[key=*\]*) ;; *) printf '%s' "$open"; return 0 ;; esac
+  case "$line" in
+    *:*) case "$verb:$kind" in
+      done:ship|done:scout|failed:ship|failed:scout) return 0 ;;
+    esac ;;
+  esac
+  case "$verb" in
+    needs-decision|blocked|"$resolve"|"$held") ;;
+    *) printf '%s' "$open"; return 0 ;;
+  esac
+  key=$(_fm_decision_key "$line") || { printf '%s' "$open"; return 0; }
+  note=$(status_line_note "$line")
+  _fm_decision_key_transition_allowed "$key" "$note" \
+    || { printf '%s' "$open"; return 0; }
+  while IFS= read -r row || [ -n "$row" ]; do
+    [ -n "$row" ] || continue
+    case "$row" in "$key"$'\t'*) ;; *) kept+="$row"$'\n' ;; esac
+  done <<EOF
+$open
+EOF
+  open=${kept%$'\n'}
+  case "$verb" in
+    needs-decision|blocked)
+      [ -n "$open" ] && open+=$'\n'
+      open+="$key"$'\t'"$verb"$'\t'"$note"
+      ;;
+  esac
+  printf '%s' "$open"
+}
+
+test_decision_fold_preserves_stdout_and_out_var_bytes() {
+  # shellcheck source=bin/fm-classify-lib.sh
+  . "$ROOT/bin/fm-classify-lib.sh"
+  local input=$'a\tneeds-decision\tfirst\nb\tblocked\tsecond\n\n' line kind expected actual open
+  local lines=(
+    'working: unchanged'
+    'needs-decision bare prose [at=10:30]'
+    'blocked [key=bad/key]: rejected key'
+    'resolved [key=pending-reply-7]: unrelated note'
+    'needs-decision [key=a] [at=2026-10-09T10:30:00Z]: reopened'
+    'blocked [key=c]: third'
+    $'blocked [key=c]: third\n\n'
+    'done'
+    'resolved [key=a]: answered'
+    'captain-held [key=b]: transferred'
+    'done: shipped'
+    'failed: stopped'
+  )
+  for input in '' "$input"; do
+    for kind in ship scout secondmate; do
+      for line in "${lines[@]}"; do
+        expected=$(legacy_decision_fold_line "$input" "$line" resolved captain-held "$kind")
+        actual=$(_fm_decision_fold_line "$input" "$line" resolved captain-held "$kind") \
+          || fail "stdout fold failed for $kind: $line"
+        [ "$actual" = "$expected" ] || fail "stdout fold changed bytes for $kind: $line"
+        open=$input
+        _fm_decision_fold_line_into "$open" "$line" resolved captain-held "$kind" open
+        [ "$open" = "$expected" ] || fail "out-var fold changed bytes for $kind: $line"
+      done
+    done
+  done
+  for input in '' $'a\tblocked\tfirst\nb\tneeds-decision\tsecond'; do
+    for line in a missing; do
+      actual=$(_fm_decision_drop "$input" "$line") || fail "stdout key removal failed"
+      open=$input
+      _fm_decision_drop "$open" "$line" open
+      [ "$open" = "$actual" ] || fail "key removal out-var and stdout bytes differ"
+      case "$line" in
+        missing) [ "$open" = "$input" ] || fail "absent key removal changed the set" ;;
+        a) [ "$open" = "${input#*$'\n'}" ] || fail "key removal changed surviving record" ;;
+      esac
+    done
+  done
+  pass "stdout and in-process decision folds preserve legacy bytes and early returns"
+}
+
+test_keyed_cold_drain_preserves_cursor_bytes_and_flat_forks() {
+  # shellcheck source=bin/fm-classify-lib.sh
+  . "$ROOT/bin/fm-classify-lib.sh"
+  local dir state history task i line open expected actual ident size signature small large
+  dir=$(make_case keyed-cold-fold)
+  for history in 3 60; do
+    state="$dir/h$history/state"
+    mkdir -p "$state"
+    for ((task = 0; task < 3; task++)); do
+      {
+        printf '%s\n' 'needs-decision [key=keep]: initial' 'blocked [key=remove]: temporary'
+        for ((i = 0; i < history; i++)); do
+          printf 'resolved [key=side-%s]: routine close\nworking: step %s\n' "$i" "$i"
+        done
+        printf '%s\n' \
+          'captain-held [key=remove]: transferred' \
+          'needs-decision [key=pending-reply-7]: pending-reply-missed: still waiting' \
+          'resolved [key=pending-reply-7]: unrelated note cannot close' \
+          'blocked [key=last]: final blocker' \
+          'needs-decision [key=keep] [at=2026-10-09T10:30:00Z]: reopened'
+        case "$task" in 1) printf 'done: shipped\n' ;; esac
+      } > "$state/fleet$task.status"
+      printf 'kind=ship\n' > "$state/fleet$task.meta"
+    done
+    actual=$(subshell_entries "$state" "$dir/h$history.count")
+    case "$history" in 3) small=$actual ;; 60) large=$actual ;; esac
+    for ((task = 0; task < 3; task++)); do
+      open=''
+      while IFS= read -r line || [ -n "$line" ]; do
+        open=$(legacy_decision_fold_line "$open" "$line" resolved captain-held ship)
+      done < "$state/fleet$task.status"
+      expected=$'pending-reply-7\tneeds-decision\tpending-reply-missed: still waiting\nlast\tblocked\tfinal blocker\nkeep\tneeds-decision\treopened'
+      case "$task" in 1) expected='' ;; esac
+      [ "$open" = "$expected" ] || fail "legacy fold did not retain the expected order and notes"
+      _fm_status_stat_into "$state/fleet$task.status" ident size \
+        || fail "could not read fixture identity and size"
+      _fm_open_decisions_fold_signature ship signature
+      {
+        printf 'version=%s\noffset=%s\nident=%s\n' "$signature" "$size" "$ident"
+        printf '%s' "$open"
+      } > "$dir/expected.cursor"
+      cmp -s "$dir/expected.cursor" "$state/.fleet$task.open-decisions-cursor" \
+        || fail "drain persisted different cursor bytes, including trailing newlines"
+      actual=$(status_open_decisions_incremental "$state/fleet$task.status")
+      [ "$actual" = "$open" ] || fail "keyed cold drain changed the legacy open set"
+    done
+  done
+  [ "$large" -le "$((small + 40))" ] \
+    || fail "keyed cold-fold subshell entries grew with history: $small to $large"
+  pass "keyed cold drains preserve exact open/cursor bytes with flat forks ($small/$large)"
 }
 
 test_incident_note_answer_buried_under_routine_note_surfaces_both
@@ -528,7 +755,11 @@ test_snapshot_does_not_ack_a_later_append
 test_retired_task_id_starts_new_status_unread
 test_weak_identity_still_presents_and_advances
 test_snapshot_failure_is_visible
+test_manifest_read_failure_does_not_replay_or_replace_receipts
+test_manifest_reader_preserves_complete_bytes
 test_open_decisions_fold_is_unchanged
 test_empty_queue_does_not_swallow_later_signal_annotation
 test_routine_working_and_covered_done_stay_silent_on_the_empty_queue
 test_drain_subshell_entries_stay_flat_as_history_and_fleet_grow
+test_decision_fold_preserves_stdout_and_out_var_bytes
+test_keyed_cold_drain_preserves_cursor_bytes_and_flat_forks

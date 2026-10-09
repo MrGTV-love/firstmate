@@ -335,6 +335,7 @@ EOF
 print_status_outcome_backstop_section() {  # <task-and-endpoint-snapshot>
   local snapshot=$1 task endpoint ident event event_endpoint line verb key receipt store lock ready
   local output='' used=0 shown=0 omitted=0 bytes item_bytes=220 global_bytes=4000 rc=0
+  local _FM_STATUS_STAT_BATCH=''
   [ "$ACTOR" = main ] || return 0
 
   store="$STATE/branch-outcomes.jsonl"
@@ -360,6 +361,7 @@ print_status_outcome_backstop_section() {  # <task-and-endpoint-snapshot>
   fi
 
   STATUS_OUTCOME_BACKSTOP_ACKNOWLEDGED=
+  _fm_status_stat_batch_into "$STATE" _FM_STATUS_STAT_BATCH
   while IFS=$'\t' read -r task endpoint ident; do
     [ -n "$task" ] || continue
     status_outcome_backstop_cursor_offset "$STATE/$task.status" receipt || { rc=1; break; }
@@ -425,20 +427,12 @@ EOF
   fi
 }
 
-# Print still-unread informational status lines (note: answers and pending-reply
-# resolutions) that the OPEN DECISIONS fold never carries. Uses the same
-# cursor-backed unread span as the annotation path, and runs on every drain -
-# including the empty-queue fast path - so a buried answer cannot be swallowed
-# when the fold later advances the cursor. Prints nothing when nothing is
-# unread, which is the common case.
+# Present the informational rows prepared by status_acknowledge_presented_snapshot,
+# not a second read of the status logs: the receipt must describe the same bytes
+# this section presents. Runs even on an empty-queue drain so buried answers
+# cannot be swallowed; prints nothing when the prepared row set is empty.
 print_unread_status_section() {
-  local snapshot=${1:-} unread task line shown=0
-
-  if [ -n "$snapshot" ]; then
-    unread=$(scan_unread_surface_snapshot "$STATE" "$snapshot") || return 1
-  else
-    unread=$(scan_unread_surface_lines "$STATE") || return 1
-  fi
+  local unread=$1 task line shown=0
   [ -n "$unread" ] || return 0
 
   while IFS=$'\t' read -r task line; do
@@ -756,13 +750,13 @@ cap_outcome_line() {  # <line> <max-bytes>
 }
 
 print_status_sections() {
-  local snapshot=${1:-} fully_presented=${2:-} acknowledged prepared
+  local snapshot=${1:-} fully_presented=${2:-} acknowledged unread prepared
   if [ -z "$snapshot" ]; then snapshot=$(status_presentation_snapshot "$STATE") || return 1; fi
   [ -n "$snapshot" ] || return 0
-  acknowledged=$(status_acknowledge_presented_snapshot "$STATE" "$snapshot" "$fully_presented") || return 1
+  status_acknowledge_presented_snapshot "$STATE" "$snapshot" "$fully_presented" acknowledged unread || return 1
   prepared=$(mktemp "$STATE/.status-presentation.prepared.XXXXXX") || return 1
   if ! {
-    print_unread_status_section "$snapshot" \
+    print_unread_status_section "$unread" \
       && print_status_outcome_backstop_section "$snapshot" \
       && print_open_decisions_section "$snapshot" \
       && print_record_divergence_section
@@ -786,6 +780,7 @@ print_status_sections() {
 
 print_status_presentation() {  # [<deduped-raw-rows>]
   local rows=${1:-} lock="$STATE/.status-presentation-lock" snapshot annotation_manifest fully_presented='' rc=0
+  local _FM_STATUS_STAT_BATCH=''
   local lock_rc holder_pid
   if fm_lock_acquire_wait_bounded "$lock" "$PRESENTATION_LOCK_TIMEOUT"; then
     :
@@ -805,6 +800,7 @@ print_status_presentation() {  # [<deduped-raw-rows>]
     rc=1
   }
   if [ "$rc" -eq 0 ] && [ -n "$rows" ]; then
+    _fm_status_stat_batch_into "$STATE" _FM_STATUS_STAT_BATCH
     fm_wake_print_annotations "$rows" "$snapshot" || rc=1
     if [ "$rc" -eq 0 ]; then
       annotation_manifest=$(fm_wake_annotation_manifest "$rows") || rc=1
@@ -833,7 +829,7 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 
 if [ -n "$ACK_THROUGH" ]; then
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
 elif fm_lock_acquire_wait_bounded "$FM_WAKE_QUEUE_LOCK" "$PRESENTATION_LOCK_TIMEOUT"; then
   :
 else
@@ -913,7 +909,7 @@ if [ -n "$ACK_THROUGH" ]; then
     echo "wake drain: inactive outcome receipt could not be recorded safely" >&2
     exit 1
   fi
-  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK"
+  fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1
   DRAIN_LOCK_HELD=true
   DRAIN_TMP=$(mktemp "$STATE/.wake-queue.ack.XXXXXX") || exit 1
   chmod 0600 "$DRAIN_TMP" || exit 1

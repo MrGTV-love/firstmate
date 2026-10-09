@@ -34,13 +34,14 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-backlog-receive.sh`  | Idempotently ingest one confined remote handoff outbox through tasks-axi             |
 | `fm-captain-hold.sh`     | Hold tasks for the captain, record the captain's answers, gate investigation completion, and report record divergence between the status log and the backlog |
 | `fm-decision-hold.sh`    | One-release compatibility shim mapping the retired decision commands onto fm-captain-hold.sh |
-| `fm-brief.sh`            | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), scout, secondmate-charter, and Herdr-lab briefs, with Captain's intent and Firstmate spec subsections on ship/scout |
+| [`fm-brief.sh`](../bin/fm-brief.sh) | Scaffold ship (explicit `--mode`, plus the project's registered `--forge`), scout, secondmate-charter, and Herdr-lab briefs, with Captain's intent and Firstmate spec subsections on ship/scout; emitted ship/scout briefs own the private-service cleanup rule |
 | [`fm-dod-lib.sh`](../bin/fm-dod-lib.sh) | Own ship/scout worker role scope, ship definitions of done, the named-head reachability gate on ship `done:` acceptance, and the no-mistakes `--intent` contract |
 | [`fm-brief-heading-lib.sh`](../bin/fm-brief-heading-lib.sh) | Shared brief-section and legacy captain-provenance reader |
 | [`fm-skill-pick.sh`](../bin/fm-skill-pick.sh) | Pick the project skill a ship or scout worker loads at launch ([operator contract](configuration.md#worker-skill-selection)) |
 | [`fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) | Shared TypeSafe credential, transport, and never-send boundary ([operator contract](configuration.md#typed-dispatch-resolution-env-typesafe_api_key)) |
 | [`fm-jev-belay-hook.sh`](../bin/fm-jev-belay-hook.sh) | Claude worker wrapper for the pinned upstream belay Stop hook ([contract](configuration.md#jev-belay-stop-hook)) |
 | [`fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs) | Node preload enforcing the [belay egress policy](configuration.md#jev-belay-stop-hook) |
+| [`fm-jev-guard-hook.sh`](../bin/fm-jev-guard-hook.sh) | Run the ten-levels jev-guard as a Claude worker tool hook ([operator contract](configuration.md#jev-guard)) |
 | [`fm-model-index.sh`](../bin/fm-model-index.sh) | Validate the home model index and resolve dispatch model roles |
 | `fm-herdr-lab.sh`        | Provision and guardedly operate an isolated, never-default Herdr lab session         |
 | `fm-herdr-lab-viewer.py` | The pty engine behind `fm-herdr-lab.sh viewer`: one real foreground Herdr client on a non-zero window grid |
@@ -50,6 +51,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-install-treehouse.sh`| Install CI's exact-version Treehouse pin for real-Herdr E2E that needs spawn worktrees |
 | `fm-herdr-ci-cleanup.sh` | Snapshot and tear down only job-owned `fm-lab-*` sessions in the Herdr CI lane       |
 | `fm-test-run.sh`         | Behavior-test runner: selection, portable lanes, bounded concurrency, budgets, coverage guard, timing/JSON; refuses to execute in the repository primary checkout when `FM_TASK_ID` marks a task worker |
+| [`fm-test-reap-orphans.sh`](../bin/fm-test-reap-orphans.sh) | Reap processes provably owned by an ended lab or test run; its header owns the safety contract |
 | `fm-test-isolation-proof.sh` | Concurrent isolation harness and portable candidate set owner |
 | `fm-cpu-pass.sh`         | Reserve an exact positive worker count, no larger than the host CPU count, while a CPU-heavy burst runs ([protocol](cpu-pass-pool.md)) |
 | `fm-cpu-pass.py`         | The engine behind `fm-cpu-pass.sh`                                                   |
@@ -156,7 +158,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-merge-authority-lib.sh` | Resolve merge authority at the gate, persist it against the accepted canonical PR, and identity-check its later poll consumption |
 | `fm-parent-channel-lib.sh` | Resolve a secondmate home's parent channel and append a captain-facing outcome line to it at most once |
 | `fm-promote.sh`          | Promote a scout task in place to a protected ship task with an explicit delivery mode, write the ship instructions carrying that mode's definition of done, and supersede the task's brief so a later relaunch cannot revive stale scout delivery text |
-| `fm-teardown.sh`         | Fail-closed teardown: return landed ship worktrees, require completed scout deliverables, retire secondmate homes |
+| [`fm-teardown.sh`](../bin/fm-teardown.sh) | Fail-closed teardown: return landed ship worktrees, require completed scout deliverables, retire secondmate homes; its header owns task-private no-mistakes agent retirement |
 | `fm-harness.sh`          | Detect the running harness, resolve crew or secondmate harness, model, and effort, and validate the native-only `ultra` effort |
 | `fm-lock.sh`             | Per-home firstmate session lock                                                      |
 | `fm-x-lib.sh`            | Shared Relay config, relay, and reply-threading helpers                              |

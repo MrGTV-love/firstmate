@@ -935,18 +935,15 @@ fm_backend_composer_state() {  # <backend> <target> [expected-label] -> empty|pe
 # session: for herdr this deliberately queries the pane directly instead of
 # going through fm_backend_herdr_target_ready (which auto-starts the herdr
 # server as a side effect via fm_backend_herdr_server_ensure - fine for an
-# operation that is about to use the pane, wrong for a passive liveness
-# probe). A gone tmux window or an unqueryable herdr pane (server down, pane
-# closed), missing zellij pane, or unreadable Orca terminal simply fails, which
-# IS "does not exist" for this purpose.
-# Mirrors fm-crew-state.sh's pane_readable check; exists here as one shared
-# primitive so callers that only need a fast alive/dead read (recovery
-# digests, the session-start fleet digest) do not re-derive it inline.
+# operation that is about to use the pane, wrong for a passive liveness probe).
+# Backs fm-crew-state.sh's pane_readable check for tmux; exists here as one
+# shared primitive for recovery digests and the session-start fleet digest.
 fm_backend_target_exists() {  # <backend> <target> [expected-label]
   local backend=$1 target=$2 expected_label=${3:-} session pane
   case "$backend" in
     tmux)
-      tmux display-message -p -t "$target" '#{pane_id}' >/dev/null 2>&1
+      fm_backend_source tmux || return 2
+      fm_backend_tmux_target_exists "$target"
       ;;
     herdr)
       fm_backend_source herdr || return 1
@@ -993,8 +990,9 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
 # Only `dead` and `missing` license recovery. Every `alive` is proven at
 # process level through the shared classifier in bin/fm-agent-process-lib.sh,
 # never from a registration or a rendered title alone. The tmux adapter
-# requires a successful session inventory and returns `missing` only when it
-# omits the exact window; the Herdr adapter reuses its strict husk classifier -
+# requires exact recorded session and window membership, with inventory-read
+# classification owned by fm_backend_tmux_window_inventory; the Herdr adapter
+# reuses its strict husk classifier -
 # which verifies a registered agent against `pane process-info` and the real
 # process table, so a registration Herdr kept over a shell-only pane reads
 # `dead` here (issue #4115) - then maps a positively stopped session server to

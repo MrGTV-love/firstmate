@@ -414,5 +414,73 @@ fi
   || fail "a dead-shell pane still showing Cursor's composer must never read empty"
 pass "cursor composer: a stale Cursor screen over a dead shell never reads empty"
 
+# --- target presence: tmux's addressed calls never fail for an absent window --
+# The defect: session start printed `endpoint: alive` for a recorded
+# `session:window` whose window had closed, because the presence probe ran
+# `display-message -t` and read its success as presence. This pins the premise
+# on the real tmux first, so the cases below cannot go quietly vacuous when a
+# tmux release changes the fallback, then asserts the verdict follows the
+# window inventory instead.
+"$REAL_TMUX" -L "$SOCKET" display-message -p -t "$SESSION:fm-gone-window" '#{pane_id}' >/dev/null 2>&1 \
+  || fail "premise changed: tmux now fails an addressed call for an absent window, so the fallback this suite guards against needs re-verifying"
+"$REAL_TMUX" -L "$SOCKET" display-message -p -t "fm-gone-session:idle" '#{pane_id}' >/dev/null 2>&1 \
+  || fail "premise changed: tmux now fails an addressed call for an absent session, so the fallback this suite guards against needs re-verifying"
+fm_backend_target_exists tmux "$SESSION:idle" \
+  || fail "a window the session lists must read as present"
+fm_backend_target_exists tmux "$SESSION:fm-gone-window" \
+  && fail "a closed window in a live session read as present through tmux's active-window fallback"
+fm_backend_target_exists tmux "$SESSION:idl" \
+  && fail "a prefix of a listed window name read as present; presence is a whole-name match"
+fm_backend_target_exists tmux "fm-gone-session:idle" \
+  && fail "a window in a session tmux does not hold read as present"
+fm_backend_target_exists tmux "$SESSION:@0" \
+  || fail "a window id keeps the direct probe, which answers for it"
+pass "target presence: a recorded window is present only when its exact session lists it"
+
+pane_index=$("$REAL_TMUX" -L "$SOCKET" split-window -d -t "$SESSION:idle" -P -F '#{pane_index}' -- /bin/sh) \
+  || fail "could not create a second pane"
+window_index=$("$REAL_TMUX" -L "$SOCKET" display-message -p -t "$SESSION:idle" '#{window_index}')
+window_id=$("$REAL_TMUX" -L "$SOCKET" display-message -p -t "$SESSION:idle" '#{window_id}')
+pane_id=$("$REAL_TMUX" -L "$SOCKET" display-message -p -t "$SESSION:idle.$pane_index" '#{pane_id}')
+for selector in "idle.$pane_index" "$window_index.$pane_index" \
+  "$window_id.$pane_index" "$pane_id" "$window_index" "$window_id" \
+  '=idle' "=idle.$pane_index"; do
+  for session_selector in "$SESSION" "=$SESSION"; do
+    fm_backend_target_exists tmux "$session_selector:$selector" \
+      || fail "a supported live target was rejected: $session_selector:$selector"
+  done
+done
+for selector in 'idle.999' "$window_index.999" "$window_id.999" '%999999' '999999'; do
+  rc=0
+  fm_backend_target_exists tmux "$SESSION:$selector" || rc=$?
+  [ "$rc" -eq 1 ] || fail "an absent selector must be proven absent: $selector (status $rc)"
+done
+fm_backend_target_exists tmux "$window_id" || fail "a bare window ID was rejected"
+fm_backend_target_exists tmux "$pane_id" || fail "a bare pane ID was rejected"
+fm_backend_target_exists tmux '@999999' && fail "an absent bare window ID read as present"
+fm_backend_target_exists tmux '%999999' && fail "an absent bare pane ID read as present"
+pass "target presence: named, indexed, ID, pane, and exact-qualified selectors retain their meaning"
+
+"$REAL_TMUX" -L "$SOCKET" new-session -d -s work-other -n fm-mate -c "$LAB/wt" -- "$LAB/bin/claude-link" 900 \
+  || fail "could not create a neighboring session"
+wait_for_state "work-other:fm-mate" alive || fail "the neighboring agent did not become alive"
+[ "$(fm_backend_agent_state tmux 'work:fm-mate')" = missing ] \
+  || fail "recovery attributed a neighboring session to a missing recorded session"
+mkdir -p "$LAB/state"
+printf 'window=work:fm-mate\nworktree=%s\nhome=%s\nkind=secondmate\n' "$LAB/wt" "$LAB/wt" > "$LAB/state/mate.meta"
+printf 'working: retained activity\n' > "$LAB/state/mate.status"
+crew_out=$(FM_HOME="$LAB" FM_STATE_OVERRIDE="$LAB/state" "$ROOT/bin/fm-crew-state.sh" mate)
+case "$crew_out" in
+  *'state: unknown'*'source: none'*'backend target gone: work:fm-mate'*) ;;
+  *) fail "a missing session reused its stale secondmate log: $crew_out" ;;
+esac
+printf 'window=work-other:fm-mate\nworktree=%s\nhome=%s\nkind=secondmate\n' "$LAB/wt" "$LAB/wt" > "$LAB/state/mate.meta"
+crew_out=$(FM_HOME="$LAB" FM_STATE_OVERRIDE="$LAB/state" "$ROOT/bin/fm-crew-state.sh" mate)
+case "$crew_out" in
+  *'state: working'*'source: status-log'*'retained activity'*) ;;
+  *) fail "an exact live secondmate no longer reports its current log: $crew_out" ;;
+esac
+pass "recovery and crew-state never substitute a neighboring session for the recorded endpoint"
+
 cleanup_all
 trap - EXIT

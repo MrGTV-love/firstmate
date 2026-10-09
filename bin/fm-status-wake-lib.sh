@@ -259,10 +259,10 @@ status_line_is_unread_surface() {  # <status-line>
     *) return 1 ;;
   esac
   _fm_decision_key_into "$line" default key || return 1
-  status_line_note "$line" note
   for prefix in ${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}; do
     case "$key" in
       "$prefix"*)
+        status_line_note "$line" note
         _fm_decision_key_transition_allowed "$key" "$note"
         return
         ;;
