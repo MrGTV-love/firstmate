@@ -2135,6 +2135,106 @@ test_completed_keyed_release_replays_after_publication_failure() {
   pass "completed default and done releases replay and recover failed publication without rewriting history"
 }
 
+test_stale_keyed_replay_preserves_a_concurrent_hold() {
+  local home parent channel id mode row replay_pid replay_rc show open published request
+  for mode in default done release; do
+    home=$(make_home "stale-keyed-replay-$mode")
+    parent=$(make_home "stale-keyed-replay-parent-$mode")
+    printf 'stale-replay-mate\n' > "$home/.fm-secondmate-home"
+    printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+      > "$home/.fm-secondmate-parent"
+    printf -- '- stale-replay-mate - synthetic scope (home: %s; scope: sample reviews; projects: sample; added 2026-07-14)\n' \
+      "$home" > "$parent/data/secondmates.md"
+    fm_write_secondmate_meta "$parent/state/stale-replay-mate.meta" "$home" \
+      "firstmate:fm-stale-replay-mate" sample
+    channel="$parent/state/stale-replay-mate.status"
+    id=sample-stale-keyed-replay
+    tasks_in "$home" add "$id" "Review the stale replay race" \
+      --kind scout --repo sample --start >/dev/null || fail "could not create the replay-race task"
+    write_origin_meta "$home" "$id"
+    FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold "$id" \
+      --reason "captain initial choice pending" >/dev/null || fail "could not open the first hold"
+    row=$(printf '%s\tgo\tProceed' "$id")
+    [ "$mode" = default ] || row=$(printf '%s\t%s' "$row" "$mode")
+    printf '%s\n' "$row" | run_captain "$home" answers --source "stale replay fixture" \
+      > "$home/release.out" 2> "$home/release.err" || fail "could not release the first hold"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: in_flight" "the first answer completed live work"
+    assert_contains "$show" "held: no" "the first answer did not release its hold"
+    cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${FM_TEST_STALE_REPLAY:-}" = 1 ] && [ "${1:-}" = show ] \
+  && [ "${2:-}" = sample-stale-keyed-replay ]; then
+  count=0
+  [ ! -f "$FM_HOME/replay-reads" ] || read -r count < "$FM_HOME/replay-reads"
+  count=$((count + 1))
+  printf '%s\n' "$count" > "$FM_HOME/replay-reads"
+  if [ "$count" -eq 2 ]; then
+    "$REAL_TASKS_AXI" "$@" > "$FM_HOME/replay-snapshot" || exit "$?"
+    : > "$FM_HOME/replay-ready"
+    while [ ! -e "$FM_HOME/replay-release" ] \
+      && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+      sleep 0.01
+    done
+    cat "$FM_HOME/replay-snapshot"
+    exit 0
+  fi
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+    chmod +x "$home/fakebin/tasks-axi"
+    (
+      printf '%s\n' "$row" | FM_TEST_STALE_REPLAY=1 FM_BACKLOG_ROW_TIMEOUT_SECS=120 \
+        run_captain "$home" answers --source "stale replay fixture"
+    ) > "$home/replay.out" 2> "$home/replay.err" &
+    replay_pid=$!
+    if ! wait_for_test_file "$home/replay-ready" "$replay_pid"; then
+      : > "$home/replay-release"
+      wait "$replay_pid" 2>/dev/null || true
+      fail "the replay did not snapshot the released first hold: $(cat "$home/replay.err")"
+    fi
+    FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:01Z run_captain "$home" hold "$id" \
+      --reason "captain revised choice pending" >/dev/null || fail "could not open the concurrent hold"
+    request_reconciles "$home" stale-replay-source "$id" \
+      || fail "could not create the concurrent hold's reconcile request"
+    request="$home/state/reconcile-requests/$id.request"
+    cp "$request" "$home/request-before"
+    show=$(tasks_in "$home" show "$id" --full)
+    published=$(cat "$channel")
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_contains "$open" "captain-hold-$id-2" "the concurrent parent decision did not open"
+    : > "$home/replay-release"
+    replay_rc=0
+    wait "$replay_pid" || replay_rc=$?
+    [ "$replay_rc" -ne 0 ] || fail "the stale replay reported success for the concurrent hold"
+    assert_not_contains "$(cat "$home/replay.out")" "closed: $id" \
+      "the stale replay reported the concurrent hold closed"
+    assert_contains "$(cat "$home/replay.out")" "answers: closed=0 skipped=1" \
+      "the stale replay failed before classifying the answer: $(cat "$home/replay.err")"
+    assert_present "$request" "the stale replay retired the concurrent hold's reconcile request"
+    cmp -s "$request" "$home/request-before" || fail "the stale replay changed the reconcile request"
+    assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+      "the stale replay changed the concurrent held task"
+    assert_equals "$published" "$(cat "$channel")" "the stale replay published a parent resolution"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_contains "$open" "captain-hold-$id-2" "the stale replay resolved the concurrent parent decision"
+    assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the first parent decision reopened"
+    printf '%s\n' "$row" | run_captain "$home" answers --source "stale replay fixture" \
+      > "$home/fresh.out" 2> "$home/fresh.err" || fail "a fresh answer could not resolve the concurrent hold"
+    assert_contains "$(cat "$home/fresh.out")" "closed: $id" "the fresh answer was not reported closed"
+    assert_absent "$request" "the fresh answer left the reconcile request pending"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: in_flight" "the fresh answer completed live work"
+    assert_contains "$show" "held: no" "the fresh answer did not release the concurrent hold"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_not_contains "$open" "captain-hold-$id-2"$'\t' "the fresh answer left the parent decision open"
+  done
+  pass "stale default, done and release replays preserve a concurrent hold until a fresh answer"
+}
+
 test_repeated_keyed_answer_resolves_its_own_hold() {
   local home parent channel id mode interruption row show out open published body
   local first_stamp=2026-07-14T12:00:00Z second_stamp=2026-07-14T12:00:01Z expected_mode
@@ -5323,6 +5423,7 @@ test_keyed_answer_releases_a_live_work_item
 test_keyed_answer_waits_for_cleanup_before_selecting_its_mode
 test_interrupted_keyed_release_closes_after_teardown
 test_completed_keyed_release_replays_after_publication_failure
+test_stale_keyed_replay_preserves_a_concurrent_hold
 test_repeated_keyed_answer_resolves_its_own_hold
 test_legacy_keyed_release_requires_explicit_closure
 test_reconcile_never_closes_through_the_keyed_answer_intake

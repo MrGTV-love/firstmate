@@ -1472,12 +1472,34 @@ command_answers() {
             || [ "$recorded_mode" = released ]; }; } \
         || { [ "$state" != "done" ] && [ "$hold_kind" != captain ] \
           && [ "$recorded_mode" = released ]; }; then
+        acquire_task_control_lock "$id"
+        if ! task_show "$id"; then
+          release_task_control_lock || fail "cannot release task control for $id"
+          printf 'skipped: %s (absent)\n' "$id"
+          skipped=$((skipped + 1))
+          continue
+        fi
+        show=$TASK_SHOW_OUTPUT
+        state=$(show_field "$show" state)
+        hold_kind=$(show_field_value "$show" hold_kind)
+        if [ "$(show_field "$show" body)" != "$body" ] \
+          || ! { { [ "$release_flag" = --auto-release ] && [ "$state" = done ] \
+              && { closed_answer_replay_mode_compatible "$recorded_mode" "$body" \
+                || [ "$recorded_mode" = released ]; }; } \
+            || { [ "$state" != done ] && [ "$hold_kind" != captain ] \
+              && [ "$recorded_mode" = released ]; }; }; then
+          release_task_control_lock || fail "cannot release task control for $id"
+          printf 'skipped: %s (task changed before answer replay)\n' "$id"
+          skipped=$((skipped + 1))
+          continue
+        fi
         occurrence=$(resolution_record_count "$body")
         case "$recorded_mode" in
           repaired) publish_parent_resolution_then_retire "$id" "$occurrence" "answered (repaired)" ;;
           released) publish_parent_resolution_then_retire "$id" "$occurrence" released ;;
           *) publish_parent_resolution_then_retire "$id" "$occurrence" answered ;;
         esac
+        release_task_control_lock || fail "cannot release task control for $id"
         printf 'closed: %s\n' "$id"
         closed=$((closed + 1))
         continue

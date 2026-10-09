@@ -209,6 +209,7 @@ A replay of that answer on an unheld, open item after the worker has ended stays
 Resolution records are never changed after they are written. If a release was recorded but interrupted before lifting the hold, an automatic retry after teardown completes the finished held item without unholding it, leaving the record as `released`, only when its `Resolves hold set:` stamp identifies the currently open hold; the occurrence and parent decision key stay unchanged across retries.
 A new hold receives its stamp under the task control lock and cannot reuse the newest resolution's associated stamp; a colliding `FM_CAPTAIN_HOLD_NOW` is refused. A repeated answer on a re-held task is recorded as that hold's own answer, preserving prior resolution records.
 An exact automatic answer replay after cleanup reaches Done preserves the recorded release and completed state while finishing parent publication and reconcile-request retirement. Legacy records without a hold association and explicit direct-answer callers still require matching modes; an ambiguous legacy release must be closed through reconciliation or a direct answer.
+Replay classification, parent publication, and reconcile-request retirement share the task control lock. A released-row snapshot invalidated by a concurrent hold is skipped without resolving that hold or retiring its reconcile request.
 
 Each key is reported as follows:
 
