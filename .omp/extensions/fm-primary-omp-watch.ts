@@ -162,7 +162,6 @@ type SessionGeneration = {
   queueReadFailures: number;
   restorePendingWaits: number;
   queueStuckReported: boolean;
-  restoredSendActivity: number;
   // A verified successor's failure close that arrived while the pipeline was
   // still delivering the wake it was started for; its bounded retry runs once
   // that delivery settles instead of being skipped by the single-flight guard.
@@ -568,7 +567,6 @@ function createGeneration(): SessionGeneration {
     queueReadFailures: 0,
     restorePendingWaits: 0,
     queueStuckReported: false,
-    restoredSendActivity: -1,
     deferredClose: null,
   };
 }
@@ -1089,26 +1087,28 @@ export default function (pi: ExtensionAPI) {
   // prompt-starting send starts that turn and flushes the queue behind it, and
   // the wake's own consumption proves delivery. The stuck copy can then reach
   // main too, which the idempotent drain absorbs.
-  function flushStuckQueue(owner: SessionGeneration, ctx: any): void {
+  function flushStuckQueue(owner: SessionGeneration, ctx: any): boolean {
     for (const [token, wake] of [...owner.unconsumedWakes]) {
       if (wake.pending?.delivered) continue;
       const attempts = restoreAttempts.get(token) ?? 0;
       if (attempts >= restoreAttemptLimit) continue;
       restoreAttempts.set(token, attempts + 1);
-      redeliverWake(owner, token, wake);
-      return;
+      return redeliverWake(owner, token, wake);
     }
-    if (owner.queueStuckReported) return;
+    if (owner.queueStuckReported) return false;
     owner.queueStuckReported = true;
     reportWait(
       ctx,
       `watcher: wake not delivered - omp is idle with queued messages it will not run, and ${restoreAttemptLimit} resubmissions did not start a turn; the wake stays in the durable queue for bin/fm-wake-drain.sh`,
     );
+    return false;
   }
 
+  // The one place that decides a restored or stuck-queue prompt: it sends at
+  // most one and reports whether it did. flushHeldWakes is its only caller, and
+  // every trigger (turn end, flush timer, new work) goes through flushHeldWakes.
   function recoverRestoredWake(owner: SessionGeneration): boolean {
     if (!generationIsLive(owner)) return false;
-    if (owner.restoredSendActivity === sessionActivity) return true;
     const ctx = editorContext();
     if (!ctx) return false;
     try {
@@ -1118,16 +1118,23 @@ export default function (pi: ExtensionAPI) {
         owner.queueStuckReported = false;
         return false;
       }
-      // Queued messages normally drain into the next run within moments, so the
-      // check waits for that. Skipping for good would strand a queue omp will
-      // never run; after the bounded wait the stuck queue is handled below.
+      // Queued messages normally drain into the next run within moments, and
+      // so does a prompt this owner already resent that is still unconsumed
+      // with no copy in the composer, so the check waits for either. Skipping
+      // for good would strand a queue omp will never run; after the bounded
+      // wait the stuck queue is handled below.
       const queued = ctx.hasPendingMessages?.() === true;
-      if (!queued) {
+      const inFlight = [...owner.unconsumedWakes].some(([token, wake]) => {
+        const attempts = restoreAttempts.get(token) ?? 0;
+        return !wake.pending?.delivered && attempts > 0 && attempts < restoreAttemptLimit &&
+          removeRestoredWake(String(ctx.ui.getEditorText() ?? ""), wake.content) === null;
+      });
+      if (!queued && !inFlight) {
         owner.restorePendingWaits = 0;
         owner.queueStuckReported = false;
       }
       if (owner.unconsumedWakes.size === 0) return false;
-      if (queued && owner.restorePendingWaits < restorePendingWaitLimit) {
+      if ((queued || inFlight) && owner.restorePendingWaits < restorePendingWaitLimit) {
         owner.restorePendingWaits += 1;
         return false;
       }
@@ -1139,11 +1146,12 @@ export default function (pi: ExtensionAPI) {
         ctx.ui.setEditorText(remainder);
         recovered = true;
         if (redeliverWake(owner, token, wake)) {
-          owner.restoredSendActivity = sessionActivity;
+          restoreAttempts.set(token, (restoreAttempts.get(token) ?? 0) + 1);
+          owner.restorePendingWaits = 0;
           return true;
         }
       }
-      if (queued && !recovered) flushStuckQueue(owner, ctx);
+      return queued && !recovered && flushStuckQueue(owner, ctx);
     } catch {}
     return false;
   }
@@ -1783,7 +1791,6 @@ export default function (pi: ExtensionAPI) {
     rememberContext(ctx);
     generation.restorePendingWaits = 0;
     generation.queueStuckReported = false;
-    recoverRestoredWake(generation);
     releaseWatcherWakes(generation);
     void flushHeldWakes(generation);
     scheduleWakeFlush(generation);

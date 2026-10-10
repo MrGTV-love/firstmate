@@ -2654,9 +2654,9 @@ if (scenario === "external") {
       idle = true;
       await waits("running turn seen by the composer poll");
       await warns("running turn seen by the composer poll");
-      // The turn-end handler runs two checks of its own.
+      // The turn-end handler runs one check of its own.
       await handlers.get("agent_end")({}, ctx);
-      await waits("turn completion", 28);
+      await waits("turn completion", 29);
       await warns("turn completion");
       if (wakes().length !== 4 || sent.length !== 4) throw new Error("an exhausted wake was sent again in a later episode");
       if (editor !== "operator draft" || sets) throw new Error("stuck-queue recovery disturbed the composer");
@@ -2671,46 +2671,75 @@ if (scenario === "external") {
       // omp is idle with messages queued that it will not run; a prompt send
       // starts a turn and flushes them.
       const draft = "\noperator\u2063 draft\n\n";
-      if (["stuck-failure", "stuck-restored-failure", "stuck-restored-failures", "stuck-restored-failure-held"].includes(scenario)) {
+      if (["stuck-failure", "stuck-restored-failure", "stuck-restored-failures", "stuck-restored-failures-turn", "stuck-restored-failure-held", "stuck-restored-failure-no-turn"].includes(scenario)) {
         // A failure notice names no queued row, so it is resent as emitted.
         await accept(wake);
         const dir = `${state}/extensions/omp-primary-watch`;
         mkdirSync(dir, { recursive: true });
-        const records = scenario === "stuck-restored-failures" ? ["invalid", "broken"] : ["invalid"];
+        const records = scenario.startsWith("stuck-restored-failures") ? ["invalid", "broken"] : ["invalid"];
         for (const record of records) {
           writeFileSync(handoff, record);
           await tool.execute();
           unlinkSync(handoff);
         }
         const failed = () => sent.filter(({ m }) => m.includes("watcher: FAILED"));
+        const prompts = () => failed().filter(({ o }) => o?.deliverAs === undefined);
         if (failed().length !== records.length || failed().some(({ o }) => o?.deliverAs !== "followUp") || new Set(failed().map(({ m }) => m)).size !== records.length) throw new Error(`expected distinct queued failure notices: ${JSON.stringify(sent)}`);
         if (scenario === "stuck-restored-failures") {
-          // Escape returns both queued notices. omp may still read idle right
-          // after a prompt send, so one turn end must send only one of them.
+          // Escape returns both queued notices. omp still reads idle after the
+          // prompt send and starts no turn: one turn end sends one notice, and
+          // the second copy waits for the bounded in-flight wait, not forever.
           const [first, second] = failed().map(({ m }) => m);
           editor = `${first}\n\n${second}\n\n${draft}`;
           await end();
-          if (failed().length !== 3 || failed()[2].m !== first || failed()[2].o?.deliverAs !== undefined || editor !== `${second}\n\n${draft}`) throw new Error(`one turn end sent more than one restored notice: ${JSON.stringify(sent)}`);
-          await sleep(1200);
-          if (failed().length !== 3 || editor !== `${second}\n\n${draft}`) throw new Error("a flush check sent a second restored notice before the first one's turn started");
-          await accept(failed()[2]);
+          if (prompts().length !== 1 || prompts()[0].m !== first || editor !== `${second}\n\n${draft}`) throw new Error(`one turn end sent more than one restored notice: ${JSON.stringify(sent)}`);
+          await sleep(300);
+          if (prompts().length !== 1 || editor !== `${second}\n\n${draft}`) throw new Error("a flush check sent a second restored notice while the first was in flight");
+          await until(() => prompts().length === 2, "the second restored notice was never sent after the bounded wait");
+          if (prompts()[1].m !== second || editor !== draft) throw new Error(`the second restored notice was not sent as emitted: ${JSON.stringify(sent)}`);
+          await sleep(300);
+          if (prompts().length !== 2) throw new Error("a restored notice was sent again after both were out");
+        } else if (scenario === "stuck-restored-failures-turn") {
+          // Escape returns both queued notices; the first prompt starts a turn.
+          const [first, second] = failed().map(({ m }) => m);
+          editor = `${first}\n\n${second}\n\n${draft}`;
+          flushes = true;
           await end();
-          if (failed().length !== 4 || failed()[3].m !== second || failed()[3].o?.deliverAs !== undefined || editor !== draft) throw new Error(`the next turn end did not send the second restored notice: ${JSON.stringify(sent)}`);
-          await accept(failed()[3]);
+          if (prompts().length !== 1 || prompts()[0].m !== first || editor !== `${second}\n\n${draft}`) throw new Error(`one turn end sent more than one restored notice: ${JSON.stringify(sent)}`);
+          await sleep(1200);
+          if (prompts().length !== 1) throw new Error("a restored notice was sent while the first one's turn ran");
+          await end();
+          if (prompts().length !== 2 || prompts()[1].m !== second || editor !== draft) throw new Error(`the next turn end did not send the second restored notice: ${JSON.stringify(sent)}`);
         } else if (scenario === "stuck-restored-failure-held") {
-          // A held watcher close must wait for the turn the restored notice starts.
+          // A held watcher close waits for the turn the restored notice starts.
           await fire("trigger-2");
           editor = `${failed()[0].m}\n\n${draft}`;
+          flushes = true;
           await end();
-          if (failed().length !== 2 || failed()[1].m !== failed()[0].m || editor !== draft || wakes().length !== 1) throw new Error(`the restored notice was not sent alone: ${JSON.stringify(sent)}`);
+          if (prompts().length !== 1 || prompts()[0].m !== failed()[0].m || editor !== draft || wakes().length !== 1) throw new Error(`the restored notice was not sent alone: ${JSON.stringify(sent)}`);
           await sleep(1200);
-          if (failed().length !== 2 || wakes().length !== 1) throw new Error(`a held watcher wake was sent in the restored notice's transition: ${JSON.stringify(sent)}`);
-          await accept(failed()[1]);
+          if (prompts().length !== 1 || wakes().length !== 1) throw new Error(`a held watcher wake was sent during the restored notice's turn: ${JSON.stringify(sent)}`);
           await end();
           await until(() => wakes().length === 2, "the held watcher wake was never sent after the restored notice's turn");
           expectWake(1, "check: trigger-1");
-          if (failed().length !== 2) throw new Error("the restored notice was sent again");
-          await accept(wakes()[1]);
+          if (prompts().length !== 1) throw new Error("the restored notice was sent again");
+        } else if (scenario === "stuck-restored-failure-no-turn") {
+          // The restored prompt is accepted but omp starts no turn for it and
+          // keeps it queued. A held watcher close still reaches the idle lane,
+          // and the bounded retry and the single warning still run.
+          await fire("trigger-2");
+          editor = `${failed()[0].m}\n\n${draft}`;
+          await end();
+          queued = true;
+          if (prompts().length !== 1 || editor !== draft) throw new Error(`the restored notice was not sent once: ${JSON.stringify(sent)}`);
+          await until(() => wakes().length >= 2, "a held watcher wake never reached the idle lane after a restored prompt started no turn");
+          expectWake(1, "check: trigger-1");
+          await until(() => notices.some(({ m }) => m.includes("wake not delivered")), "the bounded retry never ended in the operator warning", 20);
+          const resends = prompts().length;
+          if (resends < 3 || resends > 4) throw new Error(`the restored notice was not retried within its bound: ${resends}`);
+          const sentCount = sent.length;
+          await sleep(600);
+          if (sent.length !== sentCount || notices.filter(({ m }) => m.includes("wake not delivered")).length !== 1) throw new Error(`recovery sent again or warned again after the bound: ${JSON.stringify(notices)}`);
         } else if (scenario === "stuck-restored-failure") {
           // Escape returns the queued notice to the composer beside a draft.
           editor = `${failed()[0].m}\n\n${draft}`;
@@ -2723,9 +2752,11 @@ if (scenario === "external") {
           await until(() => failed().length === 2, "a failure notice stuck in omp's idle queue was never sent through the prompt flow");
           if (failed()[1].m !== failed()[0].m || failed()[1].o?.deliverAs !== undefined || queued || notices.length || sets) throw new Error("the stuck failure notice was not resent as emitted");
         }
-        await end();
-        await sleep(600);
-        if (failed().length !== 2 * records.length || wakes().length !== (scenario === "stuck-restored-failure-held" ? 2 : 1)) throw new Error("a delivered failure notice was sent again");
+        if (scenario !== "stuck-restored-failure-no-turn") {
+          await end();
+          await sleep(600);
+          if (failed().length !== 2 * records.length || wakes().length !== (scenario === "stuck-restored-failure-held" ? 2 : 1)) throw new Error("a delivered failure notice was sent again");
+        }
       } else {
         if (scenario === "stuck-restored") editor = `${wake.m}\n\n${draft}`;
         if (["stuck-new-row", "stuck-drained"].includes(scenario)) acknowledge(drain());
@@ -2898,7 +2929,7 @@ EOF
 
 test_watch_extension_queue_read_delivery() {
   local scenario out status
-  for scenario in drained owed consumed release-consume mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued stuck-watcher stuck-restored stuck-new-row stuck-drained stuck-failure stuck-restored-failure stuck-restored-failures stuck-restored-failure-held stuck-episodes stranded-owed stranded-unmarked stranded-drained stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-tracked; do
+  for scenario in drained owed consumed release-consume mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued stuck-watcher stuck-restored stuck-new-row stuck-drained stuck-failure stuck-restored-failure stuck-restored-failures stuck-restored-failures-turn stuck-restored-failure-held stuck-restored-failure-no-turn stuck-episodes stranded-owed stranded-unmarked stranded-drained stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-tracked; do
     out=$(run_watch_queue_read_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp queue-read scenario $scenario: $out"
