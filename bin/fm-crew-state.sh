@@ -26,6 +26,18 @@
 #
 #   state: <working|parked|done|blocked|paused|failed|unknown> · source: <run-step|pane|status-log|remote-endpoint|none> · <detail>
 #
+# An omp session that publishes a live-model record (bin/fm-omp-live-model.ts)
+# adds trailing components, after any detail, on every line this helper prints:
+#   model-drift: <provider/id> live (recorded <provider/id>)
+#       the model serving the session differs from the model recorded at launch,
+#       for example after omp moved it down a fallback chain. A record is
+#       compared only when the launch recorded an explicit provider/id.
+#   run-error: <message>
+#       the session's last run ended in an error that no retry or fallback
+#       recovered, so a session that stopped rather than downgrade says so.
+# Absence of either component is not evidence of health: a session that has not
+# published a record (not omp, not yet started, or remote) adds nothing.
+#
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
 #      recording remote_host= is a remote secondmate: its worktree and endpoint
@@ -203,10 +215,15 @@ FM_CREW_STATE_RUNS_LIMIT=${FM_CREW_STATE_RUNS_LIMIT:-200}
 case "$FM_CREW_STATE_RUNS_LIMIT" in ''|*[!0-9]*) FM_CREW_STATE_RUNS_LIMIT=200 ;; esac
 SEP=' · '
 
+# Trailing components from the session's live-model record (header owns them);
+# set once the task's metadata is resolved below.
+LIVE_NOTE=''
+
 # Emit the one canonical line and exit 0. Detail is optional.
 emit() {  # <state> <source> [detail]
   local line="state: $1${SEP}source: $2"
   [ -n "${3:-}" ] && line="$line${SEP}$3"
+  [ -z "$LIVE_NOTE" ] || line="$line$LIVE_NOTE"
   printf '%s\n' "$line"
   exit 0
 }
@@ -215,15 +232,20 @@ emit() {  # <state> <source> [detail]
 
 [ -f "$META" ] || emit unknown none "no metadata for $ID"
 
-# The LAST value recorded for a key, read in one pass with no process started.
-meta_value_to() {  # <output-variable> <key>
+# The LAST value recorded for a key in a key=value file, read with no process
+# started. Absent or unreadable files yield an empty value.
+record_value_to() {  # <output-variable> <file> <key>
   local _line _value=''
   while IFS= read -r _line || [ -n "$_line" ]; do
     case "$_line" in
-      "$2="*) _value=${_line#*=} ;;
+      "$3="*) _value=${_line#*=} ;;
     esac
-  done < "$META" 2>/dev/null || :
+  done < "$2" 2>/dev/null || :
   printf -v "$1" '%s' "$_value"
+}
+
+meta_value_to() {  # <output-variable> <key>
+  record_value_to "$1" "$META" "$2"
 }
 
 WT='' KIND='' HARNESS='' REMOTE_HOST='' META_MODE='' META_PROJECT=''
@@ -232,6 +254,34 @@ meta_value_to KIND kind
 meta_value_to HARNESS harness
 meta_value_to REMOTE_HOST remote_host
 [ -n "$KIND" ] || KIND=ship
+
+# Live-model components for a local omp task. A secondmate publishes into its
+# own home's state; every other kind publishes into this home's state.
+if [ "$HARNESS" = omp ] && [ -z "$REMOTE_HOST" ]; then
+  _live_file="$STATE/$ID.live-model"
+  if [ "$KIND" = secondmate ]; then
+    meta_value_to _live_home home
+    _live_file=${_live_home:+$_live_home/state/.omp-live-model}
+  fi
+  if [ -n "$_live_file" ] && [ -r "$_live_file" ]; then
+    record_value_to _live_model "$_live_file" model
+    record_value_to _live_error "$_live_file" error
+    # Record text never carries the component separator into the line.
+    _live_model=${_live_model//·/}
+    _live_error=${_live_error//·/}
+    meta_value_to _recorded_model model
+    # The launch records a model with an optional thinking suffix; the record
+    # holds the bare provider/id. A bare fuzzy pattern cannot be compared.
+    case "$_recorded_model" in
+      *:off|*:minimal|*:low|*:medium|*:high|*:xhigh|*:max|*:auto) _recorded_model=${_recorded_model%:*} ;;
+    esac
+    case "$_recorded_model" in
+      */*) [ -z "$_live_model" ] || [ "$_live_model" = "$_recorded_model" ] \
+        || LIVE_NOTE="${SEP}model-drift: $_live_model live (recorded $_recorded_model)" ;;
+    esac
+    [ -z "$_live_error" ] || LIVE_NOTE="$LIVE_NOTE${SEP}run-error: $_live_error"
+  fi
+fi
 
 # A torn-down (or never-created) worktree has no current state to read. A
 # remote secondmate's recorded worktree is a path on ITS host, so the local

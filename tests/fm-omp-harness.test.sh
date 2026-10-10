@@ -163,6 +163,8 @@ test_spawn_launch_line_and_worker_wiring() {
   local rec id=omp-launch-q1 out status launch state
   rec=$(make_spawn_case launch omp "$id")
   read_case_record "$rec"
+  mkdir -p "$HOME_DIR/state"
+  printf 'model=deepseek/deepseek-v4-pro\nerror=402 old run\n' > "$HOME_DIR/state/$id.live-model"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-astra --effort medium)
   status=$?
   expect_code 0 "$status" "omp scout spawn should succeed: $out"
@@ -172,6 +174,7 @@ test_spawn_launch_line_and_worker_wiring() {
   assert_grep "model=openai-codex/gpt-6-astra" "$state/$id.meta" "meta missing the pinned model"
   assert_grep "effort=medium" "$state/$id.meta" "meta missing the pinned effort"
   assert_present "$state/$id.omp-ext.ts" "omp spawn did not write the per-task extension"
+  assert_absent "$state/$id.live-model" "a launch must not keep a previous session's live-model record"
   launch=$(cat "$LAUNCH_LOG")
   assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
     "omp launch did not clear foreign markers and establish its own at the launch boundary"
@@ -741,6 +744,8 @@ test_secondmate_launch_relies_on_discovery() {
   printf 'charter\n' > "$home/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
   git -C "$home" init -q -b main
+  mkdir -p "$home/state"
+  printf 'model=deepseek/deepseek-v4-pro\nerror=402 old run\n' > "$home/state/.omp-live-model"
   fakebin=$(make_spawn_fakebin "$world/fake" claude)
   make_fake_omp "$fakebin"
   launchlog="$world/launch.log"
@@ -765,6 +770,7 @@ test_secondmate_launch_relies_on_discovery() {
   assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
   assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
   assert_absent "$world/home/state/sm.omp-ext.ts" "a secondmate must not receive a per-task worker extension"
+  assert_absent "$home/state/.omp-live-model" "a secondmate launch must not keep its home's previous live-model record"
   pass "fm-spawn: a real omp secondmate launch preserves primary posture and supervision"
 }
 
@@ -809,8 +815,15 @@ drive_omp_ext() {  # <ext-path> <mode>
   EXT_PATH="$1" MODE="$2" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 const mod = await import(pathToFileURL(process.env.EXT_PATH).href);
+// omp calls every handler registered for an event, so the fake does too: the
+// busy-state writer and the live-model publisher both listen to agent_start and
+// agent_end.
+const registered = {};
 const handlers = {};
-mod.default({ on: (name, fn) => { handlers[name] = fn; } });
+mod.default({ on: (name, fn) => {
+  (registered[name] ||= []).push(fn);
+  handlers[name] = async (...args) => { for (const h of registered[name]) await h(...args); };
+} });
 // ctx.isIdle() reads false at a natural TUI agent_end on omp; the extension
 // must go idle on a plain agent_end regardless of it.
 const ctx = { isIdle: () => false };
@@ -820,6 +833,11 @@ switch (process.env.MODE) {
   case "end-continuing": await handlers["agent_end"]({ type: "agent_end", willContinue: true }, ctx); break;
   case "end-final": await handlers["agent_end"]({ type: "agent_end" }, ctx); break;
   case "turn-end": await handlers["turn_end"]({ type: "turn_end", turnIndex: 0 }, ctx); break;
+  // omp hands every handler the live model on ctx.model (verified on omp 18.8.7
+  // by tests/fm-omp-fallback-chain-live-e2e.test.sh).
+  case "fallback": await handlers["retry_fallback_applied"]({ type: "retry_fallback_applied", from: "openai-codex/gpt-6.1-sol", to: "deepseek/deepseek-v4-pro" }, { ...ctx, model: { provider: "deepseek", id: "deepseek-v4-pro" } }); break;
+  case "end-error": await handlers["agent_end"]({ type: "agent_end", messages: [{ role: "assistant", stopReason: "error", errorMessage: "402 This request would exceed your available credits." }] }, { ...ctx, model: { provider: "deepseek", id: "deepseek-v4-pro" } }); break;
+  case "restore": await handlers["agent_start"]({ type: "agent_start" }, { ...ctx, model: { provider: "openai-codex", id: "gpt-6.1-sol" } }); break;
   default: throw new Error("unknown mode " + process.env.MODE);
 }
 if (process.env.MODE === "turn-end") {
@@ -841,7 +859,7 @@ test_busy_extension_lifecycle() {
   case " $out " in
     *" agent_settled "*) fail "the omp extension must not listen for agent_settled (omp has no such event)" ;;
   esac
-  for handler in agent_start agent_end turn_end tool_call tool_result; do
+  for handler in agent_start agent_end turn_end tool_call tool_result retry_fallback_applied session_start; do
     case " $out " in
       *" $handler "*) ;;
       *) fail "the omp extension must register $handler, got '$out'" ;;
@@ -861,6 +879,19 @@ test_busy_extension_lifecycle() {
 
   out=$(drive_omp_ext "$ext" end-final) || fail "final agent_end drive failed: $out"
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] || fail "a plain agent_end must classify 'idle omp-ext'"
+
+  # The model serving the task is published for bin/fm-crew-state.sh: a fallback
+  # moves it, an unrecovered run error is carried, and the next run clears the
+  # error and follows the model back to the recorded one.
+  assert_absent "$state/$id.live-model" "a task that never saw a model must publish no live-model record"
+  out=$(drive_omp_ext "$ext" fallback) || fail "retry_fallback_applied drive failed: $out"
+  assert_contains "$(cat "$state/$id.live-model")" "model=deepseek/deepseek-v4-pro" "a fallback must publish the model now serving the task"
+  out=$(drive_omp_ext "$ext" end-error) || fail "errored agent_end drive failed: $out"
+  assert_contains "$(cat "$state/$id.live-model")" "error=402 This request would exceed your available credits." \
+    "a run that ended in an unrecovered error must publish it"
+  out=$(drive_omp_ext "$ext" restore) || fail "restore drive failed: $out"
+  assert_contains "$(cat "$state/$id.live-model")" "model=openai-codex/gpt-6.1-sol" "a restore to the primary must be published"
+  assert_not_contains "$(cat "$state/$id.live-model")" "error=" "the next run must clear the previous run's error"
 
   # A record from another harness's writer is never trusted for omp.
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"
@@ -973,7 +1004,7 @@ install_omp_extension_fixture() {  # <repo>
   cp "$ROOT/.omp/extensions/fm-primary-turnend-guard.ts" "$ROOT/.omp/extensions/fm-primary-omp-watch.ts" "$repo/.omp/extensions/"
   cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" \
     "$ROOT/.pi/extensions/lib/fm-watch-lifecycle.ts" "$repo/.pi/extensions/lib/"
-  cp "$ROOT/bin/fm-operational-input.sh" "$ROOT/bin/fm-supervision-engine-lib.sh" "$repo/bin/"
+  cp "$ROOT/bin/fm-operational-input.sh" "$ROOT/bin/fm-supervision-engine-lib.sh" "$ROOT/bin/fm-omp-live-model.ts" "$repo/bin/"
   chmod +x "$repo/bin/fm-operational-input.sh"
   printf '{"name":"typebox","type":"module","exports":"./index.js"}\n' > "$repo/node_modules/typebox/package.json"
   printf 'export const Type = { Object(p) { return { type: "object", properties: p }; } };\n' > "$repo/node_modules/typebox/index.js"
@@ -1000,7 +1031,7 @@ SH
   chmod +x "$repo/bin/"*.sh
   out=$(FM_GUARD_LOG="$TMP_ROOT/guard/guard.log" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, rmSync } from "node:fs";
 const handlers = new Map();
 const pi = { on(e, h) { handlers.set(e, h); }, sendMessage() {} };
 const mod = await import(pathToFileURL(process.env.EXT).href);
@@ -1031,6 +1062,15 @@ if (r2 !== undefined) throw new Error(`the flagged second stop must stand down, 
 const payloads = readFileSync(process.env.FM_GUARD_LOG, "utf8").trim().split("\n");
 if (payloads.join("|") !== '{"stop_hook_active":false}|{"stop_hook_active":true}') throw new Error(`guard payloads were ${payloads.join("|")}`);
 if (!existsSync(`${process.env.FM_HOME}/state/.omp-turnend-extension-loaded`)) throw new Error("loaded marker was not written");
+// The same extension publishes the model serving this home's session, for the
+// parent's bin/fm-crew-state.sh, and only while no other live process owns the lock.
+const record = `${process.env.FM_HOME}/state/.omp-live-model`;
+await handlers.get("agent_start")({ type: "agent_start" }, { model: { provider: "deepseek", id: "deepseek-v4-pro" } });
+if (!readFileSync(record, "utf8").includes("model=deepseek/deepseek-v4-pro")) throw new Error(`the home extension did not publish the serving model: ${readFileSync(record, "utf8")}`);
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.ppid}\n`);
+await handlers.get("agent_start")({ type: "agent_start" }, { model: { provider: "openai-codex", id: "gpt-6.1-sol" } });
+if (!readFileSync(record, "utf8").includes("model=deepseek/deepseek-v4-pro")) throw new Error("a process that does not own the session lock overwrote the record");
+rmSync(`${process.env.FM_HOME}/state/.lock`);
 await handlers.get("session_shutdown")({}, {});
 EOF
 )
