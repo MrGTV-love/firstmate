@@ -2022,14 +2022,12 @@ test_main_ack_leaves_a_row_that_arrived_after_its_drain_unclaimed() {
 }
 
 test_queued_empty_and_missing_state_succeed_without_writes() {
-  local dir state actor marker
+  local dir state marker
   dir=$(make_case queued-empty)
   state="$dir/missing-state"
-  for actor in main branch; do
-    FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR="$actor" "$DRAIN" --queued \
-      > "$dir/queued.out" 2> "$dir/queued.err" || fail "$actor missing-state query failed"
-    [ ! -s "$dir/queued.out" ] && [ ! -s "$dir/queued.err" ] || fail "missing-state query was not empty"
-  done
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued \
+    > "$dir/queued.out" 2> "$dir/queued.err" || fail "missing-state query failed"
+  [ ! -s "$dir/queued.out" ] && [ ! -s "$dir/queued.err" ] || fail "missing-state query was not empty"
   state="$dir/state"
   FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" || fail "missing-queue query failed"
   [ ! -s "$dir/queued.out" ] && [ ! -e "$state/.wake-queue" ] || fail "missing queue was created or returned work"
@@ -2061,21 +2059,16 @@ test_queued_respects_live_and_stale_branch_grants() {
   FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued > "$dir/main.out" || fail "held-only query failed"
   [ ! -s "$dir/main.out" ] || fail "main received a live branch-reserved row"
   append_wake "$state" signal main.status "signal: main" || fail "main row append failed"
-  awk -F '\t' '$2 == 1' "$state/.wake-queue" > "$dir/branch.expected"
   awk -F '\t' '$2 == 2' "$state/.wake-queue" > "$dir/main.expected"
   cp -R "$state" "$dir/live.before"
   FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued > "$dir/main.out" || fail "main query failed"
-  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=branch "$DRAIN" --queued > "$dir/branch.out" || fail "branch query failed"
   cmp -s "$dir/main.expected" "$dir/main.out" || fail "main query did not return exactly its unreserved row"
-  cmp -s "$dir/branch.expected" "$dir/branch.out" || fail "branch query did not return exactly its granted row"
   diff -r "$dir/live.before" "$state" >/dev/null || fail "live-grant queries changed ownership state"
   kill "$owner" 2>/dev/null || true
   wait "$owner" 2>/dev/null || true
   cp -R "$state" "$dir/stale.before"
   FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued > "$dir/main.out" || fail "stale-grant main query failed"
-  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=branch "$DRAIN" --queued > "$dir/branch.out" || fail "stale-grant branch query failed"
   cmp -s "$state/.wake-queue" "$dir/main.out" || fail "stale grant did not return all rows to main"
-  [ ! -s "$dir/branch.out" ] || fail "stale branch received rows"
   diff -r "$dir/stale.before" "$state" >/dev/null || fail "query reclaimed stale-grant files rather than only reading"
   pass "--queued filters live branch ownership and reads stale grants without repairing state"
 }
@@ -2093,9 +2086,12 @@ test_queued_refuses_invalid_arguments_and_failed_or_malformed_reads() {
     [ "$rc" -eq 2 ] || fail "query accepted extra argument $record (rc=$rc)"
     [ ! -s "$dir/queued.out" ] || fail "invalid arguments returned rows"
   done
-  rc=0
-  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=invalid "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" || rc=$?
-  [ "$rc" -eq 2 ] || fail "query accepted an invalid actor (rc=$rc)"
+  for record in invalid branch; do
+    rc=0
+    FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR="$record" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" || rc=$?
+    [ "$rc" -eq 2 ] || fail "query accepted actor $record (rc=$rc)"
+    [ ! -s "$dir/queued.out" ] || fail "actor $record received rows"
+  done
   diff -r "$dir/state.before" "$state" >/dev/null || fail "argument failures changed state"
 
   mkdir "$dir/failed-awk"

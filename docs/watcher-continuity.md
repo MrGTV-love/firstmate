@@ -113,7 +113,7 @@ The existing version-2 replacement handoff stores one `check: wake may be due` m
 An unconsumed watcher wake serializes sends until the next `agent_end`, when its pending mark becomes eligible for another queue read.
 Preparation that reaches `before_agent_start` but returns idle without user `message_start` also releases the outstanding wake, unless pending vendor messages still accompany that unconsumed watcher; operator edits remain untouched.
 [Restored-wake recovery](#omp-restored-wake-recovery) owns consumption and removal of the outstanding token.
-`tests/fm-omp-harness.test.sh --watch-queue` exercises the queue-read delivery paths, partial acknowledgement, external recovery, late replacement closes, host routing, token release, editor safety, failed queries, timeouts and slow queries. `tests/fm-wake-queue.test.sh --queued-query` exercises the public read-only queue interface and actor ownership.
+`tests/fm-omp-harness.test.sh --watch-queue` exercises the queue-read delivery paths, partial acknowledgement, external recovery, late replacement closes, host routing, token release, editor safety, failed queries, timeouts and slow queries. `tests/fm-wake-queue.test.sh --queued-query` exercises the public read-only queue interface and its main-only view of branch grants.
 The live guard and its evidence are recorded in [omp stale wake gating](verification/runtime-backends.md#2026-10-08-omp-stale-wake-gating).
 The Pi and OpenCode extensions still queue every wake as a follow-up and are not covered by this gating.
 

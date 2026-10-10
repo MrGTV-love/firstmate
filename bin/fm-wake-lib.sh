@@ -2473,11 +2473,10 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
   printf '%s\n' "$count"
 }
 
-fm_wake_actor_rows() {
-  [ "$#" -eq 1 ] || return 1
-  local actor=$1 rows="$STATE/.branch-eligible-rows" queued parent
+fm_wake_main_rows() {
+  [ "$#" -eq 0 ] || return 1
+  local rows="$STATE/.branch-eligible-rows" queued parent
   local owner="$STATE/.branch-eligible-owner" grant=''
-  case "$actor" in main|branch) ;; *) return 1 ;; esac
   if [ ! -e "$FM_WAKE_QUEUE" ] && [ ! -L "$FM_WAKE_QUEUE" ]; then
     fm_dirname_to parent "$FM_WAKE_QUEUE"
     [ -d "$parent" ] && [ -x "$parent" ] || return 1
@@ -2487,7 +2486,7 @@ fm_wake_actor_rows() {
   if fm_wake_branch_grant_live "$rows" "$owner" 2>/dev/null; then
     grant=$rows
   fi
-  queued=$(FM_WAKE_ROW_GRANT="$grant" FM_WAKE_ROW_ACTOR="$actor" awk -F '\t' '
+  queued=$(FM_WAKE_ROW_GRANT="$grant" awk -F '\t' '
     BEGIN {
       seqs = ENVIRON["FM_WAKE_ROW_GRANT"]
       if (seqs != "") {
@@ -2497,9 +2496,7 @@ fm_wake_actor_rows() {
       }
     }
     NF != 5 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ || $3 !~ /^(signal|stale|check|heartbeat)$/ { exit 1 }
-    {
-      if (ENVIRON["FM_WAKE_ROW_ACTOR"] == "branch" ? ($2 in reserved) : !($2 in reserved)) print
-    }
+    !($2 in reserved) { print }
   ' "$FM_WAKE_QUEUE" 2>/dev/null) || return 1
   [ -z "$queued" ] || printf '%s\n' "$queued"
 }

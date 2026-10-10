@@ -1431,7 +1431,7 @@ EOF
   pass ".omp watch extension: a home without config/supervision-host or with an off file keeps the plain arm"
 }
 
-test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|stuck>
+test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|stuck|rejected>
   local kind=${1:-outcome} repo home log out status
   repo="$TMP_ROOT/watch-host-handoff-$kind/repo"; home="$TMP_ROOT/watch-host-handoff-$kind/home"; log="$TMP_ROOT/watch-host-handoff-$kind/arm.log"
   install_omp_extension_fixture "$repo"
@@ -1440,7 +1440,10 @@ test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|st
   printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-wake-drain.sh"
   cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
-[ "${1:-}" = --handling-delivered ] && exit 0
+if [ "${1:-}" = --handling-delivered ]; then
+  [ "$HAND_BACK_KIND" = rejected ] && exit 1
+  exit 0
+fi
 exit 1
 SH
   cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
@@ -1494,6 +1497,8 @@ const expected = process.env.HAND_BACK_KIND === "away-return" ? "the captain ret
 if (!sent[0].m.includes(expected)) throw new Error(`host hand-back lost its outcome: ${sent[0].m}`);
 if (sent[0].m.includes("signal: already handled original")) throw new Error(`host hand-back injected a handled headline: ${sent[0].m}`);
 if (["busy", "stuck"].includes(process.env.HAND_BACK_KIND) ? sent[0].o?.deliverAs !== "followUp" : sent[0].o?.deliverAs !== undefined) throw new Error("host hand-back changed its idle/busy delivery routing");
+const rejected = sent[0].m.includes("watcher: FAILED - handling delivery confirmation was rejected");
+if (process.env.HAND_BACK_KIND === "rejected" ? !rejected : rejected) throw new Error(`a rejected handling confirmation must reach main exactly when it happens: ${sent[0].m}`);
 if (stuck) {
   // omp went idle and never ran the queued follow-up.
   idle = true;
@@ -1516,7 +1521,8 @@ EOF
 # A host close that is not an operational hand-back is a queue-read mark: its
 # headline comes only from a queued row. With nothing queued, a park boundary
 # sends nothing, while a diagnostic line is delivered with the fixed pointer.
-# An away record adds the away note to the mark.
+# The away note is never stored in the mark: it is added when the wake is
+# sent, only while the away record exists.
 test_watch_extension_marks_host_closes_without_headlines() {  # <boundary|note|archived|diagnostic|restore-boundary|restore-diagnostic>
   local kind=${1:-boundary} repo home log out status
   repo="$TMP_ROOT/watch-host-mark-$kind/repo"; home="$TMP_ROOT/watch-host-mark-$kind/home"; log="$TMP_ROOT/watch-host-mark-$kind/arm.log"
@@ -1636,6 +1642,92 @@ EOF
   expect_code 0 "$status" "omp watch extension host close mark ($kind): $out"
   [ -z "$out" ] || fail "omp watch extension host close mark test printed output ($kind): $out"
   pass ".omp watch extension: a non-operational host close is a queue-read mark, never a failure or a headline ($kind)"
+}
+
+# Marks held through one busy turn merge their host lines into the one wake
+# that is sent. When that wake is not consumed and is delivered again, the
+# surviving mark still carries every line, with or without a queued row.
+test_watch_extension_redelivers_merged_host_notes() {  # <rows|empty>
+  local kind=${1:-rows} repo home log out status
+  repo="$TMP_ROOT/watch-host-redeliver-$kind/repo"; home="$TMP_ROOT/watch-host-redeliver-$kind/home"; log="$TMP_ROOT/watch-host-redeliver-$kind/arm.log"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state" "$home/config"
+  : > "$home/config/supervision-host"
+  cat > "$repo/bin/fm-watch-arm.sh" <<'SH'
+#!/usr/bin/env bash
+[ "${1:-}" = --handling-delivered ] && exit 0
+exit 1
+SH
+  cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'host=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
+case "$(grep -c '^host=' "$FM_ARM_LOG")" in
+  1)
+    sleep 1
+    if [ "$REDELIVER_KIND" = rows ]; then
+      . "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+      fm_wake_append signal queued.status 'signal: durable queued row' || exit 1
+    fi
+    printf 'supervision-host: cycle boundary - the park ended with nothing for main\n'
+    exit 0
+    ;;
+  2)
+    sleep 1
+    printf 'supervision-host: the supervision session is paused after repeated engine errors; every wake reaches you\n'
+    exit 0
+    ;;
+esac
+sleep 30
+SH
+  chmod +x "$repo/bin/fm-watch-arm.sh" "$repo/bin/fm-supervision-host.sh"
+  out=$(REDELIVER_KIND="$kind" FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_ARM_LOG="$log" FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
+    EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync, readFileSync, existsSync } from "node:fs";
+const state = `${process.env.FM_HOME}/state`;
+writeFileSync(`${state}/.lock`, `${process.pid}\n`);
+const diagnostic = "supervision-host: the supervision session is paused after repeated engine errors; every wake reaches you";
+const headline = process.env.REDELIVER_KIND === "rows" ? "FIRSTMATE WATCHER WAKE: signal: durable queued row" : "FIRSTMATE WATCHER WAKE: check: wake may be due";
+const handlers = new Map(); let tool = null; const sent = [];
+let idle = false;
+const ctx = { isIdle: () => idle, hasPendingMessages: () => false };
+const pi = {
+  on(e, h) { handlers.set(e, h); },
+  registerCommand() {},
+  registerTool(t) { tool = t; },
+  sendUserMessage(m, o) { sent.push({ m, o }); return undefined; },
+};
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (predicate) => { for (let i = 0; i < 150 && !predicate(); i += 1) await sleep(100); };
+const hosts = () => (existsSync(process.env.FM_ARM_LOG) ? readFileSync(process.env.FM_ARM_LOG, "utf8") : "").trim().split("\n").filter((row) => row.startsWith("host="));
+(await import(pathToFileURL(process.env.EXT).href)).default(pi);
+await handlers.get("before_agent_start")({}, ctx);
+await tool.execute();
+await until(() => hosts().length >= 3);
+await sleep(1500);
+if (hosts().length !== 3 || sent.length !== 0) throw new Error(`expected two held host closes during the busy turn: ${hosts().length} ${JSON.stringify(sent)}`);
+idle = true;
+await handlers.get("agent_end")({}, ctx);
+await until(() => sent.length >= 1);
+if (sent.length !== 1 || !sent[0].m.includes(headline) || !sent[0].m.includes(diagnostic)) throw new Error(`the merged wake lost its headline or host line: ${JSON.stringify(sent)}`);
+idle = false;
+await handlers.get("before_agent_start")({ prompt: sent[0].m }, ctx);
+idle = true;
+await until(() => sent.length >= 2);
+if (sent.length !== 2) throw new Error(`an unconsumed merged wake was not delivered again: ${JSON.stringify(sent)}`);
+if (!sent[1].m.includes(headline) || !sent[1].m.includes(diagnostic)) throw new Error(`the redelivered wake lost a merged host line: ${sent[1].m}`);
+await handlers.get("message_start")({ message: { role: "user", content: sent[1].m } }, ctx);
+await sleep(1500);
+if (sent.length !== 2) throw new Error(`a consumed wake was delivered again: ${JSON.stringify(sent)}`);
+await handlers.get("session_shutdown")({}, {});
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "omp watch extension merged host note redelivery ($kind): $out"
+  [ -z "$out" ] || fail "omp watch extension merged host note redelivery printed output ($kind): $out"
+  pass ".omp watch extension: a redelivered merged wake keeps every host line ($kind)"
 }
 
 # The replacement handoff follows the same empty-queue rule: stored marks merge
@@ -3335,12 +3427,15 @@ if [ "${1:-}" = --watch-queue ]; then
   test_watch_extension_delivers_host_handbacks away-return
   test_watch_extension_delivers_host_handbacks busy
   test_watch_extension_delivers_host_handbacks stuck
+  test_watch_extension_delivers_host_handbacks rejected
   test_watch_extension_marks_host_closes_without_headlines boundary
   test_watch_extension_marks_host_closes_without_headlines note
   test_watch_extension_marks_host_closes_without_headlines archived
   test_watch_extension_marks_host_closes_without_headlines diagnostic
   test_watch_extension_marks_host_closes_without_headlines restore-boundary
   test_watch_extension_marks_host_closes_without_headlines restore-diagnostic
+  test_watch_extension_redelivers_merged_host_notes rows
+  test_watch_extension_redelivers_merged_host_notes empty
   test_watch_extension_replays_host_marks_from_the_handoff diagnostic
   test_watch_extension_replays_host_marks_from_the_handoff boundary
   test_watch_extension_delivers_a_split_host_close_whole
@@ -3376,12 +3471,15 @@ test_watch_extension_delivers_host_handbacks outcome
 test_watch_extension_delivers_host_handbacks away-return
 test_watch_extension_delivers_host_handbacks busy
 test_watch_extension_delivers_host_handbacks stuck
+test_watch_extension_delivers_host_handbacks rejected
 test_watch_extension_marks_host_closes_without_headlines boundary
 test_watch_extension_marks_host_closes_without_headlines note
 test_watch_extension_marks_host_closes_without_headlines archived
 test_watch_extension_marks_host_closes_without_headlines diagnostic
 test_watch_extension_marks_host_closes_without_headlines restore-boundary
 test_watch_extension_marks_host_closes_without_headlines restore-diagnostic
+test_watch_extension_redelivers_merged_host_notes rows
+test_watch_extension_redelivers_merged_host_notes empty
 test_watch_extension_replays_host_marks_from_the_handoff diagnostic
 test_watch_extension_replays_host_marks_from_the_handoff boundary
 test_watch_extension_delivers_a_split_host_close_whole

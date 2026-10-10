@@ -1027,6 +1027,7 @@ export default function (pi: ExtensionAPI) {
         return "dropped";
       }
       const pending = held[0].pending;
+      pending.message = watcherMark(held.map((item) => item.pending.message).join("\n"));
       const headline = rows.length === 0 ? wakeDueMessage : rows[0].split("\t").slice(4).join("\t");
       if (awayRecordPresent() && hostModeEnabled()) notes.push(awayNote);
       const message = [`${headline}${rows.length > 1 ? `\nand ${rows.length - 1} more queued` : ""}`, ...notes].join("\n");
@@ -1262,7 +1263,8 @@ export default function (pi: ExtensionAPI) {
         if (!pidAlive(watcherPid)) {
           await retireArm(owner.child);
         }
-        if (!operationalHandback(pending.message)) surfaceFailure(owner, confirmed.detail);
+        if (operationalHandback(pending.message)) return await sendWake(owner, `${message}\n\n${confirmed.detail}`, pending);
+        surfaceFailure(owner, confirmed.detail);
         return await sendWake(owner, message, pending);
       }
     }
