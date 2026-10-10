@@ -1,0 +1,12 @@
+== target (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9EXEEW72Q1NM69P6G6CPJ/bin)
+ load: 18:49  up  5:23, 5 users, load averages: 52.58 55.51 49.70
+ exit=0 wall_seconds=2.0
+ complete: True
+ rows by category: {'unanswered_question': 40}
+  first question: vernant-d5-workspace:open-00 | needs-decision: open question 0 status café — naïve résumé ✓ status café — naïve résumé ✓ 
+== base (/Users/charlesabrooker/tmp/fm-lab.sK2qIG/base/bin)
+ load: 18:49  up  5:23, 5 users, load averages: 52.58 55.51 49.70
+ exit=0 wall_seconds=60.4
+ complete: False
+ rows by category: {'coverage': 1}
+  coverage | ledger degraded | questions vernant-d5-workspace.status: Command '['bash', '-c', 'cat "$2" >/dev/null || exit 1; . "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$

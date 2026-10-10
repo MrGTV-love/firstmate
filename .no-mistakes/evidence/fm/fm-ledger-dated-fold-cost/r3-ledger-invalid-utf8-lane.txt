@@ -1,0 +1,19 @@
+### lane log with invalid UTF-8 bytes (0xff, cut 0xe2 0x80, 0xe9), trailing tabs, no final newline
+== target (LC_ALL=en_US.UTF-8) exit=0 complete=True
+   question | tricky-lane:bad2 | 'needs-decision: bad � again'
+   question | tricky-lane:default | 'needs-decision: keyless question café'
+   question | tricky-lane:headXkey | 'needs-decision: must survive a dotted drop'
+   question | tricky-lane:last | 'blocked: bad stamp no newline'
+   question | tricky-lane:pending-reply-x1 | 'needs-decision: pending-reply-missed: caf�'
+   question | tricky-lane:re | 'needs-decision: reopened later'
+   question | tricky-lane:tabby | 'blocked: note ends in tabs'
+== target (LC_ALL=C) exit=0 complete=True
+   question | tricky-lane:bad2 | 'needs-decision: bad � again'
+   question | tricky-lane:default | 'needs-decision: keyless question café'
+   question | tricky-lane:headXkey | 'needs-decision: must survive a dotted drop'
+   question | tricky-lane:last | 'blocked: bad stamp no newline'
+   question | tricky-lane:pending-reply-x1 | 'needs-decision: pending-reply-missed: caf�'
+   question | tricky-lane:re | 'needs-decision: reopened later'
+   question | tricky-lane:tabby | 'blocked: note ends in tabs'
+== base (LC_ALL=en_US.UTF-8) exit=0 complete=False
+   coverage | ledger degraded | questions tricky-lane.status: 'utf-8' codec can't decode byte 0xe9 in position 58: invalid continuation byte

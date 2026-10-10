@@ -1,0 +1,30 @@
+== status_open_decisions LC_ALL=en_US.UTF-8: target vs base IDENTICAL
+pending-reply-x1^Ineeds-decision^Ipending-reply-missed: café
+tabby^Iblocked^Inote ends in tabs^I^I
+default^Ineeds-decision^Ikeyless question cafÃ©
+headXkey^Ineeds-decision^Imust survive a dotted drop
+re^Ineeds-decision^Ireopened later
+bad2^Ineeds-decision^Ibad ÿ again
+last^Iblocked^Ibad stamp no newline== status_open_decisions_dated LC_ALL=en_US.UTF-8: target vs base IDENTICAL
+pending-reply-x1^Ineeds-decision^I^Ipending-reply-missed: café
+tabby^Iblocked^I1790000000^Inote ends in tabs
+default^Ineeds-decision^I^Ikeyless question cafÃ©
+headXkey^Ineeds-decision^I^Imust survive a dotted drop
+re^Ineeds-decision^I1790000500^Ireopened later
+bad2^Ineeds-decision^I7^Ibad ÿ again
+last^Iblocked^I^Ibad stamp no newline
+== status_open_decisions LC_ALL=C: target vs base IDENTICAL
+pending-reply-x1^Ineeds-decision^Ipending-reply-missed: café
+tabby^Iblocked^Inote ends in tabs^I^I
+default^Ineeds-decision^Ikeyless question cafÃ©
+headXkey^Ineeds-decision^Imust survive a dotted drop
+re^Ineeds-decision^Ireopened later
+bad2^Ineeds-decision^Ibad ÿ again
+last^Iblocked^Ibad stamp no newline== status_open_decisions_dated LC_ALL=C: target vs base IDENTICAL
+pending-reply-x1^Ineeds-decision^I^Ipending-reply-missed: café
+tabby^Iblocked^I1790000000^Inote ends in tabs
+default^Ineeds-decision^I^Ikeyless question cafÃ©
+headXkey^Ineeds-decision^I^Imust survive a dotted drop
+re^Ineeds-decision^I1790000500^Ireopened later
+bad2^Ineeds-decision^I7^Ibad ÿ again
+last^Iblocked^I^Ibad stamp no newline

@@ -1,0 +1,15 @@
+== target: PR head c8dea6ce absent locally
+ exit=0
+ complete: True
+  unlanded_commit | vernant-lab | 2 commit(s) not on refs/remotes/origin/main; PR head c8dea6ce is not in this copy, so PR coverage was not applied; newest: vernant lab commit 2
+  unanswered_question rows: 40
+== base: PR head c8dea6ce absent locally
+ exit=0
+ complete: False
+  coverage | ledger degraded | PR head vernant-lab: fatal: Not a valid object name c8dea6ce00000000000000000000000000000000^{commit}; questions vernant-d5-workspace.status: Command '['bash', '-c', 'cat "$2" >/dev/null || exit 1; . "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$
+  unlanded_commit | vernant-lab | 2 commit(s) not on refs/remotes/origin/main; newest: vernant lab commit 2
+  unanswered_question rows: 0
+== target control: PR head = task HEAD 034f2fe7b78ad3e75fcd02832be57580c3926396 (present locally, merged)
+ exit=0
+ complete: True
+  unanswered_question rows: 40

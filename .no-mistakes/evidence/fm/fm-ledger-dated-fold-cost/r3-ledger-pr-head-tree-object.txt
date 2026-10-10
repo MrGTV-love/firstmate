@@ -1,0 +1,9 @@
+### adversarial: PR #56 head is a TREE object present in the copy (not a commit) -> must not be silently skipped
+== target (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9EXEEW72Q1NM69P6G6CPJ/bin)
+ load: 19:00  up  5:34, 5 users, load averages: 53.60 42.16 43.93
+ exit=0 wall_seconds=0.7
+ complete: False
+ rows by category: {'coverage': 1, 'missing_worker': 1, 'unanswered_question': 7, 'unlanded_commit': 1}
+  coverage | ledger degraded | PR head vernant-lab: error: 280ec743972727f1b641abca5d6ff472f872bc59^{commit}: expected commit type, but the object dereferences to tree type
+  unlanded_commit | vernant-lab | 2 commit(s) not on refs/remotes/origin/main; newest: vernant lab commit 2
+  first question: tricky-lane:bad2 | needs-decision: bad � again

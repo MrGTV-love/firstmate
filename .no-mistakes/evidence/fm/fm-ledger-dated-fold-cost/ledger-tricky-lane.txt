@@ -1,0 +1,16 @@
+== Pre-existing (base and target alike): a status log holding invalid UTF-8 degrades the questions source:
+  target: ["questions tricky-lane.status: 'utf-8' codec can't decode byte 0xe9 in position 58: invalid continuation byte"]
+  base:   ["PR head vernant-lab: fatal: Not a valid object name c8dea6ce00000000000000000000000000000000^{commit}; questions tricky-lane.status: 'utf-8' codec can't decode byte 0xe9 in position 58: invalid contin"]
+== Same log with the invalid-byte lines removed (valid UTF-8 only):
+-- target: coverage rows=[]
+   tricky-lane:default | undated | 'needs-decision: keyless question café'
+   tricky-lane:headXkey | undated | 'needs-decision: must survive a dotted drop'
+   tricky-lane:last | undated | 'blocked: bad stamp no newline'
+   tricky-lane:re | dated | 'needs-decision: reopened later'
+   tricky-lane:tabby | dated | 'blocked: note ends in tabs'
+-- base: coverage rows=['PR head vernant-lab: fatal: Not a valid object name c8dea6ce000000000000000000000000000000']
+   tricky-lane:default | undated | 'needs-decision: keyless question café'
+   tricky-lane:headXkey | undated | 'needs-decision: must survive a dotted drop'
+   tricky-lane:last | undated | 'blocked: bad stamp no newline'
+   tricky-lane:re | dated | 'needs-decision: reopened later'
+   tricky-lane:tabby | dated | 'blocked: note ends in tabs'

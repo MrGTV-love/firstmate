@@ -1,0 +1,12 @@
+== target (bin) load: load averages: 41.65 50.17 51.31
+exit=0
+wall_seconds=2.1
+complete: True
+{'unanswered_question': 40}
+vernant-d5-workspace:open-00 age 587373 | needs-decision: open question 0 status café — naïve résumé ✓
+== base (/Users/charlesabrooker/tmp/fm-lab.NsUkXl/base/bin) load: load averages: 41.65 50.17 51.31
+exit=0
+wall_seconds=60.8
+complete: False
+{'coverage': 1}
+COVERAGE ROW: ledger degraded | questions vernant-d5-workspace.status: Command '['bash', '-c', 'cat "$2" >/dev/null || exit 1; . "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$

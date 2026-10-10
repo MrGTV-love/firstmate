@@ -1,0 +1,23 @@
+### PR #56 head c8dea6ce absent from the task copy; large lane log also present
+== target (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9EXEEW72Q1NM69P6G6CPJ/bin)
+ load: 18:55  up  5:29, 5 users, load averages: 36.30 43.01 45.52
+ exit=0 wall_seconds=2.2
+ complete: True
+ rows by category: {'missing_worker': 1, 'unanswered_question': 40, 'unlanded_commit': 1}
+  unlanded_commit | vernant-lab | 2 commit(s) not on refs/remotes/origin/main; PR head c8dea6ce is not in this copy, so PR coverage was not applied; newest: vernant lab commit 2
+  first question: vernant-d5-workspace:open-00 | needs-decision: open question 0 status café — naïve résumé ✓ status café — naïve résumé ✓ 
+== base (/Users/charlesabrooker/tmp/fm-lab.sK2qIG/base/bin)
+ load: 18:55  up  5:29, 5 users, load averages: 36.30 43.01 45.52
+ exit=0 wall_seconds=60.8
+ complete: False
+ rows by category: {'coverage': 1, 'missing_worker': 1, 'unlanded_commit': 1}
+  coverage | ledger degraded | PR head vernant-lab: fatal: Not a valid object name c8dea6ce00000000000000000000000000000000^{commit}; questions vernant-d5-workspace.status: Command '['bash', '-c', 'cat "$2" >/dev/null || exit 1; . "$1/fm-status-decision-lib.sh"; status_open_decisions_dated 
+  unlanded_commit | vernant-lab | 2 commit(s) not on refs/remotes/origin/main; newest: vernant lab commit 2
+world ready: PR #56 head=d539289888c24bd14217118564588d290721a039 (present); task HEAD=d539289888c24bd14217118564588d290721a039
+### control: PR #56 head = task HEAD (present, merged)
+== target (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9EXEEW72Q1NM69P6G6CPJ/bin)
+ load: 18:56  up  5:30, 5 users, load averages: 34.97 41.40 44.74
+ exit=0 wall_seconds=2.3
+ complete: True
+ rows by category: {'missing_worker': 1, 'unanswered_question': 40}
+  first question: vernant-d5-workspace:open-00 | needs-decision: open question 0 status café — naïve résumé ✓ status café — naïve résumé ✓ 

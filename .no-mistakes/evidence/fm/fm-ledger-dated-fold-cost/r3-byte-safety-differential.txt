@@ -1,0 +1,50 @@
+en_US.UTF-8  status_open_decisions                        IDENTICAL to base (288 bytes, exit 0)
+en_US.UTF-8  status_open_decisions_dated                  IDENTICAL to base (315 bytes, exit 0)
+en_US.UTF-8  status_own_open_decisions                    IDENTICAL to base (230 bytes, exit 0)
+en_US.UTF-8  status_open_decisions_incremental            IDENTICAL to base (288 bytes, exit 0)
+en_US.UTF-8  status_open_activities                       IDENTICAL to base (0 bytes, exit 0)
+en_US.UTF-8  status_has_open_needs_decision               IDENTICAL to base (0 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[a]                   IDENTICAL to base (8 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[b]                   IDENTICAL to base (8 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[c]                   IDENTICAL to base (8 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[re]                  IDENTICAL to base (14 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[zz]                  IDENTICAL to base (0 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[head.key]            IDENTICAL to base (8 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[headXkey]            IDENTICAL to base (14 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[tabby]               IDENTICAL to base (7 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[pending-reply-x1]    IDENTICAL to base (14 bytes, exit 0)
+en_US.UTF-8  status_key_closing_verb[last]                IDENTICAL to base (7 bytes, exit 0)
+C            status_open_decisions                        IDENTICAL to base (288 bytes, exit 0)
+C            status_open_decisions_dated                  IDENTICAL to base (315 bytes, exit 0)
+C            status_own_open_decisions                    IDENTICAL to base (230 bytes, exit 0)
+C            status_open_decisions_incremental            IDENTICAL to base (288 bytes, exit 0)
+C            status_open_activities                       IDENTICAL to base (0 bytes, exit 0)
+C            status_has_open_needs_decision               IDENTICAL to base (0 bytes, exit 0)
+C            status_key_closing_verb[a]                   IDENTICAL to base (8 bytes, exit 0)
+C            status_key_closing_verb[b]                   IDENTICAL to base (8 bytes, exit 0)
+C            status_key_closing_verb[c]                   IDENTICAL to base (8 bytes, exit 0)
+C            status_key_closing_verb[re]                  IDENTICAL to base (14 bytes, exit 0)
+C            status_key_closing_verb[zz]                  IDENTICAL to base (0 bytes, exit 0)
+C            status_key_closing_verb[head.key]            IDENTICAL to base (8 bytes, exit 0)
+C            status_key_closing_verb[headXkey]            IDENTICAL to base (14 bytes, exit 0)
+C            status_key_closing_verb[tabby]               IDENTICAL to base (7 bytes, exit 0)
+C            status_key_closing_verb[pending-reply-x1]    IDENTICAL to base (14 bytes, exit 0)
+C            status_key_closing_verb[last]                IDENTICAL to base (7 bytes, exit 0)
+--- target output, en_US.UTF-8 (cat -v) ---
+[status_open_decisions]
+pending-reply-x1	needs-decision	pending-reply-missed: café
+tabby	blocked	note ends in tabs		
+default	needs-decision	keyless question cafÃ©
+headXkey	needs-decision	must survive a dotted drop
+re	needs-decision	reopened later
+bad2	needs-decision	bad ÿ again
+last	blocked	bad stamp no newline
+[status_open_decisions_dated]
+pending-reply-x1	needs-decision		pending-reply-missed: café
+tabby	blocked	1790000000	note ends in tabs
+default	needs-decision		keyless question cafÃ©
+headXkey	needs-decision		must survive a dotted drop
+re	needs-decision	1790000500	reopened later
+bad2	needs-decision	7	bad ÿ again
+last	blocked		bad stamp no newline
+

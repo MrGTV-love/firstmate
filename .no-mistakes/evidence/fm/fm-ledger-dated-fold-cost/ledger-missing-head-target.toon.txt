@@ -1,0 +1,7 @@
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9EXEEW72Q1NM69P6G6CPJ/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1791588252
+rows[41]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unlanded_commit","vernant-lab","firstmate","land this work through its PR, or obtain the captain's drop",219,false,"2 commit(s) not on refs/remotes/origin/main; PR head c8dea6ce is not in this copy, so PR coverage was not applied; newest: vernant lab commit 2"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows

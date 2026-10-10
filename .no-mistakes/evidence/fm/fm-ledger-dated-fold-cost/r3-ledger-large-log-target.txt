@@ -1,0 +1,7 @@
+== target (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9EXEEW72Q1NM69P6G6CPJ/bin)
+ load: 18:48  up  5:22, 5 users, load averages: 76.15 58.51 50.10
+ exit=0 wall_seconds=5.8
+ complete: False
+ rows by category: {'coverage': 1, 'unanswered_question': 40}
+  coverage | ledger degraded | fleet snapshot: backlog is unavailable
+  first question: vernant-d5-workspace:open-00 | needs-decision: open question 0 status café — naïve résumé ✓ status café — naïve résumé ✓ 

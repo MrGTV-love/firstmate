@@ -1,0 +1,14 @@
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9EXEEW72Q1NM69P6G6CPJ/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1791590384
+rows[8]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","vernant-lab","firstmate","recover the assigned worker without discarding work",173,false,""
+  "unanswered_question","tricky-lane:bad2","firstmate","answer or close this question, or record why it no longer applies",1791590377,true,"needs-decision: bad � again"
+  "unanswered_question","tricky-lane:default","firstmate","answer or close this question, or record why it no longer applies",null,true,"needs-decision: keyless question café"
+  "unanswered_question","tricky-lane:headXkey","firstmate","answer or close this question, or record why it no longer applies",null,true,"needs-decision: must survive a dotted drop"
+  "unanswered_question","tricky-lane:last","firstmate","answer or close this question, or record why it no longer applies",null,true,"blocked: bad stamp no newline"
+  "unanswered_question","tricky-lane:pending-reply-x1","firstmate","answer or close this question, or record why it no longer applies",null,true,"needs-decision: pending-reply-missed: caf�"
+  "unanswered_question","tricky-lane:re","firstmate","answer or close this question, or record why it no longer applies",1589884,true,"needs-decision: reopened later"
+  "unanswered_question","tricky-lane:tabby","firstmate","answer or close this question, or record why it no longer applies",1590384,true,"blocked: note ends in tabs"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
