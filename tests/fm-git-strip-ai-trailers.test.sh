@@ -400,6 +400,10 @@ exec '$real_tmux' -S '$socket' "\$@"
 SH
   cat > "$fakebin/omp" <<SH
 #!/bin/sh
+if [ "\${1:-}" = --version ]; then
+  printf 'omp/18.1.20\n'
+  exit 0
+fi
 git config --show-scope --get-all core.hooksPath > '$dir/scope.tmp'
 git config --get-all fixture.preserved > '$dir/preserved.tmp' || :
 git config --show-scope --get fixture.operator > '$dir/operator.tmp' || :

@@ -250,6 +250,36 @@ session_end_relaunch_tick() {
   [ -z "${FM_SESSION_END_WAKE:-}" ] || wake "$FM_SESSION_END_WAKE"
 }
 
+# Herdr may restore a recorded agent after startup's first scan (native restore
+# waits for a viewer). Keep recovery in the ordinary bounded supervision cycle.
+reboot_recovery_tick() {
+  local marker="$STATE/.reboot-recovery-tick" out rc=0 reason meta found=0
+  [ "$(age_of "$marker")" -ge 60 ] || return 0
+  for meta in "$STATE"/*.meta; do
+    [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+    [ "$(fm_meta_get "$meta" backend)" = herdr ] || continue
+    [ -z "$(fm_meta_get "$meta" remote_host)" ] || continue
+    found=1
+    break
+  done
+  [ "$found" = 1 ] || return 0
+  touch "$marker" || return 1
+  fm_session_end_bounds "$WATCHER_STALE_GRACE" || return 0
+  touch "$STATE/.last-watcher-beat" 2>/dev/null || true
+  FM_EXEC_TIMED_OWNER_PID="${WATCHER_PID:-$$}" run_owned_capture "$FM_SESSION_END_TIMEOUT" 1 merged \
+    fm_exec_timed "$FM_SESSION_END_TIMEOUT" 1 env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    FM_CONTROL_LAUNCH_WAIT="$FM_SESSION_END_LAUNCH_WAIT" \
+    "$SCRIPT_DIR/fm-reboot-recover.sh" recover --one || return 1
+  out=$FM_CHECK_RESULT
+  rc=$FM_CHECK_STATUS
+  touch "$marker" || return 1
+  [ -n "$out" ] || [ "$rc" -ne 0 ] || return 0
+  reason="check: Herdr reboot launch recovery: $(printf '%s' "$out" | fm_wake_clean_field)"
+  [ "$rc" -eq 0 ] || reason="$reason (failed)"
+  fm_wake_append check "reboot-launch-recovery-$(date +%s)-${WATCHER_PID:-$$}-$RANDOM$RANDOM" "$reason" || return 1
+  wake "$reason"
+}
+
 
 WATCH_LOCK="$STATE/.watch.lock"
 WATCH_PATH="$SCRIPT_DIR/fm-watch.sh"
@@ -2155,8 +2185,10 @@ run_check() {
 
 FM_ACTIVE_CHECK_PID=
 FM_ACTIVE_CHECK_PGID=
+FM_ACTIVE_CHECK_GRACE=0
 FM_CHECK_OUTPUT=
 FM_CHECK_RESULT=
+FM_CHECK_STATUS=0
 FM_CHECK_SIGNAL_PENDING=
 
 fm_check_output_cleanup() {
@@ -2166,11 +2198,12 @@ fm_check_output_cleanup() {
 
 fm_active_check_stop() {
   local pid=${FM_ACTIVE_CHECK_PID:-} pgid=${FM_ACTIVE_CHECK_PGID:-} i
+  local stop_polls=$((FM_ACTIVE_CHECK_GRACE * 100 + 20))
   [ -n "$pid" ] || [ -n "$pgid" ] || return 0
   [ -z "$pgid" ] || kill -TERM -- "-$pgid" 2>/dev/null || true
   [ -z "$pid" ] || kill -TERM "$pid" 2>/dev/null || true
   i=0
-  while [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null && [ "$i" -lt 20 ]; do
+  while [ -n "$pgid" ] && kill -0 -- "-$pgid" 2>/dev/null && [ "$i" -lt "$stop_polls" ]; do
     sleep 0.01
     i=$((i + 1))
   done
@@ -2187,6 +2220,7 @@ fm_active_check_stop() {
   fi
   FM_ACTIVE_CHECK_PID=
   FM_ACTIVE_CHECK_PGID=
+  FM_ACTIVE_CHECK_GRACE=0
 }
 
 # Stop-signal dispositions, installed with the EXIT trap below. HUP and TERM
@@ -2208,9 +2242,15 @@ watcher_stop_signals() {
 # Capture a check without blocking bash inside a command substitution, so the
 # poll shell keeps publishing progress while it waits on the bounded check.
 run_check_capture() {
-  local pgid check_started
+  FM_CHECK_OWNED_GROUP=1 run_owned_capture "$CHECK_TIMEOUT" 0 discard run_check_process "$@"
+}
+
+run_owned_capture() {
+  local capture_timeout=$1 capture_grace=$2 capture_stderr=$3 pgid check_started
+  shift 3
   fm_check_output_cleanup
   FM_CHECK_RESULT=
+  FM_CHECK_STATUS=0
   FM_CHECK_OUTPUT=$(mktemp "$STATE/.fm-check-output.XXXXXX") || return 1
   chmod 0600 "$FM_CHECK_OUTPUT" || { fm_check_output_cleanup; return 1; }
   FM_CHECK_SIGNAL_PENDING=
@@ -2220,9 +2260,16 @@ run_check_capture() {
   trap 'FM_CHECK_SIGNAL_PENDING=1' HUP INT TERM
   set -m
   check_started=$SECONDS
-  ( FM_CHECK_OWNED_GROUP=1 run_check_process "$@" ) > "$FM_CHECK_OUTPUT" 2>/dev/null &
+  (
+    if [ "$capture_stderr" = discard ]; then
+      "$@" 2>/dev/null
+    else
+      "$@" 2>&1
+    fi
+  ) > "$FM_CHECK_OUTPUT" &
   FM_ACTIVE_CHECK_PID=$!
   FM_ACTIVE_CHECK_PGID=$FM_ACTIVE_CHECK_PID
+  FM_ACTIVE_CHECK_GRACE=$capture_grace
   set +m
   watcher_stop_signals
   [ -z "$FM_CHECK_SIGNAL_PENDING" ] || exit 1
@@ -2236,13 +2283,16 @@ run_check_capture() {
   # responding. Poll briefly; watcher_beat throttles its own writes.
   while kill -0 "$FM_ACTIVE_CHECK_PID" 2>/dev/null; do
     watcher_beat
-    if [ "$((SECONDS - check_started))" -ge "$((CHECK_TIMEOUT + 1))" ]; then
+    if [ "$((SECONDS - check_started))" -ge "$((capture_timeout + capture_grace + 1))" ]; then
+      FM_CHECK_STATUS=124
       fm_active_check_stop || return 1
       break
     fi
     sleep 0.1
   done
-  [ -z "$FM_ACTIVE_CHECK_PID" ] || wait "$FM_ACTIVE_CHECK_PID" 2>/dev/null || true
+  if [ -n "$FM_ACTIVE_CHECK_PID" ]; then
+    wait "$FM_ACTIVE_CHECK_PID" 2>/dev/null || FM_CHECK_STATUS=$?
+  fi
   FM_ACTIVE_CHECK_PID=
   fm_active_check_stop || return 1
   FM_CHECK_RESULT=$(cat "$FM_CHECK_OUTPUT" 2>/dev/null || true)
@@ -3699,6 +3749,11 @@ while :; do
       triage_log "absorbed heartbeat (no captain-relevant change)"
     fi
   fi
+  reboot_recovery_tick || {
+    echo "watcher: Herdr reboot launch recovery failed" >&2
+    exit 1
+  }
+  watcher_beat
 
   # Terminal wait: a bounded native-event wait for push-capable homes (herdr),
   # else the blind poll sleep. See event_wait_or_sleep.

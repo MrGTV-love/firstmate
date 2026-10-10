@@ -1,6 +1,7 @@
 # omp (Oh My Pi)
 
-Verified for crew, scout, secondmate, and primary work on Herdr on 2026-09-05 with omp 18.1.11, building on the 2026-09-02 adapter investigation against 18.1.2.
+Minimum supported omp is 18.1.20: session-proof restoration requires [`AgentSession.waitForSessionTransition()` introduced in v18.1.20](https://github.com/can1357/oh-my-pi/blob/v18.1.20/packages/coding-agent/src/session/agent-session.ts#L4368) (tag commit `1bd60c6fbd`), absent in v18.1.19 and v18.1.11.
+Historical worker and runtime evidence is owned by [runtime verification](../../../docs/verification/runtime-backends.md#oh-my-pi-omp); [supervision verification](../../../docs/verification/supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.
 omp is a Pi fork, so `references/harness/pi.md` is the nearest relative; every difference from Pi is stated here.
 Cross-harness provider and credential identity is owned by `references/common/model-and-effort.md`.
 
@@ -8,7 +9,7 @@ Cross-harness provider and credential identity is owned by `references/common/mo
 
 | Fact | Value |
 |---|---|
-| Binary | `omp`, a single Bun-compiled executable resolved from `PATH` by `../../../bin/fm-spawn.sh`; a missing binary refuses the spawn. |
+| Binary | `omp`, a single Bun-compiled executable resolved from `PATH` by `../../../bin/fm-spawn.sh`; a missing binary or unsupported version refuses every worker, scout, local secondmate, and relaunch before launch; `../../../bin/fm-control.sh` checks the replacement before stopping the current agent; upgrade with `omp update`. |
 | Launch | [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns launch flags, session posture, worker memory scope, and secondmate extension loading. |
 | Busy state | `../../../bin/fm-busy-lib.sh` source `omp-ext`: the crewmate/scout per-task extension marks busy at `agent_start`, and idle at `agent_end` only when `willContinue` is not true; `ctx.isIdle()` is deliberately not consulted because it reads false at a natural TUI `agent_end` (`session_stop` is awaited before settle). Secondmates do not load a parent-task busy adapter. |
 | Exit command | `/quit` (`/exit` and `/q` are aliases). |
@@ -18,10 +19,10 @@ Cross-harness provider and credential identity is owned by `references/common/mo
 | Effort flag | `--thinking <off\|minimal\|low\|medium\|high\|xhigh\|max\|auto>`, a superset of the shared vocabulary, so every level including `max` maps straight across. |
 | Model discovery | `omp models [--json]` lists built-in and auto-discovered providers only; extension-registered providers such as `claude-bridge` never appear. `omp usage` shows provider windows; `quota-axi` covers the `claude` provider when the bridge is in use. |
 | Marker | None of omp's own (verified: `PI_CODING_AGENT` absent from the binary, no `PI_CODING_AGENT_DIR` or `OMP_PROFILE` in the default profile). `FM_OMP_HARNESS=omp` is Firstmate's launch marker; ancestry matches the exact process name `omp`. |
-| Composer | [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns the composer posture pin; `../../../bin/fm-composer-lib.sh` owns rendered delivery-busy signals and composer shapes, with box-shape and overlay live-reload evidence in [omp box composer through Herdr](../../../docs/verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr) and working-composer evidence in [omp injected text through Herdr](../../../docs/verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr). |
+| Composer | [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns the composer posture pin; `../../../bin/fm-composer-lib.sh` owns rendered delivery-busy signals and composer shapes, including compact-box and default-band native-resume recognition and literal-draft containment (default-band consumer regressions in [`tests/fm-composer-native-band.test.sh`](../../../tests/fm-composer-native-band.test.sh)), with box-shape and overlay live-reload evidence in [omp box composer through Herdr](../../../docs/verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr) and working-composer evidence in [omp injected text through Herdr](../../../docs/verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr). |
 | Autonomy | Approval and unattended-session posture are owned by [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh). |
 | Trust | No project-trust gate at all; a fresh profile shows a provider-login wizard instead, suppressed by `OMP_SKIP_SETUP=1`. |
-| Resume | `-c/--continue` and `-r/--resume` exist but carry no verified pane-resume contract; use deterministic relaunch. |
+| Resume | `-c/--continue` and `-r/--resume` exist; the [native-restoration inspection contract](../../../docs/agent-control.md#inspecting-a-bare-native-restore) owns Firstmate's refusal boundary. |
 
 Keep the instructions as one positional argument; a second positional never surfaced as a submitted message.
 The openai-codex models reach an extension-registered tool through omp's `xd://` virtual-file bridge: the model reads `xd://fm_watch_arm_omp` for the description and writes `xd://fm_watch_arm_omp` to invoke it, so a transcript or rpc stream shows a `write` to that path rather than a direct `fm_watch_arm_omp` call; both are the same invocation (verified 18.1.11).

@@ -39,6 +39,8 @@
 //     not run the host nothing below changes.
 //
 // Session-generation ownership (stated once here):
+// Current task-session proof handles switch events separately in
+// lib/fm-task-session.ts.
 // omp emits session_shutdown for ordinary same-process replacements (/new,
 // /resume, /fork) as well as terminal quit. This extension binds one generation
 // per session activation. Only the active live generation may start, stop,
@@ -94,12 +96,14 @@ import { Type } from "typebox";
 // resolves bin/fm-operational-input.sh relative to its own location, which is
 // the same repository root this file lives in.
 import { encodeFirstmateOperationalInput } from "../../.pi/extensions/lib/fm-operational-input.ts";
+import { installTaskSessionProof, resolveLocalSecondmateTask } from "./lib/fm-task-session.ts";
 import { bindWatchInstance, createLifecycleLog, setLifecycleDeadline } from "../../.pi/extensions/lib/fm-watch-lifecycle.ts";
 
 // The omp extension API surface this file uses. omp is a Pi fork and ships no
 // separately installable type package, so the contract is declared locally
 // rather than imported from the Pi package name.
 type ExtensionAPI = {
+  pi: Parameters<typeof installTaskSessionProof>[0]["pi"];
   on?: (event: string, handler: (event: any, ctx: any) => unknown) => void;
   sendUserMessage: (content: string, options?: { deliverAs?: string }) => unknown;
   registerCommand?: (name: string, command: { description: string; handler: (args: string, ctx: any) => Promise<void> | void }) => void;
@@ -264,6 +268,20 @@ function lockOwnership(): LockOwnership {
   if (!/^[0-9]+$/.test(lockPid) || lockPid === "1") return "other";
   if (lockPid === String(process.pid)) return "owned";
   return pidAlive(lockPid) ? "other" : "missing";
+}
+
+function lockHeldByAncestor(): boolean {
+  let lockPid = "";
+  try {
+    lockPid = readFileSync(`${state}/.lock`, "utf8").trim();
+  } catch {
+    return false;
+  }
+  for (let pid = process.ppid; pid >= 1;) {
+    if (String(pid) === lockPid) return true;
+    pid = Number(spawnSync("ps", ["-o", "ppid=", "-p", String(pid)], { encoding: "utf8" }).stdout?.trim());
+  }
+  return false;
 }
 
 // Writes only on a change, so the turn-boundary calls below stay cheap.
@@ -784,6 +802,16 @@ export default function (pi: ExtensionAPI) {
       markLoaded();
     }
     return activateOwnedWatch(generation);
+  }
+  const parentTask = resolveLocalSecondmateTask(fmRoot, fmHome, state);
+  // A descendant omp (an `omp -p` child of the lock holder) must not rewrite its
+  // secondmate's proof. Each event rechecks ancestry rather than one load-time
+  // lock read, because a stale lock PID reused by an unrelated process is not an ancestor.
+  if (parentTask) {
+    installTaskSessionProof({
+      pi: pi.pi,
+      on: (event, handler) => pi.on?.(event, (payload, ctx) => lockHeldByAncestor() ? undefined : handler(payload, ctx)),
+    }, parentTask.state, parentTask.id);
   }
 
   async function sendWake(

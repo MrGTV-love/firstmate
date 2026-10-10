@@ -33,7 +33,7 @@ SEND="$ROOT/bin/fm-send.sh"
 TMP_ROOT=$(fm_test_tmproot fm-control)
 mkdir -p "$TMP_ROOT"
 TMP_ROOT=$(cd "$TMP_ROOT" && pwd)
-trap 'rm -rf "$TMP_ROOT"' EXIT
+trap 'fm_test_cleanup; rm -rf "$TMP_ROOT"' EXIT
 
 VERIFIED_HARNESSES="claude codex opencode pi pi-signed grok kimi cursor muse omp devin"
 
@@ -830,9 +830,20 @@ test_failed_exit_send_leaves_no_deliberate_exit_marker() {
 
 # A live Claude pane on Herdr, answered by command rather than by call order
 # so the whole public exit path (agent state, busy read, composer guard) runs.
+# Lifecycle input needs positive launch attribution, so the pane's foreground
+# process is a real one whose kernel environment carries the task's recorded
+# incarnation, exactly as a managed launch does.
 make_herdr_claude_stub() {  # <case-dir>
-  local fb="$1/herdrbin"
-  mkdir -p "$fb"
+  local fb="$1/herdrbin" gen probe_pid
+  mkdir -p "$fb" "$1/fake"
+  gen="probe-$$-$RANDOM"
+  FM_SPAWN_GEN=$gen python3 -c 'import time; time.sleep(600)' &
+  probe_pid=$!
+  fm_test_record_process "$1/fake/probe-process" "$probe_pid" \
+    || fail "could not record the Herdr launch probe identity"
+  fm_test_track_process "$1/fake/probe-process" "time.sleep(600)"
+  printf '%s' "$probe_pid" > "$1/fake/probe-pid"
+  printf 'launch_proof=env-v1\nspawn_gen=%s\n' "$gen" >> "$1/home/state/t1.meta"
   cat > "$fb/herdr" <<'SH'
 #!/usr/bin/env bash
 set -u
@@ -842,7 +853,7 @@ case "${1:-} ${2:-}" in
   'pane get') printf '{"result":{"pane":{"pane_id":"%s"}}}\n' "$3" ;;
   'agent get') printf '{"result":{"agent":{"agent":"claude","agent_status":"idle"}}}\n' ;;
   'pane process-info')
-    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":4243,"name":"claude","argv0":"claude","cmdline":"claude"}]}}}\n' "$4" ;;
+    printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":4242,"foreground_processes":[{"pid":%s,"name":"claude","argv0":"claude","cmdline":"claude"}]}}}\n' "$4" "$(cat "$D/probe-pid")" ;;
   'pane read')
     printf '%s\n' "$*" >> "$D/reads"
     [ ! -e "$D/unreadable" ] || exit 1

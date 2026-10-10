@@ -26,7 +26,7 @@ All three shard summaries report `failed=0`, and each measured row reports `exit
 The new `tests/fm-omp-wake-restore-live-e2e.test.sh` hint is its successful 51 ms record from portable serial shard 3 of [run 37663635202](https://github.com/MrGTV-love/firstmate/actions/runs/37663635202) on 2026-10-07.
 That shard completed with zero failures; the live test took its opt-in capability skip, so this hint models ordinary portable CI gate evaluation, not live wake-recovery runtime.
 The 2026-10-08 merge-integration refresh uses successful per-script `FM_TEST_END` markers from [run 37821346234](https://github.com/MrGTV-love/firstmate/actions/runs/37821346234). It adds the newly merged serial members that completed successfully and refreshes existing members whose successful measurements grew by more than 30 seconds; other established weights remain conservative historical maxima. Failed invocations of the capacity, watcher-ledger, teardown, and runner suites are excluded, even though their jobs completed and uploaded artifacts.
-The new weights require ten serial shards to fit the unchanged 1200000 ms packing target. The runner and workflow matrix both use ten; no execution timeout was raised.
+The new weights, together with the composer shape suites added by the reboot-recovery change, require eleven serial shards to fit the unchanged 1200000 ms packing target. The runner and workflow matrix both use eleven; no execution timeout was raised.
 The capacity suite's 56263 ms hint is the successful Ubuntu `FM_TEST_END` baseline from upstream [run 37739997864, serial shard 9](https://github.com/kunchenguid/firstmate/actions/runs/37739997864/job/113188261544). It is not a measurement of this integration repair: the local repaired run passed the live-worker teardown but later failed the next spawn's existing backlog-read bound, so its duration is excluded.
 In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
 Collect successful per-script measurements for every member before calculating a split.
@@ -124,6 +124,7 @@ The Herdr recovery lab loads its run, backlog, and wake dependencies once in the
 The retained open-work scan fixture observes the complete ledger's actual overdue obligation before beginning its unchanged watcher-delivery wait, matching the synchronous collector fixtures' publication-before-delivery ordering. Its shared launcher sets unrelated cadence intervals above the missing-file age sentinel, so empty fixture homes do not start real summary refreshes or checks. Collector and delivery timeout values are unchanged; collector survival, no overlapping scans, and durable wake checks remain required.
 The runner and CPU-pass fixtures resolve their generated Python wrappers' shebangs through `sys.executable`, not `command -v`: a PATH entry can be a shell-based version-manager shim, which macOS cannot use to interpret another script's Python body.
 [`tests/fm-open-loops.test.sh`](../tests/fm-open-loops.test.sh) owns collector deadline coverage for origins, PR checks, PR state, and questions, including proof that the named reader triggers cancellation rather than the REST helper's cache or lock reads.
+Herdr lifecycle fixtures model both registration and foreground processes: an unregistered live harness is not a shell-only husk, and live-owner attribution may refuse before checkout inspection. Refusal coverage checks unchanged metadata and endpoint state with no lifecycle input. Fake omp executables answer the supported-version probe separately from catalog or environment output, and generated-extension fixtures include their runtime imports and host registry API.
 The Jev guard suite reads ledger permission bits through Node's filesystem API on both Linux and macOS; a BSD/GNU `stat` fallback can mix filesystem diagnostics into the mode and falsely reject a private ledger.
 The bearings Perl-timeout fixture includes `uname` for the PR library's cached platform lookup during contribution coverage, while still excluding `timeout` and `gtimeout`. A stalled GitHub read must therefore reach the Perl bound and return the ordinary snapshot with PR availability disclosed, rather than exit during dependency initialization.
 
@@ -167,7 +168,7 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the current watch-triage floor alone exceeds that objective.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses fifteen long-lived Linux jobs (ten serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses sixteen long-lived Linux jobs (eleven serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 
@@ -175,6 +176,7 @@ The workflow retains per-PR supersession without cancelling main pushes or chang
 
 [CONTRIBUTING.md](../CONTRIBUTING.md) owns the local test policy and common entry points.
 `bin/fm-test-run.sh --help` owns exact lane names, changed-file selection (including retired assets), and bounded `--jobs` mechanics.
+Changed-file selection maps the flat omp bordered captures to `fm-composer-lib.test.sh` and the native-band captures, including both 18.8.1 directory and linked-worktree layouts, to `fm-composer-native-band.test.sh`; unrelated flat captures still require a consumer mapping.
 
 ## Timeouts
 

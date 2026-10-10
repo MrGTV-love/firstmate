@@ -181,7 +181,7 @@ test_remote_probe_scheduling_keeps_per_mate_lines() { # <parallel|fallback>
   dir="$TMP_ROOT/parallel-lines-$mode"
   home="$dir/home"
   primary="$dir/primary"
-  mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects" "$primary"
+  mkdir -p "$home/state" "$home/data/handoff" "$home/config" "$home/projects" "$primary"
   git init -q -b main "$primary"
   cp -R "$ROOT/bin" "$primary/bin"
   printf 'test primary\n' > "$primary/AGENTS.md"
@@ -193,6 +193,21 @@ test_remote_probe_scheduling_keeps_per_mate_lines() { # <parallel|fallback>
   : > "$log"
   install_fake_ssh "$fakebin"
   install_slow_git "$fakebin" "$REAL_GIT" "$log"
+  cat > "$primary/bin/fm-backlog-handoff.sh" <<'SH'
+#!/usr/bin/env bash
+[ "$*" = --resume-pending ] || exit 91
+printf 'END handoff resume\n' >> "${FM_FAKE_SSH_LOG:?}"
+SH
+  cat > "$primary/bin/fm-reboot-recover.sh" <<'SH'
+#!/usr/bin/env bash
+[ "$*" = recover ] || exit 91
+printf 'START recovery recover\n' >> "${FM_FAKE_SSH_LOG:?}"
+sleep 0.2
+printf 'END recovery recover\n' >> "$FM_FAKE_SSH_LOG"
+printf 'RECOVERY_FIXTURE: completed with rc=%s\n' "${FM_FAKE_RECOVERY_RC:?}"
+exit "$FM_FAKE_RECOVERY_RC"
+SH
+  chmod +x "$primary/bin/fm-backlog-handoff.sh" "$primary/bin/fm-reboot-recover.sh"
   if [ "$mode" = fallback ]; then
     cat > "$fakebin/mktemp" <<SH
 #!/usr/bin/env bash
@@ -237,9 +252,10 @@ SH
     FM_FAKE_SSH_FAIL_HOST=host-alpha \
     FM_FAKE_SSH_DIRTY_HOST=host-charlie \
     FM_FAKE_GIT_FETCH_SLEEP=0.4 \
+    FM_FAKE_RECOVERY_RC="$([ "$mode" = parallel ] && printf 0 || printf 124)" \
     FM_INHERITABLE_CONFIG='' \
     FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
-    "$ROOT/bin/fm-bootstrap.sh" 2>&1
+    "$primary/bin/fm-bootstrap.sh" 2>&1
   )
 
   assert_contains "$out" \
@@ -316,6 +332,27 @@ EOF
     /START .* fm-remote-secondmate-control.sh sync$/ && !first_sync { first_sync = NR }
     END { exit !(last_liveness && first_sync && last_liveness < first_sync) }
   ' "$log" || fail "convergence began before all liveness probes finished"$'\n'"$(cat "$log")"
+  if [ "$mode" = parallel ]; then
+    assert_contains "$out" "RECOVERY_FIXTURE: completed with rc=0" \
+      "bootstrap must attempt slow successful recovery after the startup sweeps"
+  else
+    assert_contains "$out" "RECOVERY_FIXTURE: completed with rc=124" \
+      "bootstrap must preserve completed startup sweeps when recovery times out"
+  fi
+  awk '
+    /^END fleet-fetch / { fetch = NR }
+    /END .* fm-remote-secondmate-control.sh state$/ { liveness = NR }
+    /END .* fm-remote-secondmate-control.sh sync$/ { convergence = NR }
+    /^END handoff resume$/ { handoff = NR }
+    /^START recovery recover$/ {
+      recovery++
+      if (!(fetch && liveness && convergence && handoff)) bad = 1
+    }
+    /^END fleet-fetch / || /END .* fm-remote-secondmate-control.sh (state|sync)$/ || /^END handoff resume$/ {
+      if (recovery) bad = 1
+    }
+    END { exit !(recovery == 1 && !bad) }
+  ' "$log" || fail "recovery began before clone refresh, liveness, convergence, and handoff completed"$'\n'"$(cat "$log")"
 
   if [ -n "${FM_TEST_EVIDENCE_FILE:-}" ]; then
     {

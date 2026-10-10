@@ -251,6 +251,126 @@ test_changed_default_trips_after_teardown() {
   pass "fm-herdr-lab: changed default fleet state is a hard failure"
 }
 
+test_prepared_fresh_lab_can_provision() {
+  local name="fm-lab-prepared-$$" before
+  : > "$FAKE_LOG"
+  run_with_fake "$ROOT/bin/fm-herdr-lab.sh" prepare "$name" || fail "fresh prepare failed"
+  assert_absent "$FAKE_STATE/$name" "prepare started a session before provision"
+  assert_present "$TRIPWIRES/$name.fleet-state.json" "prepare did not claim a tripwire"
+  before=$(cat "$TRIPWIRES/$name.fleet-state.json")
+  run_with_fake "$ROOT/bin/fm-herdr-lab.sh" provision "$name" || fail "provision rejected a freshly prepared lab"
+  [ "$(cat "$FAKE_STATE/$name")" = running ] || fail "prepared provision did not start its session"
+  [ "$(cat "$TRIPWIRES/$name.fleet-state.json")" = "$before" ] \
+    || fail "prepared provision changed the claimed tripwire"
+  run_with_fake "$ROOT/bin/fm-herdr-lab.sh" teardown "$name" || fail "prepared lab teardown failed"
+  [ "$(cat "$FAKE_STATE/$name")" = deleted ] || fail "prepared lab teardown did not delete its session"
+  assert_absent "$TRIPWIRES/$name.fleet-state.json" "prepared lab teardown retained its tripwire"
+  pass "fm-herdr-lab: fresh prepare provisions and tears down its claimed session"
+}
+
+test_invalid_prepared_tripwire_refuses_provision() {
+  local name="fm-lab-prepared-invalid-$$" status=0
+  run_with_fake "$ROOT/bin/fm-herdr-lab.sh" prepare "$name" || fail "invalid-tripwire prepare failed"
+  printf '%s\n' '{"invalid":"prepared tripwire"}' > "$TRIPWIRES/$name.fleet-state.json"
+  : > "$FAKE_LOG"
+  run_with_fake "$ROOT/bin/fm-herdr-lab.sh" provision "$name" >/dev/null 2>&1 || status=$?
+  expect_code 1 "$status" "invalid prepared tripwire must refuse provision"
+  assert_absent "$FAKE_STATE/$name" "invalid prepared tripwire started a session"
+  assert_no_grep "server --session $name" "$FAKE_LOG" "invalid prepared tripwire reached server start"
+  [ "$(cat "$TRIPWIRES/$name.fleet-state.json")" = '{"invalid":"prepared tripwire"}' ] \
+    || fail "invalid prepared tripwire was overwritten"
+  rm -f "$TRIPWIRES/$name.fleet-state.json"
+  pass "fm-herdr-lab: invalid prepared tripwire refuses server start"
+}
+
+make_reboot_lab_wrapper() {
+  local dir=$1 tool
+  mkdir -p "$dir/fakebin" "$dir/tmp"
+  for tool in omp python3; do
+    command -v "$tool" >/dev/null 2>&1 && continue
+    cat > "$dir/fakebin/$tool" <<'SH'
+#!/usr/bin/env bash
+exit 99
+SH
+    chmod +x "$dir/fakebin/$tool"
+  done
+  cat > "$dir/helper" <<'SH'
+#!/usr/bin/env bash
+set -eu
+if [ "$1" = name ]; then
+  printf '%s\n' "$FM_FAKE_REBOOT_SESSION"
+  exit 0
+fi
+[ "${2:-}" = "$FM_FAKE_REBOOT_SESSION" ] || exit 95
+printf '%s\n' "$*" >> "$FM_FAKE_REBOOT_HELPER_LOG"
+if [ "$1" = provision ]; then
+  [ -s "$FM_HERDR_LAB_STATE_DIR/$2.fleet-state.json" ] || exit 96
+  cp "$FM_HERDR_LAB_STATE_DIR/$2.fleet-state.json" "$FM_FAKE_REBOOT_PREPARED"
+  exit 73
+fi
+exec "$FM_FAKE_REBOOT_REAL_HELPER" "$@"
+SH
+  chmod +x "$dir/helper"
+}
+
+run_reboot_with_fake() {
+  local dir=$1 name=$2
+  FM_OMP_REBOOT_LIVE=1 HERDR_LAB_HELPER="$dir/helper" TMPDIR="$dir/tmp" \
+    FM_FAKE_REBOOT_SESSION="$name" FM_FAKE_REBOOT_HELPER_LOG="$dir/helper.log" \
+    FM_FAKE_REBOOT_PREPARED="$dir/prepared.json" \
+    FM_FAKE_REBOOT_REAL_HELPER="$ROOT/bin/fm-herdr-lab.sh" \
+    run_with_fake env PATH="$dir/fakebin:$FAKEBIN:$PATH" \
+    "$ROOT/tests/fm-omp-reboot-live-e2e.test.sh"
+}
+
+test_reboot_fixture_refuses_colliding_sessions() {
+  local state name dir before status
+  for state in running stopped; do
+    name="fm-lab-reboot-$state-$$"
+    dir="$TMP_ROOT/reboot-$state"
+    make_reboot_lab_wrapper "$dir"
+    run_with_fake "$ROOT/bin/fm-herdr-lab.sh" provision "$name" || fail "collision fixture provision failed"
+    if [ "$state" = stopped ]; then
+      run_with_fake "$ROOT/bin/fm-herdr-lab.sh" stop "$name" || fail "collision fixture stop failed"
+    fi
+    before=$(cat "$TRIPWIRES/$name.fleet-state.json")
+    : > "$FAKE_LOG"
+    status=0
+    run_reboot_with_fake "$dir" "$name" > "$dir/output" 2>&1 || status=$?
+    expect_code 1 "$status" "$state collision must refuse the executable reboot fixture"
+    assert_grep 'already exists; refusing to adopt or overwrite' "$dir/output" \
+      "$state collision did not refuse at the ownership claim"
+    [ "$(cat "$FAKE_STATE/$name")" = "$state" ] || fail "$state collision changed the session state"
+    assert_present "$TRIPWIRES/$name.fleet-state.json" "$state collision removed the tripwire"
+    [ "$(cat "$TRIPWIRES/$name.fleet-state.json")" = "$before" ] \
+      || fail "$state collision changed the tripwire"
+    assert_no_grep "session stop $name " "$FAKE_LOG" "$state collision reached stop"
+    assert_no_grep "session delete $name " "$FAKE_LOG" "$state collision reached delete"
+    assert_no_grep "server --session $name" "$FAKE_LOG" "$state collision restarted the session"
+    assert_no_grep "provision $name" "$dir/helper.log" "$state collision was adopted"
+    assert_no_grep "teardown $name" "$dir/helper.log" "$state collision was cleaned up"
+    run_with_fake "$ROOT/bin/fm-herdr-lab.sh" teardown "$name" || fail "collision test-owned session teardown failed"
+  done
+  pass "fm-herdr-lab: executable reboot fixture preserves running and stopped collisions"
+}
+
+test_reboot_fixture_cleans_fresh_claim_on_provision_failure() {
+  local name="fm-lab-reboot-failure-$$" dir="$TMP_ROOT/reboot-failure" status=0
+  make_reboot_lab_wrapper "$dir"
+  : > "$FAKE_LOG"
+  run_reboot_with_fake "$dir" "$name" > "$dir/output" 2>&1 || status=$?
+  expect_code 73 "$status" "freshly claimed reboot provision failure must retain its failure status"
+  assert_present "$dir/prepared.json" "reboot provision did not receive a successful fresh claim"
+  assert_grep "prepare $name" "$dir/helper.log" "reboot fixture did not prepare its fresh session"
+  assert_grep "provision $name" "$dir/helper.log" "reboot fixture did not reach injected provision failure"
+  assert_grep "teardown $name" "$dir/helper.log" "reboot fixture did not clean its claimed session"
+  assert_absent "$TRIPWIRES/$name.fleet-state.json" "reboot provision failure retained its owned tripwire"
+  assert_absent "$FAKE_STATE/$name" "failed reboot provision unexpectedly created a session"
+  assert_no_grep "session stop $name " "$FAKE_LOG" "absent fresh session cleanup reached stop"
+  assert_no_grep "session delete $name " "$FAKE_LOG" "absent fresh session cleanup reached delete"
+  pass "fm-herdr-lab: executable reboot fixture cleans its fresh claim after provision failure"
+}
+
 test_stopped_owned_lab_can_reprovision() {
   local name="fm-lab-reprovision-$$"
   : > "$FAKE_LOG"
@@ -576,6 +696,10 @@ test_run_scopes_session_before_double_dash
 test_missing_tripwire_blocks_destruction
 test_changed_default_trips_after_teardown
 test_stopped_owned_lab_can_reprovision
+test_prepared_fresh_lab_can_provision
+test_invalid_prepared_tripwire_refuses_provision
+test_reboot_fixture_refuses_colliding_sessions
+test_reboot_fixture_cleans_fresh_claim_on_provision_failure
 test_failed_delete_retains_tripwire
 test_timed_out_provision_cancels_late_launch
 test_viewer_refuses_unowned_sessions

@@ -300,6 +300,7 @@ fm_backend_validate_spawn() {  # <name>
 #   - jq, for the JSON-emitting adapters (herdr, zellij, cmux) whose spawn/liveness
 #     paths parse the backend's JSON output (see each adapter's
 #     tool check, e.g. fm_backend_herdr_tool_check);
+#   - python3 for Herdr's kernel-backed process-environment ownership reader;
 #   - the treehouse worktree provider for every session-provider-only backend
 #     (tmux, herdr, zellij, cmux); orca owns its own task worktree and terminal,
 #     so it drops both treehouse and any other backend's session CLI.
@@ -308,7 +309,7 @@ fm_backend_validate_spawn() {  # <name>
 fm_backend_required_tools() {  # <backend>
   case "$1" in
     tmux)   printf '%s' 'tmux treehouse' ;;
-    herdr)  printf '%s' 'herdr jq treehouse' ;;
+    herdr)  printf '%s' 'herdr jq python3 treehouse' ;;
     zellij) printf '%s' 'zellij jq treehouse' ;;
     cmux)   printf '%s' 'cmux jq treehouse' ;;
     orca)   printf '%s' 'orca' ;;
@@ -933,7 +934,7 @@ fm_backend_busy_state() {  # <backend> <target>
 }
 
 # fm_backend_composer_state: classify the composer/input area of <target> as
-# empty|pending|pending-unproven|unknown for callers that need a pre-submit
+# empty|pending|pending-unproven|unknown-draft|unknown for callers that need a pre-submit
 # input guard, a submit acknowledgement, or a launch-readiness check. It is
 # exposed so a caller other than the send path (the away-mode daemon's
 # supervisor-pane pending-input guard in bin/fm-supervise-daemon.sh, and
@@ -944,7 +945,7 @@ fm_backend_busy_state() {  # <backend> <target>
 # fm_composer_classify_screen) - so no backend can hold a private shape
 # assumption; zellij's classifier reads `dump-screen --ansi`, which replaced
 # its old no-classifier content-diff reporting.
-fm_backend_composer_state() {  # <backend> <target> [expected-label] -> empty|pending|pending-unproven|unknown
+fm_backend_composer_state() {  # <backend> <target> [expected-label] -> empty|pending|pending-unproven|unknown-draft|unknown
   local backend=$1
   shift
   fm_backend_source "$backend" || { printf 'unknown'; return 0; }
@@ -1021,8 +1022,8 @@ fm_backend_target_exists() {  # <backend> <target> [expected-label]
 # requires exact recorded session and window membership, with inventory-read
 # classification owned by fm_backend_tmux_window_inventory; the Herdr adapter
 # reuses its strict husk classifier -
-# which verifies a registered agent against `pane process-info` and the real
-# process table, so a registration Herdr kept over a shell-only pane reads
+# which consults `pane process-info` and the real process table even when
+# registration is absent, so a registration Herdr kept over a shell-only pane reads
 # `dead` here (issue #4115) - then maps a positively stopped session server to
 # `missing` only in this recovery-grade view. Zellij remains unverified because
 # its secondmate ghost-tab and agent-process recovery path has not been

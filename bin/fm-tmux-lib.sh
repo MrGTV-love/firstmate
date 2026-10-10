@@ -167,12 +167,12 @@ EOF
 
 # fm_tmux_composer_state: the tmux composer verdict - a thin adapter over the
 # shared screen classifier. The verdict contract (empty | pending |
-# pending-unproven | unknown, positive proof required for empty, unrecognized
+# pending-unproven | unknown-draft | unknown, positive proof required for empty, unrecognized
 # future verdicts failing safe) is owned by bin/fm-composer-lib.sh. Identity
 # is fetched lazily, only when the classifier reports the verdict depends on
 # it (a pi separator pair under the cursor), so the common read never pays
 # for the process probe.
-fm_tmux_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown
+fm_tmux_composer_state() {  # <target> -> empty|pending|pending-unproven|unknown-draft|unknown
   local target=$1 cy pane verdict identity
   cy=$(fm_tmux_composer_cursor_row "$target") || { printf 'unknown'; return 0; }
   case "$cy" in ''|*[!0-9]*) printf 'unknown'; return 0 ;; esac
@@ -273,6 +273,31 @@ EOF
 # swallowed Enter leaves our text in the composer and retyping would duplicate
 # it. Echoes the final proof-carrying verdict on stdout so callers can require
 # exact `empty` before treating submission as confirmed.
+# Busy-queued Enter (opencode 1.18.4): the harness accepts Enter while mid-turn
+# and queues it for after the current turn, but keeps the typed text visible in
+# the composer. Once the Enter-retry budget is spent and a structurally proven
+# composer still reads "pending", a non-omp harness falls back to
+# `fm_pane_is_busy`: a busy pane means the Enter was accepted and queued (report
+# `empty` so the caller does not re-send), while an idle pane keeps `pending` as
+# a genuine swallow. Pending-unproven receives the same Enter retry budget but
+# never reaches this exception.
+# Turn-started confirmation (the strict blank-row posture's counterpart): a
+# harness whose mid-turn screen the classifier cannot positively identify (pi
+# replaces its separated composer while working) reads `unknown` right after a
+# successful submit. When and only when the pane was IDLE before the text was
+# typed, an idle-to-busy transition across our Enter is proof the harness
+# accepted the submission - the same semantic signal herdr's native
+# agent-state confirmation uses, read from the pane's verified busy footer.
+# The busy read is polled across the remaining retry budget because the turn
+# takes a beat to render. Without the baseline (a direct
+# fm_tmux_submit_enter_core caller, or a pane already busy before typing) an
+# `unknown` or `unknown-draft` verdict is preserved untouched: busy conversion
+# without transition evidence could mark an undelivered message delivered.
+# A positively identified omp foreground process, or an unavailable identity,
+# never receives either busy conversion: an independent watcher turn cannot
+# prove that Enter consumed the typed payload, so its unconfirmed verdict stays
+# `pending`, except that `unknown-draft` keeps its more specific draft-risk
+# signal so callers defer for the same reason.
 fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle] [foreground-command]
   local target=$1 retries=$2 sleep_s=$3 baseline_idle=${4:-} harness=${5-} i=0 j state
   if [ "$#" -lt 5 ]; then
@@ -290,9 +315,13 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
     fi
     case "$state" in
       pending|pending-unproven) ;;
-      unknown)
+      unknown|unknown-draft)
         if [ "$harness" = omp ] || [ "$harness" = unavailable ]; then
-          printf 'pending'
+          if [ "$state" = unknown-draft ]; then
+            printf 'unknown-draft'
+          else
+            printf 'pending'
+          fi
           return 0
         fi
         if [ "$baseline_idle" = 1 ]; then
@@ -306,7 +335,7 @@ fm_tmux_submit_enter_core() {  # <target> <retries> <enter-sleep> [baseline-idle
             [ "$j" -ge "$retries" ] || sleep "$sleep_s"
           done
         fi
-        printf 'unknown'
+        printf '%s' "$state"
         return 0
         ;;
       *) printf '%s' "$state"; return 0 ;;

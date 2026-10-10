@@ -33,11 +33,13 @@ cat > "$FAKE_PS" <<'SH'
 #!/usr/bin/env bash
 case "$*" in
   "-axo pid=,ppid=") printf '1 0\n67 1\n' ;;
+  "-axo pid=,ppid=,comm=") printf '1 0 init\n67 1 sh\n' ;;
   "-p 67 -o stat=") printf 'Ss\n' ;;
   *) exit 1 ;;
 esac
 SH
 chmod +x "$FAKE_PS"
+export FM_HERDR_PS_BIN="$FAKE_PS"
 LINUX_PROCESS_INFO='{"result":{"type":"pane_process_info","process_info":{"pane_id":"w2:p1","shell_pid":67,"foreground_process_group_id":67,"foreground_processes":[{"argv":["/bin/sh"],"name":"sh","pid":67}]}}}'
 argv_pid=$(
   # shellcheck disable=SC2329 # invoked indirectly by the idle-shell proof.
@@ -168,6 +170,13 @@ fm_backend_herdr_cli() {
         unknown) printf '%s\n' '{"error":{"code":"internal_error"}}' >&2; return 1 ;;
       esac
       ;;
+    "pane process-info")
+      if [ "$(cat "$FIXTURE_DIR/agent")" = live ] || [ -e "$FIXTURE_DIR/process-live" ]; then
+        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":67,"foreground_processes":[{"pid":68,"name":"omp","argv":["omp"]}]}}}\n' "$PANE"
+      else
+        printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":67,"foreground_processes":[{"pid":67,"name":"sh","argv":["/bin/sh"]}]}}}\n' "$PANE"
+      fi
+      ;;
     "api snapshot")
       : > "$FIXTURE_DIR/snapshotted"
       printf '{"result":{"snapshot":{"focused_workspace_id":"w1","focused_tab_id":"%s","focused_pane_id":"w1:p1","workspaces":' "$(cat "$FIXTURE_DIR/active-tab")"
@@ -272,6 +281,8 @@ pass "v2 cleanup requires and accepts the exact journal endpoint binding"
 reset_fixture; : > "$FM_STATE_OVERRIDE/$ID.meta"; assert_preserved "current task metadata"
 reset_fixture; printf 'live\n' > "$FIXTURE_DIR/agent"; assert_preserved "registered agent"
 reset_fixture; printf 'unknown\n' > "$FIXTURE_DIR/agent"; assert_preserved "unknown agent"
+reset_fixture; : > "$FIXTURE_DIR/process-live"; assert_preserved "unregistered live harness"
+reset_fixture; : > "$FIXTURE_DIR/error-pane-process-info"; assert_preserved "unregistered unreadable process evidence"
 reset_fixture; printf '2\n' > "$FIXTURE_DIR/tabs"; printf '2\n' > "$FIXTURE_DIR/panes"; assert_preserved "multiple tabs"
 reset_fixture; printf '2\n' > "$FIXTURE_DIR/panes"; assert_preserved "multiple panes"
 reset_fixture; : > "$FIXTURE_DIR/process-unsafe"; assert_preserved "non-idle shell"

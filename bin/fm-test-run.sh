@@ -173,8 +173,9 @@
 # rule, and the starter's src/core/ client, which bin/fm-skill-pick.mjs imports.
 # tests/lib.sh, tests/fixtures.sh, tests/*-helpers.sh and tests/*-fixture.sh are
 # shared files that map to the suites naming them; a fixture under
-# tests/fixtures/<dir>/ is mapped by that directory instead. Curated family arms
-# above those also name individual tests/ files explicitly.
+# tests/fixtures/<dir>/ is mapped by that directory instead. The flat omp ANSI
+# captures select their exact composer consumer. Curated family arms above
+# those also name individual tests/ files explicitly.
 # Deleted test assets still select remaining suites that reference them; an
 # unreferenced retired asset selects nothing. Vendored bin/ten-levels/ files
 # select the jev-guard behavior suite.
@@ -228,7 +229,7 @@ CHANGED_DEFAULT_TIMEOUT_SECS=1500
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=10
+PORTABLE_SERIAL_SHARDS=11
 
 # Conservative balance hint for a portable-serial script with no measurement.
 # Rounded above the current CI mean, including the capability-skipped scripts.
@@ -401,7 +402,7 @@ family_for_basename() {
     fm-opencode-primary-live-e2e.test.sh|fm-pi-branch-live-e2e.test.sh|\
     fm-pi-branch-responsiveness-live-e2e.test.sh|\
     fm-pi-watch-loader-live.test.sh|\
-    fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|\
+    fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|fm-omp-reboot-live-e2e.test.sh|\
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|fm-omp-fallback-chain-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
     fm-pr-state-live-e2e.test.sh|\
@@ -418,6 +419,7 @@ family_for_basename() {
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
     fm-tmux-agent-liveness.test.sh|\
     fm-control.test.sh|fm-control-relaunch.test.sh|\
+    fm-launch-proof.test.sh|\
     fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
     fm-send-inbox.test.sh|fm-spawn-batch.test.sh|\
@@ -428,6 +430,7 @@ family_for_basename() {
     fm-spawn-acquisition-cleanup.test.sh|\
     fm-spawn-compact-adviser-disable.test.sh|\
     fm-spawn-compact-adviser-disable-remote.test.sh|\
+    fm-spawn-herdr-launch-shell.test.sh|\
     fm-project-capacity.test.sh|\
     fm-teardown-endpoint-safety.test.sh)
       printf '%s\n' backend-dispatch
@@ -770,6 +773,9 @@ tests/fm-codex-continuity-live-e2e.test.sh 108
 tests/fm-codex-hook-layer-live-e2e.test.sh 108
 tests/fm-composer-codex-idle-live-e2e.test.sh 229
 tests/fm-composer-matrix-live-e2e.test.sh 51
+tests/fm-composer-native-band.test.sh 139054
+tests/fm-composer-native-continuation.test.sh 688995
+tests/fm-composer-native-idle-hint.test.sh 4023
 tests/fm-contributions.test.sh 140911
 tests/fm-control-relaunch.test.sh 338205
 tests/fm-control.test.sh 72794
@@ -819,6 +825,7 @@ tests/fm-jev-mem-guard.test.sh 336
 tests/fm-keep-ai-trailers-home-local.test.sh 27929
 tests/fm-kimi-harness.test.sh 58917
 tests/fm-launch-prompt-signals-live-e2e.test.sh 50
+tests/fm-launch-proof.test.sh 79431
 tests/fm-lint-workflows.test.sh 872
 tests/fm-live-gate.test.sh 7452
 tests/fm-live-lab-up-mate.test.sh 17363
@@ -915,6 +922,7 @@ tests/fm-spawn-claude-api-key-guard.test.sh 56894
 tests/fm-spawn-compact-adviser-disable-remote.test.sh 170462
 tests/fm-spawn-compact-adviser-disable.test.sh 85958
 tests/fm-spawn-dispatch-profile.test.sh 314611
+tests/fm-spawn-herdr-launch-shell.test.sh 60679
 tests/fm-spawn-orca-worktree.test.sh 2433
 tests/fm-spawn-pool-base-freshen.test.sh 68652
 tests/fm-spawn-worktree-settle.test.sh 9309
@@ -1782,6 +1790,13 @@ families_for_changed_path() {
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       ;;
+    bin/fm-launch-proof-lib.sh|bin/fm-reboot-recover.sh)
+      printf '%s\n' backend-dispatch
+      printf '%s\n' session-bootstrap
+      printf '%s\n' "__script__:fm-supervision-events.test.sh"
+      printf '%s\n' "__script__:fm-omp-reboot-live-e2e.test.sh"
+      printf '%s\n' "__script__:fm-omp-composer-box-live-e2e.test.sh"
+      ;;
     bin/fm-composer-lib.sh)
       # The shared shape catalogue is vendor-rendered signal; a change to it
       # re-selects the live guard (fm-composer-matrix-live-e2e) alongside the
@@ -1789,6 +1804,11 @@ families_for_changed_path() {
       printf '%s\n' backend-dispatch
       printf '%s\n' pure-contract-unit
       printf '%s\n' live-harness-optin
+      printf '%s\n' "__script__:fm-composer-native-band.test.sh"
+      printf '%s\n' "__script__:fm-composer-native-continuation.test.sh"
+      printf '%s\n' "__script__:fm-composer-native-idle-hint.test.sh"
+      printf '%s\n' "__script__:fm-task-inbox.test.sh"
+      printf '%s\n' "__script__:fm-wake-queue.test.sh"
       ;;
     bin/fm-spawn.sh)
       printf '%s\n' backend-dispatch
@@ -1869,6 +1889,13 @@ families_for_changed_path() {
       # source this one as well: most suites inherit it only through them.
       families_for_test_reference git-config-helpers.sh lib.sh herdr-test-safety.sh \
         || printf '%s\n' "__unmapped__:$path"
+      ;;
+    tests/fixtures/omp-bordered-empty.ansi|tests/fixtures/omp-bordered-pending.ansi)
+      printf '%s\n' "__script__:fm-composer-lib.test.sh"
+      ;;
+    tests/fixtures/omp-native-band-empty.ansi|tests/fixtures/omp-native-band-pending.ansi|\
+    tests/fixtures/omp-native-band-18.8.1-empty.ansi|tests/fixtures/omp-native-band-18.8.1-worktree-empty.ansi)
+      printf '%s\n' "__script__:fm-composer-native-band.test.sh"
       ;;
     tests/fixtures/*/*)
       # A fixture belongs to whichever suite reads its directory, found by the

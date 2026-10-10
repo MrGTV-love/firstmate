@@ -67,6 +67,20 @@ make_named_shells() {  # <dir> -> echoes <bindir>
 test_detection_anchored_name_and_marker_precedence() {
   local bin out
   bin=$(make_named_shells "$TMP_ROOT/named")
+  # Keep real process evidence inside this fixture's ancestry. Otherwise an
+  # actual omp running this suite makes every decoy inherit an omp ancestor.
+  local -x FM_TEST_DETECTION_BOUNDARY=$$ FM_TEST_REAL_PS
+  FM_TEST_REAL_PS=$(command -v ps)
+  local PATH="$bin:$PATH"
+  cat > "$bin/ps" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = "-o ppid= -p $FM_TEST_DETECTION_BOUNDARY" ]; then
+  printf '1\n'
+else
+  exec "$FM_TEST_REAL_PS" "$@"
+fi
+SH
+  chmod +x "$bin/ps"
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
     "$bin/omp" -c '"$1"; :' _ "$HARNESS")
@@ -116,6 +130,9 @@ if [ -n "${FM_FAKE_OMP_ENV_LOG:-}" ]; then
   printf '%s:%s\n' "${1:-launch}" "${PI_CODING_AGENT_DIR:-}" >> "$FM_FAKE_OMP_ENV_LOG"
 fi
 case "$1" in
+  --version)
+    printf 'omp/%s\n' "${FM_FAKE_OMP_VERSION:-18.1.20}"
+    ;;
   models)
     if [ -f "${PI_CODING_AGENT_DIR:-}/catalog.json" ]; then
       cat "$PI_CODING_AGENT_DIR/catalog.json"
@@ -157,6 +174,34 @@ run_scout_spawn() {  # <home> <wt> <fakebin> <launch-log> <spawn-args...>
   local home=$1 wt=$2 fakebin=$3 launchlog=$4
   shift 4
   FM_FAKE_LAUNCH_LOG="$launchlog" fm_test_run_spawn "$home" "$wt" "$fakebin" "$@" --scout
+}
+
+test_spawn_refuses_unsupported_omp_before_launch() {
+  local kind version rec id out status
+  local -a args
+  for kind in ship scout secondmate; do
+    for version in 18.1.11 18.1.19; do
+      id="omp-old-$kind-${version##*.}"
+      rec=$(make_spawn_case "$id" omp "$id")
+      read_case_record "$rec"
+      case "$kind" in
+        ship) args=(--mode local-only --yolo off) ;;
+        scout) args=(--scout) ;;
+        secondmate) args=(--secondmate) ;;
+      esac
+      out=$(FM_BACKEND=tmux FM_FAKE_OMP_VERSION="$version" FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+        fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --harness omp "${args[@]}")
+      status=$?
+      expect_code 1 "$status" "unsupported omp must refuse $kind: $out"
+      assert_contains "$out" "installed omp version 'omp/$version'" "refusal must name installed version"
+      assert_contains "$out" "minimum supported version is 18.1.20" "refusal must name minimum"
+      assert_contains "$out" "omp update" "refusal must name upgrade step"
+      [ ! -s "$LAUNCH_LOG" ] || fail "unsupported omp reached $kind launch"
+      assert_absent "$HOME_DIR/state/$id.meta" "refused launch must not publish task metadata"
+      assert_absent "$HOME_DIR/state/$id.omp-ext.ts" "refused launch must not install task extension"
+    done
+  done
+  pass "fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch"
 }
 
 test_spawn_launch_line_and_worker_wiring() {
@@ -260,7 +305,7 @@ try {
   process.env.FM_JEV_GUARD_BASE_URL = `${base}/direct`;
   process.env.FM_JEV_GUARD_OPENROUTER_URL = `${base}/fallback`;
   const handlers = {};
-  (await import(pathToFileURL(process.env.EXT_PATH))).default({ on: (name, fn) => { handlers[name] = fn; } });
+  (await import(pathToFileURL(process.env.EXT_PATH))).default({ on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
   const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf customer-record" } }, { cwd: process.env.WT });
   if (process.env.PROJECT === "firstmate") {
     assert.equal(result?.block, true);
@@ -285,7 +330,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
   local rec id out status
   rec=$(make_spawn_case model-refused omp omp-model-refused-q2)
   read_case_record "$rec"
-  id=omp-model-refused-q2
+  id='omp-model-refused-q2'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-nope)
   status=$?
   expect_code 1 "$status" "a model absent from a listed provider must refuse"
@@ -294,7 +339,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 
   rec=$(make_spawn_case model-bridge omp omp-model-bridge-q3)
   read_case_record "$rec"
-  id=omp-model-bridge-q3
+  id='omp-model-bridge-q3'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model claude-bridge/claude-opus-4-8)
   status=$?
   expect_code 0 "$status" "an extension-registered provider must pass through: $out"
@@ -303,7 +348,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 
   rec=$(make_spawn_case model-fuzzy omp omp-model-fuzzy-q4)
   read_case_record "$rec"
-  id=omp-model-fuzzy-q4
+  id='omp-model-fuzzy-q4'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model astra)
   status=$?
   expect_code 0 "$status" "a bare fuzzy pattern is omp's own matcher's job: $out"
@@ -318,7 +363,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   local rec id out status
   rec=$(make_spawn_case role-missing omp omp-role-missing-q5)
   read_case_record "$rec"
-  id=omp-role-missing-q5
+  id='omp-role-missing-q5'
   printf 'modelRoles:\n  advisor: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -330,7 +375,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-unlisted omp omp-role-unlisted-q6)
   read_case_record "$rec"
-  id=omp-role-unlisted-q6
+  id='omp-role-unlisted-q6'
   printf 'modelRoles:\n  default: openai-codex/gpt-gone:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -340,7 +385,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-listed omp omp-role-listed-q7)
   read_case_record "$rec"
-  id=omp-role-listed-q7
+  id='omp-role-listed-q7'
   printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -348,7 +393,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-pinned omp omp-role-pinned-q8)
   read_case_record "$rec"
-  id=omp-role-pinned-q8
+  id='omp-role-pinned-q8'
   printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-astra)
   status=$?
@@ -356,7 +401,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-bridge omp omp-role-bridge-q10)
   read_case_record "$rec"
-  id=omp-role-bridge-q10
+  id='omp-role-bridge-q10'
   printf 'modelRoles:\n  default: claude-bridge/claude-opus-4-8:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -367,7 +412,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-unreadable omp omp-role-unreadable-q9)
   read_case_record "$rec"
-  id=omp-role-unreadable-q9
+  id='omp-role-unreadable-q9'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
   expect_code 0 "$status" "an unreadable roles config establishes nothing and must launch: $out"
@@ -376,7 +421,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
 test_spawn_global_config_is_read_only_and_unlayered() {
   local rec id out status agent_dir
-  id=omp-role-project-q11
+  id='omp-role-project-q11'
   rec=$(make_spawn_case role-project omp "$id")
   read_case_record "$rec"
   printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
@@ -390,7 +435,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   assert_absent "$HOME_DIR/state/$id.meta" "a refused project-layer spawn must publish no record"
   [ ! -s "$LAUNCH_LOG" ] || fail "a refused project-layer spawn must record no launch"
 
-  id=omp-role-malformed-q12
+  id='omp-role-malformed-q12'
   rec=$(make_spawn_case role-malformed omp "$id")
   read_case_record "$rec"
   printf 'modelRoles:\n  default: [unterminated\n' > "$GLOBAL_CONFIG"
@@ -405,7 +450,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   assert_present "$HOME_DIR/state/$id.meta" "malformed-config pass-through must publish the task"
   assert_contains "$(cat "$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "malformed-config pass-through must reach the launch"
 
-  id=omp-role-agent-dir-q13
+  id='omp-role-agent-dir-q13'
   rec=$(make_spawn_case role-agent-dir omp "$id")
   read_case_record "$rec"
   printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
@@ -426,7 +471,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   assert_grep "models:$agent_dir" "$CASE_DIR/omp-env.log" "catalog inspection must use the canonical launch directory"
   assert_grep "--config:$agent_dir" "$CASE_DIR/omp-env.log" "the launched omp must receive the checked directory despite pane inheritance and filtering"
 
-  id=omp-role-agent-dir-missing-q14
+  id='omp-role-agent-dir-missing-q14'
   rec=$(make_spawn_case role-agent-dir-missing omp "$id")
   read_case_record "$rec"
   printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
@@ -548,7 +593,7 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
       status=$?
       expect_code 0 "$status" "profile selection must pass through an unrelated $role default ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "a profile-selecting launch must publish the task"
-      assert_absent "$CASE_DIR/omp-env.log" "profile selection must establish no catalog evidence"
+      ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "profile selection must establish no catalog evidence"
       case "$mode" in
         env-omp | env-pi) ;;
         *) assert_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
@@ -633,7 +678,7 @@ EOF" ;;
       fi
       expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
-      assert_absent "$CASE_DIR/omp-env.log" "expanded raw launch must establish no catalog evidence"
+      ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "expanded raw launch must establish no catalog evidence"
       assert_absent "$CASE_DIR/expanded" "validation must not evaluate command substitutions"
       assert_absent "$CASE_DIR/errors.log" "validation must not evaluate redirections"
       assert_contains "$(cat "$LAUNCH_LOG")" "$command" "expanded raw command must reach the launch unchanged"
@@ -684,7 +729,7 @@ test_spawn_raw_omp_literal_evidence_still_refuses() {
       if [ "$role" = unlisted ]; then
         assert_grep "models:$launch_dir" "$CASE_DIR/omp-env.log" "literal evidence must probe the launch directory's catalog"
       else
-        assert_absent "$CASE_DIR/omp-env.log" "a missing literal default must refuse without a catalog probe"
+        ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "a missing literal default must refuse without a catalog probe"
       fi
     done
   done
@@ -820,10 +865,12 @@ const mod = await import(pathToFileURL(process.env.EXT_PATH).href);
 // agent_end.
 const registered = {};
 const handlers = {};
+// The extension API exposes the host SDK; the session proof only reads the
+// live registry from it inside its own handlers, which these modes never fire.
 mod.default({ on: (name, fn) => {
   (registered[name] ||= []).push(fn);
   handlers[name] = async (...args) => { for (const h of registered[name]) await h(...args); };
-} });
+}, pi: { AgentRegistry: { global: () => ({}) } } });
 // ctx.isIdle() reads false at a natural TUI agent_end on omp; the extension
 // must go idle on a plain agent_end regardless of it.
 const ctx = { isIdle: () => false };
@@ -906,7 +953,8 @@ test_control_composer_and_model_tables() {
   [ "$(fm_control_interrupt_key omp)" = Escape ] || fail "omp interrupt key must be Escape"
   [ "$(fm_control_interrupt_repeat omp)" = 1 ] || fail "omp interrupts on a single press"
   [ -z "$(fm_control_interrupt_clear_key omp)" ] || fail "omp leaves its composer empty and needs no clear key"
-  [ "$(fm_control_harness_wiring_paths omp /wt /st id1)" = "/st/id1.omp-ext.ts" ] || fail "omp wiring path must be the state-resident extension"
+  [ "$(fm_control_harness_wiring_paths omp /wt /st id1)" = $'/st/id1.omp-ext.ts\n/st/id1.omp-session.json' ] \
+    || fail "omp wiring paths must be the state-resident extension and its current-session record"
   printf 'Working…\n' | fm_busy_lines_match omp || fail "omp busy regex must match the TUI ellipsis form"
   printf 'Working...\n' | fm_busy_lines_match omp && fail "omp busy regex must not match the three-dot form no supervised pane renders"
   printf ' ⠧ 11s  · gpt-6-astra\n' | fm_busy_lines_match omp || fail "omp busy regex must match the braille spinner plus elapsed cell"
@@ -1001,6 +1049,9 @@ test_ownership_proof_is_omp_keyed() {
 install_omp_extension_fixture() {  # <repo>
   local repo=$1
   mkdir -p "$repo/.omp/extensions" "$repo/.pi/extensions/lib" "$repo/bin" "$repo/node_modules/typebox"
+  mkdir -p "$repo/.omp/extensions/lib"
+  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$repo/.omp/extensions/lib/"
+  cp "$ROOT/bin/fm-parent-channel-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$ROOT/bin/fm-status-record-lib.sh" "$repo/bin/"
   cp "$ROOT/.omp/extensions/fm-primary-turnend-guard.ts" "$ROOT/.omp/extensions/fm-primary-omp-watch.ts" "$repo/.omp/extensions/"
   cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" \
     "$ROOT/.pi/extensions/lib/fm-watch-lifecycle.ts" "$repo/.pi/extensions/lib/"
@@ -1425,6 +1476,267 @@ EOF
   pass ".omp watch extension: a host close split across stream chunks reaches main as one whole follow-up"
 }
 
+test_task_session_proof_tracks_active_session() {
+  local case_dir="$TMP_ROOT/task-session-proof" status
+  mkdir -p "$case_dir/extension"
+  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$case_dir/extension/"
+  FM_PROOF_CASE="$case_dir" EXT="$case_dir/extension/fm-task-session.ts" node --input-type=module <<'EOF'
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync, existsSync, realpathSync, mkdirSync, symlinkSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
+const { installTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
+const state = process.env.FM_PROOF_CASE;
+const sessions = `${state}/sessions`, linkedSessions = `${state}/linked-sessions`;
+mkdirSync(sessions);
+symlinkSync(sessions, linkedSessions, "dir");
+const task = `${linkedSessions}/task.jsonl`, personal = `${linkedSessions}/personal.jsonl`;
+const canonicalTask = `${realpathSync(sessions)}/task.jsonl`;
+writeFileSync(personal, "{}\n");
+writeFileSync(`${state}/demo.meta`, "spawn_gen=proof-gen\n");
+process.env.FM_SPAWN_GEN = "proof-gen";
+const handlers = new Map(), warnings = [];
+const pi = { pi: { AgentRegistry: { global() { return { list() { return globalThis.proofRefs; } }; } } }, on(event, handler) { handlers.set(event, handler); } };
+installTaskSessionProof(pi, state, "demo");
+let file = task;
+const ctx = { agent: { kind: "main", id: "Main" }, sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
+let transitionSettled = Promise.resolve();
+globalThis.proofSession = { sessionManager: ctx.sessionManager, waitForSessionTransition() { globalThis.proofWaitStarted?.(); return transitionSettled; } };
+globalThis.proofRefs = [{ kind: "sub", session: null }, { kind: "sub", session: { sessionManager: {} } }, { kind: "main", session: globalThis.proofSession }];
+const flush = () => new Promise(resolve => setImmediate(resolve));
+const start = (context = ctx) => handlers.get("session_start")({}, context);
+const stop = () => handlers.get("session_shutdown")({}, ctx);
+const beforeSwitch = () => handlers.get("session_before_switch")({ targetSessionFile: personal, reason: "resume" }, ctx);
+const afterSwitch = () => handlers.get("session_switch")({ previousSessionFile: task, reason: "resume" }, ctx);
+const record = () => JSON.parse(readFileSync(`${state}/demo.omp-session.json`, "utf8"));
+const begin = (event, context = ctx) => {
+  let settle, started;
+  transitionSettled = new Promise(resolve => { settle = resolve; });
+  const waiting = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`${event} did not await its transition owner`)), 5000);
+    started = () => { clearTimeout(timeout); resolve(); };
+  });
+  globalThis.proofWaitStarted = started;
+  handlers.get(event)({}, context);
+  return { settle, waiting };
+};
+assert.equal(existsSync(task), false);
+start();
+assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: canonicalTask, current_session_file: canonicalTask });
+assert.equal(existsSync(task), false);
+writeFileSync(task, "{}\n");
+start();
+assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: realpathSync(task), current_session_file: realpathSync(task) });
+const parentProof = record();
+const events = ["session_start", "session_switch", "session_branch", "session_before_switch", "session_before_branch", "session_shutdown"];
+for (const childFile of [personal, undefined]) {
+  const manager = { getSessionFile() { return childFile; } };
+  const childSession = { sessionManager: manager, waitForSessionTransition() { throw new Error("child transition must not be awaited"); } };
+  for (const kind of ["sub", "advisor"]) {
+    const ref = { kind, session: childSession };
+    globalThis.proofRefs.push(ref);
+    for (const childCtx of [{ agent: { kind }, sessionManager: manager, ui: ctx.ui }, { sessionManager: manager, ui: ctx.ui }]) {
+      for (const event of events) {
+        handlers.get(event)({}, childCtx);
+        assert.deepEqual(record(), parentProof, `${event} from ${childFile ? "persisted" : "in-memory"} ${kind} must preserve parent proof`);
+      }
+    }
+    globalThis.proofRefs.pop();
+  }
+  for (const event of events) {
+    handlers.get(event)({}, { agent: { kind: "main" }, sessionManager: manager, ui: ctx.ui });
+    assert.deepEqual(record(), parentProof, `${event} from an unregistered manager must preserve parent proof`);
+  }
+}
+for (const context of [ctx, { sessionManager: ctx.sessionManager, ui: ctx.ui }]) {
+  for (const event of ["session_before_switch", "session_before_branch"]) {
+    for (const outcome of ["cancel", "rollback", "rollback-after-activation"]) {
+      for (const predecessor of [task, personal]) {
+        file = predecessor; start(context);
+        const prior = record();
+        const { settle, waiting } = begin(event, context);
+        assert.equal(record().current_session_file, "");
+        await waiting;
+        assert.equal(record().current_session_file, "", `${event} must remain unproven while pending`);
+        if (outcome !== "cancel") {
+          file = predecessor === task ? personal : task;
+          if (outcome === "rollback-after-activation") {
+            handlers.get(event === "session_before_switch" ? "session_switch" : "session_branch")({}, context);
+            assert.equal(record().current_session_file, realpathSync(file));
+          }
+          await flush();
+          assert.equal(record().current_session_file, outcome === "rollback" ? "" : realpathSync(file));
+          file = predecessor;
+        }
+        settle();
+        await flush();
+        assert.deepEqual(record(), prior, `${event} ${outcome} must restore only the settled predecessor`);
+      }
+    }
+  }
+}
+file = task; start();
+for (const event of ["session_before_switch", "session_before_branch"]) {
+  let transition = begin(event);
+  await transition.waiting;
+  file = personal;
+  transition.settle();
+  await flush();
+  assert.equal(record().current_session_file, "", `${event} must not restore after an unannounced identity change`);
+  file = task; start();
+  transition = begin(event);
+  await transition.waiting;
+  stop();
+  transition.settle();
+  await flush();
+  assert.equal(record().current_session_file, "", `${event} must not restore after shutdown`);
+  start();
+}
+transitionSettled = Promise.resolve();
+stop();
+assert.equal(record().current_session_file, "");
+assert.equal(record().task_session_file, realpathSync(task));
+file = task; start();
+beforeSwitch();
+assert.equal(record().current_session_file, "");
+assert.equal(record().task_session_file, realpathSync(task));
+file = personal; afterSwitch();
+assert.equal(record().current_session_file, realpathSync(personal));
+assert.equal(record().task_session_file, realpathSync(task));
+// Reloading the extension in the personal session must not rebind the task.
+installTaskSessionProof(pi, state, "demo"); start();
+assert.equal(record().task_session_file, realpathSync(task));
+handlers.get("session_before_branch")({}, ctx);
+assert.equal(record().current_session_file, "");
+file = task; handlers.get("session_branch")({ previousSessionFile: personal }, ctx);
+assert.equal(record().current_session_file, record().task_session_file);
+const originalWarn = console.warn; console.warn = () => {};
+try {
+  await flush();
+  const registered = globalThis.proofRefs;
+  for (const event of events) {
+    for (const refs of [registered.slice(0, 2), [...registered, { kind: "main", session: globalThis.proofSession }]]) {
+      start();
+      const prior = record();
+      globalThis.proofRefs = refs;
+      const count = warnings.length;
+      handlers.get(event)({}, { sessionManager: ctx.sessionManager, ui: ctx.ui });
+      await flush();
+      assert.deepEqual(record(), prior, `${event} without a unique registered owner must preserve parent proof`);
+      assert.equal(warnings.length, count);
+      globalThis.proofRefs = registered;
+    }
+  }
+  for (const event of ["session_before_switch", "session_before_branch"]) {
+    start();
+    const transition = begin(event, { sessionManager: ctx.sessionManager, ui: ctx.ui });
+    await transition.waiting;
+    globalThis.proofRefs = registered.slice(0, 2);
+    transition.settle();
+    await flush();
+    assert.equal(record().current_session_file, "", `${event} must not restore after its owner is unregistered`);
+    globalThis.proofRefs = registered;
+  }
+  start();
+  beforeSwitch();
+  file = `${linkedSessions}/absent.jsonl`;
+  afterSwitch();
+  assert.equal(record().current_session_file, `${realpathSync(sessions)}/absent.jsonl`);
+  assert.equal(record().task_session_file, realpathSync(task));
+  assert.notEqual(record().current_session_file, record().task_session_file);
+  assert.equal(existsSync(file), false);
+  installTaskSessionProof(pi, state, "demo"); start();
+  assert.equal(record().task_session_file, realpathSync(task));
+  file = task; start();
+  assert.equal(record().current_session_file, record().task_session_file);
+  beforeSwitch();
+  file = `${linkedSessions}/missing-parent/session.jsonl`;
+  assert.throws(afterSwitch, { code: "ENOENT" });
+  assert.equal(record().current_session_file, "");
+  assert.equal(record().task_session_file, realpathSync(task));
+  assert.ok(warnings.length);
+  file = `${personal}/session.jsonl`;
+  assert.throws(start, { code: "ENOTDIR" });
+  assert.equal(record().current_session_file, "");
+  assert.equal(record().task_session_file, realpathSync(task));
+  writeFileSync(`${state}/demo.meta`, "spawn_gen=other-gen\n");
+  file = task; assert.throws(start);
+  assert.equal(record().current_session_file, "");
+  writeFileSync(`${state}/wrong.meta`, "spawn_gen=other-gen\n");
+  installTaskSessionProof(pi, state, "wrong");
+  assert.throws(start);
+  assert.equal(existsSync(`${state}/wrong.omp-session.json`), false);
+  writeFileSync(`${state}/corrupt.meta`, "spawn_gen=proof-gen\n");
+  writeFileSync(`${state}/corrupt.omp-session.json`, "{bad");
+  installTaskSessionProof(pi, state, "corrupt");
+  assert.throws(start);
+  assert.equal(readFileSync(`${state}/corrupt.omp-session.json`, "utf8"), "{bad");
+  // Relaunch replaces the old generation's binding before its JSONL exists.
+  const replacement = `${linkedSessions}/replacement.jsonl`;
+  const canonicalReplacement = `${realpathSync(sessions)}/replacement.jsonl`;
+  writeFileSync(`${state}/demo.meta`, "spawn_gen=replacement-gen\n");
+  const child = spawnSync(process.execPath, ["--input-type=module", "-"], {
+    encoding: "utf8",
+    env: { ...process.env, FM_SPAWN_GEN: "replacement-gen", FM_REPLACEMENT_FILE: replacement },
+    input: `
+      import assert from "node:assert/strict";
+      import { existsSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
+      import { pathToFileURL } from "node:url";
+      const { installTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
+      const state = process.env.FM_PROOF_CASE;
+      const handlers = new Map();
+      const pi = { pi: { AgentRegistry: { global() { return { list() { return globalThis.proofRefs; } }; } } }, on(event, handler) { handlers.set(event, handler); } };
+      installTaskSessionProof(pi, state, "demo");
+      let file = process.env.FM_REPLACEMENT_FILE;
+      const ctx = { sessionManager: { getSessionFile() { return file; } } };
+      globalThis.proofRefs = [{ kind: "main", session: { sessionManager: ctx.sessionManager, waitForSessionTransition() { return Promise.resolve(); } } }];
+      const start = () => handlers.get("session_start")({}, ctx);
+      const record = () => JSON.parse(readFileSync(state + "/demo.omp-session.json", "utf8"));
+      const canonical = ${JSON.stringify(canonicalReplacement)};
+      assert.equal(existsSync(file), false);
+      start();
+      const expected = { version: 1, spawn_gen: "replacement-gen", pid: process.pid, task_session_file: canonical, current_session_file: canonical };
+      assert.deepEqual(record(), expected);
+      assert.equal(existsSync(file), false);
+      writeFileSync(file, "{}\\n");
+      start();
+      assert.deepEqual(record(), expected);
+      file = ${JSON.stringify(personal)};
+      start();
+      assert.deepEqual(record(), { ...expected, current_session_file: realpathSync(file) });
+      assert.notEqual(record().current_session_file, record().task_session_file);
+      file = ${JSON.stringify(`${linkedSessions}/replacement-personal.jsonl`)};
+      start();
+      assert.equal(existsSync(file), false);
+      assert.deepEqual(record(), { ...expected, current_session_file: ${JSON.stringify(`${realpathSync(sessions)}/replacement-personal.jsonl`)} });
+      installTaskSessionProof(pi, state, "demo"); start();
+      assert.equal(record().task_session_file, canonical);
+      file = process.env.FM_REPLACEMENT_FILE; start();
+      assert.deepEqual(record(), expected);
+    `,
+  });
+  assert.equal(child.status, 0, child.stderr || child.error?.message);
+  assert.notEqual(child.pid, process.pid);
+  assert.deepEqual(record(), { version: 1, spawn_gen: "replacement-gen", pid: child.pid, task_session_file: canonicalReplacement, current_session_file: canonicalReplacement });
+  delete process.env.FM_SPAWN_GEN;
+  installTaskSessionProof(pi, state, "absent");
+  start();
+  assert.equal(existsSync(`${state}/absent.omp-session.json`), false);
+} finally { console.warn = originalWarn; }
+EOF
+  status=$?
+  expect_code 0 "$status" "omp task-session proof follows activation and fails closed"
+  pass ".omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement"
+}
+
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
+  "$FM_TEST_ONLY"
+  exit $?
+fi
+
+test_task_session_proof_tracks_active_session
+test_spawn_refuses_unsupported_omp_before_launch
 # omp puts a queued user follow-up back into the composer when a run is
 # interrupted (Esc, including fm-control interrupt) or dequeued (Alt+Up), which
 # leaves a delivered watcher wake unsubmitted. The watch extension must find that
@@ -1466,7 +1778,8 @@ SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
   # Output goes to a file, not a pipe: the fixture's long-lived arm child would
   # otherwise hold a command substitution open for its whole sleep.
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+  # Use production readiness bounds: a slow login shell is not a lost wake.
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
     FM_OMP_SUCCESSOR_GRACE_MS=100 \
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
@@ -1906,8 +2219,9 @@ switch (process.env.SCENARIO) {
         const stored = JSON.parse(readFileSync(handoff, "utf8"));
         if (stored.pending.length !== 1 || stored.pending[0].delivered || !wake.includes(stored.pending[0].message)) throw new Error("unsubmitted duplicate did not retain its handoff record");
         await handlers.get("session_start")({}, ctx);
-        for (let i = 0; i < 60 && sent.length < 4; i += 1) await sleep(100);
-        if (sent.length !== 4 || sent[3].m !== wake || sent[3].o?.deliverAs !== undefined) throw new Error("idle replacement did not replay the unsubmitted duplicate as its own turn");
+        // As for initial delivery, allow readiness, retirement, and bounded retry.
+        for (let i = 0; i < 600 && sent.length < 4; i += 1) await sleep(100);
+        if (sent.length !== 4 || sent[3].m !== wake || sent[3].o?.deliverAs !== undefined) throw new Error(`idle replacement did not replay the unsubmitted duplicate as its own turn: ${JSON.stringify({ sent, wake, composer: composer.text })}`);
         await consumePrompt();
         await handlers.get("session_shutdown")({}, ctx);
         if (existsSync(handoff)) throw new Error("consumed duplicates retained a handoff record");
@@ -2275,6 +2589,120 @@ EOF
   expect_code 0 "$status" "descendant omp session must not claim the home: $out"
   [ -z "$out" ] || fail "descendant omp session test printed output: $out"
   pass ".omp extensions: a descendant omp session neither records itself as the loaded session nor arms a watcher"
+}
+
+# A local secondmate's own omp records its task-session proof in the parent
+# home. A descendant `omp -p` run from that home inherits the launch generation
+# and loads the same watch extension, but it is not the lock-owning session.
+test_secondmate_watch_proof_ignores_a_descendant_omp() {
+  local repo home parent out status proof before
+  repo="$TMP_ROOT/secondmate-descendant/repo"; home="$TMP_ROOT/secondmate-descendant/home"
+  parent="$TMP_ROOT/secondmate-descendant/parent"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state" "$parent/state" "$TMP_ROOT/secondmate-descendant/sessions"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-watch-arm.sh"
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$home/.fm-secondmate-parent"
+  printf 'sm\n' > "$home/.fm-secondmate-home"
+  printf 'spawn_gen=secondmate-gen\n' > "$parent/state/sm.meta"
+  : > "$TMP_ROOT/secondmate-descendant/sessions/task.jsonl"
+  proof="$parent/state/sm.omp-session.json"
+  jq -nc --argjson pid "$$" --arg task "$TMP_ROOT/secondmate-descendant/sessions/task.jsonl" \
+    '{version:1,spawn_gen:"secondmate-gen",pid:$pid,task_session_file:$task,current_session_file:$task}' > "$proof"
+  before=$(cat "$proof")
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+    FM_DATA_OVERRIDE="$home/data" FM_SPAWN_GEN=secondmate-gen FM_SESSIONSTART_OFF=1 \
+    WATCH_EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" CHILD_SESSION="$TMP_ROOT/secondmate-descendant/sessions/child.jsonl" \
+    node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync } from "node:fs";
+writeFileSync(process.env.CHILD_SESSION, "{}\n");
+const handlers = new Map();
+const sessionManager = { getSessionId: () => "child", getSessionFile: () => process.env.CHILD_SESSION };
+const registry = { list: () => [{ kind: "main", session: { sessionManager, waitForSessionTransition: () => Promise.resolve() } }] };
+const pi = {
+  on(event, handler) { (handlers.get(event) ?? handlers.set(event, []).get(event)).push(handler); },
+  registerCommand() {}, registerTool() {}, sendUserMessage() {}, sendMessage() {},
+  pi: { AgentRegistry: { global: () => registry } },
+};
+// The child loads while the home lock is still missing; the secondmate session
+// itself (an ancestor of this process) claims it before the child session starts.
+(await import(pathToFileURL(process.env.WATCH_EXT).href)).default(pi);
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.ppid}\n`);
+const ctx = { sessionManager };
+for (const event of ["session_start", "session_shutdown"]) {
+  for (const handler of handlers.get(event) ?? []) await handler({ type: event }, ctx);
+}
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "descendant omp of a local secondmate must load cleanly: $out"
+  [ "$(cat "$proof")" = "$before" ] \
+    || fail "a descendant omp rewrote its secondmate's task-session proof: $(cat "$proof")"
+  pass ".omp extensions: a descendant omp neither rebinds nor clears its local secondmate's task-session proof"
+}
+
+# The secondmate's own omp must publish its proof whenever no ancestor holds the
+# home lock: before it claims the lock, once it owns it, and after a reboot left
+# the lock naming a pid an unrelated live process now has.
+test_secondmate_watch_proof_publishes_for_the_secondmate_itself() {
+  local repo home parent out status stranger lock_case
+  repo="$TMP_ROOT/secondmate-self/repo"; home="$TMP_ROOT/secondmate-self/home"
+  parent="$TMP_ROOT/secondmate-self/parent"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state" "$parent/state" "$TMP_ROOT/secondmate-self/sessions"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-watch-arm.sh"
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$home/.fm-secondmate-parent"
+  printf 'sm\n' > "$home/.fm-secondmate-home"
+  printf 'spawn_gen=secondmate-gen\n' > "$parent/state/sm.meta"
+  sleep "$FM_TEST_STUB_MAX_BLOCK_SECONDS" >/dev/null 2>&1 &
+  stranger=$!
+  if ! fm_test_record_process "$TMP_ROOT/secondmate-self/stranger.process" "$stranger" \
+    || ! fm_test_track_process "$TMP_ROOT/secondmate-self/stranger.process" "sleep $FM_TEST_STUB_MAX_BLOCK_SECONDS"; then
+    kill "$stranger" 2>/dev/null; fail 'could not register the stranger lock holder'
+  fi
+  for lock_case in missing self stranger; do
+    rm -f "$home/state/.lock" "$parent/state/sm.omp-session.json"
+    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+      FM_DATA_OVERRIDE="$home/data" FM_SPAWN_GEN=secondmate-gen FM_SESSIONSTART_OFF=1 LOCK_CASE="$lock_case" STRANGER="$stranger" \
+      WATCH_EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" SESSION="$TMP_ROOT/secondmate-self/sessions/$lock_case.jsonl" \
+      PROOF="$parent/state/sm.omp-session.json" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync, writeFileSync } from "node:fs";
+const lock = `${process.env.FM_HOME}/state/.lock`;
+if (process.env.LOCK_CASE === "self") writeFileSync(lock, `${process.pid}\n`);
+if (process.env.LOCK_CASE === "stranger") writeFileSync(lock, `${process.env.STRANGER}\n`);
+writeFileSync(process.env.SESSION, "{}\n");
+const handlers = new Map();
+const sessionManager = { getSessionId: () => "self", getSessionFile: () => process.env.SESSION };
+const registry = { list: () => [{ kind: "main", session: { sessionManager, waitForSessionTransition: () => Promise.resolve() } }] };
+const pi = {
+  on(event, handler) { (handlers.get(event) ?? handlers.set(event, []).get(event)).push(handler); },
+  registerCommand() {}, registerTool() {}, sendUserMessage() {}, sendMessage() {},
+  pi: { AgentRegistry: { global: () => registry } },
+};
+(await import(pathToFileURL(process.env.WATCH_EXT).href)).default(pi);
+const ctx = { sessionManager };
+for (const handler of handlers.get("session_start") ?? []) await handler({ type: "session_start" }, ctx);
+let proof;
+try { proof = JSON.parse(readFileSync(process.env.PROOF, "utf8")); } catch (error) { throw new Error(`no task-session proof published: ${error.message}`); }
+if (proof.pid !== process.pid || proof.spawn_gen !== "secondmate-gen" || proof.current_session_file !== realpathSync(process.env.SESSION)) {
+  throw new Error(`task-session proof does not name this session: ${JSON.stringify(proof)}`);
+}
+process.exit(0);
+EOF
+)
+    status=$?
+    if [ "$status" -ne 0 ]; then
+      kill "$stranger" 2>/dev/null
+      expect_code 0 "$status" "a local secondmate with lock $lock_case must publish its task-session proof: $out"
+    fi
+  done
+  kill "$stranger" 2>/dev/null
+  wait "$stranger" 2>/dev/null
+  pass ".omp extensions: a local secondmate publishes its task-session proof with the lock missing, its own, or naming an unrelated live pid"
 }
 
 # The turn-end guard used to record itself only while the extension loaded,
@@ -2693,6 +3121,8 @@ test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
 test_watch_queue_episodes_reset_across_sessions_and_completion
 test_primary_extensions_ignore_a_descendant_session
+test_secondmate_watch_proof_ignores_a_descendant_omp
+test_secondmate_watch_proof_publishes_for_the_secondmate_itself
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
 test_watch_extension_heals_a_generation_stopped_without_a_successor
 test_watch_extension_is_single_instance_per_home

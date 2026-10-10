@@ -102,10 +102,10 @@
 #          The `code-root <file>` variant is a detect-only local check that runs
 #          even in a read-only session; detect_code_root_backlog_fork owns what
 #          it reports.
-#          Set FM_BOOTSTRAP_DETECT_ONLY=1 to skip the six MUTATING sweeps
+#          Set FM_BOOTSTRAP_DETECT_ONLY=1 to skip the lock-gated sweeps
 #          (backlog_record_reconcile, secondmate_sync,
 #          secondmate_liveness_sweep, secondmate_handoff_resume, x_mode_setup,
-#          fleet_sync) while still
+#          fleet_sync, plus read-only recorded Herdr launch inspection) while still
 #          printing every read-only detect line
 #          above; the TANGLE line switches to advisory-only wording with no
 #          checkout command. Used by
@@ -113,18 +113,20 @@
 #          the fleet lock, so a second concurrent session never race-mutates
 #          secondmate homes, pending handoff outboxes and receiver wakes,
 #          X-mode artifacts, project clones, or repair instructions.
-#          Unset/0 (the default) runs all six sweeps - this flag is purely
+#          Unset/0 (the default) runs all lock-gated sweeps - this flag is purely
 #          additive.
-#          Set FM_BOOTSTRAP_NETWORK to split this run by whether a step talks to
-#          the network, so a session start can print its digest from local reads
-#          alone and run the network half off the digest's blocking path:
-#            all  (default, and any unrecognized value) - every local and network
+#          Set FM_BOOTSTRAP_NETWORK to split synchronous local work from the
+#          deferred phase, so a session start can print its digest from local
+#          reads while network checks and recorded Herdr launch recovery run
+#          off the digest's blocking path:
+#            all  (default, and any unrecognized value) - every bootstrap
 #                 step. Unrecognized values fall back here on purpose: a typo
 #                 must never silently skip a safety sweep.
-#            skip - every LOCAL step, and none of the network ones. Skips
-#                 `gh auth status`, secondmate_liveness_sweep, secondmate_sync,
-#                 secondmate_handoff_resume, and fleet_sync.
-#            only - ONLY those network steps and nothing else. No tool detection,
+#            skip - the synchronous local pass. Skips `gh auth status`,
+#                 secondmate_liveness_sweep, secondmate_sync,
+#                 secondmate_handoff_resume, fleet_sync, and recorded Herdr
+#                 launch recovery.
+#            only - the deferred steps listed above. No tool detection,
 #                 no version floors, no tangle check, no backlog
 #                 reconciliation, no x_mode_setup: those already ran on the
 #                 local pass.
@@ -818,7 +820,7 @@ secondmate_handoff_detect() {
 
 install_cmd() {
   case "$1" in
-    tmux|node|git|gh|curl|jq|orca|zellij) echo "brew install $1  # or the platform's package manager" ;;
+    tmux|node|git|gh|curl|jq|python3|orca|zellij) echo "brew install $1  # or the platform's package manager" ;;
     cmux) echo "brew install --cask cmux  # or see https://cmux.com" ;;
     treehouse) echo "curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh" ;;
     no-mistakes) echo "curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh" ;;
@@ -1674,6 +1676,9 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     wait "$fleet_sync_pid" || true
     cat "$fleet_sync_out"
     rm -f "$fleet_sync_out"
+  fi
+  if network_phase && network_sweep_authorized 'Herdr reboot launch recovery'; then
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-reboot-recover.sh" recover || true
   fi
 fi
 local_phase && secondmate_handoff_detect
