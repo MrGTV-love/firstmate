@@ -1,0 +1,36 @@
+== NEW code: tmux send of 'treehouse get' fails ==
+$ FM_HOME=~/tmp/fm-lab.IDrz98 FM_LAB_FAIL_SEND='treehouse get' bin/fm-spawn.sh labsendz1 ~/tmp/fm-lab.IDrz98/projects/demo --mode local-only --yolo off --harness claude --backend tmux
+fm-gate-refuse: gate agent lifecycle permitted only against lab home ~/tmp/fm-lab.IDrz98
+warning: ~/tmp/fm-lab.IDrz98/data/labsendz1/launch-brief.md records no ship branch; defaulting to legacy branch fm/labsendz1
+notice: labsendz1 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+lab-injected: tmux send-keys refused
+error: tmux backend send failed for task labsendz1 (treehouse get); spawn aborted
+exit=1
+
+== BASE code (b2e06c46): same failed send ==
+$ FM_HOME=~/tmp/fm-lab.IDrz98 FM_LAB_FAIL_SEND='treehouse get' bin/fm-spawn.base-tmp.sh labsendz2 ~/tmp/fm-lab.IDrz98/projects/demo --mode local-only --yolo off --harness claude --backend tmux
+fm-gate-refuse: gate agent lifecycle permitted only against lab home ~/tmp/fm-lab.IDrz98
+warning: ~/tmp/fm-lab.IDrz98/data/labsendz2/launch-brief.md records no ship branch; defaulting to legacy branch fm/labsendz2
+notice: labsendz2 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+lab-injected: tmux send-keys refused
+exit=1
+
+== NEW code: tmux send of 'export GOTMPDIR' fails ==
+$ FM_HOME=~/tmp/fm-lab.IDrz98 FM_LAB_FAIL_SEND='export GOTMPDIR' bin/fm-spawn.sh labsendz3 ~/tmp/fm-lab.IDrz98/projects/demo --mode local-only --yolo off --harness claude --backend tmux
+fm-gate-refuse: gate agent lifecycle permitted only against lab home ~/tmp/fm-lab.IDrz98
+warning: ~/tmp/fm-lab.IDrz98/data/labsendz3/launch-brief.md records no ship branch; defaulting to legacy branch fm/labsendz3
+notice: labsendz3 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labsendz3: unavailable - no TypeSafe or OpenRouter key
+lab-injected: tmux send-keys refused
+error: tmux backend send failed for task labsendz3 (export GOTMPDIR); spawn aborted
+warning: leaving task labsendz3's slot claim on ~/.treehouse/demo-8464b0/1/demo in place; the Treehouse project lock is no longer held, so the next spawn's claim replaces it
+exit=1
+
+== NEW code: no fault, full launch ==
+$ FM_HOME=~/tmp/fm-lab.IDrz98 FM_LAB_FAIL_SEND='' bin/fm-spawn.sh labsendz4 ~/tmp/fm-lab.IDrz98/projects/demo --mode local-only --yolo off --harness claude --backend tmux
+fm-gate-refuse: gate agent lifecycle permitted only against lab home ~/tmp/fm-lab.IDrz98
+warning: ~/tmp/fm-lab.IDrz98/data/labsendz4/launch-brief.md records no ship branch; defaulting to legacy branch fm/labsendz4
+notice: labsendz4 ships mode=local-only while the standing posture for demo is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labsendz4: unavailable - no TypeSafe or OpenRouter key
+spawned labsendz4 harness=claude kind=ship mode=local-only yolo=off window=firstmate:fm-labsendz4 worktree=~/.treehouse/demo-8464b0/1/demo
+exit=0

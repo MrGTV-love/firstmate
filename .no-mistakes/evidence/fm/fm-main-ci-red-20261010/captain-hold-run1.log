@@ -1,0 +1,5 @@
+ok - wait_for_test_file waits on the file or the exit, with one seconds ceiling
+ok - default and done keyed answers choose their mode after cleanup releases the lock
+ok - interrupted default and done releases close finished work while explicit mode checks stay strict
+bash tests/fm-captain-hold-lifecycle.test.sh     26.32s user 34.09s system 70% cpu 1:25.30 total
+exit=0

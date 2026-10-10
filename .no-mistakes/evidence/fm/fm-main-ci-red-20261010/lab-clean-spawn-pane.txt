@@ -1,0 +1,69 @@
+treehouse get
+charlesabrooker@Mac-Studio demo % treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/demo-8464b0/1/demo. Type 'exit' to return.
+charlesabrooker@Mac-Studio demo % cd -- '~/.treehouse/demo-8464b0/1/demo'
+charlesabrooker@Mac-Studio demo % export GOTMPDIR=/tmp/fm-labsendz4/gotmp
+charlesabrooker@Mac-Studio demo % export COMPACT_ADVISER_DISABLE=1
+charlesabrooker@Mac-Studio demo % export FM_TASK_ID=labsendz4
+charlesabrooker@Mac-Studio demo % . '/tmp/fm-labsendz4+71cbef307994a10a926f99c480b97402ca11aba11f351b2a54504cd75051d3c3/launch.s1791668687.5053.361.sh'
+Permission allow rule (../../../../.claude/settings.json): Bash(bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) and matches only co
+mmands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../.claude/settings.json): Bash(~/firstmate/bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is
+not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../.claude/settings.json): Bash(cd ~/firstmate && bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the
+ * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (../../../../.claude/settings.json): Bash(cd ~/firstmate && export FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal pre
+
+ ▐▛███▛█   Claude Code v2.1.296
+▝▜██████▀  Opus 5.5 with high effort · Claude Max
+ ▝▝   ▝▝   ~/.treehouse/demo-8464b0/1/demo
+
+
+❯ : Firstmate operational input waiting: read '~/tmp/fm-lab.IDrz98/state/operational-inbox/1791668688-b10cb8ea128df1b4.msg' and handle its contents as Firstmate operational
+  input.
+
+  Reading ~/tmp/fm-lab.IDrz98/state/operational-inbox/1791668688-b10cb8ea128df1b4.msg
+  ⎿  ~/tmp/fm-lab.IDrz98/state/operational-inbox/1791668688-b10cb8ea128df1b4.msg
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+· Herding… (11s · ↓ 190 tokens · thinking with high effort)
+                                                                                                     tmux detected · scroll with PgUp/PgDn · or add 'set -g mouse on' to ~/.tmux.conf for wheel scroll
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 3% 32k/1.0M demo:a7455c39
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
