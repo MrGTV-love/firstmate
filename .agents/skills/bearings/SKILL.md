@@ -85,6 +85,7 @@ For a contribution wake or linked-issue filing, go directly to Contribution foll
    The detailed report includes:
    - **Title** - `# Bearings - <day> <YYYY-MM-DD>` (use "Morning status" only when the captain specifically asks for a morning brief), followed by two or three sentences framing where things stand.
    - **Captain's Call** - every unsuppressed open decision summarized with its options from the structured decision record, plus each PR ready to merge and each needed credential or login, every PR with the full `https://...` URL, never a bare `#number`.
+     Never present a decision as a guess: state what is being decided and why it is open now, give each option a label that says what it is (never a bare A, B, C or number) and what it does, name the recommended option with the reason it beats the others, and list the facts for and the facts against it, each with its source.
    - **Recently Landed** - the bounded current recent-completions baseline from structured state across the main fleet and every registered secondmate home, rendered in full on every run.
    - **Underway** - each live direct report making progress, with its current state, and the plans or main pickup pointers worth reopening (`data/<id>/report.md` files, `.lavish/*.html` boards).
    - **Charted Next** - queued or gated work, including deferred or aged captain-hold safety gates and any main-inventory integrity warning, with each item's blocker, date, age, or integrity reason.
@@ -102,7 +103,9 @@ Compose the payload from the same snapshot with the same ranking judgment as the
 - Before carding a hold, check that its SUBJECT has not already landed, and omit it when it has. `build` drops a card whose task or PR appears in the payload's own landed rows, and one whose task is no longer an open captain call. When a hold waits on one specific PR, put that PR in the card's `pr_url`. When it concerns a published version, put the artifact and numeric three-part version in the card's structured `subject`; landed rows for releases carry the same identity, and a matching or newer version drops the card. Identity matching is structured only, so verify any subject without one of these identities against current reality before carding it.
 - Never author a `reconcile` option on any card. `build` gives every decision card the standard reconcile choice itself, and the payload validator reserves that value across all card types; recommendations must name an authored option.
 - Compose exactly one decision card per captain-held task id. When one task carries multiple questions, consolidate all of them and their options into that card; never emit duplicate cards with the same task-id key.
-- Decision cards carry agent-authored copy: a short noun-phrase title, one-line `about` and `decide` context rows, and option labels with hints, with the recommended option marked.
+- Decision cards carry agent-authored copy, and `build` refuses a decision card without it: a short noun-phrase title, a required `about` (what is being decided and why it is open now) and `decide` (the concrete question), at least one authored option (`allow_freeform` may be offered alongside options, never instead of them), a required `recommend_value` naming an authored option, a required `recommend_reason` stating why it beats the others, and required non-empty `facts` and `counterfacts` arrays - the evidence that supports the recommendation and the evidence against it or the conditions that would flip it - which the card shows as "Facts for" and "Facts against".
+  Credential cards require `about` (what breaks without it and why only the captain can do it) and `decide` (the exact command or action).
+  Every authored option on every card, whether decision, merge, or credential, needs a label that says what the option is (never a bare A, B, C or number) and a required `hint` stating that option's concrete consequence; `build` refuses the payload otherwise.
 - Card `type` (decision, merge, credential) is your composing judgment from the row's content; no backlog field types a card for you.
 - When the card's task is a captain-gated WORK item (the answer should free it to proceed rather than complete it), set the card's `close: "release"` so the answer lifts the hold instead of closing the task; question-shaped items omit it.
 - A Charted Next row's optional `kind` separates work from alarms: omit it (or set `"queued"`) for real queued work, and set `"warning"` on every action-free fleet-integrity notice - the `(main-inventory)` gate, the `(return-catchup)` gate, an unavailable secondmate home, and an inventory-mismatch repair notice. The board badges a warning row `needs repair` instead of `waiting` and leaves it out of the Charted Next count, so those rows never read as dispatchable queued work.
@@ -149,6 +152,7 @@ Every `/bearings` chat response renders EXACTLY these four sections, in THIS ord
 
 1. **Captain's Call** - ONLY unsuppressed items that need the captain's own action now: a decision to make, a PR to approve or merge, a credential or login to provide, or a blocker only the captain can clear.
    Deferred or aged holds follow the presentation safety rule above instead.
+   Never present a decision as a guess: state what is being decided and why it is open now, give each option a label that says what it is (never a bare A, B, C or number) and what it does, name the recommended option with the reason it beats the others, and list the facts for and the facts against it, each with its source.
    Include `contributions.captain` rows in this section, deduplicating any row already represented by its live captain hold or merge call.
    Show the other contribution actors only as counts beside the checked/known coverage, and disclose `captain_omitted`, `unmeasured_homes`, stale verdicts and checks with no verdict when nonzero.
    Empty-state: "Nothing needs your action right now" is allowed only when `contributions.proven_clear` is true and the existing decision set is empty.
@@ -173,8 +177,9 @@ Rules that keep the contract unambiguous:
 - Do not suppress separately projected decisions, landed records, or gates from a `partial-structured` home merely because that secondmate's own row is `unknown` or its `invalidity` reports an inventory mismatch.
 - Include the required direct address to the captain inside one item or empty-state sentence.
 - Every PR appears as the full `https://...` URL; a shorthand `#number` is fine only as a back-reference after the full URL has already appeared in the same digest.
-- The chat follows `AGENTS.md` section 9 and carries one scannable line per item.
-- Detailed decisions, plans, full gate reasons, and evidence stay out of chat; file mode puts them in the report, while lavish mode puts only its payload-backed interactive detail on the board.
+- The chat follows `AGENTS.md` section 9 and carries one scannable line per item, except a Captain's Call decision.
+  A Captain's Call decision carries the reasoned block its section requires: what each option does, the recommended option with its reason, and the facts for and against it, each with its source.
+- Other detail, such as plans, full gate reasons, and evidence beyond a Captain's Call decision's reasoned block, stays out of chat; file mode puts them in the report, while lavish mode puts only its payload-backed interactive detail on the board.
 - In file mode, include the report path or link inside the four-section digest without adding another heading.
 - In lavish mode, include the board URL inside the four-section digest the same way.
 

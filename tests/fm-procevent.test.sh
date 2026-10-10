@@ -2357,6 +2357,14 @@ case "${plan[$i]}" in
     kill -TERM $$ ;;
   other-server-error)
     printf 'error: Lavish Editor session store is unavailable\ncode: SERVER_ERROR\n'; exit 1 ;;
+  no-start)
+    # What the real client prints when its 500 ms health probe gives up on a
+    # server that is still alive: it cannot start a second one on the same port.
+    printf 'error: Lavish Editor server did not start\ncode: SERVER_ERROR\nhelp[1]: Run `lavish-axi server --port %s` to inspect server startup\n' "$LAVISH_AXI_PORT"; exit 1 ;;
+  no-start-short)
+    printf 'error: Lavish Editor server did not start\ncode: SERVER_ERROR\n'; exit 1 ;;
+  no-start-other-port)
+    printf 'error: Lavish Editor server did not start\ncode: SERVER_ERROR\nhelp[1]: Run `lavish-axi server --port %s` to inspect server startup\n' "$((LAVISH_AXI_PORT + 1))"; exit 1 ;;
   feedback)
     printf 'session:\n  file: /board.html\n  status: feedback\n  session_ended: true\n  ended_by: user\nfeedback[1]{text}:\n  ship it\n' ;;
   stream)
@@ -2712,6 +2720,166 @@ PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HNEAR" \
   "$ROOT/bin/fm-procevent-lavish.sh" retire "$NEAR_ART" >/dev/null
 pass "only the exact interruption forms enter the quiet retry policy"
 
+# --- end-user-aligned regression: a slow but live server is not "did not start" ---
+# The 2026-10-10 defect: lavish-axi decides no server runs when GET /health takes
+# longer than its fixed 500 ms, tries to start a second one, and prints
+#     error: Lavish Editor server did not start
+#     code: SERVER_ERROR
+# Every armed listener captured that response and woke the fleet about every six
+# minutes while the server was alive. The stand-in server below answers
+# /health, as lavish-axi's own does, but slower than that 500 ms.
+SLOW_HEALTH="$TMP_ROOT/slow-health-server.pl"
+cat > "$SLOW_HEALTH" <<'PL'
+use strict;
+use warnings;
+use IO::Select;
+use IO::Socket::IP;
+use Time::HiRes qw(sleep time);
+my ($portfile, $delay, $pidfile) = @ARGV;
+my $server = IO::Socket::IP->new(LocalHost => "127.0.0.1", LocalPort => 0, Listen => 16, ReuseAddr => 1)
+  or die "listen: $!";
+open my $out, ">", "$portfile.tmp" or die $!;
+print $out $server->sockport, "\n";
+close $out;
+rename "$portfile.tmp", $portfile or die $!;
+my $select = IO::Select->new($server);
+my $end = time + ($ENV{FM_TEST_STUB_MAX_BLOCK_SECONDS} || 120);
+while (time < $end) {
+  $select->can_read(0.5) or next;
+  my $client = $server->accept or next;
+  my ($request, $chunk) = ("", "");
+  while ($request !~ /\r\n\r\n/ && sysread($client, $chunk, 4096)) { $request .= $chunk; }
+  sleep $delay;
+  my $body = '{"ok":true,"app":"lavish-axi","version":"0.1.79"}';
+  syswrite $client, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: " . length($body) . "\r\nConnection: close\r\n\r\n$body";
+  close $client;
+}
+PL
+# Start the slow server; its port lands in SLOW_PORT.
+start_slow_health_server() {  # <name> <seconds-per-answer>
+  local portfile="$TMP_ROOT/$1.port" pidfile="$TMP_ROOT/$1.process"
+  rm -f "$portfile"
+  perl "$SLOW_HEALTH" "$portfile" "$2" "$pidfile" >/dev/null 2>&1 &
+  fm_test_record_process "$pidfile" "$!" || fail "could not record the slow health server"
+  fm_test_track_process "$pidfile" "slow-health-server.pl"
+  wait_for "$portfile" || fail "the slow health server never started"
+  SLOW_PORT=$(cat "$portfile")
+}
+# A port nothing listens on: a server that is truly gone.
+closed_port() {
+  perl -MIO::Socket::IP -e '
+    my $s = IO::Socket::IP->new(LocalHost => "127.0.0.1", LocalPort => 0, Listen => 1) or die;
+    print $s->sockport, "\n";'
+}
+
+start_slow_health_server slow-answers 0.8
+SLOW_ANSWERS_PORT=$SLOW_PORT
+unavailable_status() {  # <home> <source-id>: the number of captured results and wakes, for failure text
+  printf 'results=%s wakes=%s' "$(count_results "$1" "$2")" "$(wake_payloads "$1" | sort -u | grep -c . || true)"
+}
+
+# A live server that answers every probe, just slowly: the failures are retried
+# quietly, in both response shapes, and the captain's real answer is delivered.
+HSLOW="$TMP_ROOT/hslow"; new_home "$HSLOW"
+SLOW_ART="$TMP_ROOT/slow-board.html"
+printf '<h1>slow</h1>\n' > "$SLOW_ART"
+lavish_session "$SLOW_ART" "http://127.0.0.1:$SLOW_ANSWERS_PORT/session/0123456789abcdef"
+slow_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$SLOW_ART")
+fm_test_track_procevent_home "$HSLOW"
+LAVISH_COUNT="$TMP_ROOT/slow-count"; LAVISH_SCRIPT="no-start no-start-short no-start feedback"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HSLOW" \
+  FM_LAVISH_POLL_RETRY_DELAY=1 FM_LAVISH_START_RETRY_CAP=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$SLOW_ART" >/dev/null
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" pe "$HSLOW" reconcile >/dev/null
+wait_for "$HSLOW/state/.wake-queue" 300 || fail "feedback after slow-server failures produced no wake"
+[ "$(cat "$LAVISH_COUNT")" = 4 ] \
+  || fail "the slow-server listener was polled $(cat "$LAVISH_COUNT") times, not the three quiet retries plus the delivering poll"
+[ "$(count_results "$HSLOW" "$slow_id")" = 1 ] \
+  || fail "a slow-server failure produced $(count_results "$HSLOW" "$slow_id") captured results instead of one"
+[ "$(wake_payloads "$HSLOW" | sort -u | grep -c .)" = 1 ] \
+  || fail "a slow-server failure woke the fleet before the answer: $(wake_payloads "$HSLOW" | sort -u)"
+assert_contains "$(wake_payloads "$HSLOW")" "procevent lavish $slow_id 1" \
+  "feedback arriving after slow-server failures is captured and announced"
+assert_grep 'ship it' "$(first_result "$HSLOW" "$slow_id")" \
+  "the announced result is the captain's feedback, not the start failure"
+pass "a live but slow Lavish server's start failure is retried quietly and a real answer still arrives"
+
+# The same live server that never recovers: after the bound the response is
+# captured and announced once, not swallowed forever.
+HSLOWX="$TMP_ROOT/hslowx"; new_home "$HSLOWX"
+SLOWX_ART="$TMP_ROOT/slow-exhaust-board.html"
+printf '<h1>slow exhaust</h1>\n' > "$SLOWX_ART"
+lavish_session "$SLOWX_ART" "http://127.0.0.1:$SLOW_ANSWERS_PORT/session/0123456789abcdef"
+slowx_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$SLOWX_ART")
+fm_test_track_procevent_home "$HSLOWX"
+LAVISH_COUNT="$TMP_ROOT/slow-exhaust-count"; LAVISH_SCRIPT="no-start"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HSLOWX" \
+  FM_LAVISH_POLL_RETRY_DELAY=1 FM_LAVISH_START_RETRY_CAP=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$SLOWX_ART" >/dev/null
+wait_capture "$HSLOWX" "$slowx_id" 600 \
+  || fail "a slow server that never recovers produced no captured result"
+[ "$(cat "$LAVISH_COUNT")" = 16 ] \
+  || fail "the start-failure bound polled $(cat "$LAVISH_COUNT") times, not the first poll plus 15 bounded retries"
+[ "$(count_results "$HSLOWX" "$slowx_id")" = 1 ] \
+  || fail "a slow server that never recovers produced $(unavailable_status "$HSLOWX" "$slowx_id")"
+wait_for "$HSLOWX/state/.wake-queue" || fail "the start failure that outlived the bound produced no wake"
+[ "$(wake_payloads "$HSLOWX" | sort -u | grep -c .)" = 1 ] \
+  || fail "the start failure that outlived the bound woke more than once: $(wake_payloads "$HSLOWX" | sort -u)"
+assert_grep 'Lavish Editor server did not start' "$(first_result "$HSLOWX" "$slowx_id")" \
+  "the announced result is the exact start failure the client returned"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HSLOWX" \
+  "$ROOT/bin/fm-procevent-lavish.sh" retire "$SLOWX_ART" >/dev/null
+pass "a start failure that outlives the bounded retries is captured and announced once"
+
+# A server that is truly gone is not retried for the full bound: it is announced
+# once after a few health probes in a row go unanswered.
+HGONE="$TMP_ROOT/hgone"; new_home "$HGONE"
+GONE_PORT_ART="$TMP_ROOT/gone-server-board.html"
+printf '<h1>gone server</h1>\n' > "$GONE_PORT_ART"
+lavish_session "$GONE_PORT_ART" "http://127.0.0.1:$(closed_port)/session/0123456789abcdef"
+gone_port_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$GONE_PORT_ART")
+fm_test_track_procevent_home "$HGONE"
+LAVISH_COUNT="$TMP_ROOT/gone-server-count"; LAVISH_SCRIPT="no-start"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HGONE" \
+  FM_LAVISH_POLL_RETRY_DELAY=1 FM_LAVISH_START_RETRY_CAP=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$GONE_PORT_ART" >/dev/null
+wait_capture "$HGONE" "$gone_port_id" 300 \
+  || fail "a server that is truly gone produced no captured result"
+[ "$(cat "$LAVISH_COUNT")" = 3 ] \
+  || fail "a gone server was polled $(cat "$LAVISH_COUNT") times, not three unanswered health probes"
+[ "$(count_results "$HGONE" "$gone_port_id")" = 1 ] \
+  || fail "a gone server produced $(unavailable_status "$HGONE" "$gone_port_id")"
+wait_for "$HGONE/state/.wake-queue" || fail "a server that is truly gone produced no wake"
+[ "$(wake_payloads "$HGONE" | sort -u | grep -c .)" = 1 ] \
+  || fail "a gone server woke more than once: $(wake_payloads "$HGONE" | sort -u)"
+assert_grep 'Lavish Editor server did not start' "$(first_result "$HGONE" "$gone_port_id")" \
+  "the announced result is the exact start failure the client returned"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HGONE" \
+  "$ROOT/bin/fm-procevent-lavish.sh" retire "$GONE_PORT_ART" >/dev/null
+pass "a Lavish server that is truly gone is announced once after the unanswered-probe bound"
+
+# Only the exact response is retried: the same words naming another port belong
+# to some other Lavish installation and surface on the first poll.
+HOTHERP="$TMP_ROOT/hotherp"; new_home "$HOTHERP"
+OTHERP_ART="$TMP_ROOT/slow-other-port-board.html"
+printf '<h1>other port</h1>\n' > "$OTHERP_ART"
+lavish_session "$OTHERP_ART" "http://127.0.0.1:$SLOW_ANSWERS_PORT/session/0123456789abcdef"
+otherp_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$OTHERP_ART")
+fm_test_track_procevent_home "$HOTHERP"
+LAVISH_COUNT="$TMP_ROOT/slow-other-port-count"; LAVISH_SCRIPT="no-start-other-port feedback"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HOTHERP" \
+  FM_LAVISH_POLL_RETRY_DELAY=1 FM_LAVISH_START_RETRY_CAP=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$OTHERP_ART" >/dev/null
+wait_for "$HOTHERP/state/.wake-queue" \
+  || fail "a start failure naming another port is captured and announced immediately"
+[ "$(cat "$LAVISH_COUNT")" = 1 ] \
+  || fail "a start failure naming another port was retried instead of surfacing on its first poll"
+assert_contains "$(wake_payloads "$HOTHERP")" "procevent lavish $otherp_id 1" \
+  "a start failure naming another port is captured and announced immediately"
+PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HOTHERP" \
+  "$ROOT/bin/fm-procevent-lavish.sh" retire "$OTHERP_ART" >/dev/null
+pass "only the exact start failure for the board's own port enters the quiet retry policy"
+
 # The public arm boundary refuses invalid retry intervals before it publishes a
 # source registration, rather than arming a listener that can only fail later.
 HINVALID="$TMP_ROOT/hinvalid"; new_home "$HINVALID"
@@ -2731,7 +2899,19 @@ for invalid_delay in 0 61 invalid; do
   assert_absent "$HINVALID/state/procevent/$invalid_id.source" \
     "arm publishes no source registration for an invalid retry delay"
 done
-pass "arm rejects malformed and out-of-range retry delays before registration"
+for invalid_cap in 0 61 invalid; do
+  invalid_status=0
+  invalid_out=$(PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HINVALID" \
+    FM_LAVISH_START_RETRY_CAP="$invalid_cap" \
+    "$ROOT/bin/fm-procevent-lavish.sh" arm "$INVALID_ART" 2>&1) || invalid_status=$?
+  [ "$invalid_status" -ne 0 ] \
+    || fail "arm accepted invalid start-retry ceiling: $invalid_cap"
+  assert_contains "$invalid_out" "FM_LAVISH_START_RETRY_CAP must be whole seconds from 1 to 60" \
+    "arm explains the rejected start-retry ceiling"
+  assert_absent "$HINVALID/state/procevent/$invalid_id.source" \
+    "arm publishes no source registration for an invalid start-retry ceiling"
+done
+pass "arm rejects malformed and out-of-range retry delays and ceilings before registration"
 
 # Shell-safe cleanup must preserve a valid TMPDIR containing an apostrophe.
 QUOTED_TMPDIR="$TMP_ROOT/poll's-stage"
@@ -2749,6 +2929,8 @@ STREAM_ART="$TMP_ROOT/stream-board.html"
 STREAM_TMPDIR="$TMP_ROOT/stream-stage"
 LAVISH_STREAM_READY="$TMP_ROOT/stream-ready"
 LAVISH_STREAM_RELEASE="$TMP_ROOT/stream-release"
+# The stream is over 4 KB, so only a bounded classifier (the longest exact response
+# it recognizes, about 140 bytes) can stay under this 300-byte runner bound.
 mkdir -p "$STREAM_TMPDIR"
 printf '<h1>stream</h1>\n' > "$STREAM_ART"
 lavish_session "$STREAM_ART"
@@ -2757,17 +2939,17 @@ fm_test_track_procevent_home "$HSTREAM"
 LAVISH_COUNT="$TMP_ROOT/stream-count"; LAVISH_SCRIPT="stream"
 PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HSTREAM" TMPDIR="$STREAM_TMPDIR" \
   LAVISH_STREAM_READY="$LAVISH_STREAM_READY" LAVISH_STREAM_RELEASE="$LAVISH_STREAM_RELEASE" \
-  FM_PROCEVENT_MAX_OUTPUT_BYTES=100 \
+  FM_PROCEVENT_MAX_OUTPUT_BYTES=300 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$STREAM_ART" >/dev/null
 wait_for "$LAVISH_STREAM_READY" || fail "streaming poll did not start"
 stream_staged=("$STREAM_TMPDIR"/fm-lavish-poll.*)
 [ -e "${stream_staged[0]}" ] || fail "streaming poll created no classifier staging file"
-[ "$(wc -c < "${stream_staged[0]}" | tr -d ' ')" -le 100 ] \
+[ "$(wc -c < "${stream_staged[0]}" | tr -d ' ')" -le 300 ] \
   || fail "streaming poll exceeded its bounded classifier staging"
 : > "$LAVISH_STREAM_RELEASE"
 wait_for "$HSTREAM/state/.wake-queue" || fail "streaming poll produced no wake"
 stream_result=$(first_result "$HSTREAM" "$stream_id" || true)
-[ "$(wc -c < "$stream_result" | tr -d ' ')" -le 100 ] \
+[ "$(wc -c < "$stream_result" | tr -d ' ')" -le 300 ] \
   || fail "streaming poll bypassed the runner output bound"
 PATH="$LAVISH_SCRIPTED_BIN:$PATH" FM_HOME="$HSTREAM" \
   "$ROOT/bin/fm-procevent-lavish.sh" retire "$STREAM_ART" >/dev/null
