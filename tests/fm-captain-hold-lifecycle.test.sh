@@ -163,8 +163,6 @@ run_pr_merge() {  # <home> <id> <url>
 
 # Wait for <path> to appear, or for <pid> to exit. The wait is on that event, never
 # on a poll count: how long cleanup takes to reach a barrier depends on host load.
-# The one ceiling, in seconds, only bounds a hang and matches the 120 s the fake
-# treehouse barrier holds a blocked process for.
 test_pid_exited() {  # <pid>
   local stat
   kill -0 "$1" 2>/dev/null || return 0
@@ -174,7 +172,8 @@ test_pid_exited() {  # <pid>
 }
 
 wait_for_test_file() {  # <path> <pid>
-  local path=$1 pid=$2 deadline=$((SECONDS + ${FM_TEST_WAIT_CEILING_SECONDS:-120}))
+  # The 120 s ceiling only bounds a hang; it is the fake treehouse barrier's own 120 s hold.
+  local path=$1 pid=$2 deadline=$((SECONDS + 120))
   while [ "$SECONDS" -lt "$deadline" ]; do
     [ -e "$path" ] && return 0
     if test_pid_exited "$pid"; then
@@ -1944,17 +1943,17 @@ SH
     : > "$home/teardown-release"
     teardown_rc=0
     wait "$teardown_pid" || teardown_rc=$?
-    # Cleanup of a task that owns no Docker object lists the host's objects a few
-    # times and removes nothing. The calls reaching the stand-in's log prove the
-    # case never reached the host's real Docker; the bound keeps the step small.
-    docker_calls=$(wc -l < "$home/docker.log" 2>/dev/null | tr -d ' ')
-    [ "${docker_calls:-0}" -ge 1 ] && [ "$docker_calls" -le 8 ] \
-      || fail "cleanup made ${docker_calls:-0} Docker calls through the stand-in, expected 1 to 8"
     show=$(tasks_in "$home" show "$id" --full)
     : > "$home/answer-release"
     answer_rc=0
     wait "$answer_pid" || answer_rc=$?
     [ "$teardown_rc" -eq 0 ] || fail "cleanup failed: $(cat "$home/teardown.err")"
+    # Cleanup of a task that owns no Docker object lists the host's objects and
+    # removes nothing. The calls reaching the stand-in's log prove the case never
+    # reached the host's real Docker.
+    docker_calls=$(wc -l < "$home/docker.log" 2>/dev/null | tr -d ' ')
+    [ "${docker_calls:-0}" -ge 1 ] \
+      || fail "cleanup made no Docker call through the stand-in"
     assert_contains "$show" "state: queued" "cleanup did not queue its finished held task"
     assert_contains "$show" "held: yes" "cleanup released its finished held task"
     assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"

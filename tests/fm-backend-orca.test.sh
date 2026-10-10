@@ -706,13 +706,12 @@ test_spawn_survives_concurrent_orca_probes() {
 test_spawn_names_the_backend_send_that_failed() {
   local out status variant send_text what
   for variant in gotmpdir launch; do
+    # The launch command is staged as launch.<gen>.sh and sourced by path.
     case "$variant" in
       gotmpdir) send_text='export GOTMPDIR'; what='export GOTMPDIR' ;;
-      launch) send_text='.launch.'; what='launch command' ;;
+      launch) send_text='/launch.'; what='launch command' ;;
     esac
     orca_spawn_fixture "send-fails-$variant" "orcasendfail$variant"
-    # The launch command is staged as launch.<gen>.sh and sourced by path.
-    [ "$variant" != launch ] || send_text='/launch.'
     out=$(orca_spawn_run FM_ORCA_FAIL_SEND_TEXT="$send_text")
     status=$?
     [ "$status" -ne 0 ] || fail "a failed Orca $variant send should end the spawn non-zero"$'\n'"$out"

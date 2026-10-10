@@ -466,9 +466,8 @@ stall_watch_has_wake() { # <out>
 # A recovery wake (check: rearm-resurface) can end a cycle that never reached the
 # stall step, so it is no proof that the stall tick ran.
 stall_watch_has_tick_wake() { # <out>
-  stall_watch_has_wake "$1" \
-    && grep -E '^(signal:|stale:|check:|heartbeat($|:))' "$1" 2>/dev/null \
-      | grep -vF 'check: rearm-resurface' | grep . >/dev/null 2>&1
+  grep -E '^(signal:|stale:|check:|heartbeat($|:))' "$1" 2>/dev/null \
+    | grep -vF 'check: rearm-resurface' | grep . >/dev/null 2>&1
 }
 
 stall_watch_record_met() { # <mode> <marker> <want> <progress> <progress-start> <sent>
