@@ -1744,7 +1744,30 @@ SH
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, existsSync, unlinkSync } from "node:fs";
+const realSetTimeout = globalThis.setTimeout;
+const realSetInterval = globalThis.setInterval;
+const realClearTimeout = globalThis.clearTimeout;
+const manualQueue = process.env.SCENARIO === "queue-episodes";
+const restoreChecks = new Set();
+let pollCheck = null;
+const fastRestore = process.env.SCENARIO.startsWith("pending-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled"].includes(process.env.SCENARIO);
+const pollWake = process.env.SCENARIO.startsWith("stranded-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled", "editor-normalized-edited", "prepended", "appended", "appended-newline", "prepended-mark", "appended-mark", "internal-mark", "edited"].includes(process.env.SCENARIO);
+globalThis.setTimeout = (callback, delay, ...args) => {
+  if (manualQueue && delay === 2000) {
+    const timer = { callback: () => callback(...args), unref() {} };
+    restoreChecks.add(timer);
+    return timer;
+  }
+  return realSetTimeout(callback, delay === 2000 && fastRestore ? 100 : delay, ...args);
+};
+globalThis.clearTimeout = (timer) => {
+  if (!restoreChecks.delete(timer)) realClearTimeout(timer);
+};
+globalThis.setInterval = (callback, delay, ...args) => {
+  if (manualQueue && delay === 3000) pollCheck = () => callback(...args);
+  return realSetInterval(callback, delay === 3000 ? (pollWake ? 100 : 3600000) : delay, ...args);
+};
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); const commands = new Map(); let tool = null; const sent = []; const turns = [];
 let receiveWake;
@@ -1763,7 +1786,13 @@ const pi = {
     }
     if (process.env.SCENARIO === "failed-send") throw new Error("fixture send rejected");
     // omp's idle auto-continue refuses an explicit follow-up behind an advisor tail.
-    if (process.env.SCENARIO === "custom-tail" || process.env.SCENARIO.startsWith("idle-")) {
+    if (process.env.SCENARIO.startsWith("pending-") && !o?.deliverAs && process.env.SCENARIO !== "pending-unflushable") {
+      // omp's prompt flow starts a turn and flushes whatever sat in its queue.
+      queued = false;
+      handlers.get("before_agent_start")({ prompt: m }, ctx);
+      handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
+    }
+    if (process.env.SCENARIO === "custom-tail" || process.env.SCENARIO.startsWith("idle-") || process.env.SCENARIO.startsWith("stranded-")) {
       if (o?.deliverAs) { queued = true; return undefined; }
       if (idle) {
         turns.push({ prompt: m, tail: transcript.at(-1) });
@@ -1787,12 +1816,17 @@ const composer = {
 };
 // Restored-wake scenarios deliver behind a running turn; idle-* scenarios
 // deliver to a lane that already went idle.
-let idle = process.env.SCENARIO.startsWith("idle-"); let queued = false;
+let idle = process.env.SCENARIO.startsWith("idle-") || process.env.SCENARIO.startsWith("stranded-"); let queued = false;
+const notices = [];
 const ctx = {
   hasUI: true,
   isIdle: () => { if (process.env.SCENARIO === "idle-stale-context" || process.env.SCENARIO === "idle-recovery-stale") throw new Error("stale context"); return idle; },
   hasPendingMessages: () => queued,
-  ui: { getEditorText: () => composer.text, setEditorText: (t) => { composer.sets.push(t); composer.text = t; } },
+  ui: {
+    getEditorText: () => composer.text,
+    setEditorText: (t) => { composer.sets.push(t); composer.text = t; },
+    notify: (m, level) => { notices.push({ m, level }); },
+  },
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const mod = await import(pathToFileURL(process.env.EXT).href);
@@ -1851,6 +1885,115 @@ else for (let i = 0; i < 600 && sent.length < expectedWakes; i += 1) await sleep
 if (sent.length !== expectedWakes) throw new Error(`expected ${expectedWakes} wakes, saw ${sent.length}`);
 const wake = sent[0].m;
 if (recovery && !wake.includes("signal: omp-restore done")) throw new Error(`recovery did not deliver its actionable close: ${wake}`);
+if (process.env.SCENARIO.startsWith("stranded-")) {
+  // Wake text left unsubmitted in an idle composer by older wiring. The arm
+  // fixture's own wake (delivered and consumed as an idle turn) supplies the
+  // wire shape; variants carry other messages.
+  const wakeWith = (message) => wake.replace("signal: omp-restore done", message);
+  const waitFor = async (check, ms = 4000) => { for (let i = 0; i < ms / 50 && !check(); i += 1) await sleep(50); return check(); };
+  const turnEnds = () => { idle = true; };
+  turnEnds();
+  const delivered = (n, text) => sent.length === n && sent[n - 1].m === text && sent[n - 1].o?.deliverAs === undefined;
+  switch (process.env.SCENARIO) {
+    case "stranded-alone":
+    case "stranded-unmarked": {
+      const typed = wakeWith("signal: stranded-one");
+      composer.text = process.env.SCENARIO === "stranded-alone" ? typed : typed.slice(1);
+      if (!await waitFor(() => sent.length === 2)) throw new Error("wake text left in an idle composer was never delivered");
+      if (!delivered(2, typed)) throw new Error(`the stranded wake was not sent whole through the prompt flow: ${JSON.stringify(sent[1])}`);
+      if (composer.text !== "") throw new Error(`the composer still holds text after delivery: ${JSON.stringify(composer.text)}`);
+      if (turns.length !== 2) throw new Error("delivery did not start the wake's own turn");
+      turnEnds();
+      await sleep(700);
+      if (sent.length !== 2) throw new Error("a consumed stranded wake was sent again");
+      break;
+    }
+    case "stranded-draft-after":
+    case "stranded-draft-before": {
+      const typed = wakeWith("signal: stranded-draft");
+      const after = "\noperator\u2063 draft\n\n";
+      const before = "\n\nbefore\u2063 draft\n\n";
+      const after_case = process.env.SCENARIO === "stranded-draft-after";
+      composer.text = after_case ? `${typed}\n\n${after}` : `${before}\n\n${typed}`;
+      if (!await waitFor(() => sent.length === 2)) throw new Error("a stranded wake beside an operator draft was never delivered");
+      if (!delivered(2, typed)) throw new Error("the stranded wake was not sent alone");
+      if (composer.text !== (after_case ? after : before)) throw new Error(`operator draft bytes changed: ${JSON.stringify(composer.text)}`);
+      break;
+    }
+    case "stranded-two": {
+      const first = wakeWith("signal: stranded-first");
+      const second = wakeWith("signal: stranded-second");
+      composer.text = `${first}\n\n${second}`;
+      if (!await waitFor(() => sent.length === 2)) throw new Error("the first stranded wake was never delivered");
+      if (!delivered(2, first) || composer.text !== second) throw new Error(`the first wake was not sent alone: ${JSON.stringify(composer.text)}`);
+      turnEnds();
+      if (!await waitFor(() => sent.length === 3)) throw new Error("the second stranded wake was never delivered");
+      if (!delivered(3, second) || composer.text !== "") throw new Error("the second wake was not sent alone");
+      break;
+    }
+    case "stranded-human": {
+      const refusals = [
+        "FIRSTMATE_OP: v1 watcher: typed by a person",
+        `Please explain this: ${wake}`,
+        `${wake} and then do this`,
+        `${wake}\n`,
+        wake.replace("Watcher continuity", "Watcher edited"),
+        wake.slice(0, -12),
+        "bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+        "an unrelated operator draft",
+      ];
+      for (const text of refusals) {
+        composer.text = text;
+        const expected = composer.text;
+        const sets = composer.sets.length;
+        await sleep(600);
+        if (sent.length !== 1 || composer.sets.length !== sets || composer.text !== expected) throw new Error(`text that is not a whole wake was submitted or changed: ${JSON.stringify(text)}`);
+      }
+      break;
+    }
+    case "stranded-busy": {
+      const typed = wakeWith("signal: stranded-busy");
+      idle = false;
+      composer.text = typed;
+      await sleep(600);
+      if (sent.length !== 1 || composer.text !== typed) throw new Error("a running turn was disturbed");
+      turnEnds();
+      if (!await waitFor(() => sent.length === 2)) throw new Error("the wake was not delivered once the turn ended");
+      if (!delivered(2, typed) || composer.text !== "") throw new Error("the wake was not sent alone after the turn ended");
+      break;
+    }
+    case "stranded-settling": {
+      for (let i = 0; i < 8; i += 1) {
+        composer.text = wakeWith(`signal: stranded-moving-${i}`);
+        await sleep(40);
+      }
+      if (sent.length !== 1) throw new Error("wake text still changing was submitted");
+      if (!await waitFor(() => sent.length === 2)) throw new Error("settled wake text was never delivered");
+      break;
+    }
+    case "stranded-bounded":
+    case "stranded-bounded-unmarked": {
+      // Text that keeps coming back must not turn delivery into a loop.
+      const typed = wakeWith("signal: stranded-again");
+      for (let i = 0; i < 6; i += 1) {
+        composer.text = typed;
+        await sleep(500);
+        turnEnds();
+      }
+      if (sent.length !== 4) throw new Error(`delivery was not bounded to three attempts: ${sent.length}`);
+      const later = wakeWith("signal: stranded-later");
+      const exhausted = process.env.SCENARIO === "stranded-bounded" ? typed : typed.slice(1);
+      composer.text = `${exhausted}\n\n${later}`;
+      if (!await waitFor(() => sent.length === 5)) throw new Error("an exhausted stranded wake blocked a later eligible wake");
+      if (!delivered(5, later) || composer.text !== exhausted) throw new Error("recovering a later wake changed the exhausted wake");
+      break;
+    }
+    default:
+      throw new Error(`unknown stranded scenario ${process.env.SCENARIO}`);
+  }
+  await handlers.get("session_shutdown")({}, ctx);
+  process.exit(0);
+}
 if (["idle-stale-context", "idle-recovery-stale", "idle-recovery-busy", "idle-recovery-missing"].includes(scenario)) {
   if (sent[0].o?.deliverAs !== "followUp" || !queued || turns.length !== 0) throw new Error("delivery without positive idle evidence must remain a follow-up");
   await handlers.get("session_shutdown")({}, ctx);
@@ -1885,6 +2028,135 @@ const settle = async () => { await handlers.get("agent_end")({ type: "agent_end"
 const same = (item) => item.m === wake && item.o?.deliverAs === undefined;
 
 switch (process.env.SCENARIO) {
+  case "queue-episodes": {
+    const check = () => {
+      if (restoreChecks.size !== 1) throw new Error(`expected one recovery check, saw ${restoreChecks.size}`);
+      const timer = restoreChecks.values().next().value;
+      restoreChecks.delete(timer);
+      timer.callback();
+      return timer.callback;
+    };
+    const episode = (label, attempts = 3) => {
+      const count = sent.length;
+      const warnings = notices.length;
+      const content = sent.at(-1).m;
+      queued = true;
+      idle = true;
+      for (let i = 0; i < 15; i += 1) {
+        check();
+        if (sent.length !== count || notices.length !== warnings) throw new Error(`${label}: recovery acted before fifteen checks`);
+      }
+      for (let i = 1; i <= attempts; i += 1) {
+        check();
+        if (sent.length !== count + i || sent.at(-1).m !== content || sent.at(-1).o?.deliverAs !== undefined || notices.length !== warnings) throw new Error(`${label}: recovery did not submit exactly ${attempts} prompt attempts`);
+      }
+      const recheck = check();
+      const notice = notices.at(-1);
+      if (notices.length !== warnings + 1 || notice.level !== "warning" || !notice.m.includes("wake not delivered")) throw new Error(`${label}: exhausted episode did not warn`);
+      recheck();
+      if (sent.length !== count + attempts || notices.length !== warnings + 1) throw new Error(`${label}: recovery or warning repeated`);
+      if (composer.text !== "operator draft" || composer.sets.length !== 0) throw new Error(`${label}: recovery disturbed the composer`);
+    };
+    const nextWake = async () => {
+      const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(`${dir}/session-replacement-actionable.json`, "invalid");
+      idle = false;
+      const count = sent.length;
+      await tool.execute();
+      unlinkSync(`${dir}/session-replacement-actionable.json`);
+      if (sent.length !== count + 1 || sent.at(-1).o?.deliverAs !== "followUp") throw new Error("expected a fresh queued failure wake");
+    };
+    composer.text = "operator draft";
+    episode("first session");
+    await handlers.get("session_shutdown")({}, ctx);
+    idle = false;
+    const beforeReplacement = sent.length;
+    await handlers.get("session_start")({}, ctx);
+    for (let i = 0; i < 60 && sent.length === beforeReplacement; i += 1) await sleep(100);
+    if (sent.length !== beforeReplacement + 1 || sent.at(-1).m !== wake || sent.at(-1).o?.deliverAs !== "followUp") throw new Error("replacement did not replay its unconsumed wake");
+    await nextWake();
+    episode("replacement session");
+
+    await nextWake();
+    idle = true;
+    queued = false;
+    check();
+    await nextWake();
+    episode("queue drained observed by recovery", 6);
+
+    queued = false;
+    pollCheck();
+    await nextWake();
+    episode("queue drained observed by polling");
+
+    await nextWake();
+    check();
+    await nextWake();
+    episode("running turn observed by recovery", 6);
+
+    idle = false;
+    pollCheck();
+    await nextWake();
+    episode("running turn observed by polling");
+
+    await nextWake();
+    await handlers.get("before_agent_start")({ prompt: wake }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: wake }] } }, ctx);
+    episode("short accepted wake turn before completion");
+
+    await nextWake();
+    await handlers.get("before_agent_start")({ prompt: "continue work" }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: "continue work" } }, ctx);
+    episode("short accepted ordinary turn before completion");
+
+    idle = false;
+    await handlers.get("before_agent_start")({ prompt: "continue work" }, ctx);
+    await handlers.get("message_start")({ message: { role: "assistant", content: "done" } }, ctx);
+    idle = true;
+    await handlers.get("agent_end")({}, ctx);
+    await nextWake();
+    episode("short turn completion between checks");
+    break;
+  }
+  case "ownership-marked":
+  case "ownership-unmarked": {
+    const before = "\n\nbefore\u2063 draft\n\n";
+    const after = "\noperator\u2063 draft\n\n";
+    const edited = (process.env.SCENARIO === "ownership-marked" ? wake : bare).replace("signal:", "edited:");
+    composer.text = `${before}\n\n${edited}\n\n${after}`;
+    const original = composer.text;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== original) throw new Error("template matching took ownership of an edited tracked wake");
+    composer.text = `${before}\n\n${process.env.SCENARIO === "ownership-marked" ? wake : bare}\n\n${after}`;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== `${before}\n\n${after}`) throw new Error("exact restored recovery no longer preserved both drafts");
+    break;
+  }
+  case "ownership-missing": {
+    const older = wake.replace("signal: omp-restore done", "signal: older-wiring");
+    composer.text = older;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== older) throw new Error("an unaccounted tracked wake allowed template submission");
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    for (let i = 0; i < 40 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || sent[1].m !== older || sent[1].o?.deliverAs !== undefined || composer.text !== "") throw new Error("resolved ownership did not release the stranded wake");
+    break;
+  }
+  case "duplicates-edited-polled": {
+    if (sent[1].m !== wake) throw new Error("expected two identical tracked wakes");
+    const edited = bare.replace("signal:", "edited:");
+    composer.text = `${wake}\n\n${edited}`;
+    await settle();
+    if (sent.length !== 3 || !same(sent[2]) || composer.text !== edited) throw new Error("an edited duplicate bypassed restored ownership");
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    await sleep(600);
+    if (sent.length !== 3 || composer.text !== edited) throw new Error("consuming one duplicate authorized the edited duplicate");
+    composer.text = bare;
+    await settle();
+    if (sent.length !== 4 || !same(sent[3]) || composer.text !== "") throw new Error("the unchanged duplicate was no longer recoverable");
+    break;
+  }
   case "duplicates":
   case "duplicates-handoff":
   case "duplicates-streaming": {
@@ -2100,6 +2372,91 @@ switch (process.env.SCENARIO) {
     if (sent.length !== 1 || composer.sets.length !== 0) throw new Error("a wake with messages still queued was submitted again");
     break;
   }
+  case "pending-persistent": {
+    // Messages queued behind an idle session never drain; the restored wake in
+    // the composer still has to reach main once the bounded wait is over.
+    composer.text = wake; queued = true;
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    for (let i = 0; i < 60 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== "") throw new Error(`a restored wake behind a stuck queue was left in the composer: ${sent.length} sent, composer ${JSON.stringify(composer.text)}`);
+    if (queued || notices.length !== 0) throw new Error("the stuck queue was not flushed by the resubmission, or a delivered wake was reported");
+    break;
+  }
+  case "pending-drains": {
+    // A queue that drains inside the wait is left to omp: the wake is recovered
+    // from the composer only after it is gone, and nothing is reported.
+    composer.text = wake; queued = true;
+    setTimeout(() => { queued = false; }, 150);
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    for (let i = 0; i < 60 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== "" || notices.length !== 0) throw new Error("a restored wake was not recovered once the queue drained");
+    break;
+  }
+  case "pending-stuck": {
+    // The wake itself sits in omp's queue (omp refused to start a turn for it)
+    // and nothing is restored to the composer.
+    queued = true;
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    for (let i = 0; i < 60 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || !same(sent[1])) throw new Error(`a wake stuck in omp's idle queue was never sent through the prompt flow: ${sent.length} sent`);
+    if (queued || composer.sets.length !== 0 || notices.length !== 0) throw new Error("the stuck queue was not flushed, or the composer was disturbed");
+    await sleep(600);
+    if (sent.length !== 2) throw new Error("a delivered wake was sent again");
+    break;
+  }
+  case "pending-unflushable": {
+    // The resubmissions do not start a turn: delivery is not proven, so the
+    // wait is reported once and the bound holds.
+    queued = true;
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    await sleep(2800);
+    if (sent.length !== 4 || !sent.slice(1).every(same)) throw new Error(`resubmission was not bounded to three attempts: ${sent.length}`);
+    if (notices.length !== 1 || notices[0].level !== "warning" || !notices[0].m.includes("wake not delivered")) throw new Error(`the undelivered wake was not reported once: ${JSON.stringify(notices)}`);
+    await sleep(600);
+    if (sent.length !== 4 || notices.length !== 1) throw new Error("the report or the resubmission repeated");
+    break;
+  }
+  case "limit-polled": {
+    // The stranded-wake poll must not hand a wake the restored-wake recovery has
+    // given up on another set of attempts.
+    for (let i = 0; i < 6; i += 1) {
+      composer.text = wake;
+      await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+      await sleep(500);
+    }
+    if (sent.length !== 4) throw new Error(`recovery was not bounded to three resubmissions with the poll running: ${sent.length}`);
+    break;
+  }
+  case "blocked-tracked-marked":
+  case "blocked-tracked-unmarked": {
+    for (let i = 0; i < 3; i += 1) {
+      composer.text = wake;
+      await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+      await sleep(500);
+    }
+    if (sent.length !== 4) throw new Error("tracked recovery did not reach its attempt limit");
+    const exhausted = process.env.SCENARIO === "blocked-tracked-marked" ? wake : bare;
+    const older = wake.replace("signal: omp-restore done", "signal: older-wiring");
+    const before = "\n\nbefore\u2063 draft\n\n";
+    const after = "\noperator\u2063 draft\n\n";
+    composer.text = `${before}\n\n${exhausted}\n\n${older}\n\n${after}`;
+    for (let i = 0; i < 40 && sent.length < 5; i += 1) await sleep(50);
+    if (sent.length !== 5 || sent[4].m !== older || sent[4].o?.deliverAs !== undefined) throw new Error("an exhausted tracked wake blocked a later stranded wake");
+    if (composer.text !== `${before}\n\n${exhausted}\n\n${after}`) throw new Error("recovering a later wake changed tracked wake or draft bytes");
+    break;
+  }
+  case "restore-window": {
+    // The run ends well after omp accepted the wake. The editor is read two full
+    // seconds after the run ended, not two seconds after the wake was accepted.
+    await sleep(1200);
+    composer.text = wake;
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    await sleep(1400);
+    if (sent.length !== 1 || composer.text !== wake) throw new Error("the restored wake was taken before the run-end settle time had passed");
+    for (let i = 0; i < 40 && sent.length < 2; i += 1) await sleep(100);
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== "") throw new Error("the restored wake was not submitted again after the settle time");
+    break;
+  }
   case "elsewhere": {
     composer.text = "an unrelated operator draft";
     await settle();
@@ -2123,9 +2480,18 @@ EOF
   return "$status"
 }
 
+test_watch_queue_episodes_reset_across_sessions_and_completion() {
+  local out status
+  out=$(run_watch_restore_scenario queue-episodes)
+  status=$?
+  expect_code 0 "$status" "omp stuck-queue episode lifecycle: $out"
+  [ -z "$out" ] || fail "omp stuck-queue episode lifecycle printed output: $out"
+  pass ".omp watch extension: isolated replacement, queue drain, running observations, accepted messages, and turn completion each restart the fifteen-check wait and once-only warning"
+}
+
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context idle-recovery-timer idle-recovery-factory idle-recovery-live-factory idle-recovery-tool idle-recovery-command idle-recovery-forwarded idle-recovery-tool-context idle-recovery-command-context idle-recovery-busy idle-recovery-stale idle-recovery-missing draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in duplicates duplicates-handoff duplicates-streaming duplicates-edited-polled preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context idle-recovery-timer idle-recovery-factory idle-recovery-live-factory idle-recovery-tool idle-recovery-command idle-recovery-forwarded idle-recovery-tool-context idle-recovery-command-context idle-recovery-busy idle-recovery-stale idle-recovery-missing stranded-alone stranded-unmarked stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-bounded-unmarked ownership-marked ownership-unmarked ownership-missing blocked-tracked-marked blocked-tracked-unmarked pending-persistent pending-drains pending-stuck pending-unflushable limit-polled restore-window draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
@@ -2650,6 +3016,7 @@ test_watch_extension_keeps_the_arm_without_the_file_or_with_off
 test_watch_extension_replays_a_host_only_boundary_across_replacement
 test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
+test_watch_queue_episodes_reset_across_sessions_and_completion
 test_primary_extensions_ignore_a_descendant_session
 test_secondmate_watch_proof_ignores_a_descendant_omp
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries

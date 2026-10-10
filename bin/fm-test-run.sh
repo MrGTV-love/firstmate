@@ -445,7 +445,7 @@ family_for_basename() {
       printf '%s\n' afk
       ;;
     fm-bearings-board-render.test.sh|fm-bearings-snapshot.test.sh|fm-contributions.test.sh|\
-    fm-fleet-snapshot-view.test.sh|fm-home-summary-refresh.test.sh)
+    fm-fleet-snapshot-view.test.sh|fm-home-summary-refresh.test.sh|fm-gh-rest.test.sh)
       printf '%s\n' snapshot-bearings
       ;;
     fm-backend-cmux.test.sh|fm-backend-cmux-smoke.test.sh)
@@ -797,6 +797,7 @@ tests/fm-forge-detect.test.sh 193
 tests/fm-fork-free-helpers.test.sh 795
 tests/fm-gate-refuse.test.sh 9953
 tests/fm-gemini-harness.test.sh 947
+tests/fm-gh-rest.test.sh 2500
 tests/fm-git-strip-ai-trailers.test.sh 2500
 tests/fm-gitignore-config.test.sh 59
 tests/fm-gotmp.test.sh 1509
@@ -1513,6 +1514,10 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-pi-watch-extension.test.sh
       printf '%s\n' __script__:fm-omp-harness.test.sh
       ;;
+    tests/assets/gh-http-shim.sh)
+      # The HTTP-faithful gh double behind fm_gh_http_shim.
+      printf '%s\n' snapshot-bearings
+      ;;
     bin/fm-test-run.sh)
       # Deliberately the WHOLE family, not just the two contract tests. This
       # runner executes every pure-contract-unit script, so a change to it is
@@ -1584,6 +1589,12 @@ families_for_changed_path() {
     bin/fm-open-loops.sh|bin/fm_open_loops.py)
       printf '%s\n' "__script__:fm-open-loops.test.sh"
       printf '%s\n' "__script__:fm-watch-open-loops.test.sh"
+      ;;
+    bin/fm-gh-rest.sh)
+      # The conditional-read helper serves every REST reader.
+      printf '%s\n' "__script__:fm-gh-rest.test.sh"
+      printf '%s\n' "__script__:fm-open-loops.test.sh"
+      printf '%s\n' snapshot-bearings
       ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)

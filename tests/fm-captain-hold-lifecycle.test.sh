@@ -1752,6 +1752,688 @@ SH
   pass "a bound channel's captured answers close their captain-held tasks at answer time"
 }
 
+# A keyed answer on a work item whose worker is still running must release the
+# item, never complete it: the board answered four calls held on live ships and
+# each was closed to Done while its worker was still validating. The intake
+# decides from the live task record, so a card that declares no close mode, or
+# declares `done`, cannot complete work that has not landed. A question-shaped
+# call with no worker keeps closing.
+test_keyed_answer_releases_a_live_work_item() {
+  local home id out show rc
+  home=$(make_home keyed-live-work)
+  id=sample-live-scout
+  tasks_in "$home" add "$id" "Review the live sample" --kind scout --repo sample --start >/dev/null \
+    || fail "could not create the in-flight work item"
+  write_origin_meta "$home" "$id"
+  run_captain "$home" hold "$id" --reason "captain design pick needed" >/dev/null \
+    || fail "could not hold the live work item for the captain"
+  tasks_in "$home" add sample-live-done-ship "Ship the second live sample" --kind ship --repo sample >/dev/null \
+    || fail "could not create the second work item"
+  write_origin_meta "$home" sample-live-done-ship ship
+  run_captain "$home" hold sample-live-done-ship --reason "captain design pick needed" >/dev/null \
+    || fail "could not hold the second live work item"
+  tasks_in "$home" add sample-live-row-only "Ship the row-only sample" --kind ship --repo sample --start >/dev/null \
+    || fail "could not create the in-flight row-only work item"
+  run_captain "$home" hold sample-live-row-only --reason "captain design pick needed" >/dev/null \
+    || fail "could not hold the row-only work item"
+  run_captain "$home" hold sample-plain-question --title "Captain call: plain" \
+    --reason "captain choice pending" --repo sample >/dev/null \
+    || fail "could not hold the plain question"
+
+  out=$(printf '%s\tgo-b\tOption B\n%s\tgo-b\tOption B\tdone\nsample-live-row-only\tgo-b\tOption B\tdone\nsample-plain-question\tyes\tYes\n' \
+    "$id" sample-live-done-ship \
+    | run_captain "$home" answers --source "live work fixture" 2>&1) \
+    || fail "answers on live work items failed: $out"
+  for id in "$id" sample-live-done-ship; do
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_not_contains "$show" "state: done" "a keyed answer completed the live work item $id"
+    assert_contains "$show" "held: no" "a keyed answer left the live work item $id held"
+    assert_contains "$show" "Resolution mode: released" "the answer on $id did not record a release"
+    assert_contains "$show" "Option B" "the answer on $id lost the captain's words"
+    assert_present "$home/state/$id.meta" "the answer removed the live task record for $id"
+  done
+  show=$(tasks_in "$home" show sample-live-row-only --full)
+  assert_contains "$show" "state: in_flight" "a keyed answer completed row-only in-flight work"
+  assert_contains "$show" "held: no" "a keyed answer left row-only work held"
+  assert_contains "$show" "Resolution mode: released" "row-only work did not record a release"
+  show=$(tasks_in "$home" show sample-plain-question --full)
+  assert_contains "$show" "state: done" "a question with no worker stopped closing"
+
+  out=$(printf 'sample-live-scout\tgo-b\tOption B\n' \
+    | run_captain "$home" answers --source "live work fixture" 2>&1) \
+    || fail "an identical live-work answer was not idempotent: $out"
+  mkdir -p "$home/data/sample-live-scout"
+  printf '# Live sample report\n' > "$home/data/sample-live-scout/report.md"
+  printf 'done: report complete\n' > "$home/state/sample-live-scout.status"
+  run_captain "$home" complete sample-live-scout --none >/dev/null \
+    || fail "could not complete the released work item's inventory"
+  run_teardown "$home" sample-live-scout > "$home/teardown.out" 2> "$home/teardown.err" \
+    || fail "could not tear down the released work item: $(cat "$home/teardown.err")"
+  show=$(tasks_in "$home" show sample-live-scout --full)
+  assert_contains "$show" "state: done" "cleanup did not complete the released work item"
+  assert_contains "$show" "held: no" "the late replay fixture is still held"
+  assert_absent "$home/state/sample-live-scout.meta" "cleanup left the worker record behind"
+  set +e
+  out=$(printf 'sample-live-scout\tgo-b\tOption B\n' \
+    | run_captain "$home" answers --source "live work fixture" 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "replaying a release after the worker ended was refused: $out"
+  assert_contains "$out" "closed: sample-live-scout" "the completed release replay was not reported closed"
+  show=$(tasks_in "$home" show sample-live-scout --full)
+  assert_contains "$show" "state: done" "a late replay reopened completed work"
+  assert_contains "$show" "held: no" "a late replay re-held the released work item"
+  assert_contains "$show" "Resolution mode: released" "a late replay lost its recorded release"
+  pass "a keyed answer releases a live work item and still closes a question"
+}
+
+test_keyed_answer_waits_for_cleanup_before_selecting_its_mode() {
+  local home id mode teardown_pid answer_pid teardown_rc answer_rc show
+  local real_perl real_sleep
+  real_perl=$(command -v perl)
+  real_sleep=$(command -v sleep)
+  for mode in default "done"; do
+    home=$(make_home "answer-waits-for-cleanup-$mode")
+    id=sample-answer-cleanup-race
+    mkdir -p "$home/data/$id" "$home/projects/$id" "$home/projects/sample"
+    tasks_in "$home" add "$id" "Investigate the cleanup race" --kind scout \
+      --repo sample --start >/dev/null || fail "could not create the cleanup-race task"
+    fm_write_meta "$home/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$home/projects/$id" \
+      "project=$home/projects/sample" "harness=codex" "kind=scout" \
+      "mode=scout" "spawn_gen=fixture-$id"
+    printf 'done: report complete\n' > "$home/state/$id.status"
+    printf '# Cleanup race report\n' > "$home/data/$id/report.md"
+    run_captain "$home" hold "$id" --reason "captain report choice pending" >/dev/null \
+      || fail "could not hold the cleanup-race task"
+    install_reused_task_barriers "$home"
+    cat > "$home/fakebin/treehouse" <<'SH'
+#!/usr/bin/env bash
+: > "$FM_HOME/teardown-ready"
+while [ ! -e "$FM_HOME/teardown-release" ] \
+    && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+  sleep 0.01
+done
+exit 0
+SH
+    chmod +x "$home/fakebin/treehouse"
+    PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+      FM_CONFIG_OVERRIDE="$home/config" FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
+      "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
+      > "$home/teardown.out" 2> "$home/teardown.err" &
+    teardown_pid=$!
+    if ! wait_for_test_file "$home/teardown-ready" "$teardown_pid"; then
+      : > "$home/teardown-release"
+      wait "$teardown_pid" 2>/dev/null || true
+      fail "cleanup did not reach its locked worktree return: $(cat "$home/teardown.err")"
+    fi
+    (
+      if [ "$mode" = default ]; then
+        printf '%s\tgo\tProceed\n' "$id"
+      else
+        printf '%s\tgo\tProceed\tdone\n' "$id"
+      fi | FM_TEST_REUSE_MERGE=1 FM_TEST_REUSE_MERGE_ONCE="$home/answer-once" \
+        FM_TEST_REUSE_MERGE_READY="$home/answer-ready" \
+        FM_TEST_REUSE_MERGE_RELEASE="$home/answer-release" \
+        FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
+        run_captain "$home" answers --source "cleanup race fixture"
+    ) > "$home/answer.out" 2> "$home/answer.err" &
+    answer_pid=$!
+    if ! wait_for_test_file "$home/answer-ready" "$answer_pid"; then
+      : > "$home/teardown-release"
+      : > "$home/answer-release"
+      wait "$teardown_pid" 2>/dev/null || true
+      wait "$answer_pid" 2>/dev/null || true
+      fail "the keyed answer did not wait behind cleanup"
+    fi
+    : > "$home/teardown-release"
+    teardown_rc=0
+    wait "$teardown_pid" || teardown_rc=$?
+    show=$(tasks_in "$home" show "$id" --full)
+    : > "$home/answer-release"
+    answer_rc=0
+    wait "$answer_pid" || answer_rc=$?
+    [ "$teardown_rc" -eq 0 ] || fail "cleanup failed: $(cat "$home/teardown.err")"
+    assert_contains "$show" "state: queued" "cleanup did not queue its finished held task"
+    assert_contains "$show" "held: yes" "cleanup released its finished held task"
+    assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"
+    [ "$answer_rc" -eq 0 ] || fail "the waiting keyed answer failed: $(cat "$home/answer.err")"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: done" "a stale release reopened finished work"
+    assert_contains "$show" "Resolution mode: answered" "the answer recorded a stale release"
+    assert_contains "$show" "Answer: go" "the waiting answer lost the captain's words"
+    assert_contains "$show" "Deliverable of the finished work: report data/$id/report.md" \
+      "the waiting answer lost cleanup's report"
+  done
+  pass "default and done keyed answers choose their mode after cleanup releases the lock"
+}
+
+test_interrupted_keyed_release_closes_after_teardown() {
+  local home parent channel id mode row show out open published body
+  for mode in default "done"; do
+    home=$(make_home "interrupted-keyed-release-$mode")
+    parent=$(make_home "interrupted-keyed-release-parent-$mode")
+    printf 'interrupted-release-mate\n' > "$home/.fm-secondmate-home"
+    printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+      > "$home/.fm-secondmate-parent"
+    printf -- '- interrupted-release-mate - synthetic scope (home: %s; scope: sample reviews; projects: sample; added 2026-07-14)\n' \
+      "$home" > "$parent/data/secondmates.md"
+    fm_write_secondmate_meta "$parent/state/interrupted-release-mate.meta" "$home" \
+      "firstmate:fm-interrupted-release-mate" sample
+    channel="$parent/state/interrupted-release-mate.status"
+    id=sample-interrupted-keyed-release
+    tasks_in "$home" add "$id" "Investigate interrupted answer recovery" \
+      --kind scout --repo sample --start >/dev/null || fail "could not create the interrupted release task"
+    write_origin_meta "$home" "$id"
+    mkdir -p "$home/data/$id"
+    printf 'done: report complete\n' > "$home/state/$id.status"
+    printf '# Interrupted answer report\n' > "$home/data/$id/report.md"
+    run_captain "$home" hold "$id" --reason "captain report choice pending" >/dev/null \
+      || fail "could not hold the interrupted release task"
+    complete_through_sibling "$home" "$id" >/dev/null \
+      || fail "could not complete the interrupted release task's inventory"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_contains "$open" "captain-hold-$id-1" "the original parent decision did not open"
+    cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = unhold ] && [ "${2:-}" = sample-interrupted-keyed-release ] \
+  && [ ! -e "$FM_HOME/unhold-failed-once" ]; then
+  : > "$FM_HOME/unhold-failed-once"
+  exit 93
+fi
+if [ "${1:-}" = done ] && [ "${2:-}" = sample-interrupted-keyed-release ] \
+  && [ ! -e "$FM_HOME/done-failed-once" ]; then
+  : > "$FM_HOME/done-failed-once"
+  exit 94
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+    chmod +x "$home/fakebin/tasks-axi"
+    row=$(printf '%s\tgo\tProceed' "$id")
+    [ "$mode" != "done" ] || row=$(printf '%s\tdone' "$row")
+    if printf '%s\n' "$row" | run_captain "$home" answers \
+      --source "interrupted release fixture" > "$home/answer.out" 2> "$home/answer.err"; then
+      fail "the interrupted unhold reported success"
+    fi
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: in_flight" "the failed release completed live work"
+    assert_contains "$show" "held: yes" "the failed release lost its hold"
+    assert_contains "$show" "Resolution mode: released" "the failure did not persist its release"
+    REAL_TASKS_AXI="$TASKS_AXI_BIN" run_teardown "$home" "$id" \
+      > "$home/teardown.out" 2> "$home/teardown.err" \
+      || fail "cleanup after interrupted release failed: $(cat "$home/teardown.err")"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: queued" "cleanup did not queue the held finished work"
+    assert_contains "$show" "held: yes" "cleanup released the unresolved hold"
+    assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"
+    printf 'Captain answered this call through interrupted release fixture.\nTask: %s\nAnswer: go\nAnswer as shown to the captain: Proceed\n' \
+      "$id" > "$home/decision.txt"
+    if run_captain "$home" answer "$id" --decision-file "$home/decision.txt" \
+      > "$home/direct.out" 2> "$home/direct.err"; then
+      fail "an explicit close accepted a recorded release"
+    fi
+    assert_contains "$(cat "$home/direct.err")" "retry with --release" \
+      "the explicit close lost its strict mode check"
+    if printf '%s\n' "$row" | run_captain "$home" answers \
+      --source "interrupted release fixture" > "$home/retry.out" 2> "$home/retry.err"; then
+      fail "the interrupted completion reported success"
+    fi
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: queued" "the failed completion changed the finished work's state"
+    assert_contains "$show" "held: yes" "the failed completion released the finished work"
+    assert_contains "$show" 'Resolution mode: released\n' "the failed completion changed the recorded release"
+    assert_not_contains "$show" "Resolution mode: answered" "the failed completion rewrote the release"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_contains "$open" "captain-hold-$id-1" "the failed completion resolved the parent decision early"
+    out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+      --source "interrupted release fixture" 2>&1) \
+      || fail "the automatic retry did not close finished held work: $out"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: done" "the automatic retry made finished work runnable"
+    assert_contains "$show" "held: no" "the automatic retry left finished work held"
+    assert_contains "$show" 'Resolution mode: released\n' "the retry changed the recorded release"
+    assert_contains "$show" "Answer: go" "the retry lost the captain's answer"
+    assert_contains "$show" "Deliverable of the finished work: report data/$id/report.md" \
+      "the retry lost the finished report"
+    body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+    assert_equals 1 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+      "the interrupted retry invented another resolution record"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the original parent decision remained unresolved"
+    published=$(cat "$channel")
+    assert_contains "$published" "resolved [key=captain-hold-$id-1]" \
+      "the interrupted retry did not resolve the original occurrence"
+    assert_not_contains "$published" "captain-hold-$id-2" "the interrupted retry invented a second occurrence"
+    if run_captain "$home" answer "$id" --decision-file "$home/decision.txt" \
+      > "$home/direct-done.out" 2> "$home/direct-done.err"; then
+      fail "a direct answer accepted a completed release"
+    fi
+    assert_contains "$(cat "$home/direct-done.err")" "not a captain-answer replay" \
+      "the completed release lost its direct-answer mode check"
+    run_captain "$home" answer "$id" --decision-file "$home/decision.txt" --auto-release >/dev/null \
+      || fail "the locked automatic replay of the completed release failed"
+    assert_equals "$published" "$(cat "$channel")" "the locked automatic replay changed the parent resolution"
+    out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+      --source "interrupted release fixture" 2>&1) \
+      || fail "the closed automatic retry was not idempotent: $out"
+    assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+      "replaying the reconciled close changed the finished work"
+    assert_equals "$published" "$(cat "$channel")" "the keyed replay changed the parent resolution"
+  done
+  pass "interrupted default and done releases close finished work while explicit mode checks stay strict"
+}
+
+test_completed_keyed_release_replays_after_publication_failure() {
+  local home parent channel id mode failure row out show published open request body before rc
+  for mode in default "done"; do
+    for failure in ordinary failed-publication; do
+      home=$(make_home "completed-keyed-release-$mode-$failure")
+      parent=$(make_home "completed-keyed-release-parent-$mode-$failure")
+      printf 'completed-release-mate\n' > "$home/.fm-secondmate-home"
+      printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+        > "$home/.fm-secondmate-parent"
+      printf -- '- completed-release-mate - synthetic scope (home: %s; scope: sample reviews; projects: sample; added 2026-07-14)\n' \
+        "$home" > "$parent/data/secondmates.md"
+      fm_write_secondmate_meta "$parent/state/completed-release-mate.meta" "$home" \
+        "firstmate:fm-completed-release-mate" sample
+      channel="$parent/state/completed-release-mate.status"
+      id=sample-completed-keyed-release
+      tasks_in "$home" add "$id" "Review completed answer recovery" \
+        --kind scout --repo sample --start >/dev/null || fail "could not create the completed release task"
+      write_origin_meta "$home" "$id"
+      mkdir -p "$home/data/$id"
+      printf 'done: report complete\n' > "$home/state/$id.status"
+      printf '# Completed answer report\n' > "$home/data/$id/report.md"
+      run_captain "$home" hold "$id" --reason "captain report choice pending" >/dev/null \
+        || fail "could not hold the completed release task"
+      complete_through_sibling "$home" "$id" >/dev/null \
+        || fail "could not complete the completed release task's inventory"
+      request_reconciles "$home" completed-release-source "$id" \
+        || fail "could not create the release's reconcile request"
+      request="$home/state/reconcile-requests/$id.request"
+      if [ "$failure" = failed-publication ]; then
+        mv "$channel" "$channel.saved"
+        mkdir "$channel"
+      fi
+      row=$(printf '%s\tgo\tProceed' "$id")
+      [ "$mode" != "done" ] || row=$(printf '%s\tdone' "$row")
+      rc=0
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+        --source "completed release fixture" 2>&1) || rc=$?
+      if [ "$failure" = failed-publication ]; then
+        [ "$rc" -ne 0 ] || fail "a failed publication with a pending request reported success"
+        assert_contains "$out" "could not publish" "the failed publication was not actionable"
+        assert_present "$request" "the failed publication retired its reconcile request"
+        rmdir "$channel"
+        mv "$channel.saved" "$channel"
+      else
+        [ "$rc" -eq 0 ] || fail "the ordinary live release failed: $out"
+        assert_absent "$request" "the successful release left its reconcile request pending"
+      fi
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: in_flight" "publication completed the live work"
+      assert_contains "$show" "held: no" "publication failure reversed the release"
+      assert_contains "$show" "Resolution mode: released" "the live release lost its record"
+      body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+      printf '%s\n' "$body" | jq -j 'split("\n\n")[0:2] | join("\n\n")' > "$home/release-record.txt"
+      run_teardown "$home" "$id" > "$home/teardown.out" 2> "$home/teardown.err" \
+        || fail "cleanup of the released task failed: $(cat "$home/teardown.err")"
+      before=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$before" "state: done" "cleanup did not complete the released task"
+      assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"
+      if [ "$failure" = failed-publication ]; then
+        assert_present "$request" "cleanup retired the unpublished reconcile request"
+        open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+          _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+        assert_contains "$open" "captain-hold-$id-1" "cleanup resolved the unpublished hold"
+      fi
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+        --source "completed release fixture" 2>&1) || fail "the completed release replay failed: $out"
+      assert_contains "$out" "closed: $id" "the completed release replay was not reported closed"
+      assert_absent "$request" "the completed release replay left its reconcile request pending"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_equals "$before" "$show" "the completed release replay changed the row"
+      body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+      assert_equals 1 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+        "the completed release replay duplicated its record"
+      printf '%s\n' "$body" | jq -j 'split("\n\n")[0:2] | join("\n\n")' > "$home/replayed-record.txt"
+      cmp -s "$home/release-record.txt" "$home/replayed-record.txt" \
+        || fail "cleanup or replay changed the released record's bytes"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the completed release's parent key remained open"
+      published=$(cat "$channel")
+      assert_equals 1 "$(grep -c "resolved \[key=captain-hold-$id-1\]" "$channel")" \
+        "the completed release did not publish exactly one resolution"
+      assert_not_contains "$published" "captain-hold-$id-2" "the completed replay invented a parent key"
+      printf 'Captain answered this call through completed release fixture.\nTask: %s\nAnswer: go\nAnswer as shown to the captain: Proceed\n' \
+        "$id" > "$home/decision.txt"
+      if run_captain "$home" answer "$id" --decision-file "$home/decision.txt" \
+        > "$home/direct.out" 2> "$home/direct.err"; then
+        fail "a direct answer accepted a completed release"
+      fi
+      assert_contains "$(cat "$home/direct.err")" "not a captain-answer replay" \
+        "the direct completed-release refusal lost its mode check"
+      if printf '%s\tgo\tProceed\trelease\n' "$id" | run_captain "$home" answers \
+        --source "completed release fixture" > "$home/explicit.out" 2> "$home/explicit.err"; then
+        fail "an explicit release card accepted a completed release"
+      fi
+      assert_contains "$(cat "$home/explicit.out")" "already closed" \
+        "the explicit release card did not keep its completed-state refusal"
+      run_captain "$home" answer "$id" --decision-file "$home/decision.txt" --auto-release >/dev/null \
+        || fail "the locked automatic Done replay failed"
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers \
+        --source "completed release fixture" 2>&1) || fail "the second completed replay failed: $out"
+      assert_contains "$out" "closed: $id" "the second completed replay was not idempotent"
+      assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" "the replay or refusals changed Done work"
+      assert_equals "$published" "$(cat "$channel")" "the replay or refusals duplicated parent publication"
+    done
+  done
+  pass "completed default and done releases replay and recover failed publication without rewriting history"
+}
+
+test_stale_keyed_replay_preserves_a_concurrent_hold() {
+  local home parent channel id mode row replay_pid replay_rc show open published request
+  for mode in default "done" release; do
+    home=$(make_home "stale-keyed-replay-$mode")
+    parent=$(make_home "stale-keyed-replay-parent-$mode")
+    printf 'stale-replay-mate\n' > "$home/.fm-secondmate-home"
+    printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+      > "$home/.fm-secondmate-parent"
+    printf -- '- stale-replay-mate - synthetic scope (home: %s; scope: sample reviews; projects: sample; added 2026-07-14)\n' \
+      "$home" > "$parent/data/secondmates.md"
+    fm_write_secondmate_meta "$parent/state/stale-replay-mate.meta" "$home" \
+      "firstmate:fm-stale-replay-mate" sample
+    channel="$parent/state/stale-replay-mate.status"
+    id=sample-stale-keyed-replay
+    tasks_in "$home" add "$id" "Review the stale replay race" \
+      --kind scout --repo sample --start >/dev/null || fail "could not create the replay-race task"
+    write_origin_meta "$home" "$id"
+    FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold "$id" \
+      --reason "captain initial choice pending" >/dev/null || fail "could not open the first hold"
+    row=$(printf '%s\tgo\tProceed' "$id")
+    [ "$mode" = default ] || row=$(printf '%s\t%s' "$row" "$mode")
+    printf '%s\n' "$row" | run_captain "$home" answers --source "stale replay fixture" \
+      > "$home/release.out" 2> "$home/release.err" || fail "could not release the first hold"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: in_flight" "the first answer completed live work"
+    assert_contains "$show" "held: no" "the first answer did not release its hold"
+    cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${FM_TEST_STALE_REPLAY:-}" = 1 ] && [ "${1:-}" = show ] \
+  && [ "${2:-}" = sample-stale-keyed-replay ]; then
+  count=0
+  [ ! -f "$FM_HOME/replay-reads" ] || read -r count < "$FM_HOME/replay-reads"
+  count=$((count + 1))
+  printf '%s\n' "$count" > "$FM_HOME/replay-reads"
+  if [ "$count" -eq 2 ]; then
+    "$REAL_TASKS_AXI" "$@" > "$FM_HOME/replay-snapshot" || exit "$?"
+    : > "$FM_HOME/replay-ready"
+    while [ ! -e "$FM_HOME/replay-release" ] \
+      && [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do
+      sleep 0.01
+    done
+    cat "$FM_HOME/replay-snapshot"
+    exit 0
+  fi
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+    chmod +x "$home/fakebin/tasks-axi"
+    (
+      printf '%s\n' "$row" | FM_TEST_STALE_REPLAY=1 FM_BACKLOG_ROW_TIMEOUT_SECS=120 \
+        run_captain "$home" answers --source "stale replay fixture"
+    ) > "$home/replay.out" 2> "$home/replay.err" &
+    replay_pid=$!
+    if ! wait_for_test_file "$home/replay-ready" "$replay_pid"; then
+      : > "$home/replay-release"
+      wait "$replay_pid" 2>/dev/null || true
+      fail "the replay did not snapshot the released first hold: $(cat "$home/replay.err")"
+    fi
+    FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:01Z run_captain "$home" hold "$id" \
+      --reason "captain revised choice pending" >/dev/null || fail "could not open the concurrent hold"
+    request_reconciles "$home" stale-replay-source "$id" \
+      || fail "could not create the concurrent hold's reconcile request"
+    request="$home/state/reconcile-requests/$id.request"
+    cp "$request" "$home/request-before"
+    show=$(tasks_in "$home" show "$id" --full)
+    published=$(cat "$channel")
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_contains "$open" "captain-hold-$id-2" "the concurrent parent decision did not open"
+    : > "$home/replay-release"
+    replay_rc=0
+    wait "$replay_pid" || replay_rc=$?
+    [ "$replay_rc" -ne 0 ] || fail "the stale replay reported success for the concurrent hold"
+    assert_not_contains "$(cat "$home/replay.out")" "closed: $id" \
+      "the stale replay reported the concurrent hold closed"
+    assert_contains "$(cat "$home/replay.out")" "answers: closed=0 skipped=1" \
+      "the stale replay failed before classifying the answer: $(cat "$home/replay.err")"
+    assert_present "$request" "the stale replay retired the concurrent hold's reconcile request"
+    cmp -s "$request" "$home/request-before" || fail "the stale replay changed the reconcile request"
+    assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+      "the stale replay changed the concurrent held task"
+    assert_equals "$published" "$(cat "$channel")" "the stale replay published a parent resolution"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_contains "$open" "captain-hold-$id-2" "the stale replay resolved the concurrent parent decision"
+    assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the first parent decision reopened"
+    printf '%s\n' "$row" | run_captain "$home" answers --source "stale replay fixture" \
+      > "$home/fresh.out" 2> "$home/fresh.err" || fail "a fresh answer could not resolve the concurrent hold"
+    assert_contains "$(cat "$home/fresh.out")" "closed: $id" "the fresh answer was not reported closed"
+    assert_absent "$request" "the fresh answer left the reconcile request pending"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: in_flight" "the fresh answer completed live work"
+    assert_contains "$show" "held: no" "the fresh answer did not release the concurrent hold"
+    open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+      _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+    assert_not_contains "$open" "captain-hold-$id-2"$'\t' "the fresh answer left the parent decision open"
+  done
+  pass "stale default, done and release replays preserve a concurrent hold until a fresh answer"
+}
+
+test_repeated_keyed_answer_resolves_its_own_hold() {
+  local home parent channel id mode interruption row show out open published body
+  local first_stamp=2026-07-14T12:00:00Z second_stamp=2026-07-14T12:00:01Z expected_mode
+  for mode in default "done"; do
+    for interruption in interrupted ordinary; do
+      home=$(make_home "reheld-keyed-answer-$mode-$interruption")
+      parent=$(make_home "reheld-keyed-answer-parent-$mode-$interruption")
+      printf 'reheld-answer-mate\n' > "$home/.fm-secondmate-home"
+      printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+        > "$home/.fm-secondmate-parent"
+      printf -- '- reheld-answer-mate - synthetic scope (home: %s; scope: sample reviews; projects: sample; added 2026-07-14)\n' \
+        "$home" > "$parent/data/secondmates.md"
+      fm_write_secondmate_meta "$parent/state/reheld-answer-mate.meta" "$home" \
+        "firstmate:fm-reheld-answer-mate" sample
+      channel="$parent/state/reheld-answer-mate.status"
+      id=sample-reheld-keyed-answer
+      tasks_in "$home" add "$id" "Investigate repeated answer recovery" \
+        --kind scout --repo sample --start >/dev/null || fail "could not create the re-held task"
+      write_origin_meta "$home" "$id"
+      mkdir -p "$home/data/$id"
+      printf 'done: report complete\n' > "$home/state/$id.status"
+      printf '# Re-held answer report\n' > "$home/data/$id/report.md"
+      FM_CAPTAIN_HOLD_NOW="$first_stamp" run_captain "$home" hold "$id" \
+        --reason "captain initial report choice pending" >/dev/null \
+        || fail "could not open the first hold"
+      complete_through_sibling "$home" "$id" >/dev/null \
+        || fail "could not complete the re-held task's inventory"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_contains "$open" "captain-hold-$id-1" "the first parent decision did not open"
+      row=$(printf '%s\tgo\tProceed' "$id")
+      [ "$mode" != "done" ] || row=$(printf '%s\tdone' "$row")
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers --source "reheld answer fixture" 2>&1) \
+        || fail "the first keyed answer failed: $out"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: in_flight" "the first answer completed live work"
+      assert_contains "$show" "held: no" "the first answer did not release live work"
+      body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+      printf '%s\n' "$body" | jq -j 'split("\n\n")[0:2] | join("\n\n")' > "$home/first-resolution.txt"
+      assert_equals 1 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+        "the first answer wrote duplicate records"
+      assert_contains "$show" "Resolution mode: released\\nResolves hold set: $first_stamp" \
+        "the first release did not identify its hold"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the first parent decision remained open"
+      assert_contains "$(cat "$channel")" "resolved [key=captain-hold-$id-1]" \
+        "the first release did not publish its resolution"
+      published=$(cat "$channel")
+      if FM_CAPTAIN_HOLD_NOW="$first_stamp" run_captain "$home" hold "$id" \
+        --reason "captain revised report choice pending" > "$home/collision.out" 2> "$home/collision.err"; then
+        fail "a same-second re-hold reused the first resolution's association"
+      fi
+      assert_contains "$(cat "$home/collision.err")" "FM_CAPTAIN_HOLD_NOW collides" \
+        "a pinned timestamp collision did not explain the refusal"
+      assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+        "a refused same-second re-hold changed the work item"
+      assert_equals "$published" "$(cat "$channel")" "a refused re-hold opened another parent key"
+      FM_CAPTAIN_HOLD_NOW="$second_stamp" run_captain "$home" hold "$id" \
+        --reason "captain revised report choice pending" >/dev/null \
+        || fail "could not open the second hold"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_contains "$open" "captain-hold-$id-2" "the second parent decision did not open"
+      if [ "$interruption" = interrupted ]; then
+        cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = unhold ] && [ "${2:-}" = sample-reheld-keyed-answer ] \
+  && [ ! -e "$FM_HOME/unhold-failed-once" ]; then
+  : > "$FM_HOME/unhold-failed-once"
+  exit 93
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+        chmod +x "$home/fakebin/tasks-axi"
+        if printf '%s\n' "$row" | run_captain "$home" answers \
+          --source "reheld answer fixture" > "$home/answer.out" 2> "$home/answer.err"; then
+          fail "the interrupted second release reported success"
+        fi
+        show=$(tasks_in "$home" show "$id" --full)
+        assert_contains "$show" "state: in_flight" "the failed second release completed live work"
+        assert_contains "$show" "held: yes" "the failed second release lost its hold"
+        body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+        assert_equals 2 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+          "the repeated live answer did not record the second hold's own answer"
+        assert_contains "$show" "Resolution mode: released\\nResolves hold set: $second_stamp" \
+          "the second release did not identify its hold"
+      fi
+      REAL_TASKS_AXI="$TASKS_AXI_BIN" run_teardown "$home" "$id" \
+        > "$home/teardown.out" 2> "$home/teardown.err" \
+        || fail "cleanup of the re-held task failed: $(cat "$home/teardown.err")"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: queued" "cleanup did not queue the re-held finished work"
+      assert_contains "$show" "held: yes" "cleanup released the second hold"
+      assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers --source "reheld answer fixture" 2>&1) \
+        || fail "the repeated answer did not complete the second hold: $out"
+      assert_contains "$out" "closed: $id" "the second hold was not reported resolved"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: done" "the repeated answer made finished work runnable"
+      assert_contains "$show" "held: no" "the repeated answer left the second hold active"
+      body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+      assert_equals 2 "$(printf '%s\n' "$body" | jq 'split("Resolution recorded by fm-captain-hold.") | length - 1')" \
+        "the completed second hold did not keep exactly two resolution records"
+      expected_mode=answered
+      [ "$interruption" != interrupted ] || expected_mode=released
+      printf '%s\n' "$body" | jq -e --arg stamp "$second_stamp" --arg mode "$expected_mode" \
+        'startswith("Resolution recorded by fm-captain-hold.\n") and
+         (split("\n")[2:4] == ["Resolution mode: " + $mode, "Resolves hold set: " + $stamp])' \
+        >/dev/null || fail "the newest record did not preserve the second hold's resolution"
+      printf '%s\n' "$body" | jq -j \
+        '("Resolution recorded by fm-captain-hold." + (split("Resolution recorded by fm-captain-hold.")[2])) | split("\n\n")[0:2] | join("\n\n")' \
+        > "$home/preserved-resolution.txt"
+      cmp -s "$home/first-resolution.txt" "$home/preserved-resolution.txt" \
+        || fail "the second hold changed the first resolution's bytes"
+      open=$(bash -c '. "$1"; status_open_decisions "$2" secondmate' \
+        _ "$ROOT/bin/fm-status-decision-lib.sh" "$channel")
+      assert_not_contains "$open" "captain-hold-$id-1"$'\t' "the first parent decision reopened"
+      assert_not_contains "$open" "captain-hold-$id-2"$'\t' "the second parent decision remained open"
+      published=$(cat "$channel")
+      assert_contains "$published" "resolved [key=captain-hold-$id-2]" \
+        "the second hold did not resolve its own parent key"
+      assert_not_contains "$published" "captain-hold-$id-3" "the second hold invented a third parent key"
+      out=$(printf '%s\n' "$row" | run_captain "$home" answers --source "reheld answer fixture" 2>&1) \
+        || fail "the completed second hold could not replay: $out"
+      assert_contains "$out" "closed: $id" "the completed replay was not idempotent"
+      assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+        "the completed replay changed resolution history"
+      assert_equals "$published" "$(cat "$channel")" "the completed replay changed parent keys"
+    done
+  done
+  pass "repeated default and done answers preserve prior holds and resolve the current parent decision"
+}
+
+test_legacy_keyed_release_requires_explicit_closure() {
+  local home id mode row show body out
+  for mode in default "done"; do
+    home=$(make_home "legacy-keyed-release-$mode")
+    id=sample-legacy-keyed-release
+    tasks_in "$home" add "$id" "Investigate legacy answer recovery" \
+      --kind scout --repo sample --start >/dev/null || fail "could not create the legacy release task"
+    write_origin_meta "$home" "$id"
+    mkdir -p "$home/data/$id"
+    printf 'done: report complete\n' > "$home/state/$id.status"
+    printf '# Legacy answer report\n' > "$home/data/$id/report.md"
+    FM_CAPTAIN_HOLD_NOW=2026-07-14T12:00:00Z run_captain "$home" hold "$id" \
+      --reason "captain initial report choice pending" >/dev/null || fail "could not open the legacy first hold"
+    complete_through_sibling "$home" "$id" >/dev/null || fail "could not complete the legacy task inventory"
+    row=$(printf '%s\tgo\tProceed' "$id")
+    [ "$mode" != "done" ] || row=$(printf '%s\tdone' "$row")
+    printf '%s\n' "$row" | run_captain "$home" answers --source "legacy release fixture" >/dev/null \
+      || fail "could not release the legacy first hold"
+    FM_CAPTAIN_HOLD_NOW=2026-07-15T12:00:00Z run_captain "$home" hold "$id" \
+      --reason "captain revised report choice pending" >/dev/null || fail "could not open the legacy second hold"
+    cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = unhold ] && [ "${2:-}" = sample-legacy-keyed-release ] \
+  && [ ! -e "$FM_HOME/unhold-failed-once" ]; then
+  : > "$FM_HOME/unhold-failed-once"
+  exit 93
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+    chmod +x "$home/fakebin/tasks-axi"
+    if printf '%s\n' "$row" | run_captain "$home" answers --source "legacy release fixture" \
+      > "$home/answer.out" 2> "$home/answer.err"; then
+      fail "the interrupted legacy release reported success"
+    fi
+    show=$(tasks_in "$home" show "$id" --full)
+    body=$(printf '%s\n' "$show" | sed -n 's/^  body: //p')
+    printf '%s\n' "$body" | jq -j 'sub("Resolves hold set: 2026-07-15T12:00:00Z\n"; "")' \
+      > "$home/legacy-body.txt"
+    tasks_in "$home" update "$id" --body-file "$home/legacy-body.txt" >/dev/null \
+      || fail "could not install the persisted legacy record"
+    REAL_TASKS_AXI="$TASKS_AXI_BIN" run_teardown "$home" "$id" \
+      > "$home/teardown.out" 2> "$home/teardown.err" \
+      || fail "cleanup of the legacy release failed: $(cat "$home/teardown.err")"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: queued" "cleanup did not retain legacy finished work"
+    assert_contains "$show" "held: yes" "cleanup released the legacy hold"
+    assert_absent "$home/state/$id.meta" "cleanup left the legacy worker record behind"
+    if out=$(printf '%s\n' "$row" | run_captain "$home" answers --source "legacy release fixture" 2>&1); then
+      fail "an ambiguous legacy release was automatically completed"
+    fi
+    assert_contains "$out" "close it with reconcile or a direct answer" \
+      "the legacy retry did not give safe closure guidance"
+    assert_not_contains "$out" "retry with --release" "the legacy retry advised reopening finished work"
+    assert_equals "$show" "$(tasks_in "$home" show "$id" --full)" \
+      "the legacy retry rewrote history or changed task state"
+    printf 'Captain explicitly closes this finished report.\n' > "$home/close.txt"
+    run_captain "$home" answer "$id" --decision-file "$home/close.txt" >/dev/null \
+      || fail "a fresh direct answer could not close the legacy hold"
+    assert_contains "$(tasks_in "$home" show "$id" --full)" "state: done" \
+      "the explicit legacy closure did not complete finished work"
+  done
+  pass "ambiguous legacy default and done releases require explicit closure without rewriting history"
+}
+
 # Decks that carry no schema marker are not all the bare question/answer pair:
 # lane-composed decision decks add `note` and bookkeeping fields (`task`,
 # `owner`, `recommended`, `decision_key`), and some name the picked option
@@ -3103,58 +3785,74 @@ SH
 }
 
 test_answer_before_cleanup_replay_preserves_the_retained_report() {
-  local home id wt rc bootstrap json
-  home=$(make_home answer-before-cleanup-replay)
-  id=sample-answer-before-cleanup-replay
-  wt="$home/projects/$id"
-  mkdir -p "$home/data/$id" "$wt" "$home/projects/sample"
-  tasks_in "$home" add "$id" "Investigate answer before cleanup replay" --kind scout \
-    --repo sample --start >/dev/null || fail "could not create the answer-before-replay fixture"
-  fm_write_meta "$home/state/$id.meta" \
-    "window=firstmate:fm-$id" "worktree=$wt" "project=$home/projects/sample" \
-    "harness=codex" "kind=scout" "mode=scout" "spawn_gen=fixture-$id"
-  printf 'done: report complete\n' > "$home/state/$id.status"
-  printf '# Interrupted cleanup\n\nThe captain call remains open.\n' > "$home/data/$id/report.md"
-  run_captain "$home" hold "$id" --reason "captain must choose after interrupted cleanup" \
-    >/dev/null || fail "could not hold the answer-before-replay fixture"
-  complete_through_sibling "$home" "$id" >/dev/null \
-    || fail "completion gate failed for the answer-before-replay fixture"
-  cat > "$home/fakebin/treehouse" <<'SH'
+  local home id wt rc bootstrap json intake show
+  for intake in direct keyed keyed-without-meta; do
+    home=$(make_home "answer-before-cleanup-replay-$intake")
+    id=sample-answer-before-cleanup-replay
+    wt="$home/projects/$id"
+    mkdir -p "$home/data/$id" "$wt" "$home/projects/sample"
+    tasks_in "$home" add "$id" "Investigate answer before cleanup replay" --kind scout \
+      --repo sample --start >/dev/null || fail "could not create the answer-before-replay fixture"
+    fm_write_meta "$home/state/$id.meta" \
+      "window=firstmate:fm-$id" "worktree=$wt" "project=$home/projects/sample" \
+      "harness=codex" "kind=scout" "mode=scout" "spawn_gen=fixture-$id"
+    printf 'done: report complete\n' > "$home/state/$id.status"
+    printf '# Interrupted cleanup\n\nThe captain call remains open.\n' > "$home/data/$id/report.md"
+    run_captain "$home" hold "$id" --reason "captain must choose after interrupted cleanup" \
+      >/dev/null || fail "could not hold the answer-before-replay fixture"
+    complete_through_sibling "$home" "$id" >/dev/null \
+      || fail "completion gate failed for the answer-before-replay fixture"
+    cat > "$home/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
 exit 1
 SH
-  chmod +x "$home/fakebin/treehouse"
+    chmod +x "$home/fakebin/treehouse"
 
-  set +e
-  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
-    > "$home/teardown.out" 2> "$home/teardown.err"
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
-  assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
-    "cleanup failed before the injected worktree return failure"
-  assert_present "$home/state/$id.backlog-close" \
-    "the interrupted cleanup lost its retained-artifact record"
+    set +e
+    PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+      FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
+      > "$home/teardown.out" 2> "$home/teardown.err"
+    rc=$?
+    set -e
+    [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
+    assert_contains "$(cat "$home/teardown.err")" "treehouse return failed for worktree $wt" \
+      "cleanup failed before the injected worktree return failure"
+    assert_present "$home/state/$id.backlog-close" \
+      "the interrupted cleanup lost its retained-artifact record"
 
-  printf 'Proceed with the reported result.\n' > "$home/answer.txt"
-  run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null \
-    || fail "the captain could not answer before cleanup replay"
-  fm_fake_exit0 "$home/fakebin" treehouse
-  bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
-    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
-    FM_CONFIG_OVERRIDE="$home/config" FM_BOOTSTRAP_NETWORK=skip \
-    "$ROOT/bin/fm-bootstrap.sh" 2>&1) \
-    || fail "session start could not replay cleanup after the answer: $bootstrap"
-  assert_absent "$home/state/$id.meta" "session start left the interrupted task record behind"
-  assert_absent "$home/state/$id.backlog-close" "session start left the pending record behind"
-  json=$(run_bearings "$home") || fail "Bearings failed after the answer-before-replay lifecycle"
-  printf '%s' "$json" | jq -e \
-    --arg id "$id" --arg report "data/$id/report.md" \
-    '.landed | any(.id == $id and .artifact == $report)' >/dev/null \
-    || fail "the retained report disappeared when the captain answered before replay: $json"
-  pass "an answer before cleanup replay preserves the retained report"
+    if [ "$intake" = direct ]; then
+      printf 'Proceed with the reported result.\n' > "$home/answer.txt"
+      run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null \
+        || fail "the captain could not answer before cleanup replay"
+    else
+      printf '%s\tgo\tProceed with the reported result.\n' "$id" \
+        | run_captain "$home" answers --source "interrupted cleanup fixture" >/dev/null \
+        || fail "the captain could not release work before cleanup replay"
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: in_flight" "the keyed answer completed work before replay"
+      assert_contains "$show" "held: no" "the keyed answer left the work held before replay"
+      assert_contains "$show" "Resolution mode: released" "the keyed answer did not record its release"
+      [ "$intake" != keyed-without-meta ] || rm -f "$home/state/$id.meta"
+    fi
+    fm_fake_exit0 "$home/fakebin" treehouse
+    bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+      FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+      FM_CONFIG_OVERRIDE="$home/config" FM_BOOTSTRAP_NETWORK=skip \
+      "$ROOT/bin/fm-bootstrap.sh" 2>&1) \
+      || fail "session start could not replay cleanup after the answer: $bootstrap"
+    assert_absent "$home/state/$id.meta" "session start left the interrupted task record behind"
+    assert_absent "$home/state/$id.backlog-close" "session start left the pending record behind"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: done" "cleanup replay reopened finished, answered work"
+    assert_contains "$show" "Proceed with the reported result." "cleanup replay lost the captain's words"
+    json=$(run_bearings "$home") || fail "Bearings failed after the answer-before-replay lifecycle"
+    printf '%s' "$json" | jq -e \
+      --arg id "$id" --arg report "data/$id/report.md" \
+      '.landed | any(.id == $id and .artifact == $report)' >/dev/null \
+      || fail "the retained report disappeared when the captain answered before replay: $json"
+  done
+  pass "cleanup replay closes answered work and preserves the report after direct or keyed answers"
 }
 
 test_answer_before_cleanup_replay_notes_a_retained_gerrit_change() {
@@ -3269,9 +3967,10 @@ SH
 }
 
 test_relocated_report_does_not_wedge_an_answer_before_replay() {
-  local home data id wt rc show bootstrap json
-  home=$(make_home relocated-answer-before-replay)
-  data="$home/données"
+  local home data id wt rc show bootstrap json intake=${1:-close}
+  local -a release_args=()
+  home=$(make_home "relocated-answer-before-replay-$intake")
+  if [ "$intake" = close ]; then data="$home/données"; else data="$home/records"; fi
   mv "$home/data" "$data"
   id=sample-relocated-answer-before-replay
   wt="$home/projects/$id"
@@ -3325,13 +4024,28 @@ SH
     "the interrupted relocated cleanup lost its pending record"
 
   printf 'Proceed despite the reporting limitation.\n' > "$home/answer.txt"
-  PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
-    FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
-    "$ROOT/bin/fm-captain-hold.sh" answer "$id" --decision-file "$home/answer.txt" \
-    >/dev/null || fail "the unsupported relocated report wedged the captain's answer"
+  if [ "$intake" = keyed ]; then
+    printf '%s\tgo\tProceed despite the reporting limitation.\n' "$id" \
+      | PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+        FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+        "$ROOT/bin/fm-captain-hold.sh" answers --source "relocated cleanup fixture" \
+        >/dev/null || fail "the relocated task could not be released by a keyed answer"
+  else
+    [ "$intake" != release ] || release_args=(--release)
+    PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+      FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$home/config" \
+      "$ROOT/bin/fm-captain-hold.sh" answer "$id" --decision-file "$home/answer.txt" \
+      "${release_args[@]+"${release_args[@]}"}" \
+      >/dev/null || fail "the unsupported relocated report wedged the captain's answer"
+  fi
   show=$(cd "$home" && tasks-axi show "$id" --full --file "$data/backlog.md") \
     || fail "the answered relocated row disappeared"
-  assert_contains "$show" "state: done" "the relocated report kept the answered call open"
+  if [ "$intake" = close ]; then
+    assert_contains "$show" "state: done" "the relocated report kept the answered call open"
+  else
+    assert_contains "$show" "state: in_flight" "the release completed work before cleanup replay"
+    assert_contains "$show" "Resolution mode: released" "the answer did not record its release"
+  fi
   assert_contains "$show" "held: no" "the relocated report kept the answered call held"
 
   fm_fake_exit0 "$home/fakebin" treehouse
@@ -3342,6 +4056,10 @@ SH
     || fail "session start could not replay relocated cleanup after the answer: $bootstrap"
   assert_absent "$home/state/$id.meta" "session start left the relocated task record behind"
   assert_absent "$home/state/$id.backlog-close" "session start left the relocated pending record behind"
+  show=$(cd "$home" && tasks-axi show "$id" --full --file "$data/backlog.md") \
+    || fail "the relocated row disappeared after replay"
+  assert_contains "$show" "state: done" "the relocated report blocked cleanup completion"
+  assert_contains "$show" "held: no" "cleanup replay left the answered task held"
   json=$(PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_DATA_OVERRIDE="$data" \
     FM_BEARINGS_NOW=2026-07-14T12:00:00Z "$BEARINGS" --json) \
     || fail "Bearings failed after the relocated answer-before-replay lifecycle"
@@ -3349,6 +4067,11 @@ SH
     '.landed | any(.id == $id) | not' >/dev/null \
     || fail "the unsupported relocated report was published as a landed delivery: $json"
   pass "an unsupported relocated report does not wedge the captain's answer"
+}
+
+test_relocated_report_does_not_wedge_released_cleanup_replay() {
+  test_relocated_report_does_not_wedge_an_answer_before_replay keyed
+  test_relocated_report_does_not_wedge_an_answer_before_replay release
 }
 
 # A home whose data directory is relocated keeps one backlog; the predicate and
@@ -5805,6 +6528,13 @@ test_secondmate_hold_stays_in_authoritative_home
 test_secondmate_home_publishes_holds_and_answers
 test_secondmate_reconcile_publishes_before_request_retirement
 test_bound_channel_answers_close_at_answer_time
+test_keyed_answer_releases_a_live_work_item
+test_keyed_answer_waits_for_cleanup_before_selecting_its_mode
+test_interrupted_keyed_release_closes_after_teardown
+test_completed_keyed_release_replays_after_publication_failure
+test_stale_keyed_replay_preserves_a_concurrent_hold
+test_repeated_keyed_answer_resolves_its_own_hold
+test_legacy_keyed_release_requires_explicit_closure
 test_unversioned_deck_shapes_with_extra_fields_still_route
 test_legacy_reconcile_replaces_previous_choices
 test_reconcile_never_closes_through_the_keyed_answer_intake
@@ -5825,6 +6555,7 @@ test_answer_before_cleanup_replay_preserves_the_retained_report
 test_answer_before_cleanup_replay_notes_a_retained_gerrit_change
 test_unusable_pending_close_record_names_its_reason
 test_relocated_report_does_not_wedge_an_answer_before_replay
+test_relocated_report_does_not_wedge_released_cleanup_replay
 test_teardown_retains_captain_calls_in_a_relocated_backlog
 test_teardown_retains_a_gerrit_captain_call_with_its_change_url
 test_merge_approval_releases_before_zero_done_retention

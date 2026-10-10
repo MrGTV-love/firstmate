@@ -1520,6 +1520,10 @@ fm_local_firstmate_state_dirs() {  # <first-state>
       FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry is unsafe at $reg"
       return 1
     }
+    if ! cat "$reg" >/dev/null 2>&1; then
+      FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry cannot be read at $reg"
+      return 1
+    fi
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
         "- "*)
@@ -1540,7 +1544,10 @@ fm_local_firstmate_state_dirs() {  # <first-state>
           [ "$known" = 1 ] || homes+=("$child")
           ;;
       esac
-    done < "$reg"
+    done < "$reg" || {
+      FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry cannot be read at $reg"
+      return 1
+    }
   done
 }
 
@@ -2745,7 +2752,7 @@ fm_wake_status_key_map() {  # <queue-key>
 
 fm_wake_annotation_manifest() {  # <deduped-raw-rows>
   local rows=$1 epoch seq kind key payload
-  while IFS=$(printf '\t') read -r epoch seq kind key payload; do
+  while IFS=$'\t' read -r epoch seq kind key payload; do
     [ "$kind" = signal ] || continue
     fm_wake_status_key_map "$key" || continue
     if [ "$FM_WAKE_STATUS_HISTORICAL" = true ]; then
@@ -2851,7 +2858,7 @@ fm_wake_print_annotations() {  # <deduped-raw-rows> [<presentation-snapshot>]
     *) sleep "$FM_WAKE_ENRICH_TEST_DELAY" ;;
   esac
 
-  while IFS=$(printf '\t') read -r status_key mode; do
+  while IFS=$'\t' read -r status_key mode; do
     [ -n "$status_key" ] || continue
     path="$STATE/$status_key"
     # A turn-ended-only (historical) row's annotation would show unread status
@@ -2871,7 +2878,7 @@ fm_wake_print_annotations() {  # <deduped-raw-rows> [<presentation-snapshot>]
     endpoint=
     if [ -n "$snapshot" ]; then
       task=${status_key%.status}
-      while IFS=$(printf '\t') read -r snapshot_task snapshot_endpoint _snapshot_ident; do
+      while IFS=$'\t' read -r snapshot_task snapshot_endpoint _snapshot_ident; do
         if [ "$snapshot_task" = "$task" ]; then endpoint=$snapshot_endpoint; break; fi
       done <<EOF
 $snapshot
