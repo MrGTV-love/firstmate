@@ -1610,12 +1610,6 @@ families_for_changed_path() {
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh|bin/fm-supervision-lib.sh)
       printf '%s\n' watcher-wake-lock
-      case "$path" in
-        bin/fm-wake*)
-          printf '%s\n' backend-dispatch
-          printf '%s\n' secondmate
-          ;;
-      esac
       ;;
     bin/fm-afk*)
       printf '%s\n' afk
@@ -1849,7 +1843,6 @@ families_for_changed_path() {
     bin/fm-spawn.sh)
       printf '%s\n' backend-dispatch
       printf '%s\n' pure-contract-unit
-      printf '%s\n' secondmate
       printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
     bin/fm-send.sh|bin/fm-harness.sh|bin/fm-peek.sh|bin/fm-composer*)

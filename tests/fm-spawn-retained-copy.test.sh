@@ -7,7 +7,8 @@
 #      changes nothing; once that record is retired the gate lets it through.
 #   2. A slot a reassociated task left behind does not block allocation: a new
 #      spawn acquires and claims it, whatever its commits.
-#   3. A local Firstmate home that cannot be read refuses rather than guessing.
+#   3. A registered local Firstmate home that cannot be read is named in one
+#      warning line and skipped: the spawn still proceeds.
 set -u
 
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -120,15 +121,20 @@ test_slot_left_by_reassociated_task_is_allocatable() {
   pass "a pool slot a reassociated task left is acquired and claimed by a new task"
 }
 
-test_unreadable_local_home_refuses() {
-  local name=unreadable-home
+test_unreadable_local_home_warns_and_proceeds() {
+  local name=unreadable-home out warnings
   make_retained_case "$name"
   printf -- '- ghost - ghost (home: %s; scope: fixture; projects: P; added 2026-10-08)\n' \
     "$CASE_DIR/missing-home" > "$HOME_DIR/data/secondmates.md"
-  assert_retained_refusal "$name" "cannot prove no Treehouse pool slot holds a task's current copy"
-  pass "an unavailable registered local home refuses allocation rather than skipping its records"
+  out=$(run_retained_spawn "$name") || fail "an unavailable registered local home stopped the spawn: $out"
+  warnings=$(printf '%s\n' "$out" | grep -c "^warning: registered local Firstmate home is unavailable: $CASE_DIR/missing-home" || true)
+  [ "$warnings" = 1 ] || fail "expected one warning line naming the unavailable home, got $warnings: $out"
+  assert_contains "$out" "spawned new-$name" "the spawn did not launch past the unavailable home"
+  assert_grep "task=new-$name" "$CASE_DIR/pool/1/.fm-slot-owner" "the spawn did not claim the slot"
+  assert_grep "worktree=$SLOT_DIR" "$HOME_DIR/state/new-$name.meta" "the spawn did not publish the slot"
+  pass "an unavailable registered local home is named in one warning and the spawn proceeds"
 }
 
 test_slot_holding_live_nested_current_copy_refuses
 test_slot_left_by_reassociated_task_is_allocatable
-test_unreadable_local_home_refuses
+test_unreadable_local_home_warns_and_proceeds

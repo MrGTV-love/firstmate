@@ -1492,6 +1492,18 @@ fm_task_set_lock_path() {  # <state-dir>
   printf '%s/.task-set.lock\n' "$state"
 }
 
+# Record one thing fm_local_firstmate_state_dirs could not prove: a failure for
+# a strict walk, a skipped entry for a tolerant one.
+# shellcheck disable=SC2034 # FM_LOCAL_FIRSTMATE_ERROR and _SKIPPED are read by callers.
+fm_local_firstmate_unproved() {  # <tolerant|''> <what>
+  if [ "$1" = tolerant ]; then
+    FM_LOCAL_FIRSTMATE_SKIPPED+=("$2")
+    return 0
+  fi
+  FM_LOCAL_FIRSTMATE_ERROR=$2
+  return 1
+}
+
 # Every Firstmate state directory on THIS machine whose task records can share a
 # machine-local resource with <first-state>: <first-state> itself, then the local
 # root home and each local secondmate home registered below it, walked through
@@ -1503,16 +1515,20 @@ fm_task_set_lock_path() {  # <state-dir>
 # FM_LOCAL_FIRSTMATE_ERROR naming what could not be proved - an unresolvable
 # root, an unsafe or malformed registry, or an unavailable registered local
 # home - so a caller refuses rather than treating an unreadable home as one
-# with no tasks. Requires bin/fm-secondmate-registry-lib.sh to be sourced first.
-# shellcheck disable=SC2034 # FM_LOCAL_FIRSTMATE_ERROR is read by callers.
-fm_local_firstmate_state_dirs() {  # <first-state>
-  local first=$1 root home reg line child known existing i=0
+# with no tasks. With `tolerant` it never fails: it lists every home it can
+# read and names each thing it could not prove in FM_LOCAL_FIRSTMATE_SKIPPED,
+# for a caller that must not let one broken home stop a whole project.
+# Requires bin/fm-secondmate-registry-lib.sh to be sourced first.
+# shellcheck disable=SC2034 # FM_LOCAL_FIRSTMATE_ERROR and _SKIPPED are read by callers.
+fm_local_firstmate_state_dirs() {  # <first-state> [tolerant]
+  local first=$1 tolerant=${2:-} root home reg line child known existing i=0
   local -a homes
   FM_LOCAL_FIRSTMATE_STATES=("$first")
   FM_LOCAL_FIRSTMATE_ERROR=
+  FM_LOCAL_FIRSTMATE_SKIPPED=()
   root=$(fm_firstmate_root_home "$FM_HOME") || {
-    FM_LOCAL_FIRSTMATE_ERROR="cannot resolve the root Firstmate home"
-    return 1
+    fm_local_firstmate_unproved "$tolerant" "cannot resolve the root Firstmate home"
+    return
   }
   homes=("$root")
   while [ "$i" -lt "${#homes[@]}" ]; do
@@ -1528,25 +1544,25 @@ fm_local_firstmate_state_dirs() {  # <first-state>
     reg="$home/data/secondmates.md"
     [ ! -e "$reg" ] && [ ! -L "$reg" ] && continue
     [ -f "$reg" ] && [ ! -L "$reg" ] || {
-      FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry is unsafe at $reg"
-      return 1
+      fm_local_firstmate_unproved "$tolerant" "local Firstmate registry is unsafe at $reg" || return 1
+      continue
     }
     if ! cat "$reg" >/dev/null 2>&1; then
-      FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry cannot be read at $reg"
-      return 1
+      fm_local_firstmate_unproved "$tolerant" "local Firstmate registry cannot be read at $reg" || return 1
+      continue
     fi
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
         "- "*)
           secondmate_registry_parse_line "$line" || {
-            FM_LOCAL_FIRSTMATE_ERROR="malformed local Firstmate registry entry in $reg"
-            return 1
+            fm_local_firstmate_unproved "$tolerant" "malformed local Firstmate registry entry in $reg" || return 1
+            continue
           }
           [ "$SECONDMATE_REGISTRY_REMOTE" -eq 0 ] || continue
           child=$([ -d "$SECONDMATE_REGISTRY_HOME" ] &&
             CDPATH='' cd -- "$SECONDMATE_REGISTRY_HOME" 2>/dev/null && pwd -P) || {
-            FM_LOCAL_FIRSTMATE_ERROR="registered local Firstmate home is unavailable: $SECONDMATE_REGISTRY_HOME"
-            return 1
+            fm_local_firstmate_unproved "$tolerant" "registered local Firstmate home is unavailable: $SECONDMATE_REGISTRY_HOME" || return 1
+            continue
           }
           known=0
           for existing in "${homes[@]}"; do
@@ -1556,8 +1572,7 @@ fm_local_firstmate_state_dirs() {  # <first-state>
           ;;
       esac
     done < "$reg" || {
-      FM_LOCAL_FIRSTMATE_ERROR="local Firstmate registry cannot be read at $reg"
-      return 1
+      fm_local_firstmate_unproved "$tolerant" "local Firstmate registry cannot be read at $reg" || return 1
     }
   done
 }

@@ -261,30 +261,41 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path>
   return 1
 }
 
+# The pool slot of <project> that strictly contains <canonical-path>, or a
+# failure when none does.
+fm_task_copy_enclosing_pool_slot() {  # <project> <canonical-path>
+  local project=$1 dir=${2%/*}
+  while [ -n "$dir" ]; do
+    if [ -f "${dir%/*/*}/treehouse-state.json" ] && fm_treehouse_pool_slot "$project" "$dir"; then
+      printf '%s\n' "$dir"
+      return 0
+    fi
+    dir=${dir%/*}
+  done
+  return 1
+}
+
 # True when no pool slot of <project> strictly contains the current copy
 # (worktree=) of a task record in this home or any locally registered Firstmate
 # home. treehouse get resets whichever slot it hands out, so a slot holding a
 # live record's nested copy must not be allocated; a slot a task merely left is
-# not a record's current copy and stays allocatable.
+# not a record's current copy and stays allocatable. A registered local home
+# that cannot be read is named in one warning line and skipped: one broken home
+# must not stop every allocation for a project.
 fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
-  local project=$1 record_state=$2 state_dir meta copy dir
-  fm_local_firstmate_state_dirs "$record_state" || {
-    echo "error: cannot prove no Treehouse pool slot holds a task's current copy: $FM_LOCAL_FIRSTMATE_ERROR; refusing allocation before treehouse get" >&2
-    return 1
-  }
+  local project=$1 record_state=$2 state_dir meta copy slot skipped
+  fm_local_firstmate_state_dirs "$record_state" tolerant
+  for skipped in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
+    echo "warning: $skipped; its task records were not checked for a current copy inside a Treehouse pool slot" >&2
+  done
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
       copy=$(fm_meta_get "$meta" worktree)
       copy=$(fm_task_copy_canonical_dir "$copy") || continue
-      dir=${copy%/*}
-      while [ -n "$dir" ]; do
-        if [ -f "${dir%/*/*}/treehouse-state.json" ] && fm_treehouse_pool_slot "$project" "$dir"; then
-          echo "error: Treehouse pool slot $dir contains task $(basename "$meta" .meta)'s current copy $copy; refusing allocation before treehouse get" >&2
-          return 1
-        fi
-        dir=${dir%/*}
-      done
+      slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy") || continue
+      echo "error: Treehouse pool slot $slot contains task $(basename "$meta" .meta)'s current copy $copy; refusing allocation before treehouse get" >&2
+      return 1
     done
   done
 }

@@ -20,6 +20,9 @@
 #      or carrying an unreadable claim, a detached ship copy, a recorded PR, a
 #      worker, the supervision branch, a session that does not own the home,
 #      and malformed arguments - changes nothing at all.
+#   7. A ship reassociated into a copy nested in its own pool slot is retired by
+#      the real teardown once its work lands, and the slot is free for the next
+#      spawn.
 set -u
 
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -733,6 +736,122 @@ test_nested_replacement_blocks_slot_allocation() {
   pass "a slot holding a reassociated task's nested copy refuses a new allocation"
 }
 
+# run_case_teardown <case-dir> <id>: the real bin/fm-teardown.sh against the
+# case home, with a treehouse that records each call and quiet endpoint and
+# forge tools.
+run_case_teardown() {  # <case-dir> <id>
+  local dir=$1 id=$2 tb="$1/teardown-bin"
+  if [ ! -d "$tb" ]; then
+    mkdir -p "$tb" "$dir/code-root" "$dir/home/config"
+    ln -s "$ROOT/bin" "$dir/code-root/bin"
+    cat > "$tb/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$dir/treehouse.log"
+exit 0
+SH
+    cat > "$tb/gh-axi" <<'SH'
+#!/usr/bin/env bash
+case "${1:-} ${2:-}" in
+  "pr list") printf '%s\n' "count: 0 (showing first 0)" "pull_requests[]: []" ; exit 0 ;;
+  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
+esac
+exit 0
+SH
+    cat > "$tb/gh" <<'SH'
+#!/usr/bin/env bash
+case "${1:-} ${2:-}" in
+  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
+esac
+exit 0
+SH
+    chmod +x "$tb/treehouse" "$tb/gh-axi" "$tb/gh"
+    fm_fake_exit0 "$tb" tmux no-mistakes
+    fm_fake_docker "$tb"
+    touch "$dir/home/state/.last-watcher-beat"
+  fi
+  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" \
+    FM_STATE_OVERRIDE="$dir/home/state" FM_DATA_OVERRIDE="$dir/home/data" \
+    FM_CONFIG_OVERRIDE="$dir/home/config" PATH="$tb:$PATH" \
+    "$ROOT/bin/fm-teardown.sh" "$id" 2>&1
+}
+
+# The whole nested lifecycle: a ship in a pool slot is reassociated into a copy
+# nested inside that slot, its work lands, teardown retires it, and the slot is
+# free for the next spawn. Teardown stops, changing nothing, while the nested
+# work is unlanded and while the enclosing slot holds a commit that is neither
+# landed nor anchored.
+test_nested_reassociation_lands_tears_down_and_frees_the_slot() {
+  local id=reassoc-nested-life dir slot new fb out rc
+  dir=$(new_case nested-life "$id")
+  slot=$(add_pool_slot "$dir" 1 "fm/$id-slot")
+  printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/1/.fm-slot-owner"
+  sed -i.bak "s|^worktree=.*|worktree=$slot|" "$dir/home/state/$id.meta"
+  sed -i.bak "s|^branch=.*|branch=fm/$id-slot|" "$dir/home/state/$id.meta"
+  sed -i.bak "s|^Ship branch: .*|Ship branch: fm/$id-slot|" "$dir/home/data/$id/brief.md"
+  sed -i.bak "/^tasktmp=/d" "$dir/home/state/$id.meta"
+  rm -f "$dir/home/state/$id.meta.bak" "$dir/home/data/$id/brief.md.bak"
+  new="$slot/.claude/worktrees/fm-$id-v2"
+  mkdir -p "$slot/.claude/worktrees"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "nested S5 copy") \
+    || fail "nested reassociation failed: $out"
+  assert_equals "$new" "$(meta_field "$dir" "$id" worktree)" "the record does not name the nested copy"
+  assert_equals "$slot" "$(meta_field "$dir" "$id" prior_worktree)" "the enclosing slot is not the prior copy"
+
+  printf 'nested work\n' > "$new/nested.txt"
+  git -C "$new" add nested.txt
+  git -C "$new" commit -qm "nested work"
+  cp "$dir/home/state/$id.meta" "$dir/meta-before"
+  rc=0
+  out=$(run_case_teardown "$dir" "$id") || rc=$?
+  expect_code 1 "$rc" "teardown must refuse while the nested copy's work is unlanded"$'\n'"$out"
+  assert_contains "$out" "not landed" "the unlanded refusal did not name the reason"
+  cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "the unlanded refusal changed the record"
+  [ ! -e "$dir/treehouse.log" ] || fail "the unlanded refusal returned a slot"
+  assert_equals "nested work" "$(cat "$new/nested.txt")" "the unlanded refusal changed the nested copy"
+
+  git -C "$new" push -q origin "HEAD:main"
+  printf 'late slot work\n' > "$slot/late.txt"
+  git -C "$slot" add late.txt
+  git -C "$slot" commit -qm "late slot work"
+  rc=0
+  out=$(run_case_teardown "$dir" "$id") || rc=$?
+  expect_code 1 "$rc" "teardown must stop while the enclosing slot holds unproven work"$'\n'"$out"
+  assert_contains "$out" "claimed pool slot $slot" "the slot refusal did not name the slot"
+  assert_contains "$out" "neither landed nor held by a refs/fm/anchor/$id-<sha> preservation anchor" \
+    "the slot refusal did not name the reason"
+  cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "the slot refusal changed the record"
+  [ ! -e "$dir/treehouse.log" ] || fail "the slot refusal returned the slot"
+  [ -d "$new" ] || fail "the slot refusal removed the nested copy"
+  assert_equals "late slot work" "$(cat "$slot/late.txt")" "the slot refusal changed the slot"
+  git -C "$slot" reset -q --hard HEAD~1
+
+  rc=0
+  out=$(run_case_teardown "$dir" "$id") || rc=$?
+  expect_code 0 "$rc" "a landed nested reassociated task must tear down"$'\n'"$out"
+  assert_contains "$out" "nested reassociated worktree $new removed and its pool slot $slot returned" \
+    "teardown did not report the nested copy removed and the slot returned"
+  [ ! -e "$new" ] || fail "teardown left the nested copy"
+  assert_line "return --force $slot" "$dir/treehouse.log" "teardown did not return the enclosing slot"
+  [ ! -e "$dir/pool/1/.fm-slot-owner" ] || fail "the retired task still claims the slot"
+  [ ! -e "$dir/home/state/$id.meta" ] || fail "teardown left the task record"
+  git -C "$dir/proj" rev-parse --verify --quiet "refs/heads/fm/$id-v2" >/dev/null \
+    || fail "teardown deleted the nested copy's branch"
+  ! git -C "$dir/proj" worktree list --porcelain | grep -Fxq "worktree $new" \
+    || fail "teardown left the nested copy registered"
+
+  fb=$(make_spawn_fakebin "$dir/spawn")
+  fm_test_fake_sleep_noop "$fb"
+  fm_test_spawn_home "$dir/home" codex
+  fm_test_spawn_brief "$dir/home" "$id-next"
+  rc=0
+  out=$(fm_test_run_spawn "$dir/home" "$slot" "$fb" "$id-next" "$dir/proj" --scout) || rc=$?
+  expect_code 0 "$rc" "a new spawn must succeed once the nested task is retired"$'\n'"$out"
+  assert_line "task=$id-next" "$dir/pool/1/.fm-slot-owner" "the new spawn did not claim the freed slot"
+  assert_equals "$slot" "$(meta_field "$dir" "$id-next" worktree)" "the new spawn did not record the freed slot"
+  pass "a nested reassociated ship lands, tears down under the landed and anchored proofs, and frees its slot for the next spawn"
+}
+
 test_anchor_failure_refuses_record_publication() {
   local phase id dir new real_git out rc
   real_git=$(command -v git)
@@ -954,6 +1073,7 @@ test_unchanged_ship_branch_requires_consistent_brief
 test_dirty_current_copy_refuses_without_publication
 test_provider_reset_preserves_spawned_copy_commits_via_anchor
 test_nested_replacement_blocks_slot_allocation
+test_nested_reassociation_lands_tears_down_and_frees_the_slot
 test_firstmate_hook_artifacts_do_not_block_reassociation
 test_anchor_failure_refuses_record_publication
 test_non_pool_reassociation_serializes_copy_ownership

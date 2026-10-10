@@ -7960,7 +7960,12 @@ test_slot_named_as_another_prior_copy_refuses() {
   pass "teardown refuses to return a pool slot another record preserves as a prior copy"
 }
 
-test_nested_reassociation_return_to_prior_copy_refuses() {
+# A task's own prior copies never refuse its own teardown outright. A copy a
+# pool return would sweep away must instead be proved disposable, and a plain
+# directory cannot be: the pool cases refuse and change nothing, with or
+# without --force. A non-pool current copy is never returned, so its teardown
+# touches no prior copy and is not blocked by one.
+test_own_prior_copies_block_only_an_unproven_pool_return() {
   local case_dir rc slot prior shape force pool
   for pool in ordinary pool; do
     for shape in return ancestor descendant; do
@@ -8001,18 +8006,32 @@ SH
           FM_HOME="$case_dir/home" FM_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
             run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         fi
-        expect_code 1 "$rc" "nested-prior-$pool-$shape-$force: preserved custody must refuse cleanup"
-        assert_grep "recorded prior_worktree" "$case_dir/stderr" \
-          "nested-prior-$pool-$shape-$force: refusal did not identify prior custody"
-        cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" \
-          || fail "nested-prior-$pool-$shape-$force: task metadata changed"
         assert_absent "$case_dir/treehouse.log" "nested-prior-$pool-$shape-$force: cleanup returned a copy"
         assert_grep "preserved B work" "$slot/nested-B/scratch.txt" \
           "nested-prior-$pool-$shape-$force: nested prior content changed"
+        if [ "$pool" = ordinary ] && [ "$force" = force ]; then
+          expect_code 0 "$rc" "nested-prior-$pool-$shape-$force: a teardown that returns nothing must not be blocked by its own prior copy: $(cat "$case_dir/stderr")"
+          assert_grep "reassociated worktree $slot left in place" "$case_dir/stdout" \
+            "nested-prior-$pool-$shape-$force: the current copy was not left in place"
+          assert_absent "$case_dir/state/task-x1.meta" "nested-prior-$pool-$shape-$force: the task record was not removed"
+          continue
+        fi
+        expect_code 1 "$rc" "nested-prior-$pool-$shape-$force: unproven work must refuse cleanup"
+        if [ "$pool" = pool ]; then
+          assert_grep "recorded prior_worktree" "$case_dir/stderr" \
+            "nested-prior-$pool-$shape-$force: refusal did not identify the prior copy"
+          assert_grep "not a Git worktree root" "$case_dir/stderr" \
+            "nested-prior-$pool-$shape-$force: refusal did not name the reason"
+        else
+          assert_grep "has uncommitted changes" "$case_dir/stderr" \
+            "nested-prior-$pool-$shape-$force: the landed-work test did not report the untracked prior work"
+        fi
+        cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" \
+          || fail "nested-prior-$pool-$shape-$force: task metadata changed"
       done
     done
   done
-  pass "nested A-to-B-to-A custody refuses ordinary and pool cleanup, including force and symlink overlap"
+  pass "own prior copies refuse only a pool return that cannot prove them landed, including force and symlink overlap"
 }
 
 test_other_record_copy_overlap_is_component_aware() {
@@ -8688,7 +8707,7 @@ test_reassociated_copies_are_left_in_place
 test_reassociated_unlanded_copy_still_refuses
 test_released_slot_record_keeps_current_copy
 test_slot_named_as_another_prior_copy_refuses
-test_nested_reassociation_return_to_prior_copy_refuses
+test_own_prior_copies_block_only_an_unproven_pool_return
 test_other_record_copy_overlap_is_component_aware
 test_forced_descendant_preserved_copy_refuses_before_cleanup
 test_tasktmp_preserves_current_and_prior_reassociated_copies
