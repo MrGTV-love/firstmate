@@ -2501,7 +2501,7 @@ Disconnected and empty rounds wait the adapter's retry delay before listening ag
 Consecutive captured `waiting` rounds double that delay up to its 60-second maximum, so a second poller left on the page cannot produce an unbounded stream of announcements.
 When a `LISTENER_ACTIVE` refusal shows another poll holds the page, the listener takes the page over with `--takeover` only when the `orphans` test proves every other poll on the page is a stray; it never displaces a poll that test cannot prove.
 An unproved hold is reported once, naming the page and each unproved poll, and is then retried quietly with the same doubling back-off; a `LISTENER_REPLACED` result hands the page off and retires the source instead of relaunching it.
-Only an ended or missing session retires automatically; an open session is never retired merely because its browser disconnected or its registration is old.
+Apart from that handoff, only an ended or missing session retires automatically; an open session is never retired merely because its browser disconnected or its registration is old.
 Unknown poll failures still reach the handler and release the listener rather than retrying indefinitely.
 The runner's existing owner lease and source launch pacing remain in force.
 An arbitrary source command registered with the Lavish classifier still completes after one poll; the `bin/fm-procevent.sh` header owns the tracked-adapter identity requirement for continuation.
@@ -2661,7 +2661,7 @@ Under the default ordering, this happens after the initial `check` publication.
 - Any registration refuses to replace an external registration while its prior runner claim is live, uncertain, orphaned, or terminal-pending; replacement becomes eligible only after that generation is proved gone or its terminal retirement completes.
 - A source that has ended therefore captures at most one terminal result, is never restarted, and leaves no recurring poll work.
 - For ordinary sources, explicit `retire` stays the supported and idempotent path afterwards; a task-owned board instead refuses `retire` until its owner concludes the open terminal round with `handled`.
-- For Lavish that verdict covers an ended session, a missing session, and the final feedback of a `Send & End` review, which the published poll marks with `session_ended` before it returns only empty ended sessions.
+- For Lavish that verdict covers an ended session, a missing session, the final feedback of a `Send & End` review, which the published poll marks with `session_ended` before it returns only empty ended sessions, and a `LISTENER_REPLACED` result, which means another poll took the page over.
 
 **Apply built-in results automatically**
 
