@@ -1677,7 +1677,10 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
   # this script, never under a fake code root.
   # Arming requests a detached runner without waiting for readiness; a consumer
   # that needs a ready listener checks it through the process-event interface.
+  # Under FM_TEST_SEAM=1 a bootstrap arms it only when FM_TEST_ARM_PROC_DETECTOR=1,
+  # so suites that do not test the detector start no runner.
   if local_phase && [ ! -e "$FM_HOME/.fm-secondmate-home" ] && [ ! -e "$FM_HOME/.fm-lab-home" ] \
+    && { [ "${FM_TEST_SEAM:-}" != 1 ] || [ "${FM_TEST_ARM_PROC_DETECTOR:-}" = 1 ]; } \
     && [ -x "$SCRIPT_DIR/fm-procevent-proc.sh" ]; then
     FM_ROOT_OVERRIDE='' FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-procevent-proc.sh" arm >/dev/null 2>&1 || [ "$?" -eq 3 ] \
       || echo "MISSING: process pile-up detector could not be armed; coverage is unconfirmed"

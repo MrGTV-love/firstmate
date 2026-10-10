@@ -1066,7 +1066,8 @@ test_bootstrap_opt_out_cleanup() {
 }
 
 test_bootstrap_opt_out_reports_cleanup_failure() {
-  local home fakebin out bootstrap_pid
+  local home fakebin out bootstrap_pid FM_TEST_ARM_PROC_DETECTOR=1
+  export FM_TEST_ARM_PROC_DETECTOR
   home="$TMP_ROOT/boot-optout-fail"; mkdir -p "$home"
   fm_test_track_procevent_home "$home"
   printf 'FMX_PAIRING_TOKEN=tok-out\n' > "$home/.env"

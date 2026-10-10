@@ -52,6 +52,11 @@ export FM_GATE_REFUSE_BYPASS=1
 # leaked harness pin alone stays inert outside a suite.
 export FM_TEST_SEAM=1
 
+# Under the seam, bootstrap arms the process pile-up detector only for a suite
+# that opts in with FM_TEST_ARM_PROC_DETECTOR=1; every other suite starts no
+# detector runner.
+unset FM_TEST_ARM_PROC_DETECTOR
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary

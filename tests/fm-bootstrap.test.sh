@@ -1427,8 +1427,8 @@ os.execvpe(sys.argv[2], sys.argv[2:], os.environ)
   }
   local case_dir fakebin home sm lab other out real_perl bootstrap_pid runner
   case_dir="$TMP_ROOT/pileup-detector-arm"
-  local FM_PROCEVENT_CLAIM_ROOT="$case_dir/claims" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60
-  export FM_PROCEVENT_CLAIM_ROOT FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS
+  local FM_PROCEVENT_CLAIM_ROOT="$case_dir/claims" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60 FM_TEST_ARM_PROC_DETECTOR=1
+  export FM_PROCEVENT_CLAIM_ROOT FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS FM_TEST_ARM_PROC_DETECTOR
   home="$case_dir/home"
   sm="$case_dir/sm"
   lab="$case_dir/lab"
