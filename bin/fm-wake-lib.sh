@@ -1300,6 +1300,8 @@ fm_lock_try_acquire() {
 # Returns 1 after that parent stays absent for five seconds, because no lock can
 # be created there and retrying would leave a deleted fixture or scratch copy
 # spinning indefinitely. A parent that returns inside the grace resets the wait.
+# It also returns 1 at once when failed self-reclamation leaves this process
+# named as the holder of the lock or its steal mutex.
 # Callers must stop before entering the critical section on failure, even if the
 # parent returns afterward; set held flags only on success and release any
 # already-held sibling locks. tests/fm-wake-queue.test.sh covers the grace, and
