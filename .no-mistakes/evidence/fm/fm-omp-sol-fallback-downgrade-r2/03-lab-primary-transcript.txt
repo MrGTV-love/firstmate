@@ -1,0 +1,33 @@
+omp: omp/18.8.7
+
+### H1. A secondmate-style primary on Sol stops and its home record carries the error
+PASS - omp discovered the tracked home extension
+provider requests:
+  codex (Sol):
+    00:31:07 gpt-6.1-sol refused-429-usage-limit
+  weak (deepseek, the global chain target): 0 requests
+home record <lab-home>/state/.omp-live-model:
+  model=openai-codex/gpt-6.1-sol
+  error=ChatGPT rate limit exceeded. retry-after-ms=3600000
+primary pane (tail):
+  |                                                                                  ██       v18.8.7
+  |                                                         Tip: Say `workflowz` in your message to drive the task with parallel
+  |                                                                    subagents in eval — watch it glow as you type
+  |  Reply with the single word ack.
+  |  Error: ChatGPT rate limit exceeded. retry-after-ms=3600000
+  |  Error: Retry failed after 1 attempts: Provider requested 3600000ms wait, exceeds retry.maxDelayMs (300000ms). Original error: ChatGPT rate limit exceeded. retry-after-ms=3600000
+  | ❯
+  |  π · ⦸ GPT-6.1 Sol · 🌳 32d18ed9638d/01M4HZH01Q50QVT91QE6CCTFYA · ⑂ detached · ◫ 7.6%/272K ⟲
+PASS - the Sol route received the request
+PASS - the weak model received no request
+PASS - the home record names the Sol model
+PASS - the home record carries the run error
+PASS - the publisher replaced the seeded stale content on its first event (this lab primary is not launched by fm-spawn)
+
+### H2. The parent supervisor's crew-state shows the secondmate's stop
+$ bin/fm-crew-state.sh mate   (meta: kind=secondmate harness=omp home=<lab-home> model=openai-codex/gpt-6.1-sol:high)
+  state: unknown · source: none · backend target gone: fm:fm-mate · run-error: ChatGPT rate limit exceeded. retry-after-ms=3600000
+PASS - the line carries the secondmate's run-error
+PASS - the line carries no model-drift (thinking suffix aside, same model)
+
+### RESULT: 0 failed checks

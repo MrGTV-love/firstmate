@@ -1,0 +1,16 @@
+spawn rc=0
+notice: omp provider 'openai-codex' is not in 'omp models --json' (extension-registered providers are never listed); launching 'openai-codex/gpt-6.1-sol' unvalidated
+skill selection for sol-lane-q3: unavailable - no TypeSafe or OpenRouter key
+spawned sol-lane-q3 harness=omp kind=scout window=firstmate:fm-sol-lane-q3 worktree=<lab>/wt
+before teardown:
+  sol-lane-q3.busy-gen
+  sol-lane-q3.busy-state
+  sol-lane-q3.git-hooks
+  sol-lane-q3.live-model
+  sol-lane-q3.meta
+  sol-lane-q3.omp-ext.ts
+$ bin/fm-teardown.sh sol-lane-q3 --force --drop-file /Users/charlesabrooker/tmp/fm-ev-scratch/drop.txt  (rc=0)
+  teardown sol-lane-q3 complete (window firstmate:fm-sol-lane-q3, worktree <lab>/wt)
+  Backlog: sol-lane-q3 just finished (this home keeps no markdown backlog at <lab>/home/data/backlog.md). Update <lab>/home/data/backlog.md - move sol-lane-q3 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+after teardown:
+PASS - teardown removed the live-model record

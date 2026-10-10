@@ -1,0 +1,5 @@
+ok - omp (omp/18.8.7): control - the global Sol chain alone still falls to the weak model
+ok - omp (omp/18.8.7): the overlay empties the Sol chain, the run stops with the provider error, and the record carries it
+ok - omp (omp/18.8.7): the overlay leaves another model's global chain in place
+ok - omp (omp/18.8.7): with the overlay a fallen-back session returns to its recorded model at the next prompt even under a global fallbackRevertPolicy: never
+ok - omp (omp/18.8.7): control - without the overlay a global fallbackRevertPolicy: never keeps the session on the fallback
