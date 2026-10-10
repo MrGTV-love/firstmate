@@ -1,0 +1,3 @@
+=== Ledger below floor with no earlier published ledger ===
+exit=0 gh calls=0
+{"complete":false,"stale":true,"rows":[{"category":"coverage","subject":"ledger degraded","evidence":"GitHub core quota low (100 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:16:47Z"}]}

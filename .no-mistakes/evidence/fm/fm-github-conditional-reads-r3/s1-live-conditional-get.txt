@@ -1,0 +1,22 @@
+$ fm-gh-rest.sh get repos/MrGTV-love/firstmate/pulls/81   # call 1 (cold cache)
+exit=0
+{"number":81,"state":"closed","title":"fix: deliver stranded and stuck-queue omp watcher wakes","head":"eb628794f0e7056a4256ee3123ec6d4742ad4419"}
+$ fm-gh-rest.sh get repos/MrGTV-love/firstmate/pulls/81   # call 2 (warm cache)
+exit=0
+{"number":81,"state":"closed","title":"fix: deliver stranded and stuck-queue omp watcher wakes","head":"eb628794f0e7056a4256ee3123ec6d4742ad4419"}
+$ fm-gh-rest.sh get repos/MrGTV-love/firstmate/pulls/81   # call 3 (warm cache)
+exit=0
+bodies identical across all 3 calls
+--- spy log (real gh, real GitHub) ---
+00:38:28 rc=0 status=200 used=1737 remaining=3263 argv=api -i repos/MrGTV-love/firstmate/pulls/81
+00:38:29 rc=1 status=304 used=1737 remaining=3263 argv=api -i -H If-None-Match: W/"5218a5433b39821efd0b650fa1341fb83c1bd25f627ac5ce9a3bd448599e97c6" repos/MrGTV-love/firstmate/pulls/81
+00:38:30 rc=1 status=304 used=1737 remaining=3263 argv=api -i -H If-None-Match: W/"5218a5433b39821efd0b650fa1341fb83c1bd25f627ac5ce9a3bd448599e97c6" repos/MrGTV-love/firstmate/pulls/81
+--- state/gh-ratelimit.core.json (recorded from response headers) ---
+{"resource":"core","limit":5000,"remaining":3263,"reset":1791592909,"observed":1791592710}
+--- state/gh-rest-cache/ entry ---
+total 80
+drwxr-xr-x  4 charlesabrooker  staff    128 Oct  9 19:38 .
+drwxr-xr-x  4 charlesabrooker  staff    128 Oct  9 19:38 ..
+-rw-r--r--  1 charlesabrooker  staff      0 Oct  9 19:38 .pruned
+-rw-------  1 charlesabrooker  staff  38330 Oct  9 19:38 add6d7898d8aadfee98025513b635392f25ef1c6f33c81a7932cba2961dcd589.json
+{"etag":"W/\"5218a5433b39821efd0b650fa1341fb83c1bd25f627ac5ce9a3bd448599e97c6\"","next":null,"body_bytes":36048}

@@ -1,0 +1,16 @@
+$ fm-gh-rest.sh get 'repos/MrGTV-love/firstmate/pulls?state=all&per_page=42' --paginate --slurp   # cold (84 PRs = two exactly-full pages)
+exit=0
+{"pages":2,"per_page":[42,42]}
+$ fm-gh-rest.sh get 'repos/MrGTV-love/firstmate/pulls?state=all&per_page=42' --paginate --slurp   # warm
+exit=0
+{"pages":2,"per_page":[42,42]}
+identical
+--- spy log ---
+00:39:40 rc=0 status=200 used=1828 remaining=3172 argv=api -i repos/MrGTV-love/firstmate/pulls?state=all&per_page=42
+00:39:42 rc=0 status=200 used=1830 remaining=3170 argv=api -i repositories/1380859068/pulls?state=all&per_page=42&page=2
+00:39:43 rc=1 status=304 used=1833 remaining=3167 argv=api -i -H If-None-Match: W/"c49463871b84a825fc9cd77f9b6976868e9ce17cf61b1cfd50290fa6d0b41cab" repos/MrGTV-love/firstmate/pulls?state=all&per_page
+00:39:44 rc=1 status=304 used=1834 remaining=3166 argv=api -i -H If-None-Match: W/"79371042b2ac94dc57d33e2449f5fd44648a05f51dbaba11a8839d85e4e9d595" repositories/1380859068/pulls?state=all&per_page=42
+00:39:45 rc=0 status=200 used=1835 remaining=3165 argv=api -i repositories/1380859068/pulls?state=all&per_page=42&page=2
+--- does a real GitHub 304 on the last page carry a Link header? ---
+HTTP/2.0 304 Not Modified
+Etag: "79371042b2ac94dc57d33e2449f5fd44648a05f51dbaba11a8839d85e4e9d595"

@@ -1,0 +1,28 @@
+--- A: recorded core bucket below the 15% floor, window still open ---
+{"resource":"core","limit":5000,"remaining":700,"reset":1791594615,"observed":1791592815}
+$ fm-gh-rest.sh guard
+GitHub core quota low (700 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:10:15Z
+exit=75
+$ fm-gh-rest.sh get repos/MrGTV-love/firstmate/pulls/81 (stdout below, stderr marked)
+stdout bytes=0
+exit=
+stderr: GitHub core quota low (700 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:10:15Z
+gh calls made while refused: 0
+--- B: exactly at the floor (750 of 5000 = 15%) ---
+guard exit=0
+--- C: below floor but window already reset (expired) ---
+guard exit=0 (silent)
+{"number":81}
+get exit=
+--- recorded bucket after the real read replaced the expired one ---
+{"resource":"core","limit":5000,"remaining":3156,"reset":1791592909,"observed":1791592816}
+--- D: no quota record at all ---
+guard exit=0
+--- spy log (real gh calls in this scenario) ---
+00:40:16 rc=1 status=304 used=1844 remaining=3156 argv=api -i -H If-None-Match: W/"5218a5433b39821efd0b650fa1341fb83c1bd25f627ac5ce9a3bd448599e97c6" repos/MrGTV
+--- A (exit codes): below floor, window open ---
+get exit=75 stdout bytes=0
+paginated get exit=75 stdout bytes=0
+gh calls while refused: 0
+--- C (exit code): expired window ---
+get exit=0 number=81

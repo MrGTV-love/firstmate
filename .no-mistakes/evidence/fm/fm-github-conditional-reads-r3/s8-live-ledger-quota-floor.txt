@@ -1,0 +1,62 @@
+=== Live open-work ledger (fm-open-loops.sh --json --heartbeat), lab FM_HOME owning MrGTV-love/firstmate#84 ===
+--- run 1 (cold for pulls/check-runs) real gh calls ---
+00:45:05 rc=0 status=200 used=146 remaining=4854 argv=api -i repos/MrGTV-love/firstmate/pulls?state=open&per_page=100
+00:45:06 rc=0 status=200 used=147 remaining=4853 argv=api -i repos/MrGTV-love/firstmate/commits/10b627526857970ec30d5a6153d1bdf5c51b8df1/check-runs?pe
+00:45:08 rc=1 status=304 used=147 remaining=4853 argv=api -i -H If-None-Match: "01dd62d4e6434e367b176181b26144506c388fe8015134063ecb2c37a763c47f" repo
+--- run 2 (warm) real gh calls ---
+00:45:43 rc=1 status=304 used=159 remaining=4841 argv=api -i -H If-None-Match: W/"db8a8441f52d936e31942a361c053765df3f8d99f6382c0c089f6265a7498296" re
+00:45:44 rc=1 status=304 used=159 remaining=4841 argv=api -i -H If-None-Match: W/"7198b37c6766490a31f131c227848bf758bb99ce0abc57fb039b02fec0836444" re
+00:45:45 rc=1 status=304 used=159 remaining=4841 argv=api -i -H If-None-Match: "01dd62d4e6434e367b176181b26144506c388fe8015134063ecb2c37a763c47f" repo
+--- run 2 result ---
+{"complete":true,"generated_epoch":1791593143,"rows":[{"category":"ready_not_started","subject":"livepr"},{"category":"red_check","subject":"https://github.com/MrGTV-love/firstmate/pull/84"}]}
+--- run 3: recorded core bucket set below floor: {"resource":"core","limit":5000,"remaining":400,"reset":1791594945,"observed":1791593145} ---
+real gh calls in run 3 (json + toon): 0
+{
+  "complete": false,
+  "stale": true,
+  "stale_reason": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:15:45Z",
+  "stale_until_epoch": 1791594945,
+  "expected_reset": 1791594945,
+  "generated_epoch": 1791593143,
+  "rows": [
+    {
+      "category": "coverage",
+      "subject": "ledger stale",
+      "stale": null,
+      "evidence": "GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:15:45Z"
+    },
+    {
+      "category": "ready_not_started",
+      "subject": "livepr",
+      "stale": true,
+      "evidence": ""
+    },
+    {
+      "category": "red_check",
+      "subject": "https://github.com/MrGTV-love/firstmate/pull/84",
+      "stale": true,
+      "evidence": "Behavior portable serial 7; Behavior portable serial 8; Behavior portable serial 5; Behavior portable serial 9; Behavior portable serial 6; Behavior portable parallel 2"
+    }
+  ]
+}
+generated_epoch kept from run 2: 1791593143 == 1791593143
+--- published state/open-loops.json after run 3 ---
+{"complete":false,"stale":true,"stale_until_epoch":1791594945,"rows":3}
+--- human (TOON) output in run 3 ---
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4HGJ55Y75PRC7WXCK4XDB5E/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1791593143
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger stale","firstmate","wait for the GitHub quota window to reset; the next run refreshes every row",null,false,"GitHub core quota low (400 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:15:45Z"
+  "ready_not_started","livepr","firstmate","informational: queued and not selected for dispatch",null,false,""
+  "red_check","https://github.com/MrGTV-love/firstmate/pull/84","firstmate","diagnose: code or test",1284,true,"Behavior portable serial 7; Behavior portable serial 8; Behavior portable serial 5; Behavior portable serial 9; Behavior portable serial 6; Behavior portable parallel 2"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+--- run 4: recorded window has reset ({"remaining":4818,"reset":1791596511} before the run) ---
+real gh calls:
+00:46:19 rc=1 status=304 used=178 remaining=4822 argv=api -i -H If-None-Match: W/"db8a8441f52d936e31942a361c053765df3f8d
+00:46:21 rc=1 status=304 used=178 remaining=4822 argv=api -i -H If-None-Match: W/"7198b37c6766490a31f131c227848bf758bb99
+00:46:23 rc=1 status=304 used=182 remaining=4818 argv=api -i -H If-None-Match: "01dd62d4e6434e367b176181b26144506c388fe8
+{"complete":true,"stale":null,"stale_reason":null,"generated_epoch":1791593178,"rows":[{"category":"ready_not_started","subject":"livepr","stale":null},{"category":"red_check","subject":"https://github.com/MrGTV-love/firstmate/pull/84","stale":null}]}
+recorded bucket after run 4 (real headers): {"resource":"core","limit":5000,"remaining":4818,"reset":1791596511,"observed":1791593183}
+(note: the bucket shown on the run-4 header line was read after the run; before the run it was {remaining:400, reset: now-5})

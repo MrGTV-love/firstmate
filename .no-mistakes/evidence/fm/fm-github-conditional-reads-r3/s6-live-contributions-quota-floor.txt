@@ -1,0 +1,25 @@
+=== Live contributions poll under the quota floor (lab FM_HOME) ===
+recorded bucket: {"resource":"core","limit":5000,"remaining":600,"reset":1791594722,"observed":1791592922}
+--- poll 3 (below floor) stdout ---
+contributions: GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:12:02Z; last observations kept, marked stale
+exit=0
+gh calls: 0
+{"checked_at":"2026-10-10T00:41:10Z","error":"GitHub core quota low (600 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:12:02Z","state":"open","head":"10b627526857970ec30d5a6153d1bdf5c51b8df1"}
+observation kept unchanged: yes
+--- poll 4 (still below floor, same window, remaining dropped further) stdout ---
+exit=0 (expect no second announcement)
+gh calls: 0
+{"error":"GitHub core quota low (550 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:12:02Z"}
+--- poll 5 (window reset: recorded reset is in the past) stdout ---
+exit=0
+gh calls: 8
+00:42:05 rc=1 status=304 used=8 remaining=4992 argv=api -i -H If-None-Match: W/"246304f84235c4b91018523780853e
+00:42:06 rc=1 status=304 used=15 remaining=4985 argv=api -i -H If-None-Match: "01dd62d4e6434e367b176181b261445
+00:42:06 rc=1 status=304 used=14 remaining=4986 argv=api -i -H If-None-Match: "01dd62d4e6434e367b176181b261445
+00:42:06 rc=1 status=304 used=13 remaining=4987 argv=api -i -H If-None-Match: "01dd62d4e6434e367b176181b261445
+00:42:06 rc=1 status=304 used=11 remaining=4989 argv=api -i -H If-None-Match: W/"9190e494cfd6fa39c8d04262e1bc9
+00:42:06 rc=1 status=304 used=12 remaining=4988 argv=api -i -H If-None-Match: "01dd62d4e6434e367b176181b261445
+00:42:06 rc=1 status=304 used=10 remaining=4990 argv=api -i -H If-None-Match: W/"7198b37c6766490a31f131c227848
+00:42:08 rc=0 status=n/a used=n/a remaining=n/a argv=pr view https://github.com/MrGTV-love/firstmate/pull/84 -
+{"checked_at":"2026-10-10T00:42:03Z","error":null,"state":"open"}
+recorded bucket now (from real headers): {"resource":"core","limit":5000,"remaining":4985,"reset":1791596511,"observed":1791592927}

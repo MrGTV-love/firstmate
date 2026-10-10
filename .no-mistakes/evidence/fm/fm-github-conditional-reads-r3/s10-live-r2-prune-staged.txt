@@ -1,0 +1,13 @@
+=== R2: leaked staged temp files older than 60 min are pruned by a normal get ===
+before:
+-rw-r--r--   1 charlesabrooker  staff       9 Oct  9 19:46 .entry.NEW333
+-rw-r--r--   1 charlesabrooker  staff       7 Oct  9 17:46 .entry.OLD111
+-rw-r--r--   1 charlesabrooker  staff     9 Oct  9 19:46 .gh-ratelimit.NEW444
+-rw-r--r--   1 charlesabrooker  staff     7 Oct  9 17:46 .gh-ratelimit.OLD222
+{"number":81}
+after:
+-rw-r--r--   1 charlesabrooker  staff       9 Oct  9 19:46 .entry.NEW333
+-rw-r--r--   1 charlesabrooker  staff       0 Oct  9 19:46 .pruned
+-rw-r--r--   1 charlesabrooker  staff     9 Oct  9 19:46 .gh-ratelimit.NEW444
+real gh call:
+00:46:48 rc=0 status=200 used=214 remaining=4786 argv=api -i repos/MrGTV-love/firstmate/pu

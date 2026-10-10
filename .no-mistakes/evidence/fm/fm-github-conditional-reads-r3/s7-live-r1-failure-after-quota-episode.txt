@@ -1,0 +1,13 @@
+=== R1 adversarial: quota-stale mark must not hide the next genuine forge failure ===
+backlog now also owns https://github.com/MrGTV-love/firstmate/pull/999999 (does not exist on GitHub -> real 404)
+--- poll A (below floor) ---
+contributions: GitHub core quota low (300 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:12:42Z; last observations kept, marked stale
+exit=0 gh calls=0
+{"task":"ghostpr","records":[{"url":"https://github.com/MrGTV-love/firstmate/pull/999999","error":"GitHub core quota low (300 of 5000 left, below the 15% floor); network sweep skipped until the window resets at 2026-10-10T01:12:42Z"}]}
+--- poll B (window reset, real forge answers 404 for the ghost PR) ---
+contributions: observation unavailable for https://github.com/MrGTV-love/firstmate/pull/999999
+exit=0
+00:42:49 rc=1 status=404 used=43 remaining=4957 argv=api -i repos/MrGTV-love/firstmate/pulls/999999
+{"task":"ghostpr","records":[{"url":"https://github.com/MrGTV-love/firstmate/pull/999999","error":"forge observation unavailable or changed during read"}]}
+--- poll C (same failure persists: episode already announced, expect silence) ---
+exit=0

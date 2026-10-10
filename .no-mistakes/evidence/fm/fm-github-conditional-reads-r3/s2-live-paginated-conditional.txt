@@ -1,0 +1,14 @@
+$ fm-gh-rest.sh get 'repos/MrGTV-love/firstmate/pulls?state=all&per_page=40' --paginate --slurp   # cold
+exit=0
+{"pages":3,"per_page":[40,40,4],"prs":84,"first":84,"last":1}
+$ fm-gh-rest.sh get 'repos/MrGTV-love/firstmate/pulls?state=all&per_page=40' --paginate --slurp   # warm
+exit=0
+{"pages":3,"per_page":[40,40,4],"prs":84}
+slurped output identical cold vs warm
+--- spy log ---
+00:38:52 rc=0 status=200 used=1759 remaining=3241 argv=api -i repos/MrGTV-love/firstmate/pulls?state=all&per_page=40
+00:38:53 rc=0 status=200 used=1760 remaining=3240 argv=api -i repositories/1380859068/pulls?state=all&per_page=40&page=2
+00:38:54 rc=0 status=200 used=1761 remaining=3239 argv=api -i repositories/1380859068/pulls?state=all&per_page=40&page=3
+00:38:55 rc=1 status=304 used=1761 remaining=3239 argv=api -i -H If-None-Match: W/"c41308133feef3df7ee63ea029b11747746a55442b4873ee98512e44ecbd88c4" repos/MrGTV-love/firstmate/pulls?state=all&per_page
+00:38:56 rc=1 status=304 used=1761 remaining=3239 argv=api -i -H If-None-Match: W/"6c1a8e75fade82de94806a9013133c7c188f4a0cf6462a52eae544a88f46b7bf" repositories/1380859068/pulls?state=all&per_page=40
+00:38:57 rc=1 status=304 used=1763 remaining=3237 argv=api -i -H If-None-Match: W/"a2bdd814574773ccde285868d1f89a1c68cf0e2633d57cbf1cbef72ada4136ac" repositories/1380859068/pulls?state=all&per_page=40
