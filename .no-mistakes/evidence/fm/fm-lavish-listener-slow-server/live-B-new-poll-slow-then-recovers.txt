@@ -1,0 +1,8 @@
+### NEW (ade978b8) poll against live-but-slow real server (0.8 s /health); proxy restored to fast ~14 s in; session already ended on the real server
+[lavish-axi] Long-polling for user feedback on /Users/charlesabrooker/tmp/fm-lavish-live.lWrMGs/board.html. This stays silent until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period - leave it running. Detected layout issues do NOT return this poll: they wait in the user's Layout issues inbox until the user queues them as ordinary feedback. If it gets killed or times out before feedback arrives, re-run `lavish-axi poll /Users/charlesabrooker/tmp/fm-lavish-live.lWrMGs/board.html` - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely.
+session:
+  file: /Users/charlesabrooker/tmp/fm-lavish-live.lWrMGs/board.html
+  status: ended
+  ended_by: agent
+next_step: "This Lavish Editor session for /Users/charlesabrooker/tmp/fm-lavish-live.lWrMGs/board.html has ended. Stop polling. Deliver any remaining updates directly in this conversation, or run `lavish-axi /Users/charlesabrooker/tmp/fm-lavish-live.lWrMGs/board.html` to open a fresh session if the user needs further visual review."
+exit= elapsed=17s

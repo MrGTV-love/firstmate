@@ -1,0 +1,5 @@
+### NEW poll, board port 64095 held by a FOREIGN HTTP service (200, app!=lavish-axi): not a lavish server, must not be retried
+error: Port 64095 is occupied by a non-Lavish server
+code: SERVER_ERROR
+help[1]: "Stop the process using port 64095, or set LAVISH_AXI_PORT to another port"
+pipe_exit= elapsed=2s
