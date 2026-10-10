@@ -501,7 +501,7 @@ status_open_decisions_dated() {  # <status-file> [<kind>]
     [ -n "$verb" ] || continue
     _fm_status_at_epoch "${opened[index]}" epoch || epoch=
     summary=${summaries[index]}
-    summary=${summary%"${summary##*[!$tab]}"}
+    summary=${summary%"${summary##*[!"$tab"]}"}
     printf '%s\t%s\t%s\t%s\n' "$key" "$verb" "$epoch" "$summary"
   done <<EOF
 $open
