@@ -27,9 +27,10 @@
 #      drives a scripted local model and spends no tokens.
 #   5. Wake text an older wiring typed into an idle composer and never submitted
 #      sat there until someone pressed Enter, and a lane restart that needs an
-#      empty composer was refused. The watch extension must deliver that wake as
-#      its own turn, clear only that wake, and leave an operator draft beside it
-#      exactly as typed. Same scripted model, no tokens.
+#      empty composer was refused. The watch extension must remove only that
+#      wake, never submit it as found, deliver the row the queue still owes in
+#      its place, and leave an operator draft beside it exactly as typed. Same
+#      scripted model, no tokens.
 # The lab-only probe records every change of the editor text: a restored wake sits in
 # the composer for only a moment, and one rendered read takes seconds on a busy
 # host, so the pane alone cannot be relied on to catch it.
@@ -380,13 +381,7 @@ recovery_matches() {
     "$PROJECT/state/.wake-followup-recovered" >/dev/null 2>&1
 }
 
-wake_is_queued() {
-  local capture queued
-  is_busy || return 1
-  [ -s "$PROJECT/state/.wake-followup-queued" ] || return 1
-  jq -e --slurpfile captured "$PROJECT/state/.wake-followup-captured" \
-    '.idle == false and .content == $captured[0].content' \
-    "$PROJECT/state/.wake-followup-queued" >/dev/null 2>&1 || return 1
+wake_row_queued() {
   awk -F '\t' -v key="$WAKE_TASK.status" \
     '$3 == "signal" && $4 == key { found = 1 } END { exit !found }' \
     "$PROJECT/state/.wake-queue" 2>/dev/null
@@ -407,6 +402,10 @@ probe_says_queued() { probe_says_state "$PROJECT/state/.lab-queue-probe" ' queue
 
 wake_is_queued() {
   is_busy || return 1
+  [ -s "$PROJECT/state/.wake-followup-queued" ] || return 1
+  jq -e --slurpfile captured "$PROJECT/state/.wake-followup-captured" \
+    '.idle == false and .content == $captured[0].content' \
+    "$PROJECT/state/.wake-followup-queued" >/dev/null 2>&1 || return 1
   wake_row_queued || return 1
   probe_says_queued || return 1
   is_busy && wake_row_queued
@@ -456,7 +455,9 @@ interrupt_queued_wake() {
     fi
     : > "$PROJECT/state/.wake-followup-queue-request"
     wait_for 20 wake_is_queued \
-      || { screen >&2; fail "$SUBJECT: the fixture probe did not put tracked wake $WAKE_SEQ into the vendor follow-up queue"; }
+      || { screen >&2; fail "$SUBJECT: the fixture probe did not put tracked wake $WAKE_SEQ into the vendor follow-up queue (probe: $(cat "$PROJECT/state/.lab-queue-probe" 2>/dev/null || echo none))"; }
+    RESTORE_BASE=$(editor_log_lines)
+    RESTORE_DRAFT=$draft
     send_key Escape
     for ((poll = 0; poll < 50; poll++)); do
       wake_is_restored && return 0
@@ -634,15 +635,22 @@ lab pane send-keys "$IDLE_PANE" ctrl+u >/dev/null
 wait_for 10 draft_cleared \
   || { idle_screen >&2; fail "$SUBJECT: could not clear the idle-wake draft before the stranded-wake step"; }
 lab pane send-text "$IDLE_PANE" "${OLD_WAKE}"$'\n\n'"operator draft beside the wake" >/dev/null
-wait_for 40 model_saw "$OLD_WAKE_MESSAGE" \
-  || { idle_screen >&2; fail "$SUBJECT: wake text left unsent in an idle composer was never delivered"; }
+# The scripted model never drains, so the advisor-tail row is still owed: the
+# queue read must deliver it a second time, and the model log holds every
+# message of the conversation in its latest line.
+owed_row_delivered_again() {
+  [ "$(tail -n 1 "$IDLE/model.log" | grep -o 'FIRSTMATE WATCHER WAKE: signal: idle-trigger-advisor-tail' | wc -l)" -ge 2 ]
+}
+wait_for 40 owed_row_delivered_again \
+  || { idle_screen >&2; fail "$SUBJECT: the still-owed queue row was not delivered after wake text was left unsent in an idle composer"; }
 sleep 3
+model_saw "$OLD_WAKE_MESSAGE" && fail "$SUBJECT: stranded wake text with no queued row was submitted as found"
 model_saw 'operator draft beside the wake' && fail "$SUBJECT: the operator draft was submitted with the stranded wake"
 draft=$(idle_composer) \
-  || { idle_screen >&2; fail "$SUBJECT: could not read the full composer after the stranded wake was delivered"; }
+  || { idle_screen >&2; fail "$SUBJECT: could not read the full composer after the stranded wake was removed"; }
 [ "$draft" = 'operator draft beside the wake' ] \
   || { idle_screen >&2; fail "$SUBJECT: the stranded wake recovery did not leave exactly the operator draft, composer now holds: '$draft'"; }
-pass "live omp stranded wake: $SUBJECT delivered wake text an older wiring left unsent in an idle composer as its own turn, cleared only that wake, and left the operator draft as typed"
+pass "live omp stranded wake: $SUBJECT removed wake text an older wiring left unsent in an idle composer, delivered the still-owed queue row in its place, and left the operator draft as typed"
 lab pane close "$IDLE_PANE" >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------------------

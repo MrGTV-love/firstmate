@@ -1318,14 +1318,15 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
 
 The live guard that refreshes this entry submits real prompts and stays opt-in.
 Because production no longer queues watcher work while busy, a fixture-only wrapper captures a real idle wake and queues the same tracked text through omp's vendor follow-up API during a running turn.
-Both recovery probes require that text to be observed in a pending composer after Escape, then verify production's idle recovery send and the preserved editor before queue drainage or draft preservation can count as recovery proof.
+Both recovery probes require that text to be observed after Escape, then verify production's idle recovery send and the preserved editor before queue drainage or draft preservation can count as recovery proof.
 If restoration is not observed, the probe retries from a fresh busy turn at most three times, then fails rather than accepting ordinary queued delivery as recovery.
+Current queue-readiness and post-Escape restoration signals are described in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
 
 ```sh
 FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
 ```
 
-The current interactive restored-wake contract remains unproven live; the recorded guard run in [omp idle wake behind an advisor note](#2026-10-08-omp-idle-wake-behind-an-advisor-note) predates the fixture wrapper.
+The latest complete guard run, on omp 18.8.1, is recorded in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel); it predates the fixture wrapper and queue-read delivery, so the current interactive restored-wake contract remains unproven live.
 Historical output below predates that wrapper, its fresh queued-wake and post-Escape restoration assertions, pre-parent-repair marker check, successful child-command evidence, and current busy-state checks at observations and submission.
 These results do not establish the current recovery contract; output for the removed parent Enter recovery is omitted.
 
@@ -1419,7 +1420,43 @@ The same step run against the extension that queued every wake as a follow-up fa
 not ok - omp (omp/18.8.1) on herdr 0.9.1: a wake reaching an idle lane behind an advisor note did not start a turn
 ```
 
-In the recorded 2026-10-08 run against omp 18.8.1, the then-current restored-wake probe failed before recovery was exercised, identically with and without the idle-delivery fix, so it did not refresh the [omp injected text](#2026-10-06-omp-injected-text-through-herdr) entry:
+The guard's later steps on omp 18.8.1 are recorded in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
+
+### 2026-10-08 omp stranded wake text and the queue panel
+
+Verified on 2026-10-08 on macOS arm64 against omp 18.8.1 in isolated Herdr 0.9.1 lab sessions.
+The idle-session steps use a scripted local OpenAI-compatible model and spend no tokens; the Escape steps use the real model.
+
+- **Wake text typed into an idle composer is never submitted by omp.**
+  A complete Firstmate watcher wake pasted into an idle session's composer without Enter stayed there for the whole 22 seconds observed, and no request reached the model, with the extension before this change.
+  Nothing raises an event when text lands in an idle composer, so the extension has to look for it; its stranded-wake poll delivered the same text as its own turn and cleared only that wake.
+- **omp does not redraw its follow-up queue panel for a follow-up an extension queues.**
+  A wake queued with `sendUserMessage(text, { deliverAs: "followUp" })` behind a running tool call was absent from the `After yield` panel for the 26 seconds observed, yet Escape then restored it to the composer, so it was queued all along, and the extension context read `hasPendingMessages()` true.
+  omp 18.8.1 refreshes the panel only from its input-submit, dequeue, compaction, and user `message_start` handlers, and the observation above shows none of them ran for the extension's queued follow-up.
+  Its `queue_update` snapshot event was not delivered to an extension handler registered for it in the same lab.
+  The guard's earlier panel parse could therefore not see the queued wake unless something else had redrawn the panel.
+- **Escape restores every queued follow-up, and recovery takes one wake per run end.**
+  The lane also queues its own outcome checks, so Escape can restore a signal wake and a `check:` wake together; the extension submits the first and the second returns after the next `agent_end`.
+  A restored wake stays in the editor for about two seconds, while one rendered composer read through the pane took one to five seconds on this host, so the guard records omp's editor text through a lab-only probe extension and retains the pane reader as a second restoration signal.
+  The restoration assertion accepts any watcher wake observed after Escape, not only the newly generated signal; the draft probe requires the draft in the same editor text.
+  If restoration is not observed, the probe retries from a fresh busy turn at most three times, then fails rather than accepting ordinary queued delivery as recovery.
+  Queue readiness requires the probe's fresh `hasPendingMessages()` answer, bracketed by busy-state and durable signal-row checks; the queue panel is not an acceptance signal, and screen captures remain available for failure diagnostics.
+
+[Watcher continuity](../watcher-continuity.md#omp-stranded-wake-text) owns the delivery contract, and [restored-wake recovery](../watcher-continuity.md#omp-restored-wake-recovery) owns the wait on queued messages.
+The guard exercises the extension under review on the installed omp:
+
+```sh
+FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
+```
+
+The stranded-wake step now reads the full editor through `fm_backend_herdr_composer_content` and requires the remainder to equal `operator draft beside the wake` exactly; the model log separately checks that the draft was not submitted.
+The idle-session launch uses the same box overlay as the spawned lane so the full-editor reader can identify the composer independently of omp's default shape.
+The guard also waits for the probe's fresh idle-context answer before typing setup prompts; the module-loaded marker and native idle report can appear before omp accepts input.
+The recorded run below predates this stronger assertion: its bottom-row-only check could miss multiline wake text remaining above the draft.
+It also predates [queue-read delivery](../watcher-continuity.md#omp-stale-wake-gating): at that time the stranded-wake poll submitted the composer copy as found, and restored-wake recovery re-submitted the exact wake.
+The extension now removes that text and lets the queue read decide what is sent, and the restored-wake probes use the fixture-only wrapper described under [omp injected text](#2026-10-06-omp-injected-text-through-herdr) with the probe's `hasPendingMessages()` answer as queue readiness.
+The stranded-wake step now requires the stranded text never to reach the model and the still-owed queue row to be delivered again in its place.
+The guard in that combined form received a syntax check only; it has not been run live.
 
 ```text
 ok - live omp idle wake: omp (omp/18.8.1) on herdr 0.9.1 started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent
