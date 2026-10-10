@@ -170,8 +170,8 @@ write_valid_payload() {  # <path>
       "checks": "green",
       "risk": "low",
       "options": [
-        { "value": "merge", "label": "Merge now" },
-        { "value": "hold", "label": "Not yet" }
+        { "value": "merge", "label": "Merge now", "hint": "The change lands on main today." },
+        { "value": "hold", "label": "Not yet", "hint": "The change stays open until the next review." }
       ],
       "allow_freeform": true
     }
@@ -190,10 +190,10 @@ EOF
 # fixture already authored, so a fixture about something else stays valid.
 fill_decision_copy() {  # <payload.json>
   jq '.captains_call |= map(
-        if .type == "decision" then
+        .options |= map(.hint //= "Sample consequence of this option.")
+        | if .type == "decision" then
           .about //= "Sample decision, open because the sample work waits on it."
           | .decide //= "Should the sample work proceed?"
-          | .options |= map(.hint //= "Sample consequence of this option.")
           | .recommend_value //= .options[0].value
           | .recommend_reason //= "It lets the sample work proceed."
           | .facts //= ["Sample evidence for the recommendation."]
@@ -920,14 +920,14 @@ test_build_refuses_bare_option_labels() {
   pass "build refuses bare letter or number labels and keeps descriptive ones"
 }
 
-test_build_requires_credential_card_copy_and_leaves_merge_cards_alone() {
+test_build_requires_credential_card_copy() {
   local home data card
   home=$(make_home credential-copy)
   data="$home/payload.json"
   card='{"key":"codex-login","type":"credential","repo":"sample","title":"Codex login expired",
     "about":"Codex workers cannot start without it, and only the captain can sign in.",
     "decide":"Run: codex login",
-    "options":[{"value":"done","label":"Signed in"}]}'
+    "options":[{"value":"done","label":"Signed in","hint":"Codex workers resume on the next dispatch."}]}'
 
   write_cards "$data" "[$card]"
   run_board "$home" build "$data" >/dev/null || fail "a complete credential card was refused"
@@ -938,12 +938,62 @@ test_build_requires_credential_card_copy_and_leaves_merge_cards_alone() {
   write_cards "$data" "[$(printf '%s' "$card" | jq -c '.decide = ""')]"
   assert_build_refused_naming "$home" "$data" "a credential card with an empty decide" \
     "codex-login" "credential card is missing a non-empty 'decide'"
+  pass "credential cards need about and decide"
+}
 
-  write_cards "$data" '[{"key":"merge.bare","type":"merge","repo":"sample","title":"Merge: bare",
-    "risk":"low","options":[{"value":"merge","label":"A"}]}]'
+test_build_refuses_bare_or_hintless_options_on_every_card_type() {
+  local home data merge credential
+  home=$(make_home option-copy-every-type)
+  data="$home/payload.json"
+  merge='{"key":"merge.bare","type":"merge","repo":"sample","title":"Merge: bare",
+    "risk":"low","options":[{"value":"merge","label":"Merge now","hint":"The change lands on main today."}]}'
+  credential='{"key":"codex-login","type":"credential","repo":"sample","title":"Codex login expired",
+    "about":"Codex workers cannot start without it, and only the captain can sign in.",
+    "decide":"Run: codex login",
+    "options":[{"value":"done","label":"Signed in","hint":"Codex workers resume on the next dispatch."}]}'
+
+  write_cards "$data" "[$merge,$credential]"
+  run_board "$home" build "$data" >/dev/null || fail "described merge and credential options were refused"
+
+  write_cards "$data" "[$(printf '%s' "$merge" | jq -c '.options[0].label = "A"')]"
+  assert_build_refused_naming "$home" "$data" "a merge option with the bare label A" \
+    "merge.bare" "option 'merge' has the bare label 'A'"
+  write_cards "$data" "[$(printf '%s' "$merge" | jq -c 'del(.options[0].hint)')]"
+  assert_build_refused_naming "$home" "$data" "a merge option without a hint" \
+    "merge.bare" "option 'merge' is missing a non-empty 'hint'"
+  write_cards "$data" "[$(printf '%s' "$credential" | jq -c '.options = [{"value":"a","label":"A"},{"value":"b","label":"B"}]')]"
+  assert_build_refused_naming "$home" "$data" "credential options A and B with no hints" \
+    "codex-login" "option 'a' has the bare label 'A'" "option 'b' has the bare label 'B'" \
+    "option 'a' is missing a non-empty 'hint'" "option 'b' is missing a non-empty 'hint'"
+  pass "build refuses bare or hintless options on merge and credential cards"
+}
+
+test_build_refuses_a_decision_card_with_no_authored_option() {
+  local home data card
+  home=$(make_home freeform-only-decision)
+  data="$home/payload.json"
+  card='{"key":"freeform-call","type":"decision","repo":"sample","title":"Open question",
+    "about":"The sample work waits on an answer.","decide":"What should the sample work do?",
+    "options":[],"allow_freeform":true,
+    "recommend_reason":"It lets the sample work proceed.",
+    "facts":["Sample evidence for."],"counterfacts":["Sample evidence against."]}'
+
+  write_cards "$data" "[$card]"
+  assert_build_refused_naming "$home" "$data" "a freeform-only decision card" \
+    "freeform-call" "decision card needs at least one authored option" \
+    "allow_freeform may be offered alongside options"
+  write_cards "$data" "[$(printf '%s' "$card" | jq -c '.recommend_value = "yes"')]"
+  assert_build_refused_naming "$home" "$data" "a freeform-only decision card naming a recommendation" \
+    "freeform-call" "decision card needs at least one authored option"
+  write_cards "$data" "[$(printf '%s' "$card" | jq -c '.allow_freeform = false')]"
+  assert_build_refused_naming "$home" "$data" "an option-less decision card without freeform" \
+    "freeform-call" "decision card needs at least one authored option"
+
+  write_cards "$data" '[{"key":"merge.freeform","type":"merge","repo":"sample","title":"Merge: freeform",
+    "risk":"low","options":[],"allow_freeform":true}]'
   run_board "$home" build "$data" >/dev/null \
-    || fail "a merge card was held to the decision-card copy rules"
-  pass "credential cards need about and decide, and merge cards keep their own rules"
+    || fail "a freeform-only merge card was refused"
+  pass "build refuses an option-less decision card by name and keeps freeform legal beside options"
 }
 
 test_path_is_stable_and_home_scoped
@@ -967,4 +1017,6 @@ test_build_refuses_a_nondecision_reconcile_value
 test_build_refuses_each_recorded_unusable_decision_card
 test_build_requires_each_piece_of_decision_card_copy
 test_build_refuses_bare_option_labels
-test_build_requires_credential_card_copy_and_leaves_merge_cards_alone
+test_build_requires_credential_card_copy
+test_build_refuses_bare_or_hintless_options_on_every_card_type
+test_build_refuses_a_decision_card_with_no_authored_option

@@ -79,18 +79,21 @@
 # has to stand on its own, so validation refuses the payload, naming the card
 # and the missing field, unless a `decision` card carries: a non-empty `about`
 # (what is being decided and why it is open now); a non-empty `decide` (the
-# concrete question); a non-empty `hint` on every authored option (that option's
-# concrete consequence); an option `label` that says what the option is, never
-# a bare letter or number such as A, B, or 2; a `recommend_value` naming one
-# authored option; and a non-empty `recommend_reason` (why that option beats the
+# concrete question); at least one authored option, because a decision with
+# only free text offers nothing to recommend (`allow_freeform` may be offered
+# alongside options, never instead of them); a `recommend_value` naming one
+# authored option; a non-empty `recommend_reason` (why that option beats the
 # others), which the card shows beside the recommended option; and non-empty
 # `facts` and `counterfacts` arrays of non-empty strings, the evidence for the
 # recommendation and the evidence against it or the conditions that would flip
 # it, which the card shows as "Facts for" and "Facts against". A `credential`
 # card needs a non-empty `about` (what breaks without it and why only the
 # captain can do it) and a non-empty `decide` (the exact command or action).
-# Merge cards keep their own rules. The check judges presence and shape only,
-# never the quality of the prose.
+# EVERY authored option on EVERY card type (decision, merge, credential) needs
+# a non-empty `hint` (that option's concrete consequence) and a `label` that
+# says what the option is, never a bare letter or number such as A, B, or 2.
+# Merge cards keep their own `risk` rule. The check judges presence and shape
+# only, never the quality of the prose.
 #
 # Every Underway row likewise carries a non-empty `name`: the durable task name
 # when known, otherwise its durable identifier.
@@ -169,7 +172,7 @@ validate_payload() {  # <data.json>
       and repo_marker
       and (.title | nonempty_string)
       and (.options | type == "array")
-      and ((.options | length) > 0 or .allow_freeform == true)
+      and (.type == "decision" or (.options | length) > 0 or .allow_freeform == true)
       and ([.options[]
         | type == "object"
           and (.value | slug(128))
@@ -188,7 +191,8 @@ validate_payload() {  # <data.json>
       and ((has("recommend_value") | not)
         or ((.recommend_value | slug(128))
           and (.recommend_value as $recommend
-            | ([.options[].value] | index($recommend) != null))))
+            | (.type == "decision" and (.options | length) == 0)
+              or ([.options[].value] | index($recommend) != null))))
       and ([.options[].value] | index("reconcile") == null)
       and (if .type == "merge" then (.risk | nonempty_string) else true end);
     def underway_item:
@@ -232,10 +236,12 @@ validate_payload() {  # <data.json>
   return 1
 }
 
-# A decision or credential card must stand on its own, so the reader never has
-# to ask what is being decided. Prints one line per missing piece, each naming
-# the card and the field. Runs only on a payload that already satisfies the
-# types above, so every field it reads is a string when present.
+# A decision or credential card must stand on its own, and every option on
+# every card must say what it is, so the reader never has to ask what is being
+# decided. Prints one line per missing piece, each naming the card and the
+# field. Runs only on a payload that already satisfies the types above, so
+# every field it reads is a string when present, except `facts` and
+# `counterfacts`, which this check types itself.
 card_copy_problems() {  # <data.json>
   jq -r '
     def blank: (type != "string") or (gsub("\\s"; "") | length == 0);
@@ -247,20 +253,16 @@ card_copy_problems() {  # <data.json>
     | .key as $i
     | .value as $c
     | "captains_call[\($i)] (\($c.key))" as $where
-    | if $c.type == "decision" then
+    | (if $c.type == "decision" then
         (if ($c.about | blank) then
           "\($where): decision card is missing a non-empty '"'"'about'"'"' (what the decision is and why it is open now)"
         else empty end),
         (if ($c.decide | blank) then
           "\($where): decision card is missing a non-empty '"'"'decide'"'"' (the concrete question)"
         else empty end),
-        ($c.options | to_entries[]
-          | select(.value.hint | blank)
-          | "\($where): option '"'"'\(.value.value)'"'"' is missing a non-empty '"'"'hint'"'"' (that option'"'"'s concrete consequence)"),
-        ($c.options | to_entries[]
-          | select(.value.label | bare_label)
-          | "\($where): option '"'"'\(.value.value)'"'"' has the bare label '"'"'\(.value.label)'"'"'; the label must say what the option is"),
-        (if ($c | has("recommend_value") | not) then
+        (if ($c.options | length) == 0 then
+          "\($where): decision card needs at least one authored option and a '"'"'recommend_value'"'"' naming one of them; allow_freeform may be offered alongside options, never instead of them"
+        elif ($c | has("recommend_value") | not) then
           "\($where): decision card is missing '"'"'recommend_value'"'"' naming one authored option"
         else empty end),
         (if ($c.recommend_reason | blank) then
@@ -279,7 +281,13 @@ card_copy_problems() {  # <data.json>
         (if ($c.decide | blank) then
           "\($where): credential card is missing a non-empty '"'"'decide'"'"' (the exact command or action)"
         else empty end)
-      else empty end
+      else empty end),
+      ($c.options | to_entries[]
+        | select(.value.hint | blank)
+        | "\($where): option '"'"'\(.value.value)'"'"' is missing a non-empty '"'"'hint'"'"' (that option'"'"'s concrete consequence)"),
+      ($c.options | to_entries[]
+        | select(.value.label | bare_label)
+        | "\($where): option '"'"'\(.value.value)'"'"' has the bare label '"'"'\(.value.label)'"'"'; the label must say what the option is")
   ' "$1"
 }
 
