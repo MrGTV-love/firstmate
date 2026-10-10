@@ -147,7 +147,7 @@ The family's clock is two long scripts that do not contend: `fm-pr-check-securit
 Admitting them inside their own family is a different question and this proof answers it: the six members present on that date are safe with each other at four workers.
 
 `tests/fm-pr-state.test.sh` and `tests/fm-pr-reviewers.test.sh` joined this family after the date above, so that result does not cover them.
-`script_allows_concurrency` in `bin/fm-test-run.sh` grants concurrency by family membership alone, so the family was re-proved at its full eight-member membership.
+`script_allows_concurrency` in `bin/fm-test-run.sh` grants concurrency by family membership alone, so the family was re-proved at its then-current eight-member membership.
 
 - Date: 2026-09-12
 - Command: `bin/fm-test-isolation-proof.sh --pool pr-forge --jobs 4`

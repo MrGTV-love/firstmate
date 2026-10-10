@@ -461,6 +461,16 @@ test_unreadable_holders_refuse_admission() {
     "the refusal did not name the unreadable state directory"
   assert_absent "$root/state/task-c.meta" "a spawn published past an unreadable state directory"
 
+  printf '# No mates\n' > "$mate/data/secondmates.md"
+  chmod 000 "$mate/data/secondmates.md"
+  rc=0
+  out=$(spawn_ship "$case_dir" task-c "$case_dir/unused") || rc=$?
+  chmod 600 "$mate/data/secondmates.md"
+  expect_code 1 "$rc" "an unreadable registry did not refuse admission: $out"
+  assert_contains "$out" "local Firstmate registry cannot be read at $mate/data/secondmates.md" \
+    "capacity admission did not propagate the registry refusal"
+  assert_absent "$root/state/task-c.meta" "a spawn published past an unreadable registry"
+
   rc=0
   out=$(spawn_ship "$case_dir" task-c) || rc=$?
   expect_code 0 "$rc" "a readable machine did not admit the worker: $out"

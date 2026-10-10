@@ -56,15 +56,15 @@
 #   that overlay. docs/configuration.md "Worker skill selection" owns selection,
 #   supported brief transports, and recorded outcomes. The picker is bounded
 #   at 30 seconds and never stops a launch.
-#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only]
+#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only] [--worktree <path>]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
 #   its admission limits, and fm-dod-lib.sh owns the restricted instruction role.
 #   Recorded recovery=reconcile-only is inherited while present; the clearance
 #   policy is in docs/agent-control.md "Recovering an exited instruction owner".
 #
-#   --relaunch launches a replacement agent for an EXISTING task into that
-#   task's own recorded worktree, reusing its recorded endpoint when that
+#   By default, --relaunch launches a replacement agent for an EXISTING task
+#   into its recorded worktree, reusing its recorded endpoint when that
 #   endpoint still exists, instead of creating either from scratch. It is
 #   the launch half of the control plane (bin/fm-control.sh relaunch), which
 #   owns the checkpoint, the progress note, stopping the previous agent, and the
@@ -85,9 +85,13 @@
 #   worktree. Herdr keeps its recorded session; a gone tmux endpoint requires
 #   the home's current configured spawn backend to resolve to Herdr and pass
 #   spawn validation.
-#   The validated worktree is reused untouched either way;
-#   a rebind is a recovery, never a teardown. Only a crewmate or scout rebinds: a
-#   secondmate whose endpoint is gone is respawned by its own owner
+#   No worktree is allocated or torn down; a rebind is a recovery, never a teardown.
+#   --worktree <path> uses the control header's prepared-destination option.
+#   docs/agent-control.md "Relocating a task whose worktree is gone" owns the
+#   contract. bin/fm-control-worktree-lib.sh repeats the proof under this task's
+#   meta lock and the shared project lock, which is held through publication.
+#   Only a crewmate or scout rebinds:
+#   a secondmate whose endpoint is gone is respawned by its own owner
 #   (`--secondmate`, driven by the session-start liveness sweep).
 #   Every fresh ship/scout launch and replacement explicitly enters the recorded
 #   worktree immediately before trust setup and brief delivery, and a pre-launch
@@ -799,6 +803,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$SCRIPT_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-control-worktree-lib.sh
+. "$SCRIPT_DIR/fm-control-worktree-lib.sh"
 # shellcheck source=bin/fm-gate-refuse-lib.sh
 . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
 # shellcheck source=bin/fm-busy-lib.sh
@@ -847,6 +853,8 @@ TRACEPARENT_SET=0
 RELAUNCH=0
 RECONCILE_ONLY=0
 CLAUDE_DEBUG=0
+RELOCATE_TO=
+RELOCATE_SET=0
 ALLOW_API_KEY=0
 # Opt-in only: exact-resume presentation-order lock waits instead of refusing.
 # Absent/unset keeps upstream refuse-on-contention. See header.
@@ -865,6 +873,10 @@ for a in "$@"; do
     harness)
       HARNESS_ARG=$a
       HARNESS_SET=1
+      ;;
+    worktree)
+      RELOCATE_TO=$a
+      RELOCATE_SET=1
       ;;
     model)
       MODEL=$a
@@ -919,6 +931,11 @@ for a in "$@"; do
   --reconcile-only) RECONCILE_ONLY=1 ;;
   --allow-api-key) ALLOW_API_KEY=1 ;;
   --herdr-resume-lock-wait) HERDR_RESUME_LOCK_WAIT=1 ;;
+  --worktree) want_value=worktree ;;
+  --worktree=*)
+    RELOCATE_TO=${a#--worktree=}
+    RELOCATE_SET=1
+    ;;
   --harness) want_value=harness ;;
   --harness=*)
     HARNESS_ARG=${a#--harness=}
@@ -1054,6 +1071,10 @@ if [ "$RELAUNCH" -eq 1 ]; then
     exit 1
   }
 else
+  [ "$RELOCATE_SET" -eq 0 ] || {
+    echo "error: --worktree applies to --relaunch only: a fresh spawn allocates its own isolated copy" >&2
+    exit 1
+  }
   [ "$CLAUDE_DEBUG" -eq 0 ] || {
     echo "error: --claude-debug applies to --relaunch only; turn it on for an existing worker with bin/fm-control.sh <id> relaunch --claude-debug" >&2
     exit 1
@@ -1540,6 +1561,7 @@ spawn_abort_cleanup() {
     [ ! -e "$SPAWN_META_TMP" ] &&
     [ ! -L "$SPAWN_META_TMP" ]; then
     RELAUNCH_REPLACEMENT_PENDING=0
+    SPAWN_SLOT_CLAIMED=0
   fi
   if [ "$RELAUNCH_REPLACEMENT_PENDING" = 1 ]; then
     RELAUNCH_REPLACEMENT_PENDING=0
@@ -1682,7 +1704,7 @@ spawn_abort_cleanup() {
   # atomic replacement rather than racing it. The release itself never removes
   # another task's claim.
   if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
+    { [ "$RELAUNCH_RELOCATING" = 1 ] || { [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; }; } &&
     fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
     SPAWN_SLOT_CLAIMED=0
     if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
@@ -2048,6 +2070,8 @@ RAW_LAUNCH=0
 # identity check refuses malformed, ambiguous, or foreign records exactly as
 # it does for teardown.
 RELAUNCH_PRIOR_HARNESS=
+# 1 when --worktree rebinds the task to a fresh copy (its proof already passed).
+RELAUNCH_RELOCATING=0
 # 1 when the recorded endpoint is authoritatively gone and this relaunch must
 # create a fresh one for the task rather than adopt its recorded address.
 RELAUNCH_REBIND=0
@@ -2156,8 +2180,19 @@ if [ "$RELAUNCH" -eq 1 ]; then
     fi
   fi
   RELAUNCH_WT=$(fm_meta_get "$RELAUNCH_META" worktree)
+  if [ "$RELOCATE_SET" -eq 1 ]; then
+    # The same proof the control plane ran, repeated under this task's meta lock:
+    # the record is about to be republished, and only this script publishes it.
+    [ -n "$RELOCATE_TO" ] || {
+      echo "error: --worktree requires a value" >&2
+      exit 1
+    }
+    fm_control_worktree_relocation "$RELAUNCH_META" "$ID" "$STATE" "$RELOCATE_TO" || exit 1
+    RELAUNCH_WT=$FM_CONTROL_RELOCATION_PATH
+    RELAUNCH_RELOCATING=1
+  fi
   [ -n "$RELAUNCH_WT" ] && [ -d "$RELAUNCH_WT" ] || {
-    echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in" >&2
+    echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in (a fresh copy of the same branch can replace it: pass --worktree <path>)" >&2
     exit 1
   }
   if [ "$KIND" = secondmate ]; then
@@ -3648,6 +3683,26 @@ if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
     exit "$FM_PROJECT_CAPACITY_DEFER_EXIT"
   fi
 fi
+if [ "$RELAUNCH_RELOCATING" = 1 ]; then
+  SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {
+    echo "error: could not resolve the shared Treehouse project lock for $PROJ_ABS" >&2
+    exit 1
+  }
+  if ! fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK"; then
+    echo "error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race relocation ownership" >&2
+    exit 1
+  fi
+  SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
+  fm_control_worktree_relocation "$RELAUNCH_META" "$ID" "$STATE" "$RELOCATE_TO" || exit 1
+  WT=$RELAUNCH_WT
+  if fm_treehouse_pool_slot "$PROJ_ABS" "$RELAUNCH_WT"; then
+    fm_treehouse_slot_owner_claim "$RELAUNCH_WT" "$ID" "$FM_HOME" || {
+      echo "error: could not claim Treehouse pool slot $RELAUNCH_WT for task $ID; refusing to relocate onto a slot that cannot later be proved to be its own" >&2
+      exit 1
+    }
+    [ "$FM_TREEHOUSE_SLOT_OWNER" != absent ] || SPAWN_SLOT_CLAIMED=1
+  fi
+fi
 [ -f "$BRIEF" ] || {
   echo "error: task $ID has no brief at inaccessible data path $BRIEF" >&2
   exit 1
@@ -4931,10 +4986,10 @@ claude_confirm_start() {
 if [ "$RELAUNCH" -eq 1 ] && [ "$BACKEND" = orca ]; then
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$RELAUNCH" -eq 1 ]; then
-  # No worktree is acquired: the recorded one is reused as-is. What must be
-  # proven instead is that the adopted endpoint's shell is actually sitting in
-  # that worktree, so the replacement agent starts where the work is rather
-  # than wherever the pane happened to drift.
+  [ "$RELAUNCH_RELOCATING" = 0 ] || spawn_enter_recorded_worktree
+  # No worktree is acquired: the selected pre-existing copy is used. The adopted
+  # endpoint's shell must be sitting in that copy, including after a relocation
+  # handoff, so the replacement never starts wherever the pane happened to drift.
   relaunch_wt_real=$(real_path_or_raw "$WT")
   relaunch_seen=
   for _ in $(seq 1 10); do
@@ -5187,6 +5242,13 @@ exclude_path() {
   grep -qxF "$rel" "$EXCL" 2>/dev/null || echo "$rel" >>"$EXCL"
 }
 if [ "$RELAUNCH" -eq 1 ]; then
+  # The fresh copy of a relocation is not firstmate's yet: this is the one place
+  # that overwrites and deletes harness files in it, so the check that none of
+  # them is somebody else's runs here, at the mutation, not only when the proof
+  # first ran.
+  if [ "$RELAUNCH_RELOCATING" = 1 ]; then
+    fm_control_worktree_wiring_free "$WT" "$STATE_REAL" "$ID" || exit 1
+  fi
   # Retire the previous incarnation's per-task harness wiring before arming the
   # new one. Without this, a harness switch would leave the old adapter's hook
   # files and turn-end token registry entries behind, and even a same-harness
@@ -5847,6 +5909,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
     exit 1
   fi
   RELAUNCH_REPLACEMENT_PENDING=0
+  SPAWN_SLOT_CLAIMED=0
   SPAWN_META_PUBLISH_STARTED=0
   SPAWN_META_TMP=
 fi

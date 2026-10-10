@@ -118,6 +118,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-pipeline-spend.sh`   | Attribute a task's no-mistakes pipeline spend to the task and keep it in the private spend ledger |
 | `fm-tangle-lib.sh`       | Shared default-branch resolution and primary-checkout tangle classification          |
 | `fm-timeout-lib.sh`      | Single owner of hard-bounded command execution and its fallback watchdog |
+| `fm-task-docker-lib.sh`  | Single owner of which Docker containers, networks, and volumes belong to a task, and of their removal at teardown |
 | `fm-timing-lib.sh`       | Single owner of the deferred network stage's per-step elapsed-time records, inert unless a run asks for them |
 | `fm-supervision-lib.sh`  | Shared supervision-need and watcher-beacon freshness predicates |
 | `fm-ff-lib.sh`           | Shared guarded fast-forward/reconcile helper for origin pulls and secondmate syncs, with durable divergence markers |
@@ -141,6 +142,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-lease-lib.sh`        | One owner of the supervision lease contract and the main-only role-partition guards  |
 | `fm-control.sh`          | Agent lifecycle control plane for an exact task id; [agent-control.md](agent-control.md) owns its verb contract |
 | `fm-control-lib.sh`      | One executable owner of the control-plane verb allowlist, per-harness interrupt/exit mechanics, per-backend capability, and the endpoint-absence proof both `exit` and `relaunch` read |
+| `fm-control-worktree-lib.sh` | Worktree-relocation proof; [agent-control.md](agent-control.md#relocating-a-task-whose-worktree-is-gone) owns the recovery contract |
 | `fm-busy-lib.sh`         | Single owner of the semantic busy-state contract: verdicts, source attribution, and per-harness sources |
 | `fm-busy-event.sh`       | The only writer of a task's semantic busy-state record and native-harness progress marker; arms an incarnation and applies lifecycle events |
 | `fm-tmux-lib.sh`         | Shared tmux pane primitives for composer capture, verified submit, and the submit-time busy check |
@@ -161,7 +163,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-merge-authority-lib.sh` | Resolve merge authority at the gate, persist it against the accepted canonical PR, and identity-check its later poll consumption |
 | `fm-parent-channel-lib.sh` | Resolve a secondmate home's parent channel and append a captain-facing outcome line to it at most once |
 | `fm-promote.sh`          | Promote a scout task in place to a protected ship task with an explicit delivery mode, write the ship instructions carrying that mode's definition of done, and supersede the task's brief so a later relaunch cannot revive stale scout delivery text |
-| [`fm-teardown.sh`](../bin/fm-teardown.sh) | Fail-closed teardown: return landed ship worktrees, require completed scout deliverables, retire secondmate homes; its header owns task-private no-mistakes agent retirement |
+| [`fm-teardown.sh`](../bin/fm-teardown.sh) | Fail-closed teardown: return landed ship worktrees, require completed scout deliverables, remove the task's own Docker stacks, retire secondmate homes; its header owns task-private no-mistakes agent retirement |
 | `fm-harness.sh`          | Detect the running harness, resolve crew or secondmate harness, model, and effort, and validate the native-only `ultra` effort |
 | `fm-lock.sh`             | Per-home firstmate session lock                                                      |
 | `fm-x-lib.sh`            | Shared Relay config, relay, and reply-threading helpers                              |
@@ -182,3 +184,11 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-voice-client.py`     | The laptop end of the spoken interface: capture, playback, and turn timing over SSH; audio devices unverified |
 | `fm_voice_frame.py`      | The wire format both machines share, copied to the laptop beside the client          |
 | `fm_voice_records.py`    | What a spoken answer may read, and the handover that queues real work                |
+
+## Task-owned Docker teardown
+
+[`fm-task-docker-lib.sh`'s header](../bin/fm-task-docker-lib.sh) owns object attribution, protected-stack precedence, volume safety, retry metadata, and the Docker call timeout.
+[`fm-teardown.sh`'s header](../bin/fm-teardown.sh) owns cleanup ordering, forced-descendant cleanup, reassigned-slot handling, prerequisites, failure/retry behavior, and the live-producer residual.
+The worker Docker instructions rendered by [`fm-brief.sh`](../bin/fm-brief.sh) own how ship and scout workers mark resources and isolate Supabase configuration.
+
+[`tests/fm-teardown.test.sh`](../tests/fm-teardown.test.sh) provides portable regression coverage; [`tests/fm-task-docker-live-e2e.test.sh`](../tests/fm-task-docker-live-e2e.test.sh) checks the library against a real Docker daemon and declares its prerequisites through [`fm_live_gate`](../tests/lib.sh).

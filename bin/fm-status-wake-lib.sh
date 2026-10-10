@@ -24,49 +24,55 @@ fi
 
 # FM_OPEN_DECISIONS_FOLD_VERSION and its bump history live with the fold rule
 # they version, in bin/fm-status-decision-lib.sh.
-status_presentation_cursor_offset() {  # <status-file>
-  local f=$1 state task manifest data row_task offset ident backstop extra cur_ident size legacy
-  [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 1
-  state=${f%/*}
-  task=${f##*/}; task=${task%.status}
-  manifest="$state/.status-presentation-cursor"
-  if [ -e "$manifest" ] || [ -L "$manifest" ]; then
-    [ -f "$manifest" ] && [ -r "$manifest" ] && [ ! -L "$manifest" ] || return 1
-    data=$(LC_ALL=C command cat "$manifest" 2>/dev/null) || return 1
-    offset=
-    while IFS=$(printf '\t') read -r row_task ident legacy backstop extra; do
-      [ -n "$row_task" ] || continue
-      [ -z "$extra" ] || return 1
-      case "$legacy:$backstop" in *[!0-9:]*) return 1 ;; esac
-      [ -n "$legacy" ] && [ -n "$ident" ] || return 1
-      if [ "$row_task" = "$task" ]; then
-        [ -z "$offset" ] || return 1
-        offset=$legacy
-        cur_ident=$ident
+
+# Printed, or assigned to <out-var> when one is given, so the per-task scans
+# take an offset without forking a command substitution. The locals carry the
+# __fm_pc_ prefix because an out-var named like an unprefixed local would be
+# assigned here and lost under bash's dynamic scope.
+status_presentation_cursor_offset() {  # <status-file> [<out-var>]
+  local __fm_pc_f=$1 __fm_pc_state __fm_pc_task __fm_pc_manifest __fm_pc_data __fm_pc_row_task
+  local __fm_pc_offset __fm_pc_ident __fm_pc_backstop __fm_pc_extra __fm_pc_cur_ident __fm_pc_size __fm_pc_legacy
+  [ -f "$__fm_pc_f" ] && [ -r "$__fm_pc_f" ] && [ ! -L "$__fm_pc_f" ] || return 1
+  __fm_pc_state=${__fm_pc_f%/*}
+  __fm_pc_task=${__fm_pc_f##*/}; __fm_pc_task=${__fm_pc_task%.status}
+  __fm_pc_manifest="$__fm_pc_state/.status-presentation-cursor"
+  if [ -e "$__fm_pc_manifest" ] || [ -L "$__fm_pc_manifest" ]; then
+    [ -f "$__fm_pc_manifest" ] && [ -r "$__fm_pc_manifest" ] && [ ! -L "$__fm_pc_manifest" ] || return 1
+    _fm_read_file_into "$__fm_pc_manifest" __fm_pc_data || return 1
+    __fm_pc_offset=
+    while IFS=$'\t' read -r __fm_pc_row_task __fm_pc_ident __fm_pc_legacy __fm_pc_backstop __fm_pc_extra; do
+      [ -n "$__fm_pc_row_task" ] || continue
+      [ -z "$__fm_pc_extra" ] || return 1
+      case "$__fm_pc_legacy:$__fm_pc_backstop" in *[!0-9:]*) return 1 ;; esac
+      [ -n "$__fm_pc_legacy" ] && [ -n "$__fm_pc_ident" ] || return 1
+      if [ "$__fm_pc_row_task" = "$__fm_pc_task" ]; then
+        [ -z "$__fm_pc_offset" ] || return 1
+        __fm_pc_offset=$__fm_pc_legacy
+        __fm_pc_cur_ident=$__fm_pc_ident
       fi
     done <<EOF
-$data
+$__fm_pc_data
 EOF
-    if [ -z "$offset" ]; then
-      printf '0'
+    if [ -z "$__fm_pc_offset" ]; then
+      _fm_emit_value "${2-}" 0
       return 0
     fi
-    ident=$cur_ident
+    __fm_pc_ident=$__fm_pc_cur_ident
   else
-    legacy=$(_fm_open_decisions_cursor_path "$f")
-    if [ -e "$legacy" ] || [ -L "$legacy" ]; then
-      status_open_decisions_cursor_offset "$f"
-      return
+    _fm_open_decisions_cursor_path "$__fm_pc_f" __fm_pc_legacy
+    if [ -e "$__fm_pc_legacy" ] || [ -L "$__fm_pc_legacy" ]; then
+      __fm_pc_offset=$(status_open_decisions_cursor_offset "$__fm_pc_f") || return 1
+      _fm_emit_value "${2-}" "$__fm_pc_offset"
+      return 0
     fi
-    offset=0
-    ident=$(_fm_open_decisions_file_ident "$f") || return 1
+    __fm_pc_offset=0
+    _fm_open_decisions_file_ident "$__fm_pc_f" __fm_pc_ident || return 1
   fi
-  cur_ident=$(_fm_open_decisions_file_ident "$f") || return 1
-  size=$(_fm_status_file_size "$f") || return 1
-  size=${size//[[:space:]]/}
-  case "$size:$offset" in *[!0-9:]*) return 1 ;; esac
-  if [ "$ident" != "$cur_ident" ] || [ "$offset" -gt "$size" ]; then offset=0; fi
-  printf '%s' "$offset"
+  _fm_status_stat_into "$__fm_pc_f" __fm_pc_cur_ident __fm_pc_size || return 1
+  __fm_pc_size=${__fm_pc_size//[[:space:]]/}
+  case "$__fm_pc_size:$__fm_pc_offset" in *[!0-9:]*) return 1 ;; esac
+  if [ "$__fm_pc_ident" != "$__fm_pc_cur_ident" ] || [ "$__fm_pc_offset" -gt "$__fm_pc_size" ]; then __fm_pc_offset=0; fi
+  _fm_emit_value "${2-}" "$__fm_pc_offset"
 }
 
 _status_observed_path_state() {
@@ -272,15 +278,17 @@ status_open_decisions_cursor_offset() {  # <status-file>
 # presentation offset. Does not write the cursor. A missing manifest row or
 # changed status identity reads the current file from offset 0; malformed or
 # unreadable cursor state fails the scan. Symlinks and unreadable status files
-# print nothing.
-status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>]
-  local f=$1 captured_end=${2:-} cf offset size actual_size chunk_file line rc=0
+# print nothing. With <out-var>, the lines are assigned to it instead of
+# printed, so a per-task scan takes them without forking a substitution.
+status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>] [<out-var>]
+  local f=$1 captured_end=${2:-} __fm_nl_out=${3-} __fm_nl_acc='' cf offset size actual_size chunk_file line rc=0
+  [ -z "$__fm_nl_out" ] || printf -v "$__fm_nl_out" '%s' ''
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
-  cf=$(_fm_open_decisions_cursor_path "$f")
+  _fm_open_decisions_cursor_path "$f" cf
   chunk_file="$cf.unread.$$"
-  offset=$(status_presentation_cursor_offset "$f") || return 1
+  status_presentation_cursor_offset "$f" offset || return 1
   case "$offset" in ''|*[!0-9]*) return 1 ;; esac
-  actual_size=$(_fm_status_file_size "$f") || return 1
+  _fm_status_file_size "$f" actual_size || return 1
   actual_size=${actual_size//[[:space:]]/}
   case "$actual_size" in ''|*[!0-9]*) return 1 ;; esac
   if [ -n "$captured_end" ]; then
@@ -295,10 +303,18 @@ status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>]
     || { rm -f "$chunk_file"; return 1; }
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
-      *[![:space:]]*) printf '%s\n' "$line" || { rc=1; break; } ;;
+      *[![:space:]]*)
+        if [ -n "$__fm_nl_out" ]; then
+          __fm_nl_acc+="$line"$'\n'
+        else
+          printf '%s\n' "$line" || { rc=1; break; }
+        fi
+        ;;
     esac
   done < "$chunk_file"
   rm -f "$chunk_file"
+  # Matches the stripped-newline text a command substitution would have given.
+  [ -z "$__fm_nl_out" ] || printf -v "$__fm_nl_out" '%s' "${__fm_nl_acc%$'\n'}"
   return "$rc"
 }
 
@@ -316,11 +332,11 @@ status_line_is_unread_surface() {  # <status-line>
     "$resolve"|"$held") ;;
     *) return 1 ;;
   esac
-  key=$(_fm_decision_key "$line") || return 1
-  note=$(status_line_note "$line")
+  _fm_decision_key_into "$line" default key || return 1
   for prefix in ${FM_CLASSIFY_RESERVED_KEY_PREFIXES:-$FM_CLASSIFY_RESERVED_KEY_PREFIXES_DEFAULT}; do
     case "$key" in
       "$prefix"*)
+        status_line_note "$line" note
         _fm_decision_key_transition_allowed "$key" "$note"
         return
         ;;
@@ -387,7 +403,7 @@ status_home_appends_ranges() {  # <status-file> -> start<TAB>end lines
     *$'\n'*) rest=${rest#*$'\n'} ;;
     *) return 0 ;;
   esac
-  while IFS=$(printf '\t') read -r start end extra || [ -n "$start" ]; do
+  while IFS=$'\t' read -r start end extra || [ -n "$start" ]; do
     [ -n "$start" ] || continue
     [ -z "$extra" ] || continue
     case "$start:$end" in *[!0-9:]*) continue ;; esac
@@ -402,7 +418,7 @@ status_home_appends_covers() {  # <status-file> <start> <end>
   local start=$2 end=$3 range_start range_end
   case "$start:$end" in *[!0-9:]*) return 1 ;; esac
   [ "$end" -ge "$start" ] || return 1
-  while IFS=$(printf '\t') read -r range_start range_end; do
+  while IFS=$'\t' read -r range_start range_end; do
     [ -n "$range_start" ] || continue
     case "$range_start:$range_end" in *[!0-9:]*) continue ;; esac
     [ "$range_start" -le "$start" ] || continue
@@ -589,7 +605,7 @@ status_span_first_actionable_record() {  # <status-file> <start-offset> [record-
           origins=$(_fm_status_open_decision_origins "$chunk_file" "$(_fm_status_kind "$f")") || { failed=1; break; }
           folded=1
         fi
-        live_line=$(while IFS=$(printf '\t') read -r _key _line; do
+        live_line=$(while IFS=$'\t' read -r _key _line; do
           [ "$_key" = "$key" ] && { printf '%s' "$_line"; break; }
         done <<EOF
 $origins
