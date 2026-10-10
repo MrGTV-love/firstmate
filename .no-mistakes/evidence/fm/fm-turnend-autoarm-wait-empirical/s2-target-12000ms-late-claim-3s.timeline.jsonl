@@ -1,0 +1,25 @@
+{"t": 0.994, "event": "setup", "label": "s2-target-12000ms-late-claim-3s", "commit": "fb3d1bd001b43350c2bd82a8a4b784d7c03ff94b", "guard_default": "104:SYNC_WAIT_MS=${FM_CLAUDE_AUTOARM_SYNC_WAIT_MS:-12000}", "hold_mode": "fixed", "hold_seconds": 3.0, "loadavg": [95.396484375, 66.06005859375, 58.2529296875], "cores": 18}
+{"t": 1.0, "event": "claude_started", "pid": 58105}
+{"t": 5.288, "event": "session_start_digest_seen"}
+{"t": 5.473, "event": "queue_lock_held_by_driver"}
+{"t": 23.598, "event": "autoarm_process_seen", "pid": 95557}
+{"t": 23.731, "event": "guard_run_started", "stop": 1, "pids": [95558, 96052]}
+{"t": 25.371, "event": "autoarm_process_seen", "pid": 98544}
+{"t": 26.917, "event": "queue_lock_release_requested", "why": "fixed 3.0s after first guard seen"}
+{"t": 27.115, "event": "queue_lock_released"}
+{"t": 27.809, "event": "ledger", "line": "epoch=1 owner_pid=95557 outcome=arming updated_at=1791674569", "mtime_after_first_guard_seen": 4.001}
+{"t": 27.94, "event": "guard_run_ended", "stop": 1, "wall_seconds": 4.212}
+{"t": 28.98, "event": "watcher_beacon_seen"}
+{"t": 48.685, "event": "ledger", "line": "epoch=1 owner_pid=95557 outcome=rewake updated_at=1791674590 session_pid=58105 recovery_generation=3782.1791674587.eyWekU", "mtime_after_first_guard_seen": 24.987}
+{"t": 49.885, "event": "autoarm_process_seen", "pid": 48081}
+{"t": 50.0, "event": "guard_run_started", "stop": 2, "pids": [48080]}
+{"t": 50.172, "event": "guard_run_ended", "stop": 2, "wall_seconds": 0.201}
+{"t": 50.357, "event": "ledger", "line": "epoch=2 owner_pid=48081 outcome=arming updated_at=1791674592", "mtime_after_first_guard_seen": 26.677}
+{"t": 68.179, "event": "watcher_health", "verdict": "healthy", "stderr": ""}
+{"t": 68.249, "event": "watch_processes", "pids": [40866, 41048, 50045]}
+{"t": 68.249, "event": "state_listing", "files": [".claude-autoarm-epoch", ".claude-autoarm-output.rCh4dZ", ".guard-watcher-stale-banner", ".heartbeat-streak", ".idle-reap-next", ".inactive-outcome-reconcile", ".last-check", ".last-heartbeat", ".last-watcher-beat", ".lock", ".lock-session", ".open-loops-started", ".open-loops-surfaced", ".open-loops.lock", ".secondmate-liveness-tick", ".session-start-agents-baseline", ".session-start-complete", ".startup-network.delivered", ".startup-network.report", ".startup-network.status", ".startup-network.timings", ".trace-context-effective", ".wake-queue", ".wake-queue.lock.owner.ZieeVC", ".wake-queue.seq", ".watch-arm-output.T6Anrr", ".watch-cycle-exits.log", ".watch-deliveries.log", ".watch.lock", ".watch.lock.owner.lpGjzA", ".watcher-down", "home-summary.json", "open-loops.json", "task1.meta", "terminal-outcomes"]}
+{"t": 68.25, "event": "ledger_final", "content": "epoch=2 owner_pid=48081 outcome=arming updated_at=1791674592\nSat Oct 10 18:23:11 2026     bash /Users/charlesabrooker/tmp/fm-wait-live.z9n1kjii/project/bin/fm-claude-stop-autoarm.sh\n"}
+{"t": 68.25, "event": "block_budget_final", "content": null}
+{"t": 94.17, "event": "claude_stopped_by_driver", "rc": 143}
+{"t": 97.279, "event": "leftover_processes", "after_session": [40866, 41048], "after_term": []}
+{"t": 97.28, "event": "summary", "label": "s2-target-12000ms-late-claim-3s", "commit": "fb3d1bd001b43350c2bd82a8a4b784d7c03ff94b", "guard_default": "104:SYNC_WAIT_MS=${FM_CLAUDE_AUTOARM_SYNC_WAIT_MS:-12000}", "hold_mode": "fixed", "turn_would_end_blind_blocks_in_transcript": 0, "did_not_claim_lines_in_transcript": 0, "guard_runs": [{"stop": 1, "wall_seconds": 4.212}, {"stop": 2, "wall_seconds": 0.201}]}

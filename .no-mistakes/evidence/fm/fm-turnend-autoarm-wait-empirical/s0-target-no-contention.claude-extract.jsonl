@@ -1,0 +1,22 @@
+{"type": "hook", "subtype": "hook_started", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_started", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_started", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_started", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_started", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_response", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": 0, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_response", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": 0, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_response", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": 0, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_progress", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": true}
+{"type": "hook", "subtype": "hook_progress", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_response", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": 0, "carries_fm_digest": false}
+{"type": "hook", "subtype": "hook_progress", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": true}
+{"type": "hook", "subtype": "hook_progress", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": true}
+{"type": "hook", "subtype": "hook_progress", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": true}
+{"type": "hook", "subtype": "hook_progress", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": null, "carries_fm_digest": true}
+{"type": "hook", "subtype": "hook_response", "hook_event": "SessionStart", "hook_name": "SessionStart:startup", "exit_code": 0, "carries_fm_digest": true}
+{"type": "init", "claude_code_version": "2.1.296", "model": "claude-opus-5-5", "cwd_is_lab_project": true}
+{"type": "assistant", "text": "CYCLE0"}
+{"type": "user", "text": "Stop hook feedback:\n[[ -z \"${GROK_AGENT:-}${GROK_HOOK_EVENT:-}\" ] || exit 0; exec \"$CLAUDE_PROJECT_DIR\"/bin/fm-claude-stop-autoarm.sh]: firstmate watcher wake - one supervision event needs a handling turn now.\ncheck: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)\nRun bin/fm-wake-drain.sh first, handle the wake, then run its exact WAKE_ACK_REQUIRED --ack-through command. Until that post-handling acknowledgement, interruption leaves the wake durable for idempotent re-handling. This Stop hook owns watcher continuity: when the handling turn ends, the next needed cycle arms automatically - do NOT run bin/fm-watch-arm.sh after an ordinary wake.\n"}
+{"type": "system", "subtype": "notification", "text": "{\"key\": \"stop-hook-error\", \"text\": \"Stop hook error occurred \\u00b7 ctrl+o to see\", \"priority\": \"immediate\"}"}
+{"type": "assistant", "text": "ACK"}
+{"type": "user", "text": "Stop hook feedback:\n[[ -z \"${GROK_AGENT:-}${GROK_HOOK_EVENT:-}\" ] || exit 0; exec \"$CLAUDE_PROJECT_DIR\"/bin/fm-claude-stop-autoarm.sh]: firstmate watcher auto-arm INTERRUPTED by TERM - the Stop-owned automatic supervision mechanism did not reach a terminal watcher outcome.\nDo not launch a manual background arm from this notice; investigate the automatic Stop hook and watcher startup before ending blind.\n"}

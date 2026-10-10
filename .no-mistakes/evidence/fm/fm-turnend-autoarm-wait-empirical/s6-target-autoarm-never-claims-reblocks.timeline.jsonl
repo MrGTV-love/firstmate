@@ -1,0 +1,51 @@
+{"t": 0.711, "event": "setup", "label": "s6-target-autoarm-never-claims-reblocks", "commit": "fb3d1bd001b43350c2bd82a8a4b784d7c03ff94b", "guard_default": "104:SYNC_WAIT_MS=${FM_CLAUDE_AUTOARM_SYNC_WAIT_MS:-12000}", "hold_mode": "forever", "hold_seconds": 0.0, "loadavg": [47.76611328125, 63.50732421875, 61.83642578125], "cores": 18}
+{"t": 0.716, "event": "claude_started", "pid": 59950}
+{"t": 4.546, "event": "session_start_digest_seen"}
+{"t": 4.713, "event": "queue_lock_held_by_driver"}
+{"t": 22.705, "event": "guard_run_started", "stop": 1, "pids": [14700]}
+{"t": 22.757, "event": "autoarm_process_seen", "pid": 14702}
+{"t": 22.922, "event": "autoarm_process_seen", "pid": 15283}
+{"t": 39.336, "event": "block_budget_file", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=1\nepoch=\n"}
+{"t": 39.695, "event": "guard_run_ended", "stop": 1, "wall_seconds": 16.988}
+{"t": 47.007, "event": "guard_run_started", "stop": 2, "pids": [72636]}
+{"t": 47.076, "event": "autoarm_process_seen", "pid": 72644}
+{"t": 63.702, "event": "block_budget_file", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=2\nepoch=\n"}
+{"t": 63.961, "event": "guard_run_ended", "stop": 2, "wall_seconds": 16.948}
+{"t": 66.579, "event": "autoarm_process_seen", "pid": 16782}
+{"t": 66.665, "event": "guard_run_started", "stop": 3, "pids": [16779]}
+{"t": 83.614, "event": "block_budget_file", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=3\nepoch=\n"}
+{"t": 83.83, "event": "guard_run_ended", "stop": 3, "wall_seconds": 17.167}
+{"t": 85.274, "event": "guard_run_started", "stop": 4, "pids": [53177]}
+{"t": 85.343, "event": "autoarm_process_seen", "pid": 53179}
+{"t": 102.122, "event": "block_budget_file", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=4\nepoch=\n"}
+{"t": 102.354, "event": "guard_run_ended", "stop": 4, "wall_seconds": 17.079}
+{"t": 105.015, "event": "autoarm_process_seen", "pid": 95469}
+{"t": 105.112, "event": "guard_run_started", "stop": 5, "pids": [95468]}
+{"t": 121.674, "event": "block_budget_file", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=5\nepoch=\n"}
+{"t": 122.019, "event": "guard_run_ended", "stop": 5, "wall_seconds": 16.926}
+{"t": 126.076, "event": "guard_run_started", "stop": 6, "pids": [40550]}
+{"t": 126.136, "event": "autoarm_process_seen", "pid": 40552}
+{"t": 142.986, "event": "block_budget_file", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=6\nepoch=\n"}
+{"t": 143.211, "event": "guard_run_ended", "stop": 6, "wall_seconds": 17.135}
+{"t": 144.333, "event": "autoarm_process_seen", "pid": 88930}
+{"t": 144.425, "event": "guard_run_started", "stop": 7, "pids": [88935]}
+{"t": 160.926, "event": "block_budget_file", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=7\nepoch=\n"}
+{"t": 161.136, "event": "guard_run_ended", "stop": 7, "wall_seconds": 16.719}
+{"t": 162.306, "event": "guard_run_started", "stop": 8, "pids": [36640]}
+{"t": 162.362, "event": "autoarm_process_seen", "pid": 36644}
+{"t": 178.704, "event": "block_budget_file", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=8\nepoch=\n"}
+{"t": 178.945, "event": "guard_run_ended", "stop": 8, "wall_seconds": 16.634}
+{"t": 180.052, "event": "autoarm_process_seen", "pid": 89034}
+{"t": 180.148, "event": "guard_run_started", "stop": 9, "pids": [89032]}
+{"t": 196.842, "event": "block_budget_file", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=9\nepoch=\n"}
+{"t": 197.075, "event": "guard_run_ended", "stop": 9, "wall_seconds": 16.941}
+{"t": 197.277, "event": "claude_exited_by_itself", "rc": 0}
+{"t": 197.329, "event": "watcher_health", "verdict": "not-healthy", "stderr": ""}
+{"t": 197.386, "event": "watch_processes", "pids": []}
+{"t": 197.386, "event": "state_listing", "files": [".guard-watcher-stale-banner", ".inactive-outcome-reconcile", ".lock", ".lock-session", ".session-start-agents-baseline", ".session-start-complete", ".startup-network.delivered", ".startup-network.report", ".startup-network.status", ".startup-network.timings", ".trace-context-effective", ".turnend-claude-blocks", ".wake-queue.lock", ".wake-queue.lock.owner.WzvdY3", "home-summary.json", "task1.meta", "terminal-outcomes"]}
+{"t": 197.386, "event": "ledger_final", "content": null}
+{"t": 197.387, "event": "block_budget_final", "content": "session=71ced21e-4c60-4e9a-9248-71e81714b7d2\ncount=9\nepoch=\n"}
+{"t": 197.387, "event": "queue_lock_release_requested", "why": "teardown"}
+{"t": 197.387, "event": "claude_exit", "rc": 0}
+{"t": 200.582, "event": "leftover_processes", "after_session": [], "after_term": []}
+{"t": 200.583, "event": "summary", "label": "s6-target-autoarm-never-claims-reblocks", "commit": "fb3d1bd001b43350c2bd82a8a4b784d7c03ff94b", "guard_default": "104:SYNC_WAIT_MS=${FM_CLAUDE_AUTOARM_SYNC_WAIT_MS:-12000}", "hold_mode": "forever", "turn_would_end_blind_blocks_in_transcript": 9, "did_not_claim_lines_in_transcript": 9, "guard_runs": [{"stop": 1, "wall_seconds": 16.988}, {"stop": 2, "wall_seconds": 16.948}, {"stop": 3, "wall_seconds": 17.167}, {"stop": 4, "wall_seconds": 17.079}, {"stop": 5, "wall_seconds": 16.926}, {"stop": 6, "wall_seconds": 17.135}, {"stop": 7, "wall_seconds": 16.719}, {"stop": 8, "wall_seconds": 16.634}, {"stop": 9, "wall_seconds": 16.941}]}
