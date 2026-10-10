@@ -1,0 +1,36 @@
+=== scenario: daemon-down-retained   task id: fmlive84741791588538   shared supabase project_id: vernfmlive84741791588538
+=== BEFORE teardown
+## containers
+## networks
+## volumes
+=== task meta before:
+window=firstmate:fm-fmlive84741791588538
+endpoint_task_id=fmlive84741791588538
+worktree=/Users/charlesabrooker/tmp/fm-fix.ziEyfL/wt
+project=/Users/charlesabrooker/tmp/fm-fix.ziEyfL/project
+kind=ship
+mode=no-mistakes
+spawn_gen=live-fmlive84741791588538
+docker_projects=fmlive84741791588538
+=== RUN: FM_HOME=<lab> bin/fm-teardown.sh fmlive84741791588538
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+warning: Docker container listing failed
+failed to connect to the docker API at unix://<fix>/no-such-docker.sock; check if the path is correct and if the daemon is running: dial unix <fix>/no-such-docker.sock: connect: no such file or directory
+warning: Docker could not be listed for fmlive84741791588538, so its Docker stacks were not cleaned up; with Docker running, list its own with: docker ps -a --filter label=fm.task=fmlive84741791588538
+error: stopping this cleanup without removing the task's records, so the Docker objects still named for fmlive84741791588538 can be reconciled and a rerun can retry.
+=== teardown exit code: 1
+=== AFTER teardown
+## containers
+## networks
+## volumes
+=== task record: KEPT
+window=firstmate:fm-fmlive84741791588538
+endpoint_task_id=fmlive84741791588538
+worktree=/Users/charlesabrooker/tmp/fm-fix.ziEyfL/wt
+project=/Users/charlesabrooker/tmp/fm-fix.ziEyfL/project
+kind=ship
+mode=no-mistakes
+spawn_gen=live-fmlive84741791588538
+docker_projects=fmlive84741791588538
+=== worktree: still present
+=== sibling record fmlive84741791588538-v2: kept

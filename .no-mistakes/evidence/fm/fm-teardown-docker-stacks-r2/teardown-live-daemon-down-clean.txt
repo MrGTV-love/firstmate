@@ -1,0 +1,29 @@
+=== scenario: daemon-down-clean   task id: fmlive912691791588532   shared supabase project_id: vernfmlive912691791588532
+=== BEFORE teardown
+## containers
+## networks
+## volumes
+=== task meta before:
+window=firstmate:fm-fmlive912691791588532
+endpoint_task_id=fmlive912691791588532
+worktree=/Users/charlesabrooker/tmp/fm-fix.Ss6xlC/wt
+project=/Users/charlesabrooker/tmp/fm-fix.Ss6xlC/project
+kind=ship
+mode=no-mistakes
+spawn_gen=live-fmlive912691791588532
+=== RUN: FM_HOME=<lab> bin/fm-teardown.sh fmlive912691791588532
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+warning: Docker container listing failed
+failed to connect to the docker API at unix://<fix>/no-such-docker.sock; check if the path is correct and if the daemon is running: dial unix <fix>/no-such-docker.sock: connect: no such file or directory
+warning: Docker could not be listed for fmlive912691791588532 and its task record retains no Docker project identities, so Docker cleanup was skipped; with Docker running, list its own with: docker ps -a --filter label=fm.task=fmlive912691791588532
+<fix>/project: STUCK: on branch main with uncommitted changes, 1 commits behind origin/main - needs attention
+teardown fmlive912691791588532 complete (window firstmate:fm-fmlive912691791588532, worktree <fix>/wt)
+Backlog: fmlive912691791588532 just finished (this home keeps no markdown backlog at <lab>/data/backlog.md). Update <lab>/data/backlog.md - move fmlive912691791588532 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+=== teardown exit code: 0
+=== AFTER teardown
+## containers
+## networks
+## volumes
+=== task record: REMOVED
+=== worktree: still present
+=== sibling record fmlive912691791588532-v2: kept

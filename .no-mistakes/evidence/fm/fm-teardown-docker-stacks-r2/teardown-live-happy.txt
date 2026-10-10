@@ -1,0 +1,59 @@
+=== scenario: happy   task id: fmlive356951791588481   shared supabase project_id: vernfmlive356951791588481
+=== BEFORE teardown
+## containers
+fmlive356951791588481-claimed  [Created]  fm.task=otherfmlive356951791588481 project=
+fmlive356951791588481-db-1  [Up 2 seconds]  fm.task= project=fmlive356951791588481
+fmlive356951791588481-throwaway-pg  [Exited (137) 3 seconds ago]  fm.task= project=
+fmlive356951791588481-v2-pg  [Created]  fm.task= project=
+gre-throwaway-fmlive356951791588481  [Created]  fm.task= project=
+otherfmlive356951791588481-db  [Created]  fm.task=otherfmlive356951791588481 project=
+plainfmlive356951791588481-db-1  [Up 1 second]  fm.task= project=plainfmlive356951791588481
+scratch-fmlive356951791588481  [Up 3 seconds]  fm.task=fmlive356951791588481 project=
+supabase_db_vernfmlive356951791588481  [Created]  fm.task= project=vernfmlive356951791588481
+## networks
+fmlive356951791588481_default
+plainfmlive356951791588481_default
+supabase_network_vernfmlive356951791588481
+## volumes
+fmlive356951791588481-scratchvol
+fmlive356951791588481-unlabelled
+fmlive356951791588481_data
+otherfmlive356951791588481-vol
+plainfmlive356951791588481_data
+supabase_db_vernfmlive356951791588481
+=== task meta before:
+window=firstmate:fm-fmlive356951791588481
+endpoint_task_id=fmlive356951791588481
+worktree=/Users/charlesabrooker/tmp/fm-fix.Ax0yWt/wt
+project=/Users/charlesabrooker/tmp/fm-fix.Ax0yWt/project
+kind=ship
+mode=no-mistakes
+spawn_gen=live-fmlive356951791588481
+=== RUN: FM_HOME=<lab> bin/fm-teardown.sh fmlive356951791588481
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+teardown: removing Docker container(s) owned by fmlive356951791588481: plainfmlive356951791588481-db-1(path) fmlive356951791588481-db-1(name) scratch-fmlive356951791588481(label) fmlive356951791588481-throwaway-pg(name)
+teardown: removed Docker network fmlive356951791588481_default owned by fmlive356951791588481
+teardown: removed Docker network plainfmlive356951791588481_default owned by fmlive356951791588481
+teardown: removed Docker volume fmlive356951791588481-scratchvol owned by fmlive356951791588481
+teardown: removed Docker volume fmlive356951791588481_data owned by fmlive356951791588481
+<fix>/project: STUCK: on branch main with uncommitted changes, 2 commits behind origin/main - needs attention
+teardown fmlive356951791588481 complete (window firstmate:fm-fmlive356951791588481, worktree <fix>/wt)
+Backlog: fmlive356951791588481 just finished (this home keeps no markdown backlog at <lab>/data/backlog.md). Update <lab>/data/backlog.md - move fmlive356951791588481 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+=== teardown exit code: 0
+=== AFTER teardown
+## containers
+fmlive356951791588481-claimed  [Created]  fm.task=otherfmlive356951791588481 project=
+fmlive356951791588481-v2-pg  [Created]  fm.task= project=
+gre-throwaway-fmlive356951791588481  [Created]  fm.task= project=
+otherfmlive356951791588481-db  [Created]  fm.task=otherfmlive356951791588481 project=
+supabase_db_vernfmlive356951791588481  [Created]  fm.task= project=vernfmlive356951791588481
+## networks
+supabase_network_vernfmlive356951791588481
+## volumes
+fmlive356951791588481-unlabelled
+otherfmlive356951791588481-vol
+plainfmlive356951791588481_data
+supabase_db_vernfmlive356951791588481
+=== task record: REMOVED
+=== worktree: still present
+=== sibling record fmlive356951791588481-v2: kept

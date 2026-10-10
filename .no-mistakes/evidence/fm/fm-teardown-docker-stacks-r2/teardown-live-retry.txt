@@ -1,0 +1,51 @@
+=== scenario: retry   task id: fmlive231551791588579   shared supabase project_id: vernfmlive231551791588579
+=== BEFORE teardown
+## containers
+## networks
+plainfmlive231551791588579_default
+## volumes
+=== task meta before:
+window=firstmate:fm-fmlive231551791588579
+endpoint_task_id=fmlive231551791588579
+worktree=/Users/charlesabrooker/tmp/fm-fix.1MKl6x/wt
+project=/Users/charlesabrooker/tmp/fm-fix.1MKl6x/project
+kind=ship
+mode=no-mistakes
+spawn_gen=live-fmlive231551791588579
+docker_projects=plainfmlive231551791588579
+=== RUN: FM_HOME=<lab> bin/fm-teardown.sh fmlive231551791588579
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+warning: Docker container listing failed
+failed to connect to the docker API at unix://<fix>/no-such-docker.sock; check if the path is correct and if the daemon is running: dial unix <fix>/no-such-docker.sock: connect: no such file or directory
+warning: Docker could not be listed for fmlive231551791588579, so its Docker stacks were not cleaned up; with Docker running, list its own with: docker ps -a --filter label=fm.task=fmlive231551791588579
+error: stopping this cleanup without removing the task's records, so the Docker objects still named for fmlive231551791588579 can be reconciled and a rerun can retry.
+=== teardown exit code: 1
+=== AFTER teardown
+## containers
+## networks
+plainfmlive231551791588579_default
+## volumes
+=== task record: KEPT
+window=firstmate:fm-fmlive231551791588579
+endpoint_task_id=fmlive231551791588579
+worktree=/Users/charlesabrooker/tmp/fm-fix.1MKl6x/wt
+project=/Users/charlesabrooker/tmp/fm-fix.1MKl6x/project
+kind=ship
+mode=no-mistakes
+spawn_gen=live-fmlive231551791588579
+docker_projects=plainfmlive231551791588579
+=== worktree: still present
+=== sibling record fmlive231551791588579-v2: kept
+
+=== RETRY with the Docker daemon reachable again: FM_HOME=<lab> bin/fm-teardown.sh fmlive231551791588579
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <lab>
+teardown: removed Docker network plainfmlive231551791588579_default owned by fmlive231551791588579
+<fix>/project: STUCK: on branch main with uncommitted changes, 2 commits behind origin/main - needs attention
+teardown fmlive231551791588579 complete (window firstmate:fm-fmlive231551791588579, worktree <fix>/wt)
+Backlog: fmlive231551791588579 just finished (this home keeps no markdown backlog at <lab>/data/backlog.md). Update <lab>/data/backlog.md - move fmlive231551791588579 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+=== retry exit code: 0
+=== AFTER retry
+## containers
+## networks
+## volumes
+=== task record: REMOVED
