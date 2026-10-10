@@ -2022,7 +2022,7 @@ confirm_launched_runners() {  # <id><TAB><registration-identity><TAB><stamp-befo
       pid=${pids[index]}; runner_identity=${identities[index]}
       if [ -n "$pid" ]; then
         if [ -z "$runner_identity" ] || ! fm_procevent_pid_state "$pid" "$runner_identity"; then
-          unconfirmed+=("$entry")
+          launch_stamp_advanced "$id" "$identity" "$before" || unconfirmed+=("$entry")
           continue
         fi
         if [ "$SECONDS" -ge "$hung_deadline" ]; then

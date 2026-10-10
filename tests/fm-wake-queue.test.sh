@@ -3051,6 +3051,10 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   ack_count=$(grep -c '^WAKE_ACK_REQUIRED:' "$first_err" || true)
   [ "$ack_count" -eq 1 ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded presentation did not emit exactly one acknowledgement command"; }
+  if grep -v -e '^WAKE_ACK_REQUIRED:' -e '^●' -e '^WARNING: ' "$first_err" | grep . >/dev/null; then
+    kill "$presentation_holder" 2>/dev/null || true
+    fail "presentation deadline leaked diagnostics beyond its acknowledgement and supervision alarms: $(cat "$first_err")"
+  fi
   grep "$(printf '\tsignal\t')" "$first_out" >/dev/null \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded presentation dropped the durable wake row"; }
   if grep -F 'task.status: needs-decision [key=fixture]' "$first_out" >/dev/null; then

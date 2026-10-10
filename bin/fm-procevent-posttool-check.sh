@@ -11,10 +11,13 @@
 set -u
 
 [ "$#" -eq 0 ] || exit 2
+[ "${FM_PROCEVENT_IN_RUNNER:-0}" != 1 ] || exit 0
+[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+[ ! -e "$STATE/.afk" ] || exit 0
 
 # shellcheck source=bin/fm-primary-scope-lib.sh
 . "$SCRIPT_DIR/fm-primary-scope-lib.sh"
@@ -26,21 +29,18 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-procevent-lib.sh"
 
 PAYLOAD=$(cat 2>/dev/null || true)
+fm_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
+fm_session_lock_owned_by_self "$STATE" || exit 0
 HELPER=0
 printf '%s' "$PAYLOAD" | perl -MJSON::PP=decode_json -e '
   local $/;
   my $payload = eval { decode_json(<STDIN>) };
   exit(ref($payload) eq "HASH" && exists($payload->{agent_id}) ? 0 : 1);
 ' 2>/dev/null && HELPER=1
-[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0
 fm_hook_payload_is_foreign_host "$PAYLOAD" && exit 0
 if [ -n "$PAYLOAD" ] && command -v jq >/dev/null 2>&1; then
   printf '%s' "$PAYLOAD" | jq -e '(.transcript_path // "") | type == "string" and contains("/.pi/")' >/dev/null 2>&1 && exit 0
 fi
-fm_primary_scope_matches "$FM_ROOT" "$STATE" || exit 0
-fm_session_lock_owned_by_self "$STATE" || exit 0
-[ "${FM_PROCEVENT_IN_RUNNER:-0}" != 1 ] || exit 0
-[ ! -e "$STATE/.afk" ] || exit 0
 # Active primary tools prove owner presence even between Stop-owned watch cycles.
 if fm_procevent_any_registered "$STATE"; then
   fm_procevent_owner_lease_touch "$STATE" 2>/dev/null || true
