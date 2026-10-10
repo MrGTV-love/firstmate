@@ -49,12 +49,13 @@ interrupt
 exit
 relaunch
 authorize-continuation
+reassociate
 EOF
 }
 
 fm_control_verb_allowed() {  # <verb>
   case "${1-}" in
-    interrupt|exit|relaunch|authorize-continuation) return 0 ;;
+    interrupt|exit|relaunch|authorize-continuation|reassociate) return 0 ;;
   esac
   return 1
 }

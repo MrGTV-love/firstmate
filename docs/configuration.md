@@ -489,6 +489,8 @@ Task meta records `backend=` only for a non-default backend; an absent `backend=
 
 - A cmux task additionally records `cmux_workspace_id=` and `cmux_surface_id=`.
 
+- A task re-pointed at a replacement copy records one `prior_worktree=` line for each copy it left, or a `released_worktree=` line for a pool slot it left and released; [Reassociating a task with a replacement copy](agent-control.md#reassociating-a-task-with-a-replacement-copy) owns those fields.
+
 ### Task selectors
 
 Task selectors for `fm-peek.sh`, `fm-send.sh`, and `fm-crew-state.sh` resolve centrally through `fm_backend_resolve_selector`.

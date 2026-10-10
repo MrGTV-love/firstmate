@@ -2002,7 +2002,7 @@ assert_dirty_diagnostic() {
     done
     # Preserve the existing exemptions without counting them as leftovers.
     mkdir "$case_dir/wt/.claude"
-    touch "$case_dir/wt/.claude/settings.local.json" "$case_dir/wt/.fm-grok-turnend"
+    touch "$case_dir/wt/.claude/settings.local.json" "$case_dir/wt/.fm-grok-turnend" "$case_dir/wt/.fm-kimi-turnend"
   fi
   before=$(git -C "$case_dir/wt" status --porcelain)
   rc=0
@@ -2021,7 +2021,7 @@ assert_dirty_diagnostic() {
   if [ "$kind" != tracked ]; then
     grep -Fq '00 proof scratch/' "$case_dir/stderr" || fail "$kind/$mode: scratch folder not named"
     grep -Fxq '  09-scratch.txt' "$case_dir/stderr" || fail "$kind/$mode: tenth path missing"
-    ! grep -q '10-scratch.txt\|11-scratch.txt\|\.claude/\|\.fm-grok-turnend' "$case_dir/stderr" \
+    ! grep -q '10-scratch.txt\|11-scratch.txt\|\.claude/\|\.fm-grok-turnend\|\.fm-kimi-turnend' "$case_dir/stderr" \
       || fail "$kind/$mode: path list exceeded its bound or included exempt files"
     grep -Fq 'additional untracked paths omitted' "$case_dir/stderr" || fail "$kind/$mode: no truncation notice"
   else
@@ -7719,6 +7719,811 @@ SH
   pass "the lane-registry scan reads each distinct registry once however many records name it"
 }
 
+test_tasktmp_preserves_current_and_prior_reassociated_copies() {
+  local case_dir tmp nested current shape force rc
+  for shape in current prior; do
+    case_dir=$(make_case "tasktmp-custody-$shape")
+    mkdir -p "$case_dir/home/state" "$case_dir/tasktmp"
+    tmp=$case_dir/tasktmp
+    nested=$tmp/B
+    git -C "$case_dir/project" worktree move "$case_dir/wt" "$nested"
+    printf 'unlanded B bytes\n' > "$nested/scratch.txt"
+    current=$nested
+    if [ "$shape" = prior ]; then
+      current=$case_dir/C
+      git -C "$case_dir/project" worktree add -q -b fm/current-C "$current" main
+    fi
+    git -C "$case_dir/project" worktree add -q -b fm/prior-A "$case_dir/A" main
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$current" "project=$case_dir/project" "kind=ship" \
+      "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+      "tasktmp=$tmp" "prior_worktree=$case_dir/A"
+    [ "$shape" != prior ] || printf 'prior_worktree=%s\n' "$nested" >> "$case_dir/state/task-x1.meta"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
+exit 0
+SH
+    cat > "$case_dir/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/reap.log"
+exit 1
+SH
+    chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/lsof"
+    for force in normal force; do
+      rc=0
+      if [ "$force" = force ]; then
+        FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      else
+        FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      fi
+      expect_code 1 "$rc" "tasktmp-$shape-$force: overlapping cleanup must refuse"
+      assert_grep "cleanup target $tmp" "$case_dir/stderr" "tasktmp refusal missed the destructive root"
+      cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" || fail "tasktmp refusal changed custody"
+      assert_grep "unlanded B bytes" "$nested/scratch.txt" "tasktmp cleanup destroyed B"
+      assert_absent "$case_dir/kill.log" "tasktmp refusal closed an endpoint"
+      assert_absent "$case_dir/reap.log" "tasktmp refusal reached process reaping"
+    done
+  done
+  pass "tasktmp admission preserves both the current nested replacement and a nested prior copy before signalling"
+}
+
+test_tasktmp_checks_all_other_copy_fields_in_both_directions() {
+  local case_dir field direction target recorded rc
+  for field in worktree home prior_worktree; do
+    for direction in ancestor descendant; do
+      case_dir=$(make_case "tasktmp-other-$field-$direction")
+      mkdir -p "$case_dir/home/state" "$case_dir/tasktmp/nested"
+      write_meta "$case_dir" no-mistakes ship
+      target=$case_dir/tasktmp
+      if [ "$direction" = ancestor ]; then
+        target=$case_dir/tasktmp/nested
+        recorded=$case_dir/tasktmp
+      else
+        recorded=$case_dir/tasktmp/nested
+      fi
+      printf 'tasktmp=%s\n' "$target" >> "$case_dir/state/task-x1.meta"
+      fm_write_meta "$case_dir/home/state/other.meta" "$field=$recorded" "kind=ship"
+      printf 'other custody bytes\n' > "$recorded/owned.txt"
+      rc=0
+      FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 1 "$rc" "tasktmp-$field-$direction: foreign custody must refuse"
+      assert_grep "task other's recorded $field" "$case_dir/stderr" "foreign tasktmp refusal omitted custody"
+      assert_grep "other custody bytes" "$recorded/owned.txt" "foreign tasktmp custody was removed"
+      assert_present "$case_dir/state/task-x1.meta" "foreign tasktmp refusal retired the record"
+    done
+  done
+  pass "tasktmp admission counts all cross-home copy fields in both containment directions"
+}
+
+test_secondmate_home_preserves_other_tasks_prior_copy() {
+  local case_dir home location field force rc
+  for location in local peer; do
+    for field in worktree home prior_worktree; do
+      case_dir=$(make_case "home-other-$location-$field")
+      mkdir -p "$case_dir/home/state" "$case_dir/home/data"
+      write_meta "$case_dir" local-only secondmate
+      home=$case_dir/secondmate-home
+      mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects"
+      printf 'task-x1\n' > "$home/.fm-secondmate-home"
+      printf 'preserved P bytes\n' > "$home/scratch.txt"
+      printf 'home=%s\n' "$home" >> "$case_dir/state/task-x1.meta"
+      if [ "$location" = local ]; then
+        fm_write_meta "$case_dir/home/state/original.meta" "$field=$home" "kind=ship"
+      else
+        mkdir -p "$case_dir/peer/state"
+        printf '# Secondmates\n- peer - peer charter (home: %s; scope: peer; projects: none; added 2026-10-08)\n' "$case_dir/peer" > "$case_dir/home/data/secondmates.md"
+        fm_write_meta "$case_dir/peer/state/original.meta" "$field=$home" "kind=ship"
+      fi
+      cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+      cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
+exit 0
+SH
+      chmod +x "$case_dir/fakebin/tmux"
+      for force in normal force; do
+        rc=0
+        if [ "$force" = force ]; then
+          FM_HOME="$case_dir/home" run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        else
+          FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        fi
+        expect_code 1 "$rc" "secondmate-$location-$field-$force: overlapping custody must refuse"
+        assert_grep "task original's recorded $field" "$case_dir/stderr" \
+          "secondmate-$location-$field-$force: refusal missed original custody: $(cat "$case_dir/stderr")"
+        cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" || fail "secondmate refusal changed its record"
+        assert_grep "preserved P bytes" "$home/scratch.txt" "secondmate retirement deleted preserved P"
+        assert_absent "$case_dir/kill.log" "secondmate refusal closed an endpoint"
+      done
+    done
+  done
+  pass "secondmate retirement preserves original copy custody in this home and registered peer homes"
+}
+
+
+# A record re-pointed by bin/fm-control.sh reassociate names its earlier copies
+# in prior_worktree=. Teardown still runs the landed-work test on the current
+# copy, but leaves a current copy that is not a pool slot - and every prior
+# copy - exactly as it is: no Treehouse return, no branch deletion.
+test_reassociated_copies_are_left_in_place() {
+  local case_dir rc old_fp
+  case_dir=$(make_case reassociated-keep)
+  mkdir -p "$case_dir/home/state"
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  git -C "$case_dir/project" worktree add -q -b fm/task-x1-old "$case_dir/old" main
+  printf 'preserved scratch\n' > "$case_dir/old/scratch.txt"
+  printf 'prior_worktree=%s\n' "$case_dir/old" >> "$case_dir/state/task-x1.meta"
+  old_fp=$(git -C "$case_dir/old" rev-parse HEAD; git -C "$case_dir/old" status --porcelain --untracked-files=all)
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "reassociated-keep: a landed reassociated task should tear down"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "reassociated worktree $case_dir/wt left in place" "$case_dir/stdout" \
+    "reassociated-keep: teardown did not report the current copy left in place"
+  assert_grep "prior copy $case_dir/old (from a reassociation) was left untouched" "$case_dir/stdout" \
+    "reassociated-keep: teardown did not report the preserved prior copy"
+  assert_absent "$case_dir/treehouse.log" "reassociated-keep: teardown returned a copy it does not own"
+  git -C "$case_dir/wt" symbolic-ref --quiet HEAD >/dev/null \
+    || fail "reassociated-keep: the current copy's branch was detached"
+  git -C "$case_dir/project" rev-parse --verify --quiet refs/heads/fm/task-x1 >/dev/null \
+    || fail "reassociated-keep: the current copy's branch was deleted"
+  [ "$old_fp" = "$(git -C "$case_dir/old" rev-parse HEAD; git -C "$case_dir/old" status --porcelain --untracked-files=all)" ] \
+    || fail "reassociated-keep: the prior copy changed"
+  assert_absent "$case_dir/state/task-x1.meta" "reassociated-keep: the task record was not removed"
+  pass "teardown of a reassociated record keeps the non-pool current copy and every prior copy untouched"
+}
+
+# A record whose earlier pool slot was released by reassociate names it only as
+# released_worktree=: still a reassociated record, so its non-pool current copy
+# is left in place, but the released slot is no preserved custody to report.
+test_released_slot_record_keeps_current_copy() {
+  local case_dir rc
+  case_dir=$(make_case reassociated-released)
+  mkdir -p "$case_dir/home/state"
+  write_meta "$case_dir" no-mistakes ship
+  land_shippable_commit "$case_dir"
+  printf 'released_worktree=%s\n' "$case_dir/released-slot" >> "$case_dir/state/task-x1.meta"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "reassociated-released: a landed reassociated task should tear down"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "reassociated worktree $case_dir/wt left in place" "$case_dir/stdout" \
+    "reassociated-released: teardown did not leave the non-pool current copy in place"
+  assert_no_grep "prior copy" "$case_dir/stdout" "reassociated-released: a released slot was reported as preserved custody"
+  assert_absent "$case_dir/treehouse.log" "reassociated-released: teardown returned a copy it does not own"
+  git -C "$case_dir/project" rev-parse --verify --quiet refs/heads/fm/task-x1 >/dev/null \
+    || fail "reassociated-released: the current copy's branch was deleted"
+  assert_absent "$case_dir/state/task-x1.meta" "reassociated-released: the task record was not removed"
+  pass "teardown of a record whose old slot was released keeps the non-pool current copy"
+}
+
+test_reassociated_unlanded_copy_still_refuses() {
+  local case_dir rc
+  case_dir=$(make_case reassociated-unlanded)
+  mkdir -p "$case_dir/home/state"
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" unlanded.txt "unlanded work"
+  git -C "$case_dir/project" worktree add -q -b fm/task-x1-old "$case_dir/old" main
+  printf 'prior_worktree=%s\n' "$case_dir/old" >> "$case_dir/state/task-x1.meta"
+  cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "reassociated-unlanded: unlanded work in the current copy must still refuse"
+  cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" \
+    || fail "reassociated-unlanded: the refusal changed the task record"
+  pass "teardown of a reassociated record still refuses unlanded work in the current copy"
+}
+
+# Another task's preserved prior copy is live custody: a teardown whose pool slot
+# some record still names in prior_worktree= refuses rather than returning it.
+test_slot_named_as_another_prior_copy_refuses() {
+  local case_dir rc slot
+  case_dir=$(make_case prior-copy-collision)
+  mkdir -p "$case_dir/home/state" "$case_dir/pool/1"
+  git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+  printf '{"worktrees":[]}\n' > "$case_dir/pool/treehouse-state.json"
+  slot=$(cd "$case_dir/pool/1/project" && pwd -P)
+  wt_commit_at() { git -C "$slot" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "$1"; }
+  wt_commit_at "shippable work"
+  git -C "$slot" push -q origin fm/task-x1
+  git -C "$case_dir/project" fetch -q origin
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+    "worktree=$slot" "project=$case_dir/project" \
+    "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1"
+  mkdir -p "$case_dir/elsewhere"
+  fm_write_meta "$case_dir/state/other.meta" "worktree=$case_dir/elsewhere" \
+    "prior_worktree=$slot" "kind=ship"
+  cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "prior-copy-collision: teardown must refuse a slot another record preserves"
+  assert_grep "is also task other's recorded prior_worktree" "$case_dir/stderr" \
+    "prior-copy-collision: the refusal did not name the preserving record"
+  cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" \
+    || fail "prior-copy-collision: the refusal changed the task record"
+  assert_present "$slot" "prior-copy-collision: the slot was removed"
+  pass "teardown refuses to return a pool slot another record preserves as a prior copy"
+}
+
+test_nested_reassociation_return_to_prior_copy_refuses() {
+  local case_dir rc slot prior shape force pool
+  for pool in ordinary pool; do
+    for shape in return ancestor descendant; do
+      case_dir=$(make_case "nested-prior-$pool-$shape")
+      mkdir -p "$case_dir/home/state"
+      slot=$case_dir/wt
+      cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+      if [ "$pool" = pool ]; then
+        mkdir -p "$case_dir/pool/1"
+        git -C "$case_dir/project" worktree move "$slot" "$case_dir/pool/1/project"
+        printf '{"worktrees":[]}\n' > "$case_dir/pool/treehouse-state.json"
+        slot=$case_dir/pool/1/project
+      fi
+      mkdir -p "$slot/nested-B"
+      printf 'preserved B work\n' > "$slot/nested-B/scratch.txt"
+      ln -s "$slot" "$case_dir/copy-A"
+      case "$shape" in
+        return) prior=$case_dir/copy-A ;;
+        ancestor) prior=${slot%/*} ;;
+        descendant) prior=$case_dir/copy-A/nested-B ;;
+      esac
+      fm_write_meta "$case_dir/state/task-x1.meta" \
+        "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+        "worktree=$slot" "project=$case_dir/project" \
+        "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+        "prior_worktree=$prior" "prior_worktree=$case_dir/copy-A/nested-B"
+      cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+      for force in normal force; do
+        rc=0
+        if [ "$force" = force ]; then
+          FM_HOME="$case_dir/home" FM_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
+            run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        else
+          FM_HOME="$case_dir/home" FM_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
+            run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        fi
+        expect_code 1 "$rc" "nested-prior-$pool-$shape-$force: preserved custody must refuse cleanup"
+        assert_grep "recorded prior_worktree" "$case_dir/stderr" \
+          "nested-prior-$pool-$shape-$force: refusal did not identify prior custody"
+        cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" \
+          || fail "nested-prior-$pool-$shape-$force: task metadata changed"
+        assert_absent "$case_dir/treehouse.log" "nested-prior-$pool-$shape-$force: cleanup returned a copy"
+        assert_grep "preserved B work" "$slot/nested-B/scratch.txt" \
+          "nested-prior-$pool-$shape-$force: nested prior content changed"
+      done
+    done
+  done
+  pass "nested A-to-B-to-A custody refuses ordinary and pool cleanup, including force and symlink overlap"
+}
+
+test_other_record_copy_overlap_is_component_aware() {
+  local case_dir field direction rc recorded
+  for field in worktree home prior_worktree; do
+    for direction in ancestor descendant sibling; do
+      case_dir=$(make_case "other-overlap-$field-$direction")
+      mkdir -p "$case_dir/home/state" "$case_dir/wt/nested" "$case_dir/wt-sibling"
+      write_meta "$case_dir" no-mistakes ship
+      land_shippable_commit "$case_dir"
+      ln -s "$case_dir/wt" "$case_dir/copy"
+      cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+      case "$direction" in
+        ancestor) recorded=$case_dir ;;
+        descendant) recorded=$case_dir/copy/nested ;;
+        sibling) recorded=$case_dir/wt-sibling ;;
+      esac
+      fm_write_meta "$case_dir/state/other.meta" "$field=$recorded" "kind=ship"
+      cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+      rc=0
+      FM_HOME="$case_dir/home" FM_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
+        run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      if [ "$direction" = sibling ]; then
+        expect_code 0 "$rc" "other-overlap-$field-$direction: sibling custody must not block cleanup"
+        assert_absent "$case_dir/state/task-x1.meta" "other-overlap-$field-$direction: task was not retired"
+      else
+        expect_code 1 "$rc" "other-overlap-$field-$direction: overlapping custody must refuse cleanup"
+        assert_grep "is also task other's recorded $field" "$case_dir/stderr" \
+          "other-overlap-$field-$direction: refusal did not identify the conflicting field"
+        cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" \
+          || fail "other-overlap-$field-$direction: refusal changed metadata"
+        assert_absent "$case_dir/treehouse.log" "other-overlap-$field-$direction: cleanup returned a copy"
+      fi
+      assert_present "$case_dir/state/other.meta" "other-overlap-$field-$direction: other record changed"
+    done
+  done
+  pass "other worktree, home, and prior custody overlap refuses in both directions but not for siblings"
+}
+
+test_forced_descendant_preserved_copy_refuses_before_cleanup() {
+  local case_dir home prior where rc
+  for where in child home; do
+    case_dir=$(make_case "descendant-prior-$where")
+    write_meta "$case_dir" local-only secondmate
+    configure_secondmate_with_tmux_children "$case_dir"
+    home=$case_dir/secondmate-home
+    if [ "$where" = child ]; then
+      prior=$case_dir/child-b-wt/prior
+    else
+      prior=$home/preserved-copy
+    fi
+    mkdir -p "$prior"
+    printf 'preserved child work\n' > "$prior/scratch.txt"
+    printf 'prior_worktree=%s\n' "$prior" >> "$home/state/child-b.meta"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+    cp "$home/state/child-b.meta" "$case_dir/child.before"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    rc=0
+    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "descendant-prior-$where: cascade must preserve child prior custody"
+    assert_grep "preserved prior_worktree" "$case_dir/stderr" \
+      "descendant-prior-$where: refusal did not identify preserved custody"
+    cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" \
+      || fail "descendant-prior-$where: parent metadata changed"
+    cmp -s "$case_dir/child.before" "$home/state/child-b.meta" \
+      || fail "descendant-prior-$where: child metadata changed"
+    assert_present "$home/state/child-a.meta" "descendant-prior-$where: earlier child was retired"
+    assert_absent "$case_dir/treehouse.log" "descendant-prior-$where: earlier child copy was returned"
+    assert_grep "preserved child work" "$prior/scratch.txt" "descendant-prior-$where: prior work changed"
+  done
+  pass "forced descendant admission preserves prior copies inside child worktrees and retiring homes before any cascade cleanup"
+}
+
+test_forced_nested_secondmate_admits_only_locked_current_copies() {
+  local shape case_dir home child_home wt sibling_wt rc field owner_home owner_meta slot_head
+  for shape in admitted prior external-worktree external-home external-prior_worktree unavailable reassigned-root reassigned-peer reassigned-inside; do
+    case_dir=$(make_case "nested-home-admission-$shape")
+    home="$case_dir/secondmate-home"
+    child_home="$case_dir/disjoint-child-home"
+    wt="$child_home/pool/1/project"
+    case "$shape" in
+      reassigned-root|reassigned-peer) wt="$case_dir/external-pool/1/project" ;;
+    esac
+    mkdir -p "$home/state" "$home/data" "$home/config" "$home/projects" \
+      "$child_home/state" "$child_home/data" "$child_home/config" "$child_home/projects"
+    mkdir -p "$case_dir/home/state" "$case_dir/home/data" "$case_dir/test-root"
+    ln -s "$ROOT/bin" "$case_dir/test-root/bin"
+    printf 'task-x1\n' > "$home/.fm-secondmate-home"
+    printf 'nested-sm\n' > "$child_home/.fm-secondmate-home"
+    printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$case_dir/home" > "$home/.fm-secondmate-parent"
+    printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$home" > "$child_home/.fm-secondmate-parent"
+    printf '# Secondmates\n- task-x1 - parent fixture (home: %s; scope: fixture; projects: alpha; added 2026-10-08)\n' \
+      "$home" > "$case_dir/home/data/secondmates.md"
+    printf '# Secondmates\n- nested-sm - child fixture (home: %s; scope: fixture; projects: alpha; added 2026-10-08)\n' \
+      "$child_home" > "$home/data/secondmates.md"
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$home" "project=$case_dir/project" "kind=secondmate" "mode=local-only"
+    printf 'home=%s\n' "$home" >> "$case_dir/state/task-x1.meta"
+    fm_write_meta "$home/state/nested-sm.meta" \
+      "window=firstmate:fm-nested-sm" "endpoint_task_id=nested-sm" \
+      "worktree=$child_home" "home=$child_home" "project=$case_dir/project" \
+      "kind=secondmate" "mode=local-only"
+    mkdir -p "${wt%/*}"
+    git -C "$case_dir/project" worktree add -q -b fm/grandchild "$wt" main
+    printf '{"worktrees":[]}\n' > "${wt%/*/*}/treehouse-state.json"
+    printf 'task=grandchild\nhome=%s\n' "$child_home" > "${wt%/*}/.fm-slot-owner"
+    fm_write_meta "$child_home/state/grandchild.meta" \
+      "window=firstmate:fm-grandchild" "endpoint_task_id=grandchild" \
+      "worktree=$wt" "project=$case_dir/project" "kind=ship" "mode=local-only"
+    sibling_wt="$case_dir/sibling-wt"
+    git -C "$case_dir/project" worktree add -q -b fm/z-sibling "$sibling_wt" main
+    fm_write_meta "$home/state/z-sibling.meta" \
+      "window=firstmate:fm-z-sibling" "endpoint_task_id=z-sibling" \
+      "worktree=$sibling_wt" "project=$case_dir/project" "kind=ship" "mode=local-only"
+    case "$shape" in
+      prior) printf 'prior_worktree=%s\n' "$wt" >> "$child_home/state/grandchild.meta" ;;
+      unavailable)
+        printf -- '- unavailable - unrelated fixture (home: %s; scope: fixture; projects: alpha; added 2026-10-08)\n' \
+          "$case_dir/missing-home" >> "$case_dir/home/data/secondmates.md"
+        ;;
+      external-*)
+        field=${shape#external-}
+        fm_write_meta "$case_dir/home/state/external.meta" "$field=$wt" "kind=ship"
+        ;;
+      reassigned-*)
+        owner_home="$case_dir/home"
+        if [ "$shape" = reassigned-peer ]; then
+          owner_home="$case_dir/peer-home"
+          mkdir -p "$owner_home/state" "$owner_home/data"
+          printf -- '- peer-sm - peer fixture (home: %s; scope: fixture; projects: alpha; added 2026-10-08)\n' \
+            "$owner_home" >> "$case_dir/home/data/secondmates.md"
+        fi
+        owner_meta="$owner_home/state/external.meta"
+        fm_write_meta "$owner_meta" "worktree=$wt" "project=$case_dir/project" "kind=ship"
+        printf 'task=external\nhome=%s\n' "$owner_home" > "${wt%/*}/.fm-slot-owner"
+        cp "$owner_meta" "$case_dir/owner-meta.before"
+        cp "${wt%/*}/.fm-slot-owner" "$case_dir/slot-owner.before"
+        slot_head=$(git -C "$wt" rev-parse HEAD)
+        mkdir -p "$wt/.claude"
+        printf 'claimant hook bytes\n' > "$wt/.claude/settings.local.json"
+        printf 'claimant uncommitted work\n' > "$wt/scratch.txt"
+        ;;
+    esac
+    printf 'retained bytes\n' > "$child_home/retained.txt"
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in
+  kill-*)
+    printf '%s\n' "\$*" >> "$case_dir/kill.log"
+    if [ "\${3:-}" = '=firstmate:=fm-z-sibling' ]; then
+      cp "$home/data/secondmates.md" "$case_dir/registry-after-child.md"
+    fi
+    ;;
+esac
+exit 0
+SH
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    rc=0
+    FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/test-root" \
+      FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/home/data" \
+      FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" \
+      "$TEARDOWN" task-x1 --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$shape" = admitted ] || [ "$shape" = reassigned-root ] || [ "$shape" = reassigned-peer ]; then
+      expect_code 0 "$rc" "locked nested home cleanup should complete: $(cat "$case_dir/stderr")"
+      assert_absent "$home" "nested cleanup retained its parent home"
+      assert_absent "$child_home" "nested cleanup retained its disjoint child home"
+      assert_absent "$case_dir/state/task-x1.meta" "nested cleanup retained the parent record"
+      assert_grep "kill-window -t =firstmate:=fm-grandchild" "$case_dir/kill.log" "nested cleanup did not close the admitted task: $(cat "$case_dir/kill.log")"
+      if [ "$shape" = admitted ]; then
+        assert_grep "$wt" "$case_dir/treehouse.log" "nested cleanup did not return the admitted pool copy"
+      else
+        assert_no_grep "$wt" "$case_dir/treehouse.log" "nested cleanup returned the reassigned pool copy"
+        cmp -s "$case_dir/slot-owner.before" "${wt%/*}/.fm-slot-owner" || fail "nested cleanup changed the claimant's slot owner"
+        cmp -s "$case_dir/owner-meta.before" "$owner_meta" || fail "nested cleanup changed the claimant's record"
+        [ "$slot_head" = "$(git -C "$wt" rev-parse HEAD)" ] || fail "nested cleanup changed the claimant's HEAD"
+        assert_grep 'claimant uncommitted work' "$wt/scratch.txt" "nested cleanup changed the claimant's work"
+        assert_grep 'claimant hook bytes' "$wt/.claude/settings.local.json" "nested cleanup removed the claimant's hooks"
+      fi
+      assert_grep "kill-window -t =firstmate:=fm-z-sibling" "$case_dir/kill.log" "nested cleanup stopped before the later sibling"
+      assert_grep "$sibling_wt" "$case_dir/treehouse.log" "nested cleanup did not return the later sibling copy"
+      assert_present "$case_dir/registry-after-child.md" "later sibling did not observe the owning registry"
+      assert_no_grep '- nested-sm ' "$case_dir/registry-after-child.md" "removed child retained its owning registration"
+      assert_no_grep '- task-x1 ' "$case_dir/home/data/secondmates.md" "removed parent retained its owning registration"
+      cp "$case_dir/kill.log" "$case_dir/kill.before-retry"
+      cp "$case_dir/treehouse.log" "$case_dir/treehouse.before-retry"
+      rc=0
+      FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/test-root" \
+        FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/home/data" \
+        FM_CONFIG_OVERRIDE="$case_dir/config" PATH="$case_dir/fakebin:$PATH" \
+        "$TEARDOWN" task-x1 --force > "$case_dir/retry.stdout" 2> "$case_dir/retry.stderr" || rc=$?
+      expect_code 1 "$rc" "retry must report the already-retired task rather than stale custody"
+      assert_grep 'task record is not a regular file' "$case_dir/retry.stderr" "retry encountered incomplete retirement"
+      cmp -s "$case_dir/kill.before-retry" "$case_dir/kill.log" || fail "retry closed another endpoint"
+      cmp -s "$case_dir/treehouse.before-retry" "$case_dir/treehouse.log" || fail "retry returned another copy"
+    else
+      expect_code 1 "$rc" "preserved nested custody must refuse: $shape"
+      if [ "$shape" = unavailable ]; then
+        assert_grep 'registered local Firstmate home is unavailable' "$case_dir/stderr" "cleanup skipped an unrelated unavailable home"
+      else
+        assert_grep 'custody overlaps' "$case_dir/stderr" "nested refusal missed preserved custody"
+      fi
+      assert_grep 'retained bytes' "$child_home/retained.txt" "nested refusal removed preserved home bytes"
+      assert_present "$home/state/nested-sm.meta" "nested refusal removed the child record"
+      assert_present "$child_home/state/grandchild.meta" "nested refusal removed the grandchild record"
+      assert_absent "$case_dir/kill.log" "nested refusal closed an endpoint"
+      assert_absent "$case_dir/treehouse.log" "nested refusal returned a copy"
+    fi
+  done
+  pass "recursive retirement admits locked copies, preserves reassigned external slots, and refuses overlapping home custody"
+}
+
+
+test_forced_descendant_reassociated_copy_preserves_checkout_and_storage() {
+  local shape case_dir home project storage current prior current_head prior_head current_branch prior_branch common rc hook
+  for shape in prior-storage current-storage home-storage prior-storage-in-sibling current-inside-home outside; do
+    case_dir=$(make_case "descendant-reassociated-$shape")
+    write_meta "$case_dir" local-only secondmate
+    configure_secondmate_with_tmux_children "$case_dir"
+    home=$case_dir/secondmate-home
+    project=$case_dir/project
+    current=$case_dir/child-b-wt
+    prior=$case_dir/prior-A
+    storage=$home/P
+    [ "$shape" != prior-storage-in-sibling ] || storage=$case_dir/child-a-wt/P
+    if [ "$shape" = prior-storage ] || [ "$shape" = current-storage ] || [ "$shape" = home-storage ] || [ "$shape" = prior-storage-in-sibling ]; then
+      git clone -q "$case_dir/origin.git" "$storage"
+    fi
+    if [ "$shape" = prior-storage ] || [ "$shape" = prior-storage-in-sibling ]; then
+      git -C "$storage" worktree add -q -b fm/prior-A "$prior" main
+    else
+      git -C "$project" worktree add -q -b fm/prior-A "$prior" main
+    fi
+    if [ "$shape" = current-storage ]; then
+      project=$storage
+      current=$case_dir/current-B
+      git -C "$project" worktree add -q -b fm/current-B "$current" main
+    elif [ "$shape" = current-inside-home ]; then
+      current=$home/current-B
+      git -C "$project" worktree move "$case_dir/child-b-wt" "$current"
+    fi
+    fm_write_meta "$home/state/child-b.meta" \
+      "window=firstmate:fm-child-b" "endpoint_task_id=child-b" \
+      "worktree=$current" "project=$project" "kind=ship" "mode=local-only" \
+      "prior_worktree=$prior"
+    if [ "$shape" = home-storage ]; then
+      git -C "$storage" worktree add -q -b fm/copy-home "$case_dir/copy-home" main
+      printf 'home=%s\n' "$case_dir/copy-home" >> "$home/state/child-b.meta"
+    fi
+    mkdir -p "$current/.claude" "$current/.opencode/plugins" "$case_dir/hooks.before"
+    for hook in .claude/settings.local.json .opencode/plugins/fm-turn-end.js \
+      .opencode/plugins/fm-busy-state.js .fm-grok-turnend .fm-kimi-turnend; do
+      printf 'preserved B hook %s\n' "$hook" > "$current/$hook"
+      cp "$current/$hook" "$case_dir/hooks.before/${hook##*/}"
+    done
+    printf 'unlanded B bytes\n' > "$current/scratch.txt"
+    printf 'unlanded A bytes\n' > "$prior/scratch.txt"
+    current_head=$(git -C "$current" rev-parse HEAD)
+    prior_head=$(git -C "$prior" rev-parse HEAD)
+    current_branch=$(git -C "$current" symbolic-ref HEAD)
+    prior_branch=$(git -C "$prior" symbolic-ref HEAD)
+    git -C "$prior" update-ref refs/fm/reassociation/preserved-A "$prior_head"
+    git -C "$current" status --porcelain --untracked-files=all > "$case_dir/current-status.before"
+    git -C "$prior" status --porcelain --untracked-files=all > "$case_dir/prior-status.before"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+    cp "$home/state/child-b.meta" "$case_dir/child.before"
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
+exit 0
+SH
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    rc=0
+    run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$shape" = outside ]; then
+      expect_code 0 "$rc" "disjoint reassociated child retirement must succeed: $(cat "$case_dir/stderr")"
+      assert_absent "$home" "reassociated retirement retained the safe home"
+      assert_absent "$case_dir/state/task-x1.meta" "reassociated retirement retained the parent record"
+      assert_grep 'kill-window -t =firstmate:=fm-child-b' "$case_dir/kill.log" "reassociated child endpoint was not retired"
+      assert_grep "$case_dir/child-a-wt" "$case_dir/treehouse.log" "ordinary sibling copy was not returned"
+      assert_no_grep "$current" "$case_dir/treehouse.log" "reassociated current was returned"
+      assert_no_grep "$prior" "$case_dir/treehouse.log" "reassociated prior was returned"
+    else
+      expect_code 1 "$rc" "forced home cleanup must refuse preserved $shape custody"
+      assert_grep 'custody overlaps' "$case_dir/stderr" "reassociated refusal omitted custody"
+      if [ "$shape" != current-inside-home ]; then
+        common=$(cd "$storage/.git" && pwd -P)
+        assert_grep "Git common-dir storage $common" "$case_dir/stderr" "refusal did not protect shared Git storage"
+      else
+        assert_grep 'recorded worktree' "$case_dir/stderr" "retiring record's preserved current was skipped"
+      fi
+      cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" || fail "storage refusal changed parent metadata"
+      cmp -s "$case_dir/child.before" "$home/state/child-b.meta" || fail "storage refusal changed child metadata"
+      assert_present "$home/state/child-a.meta" "storage refusal retired an earlier child"
+      assert_absent "$case_dir/kill.log" "storage refusal closed an endpoint"
+      assert_absent "$case_dir/treehouse.log" "storage refusal returned a copy"
+    fi
+    [ "$current_head" = "$(git -C "$current" rev-parse HEAD)" ] || fail "retirement changed B HEAD"
+    [ "$prior_head" = "$(git -C "$prior" rev-parse HEAD)" ] || fail "retirement changed A HEAD"
+    [ "$current_branch" = "$(git -C "$current" symbolic-ref HEAD)" ] || fail "retirement detached B branch"
+    [ "$prior_branch" = "$(git -C "$prior" symbolic-ref HEAD)" ] || fail "retirement detached A branch"
+    [ "$prior_head" = "$(git -C "$prior" rev-parse refs/fm/reassociation/preserved-A)" ] || fail "retirement deleted the prior anchor"
+    git -C "$current" status --porcelain --untracked-files=all > "$case_dir/current-status.after"
+    git -C "$prior" status --porcelain --untracked-files=all > "$case_dir/prior-status.after"
+    cmp -s "$case_dir/current-status.before" "$case_dir/current-status.after" || fail "retirement changed B status"
+    cmp -s "$case_dir/prior-status.before" "$case_dir/prior-status.after" || fail "retirement changed A status"
+    for hook in .claude/settings.local.json .opencode/plugins/fm-turn-end.js \
+      .opencode/plugins/fm-busy-state.js .fm-grok-turnend .fm-kimi-turnend; do
+      cmp -s "$case_dir/hooks.before/${hook##*/}" "$current/$hook" || fail "retirement changed B hook $hook"
+    done
+    assert_grep 'unlanded B bytes' "$current/scratch.txt" "retirement lost B work"
+    assert_grep 'unlanded A bytes' "$prior/scratch.txt" "retirement lost A work"
+  done
+  pass "forced retirement preserves reassociated non-pool copies and refuses their checkout or shared-storage destruction before mutation"
+}
+
+test_cleanup_roots_preserve_foreign_copy_git_storage() {
+  local root field location case_dir target copy state common rc
+  for root in home worktree tasktmp; do
+    for field in worktree home prior_worktree; do
+      for location in local peer; do
+        case_dir=$(make_case "foreign-storage-$root-$field-$location")
+        mkdir -p "$case_dir/home/state" "$case_dir/home/data"
+        if [ "$root" = home ]; then
+          write_meta "$case_dir" local-only secondmate
+          target=$case_dir/secondmate-home
+          mkdir -p "$target/state" "$target/data" "$target/config" "$target/projects"
+          printf 'task-x1\n' > "$target/.fm-secondmate-home"
+          printf 'home=%s\n' "$target" >> "$case_dir/state/task-x1.meta"
+        else
+          write_meta "$case_dir" local-only ship
+          if [ "$root" = tasktmp ]; then
+            target=$case_dir/tasktmp
+            mkdir -p "$target"
+            printf 'tasktmp=%s\n' "$target" >> "$case_dir/state/task-x1.meta"
+          else
+            target=$case_dir/wt
+          fi
+        fi
+        git clone -q "$case_dir/origin.git" "$target/P"
+        copy=$case_dir/foreign-copy
+        git -C "$target/P" worktree add -q -b fm/foreign "$copy" main
+        printf 'foreign work bytes\n' > "$copy/scratch.txt"
+        ln -s "$copy" "$case_dir/foreign-alias"
+        state=$case_dir/home/state
+        if [ "$location" = peer ]; then
+          state=$case_dir/peer/state
+          mkdir -p "$state"
+          printf '# Secondmates\n- peer - peer fixture (home: %s; scope: fixture; projects: none; added 2026-10-08)\n' \
+            "$case_dir/peer" > "$case_dir/home/data/secondmates.md"
+        fi
+        fm_write_meta "$state/foreign.meta" "$field=$case_dir/foreign-alias" "kind=ship"
+        cp "$state/foreign.meta" "$case_dir/foreign.before"
+        cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+        common=$(cd "$target/P/.git" && pwd -P)
+        cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
+exit 0
+SH
+        cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+        rc=0
+        FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+          > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        expect_code 1 "$rc" "$root cleanup must preserve $location foreign $field Git storage"
+        assert_grep "Git common-dir storage $common" "$case_dir/stderr" "foreign refusal missed shared Git storage: $(cat "$case_dir/stderr")"
+        assert_grep "task foreign's recorded $field" "$case_dir/stderr" "foreign refusal missed the preserving field"
+        cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" || fail "foreign storage refusal changed retiring metadata"
+        cmp -s "$case_dir/foreign.before" "$state/foreign.meta" || fail "foreign storage refusal changed foreign metadata"
+        assert_grep 'foreign work bytes' "$copy/scratch.txt" "foreign storage refusal lost copy bytes"
+        git -C "$copy" rev-parse --verify HEAD >/dev/null || fail "foreign storage refusal destroyed Git storage"
+        assert_absent "$case_dir/kill.log" "foreign storage refusal closed an endpoint"
+        assert_absent "$case_dir/treehouse.log" "foreign storage refusal returned a copy"
+      done
+    done
+  done
+  pass "home, worktree, and tasktmp roots preserve Git storage of every foreign copy field in local and peer homes"
+}
+
+test_tasktmp_preserves_reassociated_copy_git_storage() {
+  local shape case_dir tmp current prior project common force rc
+  for shape in current prior; do
+    case_dir=$(make_case "tasktmp-reassociated-storage-$shape")
+    mkdir -p "$case_dir/home/state" "$case_dir/tasktmp"
+    tmp=$case_dir/tasktmp
+    git clone -q "$case_dir/origin.git" "$tmp/P"
+    current=$case_dir/wt
+    prior=$case_dir/prior-A
+    project=$case_dir/project
+    if [ "$shape" = current ]; then
+      current=$case_dir/current-B
+      project=$tmp/P
+      git -C "$project" worktree add -q -b fm/current-B "$current" main
+      git -C "$case_dir/project" worktree add -q -b fm/prior-A "$prior" main
+    else
+      git -C "$tmp/P" worktree add -q -b fm/prior-A "$prior" main
+    fi
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$current" "project=$project" "kind=ship" "mode=local-only" \
+      "spawn_gen=teardown-test-task-x1" "tasktmp=$tmp" "prior_worktree=$prior"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+    common=$(cd "$tmp/P/.git" && pwd -P)
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+case "\${1:-}" in kill-*) printf '%s\n' "\$*" >> "$case_dir/kill.log" ;; esac
+exit 0
+SH
+    cat > "$case_dir/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/reap.log"
+exit 1
+SH
+    chmod +x "$case_dir/fakebin/lsof"
+    for force in normal force; do
+      rc=0
+      if [ "$force" = force ]; then
+        FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      else
+        FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      fi
+      expect_code 1 "$rc" "tasktmp must preserve reassociated $shape Git storage under $force cleanup"
+      assert_grep "Git common-dir storage $common" "$case_dir/stderr" "tasktmp refusal missed shared Git storage"
+      cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" || fail "tasktmp storage refusal changed metadata"
+      git -C "$current" rev-parse --verify HEAD >/dev/null || fail "tasktmp storage refusal destroyed B"
+      git -C "$prior" rev-parse --verify HEAD >/dev/null || fail "tasktmp storage refusal destroyed A"
+      assert_absent "$case_dir/kill.log" "tasktmp storage refusal closed an endpoint"
+      assert_absent "$case_dir/reap.log" "tasktmp storage refusal reached process reaping"
+    done
+  done
+  pass "tasktmp protects external reassociated current and prior copies' Git storage before endpoint or copy mutation"
+}
+
+test_subordinate_slot_cleanup_preserves_ancestor_custody() {
+  local shape case_dir home parent slot owner rc
+  for shape in admitted prior unvalidated shared-storage; do
+    case_dir=$(make_case "subordinate-cleanup-$shape")
+    home=$case_dir
+    parent="$TMP_ROOT/subordinate-parent-$shape"
+    mkdir -p "$home/data" "$home/config" "$parent/state" "$parent/data"
+    printf 'mate\n' > "$home/.fm-secondmate-home"
+    printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$home/.fm-secondmate-parent"
+    printf -- '- mate - mate (home: %s; scope: fixture; projects: P; added 2026-10-08)\n' "$home" > "$parent/data/secondmates.md"
+    owner="$parent/state/mate.meta"
+    fm_write_meta "$owner" "kind=secondmate" "home=$home" "worktree=$home"
+    land_shippable_commit "$case_dir"
+    slot="$home/pool/1/project"
+    if [ "$shape" = shared-storage ]; then
+      git init -q "$home"
+      slot="$home/.git/pool/1/project"
+    fi
+    mkdir -p "${slot%/*}"
+    git -C "$case_dir/project" worktree move "$case_dir/wt" "$slot"
+    printf '{"worktrees":[]}\n' > "${slot%/*/*}/treehouse-state.json"
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$slot" "project=$case_dir/project" "kind=ship" "mode=no-mistakes" \
+      "spawn_gen=teardown-test-task-x1"
+    case "$shape" in
+      prior) printf 'prior_worktree=%s\n' "$slot" >> "$owner" ;;
+      unvalidated) mv "$owner" "$parent/state/impostor.meta"; owner="$parent/state/impostor.meta" ;;
+    esac
+    cp "$owner" "$case_dir/owner.before"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    rc=0
+    FM_HOME="$home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$shape" = admitted ]; then
+      expect_code 0 "$rc" "validated ancestor should allow ordinary child slot cleanup: $(cat "$case_dir/stderr")"
+      assert_absent "$case_dir/state/task-x1.meta" "subordinate teardown did not retire the child"
+      assert_grep "return --force $slot" "$case_dir/treehouse.log" "subordinate teardown did not return its slot"
+    else
+      expect_code 1 "$rc" "protected ancestor custody should refuse $shape cleanup"
+      case "$shape" in
+        prior) assert_grep "task mate's recorded prior_worktree" "$case_dir/stderr" "cleanup skipped ancestor prior custody" ;;
+        unvalidated) assert_grep "task impostor's recorded worktree" "$case_dir/stderr" "cleanup exempted an unvalidated record" ;;
+        shared-storage) assert_grep "Git common-dir storage $home/.git" "$case_dir/stderr" "cleanup skipped ancestor Git storage" ;;
+      esac
+      cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" || fail "custody refusal retired the child"
+      assert_absent "$case_dir/treehouse.log" "custody refusal returned a slot"
+      assert_present "$slot" "custody refusal removed the slot"
+    fi
+    cmp -s "$case_dir/owner.before" "$owner" || fail "child cleanup changed the owning ancestor"
+  done
+  pass "ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage"
+}
+
 teardown_test_cases=(
 test_teardown_never_holds_up_a_steer_to_another_task
 test_lane_registry_scan_reads_each_distinct_registry_once
@@ -7870,6 +8675,21 @@ test_process_spawned_during_grace_is_reaped_on_later_pass
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
+test_reassociated_copies_are_left_in_place
+test_reassociated_unlanded_copy_still_refuses
+test_released_slot_record_keeps_current_copy
+test_slot_named_as_another_prior_copy_refuses
+test_nested_reassociation_return_to_prior_copy_refuses
+test_other_record_copy_overlap_is_component_aware
+test_forced_descendant_preserved_copy_refuses_before_cleanup
+test_tasktmp_preserves_current_and_prior_reassociated_copies
+test_tasktmp_checks_all_other_copy_fields_in_both_directions
+test_secondmate_home_preserves_other_tasks_prior_copy
+test_forced_nested_secondmate_admits_only_locked_current_copies
+test_forced_descendant_reassociated_copy_preserves_checkout_and_storage
+test_cleanup_roots_preserve_foreign_copy_git_storage
+test_tasktmp_preserves_reassociated_copy_git_storage
+test_subordinate_slot_cleanup_preserves_ancestor_custody
 test_private_nm_launch_agent_is_retired_before_teardown
 test_private_nm_launch_agent_equivalent_roots_are_retired
 test_foreign_nm_launch_agents_are_left_alone

@@ -65,13 +65,43 @@ if [ ! -f "$META" ] || [ -L "$META" ] || [ "$(fm_pr_file_link_count "$META")" !=
   echo "error: task metadata is unavailable" >&2
   exit 1
 fi
+META_TMP=
+META_LOCK=
+META_LOCK_HELD=0
+PR_POLL_PUBLISH_LOCK=
+PR_POLL_PUBLISH_LOCK_HELD=0
+pr_check_cleanup() {
+  fm_pr_poll_cleanup
+  [ -z "$META_TMP" ] || rm -f -- "$META_TMP"
+  if [ "$PR_POLL_PUBLISH_LOCK_HELD" = 1 ]; then
+    fm_lock_release "$PR_POLL_PUBLISH_LOCK" || true
+    PR_POLL_PUBLISH_LOCK_HELD=0
+  fi
+  if [ "$META_LOCK_HELD" = 1 ]; then
+    fm_lock_release "$META_LOCK" || true
+    META_LOCK_HELD=0
+  fi
+}
+trap pr_check_cleanup EXIT
+trap 'exit 1' HUP INT TERM
+META_LOCK=$(fm_meta_lock_path "$META") || exit 1
+fm_lock_acquire_wait "$META_LOCK"
+META_LOCK_HELD=1
+[ -f "$META" ] && [ ! -L "$META" ] && [ "$(fm_pr_file_link_count "$META")" = 1 ] \
+  || { echo "error: task metadata is unavailable" >&2; exit 1; }
+WT=$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)
+BRANCH=$(grep '^branch=' "$META" | tail -1 | cut -d= -f2- || true)
+MODE=$(grep '^mode=' "$META" | tail -1 | cut -d= -f2- || true)
+PROJECT=$(grep '^project=' "$META" | tail -1 | cut -d= -f2- || true)
+KIND=$(grep '^kind=' "$META" | tail -1 | cut -d= -f2- || true)
+fm_lock_release "$META_LOCK" || exit 1
+META_LOCK_HELD=0
 
 # A secondmate is a persistent worker, not a delivery lane: it never owns a
 # pull request of its own. A URL reported on its routed status channel belongs
 # to a task inside the mate's own home, which records and watches it there;
 # arming a merge watch here would queue the mate itself for teardown as landed
 # work once that pull request merges.
-KIND=$(grep '^kind=' "$META" | tail -1 | cut -d= -f2- || true)
 if [ "$KIND" = secondmate ]; then
   echo "error: $ID is a secondmate, not a delivery lane - $URL was reported on its status channel but belongs to a task in the mate's own home, which arms its own merge watch" >&2
   exit 1
@@ -133,7 +163,6 @@ fi
 # recorded and otherwise diffs the local branch, which is the current content.
 # bin/fm-pr-merge.sh reads a GitLab head live at merge time for the same reason,
 # and treats a recorded value that disagrees as stale rather than authoritative.
-WT=$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)
 PR_HEAD=
 if [ "$PROVIDER" = github ] && [ -n "$WT" ] && [ -d "$WT" ] && command -v gh >/dev/null 2>&1; then
   if REMOTE_HEAD=$(cd "$WT" && gh pr view "$URL" --json headRefOid -q .headRefOid 2>/dev/null) \
@@ -142,8 +171,6 @@ if [ "$PROVIDER" = github ] && [ -n "$WT" ] && [ -d "$WT" ] && command -v gh >/d
   fi
 fi
 
-MODE=$(grep '^mode=' "$META" | tail -1 | cut -d= -f2- || true)
-PROJECT=$(grep '^project=' "$META" | tail -1 | cut -d= -f2- || true)
 # The gate is asked about the ready report this task's worker was told to give;
 # on a Gerrit change both publishing modes report the same published line.
 case "$PROVIDER:$MODE" in
@@ -169,25 +196,6 @@ if { [ -z "$PR_HEAD" ] || ! fm_dod_forge_head_is_named_head "$MODE"; }; then
   fi
 fi
 
-META_TMP=
-META_LOCK=
-META_LOCK_HELD=0
-PR_POLL_PUBLISH_LOCK=
-PR_POLL_PUBLISH_LOCK_HELD=0
-pr_check_cleanup() {
-  fm_pr_poll_cleanup
-  [ -z "$META_TMP" ] || rm -f -- "$META_TMP"
-  if [ "$PR_POLL_PUBLISH_LOCK_HELD" = 1 ]; then
-    fm_lock_release "$PR_POLL_PUBLISH_LOCK" || true
-    PR_POLL_PUBLISH_LOCK_HELD=0
-  fi
-  if [ "$META_LOCK_HELD" = 1 ]; then
-    fm_lock_release "$META_LOCK" || true
-    META_LOCK_HELD=0
-  fi
-}
-trap pr_check_cleanup EXIT
-trap 'exit 1' HUP INT TERM
 fm_pr_poll_prepare "$STATE" "$ID" "$PROVIDER" "$URL" "$HOST" "$PROJECT_PATH" "$NUMBER" "$SCRIPT_DIR/fm-pr-poll.sh" \
   || { echo "error: could not prepare PR poll" >&2; exit 1; }
 
@@ -196,6 +204,12 @@ fm_lock_acquire_wait "$META_LOCK"
 META_LOCK_HELD=1
 [ -f "$META" ] && [ ! -L "$META" ] && [ "$(fm_pr_file_link_count "$META")" = 1 ] \
   || { echo "error: task metadata is unavailable" >&2; exit 1; }
+CURRENT_WT=$(grep '^worktree=' "$META" | tail -1 | cut -d= -f2- || true)
+CURRENT_BRANCH=$(grep '^branch=' "$META" | tail -1 | cut -d= -f2- || true)
+if [ "$CURRENT_WT" != "$WT" ] || [ "$CURRENT_BRANCH" != "$BRANCH" ]; then
+  echo "error: task worktree or branch changed while preparing PR registration; refusing" >&2
+  exit 1
+fi
 META_DEVICE=$(fm_pr_file_device "$META") || exit 1
 STATE_DEVICE=$(fm_pr_file_device "$STATE") || exit 1
 [ "$META_DEVICE" = "$STATE_DEVICE" ] || { echo "error: task metadata is unavailable" >&2; exit 1; }

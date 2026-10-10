@@ -104,11 +104,11 @@
 # genuinely this task's destroys another worker's live work. Before the first
 # cleanup step, teardown verifies record exclusivity: no OTHER task record in
 # this home or any locally registered Firstmate home may name the same live path
-# in its worktree= or home=. One live path with two task records is the reuse
-# collision itself, whichever record is stale. The one exception is a slot whose
-# owner claim (below) names another task: this teardown is then records-only and
-# touches nothing under the slot, so the scan is skipped rather than stranding
-# the stale record and, with it, the claimant's own teardown.
+# in its worktree=, home=, or prior_worktree=. One live path with two task records
+# is the reuse collision itself, whichever record is stale. The one exception
+# is a slot whose owner claim (below) names another task: this teardown is then
+# records-only and touches nothing under the slot, so the scan is skipped rather
+# than stranding the stale record and, with it, the claimant's own teardown.
 # That scan alone cannot prove THIS record is the current owner, because the task
 # that took the slot next may leave no record it can reach - its own worker may
 # have exited and its record been cleaned up, or it may live in a home this
@@ -494,6 +494,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 }
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-task-copy-lib.sh
+. "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # Supervision lease guard: post-landing cleanup is overlap territory between
 # the two Pi supervision actors; refuse while the OTHER actor holds this
 # task's live lease (contract: bin/fm-lease-lib.sh; no-op in homes without
@@ -1283,6 +1285,37 @@ MODE=$(grep '^mode=' "$META" | cut -d= -f2- || true)
 [ -n "$MODE" ] || MODE=no-mistakes
 BASE_BRANCH=$(grep '^base_branch=' "$META" | cut -d= -f2- || true)
 
+teardown_preserves_reassociated_copy() {
+  local meta=$1 kind=$2 backend=$3 project=$4 worktree=$5 line
+  [ "$kind" != secondmate ] && [ "$backend" != orca ] || return 1
+  ! fm_treehouse_pool_slot "$project" "$worktree" || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in prior_worktree=?*|released_worktree=?*) return 0 ;; esac
+  done < "$meta"
+  return 1
+}
+
+# A record that bin/fm-control.sh reassociate re-pointed at a replacement copy
+# names every copy the task worked in before in prior_worktree=, or in
+# released_worktree= when the copy's pool slot was released. Teardown never
+# touches a prior_worktree= copy: it is preserved custody that no landed-work
+# test here has inspected. A released slot is already the pool's again, with its
+# commits anchored, so it is history only. A current copy that is not a Treehouse pool slot was
+# made by the task itself, not allocated by bin/fm-spawn.sh, so no pool return
+# applies to it and its branch and hook files are not Firstmate's to remove:
+# after the ordinary landed-work test it is left exactly as it is. A current
+# copy that is a pool slot takes the ordinary return path below.
+TEARDOWN_PRIOR_COPIES=()
+while IFS= read -r teardown_prior_line || [ -n "$teardown_prior_line" ]; do
+  case "$teardown_prior_line" in
+    prior_worktree=?*) TEARDOWN_PRIOR_COPIES+=("${teardown_prior_line#prior_worktree=}") ;;
+  esac
+done < "$META"
+TEARDOWN_KEEP_COPY=0
+if teardown_preserves_reassociated_copy "$META" "$KIND" "$BACKEND" "$PROJ" "$WT"; then
+  TEARDOWN_KEEP_COPY=1
+fi
+
 # A record accepted as a legacy incarnation (no spawn_gen, and either
 # --legacy-record given or the record is windowless) may be torn down only
 # when its recorded endpoint is confidently gone or agent-less. Windowless
@@ -1454,22 +1487,6 @@ elif [ "$KIND" = secondmate ]; then
 elif [ "$FORCE" != "--force" ] && fm_pf_relay_active "$FM_HOME"; then
   PUBLIC_FOLLOWUP_RELAY_ACTIVE=1
 fi
-
-default_branch() {
-  local ref branch
-  ref=$(git -C "$PROJ" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)
-  if [ -n "$ref" ]; then
-    echo "${ref#origin/}"
-    return 0
-  fi
-  for branch in main master; do
-    if git -C "$PROJ" show-ref --verify --quiet "refs/heads/$branch"; then
-      echo "$branch"
-      return 0
-    fi
-  done
-  return 1
-}
 
 meta_value() {
   local meta=$1 key=$2
@@ -1892,31 +1909,6 @@ pr_is_merged() {
   return 0
 }
 
-# Is the branch's content already present in the up-to-date default branch? Fetches
-# first, then 3-way merges the default branch with HEAD: when HEAD introduces nothing
-# the default branch does not already contain (e.g. its change landed via squash) the
-# merged tree equals the default branch's tree. This isolates branch-only changes, so
-# unrelated commits the default branch gained past the merge-base do not count as
-# "added". Returns non-zero when inconclusive (no default ref, or a merge conflict),
-# so the caller refuses rather than guesses.
-content_in_default() {
-  local name=${BASE_BRANCH:-} ref default_tree merged_tree
-  [ -d "$WT" ] || return 1
-  [ -n "$name" ] || name=$(default_branch) || return 1
-  if git -C "$WT" remote get-url origin >/dev/null 2>&1; then
-    git -C "$WT" fetch --quiet origin "+refs/heads/$name:refs/remotes/origin/$name" >/dev/null 2>&1 || return 1
-    ref="refs/remotes/origin/$name"
-  elif git -C "$WT" rev-parse --quiet --verify "refs/heads/$name" >/dev/null 2>&1; then
-    ref="refs/heads/$name"
-  else
-    return 1
-  fi
-  default_tree=$(git -C "$WT" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
-  [ -n "$default_tree" ] || return 1
-  merged_tree=$(git -C "$WT" merge-tree --write-tree "$ref" HEAD 2>/dev/null) || return 1
-  merged_tree=$(printf '%s\n' "$merged_tree" | head -1)
-  [ "$merged_tree" = "$default_tree" ]
-}
 
 # A pushed branch proves recoverability, not delivery: require the landing
 # proofs documented in this script's header even when every commit is pushed.
@@ -1924,13 +1916,13 @@ work_is_landed() {
   local branch=$1
   if [ "$MODE" = local-only ]; then
     local name
-    name=$(default_branch) || name=
+    name=$(fm_task_copy_default_branch "$PROJ") || name=
     if [ -n "$name" ] && git -C "$WT" merge-base --is-ancestor HEAD "refs/heads/$name" 2>/dev/null; then
       return 0
     fi
   fi
   pr_is_merged "$branch" && return 0
-  content_in_default
+  fm_task_copy_content_in_default "$WT" "$PROJ" "${BASE_BRANCH:-}"
 }
 
 TEARDOWN_DROPPING=0
@@ -2038,13 +2030,6 @@ EOF
   return 1
 }
 
-canonical_existing_dir() {
-  local target=$1
-  [ -n "$target" ] || return 1
-  [ -d "$target" ] || return 1
-  ( cd "$target" && pwd -P )
-}
-
 retry_wait_secs_is_valid() {
   [[ "$1" =~ ^([0-9]+([.][0-9]*)?|[.][0-9]+)$ ]]
 }
@@ -2082,7 +2067,7 @@ worktree_git_lock_path() {
   case "$lock" in
     /*) printf '%s\n' "$lock" ;;
     *)
-      abs_dir=$(canonical_existing_dir "$dir") || return 1
+      abs_dir=$(fm_task_copy_canonical_dir "$dir") || return 1
       printf '%s/%s\n' "$abs_dir" "$lock"
       ;;
   esac
@@ -2237,7 +2222,7 @@ validate_worktree_teardown_safety() {
     return 1
   fi
 
-  if ! dirty_raw=$(git -C "$WT" status --porcelain 2>/dev/null); then
+  if ! dirty_raw=$(git -C "$WT" status --porcelain --untracked-files=all 2>/dev/null); then
     if worktree_safety_blocked_by_lock "uncommitted changes"; then
       return "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED"
     fi
@@ -2245,7 +2230,7 @@ validate_worktree_teardown_safety() {
     echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
     return 1
   fi
-  dirty=$(printf '%s\n' "$dirty_raw" | grep -vE '^\?\? (\.claude/|\.fm-(grok|kimi)-turnend$)' || true)
+  dirty=$(fm_task_copy_dirty_status "$dirty_raw")
 
   if ! unpushed_raw=$(git -C "$WT" log --oneline HEAD --not --remotes -- 2>/dev/null); then
     if worktree_safety_blocked_by_lock "commits not on a remote"; then
@@ -2274,7 +2259,7 @@ validate_worktree_teardown_safety() {
       [ -z "$TEARDOWN_UNPROVEN_COMMITS" ] || printf 'commits whose change is not proven present in the merged PR head:\n%s\n' "$TEARDOWN_UNPROVEN_COMMITS" >&2
       [ -z "$TEARDOWN_PIPELINE_INPUT_REASON" ] || printf 'this copy is not proven to be the input of the pipeline run that produced the merged PR head:\n%s\n' "$TEARDOWN_PIPELINE_INPUT_REASON" >&2
       if [ "$MODE" = local-only ]; then
-        echo "Merge the branch into local $(default_branch 2>/dev/null || echo main) first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
+        echo "Merge the branch into local $(fm_task_copy_default_branch "$PROJ" 2>/dev/null || echo main) first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
       else
         echo "Land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
       fi
@@ -2540,8 +2525,11 @@ task_registered_lanes_under_roots() {  # <canonical-root>...
     task_lane_source_add "$root"
   done
   [ -z "$PROJ" ] || task_lane_source_add "$PROJ"
-  collect_local_firstmate_states "$STATE" || return 1
-  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
+  fm_local_firstmate_state_dirs "$STATE" || {
+    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+    return 1
+  }
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
       project=$(fm_meta_get "$meta" project)
@@ -2793,8 +2781,11 @@ teardown_docker_stacks() {
   command -v docker >/dev/null 2>&1 || return 0
   WT=$(meta_value "$META" worktree)
   PROJ=$(meta_value "$META" project)
-  collect_local_firstmate_states "$STATE" || return 1
-  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
+  fm_local_firstmate_state_dirs "$STATE" || {
+    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+    return 1
+  }
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for other in "$state_dir"/*.meta; do
       [ -f "$other" ] || continue
       [ "${other##*/}" = "${META##*/}" ] && [ "$other" -ef "$META" ] && continue
@@ -2952,58 +2943,90 @@ retire_task_private_nm_launch_agents() {  # <worktree>
 teardown_live_slot_path() {
   [ "$KIND" != secondmate ] || return 1
   fm_treehouse_pool_slot "$PROJ" "$WT" || return 1
-  canonical_existing_dir "$WT"
+  fm_task_copy_canonical_dir "$WT"
 }
 
-# Every local Firstmate state directory whose records can name a pool slot this
-# task's slot might also be; bin/fm-wake-lib.sh's fm_local_firstmate_state_dirs
-# owns the walk and what it refuses.
-collect_local_firstmate_states() {
-  fm_local_firstmate_state_dirs "$1" || {
-    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
-    return 1
-  }
-  TREEHOUSE_OWNER_STATES=("${FM_LOCAL_FIRSTMATE_STATES[@]}")
-}
 
 require_exclusive_worktree_slot_record() {
-  local record_meta=$1 record_id=$2 record_state=$3 worktree=$4
-  local slot state_dir other other_id field other_path other_slot
-  slot=$(canonical_existing_dir "$worktree") || return 0
-  # A slot whose owner claim names another task was reassigned, so this record's
-  # teardown is records-only and touches nothing under it; another record naming
-  # the slot is then no hazard, and refusing would strand this stale record and
-  # block the claimant's own teardown behind it.
+  local record_meta=$1 record_id=$2 record_state=$3 worktree=$4 slot
+  slot=$(fm_task_copy_canonical_dir "$worktree") || return 0
+  # A reassigned slot is untouched: refusing its scan would strand the stale
+  # record and block the claimant's own teardown.
   fm_treehouse_slot_owner_state "$slot" "$record_id"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != other ] || return 0
-  collect_local_firstmate_states "$record_state" || return 1
-  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
-    for other in "$state_dir"/*.meta; do
-      [ -f "$other" ] && [ ! -L "$other" ] || continue
-      # Identity, not spelling: the same record reached through a differently
-      # resolved state dir (e.g. a symlinked $FM_HOME) is still this record. A
-      # differently named hardlink is another task's record, so the name must
-      # match too.
-      [ "${other##*/}" = "${record_meta##*/}" ] && [ "$other" -ef "$record_meta" ] && continue
-      other_id=$(basename "$other" .meta)
-      for field in worktree home; do
-        other_path=$(fm_meta_get "$other" "$field")
-        [ -n "$other_path" ] || continue
-        other_slot=$(canonical_existing_dir "$other_path") || continue
-        [ "$other_slot" = "$slot" ] || continue
-        echo "REFUSED: task $record_id's recorded worktree $slot is also task $other_id's recorded $field." >&2
-        echo "Returning that pool slot would kill $other_id's processes and reset its copy, so nothing was changed - not even with --force." >&2
-        echo "Reconcile whichever record is wrong (bin/fm-crew-state.sh $record_id; bin/fm-crew-state.sh $other_id), then re-run teardown." >&2
-        return 1
-      done
-    done
-  done
+  require_cleanup_copy_clearance "$record_meta" "$record_id" "$record_state" "$slot" 1
 }
 
 require_exclusive_task_worktree_slot() {
   local slot
   slot=$(teardown_live_slot_path) || return 0
   require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$slot"
+}
+
+require_cleanup_copy_clearance() {
+  local record_meta=$1 record_id=$2 record_state=$3 target=$4 allow_current=${5:-0}
+  local canonical state_dir other_meta line field copy copy_real copy_common retiring i owner_home keep_current
+  canonical=$(fm_task_copy_canonical_dir "$target") || return 0
+  fm_local_firstmate_state_dirs "$record_state" || {
+    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+    return 1
+  }
+  for state_dir in "${DESCENDANT_TASK_STATES[@]+"${DESCENDANT_TASK_STATES[@]}"}"; do
+    FM_LOCAL_FIRSTMATE_STATES+=("$state_dir")
+  done
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+    for other_meta in "$state_dir"/*.meta; do
+      [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
+      retiring=0
+      if [ "$allow_current" != 0 ]; then
+        if [ "${other_meta##*/}" = "${record_meta##*/}" ] && [ "$other_meta" -ef "$record_meta" ]; then
+          retiring=1
+        elif [ "$KIND" = secondmate ]; then
+          if [ "${other_meta##*/}" = "${META##*/}" ] && [ "$other_meta" -ef "$META" ]; then
+            retiring=1
+          fi
+          for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
+            if [ "${other_meta##*/}" = "${DESCENDANT_TASK_IDS[$i]}.meta" ] \
+               && [ "$other_meta" -ef "${DESCENDANT_TASK_STATES[$i]}/${DESCENDANT_TASK_IDS[$i]}.meta" ]; then
+              if [ "$allow_current" = home ]; then
+                retiring=1
+              elif [ "$(fm_meta_get "$other_meta" kind)" = secondmate ]; then
+                owner_home=$(fm_meta_get "$other_meta" home)
+                [ -n "$owner_home" ] || owner_home=$(fm_meta_get "$other_meta" worktree)
+                case "$record_state" in "$owner_home"/state|"$owner_home"/*/state) retiring=1 ;; esac
+              fi
+            fi
+          done
+        fi
+      fi
+      keep_current=0
+      if [ "$retiring" = 1 ] && [ "$allow_current" = home ] \
+         && teardown_preserves_reassociated_copy "$other_meta" \
+           "$(fm_meta_get "$other_meta" kind)" "$(fm_backend_of_meta "$other_meta")" \
+           "$(fm_meta_get "$other_meta" project)" "$(fm_meta_get "$other_meta" worktree)"; then
+        keep_current=1
+      fi
+      while IFS= read -r line || [ -n "$line" ]; do
+        field=${line%% *}
+        if [ "$retiring" = 1 ] && [ "$field" != prior_worktree ]; then
+          [ "$keep_current" = 1 ] || continue
+        fi
+        copy=${line#* }
+        copy_real=$(fm_task_copy_canonical_dir "$copy") || continue
+        if fm_task_copy_paths_overlap "$canonical" "$copy_real" \
+           && ! fm_task_copy_ancestor_current "$other_meta" "$record_state" "$field" "$copy_real" "$canonical"; then
+          echo "REFUSED: task $record_id's cleanup target $canonical is also task $(basename "$other_meta" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force." >&2
+          return 1
+        fi
+        copy_common=$(git -C "$copy_real" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+          && copy_common=$(fm_task_copy_canonical_dir "$copy_common") || continue
+        fm_task_copy_paths_overlap "$canonical" "$copy_common" || continue
+        echo "REFUSED: task $record_id's cleanup target $canonical overlaps Git common-dir storage $copy_common for task $(basename "$other_meta" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force." >&2
+        return 1
+      done < <(fm_task_copy_record_paths "$other_meta")
+    done
+  done
+  return 0
 }
 
 # Positive slot ownership, read from the claim the task that took the slot wrote
@@ -3205,7 +3228,7 @@ safe_rm_rf_child_worktree() {
 }
 
 validate_firstmate_home_for_removal() {
-  local home=$1 label=$2 expected_id=${3:-} abs_home_path marker_id conflict child_id child_home
+  local home=$1 label=$2 expected_id=$3 registry=$4 abs_home_path marker_id conflict child_id child_home
   [ -n "$home" ] || return 0
   [ -e "$home" ] || return 0
   abs_home_path=$(validate_removal_target "$home" "$label") || return 1
@@ -3219,8 +3242,8 @@ validate_firstmate_home_for_removal() {
       echo "REFUSED: unsafe $label removal target $home is marked for secondmate ${marker_id:-unknown}, expected $expected_id" >&2
       return 1
     fi
-    if [ -e "$SECONDMATE_REG" ] || [ -L "$SECONDMATE_REG" ]; then
-      if ! secondmate_registry_validate_bindings "$SECONDMATE_REG" secondmate_registry_path_key "$expected_id" "$abs_home_path"; then
+    if [ -e "$registry" ] || [ -L "$registry" ]; then
+      if ! secondmate_registry_validate_bindings "$registry" secondmate_registry_path_key "$expected_id" "$abs_home_path"; then
         case "$SECONDMATE_REGISTRY_ERROR" in
           overlapping\ secondmate\ home\ assignment:*)
             echo "REFUSED: unsafe $label removal target $home contains registered secondmate home; $SECONDMATE_REGISTRY_ERROR" >&2
@@ -3258,10 +3281,10 @@ EOF
 }
 
 remove_firstmate_home() {
-  local home=$1 label=$2 expected_id=${3:-} abs_home_path process_event_backup
+  local home=$1 label=$2 expected_id=$3 registry=$4 abs_home_path process_event_backup
   [ -n "$home" ] || return 0
   [ -e "$home" ] || return 0
-  abs_home_path=$(validate_firstmate_home_for_removal "$home" "$label" "$expected_id") || return 1
+  abs_home_path=$(validate_firstmate_home_for_removal "$home" "$label" "$expected_id" "$registry") || return 1
   [ -n "$abs_home_path" ] || return 0
   process_event_backup=$(snapshot_firstmate_home_process_events "$abs_home_path" "$label") || return 1
   if ! cleanup_firstmate_home_process_events "$abs_home_path" "$label"; then
@@ -3422,7 +3445,7 @@ preflight_firstmate_home_process_event_tree() {
 }
 
 collect_descendant_task_locks() {
-  local home=$1 sub_state child_meta child_id child_kind child_wt child_home task_set_lock
+  local home=$1 sub_state child_meta child_id child_kind child_wt child_home task_set_lock registry_lock
   local -a child_ids
   sub_state="$home/state"
   if [ -L "$sub_state" ]; then
@@ -3456,6 +3479,12 @@ collect_descendant_task_locks() {
     return 1
   fi
   DESCENDANT_LOCK_PATHS+=("$task_set_lock")
+  registry_lock=$(secondmate_registry_lock_path "$sub_state")
+  if ! fm_lock_try_acquire "$registry_lock"; then
+    echo "REFUSED: secondmate home $home is updating its registry right now; forced teardown changed nothing" >&2
+    return 1
+  fi
+  DESCENDANT_LOCK_PATHS+=("$registry_lock")
   child_ids=()
   for child_meta in "$sub_state"/*.meta; do
     [ -e "$child_meta" ] || continue
@@ -3600,7 +3629,7 @@ preflight_descendant_treehouse_slots() {
 }
 
 validate_firstmate_home_children_removal() {
-  local home=$1 sub_state child_meta child_id child_wt child_proj child_kind child_home child_backend
+  local home=$1 removal_root=${2:-$1} sub_state child_meta child_id child_wt child_proj child_kind child_home child_backend child_copy_mode child_keep_copy
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
@@ -3612,20 +3641,33 @@ validate_firstmate_home_children_removal() {
     child_kind=$(meta_value "$child_meta" kind)
     [ -n "$child_kind" ] || child_kind=ship
     child_backend=$(fm_backend_of_meta "$child_meta")
+    child_proj=$(meta_value "$child_meta" project)
+    child_keep_copy=0
+    if teardown_preserves_reassociated_copy "$child_meta" "$child_kind" "$child_backend" "$child_proj" "$child_wt"; then
+      child_keep_copy=1
+    fi
+    child_copy_mode=1
+    [ "$child_kind" != secondmate ] || child_copy_mode=home
+    if [ "$child_kind" != secondmate ] && [ "$child_backend" != orca ] \
+       && fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
+      require_exclusive_worktree_slot_record "$child_meta" "$child_id" "$sub_state" "$child_wt" || return 1
+    else
+      require_cleanup_copy_clearance "$child_meta" "$child_id" "$sub_state" "$child_wt" "$child_copy_mode" || return 1
+    fi
+    require_cleanup_copy_clearance "$child_meta" "$child_id" "$sub_state" "$removal_root" home || return 1
     teardown_require_backend_prerequisites "$child_backend" "$child_id" || return 1
     if [ "$child_kind" = secondmate ]; then
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
-      validate_firstmate_home_for_removal "$child_home" "child firstmate home" "$child_id" >/dev/null || return 1
-      validate_firstmate_home_children_removal "$child_home" || return 1
+      require_cleanup_copy_clearance "$child_meta" "$child_id" "$sub_state" "$child_home" home || return 1
+      validate_firstmate_home_for_removal "$child_home" "child firstmate home" "$child_id" "$home/data/secondmates.md" >/dev/null || return 1
+      validate_firstmate_home_children_removal "$child_home" "$removal_root" || return 1
     elif [ "$child_backend" = orca ]; then
       require_orca_worktree_id "$child_meta" >/dev/null || return 1
       if [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
-        child_proj=$(meta_value "$child_meta" project)
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       fi
-    elif [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
-      child_proj=$(meta_value "$child_meta" project)
+    elif [ "$child_keep_copy" != 1 ] && [ -n "$child_wt" ] && [ -e "$child_wt" ]; then
       validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
     fi
   done
@@ -3880,7 +3922,7 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
 }
 
 cleanup_firstmate_home_children() {
-  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i
+  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i child_copy_mode child_keep_copy
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
@@ -3896,6 +3938,18 @@ cleanup_firstmate_home_children() {
     child_kind=$(meta_value "$child_meta" kind)
     [ -n "$child_kind" ] || child_kind=ship
     child_backend=$(fm_backend_of_meta "$child_meta")
+    child_keep_copy=0
+    if teardown_preserves_reassociated_copy "$child_meta" "$child_kind" "$child_backend" "$child_proj" "$child_wt"; then
+      child_keep_copy=1
+    fi
+    child_copy_mode=1
+    [ "$child_kind" != secondmate ] || child_copy_mode=home
+    if [ "$child_kind" != secondmate ] && [ "$child_backend" != orca ] \
+       && fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
+      require_exclusive_worktree_slot_record "$child_meta" "$child_id" "$sub_state" "$child_wt" || return 1
+    else
+      require_cleanup_copy_clearance "$child_meta" "$child_id" "$sub_state" "$child_wt" "$child_copy_mode" || return 1
+    fi
     if [ "$child_backend" = orca ]; then
       child_t=$(meta_value "$child_meta" terminal)
     else
@@ -3941,6 +3995,7 @@ cleanup_firstmate_home_children() {
     if [ "$child_kind" = secondmate ]; then
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
+      require_cleanup_copy_clearance "$child_meta" "$child_id" "$sub_state" "$child_home" home || return 1
     fi
     if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
       teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 1 || return 1
@@ -3950,8 +4005,9 @@ cleanup_firstmate_home_children() {
     if [ "$child_kind" = secondmate ]; then
       if [ -n "$child_home" ] && [ -d "$child_home" ]; then
         cleanup_firstmate_home_children "$child_home" || return $?
-        remove_firstmate_home "$child_home" "child firstmate home" "$child_id" || return $?
+        remove_firstmate_home "$child_home" "child firstmate home" "$child_id" "$home/data/secondmates.md" || return $?
       fi
+      remove_secondmate_registry_entry "$child_id" "$home/data/secondmates.md" || return 1
     elif [ "$child_backend" = orca ]; then
       if [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
@@ -3959,6 +4015,8 @@ cleanup_firstmate_home_children() {
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
         fm_backend_remove_worktree "$child_backend" "$child_orca_worktree_id" || return 1
       fi
+    elif [ "$child_keep_copy" = 1 ]; then
+      :
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
       # The same ownership determination as the parent's own slot: a child
       # slot reassigned to another task is not this child's to kill, reset,
@@ -4013,22 +4071,40 @@ cleanup_firstmate_home_children() {
 }
 
 remove_secondmate_registry_entry() {
-  local id=$1 tmp lock rc=0 acquired=0
-  [ -f "$SECONDMATE_REG" ] || return 0
-  lock=$(secondmate_registry_lock_path "$STATE")
-  if [ "$LOCAL_REGISTRY_LOCK" != "$lock" ]; then
-    fm_lock_acquire_wait "$lock" || return 1
-    acquired=1
-  fi
-  tmp="$SECONDMATE_REG.tmp.$$"
-  grep -vE "^- $id( |$)" "$SECONDMATE_REG" > "$tmp" || true
-  mv "$tmp" "$SECONDMATE_REG" || rc=$?
-  [ "$acquired" -eq 0 ] || fm_lock_release "$lock"
-  return "$rc"
+  local id=$1 reg=$2 tmp
+  [ -f "$reg" ] || return 0
+  tmp="$reg.tmp.$$"
+  grep -vE "^- $id( |$)" "$reg" > "$tmp" || true
+  mv "$tmp" "$reg"
 }
+
+teardown_launch_home_token() {
+  local home=$1 root hash
+  root=$(cd "$home" 2>/dev/null && pwd -P) || root=$home
+  if command -v shasum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$root" | shasum -a 256 | awk '{print $1}')
+  elif command -v sha256sum >/dev/null 2>&1; then
+    hash=$(printf '%s' "$root" | sha256sum | awk '{print $1}')
+  else
+    return 1
+  fi
+  case "$hash" in
+    *[!0-9a-fA-F]*|'') return 1 ;;
+  esac
+  printf '%s' "$hash"
+}
+LAUNCH_HOME_TOKEN=$(teardown_launch_home_token "$FM_HOME") || LAUNCH_HOME_TOKEN=
+require_cleanup_copy_clearance "$META" "$ID" "$STATE" "$TASK_TMP" || exit 1
+if [ -n "$LAUNCH_HOME_TOKEN" ]; then
+  require_cleanup_copy_clearance "$META" "$ID" "$STATE" "/tmp/fm-$ID+$LAUNCH_HOME_TOKEN" || exit 1
+fi
 
 require_exclusive_task_worktree_slot || exit 1
 require_owned_task_worktree_slot || exit 1
+if [ "$KIND" != secondmate ] && teardown_owns_worktree \
+   && ! fm_treehouse_pool_slot "$PROJ" "$WT"; then
+  require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$WT" || exit 1
+fi
 
 validate_pr_poll_cleanup "$STATE" "$ID" || exit 1
 
@@ -4038,20 +4114,25 @@ if [ "$KIND" = secondmate ]; then
   LOCAL_HANDOFF_LOCK="$STATE/.backlog-handoff-$ID.lock"
   fm_lock_acquire_wait "$LOCAL_HANDOFF_LOCK" || exit 1
   [ -n "$HOME_PATH" ] || HOME_PATH=$WT
-  handoff_wake_retire_stage_recover "$HOME_PATH" || exit 1
-  handoff_wake_retire_validate || exit 1
-  pending_replies_recovery_validate initial || exit 1
-  validate_firstmate_home_for_removal "$HOME_PATH" "secondmate home" "$ID" >/dev/null || exit 1
+  validate_firstmate_home_for_removal "$HOME_PATH" "secondmate home" "$ID" "$SECONDMATE_REG" >/dev/null || exit 1
   if [ "$FORCE" = "--force" ]; then
-    validate_firstmate_home_children_removal "$HOME_PATH" || exit 1
     preflight_descendant_task_locks "$HOME_PATH" || exit 1
     validate_firstmate_home_children_removal "$HOME_PATH" || exit 1
+    require_cleanup_copy_clearance "$META" "$ID" "$STATE" "$HOME_PATH" home || exit 1
+    require_cleanup_copy_clearance "$META" "$ID" "$STATE" "$WT" home || exit 1
     preflight_descendant_treehouse_slots || exit 1
     if [ "$BACKEND" = herdr ]; then
       teardown_herdr_admit_meta "$META" "$ID" "$STATE" || exit 1
     fi
     preflight_firstmate_home_herdr_children "$HOME_PATH" || exit 1
   fi
+  if [ "$FORCE" != "--force" ]; then
+    require_cleanup_copy_clearance "$META" "$ID" "$STATE" "$HOME_PATH" 1 || exit 1
+    require_cleanup_copy_clearance "$META" "$ID" "$STATE" "$WT" 1 || exit 1
+  fi
+  handoff_wake_retire_stage_recover "$HOME_PATH" || exit 1
+  handoff_wake_retire_validate || exit 1
+  pending_replies_recovery_validate initial || exit 1
 fi
 
 if [ "$KIND" = secondmate ] && [ "$FORCE" != "--force" ]; then
@@ -4384,6 +4465,8 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   fi
 elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
   :
+elif [ "$TEARDOWN_KEEP_COPY" = 1 ]; then
+  :
 elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
   branch=$(git -C "$WT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
   if [ "$branch" != "HEAD" ]; then
@@ -4447,7 +4530,7 @@ if [ "$KIND" = secondmate ]; then
     || { echo "error: receiver wake cleanup could not be staged; preserving the secondmate home and route" >&2; exit 1; }
   pending_replies_recovery_validate recheck \
     || { echo "error: local pending-reply recovery paths changed; preserving the secondmate home and route" >&2; exit 1; }
-  if remove_firstmate_home "$HOME_PATH" "secondmate home" "$ID"; then
+  if remove_firstmate_home "$HOME_PATH" "secondmate home" "$ID" "$SECONDMATE_REG"; then
     :
   else
     rc=$?
@@ -4461,7 +4544,7 @@ if [ "$KIND" = secondmate ]; then
     pending_replies_cleanup_for_task "$STATE/pending-replies" "$PENDING_REPLIES_DIR_REAL" \
       || { echo "error: local pending-reply cleanup failed; preserving the secondmate route for retry" >&2; exit 1; }
   fi
-  remove_secondmate_registry_entry "$ID"
+  remove_secondmate_registry_entry "$ID" "$SECONDMATE_REG" || exit 1
 fi
 remove_grok_turnend_auth "$STATE" "$ID" || exit 1
 remove_kimi_turnend_auth "$STATE" "$ID" || exit 1
@@ -4471,22 +4554,6 @@ fm_backend_clear_transition "$BACKEND" "$STATE" "$T" || true
 [ -n "$TASK_TMP" ] && rm -rf "$TASK_TMP"
 # Retire only this Firstmate home's launch namespace. Its never-reused per-spawn
 # files leave the equal task-id namespace of every other home untouched.
-teardown_launch_home_token() {
-  local home=$1 root hash
-  root=$(cd "$home" 2>/dev/null && pwd -P) || root=$home
-  if command -v shasum >/dev/null 2>&1; then
-    hash=$(printf '%s' "$root" | shasum -a 256 | awk '{print $1}')
-  elif command -v sha256sum >/dev/null 2>&1; then
-    hash=$(printf '%s' "$root" | sha256sum | awk '{print $1}')
-  else
-    return 1
-  fi
-  case "$hash" in
-    *[!0-9a-fA-F]*|'') return 1 ;;
-  esac
-  printf '%s' "$hash"
-}
-LAUNCH_HOME_TOKEN=$(teardown_launch_home_token "$FM_HOME") || LAUNCH_HOME_TOKEN=
 if [ -n "$LAUNCH_HOME_TOKEN" ]; then
   rm -rf "/tmp/fm-$ID+$LAUNCH_HOME_TOKEN"
 fi
@@ -4572,9 +4639,14 @@ if [ -d "$STATE" ]; then
 fi
 if [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
+elif [ "$TEARDOWN_KEEP_COPY" = 1 ]; then
+  echo "teardown $ID complete (window ${T:-none}; reassociated worktree $WT left in place, since it is not a pool slot)"
 elif teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT)"
 else
   echo "teardown $ID complete (window ${T:-none}; pool slot $WT left to task $TEARDOWN_SLOT_REASSIGNED_TO${TEARDOWN_SLOT_REASSIGNED_HOME:+ (home $TEARDOWN_SLOT_REASSIGNED_HOME)}, which it was reassigned to)"
 fi
+for teardown_prior_copy in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
+  echo "notice: $ID's prior copy $teardown_prior_copy (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted"
+done
 backlog_refresh_reminder

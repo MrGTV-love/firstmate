@@ -421,7 +421,7 @@ family_for_basename() {
       ;;
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
     fm-tmux-agent-liveness.test.sh|\
-    fm-control.test.sh|fm-control-relaunch.test.sh|\
+    fm-control.test.sh|fm-control-relaunch.test.sh|fm-control-reassociate.test.sh|\
     fm-launch-proof.test.sh|\
     fm-session-launch-policy.test.sh|\
     fm-herdr-session-cleanup.test.sh|fm-send-resolve-key.test.sh|fm-send-strict.test.sh|\
@@ -431,6 +431,7 @@ family_for_basename() {
     fm-git-strip-ai-trailers.test.sh|\
     fm-trace-context-spawn.test.sh|fm-spawn-worktree-settle.test.sh|\
     fm-spawn-acquisition-cleanup.test.sh|\
+    fm-spawn-retained-copy.test.sh|\
     fm-spawn-compact-adviser-disable.test.sh|\
     fm-spawn-compact-adviser-disable-remote.test.sh|\
     fm-spawn-herdr-launch-shell.test.sh|\
@@ -929,6 +930,7 @@ tests/fm-spawn-dispatch-profile.test.sh 314611
 tests/fm-spawn-herdr-launch-shell.test.sh 60679
 tests/fm-spawn-orca-worktree.test.sh 2433
 tests/fm-spawn-pool-base-freshen.test.sh 68652
+tests/fm-spawn-retained-copy.test.sh 59225
 tests/fm-spawn-worktree-settle.test.sh 9309
 tests/fm-startup-growth-check.test.sh 5714
 tests/fm-startup-memory-budget.test.sh 8086
@@ -1608,6 +1610,12 @@ families_for_changed_path() {
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh|bin/fm-supervision-lib.sh)
       printf '%s\n' watcher-wake-lock
+      case "$path" in
+        bin/fm-wake*)
+          printf '%s\n' backend-dispatch
+          printf '%s\n' secondmate
+          ;;
+      esac
       ;;
     bin/fm-afk*)
       printf '%s\n' afk
@@ -1805,6 +1813,14 @@ families_for_changed_path() {
       printf '%s\n' pure-contract-unit
       printf '%s\n' pr-forge
       ;;
+    bin/fm-task-copy-lib.sh)
+      # Which local copy a task record may name: fm-spawn's isolation guard
+      # (tangle guard), fm-teardown's record scan, and fm-control reassociate.
+      printf '%s\n' backend-dispatch
+      printf '%s\n' pr-forge
+      printf '%s\n' session-bootstrap
+      printf '%s\n' secondmate
+      ;;
     bin/fm-control-lib.sh)
       printf '%s\n' backend-dispatch
       printf '%s\n' session-bootstrap
@@ -1833,6 +1849,7 @@ families_for_changed_path() {
     bin/fm-spawn.sh)
       printf '%s\n' backend-dispatch
       printf '%s\n' pure-contract-unit
+      printf '%s\n' secondmate
       printf '%s\n' "__script__:fm-skill-pick.test.sh"
       ;;
     bin/fm-send.sh|bin/fm-harness.sh|bin/fm-peek.sh|bin/fm-composer*)
