@@ -2460,6 +2460,11 @@ test_persistent_secondmate_retirement_is_poll_only() {
     'pr_head=0123456789abcdef0123456789abcdef01234567'
   mkdir -p "$dir/secondmate-home"
   printf 'working: persistent endpoint remains healthy\n' > "$state/domain.status"
+  # The watcher delivers an unread status signal ahead of any check, so mark
+  # this one read: the poll's retirement is then what the cycle exercises.
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_wake_status_mark_current "$2" "$3"' \
+    _ "$ROOT/bin/fm-wake-lib.sh" "$state" "$state/domain.status" \
+    || fail "could not mark the secondmate status read"
   printf -- '- domain | scope: test | home: %s\n' "$dir/secondmate-home" > "$dir/home/data/secondmates.md"
   printf 'endpoint-alive\n' > "$dir/endpoint-sentinel"
   meta_before=$(shasum -a 256 "$state/domain.meta")
