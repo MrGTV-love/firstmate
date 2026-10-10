@@ -213,7 +213,7 @@ pass "real herdr: interrupt refuses when herdr's own agent registry reports no a
 # symlink to a long-running Python interpreter named `claude`.
 AGENT_BIN="$SCRATCH/agentbin"
 mkdir -p "$AGENT_BIN"
-PYTHON_BIN=$(command -v python3) || fail "python3 not found"
+PYTHON_BIN=$(python3 -c 'import sys; print(sys.executable)') || fail "python3 not found"
 ln -s "$PYTHON_BIN" "$AGENT_BIN/claude"
 printf -v AGENT_Q '%q' "$AGENT_BIN/claude"
 

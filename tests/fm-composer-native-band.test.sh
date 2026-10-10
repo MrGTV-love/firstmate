@@ -90,7 +90,7 @@ screen=$' π > ⬢ GPT-4.1 > 📁 /work > ⑂ main ▶─0.2%──────�
 assert_screen "cursor on an idle band floor" empty "$CAPS_TMUX" "$screen" 1
 for floor in '╰─' '╰─ !git diff'; do
   for gap in '' $'\n' $'\nπ · model · 15.4%/272K\n' $'\n\nπ · model · 15.4%/272K'; do
-    for below in 'draft' '  draft' '/model'; do
+    for below in 'draft' '  draft' '/model' 'fix · tests 5%/10K' 'π · my draft note'; do
       band="${screen%$'\n'*}"$'\n'"$floor$gap"$'\n'"$below"
       assert_screen "cursor on a band floor '$floor' above '$below'" unknown-draft "$CAPS_TMUX" "$band" 1
       assert_refused "band floor '$floor' above '$below'" "$band" unknown-draft

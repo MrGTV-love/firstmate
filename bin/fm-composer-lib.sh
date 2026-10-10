@@ -1831,8 +1831,12 @@ _fm_composer_row_is_omp_status() {  # <trimmed-row>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OMP_STATUS_RE:-$FM_COMPOSER_OMP_STATUS_RE_DEFAULT}" sensitive
 }
 
+# omp's whole status row: the identity cell first and the context-usage cell
+# last. Rows that only open or only close like one are not this shape.
+FM_COMPOSER_OMP_BAND_STATUS_RE_DEFAULT='^(π|󰵗)[[:space:]]+·[[:space:]].*[[:space:]]·[[:space:]]+(◫[[:space:]]+)?[0-9]+(\.[0-9]+)?%/[0-9]+(\.[0-9]+)?[KM]$'
+
 # _fm_composer_text_below_band: 0 when any row below a native omp band's last
-# input row holds text other than omp's status line. The band has no closing
+# input row holds text other than omp's whole status row. The band has no closing
 # border, so that text may be draft input however many blank rows precede it.
 _fm_composer_text_below_band() {  # <plain-screen> <last-band-row>
   local row=$(($2 + 1)) line
@@ -1840,7 +1844,8 @@ _fm_composer_text_below_band() {  # <plain-screen> <last-band-row>
   while [ "$row" -lt "${#_FM_COMPOSER_ROWS[@]}" ]; do
     line=${_FM_COMPOSER_ROWS[$row]}
     fm_composer_normalize_trim_var line
-    if [ -n "$line" ] && ! _fm_composer_row_is_omp_status "$line"; then return 0; fi
+    if [ -n "$line" ] \
+       && ! fm_composer_idle_matches "$line" "$FM_COMPOSER_OMP_BAND_STATUS_RE_DEFAULT" sensitive; then return 0; fi
     row=$((row + 1))
   done
   return 1

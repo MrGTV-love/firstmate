@@ -171,7 +171,6 @@ fm_backend_herdr_cli() {
       esac
       ;;
     "pane process-info")
-      [ ! -e "$FIXTURE_DIR/process-unsafe" ] || return 1
       if [ "$(cat "$FIXTURE_DIR/agent")" = live ] || [ -e "$FIXTURE_DIR/process-live" ]; then
         printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":67,"foreground_processes":[{"pid":68,"name":"omp","argv":["omp"]}]}}}\n' "$PANE"
       else
