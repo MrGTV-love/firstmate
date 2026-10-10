@@ -151,8 +151,8 @@ This skill is the one owner of the `/bearings` chat-response format; the snapsho
 Every `/bearings` chat response renders EXACTLY these four sections, in THIS order, and nothing else structural (there is no At Anchor section):
 
 1. **Captain's Call** - ONLY unsuppressed items that need the captain's own action now: a decision to make, a PR to approve or merge, a credential or login to provide, or a blocker only the captain can clear.
-   Never present a decision as a guess: state what is being decided and why it is open now, give each option a label that says what it is (never a bare A, B, C or number) and what it does, name the recommended option with the reason it beats the others, and list the facts for and the facts against it, each with its source.
    Deferred or aged holds follow the presentation safety rule above instead.
+   Never present a decision as a guess: state what is being decided and why it is open now, give each option a label that says what it is (never a bare A, B, C or number) and what it does, name the recommended option with the reason it beats the others, and list the facts for and the facts against it, each with its source.
    Include `contributions.captain` rows in this section, deduplicating any row already represented by its live captain hold or merge call.
    Show the other contribution actors only as counts beside the checked/known coverage, and disclose `captain_omitted`, `unmeasured_homes`, stale verdicts and checks with no verdict when nonzero.
    Empty-state: "Nothing needs your action right now" is allowed only when `contributions.proven_clear` is true and the existing decision set is empty.
