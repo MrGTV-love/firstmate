@@ -250,6 +250,7 @@ if [ "$CLAIM_RC" -ne 0 ]; then
 fi
 MY_GEN=$FM_AUTOARM_MY_GEN
 [ -n "$MY_GEN" ] || exit 0
+fm_autoarm_timing_record "$STATE" claim "gen=$MY_GEN"
 
 # Commit <outcome> (optionally with the once-per-episode notice marker) for
 # this generation. Success means this generation's translation WINS and the

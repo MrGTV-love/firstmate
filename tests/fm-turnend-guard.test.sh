@@ -192,6 +192,7 @@ install_guard_scripts() {
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
   cp "$ROOT/bin/fm-supervision-engine-lib.sh" "$dir/bin/fm-supervision-engine-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
+  cp "$ROOT/bin/fm-timing-lib.sh" "$dir/bin/fm-timing-lib.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
   cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
   cp "$ROOT/bin/fm-hook-host-lib.sh" "$dir/bin/fm-hook-host-lib.sh"
@@ -1377,6 +1378,7 @@ install_integrated_autoarm() {
   cp "$ROOT/bin/fm-primary-scope-lib.sh" "$dir/bin/fm-primary-scope-lib.sh"
   cp "$ROOT/bin/fm-supervision-lib.sh" "$dir/bin/fm-supervision-lib.sh"
   cp "$ROOT/bin/fm-wake-lib.sh" "$dir/bin/fm-wake-lib.sh"
+  cp "$ROOT/bin/fm-timing-lib.sh" "$dir/bin/fm-timing-lib.sh"
   cp "$ROOT/bin/fm-path-lib.sh" "$dir/bin/fm-path-lib.sh"
   cp "$ROOT/bin/fm-secondmate-parent-lib.sh" "$dir/bin/fm-secondmate-parent-lib.sh"
   cp "$ROOT/bin/fm-hook-host-lib.sh" "$dir/bin/fm-hook-host-lib.sh"
@@ -2107,6 +2109,67 @@ test_hook_claude_mode_waits_for_late_claim() {
   pass "fm-turnend-guard --claude: bounded claim wait avoids a token-consuming forced continuation"
 }
 
+# The default wait must cover the measured claim latency (docs/turnend-guard.md
+# "The wait's measured basis"): a claim published by the real claim path 2.5
+# seconds into the wait - past the old 800 ms default, inside the measured
+# window - lets the stop end without a block or a consumed continuation.
+test_hook_claude_mode_default_wait_covers_measured_claim_latency() {
+  local dir helper out status holder timing
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-default-wait")
+  : > "$dir/state/task1.meta"
+  (
+    sleep 2.5
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      fm_autoarm_claim_next "$1/state" 300 || exit 1
+      printf "%s\n" "$$" > "$1/holder.pid"
+      sleep 60
+      exit 0
+    ' _ "$dir"
+  ) &
+  helper=$!
+  # shellcheck disable=SC2016 # the child shell expands its own argument.
+  out=$(env -u FM_CLAUDE_AUTOARM_SYNC_WAIT_MS bash -c '
+    printf "{\"stop_hook_active\":false,\"session_id\":\"sess-claude-mode\"}" \
+      | CLAUDECODE=1 FM_HOME="$1" bash "$1/bin/fm-turnend-guard.sh" --claude 2>&1
+  ' _ "$dir"); status=$?
+  holder=$(cat "$dir/holder.pid" 2>/dev/null || true)
+  [ -z "$holder" ] || kill "$holder" 2>/dev/null || true
+  kill "$helper" 2>/dev/null || true
+  wait "$helper" 2>/dev/null || true
+  expect_code 0 "$status" "the default wait must outlast a claim published 2.5s into it"
+  [ -z "$out" ] || fail "default-wait late claim produced output: $out"
+  assert_absent "$dir/state/.turnend-claude-blocks" "a covered late claim must not consume a block"
+  timing=$(cat "$dir/state/.claude-autoarm-timing" 2>/dev/null || true)
+  assert_contains "$timing" "result=allow" "the guard must record that its wait ended on a claim"
+  pass "fm-turnend-guard --claude: default wait covers a claim 2.5s after the wait starts"
+}
+
+# Both Stop participants leave one latency line per Stop, so the next
+# measurement of the default needs no lab: the guard's expired wait and the
+# auto-arm's claim.
+test_hook_claude_mode_records_wait_and_claim_latency() {
+  local dir out status timing
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-timing")
+  : > "$dir/state/task1.meta"
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" false); status=$?
+  expect_code 2 "$status" "an absent auto-arm must still block after its wait"
+  timing=$(cat "$dir/state/.claude-autoarm-timing" 2>/dev/null || true)
+  assert_contains "$timing" "result=expired" "an expired wait must be recorded"
+  assert_contains "$timing" "nominal_ms=100" "the record must name the wait that applied"
+  printf '%s\n' "$timing" | grep -Eq $'^v1\tguard\t[0-9]+\tstart_ms=[0-9]+ ' \
+    || fail "guard timing line is malformed: $timing"
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-timing-claim")
+  : > "$dir/state/task1.meta"
+  install_integrated_autoarm "$dir"
+  write_integrated_failed_arm "$dir"
+  run_integrated_autoarm "$dir" >/dev/null
+  timing=$(cat "$dir/state/.claude-autoarm-timing" 2>/dev/null || true)
+  printf '%s\n' "$timing" | grep -Eq $'^v1\tclaim\t[0-9]+\tgen=1$' \
+    || fail "auto-arm claim timing line missing or malformed: $timing"
+  pass "fm-turnend-guard --claude: guard wait and auto-arm claim latency are recorded"
+}
+
 test_hook_claude_mode_secondmate_reblocks_like_primary() {
   local dir pid out status
   dir=$(make_secondmate_dir "$TMP_ROOT/hook-claude-sm-reblock")
@@ -2441,6 +2504,8 @@ test_hook_claude_mode_fail_open_requires_notice_and_failure_epoch
 test_hook_claude_mode_away_mode_never_uses_stop_autoarm_fail_open
 test_hook_claude_mode_allow_resets_budget
 test_hook_claude_mode_waits_for_late_claim
+test_hook_claude_mode_default_wait_covers_measured_claim_latency
+test_hook_claude_mode_records_wait_and_claim_latency
 test_hook_claude_mode_secondmate_reblocks_like_primary
 test_hook_away_daemon_allows_between_watcher_cycles
 test_hook_away_daemon_allows_over_dead_watcher_lock

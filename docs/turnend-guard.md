@@ -316,12 +316,51 @@ Under the default one-shot behavior, that re-opened the 2026-07-21 blind window.
 
 Before the Claude cooperative budget can re-block a Stop, the guard checks for a live foreign session-lock owner and takes the same safe diagnostic exit described under "Guard predicates" ([foreign session-lock owner](#foreign-session-lock-owner)).
 
-The Claude mode waits up to `FM_CLAUDE_AUTOARM_SYNC_WAIT_MS` (default 800 milliseconds).
+The Claude mode waits up to `FM_CLAUDE_AUTOARM_SYNC_WAIT_MS` (default 12000 milliseconds, set from measured claim latency in [the wait's measured basis](#the-waits-measured-basis)).
 It allows the stop when any of these holds:
 
 - The watcher is healthy.
 - The auto-arm's generation claim is open.
 - `state/.claude-autoarm-epoch` contains a fresh actionable rewake owned by this event epoch.
+
+#### The wait's measured basis
+
+The wait is a floor in wall time, not a ceiling: the guard counts one 100 millisecond sleep per tenth of the setting, and each check between sleeps costs more as the host load rises.
+A guard set to 800 milliseconds nominal that expired under the stress level below ran a median of 2.0 seconds and up to 7.2 seconds of wall time, so the setting is chosen against the claim latency itself.
+
+The latency that matters is the time from the guard starting to wait until the auto-arm publishes its generation claim.
+Both Stop participants append one line per Stop to `state/.claude-autoarm-timing` (`fm_autoarm_timing_record` in `bin/fm-wake-lib.sh` owns the format), so this number is recorded for every real Stop and a miss shows as an `expired` guard line followed by a later `claim` line.
+No earlier log held it: the epoch ledger keeps only the newest entry at one-second resolution.
+
+Measured on 2026-10-10, macOS, 18 cores, in an isolated lab home that ran the real guard and the real auto-arm in parallel the way Claude starts parallel Stop hooks, with the claim time read from the ledger file's own modification time.
+The host was never idle: other fleet lanes kept its 1-minute load average between 1.1 and 4.3 times the core count during the first two rows, so no row is an idle baseline.
+
+| Level | Trials | p50 | p95 | p99 | max | 1-minute load, times cores |
+| --- | --- | --- | --- | --- | --- | --- |
+| Ambient fleet load | 300 | 90 ms | 270 ms | 894 ms | 2001 ms | 1.1 to 3.9, mean 2.4 |
+| Ambient plus 18 busy loops | 60 | 153 ms | 745 ms | 1241 ms | 1241 ms | 1.4 to 4.3, mean 3.7 |
+| Wake-queue lock stress, 3 continuous real enqueuers | 174 of 200 | 2284 ms | 8615 ms | 9393 ms | 10731 ms | 1.8 to 6.7, mean 3.8 |
+
+Counted from the Stop hook's own start (the launcher's clock just before it forked both hooks) to the claim, the same trials gave a p50 of 532, 1035, and 3429 ms, a p99 of 2778, 11528, and 13773 ms, and a max of 6512, 11528, and 16585 ms.
+Most of that is the guard and auto-arm starting up under load, and the guard's wait only has to cover the part after it begins waiting.
+
+At the old 800 millisecond default the guard never expired in the 360 CPU-load trials, and it expired in 101 of 200 stress trials.
+The stress level is a worst case, not a calibrated production rate: three loops held the wake-queue lock back to back, which no real home does continuously.
+It reproduces the 2026-10-10 14:24 and 14:25 blocks, where the claim arrived seconds after the guard gave up at host load 62 on 18 cores.
+Production wake-queue hold times were not measured, so the stress level bounds the effect without proving the cause of that incident.
+
+The margin rule is the claim path's own bound plus the longest uncontended latency measured.
+`fm_autoarm_claim_next` waits at most 10 seconds for the wake-queue lock and then gives up without claiming, so no claim is ever published later than 10 seconds plus the normal latency.
+The longest normal latency under CPU load was 2.0 seconds, so the default is 10 + 2 = 12 seconds.
+That covers every claim the stress level published (longest 10.7 seconds), and a longer wait would buy nothing.
+The 26 stress trials that never claimed at all, because the lock wait gave up, are not fixable by any wait; they remain the existing re-block path.
+Re-run at the 12 second default under the same stress, 60 trials gave 53 claims all allowed with none expired, and 7 trials with no claim that still blocked.
+
+The guard has no hook `timeout` of its own in `.claude/settings.json`, so Claude's default of 600 seconds for command hooks applies (Claude Code hooks reference, read 2026-10-10).
+A wait of 12 seconds nominal stayed inside it with a wide margin even at the 9 times wall-time stretch seen under stress (about 108 seconds).
+The cost lands only where the auto-arm is genuinely absent: each of the three budgeted re-blocks then waits the full wait before blocking.
+
+To re-derive the default, read `state/.claude-autoarm-timing`, subtract each guard line's `start_ms` from the next claim line's timestamp, and apply the same rule to the new maximum.
 
 #### Auto-arm generation claim
 
