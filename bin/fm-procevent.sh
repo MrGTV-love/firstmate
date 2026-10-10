@@ -530,7 +530,7 @@ cmd_register() {
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe and at most 64 characters: $id"
   [ "$sep" = -- ] || usage
   [ "$#" -ge 1 ] || die "register needs at least one argv element after --"
-  local arg owner pid token identity stop_state
+  local arg owner pid token identity stop_state launch
   for arg in "$@"; do
     case "$arg" in *$'\n'*) die "argv elements cannot contain newlines" ;; esac
   done
@@ -548,10 +548,11 @@ cmd_register() {
   fi
   if adapter_is_standing "$adapter"; then
     if fm_procevent_registration_matches_locked "$STATE" "$adapter" "$id" "$@"; then
+      [ "$detached" -eq 0 ] || { detached_launch_state_locked "$id"; launch=$?; }
       fm_procevent_source_lock_release "$id"
       owner_lease_refresh
       printf 'registered: %s (%s)\n' "$id" "$adapter"
-      [ "$detached" -eq 0 ] || cmd_start_public --detach "$id"
+      [ "$detached" -eq 0 ] || detach_for_launch_state "$id" "$launch"
       return $?
     fi
     if [ -e "$(fm_procevent_claim_path "$id")" ]; then
@@ -582,10 +583,11 @@ cmd_register() {
     fm_procevent_source_lock_release "$id"
     die "cannot publish the registration"
   fi
+  [ "$detached" -eq 0 ] || { detached_launch_state_locked "$id"; launch=$?; }
   fm_procevent_source_lock_release "$id"
   owner_lease_refresh
   printf 'registered: %s (%s)\n' "$id" "$adapter"
-  [ "$detached" -eq 0 ] || cmd_start_public --detach "$id"
+  [ "$detached" -eq 0 ] || detach_for_launch_state "$id" "$launch"
 }
 
 cmd_register_task() {
@@ -1017,6 +1019,26 @@ owner_lease_keepalive() {  # <parent-pid> <parent-identity>
   done
 }
 
+# detached_launch_state_locked <source-id>
+# 0 when a live canonical runner already holds the claim, 1 when a detached
+# launch may proceed, 2 when the source cannot be launched safely. Register
+# --detach decides this under its own source lock, so arming takes the lock once.
+detached_launch_state_locked() {
+  local status
+  fm_procevent_claim_state_locked "$1"
+  status=$?
+  if [ "$status" -eq 1 ] && fm_procevent_claim_undisplaceable_locked "$1"; then
+    status=2
+  fi
+  return "$status"
+}
+
+detach_for_launch_state() {  # <source-id> <detached-launch-state>
+  [ "$2" -ne 0 ] || return 0
+  [ "$2" -eq 1 ] || die "cannot safely launch source: $1"
+  detach_runner "$1"
+}
+
 cmd_start_public() {
   local id identity keeper status detached=0
   if [ "${1-}" = --detach ]; then
@@ -1033,15 +1055,10 @@ cmd_start_public() {
       fm_procevent_source_lock_release "$id"
       die "source is not registered: $id"
     fi
-    fm_procevent_claim_state_locked "$id"
+    detached_launch_state_locked "$id"
     status=$?
-    if [ "$status" -eq 1 ] && fm_procevent_claim_undisplaceable_locked "$id"; then
-      status=2
-    fi
     fm_procevent_source_lock_release "$id"
-    [ "$status" -ne 0 ] || return 0
-    [ "$status" -eq 1 ] || die "cannot safely launch source: $id"
-    detach_runner "$id"
+    detach_for_launch_state "$id" "$status"
     return $?
   fi
   identity=$(fm_pid_identity "$$" 2>/dev/null) || die "cannot identify the attached owner"
