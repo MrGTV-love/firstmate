@@ -2671,7 +2671,7 @@ if (scenario === "external") {
       // omp is idle with messages queued that it will not run; a prompt send
       // starts a turn and flushes them.
       const draft = "\noperator\u2063 draft\n\n";
-      if (["stuck-failure", "stuck-restored-failure", "stuck-restored-failures"].includes(scenario)) {
+      if (["stuck-failure", "stuck-restored-failure", "stuck-restored-failures", "stuck-restored-failure-held"].includes(scenario)) {
         // A failure notice names no queued row, so it is resent as emitted.
         await accept(wake);
         const dir = `${state}/extensions/omp-primary-watch`;
@@ -2685,16 +2685,32 @@ if (scenario === "external") {
         const failed = () => sent.filter(({ m }) => m.includes("watcher: FAILED"));
         if (failed().length !== records.length || failed().some(({ o }) => o?.deliverAs !== "followUp") || new Set(failed().map(({ m }) => m)).size !== records.length) throw new Error(`expected distinct queued failure notices: ${JSON.stringify(sent)}`);
         if (scenario === "stuck-restored-failures") {
-          // Escape returns both queued notices; each check sends one prompt.
+          // Escape returns both queued notices. omp may still read idle right
+          // after a prompt send, so one turn end must send only one of them.
           const [first, second] = failed().map(({ m }) => m);
           editor = `${first}\n\n${second}\n\n${draft}`;
-          flushes = true;
           await end();
-          if (failed().length !== 3 || failed()[2].m !== first || editor !== `${second}\n\n${draft}`) throw new Error(`one check sent more than one restored notice: ${JSON.stringify(sent)}`);
+          if (failed().length !== 3 || failed()[2].m !== first || failed()[2].o?.deliverAs !== undefined || editor !== `${second}\n\n${draft}`) throw new Error(`one turn end sent more than one restored notice: ${JSON.stringify(sent)}`);
           await sleep(1200);
-          if (failed().length !== 3) throw new Error("a restored notice was sent while the first one's turn ran");
+          if (failed().length !== 3 || editor !== `${second}\n\n${draft}`) throw new Error("a flush check sent a second restored notice before the first one's turn started");
+          await accept(failed()[2]);
           await end();
           if (failed().length !== 4 || failed()[3].m !== second || failed()[3].o?.deliverAs !== undefined || editor !== draft) throw new Error(`the next turn end did not send the second restored notice: ${JSON.stringify(sent)}`);
+          await accept(failed()[3]);
+        } else if (scenario === "stuck-restored-failure-held") {
+          // A held watcher close must wait for the turn the restored notice starts.
+          await fire("trigger-2");
+          editor = `${failed()[0].m}\n\n${draft}`;
+          await end();
+          if (failed().length !== 2 || failed()[1].m !== failed()[0].m || editor !== draft || wakes().length !== 1) throw new Error(`the restored notice was not sent alone: ${JSON.stringify(sent)}`);
+          await sleep(1200);
+          if (failed().length !== 2 || wakes().length !== 1) throw new Error(`a held watcher wake was sent in the restored notice's transition: ${JSON.stringify(sent)}`);
+          await accept(failed()[1]);
+          await end();
+          await until(() => wakes().length === 2, "the held watcher wake was never sent after the restored notice's turn");
+          expectWake(1, "check: trigger-1");
+          if (failed().length !== 2) throw new Error("the restored notice was sent again");
+          await accept(wakes()[1]);
         } else if (scenario === "stuck-restored-failure") {
           // Escape returns the queued notice to the composer beside a draft.
           editor = `${failed()[0].m}\n\n${draft}`;
@@ -2709,7 +2725,7 @@ if (scenario === "external") {
         }
         await end();
         await sleep(600);
-        if (failed().length !== 2 * records.length || wakes().length !== 1) throw new Error("a delivered failure notice was sent again");
+        if (failed().length !== 2 * records.length || wakes().length !== (scenario === "stuck-restored-failure-held" ? 2 : 1)) throw new Error("a delivered failure notice was sent again");
       } else {
         if (scenario === "stuck-restored") editor = `${wake.m}\n\n${draft}`;
         if (["stuck-new-row", "stuck-drained"].includes(scenario)) acknowledge(drain());
@@ -2882,7 +2898,7 @@ EOF
 
 test_watch_extension_queue_read_delivery() {
   local scenario out status
-  for scenario in drained owed consumed release-consume mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued stuck-watcher stuck-restored stuck-new-row stuck-drained stuck-failure stuck-restored-failure stuck-restored-failures stuck-episodes stranded-owed stranded-unmarked stranded-drained stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-tracked; do
+  for scenario in drained owed consumed release-consume mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued stuck-watcher stuck-restored stuck-new-row stuck-drained stuck-failure stuck-restored-failure stuck-restored-failures stuck-restored-failure-held stuck-episodes stranded-owed stranded-unmarked stranded-drained stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-tracked; do
     out=$(run_watch_queue_read_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp queue-read scenario $scenario: $out"

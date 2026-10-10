@@ -162,6 +162,7 @@ type SessionGeneration = {
   queueReadFailures: number;
   restorePendingWaits: number;
   queueStuckReported: boolean;
+  restoredSendActivity: number;
   // A verified successor's failure close that arrived while the pipeline was
   // still delivering the wake it was started for; its bounded retry runs once
   // that delivery settles instead of being skipped by the single-flight guard.
@@ -567,6 +568,7 @@ function createGeneration(): SessionGeneration {
     queueReadFailures: 0,
     restorePendingWaits: 0,
     queueStuckReported: false,
+    restoredSendActivity: -1,
     deferredClose: null,
   };
 }
@@ -1004,7 +1006,7 @@ export default function (pi: ExtensionAPI) {
     owner.flushing = true;
     try {
       if (!sessionIsIdle()) return "held";
-      recoverRestoredWake(owner);
+      if (recoverRestoredWake(owner)) return "held";
       releaseWatcherWakes(owner, true);
       const outstanding = [...owner.unconsumedWakes].some(([token, wake]) => wake.pending && !operationalHandback(wake.pending.message) && (!owner.heldWakes.has(token) || latestContext?.hasPendingMessages?.()));
       if (outstanding || owner.heldWakes.size === 0) return "held";
@@ -1104,16 +1106,17 @@ export default function (pi: ExtensionAPI) {
     );
   }
 
-  function recoverRestoredWake(owner: SessionGeneration): void {
-    if (!generationIsLive(owner)) return;
+  function recoverRestoredWake(owner: SessionGeneration): boolean {
+    if (!generationIsLive(owner)) return false;
+    if (owner.restoredSendActivity === sessionActivity) return true;
     const ctx = editorContext();
-    if (!ctx) return;
+    if (!ctx) return false;
     try {
       // A turn that already started will consume the wake itself.
       if (!ctx.isIdle()) {
         owner.restorePendingWaits = 0;
         owner.queueStuckReported = false;
-        return;
+        return false;
       }
       // Queued messages normally drain into the next run within moments, so the
       // check waits for that. Skipping for good would strand a queue omp will
@@ -1123,10 +1126,10 @@ export default function (pi: ExtensionAPI) {
         owner.restorePendingWaits = 0;
         owner.queueStuckReported = false;
       }
-      if (owner.unconsumedWakes.size === 0) return;
+      if (owner.unconsumedWakes.size === 0) return false;
       if (queued && owner.restorePendingWaits < restorePendingWaitLimit) {
         owner.restorePendingWaits += 1;
-        return;
+        return false;
       }
       let recovered = false;
       for (const [token, wake] of [...owner.unconsumedWakes]) {
@@ -1135,10 +1138,14 @@ export default function (pi: ExtensionAPI) {
         if (remainder === null) continue;
         ctx.ui.setEditorText(remainder);
         recovered = true;
-        if (redeliverWake(owner, token, wake)) return;
+        if (redeliverWake(owner, token, wake)) {
+          owner.restoredSendActivity = sessionActivity;
+          return true;
+        }
       }
       if (queued && !recovered) flushStuckQueue(owner, ctx);
     } catch {}
+    return false;
   }
 
   // Tracked wakes retain ownership even when their composer copies are missing
