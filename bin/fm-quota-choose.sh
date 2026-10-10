@@ -395,9 +395,6 @@ for c in "${CANDIDATES[@]}"; do
     fi
     continue
   fi
-  if [ "$harness" = claude ] && fm_dispatch_claude_quota_unbound; then
-    continue
-  fi
   scope_model=$model
   [ "$harness" != omp ] || scope_model=${model#*/}
   lane=$(jq -rn --arg h "$harness" --arg m "$model" "$FM_QUOTA_ROW_JQ"'quota_lane($h; $m)')

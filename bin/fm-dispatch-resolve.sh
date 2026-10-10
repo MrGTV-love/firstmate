@@ -411,13 +411,10 @@ if [ -n "$omp_models" ]; then
     OMP_POOLS=$(jq -cn --argjson pools "$OMP_POOLS" --arg m "$omp_model" --argjson capacity "$omp_capacity" '$pools + {($m): $capacity}')
   done <<<"$omp_models"
 fi
-CLAUDE_QUOTA_UNBOUND=false
-if fm_dispatch_claude_quota_unbound "$CONFIG"; then CLAUDE_QUOTA_UNBOUND=true; fi
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
 RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --argjson pmap "$PMAP" \
   --argjson omp_pools "$OMP_POOLS" \
-  --argjson claude_quota_unbound "$CLAUDE_QUOTA_UNBOUND" \
   --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ$JEV_MODEL_ID_JQ"'
   ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.answers.rule) as $a |
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
@@ -466,10 +463,6 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
        reason: ("OMP pooled Codex capacity " + $pool.status + "; no pool spendPriority")}
       + (if $c.floor != null then {exhausted: false, unknown: true, reason: "OMP pool profile floor is unverifiable"}
          elif $pool.status != "usable" then {unknown: true} else {} end)
-    elif $c.harness == "claude" and $claude_quota_unbound then
-      {profile: $c, provider: $p, capacity: {status: "unknown"}, eligible: true,
-       exhausted: false, unranked: true, unknown: true,
-       reason: "selected Claude authentication has no established native default-account quota mapping"}
     elif $p == null then {profile: $c, eligible: false, reason: "no provider family for harness \($c.harness); declare provider on the profile"}
     elif prov($p; $lane) == null then
       {profile: $c, provider: $p, eligible: true, unranked: true,
@@ -551,8 +544,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   (if $fb.to then $fb.to else $picked end) as $choice |
   (rule_at($choice)) as $rule |
   (if $rule == null then "none"
-   elif ($rule.floor.provider == "codex" and any(profiles($rule.use)[]; .harness == "omp" and (.model // "" | startswith("openai-codex/")))) or
-        ($rule.floor.provider == "claude" and $claude_quota_unbound and any(profiles($rule.use)[]; .harness == "claude"))
+   elif $rule.floor.provider == "codex" and any(profiles($rule.use)[]; .harness == "omp" and (.model // "" | startswith("openai-codex/")))
    then "unknown" else floor_state($rule.floor; $rule.floor.provider; "") end) as $rule_floor_state |
   (if $choice != "default" and $rule == null then []
    elif $rule == null then profiles($cfg.default // null)
@@ -568,7 +560,10 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
   {
     model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
-    rule: $picked, dispatch_rule: $sel.source,
+    rule: $picked,
+    dispatch_rule: (if $sel.source == null then null
+      elif $sel.source == "default" then (if (($cfg.default_fallback // []) | length) > 0 then "default" else null end)
+      elif ((rule_at($sel.source).fallback // []) | length) > 0 then $sel.source else null end),
     rule_when: when_of($picked),
     confidence: $a.confidence, probabilities: $a.probabilities
   }
@@ -608,7 +603,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
 # malformed configuration, unknown headroom, and floors retain their decisions.
 if jq -e '.status == "escalate" and .reason == "no rankable eligible candidate" and
   (.candidates | length) > 0 and all(.candidates[]; .exhausted == true)' <<<"$RESULT" >/dev/null; then
-  dispatch_rule=$(jq -r .dispatch_rule <<<"$RESULT")
+  dispatch_rule=$(jq -r '.dispatch_rule // ""' <<<"$RESULT")
   primary=$(jq -c '.candidates[0].profile' <<<"$RESULT")
   fallbacks=$(fm_dispatch_fallbacks "$MODEL_CONFIG" "$dispatch_rule" "$(jq -r .harness <<<"$primary")" \
     "$(jq -r '.model // ""' <<<"$primary")" "$(jq -r '.effort // ""' <<<"$primary")" "$RULES") || emit_error "invalid fallback configuration"

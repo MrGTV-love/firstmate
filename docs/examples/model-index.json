@@ -8,7 +8,7 @@
     "sonnet-grade": {
       "claude": { "model": "claude-sonnet-5-5[1m]" },
       "codex": { "model": "gpt-6.1-sol" },
-      "pi": { "model": "anthropic/claude-sonnet-5-5", "stand_in": "openrouter/z-ai/glm-5.3" }
+      "pi": { "model": "anthropic/claude-sonnet-5-5", "stand_in": "openrouter/deepseek/deepseek-v4-flash" }
     },
     "easy": {
       "claude": { "model": "haiku" },
