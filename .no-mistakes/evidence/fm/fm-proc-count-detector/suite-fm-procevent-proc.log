@@ -1,0 +1,14 @@
+FM_TEST_BEGIN 2026-10-10T06:30:54Z tests/fm-procevent-proc.test.sh family=unclassified expected_gate_skip=none
+ok - help renders only the complete header
+ok - arm starts an idempotent standing listener without a watcher or fresh owner lease
+ok - arm refuses malformed flags and registers nothing
+ok - arm refuses a host the guard cannot measure with exit 3
+ok - classify and terminal: a pile-up keeps listening, an error ends the source
+ok - a pile-up becomes one census and one durable wake, and the detector stays registered
+ok - the same canonical runner keeps listening after capture and retire stops it
+ok - the canonical episode suppresses duplicates across owner homes
+ok - the wake is acknowledged through the generic handled command
+FM_TEST_END 2026-10-10T06:32:07Z tests/fm-procevent-proc.test.sh exit=0 duration_ms=72502 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=72790
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=72502 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-procevent-proc.test.sh duration_ms=72502

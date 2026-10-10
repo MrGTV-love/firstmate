@@ -1,0 +1,24 @@
+FM_TEST_BEGIN 2026-10-10T06:30:00Z tests/fm-proc-guard.test.sh family=unclassified expected_gate_skip=none
+..............
+----------------------------------------------------------------------
+Ran 14 tests in 0.060s
+
+OK
+ok - guard real-UID, limit, privacy, and fixed-boundary behavior
+ok - check reads the user's process count and reports its limit or UNKNOWN
+ok - check classifies the count against the limit and --check exits on WARNING or CRITICAL
+ok - threshold and retention customization are refused, as are invalid remaining options
+ok - census names the tree: command counts, parent chains, deepest chains with run samples and leaf, oldest and newest
+ok - census only reads: every measured process is still alive
+ok - a count above the threshold for more than the hold writes one census and reports it
+ok - while the count stays high an open episode keeps watch silent: one census per episode
+ok - an episode closes once the count stays at or below the clear threshold
+ok - a pile-up after the episode closed is reported again
+ok - a count below the threshold writes nothing
+ok - a census that cannot be saved still reports the pile-up, with the reason
+ok - dip case skipped: this host's own process limit leaves no room for a real burst
+ok - a reported pile-up is never killed
+FM_TEST_END 2026-10-10T06:30:54Z tests/fm-proc-guard.test.sh exit=0 duration_ms=53878 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=54214
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=53878 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-proc-guard.test.sh duration_ms=53878

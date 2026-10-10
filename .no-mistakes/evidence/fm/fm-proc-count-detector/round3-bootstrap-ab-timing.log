@@ -1,0 +1,16 @@
+pair 1 main=0.385 head_noadapter=0.460 head_held=0.620 head_cold=0.536 cold_at_return=claim cold_runner_up=yes
+pair 2 main=0.377 head_noadapter=0.416 head_held=0.547 head_cold=0.483 cold_at_return=claim cold_runner_up=yes
+pair 3 main=0.352 head_noadapter=0.340 head_held=0.473 head_cold=0.476 cold_at_return=claim cold_runner_up=yes
+pair 4 main=0.345 head_noadapter=0.335 head_held=0.471 head_cold=0.487 cold_at_return=claim cold_runner_up=yes
+pair 5 main=0.412 head_noadapter=0.563 head_held=0.811 head_cold=0.812 cold_at_return=claim cold_runner_up=yes
+pair 6 main=0.405 head_noadapter=0.462 head_held=0.628 head_cold=0.646 cold_at_return=claim cold_runner_up=yes
+pair 7 main=0.393 head_noadapter=0.411 head_held=0.604 head_cold=0.593 cold_at_return=claim cold_runner_up=yes
+pair 8 main=0.385 head_noadapter=0.350 head_held=0.566 head_cold=0.622 cold_at_return=claim cold_runner_up=yes
+pair 9 main=0.387 head_noadapter=0.401 head_held=0.557 head_cold=0.523 cold_at_return=claim cold_runner_up=yes
+pair 10 main=0.339 head_noadapter=0.348 head_held=0.533 head_cold=0.634 cold_at_return=claim cold_runner_up=yes
+pair 11 main=0.408 head_noadapter=0.407 head_held=0.589 head_cold=0.609 cold_at_return=claim cold_runner_up=yes
+pair 12 main=0.416 head_noadapter=0.392 head_held=0.597 head_cold=0.589 cold_at_return=claim cold_runner_up=yes
+pair 13 main=0.411 head_noadapter=0.373 head_held=0.604 head_cold=0.579 cold_at_return=claim cold_runner_up=yes
+pair 14 main=0.373 head_noadapter=0.374 head_held=0.524 head_cold=0.512 cold_at_return=claim cold_runner_up=yes
+pair 15 main=0.382 head_noadapter=0.353 head_held=0.524 head_cold=0.557 cold_at_return=claim cold_runner_up=yes
+missing_lines=0 cold_runner_not_up=0

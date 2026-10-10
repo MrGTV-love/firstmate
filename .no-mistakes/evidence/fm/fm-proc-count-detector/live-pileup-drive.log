@@ -1,0 +1,60 @@
+[01:33:59] base user process count=1175; drive limit=2959 (60% threshold = base + 600); hold=5s interval=1s (production defaults)
+[01:33:59] == S1 arm the standing detector in the lab home
+registered: proc-guard (proc)
+armed: proc-guard
+arm exit=0
+[01:34:00] runner pid=90417 alive=yes; claim owner home=/Users/charlesabrooker/tmp/fm-lab.6sf3wh/home
+[01:34:00] registration:
+  | adapter=proc
+  | argc=4
+  | argv:
+  | /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9S3T5T9P3M93GK7BGK4TC/bin/fm-procevent-proc.sh
+  | poll
+  | --limit
+  | 2959
+[01:34:00] == S2 adversarial: a pile that stays high for less than the 5 s hold
+[01:34:03] crossed: WARNING 1889 63.8 pile=706
+[01:34:06] count back below threshold 2.42 s after it crossed; now OK 1170 39.5
+[01:34:14] after 8 s quiet: inbox result=none census_files=0 episode=none
+[01:34:14] == S3 a real self-recursive pile held above 60% for more than 5 s
+[01:34:16] crossed: WARNING 1875 63.4 pile=655
+[01:34:23] result captured 6.86 s after the threshold was crossed
+[01:34:23] captured result document:
+  | proc-guard: proc-guard
+  | status: pileup
+  | count: 2378
+  | limit: 2959
+  | threshold: 1775
+  | held_seconds: 5.99
+  | census: /Users/charlesabrooker/tmp/fm-lab.6sf3wh/home/state/proc-census.1791614063.92633.json
+  | summary: 2378 of 2959 processes; most common command bash x1387; deepest ancestry 1205
+  | sampler_samples: 23
+  | sampler_cpu_ms_per_sample: 0.256
+  | sampler_peak_rss_kb: 25952
+[01:34:23] census file: /Users/charlesabrooker/tmp/fm-lab.6sf3wh/home/state/proc-census.1791614063.92633.json mode=600
+  census schema 2 platform darwin user_process_count 2378 limit 2959
+  trigger: {'reason': 'count above threshold', 'held_seconds': 6.0, 'hold_seconds': 5.0}
+  census cost ms: 14.6 cpu ms: 12.5
+  summary: 2378 of 2959 processes; most common command bash x1387; deepest ancestry 1205
+  by_command top 3: [('bash', 1387), ('zsh', 149), ('perl', 61)]
+  by_parent_chain top 2: [('no-mistakes > 2.1.296 > zsh > bash+', 1201), ('zsh > herdr+ > zsh', 109)]
+  deepest chains: 5 first depth 1205 chain no-mistakes > 2.1.296 > zsh > bash(x1201) > sleep
+  oldest: 5 newest: 5
+[01:34:24] durable wake queue rows:
+  | 1791614063	1	check	procevent:proc-guard:1	check: procevent proc proc-guard 1
+[01:34:24] pile still alive after census: pile=1200 (never kills)
+[01:34:24] == S4 the pile stays high 12 s more: no second census or wake
+[01:34:36] result.2=none census_files=1 check_wakes=1 episode=open runner_alive=yes pile=1200
+[01:34:36] == S5 the pile ends; the episode closes after >5 s quiet; a new pile is reported again
+[01:34:36] pile killed; now OK 1181 39.9
+[01:34:43] episode=closed
+[01:34:45] second pile crossed: WARNING 1865 63.0
+[01:34:51] result.2=PRESENT census_files=2 check_wakes=2
+[01:34:51] durable wake queue rows:
+  | 1791614063	1	check	procevent:proc-guard:1	check: procevent proc proc-guard 1
+  | 1791614091	2	check	procevent:proc-guard:2	check: procevent proc proc-guard 2
+[01:34:51] == S6 retire stops the standing runner
+retired: proc-guard
+retire exit=0
+[01:34:52] runner alive after retire: no
+[01:34:52] lab removed at exit: /Users/charlesabrooker/tmp/fm-lab.6sf3wh

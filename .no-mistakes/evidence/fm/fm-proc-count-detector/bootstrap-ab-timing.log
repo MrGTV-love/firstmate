@@ -1,0 +1,19 @@
+pair 1 main=0.556 head_held_claim=1.083 head_cold_claim=1.048
+pair 2 main=0.575 head_held_claim=1.072 head_cold_claim=1.35
+pair 3 main=0.787 head_held_claim=1.218 head_cold_claim=1.079
+pair 4 main=0.5 head_held_claim=0.906 head_cold_claim=1.358
+pair 5 main=0.662 head_held_claim=1.196 head_cold_claim=1.008
+pair 6 main=0.617 head_held_claim=1.079 head_cold_claim=1.079
+pair 7 main=0.587 head_held_claim=1.076 head_cold_claim=0.989
+pair 8 main=0.562 head_held_claim=1.028 head_cold_claim=1.051
+pair 9 main=0.615 head_held_claim=1.501 head_cold_claim=1.288
+pair 10 main=0.552 head_held_claim=1.067 head_cold_claim=0.948
+pair 11 main=0.589 head_held_claim=1.034 head_cold_claim=1.002
+pair 12 main=0.471 head_held_claim=0.793 head_cold_claim=0.801
+pair 13 main=0.441 head_held_claim=0.79 head_cold_claim=1.161
+pair 14 main=0.596 head_held_claim=1.088 head_cold_claim=1.05
+pair 15 main=0.516 head_held_claim=1.001 head_cold_claim=1.022
+main             median 0.575 s  mean 0.575 s
+head_held_claim  median 1.072 s  mean 1.062 s
+head_cold_claim  median 1.050 s  mean 1.082 s
+median ratio head_held/main 1.86, head_cold/main 1.83

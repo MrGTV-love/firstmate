@@ -1,0 +1,20 @@
+== head-a start 07:15:14 load averages: 9.65 11.35 12.31
+== head-a exit=0 end 07:18:30 duration_ms=196043 cpu_pass_wait_s=0
+== main-a start 07:18:30 load averages: 9.43 11.07 12.05
+== main-a exit=0 end 07:21:21 duration_ms=170436 cpu_pass_wait_s=0
+== head-b start 07:21:21 load averages: 12.10 11.50 12.03
+== head-b exit=0 end 07:24:35 duration_ms=193527 cpu_pass_wait_s=0
+== main-b start 07:24:35 load averages: 11.56 11.14 11.73
+== main-b exit=0 end 07:27:19 duration_ms=163665 cpu_pass_wait_s=0
+== head-a start 07:27:19 load averages: 10.02 10.75 11.47
+== head-a exit=0 end 07:28:45 duration_ms=85106 cpu_pass_wait_s=0
+== main-a start 07:28:45 load averages: 12.73 11.36 11.62
+== main-a exit=0 end 07:30:01 duration_ms=75948 cpu_pass_wait_s=0
+== head start 07:30:01 load averages: 8.56 10.36 11.22
+== head exit=0 end 07:30:44 duration_ms=43284 cpu_pass_wait_s=0
+== head start 07:30:44 load averages: 8.19 10.01 11.05
+== head exit=0 end 07:31:37 duration_ms=52037 cpu_pass_wait_s=0
+== single-bootstrap A/B start 07:31:37 load averages: 8.10 9.68 10.86
+== flake loop start 07:32:54 load averages: 10.58 10.22 10.97
+== live pile drive start 07:36:28 load averages: 14.78 14.00 12.52
+== done 07:37:18

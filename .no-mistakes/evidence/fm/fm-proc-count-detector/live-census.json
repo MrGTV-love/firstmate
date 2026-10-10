@@ -1,0 +1,70 @@
+{
+ "schema": 2,
+ "platform": "darwin",
+ "user_process_count": 2378,
+ "limit": 2959,
+ "trigger": {
+  "reason": "count above threshold",
+  "held_seconds": 6.0,
+  "hold_seconds": 5.0
+ },
+ "census_cost_ms": 14.6,
+ "summary": "2378 of 2959 processes; most common command bash x1387; deepest ancestry 1205",
+ "census_cpu_ms": 12.5,
+ "by_command_top": [
+  {
+   "command": "bash",
+   "count": 1387
+  },
+  {
+   "command": "zsh",
+   "count": 149
+  },
+  {
+   "command": "perl",
+   "count": 61
+  }
+ ],
+ "by_parent_chain_top": [
+  {
+   "chain": "no-mistakes > 2.1.296 > zsh > bash+",
+   "count": 1201
+  }
+ ],
+ "deepest_chain_first": {
+  "depth": 1205,
+  "run_length": 1201,
+  "leaf": {
+   "pid": 48440,
+   "command": "sleep",
+   "executable": "pilesleep",
+   "script": ""
+  },
+  "run_samples": [
+   {
+    "pid": 86686,
+    "command": "bash",
+    "executable": "bash",
+    "script": "live-pileup-drive.sh"
+   },
+   {
+    "pid": 38582,
+    "command": "bash",
+    "executable": "bash",
+    "script": "basename"
+   },
+   {
+    "pid": 48430,
+    "command": "bash",
+    "executable": "bash",
+    "script": "basename"
+   }
+  ]
+ },
+ "counts": {
+  "deepest_chains": 5,
+  "oldest": 5,
+  "newest": 5
+ },
+ "note": "Excerpt of the live census from the final drive run (live-pileup-drive.log). Other host processes removed before publishing."
+}

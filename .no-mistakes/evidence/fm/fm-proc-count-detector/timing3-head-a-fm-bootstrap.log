@@ -1,0 +1,318 @@
+    0.2 FM_TEST_BEGIN 2026-10-10T07:22:33Z tests/fm-bootstrap.test.sh family=session-bootstrap expected_gate_skip=none
+   45.5 ok - remote guarded pairs preserve routing while notifying unrelated writes and retrying pending delivery
+   47.2 ok - bootstrap resolves model roles offline and warns on literal profile ids beside an index
+   47.8 fatal: not a git repository (or any of the parent directories): .git
+   47.8 fatal: not a git repository (or any of the parent directories): .git
+   48.1 fatal: not a git repository (or any of the parent directories): .git
+   48.1 fatal: not a git repository (or any of the parent directories): .git
+   49.8 fatal: not a git repository (or any of the parent directories): .git
+   49.8 fatal: not a git repository (or any of the parent directories): .git
+   50.4 fatal: not a git repository (or any of the parent directories): .git
+   50.4 fatal: not a git repository (or any of the parent directories): .git
+   51.8 ok - bootstrap arms the process pile-up detector in a primary home only, silently, and not when read-only, a secondmate, a lab, or unmeasurable
+   57.7 ok - a suite that does not test the detector starts no runner, owner guard, or sampler
+   66.9 ok - an opted-in suite starts exactly one detector runner and reaps it at exit
+   67.4 fatal: not a git repository (or any of the parent directories): .git
+   67.4 fatal: not a git repository (or any of the parent directories): .git
+   68.3 fatal: not a git repository (or any of the parent directories): .git
+   68.3 fatal: not a git repository (or any of the parent directories): .git
+   69.1 fatal: not a git repository (or any of the parent directories): .git
+   69.1 fatal: not a git repository (or any of the parent directories): .git
+   70.0 fatal: not a git repository (or any of the parent directories): .git
+   70.1 fatal: not a git repository (or any of the parent directories): .git
+   71.1 fatal: not a git repository (or any of the parent directories): .git
+   71.1 fatal: not a git repository (or any of the parent directories): .git
+   72.1 fatal: not a git repository (or any of the parent directories): .git
+   72.1 fatal: not a git repository (or any of the parent directories): .git
+   73.0 fatal: not a git repository (or any of the parent directories): .git
+   73.0 fatal: not a git repository (or any of the parent directories): .git
+   73.8 fatal: not a git repository (or any of the parent directories): .git
+   73.8 fatal: not a git repository (or any of the parent directories): .git
+   74.7 fatal: not a git repository (or any of the parent directories): .git
+   74.7 fatal: not a git repository (or any of the parent directories): .git
+   75.6 fatal: not a git repository (or any of the parent directories): .git
+   75.6 fatal: not a git repository (or any of the parent directories): .git
+   76.0 ok - bootstrap reports treehouse lease + tasks-axi/quota-axi bootstrap contracts
+   76.5 fatal: not a git repository (or any of the parent directories): .git
+   76.6 fatal: not a git repository (or any of the parent directories): .git
+   77.4 fatal: not a git repository (or any of the parent directories): .git
+   77.5 fatal: not a git repository (or any of the parent directories): .git
+   78.3 fatal: not a git repository (or any of the parent directories): .git
+   78.4 fatal: not a git repository (or any of the parent directories): .git
+   79.3 fatal: not a git repository (or any of the parent directories): .git
+   79.3 fatal: not a git repository (or any of the parent directories): .git
+   80.2 fatal: not a git repository (or any of the parent directories): .git
+   80.2 fatal: not a git repository (or any of the parent directories): .git
+   80.5 ok - bootstrap enforces no-mistakes minimum version
+   81.0 fatal: not a git repository (or any of the parent directories): .git
+   81.0 fatal: not a git repository (or any of the parent directories): .git
+   81.8 fatal: not a git repository (or any of the parent directories): .git
+   81.8 fatal: not a git repository (or any of the parent directories): .git
+   82.7 fatal: not a git repository (or any of the parent directories): .git
+   82.7 fatal: not a git repository (or any of the parent directories): .git
+   83.6 fatal: not a git repository (or any of the parent directories): .git
+   83.6 fatal: not a git repository (or any of the parent directories): .git
+   84.5 fatal: not a git repository (or any of the parent directories): .git
+   84.5 fatal: not a git repository (or any of the parent directories): .git
+   85.6 fatal: not a git repository (or any of the parent directories): .git
+   85.6 fatal: not a git repository (or any of the parent directories): .git
+   86.8 fatal: not a git repository (or any of the parent directories): .git
+   86.8 fatal: not a git repository (or any of the parent directories): .git
+   87.3 ok - bootstrap enforces gh-axi minimum version
+   87.9 fatal: not a git repository (or any of the parent directories): .git
+   87.9 fatal: not a git repository (or any of the parent directories): .git
+   89.5 fatal: not a git repository (or any of the parent directories): .git
+   89.5 fatal: not a git repository (or any of the parent directories): .git
+   90.7 fatal: not a git repository (or any of the parent directories): .git
+   90.7 fatal: not a git repository (or any of the parent directories): .git
+   91.7 fatal: not a git repository (or any of the parent directories): .git
+   91.7 fatal: not a git repository (or any of the parent directories): .git
+   92.6 fatal: not a git repository (or any of the parent directories): .git
+   92.6 fatal: not a git repository (or any of the parent directories): .git
+   93.4 fatal: not a git repository (or any of the parent directories): .git
+   93.5 fatal: not a git repository (or any of the parent directories): .git
+   94.3 fatal: not a git repository (or any of the parent directories): .git
+   94.3 fatal: not a git repository (or any of the parent directories): .git
+   95.1 fatal: not a git repository (or any of the parent directories): .git
+   95.1 fatal: not a git repository (or any of the parent directories): .git
+   95.9 fatal: not a git repository (or any of the parent directories): .git
+   95.9 fatal: not a git repository (or any of the parent directories): .git
+   97.1 fatal: not a git repository (or any of the parent directories): .git
+   97.1 fatal: not a git repository (or any of the parent directories): .git
+   97.7 ok - bootstrap preserves legacy Lavish boards while recommending synchronous reply support
+   98.3 fatal: not a git repository (or any of the parent directories): .git
+   98.3 fatal: not a git repository (or any of the parent directories): .git
+   99.6 fatal: not a git repository (or any of the parent directories): .git
+   99.6 fatal: not a git repository (or any of the parent directories): .git
+  100.8 fatal: not a git repository (or any of the parent directories): .git
+  100.9 fatal: not a git repository (or any of the parent directories): .git
+  102.0 fatal: not a git repository (or any of the parent directories): .git
+  102.0 fatal: not a git repository (or any of the parent directories): .git
+  102.9 fatal: not a git repository (or any of the parent directories): .git
+  102.9 fatal: not a git repository (or any of the parent directories): .git
+  103.8 fatal: not a git repository (or any of the parent directories): .git
+  103.8 fatal: not a git repository (or any of the parent directories): .git
+  104.7 fatal: not a git repository (or any of the parent directories): .git
+  104.7 fatal: not a git repository (or any of the parent directories): .git
+  105.8 fatal: not a git repository (or any of the parent directories): .git
+  105.9 fatal: not a git repository (or any of the parent directories): .git
+  107.2 fatal: not a git repository (or any of the parent directories): .git
+  107.2 fatal: not a git repository (or any of the parent directories): .git
+  107.8 ok - bootstrap enforces tasks-axi minimum version
+  108.5 fatal: not a git repository (or any of the parent directories): .git
+  108.5 fatal: not a git repository (or any of the parent directories): .git
+  109.7 fatal: not a git repository (or any of the parent directories): .git
+  109.7 fatal: not a git repository (or any of the parent directories): .git
+  111.0 fatal: not a git repository (or any of the parent directories): .git
+  111.0 fatal: not a git repository (or any of the parent directories): .git
+  112.1 fatal: not a git repository (or any of the parent directories): .git
+  112.2 fatal: not a git repository (or any of the parent directories): .git
+  113.7 fatal: not a git repository (or any of the parent directories): .git
+  113.7 fatal: not a git repository (or any of the parent directories): .git
+  114.6 fatal: not a git repository (or any of the parent directories): .git
+  114.6 fatal: not a git repository (or any of the parent directories): .git
+  115.5 fatal: not a git repository (or any of the parent directories): .git
+  115.5 fatal: not a git repository (or any of the parent directories): .git
+  115.9 ok - bootstrap enforces quota-axi minimum version
+  116.8 ok - bootstrap requires git with an install instruction
+  120.3 fatal: not a git repository (or any of the parent directories): .git
+  120.3 fatal: not a git repository (or any of the parent directories): .git
+  121.4 fatal: not a git repository (or any of the parent directories): .git
+  121.4 fatal: not a git repository (or any of the parent directories): .git
+  121.8 ok - bootstrap: backend=orca gates the Orca CLI without requiring it on the default backend
+  122.3 fatal: not a git repository (or any of the parent directories): .git
+  122.3 fatal: not a git repository (or any of the parent directories): .git
+  123.3 fatal: not a git repository (or any of the parent directories): .git
+  123.3 fatal: not a git repository (or any of the parent directories): .git
+  124.6 fatal: not a git repository (or any of the parent directories): .git
+  124.6 fatal: not a git repository (or any of the parent directories): .git
+  125.1 ok - bootstrap: session-provider backends require their own CLI + jq + treehouse, never tmux
+  125.7 fatal: not a git repository (or any of the parent directories): .git
+  125.7 fatal: not a git repository (or any of the parent directories): .git
+  126.5 fatal: not a git repository (or any of the parent directories): .git
+  126.5 fatal: not a git repository (or any of the parent directories): .git
+  127.5 fatal: not a git repository (or any of the parent directories): .git
+  127.5 fatal: not a git repository (or any of the parent directories): .git
+  128.0 ok - bootstrap: a session-provider backend gates its own CLI, never a false tmux requirement
+  128.2 ok - bootstrap: Herdr manual-install guidance is never executed as a shell command
+  128.8 fatal: not a git repository (or any of the parent directories): .git
+  128.8 fatal: not a git repository (or any of the parent directories): .git
+  129.3 ok - bootstrap: the bundled cmux CLI satisfies the active backend dependency
+  129.8 fatal: not a git repository (or any of the parent directories): .git
+  129.8 fatal: not a git repository (or any of the parent directories): .git
+  130.2 ok - bootstrap: unknown resolved backends fail closed with an actionable diagnostic
+  130.7 fatal: not a git repository (or any of the parent directories): .git
+  130.7 fatal: not a git repository (or any of the parent directories): .git
+  131.7 fatal: not a git repository (or any of the parent directories): .git
+  131.7 fatal: not a git repository (or any of the parent directories): .git
+  132.7 fatal: not a git repository (or any of the parent directories): .git
+  132.8 fatal: not a git repository (or any of the parent directories): .git
+  133.3 ok - bootstrap: JSON-emitting backends require jq (their genuine dep), never tmux
+  133.8 fatal: not a git repository (or any of the parent directories): .git
+  133.8 fatal: not a git repository (or any of the parent directories): .git
+  134.9 fatal: not a git repository (or any of the parent directories): .git
+  134.9 fatal: not a git repository (or any of the parent directories): .git
+  135.4 ok - bootstrap: the treehouse lease check follows the resolved backend's worktree provider
+  138.1 ok - bootstrap computes a fleet-size-aware default timeout and preserves partial fleet-sync output
+  139.1 ok - bootstrap keeps the quick 20s default for small fleets
+  140.7 ok - bootstrap preserves FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT as an explicit override
+  143.3 ok - bootstrap treats a blank timeout override as unset
+  144.9 ok - bootstrap computes the timeout before launching fleet sync
+  149.1 ok - bootstrap keeps routine tasks-axi, harness, dispatch, and already-live liveness confirmations silent
+  153.7 ok - bootstrap routine contract runs under system /bin/bash
+  156.5 fatal: not a git repository (or any of the parent directories): .git
+  156.5 fatal: not a git repository (or any of the parent directories): .git
+  163.1 fatal: not a git repository (or any of the parent directories): .git
+  163.1 fatal: not a git repository (or any of the parent directories): .git
+  167.0 fatal: not a git repository (or any of the parent directories): .git
+  167.0 fatal: not a git repository (or any of the parent directories): .git
+  167.5 ok - bootstrap: FM_BOOTSTRAP_NETWORK partitions one run into local and network halves
+  167.8 ok - bootstrap: every deferred mutating sweep rechecks fleet-lock ownership
+  170.5 ok - bootstrap: each deferred network phase, secondmate, and clone records its own elapsed time
+  171.0 fatal: not a git repository (or any of the parent directories): .git
+  171.0 fatal: not a git repository (or any of the parent directories): .git
+  171.7 fatal: not a git repository (or any of the parent directories): .git
+  171.7 fatal: not a git repository (or any of the parent directories): .git
+  172.4 fatal: not a git repository (or any of the parent directories): .git
+  172.4 fatal: not a git repository (or any of the parent directories): .git
+  172.8 ok - bootstrap: the tasks-axi compatibility verdict travels exactly one process hop
+  173.4 fatal: not a git repository (or any of the parent directories): .git
+  173.4 fatal: not a git repository (or any of the parent directories): .git
+  174.1 fatal: not a git repository (or any of the parent directories): .git
+  174.1 fatal: not a git repository (or any of the parent directories): .git
+  174.5 ok - bootstrap surfaces active crew-dispatch rules only as verbose BOOTSTRAP_INFO
+  175.0 fatal: not a git repository (or any of the parent directories): .git
+  175.0 fatal: not a git repository (or any of the parent directories): .git
+  176.2 fatal: not a git repository (or any of the parent directories): .git
+  176.2 fatal: not a git repository (or any of the parent directories): .git
+  177.6 fatal: not a git repository (or any of the parent directories): .git
+  177.6 fatal: not a git repository (or any of the parent directories): .git
+  178.9 fatal: not a git repository (or any of the parent directories): .git
+  178.9 fatal: not a git repository (or any of the parent directories): .git
+  180.0 fatal: not a git repository (or any of the parent directories): .git
+  180.0 fatal: not a git repository (or any of the parent directories): .git
+  181.0 fatal: not a git repository (or any of the parent directories): .git
+  181.1 fatal: not a git repository (or any of the parent directories): .git
+  182.3 fatal: not a git repository (or any of the parent directories): .git
+  182.3 fatal: not a git repository (or any of the parent directories): .git
+  183.6 fatal: not a git repository (or any of the parent directories): .git
+  183.6 fatal: not a git repository (or any of the parent directories): .git
+  185.1 fatal: not a git repository (or any of the parent directories): .git
+  185.1 fatal: not a git repository (or any of the parent directories): .git
+  186.6 fatal: not a git repository (or any of the parent directories): .git
+  186.6 fatal: not a git repository (or any of the parent directories): .git
+  188.0 fatal: not a git repository (or any of the parent directories): .git
+  188.0 fatal: not a git repository (or any of the parent directories): .git
+  189.2 fatal: not a git repository (or any of the parent directories): .git
+  189.2 fatal: not a git repository (or any of the parent directories): .git
+  190.6 fatal: not a git repository (or any of the parent directories): .git
+  190.6 fatal: not a git repository (or any of the parent directories): .git
+  191.9 fatal: not a git repository (or any of the parent directories): .git
+  191.9 fatal: not a git repository (or any of the parent directories): .git
+  193.2 fatal: not a git repository (or any of the parent directories): .git
+  193.2 fatal: not a git repository (or any of the parent directories): .git
+  194.5 fatal: not a git repository (or any of the parent directories): .git
+  194.5 fatal: not a git repository (or any of the parent directories): .git
+  195.6 fatal: not a git repository (or any of the parent directories): .git
+  195.6 fatal: not a git repository (or any of the parent directories): .git
+  196.7 fatal: not a git repository (or any of the parent directories): .git
+  196.7 fatal: not a git repository (or any of the parent directories): .git
+  197.8 fatal: not a git repository (or any of the parent directories): .git
+  197.8 fatal: not a git repository (or any of the parent directories): .git
+  198.8 fatal: not a git repository (or any of the parent directories): .git
+  198.9 fatal: not a git repository (or any of the parent directories): .git
+  200.0 fatal: not a git repository (or any of the parent directories): .git
+  200.0 fatal: not a git repository (or any of the parent directories): .git
+  201.1 fatal: not a git repository (or any of the parent directories): .git
+  201.1 fatal: not a git repository (or any of the parent directories): .git
+  202.2 fatal: not a git repository (or any of the parent directories): .git
+  202.2 fatal: not a git repository (or any of the parent directories): .git
+  203.3 fatal: not a git repository (or any of the parent directories): .git
+  203.3 fatal: not a git repository (or any of the parent directories): .git
+  204.3 fatal: not a git repository (or any of the parent directories): .git
+  204.3 fatal: not a git repository (or any of the parent directories): .git
+  205.2 fatal: not a git repository (or any of the parent directories): .git
+  205.2 fatal: not a git repository (or any of the parent directories): .git
+  206.1 fatal: not a git repository (or any of the parent directories): .git
+  206.1 fatal: not a git repository (or any of the parent directories): .git
+  207.0 fatal: not a git repository (or any of the parent directories): .git
+  207.0 fatal: not a git repository (or any of the parent directories): .git
+  207.9 fatal: not a git repository (or any of the parent directories): .git
+  207.9 fatal: not a git repository (or any of the parent directories): .git
+  208.8 fatal: not a git repository (or any of the parent directories): .git
+  208.9 fatal: not a git repository (or any of the parent directories): .git
+  209.8 fatal: not a git repository (or any of the parent directories): .git
+  209.8 fatal: not a git repository (or any of the parent directories): .git
+  210.9 fatal: not a git repository (or any of the parent directories): .git
+  210.9 fatal: not a git repository (or any of the parent directories): .git
+  212.1 fatal: not a git repository (or any of the parent directories): .git
+  212.1 fatal: not a git repository (or any of the parent directories): .git
+  213.1 fatal: not a git repository (or any of the parent directories): .git
+  213.2 fatal: not a git repository (or any of the parent directories): .git
+  214.2 fatal: not a git repository (or any of the parent directories): .git
+  214.2 fatal: not a git repository (or any of the parent directories): .git
+  215.2 fatal: not a git repository (or any of the parent directories): .git
+  215.2 fatal: not a git repository (or any of the parent directories): .git
+  216.1 fatal: not a git repository (or any of the parent directories): .git
+  216.2 fatal: not a git repository (or any of the parent directories): .git
+  217.1 fatal: not a git repository (or any of the parent directories): .git
+  217.1 fatal: not a git repository (or any of the parent directories): .git
+  218.0 fatal: not a git repository (or any of the parent directories): .git
+  218.0 fatal: not a git repository (or any of the parent directories): .git
+  219.3 fatal: not a git repository (or any of the parent directories): .git
+  219.4 fatal: not a git repository (or any of the parent directories): .git
+  220.5 fatal: not a git repository (or any of the parent directories): .git
+  220.5 fatal: not a git repository (or any of the parent directories): .git
+  221.5 fatal: not a git repository (or any of the parent directories): .git
+  221.5 fatal: not a git repository (or any of the parent directories): .git
+  222.7 fatal: not a git repository (or any of the parent directories): .git
+  222.7 fatal: not a git repository (or any of the parent directories): .git
+  224.3 fatal: not a git repository (or any of the parent directories): .git
+  224.3 fatal: not a git repository (or any of the parent directories): .git
+  225.8 fatal: not a git repository (or any of the parent directories): .git
+  225.8 fatal: not a git repository (or any of the parent directories): .git
+  227.4 fatal: not a git repository (or any of the parent directories): .git
+  227.4 fatal: not a git repository (or any of the parent directories): .git
+  228.6 fatal: not a git repository (or any of the parent directories): .git
+  228.6 fatal: not a git repository (or any of the parent directories): .git
+  229.7 fatal: not a git repository (or any of the parent directories): .git
+  229.8 fatal: not a git repository (or any of the parent directories): .git
+  231.0 fatal: not a git repository (or any of the parent directories): .git
+  231.0 fatal: not a git repository (or any of the parent directories): .git
+  232.3 fatal: not a git repository (or any of the parent directories): .git
+  232.3 fatal: not a git repository (or any of the parent directories): .git
+  233.8 fatal: not a git repository (or any of the parent directories): .git
+  233.8 fatal: not a git repository (or any of the parent directories): .git
+  235.0 fatal: not a git repository (or any of the parent directories): .git
+  235.1 fatal: not a git repository (or any of the parent directories): .git
+  236.2 fatal: not a git repository (or any of the parent directories): .git
+  236.2 fatal: not a git repository (or any of the parent directories): .git
+  237.7 fatal: not a git repository (or any of the parent directories): .git
+  237.7 fatal: not a git repository (or any of the parent directories): .git
+  239.1 fatal: not a git repository (or any of the parent directories): .git
+  239.1 fatal: not a git repository (or any of the parent directories): .git
+  240.2 fatal: not a git repository (or any of the parent directories): .git
+  240.2 fatal: not a git repository (or any of the parent directories): .git
+  241.3 fatal: not a git repository (or any of the parent directories): .git
+  241.3 fatal: not a git repository (or any of the parent directories): .git
+  242.3 fatal: not a git repository (or any of the parent directories): .git
+  242.3 fatal: not a git repository (or any of the parent directories): .git
+  243.3 fatal: not a git repository (or any of the parent directories): .git
+  243.3 fatal: not a git repository (or any of the parent directories): .git
+  244.4 fatal: not a git repository (or any of the parent directories): .git
+  244.4 fatal: not a git repository (or any of the parent directories): .git
+  245.3 fatal: not a git repository (or any of the parent directories): .git
+  245.3 fatal: not a git repository (or any of the parent directories): .git
+  246.1 fatal: not a git repository (or any of the parent directories): .git
+  246.1 fatal: not a git repository (or any of the parent directories): .git
+  246.8 fatal: not a git repository (or any of the parent directories): .git
+  246.8 fatal: not a git repository (or any of the parent directories): .git
+  247.5 fatal: not a git repository (or any of the parent directories): .git
+  247.6 fatal: not a git repository (or any of the parent directories): .git
+  248.3 fatal: not a git repository (or any of the parent directories): .git
+  248.3 fatal: not a git repository (or any of the parent directories): .git
+  248.7 ok - bootstrap gates resolver fields and additive harnesses on the typed key
+  281.7 FM_TEST_END 2026-10-10T07:27:14Z tests/fm-bootstrap.test.sh exit=0 duration_ms=281489 gate_skip=false
+  282.1 FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=282125
+  282.1 FM_TEST_SUMMARY_FAMILY family=session-bootstrap count=1 duration_ms=281489 failed=0
+  282.1 FM_TEST_SLOWEST rank=1 script=tests/fm-bootstrap.test.sh duration_ms=281489

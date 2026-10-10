@@ -1,0 +1,22 @@
+pair 1 main=0.486 head_noadapter=0.420 head_held=0.669 head_cold=0.609 cold_at_return=claim cold_runner_up=yes
+pair 2 main=0.405 head_noadapter=0.399 head_held=0.742 head_cold=0.709 cold_at_return=claim cold_runner_up=yes
+pair 3 main=0.501 head_noadapter=0.453 head_held=0.679 head_cold=0.678 cold_at_return=claim cold_runner_up=yes
+pair 4 main=0.425 head_noadapter=0.432 head_held=0.684 head_cold=0.691 cold_at_return=claim cold_runner_up=yes
+pair 5 main=0.498 head_noadapter=0.476 head_held=0.806 head_cold=0.649 cold_at_return=claim cold_runner_up=yes
+pair 6 main=0.381 head_noadapter=0.542 head_held=1.208 head_cold=1.258 cold_at_return=claim cold_runner_up=yes
+pair 7 main=0.811 head_noadapter=0.612 head_held=0.874 head_cold=0.754 cold_at_return=claim cold_runner_up=yes
+pair 8 main=0.454 head_noadapter=0.479 head_held=0.802 head_cold=0.784 cold_at_return=claim cold_runner_up=yes
+pair 9 main=0.565 head_noadapter=0.495 head_held=0.740 head_cold=0.821 cold_at_return=claim cold_runner_up=yes
+pair 10 main=0.479 head_noadapter=0.506 head_held=0.872 head_cold=1.090 cold_at_return=claim cold_runner_up=yes
+pair 11 main=0.609 head_noadapter=0.518 head_held=0.836 head_cold=0.789 cold_at_return=claim cold_runner_up=yes
+pair 12 main=0.461 head_noadapter=0.488 head_held=0.849 head_cold=0.814 cold_at_return=claim cold_runner_up=yes
+pair 13 main=0.530 head_noadapter=0.454 head_held=0.702 head_cold=0.697 cold_at_return=claim cold_runner_up=yes
+pair 14 main=0.514 head_noadapter=0.451 head_held=0.765 head_cold=0.716 cold_at_return=claim cold_runner_up=yes
+pair 15 main=0.385 head_noadapter=0.373 head_held=0.612 head_cold=0.591 cold_at_return=claim cold_runner_up=yes
+missing_lines=0 cold_runner_not_up=0
+main             median 0.486 s  mean 0.500 s
+head_noadapter   median 0.476 s  mean 0.473 s
+head_held        median 0.765 s  mean 0.789 s
+head_cold        median 0.716 s  mean 0.777 s
+head_held vs main median ratio 1.57x; adds 0.289 s over head_noadapter
+head_cold vs main median ratio 1.47x; adds 0.240 s over head_noadapter

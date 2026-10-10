@@ -1,0 +1,5 @@
+tests/fm-bootstrap.test.sh, same host, run order head-a -> main -> head-b
+shared cases: 30; head-a 229 s, main 241 s, head-b 351 s
+shared-case ratio head-a/main 0.95, head-b/main 1.46
+new detector cases on head: 19.7 s (head-a), 20.4 s (head-b)
+cases slower on BOTH head runs than main: 19; faster on both: 4; mixed: 7

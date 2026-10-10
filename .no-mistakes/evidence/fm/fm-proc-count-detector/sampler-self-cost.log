@@ -1,0 +1,10 @@
+$ bin/fm-proc-guard.sh watch --state-dir <tmp> --duration 30   (production: 1 Hz, hold 5 s, real kern.maxprocperuid)
+proc-guard: proc-guard
+status: idle
+armed: yes
+sampler_samples: 30
+sampler_cpu_ms_per_sample: 0.205
+sampler_peak_rss_kb: 21584
+       30.16 real         0.03 user         0.02 sys
+            22102016  maximum resident set size
+files written: 0

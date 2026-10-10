@@ -1,0 +1,63 @@
+[07:06:45] base user process count=1130; drive limit=2884 (60% threshold = base + 600); hold=5s interval=1s (production defaults)
+[07:06:45] == S1 arm the standing detector in the lab home
+registered: proc-guard (proc)
+armed: proc-guard
+arm exit=0
+[07:06:46] runner pid=87125 alive=yes; claim owner home=/Users/charlesabrooker/tmp/fm-lab.vIBt2f/home
+[07:06:46] registration:
+  | adapter=proc
+  | argc=4
+  | argv:
+  | /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9S3T5T9P3M93GK7BGK4TC/bin/fm-procevent-proc.sh
+  | poll
+  | --limit
+  | 2884
+[07:06:46] == S2 adversarial: a pile that stays high for less than the 5 s hold
+[07:06:48] crossed: WARNING 1855 64.3 pile=739
+/Users/charlesabrooker/.no-mistakes/evidence/01M4H9S3T5T9P3M93GK7BGK4TC/round3-live-pileup-drive.sh: line 43: 87979 Terminated: 15          PILE_DEPTH=$DEPTH "$LAB/shim/basename" > /dev/null 2>&1
+[07:06:51] count back below threshold 2.37 s after it crossed; now OK 1127 39.1
+[07:06:59] after 8 s quiet: inbox result=none census_files=0 episode=none
+[07:06:59] == S3 a real self-recursive pile held above 60% for more than 5 s
+[07:07:01] crossed: WARNING 1878 65.1 pile=764
+[07:07:08] result captured 6.56 s after the threshold was crossed
+[07:07:08] captured result document:
+  | proc-guard: proc-guard
+  | status: pileup
+  | count: 2432
+  | limit: 2884
+  | threshold: 1730
+  | held_seconds: 5.99
+  | census: /Users/charlesabrooker/tmp/fm-lab.vIBt2f/home/state/proc-census.1791634027.87919.json
+  | summary: 2432 of 2884 processes; most common command bash x1452; deepest ancestry 1206
+  | sampler_samples: 22
+  | sampler_cpu_ms_per_sample: 0.244
+  | sampler_peak_rss_kb: 25680
+[07:07:08] census file: /Users/charlesabrooker/tmp/fm-lab.vIBt2f/home/state/proc-census.1791634027.87919.json mode=600
+  census schema 2 platform darwin user_process_count 2432 limit 2884
+  trigger: {'reason': 'count above threshold', 'held_seconds': 6.0, 'hold_seconds': 5.0}
+  census cost ms: 16.1 cpu ms: 13.7
+  summary: 2432 of 2884 processes; most common command bash x1452; deepest ancestry 1206
+  by_command top 3: [('bash', 1452), ('zsh', 150), ('perl', 51)]
+  by_parent_chain top 2: [('no-mistakes > 2.1.296 > zsh > bash+', 1202), ('zsh > herdr+ > zsh', 106)]
+  deepest chains: 5 first depth 1206 chain no-mistakes > 2.1.296 > zsh > bash(x1202) > sleep
+  oldest: 5 newest: 5
+[07:07:08] durable wake queue rows:
+  | 1791634027	1	check	procevent:proc-guard:1	check: procevent proc proc-guard 1
+[07:07:08] pile still alive after census: pile=1200 (never kills)
+[07:07:08] == S4 the pile stays high 12 s more: no second census or wake
+[07:07:20] result.2=none census_files=1 check_wakes=1 episode=open runner_alive=yes pile=1200
+[07:07:20] == S5 the pile ends; the episode closes after >5 s quiet; a new pile is reported again
+/Users/charlesabrooker/.no-mistakes/evidence/01M4H9S3T5T9P3M93GK7BGK4TC/round3-live-pileup-drive.sh: line 42: 11608 Terminated: 15          PILE_DEPTH=$DEPTH "$LAB/shim/basename" > /dev/null 2>&1
+[07:07:21] pile killed; now OK 1198 41.5
+[07:07:27] episode=closed
+[07:07:29] second pile crossed: WARNING 1831 63.5
+[07:07:35] result.2=PRESENT census_files=2 check_wakes=2
+[07:07:35] durable wake queue rows:
+  | 1791634027	1	check	procevent:proc-guard:1	check: procevent proc proc-guard 1
+  | 1791634054	2	check	procevent:proc-guard:2	check: procevent proc proc-guard 2
+/Users/charlesabrooker/.no-mistakes/evidence/01M4H9S3T5T9P3M93GK7BGK4TC/round3-live-pileup-drive.sh: line 42: 80495 Terminated: 15          PILE_DEPTH=$DEPTH "$LAB/shim/basename" > /dev/null 2>&1
+[07:07:35] == S6 retire stops the standing runner
+retired: proc-guard
+retire exit=0
+[07:07:36] runner alive after retire: no
+[07:07:36] lab removed at exit: /Users/charlesabrooker/tmp/fm-lab.vIBt2f

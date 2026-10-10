@@ -1,0 +1,5 @@
+load: load averages: 24.21 40.73 46.64
+true (process spawn floor)          : median 0.003 s  min 0.003 s
+python3 -I -c pass                  : median 0.037 s  min 0.034 s
+fm-proc-guard.sh check --json       : median 0.054 s  min 0.051 s
+arm, live runner already owns claim : median 0.332 s  min 0.302 s
