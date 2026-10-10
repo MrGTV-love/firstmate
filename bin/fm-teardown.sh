@@ -49,7 +49,11 @@
 # cherry, and merge-tree containment each fail to prove content landed without also
 # accepting unlanded edits to the same paths. Teardown still accepts a merged PR
 # whose head contains the current local work (ancestor or equivalent patch ids),
-# or a clean content-in-default tree match. Anything else refuses.
+# or a clean content-in-default tree match. A copy left on pre-rebase commits
+# (even ones pushed to another remote) is also accepted when every commit the PR
+# head and the default branch lack has a patch id among the PR head's own commits
+# and each merge commit is exactly what git produces from its parents; a refusal
+# then names the commits that are not proven. Anything else refuses.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
 # no pr= was ever recorded (e.g. a yolo-authorized merge on a repo with no PR CI,
 # where the usual "checks green" fm-pr-check.sh trigger never fires) - by looking
@@ -1639,6 +1643,93 @@ $unpushed
 EOF
 }
 
+# The default-branch ref that already-landed history is read from, resolved the
+# way content_in_default resolves it but without fetching: origin's copy when the
+# copy has an origin remote, else the local branch. A stale ref is still sound
+# because every commit reachable from it is in the default branch.
+landed_default_ref() {
+  local name=${BASE_BRANCH:-} ref
+  [ -n "$name" ] || name=$(default_branch) || return 1
+  if git -C "$WT" remote get-url origin >/dev/null 2>&1; then
+    ref="refs/remotes/origin/$name"
+  else
+    ref="refs/heads/$name"
+  fi
+  git -C "$WT" rev-parse --quiet --verify "$ref^{commit}" >/dev/null 2>&1 || return 1
+  printf '%s\n' "$ref"
+}
+
+# One "<short sha> <subject>" line per commit whose change the merged PR head was
+# not proven to carry. The refusal prints it so the next step names the work.
+TEARDOWN_UNPROVEN_COMMITS=
+
+# A pipeline rebase leaves the copy on pre-rebase commits that the PR head
+# replays as new commits, and the copy's commits may sit on a remote the
+# pipeline pushed to, so they are not unpushed. Every commit of the copy that
+# neither the PR head nor the default branch contains must be proven present:
+# a non-merge commit by a stable patch id found among the PR head's own commits,
+# and a merge commit only when its tree is exactly what git produces by merging
+# its two parents, because such a merge contributes nothing of its own. A commit
+# with no proof, a merge with a hand-written change, a conflicted merge, or an
+# octopus merge leaves the copy unproven. A copy whose commits were rewritten
+# beyond their patch, as a conflict resolution during the rebase does, stays
+# unproven on purpose: only the captain's own words discard it.
+rebased_commits_are_in_pr_head() {
+  local pr_head=$1 current default_ref base pr_commits pr_patch_ids candidates commit parents
+  local patch_id tree merged proven unproven=
+  local -a fields
+  TEARDOWN_UNPROVEN_COMMITS=
+  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
+  default_ref=$(landed_default_ref) || default_ref=
+  if [ -n "$default_ref" ]; then
+    pr_commits=$(git -C "$WT" rev-list --no-merges "$pr_head" --not "$default_ref" -- 2>/dev/null) || return 1
+  else
+    base=$(git -C "$WT" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
+    pr_commits=$(git -C "$WT" rev-list --no-merges "$base..$pr_head" -- 2>/dev/null) || return 1
+  fi
+  pr_patch_ids=$(
+    printf '%s\n' "$pr_commits" \
+      | while IFS= read -r commit; do
+          [ -n "$commit" ] || continue
+          patch_id_for_commit "$commit"
+        done \
+      | sed '/^$/d' \
+      | sort -u
+  ) || return 1
+  candidates=$(git -C "$WT" rev-list "$current" --not "$pr_head" ${default_ref:+"$default_ref"} -- 2>/dev/null) || return 1
+  [ -n "$candidates" ] || return 1
+  while IFS= read -r commit; do
+    [ -n "$commit" ] || continue
+    parents=$(git -C "$WT" rev-list --parents -n 1 "$commit" 2>/dev/null) || return 1
+    read -r -a fields <<EOF
+$parents
+EOF
+    proven=0
+    case ${#fields[@]} in
+      1|2)
+        patch_id=$(patch_id_for_commit "$commit")
+        if [ -n "$patch_id" ] && printf '%s\n' "$pr_patch_ids" | grep -qxF "$patch_id"; then
+          proven=1
+        fi
+        ;;
+      3)
+        tree=$(git -C "$WT" rev-parse --verify "$commit^{tree}" 2>/dev/null) || tree=
+        if merged=$(git -C "$WT" merge-tree --write-tree "${fields[1]}" "${fields[2]}" 2>/dev/null); then
+          merged=$(printf '%s\n' "$merged" | head -1)
+          if [ -n "$tree" ] && [ "$merged" = "$tree" ]; then
+            proven=1
+          fi
+        fi
+        ;;
+    esac
+    [ "$proven" = 1 ] || unproven="$unproven$(git -C "$WT" log -1 --format='%h %s' "$commit" 2>/dev/null)"$'\n'
+  done <<EOF
+$candidates
+EOF
+  TEARDOWN_UNPROVEN_COMMITS=${unproven%$'\n'}
+  [ -z "$unproven" ]
+}
+
 # Is the worktree's PR merged for local work contained in that PR? Resolves the
 # PR from the recorded pr= URL first, then from the branch name, and asks GitHub
 # for both the PR state and head. Returns non-zero when the PR is not merged, the
@@ -1670,6 +1761,8 @@ pr_is_merged() {
   if git -C "$WT" merge-base --is-ancestor "$current" "$head" 2>/dev/null; then
     landed=1
   elif unpushed_patches_are_in_pr_head "$head"; then
+    landed=1
+  elif rebased_commits_are_in_pr_head "$head"; then
     landed=1
   fi
   [ "$landed" = 1 ] || return 1
@@ -2059,6 +2152,7 @@ validate_worktree_teardown_safety() {
     if ! work_is_landed "$branch"; then
       echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
       [ -z "$unpushed" ] || printf 'unpushed commits:\n%s\n' "$unpushed" >&2
+      [ -z "$TEARDOWN_UNPROVEN_COMMITS" ] || printf 'commits whose change is not proven present in the merged PR head:\n%s\n' "$TEARDOWN_UNPROVEN_COMMITS" >&2
       if [ "$MODE" = local-only ]; then
         echo "Merge the branch into local $(default_branch 2>/dev/null || echo main) first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
       else
