@@ -170,7 +170,7 @@ cat > "$FAKEBIN/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
   usage) cat "${OMP_USAGE_FIXTURE:?}" ;;
-  models) printf '%s\n' '{"models":[{"selector":"openrouter/z-ai/glm-5.3-flash"},{"selector":"openrouter/deepseek/deepseek-v4-flash"}]}' ;;
+  models) printf '%s\n' '{"models":[{"selector":"deepseek/deepseek-v4-flash"}]}' ;;
   *) exit 2 ;;
 esac
 SH
@@ -1417,7 +1417,7 @@ pass "API, transport, and response failures are error outcomes with exit 0"
 # --- OMP routing consumes the pool, never the single-account Codex row ----------
 cp "$BASE_RULES" "$RULES"
 jq '.rules[3].use={harness:"omp",model:"openai-codex/gpt-6-luna",effort:"high",provider:"codex"} |
-  .rules[3].fallback=[{harness:"omp",model:"openrouter/z-ai/glm-5.3-flash",effort:"high"}]' "$RULES" > "$TMP_ROOT/pool-rules.json"
+  .rules[3].fallback=[{harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"}]' "$RULES" > "$TMP_ROOT/pool-rules.json"
 mv "$TMP_ROOT/pool-rules.json" "$RULES"
 write_quota "$QUOTA" 0.7597
 jq '(.providers[] | select(.provider=="codex").quotaSemantics.effectiveAvailability[]) |=
@@ -1445,7 +1445,7 @@ mv "$TMP_ROOT/all-empty.json" "$OMP_USAGE_FIXTURE"
 reset_log
 TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
 assert_contains "$out" '  status: clear' "whole-pool exhaustion activates the declared stand-in"
-assert_contains "$out" "--model 'openrouter/z-ai/glm-5.3-flash'" "Luna uses only its named stand-in"
+assert_contains "$out" "--model 'deepseek/deepseek-v4-flash'" "Luna uses only its named stand-in"
 for harness in omp codex; do
   jq --arg h "$harness" '.rules[3].use.harness=$h |
     .rules[3].use.model=(if $h == "omp" then "openai-codex/gpt-6-luna" else "gpt-6-luna" end) |
