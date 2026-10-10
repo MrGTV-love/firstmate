@@ -1512,7 +1512,7 @@ Each fallback profile requires `harness`, `model`, and `effort`.
 An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
 Every fallback destination must also satisfy the home's session launch policy.
 A bare `claude` executable or a shell alias is not proof of that route.
-For example, a rule may declare `"fallback": [{"harness": "omp", "model": "openrouter/deepseek/deepseek-v4-flash", "effort": "high"}]`; these fields grant only the named stand-in, not a general downgrade.
+For example, a rule may declare `"fallback": [{"harness": "omp", "model": "<provider>/<model-id>", "effort": "high"}]` with a concrete selector taken from `omp models --json`; these fields grant only the named stand-in, not a general downgrade.
 The operator must preserve the task's required reasoning class in each list; an exhausted strongest route without a supported equal-class stand-in stops and reports the unavailable route.
 Natural-language `why` text does not authorize an executable fallback.
 
