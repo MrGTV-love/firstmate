@@ -5574,7 +5574,7 @@ EOF
       fm_dispatch_fallback_supported "$CONFIG" "$candidate" "$SPAWN_ROUTING_PAIR" || continue
       candidate_harness=$(jq -r .harness <<<"$candidate")
       candidate_model=$(jq -r .model <<<"$candidate")
-      candidate_capacity=$(fm_dispatch_capacity "$candidate_harness" "$candidate_model" "$CONFIG")
+      candidate_capacity=$(fm_dispatch_fallback_capacity "$candidate")
       [ "$(jq -r .status <<<"$candidate_capacity")" != exhausted ] || continue
       [ "$candidate_harness" = omp ] || break
       [ "$candidate_model" != "$MODEL" ] || continue

@@ -6,11 +6,13 @@
 # fm_omp_codex_capacity <model> [usage-json] prints model-specific pool evidence.
 # fm_dispatch_capacity <harness> <model> prints usable/exhausted/unknown evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
-# prints {rule, fallback}; without a rule, identical matching lists are safe,
-# but different lists require the explicit rule chosen at intake.
+# prints {rule, fallback}; only rules containing the profile must resolve. A
+# recorded rule that no longer contains it counts as none, and differing
+# unlabeled lists permit no fallback. rule is set only for a fallback policy.
 # fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
 # prints the original profile unless it is proven exhausted, then the first
 # permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
+# A TeamClaude fallback's proxy quota is unknown, never native Claude's row.
 
 FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=bin/fm-timeout-lib.sh
@@ -64,22 +66,11 @@ fm_omp_codex_capacity() {
   ' 2>/dev/null || printf '%s\n' '{"status":"unknown","accounts":[],"reason":"invalid omp usage JSON"}'
 }
 
-fm_dispatch_claude_quota_unbound() {
-  local config=${1:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-"$FM_DISPATCH_CAPACITY_DIR/.."}/config}}
-  [ -e "$config/claude-account" ] || [ -L "$config/claude-account" ] ||
-    { [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ]; }
-}
-
 fm_dispatch_capacity() {
-  local harness=$1 model=$2 quota config
+  local harness=$1 model=$2 quota
   case "$harness:$model" in
     omp:openai-codex/*) fm_omp_codex_capacity "$model"; return ;;
     claude:*)
-      config=${3:-${FM_CONFIG_OVERRIDE:-${FM_HOME:-$(cd "$FM_DISPATCH_CAPACITY_DIR/.." && pwd)}/config}}
-      if fm_dispatch_claude_quota_unbound "$config"; then
-        printf '%s\n' '{"status":"unknown","reason":"selected Claude authentication has no established native default-account quota mapping"}'
-        return
-      fi
       quota=$(fm_run_timed 10 quota-axi --json 2>/dev/null </dev/null) || quota='{}'
       printf '%s\n' "$quota" | jq -ce --arg model "$model" "$FM_QUOTA_ROW_JQ"'
         (quota_row(.; "claude"; "") |
@@ -96,33 +87,47 @@ fm_dispatch_capacity() {
 }
 
 fm_dispatch_fallbacks() {
-  local config=$1 rule=$2 harness=$3 model=$4 effort=$5 file resolved result
+  local config=$1 rule=$2 harness=$3 model=$4 effort=$5 file entries entry resolved rules='' result
   file=${6:-"$config/crew-dispatch.json"}
   [ -f "$file" ] || { printf '%s\n' '{"rule":"","fallback":[]}'; return; }
-  resolved=$(FM_CONFIG_OVERRIDE="$config" "$FM_DISPATCH_CAPACITY_DIR/fm-model-index.sh" profiles "$file") || return 1
-  result=$(jq -ce --arg rule "$rule" --arg h "$harness" --arg m "$model" --arg e "$effort" '
-    def profiles: if type == "array" then . else [.] end;
-    def axis: if . == null or . == "default" then "" else . end;
+  entries=$(jq -sc '
     def valid_fallback:
       type == "array" and all(.[];
         type == "object" and (.harness == "omp" or .harness == "claude") and
         (.model | type) == "string" and (.model | length) > 0 and
         (.effort == "low" or .effort == "medium" or .effort == "high" or .effort == "xhigh" or .effort == "max") and
         (if .harness == "claude" then .requires == "teamclaude" else (has("requires") | not) end));
+    if length != 1 or (.[0] | type) != "object" then error("dispatch must contain exactly one JSON object") else .[0] end |
     if any((.rules // [])[]; has("fallback") and (.fallback | valid_fallback | not)) or
        (has("default_fallback") and (.default_fallback | valid_fallback | not))
     then error("fallback must be an array of explicit OMP profiles or TeamClaude-required Claude profiles") else . end |
-    ([((.rules // []) | to_entries[] | {rule: ("rule_" + ((.key + 1) | tostring)), use: .value.use, fallback: (.value.fallback // [])})] +
-     [{rule: "default", use: (.default // []), fallback: (.default_fallback // [])}]) as $rules |
-    [$rules[] | select($rule == "" or .rule == $rule) |
-      select(any((.use | profiles)[]; .harness == $h and (.model | axis) == ($m | axis) and (.effort | axis) == ($e | axis)) or
-             any(.fallback[]; .harness == $h and (.model | axis) == ($m | axis) and (.effort | axis) == ($e | axis)))] as $matches |
-    if ($matches | length) == 0 then
-      if $rule != "" then error("dispatch rule does not contain the requested profile")
-      else {rule: "", fallback: []} end
-    elif ($matches | map(.fallback) | unique | length) > 1 then error("different fallback lists match this profile; pass --dispatch-rule")
-    else {rule: (if ($matches | length) == 1 then $matches[0].rule else "" end), fallback: $matches[0].fallback} end
-  ' <<<"$resolved" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$result" >&2; return 1; }
+    ((.rules // []) | to_entries[] | {rule: ("rule_" + ((.key + 1) | tostring)), use: .value.use, fallback: .value.fallback}),
+    {rule: "default", use: (.default // []), fallback: .default_fallback}
+  ' "$file" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$entries" >&2; return 1; }
+  while IFS= read -r entry; do
+    if resolved=$(jq -c '{rules: [{use, fallback}]}' <<<"$entry" |
+        FM_CONFIG_OVERRIDE="$config" "$FM_DISPATCH_CAPACITY_DIR/fm-model-index.sh" profiles /dev/stdin 2>/dev/null); then
+      rules+=$(jq -c --argjson entry "$entry" '.rules[0] + {rule: $entry.rule, resolved: true}' <<<"$resolved")
+    else
+      rules+=$(jq -c '. + {resolved: false}' <<<"$entry")
+    fi
+    rules+=$'\n'
+  done <<<"$entries"
+  result=$(jq -sc --arg rule "$rule" --arg h "$harness" --arg m "$model" --arg e "$effort" '
+    def profiles: if type == "array" then . else [.] end;
+    def axis: if . == null or . == "default" then "" else . end;
+    def same: type == "object" and .harness == $h and (.model | axis) == ($m | axis) and (.effort | axis) == ($e | axis);
+    def contains_profile: .resolved as $resolved |
+      any((.use | profiles)[]; same and ($resolved or (has("role") | not))) or any((.fallback // [])[]; same);
+    . as $rules |
+    [$rules[] | select($rule != "" and .rule == $rule and contains_profile)] as $recorded |
+    (if ($recorded | length) > 0 then $recorded else [$rules[] | select(contains_profile)] end) as $matches |
+    if any($matches[]; .resolved | not) then
+      error("dispatch " + ([$matches[] | select(.resolved | not) | .rule] | join(", ")) + " names a retired model or unconfigured role")
+    elif ($matches | map(.fallback // []) | unique | length) != 1 then {rule: "", fallback: []}
+    else ($matches[0].fallback // []) as $fallback |
+      {rule: (if ($matches | length) == 1 and ($fallback | length) > 0 then $matches[0].rule else "" end), fallback: $fallback} end
+  ' <<<"$rules" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$result" >&2; return 1; }
   printf '%s\n' "$result"
 }
 
@@ -152,10 +157,19 @@ fm_dispatch_fallback_supported() {
   esac
 }
 
+fm_dispatch_fallback_capacity() {
+  local candidate=$1
+  if [ "$(jq -r .harness <<<"$candidate")" = claude ]; then
+    printf '%s\n' '{"status":"unknown","reason":"TeamClaude proxy quota is not measured by native Claude account quota"}'
+    return
+  fi
+  fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")"
+}
+
 fm_dispatch_select() {
   local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} routing_config=${6:-$1} candidate state
   if [ -z "$evidence" ]; then
-    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")" "$config")
+    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")")
   fi
   state=$(jq -r .status <<<"$evidence")
   if [ "$state" != exhausted ]; then
@@ -166,7 +180,7 @@ fm_dispatch_select() {
   while IFS= read -r candidate; do
     [ "$candidate" != "$profile" ] || continue
     fm_dispatch_fallback_supported "$config" "$candidate" "$routing_config" || continue
-    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")" "$config")
+    evidence=$(fm_dispatch_fallback_capacity "$candidate")
     [ "$(jq -r .status <<<"$evidence")" != exhausted ] || continue
     jq -cn --argjson profile "$candidate" --argjson capacity "$evidence" --arg rule "$rule" \
       '{profile: $profile, capacity: $capacity, rule: $rule, switched: true}'

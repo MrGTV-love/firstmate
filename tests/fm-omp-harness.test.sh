@@ -389,6 +389,23 @@ test_spawn_rejects_retired_fallbacks_before_publication() {
   pass "retired fallback refusal covers launch-time selection and runtime chains"
 }
 
+test_spawn_ignores_stale_unrelated_rules() {
+  local rec id=omp-unrelated-stale out status
+  rec=$(make_spawn_case "$id" omp "$id")
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/config"
+  printf '%s\n' '{"version":1,"roles":{},"retired":["glm-5.3-flash"]}' > "$HOME_DIR/config/model-index.json"
+  printf '%s\n' '{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}},{"when":"unconfigured","use":{"harness":"omp","role":"missing-role"}},{"when":"strong work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"openrouter/z-ai/glm-5.3-flash","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+    metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high)
+  status=$?
+  expect_code 0 "$status" "a retired or unconfigured unrelated rule must not block the launch: $out"
+  assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "the launch keeps its own route"
+  assert_no_grep 'dispatch_rule=' "$HOME_DIR/state/$id.meta" "a rule without a fallback policy records no identifier"
+  pass "stale unrelated dispatch rules do not block a launch"
+}
+
 
 test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
   local rec id=omp-strongest-q3 out status
@@ -2807,6 +2824,7 @@ test_worker_guard_project_scope
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
 test_spawn_native_fallback_preserves_destination_order
 test_spawn_rejects_retired_fallbacks_before_publication
+test_spawn_ignores_stale_unrelated_rules
 test_spawn_exhausted_strongest_route_preserves_unlanded_work
 test_spawn_model_validation_scoped_to_listed_providers
 test_spawn_refuses_a_missing_or_unlisted_default_role

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Pooled capacity, uncertainty, explicit fallback permission, and account pins.
 set -u
-# shellcheck source=tests/lib.sh
-. "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/fixtures.sh
+. "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 # shellcheck source=bin/fm-dispatch-capacity-lib.sh
 . "$ROOT/bin/fm-dispatch-capacity-lib.sh"
 TMP_ROOT=$(fm_test_tmproot fm-dispatch-capacity)
@@ -82,13 +82,20 @@ if fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$team" > "$TMP_ROOT/r
   fail "bare Claude must not impersonate the supported TeamClaude route"
 fi
 write_pool 98
-jq '.rules[0].fallback=[]' "$TMP_ROOT/config/crew-dispatch.json" > "$TMP_ROOT/conflicting.json"
-mv "$TMP_ROOT/conflicting.json" "$TMP_ROOT/config/crew-dispatch.json"
-if fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6-luna high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
-  fail "different lists require an explicit rule rather than an arbitrary match"
-fi
+set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_9 omp openai-codex/gpt-6-luna high) || fail "a missing recorded rule must not refuse"
+assert_equals "$allowed" "$(jq -c .fallback <<<"$set")" "a missing recorded rule counts as no recorded rule"
+cp "$TMP_ROOT/config/crew-dispatch.json" "$TMP_ROOT/identical.json"
+jq '.rules[0].fallback=[{harness:"omp",model:"openrouter/deepseek/deepseek-v4-flash",effort:"high"}] |
+  .default_fallback=.rules[0].fallback' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
+set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openrouter/z-ai/glm-5.3-flash high) || fail "an edited recorded rule must not refuse"
+assert_equals '{"rule":"","fallback":[]}' "$set" "a recorded rule that no longer contains the profile counts as absent"
+jq '.rules[0].fallback=[]' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
+set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6-luna high) || fail "differing unlabeled lists must not refuse"
+assert_equals '{"rule":"","fallback":[]}' "$set" "differing unlabeled lists permit no fallback"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high)
-assert_equals '[]' "$(jq -c .fallback <<<"$set")" "an explicit rule retains its own no-fallback policy"
+assert_equals '{"rule":"","fallback":[]}' "$set" "an explicit rule retains its own no-fallback policy"
+set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" default omp openai-codex/gpt-6-luna high)
+assert_equals "$(jq -cn --argjson f "$allowed" '{rule:"default",fallback:$f}')" "$set" "an explicit rule with a fallback policy is reported"
 jq '.rules[0].fallback=[{harness:"claude",model:"opus",effort:"high"}]' "$TMP_ROOT/config/crew-dispatch.json" > "$TMP_ROOT/bad.json"
 mv "$TMP_ROOT/bad.json" "$TMP_ROOT/config/crew-dispatch.json"
 if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
@@ -126,8 +133,19 @@ for retired in openrouter/z-ai/glm-5.3-flash glm-5.3-flash; do
     fail "catalog membership must not authorize a retired stand-in"
   fi
 done
+jq -n --argjson use "$primary" '{rules:[
+    {when:"easy work",use:$use,fallback:[{harness:"omp",model:"openrouter/deepseek/deepseek-v4-flash",effort:"high"}]},
+    {when:"unconfigured",use:{harness:"omp",role:"missing-role"}},
+    {when:"strong work",use:{harness:"omp",model:"openai-codex/gpt-6.1-sol",effort:"high"},
+     fallback:[{harness:"omp",model:"openrouter/z-ai/glm-5.3-flash",effort:"high"}]}]}' > "$TMP_ROOT/config/crew-dispatch.json"
+set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6-luna high) || fail "a stale unrelated rule must not block the lookup"
+assert_equals rule_1 "$(jq -r .rule <<<"$set")" "the matched rule survives stale unrelated rules"
+assert_equals openrouter/deepseek/deepseek-v4-flash "$(jq -r '.fallback[0].model' <<<"$set")" "the matched rule keeps its own stand-in"
+if fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6.1-sol high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+  fail "a matched rule with a retired stand-in must refuse"
+fi
 rm "$TMP_ROOT/config/model-index.json"
-pass "retirement applies to configured lists and direct fallback selection"
+pass "retirement applies to matched lists and direct fallback selection, not unrelated rules"
 
 cat > "$QUOTA_FIXTURE" <<'JSON'
 {"schemaVersion":6,"providers":[
@@ -137,14 +155,16 @@ cat > "$QUOTA_FIXTURE" <<'JSON'
 JSON
 out=$(fm_dispatch_capacity claude claude-sonnet-5-5)
 assert_equals usable "$(jq -r .status <<<"$out")" "another Claude account must not veto the selected default"
-printf 'pinned-account\n' > "$TMP_ROOT/config/claude-account"
-out=$(fm_dispatch_capacity claude claude-sonnet-5-5)
-assert_equals unknown "$(jq -r .status <<<"$out")" "a pin without established quota mapping is not inferred"
-rm "$TMP_ROOT/config/claude-account"
 jq '(.providers[] | select(.accountKey=="default").quotaSemantics.effectiveAvailability[0].effectivePercentRemaining)=0' "$QUOTA_FIXTURE" > "$TMP_ROOT/native-claude-zero.json"
 mv "$TMP_ROOT/native-claude-zero.json" "$QUOTA_FIXTURE"
 printf 'teamclaude\n' > "$TMP_ROOT/config/claude-launcher"
+fm_test_fake_teamclaude "$FAKEBIN"
 out=$(fm_dispatch_capacity claude claude-opus-5-5)
-assert_equals unknown "$(jq -r .status <<<"$out")" "native Claude's exhausted account is not the TeamClaude proxy's quota"
-pass "capacity does not conflate default and pinned Claude accounts"
+assert_equals exhausted "$(jq -r .status <<<"$out")" "a Claude-primary route keeps native quota evidence"
+write_pool 0
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$team") || fail "native Claude exhaustion must not veto the TeamClaude stand-in"
+assert_equals claude "$(jq -r .profile.harness <<<"$out")" "exhausted Sol switches to its declared TeamClaude stand-in"
+assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "TeamClaude proxy quota is unknown, not native Claude's row"
+rm "$TMP_ROOT/config/claude-launcher"
+pass "capacity does not conflate native Claude quota with a TeamClaude stand-in"
 printf '# all fm-dispatch-capacity tests passed\n'

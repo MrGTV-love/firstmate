@@ -5069,7 +5069,26 @@ test_retiring_omp_removes_only_its_generated_configuration() {
   pass "OMP replacement retires generated policy without removing user configuration"
 }
 
+test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
+  local dir out rc recorded id
+  for recorded in none stale; do
+    id=rl-unlabeled-$recorded
+    dir=$(new_case "unlabeled-$recorded" "$id")
+    add_ship_task "$dir" "$id" claude
+    [ "$recorded" = none ] || printf 'dispatch_rule=rule_7\n' >> "$dir/home/state/$id.meta"
+    mkdir -p "$dir/home/config"
+    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"openrouter/deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
+    out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
+    expect_code 0 "$rc" "a $recorded recorded rule with an ambiguous match must relaunch as before: $out"
+    assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"
+    assert_no_grep 'dispatch_rule=' "$dir/home/state/$id.meta" "an ambiguous match records no fallback rule"
+  done
+  pass "relaunch without a usable recorded rule treats an ambiguous match as no fallback"
+}
+
 test_retiring_omp_removes_only_its_generated_configuration
+
+test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior
 
 test_quota_exhaustion_relaunches_only_a_permitted_route
 

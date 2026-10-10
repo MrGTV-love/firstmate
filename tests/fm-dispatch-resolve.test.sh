@@ -1433,6 +1433,13 @@ TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code o
 assert_contains "$out" '  status: clear' "the pooled sibling clears single-account exhaustion"
 assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "a healthy pool retains Luna"
 assert_contains "$out" "--dispatch-rule 'rule_4'" "the launch carries the selected fallback policy"
+cp "$RULES" "$TMP_ROOT/pool-rules.json"
+jq 'del(.rules[3].fallback)' "$TMP_ROOT/pool-rules.json" > "$RULES"
+reset_log
+TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/native-empty.json" run code out err "$BRIEF"
+assert_contains "$out" "--model 'openai-codex/gpt-6-luna'" "a rule without a fallback policy still resolves"
+assert_not_contains "$out" '--dispatch-rule' "a rule without a fallback policy emits no rule identifier"
+mv "$TMP_ROOT/pool-rules.json" "$RULES"
 jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/all-empty.json"
 mv "$TMP_ROOT/all-empty.json" "$OMP_USAGE_FIXTURE"
 reset_log
@@ -1460,34 +1467,6 @@ assert_contains "$out" '  status: escalate' "unknown pooled capacity does not au
 assert_not_contains "$out" '  profile:' "an uncertain pool does not silently use the stand-in"
 cp "$BASE_RULES" "$RULES"
 pass "typed OMP dispatch preserves pooled headroom, explicit stand-ins, and uncertainty"
-
-# Native Claude quota cannot authorize a stand-in for another authentication scope.
-jq '.rules[3].use={harness:"claude",model:"sonnet",effort:"high"} |
-  .rules[3].fallback=[{harness:"omp",model:"openrouter/deepseek/deepseek-v4-flash",effort:"high"}]' "$BASE_RULES" > "$RULES"
-jq '(.providers[] | select(.provider=="claude").quotaSemantics.effectiveAvailability[]) |=
-  (.effectivePercentRemaining=0 | .runway.status="exhausted_now")' "$QUOTA" > "$TMP_ROOT/claude-native-empty.json"
-write_response "$RESPONSE" rule_4 0.9
-for scope_file in claude-launcher claude-account; do
-  case "$scope_file" in
-    claude-launcher) printf 'teamclaude\n' > "$HOME_DIR/config/$scope_file" ;;
-    claude-account) printf 'different-account\n' > "$HOME_DIR/config/$scope_file" ;;
-  esac
-  reset_log
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/claude-native-empty.json" run code out err "$BRIEF"
-  assert_contains "$out" '-> eligible, unranked:' "unmapped selected authentication remains eligible"
-  assert_not_contains "$out" '-> not eligible:' "native default-account exhaustion must not veto another scope"
-  assert_not_contains "$out" "--model 'openrouter/deepseek/deepseek-v4-flash'" "unrelated exhaustion must not activate the stand-in"
-  jq '.rules[3].floor={scope:"all_models",min_percent:20,provider:"claude"}' "$RULES" > "$TMP_ROOT/unmapped-floor.json"
-  mv "$TMP_ROOT/unmapped-floor.json" "$RULES"
-  reset_log
-  TYPESAFE_API_KEY=$KEY QUOTA_AXI_FIXTURE="$TMP_ROOT/claude-native-empty.json" run code out err "$BRIEF"
-  assert_not_contains "$out" '  profile:' "an unrelated native floor must not select the weaker default"
-  jq 'del(.rules[3].floor)' "$RULES" > "$TMP_ROOT/no-unmapped-floor.json"
-  mv "$TMP_ROOT/no-unmapped-floor.json" "$RULES"
-  rm "$HOME_DIR/config/$scope_file"
-done
-cp "$BASE_RULES" "$RULES"
-pass "typed dispatch never binds native Claude exhaustion to a proxy or account pin"
 
 # --- configuration errors exit 2 and select nothing ----------------------------------
 reset_log
@@ -1598,10 +1577,34 @@ assert_absent "$LOG/argv" "duplicate candidates must refuse before the rule requ
 rm "$HOME_DIR/config/model-index.json"
 pass "typed intake resolves roles before quota ranking and detects concrete duplicates"
 
-
+# The chosen id is checked against the catalog of the account a pinned worker
+# would launch under, not the intake's ambient account.
+mkdir -p "$TMP_ROOT/pinned-claude" "$TMP_ROOT/ambient-claude"
+printf 'pinned-only\n' > "$TMP_ROOT/pinned-claude/catalog"
+printf 'ambient-only\n' > "$TMP_ROOT/ambient-claude/catalog"
+cat > "$FAKEBIN/claude" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\${CLAUDE_CONFIG_DIR-unset}" >> '$TMP_ROOT/claude-catalog-roots'
+jq -Rsc '{type:"control_response",response:{subtype:"success",request_id:"model-index",
+  response:{models:[split("\\n")[] | select(length > 0) | {value:., resolvedModel:.}]}}}' "\${CLAUDE_CONFIG_DIR}/catalog"
+SH
+chmod +x "$FAKEBIN/claude"
+printf '%s\n' '{"version":1,"roles":{"routine":{"claude":{"model":"pinned-only"}}},"retired":[]}' > "$HOME_DIR/config/model-index.json"
+printf '%s\n' "$TMP_ROOT/pinned-claude" > "$HOME_DIR/config/claude-account"
+printf '%s\n' '{"rules":[{"when":"Claude work.","use":{"harness":"claude","role":"routine"}}]}' > "$RULES"
 cat > "$RESPONSE" <<'JSON'
 {"model":"jev-1.13.0","answers":{"rule":{"type":"choice","choice":"rule_1","confidence":0.99,"probabilities":{"rule_1":0.99,"default":0.01}}},"usage":{"input_tokens":100,"output_tokens":60}}
 JSON
+reset_log
+CLAUDE_CONFIG_DIR="$TMP_ROOT/ambient-claude" TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+expect_code 0 "$code" "pinned-account intake exits 0"
+assert_contains "$out" "  profile: --harness 'claude' --model 'pinned-only'" "the pinned account's catalog must decide the chosen id: $err"
+[ "$(cat "$TMP_ROOT/claude-catalog-roots")" = "$TMP_ROOT/pinned-claude" ] \
+  || fail "the chosen-id catalog must be read from the pinned root only: $(cat "$TMP_ROOT/claude-catalog-roots")"
+rm "$HOME_DIR/config/model-index.json" "$HOME_DIR/config/claude-account" "$FAKEBIN/claude"
+cp "$BASE_RULES" "$RULES"
+pass "typed intake checks the chosen id against the pinned worker account's catalog"
+
 mkdir -p "$TMP_ROOT/supervisor-account"
 printf '%s\n' '{"models":[{"slug":"supervisor-only"}]}' > "$TMP_ROOT/supervisor-account/models_cache.json"
 printf 'openai-codex  supervisor-only  272K  32K  yes  no\n' > "$TMP_ROOT/supervisor-account/listed"
