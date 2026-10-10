@@ -1309,9 +1309,9 @@ if ! pane_readable "$BACKEND_TARGET"; then
   #             and fm-session-start depend on it to license a respawn after a
   #             genuine server death - a socket-connection failure is NOT
   #             covered by the unknown-never-death rule above).
-  #   dead    - the endpoint exists but confidently has no agent (herdr's agent
-  #             get answered agent_not_found, or its registration lingers over a
-  #             pane whose processes are nothing but shells - issue #4115;
+  #   dead    - the endpoint exists but confidently has no agent (herdr proved
+  #             a shell-only pane whether its registration is absent or lingers
+  #             - issue #4115;
   #             tmux's readable foreground process group is nothing but
   #             shells), still positive death evidence.
   #   alive   - the endpoint and its agent answered and only the heavy

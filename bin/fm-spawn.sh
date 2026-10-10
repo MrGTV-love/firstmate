@@ -406,6 +406,9 @@
 #   prevents equal task ids in different Firstmate homes from sharing a file.
 #   Spawn refuses an unsafe pre-existing task temp root or launch namespace, and
 #   task teardown removes only the current home's launch namespace.
+# Herdr launches record launch_proof=env-v1 and stamp FM_SPAWN_GEN with
+# spawn_gen inside the launch boundary. bin/fm-launch-proof-lib.sh owns live
+# lifecycle attribution; Herdr's bare native resume remains unmanaged.
 # Launch environment (config/launch-env-allowlist):
 #   Absent leaves ambient inheritance subject to harness-specific shedding.
 #   A present readable regular file opts every launch (ship, scout, secondmate,
@@ -1815,6 +1818,7 @@ clear_relaunch_harness_wiring() {
   done <<EOF
 $(fm_control_harness_wiring_paths "$harness" "$wt" "$state" "$id")
 EOF
+  rm -f -- "$state/$id.reboot-notice"
 }
 
 spawn_herdr_presentation_order_lock_release() {
@@ -2970,6 +2974,7 @@ omp)
     echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
     exit 1
   }
+  fm_control_omp_launch_check "$OMP_BIN" || exit 1
   OMP_SESSION_CFG="$FM_ROOT/.omp/fm-session-overlay.yml"
   OMP_WORKER_CFG="$FM_ROOT/.omp/fm-worker-overlay.yml"
   [ -f "$OMP_SESSION_CFG" ] || {
@@ -5544,6 +5549,7 @@ EOF
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installJevGuard } from "$FM_ROOT/bin/fm-jev-guard.ts";
+import { installTaskSessionProof } from "$FM_ROOT/.omp/extensions/lib/fm-task-session.ts";
 import { installLiveModelPublisher } from "$FM_ROOT/bin/fm-omp-live-model.ts";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
@@ -5554,6 +5560,7 @@ const busyEvent = (state: string, event: string) =>
   });
 export default function (pi: any) {
   installJevGuard(pi, $guard_context);
+  installTaskSessionProof(pi, "$STATE_REAL", "$ID");
   // The model serving this task now, for bin/fm-crew-state.sh's drift note.
   installLiveModelPublisher(pi, "$STATE_REAL/$ID.live-model");
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
@@ -5774,7 +5781,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5805,6 +5812,7 @@ preserve_relaunch_meta() {
   [ "$ALLOW_API_KEY" -eq 0 ] || echo "api_key=allow"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
+  [ "$BACKEND" != herdr ] || echo "launch_proof=env-v1"
   # Default-off writes no traceparent= line.
   # backend= is written only for a non-default (non-tmux) backend, so the
   # default path's meta stays byte-identical (absent backend= means tmux;
@@ -6178,6 +6186,10 @@ fi
 # launch and the launch-env-allowlist `env -i` wrapper.
 LAUNCH="export FM_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
 LAUNCH="export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH; $COMPACT_ADVISER_HOOKS$LAUNCH"
+if [ "$BACKEND" = herdr ]; then
+  LAUNCH="(export FM_SPAWN_GEN=$(shell_quote "$SPAWN_GEN"); $LAUNCH
+)"
+fi
 # When the live-harness gate has exported DISABLE_AUTOUPDATER into this spawn's
 # own environment, carry it into the launch command text so Claude Code's
 # auto-updater cannot rewrite the shared binary during a live run. Embedding the

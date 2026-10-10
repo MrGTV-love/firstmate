@@ -50,8 +50,8 @@
 # ordinary record by the worker's acknowledgement move into handled/.
 # bin/fm-task-inbox-lib.sh owns the record format, doorbell line, and retry and
 # escalation policy for ordinary and fire-and-forget records.
-# The composer pre-check before the ring is ADVISORY only: when
-# the composer visibly holds pending text the ring is skipped with a notice and
+# The composer pre-check before the ring is advisory except for pending text or
+# identified draft risk, which skips the ring with a notice and
 # the watcher re-rings an ordinary record later; no composer verdict is
 # delivery proof on this plane, and a failed ring never fails the send.
 #
@@ -64,8 +64,8 @@
 # text through the target backend's verified submit core: typed ONCE, then
 # Enter retried (never retyped) until the backend confirms a submit or reports
 # an inconclusive send. Typed-plane exit contract: 0 = submit confirmed;
-# 3 = the text was typed into the live endpoint and
-# Enter was sent, but the submit read-back stayed unconfirmed (verify the pane
+# 3 = the text was typed into the live endpoint and Enter was sent, but the
+# submit read-back stayed `pending` or `unknown-draft` (verify the pane
 # before any resend, and never re-type blindly; a marked request's
 # pending-reply expectation stays armed because this outcome is not a proven
 # failure); any other nonzero = the send failed and nothing may be assumed
@@ -1096,7 +1096,7 @@ else
       esac
     fi
     case "$ring_rc" in
-    1) echo "fm-send: doorbell skipped (composer visibly holds pending text); the steer is durably recorded at $INBOX_RECORD and $ring_retry" >&2 ;;
+    1) echo "fm-send: doorbell skipped (composer holds pending text or identified draft risk); the steer is durably recorded at $INBOX_RECORD and $ring_retry" >&2 ;;
     2) echo "fm-send: doorbell did not reach $T; the steer is durably recorded at $INBOX_RECORD and $ring_retry" >&2 ;;
     3) echo "fm-send: doorbell not typed because the agent in $T has exited; the steer is durably recorded at $INBOX_RECORD for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane" >&2 ;;
     esac
@@ -1158,7 +1158,7 @@ else
     echo "error: text not sent to $T ($TARGET_BACKEND send failed; tried $RESOLUTION_TRIED)" >&2
     exit 1
     ;;
-  pending)
+  pending|unknown-draft)
     # The text was typed into the live target and Enter was sent; only the
     # submit read-back stayed unconfirmed (e.g. a busy harness queues the
     # steer and keeps rendering it). That is not a proven failure, so never
@@ -1170,7 +1170,7 @@ else
     # correlated report still resolves it and an unanswered one still
     # surfaces through the library's own reconciliation
     # (bin/fm-pending-reply-lib.sh).
-    echo "fm-send: text delivered to $T but submission is unconfirmed (verdict=pending; tried $RESOLUTION_TRIED); do not retype or blindly resend - verify with fm-peek.sh, then re-send '--key Enter' only if the composer still holds the text" >&2
+    echo "fm-send: text delivered to $T but submission is unconfirmed (verdict=$verdict; tried $RESOLUTION_TRIED); do not retype or blindly resend - verify with fm-peek.sh, then re-send '--key Enter' only if the composer still holds the text" >&2
     exit 3
     ;;
   *)

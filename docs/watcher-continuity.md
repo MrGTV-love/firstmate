@@ -118,6 +118,7 @@ Alt+Up does not itself schedule a recovery check; a tracked wake dequeued after 
 Rare credential loss during recovery can reject resubmission after the editable copy is removed; the durable queue and shutdown handoff retain the wake, the existing parent stalled-loop alarm reports either stall for endpoint-recorded local secondmates, and consumption-confirmed removal remains follow-up `fm-omp-wake-recovery-rollback`.
 [Architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary, secondmate stalled-queue escalation, and idle-ring eligibility.
 `tests/fm-omp-harness.test.sh` covers restored-wake matching, editor normalization, draft preservation, bounded recovery, pending-wake retention across cancelled preparation without `agent_end`, later completed draft turns, and replacement handoff until accepted user `message_start`, plus identical wakes across preparation plus accepted-message callbacks, streaming delivery, and session replacement.
+The fixture uses production readiness bounds and the same bounded delivery wait for initial and replacement wakes, so a slower healthy login-shell startup does not masquerade as lost handoff state.
 It also covers the wait on queued messages: a queue that drains, a restored wake behind a queue that never drains, a wake stuck in the queue itself, and resubmissions that start no turn.
 Deterministic lifecycle checks prove that episodes after session replacement, queue drainage observed by recovery checks or polling while exhausted wakes remain tracked, or a running-turn observation each wait all fifteen checks before retrying and warn once after exhausting their attempts.
 Separate cases isolate accepted wake messages, ordinary user messages, and turn completion between checks.
@@ -358,6 +359,7 @@ An ordinary presentation drain bounds both its initial queue-lock acquire and it
 | Status-presentation lock | One such advisory after raw wake presentation, and status annotations, sections, and cursors are left retriable on the next drain. |
 
 Acknowledgement invocations and every other mutation-critical queue-lock acquire retain blocking semantics while the lock's parent directory exists, so acknowledgement atomicity is unchanged.
+The wake drain and its bounded-lock handoff use native HUP/TERM handling, with EXIT cleanup releasing only locks still owned by the exiting process. Interrupted presentation leaves durable rows available for replay until explicit acknowledgement; a successfully transferred lock remains owned by its caller.
 
 ### Vanished fixture state
 
@@ -485,9 +487,9 @@ The file is size-capped through `FM_WATCH_CYCLE_LOG_MAX_BYTES` and `FM_WATCH_CYC
 ### Grace, beacon, and stop signals
 
 The default 300-second grace is unchanged.
-Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, and while actively waiting for a deadline-bounded custom or PR check.
+Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection.
 Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
-The main shell enforces the check deadline even if the check's timeout controller stops responding.
+The main shell enforces each capture deadline even if its timeout controller stops responding.
 Home-summary publication runs separately so its inventory-sized work does not delay the main poll.
 The [process-event operating contract](configuration.md#process-to-event-sources-stateprocevent) owns background source reconciliation and queued-result delivery.
 The [pending-reply library](../bin/fm-pending-reply-lib.sh) owns retained-reply scanning and escalation-close retries.
@@ -498,6 +500,13 @@ An arm whose own script path sits under a disposable no-mistakes validation chec
 Once per poll the watcher checks that its home, its state directory, and its own code root still exist, and exits with a logged reason when one is gone, scoped to itself alone, so a torn-down temporary home or a discarded checkout never leaves an orphan watcher behind.
 The watcher uses bash's native fatal handling for HUP and TERM, including during a blocked check or a blocked `fm_backend_capture` pane read, so both run its EXIT cleanup and stop that read.
 `watcher_stop_signals` in `bin/fm-watch.sh` owns the signal-handling rationale.
+Reboot-recovery inspection uses the same registered capture ownership as checks and a bounded child.
+PID-only stop or eviction runs that capture's cleanup.
+The [timeout owner](../bin/fm-timeout-lib.sh) defines descendant termination, Perl-backed owner-death tracking, and the deadline-only fallback.
+Cleanup allows the bounded child's one-second TERM grace before retiring its controller.
+Recovery output and exit status remain available for the existing durable wake and completion cooldown.
+The bounded reboot-recovery tick runs after ordinary due supervision, including SessionEnd recovery, queued process events, task checks, signals, pane/inbox checks, and heartbeat handling, and before the terminal wait.
+The bounded scan suppresses an unchanged unmanaged-launch notice itself, and a new notice cannot preempt that work on a delayed foreground rearm; quiet cycles still publish it and retain the completion cooldown.
 The EXIT cleanup bounds its wait for `state/.watcher-down.lock` while persisting recovery state with `FM_WATCHER_CLEANUP_LOCK_BOUND` (default 2 seconds).
 Only positive decimal integers are accepted, including leading-zero forms such as `08`; empty, non-numeric, and zero values (including `00`) fall back to 2 seconds.
 A live foreign holder therefore cannot strand a TERM'd watcher in this marker-lock wait: on timeout the recovery transition fails without releasing the singleton, leaving dead-pid stale evidence for the next arm to republish and clear.
@@ -578,6 +587,9 @@ Process-event fixtures pass both the home and its matching explicit state direct
 - Bounded and successor-linked lifecycle rows.
 - A SIGSTOP counterfactual that distinguishes a live PID from a stale beacon before classifying termination.
 - A single slow, deadline-bounded check keeps the strict watcher predicate healthy beyond grace, while stopping that same main poll makes its beacon stale even with its check child still alive.
+
+`tests/fm-supervision-events.test.sh` covers recovery output/status transport and cooldown, plus real recovery command and descendant termination on PID-only owner TERM, owner death without cleanup, the inspection deadline, and an outer checkpoint deadline.
+Its TERM-resistant fixtures assert process survival before shutdown and disappearance afterward.
 
 ### Claude auto-arm and turn-end guard
 

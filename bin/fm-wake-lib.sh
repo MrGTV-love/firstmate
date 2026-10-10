@@ -1336,10 +1336,16 @@ fm_lock_acquire_wait_max() {  # <lockdir> <max-seconds>
 # every interruption safe: before transfer the helper is the owner; after
 # transfer the still-live caller is the owner.
 _fm_lock_acquire_wait_handoff() {  # <lockdir> <caller-pid>
-  local lockdir=$1 caller_pid=$2 ownerdir current back
+  local lockdir=$1 caller_pid=$2 ownerdir current back release_trap
   case "$caller_pid" in ''|*[!0-9]*) return 1 ;; esac
   fm_pid_alive "$caller_pid" || return 1
-  trap 'fm_lock_release "$lockdir"; exit 143' TERM INT
+  # Native HUP/TERM avoids Bash 5.2's pending-trap parser bug (fm-watch.sh).
+  # Freeze the quoted path so EXIT cleanup also works after locals unwind.
+  trap - HUP TERM
+  printf -v release_trap 'fm_lock_release %q' "$lockdir"
+  # shellcheck disable=SC2064 # Expand now: the EXIT trap names this exact lock.
+  trap "$release_trap" EXIT
+  trap 'exit 143' INT
   fm_lock_acquire_wait "$lockdir" || return 1
   if [ -L "$lockdir" ]; then
     ownerdir=$(fm_lock_link_owner "$lockdir" 2>/dev/null) || {
@@ -1357,7 +1363,7 @@ _fm_lock_acquire_wait_handoff() {  # <lockdir> <caller-pid>
     fm_lock_release "$lockdir"
     return 1
   fi
-  trap - TERM INT
+  trap - EXIT INT
 }
 
 # fm_lock_acquire_wait_bounded <lockdir> <positive-seconds>

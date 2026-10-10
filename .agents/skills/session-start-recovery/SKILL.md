@@ -9,13 +9,13 @@ metadata:
 # Session-start recovery
 
 The digest itself makes no external-network call and never waits for one.
-Every network check a session start owes - GitHub auth, dead-secondmate relaunch, secondmate convergence, pending handoff delivery, and project clone refresh - runs off the digest's blocking path in a bounded worker owned by `bin/fm-startup-network.sh` and is reported in the digest's own `NETWORK CHECKS` section.
-The locked startup inactive-outcome scan joins that worker so a slow local current-state read cannot block the digest; its findings use the ordinary durable wake queue.
+The [`bin/fm-startup-network.sh` header](../../../bin/fm-startup-network.sh) owns the bounded deferred stage's membership and reporting, including work that does not use the network.
+Use the digest's `NETWORK CHECKS` section for that stage's result and the ordinary durable wake queue for inactive-outcome findings.
 
 1. **Lock** - acquires the per-home session lock first, before anything mutates shared state, then starts the deferred startup stage above.
 2. **Bootstrap** - detect-only checks (tool/version problems, the worktree-tangle check, harness override, dispatch-profile validation, backlog-backend status) always run, but routine confirmations stay silent by default.
    When the lock could not be acquired, the worktree-tangle check uses read-only advisory wording without a checkout repair command.
-   Home-local stale Herdr projection cleanup and the six bootstrap MUTATING sweeps - same-home backlog reconciliation, fleet sync, secondmate convergence, secondmate liveness, pending remote handoff retry, and Relay artifact writes - run only when this session actually holds the lock from step 1; the four network ones among them run in the deferred stage rather than in this section.
+   Home-local stale Herdr projection cleanup and bootstrap's mutating sweeps run only when this session actually holds the lock from step 1; the [`bin/fm-bootstrap.sh` header](../../../bin/fm-bootstrap.sh) owns sweep membership and deferred-phase selection.
    The secondmate liveness sweep deterministically accounts for every registered secondmate: it relaunches only from the recovery-grade `dead` or `missing` states, preserves ambiguous, unreadable, or unreachable remote targets, and reports skipped or failed guarantees as `SECONDMATE_LIVENESS:` lines (`bin/fm-bootstrap.sh`; `bin/fm-backend.sh`'s `fm_backend_agent_state`; `docs/remote-secondmates.md`).
    Ordinary supervision continues the same guarantee through the watcher's cadence-gated liveness tick over the shared `bin/fm-secondmate-liveness-lib.sh`, so an eligible mate that dies mid-session can be relaunched without waiting for the next session start, subject to the [session launch policy](../../../docs/configuration.md#session-launch-policy-configsession-launch-policy).
 3. **Wake queue** - when locked, drains and presents the durable wake queue without running the inactive-outcome scan inline, and prints the raw records prominently as this turn's first work queue; a clearly labeled status-event annotation may follow a valid `signal` record and includes every status line still unread at the presentation cursor, but never replaces the raw record or current-state reconciliation, and a lapsed watcher chain still surfaces here via the same guard alarm.
