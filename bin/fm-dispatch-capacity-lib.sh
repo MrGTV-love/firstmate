@@ -10,7 +10,10 @@
 # resolve. A recorded rule that no longer contains it counts as none, and
 # differing unlabeled lists permit no fallback. rule is set only for a fallback
 # policy. primary is a recorded rule's first use profile when the profile is
-# only its stand-in, so selection prefers the primary once it is not exhausted.
+# only its stand-in.
+# fm_dispatch_start <config-dir> <kind> <fallbacks-json> <profile-json> prints
+# {profile, capacity}: that primary only when the launch policy and kind permit
+# it and its capacity is measured usable, otherwise the task's own profile.
 # fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
 # prints the original profile unless it is proven exhausted, then the first
 # permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
@@ -23,6 +26,8 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-quota-axi-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-session-launch-policy-lib.sh"
+# shellcheck source=bin/fm-control-lib.sh
+. "$FM_DISPATCH_CAPACITY_DIR/fm-control-lib.sh"
 
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
@@ -171,6 +176,23 @@ fm_dispatch_fallback_capacity() {
     return
   fi
   fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")"
+}
+
+fm_dispatch_start() {
+  local config=$1 kind=$2 profile=$4 primary harness evidence
+  primary=$(jq -c '.primary // empty' <<<"$3")
+  if [ -n "$primary" ]; then
+    harness=$(jq -r .harness <<<"$primary")
+    if fm_session_launch_policy_check "$config" "$harness" 2>/dev/null \
+       && fm_control_harness_supports_kind "$harness" "$kind"; then
+      evidence=$(fm_dispatch_capacity "$harness" "$(jq -r .model <<<"$primary")")
+      if [ "$(jq -r .status <<<"$evidence")" = usable ]; then
+        jq -cn --argjson profile "$primary" --argjson capacity "$evidence" '{profile: $profile, capacity: $capacity}'
+        return
+      fi
+    fi
+  fi
+  jq -cn --argjson profile "$profile" '{profile: $profile, capacity: null}'
 }
 
 fm_dispatch_select() {
