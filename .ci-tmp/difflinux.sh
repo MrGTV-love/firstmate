@@ -1,1 +1,0 @@
-for loc in C C.utf8; do for v in /src/.ci-tmp/m/bin /src/bin; do n=$(basename $(dirname $v)); bash /src/.ci-tmp/diff.sh $v $loc > /out/diff-linux-$loc-$n.txt 2>/out/diff-linux-$loc-$n.err; echo "$loc $n rc=$? $(wc -l < /out/diff-linux-$loc-$n.txt) err=$(wc -l < /out/diff-linux-$loc-$n.err)"; done; done
