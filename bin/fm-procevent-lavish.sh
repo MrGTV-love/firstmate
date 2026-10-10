@@ -46,7 +46,10 @@
 #            native `lavish-axi poll` for an artifact whose source id this home
 #            has a registration, launch stamp or captured result for; no live
 #            claim's process group contains it; and it started before the latest
-#            of that source's claim, launch stamp and captured results. Anything
+#            of that source's claim, launch stamp and captured results. A
+#            held-page report is not such a record, and while it is the latest
+#            capture the launch stamp is not either: both are written while the
+#            holder already holds the page. Anything
 #            unproved - an unresolvable artifact, another home's source, a busy
 #            source lock, an uncertain claim, no claim-time record, or a process
 #            whose identity changed before the signal - is kept with its reason.
@@ -1283,9 +1286,14 @@ orphan_poll_processes() {
 
 # Latest mtime among this home's claim-time records for one source, or nothing.
 orphan_last_claim() {  # <state-dir> <source-id>
-  local reg inbox
+  local reg inbox result records=()
   reg=$(fm_procevent_registry_dir "$1")
   inbox=$(fm_procevent_inbox_dir "$1")
+  held_page_reported "$2" || records=("$reg/$2".*.last-launch)
+  for result in "$inbox/$2".*.result; do
+    [ -f "$result" ] && [ ! -L "$result" ] || continue
+    [ "$(result_error_code "$result")" = LISTENER_ACTIVE ] || records+=("$result")
+  done
   perl -e '
     my $latest;
     for my $path (@ARGV) {
@@ -1294,7 +1302,7 @@ orphan_last_claim() {  # <state-dir> <source-id>
       $latest = $mtime if !defined $latest || $mtime > $latest;
     }
     print "$latest\n" if defined $latest;
-  ' "$(fm_procevent_claim_path "$2")" "$reg/$2".*.last-launch "$inbox/$2".*.result 2>/dev/null
+  ' "$(fm_procevent_claim_path "$2")" ${records[@]+"${records[@]}"} 2>/dev/null
 }
 
 # Why one Lavish poll process is not a provable orphan, per the header's

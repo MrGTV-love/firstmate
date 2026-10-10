@@ -6991,6 +6991,10 @@ if [ -n "${HELD_HOLDER-}" ]; then
   exit 1
 fi
 printf '%s\n' "$*" >> "$HELD/polls"
+if [ -f "$HELD/gate" ]; then
+  printf entered > "$HELD/gate-entered"
+  while [ -f "$HELD/gate" ]; do [ "$SECONDS" -lt 120 ] || exit 1; sleep 0.05; done
+fi
 case " $* " in *" --takeover "*) touch "$HELD/taken-over"; rm -f "$HELD/held" ;; esac
 if [ -f "$HELD/held" ]; then
   printf '%s\n' 'error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 5ms)"' \
@@ -7101,5 +7105,35 @@ assert_equals "$held_polls" "$(wc -l < "$HELD/polls" | tr -d ' ')" "a handed-off
 kill "$held_live_pid" 2>/dev/null || true
 wait "$held_live_pid" 2>/dev/null || true
 pass "an unproved holder is never displaced, its hold is reported once, and a takeover by another poll hands the page off"
+
+# A bare `lavish-axi poll` that starts after this listener's claim is not a
+# leftover. The listener's own held-page report is not a claim-time record, so
+# a later refusal still does not prove that holder stray.
+HELD=$TMP_ROOT/held-after-claim
+held_fixture "$HELD"
+export HELD
+held_art=$(cd "$HELD" && pwd -P)/review.html
+held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
+fm_test_track_procevent_home "$HELD/home"
+touch "$HELD/gate"
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
+  || fail "arming the page before its holder started failed: $(cat "$HELD/arm.out")"
+wait_for "$HELD/gate-entered" || fail "the listener never reached its first poll"
+touch "$HELD/held"
+HELD_HOLDER=live bash "$HELD/bin/lavish-axi" poll "$held_art" & held_late_pid=$!
+sleep 2  # the first refusal must come at least 1 s after the holder started
+rm -f "$HELD/gate"
+wait_for_lines "$HELD/polls" 3 300 || fail "the held listener stopped retrying"
+assert_absent "$HELD/taken-over" "a holder that started after the claim is not displaced after the hold report"
+kill -0 "$held_late_pid" 2>/dev/null || fail "the holder that started after the claim was stopped"
+held_report=$(held_results "$HELD/home" "$held_id")
+assert_equals 1 "$(printf '%s\n' "$held_report" | grep -c .)" "the late holder's hold is reported once"
+assert_contains "$(cat "$held_report")" "held-by: $held_late_pid (started after the last claim)" \
+  "the report names the late holder and why it is kept"
+PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
+kill "$held_late_pid" 2>/dev/null || true
+wait "$held_late_pid" 2>/dev/null || true
+pass "a bare poll that started after the claim is not taken over after this listener reports its hold"
 
 printf '\nall procevent tests passed\n'
