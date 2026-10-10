@@ -2072,7 +2072,7 @@ test_actionable_signal_surfaced() {
 }
 
 assert_watch_offer() {
-  STATE="$1" WATCH_OUT="$2" EXPECT_ELIGIBLE="$3" EXPECT_UNSCOPED="$4" \
+  if ! STATE="$1" WATCH_OUT="$2" EXPECT_ELIGIBLE="$3" EXPECT_UNSCOPED="$4" \
     EXPECT_TASKS="${5:-}" DISPATCH="$ROOT/bin/fm-branch-dispatch.mjs" node --input-type=module <<'JS'
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -2100,7 +2100,9 @@ for (const away of [false, true]) {
   }
 }
 JS
-  [ "$?" -eq 0 ] || fail "branch offer rejected the expected routing: $(cat "$2")"
+  then
+    fail "branch offer rejected the expected routing: $(cat "$2")"
+  fi
 }
 
 # A signal that lands while the watcher is mid-cycle, a signal that landed while
@@ -2441,6 +2443,7 @@ SH
     assert_watch_offer "$state" "$out" 0 0 b
     [ -s "$state/.watch-late-signals" ] || fail "check omitted its durable follow-up"
     if [ "$consume" = partial ]; then
+      # shellcheck disable=SC2016 # template literal expands in node, not the shell.
       seq=$(STATE="$state" node --input-type=module -e 'import { readFileSync } from "node:fs"; console.log(readFileSync(`${process.env.STATE}/.wake-queue`, "utf8").split("\n").map(line => line.split("\t")).find(row => row[2] === "signal" && row[3] === "b.status")[1]);')
       FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" activate "$$" late-signal-test || fail "could not reserve the routine signal"
       FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-wake-grant.sh" publish late-signal-test "$seq" || fail "could not grant the routine signal"
@@ -2629,8 +2632,8 @@ test_procevent_wake_never_lingers_under_the_queue_lock() {
       || fail "could not queue $shape process-event fixture"
     printf '6\n' > "$state/.prelude-progress"
     case "$shape" in
-      before-lock) hook=mv ;;
-      under-lock) hook=ln ;;
+      before-lock) hook="mv" ;;
+      under-lock) hook="ln" ;;
     esac
     real_bin=$(command -v "$hook")
     printf '#!/usr/bin/env bash\nreal_bin=%q\nhook=%q\n' "$real_bin" "$hook" > "$fakebin/$hook"

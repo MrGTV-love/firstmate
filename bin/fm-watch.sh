@@ -3356,7 +3356,9 @@ EOF
   fi
 }
 
+# shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
 FM_WAKE_BEFORE_OUTPUT_ACTION=watch_before_wake
+# shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
 FM_WAKE_AFTER_OUTPUT_ACTION=watch_after_wake
 signal_phase_follow_up
 
