@@ -91,6 +91,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
+- The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
@@ -105,6 +106,8 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 - `bin/fm-spawn.sh` owns the base task-metadata fields it emits, while the runtime-backend section below owns backend-specific fields and selector interpretation.
 
 - `bin/fm-contributions.sh` owns durable published-contribution records under each task, observation bounds, equivalent triage-label configuration, and the authenticated contribution check.
+
+- [`bin/fm-gh-rest.sh`](../bin/fm-gh-rest.sh)'s header and `--help` own the commands, file formats, environment overrides, and exit codes; [GitHub REST reads and the quota floor](#github-rest-reads-and-the-quota-floor) owns the shared read and degradation behavior.
 
 - The producing PR and Relay helpers own the fields they append, [`bin/fm-status-event-lib.sh`](../bin/fm-status-event-lib.sh) owns status-event vocabulary, [`bin/fm-status-record-lib.sh`](../bin/fm-status-record-lib.sh) owns optional emission-time syntax and legacy unknown-time handling, and `bin/fm-crew-state.sh` owns current-state reconciliation.
 
@@ -599,7 +602,8 @@ An existing ledger is left untouched while recording is disabled.
 ## Open-work ledger (config/open-loops.json)
 
 `bin/fm-open-loops.sh` reconciles this home's recorded obligations against live worker and delivery evidence.
-`bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository.
+`bin/fm-open-loops.sh --json` normally collects current evidence for this home; [quota refusal](#github-rest-reads-and-the-quota-floor) can instead retain the last published ledger.
+It never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
 Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
 Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
 For a non-informational row, an unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
@@ -648,7 +652,22 @@ The ledger covers this home's current backlog, ordinary task records, status que
 Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
 The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
 
-The watcher runs the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), ahead of any signal or check exit, so a chatty fleet cannot starve it and a slow scan cannot stall the liveness beacon.
+On each polling iteration, the watcher starts the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), before the ordinary signal and maintenance phases, so a slow scan cannot stall the liveness beacon.
+The ledger wake normally follows the signal scan.
+After three consecutive signal wakes defer maintenance, the watcher resumes maintenance first; `state/.prelude-progress` preserves the next stage across early wakes, and the deferral debt clears only after ledger surfacing, reconciliation, reply, liveness, relaunch, stall, process-event, recovery, inactive-outcome, and all due checks have run.
+Before a non-signal wake exits, the watcher scans signals again and queues newly appended status events alongside that wake; it also scans between blocking checks and after the due-check batch.
+Completed actionable check results are queued before those scans, and the first actionable result does not skip sibling checks.
+Signal identities accumulate across these scans until the cycle closes.
+Non-signal wakes retain their original headline and routing, including stale task identity and heartbeat fleet-wide scope, unless late-signal marker persistence fails as described below.
+Delivery-only scans persist the late signal files in `state/.watch-late-signals`; at the start of the next watcher cycle, before maintenance or signal scanning, the watcher emits an independent `signal:` headline naming only files whose signal rows remain queued.
+A batch already drained by Main produces no extra wake and its marker is removed.
+Follow-up and end-of-maintenance signal wakes remove the marker only after successful output; failed output leaves it available to a handling successor.
+When signals are the only end-of-maintenance headline, it names all accumulated signals.
+If the marker cannot be persisted, the watcher delivers the accumulated `signal:` headline immediately, even in handling-successor posture, instead of relying on downtime recovery; interrupted maintenance remains owed, and its delivery markers do not advance.
+Marker cleanup failure does not prevent that signal headline.
+[`pi-supervision-branch.md`](pi-supervision-branch.md#wake-dispatch) owns branch signal routing.
+For an early maintenance wake, progression is committed only after successful output and its delivery-marker callback, so failed delivery leaves that stage owed.
+[`tests/fm-watch-triage.test.sh`](../tests/fm-watch-triage.test.sh) contains the between-cycle and in-cycle signal, late-signal routing and output-failure, and bounded-maintenance-deferral regressions.
 The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
 A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
 When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
@@ -661,6 +680,12 @@ Acknowledging a wake resolves nothing: a row disappears only when fresh evidence
 The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors.
 Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
 No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
+
+On [quota refusal](#github-rest-reads-and-the-quota-floor), the reconciler discards the partial collection rather than presenting it as current evidence.
+It returns the last published rows, each marked `stale: true`, with `complete: false`, top-level `stale`, `stale_reason`, and `stale_until_epoch`, and one informational `ledger stale` coverage row stating the reset time.
+The rows keep the generation time of the run that produced them; `--heartbeat` publishes this retained result so the watcher knows the reconciler is alive.
+A home with no usable earlier ledger gets the ordinary `ledger degraded` coverage row carrying the same reason.
+The next run after the window resets collects normally and clears every mark.
 
 Create the optional local `config/open-loops.json` to override the limits:
 
@@ -677,6 +702,32 @@ On either deadline, cancellation freezes the owned command group while capturing
 It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.
 An exited command's obsolete process group does not interrupt cleanup of its recorded descendants; surviving descendants are matched by process identity before they are killed.
 A malformed configuration is reported as an error rather than ignored.
+
+### GitHub REST reads and the quota floor
+
+`bin/fm-contributions.sh` and `bin/fm_open_loops.py` read GitHub REST through `bin/fm-gh-rest.sh`.
+It sends `If-None-Match` from its per-URL ETag cache and serves the cached body on a 304, which GitHub does not count against the rate limit.
+Each conditional request snapshots the cache entry before sending its ETag; a 304 serves that snapshot's body and uses its pagination metadata when the Link header is omitted, even if another request replaces the shared entry.
+A supplied Link header updates pagination for the current read; cached metadata is updated only if the shared entry still matches the requested generation.
+A paginated read whose 304 omits the Link header for a full cached last page (item count equal to `per_page`) repeats that page as one unconditional GET, so a page added behind it is not missed.
+Cache publication shares the existing serialized response-recording boundary.
+A missing, corrupt, or unparsable cache entry is a normal GET; entries unused for a week, and staged files a killed helper left behind for over an hour, are pruned.
+Only REST is conditional; GraphQL reads (`gh pr view`, `gh pr checks`) have no equivalent.
+The contributions poll also checks the recorded core quota before its final GraphQL head read.
+Responses carrying valid `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `X-RateLimit-Resource` headers update the recorded quota, including on a 304 or an error.
+Writers serialize the update, keeping the lowest remaining value within the newest observed reset window; older-window responses cannot replace it.
+Cache and quota recording is best-effort: an unwritable state directory or a recording lock unavailable within a two-second wait silently skips recording without changing the read result.
+The enforcing response headers, not `gh api rate_limit`, are the quota evidence used by the sweeps.
+
+When the recorded core remaining quota is below the fixed 15 percent floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
+The helper's header owns the refusal interface; every REST read checks the floor before each request, including the unconditional repeat of a full last page, and publishes no partial response when refused.
+The contributions poll checks the local quota record before budget exits and after incomplete observations.
+It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode.
+Completed observations remain measured.
+Changes to the remaining quota update the reason without another announcement; announcement eligibility spans saved owners, so late owners do not restart the episode.
+The [open-work ledger section](#open-work-ledger-configopen-loopsjson) owns its retained-result behavior.
+The check needs no call of its own because it reads headers from calls the sweeps were already making.
+Focused regressions are in [`tests/fm-gh-rest.test.sh`](../tests/fm-gh-rest.test.sh), [`tests/fm-contributions.test.sh`](../tests/fm-contributions.test.sh), and [`tests/fm-open-loops.test.sh`](../tests/fm-open-loops.test.sh).
 
 ### Completion and discard
 

@@ -412,7 +412,7 @@ family_for_basename() {
     fm-send-inbox-doorbell-live-e2e.test.sh|\
     fm-calm-claude-mod-plugin.test.sh|fm-calm-claude-mod-live-e2e.test.sh|\
     fm-calm-pi-queue-retention-live-e2e.test.sh|\
-    fm-herdr-submit-confirm-live-e2e.test.sh)
+    fm-herdr-submit-confirm-live-e2e.test.sh|fm-task-docker-live-e2e.test.sh)
       printf '%s\n' live-harness-optin
       ;;
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
@@ -442,7 +442,7 @@ family_for_basename() {
       printf '%s\n' afk
       ;;
     fm-bearings-board-render.test.sh|fm-bearings-snapshot.test.sh|fm-contributions.test.sh|\
-    fm-fleet-snapshot-view.test.sh|fm-home-summary-refresh.test.sh)
+    fm-fleet-snapshot-view.test.sh|fm-home-summary-refresh.test.sh|fm-gh-rest.test.sh)
       printf '%s\n' snapshot-bearings
       ;;
     fm-backend-cmux.test.sh|fm-backend-cmux-smoke.test.sh)
@@ -791,6 +791,7 @@ tests/fm-forge-detect.test.sh 193
 tests/fm-fork-free-helpers.test.sh 795
 tests/fm-gate-refuse.test.sh 9953
 tests/fm-gemini-harness.test.sh 947
+tests/fm-gh-rest.test.sh 2500
 tests/fm-git-strip-ai-trailers.test.sh 2500
 tests/fm-gitignore-config.test.sh 59
 tests/fm-gotmp.test.sh 1509
@@ -930,6 +931,7 @@ tests/fm-supervision-host-hook.test.sh 70651
 tests/fm-supervision-host.test.sh 413717
 tests/fm-tangle-guard.test.sh 8501
 tests/fm-task-delivery.test.sh 32789
+tests/fm-task-docker-live-e2e.test.sh 15000
 tests/fm-task-inbox.test.sh 64895
 tests/fm-tasks-axi.test.sh 76507
 tests/fm-teamclaude-launch-live-e2e.test.sh 213
@@ -1505,6 +1507,10 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-pi-watch-extension.test.sh
       printf '%s\n' __script__:fm-omp-harness.test.sh
       ;;
+    tests/assets/gh-http-shim.sh)
+      # The HTTP-faithful gh double behind fm_gh_http_shim.
+      printf '%s\n' snapshot-bearings
+      ;;
     bin/fm-test-run.sh)
       # Deliberately the WHOLE family, not just the two contract tests. This
       # runner executes every pure-contract-unit script, so a change to it is
@@ -1576,6 +1582,12 @@ families_for_changed_path() {
     bin/fm-open-loops.sh|bin/fm_open_loops.py)
       printf '%s\n' "__script__:fm-open-loops.test.sh"
       printf '%s\n' "__script__:fm-watch-open-loops.test.sh"
+      ;;
+    bin/fm-gh-rest.sh)
+      # The conditional-read helper serves every REST reader.
+      printf '%s\n' "__script__:fm-gh-rest.test.sh"
+      printf '%s\n' "__script__:fm-open-loops.test.sh"
+      printf '%s\n' snapshot-bearings
       ;;
     bin/fm-watch*|bin/fm-wake*|bin/fm-inactive-reconcile.sh|\
     bin/fm-classify-lib.sh|bin/fm-daemon*|bin/fm-turnend-guard*|bin/fm-guard.sh)
@@ -1751,6 +1763,12 @@ families_for_changed_path() {
     bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-idle-session-reap.sh|bin/fm-review-diff.sh|\
     bin/fm-x-*|bin/fm-check*|bin/fm-pipeline-spend.sh)
       printf '%s\n' pr-forge
+      ;;
+    bin/fm-task-docker-lib.sh)
+      # The task-owned Docker ownership rules, sourced by bin/fm-teardown.sh
+      # (pr-forge) and proven against a real Docker by its live guard.
+      printf '%s\n' pr-forge
+      printf '%s\n' live-harness-optin
       ;;
     bin/fm-nm-run-lib.sh)
       # Shared no-mistakes run-attribution primitives, sourced by both
