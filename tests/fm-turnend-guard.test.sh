@@ -77,13 +77,21 @@ test_predicate_healthy_fresh_beacon() {
 
 test_predicate_queue_pending_flag() {
   local state="$TMP_ROOT/pred-queue/state"
-  mkdir -p "$state"
-  fm_supervision_status "$state" 300
-  [ "$FM_SUP_QUEUE_PENDING" = false ] || fail "empty/absent wake queue must not read as pending"
-  printf 'record\n' > "$state/.wake-queue"
-  fm_supervision_status "$state" 300
-  [ "$FM_SUP_QUEUE_PENDING" = true ] || fail "a non-empty wake queue must read as pending"
-  pass "fm_supervision_status: FM_SUP_QUEUE_PENDING tracks state/.wake-queue"
+  mkdir -p "$state/procevent"
+  fm_supervision_needed "$state" 300 && fail "an empty home must not need supervision"
+  : > "$state/procevent/lavish-final.source"
+  fm_supervision_needed "$state" 300 || fail "the source must need supervision before its final capture"
+  printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+    "$(date +%s)" > "$state/.wake-queue"
+  rm "$state/procevent/lavish-final.source"
+  fm_supervision_needed "$state" 300 || fail "retiring the last source must not suppress its unread final wake"
+  [ "$FM_SUP_SOURCES" -eq 0 ] || fail "the terminal source must actually be absent"
+  [ "$FM_SUP_IN_FLIGHT" -eq 0 ] || fail "the pending wake must not depend on a live task"
+  [ "$FM_SUP_QUEUE_PENDING" = true ] || fail "the final wake must remain pending"
+  : > "$state/.wake-queue"
+  fm_supervision_needed "$state" 300 && fail "an acknowledged last wake must release supervision need"
+  [ "$FM_SUP_QUEUE_PENDING" = false ] || fail "the cleared queue must not remain pending"
+  pass "fm_supervision_needed: a final unread wake survives source retirement and releases need after acknowledgement"
 }
 
 test_predicate_x_mode_needs_supervision() {
@@ -345,21 +353,59 @@ test_hook_blocks_when_dead_lock_has_fresh_beacon() {
 }
 
 test_hook_silent_with_live_lock_and_fresh_beacon() {
-  local dir pid identity out status
+  local dir pid identity out status ready hold signal current alive
   dir=$(make_primary_dir "$TMP_ROOT/hook-live-lock-fresh")
   : > "$dir/state/task1.meta"
-  sleep 60 &
+  ready="$dir/holder-ready"
+  hold="$dir/holder-hold"
+  mkfifo "$ready" "$hold" || fail "could not create live watcher holder FIFOs"
+  exec 3<>"$ready"
+  # Signal only after bash has exec'd and opened its bounded, builtin-only wait.
+  bash -c '
+    exec 4<>"$1"
+    printf "ready\n" >&3
+    exec 3>&-
+    IFS= read -r -t 60 -u 4 _
+  ' _ "$hold" &
   pid=$!
-  identity=$(watcher_identity "$dir" "$pid") || {
+  signal=''
+  if ! IFS= read -r -t 10 -u 3 signal || [ "$signal" != ready ]; then
+    printf 'live watcher holder readiness failed: pid=%s ready=%s hold=%s\n' "$pid" "$ready" "$hold" >&2
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
+    exec 3>&-
+    rm -f "$ready" "$hold"
+    fail "live watcher holder did not become ready"
+  fi
+  exec 3>&-
+  identity=$(watcher_identity "$dir" "$pid") || {
+    printf 'could not identify ready live watcher holder: pid=%s home=%s\n' "$pid" "$dir" >&2
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    rm -f "$ready" "$hold"
     fail "could not identify live watcher holder"
   }
   record_watcher_lock "$dir" "$pid" "$identity"
   touch "$dir/state/.last-watcher-beat"
   out=$(run_hook "$dir" false); status=$?
+  if [ "$status" -ne 0 ] || [ -n "$out" ]; then
+    current=$(watcher_identity "$dir" "$pid" 2>&1) || true
+    alive=false
+    kill -0 "$pid" 2>/dev/null && alive=true
+    fm_supervision_unhealthy "$dir/state" 300 || true
+    {
+      printf 'live watcher hook failure: status=%s pid=%s alive=%s\n' "$status" "$pid" "$alive"
+      printf 'hook output:\n%s\nrecorded identity: %s\ncurrent identity: %s\n' "$out" "$identity" "$current"
+      printf 'home=%s state=%s lock=%s watcher=%s beacon=%s beacon-age=%s\n' \
+        "$dir" "$dir/state" "$dir/state/.watch.lock" "$dir/bin/fm-watch.sh" \
+        "$dir/state/.last-watcher-beat" "$FM_SUP_BEACON_DESC"
+      printf 'hook env: FM_HOME=%s CLAUDECODE=1 PATH=%s\n' "$dir" "$BLIND_BIN:$PATH"
+      printf 'identity env: FM_STATE_OVERRIDE=%s\n' "$dir/state"
+    } >&2
+  fi
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
+  rm -f "$ready" "$hold"
   expect_code 0 "$status" "hook must exit 0 with a live identity-matched watcher lock and fresh beacon"
   [ -z "$out" ] || fail "hook produced output despite a live fresh watcher lock: $out"
   pass "fm-turnend-guard: silent no-op with a live watcher lock and fresh beacon"
@@ -918,6 +964,7 @@ const contracts = {
   'fm-host-mirror.sh': ['UserPromptSubmit', 'Stop'],
   'fm-turnend-guard.sh': ['Stop'],
   'fm-claude-stop-autoarm.sh': ['Stop'],
+  'fm-procevent-posttool-check.sh': ['PostToolUse'],
 };
 const registrations = Object.entries(settings.hooks).flatMap(([event, groups]) =>
   groups.flatMap(group => {
@@ -943,17 +990,31 @@ function reset(home, target, ordinary = false) {
   fs.rmSync(path.join(home, 'state'), { recursive: true, force: true });
   fs.mkdirSync(path.join(home, 'state'));
   fs.rmSync(path.join(home, 'config', 'supervision-host'), { force: true });
-  if (target === 'fm-host-mirror.sh' || target === 'fm-claude-stop-autoarm.sh') {
+  if (['fm-host-mirror.sh', 'fm-claude-stop-autoarm.sh', 'fm-procevent-posttool-check.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, '.lock'), `${owner}\n`);
   }
   if (target === 'fm-host-mirror.sh') fs.writeFileSync(path.join(home, 'config', 'supervision-host'), '');
   if (!ordinary && ['fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, 'task1.meta'), '');
   }
+  if (target === 'fm-procevent-posttool-check.sh') {
+    const inbox = statePath(home, 'procevent-inbox');
+    fs.mkdirSync(inbox);
+    fs.writeFileSync(path.join(inbox, 'lavish-config-consumer.1.result'),
+      'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,config consumer answer\n');
+    fs.writeFileSync(path.join(inbox, 'lavish-config-consumer.1.adapter'), 'lavish\n');
+  }
 }
 function snapshot(home) {
-  return fs.readdirSync(path.join(home, 'state')).sort().map(name =>
-    [name, fs.readFileSync(statePath(home, name), 'utf8')]);
+  function entries(directory, prefix = '') {
+    return fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
+      .flatMap(entry => {
+        const name = path.join(prefix, entry.name);
+        const filename = path.join(directory, entry.name);
+        return entry.isDirectory() ? entries(filename, name) : [[name, fs.readFileSync(filename, 'utf8')]];
+      });
+  }
+  return entries(path.join(home, 'state'));
 }
 function invoke(registration, home, context, payload) {
   const env = {
@@ -1045,6 +1106,52 @@ if (mode === 'contexts') {
                 assert.match(fs.readFileSync(statePath(home, '.claude-autoarm-epoch'), 'utf8'), /(?:^| )outcome=failed(?: |$)/, label);
                 assert.ok(fs.existsSync(statePath(home, '.claude-autoarm-failure-notified')), `${label}: no failure receipt`);
                 break;
+              case 'fm-procevent-posttool-check.sh': {
+                assert.equal(result.status, 0, label);
+                assert.equal(result.stderr, '', label);
+                const output = JSON.parse(result.stdout);
+                assert.equal(output.hookSpecificOutput.hookEventName, 'PostToolUse', label);
+                assert.deepEqual(snapshot(home), before, `${label}: notification changed pending state`);
+                const commands = [...output.hookSpecificOutput.additionalContext.matchAll(/`([^`]+)`/g)]
+                  .map(match => match[1]);
+                assert.equal(commands.length, 3, `${label}: missing executable recovery commands`);
+                const otherBefore = snapshot(task);
+                const runCommand = command => {
+                  const recovery = spawnSync('/bin/bash', ['-c', command], {
+                    cwd: task,
+                    env: {
+                      PATH: process.env.PATH, HOME: path.join(home, 'pane-home'),
+                      XDG_CONFIG_HOME: path.join(home, 'pane-home', '.config'),
+                      XDG_STATE_HOME: path.join(home, 'pane-home', '.state'),
+                      FM_HOME: task, FM_STATE_OVERRIDE: statePath(task, ''), FM_ROOT_OVERRIDE: task,
+                      FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
+                      FM_PROCEVENT_CLAIM_ROOT: path.join(home, 'pane-home', 'claims'),
+                    },
+                    encoding: 'utf8', timeout: 15000,
+                  });
+                  assert.ifError(recovery.error);
+                  assert.equal(recovery.signal, null, `${label}: recovery command did not settle`);
+                  assert.equal(recovery.status, 0, `${label}: ${recovery.stderr}`);
+                  return recovery;
+                };
+                runCommand(commands[0]);
+                assert.equal(fs.readFileSync(statePath(home, '.wake-queue'), 'utf8'), '',
+                  `${label}: drain did not inspect the unpublished capture's home`);
+                assert.ok(runCommand(commands[1]).stdout.includes('config consumer answer'),
+                  `${label}: direct recovery did not read the captured answer`);
+                const inbox = statePath(home, 'procevent-inbox');
+                const handled = path.join(inbox, 'lavish-config-consumer.1.handled');
+                assert.ok(!fs.existsSync(handled), `${label}: drain or read acknowledged before handling`);
+                runCommand(commands[2]);
+                assert.ok(fs.lstatSync(handled).isFile(), `${label}: acknowledgement missed the captured round`);
+                assert.deepEqual(fs.readdirSync(inbox).filter(name => name.endsWith('.handled')),
+                  ['lavish-config-consumer.1.handled'], `${label}: acknowledgement changed another round`);
+                assert.deepEqual(snapshot(task), otherBefore, `${label}: recovery changed another home's state`);
+                const acknowledged = snapshot(home);
+                silent(invoke(registration, home, context, payloadFor(registration, tool)), `${label}/handled`);
+                assert.deepEqual(snapshot(home), acknowledged, `${label}: handled notification changed state`);
+                break;
+              }
               default: assert.fail(`unhandled hook: ${registration.target}`);
             }
           }

@@ -2856,6 +2856,7 @@ resurface_after_downtime() {
     fi
     [ "$FM_RECOVERY_MARKER_ACTION" = recover ] || return 0
   fi
+  WATCHER_RECOVERY_PENDING=1
   wake "check: rearm-resurface"
 }
 

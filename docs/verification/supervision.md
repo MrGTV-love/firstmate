@@ -266,17 +266,81 @@ tests/fm-crew-state.test.sh
 
 ## Turn-end guard
 
-The blocking and bounded-follow-up mechanisms were validated across seven harnesses on 2026-07-08 through 2026-09-21, with Claude's replacement Stop-owned path revalidated on 2026-09-21, Cursor's stop-hook park validated on 2026-08-13, and omp's blocking `session_stop` hook validated on 2026-09-05.
+The blocking and bounded-follow-up mechanisms were validated across seven harnesses on 2026-07-08 through 2026-09-21, with Claude's replacement Stop-owned path revalidated on 2026-09-30, Cursor's stop-hook park validated on 2026-08-13, and omp's blocking `session_stop` hook validated on 2026-09-05.
 
 | Harness | Version verified | Mechanism | Observed result |
 | --- | --- | --- | --- |
-| Claude | 2.1.278 | Cooperative blocking `Stop` guard plus `asyncRewake` auto-arm | A fresh unsupervised session received the full session-start digest through the tracked `SessionStart` hook, reclaimed a stale dead-owner lock, completed two tokenless rewake cycles with no model arm command or guard continuation, and left a competing live owner unchanged. |
+| Claude | 2.1.285 | Cooperative blocking `Stop` guard plus `asyncRewake` auto-arm | A fresh unsupervised session received the full session-start digest through the tracked `SessionStart` hook, reclaimed a stale dead-owner lock, completed two tokenless rewake cycles with no model arm command or guard continuation, and left a competing live owner unchanged. |
 | Codex | 0.142.1 | Blocking `Stop` hook | Hook process root stayed anchored to the trusted checkout and one continuation ran. |
 | OpenCode | 1.17.6 | Passive `session.idle` callback | Throwing could not block, while `promptAsync` scheduled one TUI follow-up; headless remained fail-open. |
 | Pi | 0.80.5 | Passive `agent_settled` callback | Exactly one guard follow-up ran for an unhealthy cycle, with no recursion across tool turns. |
 | omp | 18.1.11 | Blocking `session_stop` hook returning `{ continue: true, additionalContext }` | In the isolated rpc lab (2026-09-05), the successor watcher was frozen with `SIGSTOP` until its beacon passed the lab `FM_GUARD_GRACE` of 20s while its arm child stayed attached (a killed watcher closes its arm child and the extension re-arms before the guard can fire); the next turn end raised the guard, the guard spy recorded `rc=2` followed by a stop carrying `stop_hook_active: true`, omp compelled a continuation carrying the `turn-end-guard` operational text, the `fm_watch_arm_omp` invocation count then rose to at least two, and a live watcher held the home lock after the thaw; the flagged stop was allowed, so exactly one continuation ran. `session_stop` never fired for an interrupted turn. |
 | Grok | 0.2.112 native and 0.2.73 pre-native | Running-payload adaptive `Stop` | Native false-to-true continuation stayed in one process with two model turns and zero resume launches; the field-absent pre-native process launched exactly one guarded resume. |
 | Cursor | 2026.08.11-e8db854 | Awaited `stop` hook park returning one `followup_message` | Exit 2 ended the turn normally, proving it cannot block; a returned follow-up ran a genuine second turn; a sleeping hook held the boundary open and the wake landed after it; `loop_limit` stopped the hook being invoked at its ceiling. |
+
+### Claude mid-turn Lavish feedback, 2026-09-30
+
+Claude Code 2.1.285 was exercised in an isolated primary with the tracked `PostToolUse` registration and production hook, queue drain, result reader, and acknowledgement commands.
+After an unrelated Bash tool completed, Claude read and acknowledged queued Lavish feedback before ending the turn.
+A second captured answer had no published wake row; the hook alone identified its source, sequence, and durable result path, and Claude recovered and acknowledged it after an empty drain.
+That unpublished-answer scenario used the default home without exporting `FM_HOME` or a state override, proving that the recovery command carries the resolved result path.
+With both answers handled, the same prompt took the no-notice path and ran no queue drain.
+The prompt named neither capture, so the model could not discover them from the experiment's request.
+
+The successful synchronous hook context was not serialized as a `hook_response` row in the print stream.
+The observed read-and-acknowledge actions, together with the handled-answer counterfactual, establish native delivery rather than merely successful hook output.
+The no-notice branch is chosen once at the initial tool boundary and checked against actual tool-result output, not command text that might contain an unexecuted branch or comment.
+Failed native scenarios print their commands and results before lab cleanup so that the evidence survives the failure.
+This proves delivery at a tool boundary; it does not claim an interruption while Claude is reasoning or a long tool is running.
+
+```sh
+FM_CLAUDE_LIVE_E2E=1 bash bin/fm-test-run.sh tests/fm-claude-stop-autoarm-live-e2e.test.sh
+```
+
+The same command also revalidated the Stop-owned cycles and competing-session boundary.
+The live regression preflights and launches every native session through `bin/fm-teamclaude-launch.sh`, and its lab-local `open` shim logs blocked macOS opener calls to the test output before cleanup.
+Its arm fixture distinguishes a handling successor from a foreground arm, as the portable fixtures do: the successor confirms coverage but must not consume one of the two model-facing fixture events.
+
+The listener change was separately exercised against lavish-axi 0.1.79 and a real open browser review.
+An answer was captured while the same exclusive listener remained live, a second answer was captured without reconciliation, and closing the browser produced a captured disconnect without retiring the open session or ending its listener.
+One measured answer reached durable capture in approximately 1.7 seconds; this is an observation, not a latency guarantee.
+The portable process-event regression covers consecutive unhandled answers, disconnect, empty and `waiting` poll returns, exclusive ownership, age reporting, and ended or missing session retirement.
+The existing destructive-poll durability limit still applies: feedback lost before the runner captures the poll output is not recoverable.
+
+#### Real native review revalidation, 2026-10-06
+
+Claude Code 2.1.291, TeamClaude 1.1.21-affinity.0 and lavish-axi 0.1.79 were exercised in a standalone Git primary with isolated `FM_HOME` and unchanged tracked hooks and default user settings.
+The native launch used the shipped proxy wrapper and existing managed authentication:
+
+```sh
+bash bin/fm-teamclaude-launch.sh --print "$PROMPT" \
+  --tools Bash,Read --allowedTools Bash,Read --permission-mode dontAsk \
+  --effort low --output-format stream-json --include-hook-events --verbose
+```
+
+The bounded prompt armed one real private review, held an ordinary Bash tool open for 60 seconds, and required each actual browser message to be read, acted on and acknowledged through the public adapter and queue commands.
+Two messages were sent through the native composer before the first acknowledgement; both durable captures existed while that first message was still unhandled.
+The real `PostToolUse` context triggered both owning actions and acknowledgements before the first Stop.
+A third native message and a final native Send & End then caused two genuine Stop-owned reawakening turns with no model-issued watcher arm.
+All four actions, capture acknowledgements and queue acknowledgements completed; the source self-retired and the final queue was empty.
+Observed server-acceptance-to-capture times ranged from 1040.615 to 1045.091 milliseconds, not a promised latency bound.
+The final feedback remained actionable after the last source retired, as the [supervision-need contract](../turnend-guard.md#supervision-need) requires.
+The native JSONL and normalized receipt reported:
+
+```json
+{
+  "two_native_stop_rewakes": 2,
+  "real_second_capture_before_first_ack": true,
+  "zero_model_issued_watcher_arms": true,
+  "all_four_results_and_wakes_acknowledged": true,
+  "source_self_retired": true,
+  "claims_absent": true
+}
+```
+
+`tests/fm-claude-stop-autoarm.test.sh` covers final capture before and during Stop, and the idle transition after acknowledgement; `tests/fm-turnend-guard.test.sh` covers the shared last-source retirement predicate.
+The observed native path does not establish universal every-send or no-loss delivery, and it does not remove the source-side destructive-poll limitation above.
+
 
 ### Cursor primary park, 2026-08-13
 
@@ -345,7 +409,6 @@ ok - Grok adaptive Stop real-process matrix passed with exact target cleanup and
 
 The same run proved the Claude-compatible Stop entries stay inert under `GROK_AGENT`, the legacy resume carries `GROK_TURNEND_GUARD_ACTIVE=1`, and every replacement root is removed after exact target cleanup while its control window survives.
 That inertness result is scoped to the builds it exercised: it did not establish that `GROK_AGENT` reaches a Grok HOOK process, and on grok 1.0.0 it does not, so the marker set was widened to `GROK_HOOK_EVENT` as well (docs/turnend-guard.md "Harness integrations").
-`tests/fm-turnend-guard.test.sh` now pins every tracked `.claude/settings.json` hook entry against a real grok 1.0.0 hook environment so the inertness contract is covered deterministically rather than only by the opt-in live matrix.
 
 The secondmate-home scope and manual-repair wake path were measured with Claude Code 2.1.207 on 2026-07-12, when a native background completion re-invoked the idle model with no human input.
 The current Stop-owned main/secondmate inclusion and child-worktree exclusion are covered deterministically by `tests/fm-claude-stop-autoarm.test.sh`.

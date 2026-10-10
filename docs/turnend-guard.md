@@ -34,7 +34,7 @@ The turn-end guard closes the remaining gap at the primary's own turn boundary.
 
 The guard acts at that boundary when both of these hold:
 
-- Work, a process-event source, a registered custom check, or Relay polling needs supervision.
+- Work, a process-event source, a registered custom check, Relay polling, or an unread wake needs supervision.
 - No identity-matched watcher has a fresh beacon.
 
 The beacon is `state/.last-watcher-beat`, which `bin/fm-watch.sh` touches every cycle, as [Guard grace and the poll cadence](#guard-grace-and-the-poll-cadence) describes.
@@ -78,6 +78,7 @@ These sources also count toward supervision need:
 - Registered `state/procevent/*.source` records require supervision even though they have no task metadata.
 - Every mode treats `state/x-watch.check.sh` as supervision need, so Relay polling remains guarded without an in-flight task.
 - A custom check registered with `bin/fm-check-register.sh` counts the same way, so an operator's home-level poll keeps running after the last task is torn down.
+- An unread `state/.wake-queue` record keeps delivery active after its last source or task ends; acknowledging the final wake releases that need.
 
 The default cross-harness mode exits silently with no supervision need.
 
@@ -119,7 +120,7 @@ The exception has these limits:
 ### Pull-warning verdict by supervision model
 
 `bin/fm-guard.sh`, the pull warning, instead uses the model-aware `fm_watcher_supervision_verdict` from `bin/fm-wake-lib.sh`.
-It needs a different verdict because it fires mid-turn, when the auto-arm model runs no watcher at all.
+It needs a different verdict because it fires mid-turn, when an auto-arm watcher may be absent.
 The verdict depends on the supervision model.
 
 #### Claude Stop auto-arm model
@@ -281,7 +282,7 @@ The registrations in detail:
   Cursor also loads `<project>/.claude/settings.json`, so the tracked Claude-shaped supervision entrypoints whose events Cursor covers stand down on a Cursor-delivered payload through `bin/fm-hook-host-lib.sh`.
   That predicate reads the delivered payload's own `cursor_version`, never the environment.
   Cursor exports `CURSOR_INVOKED_AS`, `CURSOR_PROJECT_DIR`, and `CURSOR_VERSION` into every child process, so an environment guard would also disable the hooks of a Claude session started by hand from a Cursor pane, which is the hazard the `GROK_SESSION_ID` exclusion below records.
-  The guarded supervision entrypoints are session start, the two Bash command protections, and the turn-end guard and auto-arm.
+  [`.claude/settings.json`](../.claude/settings.json) owns the tracked registrations; the Claude-only [process-event tool-boundary notice](configuration.md#process-to-event-sources-stateprocevent) also stands down on Cursor payloads.
   Cursor 2026.08.11-e8db854 does not fire the Claude-shaped `Stop` entry at all, but it is guarded anyway because Cursor has no `asyncRewake`.
   If a later build did fire it, `bin/fm-claude-stop-autoarm.sh` would run synchronously inside Cursor's stop step and hold that turn open for its declared multi-hour timeout, exactly the wedge grok 1.0.0 produced.
 - Grok registers a `Stop` hook in `.grok/hooks/fm-primary-turnend-guard.json` and delegates capability selection to `bin/fm-turnend-guard-grok.sh`.
@@ -291,7 +292,7 @@ The registrations in detail:
   A guard keyed on `GROK_AGENT` alone therefore stopped firing on grok 1.0.0, and the resulting Claude-only auto-arm ran synchronously under Grok.
   Grok has no `asyncRewake`, so it waited on the foregrounded watcher for the declared 28800-second timeout and the Grok turn never ended.
   Do NOT widen this guard to `GROK_SESSION_ID`: Grok injects that into every child process, so it can survive into a Claude session that Grok launched and would silently disable Claude's own continuity.
-  The same marker guard carries every tracked `.claude/settings.json` entry.
+  The same marker guard carries every tracked [`.claude/settings.json`](../.claude/settings.json) entry, including the Claude-only process-event `PostToolUse` notice.
   Native registrations under `.grok/hooks/` own Grok's supervision events; the separate [dialog mirror owner](supervision-host.md#the-dialog-mirror) defines writer applicability.
   `tests/fm-turnend-guard.test.sh` pins that inventory.
 - pi-code, Pi's Claude-hook compatibility extension, also loads `<project>/.claude/settings.json` and has no `asyncRewake`, so it awaits every Stop hook it delivers.
@@ -300,7 +301,8 @@ The registrations in detail:
   Pi's own native extensions own its supervision.
   The discriminator is the payload's own `transcript_path`, not the environment and not the shared foreign-host predicate above.
   pi-code stamps it with Pi's session file under `/.pi/`, a path component a Claude transcript never carries.
-  The stand-down fails toward running, matching the guards above, so no payload, no `jq`, or no `transcript_path` still arms, and every other Claude-shaped hook pi-code delivers keeps running.
+  The auto-arm stand-down fails toward running, matching the guards above, so no payload, no `jq`, or no `transcript_path` still arms.
+  The Claude-only [process-event tool-boundary notice](configuration.md#process-to-event-sources-stateprocevent) also stands down on Pi compatibility payloads; the other Claude-shaped hooks pi-code delivers keep running.
 
 ### Claude and Codex blocking
 
