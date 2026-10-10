@@ -1002,7 +1002,7 @@ for a in "$@"; do
     TRACEPARENT_SET=1
   ;;
   --claude-debug) CLAUDE_DEBUG=1 ;;
-  --dispatch-rule) want_value=dispatch-rule ;;
+  --dispatch-rule) want_value="dispatch-rule" ;;
   --dispatch-rule=*) DISPATCH_RULE=${a#--dispatch-rule=} ;;
   *) POS+=("$a") ;;
   esac

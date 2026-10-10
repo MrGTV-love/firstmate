@@ -6129,6 +6129,7 @@ SH
     chmod +x "$dir/fakebin/omp"
     "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" --state idle --source omp-ext --event quota-exhausted >/dev/null
     mkdir -p "$dir/user-home"
+    # shellcheck disable=SC2031 # The helper subshell's PATH change does not reach here.
     out=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
       -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
       PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
