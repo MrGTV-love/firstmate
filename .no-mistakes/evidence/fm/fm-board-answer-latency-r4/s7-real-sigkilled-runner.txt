@@ -1,0 +1,62 @@
+### S7: firstmate's runner for page G is SIGKILLed for real (only the runner pid); its adapter and native poll are left behind (target 19c0b75c)
+registered: lavish-2a3bf47971ed8473 (lavish)
+armed: lavish-2a3bf47971ed8473
+artifact: /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+runner file first line: 78001
+runner process: 78001 (78001 /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent.sh _start lavish-2a3bf47971ed8473)
+page G polls:
+82198 78001 78001 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+82644 82198 78001 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+82659 82198 78001 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+== 13:31:22 kill -KILL 78001
+page G polls after:
+82198     1 78001 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+82644 82198 78001 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+82659 82198 78001 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+poller records: lavish-2a3bf47971ed8473.82198.poller
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-2a3bf47971ed8473      lavish       orphaned   0
+$ bin/fm-procevent-lavish.sh orphans (page G lines)
+kept: 82198 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+kept: 82644 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+kept: 82659 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+orphans: found=0 killed=0 kept=94
+== 13:31:32 $ bin/fm-procevent.sh reconcile
+reconciled: published=3 started=0 stopped=0 uncertain=1 failed=0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-2a3bf47971ed8473      lavish       orphaned   0
+page G polls:
+82198     1 78001 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+82644 82198 78001 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+82659 82198 78001 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+== 13:31:39 $ bin/fm-procevent-lavish.sh arm page-g.html
+registered: lavish-2a3bf47971ed8473 (lavish)
+error: listener is not running: lavish-2a3bf47971ed8473
+arm rc=1
+page G polls:
+82198     1 78001 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+82644 82198 78001 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+82659 82198 78001 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+
+== 13:31:49 the captain answers page G ==
+captain clicked 'Send to Agent' at 13:31:57 (epoch 1791657117): Lab3 S7 answer one on page G after the runner was SIGKILLed.
+NO capture containing 'Lab3 S7 answer one' within 40s
+page G polls:
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-2a3bf47971ed8473      lavish       none       0
+== 13:32:42 $ bin/fm-procevent.sh reconcile
+reconciled: published=3 started=1 stopped=0 uncertain=0 failed=0
+page G polls:
+75409 72633 72633 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+75800 75409 72633 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+75805 75409 72633 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-g.html
+
+== 13:32:50 the captain answers page G again ==
+captain clicked 'Send to Agent' at 13:33:05 (epoch 1791657185): Lab3 S7 answer two on page G.
+capture lavish-2a3bf47971ed8473.1.result visible 0s after the click (whole seconds)
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-2a3bf47971ed8473      lavish       live       1

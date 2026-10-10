@@ -1,0 +1,23 @@
+### Teardown 13:39:41
+lab P: primary tmux server killed
+retired: lavish-5e6a2aaed70a4814
+retired: lavish-6bd7e5a727a2c655
+retired: lavish-886ca018f5e890f6
+retired: lavish-ab61a3f053b2c345
+retired: lavish-2a3bf47971ed8473
+retired: lavish-ab61a3f053b2c345
+lab 3: other-agent tmux server killed
+server:
+  status: stopped
+status: stopped
+processes still naming any lab:
+40209 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent.sh _owner-watchdog lavish-ab61a3f053b2c345 385
+73948 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent.sh _owner-watchdog lavish-2a3bf47971ed8473 726
+lab owners left: 2
+removed /Users/charlesabrooker/tmp/fm-lab.eNOnmB
+removed /Users/charlesabrooker/tmp/fm-lab.KHfAIC
+removed /Users/charlesabrooker/tmp/fm-lab.cNLXSb
+removed /Users/charlesabrooker/tmp/fm-lab.yxsljX
+removed /Users/charlesabrooker/tmp/fm-lab.V0CNDn
+removed /Users/charlesabrooker/tmp/fm-lab.s5xiIK
+13:40:15 recheck: no watchdog, owner, lab process, or private Lavish server left (they exited on their own after retire).

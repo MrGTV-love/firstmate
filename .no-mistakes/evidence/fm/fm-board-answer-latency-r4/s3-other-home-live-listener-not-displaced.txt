@@ -1,0 +1,50 @@
+### S3 (adversarial): a SECOND firstmate home (own registry, own claim root) has a live listener on page C; home 1 then arms page C (target 19c0b75c)
+home 1: /Users/charlesabrooker/tmp/fm-lab.V0CNDn ; home 2: /Users/charlesabrooker/tmp/fm-lab.s5xiIK
+== 13:29:42 home 2: $ bin/fm-procevent-lavish.sh arm page-c.html
+registered: lavish-ab61a3f053b2c345 (lavish)
+armed: lavish-ab61a3f053b2c345
+artifact: /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html
+arm rc=0
+home 2 poller record: lavish-ab61a3f053b2c345.41553.poller
+home 1 poller records for page C: 0
+page C polls:
+41553 38555 38555 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html
+42224 41553 38555 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html
+42231 41553 38555 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html
+
+== 13:29:48 home 1: $ bin/fm-procevent-lavish.sh arm page-c.html
+registered: lavish-ab61a3f053b2c345 (lavish)
+armed: lavish-ab61a3f053b2c345
+artifact: /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html
+arm rc=0
+== wait 60 s ==
+page C polls (pid ppid pgid command):
+41553 38555 38555 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html
+42224 41553 38555 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html
+42231 41553 38555 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html
+84443 52983 52983 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html
+takeover polls on page C: 0
+(eval):18: no matches found: /Users/charlesabrooker/tmp/fm-lab.s5xiIK/state/procevent-inbox/lavish-ab61a3f053b2c345.*.result
+home 2 results: 0 ; their codes: 
+home 1 results:
+--- lavish-ab61a3f053b2c345.1.result: classify=waiting
+  | error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 4935ms)"
+  | code: LISTENER_ACTIVE
+  | help[1]: Use --takeover only when you intend to displace the current listener
+  | held-page: another poll holds /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-c.html and is not a proved leftover, so it is not displaced; this listener keeps its claim, retries with back-off, and reports this hold once
+  | held-by: 41553 (no poller record)
+  | held-by: 42224 (no poller record)
+  | held-by: 42231 (no poller record)
+$ home 1 list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-6bd7e5a727a2c655      lavish       live       1
+lavish-886ca018f5e890f6      lavish       live       1
+lavish-ab61a3f053b2c345      lavish       live       1
+$ home 2 list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-ab61a3f053b2c345      lavish       live       0
+
+== 13:30:51 the captain answers page C: home 2's live listener should get it ==
+captain clicked 'Send to Agent' at 13:30:59 (epoch 1791657059): Lab3 S3 answer on page C, home 2 listens.
+home 2 capture lavish-ab61a3f053b2c345.1.result visible 1s after the click (whole seconds)
+home 1 results containing it: 0

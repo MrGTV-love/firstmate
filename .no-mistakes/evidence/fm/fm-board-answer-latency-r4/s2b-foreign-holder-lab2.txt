@@ -1,0 +1,63 @@
+### S2b (lab 2, live lab owner): another agent's bare 'lavish-axi poll' takes page B right after firstmate's poll returns (target 19c0b75c)
+lab home: /Users/charlesabrooker/tmp/fm-lab.KHfAIC ; Lavish 127.0.0.1:4498 ; load 40.49 39.01 36.98
+== 13:21:08 $ bin/fm-procevent-lavish.sh arm page-b.html
+registered: lavish-efabd03902a1ed63 (lavish)
+armed: lavish-efabd03902a1ed63
+artifact: /Users/charlesabrooker/tmp/fm-lab.KHfAIC/boards/page-b.html
+arm rc=0
+source id: lavish-efabd03902a1ed63
+
+== 13:21:12 the captain answers page B ==
+captain clicked 'Send to Agent' at 13:21:20 (epoch 1791656480): Lab2 S2 answer one on page B, before the other agent.
+capture lavish-efabd03902a1ed63.1.result visible 1s after the click; the other agent's poll was started right after it landed
+13:21:22 other agent's poll: pid 27096, started Sat Oct 10 13:21:22 2026    , parent 24745 (its tmux shell)
+
+== 13:21:22 wait 120 s ==
+other agent's poll alive: yes
+page B results:
+  lavish-efabd03902a1ed63.1.result: classify=feedback
+  lavish-efabd03902a1ed63.2.result: classify=waiting
+held-page reports: 1
+--- lavish-efabd03902a1ed63.2.result:
+  | error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 289ms)"
+  | code: LISTENER_ACTIVE
+  | help[1]: Use --takeover only when you intend to displace the current listener
+  | held-page: another poll holds /Users/charlesabrooker/tmp/fm-lab.KHfAIC/boards/page-b.html and is not a proved leftover, so it is not displaced; this listener keeps its claim, retries with back-off, and reports this hold once
+  | held-by: 27096 (no poller record)
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-efabd03902a1ed63      lavish       live       2
+poll processes on page B (pid ppid pgid command):
+57563 96221 96221 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.KHfAIC/boards/page-b.html
+27096 24745 27096 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.KHfAIC/boards/page-b.html
+
+== 13:23:23 $ bin/fm-procevent-lavish.sh orphans --kill   (page B lines and total) ==
+kept: 57563 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab.KHfAIC/boards/page-b.html
+kept: 27096 (no poller record) /Users/charlesabrooker/tmp/fm-lab.KHfAIC/boards/page-b.html
+orphans: found=0 killed=0 kept=81
+other agent's poll 27096 alive 2 s after orphans --kill: yes
+and 12 s after: yes
+
+== 13:23:39 the captain answers page B while the other agent holds it ==
+captain clicked 'Send to Agent' at 13:23:47 (epoch 1791656627): Lab2 S2 answer two, sent while the other agent holds page B.
+other agent's poll received it: 1 line(s); firstmate results containing it: 0
+(expected: a non-firstmate poll that holds the page gets that answer; firstmate must not steal it)
+
+== 13:23:51 other agent is done and does not re-poll; wait for firstmate's backed-off listener to hold page B ==
+after 20s: 50715 57563 96221 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.KHfAIC/boards/page-b.html
+
+== 13:24:14 the captain answers page B again ==
+captain clicked 'Send to Agent' at 13:24:22 (epoch 1791656662): Lab2 S2 answer three on page B, after the other agent left.
+screenshot: /Users/charlesabrooker/.no-mistakes/evidence/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/s2b-page-b-after-other-agent-left.png
+capture lavish-efabd03902a1ed63.3.result visible 4s after the click (whole seconds)
+page B results:
+  lavish-efabd03902a1ed63.1.result: classify=feedback
+  lavish-efabd03902a1ed63.2.result: classify=waiting
+  lavish-efabd03902a1ed63.3.result: classify=feedback
+wake rows for page B:
+1791656481	1	check	procevent:lavish-efabd03902a1ed63:1	check: procevent lavish lavish-efabd03902a1ed63 1
+1791656488	2	check	procevent:lavish-efabd03902a1ed63:2	check: procevent lavish lavish-efabd03902a1ed63 2
+1791656664	3	check	procevent:lavish-efabd03902a1ed63:3	check: procevent lavish lavish-efabd03902a1ed63 3
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-efabd03902a1ed63      lavish       live       3

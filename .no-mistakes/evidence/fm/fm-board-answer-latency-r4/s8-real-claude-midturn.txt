@@ -1,0 +1,61 @@
+### S8: a real Claude primary (2.1.296 (Claude Code)) in lab home /Users/charlesabrooker/tmp/fm-lab.yxsljX, plain-checkout snapshot of 19c0b75c. The captain answers while firstmate is mid-turn.
+== 13:35:47 arm page P in the lab home ==
+registered: lavish-5e6a2aaed70a4814 (lavish)
+armed: lavish-5e6a2aaed70a4814
+artifact: /Users/charlesabrooker/tmp/fm-lab.yxsljX/boards/page-p.html
+arm rc=0
+source id: lavish-5e6a2aaed70a4814
+== 13:35:48 give the primary a long turn (six 25 s sleeps) ==
+13:35:54 mid-turn check: pane shows a sleep running: 2 line(s)
+captain clicked 'Send to Agent' at 13:36:02 (epoch 1791657362): Lab S8 answer on page P: sent while firstmate is mid-turn.
+capture lavish-5e6a2aaed70a4814.1.result visible 1s after the click (whole seconds)
+13:36:32 primary marked lavish-5e6a2aaed70a4814.1.result handled +30s after the click
+sentinel-done lines in pane at that moment: 0  (0 = still mid-turn)
+13:38:54 primary turn ended (+172s after the click)
+
+## pane at the end
+nds containing a literal * at that position. Replace that * with the exact value you mean.
+ ▐▛███▛█   Claude Code v2.1.296
+▝▜██████▀  Sonnet 5.5 with high effort · Claude Max
+ ▝▝   ▝▝   ~/tmp/fm-lab.yxsljX/clone
+❯ Lab test. Do exactly this and nothing else: run the Bash command python3 -c 'import time; time.sleep(25)' six times, one Bash call each, one after another. If a hook tells you a captured Lavish
+  result is waiting, handle it as it says (drain, read it, acknowledge it with handled), quote the captain message, then continue the sleeps. Treat any other wake as lab noise: acknowledge it and
+  continue. After the sixth sleep, print a short summary and the word LAB_END_MARK in capitals with the two words joined.
+  Ran 2 shell commands
+⏺ The drain had a row but no result text. I read the result directly.
+  Ran 1 shell command
+⏺ Captain message: "Lab S8 answer on page P: sent while firstmate is mid-turn."
+  I acknowledge the result now.
+  Ran 1 shell command
+⏺ Sleep 2 of 6.
+  Ran 5 shell commands
+⏺ Captain, the test is done. All six sleeps ran.
+  - Sleeps: I ran six 25-second sleeps, one Bash call each.
+  - Lavish result: One came in after sleep 1.
+    a. I drained the wake queue.
+    b. I read the result.
+    c. I marked it handled.
+    d. I acknowledged the wake.
+  - Captain message: "Lab S8 answer on page P: sent while firstmate is mid-turn."
+  - Warning: The drain printed "WATCHER DOWN - SUPERVISION IS OFF". The test did not ask me to act on it, so I did nothing. Supervision stays off until someone repairs it.
+  - Other wakes: None.
+  LAB_END_MARK
+✻ Cascading… (running Stop hooks… 1/4 · 3m 5s · ↓ 1.9k tokens)
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 5% 57k/1.0M main clone:6caf35fc
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+## transcript events that mention the Lavish source (Claude session jsonl 6caf35fc-1ee9-455d-bde0-a32b8b90ea66.jsonl), UTC time
+18:35:49 ATTACHMENT(skill_listing) - agent-browser: Browser automation CLI for AI agents — navigate, fill forms, click, screenshot, scrape, test web apps, or automate any browser task. Triggers: "open a website", "fill out a form", "click a button", "take a screenshot", "scrape data from a page", "test this web app", "login to a site", "automate browser actions". Also covers exploratory testing/dogfooding/QA/bug hunts, Electron app
+18:36:19 ATTACHMENT(hook_success) {"hookSpecificOutput":{"additionalContext":"A captured Lavish result is waiting: lavish-5e6a2aaed70a4814 1. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.yxsljX' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/state' FM_ROOT_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/clone' '/Users/charlesabrooker/tmp/fm-lab.yxsljX/clone/bin/fm-wake-drain.sh'` now. If the drain has no row for
+18:36:19 ATTACHMENT(hook_additional_context) 
+18:36:25 user tool_result: 1791657364	1	check	procevent:lavish-5e6a2aaed70a4814:1	check: procevent lavish lavish-5e6a2aaed70a4814 1 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 71821.17
+18:36:25 ATTACHMENT(hook_success) {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"A captured Lavish result is waiting: lavish-5e6a2aaed70a4814 1. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.yxsljX' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/state' FM_ROOT_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/clone' '/Users/charlesabrooker/tmp/fm-lab.yxsljX/clone/bin/fm-wake-drain.sh'` no
+18:36:25 ATTACHMENT(hook_additional_context) 
+18:36:27 assistant tool_use: {"command": "FM_HOME='/Users/charlesabrooker/tmp/fm-lab.yxsljX' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/state' FM_ROOT_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/clone' '/Users/charlesabrooker
+18:36:28 ATTACHMENT(hook_success) {"hookSpecificOutput":{"additionalContext":"A captured Lavish result is waiting: lavish-5e6a2aaed70a4814 1. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.yxsljX' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/state' FM_ROOT_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/clone' '/Users/charlesabrooker/tmp/fm-lab.yxsljX/clone/bin/fm-wake-drain.sh'` now. If the drain has no row for
+18:36:28 ATTACHMENT(hook_additional_context) 
+18:36:31 assistant tool_use: {"command": "FM_HOME='/Users/charlesabrooker/tmp/fm-lab.yxsljX' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/state' FM_ROOT_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.yxsljX/clone' '/Users/charlesabrooker
+18:36:32 user tool_result: handled: lavish-5e6a2aaed70a4814 1

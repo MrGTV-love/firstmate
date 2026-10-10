@@ -1,0 +1,86 @@
+### S1: firstmate arms page A; the captain sends three answers; no reconcile runs (target 19c0b75c, lavish-axi 0.1.79)
+lab home: /Users/charlesabrooker/tmp/fm-lab.eNOnmB ; private Lavish server 127.0.0.1:4497 ; host load: 28.28 30.01 35.32
+== 13:06:49 $ bin/fm-procevent-lavish.sh arm page-a.html
+registered: lavish-b3d82755a23d6fff (lavish)
+armed: lavish-b3d82755a23d6fff
+artifact: /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-a.html
+arm rc=0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-b3d82755a23d6fff      lavish       live       0
+source id: lavish-b3d82755a23d6fff
+poller ledger records in this home's registry while the poll runs:
+  lavish-b3d82755a23d6fff.55133.poller: 55133|Sat Oct 10 13:06:51 2026|53488|
+  ps: 55133 53488 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-a.html
+  ps lstart: Sat Oct 10 13:06:51 2026    
+native poll processes on page A (pid ppid pgid command):
+55522 55133 53488 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-a.html
+
+== 13:06:54 answer 1 ==
+captain: click failed
+NO capture containing 'Lab S1 answer 1 from the captain' within 90s
+
+== 13:08:32 answer 2 ==
+captain: click failed
+NO capture containing 'Lab S1 answer 2 from the captain' within 90s
+
+== 13:10:09 answer 3 ==
+captain: click failed
+NO capture containing 'Lab S1 answer 3 from the captain' within 90s
+
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-b3d82755a23d6fff      lavish       live       0
+wake queue rows for page A (state/.wake-queue):
+ugrep: warning: /Users/charlesabrooker/tmp/fm-lab.eNOnmB/state/.wake-queue: No such file or directory
+(eval):23: no matches found: /Users/charlesabrooker/tmp/fm-lab.eNOnmB/state/procevent-inbox/lavish-b3d82755a23d6fff.*.result
+
+(driver note: the three clicks above failed inside the browser helper - stale element refs - so nothing was sent. The helper was fixed. A probe answer 'Lab probe answer zero' at 13:12:17 was captured as result 1 in 2 s. No reconcile or re-arm was run.)
+runner pid before: 53488 ; files: lavish-b3d82755a23d6fff.13128.poller lavish-b3d82755a23d6fff.16777233-222504640.last-launch lavish-b3d82755a23d6fff.runner lavish-b3d82755a23d6fff.source 
+
+== 13:12:29 answer 1 (earlier answers stay unhandled; no reconcile) ==
+poller records now: lavish-b3d82755a23d6fff.13128.poller 
+captain clicked 'Send to Agent' at 13:12:37 (epoch 1791655957): Lab S1 answer 1 from the captain on page A.
+capture lavish-b3d82755a23d6fff.2.result visible 1s after the click (whole seconds)
+
+== 13:12:42 answer 2 (earlier answers stay unhandled; no reconcile) ==
+poller records now: lavish-b3d82755a23d6fff.68767.poller 
+captain clicked 'Send to Agent' at 13:12:51 (epoch 1791655971): Lab S1 answer 2 from the captain on page A.
+capture lavish-b3d82755a23d6fff.3.result visible 1s after the click (whole seconds)
+
+== 13:12:56 answer 3 (earlier answers stay unhandled; no reconcile) ==
+poller records now: lavish-b3d82755a23d6fff.7122.poller 
+captain clicked 'Send to Agent' at 13:13:04 (epoch 1791655984): Lab S1 answer 3 from the captain on page A.
+screenshot: /Users/charlesabrooker/.no-mistakes/evidence/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/s1a-page-a-after-three-answers.png
+capture lavish-b3d82755a23d6fff.4.result visible 3s after the click (whole seconds)
+
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-b3d82755a23d6fff      lavish       live       4
+wake queue rows for page A:
+1791655939	1	check	procevent:lavish-b3d82755a23d6fff:1	check: procevent lavish lavish-b3d82755a23d6fff 1
+1791655958	2	check	procevent:lavish-b3d82755a23d6fff:2	check: procevent lavish lavish-b3d82755a23d6fff 2
+1791655972	3	check	procevent:lavish-b3d82755a23d6fff:3	check: procevent lavish lavish-b3d82755a23d6fff 3
+1791655985	4	check	procevent:lavish-b3d82755a23d6fff:4	check: procevent lavish lavish-b3d82755a23d6fff 4
+lavish-b3d82755a23d6fff.1.result: classify=feedback
+lavish-b3d82755a23d6fff.2.result: classify=feedback
+lavish-b3d82755a23d6fff.3.result: classify=feedback
+lavish-b3d82755a23d6fff.4.result: classify=feedback
+$ bin/fm-procevent-lavish.sh read lavish-b3d82755a23d6fff.4.result
+CAPTAIN MESSAGE
+| Lab S1 answer 3 from the captain on page A.
+END CAPTAIN MESSAGE
+
+declared_items: 1
+presented_items: 1
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 0
+captain_message_count: 1
+registry: lavish-b3d82755a23d6fff.16777233-222504640.last-launch lavish-b3d82755a23d6fff.41052.poller lavish-b3d82755a23d6fff.runner lavish-b3d82755a23d6fff.source 
+poll processes on page A now:
+41052 53488 53488 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-a.html
+41701 41052 53488 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-a.html
+41713 41052 53488 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-a.html

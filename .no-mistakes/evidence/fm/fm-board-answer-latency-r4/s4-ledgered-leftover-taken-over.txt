@@ -1,0 +1,47 @@
+### S4: a firstmate leftover 'fm-procevent-lavish.sh poll' (this home's adapter, ledgered, no live claim) holds page D; firstmate arms page D (target 19c0b75c)
+home 1: /Users/charlesabrooker/tmp/fm-lab.V0CNDn ; load 42.68 38.16 36.91
+source id: lavish-6bd7e5a727a2c655
+leftover adapter: pid 54750 pgid 54750 started 'Sat Oct 10 13:26:21 2026'
+its native poll: pid 55295 ppid 54750 : node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+poller record: lavish-6bd7e5a727a2c655.54750.poller = 54750|Sat Oct 10 13:26:21 2026|54750|
+claims for lavish-6bd7e5a727a2c655: 0
+
+== 13:26:24 $ bin/fm-procevent-lavish.sh orphans  (page D lines) ==
+kept: 51894 (artifact cannot be resolved) $PD > $LAB/leftover-d.out 2>&1"\012sleep 4\012LPID=$(pgrep -f "^bash $W/bin/fm-procevent-lavish.sh poll $PD\$" | head -1); NPID=$(pgrep -P $LPID -f "lavish-axi poll" | head -1)\012echo "leftover adapter: pid $LPID pgid $(ps -o pgid= -p $LPID | tr -d '"'"' '"'"') started '"'"'$(LC_ALL=C ps -o lstart= -p $LPID | awk '"'"'{$1=$1;print}'"'"')'"'"'"\012echo "its native poll: pid $NPID ppid $(ps -o ppid= -p $NPID | tr -d '"'"' '"'"') : $(ps -o command= -p $NPID)"\012echo "poller record: $(ls $LAB/state/procevent/ | grep poller) = $(tr '"'"'\n'"'"' '"'"'|'"'"' < $LAB/state/procevent/$ID.$LPID.poller)"\012echo "claims for $ID: $(ls $FM_PROCEVENT_CLAIM_ROOT 2>/dev/null | grep -c $ID)"\012echo; echo "== $(date +%T) \$ bin/fm-procevent-lavish.sh orphans  (page D lines) =="\012bin/fm-procevent-lavish.sh orphans 2>&1 | grep -E "page-d|orphans:"\012echo; echo "== $(date +%T) \$ bin/fm-procevent-lavish.sh arm page-d.html =="\012bin/fm-procevent-lavish.sh arm "$PD" 2>&1; echo "arm rc=$?"\012sleep 8\012echo "== $(date +%T) after 8 s =="\012echo "leftover adapter alive: $(kill -0 $LPID 2>/dev/null && echo yes || echo no); its native poll alive: $(kill -0 $NPID 2>/dev/null && echo yes || echo no)"\012echo "leftover output (what the leftover received):"; sed '"'"'s/^/  | /'"'"' $LAB/leftover-d.out | grep -v Long-polling\012echo "leftover'"'"'s poller record still present: $([ -e $LAB/state/procevent/$ID.$LPID.poller ] && echo yes || echo no)"\012echo "poll processes on page D (pid ppid pgid command):"; ps -axo pid=,ppid=,pgid=,command= | grep "poll $PD" | grep -v grep\012echo "page D results: $(ls $LAB/state/procevent-inbox/ 2>/dev/null | grep -c "$ID")  (no held-page report expected)"\012echo "\$ bin/fm-procevent.sh list"; bin/fm-procevent.sh list\012echo; echo "== $(date +%T) the captain answers page D =="\012r=$($EV/captain.sh "$URLD" "Lab3 S4 answer one on page D, after the leftover was taken over." $EV/s4a-page-d-after-takeover.png); echo "$r"\012t0=$(printf '"'"'%s\n'"'"' "$r" | sed -n '"'"'s/.*(epoch \([0-9]*\)).*/\1/p'"'"')\012$EV/waitcap.sh "$ID" "Lab3 S4 answer one" "$t0" 90\012echo "leftover output contains the answer: $(grep -c '"'"'Lab3 S4 answer one'"'"' $LAB/leftover-d.out) times"\012echo "wake rows for page D:"; grep -h "$ID" "$LAB"/state/.wake-queue* 2>&1\012for f in "$LAB/state/procevent-inbox/$ID".*.result; do echo "$(basename $f): classify=$(bin/fm-procevent-lavish.sh classify $f)"; done\012echo "\$ bin/fm-procevent.sh list"; bin/fm-procevent.sh list\012} > $out 2>&1; cat $out' && pwd -P >| /tmp/claude-b5bb-cwd
+orphan: 54750 lavish-6bd7e5a727a2c655 /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+orphan: 55295 lavish-6bd7e5a727a2c655 /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+orphan: 55301 lavish-6bd7e5a727a2c655 /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+orphans: found=3 killed=0 kept=80
+
+== 13:26:29 $ bin/fm-procevent-lavish.sh arm page-d.html ==
+registered: lavish-6bd7e5a727a2c655 (lavish)
+armed: lavish-6bd7e5a727a2c655
+artifact: /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+arm rc=0
+== 13:26:39 after 8 s ==
+leftover adapter alive: no; its native poll alive: no
+leftover output (what the leftover received):
+  | error: Lavish Editor poll listener was replaced by a takeover
+  | code: LISTENER_REPLACED
+  | help[1]: Re-run lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html only if you intend to take over listening
+leftover's poller record still present: no
+poll processes on page D (pid ppid pgid command):
+84793 81854 81854 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+97186 84793 81854 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html --takeover
+97209 84793 81854 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+page D results: 0  (no held-page report expected)
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-6bd7e5a727a2c655      lavish       live       0
+
+== 13:26:40 the captain answers page D ==
+captain clicked 'Send to Agent' at 13:26:48 (epoch 1791656808): Lab3 S4 answer one on page D, after the leftover was taken over.
+screenshot: /Users/charlesabrooker/.no-mistakes/evidence/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/s4a-page-d-after-takeover.png
+capture lavish-6bd7e5a727a2c655.1.result visible 3s after the click (whole seconds)
+leftover output contains the answer: 0 times
+wake rows for page D:
+1791656809	1	check	procevent:lavish-6bd7e5a727a2c655:1	check: procevent lavish lavish-6bd7e5a727a2c655 1
+lavish-6bd7e5a727a2c655.1.result: classify=feedback
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-6bd7e5a727a2c655      lavish       live       1

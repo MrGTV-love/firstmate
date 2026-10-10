@@ -1,0 +1,68 @@
+### S2: another agent's bare 'lavish-axi poll' takes page B in the gap right after firstmate's poll returns (target 19c0b75c)
+== 13:13:52 $ bin/fm-procevent-lavish.sh arm page-b.html
+registered: lavish-fd0a69b19b3851a8 (lavish)
+armed: lavish-fd0a69b19b3851a8
+artifact: /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-b.html
+arm rc=0
+source id: lavish-fd0a69b19b3851a8
+
+== 13:13:56 the captain answers page B ==
+captain clicked 'Send to Agent' at 13:14:05 (epoch 1791656045): Lab S2 answer one on page B, before the foreign poll.
+capture lavish-fd0a69b19b3851a8.1.result visible 1s after the click
+13:14:07 other agent started a bare poll inside firstmate's relisten delay: pid 13750 (Sat Oct 10 13:14:06 2026     node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-b.html)
+
+== 13:14:07 wait 150 s: firstmate's next polls are refused LISTENER_ACTIVE and back off ==
+foreign poll alive: yes
+foreign poll output so far:
+page B results:
+  lavish-fd0a69b19b3851a8.1.result: classify=feedback
+  lavish-fd0a69b19b3851a8.2.result: classify=waiting
+held-page reports among them: 1
+--- lavish-fd0a69b19b3851a8.2.result:
+  | error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 2034ms)"
+  | code: LISTENER_ACTIVE
+  | help[1]: Use --takeover only when you intend to displace the current listener
+  | held-page: another poll holds /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-b.html and is not a proved leftover, so it is not displaced; this listener keeps its claim, retries with back-off, and reports this hold once
+  | held-by: 13750 (no poller record)
+wake rows for page B:
+1791656047	5	check	procevent:lavish-fd0a69b19b3851a8:1	check: procevent lavish lavish-fd0a69b19b3851a8 1
+1791656055	6	check	procevent:lavish-fd0a69b19b3851a8:2	check: procevent lavish lavish-fd0a69b19b3851a8 2
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-b3d82755a23d6fff      lavish       live       4
+lavish-fd0a69b19b3851a8      lavish       live       2
+poll processes on page B (pid ppid pgid command):
+13750 72171 13750 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-b.html
+52046 73900 73900 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-b.html
+takeover polls seen: 1 (grep counts itself once)
+
+== 13:16:48 $ bin/fm-procevent-lavish.sh orphans --kill  (page B lines and total) ==
+kept: 13750 (no poller record) /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-b.html
+kept: 52046 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-b.html
+orphans: found=0 killed=0 kept=85
+foreign poll 13750 alive after orphans --kill: no
+
+== 13:16:54 the other agent finishes: its poll is ended with TERM (as that agent would) ==
+(eval):kill:9: kill 13750 failed: no such process
+foreign alive: no
+== wait up to 70 s for firstmate's backed-off listener to hold page B again ==
+after 2s: firstmate native polls on page B: 68613 52046 73900 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.eNOnmB/boards/page-b.html
+
+== 13:16:59 the captain answers page B again ==
+captain clicked 'Send to Agent' at 13:17:07 (epoch 1791656227): Lab S2 answer two on page B, after the other agent left.
+screenshot: /Users/charlesabrooker/.no-mistakes/evidence/01M4KAY4TDSEXMSMA5ZX7ZS3ZA/s2a-page-b-after-foreign-left.png
+capture lavish-fd0a69b19b3851a8.3.result visible 3s after the click (whole seconds)
+page B results:
+  lavish-fd0a69b19b3851a8.1.result: classify=feedback
+  lavish-fd0a69b19b3851a8.2.result: classify=waiting
+  lavish-fd0a69b19b3851a8.3.result: classify=feedback
+wake rows for page B:
+1791656047	5	check	procevent:lavish-fd0a69b19b3851a8:1	check: procevent lavish lavish-fd0a69b19b3851a8 1
+1791656055	6	check	procevent:lavish-fd0a69b19b3851a8:2	check: procevent lavish lavish-fd0a69b19b3851a8 2
+1791656228	7	check	procevent:lavish-fd0a69b19b3851a8:3	check: procevent lavish lavish-fd0a69b19b3851a8 3
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-b3d82755a23d6fff      lavish       live       4
+lavish-fd0a69b19b3851a8      lavish       live       3
+
+(driver note, 13:17-13:21: the foreign poll above did NOT die from 'orphans --kill'. A controlled repeat on page E showed 'orphans --kill' printing 'kept: <pid> (no poller record)', killed=0, and the poll still alive right after; a control poll with no orphans call at all also died ~6 s later. Cause: this first lab's marker names the driver's finished shell as owner, so other concurrent test runs' bin/fm-test-reap-orphans.sh treat the lab as ended and reap init-parented processes that name it (the foreign poll became init-parented when its launching shell exited at 13:16:38; it was signalled at 13:16:54). The orphans and recovery steps are re-driven in lab 2, whose owner process stays alive: see s2b-*.)

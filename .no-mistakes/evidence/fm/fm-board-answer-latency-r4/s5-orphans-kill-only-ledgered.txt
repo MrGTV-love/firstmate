@@ -1,0 +1,21 @@
+### S5: 'orphans --kill' with a ledgered firstmate leftover on page E and another agent's poll on page F that has a forged poller record (same pid, other start time) (target 19c0b75c)
+page E source: lavish-5adaff7ccd55f77c ; page F source: lavish-886ca018f5e890f6
+page E leftover adapter 14931 (record lavish-5adaff7ccd55f77c.14931.poller), its native poll 15587
+page F other agent's poll 15619, real start 'Sat Oct 10 13:27:18 2026'
+forged record lavish-886ca018f5e890f6.15619.poller: 15619|Thu Jan 1 00:00:00 2015|15619|   (a reused pid: same pid, another start time)
+
+== 13:27:21 $ bin/fm-procevent-lavish.sh orphans --kill   (lab 3 lines and total) ==
+kept: 7948 (artifact cannot be resolved) $PE > $LAB/leftover-e.out 2>&1"\012$EV/other.sh agentF "lavish-axi poll $PF > $LAB/foreign-f.out 2>&1"\012sleep 4\012LPID=$(pgrep -f "^bash $W/bin/fm-procevent-lavish.sh poll $PE\$" | head -1); LNPID=$(pgrep -P $LPID -f "lavish-axi poll" | head -1)\012FPID=$(pgrep -f "^node .*lavish-axi poll $PF\$" | head -1)\012echo "page E leftover adapter $LPID (record $(ls $LAB/state/procevent | grep "$IDE.$LPID.poller")), its native poll $LNPID"\012echo "page F other agent'"'"'s poll $FPID, real start '"'"'$(LC_ALL=C ps -o lstart= -p $FPID | awk '"'"'{$1=$1;print}'"'"')'"'"'"\012printf '"'"'%s\n%s\n%s\n'"'"' "$FPID" "Thu Jan 1 00:00:00 2015" "$FPID" > "$LAB/state/procevent/$IDF.$FPID.poller"\012echo "forged record $IDF.$FPID.poller: $(tr '"'"'\n'"'"' '"'"'|'"'"' < $LAB/state/procevent/$IDF.$FPID.poller)   (a reused pid: same pid, another start time)"\012echo; echo "== $(date +%T) \$ bin/fm-procevent-lavish.sh orphans --kill   (lab 3 lines and total) =="\012bin/fm-procevent-lavish.sh orphans --kill 2>&1 | grep -E "$LAB/boards|orphans:"\012sleep 3\012echo "page E leftover adapter alive: $(kill -0 $LPID 2>/dev/null && echo yes || echo no); its native poll alive: $(kill -0 $LNPID 2>/dev/null && echo yes || echo no)"\012echo "page E leftover record left: $(ls $LAB/state/procevent | grep -c "$IDE.*poller")"\012echo "page F other agent'"'"'s poll alive: $(kill -0 $FPID 2>/dev/null && echo yes || echo no)"\012echo "forged record still present: $([ -e $LAB/state/procevent/$IDF.$FPID.poller ] && echo yes || echo '"'"'no (pruned: start time does not match)'"'"')"\012sleep 10; echo "page F other agent'"'"'s poll alive 13 s later: $(kill -0 $FPID 2>/dev/null && echo yes || echo no)"\012echo "$FPID" > $LAB/foreign-f.pid\012} > $out 2>&1; cat $out' && pwd -P >| /tmp/claude-b379-cwd
+kept: 30100 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+kept: 30468 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+kept: 30470 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-d.html
+killed: 14931 lavish-5adaff7ccd55f77c /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-e.html
+killed: 15587 lavish-5adaff7ccd55f77c /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-e.html
+kept: 15602 (process changed before the signal) /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-e.html
+kept: 15619 (no poller record) /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-f.html
+orphans: found=2 killed=2 kept=85
+page E leftover adapter alive: no; its native poll alive: no
+page E leftover record left: 0
+page F other agent's poll alive: yes
+forged record still present: no (pruned: start time does not match)
+page F other agent's poll alive 13 s later: yes

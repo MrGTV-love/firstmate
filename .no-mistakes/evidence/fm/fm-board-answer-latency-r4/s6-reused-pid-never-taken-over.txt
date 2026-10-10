@@ -1,0 +1,26 @@
+### S6 (adversarial): page F is held by another agent's poll; a poller record names that same pid with another start time (pid reuse); firstmate arms page F (target 19c0b75c)
+other agent's poll 15619 alive: yes, real start 'Sat Oct 10 13:27:18 2026'
+forged: lavish-886ca018f5e890f6.15619.poller = 15619|Thu Jan 1 00:00:00 2015|15619|
+== 13:27:52 $ bin/fm-procevent-lavish.sh arm page-f.html
+registered: lavish-886ca018f5e890f6 (lavish)
+armed: lavish-886ca018f5e890f6
+artifact: /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-f.html
+arm rc=0
+== wait 90 s ==
+other agent's poll alive: yes
+other agent's output:
+forged record still present: no (pruned)
+page F results:
+  lavish-886ca018f5e890f6.1.result: classify=waiting
+held-page reports: 1
+--- lavish-886ca018f5e890f6.1.result:
+  | error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 35413ms)"
+  | code: LISTENER_ACTIVE
+  | help[1]: Use --takeover only when you intend to displace the current listener
+  | held-page: another poll holds /Users/charlesabrooker/tmp/fm-lab.V0CNDn/boards/page-f.html and is not a proved leftover, so it is not displaced; this listener keeps its claim, retries with back-off, and reports this hold once
+  | held-by: 15619 (no poller record)
+takeover polls on page F: 0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-6bd7e5a727a2c655      lavish       live       1
+lavish-886ca018f5e890f6      lavish       live       1
