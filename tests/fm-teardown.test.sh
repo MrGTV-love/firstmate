@@ -8113,6 +8113,53 @@ test_reverse_nested_prior_outside_claude_tears_down() {
   pass "the reverse nested shape with a prior copy outside .claude/ proves and removes it, then returns the slot"
 }
 
+# A stale index.lock in the enclosing slot makes the first return fail; while
+# teardown waits, the slot gains work. Once the stale lock is removed the slot is
+# proved again before the reset, with or without --force, so the late work stops
+# teardown, nothing is returned, and the slot keeps it.
+test_nested_slot_stale_lock_cleanup_reproves_the_slot() {
+  local case_dir rc lock force label
+  for force in normal force; do
+    label="nested-stale-lock-$force"
+    make_nested_slot_case "$label" enclosing .claude/worktrees/x
+    case_dir=$NESTED_CASE
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" = return ] || exit 0
+wt=\${@: -1}
+lock=\$(git -C "\$wt" rev-parse --path-format=absolute --git-path index.lock 2>/dev/null || true)
+if [ -n "\$lock" ] && [ -e "\$lock" ]; then
+  printf 'late slot work\n' > "\$wt/late.txt"
+  echo "fatal: Unable to create '\$lock': File exists." >&2
+  exit 128
+fi
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/treehouse"
+    add_lsof_no_holder "$case_dir"
+    lock=$(git_index_lock_path "$NESTED_SLOT")
+    : > "$lock"
+    touch -t 200001010000 "$lock"
+    rc=0
+    if [ "$force" = force ]; then
+      FM_HOME="$case_dir/home" FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+        run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    else
+      FM_HOME="$case_dir/home" FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+        run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    fi
+    expect_code 1 "$rc" "$label: the slot's late work must stop the reset: $(cat "$case_dir/stderr")"
+    assert_grep "removed provably-stale git lock" "$case_dir/stderr" "$label: the stale lock was not cleaned up"
+    assert_grep "claimed pool slot $NESTED_SLOT, which has uncommitted or untracked-unignored changes" "$case_dir/stderr" \
+      "$label: the refusal did not name the slot and the reason"
+    assert_absent "$case_dir/treehouse.log" "$label: the slot was returned"
+    assert_grep "late slot work" "$NESTED_SLOT/late.txt" "$label: the slot lost its late work"
+    assert_present "$case_dir/state/task-x1.meta" "$label: the task record was removed"
+  done
+  pass "a stale-lock cleanup in the enclosing slot proves it again before the reset, with or without --force"
+}
+
 # Returning the enclosing slot sweeps more than the nested current copy, so the
 # safety steps run on every copy swept: a run parked on the slot's own branch is
 # aborted and a task-private launch agent rooted in the slot is retired before
@@ -8828,6 +8875,7 @@ test_slot_named_as_another_prior_copy_refuses
 test_own_prior_copies_block_only_an_unproven_pool_return
 test_reverse_nested_prior_outside_claude_tears_down
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot
+test_nested_slot_stale_lock_cleanup_reproves_the_slot
 test_other_record_copy_overlap_is_component_aware
 test_forced_descendant_preserved_copy_refuses_before_cleanup
 test_tasktmp_preserves_current_and_prior_reassociated_copies

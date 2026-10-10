@@ -170,14 +170,6 @@ fm_task_copy_preserve() {  # <project> <task> <copy> <write> [<nested-copy>...]
   }
 }
 
-fm_task_copy_landed() {
-  local worktree=$1 project=$2 dirty_raw dirty
-  dirty_raw=$(git -C "$worktree" status --porcelain --untracked-files=all 2>/dev/null) || return 1
-  dirty=$(fm_task_copy_dirty_status "$dirty_raw")
-  [ -z "$dirty" ] || return 1
-  fm_task_copy_content_in_default "$worktree" "$project"
-}
-
 # True when <path> is an isolated worktree of <project>: a real directory that
 # is its own worktree root, is not the project checkout itself, and is not the
 # repository's primary checkout. FM_TASK_COPY_TOP is left holding the worktree

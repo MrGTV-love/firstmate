@@ -3181,6 +3181,12 @@ teardown_own_copy_disposable() {  # <canonical-copy>
   return 1
 }
 
+# The enclosing slot's proof again, for a return that removed a stale lock.
+# --force does not waive it.
+teardown_enclosing_slot_disposable() {
+  teardown_own_copy_disposable "$TEARDOWN_ENCLOSING_SLOT"
+}
+
 require_disposable_own_slot_copies() {
   local current prior prior_real copy known
   local -a kept=() proofs=()
@@ -4638,8 +4644,9 @@ elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
   # the project. teardown_treehouse_return tolerates transient and stale git locks
   # left by a killed crew process; see the script header for retry and stale-lock proof.
   post_lock_cleanup_check=
-  if [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ] \
-     && [ -z "$TEARDOWN_ENCLOSING_SLOT" ]; then
+  if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
+    post_lock_cleanup_check=teardown_enclosing_slot_disposable
+  elif [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ]; then
     post_lock_cleanup_check=validate_worktree_teardown_safety
   fi
   teardown_treehouse_return "$teardown_slot" "$PROJ" "worktree" "$post_lock_cleanup_check" || {
