@@ -360,6 +360,32 @@ is_live_non_zombie() {
   return 0
 }
 
+# Return a watcher fixture to a clean cycle boundary. A watcher stopped mid-cycle
+# leaves its resumable-cycle markers behind (.prelude-progress, .prelude-deferred)
+# and may leave its downtime marker, so the next watcher launched against the
+# same state resumes past the steps the test means to drive and exits on a
+# recovery wake instead. Call this before every direct launch that must run the
+# whole cycle, and only while no watcher owns the state.
+clear_watcher_cycle() {  # <state>
+  rm -rf -- "$1/.prelude-progress" "$1/.prelude-deferred" "$1/.watcher-down"
+}
+
+# Stop one directly launched watcher, then clear its cycle markers once it is
+# gone. <signal> defaults to TERM; a fixture that must not wait on the watcher's
+# own shutdown passes KILL and also clears the singleton lock the dead watcher
+# left.
+stop_watcher_and_clear_cycle() {  # <pid> <state> [signal] [poll-limit]
+  local pid=$1 state=$2 sig=${3:-TERM} limit=${4:-600}
+  if is_live_non_zombie "$pid"; then
+    kill "-$sig" "$pid" 2>/dev/null || true
+  fi
+  wait_for_exit "$pid" "$limit" || true
+  if ! is_live_non_zombie "$pid"; then
+    [ "$sig" != KILL ] || rm -rf -- "$state/.watch.lock"
+    clear_watcher_cycle "$state"
+  fi
+}
+
 hash_text() {
   if command -v md5 >/dev/null 2>&1; then
     printf '%s' "$1" | md5 -q
