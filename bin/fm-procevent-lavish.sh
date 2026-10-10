@@ -165,7 +165,9 @@
 #
 # The published poll vocabulary includes feedback, ended, waiting, and
 # browser_disconnected. A waiting result from this no-timeout poll means a
-# second poller was present; it is not a normal idle round. browser_disconnected
+# second poller was present; it is not a normal idle round. lavish-axi 0.1.79
+# refuses that poll with typed `code: LISTENER_ACTIVE` instead, and `classify`
+# reports it as waiting so it takes the same back-off. browser_disconnected
 # means the session remains open and is handled as a silent reconnect wait.
 # Before each poll attempt, resolve the artifact's saved URL from Lavish's own
 # session store (LAVISH_AXI_STATE_DIR/state.json, default ~/.lavish-axi/state.json)
@@ -814,6 +816,9 @@ cmd_classify() {
   ' "$file")
   if [ "$error_code" = NOT_FOUND ] || [[ "$error_message" == "No active Lavish Editor session"* ]]; then
     printf 'missing\n'
+  elif [ "$error_code" = LISTENER_ACTIVE ]; then
+    # Releases that refuse a second poller instead of answering `waiting`.
+    printf 'waiting\n'
   else
     printf 'unknown\n'
   fi

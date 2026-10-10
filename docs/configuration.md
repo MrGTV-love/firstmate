@@ -2495,10 +2495,10 @@ Real feedback, terminal responses, unknown errors or help text, and exhausted in
 
 **Keep open Lavish reviews listening**
 
-An ordinary firstmate-owned review armed through the shipped Lavish adapter keeps the same runner and exclusive claim after feedback, browser disconnection, a spurious `waiting` response, or an empty poll return.
+An ordinary firstmate-owned review armed through the shipped Lavish adapter keeps the same runner and exclusive claim after feedback, browser disconnection, a spurious `waiting` response or a `LISTENER_ACTIVE` refusal from a leftover poller holding the page, or an empty poll return.
 It does not wait for watcher reconciliation or for firstmate to handle an earlier answer before collecting the next one.
 Disconnected and empty rounds wait the adapter's retry delay before listening again, so an immediately returning source cannot spin.
-Consecutive captured `waiting` rounds double that delay up to its 60-second maximum, so a second poller left on the page cannot produce an unbounded stream of announcements.
+Consecutive captured `waiting` rounds, `LISTENER_ACTIVE` included, double that delay up to its 60-second maximum, so a second poller left on the page cannot produce an unbounded stream of announcements.
 Only an ended or missing session retires automatically; an open session is never retired merely because its browser disconnected or its registration is old.
 Unknown poll failures still reach the handler and release the listener rather than retrying indefinitely.
 The runner's existing owner lease and source launch pacing remain in force.

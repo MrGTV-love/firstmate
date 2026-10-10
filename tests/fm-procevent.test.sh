@@ -4062,6 +4062,10 @@ printf 'session:\n  file: /a.html\n  status: feedback\nprompts[1]{text}:\n  No a
   || fail "prompt text overrode a valid session status"
 printf 'error: No active Lavish Editor session for this file\ncode: NOT_FOUND\n' > "$CLS"
 assert_contains "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$CLS")" missing "an explicit missing session classifies as missing"
+printf '%s\n' 'error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 11175ms)"' \
+  'code: LISTENER_ACTIVE' 'help[1]: Use --takeover only when you intend to displace the current listener' > "$CLS"
+assert_equals waiting "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$CLS")" \
+  "a second poller refused with LISTENER_ACTIVE classifies as waiting"
 printf 'garbage that is not a session block\n' > "$CLS"
 assert_contains "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$CLS")" unknown "malformed output classifies as unknown rather than a lifecycle state"
 pass "the adapter classifies published poll output safely"
@@ -6823,11 +6827,13 @@ assert_present "$CONT/home/state/procevent-inbox/$cont_id.1.handled" \
   "the disconnect remains a silent no-op"
 : > "$CONT/round2"
 wait_for_lines "$CONT/started" 3 || fail "empty poll return stranded the listener"
-if ! { printf 'session:\n  status: waiting\n' > "$CONT/round3.tmp" \
+# lavish-axi 0.1.79 refuses a poll while a leftover poller holds the page.
+if ! { printf '%s\n' 'error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 11175ms)"' \
+  'code: LISTENER_ACTIVE' 'help[1]: Use --takeover only when you intend to displace the current listener' > "$CONT/round3.tmp" \
   && mv -f -- "$CONT/round3.tmp" "$CONT/round3"; }; then
-  fail "waiting round publication failed"
+  fail "held-page round publication failed"
 fi
-wait_for_lines "$CONT/started" 4 || fail "spurious waiting return stranded the listener"
+wait_for_lines "$CONT/started" 4 || fail "a page held by a leftover poller stranded the listener"
 if ! { printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,first answer\n' > "$CONT/round4.tmp" \
   && mv -f -- "$CONT/round4.tmp" "$CONT/round4"; }; then
   fail "first answer publication failed"
@@ -6918,6 +6924,11 @@ assert_equals 10 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.7.result")" "th
 assert_equals 5 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.5.result")" "a disconnected round keeps the quiet delay"
 printf 'session:\n  status: waiting\n' > "$WAITBACK/inbox/lavish-other.5.result"
 assert_equals 5 "$(waiting_delay "$WAITBACK/inbox/lavish-streak.6.result")" "another source's rounds do not join the streak"
+for seq in 1 2; do
+  printf 'error: "Lavish Editor already has an active poll listener"\ncode: LISTENER_ACTIVE\n' > "$WAITBACK/inbox/lavish-held.$seq.result"
+done
+assert_equals 5 "$(waiting_delay "$WAITBACK/inbox/lavish-held.1.result")" "a LISTENER_ACTIVE refusal keeps listening after the quiet delay"
+assert_equals 10 "$(waiting_delay "$WAITBACK/inbox/lavish-held.2.result")" "consecutive LISTENER_ACTIVE refusals back off like waiting rounds"
 pass "consecutive waiting rounds back off from the quiet delay to the maximum and reset on any other round"
 
 # Leftover poll processes: listed only when every ownership fact is proved, and
