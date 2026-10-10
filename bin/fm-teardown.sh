@@ -1349,10 +1349,12 @@ while IFS= read -r teardown_prior_line || [ -n "$teardown_prior_line" ]; do
 done < "$META"
 TEARDOWN_KEEP_COPY=0
 TEARDOWN_ENCLOSING_SLOT=
+TEARDOWN_RECORD_SLOT=
 if teardown_preserves_reassociated_copy "$META" "$KIND" "$BACKEND" "$PROJ" "$WT"; then
   TEARDOWN_KEEP_COPY=1
-  TEARDOWN_ENCLOSING_SLOT=$(teardown_record_enclosing_slot "$META" "$PROJ" "$WT") \
-    || TEARDOWN_ENCLOSING_SLOT=
+  TEARDOWN_RECORD_SLOT=$(teardown_record_enclosing_slot "$META" "$PROJ" "$WT") \
+    || TEARDOWN_RECORD_SLOT=
+  TEARDOWN_ENCLOSING_SLOT=$TEARDOWN_RECORD_SLOT
 fi
 
 # A record accepted as a legacy incarnation (no spawn_gen, and either
@@ -2266,7 +2268,7 @@ validate_worktree_teardown_safety() {
     if teardown_nested_slot landed; then
       return 0
     fi
-    if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && [ ! -d "$WT" ]; then
+    if [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ]; then
       echo "REFUSED: task $ID's nested copy $WT is already removed and its branch is not landed; a pushed branch alone is not completion." >&2
       echo "Land its PR (or merge it to local main for a local-only ship), then re-run teardown, or get the captain's own words to drop it and pass --force --drop-file." >&2
       return 1
@@ -3273,13 +3275,29 @@ teardown_nested_slot_reprove_after_lock() {
 
 teardown_nested_slot() {  # prove | landed | retire | reprove | return
   local phase=$1 current prior prior_real copy known root branch teardown_slot post_lock_check
-  local -a kept=() proofs=() swept=()
+  local -a kept=() proofs=() swept=() still=()
   case "$phase" in
     prove)
       [ "$KIND" != secondmate ] || return 0
       if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
         fm_treehouse_slot_owner_state "$TEARDOWN_ENCLOSING_SLOT" "$ID"
-        [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || TEARDOWN_ENCLOSING_SLOT=
+        if [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ]; then
+          TEARDOWN_ENCLOSING_SLOT=
+          case "$FM_TREEHOUSE_SLOT_OWNER" in
+            absent|other)
+              if [ ! -d "$WT" ]; then
+                for prior in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
+                  prior_real=$(fm_task_copy_canonical_dir "$prior") || prior_real=$prior
+                  case "$prior_real" in
+                    "$TEARDOWN_RECORD_SLOT"|"$TEARDOWN_RECORD_SLOT"/*) ;;
+                    *) still+=("$prior") ;;
+                  esac
+                done
+                TEARDOWN_PRIOR_COPIES=(${still[@]+"${still[@]}"})
+              fi
+              ;;
+          esac
+        fi
       fi
       current=$(fm_task_copy_canonical_dir "$WT") || current=
       if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
@@ -3313,7 +3331,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       TEARDOWN_PRIOR_COPIES=(${kept[@]+"${kept[@]}"})
       ;;
     landed)
-      [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && [ ! -d "$WT" ] || return 1
+      [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ] || return 1
       branch=$(fm_meta_get "$META" branch)
       [ -n "$branch" ] || branch=fm/$ID
       git -C "$PROJ" rev-parse --verify --quiet "refs/heads/$branch^{commit}" >/dev/null || return 1
@@ -3321,6 +3339,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       ;;
     reprove)
       for copy in ${TEARDOWN_PROOF_COPIES[@]+"${TEARDOWN_PROOF_COPIES[@]}"}; do
+        [ -d "$copy" ] || [ "$copy" = "$TEARDOWN_RETURN_SLOT" ] || continue
         teardown_own_copy_disposable "$copy" || return 1
       done
       ;;
@@ -4895,6 +4914,8 @@ if [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed and its pool slot $TEARDOWN_ENCLOSING_SLOT returned)"
+elif [ "$TEARDOWN_KEEP_COPY" = 1 ] && [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ]; then
+  echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT was already removed by an earlier teardown, and its pool slot $TEARDOWN_RECORD_SLOT is no longer this task's, so it was left alone)"
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}; reassociated worktree $WT left in place, since it is not a pool slot)"
 elif teardown_owns_worktree; then

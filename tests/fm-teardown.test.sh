@@ -8327,6 +8327,112 @@ test_nested_rerun_gone_copy_needs_its_branch_landed() {
   pass "a removed nested copy is judged by its own branch ref: unlanded refuses, content landed by squash passes"
 }
 
+# A fake tmux whose window cannot be closed while <case-dir>/endpoint-stuck
+# exists: kill-window fails and the window inventory still lists it. Without
+# the file every call succeeds silently.
+stuck_endpoint_tmux() {  # <case-dir>
+  local case_dir=$1
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+if [ -e "$case_dir/endpoint-stuck" ]; then
+  case "\${1:-}" in
+    kill-window) exit 1 ;;
+    list-windows) printf '%s\n' fm-task-x1; exit 0 ;;
+  esac
+fi
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+}
+
+# A step after the slot return fails, so the record stays while the slot is
+# already back in the pool and no longer claimed. The re-run can no longer reach
+# the slot through its claim, yet the removed nested copy still has to be judged
+# landed from its own branch ref: with a plain re-run, no --force and no captain
+# words, the ship is recorded as landed, never as dropped. The notices name
+# neither a copy left in place nor a slot to return again.
+test_nested_rerun_after_slot_return_records_landed() {
+  local case_dir rc mode label returns
+  for mode in local-only no-mistakes; do
+    label="nested-after-return-$mode"
+    make_nested_slot_case "$label" enclosing .claude/worktrees/x "$mode"
+    case_dir=$NESTED_CASE
+    seed_backlog_in_flight "$case_dir"
+    stuck_endpoint_tmux "$case_dir"
+    printf 'nested ship work\n' > "$NESTED_COPY/ship.txt"
+    git -C "$NESTED_COPY" add ship.txt
+    git -C "$NESTED_COPY" -c user.email=t@t -c user.name=t commit -qm "nested ship work"
+    if [ "$mode" = local-only ]; then
+      git -C "$case_dir/project" merge -q --ff-only fm/task-x1-v2
+    else
+      land_on_origin_main "$case_dir" ship.txt "nested ship work"
+    fi
+    : > "$case_dir/endpoint-stuck"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "$label: the first teardown must stop at the endpoint close: $(cat "$case_dir/stderr")"
+    assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the slot was not returned before the failure"
+    assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the returned slot is still claimed"
+    assert_absent "$NESTED_COPY" "$label: the nested copy was not removed"
+    assert_present "$case_dir/state/task-x1.meta" "$label: the failed teardown deleted the record"
+
+    rm -f "$case_dir/endpoint-stuck"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+    expect_code 0 "$rc" "$label: a plain re-run must finish: $(cat "$case_dir/stderr2")"
+    assert_no_grep "get the captain's own words" "$case_dir/stderr2" "$label: the re-run asked for captain words for landed work"
+    assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+    assert_absent "$case_dir/data/task-x1/captain-drop.md" "$label: landed work was recorded as a captain drop"
+    grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null || fail "$label: the backlog row was not closed"
+    assert_no_grep "dropped" "$case_dir/data/backlog.md" "$label: landed work was recorded as dropped"
+    assert_no_grep "left in place" "$case_dir/stdout2" "$label: the re-run said the removed copy was left in place"
+    assert_no_grep "prior copy" "$case_dir/stdout2" "$label: the re-run asked to return an already-returned slot"
+    returns=$(grep -c "^return --force $NESTED_SLOT\$" "$case_dir/treehouse.log" || true)
+    assert_equals 1 "$returns" "$label: the re-run returned the slot again"
+  done
+  pass "a re-run after the slot was already returned still judges the removed nested copy by its branch and records it landed"
+}
+
+# The stale-lock proof covers the enclosing slot only. Nested copies teardown
+# itself already removed, here two of them, are not proved again, so the stale
+# lock's cleanup returns the slot instead of refusing over a copy that is gone.
+test_nested_post_lock_reprove_skips_removed_nested_priors() {
+  local case_dir rc lock label=nested-post-lock-priors nested_y
+  make_nested_slot_case "$label" enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  nested_y="$NESTED_SLOT/.claude/worktrees/y"
+  git -C "$case_dir/project" worktree add -q -b fm/task-x1-y "$nested_y" main
+  printf 'prior_worktree=%s\n' "$nested_y" >> "$case_dir/state/task-x1.meta"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" = return ] || exit 0
+wt=\${@: -1}
+lock=\$(git -C "\$wt" rev-parse --path-format=absolute --git-path index.lock 2>/dev/null || true)
+if [ -n "\$lock" ] && [ -e "\$lock" ]; then
+  echo "fatal: Unable to create '\$lock': File exists." >&2
+  exit 128
+fi
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  add_lsof_no_holder "$case_dir"
+  lock=$(git_index_lock_path "$NESTED_SLOT")
+  : > "$lock"
+  touch -t 200001010000 "$lock"
+  rc=0
+  FM_HOME="$case_dir/home" FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "$label: the slot must be returned after the stale lock is cleared: $(cat "$case_dir/stderr")"
+  assert_grep "removed provably-stale git lock" "$case_dir/stderr" "$label: the stale lock was not cleaned up"
+  assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the slot was not returned"
+  assert_absent "$NESTED_COPY" "$label: the nested copy survived"
+  assert_absent "$nested_y" "$label: the second nested copy survived"
+  assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim survived the task"
+  assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+  pass "the post-lock proof does not refuse over nested copies teardown itself already removed"
+}
+
 # A fake treehouse whose return fails with a plain error while
 # <case-dir>/fail-return exists, and otherwise logs the return.
 fail_switch_treehouse() {  # <case-dir>
@@ -9164,6 +9270,8 @@ test_nested_slot_reproof_refusal_is_rerunnable
 test_nested_rerun_local_only_ship_is_recorded_landed
 test_nested_rerun_matrix_refusal_at_each_phase
 test_nested_rerun_gone_copy_needs_its_branch_landed
+test_nested_rerun_after_slot_return_records_landed
+test_nested_post_lock_reprove_skips_removed_nested_priors
 test_other_record_copy_overlap_is_component_aware
 test_forced_descendant_preserved_copy_refuses_before_cleanup
 test_tasktmp_preserves_current_and_prior_reassociated_copies

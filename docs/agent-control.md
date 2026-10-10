@@ -241,6 +241,8 @@ A task's own prior copies never refuse its own teardown, so a nested reassociati
 `--force` skips the landed-work test on the current copy as always and does not waive the slot proof.
 The same function covers the reverse shape, where the current copy is the pool slot and a prior copy is nested inside it: that copy is proved and removed before the ordinary return.
 A refusal after the nested copy is gone leaves the record and the slot claim in place. A plain re-run, with no `--force` and no captain words, finds the slot through the task's own `prior_worktree=`, proves it again under the same rule, and returns it; a landed ship is recorded as landed, never as dropped.
+The stale-lock proof covers the slot only: nested copies teardown already removed are not proved again.
+If a later step fails after the slot was returned and its claim released, the re-run still judges the removed copy by its `branch=` ref, so the ship is again recorded as landed. The slot is no longer this task's, so it is neither returned a second time nor named in the prior-copy notice, and the completion line says the copy was already removed.
 A nested current copy whose enclosing slot the task does not claim is left in place like any other reassociated non-pool copy.
 
 Before a fresh spawn sends `treehouse get`, and before secondmate home seeding sends `treehouse get --lease`, each under the shared project lock used for allocation and return, [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh) checks whether a pool slot of the project strictly contains a task record's current copy (`worktree=`) in this home or any locally registered home.
