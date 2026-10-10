@@ -2529,12 +2529,15 @@ Passing this syntax-only check does not prove that handlers run, cancel native s
 
 Before arming any Lavish source, open its artifact with `lavish-axi` so the saved session identifies the board's server; reply and poll attempts derive their host and port from that session and refuse missing or invalid session evidence before posting or consuming a staged worker reply.
 
-**Retry interrupted Lavish polls**
+**Retry transient Lavish poll responses**
 
-That adapter, and only that adapter, retries the one exact transient response a cut-short listener returns while its marks remain available (`error: Lavish Editor poll response was interrupted` with `code: SERVER_ERROR`), up to 12 times with poll starts at least 5 seconds apart, so an internal retry never reaches the runner as a captured result.
+That adapter, and only that adapter, retries two exact transient responses. The first is what a cut-short listener returns while its marks remain available (`error: Lavish Editor poll response was interrupted` with `code: SERVER_ERROR`); it is retried up to 12 times with poll starts at least 5 seconds apart, so an internal retry never reaches the runner as a captured result.
 This start-to-start governor is a no-op after a normally blocking poll but caps an immediately returning poll under the shipped defaults independently of the owner lease and registration launch pacing.
 
 Real feedback, ended and missing sessions, any other `SERVER_ERROR`, and that same interruption still standing once the bound is spent are all captured and announced normally; `FM_LAVISH_POLL_RETRY_DELAY` is a bounded 1 to 60 second test override for the interval only, and the runner itself stays adapter-agnostic.
+The adapter likewise treats `error: Lavish Editor server did not start` with `code: SERVER_ERROR` (with or without the `help[1]` line naming the board's own port) as transient while a lavish-axi server still answers `GET /health` on the board session's host and port within 10 seconds.
+That response is what the client prints when its fixed 500 ms health probe gives up on a live but slow server; the listener retries quietly up to 15 times with the delay doubling from 5 seconds to a 60 second ceiling, and a server that fails 3 health probes in a row is gone and is announced once.
+`FM_LAVISH_START_RETRY_CAP` is the matching bounded 1 to 60 second test override for the ceiling, and the adapter header owns the measurements those limits come from.
 An already-armed Lavish source keeps its registered listener command until it is retired and armed again, so retire the source, then arm it again to adopt this retry policy.
 
 **Retire finished Lavish listeners**

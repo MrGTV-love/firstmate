@@ -39,18 +39,36 @@ make_orca_fakebin() {  # <dir> -> echoes fakebin dir
 set -u
 LOG="${FM_ORCA_LOG:?}"
 RESP="${FM_ORCA_RESPONSES:?}"
-COUNT_FILE="$RESP/.count"
-next=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
-{
-  printf 'orca'
-  for a in "$@"; do printf '\x1f%s' "$a"; done
-  printf '\n'
-} >> "$LOG"
+# One write per call, so two concurrent callers never interleave a log line.
+line=orca
+for a in "$@"; do line="$line"$'\x1f'"$a"; done
+printf '%s\n' "$line" >> "$LOG"
 if [ "${1:-}" = status ] && [ "${FM_ORCA_STATUS_RESPONSE:-ready}" != sequence ]; then
   printf '{"ok":true,"result":{"runtime":{"reachable":true,"state":"ready"}}}\n'
   exit 0
 fi
-n=$next
+# A keyed case answers by subcommand ("<noun>-<verb>", e.g. repo-show or
+# terminal-read) from <key>.exit / <key>.out and keeps no state, so any number of
+# callers at once get the same answer and an unscripted subcommand gets the
+# default one (empty output, exit 0). Spawn starts a detached home-summary refresh
+# part-way through its own calls, and that refresh probes Orca beside them, so a
+# spawn case must be keyed. Teardown starts its refresh after its last call.
+if [ -f "$RESP/.keyed" ]; then
+  key="${1:-}-${2:-}"
+  if [ -f "$RESP/$key.exit" ]; then
+    exit "$(cat "$RESP/$key.exit")"
+  fi
+  # A send whose text holds FM_ORCA_FAIL_SEND_TEXT fails, so a case can break one
+  # chosen send without caring which call number it is.
+  if [ "$key" = terminal-send ] && [ -n "${FM_ORCA_FAIL_SEND_TEXT:-}" ]; then
+    case "$*" in *"$FM_ORCA_FAIL_SEND_TEXT"*) exit 1 ;; esac
+  fi
+  [ -f "$RESP/$key.out" ] && cat "$RESP/$key.out"
+  exit 0
+fi
+# Any other case is driven by one caller, so its responses are numbered by call.
+COUNT_FILE="$RESP/.count"
+n=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
 echo "$n" > "$COUNT_FILE"
 if [ -f "$RESP/$n.exit" ]; then
   exit "$(cat "$RESP/$n.exit")"
@@ -69,6 +87,13 @@ orca_case() {  # <name> -> sets CASE_DIR LOG RESP FB
   RESP="$CASE_DIR/responses"
   : > "$LOG"
   FB=$(make_orca_fakebin "$CASE_DIR")
+}
+
+# orca_keyed_case <name>: orca_case whose fake answers by subcommand, for a case
+# that runs spawn. Script it as "$RESP/<noun>-<verb>.out|.exit".
+orca_keyed_case() {  # <name> -> sets CASE_DIR LOG RESP FB
+  orca_case "$1"
+  : > "$RESP/.keyed"
 }
 
 neutral_fm_root() {  # <dir> -> echoes a minimal root with a quiet guard
@@ -523,12 +548,11 @@ test_spawn_preserves_orca_metadata_when_pathless_worktree_cleanup_fails() {
   mkdir -p "$data/$id" "$state" "$config"
   write_spawn_brief "$data" "$id"
   touch "$state/.last-watcher-beat"
-  orca_case pathless-cleanup-fail
-  printf '1\n' > "$RESP/1.exit"
-  printf '{"ok":true,"result":{"repo":{"id":"repo-pathless-cleanup"}}}\n' > "$RESP/2.out"
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-pathless-cleanup::/orca/wt-pathless-cleanup"}}}\n' > "$RESP/3.out"
-  printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/4.out"
-  printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/5.out"
+  orca_keyed_case pathless-cleanup-fail
+  printf '1\n' > "$RESP/repo-show.exit"
+  printf '{"ok":true,"result":{"repo":{"id":"repo-pathless-cleanup"}}}\n' > "$RESP/repo-add.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-pathless-cleanup::/orca/wt-pathless-cleanup"}}}\n' > "$RESP/worktree-create.out"
+  printf '{"ok":false,"error":{"code":"worktree_not_removed","message":"worktree not removed"}}\n' > "$RESP/worktree-rm.out"
   out=$( HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
@@ -560,11 +584,11 @@ test_spawn_writes_orca_metadata_and_launches_harness() {
   mkdir -p "$data/$id" "$state" "$config"
   write_spawn_brief "$data" "$id"
   touch "$state/.last-watcher-beat"
-  orca_case spawn
+  orca_keyed_case spawn
   log="$LOG"
-  printf '1\n' > "$RESP/1.exit"
-  printf '{"ok":true,"result":{"repo":{"id":"repo-spawn"}}}\n' > "$RESP/2.out"
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-spawn::/orca/wt-spawn","path":"%s"},"terminal":{"handle":"term-spawn"}}}\n' "$wt" > "$RESP/3.out"
+  printf '1\n' > "$RESP/repo-show.exit"
+  printf '{"ok":true,"result":{"repo":{"id":"repo-spawn"}}}\n' > "$RESP/repo-add.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-spawn::/orca/wt-spawn","path":"%s"},"terminal":{"handle":"term-spawn"}}}\n' "$wt" > "$RESP/worktree-create.out"
   out=$( HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
@@ -621,6 +645,83 @@ test_spawn_writes_orca_metadata_and_launches_harness() {
     "the staged Orca Claude launch did not disable feedback"
   rm -rf "/tmp/fm-$id" "$(dirname "$staged")"
   pass "fm-spawn.sh --backend orca: reuses implicit terminal, records metadata, launches harness"
+}
+
+# A keyed Orca spawn fixture shared by the cases below: sets SPAWN_ID PROJ WT DATA
+# STATE CONFIG and the CASE_DIR/RESP/FB/LOG of a fake Orca answering a successful
+# create sequence. <tag> keeps each case's directories apart.
+orca_spawn_fixture() {  # <tag> <id>
+  local tag=$1
+  SPAWN_ID=$2
+  PROJ="$TMP_ROOT/$tag-project"
+  WT="$TMP_ROOT/$tag-wt"
+  DATA="$TMP_ROOT/$tag-data"
+  STATE="$TMP_ROOT/$tag-state"
+  CONFIG="$TMP_ROOT/$tag-config"
+  fm_git_worktree "$PROJ" "$WT" "fm/$SPAWN_ID"
+  mkdir -p "$DATA/$SPAWN_ID" "$STATE" "$CONFIG"
+  write_spawn_brief "$DATA" "$SPAWN_ID"
+  touch "$STATE/.last-watcher-beat"
+  orca_keyed_case "$tag"
+  printf '1\n' > "$RESP/repo-show.exit"
+  printf '{"ok":true,"result":{"repo":{"id":"repo-%s"}}}\n' "$tag" > "$RESP/repo-add.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-%s::/orca/wt-%s","path":"%s"},"terminal":{"handle":"term-%s"}}}\n' \
+    "$tag" "$tag" "$WT" "$tag" > "$RESP/worktree-create.out"
+}
+
+orca_spawn_run() {  # runs fm-spawn.sh for the fixture; env assignments precede via env(1)
+  HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
+    FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
+    FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
+    env "$@" "$ROOT/bin/fm-spawn.sh" "$SPAWN_ID" "$PROJ" claude --mode no-mistakes --yolo off --backend orca 2>&1
+  local rc=$?
+  rm -rf "/tmp/fm-$SPAWN_ID" "/tmp/fm-$SPAWN_ID+"*
+  return "$rc"
+}
+
+# Spawn starts a detached home-summary refresh that probes Orca beside the
+# spawn's own calls. A fake whose answers depend on how many calls came before
+# hands one caller's scripted failure to the other, so the answers are keyed by
+# subcommand and any number of concurrent probes leaves the spawn untouched.
+test_spawn_survives_concurrent_orca_probes() {
+  local out status loop_pid probes
+  orca_spawn_fixture concurrent-probes orcaprobez3
+  (
+    while [ ! -e "$CASE_DIR/probes-stop" ]; do
+      PATH="$FB:$PATH" FM_ORCA_LOG="$CASE_DIR/probe.log" FM_ORCA_RESPONSES="$RESP" \
+        orca terminal read --terminal term-probe --limit 1 --json >/dev/null 2>&1
+    done
+  ) &
+  loop_pid=$!
+  out=$(orca_spawn_run)
+  status=$?
+  : > "$CASE_DIR/probes-stop"
+  wait "$loop_pid" 2>/dev/null || true
+  probes=$(wc -l < "$CASE_DIR/probe.log" 2>/dev/null || echo 0)
+  [ "$probes" -gt 0 ] || fail "the concurrent probe loop never called Orca"
+  expect_code 0 "$status" "a spawn beside a running Orca probe loop should still succeed ($probes probes)"$'\n'"$out"
+  assert_grep "terminal=term-concurrent-probes" "$STATE/$SPAWN_ID.meta" "spawn lost its terminal handle beside concurrent probes"
+  pass "fm-spawn.sh --backend orca: succeeds while another caller probes Orca throughout"
+}
+
+# A backend send that fails ends the spawn, and the message says which backend
+# and which send, instead of the spawn exiting 1 with nothing printed.
+test_spawn_names_the_backend_send_that_failed() {
+  local out status variant send_text what
+  for variant in gotmpdir launch; do
+    # The launch command is staged as launch.<gen>.sh and sourced by path.
+    case "$variant" in
+      gotmpdir) send_text='export GOTMPDIR'; what='export GOTMPDIR' ;;
+      launch) send_text='/launch.'; what='launch command' ;;
+    esac
+    orca_spawn_fixture "send-fails-$variant" "orcasendfail$variant"
+    out=$(orca_spawn_run FM_ORCA_FAIL_SEND_TEXT="$send_text")
+    status=$?
+    [ "$status" -ne 0 ] || fail "a failed Orca $variant send should end the spawn non-zero"$'\n'"$out"
+    assert_contains "$out" "error: orca backend send failed for task $SPAWN_ID ($what); spawn aborted" \
+      "the failed $variant send was not named in the spawn output"
+  done
+  pass "fm-spawn.sh --backend orca: a failed backend send names the backend and the send"
 }
 
 test_spawn_refuses_orca_secondmate_before_home_mutation() {
@@ -690,10 +791,10 @@ test_spawn_refuses_orca_nonisolated_worktree() {
   mkdir -p "$data/$id" "$state" "$config"
   write_spawn_brief "$data" "$id"
   touch "$state/.last-watcher-beat"
-  orca_case bad-spawn
-  printf '1\n' > "$RESP/1.exit"
-  printf '{"ok":true,"result":{"repo":{"id":"repo-bad"}}}\n' > "$RESP/2.out"
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-bad::/orca/wt-bad","path":"%s"},"terminal":{"handle":"term-bad"}}}\n' "$proj" > "$RESP/3.out"
+  orca_keyed_case bad-spawn
+  printf '1\n' > "$RESP/repo-show.exit"
+  printf '{"ok":true,"result":{"repo":{"id":"repo-bad"}}}\n' > "$RESP/repo-add.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-bad::/orca/wt-bad","path":"%s"},"terminal":{"handle":"term-bad"}}}\n' "$proj" > "$RESP/worktree-create.out"
   out=$( HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
@@ -724,11 +825,11 @@ test_spawn_removes_orca_worktree_when_terminal_create_fails() {
   mkdir -p "$data/$id" "$state" "$config"
   write_spawn_brief "$data" "$id"
   touch "$state/.last-watcher-beat"
-  orca_case terminal-fail
-  printf '1\n' > "$RESP/1.exit"
-  printf '{"ok":true,"result":{"repo":{"id":"repo-terminal-fail"}}}\n' > "$RESP/2.out"
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-terminal-fail::/orca/wt-terminal-fail","path":"%s"}}}\n' "$wt" > "$RESP/3.out"
-  printf '1\n' > "$RESP/4.exit"
+  orca_keyed_case terminal-fail
+  printf '1\n' > "$RESP/repo-show.exit"
+  printf '{"ok":true,"result":{"repo":{"id":"repo-terminal-fail"}}}\n' > "$RESP/repo-add.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-terminal-fail::/orca/wt-terminal-fail","path":"%s"}}}\n' "$wt" > "$RESP/worktree-create.out"
+  printf '1\n' > "$RESP/terminal-create.exit"
   out=$( HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
@@ -757,12 +858,12 @@ test_spawn_preserves_orca_metadata_when_abort_cleanup_fails() {
   mkdir -p "$data/$id" "$state" "$config"
   write_spawn_brief "$data" "$id"
   touch "$state/.last-watcher-beat"
-  orca_case cleanup-fail
-  printf '1\n' > "$RESP/1.exit"
-  printf '{"ok":true,"result":{"repo":{"id":"repo-cleanup-fail"}}}\n' > "$RESP/2.out"
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-cleanup-fail::/orca/wt-cleanup-fail","path":"%s"}}}\n' "$wt" > "$RESP/3.out"
-  printf '1\n' > "$RESP/4.exit"
-  printf '1\n' > "$RESP/5.exit"
+  orca_keyed_case cleanup-fail
+  printf '1\n' > "$RESP/repo-show.exit"
+  printf '{"ok":true,"result":{"repo":{"id":"repo-cleanup-fail"}}}\n' > "$RESP/repo-add.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-cleanup-fail::/orca/wt-cleanup-fail","path":"%s"}}}\n' "$wt" > "$RESP/worktree-create.out"
+  printf '1\n' > "$RESP/terminal-create.exit"
+  printf '1\n' > "$RESP/worktree-rm.exit"
   out=$( HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
@@ -790,11 +891,11 @@ test_spawn_releases_orca_resources_when_metadata_write_fails() {
   fm_git_worktree "$proj" "$wt" "fm/$id"
   mkdir -p "$data/$id" "$state/$id.meta" "$config"
   write_spawn_brief "$data" "$id"
-  orca_case meta-fail
-  printf '1\n' > "$RESP/1.exit"
-  printf '{"ok":true,"result":{"repo":{"id":"repo-meta-fail"}}}\n' > "$RESP/2.out"
-  printf '{"ok":true,"result":{"worktree":{"id":"wt-meta-fail::/orca/wt-meta-fail","path":"%s"}}}\n' "$wt" > "$RESP/3.out"
-  printf '{"ok":true,"result":{"terminal":{"handle":"term-meta-fail"}}}\n' > "$RESP/4.out"
+  orca_keyed_case meta-fail
+  printf '1\n' > "$RESP/repo-show.exit"
+  printf '{"ok":true,"result":{"repo":{"id":"repo-meta-fail"}}}\n' > "$RESP/repo-add.out"
+  printf '{"ok":true,"result":{"worktree":{"id":"wt-meta-fail::/orca/wt-meta-fail","path":"%s"}}}\n' "$wt" > "$RESP/worktree-create.out"
+  printf '{"ok":true,"result":{"terminal":{"handle":"term-meta-fail"}}}\n' > "$RESP/terminal-create.out"
   out=$( HOME="$SPAWN_HOME" CLAUDE_CONFIG_DIR='' PATH="$FB:$PATH" FM_ORCA_LOG="$LOG" FM_ORCA_RESPONSES="$RESP" \
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$state" FM_DATA_OVERRIDE="$data" FM_CONFIG_OVERRIDE="$config" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
@@ -1291,6 +1392,8 @@ test_worktree_and_terminal_helpers_parse_json
 test_worktree_create_removes_worktree_when_path_missing
 test_spawn_preserves_orca_metadata_when_pathless_worktree_cleanup_fails
 test_spawn_writes_orca_metadata_and_launches_harness
+test_spawn_survives_concurrent_orca_probes
+test_spawn_names_the_backend_send_that_failed
 test_spawn_refuses_orca_secondmate_before_home_mutation
 test_spawn_refuses_orca_when_runtime_not_ready
 test_spawn_refuses_orca_nonisolated_worktree
