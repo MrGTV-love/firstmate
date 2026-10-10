@@ -171,5 +171,9 @@ assert_equals claude "$(jq -r .profile.harness <<<"$out")" "the relaunch lands o
 assert_equals false "$(jq -r .switched <<<"$out")" "the current TeamClaude stand-in is kept, not treated as exhausted"
 assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "the current TeamClaude stand-in is not measured by native Claude's row"
 rm "$TMP_ROOT/config/claude-launcher"
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$(jq -c '.[0] | del(.requires)' <<<"$team")" "$(jq -c '. + '"$allowed" <<<"$team")") \
+  || fail "a former TeamClaude stand-in without the launcher must move to its next permitted stand-in"
+assert_equals deepseek/deepseek-v4-flash "$(jq -r .profile.model <<<"$out")" "without the TeamClaude launcher the native row is exhausted, so the next stand-in serves"
+assert_equals true "$(jq -r .switched <<<"$out")" "without the TeamClaude launcher the current Claude profile is not reported as unknown"
 pass "capacity does not conflate native Claude quota with a TeamClaude stand-in"
 printf '# all fm-dispatch-capacity tests passed\n'
