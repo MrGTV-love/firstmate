@@ -152,6 +152,8 @@ validate_payload() {  # <data.json>
     def optional_filed:
       (has("filed") | not) or (.filed == null) or (.filed | valid_filed);
     def optional_string($name): (has($name) | not) or (.[$name] | type == "string");
+    def optional_string_array($name):
+      (has($name) | not) or (.[$name] | type == "array" and all(.[]; type == "string"));
     def optional_https_url($name):
       (has($name) | not)
       or (.[$name]
@@ -186,6 +188,8 @@ validate_payload() {  # <data.json>
       and (if has("subject") then .type == "decision" else true end)
       and (optional_string("freeform_hint"))
       and (optional_string("recommend_reason"))
+      and (optional_string_array("facts"))
+      and (optional_string_array("counterfacts"))
       and ((has("close") | not) or (.close == "done" or .close == "release"))
       and ((has("allow_freeform") | not) or (.allow_freeform | type == "boolean"))
       and ((has("recommend_value") | not)
@@ -240,8 +244,8 @@ validate_payload() {  # <data.json>
 # every card must say what it is, so the reader never has to ask what is being
 # decided. Prints one line per missing piece, each naming the card and the
 # field. Runs only on a payload that already satisfies the types above, so
-# every field it reads is a string when present, except `facts` and
-# `counterfacts`, which this check types itself.
+# every field it reads is a string when present, and `facts` and
+# `counterfacts` are arrays of strings when present.
 card_copy_problems() {  # <data.json>
   jq -r '
     def blank: (type != "string") or (gsub("\\s"; "") | length == 0);

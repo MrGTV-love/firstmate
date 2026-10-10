@@ -888,7 +888,7 @@ a decision without facts|del(.captains_call[0].facts)|needs 'facts'
 a decision with an empty facts array|.captains_call[0].facts = []|needs 'facts'
 a decision with an empty facts entry|.captains_call[0].facts = ["real evidence", ""]|needs 'facts'
 a decision with a blank facts entry|.captains_call[0].facts = ["  "]|needs 'facts'
-a decision with facts that is not an array|.captains_call[0].facts = "evidence"|needs 'facts'
+a decision with facts that is not an array|.captains_call[0].facts = "evidence"|does not satisfy
 a decision without counterfacts|del(.captains_call[0].counterfacts)|needs 'counterfacts'
 a decision with an empty counterfacts array|.captains_call[0].counterfacts = []|needs 'counterfacts'
 a decision with an empty counterfacts entry|.captains_call[0].counterfacts = [""]|needs 'counterfacts'
@@ -968,6 +968,33 @@ test_build_refuses_bare_or_hintless_options_on_every_card_type() {
   pass "build refuses bare or hintless options on merge and credential cards"
 }
 
+test_build_refuses_non_string_evidence_on_every_card_type() {
+  local home data merge credential bad
+  home=$(make_home evidence-types)
+  data="$home/payload.json"
+  merge='{"key":"merge.evidence","type":"merge","repo":"sample","title":"Merge: evidence",
+    "risk":"low","options":[{"value":"merge","label":"Merge now","hint":"The change lands on main today."}]}'
+  credential='{"key":"codex-login","type":"credential","repo":"sample","title":"Codex login expired",
+    "about":"Codex workers cannot start without it, and only the captain can sign in.",
+    "decide":"Run: codex login",
+    "options":[{"value":"done","label":"Signed in","hint":"Codex workers resume on the next dispatch."}]}'
+
+  write_cards "$data" "[$(printf '%s' "$merge" | jq -c '.facts = ["Checks are green."] | .counterfacts = ["The diff is large."]'),$credential]"
+  run_board "$home" build "$data" >/dev/null || fail "string evidence on a merge card was refused"
+
+  for bad in '["x", {"a":1}]' '[42]' '"not an array"'; do
+    write_cards "$data" "[$(printf '%s' "$merge" | jq -c --argjson v "$bad" '.facts = $v')]"
+    assert_build_refused_naming "$home" "$data" "merge facts $bad" "does not satisfy"
+    write_cards "$data" "[$(printf '%s' "$merge" | jq -c --argjson v "$bad" '.counterfacts = $v')]"
+    assert_build_refused_naming "$home" "$data" "merge counterfacts $bad" "does not satisfy"
+    write_cards "$data" "[$(printf '%s' "$credential" | jq -c --argjson v "$bad" '.facts = $v')]"
+    assert_build_refused_naming "$home" "$data" "credential facts $bad" "does not satisfy"
+    write_cards "$data" "[$(printf '%s' "$credential" | jq -c --argjson v "$bad" '.counterfacts = $v')]"
+    assert_build_refused_naming "$home" "$data" "credential counterfacts $bad" "does not satisfy"
+  done
+  pass "build refuses non-string facts and counterfacts on merge and credential cards"
+}
+
 test_build_refuses_a_decision_card_with_no_authored_option() {
   local home data card
   home=$(make_home freeform-only-decision)
@@ -1019,4 +1046,5 @@ test_build_requires_each_piece_of_decision_card_copy
 test_build_refuses_bare_option_labels
 test_build_requires_credential_card_copy
 test_build_refuses_bare_or_hintless_options_on_every_card_type
+test_build_refuses_non_string_evidence_on_every_card_type
 test_build_refuses_a_decision_card_with_no_authored_option
