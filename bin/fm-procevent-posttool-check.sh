@@ -3,6 +3,7 @@
 # Usage: fm-procevent-posttool-check.sh
 # In a genuine primary home, only the session-lock owner refreshes the source
 # owner lease and receives one line of additional context while replies wait.
+# Its helper agents' events refresh that lease too, but never receive the notice.
 # No network, runner launches, wake draining, or result payload reads occur.
 # Directory entries and acknowledgement/owner markers determine pending replies;
 # only a candidate's adapter sidecar is read, capped at 16 bytes.
@@ -25,11 +26,12 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-procevent-lib.sh"
 
 PAYLOAD=$(cat 2>/dev/null || true)
+HELPER=0
 printf '%s' "$PAYLOAD" | perl -MJSON::PP=decode_json -e '
   local $/;
   my $payload = eval { decode_json(<STDIN>) };
   exit(ref($payload) eq "HASH" && exists($payload->{agent_id}) ? 0 : 1);
-' 2>/dev/null && exit 0
+' 2>/dev/null && HELPER=1
 [ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0
 fm_hook_payload_is_foreign_host "$PAYLOAD" && exit 0
 if [ -n "$PAYLOAD" ] && command -v jq >/dev/null 2>&1; then
@@ -43,6 +45,7 @@ fm_session_lock_owned_by_self "$STATE" || exit 0
 if fm_procevent_any_registered "$STATE"; then
   fm_procevent_owner_lease_touch "$STATE" 2>/dev/null || true
 fi
+[ "$HELPER" -eq 0 ] || exit 0
 
 perl -MJSON::PP=encode_json -MEncode=decode,FB_CROAK -MFile::Spec -e '
   use strict;

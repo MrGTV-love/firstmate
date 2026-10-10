@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # A held unrelated source mutex must not delay a public listener's next answer.
 set -u
-BOOTSTRAP=$(mktemp -d "$(dirname "${BASH_SOURCE[0]}")/../.fm-backlog-test.XXXXXX") || exit 1
+BOOTSTRAP=$(mktemp -d "${TMPDIR:-/tmp}/fm-backlog-test.XXXXXX") || exit 1
 export TMPDIR="$BOOTSTRAP"
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"

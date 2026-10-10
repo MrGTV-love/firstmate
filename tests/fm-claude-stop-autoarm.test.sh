@@ -1984,10 +1984,17 @@ mkdir -p "$POST_HOME/state/procevent"
 printf 'adapter=lavish\nargc=1\nargv:\n/bin/true\n' > "$POST_HOME/state/procevent/lavish-review.source"
 printf '0\n' > "$POST_HOME/state/procevent/.owner-lease"
 for post_payload in '{"agent_id":"helper-1"}' '{"agent_id":""}' '{"agent_id":null}'; do
+  printf '0\n' > "$POST_HOME/state/procevent/.owner-lease"
   [ -z "$(posttool "$post_payload")" ] || fail "helper PostToolUse received primary review feedback"
-  [ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] || fail "helper refreshed the primary lease"
+  [ "$(cat "$POST_HOME/state/procevent/.owner-lease")" != 0 ] \
+    || fail "the primary's helper did not keep the listener leased"
   assert_absent "$POST_BASE.handled" "helper acknowledged a result owned by the primary"
 done
+printf '0\n' > "$POST_HOME/state/procevent/.owner-lease"
+printf '{"agent_id":"helper-1"}\n' \
+  | FM_ROOT_OVERRIDE="$POST_HOME" FM_HOME="$POST_HOME" "$ROOT/bin/fm-procevent-posttool-check.sh" >/dev/null
+[ "$(cat "$POST_HOME/state/procevent/.owner-lease")" = 0 ] \
+  || fail "a helper outside the session-lock owner refreshed the primary lease"
 post_notice=$(posttool)
 [ "$(printf '%s' "$post_notice" | jq -r '.hookSpecificOutput.hookEventName')" = PostToolUse ] \
   || fail "helper events hid the capture from the subsequent primary event"
@@ -2014,6 +2021,46 @@ printf '{"session_id":"competing"}\n' \
 FM_HOME="$POST_HOME" "$ROOT/bin/fm-procevent.sh" handled lavish-review 1 >/dev/null
 [ -z "$(posttool)" ] || fail "handled review kept interrupting the primary"
 pass "PostToolUse reveals unhandled reviews only to their active primary, keeps listeners leased, and goes silent after handling"
+
+HELPER_TURN_HOME=$(make_primary_dir "$TMP_ROOT/helper-turn")
+HELPER_TURN_CLAIMS="$TMP_ROOT/helper-turn-claims"
+HELPER_TURN_STUB="$TMP_ROOT/helper-turn-source.sh"
+cat > "$HELPER_TURN_STUB" <<'SH'
+#!/usr/bin/env bash
+# A source that never answers within this test; bounded so it cannot outlive it.
+sleep "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}"
+exit 75
+SH
+chmod +x "$HELPER_TURN_STUB"
+fm_test_track_procevent_home "$HELPER_TURN_HOME" "$HELPER_TURN_CLAIMS"
+helper_turn_pe() {
+  FM_HOME="$HELPER_TURN_HOME" FM_PROCEVENT_CLAIM_ROOT="$HELPER_TURN_CLAIMS" \
+    FM_PROCEVENT_OWNER_LEASE_SECONDS=5 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
+    "$ROOT/bin/fm-procevent.sh" "$@"
+}
+helper_turn_event() {
+  printf '{"agent_id":"helper-1"}\n' \
+    | FM_ROOT_OVERRIDE="$HELPER_TURN_HOME" FM_HOME="$HELPER_TURN_HOME" "$FAKE_CLAUDE" -c '
+        printf "%s\n" "$$" > "$FM_HOME/state/.lock"
+        "$1/bin/fm-procevent-posttool-check.sh"
+      ' _ "$ROOT"
+}
+helper_turn_pe register lavish helper-turn-src -- "$HELPER_TURN_STUB" >/dev/null \
+  || fail "the helper-turn source did not register"
+helper_turn_event >/dev/null
+helper_turn_pe reconcile >/dev/null
+HELPER_TURN_RUNNER_FILE="$HELPER_TURN_HOME/state/procevent/helper-turn-src.runner"
+for _ in $(seq 1 100); do [ -s "$HELPER_TURN_RUNNER_FILE" ] && break; helper_turn_event >/dev/null; done
+[ -s "$HELPER_TURN_RUNNER_FILE" ] || fail "the helper-turn listener never recorded its runner"
+HELPER_TURN_RUNNER=$(cat "$HELPER_TURN_RUNNER_FILE")
+helper_turn_deadline=$((SECONDS + 15))
+while [ "$SECONDS" -lt "$helper_turn_deadline" ]; do
+  [ -z "$(helper_turn_event)" ] || fail "a helper-only turn received the primary's notice"
+  kill -0 "$HELPER_TURN_RUNNER" 2>/dev/null \
+    || fail "a helper-only turn longer than the owner lease lost its listener"
+done
+helper_turn_pe retire helper-turn-src >/dev/null 2>&1 || fail "the helper-turn source did not retire"
+pass "a helper-only turn longer than the owner lease keeps the primary's listener alive"
 
 POST_SCRIPTS="$TMP_ROOT/posttool shipped scripts' directory"
 POST_ROOT=$(make_primary_dir "$TMP_ROOT/posttool root's directory")

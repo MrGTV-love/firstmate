@@ -2457,12 +2457,13 @@ An arbitrary source command registered with the Lavish classifier still complete
 **Deliver captured feedback during a Claude turn**
 
 The tracked Claude `PostToolUse` hook calls `bin/fm-procevent-posttool-check.sh` after each tool completion.
-Only a genuine primary's current session-lock owner receives the one-line native `additionalContext` notice while a firstmate-owned Lavish result remains unhandled; payloads carrying `agent_id` never refresh the lease or receive a notice.
+Only a genuine primary's current session-lock owner receives the one-line native `additionalContext` notice while a firstmate-owned Lavish result remains unhandled; payloads carrying `agent_id` come from its helper agents and never receive a notice.
 It names the capture's source and sequence and directs the primary to drain and handle it immediately, before continuing its previous work.
 If capture succeeded but wake publication did not, the notice supplies the exact durable result path for direct reading after the empty drain and the matching acknowledgement command, with all three commands bound to absolute shipped script paths and the inspected home, state, and root so they remain usable from another working directory.
 The hook reads no result payload, performs no network call, starts no listener or watcher, and never acknowledges feedback itself.
 It inspects local directory entries and reads each candidate adapter sidecar at most 16 bytes; an empty or fully handled inbox is silent.
-Active primary tool completions also refresh the existing owner lease between Claude's Stop-owned watcher cycles.
+Active primary tool completions also refresh the existing owner lease between Claude's Stop-owned watcher cycles, and so do tool completions from that session-lock owner's helper agents, so a turn that only waits on helpers keeps its listeners alive.
+Known limit: one tool call that runs longer than `FM_PROCEVENT_OWNER_LEASE_SECONDS` with no other tool completing in that session produces no hook event, so the lease expires, the listener stops, and the source is restarted by the reconcile at the end of the turn.
 Worker-owned rounds, away homes, inherited source-runner contexts, Cursor compatibility payloads, and Pi compatibility payloads remain inert.
 A reply arriving while Claude is reasoning or executing one long tool is delivered at the next tool completion, not asynchronously inside that operation.
 Other primary integrations retain their native supervision delivery paths.
