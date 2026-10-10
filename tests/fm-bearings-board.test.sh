@@ -150,9 +150,13 @@ write_valid_payload() {  # <path>
       "about": "A payload string that tries to break out: </script><b>x</b>",
       "decide": "Adopt it?",
       "options": [
-        { "value": "yes", "label": "Adopt", "hint": "recommended" },
-        { "value": "no", "label": "Keep current" }
+        { "value": "yes", "label": "Adopt", "hint": "Admission order changes at the next build." },
+        { "value": "no", "label": "Keep current", "hint": "Admission order stays as it is today." }
       ],
+      "recommend_value": "yes",
+      "recommend_reason": "It admits perishable work first, which the current order cannot do.",
+      "facts": ["Perishable work expired unserved twice last week."],
+      "counterfacts": ["The current order has never dropped a non-perishable item."],
       "allow_freeform": true
     },
     {
@@ -180,6 +184,21 @@ write_valid_payload() {  # <path>
   "charted_more": 0
 }
 EOF
+}
+
+# Give every decision card the copy the validator requires, keeping whatever the
+# fixture already authored, so a fixture about something else stays valid.
+fill_decision_copy() {  # <payload.json>
+  jq '.captains_call |= map(
+        if .type == "decision" then
+          .about //= "Sample decision, open because the sample work waits on it."
+          | .decide //= "Should the sample work proceed?"
+          | .options |= map(.hint //= "Sample consequence of this option.")
+          | .recommend_value //= .options[0].value
+          | .recommend_reason //= "It lets the sample work proceed."
+          | .facts //= ["Sample evidence for the recommendation."]
+          | .counterfacts //= ["Sample evidence against the recommendation."]
+        else . end)' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
 }
 
 # Extract the injected payload back out of a built board page.
@@ -647,6 +666,7 @@ test_build_drops_decision_cards_whose_subject_already_landed() {
         {"id":"unrelated\nstill-open","repo":"sample","what":"unrelated multiline identity","owner":"crew"}
       ]' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
 
+  fill_decision_copy "$data"
   out=$(run_board "$home" build "$data" 2>&1) || fail "the hygiene build failed: $out"
   assert_contains "$out" "dropped-landed-card: landed-by-task" \
     "the build did not report dropping the landed work item card: $out"
@@ -680,6 +700,7 @@ EOF
       }]
       | .landed = []' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
 
+  fill_decision_copy "$data"
   out=$(run_board "$home" build "$data" 2>&1) || fail "the remote-card build failed: $out"
   assert_not_contains "$out" "dropped-landed-card: remote-mate-call" \
     "an absent remote card was reported as landed: $out"
@@ -769,6 +790,162 @@ test_build_refuses_a_nondecision_reconcile_value() {
   pass "build reserves reconcile across non-decision cards"
 }
 
+# --- decision and credential card copy is required --------------------------
+
+# Build <data> and require a refusal whose output names every <needle>, with no
+# board written.
+assert_build_refused_naming() {  # <home> <data> <why> <needle...>
+  local home=$1 data=$2 why=$3 out rc needle
+  shift 3
+  rm -f -- "$home/.lavish/bearings-board.html"
+  set +e; out=$(run_board "$home" build "$data" 2>&1); rc=$?; set -e
+  [ "$rc" -ne 0 ] || fail "$why was accepted"
+  for needle in "$@"; do
+    assert_contains "$out" "$needle" "the refusal for $why did not name $needle: $out"
+  done
+  assert_absent "$home/.lavish/bearings-board.html" "$why still produced a board"
+}
+
+# Replace the payload's Captain's Call with <cards-json>.
+write_cards() {  # <data> <cards-json>
+  write_valid_payload "$1"
+  jq --argjson cards "$2" '.captains_call = $cards' "$1" > "$1.tmp" && mv "$1.tmp" "$1"
+}
+
+# Each recorded instance from the 2026-10-10 board, with the fields that were
+# recorded. The codex-saved-reset and watcher-future-file-age rows record no
+# `about`, so a non-empty one is supplied to keep the refusal on the fields the
+# record names.
+test_build_refuses_each_recorded_unusable_decision_card() {
+  local home data
+  home=$(make_home recorded-cards)
+  data="$home/payload.json"
+
+  write_cards "$data" '[{
+    "key":"mac-mini-plan","type":"decision","repo":"sample",
+    "title":"Mac mini: A, B or C","about":"Open from the move to the Mac Studio.",
+    "decide":"Your call.",
+    "options":[{"value":"a","label":"A"},{"value":"b","label":"B"},{"value":"c","label":"C"}]
+  }]'
+  assert_build_refused_naming "$home" "$data" "the mac-mini-plan card" \
+    "mac-mini-plan" "option 'a' is missing a non-empty 'hint'" \
+    "option 'c' is missing a non-empty 'hint'" \
+    "option 'b' has the bare label 'B'" "the label must say what the option is" \
+    "missing 'recommend_value'" "missing a non-empty 'recommend_reason'" \
+    "'facts'" "'counterfacts'"
+
+  write_cards "$data" '[{
+    "key":"codex-saved-reset","type":"decision","repo":"sample",
+    "title":"Saved Codex reset","about":"A saved reset is available.",
+    "decide":"Your call.",
+    "options":[{"value":"spend","label":"Spend the GTT reset now"},
+               {"value":"wait","label":"Wait for the reset date"}]
+  }]'
+  assert_build_refused_naming "$home" "$data" "the codex-saved-reset card" \
+    "codex-saved-reset" "option 'spend' is missing a non-empty 'hint'" \
+    "option 'wait' is missing a non-empty 'hint'" \
+    "missing 'recommend_value'" "missing a non-empty 'recommend_reason'"
+
+  write_cards "$data" '[{
+    "key":"watcher-future-file-age","type":"decision","repo":"sample",
+    "title":"Watcher future file age","about":"The watcher meets files dated ahead.",
+    "decide":"Your call.",
+    "options":[{"value":"limit","label":"Add an age limit"},
+               {"value":"none","label":"Leave it unbounded"}],
+    "recommend_value":"limit"
+  }]'
+  assert_build_refused_naming "$home" "$data" "the watcher-future-file-age card" \
+    "watcher-future-file-age" "option 'limit' is missing a non-empty 'hint'" \
+    "missing a non-empty 'recommend_reason'"
+  pass "build refuses each recorded unusable decision card and names what is missing"
+}
+
+test_build_requires_each_piece_of_decision_card_copy() {
+  local home data filter
+  home=$(make_home card-copy)
+  data="$home/payload.json"
+
+  write_valid_payload "$data"
+  run_board "$home" build "$data" >/dev/null \
+    || fail "the fully authored decision card was refused"
+
+  while IFS='|' read -r why filter needle; do
+    [ -n "$why" ] || continue
+    write_valid_payload "$data"
+    jq "$filter" "$data" > "$data.tmp" && mv "$data.tmp" "$data"
+    assert_build_refused_naming "$home" "$data" "$why" "$needle"
+  done <<'CASES'
+a decision without about|del(.captains_call[0].about)|missing a non-empty 'about'
+a decision with a blank about|.captains_call[0].about = "  "|missing a non-empty 'about'
+a decision without decide|del(.captains_call[0].decide)|missing a non-empty 'decide'
+a decision with an empty decide|.captains_call[0].decide = ""|missing a non-empty 'decide'
+an option without a hint|del(.captains_call[0].options[1].hint)|option 'no' is missing a non-empty 'hint'
+an option with an empty hint|.captains_call[0].options[0].hint = ""|option 'yes' is missing a non-empty 'hint'
+a decision without recommend_value|del(.captains_call[0].recommend_value)|missing 'recommend_value'
+a decision without recommend_reason|del(.captains_call[0].recommend_reason)|missing a non-empty 'recommend_reason'
+a decision with an empty recommend_reason|.captains_call[0].recommend_reason = ""|missing a non-empty 'recommend_reason'
+a decision without facts|del(.captains_call[0].facts)|needs 'facts'
+a decision with an empty facts array|.captains_call[0].facts = []|needs 'facts'
+a decision with an empty facts entry|.captains_call[0].facts = ["real evidence", ""]|needs 'facts'
+a decision with a blank facts entry|.captains_call[0].facts = ["  "]|needs 'facts'
+a decision with facts that is not an array|.captains_call[0].facts = "evidence"|needs 'facts'
+a decision without counterfacts|del(.captains_call[0].counterfacts)|needs 'counterfacts'
+a decision with an empty counterfacts array|.captains_call[0].counterfacts = []|needs 'counterfacts'
+a decision with an empty counterfacts entry|.captains_call[0].counterfacts = [""]|needs 'counterfacts'
+CASES
+
+  write_valid_payload "$data"
+  jq '.captains_call[0].recommend_value = "unlisted"' "$data" > "$data.tmp" && mv "$data.tmp" "$data"
+  assert_build_refused_naming "$home" "$data" "a recommendation naming no authored option"
+  pass "build requires about, decide, hints, a named recommendation, its reason, facts, and counterfacts"
+}
+
+test_build_refuses_bare_option_labels() {
+  local home data label
+  home=$(make_home bare-labels)
+  data="$home/payload.json"
+  for label in A b C 1 2 3 12 "Option A" "choice 2" "A)" "(B)" "C." " 1 "; do
+    write_valid_payload "$data"
+    jq --arg label "$label" '.captains_call[0].options[0].label = $label' "$data" > "$data.tmp" \
+      && mv "$data.tmp" "$data"
+    assert_build_refused_naming "$home" "$data" "the bare label '$label'" \
+      "has the bare label" "the label must say what the option is"
+  done
+  for label in "Adopt" "Option A is cheaper" "Yes" "A2 upgrade" "Merge now"; do
+    write_valid_payload "$data"
+    jq --arg label "$label" '.captains_call[0].options[0].label = $label' "$data" > "$data.tmp" \
+      && mv "$data.tmp" "$data"
+    run_board "$home" build "$data" >/dev/null || fail "the descriptive label '$label' was refused"
+  done
+  pass "build refuses bare letter or number labels and keeps descriptive ones"
+}
+
+test_build_requires_credential_card_copy_and_leaves_merge_cards_alone() {
+  local home data card
+  home=$(make_home credential-copy)
+  data="$home/payload.json"
+  card='{"key":"codex-login","type":"credential","repo":"sample","title":"Codex login expired",
+    "about":"Codex workers cannot start without it, and only the captain can sign in.",
+    "decide":"Run: codex login",
+    "options":[{"value":"done","label":"Signed in"}]}'
+
+  write_cards "$data" "[$card]"
+  run_board "$home" build "$data" >/dev/null || fail "a complete credential card was refused"
+
+  write_cards "$data" "[$(printf '%s' "$card" | jq -c 'del(.about)')]"
+  assert_build_refused_naming "$home" "$data" "a credential card without about" \
+    "codex-login" "credential card is missing a non-empty 'about'"
+  write_cards "$data" "[$(printf '%s' "$card" | jq -c '.decide = ""')]"
+  assert_build_refused_naming "$home" "$data" "a credential card with an empty decide" \
+    "codex-login" "credential card is missing a non-empty 'decide'"
+
+  write_cards "$data" '[{"key":"merge.bare","type":"merge","repo":"sample","title":"Merge: bare",
+    "risk":"low","options":[{"value":"merge","label":"A"}]}]'
+  run_board "$home" build "$data" >/dev/null \
+    || fail "a merge card was held to the decision-card copy rules"
+  pass "credential cards need about and decide, and merge cards keep their own rules"
+}
+
 test_path_is_stable_and_home_scoped
 test_build_refuses_malformed_payloads_before_touching_the_board
 test_charted_kind_is_optional_and_accepts_both_values
@@ -787,3 +964,7 @@ test_build_fails_when_reconcile_cannot_establish_a_listener
 test_every_decision_card_carries_the_reconcile_choice
 test_build_refuses_a_payload_that_occupies_the_reconcile_value
 test_build_refuses_a_nondecision_reconcile_value
+test_build_refuses_each_recorded_unusable_decision_card
+test_build_requires_each_piece_of_decision_card_copy
+test_build_refuses_bare_option_labels
+test_build_requires_credential_card_copy_and_leaves_merge_cards_alone
