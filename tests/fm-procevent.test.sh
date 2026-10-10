@@ -6931,8 +6931,19 @@ assert_equals 5 "$(waiting_delay "$WAITBACK/inbox/lavish-held.1.result")" "a LIS
 assert_equals 10 "$(waiting_delay "$WAITBACK/inbox/lavish-held.2.result")" "consecutive LISTENER_ACTIVE refusals back off like waiting rounds"
 pass "consecutive waiting rounds back off from the quiet delay to the maximum and reset on any other round"
 
-# Leftover poll processes: listed only when every ownership fact is proved, and
-# signalled only on request.
+# The poller record `poll` writes in its home's registry is an owned persisted
+# contract: "pid\nlstart\npgid\n", with lstart from the C-locale `ps` and its
+# whitespace collapsed. A fixture seeds one to stand in for a firstmate adapter.
+poller_seed() {  # <home> <source-id> <pid> [<lstart>]
+  local lstart=${4-} pgid
+  [ -n "$lstart" ] || lstart=$(LC_ALL=C ps -o lstart= -p "$3" | awk '{ $1 = $1; print }')
+  pgid=$(ps -o pgid= -p "$3" | tr -d ' ')
+  mkdir -p "$1/state/procevent"
+  printf '%s\n%s\n%s\n' "$3" "$lstart" "$pgid" > "$1/state/procevent/$2.$3.poller"
+}
+
+# Leftover poll processes: listed only when firstmate's own poll is proved by
+# its exact identity and no claim owns it, and signalled only on request.
 ORPH="$TMP_ROOT/orphans"
 mkdir -p "$ORPH/bin" "$ORPH/home/state/procevent" "$ORPH/home/state/procevent-inbox" "$ORPH/other"
 # shellcheck disable=SC2016  # single quotes are deliberate: the stub shell expands this.
@@ -6946,15 +6957,14 @@ bash "$ORPH/bin/lavish-axi" poll "$orph_art" & orph_pid=$!
 bash "$ORPH/bin/lavish-axi" poll "$orph_foreign" & orph_foreign_pid=$!
 orph_line() { orphans "${@:2}" | awk -v pid="$1" '$2 == pid'; }
 for _ in $(seq 1 100); do [ -n "$(orph_line "$orph_pid")" ] && break; sleep 0.1; done
-assert_contains "$(orph_line "$orph_pid")" "kept: $orph_pid (not in this home's records)" \
-  "a poll for a page this home never recorded is kept"
-orph_result="$ORPH/home/state/procevent-inbox/$orph_id.1.result"
-printf 'session:\n  status: feedback\n' > "$orph_result"
-touch -t 202001010000 "$orph_result"
-assert_contains "$(orph_line "$orph_pid")" "kept: $orph_pid (started after the last claim)" \
-  "a poll newer than the source's last claim is kept"
-sleep 2
-touch "$orph_result"
+assert_contains "$(orph_line "$orph_pid")" "kept: $orph_pid (no poller record)" \
+  "a poll with no poller record in this home is kept"
+poller_seed "$ORPH/home" "$orph_id" "$orph_pid" "Thu Jan 1 00:00:00 2015"
+assert_contains "$(orph_line "$orph_pid")" "kept: $orph_pid (no poller record)" \
+  "a record for the same pid with another start time, as after pid reuse, proves nothing"
+assert_absent "$ORPH/home/state/procevent/$orph_id.$orph_pid.poller" \
+  "the scan drops a record whose process started at another time"
+poller_seed "$ORPH/home" "$orph_id" "$orph_pid"
 orph_pgid=$(ps -o pgid= -p "$orph_pid" | tr -d ' ')
 mkdir -p "$FM_PROCEVENT_CLAIM_ROOT"
 printf '%s\n' "$ORPH/home" "$orph_pgid" orphan-token orphan-identity '' '' active \
@@ -6966,16 +6976,19 @@ assert_contains "$(orph_line "$orph_pid")" "kept: $orph_pid (claim cannot be rea
   "an unreadable claim keeps the poll"
 rm -f "$FM_PROCEVENT_CLAIM_ROOT/$orph_id.claim"
 assert_contains "$(orph_line "$orph_pid")" "orphan: $orph_pid $orph_id " \
-  "an unowned poll older than the last claim is listed"
+  "an unowned poll proved by its poller record is listed"
 kill -0 "$orph_pid" 2>/dev/null || fail "listing orphans signalled a process"
 assert_contains "$(orph_line "$orph_pid" --kill)" "killed: $orph_pid $orph_id " \
   "the explicit flag signals the listed orphan"
 for _ in $(seq 1 100); do kill -0 "$orph_pid" 2>/dev/null || break; sleep 0.1; done
 kill -0 "$orph_pid" 2>/dev/null && fail "the listed orphan survived the explicit kill"
-kill -0 "$orph_foreign_pid" 2>/dev/null || fail "the kill reached a poll outside this home's records"
+kill -0 "$orph_foreign_pid" 2>/dev/null || fail "the kill reached a poll with no poller record"
+orphans >/dev/null
+assert_absent "$ORPH/home/state/procevent/$orph_id.$orph_pid.poller" \
+  "the next scan drops the record of the stopped orphan"
 kill "$orph_foreign_pid" 2>/dev/null || true
 wait "$orph_pid" "$orph_foreign_pid" 2>/dev/null || true
-pass "orphaned Lavish polls are listed by default and signalled only on request, within this home's proved records"
+pass "orphaned Lavish polls are listed by default and signalled only on request, only when proved by identity"
 
 # A held page: lavish-axi 0.1.79 refuses a poll with LISTENER_ACTIVE while
 # another poll holds the page. The fake keeps the page held while `held` exists;
@@ -7004,9 +7017,18 @@ fi
 while ! mv "$HELD/answer" "$HELD/answer.sent" 2>/dev/null; do
   [ "$SECONDS" -lt 120 ] || exit 75
   [ ! -f "$HELD/replaced" ] || { replaced; exit 1; }
+  if [ -n "${HELD_LEFTOVER-}" ] && [ -f "$HELD/taken-over" ]; then
+    replaced
+    touch "$HELD/leftover-replaced"
+    exit 1
+  fi
   sleep 0.05
 done
 cat "$HELD/answer.sent"
+if [ -f "$HELD/answer-gate" ]; then
+  printf answered > "$HELD/answered"
+  while [ -f "$HELD/answer-gate" ]; do [ "$SECONDS" -lt 120 ] || exit 1; sleep 0.05; done
+fi
 SH
   chmod +x "$1/bin/lavish-axi"
   printf '<h1>held review</h1>\n' > "$1/review.html"
@@ -7019,9 +7041,35 @@ held_results() {  # <home> <source-id>
     [ "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$result")" = waiting ] && printf '%s\n' "$result"
   done
 }
+held_orphans_keep() {  # <holder-pid> <label>
+  local out
+  out=$(FM_HOME="$HELD/home" "$ROOT/bin/fm-procevent-lavish.sh" orphans --kill)
+  assert_contains "$out" "kept: $1 (no poller record)" "orphans --kill keeps $2"
+  sleep 0.5
+  kill -0 "$1" 2>/dev/null || fail "orphans --kill stopped $2"
+}
+held_answer_announced() {  # <text>
+  local answer='' seq
+  for _ in $(seq 1 200); do
+    answer=$(grep -l "$1" "$HELD/home/state/procevent-inbox/$held_id".*.result 2>/dev/null | head -n 1)
+    [ -n "$answer" ] && break
+    sleep 0.1
+  done
+  [ -n "$answer" ] || fail "the answer '$1' was not captured"
+  assert_equals feedback "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$answer")" \
+    "the captured answer classifies as feedback"
+  seq=${answer%.result}
+  seq=${seq##*.}
+  for _ in $(seq 1 100); do
+    wake_payloads "$HELD/home" | grep -qx "procevent lavish $held_id $seq" && break
+    sleep 0.1
+  done
+  assert_contains "$(wake_payloads "$HELD/home")" "procevent lavish $held_id $seq" \
+    "the answer '$1' is announced"
+}
 
-# A leftover poll the `orphans` test proves stray is taken over, and the next
-# captain answer reaches firstmate instead of the leftover.
+# A leftover poll the `orphans` test proves stray by its poller record is taken
+# over, and the next captain answer reaches firstmate instead of the leftover.
 HELD=$TMP_ROOT/held-stray
 held_fixture "$HELD"
 export HELD
@@ -7030,7 +7078,7 @@ held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
 fm_test_track_procevent_home "$HELD/home"
 touch "$HELD/held"
 HELD_HOLDER=stray bash "$HELD/bin/lavish-axi" poll "$held_art" & held_stray_pid=$!
-sleep 2  # the stray must predate this source's claim records, as a leftover does
+poller_seed "$HELD/home" "$held_id" "$held_stray_pid"
 PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
   || fail "arming a page held by a stray failed: $(cat "$HELD/arm.out")"
@@ -7041,23 +7089,7 @@ assert_contains "$(cat "$HELD/polls")" "$held_art --takeover" "the listener poll
 wait "$held_stray_pid" 2>/dev/null || true
 printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,answer after takeover\n' > "$HELD/answer.tmp"
 mv -f -- "$HELD/answer.tmp" "$HELD/answer"
-held_answer=
-for _ in $(seq 1 200); do
-  held_answer=$(grep -l 'answer after takeover' "$HELD/home/state/procevent-inbox/$held_id".*.result 2>/dev/null | head -n 1)
-  [ -n "$held_answer" ] && break
-  sleep 0.1
-done
-[ -n "$held_answer" ] || fail "the answer after the takeover was not captured"
-assert_equals feedback "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$held_answer")" \
-  "the captured answer classifies as feedback"
-held_seq=${held_answer%.result}
-held_seq=${held_seq##*.}
-for _ in $(seq 1 100); do
-  wake_payloads "$HELD/home" | grep -qx "procevent lavish $held_id $held_seq" && break
-  sleep 0.1
-done
-assert_contains "$(wake_payloads "$HELD/home")" "procevent lavish $held_id $held_seq" \
-  "the answer after the takeover is announced"
+held_answer_announced 'answer after takeover'
 PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
 pass "a page held by a proved stray poll is taken over and the next answer is captured"
 
@@ -7106,9 +7138,9 @@ kill "$held_live_pid" 2>/dev/null || true
 wait "$held_live_pid" 2>/dev/null || true
 pass "an unproved holder is never displaced, its hold is reported once, and a takeover by another poll hands the page off"
 
-# A bare `lavish-axi poll` that starts after this listener's claim is not a
-# leftover. The listener's own held-page report is not a claim-time record, so
-# a later refusal still does not prove that holder stray.
+# A bare `lavish-axi poll` that starts after this listener's claim has no
+# poller record, so neither the refusal nor the held-page report written after
+# it started proves it stray, and `orphans --kill` keeps it.
 HELD=$TMP_ROOT/held-after-claim
 held_fixture "$HELD"
 export HELD
@@ -7129,16 +7161,17 @@ assert_absent "$HELD/taken-over" "a holder that started after the claim is not d
 kill -0 "$held_late_pid" 2>/dev/null || fail "the holder that started after the claim was stopped"
 held_report=$(held_results "$HELD/home" "$held_id")
 assert_equals 1 "$(printf '%s\n' "$held_report" | grep -c .)" "the late holder's hold is reported once"
-assert_contains "$(cat "$held_report")" "held-by: $held_late_pid (started after the last claim)" \
+assert_contains "$(cat "$held_report")" "held-by: $held_late_pid (no poller record)" \
   "the report names the late holder and why it is kept"
+held_orphans_keep "$held_late_pid" "the holder that started after the claim"
 PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
 kill "$held_late_pid" 2>/dev/null || true
 wait "$held_late_pid" 2>/dev/null || true
-pass "a bare poll that started after the claim is not taken over after this listener reports its hold"
+pass "a bare poll that started after the claim is not taken over or killed after this listener reports its hold"
 
 # The runner rewrites its launch stamp before every poll round. A bare poll that
-# starts during the relisten delay after a captured round is still newer than
-# the live claim, so neither refusal proves it stray.
+# starts during the relisten delay after a captured round, before that stamp,
+# has no poller record, so neither refusal proves it stray.
 HELD=$TMP_ROOT/held-between-rounds
 held_fixture "$HELD"
 export HELD
@@ -7160,11 +7193,117 @@ wait_for_lines "$HELD/polls" 4 1 || fail "the held listener stopped retrying"
 kill -0 "$held_gap_pid" 2>/dev/null || fail "the holder that started between rounds was stopped"
 held_report=$(held_results "$HELD/home" "$held_id")
 assert_equals 1 "$(printf '%s\n' "$held_report" | grep -c .)" "the between-rounds hold is reported once"
-assert_contains "$(cat "$held_report")" "held-by: $held_gap_pid (started after the last claim)" \
+assert_contains "$(cat "$held_report")" "held-by: $held_gap_pid (no poller record)" \
   "the report names the between-rounds holder and why it is kept"
+held_orphans_keep "$held_gap_pid" "the holder that started between rounds"
 PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
 kill "$held_gap_pid" 2>/dev/null || true
 wait "$held_gap_pid" 2>/dev/null || true
-pass "a bare poll that started between poll rounds is not taken over by the per-round launch stamp"
+pass "a bare poll that started between poll rounds is not taken over or killed"
+
+# A bare poll that starts after our poll returned the captain's answer but
+# before the runner wrote the capture has no poller record, so the newer
+# capture does not prove it stray.
+HELD=$TMP_ROOT/held-before-capture
+held_fixture "$HELD"
+export HELD
+held_art=$(cd "$HELD" && pwd -P)/review.html
+held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
+fm_test_track_procevent_home "$HELD/home"
+touch "$HELD/answer-gate"
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
+  || fail "arming the page before the answer failed: $(cat "$HELD/arm.out")"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,answer before the holder\n' > "$HELD/answer.tmp"
+mv -f -- "$HELD/answer.tmp" "$HELD/answer"
+wait_for "$HELD/answered" || fail "the listener's poll never returned the answer"
+touch "$HELD/held"
+HELD_HOLDER=live bash "$HELD/bin/lavish-axi" poll "$held_art" & held_cap_pid=$!
+sleep 1  # the capture must be written at least 1 s after the holder started
+rm -f "$HELD/answer-gate"
+wait_for_lines "$HELD/polls" 4 400 || true
+assert_absent "$HELD/taken-over" "a holder that started before the capture was written is not displaced"
+wait_for_lines "$HELD/polls" 4 1 || fail "the held listener stopped retrying"
+kill -0 "$held_cap_pid" 2>/dev/null || fail "the holder that started before the capture was stopped"
+held_answer_announced 'answer before the holder'
+held_report=$(held_results "$HELD/home" "$held_id")
+assert_equals 1 "$(printf '%s\n' "$held_report" | grep -c .)" "the before-capture hold is reported once"
+assert_contains "$(cat "$held_report")" "held-by: $held_cap_pid (no poller record)" \
+  "the report names the before-capture holder and why it is kept"
+held_orphans_keep "$held_cap_pid" "the holder that started before the capture"
+PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
+kill "$held_cap_pid" 2>/dev/null || true
+wait "$held_cap_pid" 2>/dev/null || true
+pass "a bare poll that started before the capture was written is not taken over or killed"
+
+# A poller record for the holder's pid with another start time - a reused pid -
+# proves nothing: the holder is never taken over, and the scan drops the record.
+HELD=$TMP_ROOT/held-reused
+held_fixture "$HELD"
+export HELD
+held_art=$(cd "$HELD" && pwd -P)/review.html
+held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
+fm_test_track_procevent_home "$HELD/home"
+touch "$HELD/held"
+HELD_HOLDER=live bash "$HELD/bin/lavish-axi" poll "$held_art" & held_reused_pid=$!
+poller_seed "$HELD/home" "$held_id" "$held_reused_pid" "Thu Jan 1 00:00:00 2015"
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
+  || fail "arming a page held under a reused pid failed: $(cat "$HELD/arm.out")"
+wait_for_lines "$HELD/polls" 3 400 || true
+assert_absent "$HELD/taken-over" "a holder whose pid matches a record with another start time is not displaced"
+wait_for_lines "$HELD/polls" 3 1 || fail "the held listener stopped retrying"
+kill -0 "$held_reused_pid" 2>/dev/null || fail "the holder under a reused pid was stopped"
+assert_absent "$HELD/home/state/procevent/$held_id.$held_reused_pid.poller" \
+  "the scan drops the record whose start time does not match"
+held_report=$(held_results "$HELD/home" "$held_id")
+assert_contains "$(cat "$held_report")" "held-by: $held_reused_pid (no poller record)" \
+  "the report names the holder under a reused pid and why it is kept"
+held_orphans_keep "$held_reused_pid" "the holder under a reused pid"
+PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
+kill "$held_reused_pid" 2>/dev/null || true
+wait "$held_reused_pid" 2>/dev/null || true
+pass "a reused pid with another start time is never taken over"
+
+# A firstmate leftover whose runner was SIGKILLed - its adapter and native poll
+# left behind under no claim, with the adapter's own poller record - is proved by
+# identity, the native poll through its parent, and taken over.
+HELD=$TMP_ROOT/held-leftover
+held_fixture "$HELD"
+export HELD
+held_art=$(cd "$HELD" && pwd -P)/review.html
+held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
+fm_test_track_procevent_home "$HELD/home"
+mkdir -p "$HELD/home/state/procevent"
+(
+  PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" HELD_LEFTOVER=1 \
+    "$ROOT/bin/fm-procevent-lavish.sh" poll "$held_art" > "$HELD/leftover.out" 2>&1 &
+  printf '%s\n' "$!" > "$HELD/leftover.pid"
+  wait
+) & held_dead_runner=$!
+wait_for "$HELD/leftover.pid" || fail "the leftover adapter never started"
+held_leftover_pid=$(cat "$HELD/leftover.pid")
+wait_for_lines "$HELD/polls" 1 || fail "the leftover adapter never polled"
+assert_present "$HELD/home/state/procevent/$held_id.$held_leftover_pid.poller" \
+  "the adapter records itself at entry"
+kill -KILL "$held_dead_runner" 2>/dev/null || true
+wait "$held_dead_runner" 2>/dev/null || true
+kill -0 "$held_leftover_pid" 2>/dev/null || fail "the leftover adapter died with its runner"
+touch "$HELD/held"
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
+  || fail "arming a page held by a firstmate leftover failed: $(cat "$HELD/arm.out")"
+for _ in $(seq 1 200); do [ -f "$HELD/leftover-replaced" ] && break; sleep 0.1; done
+assert_present "$HELD/leftover-replaced" "the ledgered leftover was displaced by a takeover"
+assert_contains "$(cat "$HELD/polls")" "$held_art --takeover" "the listener polled with --takeover"
+for _ in $(seq 1 100); do kill -0 "$held_leftover_pid" 2>/dev/null || break; sleep 0.1; done
+kill -0 "$held_leftover_pid" 2>/dev/null && fail "the displaced leftover adapter kept running"
+assert_absent "$HELD/home/state/procevent/$held_id.$held_leftover_pid.poller" \
+  "the adapter removes its record on exit"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,answer after the leftover\n' > "$HELD/answer.tmp"
+mv -f -- "$HELD/answer.tmp" "$HELD/answer"
+held_answer_announced 'answer after the leftover'
+PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
+pass "a ledgered firstmate leftover is proved by identity and taken over"
 
 printf '\nall procevent tests passed\n'

@@ -42,20 +42,18 @@
 #            `orphan:` or `kept:` line per process plus an `orphans:` total.
 #            Nothing is signalled without --kill, which sends TERM to each listed
 #            orphan and prints `killed:` for it. A process is an orphan only when
-#            all of these are proved: its command is this adapter's `poll` or the
-#            native `lavish-axi poll` for an artifact whose source id this home
-#            has a registration, launch stamp or captured result for; no live
-#            claim's process group contains it; and it started before the latest
-#            of that source's captured results and its loaded claim, or, when no
-#            claim loads, its launch stamp. A held-page report is not such a
-#            record, and while it is the latest capture the launch stamp is not
-#            either: both are written while the holder already holds the page.
-#            The claim keeps its time across relistens. Anything
-#            unproved - an unresolvable artifact, another home's source, a busy
-#            source lock, an uncertain claim, no claim-time record, or a process
-#            whose identity changed before the signal - is kept with its reason.
-#            This is a one-time cleanup for polls orphaned before runners
-#            drained their own process group; it never retires a registration.
+#            both are proved: it is firstmate's own poll by exact identity - this
+#            adapter's `poll` whose pid and start time match the poller record it
+#            wrote in this home's registry for that source, or a native
+#            `lavish-axi poll` whose parent is such an adapter - and no live
+#            claim's process group contains it. `poll` writes its record at entry
+#            and removes it on exit, and each scan first drops records whose
+#            process is gone or started at another time, so a reused pid never
+#            matches. Anything unproved - an unresolvable artifact, no matching
+#            poller record (every poll started before these records existed), a
+#            busy source lock, an uncertain claim, or a process whose identity
+#            changed before the signal - is kept with its reason. It never
+#            retires a registration.
 # sweep      Retire this home's Lavish listeners whose boards are finished, and
 #            print one `retired:`, `kept:` or (with --dry-run) `would-retire:`
 #            line per registration plus a `sweep:` total. Choice answers do not
@@ -719,36 +717,27 @@ poll_retry_wait() {  # <minimum-seconds>
   ' "$1"
 }
 
-# One pass over a source's captured results. Prints "<held>\t<newest>": held is
-# 1 when the highest-sequence result is a held-page report, else 0; newest is
-# the latest mtime among results that are not held-page reports, or empty.
-result_scan() {  # <state-dir> <source-id>
+# Whether this source's latest captured result already reports a held page,
+# so a refusal that continues the same hold stays quiet. Timing: this is one
+# perl pass over the source's results and runs outside any source lock;
+# orphan_verdict reads no results, so its lock-held work stays constant in the
+# number of result files.
+held_page_reported() {  # <source-id>
   perl -e '
-    my ($held, $newest, $top) = (0, "", -1);
+    my ($held, $top) = (0, -1);
     for my $path (@ARGV) {
       next if -l $path || !-f _;
-      my $mtime = (stat _)[9];
+      $path =~ /\.([0-9]+)\.result\z/ && $1 > $top or next;
+      $top = 0 + $1;
+      $held = 0;
       open my $in, "<", $path or next;
       my $first = <$in> // "";
       my $second = <$in> // "";
       close $in;
-      my $report = $first =~ /\Aerror:/ && $second =~ /\Acode:[ \t]*LISTENER_ACTIVE[ \t]*\n?\z/;
-      $newest = $mtime if !$report && ($newest eq "" || $mtime > $newest);
-      if ($path =~ /\.([0-9]+)\.result\z/ && $1 > $top) {
-        $top = 0 + $1;
-        $held = $report ? 1 : 0;
-      }
+      $held = $first =~ /\Aerror:/ && $second =~ /\Acode:[ \t]*LISTENER_ACTIVE[ \t]*\n?\z/ ? 1 : 0;
     }
-    print "$held\t$newest\n";
-  ' "$(fm_procevent_inbox_dir "$1")/$2".*.result 2>/dev/null
-}
-
-# Whether this source's latest captured result already reports a held page,
-# so a refusal that continues the same hold stays quiet.
-held_page_reported() {  # <source-id>
-  local held newest
-  IFS=$'\t' read -r held newest < <(result_scan "${FM_STATE_OVERRIDE:-$FM_HOME/state}" "$1")
-  [ "$held" = 1 ]
+    exit($held ? 0 : 1);
+  ' "$(fm_procevent_inbox_dir "${FM_STATE_OVERRIDE:-$FM_HOME/state}")/$1".*.result 2>/dev/null
 }
 
 # Exit 0 only when every other visible poll process on this page is a stray the
@@ -756,18 +745,19 @@ held_page_reported() {  # <source-id>
 # per poll that is not proved, so a live claim's poll or any unproved or foreign
 # poll is never displaced.
 held_page_strays() {  # <artifact>
-  local artifact=$1 id state own pid pgid started command strays=0 kept=0
+  local artifact=$1 id state own pid pgid lstart ppid plstart command strays=0 kept=0
   id=$(cmd_source_id "$artifact" 2>/dev/null) || return 1
   state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
   own=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
   [ -n "$own" ] || return 1
-  while IFS=$'\t' read -r pid pgid started command; do
+  poller_prune "$(fm_procevent_registry_dir "$state")" "$id"
+  while IFS=$'\t' read -r pid pgid lstart ppid plstart command; do
     [ "$pgid" != "$own" ] || continue
     if [ "$(cmd_source_id "$command" 2>/dev/null)" != "$id" ]; then
       # A poll naming this page beside extra options is still on this page.
       case " $command " in *" $artifact "*) ;; *) continue ;; esac
     fi
-    orphan_verdict "$state" "$pid" "$pgid" "$started" "$command"
+    orphan_verdict "$state" "$pid" "$pgid" "$lstart" "$ppid" "$plstart" "$command"
     if [ -z "$ORPHAN_REASON" ] && [ "$ORPHAN_ID" = "$id" ]; then
       strays=$((strays + 1))
     else
@@ -781,7 +771,7 @@ held_page_strays() {  # <artifact>
 
 cmd_poll() {
   local artifact=${1-} delay attempt=0 response cleanup_command rc filter_rc
-  local pipeline_status reply_file='' takeover=() held_wait='' holders
+  local pipeline_status reply_file='' takeover=() held_wait='' holders ledger
   local reply_text='' reply_pending=0 store_attempt=0
   [ -n "$artifact" ] || usage
   if [ "$#" -eq 3 ] && [ "${2-}" = --agent-reply-file ]; then
@@ -792,7 +782,9 @@ cmd_poll() {
   command -v lavish-axi >/dev/null 2>&1 || die "lavish-axi is not installed"
   delay=$(poll_retry_delay) || exit 1
   response=$(mktemp "${TMPDIR:-/tmp}/fm-lavish-poll.XXXXXX") || die "cannot stage the poll response"
+  ledger=$(poller_record "$artifact") || ledger=
   printf -v cleanup_command 'rm -f -- %q' "$response"
+  [ -z "$ledger" ] || printf -v cleanup_command '%s %q' "$cleanup_command" "$ledger"
   # shellcheck disable=SC2064 # $cleanup_command must expand now, while the staged path is still set.
   trap "$cleanup_command" EXIT
   # Retirement stops this listener by signalling its process group, and bash runs
@@ -1283,60 +1275,112 @@ cmd_read() {
 }
 
 # --- orphans: leftover poll processes no listener owns -----------------------
-# The header owns the eligibility contract. Prints "pid<TAB>pgid<TAB>start-epoch
-# <TAB>artifact" for every process whose command is a Lavish poll.
-orphan_poll_processes() {
-  ps -axo pid=,pgid=,etime=,command= 2>/dev/null | perl -e '
+# The header owns the eligibility contract. Start times are `ps` lstart under the
+# C locale with whitespace collapsed, the one form every writer and reader uses.
+
+# Record this adapter process in this home's registry for the artifact's source
+# and print the record path. A record is "pid\nlstart\npgid\n", published by
+# rename so a scan never reads it half written.
+poller_record() {  # <artifact>
+  local id reg lstart pgid tmp rec
+  id=$(cmd_source_id "$1" 2>/dev/null) || return 1
+  reg=$(fm_procevent_registry_dir "${FM_STATE_OVERRIDE:-$FM_HOME/state}")
+  [ -d "$reg" ] || return 1
+  lstart=$(LC_ALL=C ps -o lstart= -p "$$" 2>/dev/null | awk '{ $1 = $1; print }')
+  pgid=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
+  [ -n "$lstart" ] && [ -n "$pgid" ] || return 1
+  rec="$reg/$id.$$.poller"
+  tmp=$(umask 077; mktemp "$reg/.poller.XXXXXX") || return 1
+  if printf '%s\n%s\n%s\n' "$$" "$lstart" "$pgid" > "$tmp" && mv -f -- "$tmp" "$rec"; then
+    printf '%s\n' "$rec"
+    return 0
+  fi
+  rm -f -- "$tmp"
+  return 1
+}
+
+# Drop poller records, for one source or all, whose process is gone or started
+# at another time. The records are listed before the process snapshot is taken,
+# so a record's live writer is always in that snapshot.
+poller_prune() {  # <registry-dir> [<source-id>]
+  local records=()
+  if [ -n "${2-}" ]; then
+    records=("$1/$2".*.poller)
+  else
+    records=("$1"/*.poller)
+  fi
+  LC_ALL=C perl -e '
     use strict; use warnings;
-    my $now = time;
+    my %start;
+    open my $ps, "-|", "ps", "-axo", "pid=,lstart=" or exit 1;
+    while (my $line = <$ps>) {
+      my ($pid, $lstart) = $line =~ /\A\s*(\d+)\s+(.*?)\s*\z/ or next;
+      $lstart =~ s/\s+/ /g;
+      $start{$pid} = $lstart;
+    }
+    close $ps or exit 1;
+    for my $rec (@ARGV) {
+      next if -l $rec || !-f _;
+      open my $in, "<", $rec or next;
+      my $pid = <$in> // "";
+      my $lstart = <$in> // "";
+      close $in;
+      chomp($pid, $lstart);
+      unlink $rec unless $pid =~ /\A\d+\z/ && defined $start{$pid} && $start{$pid} eq $lstart;
+    }
+  ' "${records[@]}" 2>/dev/null || true
+}
+
+# Whether this home's poller record for <source-id> proves <pid> started at
+# <lstart> is that source's poll adapter.
+poller_recorded() {  # <registry-dir> <source-id> <pid> <lstart>
+  local rec="$1/$2.$3.poller" pid lstart
+  [ -f "$rec" ] && [ ! -L "$rec" ] || return 1
+  { IFS= read -r pid && IFS= read -r lstart; } < "$rec" || return 1
+  [ "$pid" = "$3" ] && [ -n "$lstart" ] && [ "$lstart" = "$4" ]
+}
+
+# Prints "pid<TAB>pgid<TAB>lstart<TAB>ppid<TAB>parent-lstart<TAB>artifact" for
+# every process whose command is a Lavish poll; parent-lstart is "-" when the
+# parent is not visible.
+orphan_poll_processes() {
+  LC_ALL=C ps -axo pid=,ppid=,pgid=,lstart=,command= 2>/dev/null | perl -e '
+    use strict; use warnings;
+    my (%start, @polls);
     while (my $line = <STDIN>) {
       chomp $line;
-      $line =~ /\A\s*(\d+)\s+(\d+)\s+(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)\s+(.*)\z/ or next;
-      my ($pid, $pgid, $d, $h, $m, $sec, $command) = ($1, $2, $3 // 0, $4 // 0, $5, $6, $7);
+      $line =~ /\A\s*(\d+)\s+(\d+)\s+(\d+)\s+(\S+\s+\S+\s+\d+\s+\d+:\d+:\d+\s+\d+)\s+(.*)\z/ or next;
+      my ($pid, $ppid, $pgid, $lstart, $command) = ($1, $2, $3, $4, $5);
+      $lstart =~ s/\s+/ /g;
+      $start{$pid} = $lstart;
       $command =~ m{(?:\A|[ /])(?:lavish-axi|fm-procevent-lavish\.sh) poll (.+?)(?: --agent-reply-file .+)?\z} or next;
       my $artifact = $1;
       next if $artifact =~ /\t/;
-      print join("\t", $pid, $pgid, $now - ((($d * 24 + $h) * 60 + $m) * 60 + $sec), $artifact), "\n";
+      push @polls, [$pid, $pgid, $lstart, $ppid, $artifact];
+    }
+    for my $poll (@polls) {
+      my ($pid, $pgid, $lstart, $ppid, $artifact) = @$poll;
+      print join("\t", $pid, $pgid, $lstart, $ppid, $start{$ppid} // "-", $artifact), "\n";
     }
   '
 }
 
-# Latest mtime among the given claim-time records and an optional floor, or nothing.
-orphan_last_claim() {  # <floor-or-empty> <record>...
-  perl -e '
-    my $latest = shift;
-    $latest = undef if $latest eq "";
-    for my $path (@ARGV) {
-      next if -l $path || !-f _;
-      my $mtime = (stat _)[9];
-      $latest = $mtime if !defined $latest || $mtime > $latest;
-    }
-    print "$latest\n" if defined $latest;
-  ' "$@" 2>/dev/null
-}
-
 # Why one Lavish poll process is not a provable orphan, per the header's
-# contract, in ORPHAN_REASON; empty when every fact is proved. ORPHAN_ID and
-# ORPHAN_LAST name its source and that source's latest claim-time record.
-orphan_verdict() {  # <state-dir> <pid> <pgid> <started> <artifact>
-  local state=$1 pid=$2 pgid=$3 started=$4 artifact=$5 reg inbox rec known held newest
-  local records=()
-  ORPHAN_REASON='' ORPHAN_ID='' ORPHAN_LAST=''
-  reg=$(fm_procevent_registry_dir "$state")
-  inbox=$(fm_procevent_inbox_dir "$state")
-  if ! ORPHAN_ID=$(cmd_source_id "$artifact" 2>/dev/null); then
+# contract, in ORPHAN_REASON; empty when every fact is proved. ORPHAN_ID names
+# its source.
+orphan_verdict() {  # <state-dir> <pid> <pgid> <lstart> <ppid> <parent-lstart> <artifact>
+  local pid=$2 pgid=$3 reg
+  ORPHAN_REASON='' ORPHAN_ID=''
+  reg=$(fm_procevent_registry_dir "$1")
+  if ! ORPHAN_ID=$(cmd_source_id "$7" 2>/dev/null); then
     ORPHAN_REASON='artifact cannot be resolved'
     return 0
   fi
-  known=0
-  for rec in "$reg/$ORPHAN_ID.source" "$reg/$ORPHAN_ID".*.last-launch "$inbox/$ORPHAN_ID".*.result; do
-    [ -f "$rec" ] && [ ! -L "$rec" ] && { known=1; break; }
-  done
-  if [ "$known" -eq 0 ]; then
-    ORPHAN_REASON='not in this home'"'"'s records'
+  if ! poller_recorded "$reg" "$ORPHAN_ID" "$pid" "$4" \
+    && ! poller_recorded "$reg" "$ORPHAN_ID" "$5" "$6"; then
+    ORPHAN_REASON='no poller record'
     return 0
   fi
-  IFS=$'\t' read -r held newest < <(result_scan "$state" "$ORPHAN_ID")
   if ! fm_procevent_source_lock_try_acquire "$ORPHAN_ID" 2>/dev/null; then
     ORPHAN_REASON='source is busy'
     return 0
@@ -1345,26 +1389,16 @@ orphan_verdict() {  # <state-dir> <pid> <pgid> <started> <artifact>
     if [ "$FM_PROCEVENT_CLAIM_PID" = "$pgid" ] || [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ]; then
       ORPHAN_REASON='owned by a claim'
     fi
-    records=("$(fm_procevent_claim_path "$ORPHAN_ID")")
   elif [ -e "$(fm_procevent_claim_path "$ORPHAN_ID")" ]; then
     ORPHAN_REASON='claim cannot be read'
-  elif [ "$held" != 1 ]; then
-    records=("$reg/$ORPHAN_ID".*.last-launch)
-  fi
-  if [ -z "$ORPHAN_REASON" ]; then
-    ORPHAN_LAST=$(orphan_last_claim "$newest" ${records[@]+"${records[@]}"})
-    if [ -z "$ORPHAN_LAST" ]; then
-      ORPHAN_REASON='no claim-time record'
-    elif [ "$started" -ge "$ORPHAN_LAST" ]; then
-      ORPHAN_REASON='started after the last claim'
-    fi
   fi
   fm_procevent_source_lock_release "$ORPHAN_ID" 2>/dev/null || true
 }
 
 cmd_orphans() {
-  local kill_mode=0 state pid pgid started artifact identity reason
+  local kill_mode=0 state pid pgid lstart ppid plstart artifact identity reason i
   local found=0 killed=0 kept=0
+  local -a pids=() ids=() artifacts=() identities=() reasons=()
   case "${1-}" in
     '') ;;
     --kill) kill_mode=1; shift ;;
@@ -1372,18 +1406,25 @@ cmd_orphans() {
   esac
   [ "$#" -eq 0 ] || usage
   state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
-  while IFS=$'\t' read -r pid pgid started artifact; do
+  poller_prune "$(fm_procevent_registry_dir "$state")"
+  # Every verdict is decided before any signal, because a signalled adapter
+  # removes the record that proves its native child.
+  while IFS=$'\t' read -r pid pgid lstart ppid plstart artifact; do
     [ -n "$pid" ] && [ "$pid" != "$$" ] || continue
     identity=$(fm_pid_identity "$pid" 2>/dev/null) || continue
-    orphan_verdict "$state" "$pid" "$pgid" "$started" "$artifact"
-    reason=$ORPHAN_REASON
+    orphan_verdict "$state" "$pid" "$pgid" "$lstart" "$ppid" "$plstart" "$artifact"
+    pids+=("$pid") ids+=("$ORPHAN_ID") artifacts+=("$artifact")
+    identities+=("$identity") reasons+=("$ORPHAN_REASON")
+  done < <(orphan_poll_processes)
+  for i in "${!pids[@]}"; do
+    pid=${pids[$i]} artifact=${artifacts[$i]} reason=${reasons[$i]}
     if [ -z "$reason" ]; then
       found=$((found + 1))
       if [ "$kill_mode" -eq 0 ]; then
-        printf 'orphan: %s %s started=%s last-claim=%s %s\n' "$pid" "$ORPHAN_ID" "$started" "$ORPHAN_LAST" "$artifact"
-      elif [ "$(fm_pid_identity "$pid" 2>/dev/null || true)" = "$identity" ] && kill -TERM "$pid" 2>/dev/null; then
+        printf 'orphan: %s %s %s\n' "$pid" "${ids[$i]}" "$artifact"
+      elif [ "$(fm_pid_identity "$pid" 2>/dev/null || true)" = "${identities[$i]}" ] && kill -TERM "$pid" 2>/dev/null; then
         killed=$((killed + 1))
-        printf 'killed: %s %s started=%s last-claim=%s %s\n' "$pid" "$ORPHAN_ID" "$started" "$ORPHAN_LAST" "$artifact"
+        printf 'killed: %s %s %s\n' "$pid" "${ids[$i]}" "$artifact"
       else
         found=$((found - 1))
         reason='process changed before the signal'
@@ -1393,7 +1434,7 @@ cmd_orphans() {
       kept=$((kept + 1))
       printf 'kept: %s (%s) %s\n' "$pid" "$reason" "$artifact"
     fi
-  done < <(orphan_poll_processes)
+  done
   printf 'orphans: found=%s killed=%s kept=%s\n' "$found" "$killed" "$kept"
 }
 

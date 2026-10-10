@@ -929,7 +929,6 @@ fm_procevent_claim_adopt_registration_locked() {  # <source-id> <home> <pid> <to
       "$FM_PROCEVENT_CLAIM_STATE_INODE" "$FM_PROCEVENT_CLAIM_STATE_OWNER" \
       "$FM_PROCEVENT_CLAIM_STATE_MODE" > "$tmp" \
       && chmod 0600 "$tmp" \
-      && touch -r "$claim" "$tmp" \
       && mv -f -- "$tmp" "$claim"; then
       FM_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
       return 0
@@ -941,7 +940,6 @@ fm_procevent_claim_adopt_registration_locked() {  # <source-id> <home> <pid> <to
     "$FM_PROCEVENT_CLAIM_HOME" "$FM_PROCEVENT_CLAIM_PID" "$FM_PROCEVENT_CLAIM_TOKEN" \
     "$FM_PROCEVENT_CLAIM_IDENTITY" "$FM_PROCEVENT_CLAIM_REG_DIR" "$reg_identity" > "$tmp" \
     && chmod 0600 "$tmp" \
-    && touch -r "$claim" "$tmp" \
     && mv -f -- "$tmp" "$claim"; then
     FM_PROCEVENT_CLAIM_REG_IDENTITY=$reg_identity
     return 0
