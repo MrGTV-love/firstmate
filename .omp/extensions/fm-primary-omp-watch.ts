@@ -1063,25 +1063,26 @@ export default function (pi: ExtensionAPI) {
 
   // An operational hand-back is sent again with the message it was first sent
   // with, plus its send-time note; other text, which names no queued row, is
-  // resent as emitted. A refused send rejects either way.
-  async function resendPrompt(owner: SessionGeneration, token: string, wake: UnconsumedWake): Promise<void> {
-    if (!wake.pending) {
-      await pi.sendUserMessage(wake.content);
-      return;
+  // resent as emitted. A refused send leaves the wake tracked as it was, so
+  // every caller keeps its attempt bound and its pending record stays owed.
+  async function resendPrompt(owner: SessionGeneration, token: string, wake: UnconsumedWake): Promise<boolean> {
+    if (wake.pending) owner.unconsumedWakes.delete(token);
+    try {
+      if (wake.pending) await sendWake(owner, wake.message ?? wake.pending.message, wake.pending);
+      else await pi.sendUserMessage(wake.content);
+      return true;
+    } catch {
+      owner.unconsumedWakes.set(token, wake);
+      scheduleWakeFlush(owner);
+      return false;
     }
-    owner.unconsumedWakes.delete(token);
-    await sendWake(owner, wake.message ?? wake.pending.message, wake.pending);
   }
 
   // An unconsumed watcher wake becomes a mark again, so the queue read builds
   // fresh text; any other wake is resent as a prompt.
   function redeliverWake(owner: SessionGeneration, token: string, wake: UnconsumedWake): boolean {
     if (!wake.pending || operationalHandback(wake.pending.message)) {
-      void resendPrompt(owner, token, wake).catch((error) => {
-        if (!wake.pending) return;
-        const detail = error instanceof Error ? error.message : String(error);
-        surfaceFailure(owner, `watcher: FAILED - omp extension could not deliver an operational hand-back\n${detail}`);
-      });
+      void resendPrompt(owner, token, wake);
       return true;
     }
     owner.unconsumedWakes.delete(token);
@@ -1156,10 +1157,7 @@ export default function (pi: ExtensionAPI) {
         }
         restoreAttempts.set(token, attempts + 1);
         owner.restorePendingWaits = 0;
-        try {
-          await resendPrompt(owner, token, wake);
-        } catch {
-          owner.unconsumedWakes.set(token, wake);
+        if (!(await resendPrompt(owner, token, wake))) {
           if (String(ctx.ui.getEditorText() ?? "") === remainder) ctx.ui.setEditorText(editor);
           if (attempts + 1 === restoreAttemptLimit) {
             reportWait(

@@ -1431,7 +1431,7 @@ EOF
   pass ".omp watch extension: a home without config/supervision-host or with an off file keeps the plain arm"
 }
 
-test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|stuck|rejected|unrestored|refused>
+test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|stuck|rejected|unrestored|refused|stuck-refused>
   local kind=${1:-outcome} repo home log out status
   repo="$TMP_ROOT/watch-host-handoff-$kind/repo"; home="$TMP_ROOT/watch-host-handoff-$kind/home"; log="$TMP_ROOT/watch-host-handoff-$kind/arm.log"
   install_omp_extension_fixture "$repo"
@@ -1486,7 +1486,7 @@ const pi = {
   },
 };
 // The stuck case runs the fixed one-second flush check of the extension faster.
-const stuck = process.env.HAND_BACK_KIND === "stuck";
+const stuck = ["stuck", "stuck-refused"].includes(process.env.HAND_BACK_KIND);
 const realSetTimeout = globalThis.setTimeout;
 if (stuck) globalThis.setTimeout = (callback, delay, ...args) => realSetTimeout(callback, delay === 1000 ? 20 : delay, ...args);
 const mod = await import(pathToFileURL(process.env.EXT).href);
@@ -1496,7 +1496,7 @@ let idle = !stuck;
 const failure = { rejected: "watcher: FAILED - handling delivery confirmation was rejected", unrestored: "watcher: FAILED - omp extension could not restore watcher continuity" }[process.env.HAND_BACK_KIND];
 let editor = "";
 const ctx = stuck
-  ? { hasUI: true, isIdle: () => idle, hasPendingMessages: () => true, ui: { getEditorText: () => "", setEditorText() {} } }
+  ? { hasUI: true, isIdle: () => idle, hasPendingMessages: () => true, ui: { getEditorText: () => "", setEditorText() {}, notify: (m) => { notices.push(m); } } }
   : failure || process.env.HAND_BACK_KIND === "refused"
     ? { hasUI: true, isIdle: () => true, hasPendingMessages: () => false, ui: { getEditorText: () => editor, setEditorText: (value) => { editor = value; }, notify: (m) => { notices.push(m); } } }
     : { isIdle: () => process.env.HAND_BACK_KIND !== "busy" };
@@ -1507,7 +1507,7 @@ if (sent.length !== 1 || !sent[0].m.includes("FIRSTMATE SUPERVISION HOST:")) thr
 const expected = process.env.HAND_BACK_KIND === "away-return" ? "the captain returned" : "branch-outcome:";
 if (!sent[0].m.includes(expected)) throw new Error(`host hand-back lost its outcome: ${sent[0].m}`);
 if (sent[0].m.includes("signal: already handled original")) throw new Error(`host hand-back injected a handled headline: ${sent[0].m}`);
-if (["busy", "stuck"].includes(process.env.HAND_BACK_KIND) ? sent[0].o?.deliverAs !== "followUp" : sent[0].o?.deliverAs !== undefined) throw new Error("host hand-back changed its idle/busy delivery routing");
+if (["busy", "stuck", "stuck-refused"].includes(process.env.HAND_BACK_KIND) ? sent[0].o?.deliverAs !== "followUp" : sent[0].o?.deliverAs !== undefined) throw new Error("host hand-back changed its idle/busy delivery routing");
 const rejected = sent[0].m.includes("watcher: FAILED - handling delivery confirmation was rejected");
 if (process.env.HAND_BACK_KIND === "rejected" ? !rejected : rejected) throw new Error(`a rejected handling confirmation must reach main exactly when it happens: ${sent[0].m}`);
 if (failure) {
@@ -1529,7 +1529,18 @@ if (process.env.HAND_BACK_KIND === "refused") {
   await new Promise((r) => setTimeout(r, 1500));
   if (refused !== 3 || warned().length !== 1 || editor !== sent[0].m || sent.length !== 1) throw new Error(`a refused restored hand-back was retried or warned again past its bound: ${JSON.stringify({ refused, notices })}`);
 }
-if (stuck) {
+if (process.env.HAND_BACK_KIND === "stuck-refused") {
+  // omp went idle and never ran the queued follow-up, then refuses every
+  // prompt resend: the hand-back stays tracked, retries within three attempts,
+  // warns once, and is consumed once when omp finally runs the original copy.
+  refusals = 3;
+  idle = true;
+  const warned = () => notices.filter((m) => m.includes("wake not delivered"));
+  for (let i = 0; i < 150 && (refused < 3 || warned().length < 1); i += 1) await new Promise((r) => setTimeout(r, 100));
+  if (refused !== 3 || warned().length !== 1 || sent.length !== 1) throw new Error(`a refused stuck-queue hand-back lost tracking or was not bounded: ${JSON.stringify({ refused, notices, sent })}`);
+  await new Promise((r) => setTimeout(r, 1000));
+  if (refused !== 3 || warned().length !== 1 || sent.length !== 1) throw new Error(`a refused stuck-queue hand-back was retried or warned again past its bound: ${JSON.stringify({ refused, notices, sent })}`);
+} else if (stuck) {
   // omp went idle and never ran the queued follow-up.
   idle = true;
   for (let i = 0; i < 100 && sent.length < 2; i += 1) await new Promise((r) => setTimeout(r, 100));
@@ -3562,6 +3573,7 @@ test_watch_extension_delivers_host_handbacks stuck
 test_watch_extension_delivers_host_handbacks rejected
 test_watch_extension_delivers_host_handbacks unrestored
 test_watch_extension_delivers_host_handbacks refused
+test_watch_extension_delivers_host_handbacks stuck-refused
 test_watch_extension_marks_host_closes_without_headlines boundary
 test_watch_extension_marks_host_closes_without_headlines note
 test_watch_extension_marks_host_closes_without_headlines archived
