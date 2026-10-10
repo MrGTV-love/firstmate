@@ -29,7 +29,6 @@ set -u
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(fm_test_tmproot fm-bootstrap-tests)
 export FM_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
-export FM_PROCEVENT_CLAIM_ROOT="$TMP_ROOT/claims"
 
 # Hermetic runtime-backend detection. These cases pin the backend per-home via
 # config/backend; the dev shell's ambient runtime markers ($TMUX inside tmux,
@@ -1406,13 +1405,10 @@ SH
   pass "remote guarded pairs preserve routing while notifying unrelated writes and retrying pending delivery"
 }
 
-# The per-user process pile-up detector is host-wide, so only a primary home that
-# is not read-only arms it, and a refusal to arm on an unmeasurable host stays silent.
-test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
-  bootstrap_with_limit() {
-    local limit=$1
-    shift
-    python3 -I -c '
+bootstrap_with_limit() {
+  local limit=$1
+  shift
+  python3 -I -c '
 import os, resource, sys
 if sys.platform == "linux":
     _, hard = resource.getrlimit(resource.RLIMIT_NPROC)
@@ -1424,11 +1420,16 @@ if sys.platform == "linux":
     resource.setrlimit(resource.RLIMIT_NPROC, (soft, hard))
 os.execvpe(sys.argv[2], sys.argv[2:], os.environ)
 ' "$limit" "$@"
-  }
+}
+export -f bootstrap_with_limit
+
+# The per-user process pile-up detector is host-wide, so only a primary home that
+# is not read-only arms it, and a refusal to arm on an unmeasurable host stays silent.
+test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
   local case_dir fakebin home sm lab other out real_perl bootstrap_pid runner
   case_dir="$TMP_ROOT/pileup-detector-arm"
-  local FM_PROCEVENT_CLAIM_ROOT="$case_dir/claims" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60 FM_TEST_ARM_PROC_DETECTOR=1
-  export FM_PROCEVENT_CLAIM_ROOT FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS FM_TEST_ARM_PROC_DETECTOR
+  local FM_PROCEVENT_CLAIM_ROOT="$case_dir/claims" FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=60
+  export FM_PROCEVENT_CLAIM_ROOT FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS
   home="$case_dir/home"
   sm="$case_dir/sm"
   lab="$case_dir/lab"
@@ -1537,9 +1538,91 @@ SH
   pass "bootstrap arms the process pile-up detector in a primary home only, silently, and not when read-only, a secondmate, a lab, or unmeasurable"
 }
 
+# One child suite: it sources tests/lib.sh, bootstraps a primary home from a
+# private copy of bin/ so every process it starts carries that copy's path, then
+# holds until released. With opt-in 1 it exports an empty claim root first.
+start_detector_child_suite() {  # <case-dir> <opt-in:0|1>
+  local case_dir=$1 fakebin
+  mkdir -p "$case_dir/home/config" "$case_dir/home/state"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  cp -R "$ROOT/bin" "$case_dir/bin"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  cat > "$case_dir/suite.sh" <<'SH'
+#!/usr/bin/env bash
+set -u
+# shellcheck source=tests/lib.sh disable=SC1091
+. "$1/tests/lib.sh"
+case_dir=$2
+[ "$3" = 0 ] || export FM_PROCEVENT_CLAIM_ROOT="$case_dir/claims"
+fm_test_track_procevent_home "$case_dir/home" "$FM_PROCEVENT_CLAIM_ROOT"
+bootstrap_with_limit finite env PATH="$4" FM_BACKEND=tmux FM_HOME="$case_dir/home" \
+  FM_ROOT_OVERRIDE="$case_dir/home" FM_FAKE_TREEHOUSE_LEASE_HELP=1 \
+  "$case_dir/bin/fm-bootstrap.sh" > "$case_dir/bootstrap.out" 2>&1
+printf '%s\n' "$?" > "$case_dir/ready"
+deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
+while [ ! -e "$case_dir/release" ] && [ "$SECONDS" -lt "$deadline" ]; do sleep 0.1; done
+SH
+  FM_TEST_SKIP_ORPHAN_REAP=1 bash "$case_dir/suite.sh" "$ROOT" "$case_dir" "$2" "$fakebin:$BASE_PATH" &
+  DETECTOR_CHILD_SUITE_PID=$!
+  fm_test_wait_until 120 test -s "$case_dir/ready" || fail "the child suite's bootstrap never returned"
+  expect_code 0 "$(cat "$case_dir/ready")" "the child suite's bootstrap failed: $(cat "$case_dir/bootstrap.out")"
+}
+
+# Runner, owner-guard, and sampler processes started from one child suite's bin copy.
+detector_process_count() {  # <case-dir>
+  ps -axo command= | awk -v bin="$1/bin/" '
+    index($0, bin "fm-procevent.sh _start proc-guard") \
+      || index($0, bin "fm-procevent.sh _owner-watchdog proc-guard") \
+      || index($0, bin "fm-proc-guard.py") { n++ }
+    END { print n + 0 }'
+}
+
+detector_runner_leaders() {  # <case-dir>
+  ps -axo pid=,pgid=,command= \
+    | awk -v script="$1/bin/fm-procevent.sh" '$1 == $2 && $4 == script && $5 == "_start" && $6 == "proc-guard" { print $1 }'
+}
+
+test_suite_that_does_not_test_the_detector_starts_no_detector_process() {
+  local case_dir="$TMP_ROOT/detector-not-armed" tick
+  start_detector_child_suite "$case_dir" 0
+  assert_present "$case_dir/home/state/procevent/proc-guard.source" "the child suite's bootstrap never reached detector arming"
+  for tick in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    [ "$(detector_process_count "$case_dir")" -eq 0 ] \
+      || fail "a suite that does not test the detector started detector processes (sample $tick)"
+    sleep 0.1
+  done
+  assert_absent "$case_dir/home/state/procevent/proc-guard.runner" "a suite that does not test the detector recorded a runner"
+  : > "$case_dir/release"
+  wait "$DETECTOR_CHILD_SUITE_PID" || fail "the child suite failed"
+  [ "$(detector_process_count "$case_dir")" -eq 0 ] || fail "detector processes appeared after the child suite ended"
+  pass "a suite that does not test the detector starts no runner, owner guard, or sampler"
+}
+
+test_opted_in_suite_starts_one_detector_runner_and_reaps_it() {
+  local case_dir="$TMP_ROOT/detector-opted-in" runner
+  fm_test_track_procevent_home "$case_dir/home" "$case_dir/claims"
+  start_detector_child_suite "$case_dir" 1
+  fm_test_wait_until 120 test -s "$case_dir/claims/proc-guard.claim" || fail "the opted-in suite's runner never claimed the detector"
+  runner=$(sed -n '2p' "$case_dir/claims/proc-guard.claim")
+  detector_runner_is_the_only_leader() { [ "$(detector_runner_leaders "$case_dir")" = "$runner" ]; }
+  fm_test_wait_until 30 detector_runner_is_the_only_leader \
+    || fail "expected exactly the one claimed runner $runner, found: $(detector_runner_leaders "$case_dir")"
+  : > "$case_dir/release"
+  wait "$DETECTOR_CHILD_SUITE_PID" || fail "the opted-in child suite failed"
+  # shellcheck disable=SC2016 # The child shell owns these expansions.
+  fm_test_wait_until 60 bash -c '! kill -0 "$1" 2>/dev/null && ! ps -axo pgid= | grep -qx " *$1"' _ "$runner" \
+    || fail "the opted-in suite left its runner group running"
+  detector_processes_are_gone() { [ "$(detector_process_count "$case_dir")" -eq 0 ]; }
+  fm_test_wait_until 60 detector_processes_are_gone \
+    || fail "the opted-in suite left detector processes behind"
+  pass "an opted-in suite starts exactly one detector runner and reaps it at exit"
+}
+
 test_remote_guarded_pair_notifications
 test_model_roles_preserve_offline_bootstrap
 test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only
+test_suite_that_does_not_test_the_detector_starts_no_detector_process
+test_opted_in_suite_starts_one_detector_runner_and_reaps_it
 test_bootstrap_reporting
 test_no_mistakes_min_version
 test_gh_axi_min_version

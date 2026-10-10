@@ -1066,10 +1066,11 @@ test_bootstrap_opt_out_cleanup() {
 }
 
 test_bootstrap_opt_out_reports_cleanup_failure() {
-  local home fakebin out bootstrap_pid FM_TEST_ARM_PROC_DETECTOR=1
-  export FM_TEST_ARM_PROC_DETECTOR
+  local home fakebin out bootstrap_pid FM_PROCEVENT_CLAIM_ROOT
   home="$TMP_ROOT/boot-optout-fail"; mkdir -p "$home"
-  fm_test_track_procevent_home "$home"
+  FM_PROCEVENT_CLAIM_ROOT="$home-claims"
+  export FM_PROCEVENT_CLAIM_ROOT
+  fm_test_track_procevent_home "$home" "$FM_PROCEVENT_CLAIM_ROOT"
   printf 'FMX_PAIRING_TOKEN=tok-out\n' > "$home/.env"
   FM_HOME="$home" "$ROOT/bin/fm-bootstrap.sh" >/dev/null 2>&1
   assert_present "$home/state/x-watch.check.sh" "opt-in must create the shim before cleanup failure"

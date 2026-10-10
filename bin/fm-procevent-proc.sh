@@ -29,8 +29,7 @@
 # retire     Retire the registration.
 #
 # Bootstrap arms this source only in a writable local primary home, never a
-# secondmate, disposable lab, or detect-only bootstrap, and under FM_TEST_SEAM=1
-# only when FM_TEST_ARM_PROC_DETECTOR=1.
+# secondmate, disposable lab, or detect-only bootstrap.
 # Arming requests a detached listener; docs/configuration.md owns its standing
 # lifetime, registration replacement, and continued listening.
 # The episode record lives at <process-event-claim-root>/proc-guard.episode so
