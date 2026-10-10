@@ -43,6 +43,10 @@ class CollectionDeadline(Exception):
     pass
 
 
+class PrHeadMissing(Exception):
+    """The PR's recorded head commit is not an object in the task's copy, so its coverage cannot be read."""
+
+
 class QuotaLow(Exception):
     """The recorded GitHub quota is below the floor; the sweep stops instead of publishing partial rows."""
 
@@ -87,6 +91,7 @@ class Collector:
         self.tasks = []
         self.backlog = []
         self.prs = {}
+        self.missing_heads = {}
         self.state_files = []
         self.owned_urls = set()
         self.owned_branches = set()
@@ -195,7 +200,7 @@ class Collector:
     def run(self, args, cwd=None, missing_ok=False, env=None):
         command = [str(a) for a in args]
         child = subprocess.Popen(command, cwd=cwd, env=self.env if env is None else env,
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace",
                                  stdin=subprocess.DEVNULL, start_new_session=True)
         try:
             stdout, stderr = child.communicate(timeout=self.timeout)
@@ -410,12 +415,27 @@ class Collector:
 
     def pr_pending(self, worktree, pending, pr):
         head = pr["head"]["sha"]
-        self.git(worktree, "cat-file", "-e", head + "^{commit}")
+        # rev-parse --verify --quiet exits 1 without output only for an absent object; any other failure still raises.
+        if not self.run(["git", "-C", worktree, "rev-parse", "--verify", "--quiet", head + "^{commit}"],
+                        missing_ok=True).strip():
+            raise PrHeadMissing(head)
         uncovered = self.pending_commits(worktree, head)
         if pending is None:
             return uncovered
         uncovered = set(uncovered)
         return [commit for commit in pending if commit in uncovered]
+
+    def pr_head_pending(self, task, worktree, pending, pr):
+        """pr_pending, except that a PR head absent from this copy is a note on this task's own row.
+
+        None means PR coverage could not be applied; the caller then judges the task without it. The ledger is
+        not degraded: every other source is still read, and the task's own rows say why coverage was skipped.
+        """
+        try:
+            return self.source("PR head " + task["id"], self.pr_pending, worktree, pending, pr)
+        except PrHeadMissing as missing:
+            self.missing_heads[task["id"]] = str(missing)
+            return None
 
     def content_in_default(self, worktree, base):
         default_tree = self.git(worktree, "rev-parse", base + "^{tree}")
@@ -446,7 +466,7 @@ class Collector:
         if self.git(worktree, "status", "--porcelain"):
             return False
         if pr and pr.get("merged_at"):
-            uncovered = self.source("PR head " + task["id"], self.pr_pending, worktree, None, pr)
+            uncovered = self.pr_head_pending(task, worktree, None, pr)
             if uncovered == []:
                 return True
         base = self.default_ref(worktree, task.get("mode"))
@@ -465,15 +485,17 @@ class Collector:
             return
         pr = self.pr_state(task["pr"]["url"]) if task["pr"].get("url") else None
         if pr and (pr.get("merged_at") or pr.get("state") == "open"):
-            covered = self.source("PR head " + task["id"], self.pr_pending, worktree, pending, pr)
+            covered = self.pr_head_pending(task, worktree, pending, pr)
             if covered is not None:
                 pending = covered
         if not pending:
             return
         oldest = min(int(self.git(worktree, "show", "-s", "--format=%ct", c)) for c in pending)
         title = self.git(worktree, "show", "-s", "--format=%s", pending[-1])
+        head = self.missing_heads.get(task["id"])
+        coverage = f"; PR head {head[:8]} is not in this copy, so PR coverage was not applied" if head else ""
         self.add("unlanded_commit", task["id"], "land this work through its PR, or obtain the captain's drop",
-                 oldest, evidence=f"{len(pending)} commit(s) not on {base}; newest: {title}")
+                 oldest, evidence=f"{len(pending)} commit(s) not on {base}{coverage}; newest: {title}")
 
     def forge(self, path):
         """Pages of one conditional REST read, flattened; fm-gh-rest.sh owns the ETag cache and quota headers."""

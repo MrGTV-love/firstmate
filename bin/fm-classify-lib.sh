@@ -157,6 +157,9 @@ EOF
 # token), and the fold alone decides which of them really moves the set. A line
 # whose leading word is followed by neither whitespace, a colon, nor a bracket
 # tag cannot be a transition, because the fold's own declaration guard rejects it.
+# `-a` keeps the pre-select a line filter on a log that holds a byte run invalid
+# in the caller's locale: GNU grep otherwise calls the file binary and prints no
+# candidate line at all.
 status_key_closing_verb() {  # <status-file> <key>
   local f=$1 want=$2 line resolve held open='' was verb='' kind event candidates
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
@@ -164,7 +167,7 @@ status_key_closing_verb() {  # <status-file> <key>
   kind=$(_fm_status_kind "$f")
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
-  candidates=$(grep -E \
+  candidates=$(grep -a -E \
     "^[[:space:]]*(needs-decision|blocked|done|failed|$resolve|$held)[[:space:]:[]" \
     "$f") || [ "$?" -eq 1 ] || candidates=$(cat "$f")
   while IFS= read -r line || [ -n "$line" ]; do
@@ -183,7 +186,7 @@ status_key_closing_verb() {  # <status-file> <key>
     esac
     was=0
     _fm_open_set_has "$open" "$want" && was=1
-    open=$(_fm_decision_fold_line "$open" "$line" "$resolve" "$held" "$kind")
+    _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open
     if [ "$was" = 1 ] && ! _fm_open_set_has "$open" "$want"; then
       verb=$event
     fi
@@ -781,12 +784,12 @@ _fm_status_open_activities_stream() {
     case "$verb" in
       working|"$pause")
         note=$(status_line_note "$line")
-        open=$(_fm_decision_drop "$open" "$key")
+        _fm_decision_drop "$open" "$key" open
         [ -n "$open" ] && open="${open}"$'\n'
         open="${open}${key}"$'\t'"${verb}"$'\t'"${note}"$'\n'
         ;;
       done|failed|needs-decision|blocked|"$resolve"|"$held")
-        open=$(_fm_decision_drop "$open" "$key")
+        _fm_decision_drop "$open" "$key" open
         [ -n "$open" ] && open="${open}"$'\n'
         ;;
     esac

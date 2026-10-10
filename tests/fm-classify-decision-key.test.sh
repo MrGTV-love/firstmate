@@ -26,6 +26,8 @@ set -u
 
 # shellcheck source=bin/fm-classify-lib.sh
 . "$ROOT/bin/fm-classify-lib.sh"
+# shellcheck source=bin/fm-timing-lib.sh
+. "$ROOT/bin/fm-timing-lib.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-classify-decision-key-tests)
 
@@ -656,5 +658,203 @@ test_dated_decisions_follow_valid_reopenings() {
   pass "dated decisions retain only the last valid reopening across resolutions and terminal declarations"
 }
 
+test_dated_decisions_close_only_the_exact_key_record() {
+  local dir f expected
+  dir=$(case_dir dated-exact-key)
+  f="$dir/task.status"
+  printf '%s\n' \
+    'needs-decision [key=first] [at=100]: mentions [key=a.b], tabs aside, and .* regex prose' \
+    'needs-decision [key=axb] [at=110]: keep this different key' \
+    'blocked [key=a.b] [at=120]: credentials [x] (y) * remain literal' \
+    'needs-decision [key=last] [at=130]: final question' \
+    'resolved [key=a.b] [at=140]: credentials arrived' > "$f"
+  expected=$(printf '%s\n' \
+    $'first\tneeds-decision\t100\tmentions [key=a.b], tabs aside, and .* regex prose' \
+    $'axb\tneeds-decision\t110\tkeep this different key' \
+    $'last\tneeds-decision\t130\tfinal question')
+  assert_equals "$expected" "$(status_open_decisions_dated "$f")" \
+    "closing a dotted middle key removed a different key or interpreted note prose"
+  printf 'resolved [key=first]: answered\nresolved [key=last]: answered\n' >> "$f"
+  assert_fold "$f" $'axb\tneeds-decision\tkeep this different key' "closing first and last keys"
+  assert_equals $'axb\tneeds-decision\t110\tkeep this different key' \
+    "$(status_open_decisions_dated "$f")" "closing neighboring keys changed the surviving age"
+  pass "dated and ordinary folds close only exact keys at every record position"
+}
+
+test_dated_decisions_close_only_the_exact_key_record
+
+# A byte cap can cut a multibyte character, so a recorded note can hold a byte
+# run that is not valid UTF-8. Under a UTF-8 locale such a line must fold like
+# any other: its key still closes, its neighbors still close, and a reserved
+# key still reads its note. The case runs in a subshell so the locale it forces
+# cannot leak into another case. No fixture line ends inside an incomplete
+# multibyte character: bash 5's `read` under a UTF-8 locale takes the newline
+# that follows into that character and joins the next line, on main as here,
+# before any reader sees either line.
+test_invalid_utf8_note_folds_like_any_other_line() {
+  local dir f utf8 probe=$'\xc3\xa9'
+  dir=$(case_dir invalid-utf8-note)
+  f="$dir/lane.status"
+  printf 'kind=secondmate\n' > "$dir/lane.meta"
+  utf8=$(locale -a 2>/dev/null | grep -i -E '^(C|en_US)\.utf-?8$' | head -1)
+  [ -n "$utf8" ] || fail "no UTF-8 locale is installed to fold an invalid byte under"
+  (
+    LC_ALL=$utf8
+    [ "${#probe}" = 1 ] || fail "locale $utf8 did not read a two-byte character as one"
+    printf 'needs-decision [key=a] [at=100]: bad \xff byte\n' > "$f"
+    assert_fold "$f" "$(printf 'a\tneeds-decision\tbad \xff byte')" "an open note holding an invalid byte"
+    assert_equals "$(printf 'a\tneeds-decision\t100\tbad \xff byte')" "$(status_open_decisions_dated "$f")" \
+      "an invalid byte in the note cost the opening its key, date, or summary"
+    printf 'resolved [key=a]: done\n' >> "$f"
+    assert_fold "$f" "" "a resolved line after an invalid-byte note"
+    assert_equals "" "$(status_open_decisions_dated "$f")" "an invalid-byte note stayed open and dated after its resolve"
+    assert_equals "resolved" "$(status_key_closing_verb "$f" a)" "an invalid-byte note hid its key's closing verb"
+
+    {
+      printf 'needs-decision [key=a] [at=100]: bad \xff byte\n'
+      printf 'needs-decision [key=b]: clean question\n'
+      printf 'resolved [key=b]: answered\n'
+      printf 'needs-decision [key=c] [at=10:30]: trunc \xe2\x80 cut\n'
+      printf 'resolved [key=c]: done\n'
+      printf 'resolved [key=a]: done\n'
+      printf 'needs-decision [key=pending-reply-x1]: pending-reply-missed: caf\xe9 cut\n'
+      printf 'blocked \xff[key=d] [at=200]: [key=e] a bad byte in the verb opens nothing\n'
+      printf 'needs-decision: \xff [key=f] not a stated key\n'
+    } > "$f"
+    assert_fold "$f" "$(printf '%s\n' \
+      "$(printf 'pending-reply-x1\tneeds-decision\tpending-reply-missed: caf\xe9 cut')" \
+      "$(printf 'default\tneeds-decision\t\xff [key=f] not a stated key')")" \
+      "invalid bytes across notes, a stamp, a reserved key, and a head"
+    assert_equals "$(printf '%s\n' \
+      "$(printf 'pending-reply-x1\tneeds-decision\t\tpending-reply-missed: caf\xe9 cut')" \
+      "$(printf 'default\tneeds-decision\t\t\xff [key=f] not a stated key')")" \
+      "$(status_open_decisions_dated "$f")" "the dated fold disagreed with the ordinary fold on invalid bytes"
+    assert_equals $'blocked \xff' "$(status_line_verb $'blocked \xff[key=d] [at=200]: x')" \
+      "an invalid byte before the colon changed the verb text"
+  ) || exit 1
+  pass "status lines holding invalid UTF-8 bytes fold, close, and date like any other line under $utf8"
+}
+
+test_invalid_utf8_note_folds_like_any_other_line
+
 test_dated_decisions_ignore_rejected_openers
 test_dated_decisions_follow_valid_reopenings
+test_dated_decisions_pair_each_open_key_with_its_own_last_opening() {
+  local dir f expected
+  dir=$(case_dir dated-many-keys)
+  f="$dir/lane.status"
+  printf 'kind=secondmate\n' > "$dir/lane.meta"
+  {
+    printf 'needs-decision [key=alpha] [at=100]: first alpha question\n'
+    printf 'blocked [key=beta] [at=110]: beta waits on a credential\n'
+    printf 'note [at=120]: mentions [key=alpha] and [key=beta] in prose only\n'
+    printf 'needs-decision [key=alpha] [at=130]: second alpha question\n'
+    printf 'blocked [key=alpha] [at=140]: alpha is now a blocker\n'
+    printf 'needs-decision [key=gamma] [at=150]: gamma question\n'
+    printf 'resolved [key=gamma] [at=160]: gamma answered\n'
+    printf 'needs-decision [at=170]: keyless question\n'
+    printf 'needs-decision [key=beta]: unstamped beta reopening\n'
+    printf 'blocked [key=beta] [at=190]: beta blocker again\n'
+  } >> "$f"
+  expected=$(printf '%s\n' \
+    "$(printf 'alpha\tblocked\t140\talpha is now a blocker')" \
+    "$(printf 'default\tneeds-decision\t170\tkeyless question')" \
+    "$(printf 'beta\tblocked\t190\tbeta blocker again')")
+  assert_equals "$expected" "$(status_open_decisions_dated "$f")" \
+    "each open key took its own last opening, by verb"
+  pass "dated decisions pair every open key with its own last opening in one log"
+}
+
+# A lane status log of current size (about 1.2k lines, a few hundred historical
+# openings, 25 still open) must date every open decision in a time that grows
+# with the log, not with open keys times log lines. The ledger's questions
+# source runs this under a 60 second command limit on a host that is often
+# loaded, and a per-key rescan of the log took longer than that.
+test_dated_decisions_cost_does_not_scale_with_open_keys_times_lines() {
+  local dir f out started elapsed expected_count=25
+  dir=$(case_dir dated-cost-bound)
+  f="$dir/lane.status"
+  printf 'kind=secondmate\n' > "$dir/lane.meta"
+  awk 'BEGIN {
+    n = 0
+    for (i = 1; i <= 1200; i++) {
+      r = i % 4
+      if (r == 1) { n++; printf "needs-decision [key=lane-q%03d] [at=%d]: question %d\n", n, 1700000000 + i, n }
+      else if (r == 2 && n > 25) printf "resolved [key=lane-q%03d] [at=%d]: answered %d\n", n, 1700000000 + i, n
+      else printf "working [at=%d]: routine progress line %d with padding text for a realistic width\n", 1700000000 + i, i
+    }
+  }' > "$f"
+  started=$SECONDS
+  out=$(status_open_decisions_dated "$f")
+  elapsed=$((SECONDS - started))
+  assert_equals "$expected_count" "$(printf '%s\n' "$out" | grep -c .)" "the fixture did not leave 25 decisions open"
+  assert_equals "$(printf 'lane-q025\tneeds-decision\t1700000097\tquestion 25')" "$(printf '%s\n' "$out" | tail -1)" \
+    "the last open decision lost its opening time"
+  [ "$elapsed" -le 20 ] || fail "dating $expected_count open decisions over a 1200-line log took ${elapsed}s, expected at most 20s"
+  pass "dating 25 open decisions over a lane-size log finished in ${elapsed}s"
+}
+
+test_dated_decisions_pair_each_open_key_with_its_own_last_opening
+test_dated_decisions_cost_does_not_scale_with_open_keys_times_lines
+
+# The dated output is tab-separated, so a note that ends in tabs must not carry
+# them into the summary field: a consumer that splits on tabs would read an
+# extra empty field. The ordinary fold keeps the note's own bytes.
+test_dated_summary_never_ends_in_a_tab() {
+  local dir f
+  dir=$(case_dir dated-trailing-tab)
+  f="$dir/task.status"
+  printf 'needs-decision [key=tabbed] [at=100]: inner\ttab kept\t\t\n' > "$f"
+  printf 'blocked [key=tagged] [at=110]: [key=other]\t\n' >> "$f"
+  printf 'needs-decision [key=cut] [at=120]: bad \xff byte\t\n' >> "$f"
+  assert_equals "$(printf '%s\n' \
+    "$(printf 'tabbed\tneeds-decision\t100\tinner\ttab kept')" \
+    "$(printf 'tagged\tblocked\t110\t[key=other]')" \
+    "$(printf 'cut\tneeds-decision\t120\tbad \xff byte')")" \
+    "$(status_open_decisions_dated "$f")" "a note ending in a tab left that tab on the dated summary"
+  pass "a dated summary keeps inner tabs and never ends in one"
+}
+
+# Every transition drops its key from the open set, so the ordinary fold must
+# not pay a multibyte pass over the whole set per transition. Forty open
+# decisions with wide multibyte notes, then a long run of open-and-answer
+# pairs, is the shape of a busy lane log. Folding it under a UTF-8 locale must
+# cost about what folding the same bytes under the C locale costs; comparing
+# the two runs keeps the bound independent of host load. Each run is a
+# subshell so the locale it forces cannot leak into another case.
+test_fold_cost_does_not_scale_with_multibyte_open_set_width() {
+  local dir f utf8 probe=$'\xc3\xa9' c_ms utf8_ms
+  dir=$(case_dir fold-multibyte-set-cost)
+  f="$dir/lane.status"
+  printf 'kind=secondmate\n' > "$dir/lane.meta"
+  utf8=$(locale -a 2>/dev/null | grep -i -E '^(C|en_US)\.utf-?8$' | head -1)
+  [ -n "$utf8" ] || fail "no UTF-8 locale is installed to fold a multibyte open set under"
+  awk 'BEGIN {
+    pad = sprintf("%500s", ""); gsub(/ /, "\303\251", pad)
+    for (i = 1; i <= 40; i++) printf "needs-decision [key=wide-q%02d] [at=%d]: question %d %s\n", i, 1700000000 + i, i, pad
+    for (i = 1; i <= 200; i++) {
+      printf "needs-decision [key=churn] [at=%d]: short question %d\n", 1700001000 + i, i
+      printf "resolved [key=churn] [at=%d]: answered %d\n", 1700001000 + i, i
+    }
+  }' > "$f"
+  timed_fold() {  # <locale> -> elapsed ms
+    local started out
+    LC_ALL=$1
+    started=$(fm_timing_now_ms)
+    out=$(status_open_decisions "$f")
+    assert_equals 40 "$(printf '%s\n' "$out" | grep -c .)" "the fixture did not leave 40 decisions open under $1"
+    printf '%s' "$(( $(fm_timing_now_ms) - started ))"
+  }
+  c_ms=$(timed_fold C) || exit 1
+  utf8_ms=$(
+    LC_ALL=$utf8
+    [ "${#probe}" = 1 ] || fail "locale $utf8 did not read a two-byte character as one"
+    timed_fold "$utf8"
+  ) || exit 1
+  [ "$utf8_ms" -le $((c_ms * 5 / 2)) ] \
+    || fail "folding 400 transitions over a wide multibyte open set took ${utf8_ms}ms under $utf8 and ${c_ms}ms under C"
+  pass "folding 400 transitions over a wide multibyte open set took ${utf8_ms}ms under $utf8 and ${c_ms}ms under C"
+}
+
+test_dated_summary_never_ends_in_a_tab
+test_fold_cost_does_not_scale_with_multibyte_open_set_width
