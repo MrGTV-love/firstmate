@@ -65,10 +65,10 @@
 # tasks-axi --archive-body). It closes a question with `tasks-axi done` - or,
 # with `--release`, lifts the hold with `tasks-axi unhold` so a captain-gated
 # WORK item resumes without closing - and restores resolution-first body
-# ordering. An exact retry also completes unfinished ordering normalization and
-# is idempotent only when its requested close mode
-# matches the newest record; a changed decision or a mode mismatch is rejected.
-# A re-held task may record a new answer on top. On a task already closed outside this script,
+# ordering. For direct callers, an exact retry also completes unfinished ordering
+# normalization and requires the requested close mode to match the newest record;
+# a changed decision or a mode mismatch is rejected. A re-held task may record
+# a new answer on top. On a task already closed outside this script,
 # `answer` records the missing resolution block (the old `repair` path) only
 # when the task still carries the captain-hold provenance tasks-axi preserves
 # through a close, so an ordinary finished task cannot be dressed up as an
@@ -83,12 +83,19 @@
 # task through the very same `answer` path above, so every guard applies
 # identically no matter which channel the answer arrived on. The key IS the
 # task id - no identity arithmetic. The optional fourth field selects the close:
-# empty or `done` completes the task, `release` lifts the hold so held work
-# resumes; anything else is skipped. A key that names no task, a task that is
-# not held for the captain, or a task already closed is reported as `skipped:`
-# and feeds nothing. A replayed delivery whose answer digest and requested
-# close mode both match the newest record is reported `closed:` and is a no-op;
-# a mode mismatch is skipped. The command exits nonzero when any key was
+# empty or `done` selects automatic resolution through the internal
+# `answer --auto-release` path; `release` explicitly lifts the hold so held work
+# resumes; anything else is skipped. Automatic resolution never completes work
+# still owned by a worker. docs/captain-hold-lifecycle.md#answer-time-resolution
+# owns fresh-state selection, interrupted-release recovery, and replay safety.
+# A successful resolution, including a release or compatible replay, is reported
+# as `closed:`. An exact released-record replay is compatible on an unheld open
+# task in either mode, and on a Done task only in automatic mode. Other Done
+# replays require an automatic mode and a compatible recorded close. Missing,
+# unheld, or already-closed keys outside those replay cases, and incompatible
+# replays, are reported as `skipped:` and feed nothing. These Done/unheld replay
+# paths preserve the recorded decision and task state but can finish parent
+# publication and pending reconcile-request retirement. The command exits nonzero when any key was
 # skipped. `--source` is provenance text recorded in the
 # durable decision, never a behavior switch: this command has no per-channel
 # branch and no knowledge of chat, review decks, or any transport.
@@ -209,6 +216,7 @@
 # reconciled. Records written by the retired fm-decision-hold.sh (routed,
 # declined, answered, repaired) are recognized everywhere a record is read, so
 # nothing already closed needs rewriting.
+# `Resolves hold set:` associates a resolution with its hold-set stamp.
 #
 # Parent channel: inside a secondmate home a task held for the captain, and its
 # answer, are captain-facing facts the moment they are recorded, so `hold`
@@ -515,6 +523,20 @@ recorded_resolution_mode() {  # <task-body>
   printf '%s' "$rest"
 }
 
+recorded_resolved_hold_set() {
+  local body
+  body=$(decode_shown_value "$1") || return 1
+  printf '%s\n' "$body" | awk '
+    /^Resolution mode: / {
+      if (getline > 0 && /^Resolves hold set: /) {
+        sub(/^Resolves hold set: /, "")
+        print
+      }
+      exit
+    }
+  '
+}
+
 closed_answer_replay_mode_compatible() {  # <mode> <task-body>
   case "$1" in
     answered|repaired|routed) return 0 ;;
@@ -525,11 +547,13 @@ closed_answer_replay_mode_compatible() {  # <mode> <task-body>
 # The record's label is what keeps an evidence-backed reconciliation from
 # reading as the captain's own words. `reconciled` closes a call that went moot
 # and carries verified evidence; every other mode carries what the captain said.
-resolution_block() {  # <mode>
+resolution_block() {
   local label='Captain decision:'
   [ "$1" != reconciled ] || label='Reconciliation evidence:'
-  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: %s\n\n%s\n%s\n' \
-    "$DECISION_DIGEST" "$1" "$label" "$DECISION_TEXT"
+  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: %s\n' \
+    "$DECISION_DIGEST" "$1"
+  [ -z "$2" ] || printf 'Resolves hold set: %s\n' "$2"
+  printf '\n%s\n%s\n' "$label" "$DECISION_TEXT"
 }
 
 # Durable state of one captain call: an active captain hold (annotations
@@ -925,7 +949,7 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
 
 command_hold() {
   local id=${1:-} title='' reason='' repo='' origin='' until='' show state existing_title body='' hold_kind hold_set occurrence
-  local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0
+  local existing_hold_kind='' existing_held='' preserve_hold_set=0 stored_reason previous_origin='' hold_status=0 resolved_hold_set
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
@@ -952,12 +976,12 @@ command_hold() {
       *) fail "--until must be a YYYY-MM-DD date: $until" ;;
     esac
   fi
+  acquire_task_control_lock "$id"
   hold_set=${FM_CAPTAIN_HOLD_NOW:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}
   case "$hold_set" in
     [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z) : ;;
     *) fail "FM_CAPTAIN_HOLD_NOW must be a UTC YYYY-MM-DDTHH:MM:SSZ timestamp" ;;
   esac
-  acquire_task_control_lock "$id"
   require_tasks_axi
   if task_show "$id"; then
     show=$TASK_SHOW_OUTPUT
@@ -999,6 +1023,16 @@ command_hold() {
   # snapshot may see the harmless stamp by itself, but can never see a newly
   # held task without the timestamp that defines this hold lifecycle's age.
   task_show_or_fail "$id" "task $id disappeared before recording its hold-set stamp"
+  if [ "$preserve_hold_set" = 0 ] \
+    || [ -z "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ]; then
+    resolved_hold_set=$(recorded_resolved_hold_set "$(show_field "$show" body)")
+    while [ "$hold_set" = "$resolved_hold_set" ]; do
+      [ -z "${FM_CAPTAIN_HOLD_NOW:-}" ] \
+        || fail "FM_CAPTAIN_HOLD_NOW collides with the newest resolved hold for task $id; choose a later timestamp"
+      sleep 1
+      hold_set=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+    done
+  fi
   write_hold_set_stamp "$id" "$(show_field "$show" body)" "$hold_set" "$preserve_hold_set"
   task_show_or_fail "$id" "task $id disappeared while recording its hold-set stamp"
   [ -n "$(body_hold_set_timestamp "$(show_field_value "$show" body)")" ] \
@@ -1039,10 +1073,10 @@ command_hold() {
 # Successful closure removes the stamp to restore resolution-first ordering.
 write_resolution_record() {  # <task-id> <mode> <shown-body>
   local id=$1 mode=$2 body=$3 new_body tmp hold_set
-  new_body=$(resolution_block "$mode")
   body=$(decode_shown_value "$body") \
     || fail "could not decode the existing body for $id"
   hold_set=$(body_hold_set_timestamp "$body")
+  new_body=$(resolution_block "$mode" "$hold_set")
   if [ -n "$hold_set" ]; then
     body=${body#"Captain hold set: $hold_set"}
     case "$body" in
@@ -1095,6 +1129,13 @@ apply_pending_retained_artifact() {  # <task-id>
   esac
 }
 
+# True while a worker still owns the work item: its runtime record exists or the
+# backlog still lists it In flight. Completing such an item would record a
+# landing that has not happened, so a keyed answer only ever releases it.
+live_work_item() {  # <task-id> <backlog-state>
+  [ "$2" = in_flight ] || [ -f "$STATE/$1.meta" ]
+}
+
 close_answered() {  # <task-id> <release-0-or-1>
   if [ "$2" = 1 ]; then
     tasks_axi unhold "$1" >/dev/null
@@ -1127,13 +1168,15 @@ remove_interrupted_answer_stamp() {  # <task-id>
 }
 
 command_answer() {
-  local id=${1:-} decision_file='' release=0 show state hold_kind body outcome recorded_mode occurrence
+  local id=${1:-} decision_file='' release=0 auto_release=0 show state hold_kind body outcome recorded_mode occurrence
+  local cur resolved_hold_set
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --decision-file) shift; decision_file=${1:-} ;;
       --release) release=1 ;;
+      --auto-release) auto_release=1 ;;
       *) usage >&2; exit 2 ;;
     esac
     shift
@@ -1147,6 +1190,13 @@ command_answer() {
   state=$(show_field "$show" state)
   hold_kind=$(show_field_value "$show" hold_kind)
   body=$(show_field "$show" body)
+  if [ "$auto_release" = 1 ] && [ "$state" != "done" ] \
+    && { live_work_item "$id" "$state" \
+      || { [ "$hold_kind" != captain ] \
+        && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ] \
+        && [ "$(recorded_resolution_mode "$body" || true)" = released ]; }; }; then
+    release=1
+  fi
   if [ "$release" = 1 ]; then outcome=released; else outcome=answered; fi
   # The occurrence the parent line names: the record about to be written is
   # one past those already in the body, and a retry names the newest one.
@@ -1158,16 +1208,17 @@ command_answer() {
       [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ] \
         || fail "captain-held task $id records a different captain decision"
       recorded_mode=$(recorded_resolution_mode "$body" || true)
-      closed_answer_replay_mode_compatible "$recorded_mode" "$body" \
+      { closed_answer_replay_mode_compatible "$recorded_mode" "$body" \
+        || { [ "$auto_release" = 1 ] && [ "$recorded_mode" = released ]; }; } \
         || fail "task $id records this resolution with mode ${recorded_mode:-unknown}; it is not a captain-answer replay"
       [ "$release" = 0 ] \
         || fail "task $id records this answer with mode ${recorded_mode:-unknown}; --release cannot reopen a closed task"
       remove_interrupted_answer_stamp "$id"
-      if [ "$recorded_mode" = repaired ]; then
-        publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "answered (repaired)"
-      else
-        publish_parent_resolution_then_retire "$id" $((occurrence - 1)) answered
-      fi
+      case "$recorded_mode" in
+        repaired) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "answered (repaired)" ;;
+        released) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) released ;;
+        *) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) answered ;;
+      esac
       printf 'answered: %s\n' "$id"
       return 0
     fi
@@ -1190,17 +1241,22 @@ command_answer() {
   fi
 
   if [ "$hold_kind" = captain ]; then
-    # Actively the captain's item (a date-expired hold keeps its annotations
-    # and stays answerable). A matching record means an interrupted close to
-    # finish; a different digest is a NEW answer on a re-held task and gets
-    # its own record on top. Either way the close mode is the caller's flag,
-    # checked against an interrupted close's recorded mode so a retry cannot
-    # silently flip a release into a close.
+    cur=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
+    resolved_hold_set=$(recorded_resolved_hold_set "$body")
     if body_has_resolution_record "$body" \
-      && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
+      && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ] \
+      && { [ -z "$resolved_hold_set" ] \
+        || { [ -n "$cur" ] && [ "$resolved_hold_set" = "$cur" ]; }; }; then
       recorded_mode=$(recorded_resolution_mode "$body" || true)
       case "$recorded_mode" in
-        released) [ "$release" = 1 ] || fail "task $id records this answer as a release; retry with --release" ;;
+        released)
+          if [ "$release" = 0 ]; then
+            [ "$auto_release" = 1 ] || fail "task $id records this answer as a release; retry with --release"
+            if [ -z "$resolved_hold_set" ]; then
+              fail "task $id records this answer as a release; close it with reconcile or a direct answer"
+            fi
+          fi
+          ;;
         answered|routed) [ "$release" = 0 ] || fail "task $id records this answer as a close; retry without --release" ;;
         *) fail "task $id records this resolution with mode ${recorded_mode:-unknown}; it is not a captain-answer replay" ;;
       esac
@@ -1208,7 +1264,10 @@ command_answer() {
         fail "could not close answered captain-held task $id"
       fi
       remove_interrupted_answer_stamp "$id"
-      publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "$outcome"
+      case "$recorded_mode" in
+        released) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) released ;;
+        *) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "$outcome" ;;
+      esac
       printf '%s: %s\n' "$outcome" "$id"
       return 0
     fi
@@ -1397,7 +1456,7 @@ command_answers() {
       skipped=$((skipped + 1))
       continue
     fi
-    release_flag=''
+    release_flag=--auto-release
     case "${mode:-}" in
       ''|done) : ;;
       release) release_flag=--release ;;
@@ -1449,16 +1508,39 @@ command_answers() {
       && { [ "$recorded_digest" = "$digest" ] \
         || { case "$body" in *"Resolution recorded by fm-decision-hold."*) true ;; *) false ;; esac \
           && [ -n "$legacy_digest" ] && [ "$recorded_digest" = "$legacy_digest" ]; }; }; then
-      if { [ -z "$release_flag" ] && [ "$state" = "done" ] \
-          && closed_answer_replay_mode_compatible "$recorded_mode" "$body"; } \
-        || { [ "$release_flag" = --release ] && [ "$state" != "done" ] \
-          && [ "$hold_kind" != captain ] && [ "$recorded_mode" = released ]; }; then
+      if { [ "$release_flag" = --auto-release ] && [ "$state" = "done" ] \
+          && { closed_answer_replay_mode_compatible "$recorded_mode" "$body" \
+            || [ "$recorded_mode" = released ]; }; } \
+        || { [ "$state" != "done" ] && [ "$hold_kind" != captain ] \
+          && [ "$recorded_mode" = released ]; }; then
+        acquire_task_control_lock "$id"
+        if ! task_show "$id"; then
+          release_task_control_lock || fail "cannot release task control for $id"
+          printf 'skipped: %s (absent)\n' "$id"
+          skipped=$((skipped + 1))
+          continue
+        fi
+        show=$TASK_SHOW_OUTPUT
+        state=$(show_field "$show" state)
+        hold_kind=$(show_field_value "$show" hold_kind)
+        if [ "$(show_field "$show" body)" != "$body" ] \
+          || ! { { [ "$release_flag" = --auto-release ] && [ "$state" = "done" ] \
+              && { closed_answer_replay_mode_compatible "$recorded_mode" "$body" \
+                || [ "$recorded_mode" = released ]; }; } \
+            || { [ "$state" != "done" ] && [ "$hold_kind" != captain ] \
+              && [ "$recorded_mode" = released ]; }; }; then
+          release_task_control_lock || fail "cannot release task control for $id"
+          printf 'skipped: %s (task changed before answer replay)\n' "$id"
+          skipped=$((skipped + 1))
+          continue
+        fi
         occurrence=$(resolution_record_count "$body")
         case "$recorded_mode" in
           repaired) publish_parent_resolution_then_retire "$id" "$occurrence" "answered (repaired)" ;;
           released) publish_parent_resolution_then_retire "$id" "$occurrence" released ;;
           *) publish_parent_resolution_then_retire "$id" "$occurrence" answered ;;
         esac
+        release_task_control_lock || fail "cannot release task control for $id"
         printf 'closed: %s\n' "$id"
         closed=$((closed + 1))
         continue
@@ -1474,8 +1556,7 @@ command_answers() {
       skipped=$((skipped + 1))
       continue
     fi
-    # shellcheck disable=SC2086  # release_flag is empty or a single literal flag.
-    if "$0" answer "$id" --decision-file "$tmp" $release_flag </dev/null >/dev/null 2>"$err"; then
+    if "$0" answer "$id" --decision-file "$tmp" "$release_flag" </dev/null >/dev/null 2>"$err"; then
       # A parent-channel delivery problem is reported on stderr by the answer
       # path even when the close succeeded; keep it visible.
       [ ! -s "$err" ] || cat "$err" >&2

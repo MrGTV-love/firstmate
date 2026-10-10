@@ -53,16 +53,16 @@
 # the preserved task. The writer and replay share one complete-record validator,
 # so teardown never publishes or acts on a close replay would reject.
 # The validator pins the data path to this home's configured root before any
-# recovery mutation, then re-runs exactly that close.
+# recovery mutation; replay then selects the transition from the current row.
 # `tasks-axi done` on an already-closed task backfills links
 # without moving the close date, so replay is idempotent. Ordinary dispatch needs
 # no marker: it publishes the meta first, so a crash leaves the meta itself as
 # the evidence that the row is owed a start.
-# A captain-held row uses the same record with a `mode=retain` line: replay then
-# records the deliverable and reopens the row instead of closing it, and never
-# closes a row that reads as an open captain call. An answer that closes the row
-# first applies any supported retained artifact from the validated record, then
-# replay simply retires the record.
+# A captain-held row uses the same record with a `mode=retain` line. Replay
+# records the deliverable and reopens the row only while it remains an open
+# captain call, never closing it. If the hold was released before replay, the
+# finished row closes instead of reopening unheld work. If an answer already
+# closed a retained row, replay simply retires the satisfied record.
 
 # Set by fm_backlog_transition_applies for a return-1 exemption.
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
@@ -1396,6 +1396,12 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
     row_state=$FM_BACKLOG_ROW_STATE
     if [ "${row_state%% *}" != "done" ] && [ "$FM_BACKLOG_ROW_HOLD_KIND" = captain ]; then
       mode=retain
+    elif [ "${row_state%% *}" != "done" ]; then
+      if [ "$mode" = retain ] && [ "${args[0]-}" = --report ] \
+        && ! fm_backlog_row_artifact_supported "$id" "${args[@]}"; then
+        args=()
+      fi
+      mode=close
     fi
   else
     if [ "$FM_BACKLOG_ROW_RESULT" != not_found ]; then
