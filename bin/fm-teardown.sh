@@ -321,7 +321,40 @@
 #     unarchived plist and any remaining copy.
 #     tests/fm-teardown.test.sh's private, foreign, nested, and absent-copy
 #     launch-agent cases exercise this boundary with a fake launchctl.
-# After Fix 1, Fix 3, and Fix 2, when config/pipeline-spend opts this home in, a ship
+#   Fix 4 - remove the task's own Docker stacks. Docker resources survive process
+#     exit, so after the process reap teardown calls bin/fm-task-docker-lib.sh,
+#     whose header owns object attribution, removal, and retry metadata.
+#     Apart from the daemon case below, any Docker listing, verification, or
+#     removal failure stops teardown with task identity records and the worktree
+#     kept, even under --force; rerun teardown after resolving the failure.
+#     A missing Docker CLI is silent. A stopped or unreachable daemon stops
+#     teardown only when the task record already retains docker_projects;
+#     otherwise teardown warns and continues, on ship, scout, and
+#     forced-descendant paths alike.
+#     Standalone secondmate retirement skips its own Docker cleanup.
+#     Forced cleanup closes each child's endpoint before its Docker snapshot.
+#     Ordinary, Orca, and recursive descendants use their own metadata for Docker
+#     cleanup. A nested secondmate's own Docker cleanup runs before its recursive
+#     descendant retirement and home removal, which owns its process-event sweep.
+#     A Docker refusal retains the child's retry records even though its endpoint
+#     may have already stopped.
+#     A reassigned slot is not used to attribute a Docker workdir; the library's
+#     remaining non-path ownership rules still apply.
+#     Docker path roots are owned worktrees only, never tasktmp; nested registered
+#     Git lanes and linked worktrees are excluded, including through symlinks.
+#     A lane scan that fails names its cause and stops teardown; it is skipped
+#     when the task has no path root.
+#     Only matching metadata basenames AND inodes identify the same task record;
+#     differently named hardlinks remain sibling identities.
+#     The shared-stack identity comes from the primary project's
+#     supabase/config.toml project_id. Reading a present config requires python3's
+#     standard-library tomllib parser; unreadable or invalid configuration refuses
+#     cleanup before Docker removal.
+#     tests/fm-teardown.test.sh covers failure/retry and forced-descendant cleanup.
+#     Residual: teardown leaves autonomous pipelines live, and forced-descendant
+#     cleanup does not reap a child's processes; a still-live producer can create
+#     a stack after the final listing. Snapshot cleanup cannot stop a live producer.
+# After Fix 1, Fix 3, and Fix 2, but before Fix 4, when config/pipeline-spend opts this home in, a ship
 # task whose local copy this teardown owns has its no-mistakes pipeline spend
 # recorded by bin/fm-pipeline-spend.sh, which owns the attribution and the
 # ledger. It runs before the task branch it attributes runs by is deleted and
@@ -359,6 +392,7 @@ for _teardown_source in \
   fm-tasks-axi-lib.sh \
   fm-backlog-transition-lib.sh \
   fm-timeout-lib.sh \
+  fm-task-docker-lib.sh \
   fm-backend.sh \
   fm-control-lib.sh \
   fm-lock-lib.sh \
@@ -394,6 +428,8 @@ unset _teardown_source
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+# shellcheck source=bin/fm-task-docker-lib.sh
+. "$SCRIPT_DIR/fm-task-docker-lib.sh"
 # shellcheck source=bin/fm-backend.sh
 . "$SCRIPT_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-control-lib.sh
@@ -2263,9 +2299,10 @@ task_nested_lane_for_path() {  # <root> <path>
 }
 
 # Refresh TASK_REGISTERED_LANES: every worktree, including missing or prunable
-# entries, registered strictly beneath a scan root by the recorded project,
-# git-backed scan roots, or available task projects in reachable local Firstmate
-# states. Project registries remain sources when the scan root is missing.
+# entries, registered strictly beneath a scan root by the git-backed recorded
+# project, scan roots, or available task projects in reachable local Firstmate
+# states. Project registries remain sources when the scan root is missing; a
+# recorded project that is gone or not a git repository has no registry to read.
 task_registered_lanes_under_roots() {  # <canonical-root>...
   local root src registry line lane state_dir meta project
   local -a sources
@@ -2274,7 +2311,7 @@ task_registered_lanes_under_roots() {  # <canonical-root>...
   for root in "$@"; do
     git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$root")
   done
-  [ -z "$PROJ" ] || sources+=("$PROJ")
+  [ -z "$PROJ" ] || ! git -C "$PROJ" rev-parse --show-toplevel >/dev/null 2>&1 || sources+=("$PROJ")
   collect_local_firstmate_states "$STATE" || return 1
   for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
@@ -2284,7 +2321,7 @@ task_registered_lanes_under_roots() {  # <canonical-root>...
       git -C "$project" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$project")
     done
   done
-  for src in "${sources[@]}"; do
+  for src in ${sources[@]+"${sources[@]}"}; do
     if ! registry=$(git -C "$src" worktree list --porcelain 2>/dev/null); then
       TASK_PIDS_FAILED_DIR=$src
       TASK_PIDS_ERROR="worktree registration could not be read"
@@ -2504,6 +2541,69 @@ EOF
   [ -z "$TASK_PIDS" ] && return 0
   echo "REFUSED: leaked $label processes for $ID remain after $max_passes reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2
   return 1
+}
+
+# A Docker compose working directory inside a nested lane (a linked worktree
+# under the task's root) belongs to that lane's task, not to this one. A path
+# that cannot be classified is left alone.
+fm_task_docker_path_excluded() {  # <root> <path>
+  local lane
+  [ "$1" != "$2" ] || return 1
+  lane=$(task_nested_lane_for_path "$1" "$2") || return 0
+  [ -n "$lane" ]
+}
+
+# Gathers what bin/fm-task-docker-lib.sh needs from this home and every local
+# home - the other live task ids (a longer one claims its own prefixed names,
+# the same id elsewhere makes the id ambiguous) and the task's path roots - then
+# lets it remove the stacks this task owns.
+teardown_docker_stacks() {
+  local ID=$1 META=$2 STATE=$3 reassigned=$4 PROJ WT
+  local state_dir other other_id siblings="" ambiguous=0 canon protected=""
+  local -a roots
+  roots=()
+  command -v docker >/dev/null 2>&1 || return 0
+  WT=$(meta_value "$META" worktree)
+  PROJ=$(meta_value "$META" project)
+  collect_local_firstmate_states "$STATE" || return 1
+  for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
+    for other in "$state_dir"/*.meta; do
+      [ -f "$other" ] || continue
+      [ "${other##*/}" = "${META##*/}" ] && [ "$other" -ef "$META" ] && continue
+      other_id=$(basename "$other" .meta)
+      [ "$other_id" != "$ID" ] || ambiguous=1
+      siblings="$siblings $other_id"
+    done
+  done
+  if [ "$(meta_value "$META" kind)" != secondmate ] && [ "$reassigned" != 1 ] && [ -n "$WT" ]; then
+    if canon=$(task_canonical_path "$WT" 2>/dev/null); then
+      roots+=("$canon")
+    fi
+  fi
+  if [ "${#roots[@]}" -gt 0 ]; then
+    TASK_PIDS_FAILED_DIR=
+    TASK_PIDS_ERROR=
+    if ! task_registered_lanes_under_roots "${roots[@]}"; then
+      echo "error: cannot establish nested worktree lanes for $ID${TASK_PIDS_ERROR:+ ($TASK_PIDS_ERROR: $TASK_PIDS_FAILED_DIR)}; retaining task records" >&2
+      return 1
+    fi
+  fi
+  if [ -n "$PROJ" ] && { [ -e "$PROJ/supabase/config.toml" ] || [ -L "$PROJ/supabase/config.toml" ]; }; then
+    protected=$(python3 - "$PROJ/supabase/config.toml" <<'PY'
+import sys
+import tomllib
+with open(sys.argv[1], "rb") as config:
+    project = tomllib.load(config).get("project_id")
+if not isinstance(project, str) or not project or any(c.isspace() for c in project):
+    raise SystemExit("invalid Supabase project_id")
+print(project)
+PY
+    ) || {
+      echo "error: cannot identify the shared Supabase stack for $ID; retaining task records" >&2
+      return 1
+    }
+  fi
+  fm_task_docker_cleanup "$ID" "$siblings" "$ambiguous" "$protected" "$META" ${roots[@]+"${roots[@]}"}
 }
 
 
@@ -3579,6 +3679,14 @@ cleanup_firstmate_home_children() {
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
       fi
     fi
+    child_owner_rc=0
+    if [ "$child_kind" != secondmate ] && fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
+      require_owned_worktree_slot_record "$child_id" "$child_wt" 2>/dev/null || child_owner_rc=$?
+    fi
+    if [ "$child_owner_rc" -ne 0 ] && [ "$child_owner_rc" -ne "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
+      require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
+      child_owner_rc=0
+    fi
     if [ -n "$child_t" ]; then
       if [ "$child_backend" = herdr ]; then
         fm_backend_herdr_parse_target "$child_t" || return 1
@@ -3605,6 +3713,13 @@ cleanup_firstmate_home_children() {
     if [ "$child_kind" = secondmate ]; then
       child_home=$(meta_value "$child_meta" home)
       [ -n "$child_home" ] || child_home=$child_wt
+    fi
+    if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
+      teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 1 || return 1
+    else
+      teardown_docker_stacks "$child_id" "$child_meta" "$sub_state" 0 || return 1
+    fi
+    if [ "$child_kind" = secondmate ]; then
       if [ -n "$child_home" ] && [ -d "$child_home" ]; then
         cleanup_firstmate_home_children "$child_home" || return $?
         remove_firstmate_home "$child_home" "child firstmate home" "$child_id" || return $?
@@ -3621,14 +3736,8 @@ cleanup_firstmate_home_children() {
       # slot reassigned to another task is not this child's to kill, reset,
       # or return, so only its records are cleaned up. The preflight above
       # already named the reassignment on stderr under the same lock.
-      child_owner_rc=0
-      if fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
-        require_owned_worktree_slot_record "$child_id" "$child_wt" 2>/dev/null || child_owner_rc=$?
-      fi
       if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
         :
-      elif [ "$child_owner_rc" -ne 0 ]; then
-        require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
       else
         validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
         rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
@@ -3882,6 +3991,13 @@ if [ "$KIND" = ship ] && teardown_owns_worktree && [ -e "$CONFIG/pipeline-spend"
   FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
     "$SCRIPT_DIR/fm-pipeline-spend.sh" record "$ID" >/dev/null \
     || echo "warning: could not record $ID's no-mistakes pipeline spend; cleanup continues" >&2
+fi
+
+# Fix 4 (see script header): keep task identity records and the worktree until
+# Docker cleanup succeeds, so a partial removal can be retried.
+if [ "$KIND" != secondmate ] && ! teardown_docker_stacks "$ID" "$META" "$STATE" "$TEARDOWN_SLOT_REASSIGNED"; then
+  echo "error: stopping this cleanup without removing the task's records, so the Docker objects still named for $ID can be reconciled and a rerun can retry." >&2
+  exit 1
 fi
 
 if [ "$BACKEND" = herdr ]; then

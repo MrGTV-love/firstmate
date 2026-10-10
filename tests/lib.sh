@@ -601,6 +601,136 @@ SH
   done
 }
 
+# fm_fake_docker <fakebin>
+# Drops a `docker` stub that answers the read/remove subset bin/fm-task-docker-lib.sh
+# uses (ps, rm, network ls/rm, volume ls/rm) from a flat fixture store, and that
+# renders the caller's own --format template (`{{.ID}}`, `{{.Names}}`, `{{.Name}}`,
+# `{{.Label "key"}}`), so a template the production code gets wrong breaks the case
+# instead of being masked by canned rows. Without it a fixture's PATH would reach
+# the host's real Docker. FM_FAKE_DOCKER_STORE names the store (absent = empty),
+# one object per line, tab-separated, labels as `k=v;k=v`:
+#   container <id> <name> <labels> <networks,comma>
+#   network   <id> <name> <labels>
+#   volume    <name> <labels>
+# FM_FAKE_DOCKER_LOG appends each call; FM_FAKE_DOCKER_RM_FAIL=<name,...> makes
+# `rm` leave those containers in place and fail; FM_FAKE_DOCKER_DOWN=1 answers
+# every call the way a stopped daemon does.
+fm_fake_docker() {
+  local fakebin=$1
+  cat > "$fakebin/docker" <<'PL'
+#!/usr/bin/env perl
+use strict; use warnings;
+my @a = @ARGV;
+if (defined $ENV{FM_FAKE_DOCKER_LOG} && length $ENV{FM_FAKE_DOCKER_LOG}) {
+  open my $l, '>>', $ENV{FM_FAKE_DOCKER_LOG} or die; print {$l} "docker @a\n"; close $l;
+}
+if (($ENV{FM_FAKE_DOCKER_DOWN} // '') eq '1') {
+  print STDERR "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?\n";
+  exit 1;
+}
+my $store = $ENV{FM_FAKE_DOCKER_STORE} // '';
+my @objs;
+if (length $store && -f $store) {
+  open my $in, '<', $store or die; while (<$in>) { chomp; next unless length; push @objs, [split /\t/, $_, -1]; } close $in;
+}
+sub save { return unless length $store; open my $o, '>', $store or die; print {$o} join("\t", @$_), "\n" for @objs; close $o; }
+sub labels { my %h; for my $kv (split /;/, ($_[0] // '')) { my ($k, $v) = split /=/, $kv, 2; $h{$k} = $v // ''; } return %h; }
+sub render {
+  my ($fmt, $id, $name, %lab) = @_;
+  $fmt =~ s/\{\{\.ID\}\}/$id/g;
+  $fmt =~ s/\{\{\.Names?\}\}/$name/g;
+  $fmt =~ s/\{\{\.Label "([^"]*)"\}\}/$lab{$1} \/\/ ''/ge;
+  die "fake docker: unsupported template: $fmt\n" if $fmt =~ /\{\{/;
+  return $fmt;
+}
+my $cmd = shift @a // '';
+my $sub = '';
+if ($cmd eq 'network' || $cmd eq 'volume') { $sub = shift @a // ''; }
+my $operation = length($sub) ? "$cmd-$sub" : $cmd;
+my %fail_operation = map { $_ => 1 } split /,/, ($ENV{FM_FAKE_DOCKER_FAIL} // '');
+if ($fail_operation{$operation}) { print STDERR "fake docker: $operation failed\n"; exit 1; }
+if ($cmd eq 'ps' && length($ENV{FM_FAKE_DOCKER_PS_FAIL_AT} // '')) {
+  my $counter = "$store.ps-count";
+  my $count = 0;
+  if (-f $counter) { open my $in, '<', $counter or die; $count = <$in>; close $in; }
+  ++$count;
+  open my $out, '>', $counter or die; print {$out} $count; close $out;
+  if ($count == $ENV{FM_FAKE_DOCKER_PS_FAIL_AT}) { print STDERR "fake docker: ps failed\n"; exit 1; }
+}
+my ($fmt, $quiet, @filters, @ids) = ('', 0);
+while (@a) {
+  my $x = shift @a;
+  if ($x eq '--format') { $fmt = shift @a; }
+  elsif ($x eq '--filter') { push @filters, shift @a; }
+  elsif ($x eq '-q') { $quiet = 1; }
+  elsif ($x =~ /^-/) { }
+  else { push @ids, $x; }
+}
+if ($cmd eq 'ps') {
+  for my $o (grep { $_->[0] eq 'container' } @objs) {
+    print render($fmt, $o->[1], $o->[2], labels($o->[3])), "\n";
+  }
+  exit 0;
+}
+if ($cmd eq 'rm') {
+  my %fail = map { $_ => 1 } split /,/, ($ENV{FM_FAKE_DOCKER_RM_FAIL} // '');
+  my $bad = 0;
+  for my $id (@ids) {
+    my ($hit) = grep { $_->[0] eq 'container' && ($_->[1] eq $id || $_->[2] eq $id) } @objs;
+    if ($hit && $fail{$hit->[2]}) { print STDERR "Error: cannot remove container $hit->[2]\n"; $bad = 1; next; }
+    @objs = grep { !($_->[0] eq 'container' && ($_->[1] eq $id || $_->[2] eq $id)) } @objs;
+  }
+  if (length($ENV{FM_FAKE_DOCKER_ADD_AFTER_RM} // '')) {
+    open my $in, '<', $ENV{FM_FAKE_DOCKER_ADD_AFTER_RM} or die;
+    while (<$in>) { chomp; next unless length; push @objs, [split /\t/, $_, -1]; }
+    close $in;
+  }
+  save(); exit($bad || ($ENV{FM_FAKE_DOCKER_RM_ERROR_AFTER_REMOVE} // '') eq '1' ? 1 : 0);
+}
+if ($cmd eq 'network' && $sub eq 'ls') {
+  for my $o (grep { $_->[0] eq 'network' } @objs) {
+    print render($fmt, $o->[1], $o->[2], labels($o->[3])), "\n";
+  }
+  exit 0;
+}
+if ($cmd eq 'network' && $sub eq 'rm') {
+  for my $id (@ids) {
+    my ($net) = grep { $_->[0] eq 'network' && ($_->[1] eq $id || $_->[2] eq $id) } @objs;
+    unless ($net) { print STDERR "Error: No such network: $id\n"; exit 1; }
+    my %fail = map { $_ => 1 } split /,/, ($ENV{FM_FAKE_DOCKER_NETWORK_RM_FAIL} // '');
+    if ($fail{$net->[2]}) { print STDERR "Error: cannot remove network $net->[2]\n"; exit 1; }
+    for my $c (grep { $_->[0] eq 'container' } @objs) {
+      if (grep { $_ eq $net->[2] } split /,/, ($c->[4] // '')) {
+        print STDERR "Error response from daemon: network $net->[2] has active endpoints\n"; exit 1;
+      }
+    }
+    @objs = grep { !($_->[0] eq 'network' && $_->[1] eq $net->[1]) } @objs;
+  }
+  save(); exit 0;
+}
+if ($cmd eq 'volume' && $sub eq 'ls') {
+  my %want; for my $f (@filters) { if ($f =~ /^label=([^=]+)=(.*)$/) { $want{$1} = $2; } else { die "fake docker: unsupported filter $f\n"; } }
+  for my $o (grep { $_->[0] eq 'volume' } @objs) {
+    my %l = labels($o->[2]);
+    next if grep { ($l{$_} // "\0") ne $want{$_} } keys %want;
+    print length($fmt) ? render($fmt, $o->[1], $o->[1], %l) : $o->[1], "\n";
+  }
+  exit 0;
+}
+if ($cmd eq 'volume' && $sub eq 'rm') {
+  my %fail = map { $_ => 1 } split /,/, ($ENV{FM_FAKE_DOCKER_VOLUME_RM_FAIL} // '');
+  for my $id (@ids) {
+    if ($fail{$id}) { print STDERR "Error: cannot remove volume $id\n"; exit 1; }
+    @objs = grep { !($_->[0] eq 'volume' && $_->[1] eq $id) } @objs;
+  }
+  save(); exit 0;
+}
+print STDERR "fake docker: unsupported command: $cmd $sub @ids\n";
+exit 64;
+PL
+  chmod +x "$fakebin/docker"
+}
+
 # fm_fake_crash_injector <fakebin>
 # Drops an `fm-crash-inject <pid>` shim that a PATH fake calls to simulate a
 # hard crash of the process under test. It SIGKILLs <pid> and then returns only

@@ -656,7 +656,22 @@ The ledger covers this home's current backlog, ordinary task records, status que
 Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
 The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
 
-The watcher runs the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), ahead of any signal or check exit, so a chatty fleet cannot starve it and a slow scan cannot stall the liveness beacon.
+On each polling iteration, the watcher starts the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), before the ordinary signal and maintenance phases, so a slow scan cannot stall the liveness beacon.
+The ledger wake normally follows the signal scan.
+After three consecutive signal wakes defer maintenance, the watcher resumes maintenance first; `state/.prelude-progress` preserves the next stage across early wakes, and the deferral debt clears only after ledger surfacing, reconciliation, reply, liveness, relaunch, stall, process-event, recovery, inactive-outcome, and all due checks have run.
+Before a non-signal wake exits, the watcher scans signals again and queues newly appended status events alongside that wake; it also scans between blocking checks and after the due-check batch.
+Completed actionable check results are queued before those scans, and the first actionable result does not skip sibling checks.
+Signal identities accumulate across these scans until the cycle closes.
+Non-signal wakes retain their original headline and routing, including stale task identity and heartbeat fleet-wide scope, unless late-signal marker persistence fails as described below.
+Delivery-only scans persist the late signal files in `state/.watch-late-signals`; at the start of the next watcher cycle, before maintenance or signal scanning, the watcher emits an independent `signal:` headline naming only files whose signal rows remain queued.
+A batch already drained by Main produces no extra wake and its marker is removed.
+Follow-up and end-of-maintenance signal wakes remove the marker only after successful output; failed output leaves it available to a handling successor.
+When signals are the only end-of-maintenance headline, it names all accumulated signals.
+If the marker cannot be persisted, the watcher delivers the accumulated `signal:` headline immediately, even in handling-successor posture, instead of relying on downtime recovery; interrupted maintenance remains owed, and its delivery markers do not advance.
+Marker cleanup failure does not prevent that signal headline.
+[`pi-supervision-branch.md`](pi-supervision-branch.md#wake-dispatch) owns branch signal routing.
+For an early maintenance wake, progression is committed only after successful output and its delivery-marker callback, so failed delivery leaves that stage owed.
+[`tests/fm-watch-triage.test.sh`](../tests/fm-watch-triage.test.sh) contains the between-cycle and in-cycle signal, late-signal routing and output-failure, and bounded-maintenance-deferral regressions.
 The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
 A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
 When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).

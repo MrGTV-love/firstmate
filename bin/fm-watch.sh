@@ -1017,6 +1017,7 @@ secondmate_wake_stall_tick() {
   local now=$(( $(date +%s) )) threshold=$SECONDMATE_WAKE_STALL_SECS
   local meta task kind remote_host home queue row epoch seq row_key marker progress_marker ring_marker progress observed_at observed_key
   local receipt receipt_dir notify_key queued idle reason episode_alerted already_rung w
+  local first_reason=
   # Endpoint metadata admits this queue-loop check; secondmate-liveness owns registered mates whose endpoint is missing or dead.
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
@@ -1104,8 +1105,9 @@ EOF
     fi
     fm_wake_secondmate_stall_receipt_write "$task" "$row_key" || return 1
     fm_wake_secondmate_stall_marker_write "$task" "$row_key" || return 1
-    wake "$reason"
+    [ -n "$first_reason" ] || first_reason=$reason
   done
+  [ -z "$first_reason" ] || wake "$first_reason"
   return 0
 }
 
@@ -2127,6 +2129,7 @@ procevent_surface_queued() {
   local key reason captured="" stranded="" unstarted=""
   PROCEVENT_SURFACED=
   [ -s "$FM_WAKE_QUEUE" ] || return 0
+  signal_phase_flush
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
   while IFS= read -r key; do
     case "$key" in procevent:*) ;; *) continue ;; esac
@@ -2853,15 +2856,6 @@ printf '%s\n' "$FM_WATCH_DELIVERY_IDENTITY" > "$WATCH_LOCK/pid-identity" 2>/dev/
 
 [ -e "$STATE/.last-heartbeat" ] || touch "$STATE/.last-heartbeat"
 
-# A merged poll may have queued its terminal wake and then lost the process
-# between receipt publication and fixed-path removal.
-# Finish only identity-bound retirement receipts before any check can run.
-if ! fm_pr_poll_retirement_recover_all "$STATE" "$SCRIPT_DIR/fm-pr-poll.sh"; then
-  reason="check: rejected unauthenticated PR poll retirement receipts:$FM_PR_POLL_RETIREMENT_REJECTED"
-  fm_wake_append check pr-poll-retirement "$reason" || exit 1
-  touch "$STATE/.last-check"
-  wake "$reason"
-fi
 
 # Shared by both the first-notification and already-notified paths below so
 # the retirement sequence (bin/fm-pr-lib.sh) is stated once.
@@ -2915,66 +2909,141 @@ resurface_after_downtime() {
   wake "check: rearm-resurface"
 }
 
-while :; do
-  # Home-gone exit: a deleted home, state directory, or code root means this
-  # watcher's world is gone (a torn-down temporary home or a discarded
-  # disposable checkout). Exit with a logged reason rather than writing state
-  # into nothing, or into a live home from a checkout that no longer exists.
-  # A detached helper this watcher started (home-summary refresh, reconcile)
-  # can recreate a deleted state directory before the next poll, so a lock
-  # with no holder at all is read as the same teardown: only a fresh watcher
-  # ever recreates the lock, and that case is the self-eviction below.
-  # Scoped to this process alone: no other watcher is signalled.
-  if [ "$WATCH_HOME_EXISTED" -eq 1 ] && [ ! -d "$FM_HOME" ]; then
-    echo "watcher: exiting - home no longer exists: $FM_HOME" >&2
-    exit 1
-  elif [ ! -d "$STATE" ]; then
-    echo "watcher: exiting - state directory no longer exists: $STATE" >&2
-    exit 1
-  elif [ ! -e "$WATCH_LOCK/pid" ]; then
-    echo "watcher: exiting - state directory was torn down (singleton lock removed): $STATE" >&2
-    exit 1
-  elif [ ! -d "$SCRIPT_DIR" ]; then
-    echo "watcher: exiting - code root no longer exists: $SCRIPT_DIR" >&2
-    exit 1
+PRELUDE_MAX_DEFER=3
+PRELUDE_DEFER_MARKER="$STATE/.prelude-deferred"
+SIGNAL_PHASE_FIRST=0
+PRELUDE_PROGRESS_MARKER="$STATE/.prelude-progress"
+PRELUDE_NEXT_STEP=
+SIGNAL_PHASE_DELIVERY_ONLY=0
+SIGNAL_PHASE_QUEUED_REASON=
+SIGNAL_PHASE_LATE_MARKER="$STATE/.watch-late-signals"
+
+# Loads the persisted count into PRELUDE_DEFER_COUNT without a subshell: absent
+# reads 0, anything unreadable or non-numeric reads as the bound (work owed).
+prelude_defer_load() {
+  local n=
+  PRELUDE_DEFER_COUNT=0
+  if [ -e "$PRELUDE_DEFER_MARKER" ] || [ -L "$PRELUDE_DEFER_MARKER" ]; then
+    IFS= read -r n < "$PRELUDE_DEFER_MARKER" 2>/dev/null || true
+    case "$n" in
+      0|1|2) PRELUDE_DEFER_COUNT=$n ;;
+      *) PRELUDE_DEFER_COUNT=$PRELUDE_MAX_DEFER ;;
+    esac
   fi
-
-  # Self-eviction: if the singleton lock no longer names this process, a second
-  # watcher has taken over (e.g. a transient duplicate from a racy arm). Stand
-  # down so the rightful singleton continues alone. The EXIT trap's release
-  # no-ops because the lock pid is not ours, so the survivor's lock is untouched.
-  # This makes any duplicate self-resolve within one poll instead of persisting
-  # and doubling every wake.
-  if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" != "$WATCHER_PID" ]; then
-    exit 0
+  if [ -e "$PRELUDE_PROGRESS_MARKER" ]; then
+    PRELUDE_DEFER_COUNT=$PRELUDE_MAX_DEFER
   fi
+}
 
-  watcher_beat force
-
-  # Opt-in fleet activity ledger (docs/fleet-ledger.md): pick up newly appended
-  # status lines before this cycle can exit on a wake. Off costs one file test.
-  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
-  watcher_beat
-
-  if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
-    home_summary_refresh_detached
+# Called just before a signal wake exits the cycle: when that wake skipped the
+# cycle's other work, count it toward the bound above.
+signal_phase_note_deferred_prelude() {
+  [ "$SIGNAL_PHASE_FIRST" -eq 1 ] || return 0
+  prelude_defer_load
+  if printf '%s\n' "$((PRELUDE_DEFER_COUNT + 1))" > "$PRELUDE_DEFER_MARKER.tmp.$$" 2>/dev/null; then
+    mv -f "$PRELUDE_DEFER_MARKER.tmp.$$" "$PRELUDE_DEFER_MARKER" 2>/dev/null \
+      || rm -f "$PRELUDE_DEFER_MARKER.tmp.$$" 2>/dev/null
   fi
+  return 0
+}
 
-  # Ledger refresh and surfacing run before any signal or check exit below, so a chatty
-  # fleet can never starve the obligation scan (wake() exits the cycle).
-  if [ ! -e "$STATE/open-loops.json" ] \
-    || [ "$(age_of "$STATE/open-loops.json")" -ge "$OPEN_LOOPS_INTERVAL" ]; then
-    open_loops_refresh_detached
+prelude_step_begin() {
+  [ "$PRELUDE_STEP" -le "$1" ] || return 1
+  PRELUDE_NEXT_STEP=$(($1 + 1))
+}
+
+prelude_step_commit() {
+  [ -n "$PRELUDE_NEXT_STEP" ] || return 0
+  printf '%s\n' "$PRELUDE_NEXT_STEP" > "$PRELUDE_PROGRESS_MARKER.tmp.$$" \
+    && mv -f "$PRELUDE_PROGRESS_MARKER.tmp.$$" "$PRELUDE_PROGRESS_MARKER" || return 1
+  PRELUDE_STEP=$PRELUDE_NEXT_STEP
+}
+
+signal_phase_flush() {
+  SIGNAL_PHASE_DELIVERY_ONLY=1
+  signal_phase
+  SIGNAL_PHASE_DELIVERY_ONLY=0
+}
+signal_phase_note_queued() {
+  local f
+  local -a queued_files
+  [ -n "$SIGNAL_PHASE_QUEUED_REASON" ] || SIGNAL_PHASE_QUEUED_REASON=signal:
+  read -r -a queued_files <<< "$1"
+  for f in "${queued_files[@]}"; do
+    case " ${SIGNAL_PHASE_QUEUED_REASON#signal:} " in
+      *" $f "*) ;;
+      *) SIGNAL_PHASE_QUEUED_REASON="$SIGNAL_PHASE_QUEUED_REASON $f" ;;
+    esac
+  done
+  if [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 1 ]; then
+    if [ -d "$SIGNAL_PHASE_LATE_MARKER" ] \
+      || ! printf '%s\n' "${SIGNAL_PHASE_QUEUED_REASON#signal:}" > "$SIGNAL_PHASE_LATE_MARKER.tmp.$$" \
+      || ! mv -f "$SIGNAL_PHASE_LATE_MARKER.tmp.$$" "$SIGNAL_PHASE_LATE_MARKER"; then
+      rm -f -- "$SIGNAL_PHASE_LATE_MARKER.tmp.$$"
+      FM_WAKE_AFTER_OUTPUT_ACTION=
+      if [ -n "$FM_WAKE_POST_OUTPUT_ACTION" ]; then
+        "$FM_WAKE_POST_OUTPUT_ACTION" 1 || true
+        FM_WAKE_POST_OUTPUT_ACTION=
+      fi
+      wake "$SIGNAL_PHASE_QUEUED_REASON"
+    fi
   fi
-  open_loops_surface
+  return 0
+}
+
+watch_before_wake() {
+  case "$1" in
+    signal:*) ;;
+    *) signal_phase_flush ;;
+  esac
+}
+
+signal_phase_follow_up() {
+  local files queued f reason=signal:
+  local -a late_files
+  [ -e "$SIGNAL_PHASE_LATE_MARKER" ] || [ -L "$SIGNAL_PHASE_LATE_MARKER" ] || return 0
+  files=$(cat "$SIGNAL_PHASE_LATE_MARKER") || exit 1
+  queued=$(fm_wake_queued_keys signal) || exit 1
+  read -r -a late_files <<< "$files"
+  for f in "${late_files[@]}"; do
+    case $'\n'"$queued"$'\n' in
+      *$'\n'"${f##*/}"$'\n'*) reason="$reason $f" ;;
+    esac
+  done
+  [ "$reason" = signal: ] || wake "$reason"
+  rm -f -- "$SIGNAL_PHASE_LATE_MARKER" || exit 1
+}
+
+watch_after_wake() {
+  [ "$1" -eq 0 ] || return 0
+  case "$FM_WATCH_DELIVERED_REASON" in
+    signal:*) rm -f -- "$SIGNAL_PHASE_LATE_MARKER" 2>/dev/null || true ;;
+  esac
+  [ "$2" -eq 0 ] || return 0
+  prelude_step_commit
+}
+
+prelude_phase() {
+  local PRELUDE_STEP=1 check_wake_reason=
+  if [ -e "$PRELUDE_PROGRESS_MARKER" ]; then
+    IFS= read -r PRELUDE_STEP < "$PRELUDE_PROGRESS_MARKER" || PRELUDE_STEP=1
+    case "$PRELUDE_STEP" in 1|2|3|4|5|6|7|8|9|10|11) ;; *) PRELUDE_STEP=1 ;; esac
+  fi
+  if prelude_step_begin 1; then
+    open_loops_surface
+    prelude_step_commit || exit 1
+  fi
   watcher_beat
   idle_reap_tick
 
   # Bearings publishes reconcile asks as local one-shot request files and
   # returns before any mate delivery. Supervision owns their later delivery;
   # a skipped or failed request remains durable for another poll.
-  if reconcile_requests_pending; then
-    reconcile_requests_detached
+  if prelude_step_begin 2; then
+    if reconcile_requests_pending; then
+      reconcile_requests_detached
+    fi
+    prelude_step_commit || exit 1
   fi
   watcher_beat
 
@@ -2982,79 +3051,86 @@ while :; do
   # parent reports, observe backend busy/idle turn completion, send one recovery
   # repost after grace, and escalate once if the recovery turn is also missed.
   # No conversation scraping; unresolved records are never silently expired.
-  fm_pending_reply_tick "$STATE" || true
+  if prelude_step_begin 3; then
+    fm_pending_reply_tick "$STATE" || true
+    prelude_step_commit || exit 1
+  fi
   watcher_beat
 
-  # Endpoint liveness runs before queue observation: a positively dead or
-  # missing secondmate endpoint is relaunched here on a bounded cadence, which
-  # is also what unsticks that mate's foreign wake queue. The tick's single
-  # wake exits the cycle like every other wake, so its marker is stamped before
-  # any relaunch and the restarted watcher will not re-probe early.
-  secondmate_liveness_tick || {
-    echo "watcher: secondmate liveness check failed" >&2
-    exit 1
-  }
+  if prelude_step_begin 4; then
+    secondmate_liveness_tick || {
+      echo "watcher: secondmate liveness check failed" >&2
+      exit 1
+    }
+    prelude_step_commit || exit 1
+  fi
   watcher_beat
-  # An in-flight ship or scout whose SessionEnd record says the worker is
-  # gone is relaunched through the existing control path. The tick wakes and
-  # exits the cycle like every other wake, so a restarted watcher sees the
-  # replacement rather than launching a second one.
-  session_end_relaunch_tick || {
-    echo "watcher: session-end relaunch check failed" >&2
-    exit 1
-  }
+  if prelude_step_begin 5; then
+    session_end_relaunch_tick || {
+      echo "watcher: session-end relaunch check failed" >&2
+      exit 1
+    }
+    prelude_step_commit || exit 1
+  fi
   watcher_beat
 
 
   # A live secondmate endpoint does not prove that its own wake loop is alive.
   # Observe the foreign queue before the rest of this cycle so an aged row wakes
   # the parent without consuming or rewriting the receiving home's record.
-  secondmate_wake_stall_tick || {
-    echo "watcher: secondmate wake-loop observation failed" >&2
-    exit 1
-  }
+  if prelude_step_begin 6; then
+    secondmate_wake_stall_tick || {
+      echo "watcher: secondmate wake-loop observation failed" >&2
+      exit 1
+    }
+    prelude_step_commit || exit 1
+  fi
   watcher_beat
 
   # Process-to-event liveness repair. This never discovers a result by polling:
   # each registered source has its own child blocking on that source, and this
   # only republishes results already captured durably and restarts a source
   # whose owner is gone. It is a no-op with nothing registered.
-  if [ -d "$STATE/procevent" ]; then
-    procevent_reconcile_detached
+  if prelude_step_begin 7; then
+    if [ -d "$STATE/procevent" ]; then
+      procevent_reconcile_detached
+    fi
+    procevent_surface_queued
+    prelude_step_commit || exit 1
   fi
-  # Then deliver any queued-but-unsurfaced result, including one a runner
-  # published while this watcher was between cycles.
-  procevent_surface_queued
 
   # A process-event result carries richer adapter-owned wake context than the
   # generic recovery reason, so give that owner first refusal.
-  resurface_after_downtime
+  if prelude_step_begin 8; then
+    resurface_after_downtime
+    prelude_step_commit || exit 1
+  fi
 
   # The existing poll loop also owns the bounded inactive-outcome cadence.
   # This is mechanical and silent unless a durable terminal-outcome obligation
   # was created, so quiet cycles never wake firstmate or consume model tokens.
-  inactive_out=
-  if inactive_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
-    "$SCRIPT_DIR/fm-inactive-reconcile.sh" scan 2>/dev/null); then
-    if [ -n "$inactive_out" ]; then
-      wake "check: inactive-outcome"
+  if prelude_step_begin 9; then
+    inactive_out=
+    if inactive_out=$(FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+      "$SCRIPT_DIR/fm-inactive-reconcile.sh" scan 2>/dev/null); then
+      if [ -n "$inactive_out" ]; then
+        wake "check: inactive-outcome"
+      fi
+    else
+      triage_log "inactive-outcome reconciliation unavailable"
     fi
-  else
-    triage_log "inactive-outcome reconciliation unavailable"
+    signal_phase_flush
+    prelude_step_commit || exit 1
   fi
   watcher_beat
 
   # Slow per-task checks (firstmate writes these, e.g. a merged-PR poll).
   # Time-based via .last-check mtime so the cadence survives watcher restarts.
-  # Evaluated BEFORE the signal scan: wake() exits the cycle, so a check placed
-  # after the signal scan would be starved whenever a chatty sibling crewmate
-  # keeps producing signals - the slow poll (e.g. merge detection) would then
-  # never run until the fleet went quiet. Checks are due only every
-  # CHECK_INTERVAL, so most cycles skip this block and fall straight through.
-  if [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ]; then
+  if prelude_step_begin 10 && [ "$(age_of "$STATE/.last-check")" -ge "$CHECK_INTERVAL" ]; then
     rejected_checks=
     contribution_check_output=
     for c in "$STATE"/*.check.sh; do
+      signal_phase_flush
       [ -e "$c" ] || continue
       watcher_beat
       is_pr_poll=0
@@ -3128,7 +3204,6 @@ EOF
             # outcome and no wake; bin/fm-pr-check.sh refuses to arm another.
             retire_merged_pr_poll "$id"
             pr_poll_control_release || exit 1
-            touch "$STATE/.last-check"
             triage_log "retired a merge poll armed on secondmate $id without reporting an outcome"
             continue
           fi
@@ -3154,41 +3229,56 @@ EOF
           fi
           retire_merged_pr_poll "$id"
           pr_poll_control_release || exit 1
-          touch "$STATE/.last-check"
           if [ "$FM_MERGE_OUTCOME_ALREADY_RECORDED" = true ]; then
             triage_log "absorbed duplicate merged PR poll result for $id"
             continue
           fi
-          wake "$reason"
+          [ -n "$check_wake_reason" ] || check_wake_reason=$reason
+          continue
         fi
         pr_poll_control_release || exit 1
         fm_wake_append check "$c" "$reason" || exit 1
-        touch "$STATE/.last-check"
-        wake "$reason"
+        [ -n "$check_wake_reason" ] || check_wake_reason=$reason
       fi
       pr_poll_control_release || exit 1
     done
     if [ -n "$rejected_checks" ]; then
       reason="check: rejected unauthenticated state checks:$rejected_checks"
       fm_wake_append check unauthenticated-state-checks "$reason" || exit 1
-      touch "$STATE/.last-check"
-      wake "$reason"
+      [ -n "$check_wake_reason" ] || check_wake_reason=$reason
     fi
+    signal_phase_flush
     touch "$STATE/.last-check"
     if [ -n "$contribution_check_output" ]; then
-      wake "$contribution_check_output"
+      [ -n "$check_wake_reason" ] || check_wake_reason=$contribution_check_output
     fi
   fi
+  prelude_step_commit || exit 1
+  PRELUDE_NEXT_STEP=
+  rm -f -- "$PRELUDE_DEFER_MARKER" "$PRELUDE_PROGRESS_MARKER" || exit 1
+  [ -z "$check_wake_reason" ] || wake "$check_wake_reason"
+  [ -z "$SIGNAL_PHASE_QUEUED_REASON" ] || wake "$SIGNAL_PHASE_QUEUED_REASON"
   watcher_beat
+}
 
+signal_phase() {
+  local reason pending files sf sig f file_reason surface_end surface_ident signal_actionable signal_commit_error
+  local signal_append=fm_wake_append
+  if [ "$FM_WAKE_POST_OUTPUT_ACTION" = procevent_surface_after_output ]; then
+    signal_append=fm_wake_append_locked
+  fi
   # On the first changed signal, linger one grace period and re-scan before
   # classifying: a crewmate's final status write and the same turn's turn-end
   # hook land seconds apart, and reporting them as separate actionable wakes
   # costs a full firstmate turn each. The re-scan also picks up a newer
   # signature for an already-pending file (last write wins below).
+  # The linger never runs while this watcher holds the wake-queue lock: every
+  # queue writer and drain would wait out the grace, so that flush only
+  # re-scans the race window (procevent_surface_queued flushes before locking;
+  # test_procevent_wake_never_lingers_under_the_queue_lock).
   pending=$(scan_signals)
   if [ -n "$pending" ]; then
-    sleep "$SIGNAL_GRACE"
+    [ "$signal_append" = fm_wake_append_locked ] || sleep "$SIGNAL_GRACE"
     pending=$(printf '%s\n%s' "$pending" "$(scan_signals)")
     # The final coalesced signal set is the watcher-carried status-change
     # trigger for this home's published summary. Start it before either
@@ -3222,12 +3312,12 @@ EOF
     # busy state has no verified semantic source, bounded so it cannot defer that
     # task's turn-ends forever. Absorb stays evidence-driven: with neither proof the
     # wake surfaces exactly as before.
-    # Actionable -> enqueue, advance .seen-* markers, exit. Benign (a no-verb wake
-    # whose crew is still executing) in always-on mode -> advance the markers so it
-    # will not re-fire, log, and keep blocking without enqueuing. Both evidence
-    # checks are costly (a bounded no-mistakes call, then a pane capture), so the ||
-    # ordering evaluates them ONLY for a non-afk signal with no captain-relevant
-    # status span, and the capture only once the authoritative verdict comes up short.
+    # Actionable -> enqueue and advance .seen-* markers before delivery. A scan
+    # before a non-signal close must not exit here and replace that close's routing.
+    # Benign no-verb wakes in always-on mode advance markers without enqueuing.
+    # Both evidence checks are costly (a bounded no-mistakes call, then a pane
+    # capture), so the || ordering evaluates them ONLY for a non-afk signal with
+    # no captain-relevant status span, and captures only after the verdict comes up short.
     FM_SIGNAL_SURFACE_ENDPOINTS=''
     FM_SIGNAL_NEEDS_DECISION_FILES=''
     # shellcheck disable=SC2086  # $files is a space-separated status-path list (ids carry no spaces)
@@ -3250,7 +3340,7 @@ EOF
         [ -n "$sf" ] || continue
         file_reason="$reason"
         case " $FM_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
-        fm_wake_append signal "$(basename "$f")" "$file_reason" || exit 1
+        "$signal_append" signal "$(basename "$f")" "$file_reason" || exit 1
       done <<EOF
 $pending
 EOF
@@ -3278,6 +3368,9 @@ EOF
       done <<EOF
 $FM_SIGNAL_SURFACE_ENDPOINTS
 EOF
+      signal_phase_note_deferred_prelude
+      signal_phase_note_queued "$files"
+      [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 0 ] || return 0
       wake "$reason"
     else
       while IFS=$(printf '\t') read -r sf sig f; do
@@ -3297,14 +3390,100 @@ EOF
       if [ "$signal_commit_error" -ne 0 ]; then
         while IFS=$(printf '\t') read -r sf sig f; do
           [ -n "$sf" ] || continue
-          fm_wake_append signal "$(basename "$f")" "$reason" || exit 1
+          file_reason="$reason"
+          case " $FM_SIGNAL_NEEDS_DECISION_FILES " in *" $f "*) file_reason="needs-decision:$files" ;; esac
+          "$signal_append" signal "$(basename "$f")" "$file_reason" || exit 1
         done <<EOF
 $pending
 EOF
+        signal_phase_note_deferred_prelude
+        signal_phase_note_queued "$files"
+        [ "$SIGNAL_PHASE_DELIVERY_ONLY" -eq 0 ] || return 0
         wake "$reason"
       fi
       triage_log "absorbed benign $reason"
     fi
+  fi
+}
+
+# shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
+FM_WAKE_BEFORE_OUTPUT_ACTION=watch_before_wake
+# shellcheck disable=SC2034 # Consumed by wake() in the separately linted transition owner.
+FM_WAKE_AFTER_OUTPUT_ACTION=watch_after_wake
+signal_phase_follow_up
+
+# A merged poll may have queued its terminal wake and then lost the process
+# between receipt publication and fixed-path removal.
+# Finish only identity-bound retirement receipts before any check can run.
+if ! fm_pr_poll_retirement_recover_all "$STATE" "$SCRIPT_DIR/fm-pr-poll.sh"; then
+  reason="check: rejected unauthenticated PR poll retirement receipts:$FM_PR_POLL_RETIREMENT_REJECTED"
+  fm_wake_append check pr-poll-retirement "$reason" || exit 1
+  touch "$STATE/.last-check"
+  wake "$reason"
+fi
+
+while :; do
+  # Home-gone exit: a deleted home, state directory, or code root means this
+  # watcher's world is gone (a torn-down temporary home or a discarded
+  # disposable checkout). Exit with a logged reason rather than writing state
+  # into nothing, or into a live home from a checkout that no longer exists.
+  # A detached helper this watcher started (home-summary refresh, reconcile)
+  # can recreate a deleted state directory before the next poll, so a lock
+  # with no holder at all is read as the same teardown: only a fresh watcher
+  # ever recreates the lock, and that case is the self-eviction below.
+  # Scoped to this process alone: no other watcher is signalled.
+  if [ "$WATCH_HOME_EXISTED" -eq 1 ] && [ ! -d "$FM_HOME" ]; then
+    echo "watcher: exiting - home no longer exists: $FM_HOME" >&2
+    exit 1
+  elif [ ! -d "$STATE" ]; then
+    echo "watcher: exiting - state directory no longer exists: $STATE" >&2
+    exit 1
+  elif [ ! -e "$WATCH_LOCK/pid" ]; then
+    echo "watcher: exiting - state directory was torn down (singleton lock removed): $STATE" >&2
+    exit 1
+  elif [ ! -d "$SCRIPT_DIR" ]; then
+    echo "watcher: exiting - code root no longer exists: $SCRIPT_DIR" >&2
+    exit 1
+  fi
+
+  # Self-eviction: if the singleton lock no longer names this process, a second
+  # watcher has taken over (e.g. a transient duplicate from a racy arm). Stand
+  # down so the rightful singleton continues alone. The EXIT trap's release
+  # no-ops because the lock pid is not ours, so the survivor's lock is untouched.
+  # This makes any duplicate self-resolve within one poll instead of persisting
+  # and doubling every wake.
+  if [ "$(cat "$WATCH_LOCK/pid" 2>/dev/null || true)" != "$WATCHER_PID" ]; then
+    exit 0
+  fi
+
+  watcher_beat force
+
+  [ ! -e "$CONFIG/fleet-ledger" ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" capture || true
+  watcher_beat
+  if [ "$(age_of "$STATE/home-summary.json")" -ge "$HOME_SUMMARY_INTERVAL" ]; then
+    home_summary_refresh_detached
+  fi
+
+  # Ledger refresh is detached and starts ahead of any signal or check exit, so a
+  # slow scan can never stall the beacon. Its surfacing wake is part of
+  # prelude_phase, where the bounded deferral below keeps a chatty fleet from
+  # starving it (wake() exits the cycle).
+  if [ ! -e "$STATE/open-loops.json" ] \
+    || [ "$(age_of "$STATE/open-loops.json")" -ge "$OPEN_LOOPS_INTERVAL" ]; then
+    open_loops_refresh_detached
+  fi
+
+  prelude_defer_load
+  if [ "$PRELUDE_DEFER_COUNT" -ge "$PRELUDE_MAX_DEFER" ]; then
+    SIGNAL_PHASE_FIRST=0
+    prelude_phase
+    signal_phase
+  else
+    SIGNAL_PHASE_FIRST=1
+    signal_phase
+    SIGNAL_PHASE_FIRST=0
+    prelude_phase
+    signal_phase
   fi
 
   # Layer 1 backbone: pane staleness. Two consecutive identical hashes with no busy
