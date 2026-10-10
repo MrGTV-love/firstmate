@@ -1606,6 +1606,9 @@ cat > "$EMPTY_BIN/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 # Stand-in for `lavish-axi poll <file>` when the captain closes a board he said
 # nothing on: an ended session carrying no queued content at all.
+if [ "${1-}" = poll ] && [ -n "${QUIET_GATE-}" ]; then
+  while [ ! -e "$QUIET_GATE" ]; do sleep 0.1; done
+fi
 printf 'session:\n  file: /quiet.html\n  status: ended\n  ended_by: user\n'
 SH
 chmod +x "$EMPTY_BIN/lavish-axi"
@@ -1614,8 +1617,13 @@ printf '<h1>quiet</h1>\n' > "$QUIET_ART"
 lavish_session "$QUIET_ART"
 quiet_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$QUIET_ART")
 fm_test_track_procevent_home "$HEMPTY"
-PATH="$EMPTY_BIN:$PATH" FM_HOME="$HEMPTY" \
+QUIET_GATE="$TMP_ROOT/quiet-gate"
+PATH="$EMPTY_BIN:$PATH" FM_HOME="$HEMPTY" QUIET_GATE="$QUIET_GATE" FM_LAVISH_POLL_RETRY_DELAY=60 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$QUIET_ART" >/dev/null
+quiet_runner=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/$quiet_id.claim" 2>/dev/null)
+[ -n "$quiet_runner" ] && kill -0 "$quiet_runner" 2>/dev/null \
+  || fail "no live runner was recorded for the armed quiet board"
+: > "$QUIET_GATE"
 quiet_out=$(PATH="$EMPTY_BIN:$PATH" pe "$HEMPTY" start "$quiet_id" 2>&1)
 assert_not_contains "$quiet_out" "not-autohandled" \
   "a durably silenced result was reported as still unacknowledged"
@@ -1638,6 +1646,9 @@ sleep 0.3
   || fail "a later reconcile re-announced a silenced empty board close: $(wake_payloads "$HEMPTY")"
 assert_absent "$HEMPTY/state/procevent/$quiet_id.source" \
   "an empty board close still retires its ended source"
+for _ in $(seq 1 300); do kill -0 "$quiet_runner" 2>/dev/null || break; sleep 0.1; done
+kill -0 "$quiet_runner" 2>/dev/null \
+  && fail "a runner that retired its ended source still waited out the poll retry delay"
 pass "an empty board close is captured and recorded handled without ever waking the captain"
 
 # --- end-user-aligned regression: worker-owned rounds stay open until re-arm -

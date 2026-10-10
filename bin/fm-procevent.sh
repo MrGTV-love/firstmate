@@ -1025,7 +1025,7 @@ cmd_start_public() {
 }
 
 cmd_start() {
-  local id=${1-} adapter out rc claimed bound_rc bound_pid published_capture=0 handled_capture=0 self_announcing=0 task_owner='' task_pending
+  local id=${1-} adapter out rc claimed bound_rc bound_pid published_capture=0 handled_capture=0 retired_capture=0 self_announcing=0 task_owner='' task_pending
   local extension_owner=0 extension_load_state extension_sequence='' extension_request_id=''
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   require_runner_group
@@ -1278,6 +1278,7 @@ cmd_start() {
   capture_state=
   published_capture=0
   handled_capture=0
+  retired_capture=0
   self_announcing=0
   rc=0
   durable=
@@ -1495,7 +1496,10 @@ EOF
   if adapter_result_is_terminal "$adapter" "$durable"; then
     retire_owned_terminal_source "$id"
     case "$?" in
-      0) printf 'retired: %s (adapter classified the captured result terminal)\n' "$id" ;;
+      0)
+        retired_capture=1
+        printf 'retired: %s (adapter classified the captured result terminal)\n' "$id"
+        ;;
       2) printf 'round-open: %s (its owner has not acknowledged the terminal round)\n' "$id" ;;
       *) printf 'cannot retire terminal source; it remains registered: %s\n' "$id" >&2 ;;
     esac
@@ -1505,7 +1509,9 @@ EOF
     fm_procevent_claim_capture_reservation_remove_locked || true
     exec 6<&-
   fi
-  if [ "$handled_capture" -eq 1 ]; then
+  if [ "$retired_capture" -eq 1 ]; then
+    :
+  elif [ "$handled_capture" -eq 1 ]; then
     adopt_relisten && continue
   elif [ -z "$task_owner" ]; then
     adopt_relisten "$durable" && continue
