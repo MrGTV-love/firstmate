@@ -360,7 +360,7 @@ JSON
 
   rec=$(make_spawn_case fallback omp omp-fallback-q2)
   read_case_record "$rec"
-  id=omp-fallback-q2
+  id='omp-fallback-q2'
   mkdir -p "$HOME_DIR/config"
   cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
 {"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
