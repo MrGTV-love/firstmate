@@ -129,6 +129,8 @@ ws=$(lab workspace create --cwd "$WORKTREE" --label "fm-$TASK_ID" --no-focus) \
   || fail "could not create the isolated workspace"
 PANE=$(printf '%s' "$ws" | jq -er '.result.root_pane.pane_id') \
   || fail "workspace create did not return a pane id"
+# A proven launch record: a legacy record (no launch_proof) keeps lifecycle
+# control without a pin, so only a versioned record exercises native refusal.
 cat > "$CONTROL_HOME/state/$TASK_ID.meta" <<EOF
 window=$SESSION:$PANE
 endpoint_task_id=$TASK_ID
@@ -137,6 +139,8 @@ project=$PROJECT
 harness=omp
 kind=ship
 mode=no-mistakes
+spawn_gen=box-native
+launch_proof=env-v1
 yolo=off
 model=default
 effort=default
