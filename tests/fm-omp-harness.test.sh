@@ -2185,6 +2185,57 @@ EOF
   pass ".omp extensions: a descendant omp session neither records itself as the loaded session nor arms a watcher"
 }
 
+# A local secondmate's own omp records its task-session proof in the parent
+# home. A descendant `omp -p` run from that home inherits the launch generation
+# and loads the same watch extension, but it is not the lock-owning session.
+test_secondmate_watch_proof_ignores_a_descendant_omp() {
+  local repo home parent out status proof before
+  repo="$TMP_ROOT/secondmate-descendant/repo"; home="$TMP_ROOT/secondmate-descendant/home"
+  parent="$TMP_ROOT/secondmate-descendant/parent"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state" "$parent/state" "$TMP_ROOT/secondmate-descendant/sessions"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-watch-arm.sh"
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$home/.fm-secondmate-parent"
+  printf 'sm\n' > "$home/.fm-secondmate-home"
+  printf 'spawn_gen=secondmate-gen\n' > "$parent/state/sm.meta"
+  : > "$TMP_ROOT/secondmate-descendant/sessions/task.jsonl"
+  proof="$parent/state/sm.omp-session.json"
+  jq -nc --argjson pid "$$" --arg task "$TMP_ROOT/secondmate-descendant/sessions/task.jsonl" \
+    '{version:1,spawn_gen:"secondmate-gen",pid:$pid,task_session_file:$task,current_session_file:$task}' > "$proof"
+  before=$(cat "$proof")
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+    FM_DATA_OVERRIDE="$home/data" FM_SPAWN_GEN=secondmate-gen FM_SESSIONSTART_OFF=1 \
+    WATCH_EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" CHILD_SESSION="$TMP_ROOT/secondmate-descendant/sessions/child.jsonl" \
+    node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync } from "node:fs";
+// The secondmate session itself (this test shell) holds the home lock.
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.ppid}\n`);
+writeFileSync(process.env.CHILD_SESSION, "{}\n");
+const handlers = new Map();
+const sessionManager = { getSessionId: () => "child", getSessionFile: () => process.env.CHILD_SESSION };
+const registry = { list: () => [{ kind: "main", session: { sessionManager, waitForSessionTransition: () => Promise.resolve() } }] };
+const pi = {
+  on(event, handler) { (handlers.get(event) ?? handlers.set(event, []).get(event)).push(handler); },
+  registerCommand() {}, registerTool() {}, sendUserMessage() {}, sendMessage() {},
+  pi: { AgentRegistry: { global: () => registry } },
+};
+(await import(pathToFileURL(process.env.WATCH_EXT).href)).default(pi);
+const ctx = { sessionManager };
+for (const event of ["session_start", "session_shutdown"]) {
+  for (const handler of handlers.get(event) ?? []) await handler({ type: event }, ctx);
+}
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "descendant omp of a local secondmate must load cleanly: $out"
+  [ "$(cat "$proof")" = "$before" ] \
+    || fail "a descendant omp rewrote its secondmate's task-session proof: $(cat "$proof")"
+  pass ".omp extensions: a descendant omp neither rebinds nor clears its local secondmate's task-session proof"
+}
+
 # The turn-end guard used to record itself only while the extension loaded,
 # before the session-start hook claimed the lock, so a lock that was foreign or
 # absent at that moment left a marker naming a dead pid until the next restart.
@@ -2600,6 +2651,7 @@ test_watch_extension_replays_a_host_only_boundary_across_replacement
 test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
 test_primary_extensions_ignore_a_descendant_session
+test_secondmate_watch_proof_ignores_a_descendant_omp
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
 test_watch_extension_heals_a_generation_stopped_without_a_successor
 test_watch_extension_is_single_instance_per_home

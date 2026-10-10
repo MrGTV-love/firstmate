@@ -5,7 +5,8 @@ set -euo pipefail
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 fm_live_gate opt-in FM_OMP_TASK_SESSION_LIVE omp python3
 LAB=$(fm_test_tmproot fm-omp-task-session-live)
-export FM_PROOF_LAB="$LAB" FM_PROOF_ROOT="$ROOT"
+export FM_PROOF_LAB="$LAB" FM_PROOF_ROOT="$ROOT" FM_TEST_PROCESS_REGISTRY
+export -f fm_test_track_process
 python3 <<'PY'
 import json, os, pathlib, selectors, subprocess, time, uuid
 
@@ -37,6 +38,9 @@ with (lab / 'stderr.log').open('w+') as errors:
                                cwd=project, env=env, stdin=subprocess.PIPE,
                                stdout=subprocess.PIPE, stderr=errors, text=True)
     try:
+        subprocess.run(['bash', '-c', 'fm_test_record_process "$1" "$2" && fm_test_track_process "$1" "$3"',
+                        'register', str(lab / 'omp.process'), str(process.pid), str(extension)],
+                       timeout=10, check=True)
         process.stdin.write('{"id":"ready","type":"get_state"}\n')
         process.stdin.flush()
         selector = selectors.DefaultSelector()

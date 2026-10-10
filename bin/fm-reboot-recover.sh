@@ -8,7 +8,9 @@
 # Remote secondmates and other backends keep their existing recovery owners.
 # Missing/stopped agents remain with their existing liveness recovery paths.
 # Herdr's session-wide auto-resume setting is deliberately not changed.
-# Unknown versioned launch proof is reported; legacy-unproven records skip.
+# Unknown versioned launch proof is reported. A legacy record (no launch_proof)
+# keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
+# legacy-unproven records skip.
 # Failed inspection is surfaced; an unbounded sweep continues inspecting records.
 # --one stops after one selected local Herdr record, including inspection refusals.
 # STATE/.reboot-recovery-cursor holds that id. It advances atomically before
@@ -140,6 +142,11 @@ for ((offset=0; offset<count && (ONE == 0 || selected == 0); offset++)); do
       continue
       ;;
     unmanaged)
+      if [ -z "$(fm_meta_get "$meta" launch_proof)" ]; then
+        notice "$id" "legacy $identity" \
+          "REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" || true
+        continue
+      fi
       notice "$id" "unmanaged $identity" \
         "REBOOT_RECOVERY: $id: live launch is unmanaged; no lifecycle action taken" || true
       ;;

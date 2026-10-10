@@ -24,6 +24,7 @@ Load `harness-adapters` before a resume command or a harness-specific skill invo
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 
 For a live Herdr agent restored after reboot, follow the [native-restoration inspection contract](../../../docs/agent-control.md#inspecting-a-bare-native-restore): leave an unmanaged agent untouched and report the alert rather than treating its live pane as a dead endpoint.
+A legacy record reported as `legacy record; exit and relaunch are allowed` is not unmanaged: stop or replace it through `bin/fm-control.sh` like any proven worker.
 An unmanaged agent, unknown composer, unreadable proof, or pending draft is a refusal requiring investigation, never permission to clear input or kill the pane.
 
 ## Session-start reconciliation for a dead ordinary direct report

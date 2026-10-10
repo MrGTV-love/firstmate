@@ -126,7 +126,9 @@ The sweep never discovers other homes' panes or recursively enters a secondmate 
 The [control script's header and help](../bin/fm-control.sh) own its inspection-only relaunch option and argument exclusions.
 Under the task's control lock it inspects the live launch and reports unmanaged proof without interrupting, exiting, checkpointing, noting, or replacing the agent.
 It leaves managed and stopped agents untouched.
-Unknown versioned proof refuses; legacy-unproven proof skips.
+Unknown versioned proof refuses.
+A legacy record (empty `launch_proof`) keeps exit and relaunch, so inspection reports an unpinned legacy omp as `legacy record; exit and relaunch are allowed` rather than unmanaged, and other legacy-unproven proof skips.
+The bounded sweep reports that legacy notice once per restored-agent identity, like an unmanaged notice.
 Drafts, busy state, task instructions, profile axes, charters, child records, and unlanded work remain unchanged.
 
 ### Live Herdr task attribution

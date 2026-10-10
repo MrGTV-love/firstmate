@@ -719,6 +719,10 @@ test_watcher_defers_ring_for_unknown_draft() {
     || fail "could not mark the draft-risk task exactly idle"
   printf '%s\n' "${1:-$'────────\n❯ preface\n ❯ nested draft\n────────'}" > "$dir/draft.capture"
   cp "$dir/draft.capture" "$dir/draft-before"
+  [ "$(PATH="$dir/fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$dir/draft.capture" FM_FAKE_TMUX_CURSOR_Y=2 \
+    FM_FAKE_TMUX_AGENT=claude bash -c '. "$1"; fm_backend_composer_state tmux sess:fm-t1 fm-t1' \
+      _ "$ROOT/bin/fm-backend.sh")" = unknown-draft ] \
+    || fail "the draft-risk fixture must reach the real classifier's unknown-draft verdict"
   rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue after your draft")
   age_path "$rec"
   watch_bg "$state" "$dir/fakebin" "$out" \

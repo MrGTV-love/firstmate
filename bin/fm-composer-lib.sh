@@ -1995,6 +1995,7 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
       _fm_composer_screen_row_var line "$row" "$plain"
       indent=${line%%[![:space:]]*}
       case "$indent" in "$root_indent  "*) ;; *) return 1 ;; esac
+      [ "$blocked" = 1 ] || [ "$indent" = "$root_indent  " ] || return 1
     fi
     row=$((row + 1))
   done
@@ -2605,6 +2606,16 @@ EOF
     if [ "$FM_COMPOSER_SCAN_BOX_TOP" -ge 0 ]; then
       if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ] && [ "$FM_COMPOSER_SCAN_BOX_AMBIG" = 1 ]; then
         printf 'unknown'; return 0
+      fi
+      if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ]; then
+        local below below_row=$((FM_COMPOSER_SCAN_BOX_BOTTOM + 1))
+        _fm_composer_screen_row_var below "$below_row" "$plain"
+        fm_composer_normalize_trim_var below
+        if _fm_composer_row_is_omp_status "$below"; then
+          _fm_composer_screen_row_var below "$((below_row + 1))" "$plain"
+          fm_composer_normalize_trim_var below
+        fi
+        [ -z "$below" ] || { printf 'unknown'; return 0; }
       fi
       local box_last=$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))
       [ "$FM_COMPOSER_SCAN_BOX_OMP" = 0 ] || box_last=$FM_COMPOSER_SCAN_BOX_BOTTOM

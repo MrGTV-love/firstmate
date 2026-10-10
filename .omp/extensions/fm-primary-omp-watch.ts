@@ -724,7 +724,7 @@ export default function (pi: ExtensionAPI) {
     return activateOwnedWatch(generation);
   }
   const parentTask = resolveLocalSecondmateTask(fmRoot, fmHome, state);
-  if (parentTask) installTaskSessionProof(pi, parentTask.state, parentTask.id);
+  if (parentTask && lockOwnership() !== "other") installTaskSessionProof(pi, parentTask.state, parentTask.id);
 
   async function sendWake(
     owner: SessionGeneration,

@@ -286,6 +286,8 @@ test_unstyled_nested_draft_skips_ring_advisorily() {
   err="$dir/send.err"
   printf '%s\n' "${1:-$'────────\n❯ preface\n ❯ nested draft\n────────'}" > "$dir/composer"
   cp "$dir/composer" "$dir/composer-before"
+  [ "$(cmux_composer_state "$dir")" = unknown-draft ] \
+    || fail "the draft-risk fixture must reach the real classifier's unknown-draft verdict"
   run_send "$dir" "$err" -- t1 "preserve the unfinished nested draft"
   rc=$?
   expect_code 0 "$rc" "an identified draft risk must not fail durable enqueue"

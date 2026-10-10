@@ -61,11 +61,29 @@ for state in empty pending; do
 done
 pass "saved omp 18.6.3 native empty and command draft bands agree across public APIs and locales"
 
-# A shell launch line above the transcript is not the idle band's draft root.
-screen=$'❯ omp\n'"$(cat "$ROOT/tests/fixtures/omp-native-band-empty.ansi")"
-assert_screen "idle native band below its shell launch line" empty "$CAPS_STYLED" "$screen"
-assert_content "idle native band below its shell launch line" '' "$CAPS_STYLED" "$screen"
-pass "an idle native band keeps its own boundary below a transcript-separated shell line"
+# A shell launch line above the transcript is not the idle band's draft root,
+# including a fresh start whose logo and tip precede any conversation row.
+for fresh in 0 1; do
+  screen=$(cat "$ROOT/tests/fixtures/omp-native-band-empty.ansi")
+  [ "$fresh" = 0 ] || screen=$(printf '%s\n' "$screen" | grep -v 'Disposable native renderer conversation')
+  screen=$'❯ omp\n'"$screen"
+  for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
+    assert_screen "idle native band (fresh=$fresh) below its shell launch line" empty "$caps" "$screen"
+    assert_content "idle native band (fresh=$fresh) below its shell launch line" '' "$caps" "$screen"
+  done
+done
+pass "an idle native band keeps its own boundary below a gap-separated shell line"
+
+# A band has no closing border, so text below its floor is unbounded input in
+# cursor mode exactly as it is cursorless.
+screen=$' π > ⬢ GPT-4.1 > 📁 /work > ⑂ main ▶─0.2%─────────────────────────────╎─┃─────1M─\n╰─'
+assert_screen "cursor on an idle band floor" empty "$CAPS_TMUX" "$screen" 1
+for below in 'draft|unknown' '  draft|unknown-draft'; do
+  want=${below#*|} below=${below%|*}
+  assert_screen "cursor on a band floor above '$below'" "$want" "$CAPS_TMUX" "$screen"$'\n'"$below" 1
+  assert_refused "band floor above '$below'" "$screen"$'\n'"$below" "$want"
+done
+pass "text below a native band floor is never read as an empty composer"
 
 # The live 18.8.1 meter fills the remaining width and marks its limit with ╎.
 # Its linked-worktree path uses 🌳 rather than the ordinary directory's 📁.

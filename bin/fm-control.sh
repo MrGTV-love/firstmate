@@ -13,7 +13,9 @@
 # --recover-launch is Herdr-only inspection under the control lock.
 # Managed and stopped agents are left untouched. Unmanaged live agents are
 # reported without lifecycle input; native restoration does not prove ownership.
-# Unknown proof on a versioned launch refuses; legacy-unproven launches skip.
+# Unknown proof on a versioned launch refuses. A legacy record (no launch_proof)
+# keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
+# legacy-unproven launches skip.
 # This mode cannot change a profile or create a relaunch transaction.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
@@ -1258,6 +1260,10 @@ do_relaunch() {
     case "$state" in
       managed) echo "recovery-skipped $ID launch=managed"; return 0 ;;
       unmanaged)
+        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+          echo "recovery-skipped $ID launch=legacy record; exit and relaunch are allowed"
+          return 0
+        fi
         echo "recovery-skipped $ID launch=unmanaged; no lifecycle action taken"
         return 0
         ;;

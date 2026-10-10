@@ -111,11 +111,13 @@ cp "$FAKE/lsof" "$TMP_ROOT/lsof.fake"
 # This code runs only in the final exec environment. Opening the blocking fifo
 # read-write keeps the holder alive without inherited fixture descriptors.
 # Its flushed pid is the readiness handshake, not a startup-delay guess.
-HOLDER_CODE='import os
+HOLDER_CODE="import os
+import signal
 import sys
-with open(sys.argv[1], "r+b", buffering=0) as fifo:
+signal.alarm($FM_TEST_STUB_MAX_BLOCK_SECONDS)
+with open(sys.argv[1], 'r+b', buffering=0) as fifo:
     print(os.getpid(), flush=True)
-    fifo.read()'
+    fifo.read()"
 
 holder_ready() { # <ready-fifo> [expected-pid]
   local ready=$1 expected=${2:-} pid
@@ -159,6 +161,8 @@ PY
   ) 4>&- > "$ready" &
   HOLDER_PID=$!
   HOLDER_PIDS+=("$HOLDER_PID")
+  fm_test_record_process "$TMP_ROOT/holder-$HOLDER_N.process" "$HOLDER_PID" \
+    && fm_test_track_process "$TMP_ROOT/holder-$HOLDER_N.process" "$fifo"
   holder_ready "$ready" "$HOLDER_PID"
 }
 
@@ -180,6 +184,8 @@ hold_under() {
     ' "$@" ) 4>&- > "$ready" &
   HOLDER_PIDS+=("$!")
   holder_ready "$ready"
+  fm_test_record_process "$TMP_ROOT/holder-$HOLDER_N.process" "$HOLDER_PID" \
+    && fm_test_track_process "$TMP_ROOT/holder-$HOLDER_N.process" "$fifo"
 }
 
 CASE_N=0

@@ -318,6 +318,8 @@ test_herdr_lone_unregistered_pane_is_agent_free() {
   dir="$TMP_ROOT/herdr-gone"; mkdir -p "$dir"
   printf '%s\n' '{"error":{"code":"agent_not_found","message":"agent target w9:p1 not found"}}' > "$dir/agent-get.json"
   sleep 30 & shell_pid=$!
+  fm_test_record_process "$dir/shell.process" "$shell_pid" \
+    && fm_test_track_process "$dir/shell.process" "sleep 30"
   agy_herdr_process_info_body "$shell_pid" bash > "$dir/process-info.json"
   out=$(agy_herdr_agent_state "$dir")
   [ "$out" = no-agent ] || fail "an unregistered shell-only pane must read no-agent, got '$out'"

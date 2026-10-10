@@ -4746,13 +4746,21 @@ test_reboot_recovery_inspects_without_native_attribution() {
           expect_code "$expected" "$rc" "$proof/$mode/$scenario inspection must not recover"$'\n'"$out"
           if [ "$mode" = direct ] && [ "$expected" = 0 ]; then
             assert_contains "$out" recovery-skipped "direct inspection must report its skip"
-            if [ "$scenario" = missing-registration ]; then
+            if [ "$scenario" = missing-registration ] && [ "$proof" = legacy ]; then
+              assert_contains "$out" "launch=legacy record; exit and relaunch are allowed" \
+                "missing registration on a legacy record must report its retained lifecycle"
+            elif [ "$scenario" = missing-registration ]; then
               assert_contains "$out" "launch=unmanaged" "missing registration must reach live ownership inspection"
             fi
           fi
-          if [ "$scenario" = missing-registration ] && [ "$mode" = sweep ]; then
+          if [ "$scenario" = missing-registration ] && [ "$mode" = sweep ] && [ "$proof" = legacy ]; then
+            assert_contains "$out" "REBOOT_RECOVERY: $id: legacy record; exit and relaunch are allowed" \
+              "sweep must report the legacy record's retained lifecycle"
+          elif [ "$scenario" = missing-registration ] && [ "$mode" = sweep ]; then
             assert_contains "$out" "live launch is unmanaged" "sweep must inspect the unregistered live launch"
           fi
+          [ "$proof" != legacy ] || assert_not_contains "$out" unmanaged \
+            "$mode inspection must never report a legacy record as unmanaged"
           [ "$before" = "$(shasum -a 256 "${preserved[@]}")" ] || fail "$proof/$mode/$scenario changed records, draft or work"
           assert_present "$dir/fake/herdr-agent-live" "inspected pane must remain alive"
           assert_absent "$dir/fake/exit-pending" "inspection must not deliver an exit"
