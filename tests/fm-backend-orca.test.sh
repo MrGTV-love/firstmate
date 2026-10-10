@@ -674,6 +674,9 @@ orca_spawn_run() {  # runs fm-spawn.sh for the fixture; env assignments precede 
     FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" FM_CONFIG_OVERRIDE="$CONFIG" \
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/unused-projects" FM_SPAWN_NO_GUARD=1 \
     env "$@" "$ROOT/bin/fm-spawn.sh" "$SPAWN_ID" "$PROJ" claude --mode no-mistakes --yolo off --backend orca 2>&1
+  local rc=$?
+  rm -rf "/tmp/fm-$SPAWN_ID" "/tmp/fm-$SPAWN_ID+"*
+  return "$rc"
 }
 
 # Spawn starts a detached home-summary refresh that probes Orca beside the
