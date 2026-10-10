@@ -3302,7 +3302,7 @@ The saved omp 18.8.1 default-band capture in
 `▶─0.2%─────────────────────────────╎─┃─────1M─` and bright effort keys with dim
 hint text. Replaying that capture through the public composer APIs proves
 `empty` with no extracted draft when styling is available; without styling,
-the hint remains input risk (`pending`). `bash tests/fm-composer-native-band.test.sh`
+the hint remains input risk (`unknown`). `bash tests/fm-composer-native-band.test.sh`
 also checks that bright typed hints and pasted band frames remain drafts.
 This captured-screen regression does not itself rerun the live managed-worker exit.
 

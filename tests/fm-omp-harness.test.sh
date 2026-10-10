@@ -2617,8 +2617,11 @@ test_secondmate_watch_proof_publishes_for_the_secondmate_itself() {
   printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$home/.fm-secondmate-parent"
   printf 'sm\n' > "$home/.fm-secondmate-home"
   printf 'spawn_gen=secondmate-gen\n' > "$parent/state/sm.meta"
-  sleep 300 >/dev/null 2>&1 &
+  sleep "$FM_TEST_STUB_MAX_BLOCK_SECONDS" >/dev/null 2>&1 &
   stranger=$!
+  fm_test_record_process "$TMP_ROOT/secondmate-self/stranger.process" "$stranger" \
+    && fm_test_track_process "$TMP_ROOT/secondmate-self/stranger.process" "sleep $FM_TEST_STUB_MAX_BLOCK_SECONDS" \
+    || { kill "$stranger" 2>/dev/null; fail 'could not register the stranger lock holder'; }
   for lock_case in missing self stranger; do
     rm -f "$home/state/.lock" "$parent/state/sm.omp-session.json"
     out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
