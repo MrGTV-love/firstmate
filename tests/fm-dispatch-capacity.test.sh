@@ -165,6 +165,11 @@ write_pool 0
 out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$strong" "$team") || fail "native Claude exhaustion must not veto the TeamClaude stand-in"
 assert_equals claude "$(jq -r .profile.harness <<<"$out")" "exhausted Sol switches to its declared TeamClaude stand-in"
 assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "TeamClaude proxy quota is unknown, not native Claude's row"
+out=$(fm_dispatch_select "$TMP_ROOT/config" rule_1 "$(jq -c '.[0] | del(.requires)' <<<"$team")" "$team") \
+  || fail "a task already on its TeamClaude stand-in must relaunch despite native Claude exhaustion"
+assert_equals claude "$(jq -r .profile.harness <<<"$out")" "the relaunch lands on the TeamClaude stand-in"
+assert_equals false "$(jq -r .switched <<<"$out")" "the current TeamClaude stand-in is kept, not treated as exhausted"
+assert_equals unknown "$(jq -r .capacity.status <<<"$out")" "the current TeamClaude stand-in is not measured by native Claude's row"
 rm "$TMP_ROOT/config/claude-launcher"
 pass "capacity does not conflate native Claude quota with a TeamClaude stand-in"
 printf '# all fm-dispatch-capacity tests passed\n'

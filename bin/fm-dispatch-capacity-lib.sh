@@ -12,7 +12,8 @@
 # fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
 # prints the original profile unless it is proven exhausted, then the first
 # permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
-# A TeamClaude fallback's proxy quota is unknown, never native Claude's row.
+# A TeamClaude fallback's proxy quota is unknown, never native Claude's row,
+# both as a candidate and once a task already runs on that stand-in.
 
 FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=bin/fm-timeout-lib.sh
@@ -169,7 +170,12 @@ fm_dispatch_fallback_capacity() {
 fm_dispatch_select() {
   local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} routing_config=${6:-$1} candidate state
   if [ -z "$evidence" ]; then
-    evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")")
+    if jq -e --argjson p "$profile" 'any(.[]; .requires == "teamclaude" and
+         .harness == $p.harness and .model == $p.model and .effort == $p.effort)' <<<"$fallback" >/dev/null; then
+      evidence=$(fm_dispatch_fallback_capacity "$profile")
+    else
+      evidence=$(fm_dispatch_capacity "$(jq -r .harness <<<"$profile")" "$(jq -r '.model // ""' <<<"$profile")")
+    fi
   fi
   state=$(jq -r .status <<<"$evidence")
   if [ "$state" != exhausted ]; then
