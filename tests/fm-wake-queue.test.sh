@@ -1086,6 +1086,9 @@ test_term_stops_a_watcher_blocked_in_the_drain_ring_idle_capture() {
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     secondmate_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
+  # The first leg's stop published watcher downtime; acknowledge it so the
+  # blocked leg reaches the ring instead of exiting on check: rearm-resurface.
+  drain_liveness_wakes "$dir"
 
   # The active-turn read returns, then the idle-proof read blocks on a FIFO
   # whose write end the holder keeps open without writing.
@@ -1110,6 +1113,7 @@ SH
   PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" \
     FM_FAKE_TMUX_CAPTURE="$fifo" FM_FAKE_CAPTURE_COUNT="$dir/captures" \
+    FM_OPEN_LOOPS_INTERVAL=999999 \
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     "$WATCH" > "$out" 2>&1 &
