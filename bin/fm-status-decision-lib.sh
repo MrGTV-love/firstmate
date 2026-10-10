@@ -257,7 +257,7 @@ _fm_decision_drop() {  # <open-set> <key> <out-var>
     printf -v "$3" '%s' "${1%$'\n'}"
   fi
 }
-# Fold ONE status line into an existing "<key>\t<verb>\t<note>\n"-per-line open
+# Fold ONE status line into an existing "<key>\t<verb>\t<note>"-per-line open
 # set, applying the same needs-decision/blocked-opens, resolved/captain-held-closes
 # rule the status-fold contract above documents. Pure text transform, no file I/O.
 # This is the ONE place the per-line open/resolved rule is written; both the
