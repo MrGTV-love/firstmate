@@ -412,7 +412,7 @@ family_for_basename() {
     fm-send-inbox-doorbell-live-e2e.test.sh|\
     fm-calm-claude-mod-plugin.test.sh|fm-calm-claude-mod-live-e2e.test.sh|\
     fm-calm-pi-queue-retention-live-e2e.test.sh|\
-    fm-herdr-submit-confirm-live-e2e.test.sh)
+    fm-herdr-submit-confirm-live-e2e.test.sh|fm-task-docker-live-e2e.test.sh)
       printf '%s\n' live-harness-optin
       ;;
     fm-backend-herdr.test.sh|fm-backend-tmux-smoke.test.sh|fm-backend.test.sh|\
@@ -931,6 +931,7 @@ tests/fm-supervision-host-hook.test.sh 70651
 tests/fm-supervision-host.test.sh 413717
 tests/fm-tangle-guard.test.sh 8501
 tests/fm-task-delivery.test.sh 32789
+tests/fm-task-docker-live-e2e.test.sh 15000
 tests/fm-task-inbox.test.sh 64895
 tests/fm-tasks-axi.test.sh 76507
 tests/fm-teamclaude-launch-live-e2e.test.sh 213
@@ -1762,6 +1763,12 @@ families_for_changed_path() {
     bin/fm-pr-*|bin/fm-merge-local.sh|bin/fm-teardown.sh|bin/fm-idle-session-reap.sh|bin/fm-review-diff.sh|\
     bin/fm-x-*|bin/fm-check*|bin/fm-pipeline-spend.sh)
       printf '%s\n' pr-forge
+      ;;
+    bin/fm-task-docker-lib.sh)
+      # The task-owned Docker ownership rules, sourced by bin/fm-teardown.sh
+      # (pr-forge) and proven against a real Docker by its live guard.
+      printf '%s\n' pr-forge
+      printf '%s\n' live-harness-optin
       ;;
     bin/fm-nm-run-lib.sh)
       # Shared no-mistakes run-attribution primitives, sourced by both

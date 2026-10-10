@@ -131,6 +131,8 @@ fm_tasks_axi_compatible() { return 1; }
 fm_backlog_backend_manual() { return 1; }
 SH
   ln -s "$ROOT/bin/fm-backlog-transition-lib.sh" "$fake/bin/fm-backlog-transition-lib.sh"
+  # fm-task-docker-lib.sh: teardown removes the task's own Docker stacks.
+  ln -s "$ROOT/bin/fm-task-docker-lib.sh" "$fake/bin/fm-task-docker-lib.sh"
   mkdir -p "$fake/fakebin"
   cat > "$fake/fakebin/gh" <<'SH'
 #!/usr/bin/env bash
