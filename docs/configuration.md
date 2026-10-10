@@ -696,7 +696,7 @@ Each conditional request snapshots the cache entry before sending its ETag; a 30
 A supplied Link header updates pagination for the current read; cached metadata is updated only if the shared entry still matches the requested generation.
 A paginated read whose 304 omits the Link header for a full cached last page (item count equal to `per_page`) repeats that page as one unconditional GET, so a page added behind it is not missed.
 Cache publication shares the existing serialized response-recording boundary.
-A missing, corrupt, or unparsable cache entry is a normal GET, and entries unused for a week are pruned.
+A missing, corrupt, or unparsable cache entry is a normal GET; entries unused for a week, and staged files a killed helper left behind for over an hour, are pruned.
 Only REST is conditional; GraphQL reads (`gh pr view`, `gh pr checks`) have no equivalent.
 The contributions poll also checks the recorded core quota before its final GraphQL head read.
 Responses carrying valid `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `X-RateLimit-Resource` headers update the recorded quota, including on a 304 or an error.
@@ -705,7 +705,7 @@ Cache and quota recording is best-effort: an unwritable state directory or a rec
 The enforcing response headers, not `gh api rate_limit`, are the quota evidence used by the sweeps.
 
 When the recorded core remaining quota is below the fixed 15 percent floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
-The helper's header owns the refusal interface; every REST read checks the floor before each page and publishes no partial response when refused.
+The helper's header owns the refusal interface; every REST read checks the floor before each request, including the unconditional repeat of a full last page, and publishes no partial response when refused.
 The contributions poll checks the local quota record before budget exits and after incomplete observations.
 It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode.
 Completed observations remain measured.

@@ -7,7 +7,7 @@
 #
 # get makes one REST GET per page through `gh api -i` and prints the JSON body (one document per page;
 # --slurp prints a single array of page bodies; --paginate follows Link rel="next"). get checks the quota floor
-# before every page. A forge error exits 1 with its message on stderr; error responses are not cached.
+# before every request. A forge error exits 1 with its message on stderr; error responses are not cached.
 # The per-URL cache is <state>/gh-rest-cache/, with JSON entries {etag,body,next}; body is JSON text stored
 # as a string and next is the next endpoint or null. Quota records are <state>/gh-ratelimit.<resource>.json
 # with {resource,limit,remaining,reset,observed}; reset and observed are Unix epoch seconds.
