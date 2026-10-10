@@ -170,7 +170,8 @@ fm_dispatch_fallback_capacity() {
 fm_dispatch_select() {
   local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} routing_config=${6:-$1} candidate state
   if [ -z "$evidence" ]; then
-    if jq -e --argjson p "$profile" 'any(.[]; .requires == "teamclaude" and
+    if [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ] &&
+       jq -e --argjson p "$profile" 'any(.[]; .requires == "teamclaude" and
          .harness == $p.harness and .model == $p.model and .effort == $p.effort)' <<<"$fallback" >/dev/null; then
       evidence=$(fm_dispatch_fallback_capacity "$profile")
     else
