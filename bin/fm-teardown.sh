@@ -2954,7 +2954,7 @@ require_exclusive_worktree_slot_record() {
   # record and block the claimant's own teardown.
   fm_treehouse_slot_owner_state "$slot" "$record_id"
   [ "$FM_TREEHOUSE_SLOT_OWNER" != other ] || return 0
-  require_cleanup_copy_clearance "$record_meta" "$record_id" "$record_state" "$slot" 1
+  require_cleanup_copy_clearance "$record_meta" "$record_id" "$record_state" "$slot" 1 slot
 }
 
 require_exclusive_task_worktree_slot() {
@@ -2964,8 +2964,8 @@ require_exclusive_task_worktree_slot() {
 }
 
 require_cleanup_copy_clearance() {
-  local record_meta=$1 record_id=$2 record_state=$3 target=$4 allow_current=${5:-0}
-  local canonical state_dir other_meta line field copy copy_real copy_common retiring i owner_home keep_current
+  local record_meta=$1 record_id=$2 record_state=$3 target=$4 allow_current=${5:-0} target_kind=${6:-}
+  local canonical state_dir other_meta line field copy copy_real copy_common retiring i owner_home keep_current overlaps
   canonical=$(fm_task_copy_canonical_dir "$target") || return 0
   fm_local_firstmate_state_dirs "$record_state" || {
     echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
@@ -3013,7 +3013,22 @@ require_cleanup_copy_clearance() {
         fi
         copy=${line#* }
         copy_real=$(fm_task_copy_canonical_dir "$copy") || continue
-        if fm_task_copy_paths_overlap "$canonical" "$copy_real" \
+        # Returning a pool slot (target_kind=slot) refuses another ordinary
+        # task's current worktree= only on an exact path match, as origin/main
+        # does: the return resets that one slot and never removes a copy that
+        # merely sits inside it. Every other cleanup target is removed
+        # outright; home=, prior_worktree= and a secondmate's worktree= (its
+        # home) name custody no teardown may sweep away, so they keep the
+        # component-aware overlap.
+        overlaps=0
+        if [ "$target_kind" = slot ] && [ "$field" = worktree ] && [ "$retiring" = 0 ] \
+           && [ "$(fm_meta_get "$other_meta" kind)" != secondmate ] \
+           && ! { [ "${other_meta##*/}" = "${record_meta##*/}" ] && [ "$other_meta" -ef "$record_meta" ]; }; then
+          [ "$canonical" != "$copy_real" ] || overlaps=1
+        elif fm_task_copy_paths_overlap "$canonical" "$copy_real"; then
+          overlaps=1
+        fi
+        if [ "$overlaps" = 1 ] \
            && ! fm_task_copy_ancestor_current "$other_meta" "$record_state" "$field" "$copy_real" "$canonical"; then
           echo "REFUSED: task $record_id's cleanup target $canonical is also task $(basename "$other_meta" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force." >&2
           return 1

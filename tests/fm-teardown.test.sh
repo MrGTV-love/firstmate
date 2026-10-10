@@ -8016,9 +8016,9 @@ SH
 }
 
 test_other_record_copy_overlap_is_component_aware() {
-  local case_dir field direction rc recorded
+  local case_dir field direction rc recorded proceeds
   for field in worktree home prior_worktree; do
-    for direction in ancestor descendant sibling; do
+    for direction in ancestor descendant sibling exact; do
       case_dir=$(make_case "other-overlap-$field-$direction")
       mkdir -p "$case_dir/home/state" "$case_dir/wt/nested" "$case_dir/wt-sibling"
       write_meta "$case_dir" no-mistakes ship
@@ -8033,14 +8033,23 @@ SH
         ancestor) recorded=$case_dir ;;
         descendant) recorded=$case_dir/copy/nested ;;
         sibling) recorded=$case_dir/wt-sibling ;;
+        exact) recorded=$case_dir/wt ;;
+      esac
+      # Another task's current worktree= is refused only on an exact path match,
+      # as on origin/main; home= and prior_worktree= keep the component-aware
+      # overlap, so a copy nested inside or around the target still refuses.
+      proceeds=0
+      case "$direction" in
+        sibling) proceeds=1 ;;
+        ancestor|descendant) [ "$field" != worktree ] || proceeds=1 ;;
       esac
       fm_write_meta "$case_dir/state/other.meta" "$field=$recorded" "kind=ship"
       cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
       rc=0
       FM_HOME="$case_dir/home" FM_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
         run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-      if [ "$direction" = sibling ]; then
-        expect_code 0 "$rc" "other-overlap-$field-$direction: sibling custody must not block cleanup"
+      if [ "$proceeds" = 1 ]; then
+        expect_code 0 "$rc" "other-overlap-$field-$direction: this custody must not block cleanup"
         assert_absent "$case_dir/state/task-x1.meta" "other-overlap-$field-$direction: task was not retired"
       else
         expect_code 1 "$rc" "other-overlap-$field-$direction: overlapping custody must refuse cleanup"
@@ -8053,7 +8062,7 @@ SH
       assert_present "$case_dir/state/other.meta" "other-overlap-$field-$direction: other record changed"
     done
   done
-  pass "other worktree, home, and prior custody overlap refuses in both directions but not for siblings"
+  pass "other home and prior custody overlap refuses in both directions, another task's worktree only on an exact match, and siblings never"
 }
 
 test_forced_descendant_preserved_copy_refuses_before_cleanup() {
