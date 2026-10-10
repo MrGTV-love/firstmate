@@ -81,7 +81,7 @@ fm_control_worktree_registered_head() {  # <git-common-dir> <path>
 fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
   local meta=$1 id=$2 state=$3 dest=$4
   local kind old probe parent real top project common project_common git_dir branch checked
-  local head='' evidence='' journal other owned status source i owner_home this_home s field
+  local head='' evidence='' journal other_meta owned status source i owner_home this_home s field
   local -a heads=() sources=()
 
   kind=$(fm_meta_get "$meta" kind)
@@ -246,18 +246,18 @@ fm_control_worktree_relocation() {  # <meta> <id> <state-dir> <destination>
       echo "error: local Firstmate state directory $s cannot be read, so the fresh copy's ownership cannot be ruled out" >&2
       return 1
     fi
-    for other in "$s"/*.meta; do
-      [ "${other##*/}" = "${meta##*/}" ] && [ "$other" -ef "$meta" ] && continue
-      [ -e "$other" ] || [ -L "$other" ] || continue
-      if [ ! -f "$other" ] || [ -L "$other" ] || ! cat "$other" >/dev/null 2>&1; then
-        echo "error: another task record ($other) cannot be read, so the fresh copy's ownership cannot be ruled out" >&2
+    for other_meta in "$s"/*.meta; do
+      [ "${other_meta##*/}" = "${meta##*/}" ] && [ "$other_meta" -ef "$meta" ] && continue
+      [ -e "$other_meta" ] || [ -L "$other_meta" ] || continue
+      if [ ! -f "$other_meta" ] || [ -L "$other_meta" ] || ! cat "$other_meta" >/dev/null 2>&1; then
+        echo "error: another task record ($other_meta) cannot be read, so the fresh copy's ownership cannot be ruled out" >&2
         return 1
       fi
       for field in worktree home; do
-        owned=$(fm_meta_get "$other" "$field")
+        owned=$(fm_meta_get "$other_meta" "$field")
         [ -n "$owned" ] || continue
         if [ "$owned" = "$real" ] || [ "$(cd "$owned" 2>/dev/null && pwd -P)" = "$real" ]; then
-          echo "error: the fresh copy $dest is recorded by another task ($(basename "$other" .meta)$([ "$s" -ef "$state" ] || printf ' of home %s' "${s%/state}"))" >&2
+          echo "error: the fresh copy $dest is recorded by another task ($(basename "$other_meta" .meta)$([ "$s" -ef "$state" ] || printf ' of home %s' "${s%/state}"))" >&2
           return 1
         fi
       done

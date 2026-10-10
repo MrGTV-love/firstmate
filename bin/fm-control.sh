@@ -898,8 +898,9 @@ PRIOR_RELOCATE_TO=
 PRIOR_RELOCATE_HEAD=
 PRIOR_RELOCATE_HEAD_SOURCE=
 if [ "$VERB" = relaunch ] && { [ -e "$JOURNAL" ] || [ -L "$JOURNAL" ]; }; then
-  [ -f "$JOURNAL" ] && [ ! -L "$JOURNAL" ] && cat "$JOURNAL" >/dev/null 2>&1 \
-    || die "control journal $JOURNAL cannot be read; refusing to overwrite recorded recovery evidence"
+  if [ ! -f "$JOURNAL" ] || [ -L "$JOURNAL" ] || ! cat "$JOURNAL" >/dev/null 2>&1; then
+    die "control journal $JOURNAL cannot be read; refusing to overwrite recorded recovery evidence"
+  fi
   if [ "$(fm_meta_get "$JOURNAL" task)" = "$ID" ]; then
     PRIOR_RELOCATE_FROM=$(fm_meta_get "$JOURNAL" relocation_from)
     PRIOR_RELOCATE_TO=$(fm_meta_get "$JOURNAL" relocation_to)

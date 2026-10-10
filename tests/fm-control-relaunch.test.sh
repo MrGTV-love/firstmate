@@ -2901,15 +2901,15 @@ test_relocation_checks_every_recorded_head_and_requires_evidence() {
       make_relocation_case "$dir" "$id"
     fi
     case "$variant" in
-      registered) source=registered-worktree,meta-pr_head ;;
+      registered) source="registered-worktree,meta-pr_head" ;;
       journal)
         printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/first-head")" > "$dir/home/state/$id.control-relaunch"
         source=journal-worktree_head,meta-pr_head
         ;;
-      pr-head) source=meta-pr_head ;;
+      pr-head) source="meta-pr_head" ;;
       all)
         printf 'task=%s\nworktree=%s\nworktree_head=%s\n' "$id" "$dir/wt" "$(cat "$dir/first-head")" > "$dir/home/state/$id.control-relaunch"
-        source=registered-worktree,journal-worktree_head,meta-pr_head
+        source="registered-worktree,journal-worktree_head,meta-pr_head"
         ;;
     esac
     out=$(run_control "$dir" "$id" relaunch --worktree "$dir/dest" --note "resume"); rc=$?
@@ -3298,7 +3298,7 @@ test_relocation_proof_survives_later_ordinary_launch_failure() {
       from) expected="$dir/wt" ;;
       to) expected="$dir/dest" ;;
       head) expected=$(cat "$dir/committed-head") ;;
-      head_source) expected=meta-pr_head ;;
+      head_source) expected="meta-pr_head" ;;
     esac
     [ "$(journal_field "$dir" "$id" "relocation_$field")" = "$expected" ] \
       || fail "ordinary launch failure lost relocation_$field"
@@ -3419,6 +3419,7 @@ test_concurrent_non_pool_relocations_publish_only_one_owner() {
   before=$(cat "$second/home/state/$id.meta")
   : > "$dir/fake/hold-relocation-cd"
   run_spawn "$dir" "$id" --relaunch --worktree "$dir/dest" > "$dir/first.out" 2>&1 &
+  # shellcheck disable=SC2031 # The parent just launched this child; $! is not inherited.
   first_pid=$!
   while [ ! -f "$dir/fake/relocation-cd-held" ] && kill -0 "$first_pid" 2>/dev/null && [ "$i" -lt 1000 ]; do
     sleep 0.01
