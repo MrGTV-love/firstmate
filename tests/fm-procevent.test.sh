@@ -7136,4 +7136,35 @@ kill "$held_late_pid" 2>/dev/null || true
 wait "$held_late_pid" 2>/dev/null || true
 pass "a bare poll that started after the claim is not taken over after this listener reports its hold"
 
+# The runner rewrites its launch stamp before every poll round. A bare poll that
+# starts during the relisten delay after a captured round is still newer than
+# the live claim, so neither refusal proves it stray.
+HELD=$TMP_ROOT/held-between-rounds
+held_fixture "$HELD"
+export HELD
+held_art=$(cd "$HELD" && pwd -P)/review.html
+held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
+fm_test_track_procevent_home "$HELD/home"
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=4 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
+  || fail "arming the page before the round failed: $(cat "$HELD/arm.out")"
+printf 'session:\n  status: browser_disconnected\n' > "$HELD/answer.tmp"
+mv -f -- "$HELD/answer.tmp" "$HELD/answer"
+wait_for "$HELD/home/state/procevent-inbox/$held_id.1.result" || fail "the first round was not captured"
+sleep 1  # the holder must start after the captured round, inside the relisten delay
+touch "$HELD/held"
+HELD_HOLDER=live bash "$HELD/bin/lavish-axi" poll "$held_art" & held_gap_pid=$!
+wait_for_lines "$HELD/polls" 4 400 || true
+assert_absent "$HELD/taken-over" "a holder that started between rounds is not displaced by either refusal"
+wait_for_lines "$HELD/polls" 4 1 || fail "the held listener stopped retrying"
+kill -0 "$held_gap_pid" 2>/dev/null || fail "the holder that started between rounds was stopped"
+held_report=$(held_results "$HELD/home" "$held_id")
+assert_equals 1 "$(printf '%s\n' "$held_report" | grep -c .)" "the between-rounds hold is reported once"
+assert_contains "$(cat "$held_report")" "held-by: $held_gap_pid (started after the last claim)" \
+  "the report names the between-rounds holder and why it is kept"
+PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
+kill "$held_gap_pid" 2>/dev/null || true
+wait "$held_gap_pid" 2>/dev/null || true
+pass "a bare poll that started between poll rounds is not taken over by the per-round launch stamp"
+
 printf '\nall procevent tests passed\n'

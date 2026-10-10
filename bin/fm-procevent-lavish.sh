@@ -46,10 +46,11 @@
 #            native `lavish-axi poll` for an artifact whose source id this home
 #            has a registration, launch stamp or captured result for; no live
 #            claim's process group contains it; and it started before the latest
-#            of that source's claim, launch stamp and captured results. A
-#            held-page report is not such a record, and while it is the latest
-#            capture the launch stamp is not either: both are written while the
-#            holder already holds the page. Anything
+#            of that source's captured results and its loaded claim, or, when no
+#            claim loads, its launch stamp. A held-page report is not such a
+#            record, and while it is the latest capture the launch stamp is not
+#            either: both are written while the holder already holds the page.
+#            The claim keeps its time across relistens. Anything
 #            unproved - an unresolvable artifact, another home's source, a busy
 #            source lock, an uncertain claim, no claim-time record, or a process
 #            whose identity changed before the signal - is kept with its reason.
@@ -718,20 +719,36 @@ poll_retry_wait() {  # <minimum-seconds>
   ' "$1"
 }
 
+# One pass over a source's captured results. Prints "<held>\t<newest>": held is
+# 1 when the highest-sequence result is a held-page report, else 0; newest is
+# the latest mtime among results that are not held-page reports, or empty.
+result_scan() {  # <state-dir> <source-id>
+  perl -e '
+    my ($held, $newest, $top) = (0, "", -1);
+    for my $path (@ARGV) {
+      next if -l $path || !-f _;
+      my $mtime = (stat _)[9];
+      open my $in, "<", $path or next;
+      my $first = <$in> // "";
+      my $second = <$in> // "";
+      close $in;
+      my $report = $first =~ /\Aerror:/ && $second =~ /\Acode:[ \t]*LISTENER_ACTIVE[ \t]*\n?\z/;
+      $newest = $mtime if !$report && ($newest eq "" || $mtime > $newest);
+      if ($path =~ /\.([0-9]+)\.result\z/ && $1 > $top) {
+        $top = 0 + $1;
+        $held = $report ? 1 : 0;
+      }
+    }
+    print "$held\t$newest\n";
+  ' "$(fm_procevent_inbox_dir "$1")/$2".*.result 2>/dev/null
+}
+
 # Whether this source's latest captured result already reports a held page,
 # so a refusal that continues the same hold stays quiet.
 held_page_reported() {  # <source-id>
-  local result seq latest='' latest_seq=0
-  for result in "$(fm_procevent_inbox_dir "${FM_STATE_OVERRIDE:-$FM_HOME/state}")/$1".*.result; do
-    [ -f "$result" ] && [ ! -L "$result" ] || continue
-    seq=$(fm_procevent_result_sequence "$result")
-    case "$seq" in ''|*[!0-9]*) continue ;; esac
-    if [ "$((10#$seq))" -gt "$latest_seq" ]; then
-      latest_seq=$((10#$seq))
-      latest=$result
-    fi
-  done
-  [ -n "$latest" ] && [ "$(result_error_code "$latest")" = LISTENER_ACTIVE ]
+  local held newest
+  IFS=$'\t' read -r held newest < <(result_scan "${FM_STATE_OVERRIDE:-$FM_HOME/state}" "$1")
+  [ "$held" = 1 ]
 }
 
 # Exit 0 only when every other visible poll process on this page is a stray the
@@ -1284,32 +1301,26 @@ orphan_poll_processes() {
   '
 }
 
-# Latest mtime among this home's claim-time records for one source, or nothing.
-orphan_last_claim() {  # <state-dir> <source-id>
-  local reg inbox result records=()
-  reg=$(fm_procevent_registry_dir "$1")
-  inbox=$(fm_procevent_inbox_dir "$1")
-  held_page_reported "$2" || records=("$reg/$2".*.last-launch)
-  for result in "$inbox/$2".*.result; do
-    [ -f "$result" ] && [ ! -L "$result" ] || continue
-    [ "$(result_error_code "$result")" = LISTENER_ACTIVE ] || records+=("$result")
-  done
+# Latest mtime among the given claim-time records and an optional floor, or nothing.
+orphan_last_claim() {  # <floor-or-empty> <record>...
   perl -e '
-    my $latest;
+    my $latest = shift;
+    $latest = undef if $latest eq "";
     for my $path (@ARGV) {
       next if -l $path || !-f _;
       my $mtime = (stat _)[9];
       $latest = $mtime if !defined $latest || $mtime > $latest;
     }
     print "$latest\n" if defined $latest;
-  ' "$(fm_procevent_claim_path "$2")" ${records[@]+"${records[@]}"} 2>/dev/null
+  ' "$@" 2>/dev/null
 }
 
 # Why one Lavish poll process is not a provable orphan, per the header's
 # contract, in ORPHAN_REASON; empty when every fact is proved. ORPHAN_ID and
 # ORPHAN_LAST name its source and that source's latest claim-time record.
 orphan_verdict() {  # <state-dir> <pid> <pgid> <started> <artifact>
-  local state=$1 pid=$2 pgid=$3 started=$4 artifact=$5 reg inbox rec known
+  local state=$1 pid=$2 pgid=$3 started=$4 artifact=$5 reg inbox rec known held newest
+  local records=()
   ORPHAN_REASON='' ORPHAN_ID='' ORPHAN_LAST=''
   reg=$(fm_procevent_registry_dir "$state")
   inbox=$(fm_procevent_inbox_dir "$state")
@@ -1325,6 +1336,7 @@ orphan_verdict() {  # <state-dir> <pid> <pgid> <started> <artifact>
     ORPHAN_REASON='not in this home'"'"'s records'
     return 0
   fi
+  IFS=$'\t' read -r held newest < <(result_scan "$state" "$ORPHAN_ID")
   if ! fm_procevent_source_lock_try_acquire "$ORPHAN_ID" 2>/dev/null; then
     ORPHAN_REASON='source is busy'
     return 0
@@ -1333,11 +1345,14 @@ orphan_verdict() {  # <state-dir> <pid> <pgid> <started> <artifact>
     if [ "$FM_PROCEVENT_CLAIM_PID" = "$pgid" ] || [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ]; then
       ORPHAN_REASON='owned by a claim'
     fi
+    records=("$(fm_procevent_claim_path "$ORPHAN_ID")")
   elif [ -e "$(fm_procevent_claim_path "$ORPHAN_ID")" ]; then
     ORPHAN_REASON='claim cannot be read'
+  elif [ "$held" != 1 ]; then
+    records=("$reg/$ORPHAN_ID".*.last-launch)
   fi
   if [ -z "$ORPHAN_REASON" ]; then
-    ORPHAN_LAST=$(orphan_last_claim "$state" "$ORPHAN_ID")
+    ORPHAN_LAST=$(orphan_last_claim "$newest" ${records[@]+"${records[@]}"})
     if [ -z "$ORPHAN_LAST" ]; then
       ORPHAN_REASON='no claim-time record'
     elif [ "$started" -ge "$ORPHAN_LAST" ]; then
