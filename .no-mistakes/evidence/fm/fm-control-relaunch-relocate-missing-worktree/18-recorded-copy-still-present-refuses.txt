@@ -1,0 +1,8 @@
+$ FM_HOME=/private/tmp/fmlab.japfxC/home bin/fm-control.sh labd3f01b8ca23e-worker relaunch --worktree /private/tmp/fmlab.japfxC/copies/second --note resume
+error: task labd3f01b8ca23e-worker's recorded worktree /private/tmp/fmlab.japfxC/copies/good still exists or its absence cannot be proven (/private/tmp/fmlab.japfxC/copies/good is present); --worktree replaces a copy that is gone, never one that is there
+exit=1
+task record: byte-identical
+brief: byte-identical
+journal: PRESENT
+worker pane command: 2.1.296
+journal: byte-identical to before

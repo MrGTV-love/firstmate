@@ -1,0 +1,9 @@
+$ FM_HOME=/private/tmp/fmlab.japfxC/home bin/fm-control.sh labd3f01b8ca23e-worker relaunch --worktree /private/tmp/fmlab.japfxC/copies/good --note resume
+error: the fresh copy /private/tmp/fmlab.japfxC/copies/good already holds the harness file .fm-grok-turnend, which the launch would overwrite or delete; relocation never touches a file it did not create. Use a copy without it (a copy returned to the pool carries none)
+exit=1
+task record: byte-identical
+brief: byte-identical
+journal: absent
+worker pane command: 2.1.296
+--- after refusal:
+foreign token

@@ -1,0 +1,62 @@
+$ FM_HOME=/private/tmp/fmlab.japfxC/home bin/fm-control.sh labd3f01b8ca23e-worker relaunch --worktree /private/tmp/fmlab.japfxC/copies/good --note '...'
+before: worker pane cwd=/private/tmp/fmlab.japfxC/treehouse/.treehouse/notes-3e606f/1/notes 2.1.296 pid=23704
+skill selection for labd3f01b8ca23e-worker: unavailable - no TypeSafe or OpenRouter key
+relaunched labd3f01b8ca23e-worker harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-labd3f01b8ca23e-worker worktree=/private/tmp/fmlab.japfxC/copies/good
+$R/labcmd.sh $R/home/bin/fm-control.sh $ID relaunch --worktree $R/copies/good  2.37s user 3.94s system 41% cpu 15.358 total
+exit=0
+
+=== after ===
+--- diff task record (before -> after)
+3c3
+< worktree=/private/tmp/fmlab.japfxC/treehouse/.treehouse/notes-3e606f/1/notes
+---
+> worktree=/private/tmp/fmlab.japfxC/copies/good
+15,16c15,17
+< busy_gen=g1791587051.37179.24747
+< spawn_gen=s1791587052.15690.11221
+---
+> busy_gen=g1791588017.12824.32192
+> spawn_gen=s1791588018.3279.20063
+> control_relaunch_tx=84586.20261009T232013Z.21238
+--- journal labd3f01b8ca23e-worker.control-relaunch
+v1
+task=labd3f01b8ca23e-worker
+phase=complete
+ts=2026-10-09T23:20:22Z
+backend=tmux
+endpoint=firstmate:fm-labd3f01b8ca23e-worker
+worktree=/private/tmp/fmlab.japfxC/copies/good
+kind=ship
+from_harness=claude
+from_model=sonnet
+from_effort=low
+to_harness=claude
+to_model=sonnet
+to_effort=low
+relocation_from=/private/tmp/fmlab.japfxC/treehouse/.treehouse/notes-3e606f/1/notes
+relocation_to=/private/tmp/fmlab.japfxC/copies/good
+relocation_head=4ddc72e6b5f2d9975c1aac03381df4db2a27c783
+relocation_head_source=registered-worktree
+worktree_head=4ddc72e6b5f2d9975c1aac03381df4db2a27c783
+worktree_dirty=no
+note_file=/private/tmp/fmlab.japfxC/home/state/labd3f01b8ca23e-worker.control-relaunch.note
+exit_result=stopped
+--- worker pane: /private/tmp/fmlab.japfxC/copies/good 2.1.296 pid=23704
+head: illegal line count -- 0
+--- fresh copy HEAD 4ddc72e6b5f2d9975c1aac03381df4db2a27c783 branch fm/labd3f01b8ca23e-worker; status:
+!! .claude/
+--- status log
+paused [at=1791587062]: waiting for gate file /private/tmp/fmlab.japfxC/home/data/labd3f01b8ca23e-worker/gate and a resume message
+--- brief tail
+
+This task was relaunched in /private/tmp/fmlab.japfxC/copies/good because its recorded local copy
+(/private/tmp/fmlab.japfxC/treehouse/.treehouse/notes-3e606f/1/notes) was proven absent. The new copy is a fresh checkout of the same branch
+and contains every surviving recorded head (registered-worktree), proven at 4ddc72e6b5f2d9975c1aac03381df4db2a27c783.
+Uncommitted changes in the vanished copy are not recoverable; check the branch
+and the status log for what is missing before continuing.
+
+First, check your instruction inbox: list /private/tmp/fmlab.japfxC/home/state/labd3f01b8ca23e-worker.inbox/*.msg, act on
+each message in numeric order, then mv each handled file into
+/private/tmp/fmlab.japfxC/home/state/labd3f01b8ca23e-worker.inbox/handled/. A steer sent before the relaunch survives there.
+
+Live lab: the pool copy was deleted; continue paused on the gate as before.

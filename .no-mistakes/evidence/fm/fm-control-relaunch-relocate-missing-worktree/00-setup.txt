@@ -1,0 +1,3 @@
+# Setup: worker committed 4ddc72e6b5f2d9975c1aac03381df4db2a27c783 on fm/labd3f01b8ca23e-worker, then its pool copy /private/tmp/fmlab.japfxC/treehouse/.treehouse/notes-3e606f/1/notes was deleted (rm -rf), registration kept
+/private/tmp/fmlab.japfxC/home/projects/notes                       6f69254 [main]
+/private/tmp/fmlab.japfxC/treehouse/.treehouse/notes-3e606f/1/notes 4ddc72e [fm/labd3f01b8ca23e-worker] prunable

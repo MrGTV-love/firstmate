@@ -1,0 +1,7 @@
+$ FM_HOME=/private/tmp/fmlab.japfxC/home bin/fm-control.sh labd3f01b8ca23e-worker relaunch --note resume
+error: task labd3f01b8ca23e-worker's recorded worktree /private/tmp/fmlab.japfxC/treehouse/.treehouse/notes-3e606f/1/notes is missing; refusing to relaunch and lose track of its work (a fresh copy of the same branch can replace it: pass --worktree <path>)
+exit=1
+task record: byte-identical
+brief: byte-identical
+journal: absent
+worker pane command: 2.1.296

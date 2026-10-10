@@ -1,0 +1,30 @@
+$ FM_HOME=/private/tmp/fmlab.japfxC/home bin/fm-control.sh labd3f01b8ca23e-worker relaunch --worktree /private/tmp/fmlab.japfxC/copies/second --note '...'   (lock released)
+skill selection for labd3f01b8ca23e-worker: unavailable - no TypeSafe or OpenRouter key
+relaunched labd3f01b8ca23e-worker harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=firstmate:fm-labd3f01b8ca23e-worker worktree=/private/tmp/fmlab.japfxC/copies/second
+exit=0
+--- task record worktree: worktree=/private/tmp/fmlab.japfxC/copies/second
+--- journal
+v1
+task=labd3f01b8ca23e-worker
+phase=complete
+ts=2026-10-09T23:27:39Z
+backend=tmux
+endpoint=firstmate:fm-labd3f01b8ca23e-worker
+worktree=/private/tmp/fmlab.japfxC/copies/second
+kind=ship
+from_harness=claude
+from_model=sonnet
+from_effort=low
+to_harness=claude
+to_model=sonnet
+to_effort=low
+relocation_from=/private/tmp/fmlab.japfxC/copies/good
+relocation_to=/private/tmp/fmlab.japfxC/copies/second
+relocation_head=6cb5bcc220bd2556e804ea8aa1d115576df99a4e
+relocation_head_source=registered-worktree,journal-relocation_head,journal-worktree_head
+worktree_head=6cb5bcc220bd2556e804ea8aa1d115576df99a4e
+worktree_dirty=no
+note_file=/private/tmp/fmlab.japfxC/home/state/labd3f01b8ca23e-worker.control-relaunch.note
+exit_result=already-stopped
+--- worker pane: /private/tmp/fmlab.japfxC/copies/second 2.1.296
+--- copy HEAD 6cb5bcc220bd2556e804ea8aa1d115576df99a4e  (expected H2 6cb5bcc220bd2556e804ea8aa1d115576df99a4e)

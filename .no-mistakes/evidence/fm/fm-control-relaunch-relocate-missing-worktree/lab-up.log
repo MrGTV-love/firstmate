@@ -1,0 +1,15 @@
+lab: /private/tmp/fmlab.japfxC (tear down with: bin/fm-live-lab.sh down /private/tmp/fmlab.japfxC)
+tree: b82f1340e1207864bf6b1aed7f095311b329da08 from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H9GQ8DKY44GE4BB3R7ZGYT
+skill selection for labd3f01b8ca23e-worker: unavailable - no TypeSafe or OpenRouter key
+spawned labd3f01b8ca23e-worker harness=claude kind=ship mode=local-only yolo=on window=firstmate:fm-labd3f01b8ca23e-worker worktree=/private/tmp/fmlab.japfxC/treehouse/.treehouse/notes-3e606f/1/notes
+gate: /private/tmp/fmlab.japfxC/home/data/labd3f01b8ca23e-worker/gate (touch, then message the worker to resume)
+primary: claude --setting-sources project,local --model sonnet --effort medium --permission-mode auto
+ok primary: claude pid 71338 in /private/tmp/fmlab.japfxC/home
+ok probe: the primary answered LABREADY-d3f01b8ca23e
+ok trust: /private/tmp/fmlab.japfxC/home is trusted in the Claude store
+fail host: supervision host pid 86519 runs (expected none)
+ok watcher: live watcher with a fresh beacon
+ok worker: labd3f01b8ca23e-worker parked on /private/tmp/fmlab.japfxC/home/data/labd3f01b8ca23e-worker/gate
+ok treehouse: ~/.treehouse unchanged
+not ready after 600s; the lab is left up for inspection: bin/fm-live-lab.sh pane /private/tmp/fmlab.japfxC, then bin/fm-live-lab.sh down /private/tmp/fmlab.japfxC
+exit=1

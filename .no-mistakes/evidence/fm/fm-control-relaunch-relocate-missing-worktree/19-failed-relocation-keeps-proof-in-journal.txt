@@ -1,0 +1,32 @@
+# A second relocation (copies/good vanished -> copies/second) while another process holds the shared project lock
+$ FM_HOME=/private/tmp/fmlab.japfxC/home bin/fm-control.sh labd3f01b8ca23e-worker relaunch --worktree /private/tmp/fmlab.japfxC/copies/second --note '...'
+error: another spawn or cleanup holds the shared project lock for /private/tmp/fmlab.japfxC/home/projects/notes; refusing to race relocation ownership
+error: the replacement agent for labd3f01b8ca23e-worker could not be launched on claude
+error: labd3f01b8ca23e-worker's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /private/tmp/fmlab.japfxC/copies/second
+exit=1
+--- task record vs before
+15d14
+< busy_gen=g1791588017.12824.32192
+--- journal after the failure rewrite
+v1
+task=labd3f01b8ca23e-worker
+phase=failed:launching
+ts=2026-10-09T23:26:51Z
+backend=tmux
+endpoint=firstmate:fm-labd3f01b8ca23e-worker
+worktree=/private/tmp/fmlab.japfxC/copies/good
+kind=ship
+from_harness=claude
+from_model=sonnet
+from_effort=low
+to_harness=claude
+to_model=sonnet
+to_effort=low
+relocation_from=/private/tmp/fmlab.japfxC/copies/good
+relocation_to=/private/tmp/fmlab.japfxC/copies/second
+relocation_head=6cb5bcc220bd2556e804ea8aa1d115576df99a4e
+relocation_head_source=registered-worktree,journal-relocation_head,journal-worktree_head
+worktree_head=6cb5bcc220bd2556e804ea8aa1d115576df99a4e
+worktree_dirty=no
+rollback=prior-record-kept
+--- worker pane: /private/tmp/fmlab.japfxC/copies/good zsh

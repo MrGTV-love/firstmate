@@ -1,0 +1,7 @@
+$ FM_HOME=/private/tmp/fmlab.japfxC/home bin/fm-control.sh labd3f01b8ca23e-worker relaunch --worktree copies/good --note resume
+error: the fresh copy must be given as an absolute path, not 'copies/good'
+exit=1
+task record: byte-identical
+brief: byte-identical
+journal: absent
+worker pane command: 2.1.296

@@ -1,0 +1,7 @@
+$ FM_HOME=/private/tmp/fmlab.japfxC/home bin/fm-control.sh labd3f01b8ca23e-worker relaunch --worktree /private/tmp/fmlab.japfxC/home/projects/notes --note resume
+error: the fresh copy must be an isolated worktree of the repository, not the project's own checkout
+exit=1
+task record: byte-identical
+brief: byte-identical
+journal: absent
+worker pane command: 2.1.296

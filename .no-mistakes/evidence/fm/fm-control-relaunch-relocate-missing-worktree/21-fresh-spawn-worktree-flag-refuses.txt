@@ -1,0 +1,4 @@
+$ FM_HOME=/private/tmp/fmlab.japfxC/home bin/fm-spawn.sh labfresh /private/tmp/fmlab.japfxC/home/projects/notes --worktree /private/tmp/fmlab.japfxC/copies/second
+error: --worktree applies to --relaunch only: a fresh spawn allocates its own isolated copy
+exit=1
+ls: /private/tmp/fmlab.japfxC/home/state/labfresh.meta: No such file or directory
