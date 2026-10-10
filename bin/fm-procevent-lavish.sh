@@ -166,8 +166,17 @@
 # The published poll vocabulary includes feedback, ended, waiting, and
 # browser_disconnected. A waiting result from this no-timeout poll means a
 # second poller was present; it is not a normal idle round. lavish-axi 0.1.79
-# refuses that poll with typed `code: LISTENER_ACTIVE` instead, and `classify`
-# reports it as waiting so it takes the same back-off. browser_disconnected
+# refuses that poll with typed `code: LISTENER_ACTIVE` instead: the page is held.
+# `poll` then checks every other poll process on the page with the `orphans`
+# test. When each is a proved stray, it polls again with `--takeover`, so the
+# next answer reaches this listener. Otherwise it displaces nothing: it prints
+# the refusal plus `held-page:` and `held-by:` lines naming the page and each
+# unproved poll, which `classify` reports as waiting, once per hold. While the
+# latest capture is that report, later refusals stay quiet and retry after the
+# quiet delay, doubling to POLL_RETRY_DELAY_MAX, under the same runner and claim.
+# A LISTENER_REPLACED result means another poll took this listener's page over;
+# `terminal` treats it as a handoff, so the source retires instead of relaunching.
+# browser_disconnected
 # means the session remains open and is handled as a silent reconnect wait.
 # Before each poll attempt, resolve the artifact's saved URL from Lavish's own
 # session store (LAVISH_AXI_STATE_DIR/state.json, default ~/.lavish-axi/state.json)
@@ -573,7 +582,9 @@ POLL_RETRY_DELAY_MAX=60
 # response must be one of the forms described above with those exact bytes.
 # Whitespace variants, any other help text or port, a longer response that
 # merely opens with them, and any other SERVER_ERROR are genuine errors this
-# adapter must never swallow.
+# adapter must never swallow. Exit 11 only for a whole LISTENER_ACTIVE refusal:
+# one error line, that code line, then only help lines. Its text varies, so it
+# is staged whole and printed by the caller when it reports the held page.
 poll_response_filter() {  # <response-file>
   perl -e '
     use strict;
@@ -590,6 +601,19 @@ poll_response_filter() {  # <response-file>
     push @forms, "error: Lavish Editor server did not start\ncode: SERVER_ERROR\n"
       . "help[1]: Run `lavish-axi server --port $port` to inspect server startup\n"
       if $port =~ /\A[0-9]+\z/;
+    my $held = qr/\Aerror: [^\n]*\ncode: LISTENER_ACTIVE\n(?:help\[[0-9]+\]: [^\n]*\n)*\z/;
+    sub may_be_held {
+      my ($seen) = @_;
+      my ($head, $code) = ("error: ", "code: LISTENER_ACTIVE\n");
+      return 0 if length($seen) > 4096;
+      return substr($head, 0, length $seen) eq $seen if length($seen) < length($head);
+      return 0 if substr($seen, 0, length $head) ne $head;
+      my $newline = index($seen, "\n");
+      return 1 if $newline < 0;
+      my $rest = substr($seen, $newline + 1);
+      return substr($code, 0, length $rest) eq $rest if length($rest) < length($code);
+      return substr($rest, 0, length $code) eq $code;
+    }
     open my $staged, ">", $stage or exit 2;
     binmode STDIN;
     binmode STDOUT;
@@ -612,7 +636,8 @@ poll_response_filter() {  # <response-file>
         write_all(*STDOUT, $chunk);
         next;
       }
-      # Stage through the first byte that leaves every form, and no further.
+      # Stage through the first byte that leaves every form, and no further;
+      # a possible LISTENER_ACTIVE refusal is staged whole.
       my $seen = $candidate . $chunk;
       my $same = 0;
       for my $form (@forms) {
@@ -620,9 +645,11 @@ poll_response_filter() {  # <response-file>
         (substr($seen, 0, $span) ^ substr($form, 0, $span)) =~ /^(\0*)/;
         $same = length $1 if length $1 > $same;
       }
-      my $keep = $same < length($seen) ? $same + 1 : $same;
-      write_all($staged, substr($seen, length($candidate), $keep - length($candidate)));
-      if ($same == length($seen)) {
+      my $hold = may_be_held($seen);
+      my $keep = $hold ? length($seen) : $same < length($seen) ? $same + 1 : $same;
+      my $from = length $candidate;
+      write_all($staged, substr($seen, $from, $keep - $from)) if $keep > $from;
+      if ($same == length($seen) || $hold) {
         $candidate = $seen;
       } else {
         write_all(*STDOUT, $seen);
@@ -630,6 +657,7 @@ poll_response_filter() {  # <response-file>
       }
     }
     exit 10 if !$streaming && grep { $candidate eq $_ } $bare, @forms;
+    exit 11 if !$streaming && $candidate =~ $held;
     write_all(*STDOUT, $candidate) unless $streaming;
   ' "$1"
 }
@@ -687,9 +715,53 @@ poll_retry_wait() {  # <minimum-seconds>
   ' "$1"
 }
 
+# Whether this source's latest captured result already reports a held page,
+# so a refusal that continues the same hold stays quiet.
+held_page_reported() {  # <source-id>
+  local result seq latest='' latest_seq=0
+  for result in "$(fm_procevent_inbox_dir "${FM_STATE_OVERRIDE:-$FM_HOME/state}")/$1".*.result; do
+    [ -f "$result" ] && [ ! -L "$result" ] || continue
+    seq=$(fm_procevent_result_sequence "$result")
+    case "$seq" in ''|*[!0-9]*) continue ;; esac
+    if [ "$((10#$seq))" -gt "$latest_seq" ]; then
+      latest_seq=$((10#$seq))
+      latest=$result
+    fi
+  done
+  [ -n "$latest" ] && [ "$(result_error_code "$latest")" = LISTENER_ACTIVE ]
+}
+
+# Exit 0 only when every other visible poll process on this page is a stray the
+# `orphans` contract proves, and at least one exists. Prints one `held-by:` line
+# per poll that is not proved, so a live claim's poll or any unproved or foreign
+# poll is never displaced.
+held_page_strays() {  # <artifact>
+  local artifact=$1 id state own pid pgid started command strays=0 kept=0
+  id=$(cmd_source_id "$artifact" 2>/dev/null) || return 1
+  state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
+  own=$(ps -o pgid= -p "$$" 2>/dev/null | tr -d ' ')
+  [ -n "$own" ] || return 1
+  while IFS=$'\t' read -r pid pgid started command; do
+    [ "$pgid" != "$own" ] || continue
+    if [ "$(cmd_source_id "$command" 2>/dev/null)" != "$id" ]; then
+      # A poll naming this page beside extra options is still on this page.
+      case " $command " in *" $artifact "*) ;; *) continue ;; esac
+    fi
+    orphan_verdict "$state" "$pid" "$pgid" "$started" "$command"
+    if [ -z "$ORPHAN_REASON" ] && [ "$ORPHAN_ID" = "$id" ]; then
+      strays=$((strays + 1))
+    else
+      kept=$((kept + 1))
+      printf 'held-by: %s (%s)\n' "$pid" "${ORPHAN_REASON:-another source}"
+    fi
+  done < <(orphan_poll_processes)
+  [ "$kept" -gt 0 ] || [ "$strays" -gt 0 ] || printf 'held-by: no visible poll process\n'
+  [ "$kept" -eq 0 ] && [ "$strays" -gt 0 ]
+}
+
 cmd_poll() {
   local artifact=${1-} delay attempt=0 response cleanup_command rc filter_rc
-  local pipeline_status reply_file=''
+  local pipeline_status reply_file='' takeover=() held_wait='' holders
   local reply_text='' reply_pending=0 store_attempt=0
   [ -n "$artifact" ] || usage
   if [ "$#" -eq 3 ] && [ "${2-}" = --agent-reply-file ]; then
@@ -747,12 +819,13 @@ cmd_poll() {
       fi
     fi
     if [ "$reply_pending" -eq 1 ]; then
-      lavish-axi poll "$artifact" --agent-reply "$reply_text" | poll_response_filter "$response"
+      lavish-axi poll "$artifact" ${takeover[@]+"${takeover[@]}"} --agent-reply "$reply_text" | poll_response_filter "$response"
     else
-      lavish-axi poll "$artifact" | poll_response_filter "$response"
+      lavish-axi poll "$artifact" ${takeover[@]+"${takeover[@]}"} | poll_response_filter "$response"
     fi
     pipeline_status=("${PIPESTATUS[@]}")
     reply_pending=0
+    takeover=()
     rc=${pipeline_status[0]}
     filter_rc=${pipeline_status[1]}
     case "$filter_rc" in
@@ -766,6 +839,25 @@ cmd_poll() {
           cat -- "$response"
           break
         fi
+        ;;
+      11)
+        # A held page (header). Take it from a proved stray; otherwise report
+        # the hold once and keep retrying it quietly with the waiting back-off.
+        if holders=$(held_page_strays "$artifact"); then
+          takeover=(--takeover)
+          continue
+        fi
+        if ! held_page_reported "$(cmd_source_id "$artifact")"; then
+          cat -- "$response"
+          printf 'held-page: another poll holds %s and is not a proved leftover, so it is not displaced; this listener keeps its claim, retries with back-off, and reports this hold once\n' "$artifact"
+          [ -z "$holders" ] || printf '%s\n' "$holders"
+          break
+        fi
+        held_wait=${held_wait:-$delay}
+        poll_retry_wait "$held_wait" \
+          || die "cannot enforce the poll rate governor"
+        held_wait=$((held_wait * 2))
+        [ "$held_wait" -le "$POLL_RETRY_DELAY_MAX" ] || held_wait=$POLL_RETRY_DELAY_MAX
         ;;
       *) die "cannot classify the poll response" ;;
     esac
@@ -795,6 +887,16 @@ session_field() {  # <result-file> <field>
   ' "$1"
 }
 
+# The typed `code:` that follows a leading `error:` line, or nothing.
+result_error_code() {  # <result-file>
+  awk '
+    NR == 1 && /^error:[[:space:]]*/ { in_error=1; next }
+    in_error && /^code:[[:space:]]*[A-Z_]+[[:space:]]*$/ {
+      sub(/^code:[[:space:]]*/, ""); sub(/[[:space:]]*$/, ""); print; exit }
+    in_error { exit }
+  ' "$1"
+}
+
 # Classify a completed result into a lifecycle state for the handler.
 cmd_classify() {
   local file=${1-} status error_code error_message
@@ -808,12 +910,7 @@ cmd_classify() {
     browser_disconnected) printf 'disconnected\n'; return 0 ;;
   esac
   error_message=$(awk 'NR == 1 && /^error:[[:space:]]*/ { sub(/^error:[[:space:]]*/, ""); print }' "$file")
-  error_code=$(awk '
-    NR == 1 && /^error:[[:space:]]*/ { in_error=1; next }
-    in_error && /^code:[[:space:]]*[A-Z_]+[[:space:]]*$/ {
-      sub(/^code:[[:space:]]*/, ""); sub(/[[:space:]]*$/, ""); print; exit }
-    in_error { exit }
-  ' "$file")
+  error_code=$(result_error_code "$file")
   if [ "$error_code" = NOT_FOUND ] || [[ "$error_message" == "No active Lavish Editor session"* ]]; then
     printf 'missing\n'
   elif [ "$error_code" = LISTENER_ACTIVE ]; then
@@ -829,7 +926,9 @@ cmd_classify() {
 # session produces nothing further, a missing session has nothing left to
 # produce, and the published poll delivers the final feedback of a `Send & End`
 # review marked with session_ended and returns only empty ended sessions after
-# it. Anything else - including an unreadable result - keeps the source armed.
+# it. A LISTENER_REPLACED result means another poll took this page over on
+# purpose, so this listener hands the page off instead of fighting for it.
+# Anything else - including an unreadable result - keeps the source armed.
 cmd_terminal() {
   local file=${1-}
   [ -n "$file" ] || usage
@@ -837,6 +936,7 @@ cmd_terminal() {
   case "$(cmd_classify "$file")" in
     ended|missing) return 0 ;;
   esac
+  [ "$(result_error_code "$file")" != LISTENER_REPLACED ] || return 0
   case "$(session_field "$file" session_ended)" in
     true|True|TRUE) return 0 ;;
   esac
@@ -1197,9 +1297,51 @@ orphan_last_claim() {  # <state-dir> <source-id>
   ' "$(fm_procevent_claim_path "$2")" "$reg/$2".*.last-launch "$inbox/$2".*.result 2>/dev/null
 }
 
+# Why one Lavish poll process is not a provable orphan, per the header's
+# contract, in ORPHAN_REASON; empty when every fact is proved. ORPHAN_ID and
+# ORPHAN_LAST name its source and that source's latest claim-time record.
+orphan_verdict() {  # <state-dir> <pid> <pgid> <started> <artifact>
+  local state=$1 pid=$2 pgid=$3 started=$4 artifact=$5 reg inbox rec known
+  ORPHAN_REASON='' ORPHAN_ID='' ORPHAN_LAST=''
+  reg=$(fm_procevent_registry_dir "$state")
+  inbox=$(fm_procevent_inbox_dir "$state")
+  if ! ORPHAN_ID=$(cmd_source_id "$artifact" 2>/dev/null); then
+    ORPHAN_REASON='artifact cannot be resolved'
+    return 0
+  fi
+  known=0
+  for rec in "$reg/$ORPHAN_ID.source" "$reg/$ORPHAN_ID".*.last-launch "$inbox/$ORPHAN_ID".*.result; do
+    [ -f "$rec" ] && [ ! -L "$rec" ] && { known=1; break; }
+  done
+  if [ "$known" -eq 0 ]; then
+    ORPHAN_REASON='not in this home'"'"'s records'
+    return 0
+  fi
+  if ! fm_procevent_source_lock_try_acquire "$ORPHAN_ID" 2>/dev/null; then
+    ORPHAN_REASON='source is busy'
+    return 0
+  fi
+  if fm_procevent_claim_load_locked "$ORPHAN_ID" 2>/dev/null; then
+    if [ "$FM_PROCEVENT_CLAIM_PID" = "$pgid" ] || [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ]; then
+      ORPHAN_REASON='owned by a claim'
+    fi
+  elif [ -e "$(fm_procevent_claim_path "$ORPHAN_ID")" ]; then
+    ORPHAN_REASON='claim cannot be read'
+  fi
+  if [ -z "$ORPHAN_REASON" ]; then
+    ORPHAN_LAST=$(orphan_last_claim "$state" "$ORPHAN_ID")
+    if [ -z "$ORPHAN_LAST" ]; then
+      ORPHAN_REASON='no claim-time record'
+    elif [ "$started" -ge "$ORPHAN_LAST" ]; then
+      ORPHAN_REASON='started after the last claim'
+    fi
+  fi
+  fm_procevent_source_lock_release "$ORPHAN_ID" 2>/dev/null || true
+}
+
 cmd_orphans() {
-  local kill_mode=0 state reg inbox pid pgid started artifact id identity last reason
-  local found=0 killed=0 kept=0 rec known
+  local kill_mode=0 state pid pgid started artifact identity reason
+  local found=0 killed=0 kept=0
   case "${1-}" in
     '') ;;
     --kill) kill_mode=1; shift ;;
@@ -1207,52 +1349,21 @@ cmd_orphans() {
   esac
   [ "$#" -eq 0 ] || usage
   state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
-  reg=$(fm_procevent_registry_dir "$state")
-  inbox=$(fm_procevent_inbox_dir "$state")
   while IFS=$'\t' read -r pid pgid started artifact; do
     [ -n "$pid" ] && [ "$pid" != "$$" ] || continue
     identity=$(fm_pid_identity "$pid" 2>/dev/null) || continue
-    reason=''
-    if ! id=$(cmd_source_id "$artifact" 2>/dev/null); then
-      reason='artifact cannot be resolved'
-    else
-      known=0
-      for rec in "$reg/$id.source" "$reg/$id".*.last-launch "$inbox/$id".*.result; do
-        [ -f "$rec" ] && [ ! -L "$rec" ] && { known=1; break; }
-      done
-      if [ "$known" -eq 0 ]; then
-        reason='not in this home'"'"'s records'
-      elif ! fm_procevent_source_lock_try_acquire "$id" 2>/dev/null; then
-        reason='source is busy'
+    orphan_verdict "$state" "$pid" "$pgid" "$started" "$artifact"
+    reason=$ORPHAN_REASON
+    if [ -z "$reason" ]; then
+      found=$((found + 1))
+      if [ "$kill_mode" -eq 0 ]; then
+        printf 'orphan: %s %s started=%s last-claim=%s %s\n' "$pid" "$ORPHAN_ID" "$started" "$ORPHAN_LAST" "$artifact"
+      elif [ "$(fm_pid_identity "$pid" 2>/dev/null || true)" = "$identity" ] && kill -TERM "$pid" 2>/dev/null; then
+        killed=$((killed + 1))
+        printf 'killed: %s %s started=%s last-claim=%s %s\n' "$pid" "$ORPHAN_ID" "$started" "$ORPHAN_LAST" "$artifact"
       else
-        if fm_procevent_claim_load_locked "$id" 2>/dev/null; then
-          if [ "$FM_PROCEVENT_CLAIM_PID" = "$pgid" ] || [ "$FM_PROCEVENT_CLAIM_PID" = "$pid" ]; then
-            reason='owned by a claim'
-          fi
-        elif [ -e "$(fm_procevent_claim_path "$id")" ]; then
-          reason='claim cannot be read'
-        fi
-        if [ -z "$reason" ]; then
-          last=$(orphan_last_claim "$state" "$id")
-          if [ -z "$last" ]; then
-            reason='no claim-time record'
-          elif [ "$started" -ge "$last" ]; then
-            reason='started after the last claim'
-          fi
-        fi
-        if [ -z "$reason" ]; then
-          found=$((found + 1))
-          if [ "$kill_mode" -eq 0 ]; then
-            printf 'orphan: %s %s started=%s last-claim=%s %s\n' "$pid" "$id" "$started" "$last" "$artifact"
-          elif [ "$(fm_pid_identity "$pid" 2>/dev/null || true)" = "$identity" ] && kill -TERM "$pid" 2>/dev/null; then
-            killed=$((killed + 1))
-            printf 'killed: %s %s started=%s last-claim=%s %s\n' "$pid" "$id" "$started" "$last" "$artifact"
-          else
-            found=$((found - 1))
-            reason='process changed before the signal'
-          fi
-        fi
-        fm_procevent_source_lock_release "$id" 2>/dev/null || true
+        found=$((found - 1))
+        reason='process changed before the signal'
       fi
     fi
     if [ -n "$reason" ]; then
