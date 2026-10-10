@@ -65,7 +65,13 @@ cat > "$LAB/payload.json" <<'JSON'
       "type": "decision",
       "repo": "sample",
       "title": "Guard placeholder",
-      "options": [{ "value": "yes", "label": "Yes" }]
+      "about": "Placeholder card that proves the board builds against the installed provider.",
+      "decide": "Nothing to decide; the guard never answers it.",
+      "options": [{ "value": "yes", "label": "Yes", "hint": "Nothing changes; this is a placeholder." }],
+      "recommend_value": "yes",
+      "recommend_reason": "It is the only option on the placeholder card.",
+      "facts": ["The guard only needs a card the board can render."],
+      "counterfacts": ["No real decision depends on this card."]
     }
   ],
   "underway": [],

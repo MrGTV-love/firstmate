@@ -293,7 +293,59 @@ JSON
   pass "overdue obligations survive an empty composed board with owner, next action, and age"
 }
 
+# Build the board from <calls-json> alone and return what the renderer produced.
+render_calls() {  # <home> <calls-json>
+  local home=$1 calls=$2 data="$1/payload.json"
+  jq -n --argjson calls "$calls" '{
+    schema:"fm-bearings-board.v1", home:"render-home", generated:"2026-10-10T00:00Z",
+    prs_live:false, captains_call:$calls, underway:[], landed:[], charted:[]}' > "$data"
+  PATH="$home/fakebin:$PATH" FM_HOME="$home" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_PROCEVENT_CLAIM_ROOT="$home/procevent-claims" \
+    LAVISH_AXI_STATE_DIR="$home/lavish-state" \
+    "$BOARD" build "$data" >/dev/null || fail "the board did not build"
+  require_listener_reached_poll "$home"
+  node "$HARNESS" "$home/.lavish/bearings-board.html" \
+    || fail "the built board could not be rendered"
+}
+
+test_a_decision_card_shows_its_recommendation_reason_and_both_evidence_lists() {
+  local home out
+  home=$(make_home decision-evidence)
+  out=$(render_calls "$home" '[{
+    "key":"mac-mini-plan","type":"decision","repo":"sample",
+    "title":"Mac mini role",
+    "about":"The Mac Studio move left the Mac mini without a job.",
+    "decide":"What should the Mac mini do now?",
+    "options":[
+      {"value":"build","label":"Run CI builds","hint":"Frees the Studio for agents; adds one machine to keep patched."},
+      {"value":"retire","label":"Retire it","hint":"Saves upkeep; loses the spare capacity."}],
+    "recommend_value":"build",
+    "recommend_reason":"It adds capacity without new spend.",
+    "facts":["CI queues ran 40 minutes behind during the move.","The Mac mini sits idle."],
+    "counterfacts":["It is out of warranty.","A second machine doubles the patching work."]
+  }]')
+  printf '%s' "$out" | jq -e '.error == ""' >/dev/null \
+    || fail "the board rendered its error instead of the decision card: $out"
+  printf '%s' "$out" | jq -e '
+    (.calls | length) == 1
+    and (.calls[0].options[0] | .label == "Run CI builds" and .rec == true
+      and (.hint | contains("Frees the Studio"))
+      and .why == "Why recommended: It adds capacity without new spend.")
+    and (.calls[0].options[1] | .rec == false and .why == "")
+  ' >/dev/null || fail "the recommended option did not show its reason beside it: $out"
+  printf '%s' "$out" | jq -e '
+    .calls[0].evidence == [
+      {"heading":"Facts for",
+       "items":["CI queues ran 40 minutes behind during the move.","The Mac mini sits idle."]},
+      {"heading":"Facts against",
+       "items":["It is out of warranty.","A second machine doubles the patching work."]}]
+  ' >/dev/null || fail "the card did not list both facts for and facts against: $out"
+  pass "a decision card shows the recommendation reason beside its option and both evidence lists"
+}
+
 test_overdue_obligations_cannot_be_omitted_by_the_board_composer
+test_a_decision_card_shows_its_recommendation_reason_and_both_evidence_lists
 test_an_underway_row_leads_with_the_task_name_and_keeps_its_run_status
 test_an_underway_identifier_label_is_not_replaced_by_run_status
 test_charted_next_reads_newest_filed_first

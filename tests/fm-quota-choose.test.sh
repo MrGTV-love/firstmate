@@ -58,6 +58,14 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$FAKEBIN"
+cat > "$FAKEBIN/omp" <<'SH'
+#!/usr/bin/env bash
+[ "$1" = usage ] || exit 2
+jq -n --argjson now "$(date +%s)" --argjson remaining "${OMP_POOL_REMAINING:-20}" '
+  {reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+    limits:[{scope:{shared:true},amount:{unit:"percent",remaining:$remaining}}]}]}'
+SH
+chmod +x "$FAKEBIN/omp"
 
 cat > "$FIXTURE" <<'JSON'
 {
@@ -221,13 +229,15 @@ fi
 [ "$out" = "none" ] || fail "specific scope: expected 'none', got '$out'"
 ok "specific model scope bounds generic quota"
 
-if out=$(call_choose --snapshot "$LAB/captured.json" --candidate omp:openai-codex/codex_bengalfox 2>/dev/null); then
-  fail "omp prefix: the bare codex model scope did not veto, got exit 0 with '$out'"
+if out=$(OMP_POOL_REMAINING=0 call_choose --snapshot "$LAB/captured.json" --candidate omp:openai-codex/gpt-6.1-sol 2>/dev/null); then
+  fail "OMP pool exhaustion must veto a positive single-account snapshot"
 fi
-[ "$out" = "none" ] || fail "omp prefix: expected 'none' from the exhausted codex model scope, got '$out'"
-out=$(call_choose --snapshot "$LAB/captured.json" --candidate omp:openai-codex/codex_other)
-[ "$out" = "omp openai-codex/codex_other" ] || fail "omp prefix: expected the provider-wide codex quota to select the prefixed model, got '$out'"
-ok "omp openai-codex prefix matches the bare codex model scope"
+[ "$out" = none ] || fail "exhausted OMP pool returned '$out'"
+jq '(.providers[] | select(.provider == "codex").quotaSemantics.effectiveAvailability[]) |=
+  (.effectivePercentRemaining = 0 | .runway.status = "exhausted_now")' "$LAB/captured.json" > "$LAB/single-exhausted.json"
+out=$(call_choose --snapshot "$LAB/single-exhausted.json" --candidate omp:openai-codex/gpt-6.1-sol)
+[ "$out" = "omp openai-codex/gpt-6.1-sol" ] || fail "a healthy OMP sibling must survive single-account exhaustion: '$out'"
+ok "OMP Codex uses its pooled accounts rather than the single-account snapshot"
 
 if err=$(call_choose --snapshot "$LAB/captured.json" --candidate omp:ollama/qwen3:8b --candidate claude:claude-3-5-sonnet 2>&1); then
   fail "unmapped omp prefix unexpectedly selected a later candidate"

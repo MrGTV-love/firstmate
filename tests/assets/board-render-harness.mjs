@@ -5,7 +5,9 @@
 // Usage: node board-render-harness.mjs <built-board.html>
 // Prints one JSON document:
 //   { stats:[{n,label}], underway:[{title,sub,badges}],
-//     charted:[{title,sub,badges,pickable}], empty, more, error }
+//     charted:[{title,sub,badges,pickable}], empty, more, error,
+//     calls:[{title,about,decide,options:[{label,hint,why,rec}],
+//       evidence:[{heading,items}]}] }
 import { readFileSync } from "node:fs";
 
 const html = readFileSync(process.argv[2], "utf8");
@@ -27,6 +29,11 @@ class Node {
     this.classList = {
       add: (c) => { this.className = (this.className + " " + c).trim(); },
       contains: (c) => this.className.split(/\s+/).includes(c),
+      remove: (c) => { this.className = this.className.split(/\s+/).filter((x) => x && x !== c).join(" "); },
+      toggle: (c, on) => {
+        const has = this.className.split(/\s+/).includes(c);
+        if (on === undefined ? !has : on) { if (!has) this.classList.add(c); } else this.classList.remove(c);
+      },
     };
   }
   get textContent() {
@@ -122,5 +129,33 @@ const errorText = [...byId.entries()]
 const empty = ch.children.filter((c) => c.className.includes("bb-empty")).map((c) => c.textContent);
 const more = ch.children.filter((c) => c.className.includes("bb-morechip")).map((c) => c.textContent);
 
+const textOf = (node, cls) =>
+  node?.children.find((c) => c.className.split(/\s+/).includes(cls))?.textContent ?? "";
+const ctxOf = (card, key) => {
+  const row = card.querySelectorAll(".bb-ctx__row").find((r) => textOf(r, "bb-ctx__k") === key);
+  return row ? textOf(row, "bb-ctx__v") : "";
+};
+const deck = byId.get("bb-call") || new Node("div");
+const calls = deck.children
+  .filter((c) => c.className.split(/\s+/).includes("bb-decision"))
+  .map((card) => ({
+    title: card.querySelectorAll(".bb-decision__title")[0]?.textContent ?? "",
+    about: ctxOf(card, "about"),
+    decide: ctxOf(card, "decide"),
+    evidence: card.querySelectorAll(".bb-evidence__box").map((box) => ({
+      heading: textOf(box, "bb-evidence__head"),
+      items: box.querySelectorAll(".bb-evidence__item").map((i) => i.textContent),
+    })),
+    options: card.querySelectorAll(".bb-opt").map((opt) => {
+      const body = opt.children.find((c) => c.className.includes("bb-opt__body"));
+      return {
+        label: textOf(body, "bb-opt__label"),
+        hint: textOf(body, "bb-opt__hint"),
+        why: textOf(body, "bb-opt__why"),
+        rec: opt.children.some((c) => c.className.includes("bb-opt__rec")),
+      };
+    }),
+  }));
+
 process.stdout.write(
-  JSON.stringify({ stats, underway, charted, empty, more, error: errorText }) + "\n");
+  JSON.stringify({ stats, underway, charted, empty, more, error: errorText, calls }) + "\n");
