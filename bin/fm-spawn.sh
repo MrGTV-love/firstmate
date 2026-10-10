@@ -261,7 +261,14 @@
 #   .omp/fm-session-overlay.yml through --config. That overlay pins composer
 #   shape, plan mode off, prewalk off, and the non-interactive usage-reserve
 #   policy for the one session only (--auto-approve alone owns approval,
-#   forcing tools.approvalMode: yolo for the session).
+#   forcing tools.approvalMode: yolo for the session). It also ends the Sol
+#   model's fallback chain at its equal, the same model on another route, so a
+#   provider error burst cannot strand a session on a weaker model, and it pins
+#   omp's own return to the recorded model once the primary serves again.
+#   Each session publishes the model it is serving through
+#   bin/fm-omp-live-model.ts (a crewmate or scout from its per-task extension, a
+#   secondmate from the home's tracked extension), and bin/fm-crew-state.sh
+#   reports a differing model or an unrecovered run error beside the state.
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
 #   Secondmate lanes keep their memory settings; the captain's own
@@ -5474,6 +5481,7 @@ EOF
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installJevGuard } from "$FM_ROOT/bin/fm-jev-guard.ts";
+import { installLiveModelPublisher } from "$FM_ROOT/bin/fm-omp-live-model.ts";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -5483,6 +5491,8 @@ const busyEvent = (state: string, event: string) =>
   });
 export default function (pi: any) {
   installJevGuard(pi, $guard_context);
+  // The model serving this task now, for bin/fm-crew-state.sh's drift note.
+  installLiveModelPublisher(pi, "$STATE_REAL/$ID.live-model");
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;
