@@ -232,12 +232,15 @@ Recursive retirement validates each child against its owning home's registry and
 It never touches a prior copy outside the slot it returns and names each one it left, to be returned or removed only after its contents are confirmed landed or unwanted.
 
 A task's own prior copies never refuse its own teardown, so a nested reassociation can always be retired.
-When the current copy is nested inside a pool slot the task still claims, teardown runs the landed-work test on the nested copy, removes it (its branch stays), returns the enclosing slot, and drops the claim.
-When the current copy is the pool slot and a prior copy is nested inside it, teardown removes that prior copy before the ordinary return.
-In both shapes each own copy the return would sweep away, other than the current copy, must be a clean worktree root whose HEAD is landed in the default branch or held by the task's `refs/fm/anchor/<task>-<sha>` anchor; otherwise teardown stops before changing anything and names the copy and the reason.
-`--force` skips the landed-work test on the current copy as always and does not waive that proof.
-Before any destructive step, teardown concludes a parked no-mistakes run, retires a task-private launch agent, and reaps leaked processes on every copy the return sweeps away, each as its own root, not only on the current copy.
-If that proof fails after a stale-lock cleanup, the nested copy is already removed; a re-run finds the slot through the task's own `prior_worktree=` and proves it again under the same rule.
+[`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s `teardown_nested_slot` is the one owner of returning the enclosing slot once the task's own nested copy goes. It works in three phases, and a re-run derives its input from the record's `branch=` and `prior_worktree=`, never from the nested copy still existing:
+
+1. **Proof, with no side effects.** The nested copy passes the ordinary landed-work test. When an earlier teardown already removed it, that test runs on its `branch=` ref read from the project: a merged PR, then local-main ancestry for a local-only ship, then the merge-tree content check, so neither the copy nor a recorded `pr=` URL is needed. The slot and every own copy nested in it are clean worktree roots whose HEAD is landed by that same rule or held by the task's `refs/fm/anchor/<task>-<sha>` anchor, and the slot's claim is this task's. Otherwise teardown stops before changing anything and names the copy and the reason.
+2. **Retire, on every swept root.** Before any destructive step, teardown concludes a parked no-mistakes run, retires a task-private launch agent, and reaps leaked processes on the current copy, the slot and each nested copy, each as its own root.
+3. **Execute.** Teardown proves the slot and the nested copies again with the lock held and refuses before removing anything. Then it removes the nested copy (its branch stays), detaches the slot, returns it, and drops the claim. If the return removes a stale `index.lock`, the slot is proved once more before the reset.
+
+`--force` skips the landed-work test on the current copy as always and does not waive the slot proof.
+The same function covers the reverse shape, where the current copy is the pool slot and a prior copy is nested inside it: that copy is proved and removed before the ordinary return.
+A refusal after the nested copy is gone leaves the record and the slot claim in place. A plain re-run, with no `--force` and no captain words, finds the slot through the task's own `prior_worktree=`, proves it again under the same rule, and returns it; a landed ship is recorded as landed, never as dropped.
 A nested current copy whose enclosing slot the task does not claim is left in place like any other reassociated non-pool copy.
 
 Before a fresh spawn sends `treehouse get`, and before secondmate home seeding sends `treehouse get --lease`, each under the shared project lock used for allocation and return, [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh) checks whether a pool slot of the project strictly contains a task record's current copy (`worktree=`) in this home or any locally registered home.

@@ -737,14 +737,14 @@ do_reassociate() {
       prior_worktree=?*)
         prior_real=$(fm_task_copy_canonical_dir "${line#prior_worktree=}") || continue
         own_copies+=("$prior_real")
-        for slot in ${left_slots[@]+"${left_slots[@]}"}; do
-          case "$prior_real" in "$slot"|"$slot"/*) proofs+=("$prior_real") ;; esac
-        done
         ;;
     esac
   done < "$META"
   for slot in ${left_slots[@]+"${left_slots[@]}"}; do
     [ ! -d "$slot" ] || proofs+=("$slot")
+    while IFS= read -r prior_real; do
+      proofs+=("$prior_real")
+    done < <(fm_task_copy_priors_inside "$META" "$slot")
   done
   [ -z "$old_real" ] || proofs=("$old_real" ${proofs[@]+"${proofs[@]}"})
   for write in 0 1; do

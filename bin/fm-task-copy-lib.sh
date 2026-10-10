@@ -62,8 +62,8 @@ fm_task_copy_default_branch() {
   return 1
 }
 
-fm_task_copy_content_in_default() {
-  local worktree=$1 project=$2 name=${3:-} ref default_tree merged_tree
+fm_task_copy_content_in_default() {  # <worktree> <project> [<default-branch>] [<head-ref>]
+  local worktree=$1 project=$2 name=${3:-} head=${4:-HEAD} ref default_tree merged_tree
   [ -d "$worktree" ] || return 1
   [ -n "$name" ] || name=$(fm_task_copy_default_branch "$project") || return 1
   if git -C "$worktree" remote get-url origin >/dev/null 2>&1; then
@@ -76,7 +76,7 @@ fm_task_copy_content_in_default() {
   fi
   default_tree=$(git -C "$worktree" rev-parse --quiet --verify "$ref^{tree}" 2>/dev/null) || return 1
   [ -n "$default_tree" ] || return 1
-  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" HEAD 2>/dev/null) || return 1
+  merged_tree=$(git -C "$worktree" merge-tree --write-tree "$ref" "$head" 2>/dev/null) || return 1
   merged_tree=${merged_tree%%$'\n'*}
   [ "$merged_tree" = "$default_tree" ]
 }
@@ -100,6 +100,18 @@ fm_task_copy_dirty_status() {  # <porcelain-status> [<copy> <nested-copy>...]
     done
     printf '%s\n' "$line"
   done <<< "$status"
+}
+
+# The canonical paths of the task's own prior_worktree= copies that lie strictly
+# inside <slot>: the copies a reset or release of that slot would sweep away.
+# Shared by bin/fm-control.sh reassociate and bin/fm-teardown.sh.
+fm_task_copy_priors_inside() {  # <meta> <slot>
+  local meta=$1 slot=$2 line prior_real
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in prior_worktree=?*) ;; *) continue ;; esac
+    prior_real=$(fm_task_copy_canonical_dir "${line#prior_worktree=}") || continue
+    case "$prior_real" in "$slot"/*) printf '%s\n' "$prior_real" ;; esac
+  done < "$meta"
 }
 
 # The one rule for a task's own copy that a pool slot reset or release may

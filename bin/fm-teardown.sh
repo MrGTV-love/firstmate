@@ -1340,7 +1340,7 @@ teardown_preserves_reassociated_copy() {
 # copy that is a pool slot takes the ordinary return path below. So does a
 # current copy nested inside a pool slot this task still claims: it is removed
 # and that slot is returned, since the slot would otherwise stay held by a task
-# that no longer exists (require_disposable_own_slot_copies).
+# that no longer exists (teardown_nested_slot).
 TEARDOWN_PRIOR_COPIES=()
 while IFS= read -r teardown_prior_line || [ -n "$teardown_prior_line" ]; do
   case "$teardown_prior_line" in
@@ -1642,7 +1642,7 @@ remove_pr_poll_artifacts() {
 pr_number_from_branch() {
   local branch=$1 out n
   [ -n "$branch" ] && [ "$branch" != HEAD ] || return 1
-  out=$( cd "$WT" && gh-axi pr list --state all --head "$branch" --limit 1 2>/dev/null ) || return 1
+  out=$( cd "${TEARDOWN_LANDED_DIR:-$WT}" && gh-axi pr list --state all --head "$branch" --limit 1 2>/dev/null ) || return 1
   n=$(printf '%s\n' "$out" | sed -n 's/^[[:space:]]*\([0-9][0-9]*\),.*/\1/p' | head -1)
   [ -n "$n" ] || return 1
   printf '%s' "$n"
@@ -1665,28 +1665,31 @@ pr_number_from_target() {
   printf '%s' "$n"
 }
 
+# The landed-work helpers below measure a ref in a directory: the task copy's
+# HEAD by default, or, through teardown_landed, any other directory and ref.
 ensure_commit_object() {
-  local target=$1 commit=$2 n
-  git -C "$WT" cat-file -e "$commit^{commit}" 2>/dev/null && return 0
+  local target=$1 commit=$2 n dir=${TEARDOWN_LANDED_DIR:-$WT}
+  git -C "$dir" cat-file -e "$commit^{commit}" 2>/dev/null && return 0
   n=$(pr_number_from_target "$target") || return 1
-  git -C "$WT" remote get-url origin >/dev/null 2>&1 || return 1
-  git -C "$WT" fetch --quiet origin "refs/pull/$n/head" >/dev/null 2>&1 || return 1
-  git -C "$WT" cat-file -e "$commit^{commit}" 2>/dev/null
+  git -C "$dir" remote get-url origin >/dev/null 2>&1 || return 1
+  git -C "$dir" fetch --quiet origin "refs/pull/$n/head" >/dev/null 2>&1 || return 1
+  git -C "$dir" cat-file -e "$commit^{commit}" 2>/dev/null
 }
 
 patch_id_for_commit() {
   local commit=$1
-  git -C "$WT" show --pretty=medium --no-ext-diff "$commit" 2>/dev/null \
+  git -C "${TEARDOWN_LANDED_DIR:-$WT}" show --pretty=medium --no-ext-diff "$commit" 2>/dev/null \
     | git patch-id --stable 2>/dev/null \
     | awk 'NR == 1 { print $1 }'
 }
 
 unpushed_patches_are_in_pr_head() {
   local pr_head=$1 current base pr_patch_ids commit patch_id unpushed
-  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
-  base=$(git -C "$WT" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
+  current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || return 1
+  base=$(git -C "$dir" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
   pr_patch_ids=$(
-    git -C "$WT" log --format=%H "$base..$pr_head" -- 2>/dev/null \
+    git -C "$dir" log --format=%H "$base..$pr_head" -- 2>/dev/null \
       | while IFS= read -r commit; do
           patch_id_for_commit "$commit"
         done \
@@ -1694,7 +1697,7 @@ unpushed_patches_are_in_pr_head() {
       | sort -u
   ) || return 1
   [ -n "$pr_patch_ids" ] || return 1
-  unpushed=$(git -C "$WT" log --format=%H HEAD --not --remotes -- 2>/dev/null) || return 1
+  unpushed=$(git -C "$dir" log --format=%H "$ref" --not --remotes -- 2>/dev/null) || return 1
   [ -n "$unpushed" ] || return 1
   while IFS= read -r commit; do
     [ -n "$commit" ] || continue
@@ -1910,14 +1913,15 @@ EOF
 # occurs - the caller then falls back to the content check.
 pr_is_merged() {
   local branch=$1 target view state remainder head resolved_url current landed=0
-  [ -d "$WT" ] || return 1
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
+  [ -d "$dir" ] || return 1
   if [ -n "$PR_URL" ]; then
     target=$PR_URL
   else
     target=$(pr_number_from_branch "$branch") || return 1
   fi
   [ -n "$target" ] || return 1
-  view=$(cd "$WT" && gh pr view "$target" --json state,headRefOid,url -q '.state + "\t" + .headRefOid + "\t" + .url' 2>/dev/null) || return 1
+  view=$(cd "$dir" && gh pr view "$target" --json state,headRefOid,url -q '.state + "\t" + .headRefOid + "\t" + .url' 2>/dev/null) || return 1
   state=${view%%$'\t'*}
   remainder=${view#*$'\t'}
   [ "$state" != "$view" ] || return 1
@@ -1930,8 +1934,8 @@ pr_is_merged() {
   esac
   [ -n "$head" ] || return 1
   ensure_commit_object "$target" "$head" || return 1
-  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
-  if git -C "$WT" merge-base --is-ancestor "$current" "$head" 2>/dev/null; then
+  current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || return 1
+  if git -C "$dir" merge-base --is-ancestor "$current" "$head" 2>/dev/null; then
     landed=1
   elif unpushed_patches_are_in_pr_head "$head"; then
     landed=1
@@ -1953,15 +1957,24 @@ pr_is_merged() {
 # proofs documented in this script's header even when every commit is pushed.
 work_is_landed() {
   local branch=$1
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   if [ "$MODE" = local-only ]; then
     local name
     name=$(fm_task_copy_default_branch "$PROJ") || name=
-    if [ -n "$name" ] && git -C "$WT" merge-base --is-ancestor HEAD "refs/heads/$name" 2>/dev/null; then
+    if [ -n "$name" ] && git -C "$dir" merge-base --is-ancestor "$ref" "refs/heads/$name" 2>/dev/null; then
       return 0
     fi
   fi
   pr_is_merged "$branch" && return 0
-  fm_task_copy_content_in_default "$WT" "$PROJ" "${BASE_BRANCH:-}"
+  fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"
+}
+
+# The one landed-work rule, applied to <ref> in <dir>: the task copy's own HEAD,
+# the enclosing slot's HEAD, or a removed copy's branch ref read from the
+# project. <branch> names the PR lookup, as for work_is_landed.
+teardown_landed() {  # <dir> <ref> <branch>
+  local TEARDOWN_LANDED_DIR=$1 TEARDOWN_LANDED_REF=$2
+  work_is_landed "$3"
 }
 
 TEARDOWN_DROPPING=0
@@ -2250,6 +2263,14 @@ validate_worktree_teardown_safety() {
     secondmate|scout) return 0 ;;
   esac
   if [ ! -d "$WT" ] || [ "$(git -C "$WT" rev-parse --is-inside-work-tree 2>/dev/null)" != true ]; then
+    if teardown_nested_slot landed; then
+      return 0
+    fi
+    if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && [ ! -d "$WT" ]; then
+      echo "REFUSED: task $ID's nested copy $WT is already removed and its branch is not landed; a pushed branch alone is not completion." >&2
+      echo "Land its PR (or merge it to local main for a local-only ship), then re-run teardown, or get the captain's own words to drop it and pass --force --drop-file." >&2
+      return 1
+    fi
     if [[ "$PR_URL" =~ ^https://github[.]com/([^/]+/[^/]+)/pull/([0-9]+)$ ]] \
         && recorded_pr_state=$(gh pr view "$PR_URL" --json state -q '.state' 2>/dev/null) \
         && [ "$recorded_pr_state" = MERGED ]; then
@@ -2307,6 +2328,21 @@ validate_worktree_teardown_safety() {
       return 1
     fi
   fi
+}
+
+# The landed-work test above, with its stale-lock retry, as a refusal: exits on
+# failure. --force skips it.
+require_worktree_teardown_safety() {
+  local safety_rc=0
+  [ "$FORCE" != "--force" ] || return 0
+  validate_worktree_teardown_safety || safety_rc=$?
+  [ "$safety_rc" -ne 0 ] || return 0
+  if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ]; then
+    cleanup_stale_lock_for_safety_check "$WT" || exit 1
+    validate_worktree_teardown_safety || exit 1
+    return 0
+  fi
+  exit 1
 }
 
 # Fix 1 (see script header): does the active-or-most-recent no-mistakes run in
@@ -3070,7 +3106,7 @@ require_cleanup_copy_clearance() {
           [ "$keep_current" = 1 ] || continue
         fi
         # The task's own prior copies never refuse its own slot cleanup here:
-        # require_disposable_own_slot_copies proves each one a return would
+        # teardown_nested_slot proves each one a return would
         # sweep away, and a cleanup that returns nothing touches none of them.
         if [ "$own" = 1 ] && [ "$field" = prior_worktree ] \
            && [ "$target_kind" = slot ] && [ "$record_meta" = "$META" ]; then
@@ -3182,12 +3218,28 @@ teardown_owns_worktree() {
 # (refs/fm/anchor/<task>-<sha>, written by bin/fm-control.sh reassociate).
 # --force does not waive that proof: no captain words cover a prior copy.
 #
-# Sets TEARDOWN_RETURN_SLOT to the slot this teardown returns, and
-# TEARDOWN_NESTED_COPIES to the proven copies inside it that are removed first.
-# A nested current copy whose enclosing slot this task does not claim keeps the
-# ordinary reassociated treatment: nothing of it is touched.
+# teardown_nested_slot is the one owner of that lifecycle, so a re-run after any
+# refusal derives its input from the record's branch= and prior_worktree=, never
+# from the nested copy still existing:
+#   prove    Phase A, no side effects. The slot and every own copy nested in it
+#            are clean and landed or anchored, and the claim is this task's.
+#   landed   Phase A for a nested copy an earlier teardown already removed: its
+#            branch ref, read from the project, passes teardown_landed.
+#   retire   Phase B. Conclude parked runs, retire launch agents and reap
+#            processes on every root the return sweeps: the current copy, the
+#            slot and each nested copy.
+#   reprove  The proof again, for a call site that cannot refuse by itself.
+#   return   Phase C. Prove again before anything is removed, then remove the
+#            nested copies, detach the slot, return it and drop the claim. An
+#            ordinary teardown has no nested copy, so only the return remains.
+# Sets TEARDOWN_RETURN_SLOT to the slot this teardown returns, TEARDOWN_NESTED_COPIES
+# to the proven copies inside it that are removed first, and TEARDOWN_PROOF_COPIES
+# to every copy the proof covers. A nested current copy whose enclosing slot this
+# task does not claim keeps the ordinary reassociated treatment: nothing of it
+# is touched.
 TEARDOWN_RETURN_SLOT=
 TEARDOWN_NESTED_COPIES=()
+TEARDOWN_PROOF_COPIES=()
 TEARDOWN_PROOF_OUTCOME="nothing was changed - not even with --force"
 teardown_own_copy_disposable() {  # <canonical-copy>
   local copy=$1 what="recorded prior_worktree" rc=0
@@ -3197,7 +3249,7 @@ teardown_own_copy_disposable() {  # <canonical-copy>
   case "$rc" in
     0) return 0 ;;
     2)
-      ! fm_task_copy_content_in_default "$copy" "$PROJ" "${BASE_BRANCH:-}" || return 0
+      ! teardown_landed "$copy" HEAD "" || return 0
       echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, whose HEAD $FM_TASK_COPY_HEAD is neither landed nor held by a refs/fm/anchor/$ID-<sha> preservation anchor; $TEARDOWN_PROOF_OUTCOME." >&2
       echo "Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown." >&2
       return 1
@@ -3211,53 +3263,125 @@ teardown_own_copy_disposable() {  # <canonical-copy>
   return 1
 }
 
-# The enclosing slot's proof again, for a return that removed a stale lock.
-# --force does not waive it. Earlier cleanup steps have already run by then.
-teardown_enclosing_slot_disposable() {
+# The stale-lock return's post-cleanup check: one word, because
+# teardown_treehouse_return runs it with no arguments. The nested copy is
+# already removed by then.
+teardown_nested_slot_reprove_after_lock() {
   TEARDOWN_PROOF_OUTCOME="the slot was not returned and keeps its contents, but earlier cleanup steps already ran, including removing the nested copy; --force does not waive this proof"
-  teardown_own_copy_disposable "$TEARDOWN_ENCLOSING_SLOT"
+  teardown_nested_slot reprove
 }
 
-require_disposable_own_slot_copies() {
-  local current prior prior_real copy known
-  local -a kept=() proofs=()
-  if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
-    fm_treehouse_slot_owner_state "$TEARDOWN_ENCLOSING_SLOT" "$ID"
-    [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || TEARDOWN_ENCLOSING_SLOT=
-  fi
-  current=$(fm_task_copy_canonical_dir "$WT") || current=
-  if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
-    TEARDOWN_RETURN_SLOT=$TEARDOWN_ENCLOSING_SLOT
-    require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RETURN_SLOT" || return 1
-    TEARDOWN_NESTED_COPIES=(${current:+"$current"})
-    proofs=("$TEARDOWN_RETURN_SLOT")
-  elif ! teardown_owns_worktree || ! TEARDOWN_RETURN_SLOT=$(teardown_live_slot_path); then
-    TEARDOWN_RETURN_SLOT=
-    return 0
-  fi
-  for prior in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
-    prior_real=$(fm_task_copy_canonical_dir "$prior") || prior_real=
-    case "$prior_real" in
-      "$TEARDOWN_RETURN_SLOT") continue ;;
-      "$TEARDOWN_RETURN_SLOT"/*) ;;
-      *)
-        kept+=("$prior")
-        continue
-        ;;
-    esac
-    known=0
-    [ "$prior_real" != "$current" ] || known=1
-    for copy in ${proofs[@]+"${proofs[@]}"}; do
-      [ "$copy" != "$prior_real" ] || known=1
-    done
-    [ "$known" = 0 ] || continue
-    proofs+=("$prior_real")
-    TEARDOWN_NESTED_COPIES+=("$prior_real")
-  done
-  for copy in ${proofs[@]+"${proofs[@]}"}; do
-    teardown_own_copy_disposable "$copy" || return 1
-  done
-  TEARDOWN_PRIOR_COPIES=(${kept[@]+"${kept[@]}"})
+teardown_nested_slot() {  # prove | landed | retire | reprove | return
+  local phase=$1 current prior prior_real copy known root branch teardown_slot post_lock_check
+  local -a kept=() proofs=() swept=()
+  case "$phase" in
+    prove)
+      [ "$KIND" != secondmate ] || return 0
+      if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
+        fm_treehouse_slot_owner_state "$TEARDOWN_ENCLOSING_SLOT" "$ID"
+        [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || TEARDOWN_ENCLOSING_SLOT=
+      fi
+      current=$(fm_task_copy_canonical_dir "$WT") || current=
+      if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
+        TEARDOWN_RETURN_SLOT=$TEARDOWN_ENCLOSING_SLOT
+        require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RETURN_SLOT" || return 1
+        TEARDOWN_NESTED_COPIES=(${current:+"$current"})
+        proofs=("$TEARDOWN_RETURN_SLOT")
+      elif ! teardown_owns_worktree || ! TEARDOWN_RETURN_SLOT=$(teardown_live_slot_path); then
+        TEARDOWN_RETURN_SLOT=
+        return 0
+      fi
+      for prior in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
+        prior_real=$(fm_task_copy_canonical_dir "$prior") || prior_real=$prior
+        case "$prior_real" in
+          "$TEARDOWN_RETURN_SLOT"|"$TEARDOWN_RETURN_SLOT"/*) ;;
+          *) kept+=("$prior") ;;
+        esac
+      done
+      while IFS= read -r prior_real; do
+        known=0
+        [ "$prior_real" != "$current" ] || known=1
+        for copy in ${proofs[@]+"${proofs[@]}"}; do
+          [ "$copy" != "$prior_real" ] || known=1
+        done
+        [ "$known" = 0 ] || continue
+        proofs+=("$prior_real")
+        TEARDOWN_NESTED_COPIES+=("$prior_real")
+      done < <(fm_task_copy_priors_inside "$META" "$TEARDOWN_RETURN_SLOT")
+      TEARDOWN_PROOF_COPIES=(${proofs[@]+"${proofs[@]}"})
+      teardown_nested_slot reprove || return 1
+      TEARDOWN_PRIOR_COPIES=(${kept[@]+"${kept[@]}"})
+      ;;
+    landed)
+      [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && [ ! -d "$WT" ] || return 1
+      branch=$(fm_meta_get "$META" branch)
+      [ -n "$branch" ] || branch=fm/$ID
+      git -C "$PROJ" rev-parse --verify --quiet "refs/heads/$branch^{commit}" >/dev/null || return 1
+      teardown_landed "$PROJ" "refs/heads/$branch" "$branch"
+      ;;
+    reprove)
+      for copy in ${TEARDOWN_PROOF_COPIES[@]+"${TEARDOWN_PROOF_COPIES[@]}"}; do
+        teardown_own_copy_disposable "$copy" || return 1
+      done
+      ;;
+    retire)
+      # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root.
+      swept=("$WT")
+      for root in ${TEARDOWN_RETURN_SLOT:+"$TEARDOWN_RETURN_SLOT"} \
+          ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+        [ "$root" -ef "$WT" ] || swept+=("$root")
+      done
+      for root in "${swept[@]}"; do
+        conclude_task_no_mistakes_run "$root" || exit 1
+      done
+      for root in "${swept[@]}"; do
+        retire_task_private_nm_launch_agents "$root" || exit 1
+      done
+      reap_task_worktree_processes worktree "${swept[@]}" "$TASK_TMP" || exit 1
+      ;;
+    return)
+      if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; then
+        TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
+        teardown_nested_slot reprove || exit 1
+        [ ! -d "$WT" ] || require_worktree_teardown_safety
+        for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+          git -C "$PROJ" worktree remove --force "$copy" >/dev/null 2>&1 || {
+            echo "error: could not remove $ID's nested copy $copy before returning pool slot $TEARDOWN_RETURN_SLOT; teardown aborted" >&2
+            exit 1
+          }
+        done
+      fi
+      teardown_slot=${TEARDOWN_ENCLOSING_SLOT:-$WT}
+      branch=$(git -C "$teardown_slot" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
+      if [ "$branch" != "HEAD" ]; then
+        if git -C "$teardown_slot" checkout --detach -q 2>/dev/null; then
+          git -C "$teardown_slot" branch -D "$branch" >/dev/null 2>&1 || true
+        fi
+      fi
+      # Remove our hook file so a reused pool worktree cannot fire signals for a dead task.
+      rm -f "$teardown_slot/.claude/settings.local.json" "$teardown_slot/.opencode/plugins/fm-turn-end.js" \
+        "$teardown_slot/.fm-grok-turnend" "$teardown_slot/.fm-kimi-turnend"
+      # Kills remaining processes in the worktree (including the agent), resets, returns
+      # to pool. treehouse resolves the pool from the working directory, so run it from
+      # the project. teardown_treehouse_return tolerates transient and stale git locks
+      # left by a killed crew process; see the script header for retry and stale-lock proof.
+      post_lock_check=
+      if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
+        post_lock_check=teardown_nested_slot_reprove_after_lock
+      elif [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ]; then
+        post_lock_check=validate_worktree_teardown_safety
+      fi
+      teardown_treehouse_return "$teardown_slot" "$PROJ" "worktree" "$post_lock_check" || {
+        echo "error: treehouse return failed for worktree $teardown_slot; teardown aborted" >&2
+        exit 1
+      }
+      # The slot is back in the pool, so this task's claim on it is spent. Dropping
+      # it here - and only after a return that succeeded - keeps a returned slot
+      # unclaimed until its next holder claims it, and leaves the claim in place
+      # whenever the return did not actually happen.
+      fm_treehouse_slot_owner_release "$teardown_slot" "$ID"
+      ;;
+  esac
 }
 
 firstmate_home_has_treehouse_slot() {
@@ -4273,9 +4397,7 @@ if [ "$KIND" != secondmate ] && teardown_owns_worktree \
    && ! fm_treehouse_pool_slot "$PROJ" "$WT"; then
   require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$WT" || exit 1
 fi
-if [ "$KIND" != secondmate ]; then
-  require_disposable_own_slot_copies || exit 1
-fi
+teardown_nested_slot prove || exit 1
 
 validate_pr_poll_cleanup "$STATE" "$ID" || exit 1
 
@@ -4381,19 +4503,7 @@ if [ -n "$X_REQUEST" ]; then
   echo "warning: task $ID still carries an unreconciled Relay request link ($X_REQUEST) on its task record." >&2
 fi
 
-if [ "$FORCE" != "--force" ]; then
-  if validate_worktree_teardown_safety; then
-    :
-  else
-    safety_rc=$?
-    if [ "$safety_rc" -eq "$TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED" ]; then
-      cleanup_stale_lock_for_safety_check "$WT" || exit 1
-      validate_worktree_teardown_safety || exit 1
-    else
-      exit 1
-    fi
-  fi
-fi
+require_worktree_teardown_safety
 
 TEARDOWN_HERDR_SESSION=
 TEARDOWN_HERDR_PANE=
@@ -4462,21 +4572,7 @@ fi
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
-  # A pool return also sweeps the slot it returns and the task's own copies
-  # nested in it (require_disposable_own_slot_copies), so each is concluded,
-  # retired and reaped as its own root, not only the current copy.
-  TEARDOWN_SWEPT_ROOTS=("$WT")
-  for teardown_swept_root in ${TEARDOWN_RETURN_SLOT:+"$TEARDOWN_RETURN_SLOT"} \
-      ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
-    [ "$teardown_swept_root" -ef "$WT" ] || TEARDOWN_SWEPT_ROOTS+=("$teardown_swept_root")
-  done
-  for teardown_swept_root in "${TEARDOWN_SWEPT_ROOTS[@]}"; do
-    conclude_task_no_mistakes_run "$teardown_swept_root"
-  done
-  for teardown_swept_root in "${TEARDOWN_SWEPT_ROOTS[@]}"; do
-    retire_task_private_nm_launch_agents "$teardown_swept_root" || exit 1
-  done
-  reap_task_worktree_processes worktree "${TEARDOWN_SWEPT_ROOTS[@]}" "$TASK_TMP"
+  teardown_nested_slot retire
 elif [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes tasktmp "$TASK_TMP"
 fi
@@ -4651,44 +4747,7 @@ elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ] && [ -z "$TEARDOWN_ENCLOSING_SLOT" ]; then
   :
 elif { [ -d "$WT" ] || [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; } && [ "$KIND" != secondmate ]; then
-  # The task's own copies nested in the slot were proved disposable before the
-  # first cleanup step; they go first so the return leaves no registered
-  # worktree pointing into a reset slot. Their branches stay.
-  for teardown_nested_copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
-    git -C "$PROJ" worktree remove --force "$teardown_nested_copy" >/dev/null 2>&1 || {
-      echo "error: could not remove $ID's nested copy $teardown_nested_copy before returning pool slot $TEARDOWN_RETURN_SLOT; teardown aborted" >&2
-      exit 1
-    }
-  done
-  teardown_slot=${TEARDOWN_ENCLOSING_SLOT:-$WT}
-  branch=$(git -C "$teardown_slot" rev-parse --abbrev-ref HEAD 2>/dev/null || echo HEAD)
-  if [ "$branch" != "HEAD" ]; then
-    if git -C "$teardown_slot" checkout --detach -q 2>/dev/null; then
-      git -C "$teardown_slot" branch -D "$branch" >/dev/null 2>&1 || true
-    fi
-  fi
-  # Remove our hook file so a reused pool worktree cannot fire signals for a dead task.
-  rm -f "$teardown_slot/.claude/settings.local.json" "$teardown_slot/.opencode/plugins/fm-turn-end.js" \
-    "$teardown_slot/.fm-grok-turnend" "$teardown_slot/.fm-kimi-turnend"
-  # Kills remaining processes in the worktree (including the agent), resets, returns
-  # to pool. treehouse resolves the pool from the working directory, so run it from
-  # the project. teardown_treehouse_return tolerates transient and stale git locks
-  # left by a killed crew process; see the script header for retry and stale-lock proof.
-  post_lock_cleanup_check=
-  if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
-    post_lock_cleanup_check=teardown_enclosing_slot_disposable
-  elif [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ]; then
-    post_lock_cleanup_check=validate_worktree_teardown_safety
-  fi
-  teardown_treehouse_return "$teardown_slot" "$PROJ" "worktree" "$post_lock_cleanup_check" || {
-    echo "error: treehouse return failed for worktree $teardown_slot; teardown aborted" >&2
-    exit 1
-  }
-  # The slot is back in the pool, so this task's claim on it is spent. Dropping
-  # it here - and only after a return that succeeded - keeps a returned slot
-  # unclaimed until its next holder claims it, and leaves the claim in place
-  # whenever the return did not actually happen.
-  fm_treehouse_slot_owner_release "$teardown_slot" "$ID"
+  teardown_nested_slot return
 fi
 
 if [ "$BACKEND" != herdr ] && [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS" != 1 ]; then
