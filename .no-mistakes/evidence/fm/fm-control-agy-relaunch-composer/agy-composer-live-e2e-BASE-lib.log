@@ -1,0 +1,7 @@
+FM_TEST_BEGIN 2026-10-10T22:37:33Z tests/fm-agy-composer-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+timing: boot=9s load=40.65 44.03 44.54
+not ok - idle-empty: composer never read 'empty' within 10s (last 'unknown', identity agy/idle, agy 1.3.3, herdr herdr 0.9.1)
+FM_TEST_END 2026-10-10T22:38:53Z tests/fm-agy-composer-live-e2e.test.sh exit=1 duration_ms=80060 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=80557
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=80060 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-agy-composer-live-e2e.test.sh duration_ms=80060

@@ -1,0 +1,18 @@
+FM_TEST_BEGIN 2026-10-10T22:35:53Z tests/fm-agy-composer-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+timing: boot=8s load=47.42 47.14 45.63
+timing: idle-empty=1s load=47.42 47.14 45.63
+ok - an idle real agy pane reads empty (native identity agy/idle) [agy 1.3.3, herdr herdr 0.9.1]
+timing: draft-pending=0s load=47.42 47.14 45.63
+ok - agy composer text reads pending
+timing: draft-cleared=0s load=47.42 47.14 45.63
+timing: popup=0s load=47.42 47.14 45.63
+ok - the agy slash popup never reads empty
+timing: popup-cleared=0s load=47.42 47.14 45.63
+timing: turn=4s load=47.42 47.14 45.63
+ok - a real agy turn in flight never reads empty, and the settled pane reads empty again
+timing: exit=4s load=47.42 47.14 45.63
+ok - fm-control exit stops an idle real agy worker past its composer-empty proof
+FM_TEST_END 2026-10-10T22:37:19Z tests/fm-agy-composer-live-e2e.test.sh exit=0 duration_ms=85830 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=86362
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=1 duration_ms=85830 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-agy-composer-live-e2e.test.sh duration_ms=85830
