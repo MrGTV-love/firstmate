@@ -62,6 +62,10 @@ run_case_spawn() {
 install_env_probe() {  # <fakebin> <harness> [variable]
   cat > "$1/$2" <<SH
 #!/bin/sh
+if [ "\${1:-}" = --version ]; then
+  printf '%s\n' '18.1.20'
+  exit 0
+fi
 printf '%s\n' "\${${3:-COMPACT_ADVISER_DISABLE}-unset}"
 SH
   chmod +x "$1/$2"
@@ -70,6 +74,10 @@ SH
 install_launch_state_probe() {
   cat > "$1/$2" <<'SH'
 #!/bin/sh
+if [ "${1:-}" = --version ]; then
+  printf '%s\n' '18.1.20'
+  exit 0
+fi
 printf '%s|%s|%s|%s|%s\n' "${FM_TASK_ID-unset}" "${COMPACT_ADVISER_DISABLE-unset}" \
   "${CLAUDE_CODE_ENABLE_FUNCTION_HOOKS-unset}" "${FM_COMPACT_ADVISER_HOOKS-unset}" \
   "${FM_COMPACT_ADVISER_DISABLE-unset}"

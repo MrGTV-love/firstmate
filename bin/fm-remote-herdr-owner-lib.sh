@@ -28,10 +28,11 @@
 #     runs `server` wins. Returns 2, printing nothing, when lsof does not
 #     resolve; the caller decides what an unprovable owner means.
 #   fm_remote_herdr_process_env <pid>
-#     Prints the process environment as NAME=VALUE lines: `ps -Eww` on darwin
-#     (own-uid processes only, and macOS hides the environment of Apple
-#     platform binaries such as /bin/sleep even from the same user; a herdr
-#     server is never one), /proc/<pid>/environ elsewhere.
+#     Prints complete single-line NAME=VALUE entries, using Python 3 to read
+#     Darwin KERN_PROCARGS2 or Linux /proc/<pid>/environ as NUL-delimited bytes.
+#     Omits unrelated entries that cannot be represented as unambiguous lines.
+#     Returns nonzero without output for unreadable environments or ambiguous
+#     ownership markers, including line breaks or duplicate marker names.
 #   fm_remote_herdr_process_ancestry <pid>
 #     Prints "<pid> <command>" for <pid> and each ancestor up to pid 1.
 #   fm_remote_herdr_owner_birth <pid>
@@ -49,6 +50,10 @@
 #     Succeeds only for launchd and worker. `unknown` is deliberately not
 #     Aqua: a server that cannot prove its birth is treated like a foreign one,
 #     because leaving it in place silently reproduces the keychain failure.
+
+fm_remote_herdr_owner_reader_available() {
+  python3 -c 'import sys; sys.exit(sys.version_info[0] != 3)' </dev/null >/dev/null 2>&1
+}
 
 fm_remote_herdr_socket_owner() { # <socket-path>
   local socket=$1 real pid='' line candidates='' candidate cmd
@@ -80,11 +85,82 @@ EOF2
 fm_remote_herdr_process_env() { # <pid>
   local pid=$1
   case "$pid" in ''|*[!0-9]*) return 1 ;; esac
-  if [ -r "/proc/$pid/environ" ]; then
-    tr '\0' '\n' < "/proc/$pid/environ"
-    return 0
-  fi
-  ps -Eww -o command= -p "$pid" 2>/dev/null | tr ' ' '\n' | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' || true
+  fm_remote_herdr_owner_reader_available || return 1
+  python3 - "$pid" 2>/dev/null <<'PY'
+import ctypes
+import re
+import struct
+import sys
+
+def darwin_environment(pid):
+    libc = ctypes.CDLL(None, use_errno=True)
+    sysctl = libc.sysctl
+    sysctl.argtypes = [ctypes.POINTER(ctypes.c_int), ctypes.c_uint,
+                       ctypes.c_void_p, ctypes.POINTER(ctypes.c_size_t),
+                       ctypes.c_void_p, ctypes.c_size_t]
+    sysctl.restype = ctypes.c_int
+    argmax = ctypes.c_int()
+    size = ctypes.c_size_t(ctypes.sizeof(argmax))
+    mib = (ctypes.c_int * 2)(1, 8)
+    if sysctl(mib, 2, ctypes.byref(argmax), ctypes.byref(size), None, 0) != 0 or argmax.value <= 0:
+        raise ValueError()
+    buffer = ctypes.create_string_buffer(argmax.value + ctypes.sizeof(ctypes.c_int))
+    size = ctypes.c_size_t(ctypes.sizeof(buffer))
+    mib = (ctypes.c_int * 3)(1, 49, pid)
+    if sysctl(mib, 3, buffer, ctypes.byref(size), None, 0) != 0:
+        raise ValueError()
+    data = buffer.raw[:size.value]
+    argc = struct.unpack_from("=i", data)[0]
+    if argc <= 0 or argc > len(data):
+        raise ValueError()
+    start = ctypes.sizeof(ctypes.c_int)
+    end = data.index(b"\0", start) + 1
+    width = ctypes.sizeof(ctypes.c_void_p)
+    offset = start + ((end - start + width - 1) // width) * width
+    if end == start + 1 or offset > len(data) or any(data[end:offset]):
+        raise ValueError()
+    for _ in range(argc):
+        offset = data.index(b"\0", offset) + 1
+    return data[offset:]
+
+try:
+    pid = int(sys.argv[1])
+    if pid <= 0 or pid > 2147483647:
+        raise ValueError()
+    if sys.platform == "darwin":
+        data = darwin_environment(pid)
+        if not data.endswith(b"\0"):
+            raise ValueError()
+        entries = data.split(b"\0")
+        entries = entries[:entries.index(b"")] if b"" in entries else entries
+    elif sys.platform.startswith("linux"):
+        with open("/proc/{}/environ".format(pid), "rb") as stream:
+            data = stream.read()
+        if not data.endswith(b"\0"):
+            raise ValueError()
+        entries = data[:-1].split(b"\0")
+    else:
+        raise ValueError()
+    markers = {b"SSH_CONNECTION", b"SSH_CLIENT", b"SSH_TTY",
+               b"XPC_SERVICE_NAME", b"FM_REMOTE_JOB_ACTIVE",
+               b"PATH", b"HOME", b"FM_SPAWN_GEN"}
+    names = set()
+    output = []
+    for entry in entries:
+        name, separator, _ = entry.partition(b"=")
+        if (not separator or not re.fullmatch(rb"[A-Za-z_][A-Za-z0-9_]*", name)
+                or b"\n" in entry or b"\r" in entry or name in names):
+            if name in markers:
+                raise ValueError()
+            continue
+        names.add(name)
+        output.append(entry)
+    if not entries:
+        raise ValueError()
+    sys.stdout.buffer.write(b"\n".join(output) + b"\n")
+except (OSError, ValueError, OverflowError, struct.error, AttributeError):
+    sys.exit(1)
+PY
 }
 
 fm_remote_herdr_process_ancestry() { # <pid>

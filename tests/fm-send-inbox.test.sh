@@ -111,8 +111,58 @@ run_send() { # <case-dir> <err-file> [env...] -- <fm-send args...>
   : >"$dir/send.log"
   env PATH="$dir/fakebin:$PATH" \
     FM_ROOT_OVERRIDE="$dir/home" FM_HOME="$dir/home" FM_SEND_LOG="$dir/send.log" \
+    FM_FAKE_CMUX_DIR="$dir" \
     FM_SEND_SETTLE=0 ${envs[@]+"${envs[@]}"} \
     "$SEND" "$@" >/dev/null 2>"$err"
+}
+
+setup_cmux_case() {
+  local dir title
+  dir=$(setup_case "$1")
+  fm_write_meta "$dir/home/state/t1.meta" \
+    "window=workspace-t1:surface-t1" "endpoint_task_id=t1" \
+    "kind=ship" "harness=claude" "backend=cmux" \
+    "cmux_workspace_id=workspace-t1" "cmux_surface_id=surface-t1"
+  title=$(FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/home" \
+    bash -c '. "$1"; fm_backend_cmux_scoped_title fm-t1' _ "$ROOT/bin/backends/cmux.sh") \
+    || fail "could not resolve the fixture's cmux task title"
+  jq -n --arg title "$title" \
+    '{workspaces:[{id:"workspace-t1",title:$title}]}' > "$dir/cmux-workspaces.json"
+  printf '{"panes":[{"selected_surface_id":"surface-t1","surface_ids":["surface-t1"]}]}\n' \
+    > "$dir/cmux-panes.json"
+  cat > "$dir/fakebin/cmux" <<'SH'
+#!/usr/bin/env bash
+set -u
+dir=${FM_FAKE_CMUX_DIR:?}
+printf '%s\n' "${1:-}" >> "$dir/cmux.log"
+case "${1:-}" in
+  version) printf 'cmux 0.64.17\n' ;;
+  ping) printf 'PONG\n' ;;
+  workspace)
+    [ "${2:-}" = list ] || exit 1
+    cat "$dir/cmux-workspaces.json" ;;
+  list-panes) cat "$dir/cmux-panes.json" ;;
+  read-screen) jq -n --rawfile text "$dir/composer" '{text:$text}' ;;
+  send)
+    printf '%s\n' "${@: -1}" >> "$FM_SEND_LOG"
+    printf '%s' "${@: -1}" >> "$dir/composer" ;;
+  send-key)
+    key=${@: -1}
+    printf '[KEY] %s\n' "$key" >> "$FM_SEND_LOG"
+    [ "$key" != enter ] || : > "$dir/composer" ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$dir/fakebin/cmux"
+  printf '%s\n' "$dir"
+}
+
+cmux_composer_state() {
+  local dir=$1
+  PATH="$dir/fakebin:$PATH" FM_FAKE_CMUX_DIR="$dir" \
+    FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/home" \
+    bash -c '. "$1"; fm_backend_composer_state cmux workspace-t1:surface-t1 fm-t1' \
+      _ "$ROOT/bin/fm-backend.sh"
 }
 
 record_body() { # <record>
@@ -227,6 +277,57 @@ test_pending_composer_skips_ring_advisorily() {
   assert_contains "$(cat "$err")" "watcher will re-ring" \
     "the skip notice should point at the re-ring"
   pass "fm-send inbox: a visibly pending composer skips the ring, and the steer stays durably sent"
+}
+
+test_unstyled_nested_draft_skips_ring_advisorily() {
+  local dir err rc rec
+  command -v jq >/dev/null 2>&1 || { printf 'skip: cmux inbox draft regression requires jq\n'; return; }
+  dir=$(setup_cmux_case "unstyled-nested-draft${1:+-native}")
+  err="$dir/send.err"
+  printf '%s\n' "${1:-$'────────\n❯ preface\n ❯ nested draft\n────────'}" > "$dir/composer"
+  cp "$dir/composer" "$dir/composer-before"
+  [ "$(cmux_composer_state "$dir")" = unknown-draft ] \
+    || fail "the draft-risk fixture must reach the real classifier's unknown-draft verdict"
+  run_send "$dir" "$err" -- t1 "preserve the unfinished nested draft"
+  rc=$?
+  expect_code 0 "$rc" "an identified draft risk must not fail durable enqueue"
+  rec="$dir/home/state/t1.inbox/001.msg"
+  [ -f "$rec" ] || fail "the draft-risk steer was not durably recorded"
+  [ "$(record_body _ "$rec")" = "preserve the unfinished nested draft" ] \
+    || fail "the draft-risk steer body changed"
+  assert_contains "$(cat "$dir/cmux.log")" "read-screen" \
+    "the real cmux adapter must inspect the unstyled composer"
+  [ ! -s "$dir/send.log" ] || fail "draft risk received text or a key:"$'\n'"$(cat "$dir/send.log")"
+  cmp -s "$dir/composer-before" "$dir/composer" || fail "the existing nested draft changed"
+  assert_contains "$(cat "$err")" "doorbell skipped" "the deferred ring must be visible"
+  assert_contains "$(cat "$err")" "durably recorded at $rec" \
+    "the deferred notice must identify the durable steer"
+  assert_contains "$(cat "$err")" "watcher will re-ring" \
+    "the deferred notice must name the re-ring path"
+  pass "fm-send inbox: an unstyled nested draft is preserved while the steer is durably queued and deferred"
+}
+
+test_unknown_idle_composer_still_rings_advisorily() {
+  local dir err rc typed
+  command -v jq >/dev/null 2>&1 || { printf 'skip: cmux inbox unknown-idle regression requires jq\n'; return; }
+  dir=$(setup_cmux_case unknown-idle)
+  err="$dir/send.err"
+  printf 'unrecognized idle prompt\n' > "$dir/composer"
+  [ "$(cmux_composer_state "$dir")" = unknown ] \
+    || fail "the ordinary idle fixture must reach the real classifier's unknown verdict"
+  run_send "$dir" "$err" -- t1 "ring an unfamiliar idle composer"
+  rc=$?
+  expect_code 0 "$rc" "ordinary unknown-idle must remain advisory at enqueue"
+  [ "$(record_body _ "$dir/home/state/t1.inbox/001.msg")" = "ring an unfamiliar idle composer" ] \
+    || fail "the ordinary unknown-idle steer was not recorded"
+  typed=$(cat "$dir/send.log")
+  assert_contains "$typed" "Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" \
+    "ordinary unknown-idle must still receive the inbox doorbell"
+  assert_contains "$typed" "[KEY] enter" "ordinary unknown-idle must still submit the doorbell"
+  case "$typed" in
+    *"ring an unfamiliar idle composer"*) fail "the unknown-idle steer payload was typed" ;;
+  esac
+  pass "fm-send inbox: an ordinary unknown-idle composer still rings through the real classifier"
 }
 
 test_failed_ring_is_still_sent() {
@@ -509,6 +610,9 @@ test_deep_home_doorbell_stays_short
 test_multiline_steer_is_legal
 test_resend_enqueues_new_sequence
 test_pending_composer_skips_ring_advisorily
+test_unstyled_nested_draft_skips_ring_advisorily
+test_unstyled_nested_draft_skips_ring_advisorily $'────────\n╭── π > model > path ─╮\n╰─  ─╯\n────────'
+test_unknown_idle_composer_still_rings_advisorily
 test_failed_ring_is_still_sent
 test_fire_and_forget_unlanded_ring_owes_one_retry
 test_fire_and_forget_retry_stays_off_without_the_flag

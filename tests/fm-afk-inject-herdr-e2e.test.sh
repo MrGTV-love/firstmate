@@ -18,8 +18,8 @@
 # binary untouched.
 #
 # The "supervisor pane" is a tiny deterministic bash loop (not a real harness
-# binary): it draws a bordered composer row ("│ > <buf> │") that exercises the
-# bordered branch of fm_backend_herdr_composer_state, and logs every submitted
+# binary): it draws a bare agent-glyph composer row ("❯ <buf>") that exercises
+# the shared classifier's bare branch, and logs every submitted
 # line (hex + text + injection/user classification) - the same technique
 # tests/fm-afk-inject-e2e.test.sh uses for its tmux supervisor pane, so this
 # test asserts on submitted CONTENT, not pane appearance. It ALSO registers
@@ -171,10 +171,10 @@ report_agent_state idle
 
 _buf=
 # redraw: keep the composer visually pinned to ONE terminal row regardless of
-# _buf's length - a realistic bordered single-line composer horizontally
-# scrolls to show the tail near the cursor rather than letting the terminal
-# hard-wrap a too-long line across multiple rows (which would break the
-# structural border-row classifier's one-row assumption: a batched escalation
+# _buf's length - this single-line fixture horizontally scrolls to show the
+# tail near the cursor rather than letting the terminal hard-wrap a too-long
+# line across multiple rows (which would invalidate this fixture's one-row
+# composer geometry: a batched escalation
 # digest easily exceeds a narrow pane's column width). A hardcoded width
 # (not `tput cols`) is used deliberately: verified empirically against a real
 # herdr pane launched this same way that `tput cols` inside this script's own

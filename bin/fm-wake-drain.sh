@@ -826,7 +826,10 @@ cleanup() {
 
 trap cleanup EXIT
 trap 'exit 130' INT
-trap 'exit 143' TERM
+# As in fm-watch.sh, native HUP/TERM runs EXIT cleanup without a pending signal
+# trap being parsed inside $() (and potentially swallowed) by Bash 5.2. Keep
+# INT trapped because Bash can ignore a direct SIGINT while a child runs.
+trap - HUP TERM
 
 if [ -n "$ACK_THROUGH" ]; then
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || exit 1

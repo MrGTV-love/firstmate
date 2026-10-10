@@ -25,8 +25,9 @@
 # delete is available only through teardown.
 # Both paths perform a fresh refuse-default check immediately before each
 # destructive call.
-# Provision records the running default session as a fleet-state tripwire and
-# teardown requires that record to be identical afterward.
+# Prepare claims a fresh name and records the running default-session tripwire.
+# Provision reuses a prepared claim only after checking that tripwire; otherwise
+# it prepares the name itself. Teardown requires the tripwire to match afterward.
 # Provision's server and the viewer launcher start through bin/fm-proc-budget.sh;
 # its header owns the inherited process-budget contract. Status, stop, and
 # teardown client calls are not wrapped, so budget setup cannot block cleanup.
@@ -435,7 +436,12 @@ fm_herdr_lab_provision() { # <session>
     }
     fm_herdr_lab_check_tripwire "$name" || return 1
   else
-    fm_herdr_lab_prepare "$name" || return 1
+    tripwire=$(fm_herdr_lab_tripwire_path "$name")
+    if [ -f "$tripwire" ]; then
+      fm_herdr_lab_check_tripwire "$name" || return 1
+    else
+      fm_herdr_lab_prepare "$name" || return 1
+    fi
   fi
   HERDR_SESSION="$name" "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/fm-proc-budget.sh" -- herdr server --session "$name" >/dev/null 2>&1 &
   server_pid=$!

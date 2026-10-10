@@ -119,8 +119,16 @@ SH
     cat > "$FAKEBIN/$executable" <<'SH'
 #!/usr/bin/env bash
 set -eu
+if [ "${0##*/}" = omp ] && [ "${1:-}" = --version ]; then
+  printf 'omp/18.1.20\n'
+  exit 0
+fi
 if [ "${0##*/}" = omp ] && [ "${1:-}" = models ] && [ "${2:-}" = --json ]; then
   printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"}]}'
+  exit 0
+fi
+if [ "${0##*/}" = omp ] && [ "${1:-}" = usage ]; then
+  printf '%s\n' '{"reports":[]}'
   exit 0
 fi
 if [ -n "${FM_POLICY_CHILD:-}" ]; then

@@ -489,7 +489,7 @@ test_sweep_launch_policy_allows_configured_omp_replacement() {
   printf 'omp-or-tc\n' > "$w/home/config/session-launch-policy"
   printf 'omp openai-codex/gpt-6.1-sol high\n' > "$w/home/config/secondmate-harness"
   fb=$(make_toolchain "$w"); tmuxfb=$(make_liveness_tmux "$w")
-  fm_fake_exit0 "$fb" omp
+  fm_fake_version_tool "$fb" omp FM_FAKE_OMP_VERSION 18.1.20
   log="$w/calls.log"; : > "$log"
 
   out=$(run_bootstrap "$tmuxfb:$fb" "$w/home" zsh "$log")

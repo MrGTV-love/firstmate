@@ -1512,6 +1512,74 @@ test_crewmate_scaffolds_require_stopping_private_services() {
   pass "fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line"
 }
 
+test_crewmate_scaffolds_teach_the_docker_task_marker() {
+  local home mode id brief
+  home="$TMP_ROOT/docker-marker-home"
+  mkdir -p "$home/data"
+
+  # Teardown can remove only the Docker stacks that carry evidence of their task
+  # (bin/fm-task-docker-lib.sh), so every worker scaffold must teach the marker
+  # that bin/fm-spawn.sh's exported FM_TASK_ID makes free to apply.
+  for mode in no-mistakes direct-PR local-only; do
+    id="brief-docker-$mode"
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" "$id" alpha --mode "$mode" >/dev/null 2>&1 \
+      || fail "fm-brief.sh --mode $mode exited non-zero"
+    brief="$home/data/$id/brief.md"
+    # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
+    assert_grep '--label fm.task=$FM_TASK_ID' "$brief" "$mode ship brief did not teach the Docker task label"
+    # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
+    assert_grep 'docker compose -p "$FM_TASK_ID"' "$brief" "$mode ship brief did not teach the exact compose project name"
+    # shellcheck disable=SC2016
+    assert_grep 'fm.task: ${FM_TASK_ID}' "$brief" "$mode ship brief did not teach Compose object labels"
+    assert_grep "every declared network and volume" "$brief" "$mode ship brief omitted Compose resource labels"
+    assert_grep "valid Compose project name" "$brief" "$mode ship brief omitted the Compose naming constraint"
+    assert_grep "starting with a lowercase letter or digit" "$brief" "$mode ship brief omitted the Compose initial-character constraint"
+    assert_grep "isolated task-local" "$brief" "$mode ship brief did not isolate Supabase configuration"
+    assert_grep 'supabase/config.toml' "$brief" "$mode ship brief did not name the Supabase config"
+    assert_grep 'project_id' "$brief" "$mode ship brief did not teach Supabase project configuration"
+    assert_grep 'supabase start' "$brief" "$mode ship brief did not teach the supported Supabase command"
+    assert_grep "Never edit or start the shared" "$brief" "$mode ship brief did not protect shared Supabase"
+    assert_grep 'no task marker, no name starting with your task id (followed by - or _), and no' "$brief" \
+      "$mode ship brief did not qualify the absence of task-identifying evidence"
+    assert_grep 'Compose project in your worktree cannot be attributed to you and outlives your task' "$brief" \
+      "$mode ship brief did not include Compose worktree evidence in the attribution warning"
+    assert_no_grep "--project-id" "$brief" "$mode ship brief emitted an unsupported Supabase option"
+    # shellcheck disable=SC2016
+    assert_no_grep 'starting `$FM_TASK_ID-' "$brief" "$mode ship brief permitted prefixed Compose projects"
+  done
+
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-docker-scout alpha --scout >/dev/null 2>&1 \
+    || fail "fm-brief.sh --scout exited non-zero"
+  brief="$home/data/brief-docker-scout/brief.md"
+  # shellcheck disable=SC2016 # Literal command text must remain unexpanded.
+  assert_grep '--label fm.task=$FM_TASK_ID' "$brief" "scout brief did not teach the Docker task label"
+  # shellcheck disable=SC2016
+  assert_grep 'fm.task: ${FM_TASK_ID}' "$brief" "scout brief did not teach Compose object labels"
+  # shellcheck disable=SC2016
+  assert_grep 'docker compose -p "$FM_TASK_ID"' "$brief" "scout brief did not teach the exact compose project name"
+  assert_grep "every declared network and volume" "$brief" "scout brief omitted Compose resource labels"
+  assert_grep "valid Compose project name" "$brief" "scout brief omitted the Compose naming constraint"
+  assert_grep "starting with a lowercase letter or digit" "$brief" "scout brief omitted the Compose initial-character constraint"
+  assert_grep "isolated task-local" "$brief" "scout brief did not isolate Supabase configuration"
+  assert_grep 'supabase/config.toml' "$brief" "scout brief did not name the Supabase config"
+  assert_grep 'project_id' "$brief" "scout brief did not teach Supabase project configuration"
+  assert_grep 'supabase start' "$brief" "scout brief did not teach the supported Supabase command"
+  assert_grep "Never edit or start the shared" "$brief" "scout brief did not protect shared Supabase"
+  assert_grep 'no task marker, no name starting with your task id (followed by - or _), and no' "$brief" \
+    "scout brief did not qualify the absence of task-identifying evidence"
+  assert_grep 'Compose project in your worktree cannot be attributed to you and outlives your task' "$brief" \
+    "scout brief did not include Compose worktree evidence in the attribution warning"
+  assert_no_grep "--project-id" "$brief" "scout brief emitted an unsupported Supabase option"
+
+  FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-docker-mate --secondmate alpha >/dev/null 2>&1 \
+    || fail "fm-brief.sh --secondmate exited non-zero"
+  assert_no_grep "fm.task" "$home/data/brief-docker-mate/brief.md" \
+    "secondmate charter must not inherit the crewmate Docker marker rule"
+
+  pass "fm-brief.sh: every crewmate scaffold teaches the Docker task marker and the secondmate charter does not"
+}
+
 # A runaway scratch tree fills the user's whole process table and costs every
 # lane its forks (the 2026-10-08 fork-EAGAIN incident), and only the worker's
 # own brief reaches an ad-hoc shim, lab, or measurement script. Every crewmate
@@ -1612,3 +1680,4 @@ test_branch_prefix_value_is_validated
 test_branch_prefix_command_is_shell_safe
 test_crewmate_scaffolds_forbid_pool_administration
 test_crewmate_scaffolds_require_stopping_private_services
+test_crewmate_scaffolds_teach_the_docker_task_marker

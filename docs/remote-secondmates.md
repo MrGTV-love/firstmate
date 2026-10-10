@@ -245,7 +245,7 @@ The script's own header owns the full line protocol.
 bin/fm-on.sh <secondmate-id|ssh-alias> fm-remote-doctor.sh --fix
 ```
 
-Over the plain SSH doctor bootstrap, it writes and reloads two Firstmate-owned launch agents on macOS:
+Over the plain SSH doctor bootstrap, `--fix` repairs these Firstmate-owned launch agents on macOS, subject to the prerequisite refusals in [`bin/fm-remote-doctor.sh`](../bin/fm-remote-doctor.sh):
 
 - `dev.firstmate.remote-job`.
 - `dev.firstmate.herdr.fm-remote`.
@@ -270,25 +270,17 @@ Every claude pane under such a server falls back to a stale plaintext credential
 Herdr's own SSH remote attach starts a server born in another session when it finds none.
 At boot, that server wins the `fm-remote` socket, because sshd accepts connections before the login session exists.
 The guard is what makes the launch agent converge.
-It acts on whichever server owns the `fm-remote` socket:
-
-| Socket owner | Guard action |
-| --- | --- |
-| Nothing | Execs the server in the foreground under launchd. |
-| An Aqua-born server | Exits 0. |
-| Any other (foreign) server | Stops the foreign server and takes the session over, closing its panes so the parent firstmate relaunches its mates into the Aqua-born server. |
-
-`KeepAlive={SuccessfulExit=false}` lets that exit 0 rest instead of respawning against a held socket.
-The guard's header owns the decision table, and [`bin/fm-remote-herdr-owner-lib.sh`](../bin/fm-remote-herdr-owner-lib.sh) owns the birth markers it reads.
+The [guard's header](../bin/fm-remote-herdr-guard.sh) owns the prerequisite refusal, socket-owner decision table, takeover behavior, and launchd exit policy.
+[`bin/fm-remote-herdr-owner-lib.sh`](../bin/fm-remote-herdr-owner-lib.sh) owns the birth markers it reads.
 
 ### Other repairs and limits
 
 `--fix` also takes these actions:
 
-- It starts the same workers directly on Linux.
+- It starts the same workers directly on Linux, subject to the doctor's prerequisite refusals.
 - It recreates the `~/.local/bin/fm-remote-entrypoint.sh` symlink when it is absent.
 - It creates only Firstmate-owned required-tool wrappers that it can prove resolve to a version-manager target.
-  It stops after one harness satisfies the at-least-one requirement, which is the harness line of the [required remote tools](#required-remote-tools).
+  It stops after one harness satisfies the doctor's [at-least-one requirement](#required-remote-tools).
 
 Its limits:
 
@@ -311,11 +303,12 @@ A file at `~/.local/bin/fm-remote-entrypoint.sh` that is not Firstmate's own sym
 
 ### Required remote tools
 
-| Requirement | Tools |
-| --- | --- |
-| Always required | `git`, `jq`, `herdr`, compatible `tasks-axi`, and `treehouse` |
-| At least one of | `claude`, `codex`, `opencode`, `pi`, `pi-signed`, `grok`, or `kimi` |
-| Additionally required on macOS | `lsof`, so the doctor and guard can prove which process owns the session socket |
+[`bin/fm-remote-doctor.sh`](../bin/fm-remote-doctor.sh) owns the required-tool list, at-least-one harness requirement, and platform-specific checks.
+The [runtime backend prerequisites](configuration.md#runtime-backend-configbackend--fm_backend) own Herdr's runtime `python3` requirement.
+On macOS, the doctor checks both its own ownership-reader PATH and that Python 3 executes through the resolved launch-agent shell with `-l -c`.
+The launch-shell probe starts with the GUI launchd environment (or the system launchd PATH when no PATH is configured), not the worker's filesystem-composed PATH.
+Expose `python3` through that account's login-shell startup or GUI launchd environment; seeing it in the worker's required-tool report alone is not sufficient.
+A missing ownership-reader prerequisite is a human gap: readiness returns it without attempting repairs, and doctor blocks Herdr server repair and, on macOS, Herdr plist installation/replacement and loaded-job reload.
 
 ## Provision a route
 
@@ -376,13 +369,7 @@ Launch records are created only when the secondmate is launched.
 
 ### The seed's readiness gate
 
-The seed gates readiness in these steps:
-
-1. The seed runs a read-only check.
-2. When that check reports a gap, it runs `--fix`.
-3. It then runs a second read-only check, whose verdict decides.
-
-So the operator never has to run the repair by hand, and a repair is never trusted on its own word.
+The seed uses the [shared readiness gate](../bin/fm-remote-readiness-lib.sh), which owns check/repair sequencing; [Required remote tools](#required-remote-tools) owns prerequisite refusals that need operator action instead of repair.
 When a host stays red, the seed prints the doctor's remaining gaps and their operator steps, restores the registry, and creates nothing on the remote host.
 
 ### Failure and rollback

@@ -626,6 +626,25 @@ EOF
 PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE%$'\n'}
 PRIVATE_SERVICE_RULE=${PRIVATE_SERVICE_RULE//__PAUSED_VERB__/$PAUSED_VERB}
 
+# Explicit task markers avoid depending on the library's name/project/path
+# heuristics; bin/fm-task-docker-lib.sh owns attribution. FM_TASK_ID is exported
+# by bin/fm-spawn.sh.
+IFS= read -r -d '' DOCKER_MARKER_RULE <<'EOF' || true
+10. Mark every Docker object you start with your task id, so teardown removes it with your task:
+   pass `--label fm.task=$FM_TASK_ID` to `docker run`, `docker create`, `docker network create`, and
+   `docker volume create`. In Compose, add `fm.task: ${FM_TASK_ID}` to every service's labels and to
+   the labels of every declared network and volume. Use `docker compose -p "$FM_TASK_ID"` only when
+   the exact task id is a valid Compose project name: lowercase letters, digits, hyphens and
+   underscores, starting with a lowercase letter or digit. Do not substitute a task-id prefix.
+   For Supabase, use an isolated task-local `supabase/config.toml` with `project_id` set to the exact
+   task id, then run `supabase start` from that task-local project. Never edit or start the shared
+   project's Supabase configuration; configure the project id in the file, not a command-line flag.
+   A container with no task marker, no name starting with your task id (followed by - or _), and no
+   Compose project in your worktree cannot be attributed to you and outlives your task. Remove what
+   you finish with as you go; teardown only catches what is left, and never touches another task's stacks.
+EOF
+DOCKER_MARKER_RULE=${DOCKER_MARKER_RULE%$'\n'}
+
 if [ "$KIND" = scout ]; then
 if "$SCRIPT_DIR/fm-bootstrap.sh" lavish-compatible >/dev/null 2>&1; then
   LAVISH_LINE='If your deliverable is a visual artifact the captain will review and iterate on, use the lavish-axi rule: arm your board with bin/fm-procevent-lavish.sh arm <artifact.html> --for <task-id>; never run lavish-axi poll yourself. Re-arm with the reply after each nonterminal round to acknowledge it, route the board feedback through your steering inbox, write needs-decision [key=board-review] with the live board URL when the captain owes a decision, and stop at session_ended or an empty End without re-arming - acknowledge that final round with bin/fm-procevent.sh handled <source-id> <sequence> to conclude and retire your board.'
@@ -668,6 +687,7 @@ $CREWMATE_PAUSE_INSTRUCTIONS
 $SHARED_INFRA_RULE
 $PRIVATE_SERVICE_RULE
 $SHARED_PROC_BUDGET_RULE
+$DOCKER_MARKER_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 
@@ -750,6 +770,7 @@ $ASK_USER_BLOCK
 $SHARED_INFRA_RULE
 $PRIVATE_SERVICE_RULE
 $SHARED_PROC_BUDGET_RULE
+$DOCKER_MARKER_RULE
 
 $WAIT_BLOCK$INBOX_SECTION
 

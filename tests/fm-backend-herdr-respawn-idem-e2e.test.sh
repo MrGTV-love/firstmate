@@ -103,12 +103,10 @@ fi
 
 pass "repro setup: two real fm-<id> task tabs exist (crewmate-shaped and secondmate-shaped), neither with a registered agent"
 
-# --- 2. a REAL herdr session restart - the actual root cause -----------------
-# `session stop` + fresh `herdr server` for the SAME named session: verified
-# in docs/herdr-backend.md "ID stability across a server restart" to preserve
-# every workspace/tab/pane id and label, while resetting each pane's
-# underlying process (a fresh shell) and its agent_status to unknown - the
-# exact husk shape a restored task tab comes back in.
+# --- 2. a REAL herdr session restart of shell-only task panes ----------------
+# These panes had no registered agent before the restart, so their restored
+# shells exercise the husk path, not live native-agent restoration.
+# docs/herdr-backend.md "Restart and liveness behavior" owns the distinction.
 
 fm_herdr_lab_stop "$SESSION" >/dev/null 2>&1 \
   || fail "could not stop the isolated session for the restart"

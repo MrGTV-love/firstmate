@@ -19,6 +19,8 @@ FM_PUSH_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TRIAGE_LOG="$STATE/.watch-triage.log"
 TRIAGE_LOG_MAX_BYTES=${FM_WATCH_TRIAGE_LOG_MAX_BYTES:-262144}
 FM_WAKE_POST_OUTPUT_ACTION=
+FM_WAKE_BEFORE_OUTPUT_ACTION=
+FM_WAKE_AFTER_OUTPUT_ACTION=
 # Set only after this watcher has printed a durable actionable reason. The
 # watcher's EXIT cleanup uses it to distinguish an ordinary delivered close from
 # an interruption that leaves a recovery gap before the next arm.
@@ -90,7 +92,8 @@ triage_log() {
 
 # Exit after reporting one actionable wake. Tests override this callback.
 wake() {
-  local output_status=0
+  local output_status=0 post_output_status=0
+  [ -z "$FM_WAKE_BEFORE_OUTPUT_ACTION" ] || "$FM_WAKE_BEFORE_OUTPUT_ACTION" "$1" || exit 1
   case "$1" in
     heartbeat*) echo $(( $(cat "$STATE/.heartbeat-streak" 2>/dev/null || echo 0) + 1 )) > "$STATE/.heartbeat-streak" ;;
     *) echo 0 > "$STATE/.heartbeat-streak" ;;
@@ -106,7 +109,10 @@ wake() {
     output_status=1
   fi
   if [ -n "$FM_WAKE_POST_OUTPUT_ACTION" ]; then
-    "$FM_WAKE_POST_OUTPUT_ACTION" "$output_status" || true
+    "$FM_WAKE_POST_OUTPUT_ACTION" "$output_status" || post_output_status=$?
+  fi
+  if [ -n "$FM_WAKE_AFTER_OUTPUT_ACTION" ]; then
+    "$FM_WAKE_AFTER_OUTPUT_ACTION" "$output_status" "$post_output_status" || true
   fi
   [ "$output_status" -eq 0 ] || exit "$output_status"
   exit 0

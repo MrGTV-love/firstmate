@@ -123,13 +123,10 @@ pass "real herdr: create_task prunes the freshly-created workspace's seeded defa
 # each against its own independent throwaway tab.
 
 # --- restored-layout husk close-and-replace, against the REAL binary --------
-# (docs/herdr-backend.md "Known gaps" / "ID stability across a server
-# restart"). herdr persists and restores its whole session layout across a
-# server restart, and a restored fm-<id> task tab comes back a HUSK: a dead
-# pane, or (verified above and empirically in "ID stability") a plain
-# agent-less shell. Both throwaway tabs below are independent of $TAB_ID/
-# $PANE_ID/$TARGET (this suite's primary task, which the rest of the file
-# still depends on) so neither scenario disturbs it.
+# docs/herdr-backend.md "Restart and liveness behavior" owns restoration.
+# Both throwaway tabs below are independent of $TAB_ID/$PANE_ID/$TARGET
+# (this suite's primary task, which the rest of the file still depends on),
+# so neither scenario disturbs it.
 
 # 1. A genuinely LIVE duplicate (a real registered agent, via herdr's own
 #    `pane report-agent`) must still refuse exactly as before.

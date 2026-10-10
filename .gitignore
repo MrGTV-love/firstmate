@@ -17,3 +17,4 @@ config/
 graft/.cache/
 /jiti/
 /node-compile-cache/
+.live-lavish-validation/
