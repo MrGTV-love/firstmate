@@ -1626,8 +1626,9 @@ QUIET_GATE="$TMP_ROOT/quiet-gate"
 PATH="$EMPTY_BIN:$PATH" FM_HOME="$HEMPTY" QUIET_GATE="$QUIET_GATE" FM_LAVISH_POLL_RETRY_DELAY=60 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$QUIET_ART" >/dev/null
 quiet_runner=$(sed -n '2p' "$FM_PROCEVENT_CLAIM_ROOT/$quiet_id.claim" 2>/dev/null)
-[ -n "$quiet_runner" ] && kill -0 "$quiet_runner" 2>/dev/null \
-  || fail "no live runner was recorded for the armed quiet board"
+if [ -z "$quiet_runner" ] || ! kill -0 "$quiet_runner" 2>/dev/null; then
+  fail "no live runner was recorded for the armed quiet board"
+fi
 : > "$QUIET_GATE"
 QUIET_HANDLED="$HEMPTY/state/procevent-inbox/$quiet_id.1.handled"
 for _ in $(seq 1 100); do
@@ -6891,6 +6892,7 @@ pass "consecutive waiting rounds back off from the quiet delay to the maximum an
 # signalled only on request.
 ORPH="$TMP_ROOT/orphans"
 mkdir -p "$ORPH/bin" "$ORPH/home/state/procevent" "$ORPH/home/state/procevent-inbox" "$ORPH/other"
+# shellcheck disable=SC2016  # single quotes are deliberate: the stub shell expands this.
 printf '#!/usr/bin/env bash\nwhile [ "$SECONDS" -lt "${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}" ]; do sleep 1; done\n' > "$ORPH/bin/lavish-axi"
 orph_art="$ORPH/review.html"; orph_foreign="$ORPH/other/review.html"
 printf '<h1>orphan review</h1>\n' > "$orph_art"
