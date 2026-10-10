@@ -513,13 +513,35 @@ if [ "$FORCE" = --force ] && [ "$(fm_lease_actor)" = branch ]; then
 fi
 fm_lease_guard "$ID" "teardown (fm-teardown)"
 
-# True when a record's worktree is a pool slot of its project or lies inside
-# one: the two shapes whose teardown returns a slot under the project lock.
-teardown_record_in_pool_slot() {  # <project> <worktree>
-  local copy
-  ! fm_treehouse_pool_slot "$1" "$2" || return 0
-  copy=$(fm_task_copy_canonical_dir "$2") || return 1
-  fm_task_copy_enclosing_pool_slot "$1" "$copy" >/dev/null
+# The pool slot of <project> that encloses a record's current copy without
+# being it: the slot that strictly contains the copy or, once the copy is gone,
+# the record's own prior_worktree= pool slot that encloses its recorded path -
+# what a nested teardown leaves when it stops after removing that copy.
+teardown_record_enclosing_slot() {  # <meta> <project> <worktree>
+  local meta=$1 project=$2 worktree=$3 copy line prior prior_real
+  if copy=$(fm_task_copy_canonical_dir "$worktree"); then
+    fm_task_copy_enclosing_pool_slot "$project" "$copy"
+    return
+  fi
+  [ -n "$worktree" ] || return 1
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in prior_worktree=?*) ;; *) continue ;; esac
+    prior=${line#prior_worktree=}
+    prior_real=$(fm_task_copy_canonical_dir "$prior") || continue
+    case "$worktree" in "$prior"/*|"$prior_real"/*) ;; *) continue ;; esac
+    fm_treehouse_pool_slot "$project" "$prior_real" || continue
+    printf '%s\n' "$prior_real"
+    return 0
+  done < "$meta"
+  return 1
+}
+
+# True when a record's worktree is a pool slot of its project or a slot
+# encloses it: the two shapes whose teardown returns a slot under the project
+# lock.
+teardown_record_in_pool_slot() {  # <meta> <project> <worktree>
+  ! fm_treehouse_pool_slot "$2" "$3" || return 0
+  teardown_record_enclosing_slot "$1" "$2" "$3" >/dev/null
 }
 
 META="$STATE/$ID.meta"
@@ -535,7 +557,7 @@ if [ -f "$META" ] && [ ! -L "$META" ]; then
   TEARDOWN_LOCK_PROJECT=$(fm_meta_get "$META" project)
   if [ "$TEARDOWN_LOCK_KIND" != secondmate ] \
      && [ "$TEARDOWN_LOCK_BACKEND" != orca ] \
-     && teardown_record_in_pool_slot "$TEARDOWN_LOCK_PROJECT" "$TEARDOWN_LOCK_WT"; then
+     && teardown_record_in_pool_slot "$META" "$TEARDOWN_LOCK_PROJECT" "$TEARDOWN_LOCK_WT"; then
     TREEHOUSE_SLOT_LOCK_REQUIRED=1
     TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$TEARDOWN_LOCK_PROJECT") || {
       echo "REFUSED: cannot resolve the shared Treehouse project lock for ${TEARDOWN_LOCK_PROJECT:-<missing>}; nothing was changed" >&2
@@ -1278,7 +1300,7 @@ CLEANUP_RECOVERY=$TEARDOWN_CLEANUP_RECOVERY
 KIND=$TEARDOWN_META_KIND
 EXPECTED_TREEHOUSE_PROJECT_LOCK=
 if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ] \
-   && teardown_record_in_pool_slot "$PROJ" "$WT"; then
+   && teardown_record_in_pool_slot "$META" "$PROJ" "$WT"; then
   EXPECTED_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ") || {
     echo "REFUSED: cannot resolve the shared Treehouse project lock for ${PROJ:-<missing>}; nothing was changed" >&2
     exit 1
@@ -1329,10 +1351,8 @@ TEARDOWN_KEEP_COPY=0
 TEARDOWN_ENCLOSING_SLOT=
 if teardown_preserves_reassociated_copy "$META" "$KIND" "$BACKEND" "$PROJ" "$WT"; then
   TEARDOWN_KEEP_COPY=1
-  if teardown_current_copy=$(fm_task_copy_canonical_dir "$WT"); then
-    TEARDOWN_ENCLOSING_SLOT=$(fm_task_copy_enclosing_pool_slot "$PROJ" "$teardown_current_copy") \
-      || TEARDOWN_ENCLOSING_SLOT=
-  fi
+  TEARDOWN_ENCLOSING_SLOT=$(teardown_record_enclosing_slot "$META" "$PROJ" "$WT") \
+    || TEARDOWN_ENCLOSING_SLOT=
 fi
 
 # A record accepted as a legacy incarnation (no spawn_gen, and either
@@ -2990,12 +3010,21 @@ require_exclusive_task_worktree_slot() {
 
 require_cleanup_copy_clearance() {
   local record_meta=$1 record_id=$2 record_state=$3 target=$4 allow_current=${5:-0} target_kind=${6:-}
-  local canonical state_dir other_meta line field copy copy_real copy_common retiring i owner_home keep_current overlaps own
+  local canonical state_dir other_meta line field copy copy_real copy_common retiring i owner_home keep_current overlaps own skipped
   canonical=$(fm_task_copy_canonical_dir "$target") || return 0
-  fm_local_firstmate_state_dirs "$record_state" || {
-    echo "REFUSED: $FM_LOCAL_FIRSTMATE_ERROR; nothing was changed" >&2
+  # A retiring secondmate's own registered home that is already gone holds
+  # nothing to lose, so it alone is not a reason to refuse; every other home
+  # the walk cannot prove still refuses.
+  fm_local_firstmate_state_dirs "$record_state" tolerant
+  for skipped in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
+    if [ "$KIND" = secondmate ] && [ -n "${HOME_PATH:-$WT}" ] && [ ! -e "${HOME_PATH:-$WT}" ] \
+       && [ ! -L "${HOME_PATH:-$WT}" ] \
+       && [ "$skipped" = "registered local Firstmate home is unavailable: ${HOME_PATH:-$WT}" ]; then
+      continue
+    fi
+    echo "REFUSED: $skipped; nothing was changed" >&2
     return 1
-  }
+  done
   for state_dir in "${DESCENDANT_TASK_STATES[@]+"${DESCENDANT_TASK_STATES[@]}"}"; do
     FM_LOCAL_FIRSTMATE_STATES+=("$state_dir")
   done
@@ -3159,6 +3188,7 @@ teardown_owns_worktree() {
 # ordinary reassociated treatment: nothing of it is touched.
 TEARDOWN_RETURN_SLOT=
 TEARDOWN_NESTED_COPIES=()
+TEARDOWN_PROOF_OUTCOME="nothing was changed - not even with --force"
 teardown_own_copy_disposable() {  # <canonical-copy>
   local copy=$1 what="recorded prior_worktree" rc=0
   [ "$copy" != "$TEARDOWN_ENCLOSING_SLOT" ] || what="claimed pool slot"
@@ -3168,22 +3198,23 @@ teardown_own_copy_disposable() {  # <canonical-copy>
     0) return 0 ;;
     2)
       ! fm_task_copy_content_in_default "$copy" "$PROJ" "${BASE_BRANCH:-}" || return 0
-      echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, whose HEAD $FM_TASK_COPY_HEAD is neither landed nor held by a refs/fm/anchor/$ID-<sha> preservation anchor; nothing was changed - not even with --force." >&2
+      echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, whose HEAD $FM_TASK_COPY_HEAD is neither landed nor held by a refs/fm/anchor/$ID-<sha> preservation anchor; $TEARDOWN_PROOF_OUTCOME." >&2
       echo "Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown." >&2
       return 1
       ;;
   esac
-  echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, which $FM_TASK_COPY_REASON; nothing was changed - not even with --force." >&2
+  echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, which $FM_TASK_COPY_REASON; $TEARDOWN_PROOF_OUTCOME." >&2
   if [ -n "$FM_TASK_COPY_DIRTY" ]; then
     report_worktree_dirt "$FM_TASK_COPY_DIRTY"
-    echo "Commit or carry them over, then re-run teardown." >&2
+    echo "Commit and land them, or carry them over, then re-run teardown; it proves the copy again." >&2
   fi
   return 1
 }
 
 # The enclosing slot's proof again, for a return that removed a stale lock.
-# --force does not waive it.
+# --force does not waive it. Earlier cleanup steps have already run by then.
 teardown_enclosing_slot_disposable() {
+  TEARDOWN_PROOF_OUTCOME="the slot was not returned and keeps its contents, but earlier cleanup steps already ran, including removing the nested copy; --force does not waive this proof"
   teardown_own_copy_disposable "$TEARDOWN_ENCLOSING_SLOT"
 }
 
@@ -3194,11 +3225,11 @@ require_disposable_own_slot_copies() {
     fm_treehouse_slot_owner_state "$TEARDOWN_ENCLOSING_SLOT" "$ID"
     [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || TEARDOWN_ENCLOSING_SLOT=
   fi
-  current=$(fm_task_copy_canonical_dir "$WT") || return 0
+  current=$(fm_task_copy_canonical_dir "$WT") || current=
   if [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
     TEARDOWN_RETURN_SLOT=$TEARDOWN_ENCLOSING_SLOT
     require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RETURN_SLOT" || return 1
-    TEARDOWN_NESTED_COPIES=("$current")
+    TEARDOWN_NESTED_COPIES=(${current:+"$current"})
     proofs=("$TEARDOWN_RETURN_SLOT")
   elif ! teardown_owns_worktree || ! TEARDOWN_RETURN_SLOT=$(teardown_live_slot_path); then
     TEARDOWN_RETURN_SLOT=
@@ -4619,7 +4650,7 @@ elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
   :
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ] && [ -z "$TEARDOWN_ENCLOSING_SLOT" ]; then
   :
-elif [ -d "$WT" ] && [ "$KIND" != secondmate ]; then
+elif { [ -d "$WT" ] || [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; } && [ "$KIND" != secondmate ]; then
   # The task's own copies nested in the slot were proved disposable before the
   # first cleanup step; they go first so the return leaves no registered
   # worktree pointing into a reset slot. Their branches stay.

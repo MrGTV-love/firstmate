@@ -6943,6 +6943,38 @@ test_docker_latest_foreign_carriers_veto_network_removal() {
   pass "foreign carriers observed after container removal veto both project-label heuristics but not explicit network markers"
 }
 
+# Retiring a secondmate whose own registered home is already gone must not be
+# refused by the custody scan's walk over that same home: nothing there can be
+# lost. Any other registered home that cannot be read still refuses, with or
+# without --force.
+test_secondmate_retirement_exempts_only_its_own_missing_home() {
+  local case_dir shape rc gone
+  for shape in own other; do
+    case_dir=$(make_case "secondmate-missing-home-$shape")
+    gone="$case_dir-gone"
+    write_meta "$case_dir" local-only secondmate
+    printf 'home=%s\ntasktmp=%s\n' "$gone/secondmate-home" "$case_dir/tasktmp" >> "$case_dir/state/task-x1.meta"
+    mkdir -p "$case_dir/tasktmp"
+    printf -- '- task-x1 - task-x1 (home: %s; scope: fixture; projects: P; added 2026-10-08)\n' \
+      "$gone/secondmate-home" > "$case_dir/data/secondmates.md"
+    rc=0
+    if [ "$shape" = own ]; then
+      FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+      expect_code 0 "$rc" "missing-home-own: retiring a secondmate whose own home is gone must succeed: $(cat "$case_dir/stderr")"
+      assert_absent "$case_dir/state/task-x1.meta" "missing-home-own: the record was not retired"
+      continue
+    fi
+    printf -- '- ghost - ghost (home: %s; scope: fixture; projects: P; added 2026-10-08)\n' \
+      "$gone/ghost-home" >> "$case_dir/data/secondmates.md"
+    FM_HOME="$case_dir" run_teardown "$case_dir" --force > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "missing-home-other: another unreadable registered home must still refuse"
+    assert_grep "registered local Firstmate home is unavailable: $gone/ghost-home" "$case_dir/stderr" \
+      "missing-home-other: the refusal did not name the other home"
+    assert_present "$case_dir/state/task-x1.meta" "missing-home-other: the refusal retired the record"
+  done
+  pass "secondmate retirement exempts only its own missing home from the custody walk"
+}
+
 test_standalone_secondmate_skips_docker_cleanup() {
   local case_dir posture rc
   for posture in ordinary forced; do
@@ -8160,6 +8192,63 @@ SH
   pass "a stale-lock cleanup in the enclosing slot proves it again before the reset, with or without --force"
 }
 
+# A refusal at the enclosing slot's post-lock proof comes after the nested
+# current copy was already removed. A re-run must still find the slot through
+# the task's own prior copy, prove it again, and return it only once its work
+# is landed or anchored, never retire the record and leave the slot claimed but
+# unproved. --force does not waive that proof.
+test_nested_slot_reproof_refusal_is_rerunnable() {
+  local case_dir rc lock label=nested-reproof-rerun
+  make_nested_slot_case "$label" enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+[ "\${1:-}" = return ] || exit 0
+wt=\${@: -1}
+lock=\$(git -C "\$wt" rev-parse --path-format=absolute --git-path index.lock 2>/dev/null || true)
+if [ -n "\$lock" ] && [ -e "\$lock" ]; then
+  printf 'late slot work\n' > "\$wt/late.txt"
+  echo "fatal: Unable to create '\$lock': File exists." >&2
+  exit 128
+fi
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  add_lsof_no_holder "$case_dir"
+  lock=$(git_index_lock_path "$NESTED_SLOT")
+  : > "$lock"
+  touch -t 200001010000 "$lock"
+  rc=0
+  FM_HOME="$case_dir/home" FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "$label: the first teardown must stop at the slot's late work: $(cat "$case_dir/stderr")"
+  assert_absent "$NESTED_COPY" "$label: the first teardown had not yet removed the nested copy"
+  assert_no_grep "nothing was changed" "$case_dir/stderr" "$label: the post-lock refusal claimed nothing was changed"
+
+  git -C "$NESTED_SLOT" add late.txt
+  git -C "$NESTED_SLOT" commit -qm "late slot work"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+    > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 1 "$rc" "$label: a re-run must prove the slot again, even with --force: $(cat "$case_dir/stderr2")"
+  assert_grep "claimed pool slot $NESTED_SLOT" "$case_dir/stderr2" "$label: the re-run refusal did not name the slot"
+  assert_grep "neither landed nor held" "$case_dir/stderr2" "$label: the re-run refusal did not name the reason"
+  assert_present "$case_dir/state/task-x1.meta" "$label: the re-run retired the record with the slot unproved"
+  assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the re-run dropped the slot claim"
+  assert_absent "$case_dir/treehouse.log" "$label: the re-run returned the unproved slot"
+
+  git -C "$NESTED_SLOT" push -q origin HEAD:main
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+    > "$case_dir/stdout3" 2> "$case_dir/stderr3" || rc=$?
+  expect_code 0 "$rc" "$label: a re-run with the slot's work landed must finish: $(cat "$case_dir/stderr3")"
+  assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the landed slot was not returned"
+  assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim survived the task"
+  assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+  pass "a re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands"
+}
+
 # Returning the enclosing slot sweeps more than the nested current copy, so the
 # safety steps run on every copy swept: a run parked on the slot's own branch is
 # aborted and a task-private launch agent rooted in the slot is retired before
@@ -8876,6 +8965,7 @@ test_own_prior_copies_block_only_an_unproven_pool_return
 test_reverse_nested_prior_outside_claude_tears_down
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot
 test_nested_slot_stale_lock_cleanup_reproves_the_slot
+test_nested_slot_reproof_refusal_is_rerunnable
 test_other_record_copy_overlap_is_component_aware
 test_forced_descendant_preserved_copy_refuses_before_cleanup
 test_tasktmp_preserves_current_and_prior_reassociated_copies
@@ -8908,6 +8998,7 @@ test_docker_workdirs_canonicalize_and_exclude_foreign_lanes_and_tasktmp
 test_docker_mixed_project_carriers_spare_empty_heuristic_networks
 test_docker_latest_foreign_carriers_veto_network_removal
 test_standalone_secondmate_skips_docker_cleanup
+test_secondmate_retirement_exempts_only_its_own_missing_home
 test_docker_project_record_failure_prevents_container_removal
 test_docker_verified_cleanup_clears_retained_projects
 test_docker_ambiguous_ids_trust_only_worktree_evidence
