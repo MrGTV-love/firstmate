@@ -12,8 +12,9 @@
 # policy. primary is a recorded rule's first use profile when the profile is
 # only its stand-in.
 # fm_dispatch_start <config-dir> <kind> <fallbacks-json> <profile-json> prints
-# {profile, capacity}: that primary only when the launch policy and kind permit
-# it and its capacity is measured usable, otherwise the task's own profile.
+# {profile, capacity}: that primary only when it passes every launch-readiness
+# check in fm_dispatch_launch_ready and its capacity is measured usable,
+# otherwise the task's own profile. It never refuses.
 # fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
 # prints the original profile unless it is proven exhausted, then the first
 # permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
@@ -28,6 +29,10 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-session-launch-policy-lib.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-worker-account-lib.sh
+. "$FM_DISPATCH_CAPACITY_DIR/fm-worker-account-lib.sh"
+# shellcheck source=bin/fm-exclude-tools-lib.sh
+. "$FM_DISPATCH_CAPACITY_DIR/fm-exclude-tools-lib.sh"
 
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
@@ -178,14 +183,28 @@ fm_dispatch_fallback_capacity() {
   fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")"
 }
 
+fm_dispatch_launch_ready() (
+  config=$1 kind=$2 harness=$3 model=$4
+  [ "$model" != default ] || model=
+  fm_session_launch_policy_check "$config" "$harness" || exit 1
+  fm_control_harness_supports_kind "$harness" "$kind" || exit 1
+  if [ "$harness" = claude ]; then
+    # shellcheck source=/dev/null
+    . "$FM_DISPATCH_CAPACITY_DIR/fm-claude-launcher-lib.sh"
+    fm_claude_launcher_select "$config" || exit 1
+  fi
+  fm_worker_account_select "$harness" "$config" "$model" "$harness" || exit 1
+  fm_exclude_tools_check "$harness" 0 "$config" || exit 1
+) >/dev/null 2>&1
+
 fm_dispatch_start() {
-  local config=$1 kind=$2 profile=$4 primary harness evidence
+  local config=$1 kind=$2 profile=$4 primary harness model evidence
   primary=$(jq -c '.primary // empty' <<<"$3")
   if [ -n "$primary" ]; then
     harness=$(jq -r .harness <<<"$primary")
-    if fm_session_launch_policy_check "$config" "$harness" 2>/dev/null \
-       && fm_control_harness_supports_kind "$harness" "$kind"; then
-      evidence=$(fm_dispatch_capacity "$harness" "$(jq -r .model <<<"$primary")")
+    model=$(jq -r .model <<<"$primary")
+    if fm_dispatch_launch_ready "$config" "$kind" "$harness" "$model"; then
+      evidence=$(fm_dispatch_capacity "$harness" "$model")
       if [ "$(jq -r .status <<<"$evidence")" = usable ]; then
         jq -cn --argjson profile "$primary" --argjson capacity "$evidence" '{profile: $profile, capacity: $capacity}'
         return

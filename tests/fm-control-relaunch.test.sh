@@ -5099,41 +5099,51 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
   pass "relaunch without a usable recorded rule treats an ambiguous match as no fallback"
 }
 
-test_relaunch_keeps_the_stand_in_when_policy_refuses_the_primary() {
-  local dir out rc id=rl-policy meta
-  dir=$(new_case policy-primary "$id")
-  add_ship_task "$dir" "$id" omp
-  printf omp > "$dir/fake/command"
-  printf omp > "$dir/fake/becomes"
-  meta=$(cat "$dir/home/state/$id.meta")
-  meta=${meta/model=default/model=deepseek/deepseek-v4-flash}
-  meta=${meta/effort=default/effort=high}
-  printf '%s\ndispatch_rule=rule_1\n' "$meta" > "$dir/home/state/$id.meta"
-  mkdir -p "$dir/home/config"
-  printf 'omp-or-tc\n' > "$dir/home/config/session-launch-policy"
-  printf '%s\n' '{"rules":[{"when":"assigned work","use":{"harness":"claude","model":"sonnet","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$dir/home/config/crew-dispatch.json"
-  cat > "$dir/fakebin/quota-axi" <<'SH'
+test_relaunch_keeps_the_stand_in_when_the_primary_cannot_launch() {
+  local dir out rc id meta blocker
+  for blocker in policy proxy pin; do
+    id=rl-primary-$blocker
+    dir=$(new_case "primary-$blocker" "$id")
+    add_ship_task "$dir" "$id" omp
+    printf omp > "$dir/fake/command"
+    printf omp > "$dir/fake/becomes"
+    meta=$(cat "$dir/home/state/$id.meta")
+    meta=${meta/model=default/model=deepseek/deepseek-v4-flash}
+    meta=${meta/effort=default/effort=high}
+    printf '%s\ndispatch_rule=rule_1\n' "$meta" > "$dir/home/state/$id.meta"
+    mkdir -p "$dir/home/config"
+    case "$blocker" in
+      policy) printf 'omp-or-tc\n' > "$dir/home/config/session-launch-policy" ;;
+      proxy)
+        printf 'teamclaude\n' > "$dir/home/config/claude-launcher"
+        fm_test_fake_teamclaude "$dir/fakebin"
+        ;;
+      pin) printf '%s\n' "$dir/missing-claude-account" > "$dir/home/config/claude-account" ;;
+    esac
+    printf '%s\n' '{"rules":[{"when":"assigned work","use":{"harness":"claude","model":"sonnet","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$dir/home/config/crew-dispatch.json"
+    cat > "$dir/fakebin/quota-axi" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' '{"schemaVersion":6,"providers":[{"provider":"claude","accountKey":"default","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":70}]}}]}'
 SH
-  cat > "$dir/fakebin/omp" <<'SH'
+    cat > "$dir/fakebin/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
   models) printf '%s\n' '{"models":[{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"}]}' ;;
   *) exit 0 ;;
 esac
 SH
-  chmod +x "$dir/fakebin/quota-axi" "$dir/fakebin/omp"
-  out=$(run_control "$dir" "$id" relaunch --note "continue under the launch policy"); rc=$?
-  expect_code 0 "$rc" "a policy-refused primary must not block the stand-in relaunch: $out"
-  assert_equals omp "$(meta_field "$dir" "$id" harness)" "the task stays on its permitted harness"
-  assert_equals deepseek/deepseek-v4-flash "$(meta_field "$dir" "$id" model)" "the task stays on its stand-in"
-  pass "relaunch keeps a recorded stand-in when the launch policy refuses the rule's primary"
+    chmod +x "$dir/fakebin/quota-axi" "$dir/fakebin/omp"
+    out=$(FM_FAKE_TEAMCLAUDE_STATUS=1 run_control "$dir" "$id" relaunch --note "continue on the stand-in"); rc=$?
+    expect_code 0 "$rc" "a primary blocked by $blocker must not refuse the stand-in relaunch: $out"
+    assert_equals omp "$(meta_field "$dir" "$id" harness)" "the task stays on its launchable harness ($blocker)"
+    assert_equals deepseek/deepseek-v4-flash "$(meta_field "$dir" "$id" model)" "the task stays on its stand-in ($blocker)"
+  done
+  pass "relaunch keeps a recorded stand-in when policy, a stopped TeamClaude proxy, or an account pin blocks the rule's primary"
 }
 
 test_retiring_omp_removes_only_its_generated_configuration
 
-test_relaunch_keeps_the_stand_in_when_policy_refuses_the_primary
+test_relaunch_keeps_the_stand_in_when_the_primary_cannot_launch
 
 test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior
 

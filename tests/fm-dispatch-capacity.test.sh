@@ -98,6 +98,14 @@ printf 'omp-or-tc\n' > "$TMP_ROOT/config/session-launch-policy"
 out=$(fm_dispatch_start "$TMP_ROOT/config" ship "$(jq -c '.primary.harness="claude"' <<<"$set")" "$standin")
 assert_equals "$standin" "$(jq -c .profile <<<"$out")" "a policy-refused primary keeps the stand-in"
 rm "$TMP_ROOT/config/session-launch-policy"
+printf '%s\n' "$TMP_ROOT/missing-claude-account" > "$TMP_ROOT/config/claude-account"
+out=$(fm_dispatch_start "$TMP_ROOT/config" ship "$(jq -c '.primary.harness="claude"' <<<"$set")" "$standin")
+assert_equals "$standin" "$(jq -c .profile <<<"$out")" "a primary whose account pin refuses keeps the stand-in"
+rm "$TMP_ROOT/config/claude-account"
+printf 'hidden_tool\n' > "$TMP_ROOT/config/crew-exclude-tools"
+out=$(fm_dispatch_start "$TMP_ROOT/config" ship "$set" "$standin")
+assert_equals "$standin" "$(jq -c .profile <<<"$out")" "a primary that cannot hide excluded tools keeps the stand-in"
+rm "$TMP_ROOT/config/crew-exclude-tools"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp deepseek/deepseek-v4-flash high)
 assert_equals null "$(jq -c .primary <<<"$set")" "an unrecorded stand-in keeps the explicitly requested route"
 jq '.rules[0].fallback=[]' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
