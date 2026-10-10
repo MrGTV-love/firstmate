@@ -2892,16 +2892,20 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
   DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
   DISPATCH_FALLBACK=$(jq -c .fallback <<<"$dispatch_set")
   if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
-    dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "$MODEL" --arg e "$EFFORT" '{harness:$h, model:$m, effort:$e}')
-    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$SPAWN_ROUTING_PAIR") || exit 1
+    dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "${MODEL:-default}" --arg e "${EFFORT:-default}" '{harness:$h, model:$m, effort:$e}')
+    dispatch_start=$(jq -c --argjson profile "$dispatch_profile" '.primary // $profile' <<<"$dispatch_set")
+    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_start" "$DISPATCH_FALLBACK" "" "$SPAWN_ROUTING_PAIR") || exit 1
     DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
-    if [ "$DISPATCH_SWITCHED" = true ]; then
+    if [ "$(jq -c .profile <<<"$dispatch_result")" != "$dispatch_profile" ]; then
       HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
-      MODEL=$(jq -r .profile.model <<<"$dispatch_result")
-      EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
-      MODEL=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
-      MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
-      if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
+      MODEL=$(jq -r '.profile.model | if . == "default" then "" else . end' <<<"$dispatch_result")
+      EFFORT=$(jq -r '.profile.effort | if . == "default" then "" else . end' <<<"$dispatch_result")
+      MODEL_INDEXED=0
+      if [ -n "$MODEL" ]; then
+        MODEL=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+        MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
+        if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
+      fi
       LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
     fi
   fi

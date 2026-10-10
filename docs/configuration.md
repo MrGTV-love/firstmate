@@ -1377,7 +1377,7 @@ It does not change commit-attribution preferences.
       "claude": { "model": "sonnet" },
       "omp": {
         "model": "anthropic/claude-sonnet-5-5",
-        "stand_in": "openrouter/deepseek/deepseek-v4-flash"
+        "stand_in": "deepseek/deepseek-v4-flash"
       }
     }
   },
@@ -1512,7 +1512,7 @@ Each fallback profile requires `harness`, `model`, and `effort`.
 An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
 Every fallback destination must also satisfy the home's session launch policy.
 A bare `claude` executable or a shell alias is not proof of that route.
-For example, a rule may declare `"fallback": [{"harness": "omp", "model": "openrouter/deepseek/deepseek-v4-flash", "effort": "high"}]`, using a concrete selector taken from `omp models --json`; these fields grant only the named stand-in, not a general downgrade.
+For example, a rule may declare `"fallback": [{"harness": "omp", "model": "deepseek/deepseek-v4-flash", "effort": "high"}]`, using a concrete selector taken from `omp models --json`; these fields grant only the named stand-in, not a general downgrade.
 The operator must preserve the task's required reasoning class in each list; an exhausted strongest route without a supported equal-class stand-in stops and reports the unavailable route.
 Natural-language `why` text does not authorize an executable fallback.
 
@@ -1522,6 +1522,8 @@ Spawn and recovery resolve each rule against their frozen model-index and dispat
 Only rules that contain the launched profile must resolve, so a retired model or unconfigured role in an unrelated rule does not block a launch or recovery.
 When the matched rule has a fallback policy, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
 A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
+A task on a recorded rule's stand-in starts selection from that rule's first `use` profile on every spawn and relaunch, so it returns to the primary once the primary is not exhausted.
+An explicit relaunch `--harness`, `--model`, or `--effort` override keeps the requested route.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
 OMP workers receive a later per-task configuration overlay with exact model-and-effort chains, preventing ambient chains from weakening the task.
 Those chains contain only the order-preserving eligible native prefix; the first supported cross-harness destination ends the prefix and leaves the transition to recovery.

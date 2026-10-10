@@ -4999,7 +4999,7 @@ test_quota_exhaustion_relaunches_only_a_permitted_route() {
     jq -n --arg model "$model" '{rules:[{when:"assigned work",
       use:{harness:"omp",model:$model,effort:"high",provider:"codex"},
       fallback:(if $model=="openai-codex/gpt-6-luna" then
-        [{harness:"omp",model:"openrouter/z-ai/glm-5.3-flash",effort:"high"}] else [] end)}]}' > "$dir/home/config/crew-dispatch.json"
+        [{harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"}] else [] end)}]}' > "$dir/home/config/crew-dispatch.json"
     jq -n --argjson now "$(date +%s)" '{reports:[
       {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
       {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}
@@ -5008,7 +5008,7 @@ test_quota_exhaustion_relaunches_only_a_permitted_route() {
 #!/usr/bin/env bash
 case "$1" in
   usage) cat "$FM_FAKE_DIR/../usage.json" ;;
-  models) printf '%s\n' '{"models":[{"provider":"openrouter","id":"z-ai/glm-5.3-flash","selector":"openrouter/z-ai/glm-5.3-flash"}]}' ;;
+  models) printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"}]}' ;;
   *) exit 0 ;;
 esac
 SH
@@ -5033,9 +5033,15 @@ SH
     assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "automatic replacement must preserve uncommitted work"
     if [ "$model" = openai-codex/gpt-6-luna ]; then
       assert_contains "$out" 'auto-relaunched after quota exhaustion' "an idle live OMP session must recover automatically"
-      assert_equals openrouter/z-ai/glm-5.3-flash "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
+      assert_equals deepseek/deepseek-v4-flash "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
       assert_equals complete "$(journal_field "$dir" "$id" phase)" "the real replacement transaction must complete"
       assert_grep 'fallback relaunched' "$dir/home/state/$id.status" "the served route must be reported"
+      jq '.reports[].metadata.meterStates.chat={allowed:true,limitReached:false}' "$dir/usage.json" > "$dir/usage-reset.json"
+      mv "$dir/usage-reset.json" "$dir/usage.json"
+      out=$(run_control "$dir" "$id" relaunch --note "continue after the primary reset"); rc=$?
+      expect_code 0 "$rc" "a relaunch after the primary resets must succeed: $out"
+      assert_equals openai-codex/gpt-6-luna "$(meta_field "$dir" "$id" model)" "the next relaunch returns to the primary"
+      assert_equals rule_1 "$(meta_field "$dir" "$id" dispatch_rule)" "the rule follows the task back to its primary"
     else
       assert_contains "$out" 'auto-relaunch failed' "strongest-model exhaustion must be surfaced without a weak stand-in"
       assert_equals omp "$(cat "$dir/fake/command")" "an unavailable strongest route must refuse before stopping the old agent"
@@ -5043,7 +5049,7 @@ SH
       assert_no_grep '/quit' "$dir/fake/literal" "no exit may be sent when the strongest replacement is unavailable"
     fi
   done
-  pass "supervised OMP quota recovery uses the declared stand-in or preserves the strongest route and work"
+  pass "supervised OMP quota recovery uses the declared stand-in, returns to the reset primary, or preserves the strongest route and work"
 }
 
 test_retiring_omp_removes_only_its_generated_configuration() {
@@ -5077,7 +5083,7 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
     add_ship_task "$dir" "$id" claude
     [ "$recorded" = none ] || printf 'dispatch_rule=rule_7\n' >> "$dir/home/state/$id.meta"
     mkdir -p "$dir/home/config"
-    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"openrouter/deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
+    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
     out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
     expect_code 0 "$rc" "a $recorded recorded rule with an ambiguous match must relaunch as before: $out"
     assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"
