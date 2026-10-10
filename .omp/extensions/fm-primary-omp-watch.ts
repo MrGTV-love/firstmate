@@ -1065,10 +1065,10 @@ export default function (pi: ExtensionAPI) {
   // fresh text; an operational hand-back is sent again with the message it was
   // first sent with, plus its send-time note;
   // other text, which names no queued row, is resent as emitted.
-  function redeliverWake(owner: SessionGeneration, token: string, wake: UnconsumedWake): void {
+  function redeliverWake(owner: SessionGeneration, token: string, wake: UnconsumedWake): boolean {
     if (!wake.pending) {
       pi.sendUserMessage(wake.content);
-      return;
+      return true;
     }
     owner.unconsumedWakes.delete(token);
     if (operationalHandback(wake.pending.message)) {
@@ -1076,9 +1076,10 @@ export default function (pi: ExtensionAPI) {
         const detail = error instanceof Error ? error.message : String(error);
         surfaceFailure(owner, `watcher: FAILED - omp extension could not deliver an operational hand-back\n${detail}`);
       });
-    } else {
-      owner.heldWakes.set(token, { pending: wake.pending });
+      return true;
     }
+    owner.heldWakes.set(token, { pending: wake.pending });
+    return false;
   }
 
   // omp is idle with messages still queued after the bounded wait, so nothing
@@ -1134,7 +1135,7 @@ export default function (pi: ExtensionAPI) {
         if (remainder === null) continue;
         ctx.ui.setEditorText(remainder);
         recovered = true;
-        redeliverWake(owner, token, wake);
+        if (redeliverWake(owner, token, wake)) return;
       }
       if (queued && !recovered) flushStuckQueue(owner, ctx);
     } catch {}
