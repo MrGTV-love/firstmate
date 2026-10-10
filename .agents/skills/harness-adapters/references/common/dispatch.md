@@ -23,7 +23,7 @@ Follow [Worker skill selection](../../../docs/configuration.md#worker-skill-sele
 Natural-language rules stay with firstmate; model references follow the [fleet model-index contract](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson).
 
 `../../../bin/fm-busy-lib.sh` owns semantic busy trust.
-Composer shapes, glyphs, placeholders, popups, rendered delivery signals, and the `empty` / `pending` / `pending-unproven` / `unknown` decision belong only to `../../../bin/fm-composer-lib.sh`.
+Composer shapes, glyphs, placeholders, popups, rendered delivery signals, and the verdict contract belong only to [`bin/fm-composer-lib.sh`](../../../bin/fm-composer-lib.sh).
 Tool references record empirical knowledge for those executable owners.
 
 ## Adapter verification

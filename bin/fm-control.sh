@@ -7,8 +7,16 @@
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--claude-debug]
-#                                         [--reconcile-only]
+#                                         [--reconcile-only] [--worktree <path>]
 #                                         (--note <text> | --note-file <path>)
+#        fm-control.sh <task-id> relaunch --recover-launch
+# --recover-launch is Herdr-only inspection under the control lock.
+# Managed and stopped agents are left untouched. Unmanaged live agents are
+# reported without lifecycle input; native restoration does not prove ownership.
+# Unknown proof on a versioned launch refuses. A legacy record (no launch_proof)
+# keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
+# legacy-unproven launches skip.
+# This mode cannot change a profile or create a relaunch transaction.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
@@ -25,6 +33,9 @@
 # explicitly clear recovery after ordinary automatic-backlog admission.
 # It neither launches an agent nor delivers instructions; then use fm-send for
 # a new continuation instruction, or ordinary relaunch for an exited owner.
+# --worktree <path> accepts a prepared absolute destination for a ship relaunch.
+# docs/agent-control.md "Relocating a task whose worktree is gone" owns eligibility
+# and recovery guarantees; bin/fm-control-worktree-lib.sh owns their proof.
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
 # A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
@@ -194,10 +205,14 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-busy-lib.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$SCRIPT_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-control-worktree-lib.sh
+. "$SCRIPT_DIR/fm-control-worktree-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-secondmate-registry-lib.sh
+. "$SCRIPT_DIR/fm-secondmate-registry-lib.sh"
 # shellcheck source=bin/fm-worker-account-lib.sh
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 # shellcheck source=bin/fm-api-key-guard-lib.sh
@@ -212,6 +227,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
 # shellcheck source=bin/fm-exclude-tools-lib.sh
 . "$SCRIPT_DIR/fm-exclude-tools-lib.sh"
+# shellcheck source=bin/fm-dispatch-capacity-lib.sh
+. "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
@@ -291,7 +308,10 @@ NOTE=
 NOTE_SET=0
 CLAUDE_DEBUG=0
 RECONCILE_ONLY=0
+RELOCATE_TO=
+RELOCATE_SET=0
 control_want_value=
+RECOVER_LAUNCH=0
 for control_arg in "$@"; do
   if [ -n "$control_want_value" ]; then
     case "$control_arg" in
@@ -302,6 +322,7 @@ for control_arg in "$@"; do
       model) NEW_MODEL=$control_arg; MODEL_SET=1 ;;
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
+      worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
         NOTE=$(cat "$control_arg")
@@ -318,6 +339,8 @@ for control_arg in "$@"; do
     --model=*) NEW_MODEL=${control_arg#--model=}; MODEL_SET=1 ;;
     --effort) control_want_value=effort ;;
     --effort=*) NEW_EFFORT=${control_arg#--effort=}; EFFORT_SET=1 ;;
+    --worktree) control_want_value=worktree ;;
+    --worktree=*) RELOCATE_TO=${control_arg#--worktree=}; RELOCATE_SET=1 ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;
     --note-file) control_want_value=note_file ;;
@@ -327,6 +350,7 @@ for control_arg in "$@"; do
       NOTE_SET=1
       ;;
     --claude-debug) CLAUDE_DEBUG=1 ;;
+    --recover-launch) RECOVER_LAUNCH=1 ;;
     --reconcile-only) RECONCILE_ONLY=1 ;;
     *) die "unexpected argument '$control_arg'" ;;
   esac
@@ -337,9 +361,15 @@ if [ -n "$control_want_value" ]; then
 fi
 
 if [ "$VERB" != relaunch ]; then
-  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
-    || die "--harness, --model, --effort, --note, --claude-debug, and --reconcile-only apply to 'relaunch' only"
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
+    || die "--harness, --model, --effort, --note, --claude-debug, --recover-launch, --reconcile-only, and --worktree apply to 'relaunch' only"
 fi
+if [ "$RECOVER_LAUNCH" = 1 ]; then
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
+    || die "--recover-launch only inspects the recorded launch; it cannot be combined with replacement options, --reconcile-only, or --worktree"
+fi
+[ "$RELOCATE_SET" = 0 ] || [ -n "$RELOCATE_TO" ] || die "--worktree requires a value"
+
 [ "$HARNESS_SET" = 0 ] || [ -n "$NEW_HARNESS" ] || die "--harness requires a non-empty value"
 [ "$MODEL_SET" = 0 ] || [ -n "$NEW_MODEL" ] || die "--model requires a non-empty value"
 [ "$EFFORT_SET" = 0 ] || [ -n "$NEW_EFFORT" ] || die "--effort requires a non-empty value"
@@ -456,6 +486,12 @@ fm_control_harness_supported "$HARNESS" \
 
 fm_backend_validate "$BACKEND" || exit 1
 
+if [ "$BACKEND" = herdr ]; then
+  # shellcheck source=bin/fm-launch-proof-lib.sh
+  . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
+  fm_backend_source herdr || die "could not load Herdr lifecycle control"
+fi
+
 # --- shared helpers ---------------------------------------------------------
 
 agent_state() {
@@ -466,8 +502,24 @@ busy_verdict() {
   fm_busy_classify_meta "$META" "$ID" "$STATE"
 }
 
-# wait_agent_state <wanted...> <timeout>: poll until agent_state prints one of
-# the wanted values. Prints the final observed state; returns 0 on a match.
+require_live_task_attribution() {
+  local state=${1:-} absence
+  [ "$BACKEND" = herdr ] || return 0
+  [ -n "$state" ] || state=$(agent_state)
+  if [ "$state" = missing ]; then
+    absence=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T")
+    state=${absence%%$'\t'*}
+  fi
+  case "$state" in
+    dead|gone) return 0 ;;
+    alive) ;;
+    *) return 1 ;;
+  esac
+  fm_launch_proof_herdr_authorizes "$META"
+}
+
+# wait_agent_state <timeout> <wanted...>: poll until a wanted state is proven.
+# Herdr's alive postcondition also requires the managed launch incarnation.
 wait_agent_state() {  # <timeout> <wanted>...
   local timeout=$1 state want elapsed=0
   shift
@@ -475,6 +527,10 @@ wait_agent_state() {  # <timeout> <wanted>...
     state=$(agent_state)
     for want in "$@"; do
       if [ "$state" = "$want" ]; then
+        if [ "$want" = alive ] && [ "$BACKEND" = herdr ] \
+          && ! fm_launch_proof_herdr_authorizes "$META"; then
+          continue
+        fi
         printf '%s' "$state"
         return 0
       fi
@@ -652,6 +708,8 @@ verify_interrupt_running() {
 
 do_interrupt() {
   local proof cancel
+  require_live_task_attribution alive \
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
   cancel=$(deliver_interrupt) || return $?
   proof=$(verify_interrupt_running) || return $?
   printf '%s cancel=%s' "$proof" "$cancel"
@@ -767,6 +825,8 @@ do_exit() {
       ;;
     *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send a lifecycle command into an unattributed endpoint" ;;
   esac
+  require_live_task_attribution alive \
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
   # A busy agent is interrupted first before the exit command is submitted.
   case "$(busy_verdict)" in
     busy*)
@@ -874,6 +934,26 @@ BRIEF_PRIOR="$JOURNAL.brief-prior"
 NOTE_FILE="$JOURNAL.note"
 RELAUNCH_META_PUBLISHED=0
 RELAUNCH_AGENT_CONFIRMED=0
+RELOCATING=0
+RELOCATE_FROM=
+RELOCATE_DEST=
+RELOCATE_HEAD=
+RELOCATE_HEAD_SOURCE=
+PRIOR_RELOCATE_FROM=
+PRIOR_RELOCATE_TO=
+PRIOR_RELOCATE_HEAD=
+PRIOR_RELOCATE_HEAD_SOURCE=
+if [ "$VERB" = relaunch ] && { [ -e "$JOURNAL" ] || [ -L "$JOURNAL" ]; }; then
+  if [ ! -f "$JOURNAL" ] || [ -L "$JOURNAL" ] || ! cat "$JOURNAL" >/dev/null 2>&1; then
+    die "control journal $JOURNAL cannot be read; refusing to overwrite recorded recovery evidence"
+  fi
+  if [ "$(fm_meta_get "$JOURNAL" task)" = "$ID" ]; then
+    PRIOR_RELOCATE_FROM=$(fm_meta_get "$JOURNAL" relocation_from)
+    PRIOR_RELOCATE_TO=$(fm_meta_get "$JOURNAL" relocation_to)
+    PRIOR_RELOCATE_HEAD=$(fm_meta_get "$JOURNAL" relocation_head)
+    PRIOR_RELOCATE_HEAD_SOURCE=$(fm_meta_get "$JOURNAL" relocation_head_source)
+  fi
+fi
 RELAUNCH_TX=
 RELAUNCH_BRIEF=
 PRIOR_HARNESS=$HARNESS
@@ -886,6 +966,8 @@ PRIOR_EFFORT=
 TARGET_HARNESS=$HARNESS
 TARGET_MODEL=
 TARGET_EFFORT=
+TARGET_DISPATCH_RULE=
+TARGET_DISPATCH_SWITCHED=false
 
 journal_write() {  # <phase> [extra-line]...
   local phase=$1
@@ -905,8 +987,23 @@ journal_write() {  # <phase> [extra-line]...
     echo "to_harness=$TARGET_HARNESS"
     echo "to_model=$TARGET_MODEL"
     echo "to_effort=$TARGET_EFFORT"
+    # The relocation proof rides every rewrite, the failure journals included:
+    # it is written here rather than passed by each caller, so no phase can
+    # forget it. A later identical relocation is judged against it
+    # (fm_control_worktree_relocation reads relocation_head back).
+    if [ "$RELOCATING" = 1 ]; then
+      echo "relocation_from=$RELOCATE_FROM"
+      echo "relocation_to=$RELOCATE_DEST"
+      echo "relocation_head=$RELOCATE_HEAD"
+      echo "relocation_head_source=$RELOCATE_HEAD_SOURCE"
+    else
+      [ -z "$PRIOR_RELOCATE_FROM" ] || echo "relocation_from=$PRIOR_RELOCATE_FROM"
+      [ -z "$PRIOR_RELOCATE_TO" ] || echo "relocation_to=$PRIOR_RELOCATE_TO"
+      [ -z "$PRIOR_RELOCATE_HEAD" ] || echo "relocation_head=$PRIOR_RELOCATE_HEAD"
+      [ -z "$PRIOR_RELOCATE_HEAD_SOURCE" ] || echo "relocation_head_source=$PRIOR_RELOCATE_HEAD_SOURCE"
+    fi
     local line
-    for line in "$@"; do
+    for line in "${CHECKPOINT_LINES[@]}" "$@"; do
       echo "$line"
     done
   } > "$JOURNAL.tmp" && mv -f "$JOURNAL.tmp" "$JOURNAL"; then
@@ -914,6 +1011,16 @@ journal_write() {  # <phase> [extra-line]...
     return 0
   fi
   return 1
+}
+
+# Where the task's work is preserved: the recorded copy, or the fresh one a
+# relocation is moving it to (the recorded copy is gone by definition).
+work_location() {
+  if [ "$RELOCATING" = 1 ]; then
+    printf '%s' "$RELOCATE_DEST"
+  else
+    printf '%s' "$WT"
+  fi
 }
 
 relaunch_rollback() {
@@ -943,7 +1050,7 @@ relaunch_rollback() {
           ;;
         dead)
           journal_write "failed:$RELAUNCH_PHASE" "rollback=prior-record-kept-agent-dead" || true
-          echo "error: $ID's agent stopped but relaunch did not reach replacement launch; no agent is running, and its work plus progress note are preserved at $WT" >&2
+          echo "error: $ID's agent stopped but relaunch did not reach replacement launch; no agent is running, and its work plus progress note are preserved at $(work_location)" >&2
           ;;
         *)
           # The old agent was NOT proven stopped, so no replacement is coming
@@ -972,10 +1079,10 @@ relaunch_rollback() {
         # reconciles. Rewriting it back to the old harness would be a second,
         # worse inaccuracy.
         journal_write "failed:$RELAUNCH_PHASE" "rollback=none-new-record-kept" || true
-        echo "error: $ID was relaunched on $TARGET_HARNESS but no running agent could be confirmed; its work is preserved at $WT" >&2
+        echo "error: $ID was relaunched on $TARGET_HARNESS but no running agent could be confirmed; its work is preserved at $(work_location)" >&2
       else
         journal_write "failed:$RELAUNCH_PHASE" "rollback=prior-record-kept" || true
-        echo "error: $ID's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at $WT" >&2
+        echo "error: $ID's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at $(work_location)" >&2
       fi
       ;;
   esac
@@ -1035,6 +1142,9 @@ resolve_relaunch_profile() {
   # transaction, where nothing has changed yet.
   fm_control_harness_supports_kind "$TARGET_HARNESS" "$KIND" \
     || die "'$TARGET_HARNESS' is not verified to run a $KIND task, so relaunching $ID onto it would stop the running agent for a launch that must be refused; choose an adapter verified for this kind"
+  if [ "$TARGET_HARNESS" = omp ]; then
+    fm_control_omp_launch_check || return 1
+  fi
   # A model or effort chosen for the previous harness does not transfer to a
   # different one, so an explicit harness change resets both axes unless the
   # caller names them too.
@@ -1058,12 +1168,43 @@ resolve_relaunch_profile() {
   fi
   # A role reference, or a model the index has since retired, is resolved or
   # refused here, before the stop, exactly as the launch owner would.
-  if [ "$TARGET_MODEL" != default ]; then
+  if [ "$TARGET_MODEL" != default ] || [ "$KIND" != secondmate ]; then
     RELAUNCH_PAIR_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-control-pair.XXXXXX") || return 1
     FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
       fm_config_inherit_pair_stage "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$RELAUNCH_PAIR_DIR" || return 1
+    if [ "$TARGET_MODEL" != default ]; then
+      TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
+        "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
+    fi
+  fi
+  if [ "$KIND" != secondmate ]; then
+    local dispatch_set dispatch_profile dispatch_result config_dir
+    config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+    TARGET_DISPATCH_RULE=$(fm_meta_get "$META" dispatch_rule)
+    if [ "$HARNESS_SET" = 1 ] || [ "$MODEL_SET" = 1 ] || [ "$EFFORT_SET" = 1 ]; then
+      TARGET_DISPATCH_RULE=
+    fi
+    dispatch_set=$(fm_dispatch_fallbacks "$RELAUNCH_PAIR_DIR" "$TARGET_DISPATCH_RULE" \
+      "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
+    TARGET_DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
+    if [ "$TARGET_HARNESS" = omp ] && [[ "$TARGET_MODEL" == openai-codex/* ]] \
+       || [ "$(jq -c .fallback <<<"$dispatch_set")" != '[]' ]; then
+      dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
+        --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
+      dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
+        "$dispatch_profile" "$(jq -c .fallback <<<"$dispatch_set")" "" "$RELAUNCH_PAIR_DIR") || return 1
+      TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
+      TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
+      TARGET_MODEL=$(jq -r .profile.model <<<"$dispatch_result")
+      TARGET_EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
+    fi
+  fi
+  if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
     TARGET_MODEL=$(FM_CONFIG_OVERRIDE="$RELAUNCH_PAIR_DIR" \
       "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
+    fm_session_launch_policy_check "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$TARGET_HARNESS" || return 1
+    fm_control_harness_supports_kind "$TARGET_HARNESS" "$KIND" \
+      || die "'$TARGET_HARNESS' is not verified to run a $KIND task"
   fi
   if [ "$TARGET_EFFORT" = ultra ]; then
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" || return 1
@@ -1099,20 +1240,34 @@ resolve_relaunch_profile() {
 # refuses outright when any of it cannot be established.
 CHECKPOINT_LINES=()
 safe_checkpoint() {
-  local wt_real wt_top wt_top_real head head_ref head_ref_status status_output dirty children marker child_meta
+  local wt_real wt_top wt_top_real head head_ref head_ref_status status_output dirty children marker child_meta check_wt
   CHECKPOINT_LINES=()
   [ -n "$WT" ] || die "task $ID has no recorded worktree; refusing to relaunch without a recorded local copy to preserve"
-  [ -d "$WT" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work"
-  wt_real=$(cd "$WT" 2>/dev/null && pwd -P) || die "task $ID's recorded worktree $WT cannot be resolved"
-  wt_top=$(git -C "$WT" rev-parse --show-toplevel 2>/dev/null) \
-    || die "task $ID's recorded worktree $WT is not a git worktree; refusing to relaunch without a checkout whose unlanded work can be accounted for"
+  if [ "$RELOCATE_SET" = 1 ]; then
+    # The recorded copy is gone, so there is nothing at $WT to account for. The
+    # proof runs BEFORE the journal or anything else is written; the checkpoint
+    # below then accounts for the fresh copy the replacement will start from.
+    fm_control_worktree_relocation "$META" "$ID" "$STATE" "$RELOCATE_TO" || exit 1
+    RELOCATING=1
+    RELOCATE_FROM=$FM_CONTROL_RELOCATION_FROM
+    RELOCATE_DEST=$FM_CONTROL_RELOCATION_PATH
+    RELOCATE_HEAD=$FM_CONTROL_RELOCATION_HEAD
+    RELOCATE_HEAD_SOURCE=$FM_CONTROL_RELOCATION_HEAD_SOURCE
+    check_wt=$RELOCATE_DEST
+  else
+    check_wt=$WT
+  fi
+  [ -d "$check_wt" ] || die "task $ID's recorded worktree $WT is missing; refusing to relaunch and lose track of its work (a fresh copy of the same branch can replace it: pass --worktree <path>)"
+  wt_real=$(cd "$check_wt" 2>/dev/null && pwd -P) || die "task $ID's recorded worktree $check_wt cannot be resolved"
+  wt_top=$(git -C "$check_wt" rev-parse --show-toplevel 2>/dev/null) \
+    || die "task $ID's recorded worktree $check_wt is not a git worktree; refusing to relaunch without a checkout whose unlanded work can be accounted for"
   wt_top_real=$(cd "$wt_top" 2>/dev/null && pwd -P) || wt_top_real=$wt_top
   [ "$wt_real" = "$wt_top_real" ] \
-    || die "task $ID's recorded worktree $WT is not a worktree root (root is $wt_top); refusing to relaunch against an ambiguous checkout"
-  if head=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null); then
+    || die "task $ID's recorded worktree $check_wt is not a worktree root (root is $wt_top); refusing to relaunch against an ambiguous checkout"
+  if head=$(git -C "$check_wt" rev-parse --verify HEAD 2>/dev/null); then
     :
-  elif head_ref=$(git -C "$WT" symbolic-ref -q HEAD 2>/dev/null); then
-    if git -C "$WT" show-ref --verify --quiet "$head_ref" 2>/dev/null; then
+  elif head_ref=$(git -C "$check_wt" symbolic-ref -q HEAD 2>/dev/null); then
+    if git -C "$check_wt" show-ref --verify --quiet "$head_ref" 2>/dev/null; then
       die "task $ID's worktree HEAD exists but cannot be resolved; refusing to relaunch from an unreadable checkout"
     else
       head_ref_status=$?
@@ -1123,7 +1278,7 @@ safe_checkpoint() {
   else
     die "task $ID's worktree HEAD cannot be inspected; refusing to relaunch from an unreadable checkout"
   fi
-  status_output=$(git -C "$WT" status --porcelain 2>/dev/null) \
+  status_output=$(git -C "$check_wt" status --porcelain 2>/dev/null) \
     || die "task $ID's worktree status cannot be inspected; refusing to relaunch without accounting for local changes"
   if [ -n "$status_output" ]; then
     dirty=yes
@@ -1180,6 +1335,12 @@ record_note() {
         echo
         if [ "$RECONCILE_ONLY" = 1 ]; then
           echo "This task was relaunched for instruction reconciliation only, not continuation."
+        elif [ "$RELOCATING" = 1 ]; then
+          echo "This task was relaunched in $RELOCATE_DEST because its recorded local copy"
+          echo "($RELOCATE_FROM) was proven absent. The new copy is a fresh checkout of the same branch"
+          echo "and contains every surviving recorded head ($RELOCATE_HEAD_SOURCE), proven at $RELOCATE_HEAD."
+          echo "Uncommitted changes in the vanished copy are not recoverable; check the branch"
+          echo "and the status log for what is missing before continuing."
         else
           echo "This task was relaunched. Continue from here; the local copy and every"
           echo "uncommitted change are exactly as the previous worker left them."
@@ -1201,6 +1362,35 @@ do_relaunch() {
   local -a spawn_args
 
   require_state_verified_backend relaunch
+  if [ "$RECOVER_LAUNCH" = 1 ]; then
+    [ "$BACKEND" = herdr ] || die "--recover-launch is supported only for recorded Herdr endpoints"
+    state=$(agent_state)
+    case "$state" in
+      dead|missing) echo "recovery-skipped $ID agent=$state"; return 0 ;;
+      alive) ;;
+      *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
+    esac
+    state=$(fm_launch_proof_herdr "$META")
+    case "$state" in
+      managed) echo "recovery-skipped $ID launch=managed"; return 0 ;;
+      unmanaged)
+        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+          echo "recovery-skipped $ID launch=legacy record; exit and relaunch are allowed"
+          return 0
+        fi
+        echo "recovery-skipped $ID launch=unmanaged; no lifecycle action taken"
+        return 0
+        ;;
+      unknown)
+        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+          echo "recovery-skipped $ID launch=legacy-unproven"
+          return 0
+        fi
+        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken"
+        ;;
+      *) die "invalid launch proof for $ID: $state" ;;
+    esac
+  fi
   resolve_relaunch_profile
   if [ "$CLAUDE_DEBUG" = 1 ] && [ "$TARGET_HARNESS" != claude ]; then
     die "--claude-debug applies only to a claude relaunch; $ID would be replaced on $TARGET_HARNESS"
@@ -1255,6 +1445,11 @@ do_relaunch() {
       *) die "reconciliation-only recovery requires a proven exited owner (endpoint reads $state)" ;;
     esac
   fi
+  # Admission refusals above name the task's own state; only then does an
+  # unattributable live Herdr agent stop an ordinary relaunch, still before any
+  # checkpoint or lifecycle input.
+  require_live_task_attribution \
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
   safe_checkpoint
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
@@ -1263,10 +1458,10 @@ do_relaunch() {
   fi
   cp -p "$META" "$META_PRIOR" || die "could not preserve task $ID's durable record before relaunching"
   RELAUNCH_ACTIVE=1
-  journal_write checkpoint "${CHECKPOINT_LINES[@]}" "$note_line"
+  journal_write checkpoint "$note_line"
 
   record_note
-  journal_write noted "${CHECKPOINT_LINES[@]}" "$note_line"
+  journal_write noted "$note_line"
 
   # Refuse before stopping the current worker, using the replacement harness,
   # account pin, allowlist, and backend that fm-spawn will use.
@@ -1275,19 +1470,21 @@ do_relaunch() {
   fm_api_key_guard "$TARGET_HARNESS" "$TARGET_API_KEY_ALLOW" "$TARGET_WORKER_ACCOUNT" \
     "$FM_API_KEY_LAUNCH_ENV_ENABLED" "$FM_API_KEY_LAUNCH_ENV_NAMES" "$BACKEND" \
     || die "refused before stopping $ID: an Anthropic credential would reach the replacement worker"
-  journal_write stopping "${CHECKPOINT_LINES[@]}" "$note_line"
+  journal_write stopping "$note_line"
   exit_result=$(do_exit)
-  journal_write exited "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
+  journal_write exited "$note_line" "exit_result=$exit_result"
 
   # The launch owner (fm-spawn --relaunch) clears the previous incarnation's
   # per-task harness wiring before arming the new one, so nothing to do here.
   RELAUNCH_TX="${BASHPID:-$$}.$(date -u +%Y%m%dT%H%M%SZ).$RANDOM"
-  journal_write launching "${CHECKPOINT_LINES[@]}" "$note_line" "relaunch_tx=$RELAUNCH_TX"
+  journal_write launching "$note_line" "relaunch_tx=$RELAUNCH_TX"
   spawn_args=("$ID" --relaunch --harness "$TARGET_HARNESS")
   [ "$RECONCILE_ONLY" = 0 ] || spawn_args+=(--reconcile-only)
   [ "$CLAUDE_DEBUG" = 0 ] || spawn_args+=(--claude-debug)
+  [ "$RELOCATING" = 0 ] || spawn_args+=(--worktree "$RELOCATE_DEST")
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
+  [ -z "$TARGET_DISPATCH_RULE" ] || spawn_args+=(--dispatch-rule "$TARGET_DISPATCH_RULE")
   if [ "$TARGET_API_KEY_ALLOW" = 1 ]; then
     spawn_args+=(--allow-api-key)
   fi
@@ -1310,22 +1507,36 @@ do_relaunch() {
        && [ -n "$FM_BACKEND_VALIDATED_TARGET" ]; then
       T=$FM_BACKEND_VALIDATED_TARGET
       BACKEND=$FM_BACKEND_VALIDATED_BACKEND
+      WT=$(fm_meta_get "$META" worktree)
+      if [ "$BACKEND" = herdr ] && ! declare -F fm_launch_proof_herdr >/dev/null 2>&1; then
+        # shellcheck source=bin/fm-launch-proof-lib.sh
+        . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
+        fm_backend_source herdr || die "could not load Herdr lifecycle control"
+      fi
     else
       die "the replacement agent for $ID was launched, but task $ID's republished record no longer passes endpoint validation (the refusal above names the row), so this transaction cannot say which endpoint to confirm it on; reconcile $META before any further control action"
     fi
   else
-    [ "$(fm_meta_get "$META" control_relaunch_tx)" != "$RELAUNCH_TX" ] \
-      || RELAUNCH_META_PUBLISHED=1
+    if [ "$(fm_meta_get "$META" control_relaunch_tx)" = "$RELAUNCH_TX" ]; then
+      RELAUNCH_META_PUBLISHED=1
+      WT=$(fm_meta_get "$META" worktree)
+    fi
     die "the replacement agent for $ID could not be launched on $TARGET_HARNESS"
   fi
 
   state=$(wait_agent_state "$LAUNCH_WAIT" alive) || {
+    if [ "$BACKEND" = herdr ] && [ "$state" = alive ]; then
+      die "the replacement agent for $ID is running but its managed launch incarnation could not be proven within ${LAUNCH_WAIT}s"
+    fi
     die "the replacement agent for $ID did not come up within ${LAUNCH_WAIT}s (endpoint reads '$state')"
   }
   RELAUNCH_AGENT_CONFIRMED=1
 
-  journal_write complete "${CHECKPOINT_LINES[@]}" "$note_line" "exit_result=$exit_result"
+  journal_write complete "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
+  if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
+    printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s\n' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+  fi
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }
 

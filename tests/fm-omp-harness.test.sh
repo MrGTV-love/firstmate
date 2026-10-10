@@ -35,6 +35,8 @@ set -u
 
 # shellcheck source=bin/fm-busy-lib.sh
 . "$ROOT/bin/fm-busy-lib.sh"
+# shellcheck source=bin/fm-status-event-lib.sh
+. "$ROOT/bin/fm-status-event-lib.sh"
 # shellcheck source=bin/fm-composer-lib.sh
 . "$ROOT/bin/fm-composer-lib.sh"
 # shellcheck source=bin/fm-control-lib.sh
@@ -59,6 +61,17 @@ make_named_shells() {  # <dir> -> echoes <bindir>
   for name in omp ompd comp; do
     ln -sf /bin/bash "$dir/$name"
   done
+  # Keep the real process-name proof, but bound ancestry to the named fixture
+  # shell: this suite itself can legitimately run under an OMP ancestor.
+  cat > "$dir/ps" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = "-o ppid= -p ${FM_ANCESTRY_FIXTURE_PID:-}" ]; then
+  printf '1\n'
+else
+  exec /bin/ps "$@"
+fi
+SH
+  chmod +x "$dir/ps"
   printf '%s' "$dir"
 }
 
@@ -67,25 +80,39 @@ make_named_shells() {  # <dir> -> echoes <bindir>
 test_detection_anchored_name_and_marker_precedence() {
   local bin out
   bin=$(make_named_shells "$TMP_ROOT/named")
+  # Keep real process evidence inside this fixture's ancestry. Otherwise an
+  # actual omp running this suite makes every decoy inherit an omp ancestor.
+  local -x FM_TEST_DETECTION_BOUNDARY=$$ FM_TEST_REAL_PS
+  FM_TEST_REAL_PS=$(command -v ps)
+  local PATH="$bin:$PATH"
+  cat > "$bin/ps" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = "-o ppid= -p $FM_TEST_DETECTION_BOUNDARY" ]; then
+  printf '1\n'
+else
+  exec "$FM_TEST_REAL_PS" "$@"
+fi
+SH
+  chmod +x "$bin/ps"
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
+    PATH="$bin:$PATH" "$bin/omp" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "a process named omp must detect as omp, got '$out'"
   for decoy in ompd comp; do
     # shellcheck disable=SC2016 # the quoted body expands inside the named shell
     out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-      "$bin/$decoy" -c '"$1"; :' _ "$HARNESS")
+      PATH="$bin:$PATH" "$bin/$decoy" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
     [ "$out" != omp ] || fail "'$decoy' merely contains omp and must not detect as omp"
   done
   # The marker beats an inherited CLAUDECODE only under a real omp ancestor.
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
-    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
+    PATH="$bin:$PATH" "$bin/omp" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "FM_OMP_HARNESS under an omp ancestor must outrank an inherited CLAUDECODE, got '$out'"
   # ...and is inert when it leaks into a worker with no omp ancestor.
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
-    bash -c '"$1"; :' _ "$HARNESS")
+    PATH="$bin:$PATH" bash -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = claude ] || fail "a leaked FM_OMP_HARNESS without an omp ancestor must not relabel a claude worker, got '$out'"
   pass "fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry"
 }
@@ -116,12 +143,18 @@ if [ -n "${FM_FAKE_OMP_ENV_LOG:-}" ]; then
   printf '%s:%s\n' "${1:-launch}" "${PI_CODING_AGENT_DIR:-}" >> "$FM_FAKE_OMP_ENV_LOG"
 fi
 case "$1" in
+  --version)
+    printf 'omp/%s\n' "${FM_FAKE_OMP_VERSION:-18.1.20}"
+    ;;
   models)
     if [ -f "${PI_CODING_AGENT_DIR:-}/catalog.json" ]; then
       cat "$PI_CODING_AGENT_DIR/catalog.json"
       exit 0
     fi
-    printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
+    printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"},{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
+    ;;
+  usage)
+    if [ -n "${OMP_USAGE_FIXTURE:-}" ]; then cat "$OMP_USAGE_FIXTURE"; else printf '{}\n'; fi
     ;;
 esac
 exit 0
@@ -159,10 +192,40 @@ run_scout_spawn() {  # <home> <wt> <fakebin> <launch-log> <spawn-args...>
   FM_FAKE_LAUNCH_LOG="$launchlog" fm_test_run_spawn "$home" "$wt" "$fakebin" "$@" --scout
 }
 
+test_spawn_refuses_unsupported_omp_before_launch() {
+  local kind version rec id out status
+  local -a args
+  for kind in ship scout secondmate; do
+    for version in 18.1.11 18.1.19; do
+      id="omp-old-$kind-${version##*.}"
+      rec=$(make_spawn_case "$id" omp "$id")
+      read_case_record "$rec"
+      case "$kind" in
+        ship) args=(--mode local-only --yolo off) ;;
+        scout) args=(--scout) ;;
+        secondmate) args=(--secondmate) ;;
+      esac
+      out=$(FM_BACKEND=tmux FM_FAKE_OMP_VERSION="$version" FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" \
+        fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$id" "$PROJ_DIR" --harness omp "${args[@]}")
+      status=$?
+      expect_code 1 "$status" "unsupported omp must refuse $kind: $out"
+      assert_contains "$out" "installed omp version 'omp/$version'" "refusal must name installed version"
+      assert_contains "$out" "minimum supported version is 18.1.20" "refusal must name minimum"
+      assert_contains "$out" "omp update" "refusal must name upgrade step"
+      [ ! -s "$LAUNCH_LOG" ] || fail "unsupported omp reached $kind launch"
+      assert_absent "$HOME_DIR/state/$id.meta" "refused launch must not publish task metadata"
+      assert_absent "$HOME_DIR/state/$id.omp-ext.ts" "refused launch must not install task extension"
+    done
+  done
+  pass "fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch"
+}
+
 test_spawn_launch_line_and_worker_wiring() {
   local rec id=omp-launch-q1 out status launch state
   rec=$(make_spawn_case launch omp "$id")
   read_case_record "$rec"
+  mkdir -p "$HOME_DIR/state"
+  printf 'model=deepseek/deepseek-v4-pro\nerror=402 old run\n' > "$HOME_DIR/state/$id.live-model"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-astra --effort medium)
   status=$?
   expect_code 0 "$status" "omp scout spawn should succeed: $out"
@@ -172,6 +235,7 @@ test_spawn_launch_line_and_worker_wiring() {
   assert_grep "model=openai-codex/gpt-6-astra" "$state/$id.meta" "meta missing the pinned model"
   assert_grep "effort=medium" "$state/$id.meta" "meta missing the pinned effort"
   assert_present "$state/$id.omp-ext.ts" "omp spawn did not write the per-task extension"
+  assert_absent "$state/$id.live-model" "a launch must not keep a previous session's live-model record"
   launch=$(cat "$LAUNCH_LOG")
   assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
     "omp launch did not clear foreign markers and establish its own at the launch boundary"
@@ -257,7 +321,7 @@ try {
   process.env.FM_JEV_GUARD_BASE_URL = `${base}/direct`;
   process.env.FM_JEV_GUARD_OPENROUTER_URL = `${base}/fallback`;
   const handlers = {};
-  (await import(pathToFileURL(process.env.EXT_PATH))).default({ on: (name, fn) => { handlers[name] = fn; } });
+  (await import(pathToFileURL(process.env.EXT_PATH))).default({ on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
   const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf customer-record" } }, { cwd: process.env.WT });
   if (process.env.PROJECT === "firstmate") {
     assert.equal(result?.block, true);
@@ -278,11 +342,136 @@ JS
   pass "real omp spawns authorize firstmate only and carry project scope through the generated extension"
 }
 
+test_spawn_retains_pooled_capacity_and_declared_stand_ins() {
+  local rec id=omp-pool-q1 out status
+  rec=$(make_spawn_case pool omp "$id")
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/config"
+  cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
+JSON
+  jq -n --argjson now "$(date +%s)" '{reports:[
+    {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
+    {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}
+  ]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+  expect_code 0 $? "a healthy pooled sibling must permit launch: $out"
+  assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "pooled launch must retain Luna"
+
+  rec=$(make_spawn_case fallback omp omp-fallback-q2)
+  read_case_record "$rec"
+  id='omp-fallback-q2'
+  mkdir -p "$HOME_DIR/config"
+  cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
+JSON
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+  status=$?
+  expect_code 0 "$status" "whole-pool exhaustion must select the permitted Luna stand-in: $out"
+  assert_grep 'model=deepseek/deepseek-v4-flash' "$HOME_DIR/state/$id.meta" "the replacement route must become durable"
+  assert_grep 'fallback launched' "$HOME_DIR/state/$id.status" "the changed serving route must be reported"
+  pass "launch preserves healthy pooled accounts and uses only the selected rule's stand-in"
+}
+
+test_spawn_native_fallback_preserves_destination_order() {
+  local rec id out status ordering expected
+  for ordering in cross-first native-first restricted; do
+    id="omp-order-$ordering"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/config"
+    printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
+    fm_test_fake_teamclaude "$FAKEBIN_DIR"
+    jq -n --arg order "$ordering" '
+      {harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"} as $native |
+      {harness:"claude",model:"claude-opus-5-5[1m]",effort:"high",requires:"teamclaude"} as $cross |
+      {harness:"omp",model:"ollama/qwen3:8b",effort:"high"} as $last |
+      {rules:[{when:"work",use:{harness:"omp",model:"openai-codex/gpt-6-luna",effort:"high"},
+        fallback:(if $order == "native-first" then [$native,$cross,$last] else [$cross,$native] end)}]}
+    ' > "$HOME_DIR/config/crew-dispatch.json"
+    if [ "$ordering" = restricted ]; then
+      printf 'omp-or-tc\n' > "$HOME_DIR/config/session-launch-policy"
+    fi
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
+    out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+    status=$?
+    expect_code 0 "$status" "ordered native fallback launch: $out"
+    expected='["deepseek/deepseek-v4-flash:high"]'
+    [ "$ordering" != cross-first ] || expected='[]'
+    assert_equals "$expected" "$(jq -c '.retry.fallbackChains["openai-codex/gpt-6-luna:high"]' "$HOME_DIR/state/$id.omp-fallback.yml")" \
+      "native fallback stops at the first supported cross-harness destination"
+    if [ "$ordering" = restricted ]; then
+      jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$CASE_DIR/usage.json" > "$CASE_DIR/exhausted.json"
+      fm_test_spawn_brief "$HOME_DIR" "$id-empty"
+      out=$(OMP_USAGE_FIXTURE="$CASE_DIR/exhausted.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id-empty" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+      status=$?
+      expect_code 0 "$status" "restricted exhaustion must select the allowed native destination: $out"
+      assert_grep 'harness=omp' "$HOME_DIR/state/$id-empty.meta" "fallback must not bypass launch policy"
+      assert_grep 'model=deepseek/deepseek-v4-flash' "$HOME_DIR/state/$id-empty.meta" "fallback uses the next policy-eligible destination"
+    fi
+  done
+  pass "native chains preserve fallback order and shared launch policy"
+}
+
+test_spawn_rejects_retired_fallbacks_before_publication() {
+  local rec id out status capacity
+  for capacity in usable exhausted; do
+    id="omp-retired-$capacity"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/config"
+    printf '%s\n' '{"version":1,"roles":{},"retired":["deepseek-v4-flash"]}' > "$HOME_DIR/config/model-index.json"
+    printf '%s\n' '{"rules":[{"when":"work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+    jq -n --arg state "$capacity" --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:($state=="usable"),limitReached:($state=="exhausted")}}}}]}' > "$CASE_DIR/usage.json"
+    out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+    status=$?
+    expect_code 1 "$status" "a retired fallback must refuse for $capacity capacity: $out"
+    assert_absent "$HOME_DIR/state/$id.meta" "retired fallback refusal must precede task publication"
+    assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "retired fallback refusal must precede native chain emission"
+  done
+  pass "retired fallback refusal covers launch-time selection and runtime chains"
+}
+
+test_spawn_ignores_stale_unrelated_rules() {
+  local rec id=omp-unrelated-stale out status
+  rec=$(make_spawn_case "$id" omp "$id")
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/config"
+  printf '%s\n' '{"version":1,"roles":{},"retired":["deepseek-v4-flash"]}' > "$HOME_DIR/config/model-index.json"
+  printf '%s\n' '{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}},{"when":"unconfigured","use":{"harness":"omp","role":"missing-role"}},{"when":"strong work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6-astra","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"ultra"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+    metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high)
+  status=$?
+  expect_code 0 "$status" "a retired, unconfigured, or invalid unrelated rule must not block the launch: $out"
+  assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "the launch keeps its own route"
+  assert_no_grep 'dispatch_rule=' "$HOME_DIR/state/$id.meta" "a rule without a fallback policy records no identifier"
+  pass "stale unrelated dispatch rules do not block a launch"
+}
+
+
+test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
+  local rec id=omp-strongest-q3 out status
+  rec=$(make_spawn_case strongest omp "$id")
+  read_case_record "$rec"
+  printf 'unlanded work\n' > "$WT_DIR/unfinished.txt"
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},resetCredits:{availableCount:1}}]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high)
+  status=$?
+  expect_code 1 "$status" "Sol without an available same-class stand-in must refuse: $out"
+  assert_absent "$HOME_DIR/state/$id.meta" "refused launch must publish no replacement"
+  assert_equals 'unlanded work' "$(cat "$WT_DIR/unfinished.txt")" "quota exhaustion must preserve work"
+  pass "strongest-model exhaustion neither spends saved resets nor weakens or discards the task"
+}
+
 test_spawn_model_validation_scoped_to_listed_providers() {
   local rec id out status
   rec=$(make_spawn_case model-refused omp omp-model-refused-q2)
   read_case_record "$rec"
-  id=omp-model-refused-q2
+  id='omp-model-refused-q2'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-nope)
   status=$?
   expect_code 1 "$status" "a model absent from a listed provider must refuse"
@@ -291,7 +480,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 
   rec=$(make_spawn_case model-bridge omp omp-model-bridge-q3)
   read_case_record "$rec"
-  id=omp-model-bridge-q3
+  id='omp-model-bridge-q3'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model claude-bridge/claude-opus-4-8)
   status=$?
   expect_code 0 "$status" "an extension-registered provider must pass through: $out"
@@ -300,7 +489,7 @@ test_spawn_model_validation_scoped_to_listed_providers() {
 
   rec=$(make_spawn_case model-fuzzy omp omp-model-fuzzy-q4)
   read_case_record "$rec"
-  id=omp-model-fuzzy-q4
+  id='omp-model-fuzzy-q4'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model astra)
   status=$?
   expect_code 0 "$status" "a bare fuzzy pattern is omp's own matcher's job: $out"
@@ -315,7 +504,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
   local rec id out status
   rec=$(make_spawn_case role-missing omp omp-role-missing-q5)
   read_case_record "$rec"
-  id=omp-role-missing-q5
+  id='omp-role-missing-q5'
   printf 'modelRoles:\n  advisor: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -327,7 +516,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-unlisted omp omp-role-unlisted-q6)
   read_case_record "$rec"
-  id=omp-role-unlisted-q6
+  id='omp-role-unlisted-q6'
   printf 'modelRoles:\n  default: openai-codex/gpt-gone:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -337,7 +526,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-listed omp omp-role-listed-q7)
   read_case_record "$rec"
-  id=omp-role-listed-q7
+  id='omp-role-listed-q7'
   printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -345,7 +534,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-pinned omp omp-role-pinned-q8)
   read_case_record "$rec"
-  id=omp-role-pinned-q8
+  id='omp-role-pinned-q8'
   printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-astra)
   status=$?
@@ -353,7 +542,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-bridge omp omp-role-bridge-q10)
   read_case_record "$rec"
-  id=omp-role-bridge-q10
+  id='omp-role-bridge-q10'
   printf 'modelRoles:\n  default: claude-bridge/claude-opus-4-8:high\n' > "$GLOBAL_CONFIG"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
@@ -364,7 +553,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
   rec=$(make_spawn_case role-unreadable omp omp-role-unreadable-q9)
   read_case_record "$rec"
-  id=omp-role-unreadable-q9
+  id='omp-role-unreadable-q9'
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
   expect_code 0 "$status" "an unreadable roles config establishes nothing and must launch: $out"
@@ -373,7 +562,7 @@ test_spawn_refuses_a_missing_or_unlisted_default_role() {
 
 test_spawn_global_config_is_read_only_and_unlayered() {
   local rec id out status agent_dir
-  id=omp-role-project-q11
+  id='omp-role-project-q11'
   rec=$(make_spawn_case role-project omp "$id")
   read_case_record "$rec"
   printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
@@ -387,7 +576,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   assert_absent "$HOME_DIR/state/$id.meta" "a refused project-layer spawn must publish no record"
   [ ! -s "$LAUNCH_LOG" ] || fail "a refused project-layer spawn must record no launch"
 
-  id=omp-role-malformed-q12
+  id='omp-role-malformed-q12'
   rec=$(make_spawn_case role-malformed omp "$id")
   read_case_record "$rec"
   printf 'modelRoles:\n  default: [unterminated\n' > "$GLOBAL_CONFIG"
@@ -402,7 +591,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   assert_present "$HOME_DIR/state/$id.meta" "malformed-config pass-through must publish the task"
   assert_contains "$(cat "$LAUNCH_LOG")" "'$FAKEBIN_DIR/omp'" "malformed-config pass-through must reach the launch"
 
-  id=omp-role-agent-dir-q13
+  id='omp-role-agent-dir-q13'
   rec=$(make_spawn_case role-agent-dir omp "$id")
   read_case_record "$rec"
   printf 'modelRoles: {}\n' > "$GLOBAL_CONFIG"
@@ -423,7 +612,7 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   assert_grep "models:$agent_dir" "$CASE_DIR/omp-env.log" "catalog inspection must use the canonical launch directory"
   assert_grep "--config:$agent_dir" "$CASE_DIR/omp-env.log" "the launched omp must receive the checked directory despite pane inheritance and filtering"
 
-  id=omp-role-agent-dir-missing-q14
+  id='omp-role-agent-dir-missing-q14'
   rec=$(make_spawn_case role-agent-dir-missing omp "$id")
   read_case_record "$rec"
   printf 'modelRoles:\n  default: openai-codex/gpt-6-astra:high\n' > "$GLOBAL_CONFIG"
@@ -545,7 +734,7 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
       status=$?
       expect_code 0 "$status" "profile selection must pass through an unrelated $role default ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "a profile-selecting launch must publish the task"
-      assert_absent "$CASE_DIR/omp-env.log" "profile selection must establish no catalog evidence"
+      ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "profile selection must establish no catalog evidence"
       case "$mode" in
         env-omp | env-pi) ;;
         *) assert_contains "$(cat "$LAUNCH_LOG")" "$command" "the raw profile-selecting command must reach the launch unchanged" ;;
@@ -630,7 +819,7 @@ EOF" ;;
       fi
       expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
-      assert_absent "$CASE_DIR/omp-env.log" "expanded raw launch must establish no catalog evidence"
+      ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "expanded raw launch must establish no catalog evidence"
       assert_absent "$CASE_DIR/expanded" "validation must not evaluate command substitutions"
       assert_absent "$CASE_DIR/errors.log" "validation must not evaluate redirections"
       assert_contains "$(cat "$LAUNCH_LOG")" "$command" "expanded raw command must reach the launch unchanged"
@@ -681,7 +870,7 @@ test_spawn_raw_omp_literal_evidence_still_refuses() {
       if [ "$role" = unlisted ]; then
         assert_grep "models:$launch_dir" "$CASE_DIR/omp-env.log" "literal evidence must probe the launch directory's catalog"
       else
-        assert_absent "$CASE_DIR/omp-env.log" "a missing literal default must refuse without a catalog probe"
+        ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "a missing literal default must refuse without a catalog probe"
       fi
     done
   done
@@ -741,6 +930,8 @@ test_secondmate_launch_relies_on_discovery() {
   printf 'charter\n' > "$home/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
   git -C "$home" init -q -b main
+  mkdir -p "$home/state"
+  printf 'model=deepseek/deepseek-v4-pro\nerror=402 old run\n' > "$home/state/.omp-live-model"
   fakebin=$(make_spawn_fakebin "$world/fake" claude)
   make_fake_omp "$fakebin"
   launchlog="$world/launch.log"
@@ -765,6 +956,7 @@ test_secondmate_launch_relies_on_discovery() {
   assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
   assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
   assert_absent "$world/home/state/sm.omp-ext.ts" "a secondmate must not receive a per-task worker extension"
+  assert_absent "$home/state/.omp-live-model" "a secondmate launch must not keep its home's previous live-model record"
   pass "fm-spawn: a real omp secondmate launch preserves primary posture and supervision"
 }
 
@@ -809,8 +1001,17 @@ drive_omp_ext() {  # <ext-path> <mode>
   EXT_PATH="$1" MODE="$2" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 const mod = await import(pathToFileURL(process.env.EXT_PATH).href);
+// omp calls every handler registered for an event, so the fake does too: the
+// busy-state writer and the live-model publisher both listen to agent_start and
+// agent_end.
+const registered = {};
 const handlers = {};
-mod.default({ on: (name, fn) => { handlers[name] = fn; } });
+// The extension API exposes the host SDK; the session proof only reads the
+// live registry from it inside its own handlers, which these modes never fire.
+mod.default({ on: (name, fn) => {
+  (registered[name] ||= []).push(fn);
+  handlers[name] = async (...args) => { for (const h of registered[name]) await h(...args); };
+}, pi: { AgentRegistry: { global: () => ({}) } } });
 // ctx.isIdle() reads false at a natural TUI agent_end on omp; the extension
 // must go idle on a plain agent_end regardless of it.
 const ctx = { isIdle: () => false };
@@ -820,6 +1021,15 @@ switch (process.env.MODE) {
   case "end-continuing": await handlers["agent_end"]({ type: "agent_end", willContinue: true }, ctx); break;
   case "end-final": await handlers["agent_end"]({ type: "agent_end" }, ctx); break;
   case "turn-end": await handlers["turn_end"]({ type: "turn_end", turnIndex: 0 }, ctx); break;
+  // omp hands every handler the live model on ctx.model (verified on omp 18.8.7
+  // by tests/fm-omp-fallback-chain-live-e2e.test.sh).
+  case "fallback": await handlers["retry_fallback_applied"]({ type: "retry_fallback_applied", from: "openai-codex/gpt-6.1-sol", to: "deepseek/deepseek-v4-pro" }, { ...ctx, model: { provider: "deepseek", id: "deepseek-v4-pro" } }); break;
+  case "end-error": await handlers["agent_end"]({ type: "agent_end", messages: [{ role: "assistant", stopReason: "error", errorMessage: "402 This request would exceed your available credits." }] }, { ...ctx, model: { provider: "deepseek", id: "deepseek-v4-pro" } }); break;
+  case "restore": await handlers["agent_start"]({ type: "agent_start" }, { ...ctx, model: { provider: "openai-codex", id: "gpt-6.1-sol" } }); break;
+  case "quota-error":
+    await handlers["agent_end"]({messages:[{role:"assistant",stopReason:"error",errorMessage:"usage_limit_reached"}]}, ctx); break;
+  case "fallback-served":
+    await handlers["retry_fallback_succeeded"]({model:"deepseek/deepseek-v4-flash:high"}, ctx); break;
   default: throw new Error("unknown mode " + process.env.MODE);
 }
 if (process.env.MODE === "turn-end") {
@@ -841,7 +1051,7 @@ test_busy_extension_lifecycle() {
   case " $out " in
     *" agent_settled "*) fail "the omp extension must not listen for agent_settled (omp has no such event)" ;;
   esac
-  for handler in agent_start agent_end turn_end tool_call tool_result; do
+  for handler in agent_start agent_end turn_end tool_call tool_result retry_fallback_applied session_start; do
     case " $out " in
       *" $handler "*) ;;
       *) fail "the omp extension must register $handler, got '$out'" ;;
@@ -861,6 +1071,30 @@ test_busy_extension_lifecycle() {
 
   out=$(drive_omp_ext "$ext" end-final) || fail "final agent_end drive failed: $out"
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] || fail "a plain agent_end must classify 'idle omp-ext'"
+  out=$(drive_omp_ext "$ext" quota-error) || fail "quota error drive failed: $out"
+  assert_contains "$(fm_busy_record_read "$state" "$id")" 'quota-exhausted' "a terminal native usage failure must be actionable"
+  printf 'done: PR opened\n' > "$state/$id.status"
+  out=$(drive_omp_ext "$ext" fallback-served) || fail "fallback status drive failed: $out"
+  grep -Eq '^note \[at=[0-9]+\]: model-matrix fallback served deepseek/deepseek-v4-flash:high$' "$state/$id.status" \
+    || fail "native model fallback must publish the serving model as a note: $(cat "$state/$id.status")"
+  [ "$(last_status_line "$state/$id.status")" = 'done: PR opened' ] || fail "the fallback notice must not replace the worker's done declaration"
+  rm "$state/$id.busy-gen"
+  printf 'working: replacement owns this task\n' > "$state/$id.status"
+  out=$(drive_omp_ext "$ext" fallback-served) || fail "retired callback drive failed: $out"
+  assert_equals 'working: replacement owns this task' "$(cat "$state/$id.status")" "a retired callback must not publish a stale serving model"
+
+  # The model serving the task is published for bin/fm-crew-state.sh: a fallback
+  # moves it, an unrecovered run error is carried, and the next run clears the
+  # error and follows the model back to the recorded one.
+  assert_absent "$state/$id.live-model" "a task that never saw a model must publish no live-model record"
+  out=$(drive_omp_ext "$ext" fallback) || fail "retry_fallback_applied drive failed: $out"
+  assert_contains "$(cat "$state/$id.live-model")" "model=deepseek/deepseek-v4-pro" "a fallback must publish the model now serving the task"
+  out=$(drive_omp_ext "$ext" end-error) || fail "errored agent_end drive failed: $out"
+  assert_contains "$(cat "$state/$id.live-model")" "error=402 This request would exceed your available credits." \
+    "a run that ended in an unrecovered error must publish it"
+  out=$(drive_omp_ext "$ext" restore) || fail "restore drive failed: $out"
+  assert_contains "$(cat "$state/$id.live-model")" "model=openai-codex/gpt-6.1-sol" "a restore to the primary must be published"
+  assert_not_contains "$(cat "$state/$id.live-model")" "error=" "the next run must clear the previous run's error"
 
   # A record from another harness's writer is never trusted for omp.
   fm_busy_source_trusted omp pi-ext && fail "omp must not trust the Pi extension's records"
@@ -875,7 +1109,8 @@ test_control_composer_and_model_tables() {
   [ "$(fm_control_interrupt_key omp)" = Escape ] || fail "omp interrupt key must be Escape"
   [ "$(fm_control_interrupt_repeat omp)" = 1 ] || fail "omp interrupts on a single press"
   [ -z "$(fm_control_interrupt_clear_key omp)" ] || fail "omp leaves its composer empty and needs no clear key"
-  [ "$(fm_control_harness_wiring_paths omp /wt /st id1)" = "/st/id1.omp-ext.ts" ] || fail "omp wiring path must be the state-resident extension"
+  [ "$(fm_control_harness_wiring_paths omp /wt /st id1)" = $'/st/id1.omp-ext.ts\n/st/id1.omp-session.json\n/st/id1.omp-fallback.yml' ] \
+    || fail "omp wiring paths must be the state-resident extension, its current-session record, and the fallback overlay"
   printf 'Working…\n' | fm_busy_lines_match omp || fail "omp busy regex must match the TUI ellipsis form"
   printf 'Working...\n' | fm_busy_lines_match omp && fail "omp busy regex must not match the three-dot form no supervised pane renders"
   printf ' ⠧ 11s  · gpt-6-astra\n' | fm_busy_lines_match omp || fail "omp busy regex must match the braille spinner plus elapsed cell"
@@ -970,10 +1205,13 @@ test_ownership_proof_is_omp_keyed() {
 install_omp_extension_fixture() {  # <repo>
   local repo=$1
   mkdir -p "$repo/.omp/extensions" "$repo/.pi/extensions/lib" "$repo/bin" "$repo/node_modules/typebox"
+  mkdir -p "$repo/.omp/extensions/lib"
+  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$repo/.omp/extensions/lib/"
+  cp "$ROOT/bin/fm-parent-channel-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$ROOT/bin/fm-status-record-lib.sh" "$repo/bin/"
   cp "$ROOT/.omp/extensions/fm-primary-turnend-guard.ts" "$ROOT/.omp/extensions/fm-primary-omp-watch.ts" "$repo/.omp/extensions/"
   cp "$ROOT/.pi/extensions/lib/fm-operational-input.ts" "$ROOT/.pi/extensions/lib/fm-sessionstart-supervisor.mjs" \
     "$ROOT/.pi/extensions/lib/fm-watch-lifecycle.ts" "$repo/.pi/extensions/lib/"
-  cp "$ROOT/bin/fm-operational-input.sh" "$ROOT/bin/fm-supervision-engine-lib.sh" "$repo/bin/"
+  cp "$ROOT/bin/fm-operational-input.sh" "$ROOT/bin/fm-supervision-engine-lib.sh" "$ROOT/bin/fm-omp-live-model.ts" "$repo/bin/"
   chmod +x "$repo/bin/fm-operational-input.sh"
   printf '{"name":"typebox","type":"module","exports":"./index.js"}\n' > "$repo/node_modules/typebox/package.json"
   printf 'export const Type = { Object(p) { return { type: "object", properties: p }; } };\n' > "$repo/node_modules/typebox/index.js"
@@ -1000,7 +1238,7 @@ SH
   chmod +x "$repo/bin/"*.sh
   out=$(FM_GUARD_LOG="$TMP_ROOT/guard/guard.log" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" EXT="$repo/.omp/extensions/fm-primary-turnend-guard.ts" node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, writeFileSync, rmSync } from "node:fs";
 const handlers = new Map();
 const pi = { on(e, h) { handlers.set(e, h); }, sendMessage() {} };
 const mod = await import(pathToFileURL(process.env.EXT).href);
@@ -1031,6 +1269,15 @@ if (r2 !== undefined) throw new Error(`the flagged second stop must stand down, 
 const payloads = readFileSync(process.env.FM_GUARD_LOG, "utf8").trim().split("\n");
 if (payloads.join("|") !== '{"stop_hook_active":false}|{"stop_hook_active":true}') throw new Error(`guard payloads were ${payloads.join("|")}`);
 if (!existsSync(`${process.env.FM_HOME}/state/.omp-turnend-extension-loaded`)) throw new Error("loaded marker was not written");
+// The same extension publishes the model serving this home's session, for the
+// parent's bin/fm-crew-state.sh, and only while no other live process owns the lock.
+const record = `${process.env.FM_HOME}/state/.omp-live-model`;
+await handlers.get("agent_start")({ type: "agent_start" }, { model: { provider: "deepseek", id: "deepseek-v4-pro" } });
+if (!readFileSync(record, "utf8").includes("model=deepseek/deepseek-v4-pro")) throw new Error(`the home extension did not publish the serving model: ${readFileSync(record, "utf8")}`);
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.ppid}\n`);
+await handlers.get("agent_start")({ type: "agent_start" }, { model: { provider: "openai-codex", id: "gpt-6.1-sol" } });
+if (!readFileSync(record, "utf8").includes("model=deepseek/deepseek-v4-pro")) throw new Error("a process that does not own the session lock overwrote the record");
+rmSync(`${process.env.FM_HOME}/state/.lock`);
 await handlers.get("session_shutdown")({}, {});
 EOF
 )
@@ -1385,6 +1632,267 @@ EOF
   pass ".omp watch extension: a host close split across stream chunks reaches main as one whole follow-up"
 }
 
+test_task_session_proof_tracks_active_session() {
+  local case_dir="$TMP_ROOT/task-session-proof" status
+  mkdir -p "$case_dir/extension"
+  cp "$ROOT/.omp/extensions/lib/fm-task-session.ts" "$case_dir/extension/"
+  FM_PROOF_CASE="$case_dir" EXT="$case_dir/extension/fm-task-session.ts" node --input-type=module <<'EOF'
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync, existsSync, realpathSync, mkdirSync, symlinkSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
+const { installTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
+const state = process.env.FM_PROOF_CASE;
+const sessions = `${state}/sessions`, linkedSessions = `${state}/linked-sessions`;
+mkdirSync(sessions);
+symlinkSync(sessions, linkedSessions, "dir");
+const task = `${linkedSessions}/task.jsonl`, personal = `${linkedSessions}/personal.jsonl`;
+const canonicalTask = `${realpathSync(sessions)}/task.jsonl`;
+writeFileSync(personal, "{}\n");
+writeFileSync(`${state}/demo.meta`, "spawn_gen=proof-gen\n");
+process.env.FM_SPAWN_GEN = "proof-gen";
+const handlers = new Map(), warnings = [];
+const pi = { pi: { AgentRegistry: { global() { return { list() { return globalThis.proofRefs; } }; } } }, on(event, handler) { handlers.set(event, handler); } };
+installTaskSessionProof(pi, state, "demo");
+let file = task;
+const ctx = { agent: { kind: "main", id: "Main" }, sessionManager: { getSessionFile() { return file; } }, ui: { notify(message) { warnings.push(message); } } };
+let transitionSettled = Promise.resolve();
+globalThis.proofSession = { sessionManager: ctx.sessionManager, waitForSessionTransition() { globalThis.proofWaitStarted?.(); return transitionSettled; } };
+globalThis.proofRefs = [{ kind: "sub", session: null }, { kind: "sub", session: { sessionManager: {} } }, { kind: "main", session: globalThis.proofSession }];
+const flush = () => new Promise(resolve => setImmediate(resolve));
+const start = (context = ctx) => handlers.get("session_start")({}, context);
+const stop = () => handlers.get("session_shutdown")({}, ctx);
+const beforeSwitch = () => handlers.get("session_before_switch")({ targetSessionFile: personal, reason: "resume" }, ctx);
+const afterSwitch = () => handlers.get("session_switch")({ previousSessionFile: task, reason: "resume" }, ctx);
+const record = () => JSON.parse(readFileSync(`${state}/demo.omp-session.json`, "utf8"));
+const begin = (event, context = ctx) => {
+  let settle, started;
+  transitionSettled = new Promise(resolve => { settle = resolve; });
+  const waiting = new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error(`${event} did not await its transition owner`)), 5000);
+    started = () => { clearTimeout(timeout); resolve(); };
+  });
+  globalThis.proofWaitStarted = started;
+  handlers.get(event)({}, context);
+  return { settle, waiting };
+};
+assert.equal(existsSync(task), false);
+start();
+assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: canonicalTask, current_session_file: canonicalTask });
+assert.equal(existsSync(task), false);
+writeFileSync(task, "{}\n");
+start();
+assert.deepEqual(record(), { version: 1, spawn_gen: "proof-gen", pid: process.pid, task_session_file: realpathSync(task), current_session_file: realpathSync(task) });
+const parentProof = record();
+const events = ["session_start", "session_switch", "session_branch", "session_before_switch", "session_before_branch", "session_shutdown"];
+for (const childFile of [personal, undefined]) {
+  const manager = { getSessionFile() { return childFile; } };
+  const childSession = { sessionManager: manager, waitForSessionTransition() { throw new Error("child transition must not be awaited"); } };
+  for (const kind of ["sub", "advisor"]) {
+    const ref = { kind, session: childSession };
+    globalThis.proofRefs.push(ref);
+    for (const childCtx of [{ agent: { kind }, sessionManager: manager, ui: ctx.ui }, { sessionManager: manager, ui: ctx.ui }]) {
+      for (const event of events) {
+        handlers.get(event)({}, childCtx);
+        assert.deepEqual(record(), parentProof, `${event} from ${childFile ? "persisted" : "in-memory"} ${kind} must preserve parent proof`);
+      }
+    }
+    globalThis.proofRefs.pop();
+  }
+  for (const event of events) {
+    handlers.get(event)({}, { agent: { kind: "main" }, sessionManager: manager, ui: ctx.ui });
+    assert.deepEqual(record(), parentProof, `${event} from an unregistered manager must preserve parent proof`);
+  }
+}
+for (const context of [ctx, { sessionManager: ctx.sessionManager, ui: ctx.ui }]) {
+  for (const event of ["session_before_switch", "session_before_branch"]) {
+    for (const outcome of ["cancel", "rollback", "rollback-after-activation"]) {
+      for (const predecessor of [task, personal]) {
+        file = predecessor; start(context);
+        const prior = record();
+        const { settle, waiting } = begin(event, context);
+        assert.equal(record().current_session_file, "");
+        await waiting;
+        assert.equal(record().current_session_file, "", `${event} must remain unproven while pending`);
+        if (outcome !== "cancel") {
+          file = predecessor === task ? personal : task;
+          if (outcome === "rollback-after-activation") {
+            handlers.get(event === "session_before_switch" ? "session_switch" : "session_branch")({}, context);
+            assert.equal(record().current_session_file, realpathSync(file));
+          }
+          await flush();
+          assert.equal(record().current_session_file, outcome === "rollback" ? "" : realpathSync(file));
+          file = predecessor;
+        }
+        settle();
+        await flush();
+        assert.deepEqual(record(), prior, `${event} ${outcome} must restore only the settled predecessor`);
+      }
+    }
+  }
+}
+file = task; start();
+for (const event of ["session_before_switch", "session_before_branch"]) {
+  let transition = begin(event);
+  await transition.waiting;
+  file = personal;
+  transition.settle();
+  await flush();
+  assert.equal(record().current_session_file, "", `${event} must not restore after an unannounced identity change`);
+  file = task; start();
+  transition = begin(event);
+  await transition.waiting;
+  stop();
+  transition.settle();
+  await flush();
+  assert.equal(record().current_session_file, "", `${event} must not restore after shutdown`);
+  start();
+}
+transitionSettled = Promise.resolve();
+stop();
+assert.equal(record().current_session_file, "");
+assert.equal(record().task_session_file, realpathSync(task));
+file = task; start();
+beforeSwitch();
+assert.equal(record().current_session_file, "");
+assert.equal(record().task_session_file, realpathSync(task));
+file = personal; afterSwitch();
+assert.equal(record().current_session_file, realpathSync(personal));
+assert.equal(record().task_session_file, realpathSync(task));
+// Reloading the extension in the personal session must not rebind the task.
+installTaskSessionProof(pi, state, "demo"); start();
+assert.equal(record().task_session_file, realpathSync(task));
+handlers.get("session_before_branch")({}, ctx);
+assert.equal(record().current_session_file, "");
+file = task; handlers.get("session_branch")({ previousSessionFile: personal }, ctx);
+assert.equal(record().current_session_file, record().task_session_file);
+const originalWarn = console.warn; console.warn = () => {};
+try {
+  await flush();
+  const registered = globalThis.proofRefs;
+  for (const event of events) {
+    for (const refs of [registered.slice(0, 2), [...registered, { kind: "main", session: globalThis.proofSession }]]) {
+      start();
+      const prior = record();
+      globalThis.proofRefs = refs;
+      const count = warnings.length;
+      handlers.get(event)({}, { sessionManager: ctx.sessionManager, ui: ctx.ui });
+      await flush();
+      assert.deepEqual(record(), prior, `${event} without a unique registered owner must preserve parent proof`);
+      assert.equal(warnings.length, count);
+      globalThis.proofRefs = registered;
+    }
+  }
+  for (const event of ["session_before_switch", "session_before_branch"]) {
+    start();
+    const transition = begin(event, { sessionManager: ctx.sessionManager, ui: ctx.ui });
+    await transition.waiting;
+    globalThis.proofRefs = registered.slice(0, 2);
+    transition.settle();
+    await flush();
+    assert.equal(record().current_session_file, "", `${event} must not restore after its owner is unregistered`);
+    globalThis.proofRefs = registered;
+  }
+  start();
+  beforeSwitch();
+  file = `${linkedSessions}/absent.jsonl`;
+  afterSwitch();
+  assert.equal(record().current_session_file, `${realpathSync(sessions)}/absent.jsonl`);
+  assert.equal(record().task_session_file, realpathSync(task));
+  assert.notEqual(record().current_session_file, record().task_session_file);
+  assert.equal(existsSync(file), false);
+  installTaskSessionProof(pi, state, "demo"); start();
+  assert.equal(record().task_session_file, realpathSync(task));
+  file = task; start();
+  assert.equal(record().current_session_file, record().task_session_file);
+  beforeSwitch();
+  file = `${linkedSessions}/missing-parent/session.jsonl`;
+  assert.throws(afterSwitch, { code: "ENOENT" });
+  assert.equal(record().current_session_file, "");
+  assert.equal(record().task_session_file, realpathSync(task));
+  assert.ok(warnings.length);
+  file = `${personal}/session.jsonl`;
+  assert.throws(start, { code: "ENOTDIR" });
+  assert.equal(record().current_session_file, "");
+  assert.equal(record().task_session_file, realpathSync(task));
+  writeFileSync(`${state}/demo.meta`, "spawn_gen=other-gen\n");
+  file = task; assert.throws(start);
+  assert.equal(record().current_session_file, "");
+  writeFileSync(`${state}/wrong.meta`, "spawn_gen=other-gen\n");
+  installTaskSessionProof(pi, state, "wrong");
+  assert.throws(start);
+  assert.equal(existsSync(`${state}/wrong.omp-session.json`), false);
+  writeFileSync(`${state}/corrupt.meta`, "spawn_gen=proof-gen\n");
+  writeFileSync(`${state}/corrupt.omp-session.json`, "{bad");
+  installTaskSessionProof(pi, state, "corrupt");
+  assert.throws(start);
+  assert.equal(readFileSync(`${state}/corrupt.omp-session.json`, "utf8"), "{bad");
+  // Relaunch replaces the old generation's binding before its JSONL exists.
+  const replacement = `${linkedSessions}/replacement.jsonl`;
+  const canonicalReplacement = `${realpathSync(sessions)}/replacement.jsonl`;
+  writeFileSync(`${state}/demo.meta`, "spawn_gen=replacement-gen\n");
+  const child = spawnSync(process.execPath, ["--input-type=module", "-"], {
+    encoding: "utf8",
+    env: { ...process.env, FM_SPAWN_GEN: "replacement-gen", FM_REPLACEMENT_FILE: replacement },
+    input: `
+      import assert from "node:assert/strict";
+      import { existsSync, readFileSync, writeFileSync, realpathSync } from "node:fs";
+      import { pathToFileURL } from "node:url";
+      const { installTaskSessionProof } = await import(pathToFileURL(process.env.EXT).href);
+      const state = process.env.FM_PROOF_CASE;
+      const handlers = new Map();
+      const pi = { pi: { AgentRegistry: { global() { return { list() { return globalThis.proofRefs; } }; } } }, on(event, handler) { handlers.set(event, handler); } };
+      installTaskSessionProof(pi, state, "demo");
+      let file = process.env.FM_REPLACEMENT_FILE;
+      const ctx = { sessionManager: { getSessionFile() { return file; } } };
+      globalThis.proofRefs = [{ kind: "main", session: { sessionManager: ctx.sessionManager, waitForSessionTransition() { return Promise.resolve(); } } }];
+      const start = () => handlers.get("session_start")({}, ctx);
+      const record = () => JSON.parse(readFileSync(state + "/demo.omp-session.json", "utf8"));
+      const canonical = ${JSON.stringify(canonicalReplacement)};
+      assert.equal(existsSync(file), false);
+      start();
+      const expected = { version: 1, spawn_gen: "replacement-gen", pid: process.pid, task_session_file: canonical, current_session_file: canonical };
+      assert.deepEqual(record(), expected);
+      assert.equal(existsSync(file), false);
+      writeFileSync(file, "{}\\n");
+      start();
+      assert.deepEqual(record(), expected);
+      file = ${JSON.stringify(personal)};
+      start();
+      assert.deepEqual(record(), { ...expected, current_session_file: realpathSync(file) });
+      assert.notEqual(record().current_session_file, record().task_session_file);
+      file = ${JSON.stringify(`${linkedSessions}/replacement-personal.jsonl`)};
+      start();
+      assert.equal(existsSync(file), false);
+      assert.deepEqual(record(), { ...expected, current_session_file: ${JSON.stringify(`${realpathSync(sessions)}/replacement-personal.jsonl`)} });
+      installTaskSessionProof(pi, state, "demo"); start();
+      assert.equal(record().task_session_file, canonical);
+      file = process.env.FM_REPLACEMENT_FILE; start();
+      assert.deepEqual(record(), expected);
+    `,
+  });
+  assert.equal(child.status, 0, child.stderr || child.error?.message);
+  assert.notEqual(child.pid, process.pid);
+  assert.deepEqual(record(), { version: 1, spawn_gen: "replacement-gen", pid: child.pid, task_session_file: canonicalReplacement, current_session_file: canonicalReplacement });
+  delete process.env.FM_SPAWN_GEN;
+  installTaskSessionProof(pi, state, "absent");
+  start();
+  assert.equal(existsSync(`${state}/absent.omp-session.json`), false);
+} finally { console.warn = originalWarn; }
+EOF
+  status=$?
+  expect_code 0 "$status" "omp task-session proof follows activation and fails closed"
+  pass ".omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement"
+}
+
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  declare -F "$FM_TEST_ONLY" >/dev/null || fail "unknown test: $FM_TEST_ONLY"
+  "$FM_TEST_ONLY"
+  exit $?
+fi
+
+test_task_session_proof_tracks_active_session
+test_spawn_refuses_unsupported_omp_before_launch
 # omp puts a queued user follow-up back into the composer when a run is
 # interrupted (Esc, including fm-control interrupt) or dequeued (Alt+Up), which
 # leaves a delivered watcher wake unsubmitted. The watch extension must find that
@@ -1426,12 +1934,36 @@ SH
   chmod +x "$repo/bin/fm-watch-arm.sh"
   # Output goes to a file, not a pipe: the fixture's long-lived arm child would
   # otherwise hold a command substitution open for its whole sleep.
-  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" FM_OMP_ARM_READY_TIMEOUT_MS=3000 \
+  # Use production readiness bounds: a slow login shell is not a lost wake.
+  FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" FM_DATA_OVERRIDE="$home/data" \
     FM_OMP_SUCCESSOR_GRACE_MS=100 \
     FM_WATCH_REARM_RETRY_LIMIT=1 FM_WATCH_REARM_RETRY_BASE_MS=5 FM_WATCH_REARM_RETRY_MAX_MS=10 \
     SCENARIO="$scenario" EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" node --input-type=module >"$home/scenario.out" 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
-import { writeFileSync, mkdirSync, readFileSync, existsSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync, existsSync, unlinkSync } from "node:fs";
+const realSetTimeout = globalThis.setTimeout;
+const realSetInterval = globalThis.setInterval;
+const realClearTimeout = globalThis.clearTimeout;
+const manualQueue = process.env.SCENARIO === "queue-episodes";
+const restoreChecks = new Set();
+let pollCheck = null;
+const fastRestore = process.env.SCENARIO.startsWith("pending-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled"].includes(process.env.SCENARIO);
+const pollWake = process.env.SCENARIO.startsWith("stranded-") || process.env.SCENARIO.startsWith("ownership-") || process.env.SCENARIO.startsWith("blocked-") || ["limit-polled", "duplicates-edited-polled", "editor-normalized-edited", "prepended", "appended", "appended-newline", "prepended-mark", "appended-mark", "internal-mark", "edited"].includes(process.env.SCENARIO);
+globalThis.setTimeout = (callback, delay, ...args) => {
+  if (manualQueue && delay === 2000) {
+    const timer = { callback: () => callback(...args), unref() {} };
+    restoreChecks.add(timer);
+    return timer;
+  }
+  return realSetTimeout(callback, delay === 2000 && fastRestore ? 100 : delay, ...args);
+};
+globalThis.clearTimeout = (timer) => {
+  if (!restoreChecks.delete(timer)) realClearTimeout(timer);
+};
+globalThis.setInterval = (callback, delay, ...args) => {
+  if (manualQueue && delay === 3000) pollCheck = () => callback(...args);
+  return realSetInterval(callback, delay === 3000 ? (pollWake ? 100 : 3600000) : delay, ...args);
+};
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const handlers = new Map(); const commands = new Map(); let tool = null; const sent = []; const turns = [];
 let receiveWake;
@@ -1450,7 +1982,13 @@ const pi = {
     }
     if (process.env.SCENARIO === "failed-send") throw new Error("fixture send rejected");
     // omp's idle auto-continue refuses an explicit follow-up behind an advisor tail.
-    if (process.env.SCENARIO === "custom-tail" || process.env.SCENARIO.startsWith("idle-")) {
+    if (process.env.SCENARIO.startsWith("pending-") && !o?.deliverAs && process.env.SCENARIO !== "pending-unflushable") {
+      // omp's prompt flow starts a turn and flushes whatever sat in its queue.
+      queued = false;
+      handlers.get("before_agent_start")({ prompt: m }, ctx);
+      handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
+    }
+    if (process.env.SCENARIO === "custom-tail" || process.env.SCENARIO.startsWith("idle-") || process.env.SCENARIO.startsWith("stranded-")) {
       if (o?.deliverAs) { queued = true; return undefined; }
       if (idle) {
         turns.push({ prompt: m, tail: transcript.at(-1) });
@@ -1474,12 +2012,17 @@ const composer = {
 };
 // Restored-wake scenarios deliver behind a running turn; idle-* scenarios
 // deliver to a lane that already went idle.
-let idle = process.env.SCENARIO.startsWith("idle-"); let queued = false;
+let idle = process.env.SCENARIO.startsWith("idle-") || process.env.SCENARIO.startsWith("stranded-"); let queued = false;
+const notices = [];
 const ctx = {
   hasUI: true,
   isIdle: () => { if (process.env.SCENARIO === "idle-stale-context" || process.env.SCENARIO === "idle-recovery-stale") throw new Error("stale context"); return idle; },
   hasPendingMessages: () => queued,
-  ui: { getEditorText: () => composer.text, setEditorText: (t) => { composer.sets.push(t); composer.text = t; } },
+  ui: {
+    getEditorText: () => composer.text,
+    setEditorText: (t) => { composer.sets.push(t); composer.text = t; },
+    notify: (m, level) => { notices.push({ m, level }); },
+  },
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const mod = await import(pathToFileURL(process.env.EXT).href);
@@ -1538,6 +2081,115 @@ else for (let i = 0; i < 600 && sent.length < expectedWakes; i += 1) await sleep
 if (sent.length !== expectedWakes) throw new Error(`expected ${expectedWakes} wakes, saw ${sent.length}`);
 const wake = sent[0].m;
 if (recovery && !wake.includes("signal: omp-restore done")) throw new Error(`recovery did not deliver its actionable close: ${wake}`);
+if (process.env.SCENARIO.startsWith("stranded-")) {
+  // Wake text left unsubmitted in an idle composer by older wiring. The arm
+  // fixture's own wake (delivered and consumed as an idle turn) supplies the
+  // wire shape; variants carry other messages.
+  const wakeWith = (message) => wake.replace("signal: omp-restore done", message);
+  const waitFor = async (check, ms = 4000) => { for (let i = 0; i < ms / 50 && !check(); i += 1) await sleep(50); return check(); };
+  const turnEnds = () => { idle = true; };
+  turnEnds();
+  const delivered = (n, text) => sent.length === n && sent[n - 1].m === text && sent[n - 1].o?.deliverAs === undefined;
+  switch (process.env.SCENARIO) {
+    case "stranded-alone":
+    case "stranded-unmarked": {
+      const typed = wakeWith("signal: stranded-one");
+      composer.text = process.env.SCENARIO === "stranded-alone" ? typed : typed.slice(1);
+      if (!await waitFor(() => sent.length === 2)) throw new Error("wake text left in an idle composer was never delivered");
+      if (!delivered(2, typed)) throw new Error(`the stranded wake was not sent whole through the prompt flow: ${JSON.stringify(sent[1])}`);
+      if (composer.text !== "") throw new Error(`the composer still holds text after delivery: ${JSON.stringify(composer.text)}`);
+      if (turns.length !== 2) throw new Error("delivery did not start the wake's own turn");
+      turnEnds();
+      await sleep(700);
+      if (sent.length !== 2) throw new Error("a consumed stranded wake was sent again");
+      break;
+    }
+    case "stranded-draft-after":
+    case "stranded-draft-before": {
+      const typed = wakeWith("signal: stranded-draft");
+      const after = "\noperator\u2063 draft\n\n";
+      const before = "\n\nbefore\u2063 draft\n\n";
+      const after_case = process.env.SCENARIO === "stranded-draft-after";
+      composer.text = after_case ? `${typed}\n\n${after}` : `${before}\n\n${typed}`;
+      if (!await waitFor(() => sent.length === 2)) throw new Error("a stranded wake beside an operator draft was never delivered");
+      if (!delivered(2, typed)) throw new Error("the stranded wake was not sent alone");
+      if (composer.text !== (after_case ? after : before)) throw new Error(`operator draft bytes changed: ${JSON.stringify(composer.text)}`);
+      break;
+    }
+    case "stranded-two": {
+      const first = wakeWith("signal: stranded-first");
+      const second = wakeWith("signal: stranded-second");
+      composer.text = `${first}\n\n${second}`;
+      if (!await waitFor(() => sent.length === 2)) throw new Error("the first stranded wake was never delivered");
+      if (!delivered(2, first) || composer.text !== second) throw new Error(`the first wake was not sent alone: ${JSON.stringify(composer.text)}`);
+      turnEnds();
+      if (!await waitFor(() => sent.length === 3)) throw new Error("the second stranded wake was never delivered");
+      if (!delivered(3, second) || composer.text !== "") throw new Error("the second wake was not sent alone");
+      break;
+    }
+    case "stranded-human": {
+      const refusals = [
+        "FIRSTMATE_OP: v1 watcher: typed by a person",
+        `Please explain this: ${wake}`,
+        `${wake} and then do this`,
+        `${wake}\n`,
+        wake.replace("Watcher continuity", "Watcher edited"),
+        wake.slice(0, -12),
+        "bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.",
+        "an unrelated operator draft",
+      ];
+      for (const text of refusals) {
+        composer.text = text;
+        const expected = composer.text;
+        const sets = composer.sets.length;
+        await sleep(600);
+        if (sent.length !== 1 || composer.sets.length !== sets || composer.text !== expected) throw new Error(`text that is not a whole wake was submitted or changed: ${JSON.stringify(text)}`);
+      }
+      break;
+    }
+    case "stranded-busy": {
+      const typed = wakeWith("signal: stranded-busy");
+      idle = false;
+      composer.text = typed;
+      await sleep(600);
+      if (sent.length !== 1 || composer.text !== typed) throw new Error("a running turn was disturbed");
+      turnEnds();
+      if (!await waitFor(() => sent.length === 2)) throw new Error("the wake was not delivered once the turn ended");
+      if (!delivered(2, typed) || composer.text !== "") throw new Error("the wake was not sent alone after the turn ended");
+      break;
+    }
+    case "stranded-settling": {
+      for (let i = 0; i < 8; i += 1) {
+        composer.text = wakeWith(`signal: stranded-moving-${i}`);
+        await sleep(40);
+      }
+      if (sent.length !== 1) throw new Error("wake text still changing was submitted");
+      if (!await waitFor(() => sent.length === 2)) throw new Error("settled wake text was never delivered");
+      break;
+    }
+    case "stranded-bounded":
+    case "stranded-bounded-unmarked": {
+      // Text that keeps coming back must not turn delivery into a loop.
+      const typed = wakeWith("signal: stranded-again");
+      for (let i = 0; i < 6; i += 1) {
+        composer.text = typed;
+        await sleep(500);
+        turnEnds();
+      }
+      if (sent.length !== 4) throw new Error(`delivery was not bounded to three attempts: ${sent.length}`);
+      const later = wakeWith("signal: stranded-later");
+      const exhausted = process.env.SCENARIO === "stranded-bounded" ? typed : typed.slice(1);
+      composer.text = `${exhausted}\n\n${later}`;
+      if (!await waitFor(() => sent.length === 5)) throw new Error("an exhausted stranded wake blocked a later eligible wake");
+      if (!delivered(5, later) || composer.text !== exhausted) throw new Error("recovering a later wake changed the exhausted wake");
+      break;
+    }
+    default:
+      throw new Error(`unknown stranded scenario ${process.env.SCENARIO}`);
+  }
+  await handlers.get("session_shutdown")({}, ctx);
+  process.exit(0);
+}
 if (["idle-stale-context", "idle-recovery-stale", "idle-recovery-busy", "idle-recovery-missing"].includes(scenario)) {
   if (sent[0].o?.deliverAs !== "followUp" || !queued || turns.length !== 0) throw new Error("delivery without positive idle evidence must remain a follow-up");
   await handlers.get("session_shutdown")({}, ctx);
@@ -1572,6 +2224,135 @@ const settle = async () => { await handlers.get("agent_end")({ type: "agent_end"
 const same = (item) => item.m === wake && item.o?.deliverAs === undefined;
 
 switch (process.env.SCENARIO) {
+  case "queue-episodes": {
+    const check = () => {
+      if (restoreChecks.size !== 1) throw new Error(`expected one recovery check, saw ${restoreChecks.size}`);
+      const timer = restoreChecks.values().next().value;
+      restoreChecks.delete(timer);
+      timer.callback();
+      return timer.callback;
+    };
+    const episode = (label, attempts = 3) => {
+      const count = sent.length;
+      const warnings = notices.length;
+      const content = sent.at(-1).m;
+      queued = true;
+      idle = true;
+      for (let i = 0; i < 15; i += 1) {
+        check();
+        if (sent.length !== count || notices.length !== warnings) throw new Error(`${label}: recovery acted before fifteen checks`);
+      }
+      for (let i = 1; i <= attempts; i += 1) {
+        check();
+        if (sent.length !== count + i || sent.at(-1).m !== content || sent.at(-1).o?.deliverAs !== undefined || notices.length !== warnings) throw new Error(`${label}: recovery did not submit exactly ${attempts} prompt attempts`);
+      }
+      const recheck = check();
+      const notice = notices.at(-1);
+      if (notices.length !== warnings + 1 || notice.level !== "warning" || !notice.m.includes("wake not delivered")) throw new Error(`${label}: exhausted episode did not warn`);
+      recheck();
+      if (sent.length !== count + attempts || notices.length !== warnings + 1) throw new Error(`${label}: recovery or warning repeated`);
+      if (composer.text !== "operator draft" || composer.sets.length !== 0) throw new Error(`${label}: recovery disturbed the composer`);
+    };
+    const nextWake = async () => {
+      const dir = `${process.env.FM_HOME}/state/extensions/omp-primary-watch`;
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(`${dir}/session-replacement-actionable.json`, "invalid");
+      idle = false;
+      const count = sent.length;
+      await tool.execute();
+      unlinkSync(`${dir}/session-replacement-actionable.json`);
+      if (sent.length !== count + 1 || sent.at(-1).o?.deliverAs !== "followUp") throw new Error("expected a fresh queued failure wake");
+    };
+    composer.text = "operator draft";
+    episode("first session");
+    await handlers.get("session_shutdown")({}, ctx);
+    idle = false;
+    const beforeReplacement = sent.length;
+    await handlers.get("session_start")({}, ctx);
+    for (let i = 0; i < 60 && sent.length === beforeReplacement; i += 1) await sleep(100);
+    if (sent.length !== beforeReplacement + 1 || sent.at(-1).m !== wake || sent.at(-1).o?.deliverAs !== "followUp") throw new Error("replacement did not replay its unconsumed wake");
+    await nextWake();
+    episode("replacement session");
+
+    await nextWake();
+    idle = true;
+    queued = false;
+    check();
+    await nextWake();
+    episode("queue drained observed by recovery", 6);
+
+    queued = false;
+    pollCheck();
+    await nextWake();
+    episode("queue drained observed by polling");
+
+    await nextWake();
+    check();
+    await nextWake();
+    episode("running turn observed by recovery", 6);
+
+    idle = false;
+    pollCheck();
+    await nextWake();
+    episode("running turn observed by polling");
+
+    await nextWake();
+    await handlers.get("before_agent_start")({ prompt: wake }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: [{ type: "text", text: wake }] } }, ctx);
+    episode("short accepted wake turn before completion");
+
+    await nextWake();
+    await handlers.get("before_agent_start")({ prompt: "continue work" }, ctx);
+    await handlers.get("message_start")({ message: { role: "user", content: "continue work" } }, ctx);
+    episode("short accepted ordinary turn before completion");
+
+    idle = false;
+    await handlers.get("before_agent_start")({ prompt: "continue work" }, ctx);
+    await handlers.get("message_start")({ message: { role: "assistant", content: "done" } }, ctx);
+    idle = true;
+    await handlers.get("agent_end")({}, ctx);
+    await nextWake();
+    episode("short turn completion between checks");
+    break;
+  }
+  case "ownership-marked":
+  case "ownership-unmarked": {
+    const before = "\n\nbefore\u2063 draft\n\n";
+    const after = "\noperator\u2063 draft\n\n";
+    const edited = (process.env.SCENARIO === "ownership-marked" ? wake : bare).replace("signal:", "edited:");
+    composer.text = `${before}\n\n${edited}\n\n${after}`;
+    const original = composer.text;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== original) throw new Error("template matching took ownership of an edited tracked wake");
+    composer.text = `${before}\n\n${process.env.SCENARIO === "ownership-marked" ? wake : bare}\n\n${after}`;
+    await settle();
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== `${before}\n\n${after}`) throw new Error("exact restored recovery no longer preserved both drafts");
+    break;
+  }
+  case "ownership-missing": {
+    const older = wake.replace("signal: omp-restore done", "signal: older-wiring");
+    composer.text = older;
+    await settle();
+    if (sent.length !== 1 || composer.sets.length !== 0 || composer.text !== older) throw new Error("an unaccounted tracked wake allowed template submission");
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    for (let i = 0; i < 40 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || sent[1].m !== older || sent[1].o?.deliverAs !== undefined || composer.text !== "") throw new Error("resolved ownership did not release the stranded wake");
+    break;
+  }
+  case "duplicates-edited-polled": {
+    if (sent[1].m !== wake) throw new Error("expected two identical tracked wakes");
+    const edited = bare.replace("signal:", "edited:");
+    composer.text = `${wake}\n\n${edited}`;
+    await settle();
+    if (sent.length !== 3 || !same(sent[2]) || composer.text !== edited) throw new Error("an edited duplicate bypassed restored ownership");
+    await handlers.get("message_start")({ message: { role: "user", content: wake } }, ctx);
+    await sleep(600);
+    if (sent.length !== 3 || composer.text !== edited) throw new Error("consuming one duplicate authorized the edited duplicate");
+    composer.text = bare;
+    await settle();
+    if (sent.length !== 4 || !same(sent[3]) || composer.text !== "") throw new Error("the unchanged duplicate was no longer recoverable");
+    break;
+  }
   case "duplicates":
   case "duplicates-handoff":
   case "duplicates-streaming": {
@@ -1594,8 +2375,9 @@ switch (process.env.SCENARIO) {
         const stored = JSON.parse(readFileSync(handoff, "utf8"));
         if (stored.pending.length !== 1 || stored.pending[0].delivered || !wake.includes(stored.pending[0].message)) throw new Error("unsubmitted duplicate did not retain its handoff record");
         await handlers.get("session_start")({}, ctx);
-        for (let i = 0; i < 60 && sent.length < 4; i += 1) await sleep(100);
-        if (sent.length !== 4 || sent[3].m !== wake || sent[3].o?.deliverAs !== undefined) throw new Error("idle replacement did not replay the unsubmitted duplicate as its own turn");
+        // As for initial delivery, allow readiness, retirement, and bounded retry.
+        for (let i = 0; i < 600 && sent.length < 4; i += 1) await sleep(100);
+        if (sent.length !== 4 || sent[3].m !== wake || sent[3].o?.deliverAs !== undefined) throw new Error(`idle replacement did not replay the unsubmitted duplicate as its own turn: ${JSON.stringify({ sent, wake, composer: composer.text })}`);
         await consumePrompt();
         await handlers.get("session_shutdown")({}, ctx);
         if (existsSync(handoff)) throw new Error("consumed duplicates retained a handoff record");
@@ -1786,6 +2568,91 @@ switch (process.env.SCENARIO) {
     if (sent.length !== 1 || composer.sets.length !== 0) throw new Error("a wake with messages still queued was submitted again");
     break;
   }
+  case "pending-persistent": {
+    // Messages queued behind an idle session never drain; the restored wake in
+    // the composer still has to reach main once the bounded wait is over.
+    composer.text = wake; queued = true;
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    for (let i = 0; i < 60 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== "") throw new Error(`a restored wake behind a stuck queue was left in the composer: ${sent.length} sent, composer ${JSON.stringify(composer.text)}`);
+    if (queued || notices.length !== 0) throw new Error("the stuck queue was not flushed by the resubmission, or a delivered wake was reported");
+    break;
+  }
+  case "pending-drains": {
+    // A queue that drains inside the wait is left to omp: the wake is recovered
+    // from the composer only after it is gone, and nothing is reported.
+    composer.text = wake; queued = true;
+    setTimeout(() => { queued = false; }, 150);
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    for (let i = 0; i < 60 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== "" || notices.length !== 0) throw new Error("a restored wake was not recovered once the queue drained");
+    break;
+  }
+  case "pending-stuck": {
+    // The wake itself sits in omp's queue (omp refused to start a turn for it)
+    // and nothing is restored to the composer.
+    queued = true;
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    for (let i = 0; i < 60 && sent.length < 2; i += 1) await sleep(50);
+    if (sent.length !== 2 || !same(sent[1])) throw new Error(`a wake stuck in omp's idle queue was never sent through the prompt flow: ${sent.length} sent`);
+    if (queued || composer.sets.length !== 0 || notices.length !== 0) throw new Error("the stuck queue was not flushed, or the composer was disturbed");
+    await sleep(600);
+    if (sent.length !== 2) throw new Error("a delivered wake was sent again");
+    break;
+  }
+  case "pending-unflushable": {
+    // The resubmissions do not start a turn: delivery is not proven, so the
+    // wait is reported once and the bound holds.
+    queued = true;
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    await sleep(2800);
+    if (sent.length !== 4 || !sent.slice(1).every(same)) throw new Error(`resubmission was not bounded to three attempts: ${sent.length}`);
+    if (notices.length !== 1 || notices[0].level !== "warning" || !notices[0].m.includes("wake not delivered")) throw new Error(`the undelivered wake was not reported once: ${JSON.stringify(notices)}`);
+    await sleep(600);
+    if (sent.length !== 4 || notices.length !== 1) throw new Error("the report or the resubmission repeated");
+    break;
+  }
+  case "limit-polled": {
+    // The stranded-wake poll must not hand a wake the restored-wake recovery has
+    // given up on another set of attempts.
+    for (let i = 0; i < 6; i += 1) {
+      composer.text = wake;
+      await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+      await sleep(500);
+    }
+    if (sent.length !== 4) throw new Error(`recovery was not bounded to three resubmissions with the poll running: ${sent.length}`);
+    break;
+  }
+  case "blocked-tracked-marked":
+  case "blocked-tracked-unmarked": {
+    for (let i = 0; i < 3; i += 1) {
+      composer.text = wake;
+      await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+      await sleep(500);
+    }
+    if (sent.length !== 4) throw new Error("tracked recovery did not reach its attempt limit");
+    const exhausted = process.env.SCENARIO === "blocked-tracked-marked" ? wake : bare;
+    const older = wake.replace("signal: omp-restore done", "signal: older-wiring");
+    const before = "\n\nbefore\u2063 draft\n\n";
+    const after = "\noperator\u2063 draft\n\n";
+    composer.text = `${before}\n\n${exhausted}\n\n${older}\n\n${after}`;
+    for (let i = 0; i < 40 && sent.length < 5; i += 1) await sleep(50);
+    if (sent.length !== 5 || sent[4].m !== older || sent[4].o?.deliverAs !== undefined) throw new Error("an exhausted tracked wake blocked a later stranded wake");
+    if (composer.text !== `${before}\n\n${exhausted}\n\n${after}`) throw new Error("recovering a later wake changed tracked wake or draft bytes");
+    break;
+  }
+  case "restore-window": {
+    // The run ends well after omp accepted the wake. The editor is read two full
+    // seconds after the run ended, not two seconds after the wake was accepted.
+    await sleep(1200);
+    composer.text = wake;
+    await handlers.get("agent_end")({ type: "agent_end" }, ctx);
+    await sleep(1400);
+    if (sent.length !== 1 || composer.text !== wake) throw new Error("the restored wake was taken before the run-end settle time had passed");
+    for (let i = 0; i < 40 && sent.length < 2; i += 1) await sleep(100);
+    if (sent.length !== 2 || !same(sent[1]) || composer.text !== "") throw new Error("the restored wake was not submitted again after the settle time");
+    break;
+  }
   case "elsewhere": {
     composer.text = "an unrelated operator draft";
     await settle();
@@ -1809,9 +2676,18 @@ EOF
   return "$status"
 }
 
+test_watch_queue_episodes_reset_across_sessions_and_completion() {
+  local out status
+  out=$(run_watch_restore_scenario queue-episodes)
+  status=$?
+  expect_code 0 "$status" "omp stuck-queue episode lifecycle: $out"
+  [ -z "$out" ] || fail "omp stuck-queue episode lifecycle printed output: $out"
+  pass ".omp watch extension: isolated replacement, queue drain, running observations, accepted messages, and turn completion each restart the fifteen-check wait and once-only warning"
+}
+
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer() {
   local scenario out status
-  for scenario in duplicates duplicates-handoff duplicates-streaming preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context idle-recovery-timer idle-recovery-factory idle-recovery-live-factory idle-recovery-tool idle-recovery-command idle-recovery-forwarded idle-recovery-tool-context idle-recovery-command-context idle-recovery-busy idle-recovery-stale idle-recovery-missing draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
+  for scenario in duplicates duplicates-handoff duplicates-streaming duplicates-edited-polled preparation-cancelled preparation-handoff editor-normalized editor-normalized-message editor-normalized-edited nonpending failed-send sync-consumed consumed normalized-consumed draft custom-tail idle-empty idle-draft idle-stale-context idle-recovery-timer idle-recovery-factory idle-recovery-live-factory idle-recovery-tool idle-recovery-command idle-recovery-forwarded idle-recovery-tool-context idle-recovery-command-context idle-recovery-busy idle-recovery-stale idle-recovery-missing stranded-alone stranded-unmarked stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-bounded-unmarked ownership-marked ownership-unmarked ownership-missing blocked-tracked-marked blocked-tracked-unmarked pending-persistent pending-drains pending-stuck pending-unflushable limit-polled restore-window draft-before draft-after-bytes draft-before-bytes draft-both prepended appended appended-newline prepended-mark appended-mark internal-mark edited alone alone-marked busy queued elsewhere limit; do
     out=$(run_watch_restore_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp watch restore scenario $scenario: $out"
@@ -1869,6 +2745,120 @@ EOF
   expect_code 0 "$status" "descendant omp session must not claim the home: $out"
   [ -z "$out" ] || fail "descendant omp session test printed output: $out"
   pass ".omp extensions: a descendant omp session neither records itself as the loaded session nor arms a watcher"
+}
+
+# A local secondmate's own omp records its task-session proof in the parent
+# home. A descendant `omp -p` run from that home inherits the launch generation
+# and loads the same watch extension, but it is not the lock-owning session.
+test_secondmate_watch_proof_ignores_a_descendant_omp() {
+  local repo home parent out status proof before
+  repo="$TMP_ROOT/secondmate-descendant/repo"; home="$TMP_ROOT/secondmate-descendant/home"
+  parent="$TMP_ROOT/secondmate-descendant/parent"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state" "$parent/state" "$TMP_ROOT/secondmate-descendant/sessions"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-watch-arm.sh"
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$home/.fm-secondmate-parent"
+  printf 'sm\n' > "$home/.fm-secondmate-home"
+  printf 'spawn_gen=secondmate-gen\n' > "$parent/state/sm.meta"
+  : > "$TMP_ROOT/secondmate-descendant/sessions/task.jsonl"
+  proof="$parent/state/sm.omp-session.json"
+  jq -nc --argjson pid "$$" --arg task "$TMP_ROOT/secondmate-descendant/sessions/task.jsonl" \
+    '{version:1,spawn_gen:"secondmate-gen",pid:$pid,task_session_file:$task,current_session_file:$task}' > "$proof"
+  before=$(cat "$proof")
+  out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+    FM_DATA_OVERRIDE="$home/data" FM_SPAWN_GEN=secondmate-gen FM_SESSIONSTART_OFF=1 \
+    WATCH_EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" CHILD_SESSION="$TMP_ROOT/secondmate-descendant/sessions/child.jsonl" \
+    node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { writeFileSync } from "node:fs";
+writeFileSync(process.env.CHILD_SESSION, "{}\n");
+const handlers = new Map();
+const sessionManager = { getSessionId: () => "child", getSessionFile: () => process.env.CHILD_SESSION };
+const registry = { list: () => [{ kind: "main", session: { sessionManager, waitForSessionTransition: () => Promise.resolve() } }] };
+const pi = {
+  on(event, handler) { (handlers.get(event) ?? handlers.set(event, []).get(event)).push(handler); },
+  registerCommand() {}, registerTool() {}, sendUserMessage() {}, sendMessage() {},
+  pi: { AgentRegistry: { global: () => registry } },
+};
+// The child loads while the home lock is still missing; the secondmate session
+// itself (an ancestor of this process) claims it before the child session starts.
+(await import(pathToFileURL(process.env.WATCH_EXT).href)).default(pi);
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.ppid}\n`);
+const ctx = { sessionManager };
+for (const event of ["session_start", "session_shutdown"]) {
+  for (const handler of handlers.get(event) ?? []) await handler({ type: event }, ctx);
+}
+process.exit(0);
+EOF
+)
+  status=$?
+  expect_code 0 "$status" "descendant omp of a local secondmate must load cleanly: $out"
+  [ "$(cat "$proof")" = "$before" ] \
+    || fail "a descendant omp rewrote its secondmate's task-session proof: $(cat "$proof")"
+  pass ".omp extensions: a descendant omp neither rebinds nor clears its local secondmate's task-session proof"
+}
+
+# The secondmate's own omp must publish its proof whenever no ancestor holds the
+# home lock: before it claims the lock, once it owns it, and after a reboot left
+# the lock naming a pid an unrelated live process now has.
+test_secondmate_watch_proof_publishes_for_the_secondmate_itself() {
+  local repo home parent out status stranger lock_case
+  repo="$TMP_ROOT/secondmate-self/repo"; home="$TMP_ROOT/secondmate-self/home"
+  parent="$TMP_ROOT/secondmate-self/parent"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state" "$parent/state" "$TMP_ROOT/secondmate-self/sessions"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-watch-arm.sh"
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$home/.fm-secondmate-parent"
+  printf 'sm\n' > "$home/.fm-secondmate-home"
+  printf 'spawn_gen=secondmate-gen\n' > "$parent/state/sm.meta"
+  sleep "$FM_TEST_STUB_MAX_BLOCK_SECONDS" >/dev/null 2>&1 &
+  stranger=$!
+  if ! fm_test_record_process "$TMP_ROOT/secondmate-self/stranger.process" "$stranger" \
+    || ! fm_test_track_process "$TMP_ROOT/secondmate-self/stranger.process" "sleep $FM_TEST_STUB_MAX_BLOCK_SECONDS"; then
+    kill "$stranger" 2>/dev/null; fail 'could not register the stranger lock holder'
+  fi
+  for lock_case in missing self stranger; do
+    rm -f "$home/state/.lock" "$parent/state/sm.omp-session.json"
+    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+      FM_DATA_OVERRIDE="$home/data" FM_SPAWN_GEN=secondmate-gen FM_SESSIONSTART_OFF=1 LOCK_CASE="$lock_case" STRANGER="$stranger" \
+      WATCH_EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" SESSION="$TMP_ROOT/secondmate-self/sessions/$lock_case.jsonl" \
+      PROOF="$parent/state/sm.omp-session.json" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync, writeFileSync } from "node:fs";
+const lock = `${process.env.FM_HOME}/state/.lock`;
+if (process.env.LOCK_CASE === "self") writeFileSync(lock, `${process.pid}\n`);
+if (process.env.LOCK_CASE === "stranger") writeFileSync(lock, `${process.env.STRANGER}\n`);
+writeFileSync(process.env.SESSION, "{}\n");
+const handlers = new Map();
+const sessionManager = { getSessionId: () => "self", getSessionFile: () => process.env.SESSION };
+const registry = { list: () => [{ kind: "main", session: { sessionManager, waitForSessionTransition: () => Promise.resolve() } }] };
+const pi = {
+  on(event, handler) { (handlers.get(event) ?? handlers.set(event, []).get(event)).push(handler); },
+  registerCommand() {}, registerTool() {}, sendUserMessage() {}, sendMessage() {},
+  pi: { AgentRegistry: { global: () => registry } },
+};
+(await import(pathToFileURL(process.env.WATCH_EXT).href)).default(pi);
+const ctx = { sessionManager };
+for (const handler of handlers.get("session_start") ?? []) await handler({ type: "session_start" }, ctx);
+let proof;
+try { proof = JSON.parse(readFileSync(process.env.PROOF, "utf8")); } catch (error) { throw new Error(`no task-session proof published: ${error.message}`); }
+if (proof.pid !== process.pid || proof.spawn_gen !== "secondmate-gen" || proof.current_session_file !== realpathSync(process.env.SESSION)) {
+  throw new Error(`task-session proof does not name this session: ${JSON.stringify(proof)}`);
+}
+process.exit(0);
+EOF
+)
+    status=$?
+    if [ "$status" -ne 0 ]; then
+      kill "$stranger" 2>/dev/null
+      expect_code 0 "$status" "a local secondmate with lock $lock_case must publish its task-session proof: $out"
+    fi
+  done
+  kill "$stranger" 2>/dev/null
+  wait "$stranger" 2>/dev/null
+  pass ".omp extensions: a local secondmate publishes its task-session proof with the lock missing, its own, or naming an unrelated live pid"
 }
 
 # The turn-end guard used to record itself only while the extension loaded,
@@ -2264,6 +3254,11 @@ test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_worker_replace_mode_environment
 test_worker_guard_project_scope
+test_spawn_retains_pooled_capacity_and_declared_stand_ins
+test_spawn_native_fallback_preserves_destination_order
+test_spawn_rejects_retired_fallbacks_before_publication
+test_spawn_ignores_stale_unrelated_rules
+test_spawn_exhausted_strongest_route_preserves_unlanded_work
 test_spawn_model_validation_scoped_to_listed_providers
 test_spawn_refuses_a_missing_or_unlisted_default_role
 test_spawn_global_config_is_read_only_and_unlayered
@@ -2285,7 +3280,10 @@ test_watch_extension_keeps_the_arm_without_the_file_or_with_off
 test_watch_extension_replays_a_host_only_boundary_across_replacement
 test_watch_extension_delivers_a_split_host_close_whole
 test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
+test_watch_queue_episodes_reset_across_sessions_and_completion
 test_primary_extensions_ignore_a_descendant_session
+test_secondmate_watch_proof_ignores_a_descendant_omp
+test_secondmate_watch_proof_publishes_for_the_secondmate_itself
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
 test_watch_extension_heals_a_generation_stopped_without_a_successor
 test_watch_extension_is_single_instance_per_home

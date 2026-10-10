@@ -2,10 +2,10 @@
 
 _FM_CLASSIFY_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd 2>/dev/null)" || _FM_CLASSIFY_LIB_DIR="."
 
-# The kernel name, read once at source time rather than forked by every status
-# stat helper below. These helpers mostly run inside $() subshells, where a lazy
-# cache would never persist. fm-wake-lib.sh's _FM_UNAME is reused when it is
-# already loaded; either value is compared only against Darwin.
+# Read the kernel name once at source time, not per status metadata lookup.
+# This also serves stdout helpers called through $(), where a lazy cache would
+# not persist. Reuse fm-wake-lib.sh's _FM_UNAME when already loaded; either value
+# is compared only against Darwin.
 _FM_CLASSIFY_UNAME_S=${_FM_UNAME:-$(uname -s 2>/dev/null)}
 
 
@@ -41,64 +41,143 @@ _fm_open_decisions_cursor_path() {  # <status-file> [<out-var>]
 }
 
 
-# Portable strongest-available identity: strong:<device>:<inode>:<birth-time>
-# when birth time is available, otherwise weak:<device>:<inode>.
-# The default reader captures identity and size in one stat invocation to avoid
-# repeated per-task scheduling and to sample both from the same metadata read.
-# Optional output variables let warm fold callers avoid command substitutions;
-# without an identity output variable, the identity is printed on stdout.
-_fm_open_decisions_file_ident() {  # <file> [<identity-out-var> [<size-out-var>]]
-  local __fm_info_record __fm_info_rest __fm_info_ident __fm_info_epoch __fm_info_birth __fm_info_size
-  if [ -n "${FM_STATUS_IDENTITY_READER:-}" ]; then
-    __fm_info_ident=$("$FM_STATUS_IDENTITY_READER" "$1") || return 1
-    if [ -n "${3:-}" ]; then __fm_info_size=$(_fm_status_file_size "$1") || return 1; fi
+# A scan scopes these facts with `local _FM_STATUS_STAT_BATCH`, then refreshes
+# them before walking the fleet. Never carry them across scans or reuse them for
+# a post-read validation; cursor commitment must start a new metadata scan.
+# Identity/size reader seams bypass batching and keep their per-file calls.
+# An unavailable batch or unrepresentable path falls back to per-file metadata.
+_fm_status_stat_batch_into() {  # <state> <out-var>
+  local __fm_sb_file __fm_sb_data='' __fm_sb_files=() __fm_sb_manifest="$1/.status-presentation-cursor"
+  printf -v "$2" '%s' ''
+  for __fm_sb_file in "$__fm_sb_manifest" "$1"/*.status; do
+    if [ "$__fm_sb_file" != "$__fm_sb_manifest" ] && [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then continue; fi
+    [ -f "$__fm_sb_file" ] && [ -r "$__fm_sb_file" ] && [ ! -L "$__fm_sb_file" ] || continue
+    # Unusual path bytes cannot be represented in this private row format.
+    case "$__fm_sb_file" in *$'\t'*|*$'\n'*) return 0 ;; esac
+    __fm_sb_files[${#__fm_sb_files[@]}]=$__fm_sb_file
+  done
+  [ "${#__fm_sb_files[@]}" -gt 0 ] || return 0
+  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+    __fm_sb_data=$(LC_ALL=C /usr/bin/stat -f $'%N\t%d:%i|%B|%FB|%z|%m' "${__fm_sb_files[@]}" 2>/dev/null) || return 0
   else
-    if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
-      __fm_info_record=$(LC_ALL=C /usr/bin/stat -f $'%d:%i\t%B\t%FB\t%z' "$1" 2>/dev/null) || return 1
-    else
-      __fm_info_record=$(LC_ALL=C stat -c $'%d:%i\t%W\t%w\t%s' "$1" 2>/dev/null) || return 1
-    fi
-    __fm_info_ident=${__fm_info_record%%$'\t'*}
-    __fm_info_rest=${__fm_info_record#*$'\t'}
-    __fm_info_epoch=${__fm_info_rest%%$'\t'*}
-    __fm_info_rest=${__fm_info_rest#*$'\t'}
-    __fm_info_birth=${__fm_info_rest%%$'\t'*}
-    __fm_info_size=${__fm_info_rest#*$'\t'}
-    [ "$__fm_info_epoch" != 0 ] || __fm_info_birth=''
-    case "$__fm_info_ident$__fm_info_birth" in *$'\t'*|*$'\n'*|'') return 1 ;; esac
-    if [ -n "$__fm_info_birth" ]; then
-      __fm_info_ident="strong:$__fm_info_ident:$__fm_info_birth"
-    else
-      __fm_info_ident="weak:$__fm_info_ident"
-    fi
-    if [ -n "${3:-}" ] && [ -n "${FM_STATUS_SIZE_READER:-}" ]; then
-      __fm_info_size=$("$FM_STATUS_SIZE_READER" "$1") || return 1
-    fi
+    __fm_sb_data=$(LC_ALL=C stat -c $'%n\t%d:%i|%W|%w|%s|%Y' "${__fm_sb_files[@]}" 2>/dev/null) || return 0
   fi
-  if [ -n "${3:-}" ]; then printf -v "$3" '%s' "$__fm_info_size"; fi
-  if [ -n "${2:-}" ]; then printf -v "$2" '%s' "$__fm_info_ident"; else printf '%s' "$__fm_info_ident"; fi
+  printf -v "$2" '%s' "$__fm_sb_data"
 }
 
-_fm_status_file_size() {  # <status-file>
-  local f=$1
+# Use this scan's batch row when available; otherwise read device:inode identity,
+# birth time, size, and mtime together in one per-file stat, avoiding separate
+# forks and observations for each field. A batch row is not fresh validation.
+# <ident-var>, <size-var>, and <mtime-var> name the variables to set; an empty
+# name skips that value. A value this host cannot read fails the whole call.
+# Every local below carries the __fm_ prefix because an out-var named like an
+# unprefixed local would be assigned here and lost under bash's dynamic scope.
+_fm_status_stat_raw() {  # <file> <ident-var> <size-var> <mtime-var>
+  local __fm_st_facts='' __fm_st_path __fm_st_row __fm_st_dev_ino __fm_st_epoch __fm_st_birth __fm_st_rest __fm_st_size __fm_st_mtime
+  while IFS=$'\t' read -r __fm_st_path __fm_st_row; do
+    if [ "$__fm_st_path" = "$1" ]; then __fm_st_facts=$__fm_st_row; break; fi
+  done <<EOF
+${_FM_STATUS_STAT_BATCH:-}
+EOF
+  if [ -z "$__fm_st_facts" ]; then
+    if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
+      __fm_st_facts=$(LC_ALL=C /usr/bin/stat -f '%d:%i|%B|%FB|%z|%m' "$1" 2>/dev/null) || return 1
+    else
+      __fm_st_facts=$(LC_ALL=C stat -c '%d:%i|%W|%w|%s|%Y' "$1" 2>/dev/null) || return 1
+    fi
+  fi
+  __fm_st_dev_ino=${__fm_st_facts%%|*}; __fm_st_rest=${__fm_st_facts#*|}
+  __fm_st_epoch=${__fm_st_rest%%|*}; __fm_st_rest=${__fm_st_rest#*|}
+  # The birth text can hold spaces but never a bar, so the last two bars end it.
+  __fm_st_mtime=${__fm_st_rest##*|}; __fm_st_rest=${__fm_st_rest%|*}
+  __fm_st_size=${__fm_st_rest##*|}; __fm_st_birth=${__fm_st_rest%|*}
+  [ "$__fm_st_epoch" != 0 ] || __fm_st_birth=''
+  if [ -n "${2-}" ]; then
+    case "$__fm_st_dev_ino$__fm_st_birth" in *$'\t'*|*$'\n'*|'') return 1 ;; esac
+    if [ -n "$__fm_st_birth" ]; then
+      printf -v "$2" 'strong:%s:%s' "$__fm_st_dev_ino" "$__fm_st_birth"
+    else
+      printf -v "$2" 'weak:%s' "$__fm_st_dev_ino"
+    fi
+  fi
+  if [ -n "${3-}" ]; then printf -v "$3" '%s' "$__fm_st_size"; fi
+  if [ -n "${4-}" ]; then printf -v "$4" '%s' "$__fm_st_mtime"; fi
+}
+
+# Printed, or assigned to <out-var> when one is given, so a per-task caller can
+# take the identity without forking a command substitution around the stat.
+_fm_open_decisions_file_ident() {  # <file> [<identity-out-var> [<size-out-var>]]
+  local __fm_id_value
+  if [ -n "${FM_STATUS_IDENTITY_READER:-}" ]; then
+    if [ "$#" -le 1 ]; then "$FM_STATUS_IDENTITY_READER" "$1"; return; fi
+    __fm_id_value=$("$FM_STATUS_IDENTITY_READER" "$1") || return
+  else
+    _fm_status_stat_raw "$1" __fm_id_value "${3-}" '' || return 1
+  fi
+  if [ -n "${3:-}" ] && [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then
+    _fm_status_file_size "$1" "$3" || return 1
+  fi
+  if [ -n "${2:-}" ]; then printf -v "$2" '%s' "$__fm_id_value"; else printf '%s' "$__fm_id_value"; fi
+}
+
+_fm_status_file_size() {  # <status-file> [<out-var>]
+  local __fm_sz_value
   if [ -n "${FM_STATUS_SIZE_READER:-}" ]; then
-    "$FM_STATUS_SIZE_READER" "$f"
+    if [ "$#" -le 1 ]; then "$FM_STATUS_SIZE_READER" "$1"; return; fi
+    __fm_sz_value=$("$FM_STATUS_SIZE_READER" "$1") || return
+    printf -v "$2" '%s' "$__fm_sz_value"
+    return
+  fi
+  if [ "$#" -gt 1 ]; then
+    _fm_status_stat_raw "$1" '' "$2" ''
+  else
+    _fm_status_stat_raw "$1" '' __fm_sz_value '' || return 1
+    printf '%s' "$__fm_sz_value"
+  fi
+}
+
+_fm_status_file_mtime() {  # <status-file> [<out-var>]
+  if [ "$#" -gt 1 ]; then
+    _fm_status_stat_raw "$1" '' '' "$2"
     return
   fi
   if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
-    LC_ALL=C /usr/bin/stat -f '%z' "$f" 2>/dev/null
+    LC_ALL=C /usr/bin/stat -f '%m' "$1" 2>/dev/null
   else
-    LC_ALL=C stat -c '%s' "$f" 2>/dev/null
+    LC_ALL=C stat -c '%Y' "$1" 2>/dev/null
   fi
 }
 
-_fm_status_file_mtime() {  # <status-file>
-  local f=$1
-  if [ "$_FM_CLASSIFY_UNAME_S" = Darwin ]; then
-    LC_ALL=C /usr/bin/stat -f '%m' "$f" 2>/dev/null
-  else
-    LC_ALL=C stat -c '%Y' "$f" 2>/dev/null
+# Identity, size, and mtime together: use scan-batched facts or one per-file stat,
+# unless a reader seam requires separate reads.
+_fm_status_stat_into() {  # <file> <ident-var> <size-var> <mtime-var>
+  if [ -n "${FM_STATUS_IDENTITY_READER:-}${FM_STATUS_SIZE_READER:-}" ]; then
+    if [ -n "${2-}" ]; then _fm_open_decisions_file_ident "$1" "$2" || return 1; fi
+    if [ -n "${3-}" ]; then _fm_status_file_size "$1" "$3" || return 1; fi
+    if [ -n "${4-}" ]; then _fm_status_file_mtime "$1" "$4" || return 1; fi
+    return 0
   fi
+  _fm_status_stat_raw "$1" "${2-}" "${3-}" "${4-}"
+}
+
+# Read the presentation manifest without per-task cat forks, keeping trailing
+# newlines. Publish <out-var> only after a successful read of the metadata byte
+# count; open/read failures, short reads, and NUL-delimited prefixes leave it
+# unchanged. Consumers distinguish a missing manifest from a failed read of an
+# existing receipt, which must never become an empty or partial successful read.
+_fm_read_file_into() {  # <file> <out-var>
+  local __fm_rf_data='' __fm_rf_size LC_ALL=C
+  _fm_status_stat_raw "$1" '' __fm_rf_size '' || return 1
+  case "$__fm_rf_size" in ''|*[!0-9]*) return 1 ;; esac
+  { [ "$__fm_rf_size" -eq 0 ] || IFS= read -r -d '' -n "$__fm_rf_size" __fm_rf_data; } 2>/dev/null < "$1" || return 1
+  [ "${#__fm_rf_data}" -eq "$__fm_rf_size" ] || return 1
+  printf -v "$2" '%s' "$__fm_rf_data"
+}
+
+# Printed, or assigned to <out-var> when one is named: the one place a value
+# leaves a function that offers both the printing and the fork-free form.
+_fm_emit_value() {  # <out-var-or-empty> <value>
+  if [ -n "${1-}" ]; then printf -v "$1" '%s' "$2"; else printf '%s' "$2"; fi
 }
 
 # Private scratch path for a one-shot span read, alongside the status file the
@@ -106,7 +185,9 @@ _fm_status_file_mtime() {  # <status-file>
 # (the watcher and the away-mode daemon both classify the same stream) never
 # truncate each other's chunk.
 _fm_status_span_scratch() {  # <status-file>
-  printf '%s.span.%s' "$(_fm_open_decisions_cursor_path "$1")" "$$"
+  local __fm_ss_cursor
+  _fm_open_decisions_cursor_path "$1" __fm_ss_cursor
+  printf '%s.span.%s' "$__fm_ss_cursor" "$$"
 }
 
 _fm_status_read_span() {  # <status-file> <start-offset> <byte-length>
@@ -149,10 +230,8 @@ status_snapshot_latest_event() {  # <status-file> <captured-endpoint> <captured-
   case "$endpoint" in ''|*[!0-9]*|0) return 1 ;; esac
   [ -n "$expected_ident" ] || return 1
 
-  before_mtime=$(_fm_status_file_mtime "$f") || return 1
-  before_size=$(_fm_status_file_size "$f") || return 1
+  _fm_status_stat_into "$f" before_ident before_size before_mtime || return 1
   before_size=${before_size//[[:space:]]/}
-  before_ident=$(_fm_open_decisions_file_ident "$f") || return 1
   case "$before_mtime:$before_size" in *[!0-9:]*) return 1 ;; esac
   [ "$before_size" -eq "$endpoint" ] && [ "$before_ident" = "$expected_ident" ] || return 1
 
@@ -186,10 +265,9 @@ status_snapshot_latest_event() {  # <status-file> <captured-endpoint> <captured-
   case "$event_endpoint" in ''|*[!0-9]*) return 1 ;; esac
   [ -n "$line" ] || return 1
 
-  after_mtime=$(_fm_status_file_mtime "$f") || return 1
-  after_size=$(_fm_status_file_size "$f") || return 1
+  local _FM_STATUS_STAT_BATCH=''
+  _fm_status_stat_into "$f" after_ident after_size after_mtime || return 1
   after_size=${after_size//[[:space:]]/}
-  after_ident=$(_fm_open_decisions_file_ident "$f") || return 1
   case "$after_mtime:$after_size" in *[!0-9:]*) return 1 ;; esac
   [ "$after_mtime" = "$before_mtime" ] \
     && [ "$after_size" -eq "$endpoint" ] \

@@ -25,9 +25,18 @@
 #      idle lane sat unread until someone pressed Enter. The watch extension must
 #      start that wake's own turn and leave an operator draft unsent. This step
 #      drives a scripted local model and spends no tokens.
+#   5. Wake text an older wiring typed into an idle composer and never submitted
+#      sat there until someone pressed Enter, and a lane restart that needs an
+#      empty composer was refused. The watch extension must deliver that wake as
+#      its own turn, clear only that wake, and leave an operator draft beside it
+#      exactly as typed. Same scripted model, no tokens.
+# The lab-only probe records every change of the editor text: a restored wake sits in
+# the composer for only a moment, and one rendered read takes seconds on a busy
+# host, so the pane alone cannot be relied on to catch it.
 # Steps 1-3 submit model prompts, so the guard is opt-in; it fails naming omp
 # and `omp --version`. Refresh docs/verification/runtime-backends.md
-# ("omp injected text" and "omp idle wake") from its output after any omp upgrade.
+# ("omp injected text", "omp idle wake", and "omp stranded wake text") from its
+# output after any omp upgrade.
 # Every Herdr call, including adapter calls, is routed through bin/fm-herdr-lab.sh.
 set -u
 unset FM_HOME FM_ROOT_OVERRIDE FM_STATE_OVERRIDE FM_CONFIG_OVERRIDE FM_DATA_OVERRIDE
@@ -130,6 +139,41 @@ while IFS= read -r path; do
 done <<EOF
 $(git -C "$ROOT" ls-files --modified --others --exclude-standard)
 EOF
+# Lab-only probe: omp's own queued-message and idle answers, and every change of
+# the editor text, written where the guard can read them. omp's queue panel is not
+# redrawn for an extension's queued follow-up, so the panel alone cannot say
+# whether the wake is queued; and a restored wake sits in the composer for only
+# a moment while each rendered read through the pane takes seconds on a busy host,
+# so the pane alone cannot be relied on to catch it.
+mkdir -p "$PROJECT/.omp/extensions"
+cat > "$PROJECT/.omp/extensions/fm-lab-queue-probe.ts" <<'TS'
+import { appendFileSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+const out = resolve(dirname(fileURLToPath(import.meta.url)), "../../state/.lab-queue-probe");
+const editorLog = resolve(dirname(fileURLToPath(import.meta.url)), "../../state/.lab-editor-log");
+export default function (pi: { on?: (event: string, handler: (event: any, ctx: any) => unknown) => void }) {
+  let ctx: any = null;
+  const remember = (_event: unknown, context: unknown) => {
+    if (typeof context === "object" && context !== null) ctx = context;
+  };
+  for (const event of ["session_start", "before_agent_start", "message_start", "agent_end"]) pi.on?.(event, remember);
+  let lastEditor = "";
+  const timer = setInterval(() => {
+    try {
+      const editor = String(ctx?.ui?.getEditorText?.() ?? "");
+      if (editor !== lastEditor) {
+        lastEditor = editor;
+        appendFileSync(editorLog, `${Math.floor(Date.now() / 1000)} ${JSON.stringify(editor)}\n`);
+      }
+    } catch {}
+    try {
+      writeFileSync(out, `${Math.floor(Date.now() / 1000)} queued=${ctx?.hasPendingMessages?.() === true ? 1 : 0} idle=${ctx?.isIdle?.() === true ? 1 : 0}\n`);
+    } catch {}
+  }, 100);
+  timer.unref();
+}
+TS
 # The launching code root must be distinct from the secondmate home; the
 # ordinary spawn interface deliberately refuses its own repository as a home.
 cp -R "$PROJECT" "$CODE_ROOT" || fail "could not prepare the isolated launching code root"
@@ -205,6 +249,10 @@ start_omp() {
   TERMINAL_CONTROL_PID=$!
   wait_for 120 is_idle || { screen >&2; fail "$SUBJECT never published settled task evidence for $label"; }
   sleep 2
+  # Native idle can precede the initial launch-brief turn. Do not type the arm
+  # request until omp's own context confirms that turn has settled.
+  wait_for 120 probe_says_state "$PROJECT/state/.lab-queue-probe" ' idle=1' \
+    || { screen >&2; fail "$SUBJECT: the launch-brief turn did not settle for $label"; }
   send_text 'Call the fm_watch_arm_omp tool exactly once now, then reply with only the word ARMED.'
   sleep 1
   send_key Enter
@@ -233,38 +281,64 @@ queue_wake() {
   : > "$PROJECT/state/$WAKE_TASK.meta"
   printf 'done: wake lab signal %s\n' "$WAKE_TASK" > "$PROJECT/state/$WAKE_TASK.status"
   wait_for 60 wake_is_queued \
-    || { screen >&2; fail "$SUBJECT: $WAKE_TASK was not submitted into the running turn's follow-up queue (queue rows: $(queue_rows))"; }
+    || { screen >&2; fail "$SUBJECT: $WAKE_TASK was not submitted into the running turn's follow-up queue (queue rows: $(queue_rows), probe: $(cat "$PROJECT/state/.lab-queue-probe" 2>/dev/null || echo none))"; }
 }
 
-wake_is_queued() {
-  local capture queued
-  is_busy || return 1
+wake_row_queued() {
   awk -F '\t' -v key="$WAKE_TASK.status" \
     '$3 == "signal" && $4 == key { found = 1 } END { exit !found }' \
-    "$PROJECT/state/.wake-queue" 2>/dev/null || return 1
-  capture=$(screen)
-  queued=$(printf '%s\n' "$capture" | awk '
-    /After yield.*[1-9][0-9]*/ { in_queue = 1; next }
-    in_queue && /to edit/ { printf "%s", rows; exit }
-    in_queue { rows = rows $0 }
-  ' | tr -d '[:space:]')
-  case "$queued" in
-    *"FIRSTMATEWATCHERWAKE:"*"$WAKE_TASK.status"*) ;;
-    *) return 1 ;;
-  esac
-  is_busy && \
-    awk -F '\t' -v key="$WAKE_TASK.status" \
-      '$3 == "signal" && $4 == key { found = 1 } END { exit !found }' \
-      "$PROJECT/state/.wake-queue" 2>/dev/null
+    "$PROJECT/state/.wake-queue" 2>/dev/null
+}
+
+# omp's own answer through the lab probe, no more than three seconds old.
+probe_says_state() {  # <probe-path> <required-state>
+  local line stamp now
+  line=$(cat "$1" 2>/dev/null) || return 1
+  stamp=${line%% *}
+  now=$(date +%s)
+  case "$stamp" in ''|*[!0-9]*) return 1 ;; esac
+  [ $((now - stamp)) -le 3 ] || return 1
+  case "$line" in *"$2"*) return 0 ;; esac
+  return 1
+}
+probe_says_queued() { probe_says_state "$PROJECT/state/.lab-queue-probe" ' queued=1 '; }
+
+wake_is_queued() {
+  is_busy || return 1
+  wake_row_queued || return 1
+  probe_says_queued || return 1
+  is_busy && wake_row_queued
+}
+
+# omp's own record that Escape restored a watcher wake into its editor: the probe
+# logs every change of the editor text, so a restoration that lasts a moment cannot
+# fall between the pane reads below. Any watcher wake counts, not only this task's
+# signal: the lane also receives the secondmate's own outcome checks, one of which
+# can already be queued when the signal arrives. Every wake is tracked and
+# restored alike. RESTORE_BASE marks the log before Escape, and RESTORE_DRAFT
+# (when set) must sit in the same editor text as the wake.
+RESTORE_BASE=0
+RESTORE_DRAFT=
+editor_log_lines() { echo $(( $(wc -l < "$PROJECT/state/.lab-editor-log" 2>/dev/null || echo 0) )); }
+editor_log_restored_wake() {
+  local entries
+  entries=$(tail -n +"$((RESTORE_BASE + 1))" "$PROJECT/state/.lab-editor-log" 2>/dev/null | grep -F 'FIRSTMATE WATCHER WAKE') || return 1
+  [ -z "$RESTORE_DRAFT" ] || printf '%s\n' "$entries" | grep -F -- "$RESTORE_DRAFT" >/dev/null
 }
 
 wake_is_restored() {
-  local content
+  local content draft
+  editor_log_restored_wake && return 0
   composer_is pending || return 1
   content=$(fm_backend_herdr_composer_content "$TARGET" '') || return 1
   content=$(printf '%s' "$content" | tr -d '[:space:]')
   case "$content" in
-    *"FIRSTMATEWATCHERWAKE:"*"$WAKE_TASK.status"*) return 0 ;;
+    *"FIRSTMATEWATCHERWAKE:"*) ;;
+    *) return 1 ;;
+  esac
+  draft=$(printf '%s' "$RESTORE_DRAFT" | tr -d '[:space:]')
+  case "$content" in
+    *"$draft"*) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -278,6 +352,8 @@ interrupt_queued_wake() {
       sleep 1
     fi
     queue_wake
+    RESTORE_BASE=$(editor_log_lines)
+    RESTORE_DRAFT=$draft
     send_key Escape
     for ((poll = 0; poll < 50; poll++)); do
       wake_is_restored && return 0
@@ -310,6 +386,7 @@ interrupt_queued_wake() {
 IDLE="$LAB/idle"
 mkdir -p "$IDLE/agent" "$IDLE/home/.omp/extensions" "$IDLE/home/.pi/extensions/lib" "$IDLE/home/bin" "$IDLE/home/state"
 cp "$PROJECT/.omp/extensions/fm-primary-omp-watch.ts" "$IDLE/home/.omp/extensions/"
+cp "$PROJECT/.omp/extensions/fm-lab-queue-probe.ts" "$IDLE/home/.omp/extensions/"
 cp "$PROJECT/.pi/extensions/lib/fm-operational-input.ts" "$IDLE/home/.pi/extensions/lib/"
 cp "$PROJECT/.pi/extensions/lib/fm-watch-lifecycle.ts" "$IDLE/home/.pi/extensions/lib/"
 cp "$PROJECT/bin/fm-operational-input.sh" "$IDLE/home/bin/"
@@ -396,14 +473,19 @@ IDLE_PANE=$(lab workspace create --cwd "$IDLE/home" --label idle-wake --no-focus
 [ -n "$IDLE_PANE" ] || fail "could not create the idle-wake lab pane"
 # The pid written to state/.lock is the omp the shell execs, so the extension
 # owns the lock and arms at session_start without a model turn.
-lab pane run "$IDLE_PANE" "bash -c 'printf \"%s\\n\" \$\$ > $IDLE/home/state/.lock; exec env FM_HOME=$IDLE/home PI_CODING_AGENT_DIR=$IDLE/agent $REAL_OMP --model lab/m1'" >/dev/null \
+# Use the same box overlay as the spawned lane: the full-editor reader requires
+# its status-bearing top and folded bottom borders, not omp's default shape.
+lab pane run "$IDLE_PANE" "bash -c 'printf \"%s\\n\" \$\$ > $IDLE/home/state/.lock; exec env FM_HOME=$IDLE/home PI_CODING_AGENT_DIR=$IDLE/agent $REAL_OMP --config $BOX_OVERLAY --model lab/m1'" >/dev/null \
   || fail "could not start omp in the idle-wake lab pane"
 idle_screen() { lab pane read "$IDLE_PANE" --source visible 2>/dev/null || true; }
 model_saw() { grep -F -- "$1" "$IDLE/model.log" >/dev/null 2>&1; }
 note_posted() { idle_screen | grep -F 'IDLE-LAB-NOTE' >/dev/null; }
+idle_ready() { probe_says_state "$IDLE/home/state/.lab-queue-probe" ' idle=1'; }
 wait_for 60 test -s "$IDLE/home/state/.omp-watch-extension-loaded" \
   || { idle_screen >&2; fail "$SUBJECT: the idle-wake session never loaded the watch extension"; }
-sleep 3
+# The loaded marker is written before session_start and does not prove that omp
+# accepts input yet; wait for the real context's fresh idle answer instead.
+wait_for 120 idle_ready || { idle_screen >&2; fail "$SUBJECT: the idle-wake editor never became ready"; }
 lab pane send-text "$IDLE_PANE" 'IDLE-LAB-ADVISE reply ack' >/dev/null
 sleep 1
 lab pane send-keys "$IDLE_PANE" Enter >/dev/null
@@ -419,6 +501,36 @@ model_saw 'operator draft kept' && fail "$SUBJECT: the operator draft was submit
 idle_screen | grep -F 'operator draft kept' >/dev/null \
   || { idle_screen >&2; fail "$SUBJECT: the operator draft did not stay in the composer"; }
 pass "live omp idle wake: $SUBJECT started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent"
+
+# ---------------------------------------------------------------------------
+# Session I, second step: wake text an older wiring typed into the idle composer
+# and never submitted. It is built from the operational-input owner's legacy wake
+# shape and encoder, typed without Enter, beside an operator draft.
+# ---------------------------------------------------------------------------
+# shellcheck source=bin/fm-operational-input.sh
+. "$ROOT/bin/fm-operational-input.sh"
+OLD_WAKE_MESSAGE='stale: old-wiring-lane wake left in the composer'
+fm_operational_input_encode watcher "${FM_LEGACY_WATCHER_PREFIX}${OLD_WAKE_MESSAGE}${FM_LEGACY_WATCHER_SUFFIX}" OLD_WAKE \
+  || fail "could not encode the older-wiring wake"
+idle_composer() { fm_backend_herdr_composer_content "$SESSION:$IDLE_PANE" ''; }
+draft_cleared() {
+  local content
+  content=$(idle_composer) || return 1
+  [ -z "$content" ]
+}
+lab pane send-keys "$IDLE_PANE" ctrl+u >/dev/null
+wait_for 10 draft_cleared \
+  || { idle_screen >&2; fail "$SUBJECT: could not clear the idle-wake draft before the stranded-wake step"; }
+lab pane send-text "$IDLE_PANE" "${OLD_WAKE}"$'\n\n'"operator draft beside the wake" >/dev/null
+wait_for 40 model_saw "$OLD_WAKE_MESSAGE" \
+  || { idle_screen >&2; fail "$SUBJECT: wake text left unsent in an idle composer was never delivered"; }
+sleep 3
+model_saw 'operator draft beside the wake' && fail "$SUBJECT: the operator draft was submitted with the stranded wake"
+draft=$(idle_composer) \
+  || { idle_screen >&2; fail "$SUBJECT: could not read the full composer after the stranded wake was delivered"; }
+[ "$draft" = 'operator draft beside the wake' ] \
+  || { idle_screen >&2; fail "$SUBJECT: the stranded wake recovery did not leave exactly the operator draft, composer now holds: '$draft'"; }
+pass "live omp stranded wake: $SUBJECT delivered wake text an older wiring left unsent in an idle composer as its own turn, cleared only that wake, and left the operator draft as typed"
 lab pane close "$IDLE_PANE" >/dev/null 2>&1 || true
 
 # ---------------------------------------------------------------------------
@@ -436,6 +548,9 @@ pass "live omp wake restore: $SUBJECT re-submitted a wake that Esc restored to t
 # An operator draft typed while the wake was queued survives the recovery.
 wait_for 120 is_idle || fail "the lane did not settle after handling the wake"
 interrupt_queued_wake 'operator draft kept'
+draft_alone() { [ "$(fm_backend_herdr_composer_content "$TARGET" '')" = 'operator draft kept' ]; }
+wait_for 60 draft_alone \
+  || { screen >&2; fail "$SUBJECT: the wake restored next to an operator draft was never taken out of the composer, which holds: '$(fm_backend_herdr_composer_content "$TARGET" '')'"; }
 wait_for 90 queue_drained \
   || { screen >&2; fail "$SUBJECT: the wake restored next to an operator draft was never submitted again"; }
 draft=$(fm_backend_herdr_composer_content "$TARGET" '')

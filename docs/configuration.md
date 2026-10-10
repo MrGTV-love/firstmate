@@ -91,6 +91,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
+- The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
@@ -105,6 +106,8 @@ Untracked files and directories whose names begin with `scratchpad` are also git
 - `bin/fm-spawn.sh` owns the base task-metadata fields it emits, while the runtime-backend section below owns backend-specific fields and selector interpretation.
 
 - `bin/fm-contributions.sh` owns durable published-contribution records under each task, observation bounds, equivalent triage-label configuration, and the authenticated contribution check.
+
+- [`bin/fm-gh-rest.sh`](../bin/fm-gh-rest.sh)'s header and `--help` own the commands, file formats, environment overrides, and exit codes; [GitHub REST reads and the quota floor](#github-rest-reads-and-the-quota-floor) owns the shared read and degradation behavior.
 
 - The producing PR and Relay helpers own the fields they append, [`bin/fm-status-event-lib.sh`](../bin/fm-status-event-lib.sh) owns status-event vocabulary, [`bin/fm-status-record-lib.sh`](../bin/fm-status-record-lib.sh) owns optional emission-time syntax and legacy unknown-time handling, and `bin/fm-crew-state.sh` owns current-state reconciliation.
 
@@ -428,6 +431,10 @@ For spawn-capable adapters, the runtime session-provider backend controls where 
 
 Treehouse remains the worktree provider for tmux, herdr, zellij, and cmux, since herdr, zellij, and cmux are session providers only; Orca provides both the task worktree and terminal endpoint.
 
+Every admitted Herdr runtime requires a `python3` on its runtime PATH that runs as Python 3 to read process environments and prove runtime ownership, including local homes and remote hosts on every supported platform.
+Remote launch-agent prerequisites and repair refusals are owned by [remote readiness](remote-secondmates.md#required-remote-tools).
+Ownership remains unproven rather than being accepted from an unreadable environment.
+
 ### Backend selection order
 
 New spawns choose the backend in this order:
@@ -461,7 +468,7 @@ The compatibility helper `fm_backend_agent_alive` continues to collapse those de
 
 ### Dependency and socket checks
 
-- A herdr spawn additionally version-gates against the installed `herdr` binary's protocol and requires `jq`, refusing loudly on an incompatible or missing installation.
+- A herdr spawn additionally version-gates against the installed `herdr` binary's protocol and requires `jq` and `python3`, refusing loudly on an incompatible or missing installation.
 
 - A zellij spawn additionally version-gates against the installed `zellij` binary's version and requires `jq`, refusing loudly when either is missing or the version is older than 0.44.
 
@@ -599,7 +606,8 @@ An existing ledger is left untouched while recording is disabled.
 ## Open-work ledger (config/open-loops.json)
 
 `bin/fm-open-loops.sh` reconciles this home's recorded obligations against live worker and delivery evidence.
-`bin/fm-open-loops.sh --json` is a fresh, read-only reading of this home; it never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository.
+`bin/fm-open-loops.sh --json` normally collects current evidence for this home; [quota refusal](#github-rest-reads-and-the-quota-floor) can instead retain the last published ledger.
+It never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
 Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
 Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
 For a non-informational row, an unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
@@ -648,7 +656,22 @@ The ledger covers this home's current backlog, ordinary task records, status que
 Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
 The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
 
-The watcher runs the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), ahead of any signal or check exit, so a chatty fleet cannot starve it and a slow scan cannot stall the liveness beacon.
+On each polling iteration, the watcher starts the reconciler as a detached helper when the ledger is missing and every `FM_OPEN_LOOPS_INTERVAL` seconds thereafter (default 600), before the ordinary signal and maintenance phases, so a slow scan cannot stall the liveness beacon.
+The ledger wake normally follows the signal scan.
+After three consecutive signal wakes defer maintenance, the watcher resumes maintenance first; `state/.prelude-progress` preserves the next stage across early wakes, and the deferral debt clears only after ledger surfacing, reconciliation, reply, liveness, relaunch, stall, process-event, recovery, inactive-outcome, and all due checks have run.
+Before a non-signal wake exits, the watcher scans signals again and queues newly appended status events alongside that wake; it also scans between blocking checks and after the due-check batch.
+Completed actionable check results are queued before those scans, and the first actionable result does not skip sibling checks.
+Signal identities accumulate across these scans until the cycle closes.
+Non-signal wakes retain their original headline and routing, including stale task identity and heartbeat fleet-wide scope, unless late-signal marker persistence fails as described below.
+Delivery-only scans persist the late signal files in `state/.watch-late-signals`; at the start of the next watcher cycle, before maintenance or signal scanning, the watcher emits an independent `signal:` headline naming only files whose signal rows remain queued.
+A batch already drained by Main produces no extra wake and its marker is removed.
+Follow-up and end-of-maintenance signal wakes remove the marker only after successful output; failed output leaves it available to a handling successor.
+When signals are the only end-of-maintenance headline, it names all accumulated signals.
+If the marker cannot be persisted, the watcher delivers the accumulated `signal:` headline immediately, even in handling-successor posture, instead of relying on downtime recovery; interrupted maintenance remains owed, and its delivery markers do not advance.
+Marker cleanup failure does not prevent that signal headline.
+[`pi-supervision-branch.md`](pi-supervision-branch.md#wake-dispatch) owns branch signal routing.
+For an early maintenance wake, progression is committed only after successful output and its delivery-marker callback, so failed delivery leaves that stage owed.
+[`tests/fm-watch-triage.test.sh`](../tests/fm-watch-triage.test.sh) contains the between-cycle and in-cycle signal, late-signal routing and output-failure, and bounded-maintenance-deferral regressions.
 The helper's `--heartbeat` mode atomically publishes the dated result to `state/open-loops.json`.
 A lock in the effective state directory serializes collection through publication across watcher restarts: contending heartbeats skip, while fresh CLI readers wait and then collect.
 When the set of overdue rows changes, the watcher queues one durable `check` wake and exits with `check: open-loop-ledger`; an unchanged set repeats only every `FM_OPEN_LOOPS_RESURFACE` seconds (default 21600).
@@ -661,6 +684,12 @@ Acknowledging a wake resolves nothing: a row disappears only when fresh evidence
 The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors.
 Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
 No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
+
+On [quota refusal](#github-rest-reads-and-the-quota-floor), the reconciler discards the partial collection rather than presenting it as current evidence.
+It returns the last published rows, each marked `stale: true`, with `complete: false`, top-level `stale`, `stale_reason`, and `stale_until_epoch`, and one informational `ledger stale` coverage row stating the reset time.
+The rows keep the generation time of the run that produced them; `--heartbeat` publishes this retained result so the watcher knows the reconciler is alive.
+A home with no usable earlier ledger gets the ordinary `ledger degraded` coverage row carrying the same reason.
+The next run after the window resets collects normally and clears every mark.
 
 Create the optional local `config/open-loops.json` to override the limits:
 
@@ -677,6 +706,32 @@ On either deadline, cancellation freezes the owned command group while capturing
 It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.
 An exited command's obsolete process group does not interrupt cleanup of its recorded descendants; surviving descendants are matched by process identity before they are killed.
 A malformed configuration is reported as an error rather than ignored.
+
+### GitHub REST reads and the quota floor
+
+`bin/fm-contributions.sh` and `bin/fm_open_loops.py` read GitHub REST through `bin/fm-gh-rest.sh`.
+It sends `If-None-Match` from its per-URL ETag cache and serves the cached body on a 304, which GitHub does not count against the rate limit.
+Each conditional request snapshots the cache entry before sending its ETag; a 304 serves that snapshot's body and uses its pagination metadata when the Link header is omitted, even if another request replaces the shared entry.
+A supplied Link header updates pagination for the current read; cached metadata is updated only if the shared entry still matches the requested generation.
+A paginated read whose 304 omits the Link header for a full cached last page (item count equal to `per_page`) repeats that page as one unconditional GET, so a page added behind it is not missed.
+Cache publication shares the existing serialized response-recording boundary.
+A missing, corrupt, or unparsable cache entry is a normal GET; entries unused for a week, and staged files a killed helper left behind for over an hour, are pruned.
+Only REST is conditional; GraphQL reads (`gh pr view`, `gh pr checks`) have no equivalent.
+The contributions poll also checks the recorded core quota before its final GraphQL head read.
+Responses carrying valid `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `X-RateLimit-Resource` headers update the recorded quota, including on a 304 or an error.
+Writers serialize the update, keeping the lowest remaining value within the newest observed reset window; older-window responses cannot replace it.
+Cache and quota recording is best-effort: an unwritable state directory or a recording lock unavailable within a two-second wait silently skips recording without changing the read result.
+The enforcing response headers, not `gh api rate_limit`, are the quota evidence used by the sweeps.
+
+When the recorded core remaining quota is below the fixed 15 percent floor and its window has not reset, the contributions poll and the open-work ledger make no further forge read.
+The helper's header owns the refusal interface; every REST read checks the floor before each request, including the unconditional repeat of a full last page, and publishes no partial response when refused.
+The contributions poll checks the local quota record before budget exits and after incomplete observations.
+It keeps every remaining unmeasured live owner's last observation and checked timestamp, marks it unverified with the reset time as its reason regardless of the remaining network budget, and reports that once per resource/reset-window episode.
+Completed observations remain measured.
+Changes to the remaining quota update the reason without another announcement; announcement eligibility spans saved owners, so late owners do not restart the episode.
+The [open-work ledger section](#open-work-ledger-configopen-loopsjson) owns its retained-result behavior.
+The check needs no call of its own because it reads headers from calls the sweeps were already making.
+Focused regressions are in [`tests/fm-gh-rest.test.sh`](../tests/fm-gh-rest.test.sh), [`tests/fm-contributions.test.sh`](../tests/fm-contributions.test.sh), and [`tests/fm-open-loops.test.sh`](../tests/fm-open-loops.test.sh).
 
 ### Completion and discard
 
@@ -867,7 +922,7 @@ muse is verified for crewmate and scout launches ONLY, and `fm-spawn.sh` refuses
 muse also needs a worker-reachable credential before spawning, and the portable fleet path is the `<config>/muse/auth.json` credential stored by `muse login`, because a caller-only `META_API_KEY` does not cross a long-lived backend daemon.
 
 gemini is likewise refused for secondmates because it has no primary supervision protocol; [its adapter reference](../.agents/skills/harness-adapters/references/harness/gemini.md) owns the credential precondition, canonical-launch wiring, and raw-launch limitations.
-rovo is likewise verified for crewmate and scout launches ONLY, refused for a secondmate for the same reason - no turn-end hook and no primary supervision protocol; [`docs/verification/rovo.md`](verification/rovo.md) owns that evidence, including the OAuth token's silent background refresh from a stored refresh token and both tmux and herdr pane liveness (herdr placement is verified live, with a Herdr-side agent-detection gap left open for recovery classification).
+rovo is likewise verified for crewmate and scout launches ONLY, refused for a secondmate for the same reason - no turn-end hook and no primary supervision protocol; [`docs/verification/rovo.md`](verification/rovo.md) owns the live launch, OAuth refresh, and pane-liveness evidence, while [Herdr's process-backed liveness contract](herdr-backend.md#stale-agent-registrations) owns current recovery classification.
 
 agy is likewise verified for crewmate and scout launches ONLY, refused for a secondmate for the same reason - no hook surface and no primary supervision protocol; [`docs/verification/agy.md`](verification/agy.md) owns that evidence, including the spawn-time worktree trust pre-registration through `bin/fm-agy-trust.sh` and Herdr's native agy pane recognition.
 devin is verified for crewmate and scout launches only; a secondmate is refused because Devin has no verified primary supervision protocol.
@@ -1326,7 +1381,7 @@ It does not change commit-attribution preferences.
       "claude": { "model": "sonnet" },
       "omp": {
         "model": "anthropic/claude-sonnet-5-5",
-        "stand_in": "openrouter/z-ai/glm-5.3"
+        "stand_in": "deepseek/deepseek-v4-flash"
       }
     }
   },
@@ -1401,7 +1456,7 @@ Firstmate cannot see which part of a worker's life uses the resource, so the num
 `config/crew-dispatch.json` is an optional local, gitignored file containing natural-language rules that firstmate reads before dispatching a crewmate or scout.
 When present, the file must contain exactly one JSON object; empty files, non-object values, and concatenated documents are malformed.
 Firstmate chooses the best matching rule with judgment; shell scripts do not match the natural-language rules.
-Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes the selected profile to `fm-spawn.sh`.
+Firstmate resolves the rule's profile object or array under `AGENTS.md` section 4, the [fleet model index](#fleet-model-index-configmodel-indexjson), and `quota-array-dispatch`, then passes concrete `--harness`, `--model`, and `--effort` flags to `fm-spawn.sh`, plus `--dispatch-rule rule_N` or `--dispatch-rule default` when the rule has a fallback policy.
 
 **Spawn requirements**
 
@@ -1444,6 +1499,44 @@ This section is the single owner of the canonical schema and its per-field seman
 | `use` and optional top-level `default` | Accept one profile object or a non-empty array of profile objects; the single-object form remains fully backward-compatible. |
 | Profile `harness` | Required in every profile. |
 | Profile `model` or `role`, `stand_in`, and `effort`; rule `why` | Optional; `role` and `stand_in` follow the [model index contract](#fleet-model-index-configmodel-indexjson). |
+| Rule `fallback` and top-level `default_fallback` | Optional ordered arrays of explicit stand-ins; an empty or absent list permits none. |
+
+**Pooled OMP capacity and declared stand-ins**
+
+`bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/<id> [--json]` reports every pooled account as `usable`, `exhausted`, or `unknown`, without account identities or credentials.
+OMP's own `usage --provider openai-codex --json` is authoritative for that surface, not quota-axi's single-account Codex row.
+A fresh usable sibling keeps the model available; an unmeasured sibling prevents a whole-pool exhaustion verdict.
+Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
+The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
+Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
+Native Claude's default-account quota is not a TeamClaude proxy ledger, so a TeamClaude fallback candidate's capacity is unknown and native Claude exhaustion cannot veto that stand-in, including on recovery of a task already running on it while `config/claude-launcher` selects `teamclaude`.
+Claude-primary routes keep their existing quota-axi ranking, floors, and `fm-quota-choose.sh` treatment.
+
+Each fallback profile requires `harness`, `model`, and `effort`.
+An OMP fallback uses a concrete catalog selector; a Claude fallback additionally requires `"requires": "teamclaude"` and is available only when the supported Claude launch owner exists, `config/claude-launcher` selects `teamclaude`, and that owner's readiness check succeeds.
+Every fallback destination must also satisfy the home's session launch policy.
+A bare `claude` executable or a shell alias is not proof of that route.
+For example, a rule may declare `"fallback": [{"harness": "omp", "model": "deepseek/deepseek-v4-flash", "effort": "high"}]`, using a concrete selector taken from `omp models --json`; these fields grant only the named stand-in, not a general downgrade.
+The operator must preserve the task's required reasoning class in each list; an exhausted strongest route without a supported equal-class stand-in stops and reports the unavailable route.
+Natural-language `why` text does not authorize an executable fallback.
+
+`fm-dispatch-resolve.sh`, `fm-spawn.sh`, and `fm-control.sh relaunch` share the same fallback list.
+Only proven primary exhaustion activates it; approval, confidence, unknown capacity, and floor decisions are not bypassed.
+Spawn and recovery resolve each rule against their frozen model-index and dispatch pair, even when typed resolution is off.
+Only rules that contain the launched profile must resolve, so a retired model or unconfigured role in an unrelated rule does not block a launch or recovery.
+When the matched rule has a fallback policy, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
+A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
+A task that switched to a stand-in stays on it until it is launched again from the matrix.
+Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
+OMP workers receive a later per-task configuration overlay with exact model-and-effort chains, preventing ambient chains from weakening the task.
+Those chains contain only the order-preserving eligible native prefix; the first supported cross-harness destination ends the prefix and leaves the transition to recovery.
+Native OMP account rotation precedes model fallback, and successful native model switches publish the serving selector.
+An idle terminal quota error after native rotation is handled by the existing bounded recovery scan through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
+Launch and successful replacement append the selected route to task status.
+A stand-in the typed dispatch resolution kept as unknown is launched without a route line in the task status.
+A native model fallback appends a `note:` line naming the serving model, and status readers skip that note so the worker's own latest declaration stays the task state.
+Account pins and saved resets are unchanged; reviewer model selection remains owned by no-mistakes, not these worker controls.
+
 
 **Fields applied only by typed resolution**
 
@@ -1829,7 +1922,7 @@ The per-backend delta is required only for the backend resolved from `FM_BACKEND
 | Resolved backend | Additional tools |
 | --- | --- |
 | `tmux` | `tmux`, `treehouse` |
-| `herdr` | `herdr`, `jq`, `treehouse` |
+| `herdr` | `herdr`, `jq`, `python3`, `treehouse` |
 | `zellij` | `zellij`, `jq`, `treehouse` |
 | `orca` | `orca` |
 | `cmux` | `cmux`, `jq`, `treehouse` |
@@ -2435,12 +2528,15 @@ Passing this syntax-only check does not prove that handlers run, cancel native s
 
 Before arming any Lavish source, open its artifact with `lavish-axi` so the saved session identifies the board's server; reply and poll attempts derive their host and port from that session and refuse missing or invalid session evidence before posting or consuming a staged worker reply.
 
-**Retry interrupted Lavish polls**
+**Retry transient Lavish poll responses**
 
-That adapter, and only that adapter, retries the one exact transient response a cut-short listener returns while its marks remain available (`error: Lavish Editor poll response was interrupted` with `code: SERVER_ERROR`), up to 12 times with poll starts at least 5 seconds apart, so an internal retry never reaches the runner as a captured result.
+That adapter, and only that adapter, retries two exact transient responses. The first is what a cut-short listener returns while its marks remain available (`error: Lavish Editor poll response was interrupted` with `code: SERVER_ERROR`); it is retried up to 12 times with poll starts at least 5 seconds apart, so an internal retry never reaches the runner as a captured result.
 This start-to-start governor is a no-op after a normally blocking poll but caps an immediately returning poll under the shipped defaults independently of the owner lease and registration launch pacing.
 
 Real feedback, ended and missing sessions, any other `SERVER_ERROR`, and that same interruption still standing once the bound is spent are all captured and announced normally; `FM_LAVISH_POLL_RETRY_DELAY` is a bounded 1 to 60 second test override for the interval only, and the runner itself stays adapter-agnostic.
+The adapter likewise treats `error: Lavish Editor server did not start` with `code: SERVER_ERROR` (with or without the `help[1]` line naming the board's own port) as transient while a lavish-axi server still answers `GET /health` on the board session's host and port within 10 seconds.
+That response is what the client prints when its fixed 500 ms health probe gives up on a live but slow server; the listener retries quietly up to 15 times with the delay doubling from 5 seconds to a 60 second ceiling, and a server that fails 3 health probes in a row is gone and is announced once.
+`FM_LAVISH_START_RETRY_CAP` is the matching bounded 1 to 60 second test override for the ceiling, and the adapter header owns the measurements those limits come from.
 An already-armed Lavish source keeps its registered listener command until it is retired and armed again, so retire the source, then arm it again to adopt this retry policy.
 
 **Retire finished Lavish listeners**
@@ -2879,8 +2975,8 @@ FM_SESSION_START_QUEUED_LIMIT=20   # plain queued backlog rows in the session-st
 FM_SESSION_START_ENDPOINT_TIMEOUT=10   # seconds bounding each per-task endpoint liveness read in the session-start digest (bin/fm-session-start.sh); nonpositive or invalid values fall back to 10; a read that hits the bound or dies becomes that task's own `endpoint: error` line and the digest continues
 FM_BACKLOG_ROW_TIMEOUT_SECS=10   # seconds bounding each backlog row read (bin/fm-backlog-transition-lib.sh); nonpositive or invalid values fall back to 10; the first bound hit latches the sweep so later reads return immediately, each still naming its own item
 FM_BOOTSTRAP_DETECT_ONLY=0   # internal/read-only session-start mode: skip bootstrap's mutating sweeps and print advisory TANGLE wording
-FM_BOOTSTRAP_NETWORK=all   # internal session-start phase split: all, skip (local steps only), or only (network steps only); see bin/fm-bootstrap.sh
-FM_STARTUP_NETWORK_TIMEOUT=120   # seconds bounding the deferred inactive-outcome scan plus network checks, including the lock waits the worker makes before them; hitting it prints an actionable NETWORK_CHECKS line, and a lock a live process still holds at the deadline ends the worker with a failed-rerun record (publication and delivery are bounded by FM_SESSION_START_TIMEOUT the same way)
+FM_BOOTSTRAP_NETWORK=all   # internal session-start phase split; bin/fm-bootstrap.sh header owns values and phase membership
+FM_STARTUP_NETWORK_TIMEOUT=120   # deferred-stage bound in seconds; bin/fm-startup-network.sh header/help owns covered work, lock waits, and timeout reporting
 FM_TASKS_AXI_COMPATIBLE=   # internal one-hop handoff of an already-computed tasks-axi compatibility verdict (0 or 1); consumed when bin/fm-tasks-axi-lib.sh is sourced
 FM_GUARD_READ_ONLY=0    # internal/read-only guard mode: keep alarms but suppress drain, supervision repair, and checkout repair commands
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the guarded operation WILL still run.'   # banner continuation line; fm-send.sh overrides it to name the requested message specifically
@@ -3001,7 +3097,7 @@ FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=30       # min mtime age before fm-fleet
 FM_BUSY_REGEX=          # optional override for rendered delivery guards and Grok's isolated task-state fallback; converted worker state ignores it
 FM_COMPOSER_IDLE_RE=    # optional fleet-wide idle-placeholder regex override (bin/fm-composer-lib.sh); a match alone does not prove emptiness because shape-specific position and ANSI de-emphasis safety gates still apply
 FM_COMPOSER_CAPTURE_LINES=20   # fleet-wide bound for tail-capture composer reads; it no longer bounds the adapter composer state/content reads on tmux or herdr, which supply their bounded visible pane instead, while the cmux, orca, and Zellij adapters use this small window so stale scrollback banners stay out of the candidate set; it still bounds the shared inbox composer read (bin/fm-task-inbox-lib.sh) on every backend, and on herdr it also floors how many Ctrl+U presses a refused leftover may take
-FM_COMPOSER_PI_MAX_LINES=8     # fleet-wide: maximum rows admitted between Pi's identity-corroborated separator pair; taller or ambiguous candidates stay unknown
+FM_COMPOSER_PI_MAX_LINES=8     # fleet-wide: maximum rows admitted between Pi's identity-corroborated separator pair; bin/fm-composer-lib.sh owns the verdict contract
 FM_COMPOSER_GHOST_LUMA_MAX=128   # fleet-wide: truecolor ghost luminance ceiling; shared mechanics owned by bin/fm-composer-lib.sh's fm_composer_strip_ghost, Herdr exception by docs/herdr-backend.md "Claude composer proof"
 GROK_HOME=              # optional Grok config home for firstmate's global grok turn-end hook; defaults to ~/.grok
 FM_SEND_RETRIES=3       # fm-send typed-plane Enter-retry attempts after typing the line once; agy typed targets use a longer per-harness default owned by bin/fm-send.sh

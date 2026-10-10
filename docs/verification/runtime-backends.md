@@ -1208,16 +1208,17 @@ Typed text appears in the folded row (`╰─ hello world typed text ─╯`), w
 The current classification and plain-hint safety boundary is owned by [Composer and injection safety](../herdr-backend.md#composer-and-injection-safety); exact container predicates are owned by `bin/fm-composer-lib.sh`.
 `test_matrix_omp_box_composer` and `test_omp_box_requires_omp_identity_and_complete_shape` in `tests/fm-composer-lib.test.sh` carry the captured idle screen and the captured typed, wrapped, and hint rows.
 
-The live guard that refreshes this entry launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands.
-Its default-on checks spend no tokens wherever omp, herdr, and jq are installed; the relaunch proof submits a real worker brief and remains opt-in:
+The live guard launches the installed omp idle with the box shape pinned in a guarded Herdr lab and drives the public lifecycle commands.
+It now verifies that direct native launches remain unmanaged and that interrupt, exit, and ordinary relaunch preserve their live PID, screen, draft, endpoint, instructions, and dirty work.
+After guarded lab teardown, cleanup waits up to 10 seconds for the captured native PID/start incarnation to exit before removing its private worktree and overlay. Failed teardown, uncaptured launch identity, or unconfirmed exit retains the private tree and fails the test, including on early failures.
+The default-on checks spend no tokens wherever omp, herdr, jq, and python3 are installed:
 
 ```sh
-FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1 tests/fm-omp-composer-box-live-e2e.test.sh
+FM_OMP_COMPOSER_BOX_LIVE=1 tests/fm-omp-composer-box-live-e2e.test.sh
 ```
 
-Setting `FM_OMP_COMPOSER_BOX_LIVE_RELAUNCH=1` forces the shared capability gate even when `FM_LIVE=0` or `FM_OMP_COMPOSER_BOX_LIVE=0`; a missing required tool fails rather than skips.
-Setting the relaunch flag to `0` skips only the token-spending relaunch portion and leaves token-free checks governed by their existing live controls.
-The relaunch proof first requires a live agent with a proven empty box composer, failing if that readiness wait expires, then checks replacement-agent liveness and endpoint preservation; it does not require a model-generated acknowledgement.
+The shared capability gate owns explicit enable/disable and missing-tool behavior.
+The historical lifecycle-success output below predates the current ownership boundary; the model-consuming relaunch option has been removed.
 
 Observed output:
 
@@ -1316,14 +1317,13 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
 `tests/fm-omp-harness.test.sh` carries restored-wake editor recovery, descendant sessions, and marker self-repair; `tests/fm-composer-lib.test.sh` carries working-box fixtures captured during this verification; backend submit regressions carry dropped-Enter and stale-frame reread protections, and `tests/fm-wake-queue.test.sh` carries the ordinary stalled-loop alarm and idle-ring boundaries.
 
 The live guard that refreshes this entry submits real prompts and stays opt-in.
-Both recovery probes require the fresh queued wake to be observed in a pending composer after Escape before queue drainage or draft preservation can count as recovery proof.
-If restoration is not observed, the probe retries from a fresh busy turn at most three times, then fails rather than accepting ordinary queued delivery as recovery.
+Current queue-readiness and post-Escape restoration assertions are described in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
 
 ```sh
 FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
 ```
 
-The latest guard run stopped before restored-wake recovery was exercised; see [omp idle wake behind an advisor note](#2026-10-08-omp-idle-wake-behind-an-advisor-note).
+The latest complete guard run, on omp 18.8.1, is recorded in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
 Historical output below predates its fresh queued-wake and post-Escape restoration assertions, pre-parent-repair marker check, successful child-command evidence, and current busy-state checks at observations and submission.
 These results do not establish the current recovery contract; output for the removed parent Enter recovery is omitted.
 
@@ -1365,10 +1365,98 @@ The same step run against the extension that queued every wake as a follow-up fa
 not ok - omp (omp/18.8.1) on herdr 0.9.1: a wake reaching an idle lane behind an advisor note did not start a turn
 ```
 
-On omp 18.8.1 the guard's next step, the restored-wake probe, fails before recovery is exercised, identically with and without this change, so it does not yet refresh the [omp injected text](#2026-10-06-omp-injected-text-through-herdr) entry:
+The guard's later steps on omp 18.8.1 are recorded in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
+
+### 2026-10-08 omp stranded wake text and the queue panel
+
+Verified on 2026-10-08 on macOS arm64 against omp 18.8.1 in isolated Herdr 0.9.1 lab sessions.
+The idle-session steps use a scripted local OpenAI-compatible model and spend no tokens; the Escape steps use the real model.
+
+- **Wake text typed into an idle composer is never submitted by omp.**
+  A complete Firstmate watcher wake pasted into an idle session's composer without Enter stayed there for the whole 22 seconds observed, and no request reached the model, with the extension before this change.
+  Nothing raises an event when text lands in an idle composer, so the extension has to look for it; its stranded-wake poll delivered the same text as its own turn and cleared only that wake.
+- **omp does not redraw its follow-up queue panel for a follow-up an extension queues.**
+  A wake queued with `sendUserMessage(text, { deliverAs: "followUp" })` behind a running tool call was absent from the `After yield` panel for the 26 seconds observed, yet Escape then restored it to the composer, so it was queued all along, and the extension context read `hasPendingMessages()` true.
+  omp 18.8.1 refreshes the panel only from its input-submit, dequeue, compaction, and user `message_start` handlers, and the observation above shows none of them ran for the extension's queued follow-up.
+  Its `queue_update` snapshot event was not delivered to an extension handler registered for it in the same lab.
+  The guard's earlier panel parse could therefore not see the queued wake unless something else had redrawn the panel.
+- **Escape restores every queued follow-up, and recovery takes one wake per run end.**
+  The lane also queues its own outcome checks, so Escape can restore a signal wake and a `check:` wake together; the extension submits the first and the second returns after the next `agent_end`.
+  A restored wake stays in the editor for about two seconds, while one rendered composer read through the pane took one to five seconds on this host, so the guard records omp's editor text through a lab-only probe extension and retains the pane reader as a second restoration signal.
+  The restoration assertion accepts any watcher wake observed after Escape, not only the newly generated signal; the draft probe requires the draft in the same editor text.
+  If restoration is not observed, the probe retries from a fresh busy turn at most three times, then fails rather than accepting ordinary queued delivery as recovery.
+  Queue readiness requires the probe's fresh `hasPendingMessages()` answer, bracketed by busy-state and durable signal-row checks; the queue panel is not an acceptance signal, and screen captures remain available for failure diagnostics.
+
+[Watcher continuity](../watcher-continuity.md#omp-stranded-wake-text) owns the delivery contract, and [restored-wake recovery](../watcher-continuity.md#omp-restored-wake-recovery) owns the wait on queued messages.
+The guard exercises the extension under review on the installed omp:
+
+```sh
+FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
+```
+
+The stranded-wake step now reads the full editor through `fm_backend_herdr_composer_content` and requires the remainder to equal `operator draft beside the wake` exactly; the model log separately checks that the draft was not submitted.
+The idle-session launch uses the same box overlay as the spawned lane so the full-editor reader can identify the composer independently of omp's default shape.
+The guard also waits for the probe's fresh idle-context answer before typing setup prompts; the module-loaded marker and native idle report can appear before omp accepts input.
+The recorded run below predates this stronger assertion: its bottom-row-only check could miss multiline wake text remaining above the draft.
 
 ```text
-not ok - omp (omp/18.8.1) on herdr 0.9.1: wakelab1 was not submitted into the running turn's follow-up queue (queue rows: 3)
+ok - live omp idle wake: omp (omp/18.8.1) on herdr 0.9.1 started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent
+ok - live omp stranded wake: omp (omp/18.8.1) on herdr 0.9.1 delivered wake text an older wiring left unsent in an idle composer as its own turn, cleared only that wake, and left the operator draft as typed
+ok - live omp wake restore: omp (omp/18.8.1) on herdr 0.9.1 re-submitted a wake that Esc restored to the composer, and the lane handled it
+ok - live omp wake restore: omp (omp/18.8.1) on herdr 0.9.1 left the operator's draft exactly as typed while it re-submitted the wake
+ok - live omp markers: omp (omp/18.8.1) on herdr 0.9.1 kept both loaded markers on the session pid 45643 before parent repair and after the parent resumed
+ok - live omp busy composer: omp (omp/18.8.1) on herdr 0.9.1 reads empty and pending while a turn runs
+ok - live omp busy composer: omp (omp/18.8.1) on herdr 0.9.1 took an injected doorbell mid-turn and left the composer empty
+```
+
+The strengthened guard passed every step on 2026-10-09 against omp 18.8.1 on Herdr 0.9.3, with the native Herdr integration installed in a disposable agent home and a scripted local model executing the real tools and drain acknowledgements.
+
+The earlier guard run with the extension as it stood before this change stopped at the stranded-wake step:
+
+```text
+ok - live omp idle wake: omp (omp/18.8.1) on herdr 0.9.1 started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent
+not ok - omp (omp/18.8.1) on herdr 0.9.1: wake text left unsent in an idle composer was never delivered
+```
+
+The guard has no live step for the wait on a queue that never drains; `tests/fm-omp-harness.test.sh` covers it with a fake omp API.
+Additional isolated live validation on 2026-10-09, with omp 18.8.1 on Herdr 0.9.3 and a scripted local model, reproduced this state through real omp APIs: Escape restored a tracked wake beside a draft, a non-turn-triggering custom message supplied the context tail, and an explicit follow-up remained queued while omp reported idle.
+After the bounded wait, the extension submitted the wake alone, omp consumed the queued follow-up, and the editor retained exactly the unsent draft.
+The before-change extension also reproduced the stranded older-wiring wake: it remained above the draft until the live check timed out; the changed extension delivered it and left exactly the draft.
+
+### 2026-10-09 omp fallback chain
+
+Verified on 2026-10-09 on macOS arm64 against omp 18.8.7, with the built-in `openai-codex` and `deepseek` providers pointed at scripted local servers through an isolated agent directory's `models.yml`, so no model tokens were spent.
+The agent directory's `config.yml` carries the operator's Sol chain as it stands, `openai-codex/gpt-6.1-sol` to `deepseek/deepseek-v4-pro`, and one other chain, `deepseek/deepseek-v4-pro` to a lab-only route.
+The guard drives `omp -p` with the tracked session overlay `.omp/fm-session-overlay.yml`, the overlay every Firstmate-launched omp session carries.
+
+- **The incident reproduces without the overlay.**
+  With the primary refusing, the global chain moved the session on to the weak model, which answered.
+  That is how a lane recorded on Sol ended on `deepseek-v4-flash` on 2026-10-09: the primary hit its usage limit, then the equal refused for credits.
+- **The overlay empties the Sol chain.**
+  With the overlay, the weak model received no request, the run exited non-zero with the primary's rate-limit error, and the live-model record named the recorded model and carried the error.
+  omp merges `--config` overlays key by key and replaces an array whole, so the overlay's empty Sol entry replaced the global Sol chain and left every other chain alone: with the overlay, a session on the other chain's model still moved to that chain's route when its model refused.
+  Fleet agents run on no OpenRouter route, so the equal is not a chain hop; a stand-in is chosen at dispatch or relaunch.
+- **omp returns to the recorded model by itself.**
+  `retry.fallbackRevertPolicy: cooldown-expiry` restores the original selector at the next prompt once its suppression window ends; it never steps back to an intermediate route, and a primary that is out of quota for days stays suppressed for days.
+  The guard layers a lab-only chain after the tracked overlay (a later `--config` wins) so a fallback can happen at all.
+  A refusal classed as a concurrency limit is suppressed for 5 seconds, so the guard's second prompt ran on the primary again and the record followed.
+  The overlay pins the policy, because a global `never` left the same session on its fallback in the control run.
+- **A provider's own short `retry-after` never reaches the chain.**
+  A 429 whose `retry-after` is a few seconds is waited out inside the provider call, so the session retries the same model and no fallback happens; only a refusal that surfaces to omp's retry layer, such as a long usage limit or a 402, moves a session.
+
+`bin/fm-crew-state.sh` reads the live-model record (`bin/fm-omp-live-model.ts`) and adds `model-drift` and `run-error` components, so a session that moved or stopped is visible rather than silent.
+The guard refreshes this entry after any omp upgrade and spends no tokens, so it runs wherever omp and python3 are installed:
+
+```sh
+FM_OMP_FALLBACK_LIVE=1 tests/fm-omp-fallback-chain-live-e2e.test.sh
+```
+
+```text
+ok - omp (omp/18.8.7): control - the global Sol chain alone still falls to the weak model
+ok - omp (omp/18.8.7): the overlay empties the Sol chain, the run stops with the provider error, and the record carries it
+ok - omp (omp/18.8.7): the overlay leaves another model's global chain in place
+ok - omp (omp/18.8.7): with the overlay a fallen-back session returns to its recorded model at the next prompt even under a global fallbackRevertPolicy: never
+ok - omp (omp/18.8.7): control - without the overlay a global fallbackRevertPolicy: never keeps the session on the fallback
 ```
 
 ## Steering-inbox doorbell
@@ -1394,7 +1482,7 @@ ok - muse (Muse Code 0.2.1 (0.2.1-R1215.1)): the doorbell reached a real worker,
 
 All six installed harnesses honored the doorbell contract with real model turns: each listed the inbox named by the doorbell, read its record, executed the instruction inside it, and acknowledged with the atomic `mv`.
 Two findings from the run shaped the shipped behavior: an OpenCode vendor update modal swallowed the first doorbell and the single re-ring recovered it, which is exactly the watcher ladder's job; and grok 1.0.5's idle composer never classifies `empty` (a classifier drift owned by the [Composer classification matrix](#composer-classification-matrix) guard, whose refresh for grok 1.0.5 is still owed), which motivated the ring's advisory pre-check not to skip on ambiguity - a doorbell into an ambiguous composer is a recoverable constant line, while skipping on ambiguity would starve steering for any harness the classifier cannot positively identify.
-The current pending-composer ring contract is owned by `bin/fm-task-inbox-lib.sh`.
+The [inbox ring owner](../../bin/fm-task-inbox-lib.sh) defines the current advisory pre-check, draft-risk deferral, and own-doorbell retry contract.
 Kimi was not installed on the verification machine; its receive path is the same one-line-plus-shell contract, and the portable ladder and enqueue regressions in `tests/fm-task-inbox.test.sh` and `tests/fm-send-inbox.test.sh` cover every harness-independent half.
 This guard is the refresh command after any harness upgrade; it spends a small number of real tokens per installed harness, reports an absent harness explicitly, and refuses a run that verified nothing.
 
@@ -1415,6 +1503,10 @@ ok - opencode (1.18.33): the doorbell reached a real worker, which acted and ack
 
 OpenCode needed `FM_SEND_INBOX_LIVE_TIMEOUT=560` because its configured model was still mid-turn at the default 240 seconds.
 Pi 0.87.1 was installed but not verified: its configured model returned an account error (`The 'gpt-5.6-sol' model is not supported when using Codex with a ChatGPT account`) before it read the inbox.
+
+Portable draft-risk coverage lives in `tests/fm-composer-lib.test.sh`, `tests/fm-composer-native-band.test.sh`, `tests/fm-composer-native-continuation.test.sh`, and `tests/fm-composer-native-idle-hint.test.sh`.
+`tests/fm-send-inbox.test.sh`, `tests/fm-task-inbox.test.sh`, `tests/fm-tmux-submit-busy.test.sh`, and `tests/fm-wake-queue.test.sh` cover consumer deferral, retained drafts, ordinary unknown-idle rings, and parent alerts.
+These portable checks do not renew the live-harness evidence above.
 
 ## Waiting-worker command ceilings
 
@@ -2371,14 +2463,14 @@ ok - real herdr: a stale registration no longer blocks relaunch, and the endpoin
 ok - real herdr: an agent that does not stop fails closed instead of being reported as stopped
 ```
 
-The registry read through `herdr pane report-agent` is the same source `fm_backend_herdr_agent_state` classifies, and since 2026-09-10 that registration counts as an agent only while `pane process-info` shows a harness process behind it, so the guard backs the registration with a real process named like a harness (a symlink to `sleep`) and then stops that process, with no real harness launched.
+The lifecycle guard backs its synthetic registration with an inert Python interpreter symlinked as `claude` and launched with the recorded `FM_SPAWN_GEN`, then stops that process without launching a real harness.
 That command is the guard that refreshes this record; run it after every Herdr upgrade rather than trusting the version above.
 
 For Pi on Herdr 0.9.0, `herdr agent get` reflects whether the agent process remains live; its registration does not persist merely because the pane and parent shell do.
 A Pi launched as a child of the pane shell (not via `exec`) that then `/quit`s or is SIGKILL'd leaves the pane and shell in place, and `agent get` returns `agent_not_found`.
 A sibling live idle Pi stays `agent=pi` with `agent_status=idle`.
-`fm_backend_herdr_pane_agent_state` maps that `agent_not_found` leftover shell to `no-agent` and `fm_backend_herdr_agent_state` maps it to `dead` (relaunch-allowed), while the live idle pane stays `alive`.
-`herdr pane get` `.agent_status` can still read `idle` after the occupant is gone; liveness is `agent get`, never that pane field.
+The [process-backed liveness contract](../herdr-backend.md#stale-agent-registrations) owns how those registered and unregistered panes are classified now.
+The historical `herdr pane get` `.agent_status` could still read `idle` after the occupant was gone, so that field alone never established liveness.
 
 ```sh
 tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh
@@ -2545,6 +2637,78 @@ poll 8: {"agent_status":"working","session":".../2026-09-21T14-10-08-776Z_01a0c4
 ```
 
 The read that supplies the reference is `bin/backends/herdr.sh`'s `fm_backend_herdr_pane_agent_session_ref`, the per-harness rule is `bin/fm-control-lib.sh`'s `fm_control_relaunch_resume_flag`, and the launch argument is composed by `relaunch_resume_args` in `bin/fm-spawn.sh`; `docs/herdr-backend.md` "Agent status authority and relaunch" owns the contract. Nothing here changes `resume` as a control verb, and only a relaunch asks for it.
+
+### Native omp default-band composer
+
+The [live task-attribution contract](../agent-control.md#live-herdr-task-attribution) owns lifecycle authorization independently of composer classification.
+
+Measured 2026-10-06 on macOS aarch64 with omp 18.6.3 in a fresh guarded, named non-default Herdr lab.
+The shared classifier recognized the native status-band header and adjacent `╰─` input row without a Firstmate composer overlay.
+Actual empty captures classified `empty` and extracted no draft; unsubmitted `!git diff` classified `pending`, extracted completely, and ordinary exit refused without changing the screen or recorded task identity.
+An unsubmitted multiline draft containing literal borders, status-shaped text, and a pasted band remained pending and fully extractable, including cursor-on-root and cursor-on-continuation checks.
+These public-API checks passed in both default-locale and fresh `LC_ALL=C` Bash processes.
+No model input was submitted, and guarded lab teardown succeeded.
+The saved actual renderer captures and focused portable checks are refreshed with `bash tests/fm-composer-native-band.test.sh` and `LC_ALL=C bash tests/fm-composer-native-band.test.sh`; these checks do not themselves launch the live lab.
+
+### Bare native omp restoration and managed recovery
+
+The [live task-attribution contract](../agent-control.md#live-herdr-task-attribution) owns the current inspection-only boundary.
+Older native-restored lifecycle-success measurements do not authorize recovery under that boundary.
+
+#### Captured renderer evidence
+
+The compact composer fixtures in `tests/fixtures/omp-bordered-{empty,pending}.ansi` were captured from real omp 18.6.0 in a guarded named Herdr lab.
+The native-band fixtures were measured on 2026-10-06 with omp 18.6.3 on macOS aarch64; the preceding [default-band record](#native-omp-default-band-composer) owns those observations.
+Real omp 18.6.1 borderless captures established the two-space continuation gutter for quote, heading, and pasted-frame input.
+The renderer's [editor layout](https://github.com/can1357/oh-my-pi/blob/v18.6.1/packages/tui/src/components/editor.ts#L2557-L2587) and [borderless style](https://github.com/can1357/oh-my-pi/blob/v18.6.1/packages/tui/src/components/composer/borderless.ts) corroborate that geometry.
+Unsubmitted `preface\n\n╭── π > model > path ─╮\n│ │\n╰─  ─╯` and its `> quote` / trailing `❯ ` variants demonstrated that a pasted frame can resemble an empty composer inside a draft.
+The historical classifier refused those ambiguous captures and content extraction returned status 1 without output; the shared classifier's current verdict contract, including `unknown-draft`, is owned by [`bin/fm-composer-lib.sh`](../../bin/fm-composer-lib.sh).
+`tests/fm-composer-native-continuation.test.sh` covers quote and heading continuations, literal borders, blank boundaries, status-shaped rows, cursor and cursorless selection, normalized extraction, and both UTF-8 and `LC_ALL=C`.
+`tests/fm-composer-native-band.test.sh` covers owned blank and braille continuations and unproven-gutter refusal.
+`tests/fm-composer-lib.test.sh` covers braille gutter blockers and captured roots, enclosing Pi ownership, and standalone boxed composers.
+These captured-frame regressions do not themselves launch a live harness.
+
+#### Current native-restoration guard
+
+```sh
+FM_OMP_REBOOT_LIVE=1 HERDR_LAB_HELPER=bin/fm-herdr-lab.sh \
+  bash bin/fm-test-run.sh tests/fm-launch-proof.test.sh tests/fm-omp-reboot-live-e2e.test.sh
+```
+
+The live guard starts actual `omp --resume=<ref>` task and local-secondmate processes in a guarded named Herdr lab.
+Its native session fixtures contain a valid header and an initial user message encoded by the public Firstmate launch-brief encoder.
+It exercises the native restore command, not a host reboot, and submits no model request.
+The private boxed-composer profile, built-in model, and fixture-only placeholder key allow rendering without operator settings or credentials.
+All Herdr calls, including production-adapter calls, pass through the session-pinning lab helper.
+The native processes use private HOME and XDG roots, config and agent directories, and profile selectors; Firstmate's state, data, config, and projects overrides point at the private fixture home.
+The guard checks that unmanaged task and secondmate agents remain unchanged for empty, prose, `!git diff`, and `$ print(1)` composers across interrupt, exit, relaunch, direct launch inspection, and reboot sweeps.
+Before snapshotting the native screen, the guard waits for the encoded launch brief to render and the resumed transcript to settle; an idle composer alone can precede that startup replay.
+Preservation assertions cover live PID, screen, busy generation/state, task metadata and instructions, recorded profile, charter and child records, branch, HEAD, and dirty work.
+The [destructive lab safety contract](../herdr-backend.md#destructive-lab-safety) owns teardown-gated dependency cleanup and the default-session tripwire.
+This guard does not modify remote secondmates, unrelated panes, shared worktree pools, or global Herdr configuration.
+
+#### Recorded-task attribution
+
+`tests/fm-launch-proof.test.sh` covers matching and missing kernel environment pins, versioned and legacy records, foreground ancestry, shells and helpers, interpreter-based harnesses, and rejection of argv, cwd, and initial-message shortcuts.
+Its kernel-environment probes are identity-registered and remain alive until cleanup, rather than expiring while a slow host is still reading them.
+Its `test_launch_proof_pinned_personal_switch` case changes only the active session proof and verifies that a same-PID personal-session switch loses managed authority.
+`test_reboot_recovery_inspects_without_native_attribution` in `tests/fm-control-relaunch.test.sh` covers inspection without lifecycle input or task-record mutation.
+`tests/fm-omp-harness.test.sh` covers activation, cancelled and rolled-back transitions, shutdown, and child-event preservation with both minimum-runtime and newer context shapes.
+Profile and raw-shell launch regressions assert successful execution with unrelated missing or unlisted defaults and preserved shell effects; they do not require zero harness calls, because the supported-version preflight may invoke `omp --version` before launch.
+The token-free installed-runtime refresh for the production proof extension is:
+
+```sh
+FM_OMP_TASK_SESSION_LIVE=1 bash tests/fm-omp-task-session-live-e2e.test.sh
+```
+
+The RPC refresh drains complete frames directly from the stdout file descriptor, including frames coalesced into one read, and allows the same 90-second cold-start bound as control-plane relaunch.
+
+For focused real-native cleanup proof without the lifecycle matrix:
+
+```sh
+FM_OMP_REBOOT_LIVE=1 FM_OMP_REBOOT_CLEANUP_SMOKE=1 \
+  bash tests/fm-omp-reboot-live-e2e.test.sh
+```
 
 ### Away-mode transport
 
@@ -3168,6 +3332,40 @@ Under the captain's `unicode` symbol preset the idle screen through Herdr was a 
 Before the status-row rule the shared classifier folded that row into the bare composer's wrap region and read the idle pane `pending`, so `bin/fm-send.sh` skipped its doorbell on the first live omp worker.
 After the rule, the same live Herdr capture read `empty`, a steer's doorbell landed, and the worker opened a turn on it.
 `tests/fm-composer-lib.test.sh` pins the unicode idle row, the nerd-preset idle row, the busy spinner row, and typed text over the same fixture in both locales.
+
+The saved omp 18.8.1 default-band capture in
+`tests/fixtures/omp-native-band-18.8.1-empty.ansi` includes the expanded meter
+`▶─0.2%─────────────────────────────╎─┃─────1M─` and bright effort keys with dim
+hint text. Replaying that capture through the public composer APIs proves
+`empty` with no extracted draft when styling is available; without styling,
+the hint remains input risk (`unknown`). `bash tests/fm-composer-native-band.test.sh`
+also checks that bright typed hints and pasted band frames remain drafts.
+This captured-screen regression does not itself rerun the live managed-worker exit.
+
+#### Owned frame status substrings (2026-10-06)
+
+On macOS arm64 with omp 18.6.3 and Herdr 0.9.1 (protocol 22), four separate real omp panes in a guarded named lab exercised the native borderless composer without submitting model input.
+Bracketed paste inserted a leading newline and a literal frame whose header, body, or floor contained `· 15.4%/272K`; the fourth pane remained untouched.
+Visible ANSI captures were classified and extracted with the shared public interfaces in both `LC_ALL=C` and `LC_ALL=en_US.UTF-8`:
+
+```bash
+source bin/fm-composer-lib.sh
+caps=$'styled=1\ncursor=0\nidentity=0\nrows=20'
+fm_composer_classify_screen "$caps" "$screen"
+fm_composer_extract_selected_content "$caps" "$screen"
+```
+
+The actual named-pane backend interfaces, `fm_backend_herdr_composer_state` and `fm_backend_herdr_composer_content`, returned the same results:
+
+| Actual input | State | Complete extracted content |
+| --- | --- | --- |
+| Untouched composer | `empty` | Empty |
+| Status substring in header | `pending` | `╭── π > model > path · 15.4%/272K ─╮ ╰─ ─╯` |
+| Status substring in body | `pending` | `╭── π > model > path ─╮ │ text · 15.4%/272K │ ╰─ ─╯` |
+| Status substring in floor | `pending` | `╭── π > model > path ─╮ ╰─ text · 15.4%/272K ─╯` |
+
+The real unowned status footer was excluded in every extraction, including the empty control.
+`bash tests/fm-composer-native-continuation.test.sh` contains the focused portable ownership regressions; repeating the named-lab capture with actual unsubmitted input refreshes this renderer evidence.
 
 ### Busy state and lifecycle
 

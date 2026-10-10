@@ -23,6 +23,10 @@ A relaunch admission refusal is not a failed launch; reconcile it through the [i
 Load `harness-adapters` before a resume command or a harness-specific skill invocation, and whenever the adapter's own quirks matter.
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 
+For a live Herdr agent restored after reboot, follow the [native-restoration inspection contract](../../../docs/agent-control.md#inspecting-a-bare-native-restore): leave an unmanaged agent untouched and report the alert rather than treating its live pane as a dead endpoint.
+A legacy record reported as `legacy record; exit and relaunch are allowed` is not unmanaged: stop or replace it through `bin/fm-control.sh` like any proven worker.
+An unmanaged agent, unknown composer, unreadable proof, or pending draft is a refusal requiring investigation, never permission to clear input or kill the pane.
+
 ## Session-start reconciliation for a dead ordinary direct report
 
 This procedure covers ordinary `kind=ship` and `kind=scout` direct reports.
@@ -39,8 +43,7 @@ When no authoritative run accounts for the task, inspect only its recorded backe
 Use `treehouse status` for treehouse-backed tmux, herdr, zellij, or cmux tasks, and use the recorded `orca_worktree_id=` and `terminal=` for Orca tasks.
 Do not sweep another home's endpoints or infer ownership from a matching window label.
 
-Before relaunch, prove that no live agent still owns the recorded task and that the existing worktree remains available.
-Preserve its uncommitted changes and commits, keep the same task identity, and relaunch the recorded harness when admission permits, following the [transactional relaunch contract](../../../docs/agent-control.md#transactional-relaunch) in that existing worktree with the same brief plus a concise progress note.
+Follow the [transactional relaunch contract](../../../docs/agent-control.md#transactional-relaunch) for recovery in the recorded copy, or its [missing-worktree relocation procedure](../../../docs/agent-control.md#relocating-a-task-whose-worktree-is-gone) when that copy is gone.
 For a missing endpoint, follow the [control plane's reclaim policy](../../../docs/agent-control.md#reclaiming-a-task-whose-endpoint-is-gone) rather than inferring absence from the backend classifier.
 Do not work around a reclaim refusal by respawning: an endpoint whose absence is unproven may still hold a live agent in that worktree.
 That reclaim is the owning home's operation only, and a secondmate is the one exception: recover it through `bin/fm-spawn.sh <id> --secondmate` as above.

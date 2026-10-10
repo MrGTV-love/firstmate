@@ -491,6 +491,18 @@ case "${1:-} ${2:-}" in
       exit 1
     fi
     ;;
+  "pane process-info")
+    # The old pane is a bare shell husk: process evidence, not only the missing
+    # agent registration, is what licenses calling its endpoint dead.
+    if [ "${4:-}" = p-old ] && [ ! -e "$killed" ]; then
+      husk_pid=$(cat "${state}.huskpid")
+      printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"p-old","shell_pid":%s,"foreground_process_group_id":%s,"foreground_processes":[{"pid":%s,"name":"zsh","argv0":"zsh","argv":["-zsh"],"cmdline":"-zsh"}]}}}\n' \
+        "$husk_pid" "$husk_pid" "$husk_pid"
+    else
+      printf '%s\n' '{"error":{"code":"pane_not_found"}}' >&2
+      exit 1
+    fi
+    ;;
   "pane close")
     [ "${3:-}" = p-old ] && : > "$killed"
     ;;
@@ -657,7 +669,7 @@ run_session_start_secondmate() {
 }
 
 prepare_session_start_herdr_secondmate() {
-  local name=$1 rec root home fakebin w mate log state id=$SESSION_START_HERDR_SECOND_MATE_ID
+  local name=$1 rec root home fakebin w mate log state husk_pid id=$SESSION_START_HERDR_SECOND_MATE_ID
   rec=$(new_world "$name")
   IFS='|' read -r root home fakebin <<EOF
 $rec
@@ -693,6 +705,14 @@ EOF
   fm_fake_exit0 "$fakebin" pi
   make_fake_herdr_secondmate_recovery "$fakebin"
   : > "$log"
+  # An idle process stands in for the husk pane's lone shell, so the pane's
+  # process evidence names a pid that really exists and has no children.
+  sleep 600 >/dev/null 2>&1 &
+  husk_pid=$!
+  printf '%s\n' "$husk_pid" > "$state.huskpid"
+  fm_test_record_process "$state.husk-process" "$husk_pid" \
+    || fail "could not record the Herdr husk fixture identity"
+  fm_test_track_process "$state.husk-process" "sleep 600"
   printf '%s|%s|%s|%s|%s|%s\n' "$root" "$home" "$fakebin" "$mate" "$log" "$state"
 }
 
@@ -700,7 +720,7 @@ run_session_start_herdr_secondmate() {
   local root=$1 home=$2 fakebin=$3 mate=$4 log=$5 state=$6
   FM_BACKEND=herdr FM_FAKE_HERDR_LOG="$log" FM_FAKE_HERDR_STATE="$state" \
     FM_FAKE_SECOND_MATE_ID="$SESSION_START_HERDR_SECOND_MATE_ID" \
-    FM_FAKE_HARNESS_PID=$$ \
+    FM_FAKE_HARNESS_PID=$$ FM_HERDR_PS_BIN=/bin/ps \
     run_session_start "$home" "$root" "$fakebin:$BASE_PATH"
 }
 
@@ -1168,7 +1188,7 @@ EOF
     make_fake_toolchain "$fakebin"
     make_fake_ps_claude "$fakebin"
     rm -f "$fakebin/tmux"
-    fm_fake_exit0 "$fakebin" herdr jq
+    fm_fake_exit0 "$fakebin" herdr jq python3
     printf '%s\n' manual > "$home/config/backlog-backend"
     mask="$home/mask-tmux.bash"
     cat > "$mask" <<'SH'
@@ -1193,6 +1213,7 @@ SH
     assert_not_contains "$out" "MISSING: tmux" "Herdr session start falsely required masked tmux"
     assert_not_contains "$out" "MISSING: herdr" "Herdr session start missed its available session CLI"
     assert_not_contains "$out" "MISSING: jq" "Herdr session start missed its available JSON dependency"
+    assert_not_contains "$out" "MISSING: python3" "Herdr session start missed its available ownership dependency"
     assert_not_contains "$out" "MISSING: treehouse" "Herdr session start missed its available worktree provider"
   done
   pass "session start: configured and auto-detected Herdr homes never require tmux"
@@ -1428,6 +1449,9 @@ EOF
   run_session_start_herdr_secondmate "$root" "$home" "$fakebin" "$mate" "$log" "$state" >/dev/null
   wait_for_network_stage "$home" "$root" || fail "the deferred network stage never published"
 
+  if fm_test_process_alive "$state.husk-process" "sleep 600"; then
+    kill "$FM_TEST_PROCESS_PID" 2>/dev/null || true
+  fi
   out=$(network_stage_report "$home" "$root")
   assert_not_contains "$out" "SECONDMATE_LIVENESS:" "successful Herdr husk recovery should stay non-actionable"
   assert_contains "$(cat "$log")" "pane close p-old" "session start did not close the confirmed Herdr husk"
@@ -1999,7 +2023,7 @@ EOF
   assert_contains "$out" "SESSION START" "the digest did not complete"
   assert_contains "$out" "IN PROGRESS - the deferred network checks have not finished yet." \
     "the digest did not disclose that its network checks were still running"
-  assert_contains "$out" "NOT yet confirmed: GitHub authentication, dead-secondmate relaunch" \
+  assert_contains "$out" "NOT yet confirmed: GitHub authentication, recorded Herdr launch recovery, dead-secondmate relaunch" \
     "the digest did not name the checks it has not confirmed"
   assert_not_contains "$out" "NEEDS_GH_AUTH" \
     "the digest reported a GitHub-auth verdict it could not yet have"

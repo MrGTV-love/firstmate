@@ -879,6 +879,10 @@ SH
 # exits on a later check's wake without the poll's result.
 run_watcher_bounded() {
   local home=$1 fakebin=$2 check_interval=${FM_TEST_CHECK_INTERVAL:-0} watch_root=${FM_TEST_WATCH_ROOT:-$ROOT}
+  # PR arming also registers the contributions observer. Its separate suite owns
+  # that poll; retire it before this watcher can exit on an unrelated wake.
+  FM_HOME="$home" "$ROOT/bin/fm-check-unregister.sh" contributions >/dev/null \
+    || fail "could not retire the contributions observer"
   local check_timeout_env=(-u FM_CHECK_TIMEOUT)
   [ -z "${FM_TEST_CHECK_TIMEOUT:-}" ] || check_timeout_env=("FM_CHECK_TIMEOUT=$FM_TEST_CHECK_TIMEOUT")
   shift 2
@@ -2460,6 +2464,11 @@ test_persistent_secondmate_retirement_is_poll_only() {
     'pr_head=0123456789abcdef0123456789abcdef01234567'
   mkdir -p "$dir/secondmate-home"
   printf 'working: persistent endpoint remains healthy\n' > "$state/domain.status"
+  # The watcher delivers an unread status signal ahead of any check, so mark
+  # this one read: the poll's retirement is then what the cycle exercises.
+  FM_STATE_OVERRIDE="$state" bash -c '. "$1"; fm_wake_status_mark_current "$2" "$3"' \
+    _ "$ROOT/bin/fm-wake-lib.sh" "$state" "$state/domain.status" \
+    || fail "could not mark the secondmate status read"
   printf -- '- domain | scope: test | home: %s\n' "$dir/secondmate-home" > "$dir/home/data/secondmates.md"
   printf 'endpoint-alive\n' > "$dir/endpoint-sentinel"
   meta_before=$(shasum -a 256 "$state/domain.meta")
@@ -2852,19 +2861,8 @@ merged_ledger_row() {  # <state> <task-id>
     'index($5, prefix) == 1 { print $5 }' "$1/.wake-queue"
 }
 
-# Arming also registers the contributions observer, whose poll runs a full fleet
-# snapshot on every watcher check cycle. No case here exercises it (its own
-# suite does), so a case retires it before a bounded merged-poll run instead of
-# charging that work to the run's hang guard. Only ever call this while no
-# watcher runs, because a check removed mid-cycle is reported as rejected.
-retire_contributions_observer() {  # <dir>
-  FM_HOME="$1/home" "$ROOT/bin/fm-check-unregister.sh" contributions >/dev/null \
-    || fail "could not retire the contributions observer"
-}
-
 run_merged_poll_cycle() {  # <dir>
   local dir=$1 rc=0
-  retire_contributions_observer "$dir"
   add_stop_custom_check "$dir"
   set +e
   FM_TEST_GH_STATE=MERGED run_watcher_bounded "$dir/home" "$dir/fakebin" \
@@ -3089,7 +3087,6 @@ case " $* " in
 esac
 SH
   chmod +x "$dir/fakebin/mv"
-  retire_contributions_observer "$dir"
   add_stop_custom_check "$dir"
   set +e
   FM_TEST_REAL_MV="$REAL_MV" FM_TEST_REPLACEMENT_RAN="$dir/replacement-ran" \

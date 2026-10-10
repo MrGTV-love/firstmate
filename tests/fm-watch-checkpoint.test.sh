@@ -66,6 +66,116 @@ SH
   pass "checkpoint preserves watcher environment for registered custom checks"
 }
 
+test_due_checks_precede_repeated_unmanaged_recovery() {
+  local home bin file status cycle drained notice expected_checks='' expected_recoveries=''
+  local sequence generation
+  local -a fixture_env
+  home=$(make_home recovery-order)
+  bin="$home/root/bin"
+  mkdir -p "$bin" "$home/tools" "$home/tmp" "$home/runtime"
+  chmod 0700 "$home/runtime"
+  for file in "$ROOT/bin/"*; do
+    [ "${file##*/}" != fm-reboot-recover.sh ] || continue
+    ln -s "$file" "$bin/${file##*/}"
+  done
+  cat > "$bin/fm-reboot-recover.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_HOME/recovery-calls"
+printf 'REBOOT_RECOVERY: restored: live launch is unmanaged; no lifecycle action taken\n'
+SH
+  cat > "$home/tools/herdr" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  "status --json"*)
+    printf '{"server":{"running":true},"client":{"protocol":16,"version":"0.9.0"}}\n'
+    ;;
+  "pane get "*)
+    printf '{"error":{"code":"pane_not_found"}}\n'
+    exit 1
+    ;;
+  *) exit 1 ;;
+esac
+SH
+  cat > "$home/state/due-check.check.sh" <<'SH'
+#!/usr/bin/env bash
+printf 'due-check\n' >> "$FM_HOME/check-calls"
+printf 'due-check result: ordinary supervision progressed\n'
+SH
+  chmod 0700 "$bin/fm-reboot-recover.sh" "$home/tools/herdr" "$home/state/due-check.check.sh"
+  fixture_env=(env -i "PATH=$home/tools:$PATH" "HOME=$home" "TMPDIR=$home/tmp"
+    "XDG_CONFIG_HOME=$home/config" "XDG_DATA_HOME=$home/data" "XDG_STATE_HOME=$home/state"
+    "XDG_CACHE_HOME=$home/cache" "XDG_RUNTIME_DIR=$home/runtime"
+    "FM_HOME=$home" "FM_ROOT_OVERRIDE=$home/root" "FM_STATE_OVERRIDE=$home/state"
+    "FM_CONFIG_OVERRIDE=$home/config" "FM_PROCEVENT_CLAIM_ROOT=$home/procevent-claims"
+    FM_GATE_REFUSE_BYPASS=1 FM_TEST_SEAM=1 FM_OPEN_LOOPS_BIN=/usr/bin/true
+    FM_POLL=1 FM_SIGNAL_GRACE=1 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999
+    FM_HEARTBEAT_MAX=999999 FM_HOME_SUMMARY_INTERVAL=999999)
+  fm_write_meta "$home/state/restored.meta" "backend=herdr" "kind=ship" \
+    "window=checkpoint-fixture:pane-absent" "worktree=$home"
+  : > "$home/check-calls"
+  : > "$home/recovery-calls"
+  touch "$home/state/home-summary.json" "$home/state/.last-heartbeat"
+  "${fixture_env[@]}" "$bin/fm-check-register.sh" due-check >/dev/null \
+    || fail "could not register recovery-order custom check"
+  notice='REBOOT_RECOVERY: restored: live launch is unmanaged; no lifecycle action taken'
+  for cycle in 1 2; do
+    touch -t 200001010000 "$home/state/.last-check" "$home/state/.reboot-recovery-tick"
+    status=0
+    "${fixture_env[@]}" "$bin/fm-watch-checkpoint.sh" --seconds 8 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+    expect_code 0 "$status" "due check checkpoint exit, cycle $cycle"
+    expected_checks="${expected_checks:+$expected_checks$'\n'}due-check"
+    assert_equals "$expected_checks" "$(cat "$home/check-calls")" "due check did not execute, cycle $cycle"
+    assert_contains "$(cat "$home/out.txt")" "due-check result: ordinary supervision progressed" \
+      "due check result was not surfaced, cycle $cycle"
+    assert_not_contains "$(cat "$home/out.txt")" "$notice" "recovery notice preceded due check, cycle $cycle"
+    assert_equals "$expected_recoveries" "$(cat "$home/recovery-calls")" \
+      "recovery ran before due check, cycle $cycle"
+    drained=$("${fixture_env[@]}" "$bin/fm-wake-drain.sh" 2>"$home/drain.err")
+    assert_contains "$drained" $'\tcheck\t'"$home/state/due-check.check.sh"$'\t' \
+      "due check wake was not queued durably, cycle $cycle"
+    assert_contains "$drained" "due-check result: ordinary supervision progressed" \
+      "durable due check wake lost its result, cycle $cycle"
+    assert_not_contains "$drained" "$notice" "recovery was queued before due check, cycle $cycle"
+    sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$home/drain.err")
+    generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$home/drain.err")
+    [ -n "$sequence" ] && [ -n "$generation" ] || fail "due check drain omitted acknowledgement token, cycle $cycle"
+    "${fixture_env[@]}" "$bin/fm-wake-drain.sh" --ack-through "$sequence" --recovery-generation "$generation" \
+      >"$home/ack.out" 2>"$home/ack.err" || fail "could not acknowledge due check wake, cycle $cycle"
+
+    touch "$home/state/.last-check"
+    touch -t 200001010000 "$home/state/.reboot-recovery-tick"
+    status=0
+    "${fixture_env[@]}" "$bin/fm-watch-checkpoint.sh" --seconds 8 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+    expect_code 0 "$status" "unmanaged recovery checkpoint exit, cycle $cycle"
+    expected_recoveries="${expected_recoveries:+$expected_recoveries$'\n'}recover --one"
+    assert_equals "$expected_recoveries" "$(cat "$home/recovery-calls")" \
+      "recovery did not receive recover --one, cycle $cycle"
+    assert_equals "$expected_checks" "$(cat "$home/check-calls")" "quiet check executed again, cycle $cycle"
+    assert_contains "$(cat "$home/out.txt")" "check: Herdr reboot launch recovery: $notice" \
+      "unmanaged recovery notice was not surfaced, cycle $cycle"
+    drained=$("${fixture_env[@]}" "$bin/fm-wake-drain.sh" 2>"$home/drain.err")
+    assert_contains "$drained" $'\tcheck\treboot-launch-recovery-' \
+      "recovery wake was not queued durably, cycle $cycle"
+    assert_contains "$drained" "check: Herdr reboot launch recovery: $notice" \
+      "durable recovery wake lost its payload, cycle $cycle"
+    sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$home/drain.err")
+    generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$home/drain.err")
+    [ -n "$sequence" ] && [ -n "$generation" ] || fail "recovery drain omitted acknowledgement token, cycle $cycle"
+    "${fixture_env[@]}" "$bin/fm-wake-drain.sh" --ack-through "$sequence" --recovery-generation "$generation" \
+      >"$home/ack.out" 2>"$home/ack.err" || fail "could not acknowledge recovery wake, cycle $cycle"
+  done
+  status=0
+  "${fixture_env[@]}" "$bin/fm-watch-checkpoint.sh" --seconds 2 >"$home/out.txt" 2>"$home/err.txt" || status=$?
+  expect_code 124 "$status" "immediate recovery rearm respects cooldown"
+  assert_contains "$(cat "$home/out.txt")" "checkpoint: no actionable wake within 2s" \
+    "recovery cooldown checkpoint was not quiet"
+  assert_equals "$expected_recoveries" "$(cat "$home/recovery-calls")" "recovery ran again during cooldown"
+  assert_equals "$expected_checks" "$(cat "$home/check-calls")" "quiet check ran during recovery cooldown"
+  drained=$("${fixture_env[@]}" "$bin/fm-wake-drain.sh" 2>"$home/drain.err")
+  assert_equals "" "$drained" "recovery cooldown published another wake"
+  pass "checkpoint: due checks progress before repeated unmanaged recovery, whose durable notice and cooldown survive"
+}
+
 test_existing_singleton_watcher_is_not_success() {
   local home out err status
   home=$(make_home singleton)
@@ -199,6 +309,7 @@ test_real_host_checkpoint_ends_quietly_at_its_bound() {
 test_quiet_checkpoint_exits_124_cleanly
 test_signal_passes_through_and_exits_zero
 test_registered_check_uses_preserved_watcher_environment
+test_due_checks_precede_repeated_unmanaged_recovery
 test_existing_singleton_watcher_is_not_success
 test_host_checkpoint_bounds_the_park_by_posture
 test_host_checkpoint_passes_a_handback_and_reports_a_stand_down

@@ -180,8 +180,8 @@ The registered hook timeouts sit above that budget, so the harness never preempt
 The deferred startup stage deliberately runs in its own process group under its own deadline.
 So a truncated digest does neither of these:
 
-- Kill the network checks and inactive-outcome scan it was not waiting for.
-- Orphan unbounded network work.
+- Kill the deferred work it was not waiting for; the [`bin/fm-startup-network.sh` header](../bin/fm-startup-network.sh) owns that stage's membership.
+- Orphan unbounded deferred work.
 
 ## Shared wrapper and safety
 

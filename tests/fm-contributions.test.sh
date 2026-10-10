@@ -130,23 +130,24 @@ case "$*" in
        merged_at:(if $state == "merged" then "2026-09-16T07:00:00Z" else null end)}' ;;
   'api repos/o/r/issues/9')
     jq -n --slurpfile labels "$FORGE/labels.json" '{state:"open",user:{login:"author"},labels:$labels[0]}' ;;
-  'api repos/o/r/issues/'*'/events?'*) jq -s . "$FORGE/events.json" ;;
-  'api repos/o/r/issues/'*'/comments?'*) jq -s . "$FORGE/comments.json" ;;
-  'api repos/o/r/pulls/'*'/reviews?'*) jq -s . "$FORGE/reviews.json" ;;
-  'api repos/o/r/pulls/'*'/comments?'*) jq -s . "$FORGE/inline.json" ;;
+  'api repos/o/r/issues/'*'/events?'*) jq -c . "$FORGE/events.json" ;;
+  'api repos/o/r/issues/'*'/comments?'*) jq -c . "$FORGE/comments.json" ;;
+  'api repos/o/r/pulls/'*'/reviews?'*) jq -c . "$FORGE/reviews.json" ;;
+  'api repos/o/r/pulls/'*'/comments?'*) jq -c . "$FORGE/inline.json" ;;
   'api repos/o/r/commits/'*'/check-runs?'*)
-    printf '[{"check_runs":[{"name":"test","id":1,"status":"completed","conclusion":"success","started_at":"2026-09-16T08:00:00Z"}]}]\n' ;;
-  'api repos/o/r/commits/'*'/statuses?'*) printf '[[]]\n' ;;
+    printf '{"check_runs":[{"name":"test","id":1,"status":"completed","conclusion":"success","started_at":"2026-09-16T08:00:00Z"}]}\n' ;;
+  'api repos/o/r/commits/'*'/statuses?'*) printf '[]\n' ;;
   'api repos/o/r') printf '{"permissions":{"push":false}}\n' ;;
   *) printf 'unexpected gh fixture call: %s\n' "$*" >&2; exit 1 ;;
 esac
 SH
   chmod +x "$home/fakebin/gh"
+  fm_gh_http_shim "$home/fakebin"
 }
 
 with_home() {
   local home=$1; shift
-  PATH="$home/fakebin:$PATH" FORGE="$home/forge" HEAD_A="$HEAD_A" \
+  PATH="$home/fakebin:$PATH" FORGE="$home/forge" HEAD_A="$HEAD_A" GH_SHIM_LOG="$home/forge/shim.log" \
     FM_HOME="$home" FM_ROOT_OVERRIDE="$home/root" FM_STATE_OVERRIDE="$home/state" \
     FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" \
     FM_CONTRIBUTIONS_NOW="$NOW" "$@"
@@ -629,7 +630,10 @@ wrap_forge() { # home: log gh calls and apply per-call faults from $FORGE/fault
   cat > "$home/fakebin/gh" <<'SH'
 #!/usr/bin/env bash
 set -eu
-printf '%s\n' "$*" >> "$FORGE/calls"
+# The HTTP-faithful gh receives `api -i [-H If-None-Match: ...] <endpoint>`; the faults and the call log
+# below speak the plain `api <endpoint>` form.
+plain=$(printf '%s' "$*" | sed -E 's/^api -i /api /; s/ -H If-None-Match: [^ ]+//')
+printf '%s\n' "$plain" >> "$FORGE/calls"
 fault=$(cat "$FORGE/fault" 2>/dev/null || true)
 case "$fault" in latency) sleep "${FORGE_LATENCY:-2}" ;; esac
 # Concurrent forge callers each advance one shared clock. Truncating it in
@@ -643,9 +647,23 @@ clock_bump() {
   printf '%s\n' "$(( $(cat "$FORGE/clock") + $1 ))" > "$tmp"
   mv -f "$tmp" "$FORGE/clock"
 }
-case "$fault:$*" in
+case "$fault:$plain" in
   # Advance once before the parallel read wave; its readers share this clock.
+  quota-wave:'api repos/o/r/pulls/8'|quota-deadline:'api repos/o/r/pulls/8') clock_bump 6 ;;
+  quota-wave:'api '*|quota-deadline:'api '*|quota-issue:'api '*comments\?*|quota-issue:'api '*events\?*)
+    peers=6
+    [ "$fault" != quota-issue ] || peers=2
+    : > "$FORGE/ready.$(printf '%s' "$plain" | shasum | cut -c1-16)"
+    for ((n=0; n<200; n++)); do
+      [ "$(find "$FORGE" -name 'ready.*' | wc -l | tr -d ' ')" -lt "$peers" ] || break
+      sleep 0.01
+    done
+    [ "$n" -lt 200 ] || exit 1
+    export GH_SHIM_REMAINING=500
+    if [ "$fault:$plain" = 'quota-deadline:api repos/o/r' ]; then clock_bump 100; fi
+    ;;
   reserve:'api repos/o/r/issues/9') clock_bump 6 ;;
+  quota-issue:'api repos/o/r/issues/9') clock_bump 6 ;;
   slow-wave:'api repos/o/r/pulls/8') sleep 3 ;;
   slow-wave:'api repos/o/r/pulls/8/reviews?'*) sleep 6 ;;
   exhaust:'api repos/o/r/issues/8/comments?'*) clock_bump 100 ;;
@@ -1182,8 +1200,216 @@ test_retire_is_idempotent_and_refuses_unknown_pairs() {
   pass 'retire is idempotent and refuses non-captain, unknown, malformed and signal-bearing pairs'
 }
 
+shim_count() { # home kind(counted|not-modified) : REST reads (api -i) the shim logged
+  grep -c "^$2 api -i " "$1/forge/shim.log" 2>/dev/null || true
+}
+
+test_repeated_poll_reads_unchanged_prs_conditionally() {
+  local home first
+  home=$(new_home conditional-poll)
+  forge_home "$home"
+  with_home "$home" "$ROOT/bin/fm-pr-check.sh" delivery https://github.com/o/r/pull/8 >/dev/null \
+    || fail 'could not register the owned delivery'
+  : > "$home/forge/shim.log"
+  registered_checks "$home" >/dev/null
+  first=$(shim_count "$home" counted)
+  [ "$first" -ge 7 ] || fail "the first sweep made only $first counted REST reads"
+  : > "$home/forge/shim.log"
+  registered_checks "$home" >/dev/null
+  [ "$(shim_count "$home" counted)" = 0 ] \
+    || fail "an unchanged PR was re-read with $(shim_count "$home" counted) counted REST calls on the second sweep"
+  [ "$(shim_count "$home" not-modified)" = "$first" ] \
+    || fail "the second sweep answered $(shim_count "$home" not-modified) of $first REST reads with a 304"
+  jq -e '.records[0].error == null and .records[0].observation.head == "'"$HEAD_A"'"' \
+    "$home/data/delivery/contributions.json" >/dev/null || fail 'cached reads did not yield the same observation'
+  printf '[{"id":12,"user":{"login":"maintainer"},"author_association":"OWNER","body":"changed","html_url":"https://github.com/o/r/pull/8#issuecomment-12","updated_at":"2026-09-16T08:01:00Z"}]\n' \
+    > "$home/forge/comments.json"
+  registered_checks "$home" >/dev/null
+  jq -e '.records[0].pending | length == 1' "$home/data/delivery/contributions.json" >/dev/null \
+    || fail 'a changed resource was served from the cache instead of being read'
+  pass 'a repeated poll answers unchanged PR reads with 304s and still sees a changed resource'
+}
+
+# Record the quota a response reported, in the documented gh-ratelimit.<resource>.json format.
+# A read below the floor is refused, so a test cannot lower the record by reading.
+set_quota() { # home remaining reset
+  jq -n --argjson remaining "$2" --argjson reset "$3" --argjson now "$(date +%s)" \
+    '{resource:"core",limit:5000,remaining:$remaining,reset:$reset,observed:$now}' > "$1/state/gh-ratelimit.core.json"
+}
+
+test_low_quota_poll_keeps_last_observation_marked_stale() {
+  local home out before reset
+  home=$(new_home low-quota)
+  forge_home "$home"
+  with_home "$home" "$ROOT/bin/fm-pr-check.sh" delivery https://github.com/o/r/pull/8 >/dev/null \
+    || fail 'could not register the owned delivery'
+  registered_checks "$home" >/dev/null
+  jq -e '.records[0].error == null' "$home/data/delivery/contributions.json" >/dev/null || fail 'healthy sweep recorded an error'
+  # A sweep whose own responses report 500 of 5000 left crosses the floor mid-observation: the reads still to come
+  # are refused before any network call, the last observation is kept, and the episode is announced once.
+  out=$(GH_SHIM_REMAINING=500 with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'sweep reporting low quota failed'
+  reset=$(jq -r .reset "$home/state/gh-ratelimit.core.json")
+  assert_contains "$out" 'quota low (500 of 5000' 'the sweep that crossed the floor did not state the remaining quota'
+  assert_contains "$out" "$(jq -rn --argjson r "$reset" '$r | todate')" 'the sweep did not state the reset time'
+  jq -e --arg head "$HEAD_A" '.records[0].observation.head == $head and (.records[0].error | contains("quota low"))' \
+    "$home/data/delivery/contributions.json" >/dev/null || fail 'the last observation was not kept and marked stale with the reason'
+  set_quota "$home" 400 "$reset"
+  before=$(wc -l < "$home/forge/shim.log")
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'repeat low-quota poll failed'
+  [ -z "$out" ] || fail "the low-quota episode was announced twice: $out"
+  assert_equals "$before" "$(wc -l < "$home/forge/shim.log")" 'a poll below the floor still called the forge'
+  jq -e '.records[0].error | contains("400 of 5000")' "$home/data/delivery/contributions.json" >/dev/null \
+    || fail 'the stale reason did not track changed quota within the episode'
+  set_quota "$home" 300 "$((reset + 3600))"
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'new low-quota window poll failed'
+  assert_contains "$out" 'quota low (300 of 5000' 'a new reset window did not announce its low-quota episode'
+  before=$(wc -l < "$home/forge/shim.log")
+  with_home "$home" "$ROOT/bin/fm-fleet-snapshot.sh" --contribution-input > "$home/input.json" \
+    || fail 'could not build the contribution input'
+  with_home "$home" "$ROOT/bin/fm-contributions.sh" snapshot "$home/input.json" --all \
+    | jq -e '.complete == false and .checked == 0 and (.rows[0].reason | contains("quota low") and contains("resets at"))' >/dev/null \
+    || fail 'the stale row does not carry the quota reason and reset time'
+  # The window resets: the next sweep reads again and clears the mark.
+  jq --argjson past "$(( $(date +%s) - 5 ))" '.reset = $past' "$home/state/gh-ratelimit.core.json" > "$home/state/rl.tmp" \
+    && mv "$home/state/rl.tmp" "$home/state/gh-ratelimit.core.json"
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'poll after the reset failed'
+  [ "$(wc -l < "$home/forge/shim.log")" -gt "$before" ] || fail 'the sweep did not resume after the window reset'
+  jq -e '.records[0].error == null' "$home/data/delivery/contributions.json" >/dev/null || fail 'the stale mark outlived the reset'
+  pass 'below the floor the poll keeps the last observation stale with the reset time, once, and resumes after the reset'
+}
+
+test_failure_after_quota_episode_wakes() {
+  local home out line='contributions: observation unavailable for https://github.com/o/r/pull/8'
+  home=$(new_home failure-after-quota)
+  forge_home "$home"
+  wrap_forge "$home"
+  with_home "$home" "$ROOT/bin/fm-pr-check.sh" delivery https://github.com/o/r/pull/8 >/dev/null \
+    || fail 'could not register the owned delivery'
+  registered_checks "$home" >/dev/null
+  set_quota "$home" 400 "$(( $(date +%s) + 3600 ))"
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'low-quota poll failed'
+  assert_contains "$out" 'quota low (400 of 5000' 'the quota episode was not announced'
+  jq -e '.records[0].error | contains("quota low")' "$home/data/delivery/contributions.json" >/dev/null \
+    || fail 'the quota episode did not mark the record stale'
+  # The window resets and the forge then fails for its own reason: that is a new failure episode.
+  set_quota "$home" 400 "$(( $(date +%s) - 5 ))"
+  printf 'down\n' > "$home/forge/fault"
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'poll of a failing forge after the reset failed'
+  [ "$out" = "$line" ] || fail "a genuine failure after a quota episode did not wake: $out"
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'repeat poll of a failing forge failed'
+  [ -z "$out" ] || fail "an unchanged read failure woke again on the next cycle: $out"
+  pass 'a genuine forge failure after a quota-stale episode wakes once'
+}
+
+test_late_owners_keep_quota_episode_suppressed() {
+  local home out before
+  home=$(new_home late-quota-owners)
+  forge_home "$home"
+  GH_SHIM_REMAINING=400 with_home "$home" "$ROOT/bin/fm-gh-rest.sh" get repos/o/r >/dev/null \
+    || fail 'could not seed a low-quota window'
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'initial low-quota poll failed'
+  assert_contains "$out" 'quota low (400 of 5000' 'the initial quota episode was not announced'
+  before=$(wc -l < "$home/forge/shim.log")
+  printf -- '- [ ] aaa - Late owner https://github.com/o/r/pull/8 (repo: sample) (kind: ship)\n' >> "$home/data/backlog.md"
+  record "$home" tail 9 open mergeable
+  cp "$home/data/tail/contributions.json" "$home/tail.prior.json"
+  out=$(with_home "$home" "$ROOT/bin/fm-contributions.sh" poll) || fail 'late-owner low-quota poll failed'
+  [ -z "$out" ] || fail "late owners restarted the same quota episode: $out"
+  assert_equals "$before" "$(wc -l < "$home/forge/shim.log")" 'late-owner handling contacted the forge below the floor'
+  jq -e '.records[0] | .checked_at == null and .observation == null and (.error | contains("400 of 5000"))' \
+    "$home/data/aaa/contributions.json" >/dev/null || fail 'a late owner was not marked unmeasured'
+  jq -e --slurpfile prior "$home/tail.prior.json" '
+    .records[0] as $row | $prior[0].records[0] as $old
+    | ($row.error | contains("400 of 5000")) and ($row | del(.error)) == ($old | del(.error))' \
+    "$home/data/tail/contributions.json" >/dev/null || fail 'a late URL owner lost its observation or quota reason'
+  pass 'late owners of the same or another URL inherit quota staleness without restarting its episode'
+}
+
+test_low_quota_wave_guards_graphql_and_marks_every_tail_owner() {
+  local home out task mode
+  NOW=2026-09-16T00:00:00Z
+  for mode in quota-wave quota-deadline; do
+    home=$(new_home "$mode-tail")
+    forge_home "$home"
+    wrap_forge "$home"
+    record "$home" duplicate 8 open mergeable
+    record "$home" tail 9 open mergeable
+    record "$home" final 10 merged mergeable
+    for task in delivery duplicate tail final; do
+      cp "$home/data/$task/contributions.json" "$home/$task.prior.json"
+    done
+    /bin/date +%s > "$home/forge/clock"
+    printf '%s\n' "$mode" > "$home/forge/fault"
+    out=$(with_home "$home" env FM_CONTRIBUTIONS_BUDGET=20 "$ROOT/bin/fm-contributions.sh" poll) \
+      || fail 'poll crossing the quota floor after a parallel wave failed'
+    assert_contains "$out" 'quota low (500 of 5000' 'the low-quota wave was not announced'
+    assert_equals 7 "$(wc -l < "$home/forge/calls" | tr -d ' ')" 'a GraphQL or tail read escaped the quota floor'
+    for task in delivery duplicate tail; do
+      jq -e --slurpfile prior "$home/$task.prior.json" '
+        .records[0] as $row | $prior[0].records[0] as $old
+        | ($row.error | contains("quota low")) and ($row | del(.error)) == ($old | del(.error))' \
+        "$home/data/$task/contributions.json" >/dev/null || fail "quota refusal changed or failed to mark owner $task"
+    done
+    cmp -s "$home/final.prior.json" "$home/data/final/contributions.json" || fail 'quota refusal changed a final observation'
+  done
+  pass 'a successful REST wave below the floor refuses GraphQL and marks every tail owner despite the budget reserve'
+}
+
+test_successful_issue_wave_marks_unmeasured_tail_owners() {
+  local home out task
+  NOW=2026-09-16T00:00:00Z
+  home=$(new_home quota-issue-tail)
+  forge_home "$home"
+  printf -- '- [ ] filed - Issue https://github.com/o/r/issues/9 (repo: sample) (kind: ship)\n' >> "$home/data/backlog.md"
+  with_home "$home" "$ROOT/bin/fm-contributions.sh" poll >/dev/null || fail 'initial issue poll failed'
+  record "$home" duplicate 8 open mergeable
+  record "$home" final 10 merged mergeable
+  for task in delivery duplicate final; do
+    cp "$home/data/$task/contributions.json" "$home/$task.prior.json"
+  done
+  wrap_forge "$home"
+  /bin/date +%s > "$home/forge/clock"
+  printf 'quota-issue\n' > "$home/forge/fault"
+  NOW=2026-09-16T00:01:00Z
+  out=$(with_home "$home" env FM_CONTRIBUTIONS_BUDGET=20 "$ROOT/bin/fm-contributions.sh" poll) \
+    || fail 'issue poll reporting low quota failed'
+  assert_contains "$out" 'quota low (500 of 5000' 'a successful final issue wave hid the quota transition'
+  assert_equals 3 "$(wc -l < "$home/forge/calls" | tr -d ' ')" 'a tail URL was read below the floor'
+  jq -e --arg now "$NOW" '.records[0] | .checked_at == $now and .error == null and .observation.state == "open"' \
+    "$home/data/filed/contributions.json" >/dev/null || fail 'the completed issue observation was not saved as measured'
+  for task in delivery duplicate; do
+    jq -e --slurpfile prior "$home/$task.prior.json" '
+      .records[0] as $row | $prior[0].records[0] as $old
+      | ($row.error | contains("quota low")) and ($row | del(.error)) == ($old | del(.error))' \
+      "$home/data/$task/contributions.json" >/dev/null || fail "the successful issue wave failed to preserve and mark $task"
+  done
+  cmp -s "$home/final.prior.json" "$home/data/final/contributions.json" || fail 'a successful low-quota wave changed a final row'
+  pass 'a completed issue stays measured while all unmeasured tail owners become quota-stale'
+}
+
+test_http_shim_preserves_backend_failures() {
+  local home mode status
+  home=$(new_home shim-failure)
+  forge_home "$home"
+  for mode in http passthrough nonapi; do
+    case "$mode" in
+      http) set -- api -i repos/o/r/unexpected ;;
+      passthrough) set -- api repos/o/r/unexpected ;;
+      nonapi) set -- release -i unexpected ;;
+    esac
+    : > "$home/forge/shim.log"
+    status=0
+    with_home "$home" "$home/fakebin/gh" "$@" > "$home/shim.out" 2> "$home/shim.err" || status=$?
+    assert_equals 1 "$status" "$mode shim lost the backend's exit status"
+    assert_contains "$(cat "$home/shim.err")" 'unexpected gh fixture call:' "$mode shim swallowed the backend's error"
+    assert_equals '' "$(cat "$home/shim.out")" "$mode shim emitted a successful response for a backend failure"
+    assert_equals "counted $*" "$(cat "$home/forge/shim.log")" "$mode shim did not log the failed call"
+  done
+  pass 'HTTP and passthrough shims preserve backend failures without a successful response'
+}
+
 failures=0
-for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_budget_refusal_between_calls test_budget_bounded_call_timeout test_genuine_failure_near_deadline_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_reservation_defers_later_url_when_fifteen_seconds_do_not_remain test_three_second_pr_reads_complete_fresh_in_one_cycle test_slow_read_deadline_kill_is_budget_refusal test_unmeasured_url_does_not_starve_the_tail test_budget_is_cut_down_to_the_watcher_check_bound test_arm_plumbs_a_configured_budget_into_the_check_shim test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs; do
+for test_name in test_actor_coverage test_stale_verdict test_unchecked_is_not_silence test_newest_check_has_no_verdict test_comment_wake test_review_wake test_inline_wake test_ready_issue_wake test_fresh_issue_requires_maintainer test_missing_lane_remains_missing test_partial_freshness_keeps_measured_rows test_malformed_record_cannot_prove_silence test_issue_timeline_and_exact_ack test_verdict_retains_judged_head test_verdict_actor_values_are_discoverable test_observed_replacement_refreshes_verdict test_unobserved_head_leaves_verdict_unknown test_away_yolo_is_fleet_work test_away_yolo_cross_home_is_fleet_work test_retired_and_unsupported_coverage test_unsupported_forge_is_not_fleet_work test_held_unsupported_forge_is_not_captain_work test_shared_contribution_signal_wakes_once test_watcher_keeps_diagnostics_separate_from_contribution_wakes test_expired_child_unsupported_forge_stays_unmeasured test_watcher_surfaces_new_contribution_once test_home_summary_coverage test_unreadable_pending_is_not_empty test_record_task_identity_matches_dirname_basename test_read_only_views_create_no_state test_budget_refusal_between_calls test_budget_bounded_call_timeout test_genuine_failure_near_deadline_is_unavailable test_shared_url_observed_once test_terminal_contribution_settles test_late_owner_inherits_terminal_observation test_interrupted_multi_owner_poll_settles_every_owner test_done_task_open_pr_still_observed test_reservation_defers_later_url_when_fifteen_seconds_do_not_remain test_three_second_pr_reads_complete_fresh_in_one_cycle test_slow_read_deadline_kill_is_budget_refusal test_unmeasured_url_does_not_starve_the_tail test_budget_is_cut_down_to_the_watcher_check_bound test_arm_plumbs_a_configured_budget_into_the_check_shim test_unavailable_forge_records_error_and_wakes_once_per_episode test_late_owner_keeps_failure_episode_suppressed test_retire_ends_observation_of_a_gone_contribution test_late_owner_of_a_retired_final_contribution_is_not_retired test_retire_is_idempotent_and_refuses_unknown_pairs test_repeated_poll_reads_unchanged_prs_conditionally test_low_quota_poll_keeps_last_observation_marked_stale test_failure_after_quota_episode_wakes test_late_owners_keep_quota_episode_suppressed test_low_quota_wave_guards_graphql_and_marks_every_tail_owner test_successful_issue_wave_marks_unmeasured_tail_owners test_http_shim_preserves_backend_failures; do
   ( "$test_name" ) || failures=$((failures + 1))
 done
 [ "$failures" -eq 0 ] || fail "$failures contribution regressions"

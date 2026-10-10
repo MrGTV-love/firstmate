@@ -75,13 +75,23 @@ case "${1:-}" in
     done
     if [ "$literal" = 1 ]; then
       printf '%s' "${1:-}" >> "$FM_SEND_LOG"
+      printf 'literal\n' >> "$FM_SEND_LOG.types"
+    else
+      printf '%s\n' "${1:-}" >> "$FM_SEND_LOG.keys"
     fi
     exit 0 ;;
   display-message)
-    for a in "$@"; do case "$a" in *cursor_y*) printf '1\n'; exit 0 ;; esac; done
+    for a in "$@"; do
+      case "$a" in
+        *cursor_y*) printf '1\n'; exit 0 ;;
+        *pane_current_command*) printf '%s\n' "${FM_FAKE_TMUX_COMMAND:-fakepane}"; exit 0 ;;
+      esac
+    done
     printf 'fakepane\n'; exit 0 ;;
   capture-pane)
-    if [ "${FM_FAKE_TMUX_PENDING:-0}" = 1 ]; then
+    if [ "${FM_FAKE_TMUX_UNKNOWN_DRAFT:-0}" = 1 ] && [ -s "$FM_SEND_LOG" ]; then
+      printf '❯ preface\n ❯ nested draft\n'
+    elif [ "${FM_FAKE_TMUX_PENDING:-0}" = 1 ]; then
       printf '╭────────────╮\n│ > steer    │\n╰────────────╯\n'
     else
       printf '╭────╮\n│    │\n╰────╯\n'
@@ -736,6 +746,54 @@ test_local_secondmate_pending_keeps_expectation_armed() {
   pass "fm-send local: an unconfirmed secondmate send keeps its reply expectation armed"
 }
 
+test_local_secondmate_unknown_draft_preserves_delivery() {
+  local dir fb log home rc rec corr expected
+  dir="$TMP_ROOT/local-unknown-draft"; mkdir -p "$dir"
+  fb=$(make_stubs "$dir"); log="$dir/send.log"
+  home=$(setup_home local-unknown-draft)
+  fm_write_meta "$home/state/lsm.meta" \
+    "window=sess:fm-lsm" "harness=omp" "kind=secondmate" "mode=secondmate" "home=$home/sm"
+  printf 'blocked [key=ledger]: need an audit\n' > "$home/state/lsm.status"
+  cp "$home/state/lsm.status" "$dir/status-before"
+  : > "$log"
+  rc=0
+  env PATH="$fb:$PATH" FM_FAKE_TMUX_UNKNOWN_DRAFT=1 FM_FAKE_TMUX_COMMAND=omp \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    "$SEND" lsm --resolve-key ledger "/audit the ledger" >"$dir/out" 2>"$dir/err" || rc=$?
+  expect_code 3 "$rc" "post-submit draft risk must report delivered-unconfirmed"
+  assert_contains "$(cat "$dir/err")" "verdict=unknown-draft" \
+    "the unconfirmed report must preserve the actual draft-risk verdict"
+  assert_contains "$(cat "$dir/err")" "do not retype or blindly resend" \
+    "post-submit draft risk must warn against duplicating the delivery"
+  [ "$(cat "$log.types")" = literal ] || fail "draft risk must not retype the payload"
+  [ "$(cat "$log.keys")" = Enter ] || fail "draft risk must stop after the first Enter"
+  cmp -s "$dir/status-before" "$home/state/lsm.status" \
+    || fail "an unconfirmed draft-risk delivery must leave the decision open"
+  rec=$(pending_record "$home")
+  [ -n "$rec" ] || fail "post-submit draft risk discarded the reply expectation"
+  [ "$(fm_pending_reply_get "$rec" phase)" = awaiting_report ] \
+    || fail "the draft-risk expectation must remain armed"
+  [ -z "$(fm_pending_reply_get "$rec" delivered_epoch)" ] \
+    || fail "draft risk must not claim confirmed delivery"
+  corr=$(fm_pending_reply_get "$rec" corr_id)
+  fm_pending_reply_embed_corr "${FM_FROMFIRST_MARK}/audit the ledger" "$corr" expected
+  [ "$(cat "$log")" = "$expected" ] || fail "the typed request must match its reply correlation"
+  rc=0
+  env PATH="$fb:$PATH" FM_FAKE_TMUX_UNKNOWN_DRAFT=1 FM_FAKE_TMUX_COMMAND=omp \
+    FM_ROOT_OVERRIDE="$home" FM_HOME="$home" FM_SEND_LOG="$log" FM_SEND_SETTLE=0 \
+    FM_PENDING_REPLY_EXISTING_CORR="$corr" \
+    "$SEND" lsm "/audit the ledger" >"$dir/retry.out" 2>"$dir/retry.err" || rc=$?
+  expect_code 1 "$rc" "an unresolved draft-risk delivery must refuse a blind resend"
+  assert_contains "$(cat "$dir/retry.err")" "refusing to resend correlation $corr" \
+    "the preserved delivery marker must prevent duplicate typing"
+  [ "$(cat "$log.types")" = literal ] || fail "the refused resend typed again"
+  [ "$(cat "$log.keys")" = Enter ] || fail "the refused resend pressed Enter again"
+  printf 'done [corr=%s]: ledger clean\n' "$corr" >> "$home/state/lsm.status"
+  fm_pending_reply_try_resolve "$home/state" "$corr" \
+    || fail "a correlated report must resolve the preserved draft-risk expectation"
+  pass "fm-send local: post-submit draft risk retains reply tracking without resending or closing decisions"
+}
+
 test_local_pending_reports_delivered_unconfirmed() {
   local dir fb log home rc err
   dir="$TMP_ROOT/local-pending"; mkdir -p "$dir"
@@ -801,5 +859,6 @@ test_remote_send_budget_bounds_busy_lane
 test_local_pending_reports_delivered_unconfirmed
 test_local_pending_does_not_close_resolve_key
 test_local_secondmate_pending_keeps_expectation_armed
+test_local_secondmate_unknown_draft_preserves_delivery
 
 echo "all fm-send-remote-delivery tests passed"

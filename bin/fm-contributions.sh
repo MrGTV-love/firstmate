@@ -64,9 +64,9 @@
 # attempted at most once per poll and its observation applied to every owner.
 # A final observation applies
 # to every owner without another forge read. When the budget refuses a read
-# mid-observation, that URL's records stay untouched and the poll moves to the
-# next URL that still has a full observation reserve; only a genuine forge
-# failure or head change records an error.
+# mid-observation, that URL's records stay untouched unless quota protection applies, and the poll moves
+# to the next URL that still has a full observation reserve; a genuine forge failure or head change
+# records an error. docs/configuration.md "GitHub REST reads and the quota floor" owns quota degradation.
 # API failure leaves error evidence; an expired or absent observation is not
 # silence. FM_CONTRIBUTIONS_MAX_AGE (default 900 seconds) bounds freshness.
 # A URL whose last good observation is merged or closed is final: it is
@@ -74,6 +74,8 @@
 # observation, with a stale error beside it cleared.
 # A genuine failure prints its unavailable line only when it starts an episode
 # (no prior owner has an error); a successful read ends the episode.
+# REST reads use fm-gh-rest.sh; its header owns the helper interface and
+# docs/configuration.md "GitHub REST reads and the quota floor" owns the shared read behavior.
 # FM_CONTRIBUTIONS_NOW supplies an ISO UTC clock for tests, otherwise UTC now.
 # FM_CONTRIBUTIONS_READY_LABEL selects the equivalent triage label, default
 # ready-for-pr. Labels are matched case-insensitively and exactly.
@@ -224,8 +226,21 @@ forge() {
   # The budget, not the forge, refused this read.
   [ "$remaining" -gt 0 ] || { BUDGET_EXHAUSTED=1; : > "$TMP/budget-exhausted"; return 1; }
   [ "$remaining" -le 5 ] || remaining=5
-  fm_run_timed "$remaining" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
-    gh "$@" 2> "$forge_err" || rc=$?
+  if [ "$1" = api ]; then
+    shift # REST reads are conditional, record the quota headers, and refuse below the floor
+    fm_run_timed "$remaining" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+      "$SCRIPT_DIR/fm-gh-rest.sh" get "$@" 2> "$forge_err" || rc=$?
+  else
+    "$SCRIPT_DIR/fm-gh-rest.sh" guard > "$forge_err" 2>&1 || rc=$?
+    if [ "$rc" -eq 0 ]; then
+      fm_run_timed "$remaining" env GH_PROMPT_DISABLED=1 GH_NO_UPDATE_NOTIFIER=1 \
+        gh "$@" 2> "$forge_err" || rc=$?
+    fi
+  fi
+  if [ "$rc" -eq 75 ]; then # quota refusal can follow completed pages; no partial response is consumed
+    head -1 "$forge_err" > "$TMP/quota-low"
+    return "$rc"
+  fi
   # A kill at the read bound or the deadline is budget refusal too; only the
   # forge's own nonzero exit is unavailable evidence.
   if [ "$rc" -eq 124 ]; then
@@ -235,6 +250,31 @@ forge() {
     : > "$TMP/forge-unavailable"
   fi
   return "$rc"
+}
+
+mark_quota_stale() { # canonical-url task... : keep the last observation, make the reason the quota reset
+  local url=$1 task kind
+  shift
+  case "$url" in */issues/*) kind=issue ;; *) kind="pr" ;; esac
+  if ! jq -e --arg error "$QUOTA_REASON" '
+    ($error | split(" quota low (")) as $new
+    | any(.[] | .records[];
+      (.error // "" | split(" quota low (")) as $old
+      | ($old | length) == 2 and $old[0] == $new[0]
+        and ($old[1] | split("resets at ")[-1]) == ($new[1] | split("resets at ")[-1]))' "$TMP/saved.json" >/dev/null; then
+    QUOTA_ANNOUNCE=1
+  fi
+  for task in "$@"; do
+    fm_pr_task_id_valid "$task" || { printf 'contributions: invalid durable task id\n'; continue; }
+    jq -n --slurpfile saved "$TMP/saved.json" --arg task "$task" --arg url "$url" --arg kind "$kind" '
+      ([$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first)
+      // {url:$url,kind:$kind,checked_at:null,observation:null,verdict:null,seen:[],pending:[],notified:[]}' > "$TMP/old.json"
+    if jq -e --arg error "$QUOTA_REASON" '.error == $error' "$TMP/old.json" >/dev/null; then
+      continue
+    fi
+    jq --arg error "$QUOTA_REASON" '.error = $error' "$TMP/old.json" > "$TMP/row.json"
+    write_record "$task" "$TMP/row.json"
+  done
 }
 
 wait_forges() { # background forge pids from one independent read wave
@@ -253,7 +293,7 @@ observe() { # canonical GitHub URL -> normalized JSON
   case "$url" in https://github.com/*) ;; *) return 1 ;; esac
   part=${url#https://github.com/}; number=${part##*/}; part=${part%/*}; kind=${part##*/}; part=${part%/*}
   case "$kind" in pull) endpoint="repos/$part/pulls/$number" ;; issues) endpoint="repos/$part/issues/$number" ;; *) return 1 ;; esac
-  rm -f -- "$TMP/budget-exhausted" "$TMP/forge-unavailable"
+  rm -f -- "$TMP/budget-exhausted" "$TMP/forge-unavailable" "$TMP/quota-low"
   BUDGET_EXHAUSTED=0
   forge api "$endpoint" > "$TMP/core.json" || return 1
   jq -e '(.state == "open" or .state == "closed") and (.user.login | type == "string")' "$TMP/core.json" >/dev/null || return 1
@@ -395,16 +435,32 @@ poll() {
     | .[]' < "$TMP/live.tsv" > "$TMP/known.tsv"
   DEADLINE=$(( $(date +%s) + BUDGET ))
   OBSERVATION_RESERVE=$((BUDGET < 15 ? BUDGET : 15))
+  QUOTA_ANNOUNCE=0
+  QUOTA_REASON=
   while IFS=$'\t' read -r -a row; do
+    [ -n "$QUOTA_REASON" ] || QUOTA_REASON=$("$SCRIPT_DIR/fm-gh-rest.sh" guard) || true
+    if [ -n "$QUOTA_REASON" ]; then
+      mark_quota_stale "${row[0]}" "${row[@]:1}"
+      continue
+    fi
     [ $((DEADLINE - $(date +%s))) -ge "$OBSERVATION_RESERVE" ] || break
     url=${row[0]}
     observed=0
     observe "$url" || observed=$?
+    if [ -e "$TMP/quota-low" ]; then
+      QUOTA_REASON=$(head -1 "$TMP/quota-low")
+    elif [ "$observed" -ne 0 ]; then
+      QUOTA_REASON=$("$SCRIPT_DIR/fm-gh-rest.sh" guard) || true
+    fi
+    if [ -n "$QUOTA_REASON" ]; then
+      mark_quota_stale "$url" "${row[@]:1}"
+      continue
+    fi
     [ "$BUDGET_EXHAUSTED" -eq 0 ] || continue
     # Wake once per failure episode: only when no owner has a prior error.
     if [ "$observed" -ne 0 ] && jq -ne --slurpfile saved "$TMP/saved.json" --arg url "$url" --args \
       'all($ARGS.positional[] as $task | [$saved[0][] | select(.task == $task) | .records[] | select(.url == $url)] | first;
-        .error == null)' "${row[@]:1}" >/dev/null; then
+        .error == null or ((.error | type) == "string" and (.error | contains(" quota low ("))))' "${row[@]:1}" >/dev/null; then
       printf 'contributions: observation unavailable for %s\n' "$url"
     fi
     case "$url" in */issues/*) kind=issue ;; *) kind="pr" ;; esac
@@ -432,6 +488,7 @@ poll() {
       publish_pending "$task" "$url" "$TMP/row.json"
     done
   done < "$TMP/known.tsv"
+  [ "$QUOTA_ANNOUNCE" -eq 0 ] || printf 'contributions: %s; last observations kept, marked stale\n' "$QUOTA_REASON"
 }
 
 arm() {

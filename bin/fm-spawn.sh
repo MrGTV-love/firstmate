@@ -56,15 +56,15 @@
 #   that overlay. docs/configuration.md "Worker skill selection" owns selection,
 #   supported brief transports, and recorded outcomes. The picker is bounded
 #   at 30 seconds and never stops a launch.
-#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only]
+#        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only] [--worktree <path>]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
 #   its admission limits, and fm-dod-lib.sh owns the restricted instruction role.
 #   Recorded recovery=reconcile-only is inherited while present; the clearance
 #   policy is in docs/agent-control.md "Recovering an exited instruction owner".
 #
-#   --relaunch launches a replacement agent for an EXISTING task into that
-#   task's own recorded worktree, reusing its recorded endpoint when that
+#   By default, --relaunch launches a replacement agent for an EXISTING task
+#   into its recorded worktree, reusing its recorded endpoint when that
 #   endpoint still exists, instead of creating either from scratch. It is
 #   the launch half of the control plane (bin/fm-control.sh relaunch), which
 #   owns the checkpoint, the progress note, stopping the previous agent, and the
@@ -85,9 +85,13 @@
 #   worktree. Herdr keeps its recorded session; a gone tmux endpoint requires
 #   the home's current configured spawn backend to resolve to Herdr and pass
 #   spawn validation.
-#   The validated worktree is reused untouched either way;
-#   a rebind is a recovery, never a teardown. Only a crewmate or scout rebinds: a
-#   secondmate whose endpoint is gone is respawned by its own owner
+#   No worktree is allocated or torn down; a rebind is a recovery, never a teardown.
+#   --worktree <path> uses the control header's prepared-destination option.
+#   docs/agent-control.md "Relocating a task whose worktree is gone" owns the
+#   contract. bin/fm-control-worktree-lib.sh repeats the proof under this task's
+#   meta lock and the shared project lock, which is held through publication.
+#   Only a crewmate or scout rebinds:
+#   a secondmate whose endpoint is gone is respawned by its own owner
 #   (`--secondmate`, driven by the session-start liveness sweep).
 #   Every fresh ship/scout launch and replacement explicitly enters the recorded
 #   worktree immediately before trust setup and brief delivery, and a pre-launch
@@ -108,6 +112,9 @@
 #   build agent's variant, keyed to the resolved model, inside the
 #   OPENCODE_CONFIG_CONTENT JSON its launch already carries (config schema
 #   verified on opencode 1.18.32); without a model the axis is recorded but omitted.
+#   --dispatch-rule <rule_N|default> names the crew-dispatch rule whose declared
+#   fallback list this task may use; docs/configuration.md "Crew dispatch
+#   profiles" owns that policy and the stand-in switch on proven exhaustion.
 #   --backend <name> is the explicit runtime session-provider backend for this
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
 #   is authorized). Without it, the script resolves FM_BACKEND, then
@@ -261,9 +268,20 @@
 #   .omp/fm-session-overlay.yml through --config. That overlay pins composer
 #   shape, plan mode off, prewalk off, and the non-interactive usage-reserve
 #   policy for the one session only (--auto-approve alone owns approval,
-#   forcing tools.approvalMode: yolo for the session).
+#   forcing tools.approvalMode: yolo for the session). It also empties the Sol
+#   model's fallback chain, so a failing Sol run stops and reports through the
+#   live-model record instead of moving to a weaker model, and it pins omp's own
+#   return to the recorded model once the primary serves again.
+#   Each session publishes the model it is serving through
+#   bin/fm-omp-live-model.ts (a crewmate or scout from its per-task extension, a
+#   secondmate from the home's tracked extension), and bin/fm-crew-state.sh
+#   reports a differing model or an unrecovered run error beside the state.
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
+#   Workers also enable eager native account rotation without waiting for usage
+#   resets and receive a task-owned --config overlay permitting only declared
+#   OMP model fallbacks, with an empty default chain so ambient role chains
+#   cannot weaken the assigned model.
 #   Secondmate lanes keep their memory settings; the captain's own
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written or
 #   renamed by Firstmate.
@@ -395,6 +413,9 @@
 #   prevents equal task ids in different Firstmate homes from sharing a file.
 #   Spawn refuses an unsafe pre-existing task temp root or launch namespace, and
 #   task teardown removes only the current home's launch namespace.
+# Herdr launches record launch_proof=env-v1 and stamp FM_SPAWN_GEN with
+# spawn_gen inside the launch boundary. bin/fm-launch-proof-lib.sh owns live
+# lifecycle attribution; Herdr's bare native resume remains unmanaged.
 # Launch environment (config/launch-env-allowlist):
 #   Absent leaves ambient inheritance subject to harness-specific shedding.
 #   A present readable regular file opts every launch (ship, scout, secondmate,
@@ -521,7 +542,7 @@
 #                  turn-end extension, written by this script; outside the worktree so
 #                  omp's cwd-only auto-discovery cannot load it a second time)
 #     __OMPSESSIONCFG__ absolute path to the tracked .omp/fm-session-overlay.yml posture overlay
-#     __OMPWORKERCFG__ absolute path to the tracked .omp/fm-worker-overlay.yml memory overlay
+#     __OMPWORKERCFG__ quoted --config arguments for worker memory/retry settings and task-owned model policy
 #     __OPINPUT__   absolute path to the canonical operational-input encoder
 #     __BRIEFDOORBELL__ quoted printable doorbell naming the launch-brief record this
 #                  script published into the receiving home's operational inbox
@@ -799,10 +820,14 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-control-lib.sh
 . "$SCRIPT_DIR/fm-control-lib.sh"
+# shellcheck source=bin/fm-control-worktree-lib.sh
+. "$SCRIPT_DIR/fm-control-worktree-lib.sh"
 # shellcheck source=bin/fm-gate-refuse-lib.sh
 . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
 # shellcheck source=bin/fm-busy-lib.sh
 . "$SCRIPT_DIR/fm-busy-lib.sh"
+# shellcheck source=bin/fm-status-event-lib.sh
+. "$SCRIPT_DIR/fm-status-event-lib.sh"
 # shellcheck source=bin/fm-cursor-lib.sh
 . "$SCRIPT_DIR/fm-cursor-lib.sh"
 # fm-dod-lib.sh also owns the PR and classification imports needed below.
@@ -820,6 +845,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-claude-launcher-lib.sh"
 # shellcheck source=bin/fm-claude-memory-lib.sh
 . "$SCRIPT_DIR/fm-claude-memory-lib.sh"
+# shellcheck source=bin/fm-dispatch-capacity-lib.sh
+. "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never spawn
 # a direct report (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
@@ -829,6 +856,9 @@ KIND_SET=0
 HARNESS_ARG=
 MODEL=
 EFFORT=
+DISPATCH_RULE=
+DISPATCH_FALLBACK='[]'
+DISPATCH_SWITCHED=false
 BACKEND_ARG=
 MODE=
 YOLO=
@@ -847,6 +877,8 @@ TRACEPARENT_SET=0
 RELAUNCH=0
 RECONCILE_ONLY=0
 CLAUDE_DEBUG=0
+RELOCATE_TO=
+RELOCATE_SET=0
 ALLOW_API_KEY=0
 # Opt-in only: exact-resume presentation-order lock waits instead of refusing.
 # Absent/unset keeps upstream refuse-on-contention. See header.
@@ -865,6 +897,10 @@ for a in "$@"; do
     harness)
       HARNESS_ARG=$a
       HARNESS_SET=1
+      ;;
+    worktree)
+      RELOCATE_TO=$a
+      RELOCATE_SET=1
       ;;
     model)
       MODEL=$a
@@ -898,6 +934,7 @@ for a in "$@"; do
       TRACEPARENT_ARG=$a
       TRACEPARENT_SET=1
       ;;
+    dispatch-rule) DISPATCH_RULE=$a ;;
     *)
       echo "error: internal parser state for --$want_value" >&2
       exit 1
@@ -919,6 +956,11 @@ for a in "$@"; do
   --reconcile-only) RECONCILE_ONLY=1 ;;
   --allow-api-key) ALLOW_API_KEY=1 ;;
   --herdr-resume-lock-wait) HERDR_RESUME_LOCK_WAIT=1 ;;
+  --worktree) want_value=worktree ;;
+  --worktree=*)
+    RELOCATE_TO=${a#--worktree=}
+    RELOCATE_SET=1
+    ;;
   --harness) want_value=harness ;;
   --harness=*)
     HARNESS_ARG=${a#--harness=}
@@ -965,6 +1007,8 @@ for a in "$@"; do
     TRACEPARENT_SET=1
   ;;
   --claude-debug) CLAUDE_DEBUG=1 ;;
+  --dispatch-rule) want_value="dispatch-rule" ;;
+  --dispatch-rule=*) DISPATCH_RULE=${a#--dispatch-rule=} ;;
   *) POS+=("$a") ;;
   esac
 done
@@ -1054,6 +1098,10 @@ if [ "$RELAUNCH" -eq 1 ]; then
     exit 1
   }
 else
+  [ "$RELOCATE_SET" -eq 0 ] || {
+    echo "error: --worktree applies to --relaunch only: a fresh spawn allocates its own isolated copy" >&2
+    exit 1
+  }
   [ "$CLAUDE_DEBUG" -eq 0 ] || {
     echo "error: --claude-debug applies to --relaunch only; turn it on for an existing worker with bin/fm-control.sh <id> relaunch --claude-debug" >&2
     exit 1
@@ -1540,6 +1588,7 @@ spawn_abort_cleanup() {
     [ ! -e "$SPAWN_META_TMP" ] &&
     [ ! -L "$SPAWN_META_TMP" ]; then
     RELAUNCH_REPLACEMENT_PENDING=0
+    SPAWN_SLOT_CLAIMED=0
   fi
   if [ "$RELAUNCH_REPLACEMENT_PENDING" = 1 ]; then
     RELAUNCH_REPLACEMENT_PENDING=0
@@ -1682,7 +1731,7 @@ spawn_abort_cleanup() {
   # atomic replacement rather than racing it. The release itself never removes
   # another task's claim.
   if [ "$SPAWN_SLOT_CLAIMED" = 1 ] && [ -n "${WT:-}" ] &&
-    [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ] &&
+    { [ "$RELAUNCH_RELOCATING" = 1 ] || { [ ! -e "$STATE/$ID.meta" ] && [ ! -L "$STATE/$ID.meta" ]; }; } &&
     fm_treehouse_pool_slot "$PROJ_ABS" "$WT"; then
     SPAWN_SLOT_CLAIMED=0
     if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
@@ -1786,6 +1835,7 @@ clear_relaunch_harness_wiring() {
   done <<EOF
 $(fm_control_harness_wiring_paths "$harness" "$wt" "$state" "$id")
 EOF
+  rm -f -- "$state/$id.reboot-notice"
 }
 
 spawn_herdr_presentation_order_lock_release() {
@@ -1816,6 +1866,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ -z "$HARNESS_ARG" ] || shared_args+=(--harness "$HARNESS_ARG")
   [ -z "$MODEL" ] || shared_args+=(--model "$MODEL")
   [ -z "$EFFORT" ] || shared_args+=(--effort "$EFFORT")
+  [ -z "$DISPATCH_RULE" ] || shared_args+=(--dispatch-rule "$DISPATCH_RULE")
   [ -z "$BACKEND_ARG" ] || shared_args+=(--backend "$BACKEND_ARG")
   # One delivery contract applies to every pair in a batch, exactly like the shared
   # harness. Each pair still re-validates it against its own brief, so a batch
@@ -2048,6 +2099,8 @@ RAW_LAUNCH=0
 # identity check refuses malformed, ambiguous, or foreign records exactly as
 # it does for teardown.
 RELAUNCH_PRIOR_HARNESS=
+# 1 when --worktree rebinds the task to a fresh copy (its proof already passed).
+RELAUNCH_RELOCATING=0
 # 1 when the recorded endpoint is authoritatively gone and this relaunch must
 # create a fresh one for the task rather than adopt its recorded address.
 RELAUNCH_REBIND=0
@@ -2156,8 +2209,19 @@ if [ "$RELAUNCH" -eq 1 ]; then
     fi
   fi
   RELAUNCH_WT=$(fm_meta_get "$RELAUNCH_META" worktree)
+  if [ "$RELOCATE_SET" -eq 1 ]; then
+    # The same proof the control plane ran, repeated under this task's meta lock:
+    # the record is about to be republished, and only this script publishes it.
+    [ -n "$RELOCATE_TO" ] || {
+      echo "error: --worktree requires a value" >&2
+      exit 1
+    }
+    fm_control_worktree_relocation "$RELAUNCH_META" "$ID" "$STATE" "$RELOCATE_TO" || exit 1
+    RELAUNCH_WT=$FM_CONTROL_RELOCATION_PATH
+    RELAUNCH_RELOCATING=1
+  fi
   [ -n "$RELAUNCH_WT" ] && [ -d "$RELAUNCH_WT" ] || {
-    echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in" >&2
+    echo "error: task $ID's recorded worktree '${RELAUNCH_WT:-none}' is missing; refusing to relaunch without the local copy its work lives in (a fresh copy of the same branch can replace it: pass --worktree <path>)" >&2
     exit 1
   }
   if [ "$KIND" = secondmate ]; then
@@ -2805,7 +2869,7 @@ if [ "$KIND" = secondmate ] && [ -z "$ARG3" ]; then
     fi
   fi
 fi
-if [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+if { [ -n "$MODEL" ] && [ "$MODEL" != default ]; } || { [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; }; then
   SPAWN_ROUTING_PAIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-spawn-routing-pair.XXXXXX") || exit 1
   FM_INHERITABLE_CONFIG='model-index.json crew-dispatch.json' \
     fm_config_inherit_pair_stage "$CONFIG" "$SPAWN_ROUTING_PAIR" || exit 1
@@ -2828,6 +2892,30 @@ if [ -n "$MODEL" ] && [ "$MODEL" != default ] && [ "$MODEL_INDEXED" = 1 ]; then
 else
   MODEL_INDEXED=0
 fi
+
+# Preserve the chosen rule through launch and recovery. Only declared stand-ins
+# may replace a proven exhausted route; unknown OMP quota is never single-account
+# quota-axi exhaustion. Secondmate and raw launch identities remain unchanged.
+if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
+  dispatch_set=$(fm_dispatch_fallbacks "$SPAWN_ROUTING_PAIR" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
+  DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
+  DISPATCH_FALLBACK=$(jq -c .fallback <<<"$dispatch_set")
+  if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
+    dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "$MODEL" --arg e "$EFFORT" '{harness:$h, model:$m, effort:$e}')
+    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$SPAWN_ROUTING_PAIR") || exit 1
+    DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
+    if [ "$DISPATCH_SWITCHED" = true ]; then
+      HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
+      MODEL=$(jq -r .profile.model <<<"$dispatch_result")
+      EFFORT=$(jq -r .profile.effort <<<"$dispatch_result")
+      MODEL=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" model "$HARNESS" "$MODEL") || exit 1
+      MODEL_INDEXED=$(FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" "$SCRIPT_DIR/fm-model-index.sh" entry "$HARNESS" "$MODEL") || exit 1
+      if [ "$MODEL_INDEXED" = true ]; then MODEL_INDEXED=1; else MODEL_INDEXED=0; fi
+      LAUNCH=$(launch_template "$HARNESS" "$KIND") || exit 1
+    fi
+  fi
+fi
+fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
 
 if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
   echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
@@ -2928,6 +3016,7 @@ omp)
     echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
     exit 1
   }
+  fm_control_omp_launch_check "$OMP_BIN" || exit 1
   OMP_SESSION_CFG="$FM_ROOT/.omp/fm-session-overlay.yml"
   OMP_WORKER_CFG="$FM_ROOT/.omp/fm-worker-overlay.yml"
   [ -f "$OMP_SESSION_CFG" ] || {
@@ -3648,6 +3737,26 @@ if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
     exit "$FM_PROJECT_CAPACITY_DEFER_EXIT"
   fi
 fi
+if [ "$RELAUNCH_RELOCATING" = 1 ]; then
+  SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {
+    echo "error: could not resolve the shared Treehouse project lock for $PROJ_ABS" >&2
+    exit 1
+  }
+  if ! fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK"; then
+    echo "error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race relocation ownership" >&2
+    exit 1
+  fi
+  SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
+  fm_control_worktree_relocation "$RELAUNCH_META" "$ID" "$STATE" "$RELOCATE_TO" || exit 1
+  WT=$RELAUNCH_WT
+  if fm_treehouse_pool_slot "$PROJ_ABS" "$RELAUNCH_WT"; then
+    fm_treehouse_slot_owner_claim "$RELAUNCH_WT" "$ID" "$FM_HOME" || {
+      echo "error: could not claim Treehouse pool slot $RELAUNCH_WT for task $ID; refusing to relocate onto a slot that cannot later be proved to be its own" >&2
+      exit 1
+    }
+    [ "$FM_TREEHOUSE_SLOT_OWNER" != absent ] || SPAWN_SLOT_CLAIMED=1
+  fi
+fi
 [ -f "$BRIEF" ] || {
   echo "error: task $ID has no brief at inaccessible data path $BRIEF" >&2
   exit 1
@@ -4293,10 +4402,10 @@ else
     # it stands up a DIFFERENT home's own workspace by design - so it asks for
     # the per-home container instead of inheriting this launcher's.
     HERDR_LABEL_HOME=$FM_HOME
-    HERDR_LAUNCHER_RELATIONSHIP=launcher-home
+    HERDR_LAUNCHER_RELATIONSHIP='launcher-home'
     if [ "$KIND" = secondmate ]; then
       HERDR_LABEL_HOME=$PROJ_ABS
-      HERDR_LAUNCHER_RELATIONSHIP=other-home
+      HERDR_LAUNCHER_RELATIONSHIP='other-home'
     fi
     HERDR_PRESENTATION_JOURNAL=$(fm_backend_herdr_projection_journal_path "$STATE" "$ID")
     HERDR_PROJECTED=0
@@ -4559,6 +4668,17 @@ spawn_send_key() { # <target> <key>
   orca) fm_backend_orca_send_key "$1" "$2" ;;
   cmux) fm_backend_cmux_send_key "$1" "$2" "$W" ;;
   esac
+}
+
+# Run one backend send whose failure ends the spawn. Under `set -e` a failed send
+# would otherwise end the script with exit 1, and a backend wrapper such as
+# Orca's adds no text saying why; name the backend and the send instead.
+spawn_send_or_abort() { # <what> <send-function> <arg>...
+  local what=$1
+  shift
+  "$@" && return 0
+  echo "error: $BACKEND backend send failed for task $ID ($what); spawn aborted" >&2
+  exit 1
 }
 
 # Enter the exact copy recorded for this task immediately before trust setup and
@@ -4931,10 +5051,10 @@ claude_confirm_start() {
 if [ "$RELAUNCH" -eq 1 ] && [ "$BACKEND" = orca ]; then
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$RELAUNCH" -eq 1 ]; then
-  # No worktree is acquired: the recorded one is reused as-is. What must be
-  # proven instead is that the adopted endpoint's shell is actually sitting in
-  # that worktree, so the replacement agent starts where the work is rather
-  # than wherever the pane happened to drift.
+  [ "$RELAUNCH_RELOCATING" = 0 ] || spawn_enter_recorded_worktree
+  # No worktree is acquired: the selected pre-existing copy is used. The adopted
+  # endpoint's shell must be sitting in that copy, including after a relocation
+  # handoff, so the replacement never starts wherever the pane happened to drift.
   relaunch_wt_real=$(real_path_or_raw "$WT")
   relaunch_seen=
   for _ in $(seq 1 10); do
@@ -4964,7 +5084,7 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
-  spawn_send_text_line "$WT_TARGET" 'treehouse get'
+  spawn_send_or_abort "treehouse get" spawn_send_text_line "$WT_TARGET" 'treehouse get'
 
   # Wait for the treehouse subshell: the pane's cwd moves from the project to the worktree.
   # Target the stable window id, not the name: if the name is ever lost (e.g. an
@@ -5187,6 +5307,13 @@ exclude_path() {
   grep -qxF "$rel" "$EXCL" 2>/dev/null || echo "$rel" >>"$EXCL"
 }
 if [ "$RELAUNCH" -eq 1 ]; then
+  # The fresh copy of a relocation is not firstmate's yet: this is the one place
+  # that overwrites and deletes harness files in it, so the check that none of
+  # them is somebody else's runs here, at the mutation, not only when the proof
+  # first ran.
+  if [ "$RELAUNCH_RELOCATING" = 1 ]; then
+    fm_control_worktree_wiring_free "$WT" "$STATE_REAL" "$ID" || exit 1
+  fi
   # Retire the previous incarnation's per-task harness wiring before arming the
   # new one. Without this, a harness switch would leave the old adapter's hook
   # files and turn-end token registry entries behind, and even a same-harness
@@ -5460,6 +5587,31 @@ EOF
     guard_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guard_config" --arg state "$STATE_REAL" \
       --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" --arg project "$guard_project" \
       '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project}') || exit 1
+    rm -f "$STATE/$ID.live-model"
+    # Exact model and effort keys override ambient default or provider chains.
+    # This per-task overlay travels to all local backends through --config.
+    native_fallback='[]'
+    while IFS= read -r candidate; do
+      fm_dispatch_fallback_supported "$CONFIG" "$candidate" "$SPAWN_ROUTING_PAIR" || continue
+      candidate_harness=$(jq -r .harness <<<"$candidate")
+      candidate_model=$(jq -r .model <<<"$candidate")
+      candidate_capacity=$(fm_dispatch_fallback_capacity "$candidate")
+      [ "$(jq -r .status <<<"$candidate_capacity")" != exhausted ] || continue
+      [ "$candidate_harness" = omp ] || break
+      [ "$candidate_model" != "$MODEL" ] || continue
+      native_fallback=$(jq -cn --argjson prefix "$native_fallback" --argjson profile "$candidate" '$prefix + [$profile]') || exit 1
+    done < <(jq -c '.[]' <<<"$DISPATCH_FALLBACK")
+    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" '
+      def effort_key($m; $e): if $e == "" then $m else $m + ":" + $e end;
+      ([$fallback[] | effort_key(.model; .effort)]) as $chain |
+      {retry: {modelFallback: ($model | contains("/")), fallbackChains:
+        (reduce ([{model:$model, effort:$effort}] + $fallback)[] as $p
+          ({default: []}; if ($p.model | contains("/")) then
+            .[$p.model] = [] | .[effort_key($p.model; $p.effort)] = [] else . end)
+         | if ($model | contains("/")) then
+             .[$model] = $chain | .[effort_key($model; $effort)] = $chain else . end)}}
+    ' > "$STATE/$ID.omp-fallback.yml" || exit 1
+    chmod 600 "$STATE/$ID.omp-fallback.yml" || exit 1
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
 // Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
@@ -5474,6 +5626,9 @@ EOF
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installJevGuard } from "$FM_ROOT/bin/fm-jev-guard.ts";
+import { installTaskSessionProof } from "$FM_ROOT/.omp/extensions/lib/fm-task-session.ts";
+import { installLiveModelPublisher } from "$FM_ROOT/bin/fm-omp-live-model.ts";
+import { appendFileSync, readFileSync } from "node:fs";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -5483,12 +5638,29 @@ const busyEvent = (state: string, event: string) =>
   });
 export default function (pi: any) {
   installJevGuard(pi, $guard_context);
+  installTaskSessionProof(pi, "$STATE_REAL", "$ID");
+  // The model serving this task now, for bin/fm-crew-state.sh's drift note.
+  installLiveModelPublisher(pi, "$STATE_REAL/$ID.live-model");
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;
-    return busyEvent("idle", "agent-end");
+    const last = event?.messages?.filter((m: any) => m.role === "assistant").at(-1);
+    const exhausted = last?.stopReason === "error" &&
+      /usage_limit_reached|usage limit|quota.*exhaust/i.test(last.errorMessage ?? "");
+    return busyEvent("idle", exhausted ? "quota-exhausted" : "agent-end");
   });
   pi.on("turn_end", () => execFile("touch", ["$TURNEND"]));
+  pi.on("retry_fallback_succeeded", (event: any) => {
+    try {
+      if (readFileSync("$STATE_REAL/$ID.busy-gen", "utf8").trim() !== "$BUSY_GEN") return;
+    } catch (error: any) {
+      if (error?.code === "ENOENT") return;
+      throw error;
+    }
+    const model = String(event.model ?? "").replace(/[\\r\\n\\t]/g, " ");
+    appendFileSync("$STATE_REAL/$ID.status",
+      "note [at=" + Math.floor(Date.now() / 1000) + "]: $FM_STATUS_FALLBACK_NOTICE" + model + "\\n");
+  });
 }
 EOF
     LAUNCH="env PI_EDIT_VARIANT=replace $LAUNCH"
@@ -5701,7 +5873,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort dispatch_rule account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5732,11 +5904,13 @@ preserve_relaunch_meta() {
   [ "$ALLOW_API_KEY" -eq 0 ] || echo "api_key=allow"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
+  [ "$BACKEND" != herdr ] || echo "launch_proof=env-v1"
   # Default-off writes no traceparent= line.
   # backend= is written only for a non-default (non-tmux) backend, so the
   # default path's meta stays byte-identical (absent backend= means tmux;
   # data/fm-backend-design-d7's P1 compatibility contract).
   [ "$BACKEND" = tmux ] || echo "backend=$BACKEND"
+  [ -z "$DISPATCH_RULE" ] || echo "dispatch_rule=$DISPATCH_RULE"
   if [ "$BACKEND" = herdr ]; then
     echo "herdr_session=$HERDR_SES"
     echo "herdr_workspace_id=$HERDR_WORKSPACE_ID"
@@ -5847,6 +6021,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
     exit 1
   fi
   RELAUNCH_REPLACEMENT_PENDING=0
+  SPAWN_SLOT_CLAIMED=0
   SPAWN_META_PUBLISH_STARTED=0
   SPAWN_META_TMP=
 fi
@@ -5878,6 +6053,9 @@ sq_piwatch=$(shell_quote "$PROJ_ABS/.pi/extensions/fm-primary-pi-watch.ts")
 sq_ompext=$(shell_quote "$STATE/$ID.omp-ext.ts")
 sq_ompcfg=$(shell_quote "${OMP_WORKER_CFG:-$FM_ROOT/.omp/fm-worker-overlay.yml}")
 sq_ompsessioncfg=$(shell_quote "${OMP_SESSION_CFG:-$FM_ROOT/.omp/fm-session-overlay.yml}")
+if [ "$HARNESS" = omp ] && [ "$KIND" != secondmate ]; then
+  sq_ompcfg="$sq_ompcfg --config $(shell_quote "$STATE/$ID.omp-fallback.yml")"
+fi
 sq_opinput=$(shell_quote "$FM_ROOT/bin/fm-operational-input.sh")
 sq_worktree=$(shell_quote "$WT")
 MODELFLAG=$(model_flag_for_harness "$HARNESS" "$MODEL")
@@ -6033,6 +6211,7 @@ if [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
   LAUNCH="$tc_env $LAUNCH"
 fi
 if [ "$KIND" = secondmate ]; then
+  [ "$HARNESS" != omp ] || rm -f "$PROJ_ABS/state/.omp-live-model"
   sq_home=$(shell_quote "$PROJ_ABS")
   sq_primary_home=$(shell_quote "$FM_HOME")
   # Keep this in step with fm_supervision_model (bin/fm-wake-lib.sh): Claude's
@@ -6103,6 +6282,10 @@ fi
 # launch and the launch-env-allowlist `env -i` wrapper.
 LAUNCH="export FM_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
 LAUNCH="export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH; $COMPACT_ADVISER_HOOKS$LAUNCH"
+if [ "$BACKEND" = herdr ]; then
+  LAUNCH="(export FM_SPAWN_GEN=$(shell_quote "$SPAWN_GEN"); $LAUNCH
+)"
+fi
 # When the live-harness gate has exported DISABLE_AUTOUPDATER into this spawn's
 # own environment, carry it into the launch command text so Claude Code's
 # auto-updater cannot rewrite the shared binary during a live run. Embedding the
@@ -6150,13 +6333,15 @@ spawn_record_traceparent() {
 # Export GOTMPDIR into the crewmate's pane shell so the agent and every child
 # process (go build, go test, ...) inherit it. Sent before the launch command so
 # the env is set when the agent starts; the brief sleep lets the export land.
-spawn_send_text_line "$T" "export GOTMPDIR=$TASK_TMP/gotmp"
+spawn_send_or_abort "export GOTMPDIR" spawn_send_text_line "$T" "export GOTMPDIR=$TASK_TMP/gotmp"
 # Export the compact-adviser kill switch into the pane shell through the same
 # pre-launch channel, so later commands in that shell inherit it too. The launch
 # command independently establishes the value for the agent process itself.
-spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
+spawn_send_or_abort "export COMPACT_ADVISER_DISABLE" \
+  spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
-  spawn_send_text_line "$T" "export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST")"
+  spawn_send_or_abort "export LAVISH_AXI_HOST" \
+    spawn_send_text_line "$T" "export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST")"
 fi
 # Mark the pane as a task worker so bin/fm-test-run.sh can refuse to run the
 # suite in the repository's primary checkout. Ship and scout workers are the
@@ -6164,7 +6349,7 @@ fi
 # The id reached a validated bare-slug charset above, so it carries no shell
 # syntax of its own.
 if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
-  spawn_send_text_line "$T" "export FM_TASK_ID=$ID"
+  spawn_send_or_abort "export FM_TASK_ID" spawn_send_text_line "$T" "export FM_TASK_ID=$ID"
 fi
 # Send through the exact channel that already ships GOTMPDIR, so every backend
 # and harness - ship, scout, and secondmate - gets it before launch. Skipped
@@ -6256,12 +6441,12 @@ if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
   exit 1
 fi
 sleep 0.3
-spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
+spawn_send_or_abort "launch command" spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3
 if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
   HERDR_PROJECTION_ABORT_CLEANUP=0
 fi
-spawn_send_key "$T" Enter
+spawn_send_or_abort "launch Enter" spawn_send_key "$T" Enter
 SPAWN_LAUNCH_SENT=1
 if [ "$HARNESS" = kimi ]; then
   if ! kimi_wait_for_ready; then
@@ -6413,4 +6598,7 @@ SPAWN_ACCOUNT=
 [ -z "$WORKER_ACCOUNT_PROVIDER" ] || SPAWN_ACCOUNT="$SPAWN_ACCOUNT account_provider=$WORKER_ACCOUNT_PROVIDER"
 # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.
 [ ! -e "$CONFIG/fleet-ledger" ] || [ "$RELAUNCH" -eq 1 ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$ID" "$KIND" "${PROJ_ABS##*/}" "$HARNESS" "$MODEL" || true
+if [ "$DISPATCH_SWITCHED" = true ]; then
+  printf 'working [at=%s]: model-matrix fallback launched %s %s for %s\n' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+fi
 echo "spawned $ID harness=$HARNESS kind=$KIND$SPAWN_DELIVERY window=$META_WINDOW worktree=$WT$SPAWN_ACCOUNT"
