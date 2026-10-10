@@ -1,0 +1,869 @@
+### sm open
+   g   a   m   m   a  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   c   o   l   o   n   -   f   o   r   m    
+   g   a   m   m   a  \n   d   e   l   t   a  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   c   o   r   r    
+   t   h   e   n       k   e   y  \n   p   e   n   d   i   n   g
+   -   r   e   p   l   y   -   x   2  \t   n   e   e   d   s   -
+   d   e   c   i   s   i   o   n  \t   p   e   n   d   i   n   g
+   -   r   e   p   l   y   -   m   i   s   s   e   d   :       r
+   e   a   l       e   s   c   a   l   a   t   i   o   n  \n   e
+   p   s  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   t   a   b  \t   i   n   s   i   d   e  \t   a   n   d
+       t   r   a   i   l   i   n   g  \t  \t  \n   z   e   t   a
+  \t   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t
+   i   d   e   o   g   r   a   p   h   i   c       s   p   a   c
+   e       l   e   a   d  \n   e   t   a  \t   n   e   e   d   s
+   -   d   e   c   i   s   i   o   n  \t   c   a   f 303 251    
+ 377       m   i   d       i   n   v   a   l   i   d  \n   t   h
+   e   t   a  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   t   r   u   n   c     342 200       c   u   t  \n
+   a   l   p   h   a  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   a   l   p   h   a       a   g   a   i   n
+  \n   k   a   p   p   a  \t   n   e   e   d   s   -   d   e   c
+   i   s   i   o   n  \t   s   p   a   c   e   d  \n   l   a   m
+   .   d   a  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   d   o   t   t   e   d       k   e   y  \n   m   u
+  \t   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t
+   a   f   t   e   r       d   o   n   e
+### sm dated
+   g   a   m   m   a  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t  \t   c   o   l   o   n   -   f   o   r   m
+       g   a   m   m   a  \n   d   e   l   t   a  \t   n   e   e
+   d   s   -   d   e   c   i   s   i   o   n  \t  \t   c   o   r
+   r       t   h   e   n       k   e   y  \n   p   e   n   d   i
+   n   g   -   r   e   p   l   y   -   x   2  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t  \t   p   e   n   d
+   i   n   g   -   r   e   p   l   y   -   m   i   s   s   e   d
+   :       r   e   a   l       e   s   c   a   l   a   t   i   o
+   n  \n   e   p   s  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t  \t   t   a   b  \t   i   n   s   i   d   e
+  \t   a   n   d       t   r   a   i   l   i   n   g  \n   z   e
+   t   a  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t  \t   i   d   e   o   g   r   a   p   h   i   c       s
+   p   a   c   e       l   e   a   d  \n   e   t   a  \t   n   e
+   e   d   s   -   d   e   c   i   s   i   o   n  \t  \t   c   a
+   f 303 251     377       m   i   d       i   n   v   a   l   i
+   d  \n   t   h   e   t   a  \t   n   e   e   d   s   -   d   e
+   c   i   s   i   o   n  \t  \t   t   r   u   n   c     342 200
+       c   u   t  \n   a   l   p   h   a  \t   n   e   e   d   s
+   -   d   e   c   i   s   i   o   n  \t   3   0   0  \t   a   l
+   p   h   a       a   g   a   i   n  \n   k   a   p   p   a  \t
+   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t  \t
+   s   p   a   c   e   d  \n   l   a   m   .   d   a  \t   n   e
+   e   d   s   -   d   e   c   i   s   i   o   n  \t  \t   d   o
+   t   t   e   d       k   e   y  \n   m   u  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t  \t   a   f   t   e
+   r       d   o   n   e  \n
+### sm activities
+### sm origins
+   g   a   m   m   a  \t   5  \n   d   e   l   t   a  \t   6  \n
+   p   e   n   d   i   n   g   -   r   e   p   l   y   -   x   2
+  \t   9  \n   e   p   s  \t   1   3  \n   z   e   t   a  \t   1
+   4  \n   e   t   a  \t   1   5  \n   t   h   e   t   a  \t   1
+   6  \n   a   l   p   h   a  \t   1   9  \n   k   a   p   p   a
+  \t   2   2  \n   l   a   m   .   d   a  \t   2   3  \n   m   u
+  \t   2   6
+### sm closing alpha=[needs-decision]
+### sm closing beta=[captain-held]
+### sm closing gamma=[needs-decision]
+### sm closing delta=[needs-decision]
+### sm closing default=[resolved]
+### sm closing pending-reply-x1=[]
+### sm closing pending-reply-x2=[needs-decision]
+### sm closing eps=[needs-decision]
+### sm closing eta=[needs-decision]
+### sm closing theta=[needs-decision]
+### sm closing lam.da=[needs-decision]
+### sm closing lam=[]
+### sm closing mu=[needs-decision]
+### sm closing w01=[]
+### sm closing w02=[]
+### sm inc1
+   g   a   m   m   a  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   c   o   l   o   n   -   f   o   r   m    
+   g   a   m   m   a  \n   d   e   l   t   a  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   c   o   r   r    
+   t   h   e   n       k   e   y  \n   p   e   n   d   i   n   g
+   -   r   e   p   l   y   -   x   2  \t   n   e   e   d   s   -
+   d   e   c   i   s   i   o   n  \t   p   e   n   d   i   n   g
+   -   r   e   p   l   y   -   m   i   s   s   e   d   :       r
+   e   a   l       e   s   c   a   l   a   t   i   o   n  \n   e
+   p   s  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   t   a   b  \t   i   n   s   i   d   e  \t   a   n   d
+       t   r   a   i   l   i   n   g  \t  \t  \n   z   e   t   a
+  \t   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t
+   i   d   e   o   g   r   a   p   h   i   c       s   p   a   c
+   e       l   e   a   d  \n   e   t   a  \t   n   e   e   d   s
+   -   d   e   c   i   s   i   o   n  \t   c   a   f 303 251    
+ 377       m   i   d       i   n   v   a   l   i   d  \n   t   h
+   e   t   a  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   t   r   u   n   c     342 200       c   u   t  \n
+   a   l   p   h   a  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   a   l   p   h   a       a   g   a   i   n
+  \n   k   a   p   p   a  \t   n   e   e   d   s   -   d   e   c
+   i   s   i   o   n  \t   s   p   a   c   e   d  \n   l   a   m
+   .   d   a  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   d   o   t   t   e   d       k   e   y  \n   m   u
+  \t   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t
+   a   f   t   e   r       d   o   n   e
+### sm inc2
+   g   a   m   m   a  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   c   o   l   o   n   -   f   o   r   m    
+   g   a   m   m   a  \n   d   e   l   t   a  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   c   o   r   r    
+   t   h   e   n       k   e   y  \n   p   e   n   d   i   n   g
+   -   r   e   p   l   y   -   x   2  \t   n   e   e   d   s   -
+   d   e   c   i   s   i   o   n  \t   p   e   n   d   i   n   g
+   -   r   e   p   l   y   -   m   i   s   s   e   d   :       r
+   e   a   l       e   s   c   a   l   a   t   i   o   n  \n   e
+   p   s  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   t   a   b  \t   i   n   s   i   d   e  \t   a   n   d
+       t   r   a   i   l   i   n   g  \t  \t  \n   z   e   t   a
+  \t   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t
+   i   d   e   o   g   r   a   p   h   i   c       s   p   a   c
+   e       l   e   a   d  \n   e   t   a  \t   n   e   e   d   s
+   -   d   e   c   i   s   i   o   n  \t   c   a   f 303 251    
+ 377       m   i   d       i   n   v   a   l   i   d  \n   t   h
+   e   t   a  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   t   r   u   n   c     342 200       c   u   t  \n
+   a   l   p   h   a  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   a   l   p   h   a       a   g   a   i   n
+  \n   k   a   p   p   a  \t   n   e   e   d   s   -   d   e   c
+   i   s   i   o   n  \t   s   p   a   c   e   d  \n   l   a   m
+   .   d   a  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   d   o   t   t   e   d       k   e   y  \n   n   u
+  \t   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t
+   n   e   w       n   u
+### sm open-after-checkpoint
+   g   a   m   m   a  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   c   o   l   o   n   -   f   o   r   m    
+   g   a   m   m   a  \n   d   e   l   t   a  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   c   o   r   r    
+   t   h   e   n       k   e   y  \n   p   e   n   d   i   n   g
+   -   r   e   p   l   y   -   x   2  \t   n   e   e   d   s   -
+   d   e   c   i   s   i   o   n  \t   p   e   n   d   i   n   g
+   -   r   e   p   l   y   -   m   i   s   s   e   d   :       r
+   e   a   l       e   s   c   a   l   a   t   i   o   n  \n   e
+   p   s  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   t   a   b  \t   i   n   s   i   d   e  \t   a   n   d
+       t   r   a   i   l   i   n   g  \t  \t  \n   z   e   t   a
+  \t   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t
+   i   d   e   o   g   r   a   p   h   i   c       s   p   a   c
+   e       l   e   a   d  \n   e   t   a  \t   n   e   e   d   s
+   -   d   e   c   i   s   i   o   n  \t   c   a   f 303 251    
+ 377       m   i   d       i   n   v   a   l   i   d  \n   t   h
+   e   t   a  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   t   r   u   n   c     342 200       c   u   t  \n
+   a   l   p   h   a  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   a   l   p   h   a       a   g   a   i   n
+  \n   k   a   p   p   a  \t   n   e   e   d   s   -   d   e   c
+   i   s   i   o   n  \t   s   p   a   c   e   d  \n   l   a   m
+   .   d   a  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   d   o   t   t   e   d       k   e   y  \n   n   u
+  \t   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t
+   n   e   w       n   u
+### ship open
+   m   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   a   f   t   e   r       d   o   n   e
+### ship dated
+   m   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t  \t   a   f   t   e   r       d   o   n   e  \n
+### ship activities
+### ship origins
+   m   u  \t   2   6
+### ship closing alpha=[done]
+### ship closing beta=[captain-held]
+### ship closing gamma=[done]
+### ship closing delta=[done]
+### ship closing default=[resolved]
+### ship closing pending-reply-x1=[]
+### ship closing pending-reply-x2=[done]
+### ship closing eps=[done]
+### ship closing eta=[done]
+### ship closing theta=[done]
+### ship closing lam.da=[done]
+### ship closing lam=[]
+### ship closing mu=[needs-decision]
+### ship closing w01=[]
+### ship closing w02=[]
+### ship inc1
+   m   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   a   f   t   e   r       d   o   n   e
+### ship inc2
+   n   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   n   e   w       n   u
+### ship open-after-checkpoint
+   n   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   n   e   w       n   u
+### scout open
+   m   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   a   f   t   e   r       d   o   n   e
+### scout dated
+   m   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t  \t   a   f   t   e   r       d   o   n   e  \n
+### scout activities
+### scout origins
+   m   u  \t   2   6
+### scout closing alpha=[done]
+### scout closing beta=[captain-held]
+### scout closing gamma=[done]
+### scout closing delta=[done]
+### scout closing default=[resolved]
+### scout closing pending-reply-x1=[]
+### scout closing pending-reply-x2=[done]
+### scout closing eps=[done]
+### scout closing eta=[done]
+### scout closing theta=[done]
+### scout closing lam.da=[done]
+### scout closing lam=[]
+### scout closing mu=[needs-decision]
+### scout closing w01=[]
+### scout closing w02=[]
+### scout inc1
+   m   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   a   f   t   e   r       d   o   n   e
+### scout inc2
+   n   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   n   e   w       n   u
+### scout open-after-checkpoint
+   n   u  \t   n   e   e   d   s   -   d   e   c   i   s   i   o
+   n  \t   n   e   w       n   u
+### wide open
+   w   0   2  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       2     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   4  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       4     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   6  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       6     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   8  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       8     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   1   0  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       1   0     303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+  \n   w   1   2  \t   n   e   e   d   s   -   d   e   c   i   s
+   i   o   n  \t   q       1   2     303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251  \n   w   1   4  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   q       1   4     303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251  \n   w   1   6  \t   n   e   e   d   s   -   d   e   c
+   i   s   i   o   n  \t   q       1   6     303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251  \n   w   1   8  \t   n   e   e   d   s   -   d   e
+   c   i   s   i   o   n  \t   q       1   8     303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251  \n   w   2   0  \t   n   e   e   d   s   -   d
+   e   c   i   s   i   o   n  \t   q       2   0     303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251  \n   w   2   2  \t   n   e   e   d   s   -
+   d   e   c   i   s   i   o   n  \t   q       2   2     303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251  \n   w   2   4  \t   n   e   e   d   s
+   -   d   e   c   i   s   i   o   n  \t   q       2   4     303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251  \n   w   2   6  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   q       2   6    
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251 303 251  \n   w   2   8  \t   n   e   e
+   d   s   -   d   e   c   i   s   i   o   n  \t   q       2   8
+     303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251  \n   w   3   0  \t   n   e
+   e   d   s   -   d   e   c   i   s   i   o   n  \t   q       3
+   0     303 251 303 251 303 251 303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251 303 251 303 251
+### wide dated
+   w   0   2  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   1   7   0   0   0   0   0   0   0   2  \t   q    
+   2     303 251 303 251 303 251 303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251 303 251 303 251  \n   w   0   4  \t   n
+   e   e   d   s   -   d   e   c   i   s   i   o   n  \t   1   7
+   0   0   0   0   0   0   0   4  \t   q       4     303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251  \n   w   0   6  \t   n   e   e   d   s   -
+   d   e   c   i   s   i   o   n  \t   1   7   0   0   0   0   0
+   0   0   6  \t   q       6     303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+  \n   w   0   8  \t   n   e   e   d   s   -   d   e   c   i   s
+   i   o   n  \t   1   7   0   0   0   0   0   0   0   8  \t   q
+       8     303 251 303 251 303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251  \n   w   1   0  \t
+   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t   1
+   7   0   0   0   0   0   0   1   0  \t   q       1   0     303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251  \n   w   1   2  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   1   7   0   0   0
+   0   0   0   1   2  \t   q       1   2     303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251  \n   w   1   4  \t   n   e   e   d   s   -   d   e
+   c   i   s   i   o   n  \t   1   7   0   0   0   0   0   0   1
+   4  \t   q       1   4     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   1   6  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   1   7   0   0   0   0   0   0   1   6  \t   q    
+   1   6     303 251 303 251 303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251  \n   w   1   8  \t
+   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t   1
+   7   0   0   0   0   0   0   1   8  \t   q       1   8     303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251  \n   w   2   0  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   1   7   0   0   0
+   0   0   0   2   0  \t   q       2   0     303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251  \n   w   2   2  \t   n   e   e   d   s   -   d   e
+   c   i   s   i   o   n  \t   1   7   0   0   0   0   0   0   2
+   2  \t   q       2   2     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   2   4  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   1   7   0   0   0   0   0   0   2   4  \t   q    
+   2   4     303 251 303 251 303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251  \n   w   2   6  \t
+   n   e   e   d   s   -   d   e   c   i   s   i   o   n  \t   1
+   7   0   0   0   0   0   0   2   6  \t   q       2   6     303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251  \n   w   2   8  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   1   7   0   0   0
+   0   0   0   2   8  \t   q       2   8     303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251  \n   w   3   0  \t   n   e   e   d   s   -   d   e
+   c   i   s   i   o   n  \t   1   7   0   0   0   0   0   0   3
+   0  \t   q       3   0     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+### wide activities
+### wide origins
+   w   0   2  \t   2  \n   w   0   4  \t   4  \n   w   0   6  \t
+   6  \n   w   0   8  \t   8  \n   w   1   0  \t   1   0  \n   w
+   1   2  \t   1   2  \n   w   1   4  \t   1   4  \n   w   1   6
+  \t   1   6  \n   w   1   8  \t   1   8  \n   w   2   0  \t   2
+   0  \n   w   2   2  \t   2   2  \n   w   2   4  \t   2   4  \n
+   w   2   6  \t   2   6  \n   w   2   8  \t   2   8  \n   w   3
+   0  \t   3   0
+### wide closing alpha=[]
+### wide closing beta=[]
+### wide closing gamma=[]
+### wide closing delta=[]
+### wide closing default=[]
+### wide closing pending-reply-x1=[]
+### wide closing pending-reply-x2=[]
+### wide closing eps=[]
+### wide closing eta=[]
+### wide closing theta=[]
+### wide closing lam.da=[]
+### wide closing lam=[]
+### wide closing mu=[]
+### wide closing w01=[resolved]
+### wide closing w02=[needs-decision]
+### wide inc1
+   w   0   2  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       2     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   4  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       4     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   6  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       6     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   8  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       8     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   1   0  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       1   0     303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+  \n   w   1   2  \t   n   e   e   d   s   -   d   e   c   i   s
+   i   o   n  \t   q       1   2     303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251  \n   w   1   4  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   q       1   4     303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251  \n   w   1   6  \t   n   e   e   d   s   -   d   e   c
+   i   s   i   o   n  \t   q       1   6     303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251  \n   w   1   8  \t   n   e   e   d   s   -   d   e
+   c   i   s   i   o   n  \t   q       1   8     303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251  \n   w   2   0  \t   n   e   e   d   s   -   d
+   e   c   i   s   i   o   n  \t   q       2   0     303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251  \n   w   2   2  \t   n   e   e   d   s   -
+   d   e   c   i   s   i   o   n  \t   q       2   2     303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251  \n   w   2   4  \t   n   e   e   d   s
+   -   d   e   c   i   s   i   o   n  \t   q       2   4     303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251  \n   w   2   6  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   q       2   6    
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251 303 251  \n   w   2   8  \t   n   e   e
+   d   s   -   d   e   c   i   s   i   o   n  \t   q       2   8
+     303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251  \n   w   3   0  \t   n   e
+   e   d   s   -   d   e   c   i   s   i   o   n  \t   q       3
+   0     303 251 303 251 303 251 303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251 303 251 303 251
+### wide inc2
+   w   0   2  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       2     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   4  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       4     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   6  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       6     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   8  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       8     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   1   0  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       1   0     303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+  \n   w   1   2  \t   n   e   e   d   s   -   d   e   c   i   s
+   i   o   n  \t   q       1   2     303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251  \n   w   1   4  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   q       1   4     303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251  \n   w   1   6  \t   n   e   e   d   s   -   d   e   c
+   i   s   i   o   n  \t   q       1   6     303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251  \n   w   1   8  \t   n   e   e   d   s   -   d   e
+   c   i   s   i   o   n  \t   q       1   8     303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251  \n   w   2   0  \t   n   e   e   d   s   -   d
+   e   c   i   s   i   o   n  \t   q       2   0     303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251  \n   w   2   2  \t   n   e   e   d   s   -
+   d   e   c   i   s   i   o   n  \t   q       2   2     303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251  \n   w   2   4  \t   n   e   e   d   s
+   -   d   e   c   i   s   i   o   n  \t   q       2   4     303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251  \n   w   2   6  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   q       2   6    
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251 303 251  \n   w   2   8  \t   n   e   e
+   d   s   -   d   e   c   i   s   i   o   n  \t   q       2   8
+     303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251  \n   w   3   0  \t   n   e
+   e   d   s   -   d   e   c   i   s   i   o   n  \t   q       3
+   0     303 251 303 251 303 251 303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251 303 251 303 251  \n   n   u  \t   n   e
+   e   d   s   -   d   e   c   i   s   i   o   n  \t   n   e   w
+       n   u
+### wide open-after-checkpoint
+   w   0   2  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       2     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   4  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       4     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   6  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       6     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   0   8  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       8     303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251  \n
+   w   1   0  \t   n   e   e   d   s   -   d   e   c   i   s   i
+   o   n  \t   q       1   0     303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+  \n   w   1   2  \t   n   e   e   d   s   -   d   e   c   i   s
+   i   o   n  \t   q       1   2     303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251  \n   w   1   4  \t   n   e   e   d   s   -   d   e   c   i
+   s   i   o   n  \t   q       1   4     303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251  \n   w   1   6  \t   n   e   e   d   s   -   d   e   c
+   i   s   i   o   n  \t   q       1   6     303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251  \n   w   1   8  \t   n   e   e   d   s   -   d   e
+   c   i   s   i   o   n  \t   q       1   8     303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251  \n   w   2   0  \t   n   e   e   d   s   -   d
+   e   c   i   s   i   o   n  \t   q       2   0     303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251  \n   w   2   2  \t   n   e   e   d   s   -
+   d   e   c   i   s   i   o   n  \t   q       2   2     303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251  \n   w   2   4  \t   n   e   e   d   s
+   -   d   e   c   i   s   i   o   n  \t   q       2   4     303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251  \n   w   2   6  \t   n   e   e   d
+   s   -   d   e   c   i   s   i   o   n  \t   q       2   6    
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251 303 251  \n   w   2   8  \t   n   e   e
+   d   s   -   d   e   c   i   s   i   o   n  \t   q       2   8
+     303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+ 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303
+*
+ 251 303 251 303 251 303 251 303 251  \n   w   3   0  \t   n   e
+   e   d   s   -   d   e   c   i   s   i   o   n  \t   q       3
+   0     303 251 303 251 303 251 303 251 303 251 303 251 303 251
+ 303 251 303 251 303 251 303 251 303 251 303 251 303 251 303 251
+*
+ 303 251 303 251 303 251 303 251 303 251  \n   n   u  \t   n   e
+   e   d   s   -   d   e   c   i   s   i   o   n  \t   n   e   w
+       n   u
+### line working:\ start verb=[working] note=[start] key=[default] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line needs-decision\ \[key=alpha\]\ \[at=100\]:\ first\ alpha\ question verb=[needs-decision] note=[first alpha question] key=[alpha] rc=0
+  fold=$'alpha\tneeds-decision\tfirst alpha question.'
+  foldship=$'alpha\tneeds-decision\tfirst alpha question.'
+  fold=$'a\tneeds-decision\tx\nalpha\tneeds-decision\tfirst alpha question.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tneeds-decision\tfirst alpha question.'
+  fold=$'a\tneeds-decision\tx\nalpha\tneeds-decision\tfirst alpha question.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tneeds-decision\tfirst alpha question.'
+  fold=$'eps\tneeds-decision\tz\nalpha\tneeds-decision\tfirst alpha question.'
+  foldship=$'eps\tneeds-decision\tz\nalpha\tneeds-decision\tfirst alpha question.'
+### line blocked\ \[key=beta\]\ \[at=10:30\]:\ beta\ waits verb=[blocked] note=[beta waits] key=[beta] rc=0
+  fold=$'beta\tblocked\tbeta waits.'
+  foldship=$'beta\tblocked\tbeta waits.'
+  fold=$'a\tneeds-decision\tx\nbeta\tblocked\tbeta waits.'
+  foldship=$'a\tneeds-decision\tx\nbeta\tblocked\tbeta waits.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nbeta\tblocked\tbeta waits.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nbeta\tblocked\tbeta waits.'
+  fold=$'eps\tneeds-decision\tz\nbeta\tblocked\tbeta waits.'
+  foldship=$'eps\tneeds-decision\tz\nbeta\tblocked\tbeta waits.'
+### line note\ \[at=120\]:\ mentions\ \[key=alpha\]\ in\ prose verb=[note] note=[mentions [key=alpha] in prose] key=[default] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line needs-decision:\ \[key=gamma\]\ colon-form\ gamma verb=[needs-decision] note=[colon-form gamma] key=[gamma] rc=0
+  fold=$'gamma\tneeds-decision\tcolon-form gamma.'
+  foldship=$'gamma\tneeds-decision\tcolon-form gamma.'
+  fold=$'a\tneeds-decision\tx\ngamma\tneeds-decision\tcolon-form gamma.'
+  foldship=$'a\tneeds-decision\tx\ngamma\tneeds-decision\tcolon-form gamma.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\ngamma\tneeds-decision\tcolon-form gamma.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\ngamma\tneeds-decision\tcolon-form gamma.'
+  fold=$'eps\tneeds-decision\tz\ngamma\tneeds-decision\tcolon-form gamma.'
+  foldship=$'eps\tneeds-decision\tz\ngamma\tneeds-decision\tcolon-form gamma.'
+### line needs-decision\ \[corr=c1\]\ \[key=delta\]:\ corr\ then\ key verb=[needs-decision] note=[corr then key] key=[delta] rc=0
+  fold=$'delta\tneeds-decision\tcorr then key.'
+  foldship=$'delta\tneeds-decision\tcorr then key.'
+  fold=$'a\tneeds-decision\tx\ndelta\tneeds-decision\tcorr then key.'
+  foldship=$'a\tneeds-decision\tx\ndelta\tneeds-decision\tcorr then key.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\ndelta\tneeds-decision\tcorr then key.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\ndelta\tneeds-decision\tcorr then key.'
+  fold=$'eps\tneeds-decision\tz\ndelta\tneeds-decision\tcorr then key.'
+  foldship=$'eps\tneeds-decision\tz\ndelta\tneeds-decision\tcorr then key.'
+### line needs-decision\ \[corr=c2\]:\ corr\ no\ key verb=[needs-decision] note=[corr no key] key=[default] rc=0
+  fold=$'default\tneeds-decision\tcorr no key.'
+  foldship=$'default\tneeds-decision\tcorr no key.'
+  fold=$'a\tneeds-decision\tx\ndefault\tneeds-decision\tcorr no key.'
+  foldship=$'a\tneeds-decision\tx\ndefault\tneeds-decision\tcorr no key.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\ndefault\tneeds-decision\tcorr no key.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\ndefault\tneeds-decision\tcorr no key.'
+  fold=$'eps\tneeds-decision\tz\ndefault\tneeds-decision\tcorr no key.'
+  foldship=$'eps\tneeds-decision\tz\ndefault\tneeds-decision\tcorr no key.'
+### line needs-decision\ \[key=pending-reply-x1\]:\ not\ the\ vocabulary verb=[needs-decision] note=[not the vocabulary] key=[pending-reply-x1] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line needs-decision\ \[key=pending-reply-x2\]:\ pending-reply-missed:\ real\ escalation verb=[needs-decision] note=[pending-reply-missed: real escalation] key=[pending-reply-x2] rc=0
+  fold=$'pending-reply-x2\tneeds-decision\tpending-reply-missed: real escalation.'
+  foldship=$'pending-reply-x2\tneeds-decision\tpending-reply-missed: real escalation.'
+  fold=$'a\tneeds-decision\tx\npending-reply-x2\tneeds-decision\tpending-reply-missed: real escalation.'
+  foldship=$'a\tneeds-decision\tx\npending-reply-x2\tneeds-decision\tpending-reply-missed: real escalation.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\npending-reply-x2\tneeds-decision\tpending-reply-missed: real escalation.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\npending-reply-x2\tneeds-decision\tpending-reply-missed: real escalation.'
+  fold=$'eps\tneeds-decision\tz\npending-reply-x2\tneeds-decision\tpending-reply-missed: real escalation.'
+  foldship=$'eps\tneeds-decision\tz\npending-reply-x2\tneeds-decision\tpending-reply-missed: real escalation.'
+### line needs-decision\ \[key=bad\ slug\]:\ malformed\ key verb=[needs-decision] note=[malformed key] key=[] rc=1
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line resolved\ \[key=alpha\]:\ answered\ alpha verb=[resolved] note=[answered alpha] key=[alpha] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line captain-held\ \[key=beta\]:\ held\ beta verb=[captain-held] note=[held beta] key=[beta] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line $'needs-decision [key=eps]: tab\tinside\tand trailing\t\t' verb=[needs-decision] note=[tab	inside	and trailing		] key=[eps] rc=0
+  fold=$'eps\tneeds-decision\ttab\tinside\tand trailing\t\t.'
+  foldship=$'eps\tneeds-decision\ttab\tinside\tand trailing\t\t.'
+  fold=$'a\tneeds-decision\tx\neps\tneeds-decision\ttab\tinside\tand trailing\t\t.'
+  foldship=$'a\tneeds-decision\tx\neps\tneeds-decision\ttab\tinside\tand trailing\t\t.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\neps\tneeds-decision\ttab\tinside\tand trailing\t\t.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\neps\tneeds-decision\ttab\tinside\tand trailing\t\t.'
+  fold=$'eps\tneeds-decision\ttab\tinside\tand trailing\t\t.'
+  foldship=$'eps\tneeds-decision\ttab\tinside\tand trailing\t\t.'
+### line needs-decision\ \[key=zeta\]:　\ ideographic\ space\ lead verb=[needs-decision] note=[ideographic space lead] key=[zeta] rc=0
+  fold=$'zeta\tneeds-decision\tideographic space lead.'
+  foldship=$'zeta\tneeds-decision\tideographic space lead.'
+  fold=$'a\tneeds-decision\tx\nzeta\tneeds-decision\tideographic space lead.'
+  foldship=$'a\tneeds-decision\tx\nzeta\tneeds-decision\tideographic space lead.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nzeta\tneeds-decision\tideographic space lead.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nzeta\tneeds-decision\tideographic space lead.'
+  fold=$'eps\tneeds-decision\tz\nzeta\tneeds-decision\tideographic space lead.'
+  foldship=$'eps\tneeds-decision\tz\nzeta\tneeds-decision\tideographic space lead.'
+### line $'needs-decision [key=eta]: café \377 mid invalid' verb=[needs-decision] note=[café � mid invalid] key=[eta] rc=0
+  fold=$'eta\tneeds-decision\tcafé \377 mid invalid.'
+  foldship=$'eta\tneeds-decision\tcafé \377 mid invalid.'
+  fold=$'a\tneeds-decision\tx\neta\tneeds-decision\tcafé \377 mid invalid.'
+  foldship=$'a\tneeds-decision\tx\neta\tneeds-decision\tcafé \377 mid invalid.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\neta\tneeds-decision\tcafé \377 mid invalid.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\neta\tneeds-decision\tcafé \377 mid invalid.'
+  fold=$'eps\tneeds-decision\tz\neta\tneeds-decision\tcafé \377 mid invalid.'
+  foldship=$'eps\tneeds-decision\tz\neta\tneeds-decision\tcafé \377 mid invalid.'
+### line $'needs-decision [key=theta]: trunc \342\200 cut' verb=[needs-decision] note=[trunc � cut] key=[theta] rc=0
+  fold=$'theta\tneeds-decision\ttrunc \342\200 cut.'
+  foldship=$'theta\tneeds-decision\ttrunc \342\200 cut.'
+  fold=$'a\tneeds-decision\tx\ntheta\tneeds-decision\ttrunc \342\200 cut.'
+  foldship=$'a\tneeds-decision\tx\ntheta\tneeds-decision\ttrunc \342\200 cut.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\ntheta\tneeds-decision\ttrunc \342\200 cut.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\ntheta\tneeds-decision\ttrunc \342\200 cut.'
+  fold=$'eps\tneeds-decision\tz\ntheta\tneeds-decision\ttrunc \342\200 cut.'
+  foldship=$'eps\tneeds-decision\tz\ntheta\tneeds-decision\ttrunc \342\200 cut.'
+### line paused:\ a\ pause verb=[paused] note=[a pause] key=[default] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line resolved:\ default\ retract verb=[resolved] note=[default retract] key=[default] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line needs-decision\ \[key=alpha\]\ \[at=300\]:\ alpha\ again verb=[needs-decision] note=[alpha again] key=[alpha] rc=0
+  fold=$'alpha\tneeds-decision\talpha again.'
+  foldship=$'alpha\tneeds-decision\talpha again.'
+  fold=$'a\tneeds-decision\tx\nalpha\tneeds-decision\talpha again.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tneeds-decision\talpha again.'
+  fold=$'a\tneeds-decision\tx\nalpha\tneeds-decision\talpha again.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tneeds-decision\talpha again.'
+  fold=$'eps\tneeds-decision\tz\nalpha\tneeds-decision\talpha again.'
+  foldship=$'eps\tneeds-decision\tz\nalpha\tneeds-decision\talpha again.'
+### line $'blocked \377[key=iota]: bad verb byte' verb=[blocked �] note=[bad verb byte] key=[iota] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line needs-decision verb=[needs-decision] note=[needs-decision] key=[default] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line \ \ \ needs-decision\ \[key=kappa\]\ \ \ :\ \ \ spaced verb=[needs-decision] note=[spaced] key=[kappa] rc=0
+  fold=$'kappa\tneeds-decision\tspaced.'
+  foldship=$'kappa\tneeds-decision\tspaced.'
+  fold=$'a\tneeds-decision\tx\nkappa\tneeds-decision\tspaced.'
+  foldship=$'a\tneeds-decision\tx\nkappa\tneeds-decision\tspaced.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nkappa\tneeds-decision\tspaced.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nkappa\tneeds-decision\tspaced.'
+  fold=$'eps\tneeds-decision\tz\nkappa\tneeds-decision\tspaced.'
+  foldship=$'eps\tneeds-decision\tz\nkappa\tneeds-decision\tspaced.'
+### line needs-decision\ \[key=lam.da\]:\ dotted\ key verb=[needs-decision] note=[dotted key] key=[lam.da] rc=0
+  fold=$'lam.da\tneeds-decision\tdotted key.'
+  foldship=$'lam.da\tneeds-decision\tdotted key.'
+  fold=$'a\tneeds-decision\tx\nlam.da\tneeds-decision\tdotted key.'
+  foldship=$'a\tneeds-decision\tx\nlam.da\tneeds-decision\tdotted key.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nlam.da\tneeds-decision\tdotted key.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nlam.da\tneeds-decision\tdotted key.'
+  fold=$'eps\tneeds-decision\tz\nlam.da\tneeds-decision\tdotted key.'
+  foldship=$'eps\tneeds-decision\tz\nlam.da\tneeds-decision\tdotted key.'
+### line resolved\ \[key=lam\]:\ near\ miss verb=[resolved] note=[near miss] key=[lam] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=$'a\tneeds-decision\tx.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=$'eps\tneeds-decision\tz.'
+### line done:\ finished verb=[done] note=[finished] key=[default] rc=0
+  fold=.
+  foldship=.
+  fold=$'a\tneeds-decision\tx.'
+  foldship=.
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty.'
+  foldship=.
+  fold=$'eps\tneeds-decision\tz.'
+  foldship=.
+### line needs-decision\ \[key=mu\]:\ after\ done verb=[needs-decision] note=[after done] key=[mu] rc=0
+  fold=$'mu\tneeds-decision\tafter done.'
+  foldship=$'mu\tneeds-decision\tafter done.'
+  fold=$'a\tneeds-decision\tx\nmu\tneeds-decision\tafter done.'
+  foldship=$'a\tneeds-decision\tx\nmu\tneeds-decision\tafter done.'
+  fold=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nmu\tneeds-decision\tafter done.'
+  foldship=$'a\tneeds-decision\tx\nalpha\tblocked\ty\nmu\tneeds-decision\tafter done.'
+  fold=$'eps\tneeds-decision\tz\nmu\tneeds-decision\tafter done.'
+  foldship=$'eps\tneeds-decision\tz\nmu\tneeds-decision\tafter done.'
+### drop '' a stdout=. var=''
+### drop '' a.b stdout=. var=''
+### drop '' axb stdout=. var=''
+### drop '' c stdout=. var=''
+### drop '' zz stdout=. var=''
+### drop $'a\tx\ty' a stdout=. var=''
+### drop $'a\tx\ty' a.b stdout=$'a\tx\ty\n.' var=$'a\tx\ty'
+### drop $'a\tx\ty' axb stdout=$'a\tx\ty\n.' var=$'a\tx\ty'
+### drop $'a\tx\ty' c stdout=$'a\tx\ty\n.' var=$'a\tx\ty'
+### drop $'a\tx\ty' zz stdout=$'a\tx\ty\n.' var=$'a\tx\ty'
+### drop $'a\tx\ty\n' a stdout=. var=''
+### drop $'a\tx\ty\n' a.b stdout=$'a\tx\ty\n.' var=$'a\tx\ty'
+### drop $'a\tx\ty\n' axb stdout=$'a\tx\ty\n.' var=$'a\tx\ty'
+### drop $'a\tx\ty\n' c stdout=$'a\tx\ty\n.' var=$'a\tx\ty'
+### drop $'a\tx\ty\n' zz stdout=$'a\tx\ty\n.' var=$'a\tx\ty'
+### drop $'b\tx\ty\na\tx\ty\nc\tq\tr\n\n' a stdout=$'b\tx\ty\nc\tq\tr\n.' var=$'b\tx\ty\nc\tq\tr'
+### drop $'b\tx\ty\na\tx\ty\nc\tq\tr\n\n' a.b stdout=$'b\tx\ty\na\tx\ty\nc\tq\tr\n.' var=$'b\tx\ty\na\tx\ty\nc\tq\tr'
+### drop $'b\tx\ty\na\tx\ty\nc\tq\tr\n\n' axb stdout=$'b\tx\ty\na\tx\ty\nc\tq\tr\n.' var=$'b\tx\ty\na\tx\ty\nc\tq\tr'
+### drop $'b\tx\ty\na\tx\ty\nc\tq\tr\n\n' c stdout=$'b\tx\ty\na\tx\ty\n.' var=$'b\tx\ty\na\tx\ty'
+### drop $'b\tx\ty\na\tx\ty\nc\tq\tr\n\n' zz stdout=$'b\tx\ty\na\tx\ty\nc\tq\tr\n.' var=$'b\tx\ty\na\tx\ty\nc\tq\tr'
+### drop $'a.b\tx\ty\naxb\tx\ty' a stdout=$'a.b\tx\ty\naxb\tx\ty\n.' var=$'a.b\tx\ty\naxb\tx\ty'
+### drop $'a.b\tx\ty\naxb\tx\ty' a.b stdout=$'axb\tx\ty\n.' var=$'axb\tx\ty'
+### drop $'a.b\tx\ty\naxb\tx\ty' axb stdout=$'a.b\tx\ty\n.' var=$'a.b\tx\ty'
+### drop $'a.b\tx\ty\naxb\tx\ty' c stdout=$'a.b\tx\ty\naxb\tx\ty\n.' var=$'a.b\tx\ty\naxb\tx\ty'
+### drop $'a.b\tx\ty\naxb\tx\ty' zz stdout=$'a.b\tx\ty\naxb\tx\ty\n.' var=$'a.b\tx\ty\naxb\tx\ty'

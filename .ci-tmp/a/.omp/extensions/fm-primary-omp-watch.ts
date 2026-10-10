@@ -1,0 +1,1441 @@
+// Firstmate primary watcher bridge for omp (Oh My Pi).
+//
+// A port of .pi/extensions/fm-primary-pi-watch.ts for the omp fork. The arm,
+// successor, retry, and replacement-handoff logic follows the Pi contract;
+// the omp-specific differences are stated once here:
+//   - omp auto-discovers this file from <cwd>/.omp/extensions with no trust
+//     gate, so an omp primary or secondmate started inside its home loads it
+//     without -e (naming it both ways loads it twice - verified, omp 18.1.11).
+//   - pi.sendUserMessage returns synchronously (no promise) in omp, so accepting
+//     a wake means the call returned, not that a turn consumed it.
+//   - omp reports no session_shutdown reason, so EVERY shutdown with a pending
+//     actionable close persists the replacement handoff. The next owning
+//     activation, through session_start, self-heal, or an arm call, replays it;
+//     a later process can also replay the durable handoff. If publication fails,
+//     the pending wake and failure detail remain in process memory for recovery.
+//     Replaying a wake main has already drained is harmless (the queue is durable
+//     and the drain is idempotent); losing one across /new is not.
+//   - Replacement shutdown retires the established predecessor arm before the
+//     successor arms; unlike Pi, it is not retained until a distinct active
+//     successor generation commits its own arm, so omp keeps the plain
+//     teardown-and-rearm replacement shape.
+//   - The Pi supervision branch is out of scope for omp: every actionable wake
+//     is delivered to main, so no branch offer is made and no calm presentation
+//     hooks exist.
+//   - The arming tool is fm_watch_arm_omp and its human fallback
+//     /fm-watch-arm-omp; the loaded-build marker is state/.omp-watch-extension-loaded.
+//   - Supervision host: a home opted in with config/supervision-host
+//     (docs/configuration.md "Supervision host" owns the gate, which
+//     bin/fm-supervision-engine-lib.sh enabled answers; config/supervision-host-off opts out) spawns
+//     bin/fm-supervision-host.sh park --restart in the arm's place, which
+//     takes away-posture wakes itself and closes only when main is needed; its
+//     header owns the output read here. A "supervision-host:" line is
+//     actionable like a wake line, and the message delivered at the host's
+//     close carries every such line in order while wake lines keep an
+//     eight-line cap. The host
+//     prints the first cycle's status line as soon as it is verified, so
+//     readiness and the handling handoff work as they do for the arm, with a
+//     longer readiness budget for the host's own startup. On a home that does
+//     not run the host nothing below changes.
+//
+// Session-generation ownership (stated once here):
+// omp emits session_shutdown for ordinary same-process replacements (/new,
+// /resume, /fork) as well as terminal quit. This extension binds one generation
+// per session activation. Only the active live generation may start, stop,
+// rearm, or clear the arm child. An owning replacement session_start or arm
+// call activates its new generation without a model turn. A replacement
+// handoff carries actionable closes that were still pending delivery; its
+// durable state lives at state/extensions/omp-primary-watch/session-replacement-actionable.json.
+// Stale callbacks from a prior generation are no-ops against the active replacement.
+// A stopped generation is never a dead end: omp can stop a session generation
+// with no matching session_start reaching this extension, and a stopped
+// generation refuses every arm. If no successor has bound within
+// FM_OMP_SUCCESSOR_GRACE_MS (configuration reference owns the default) while
+// this process still owns the home lock, the extension binds a fresh generation
+// itself, exactly as session_start would, and an arm call does the same because
+// it proves a live session. Recovery waits for predecessor retirement, and a
+// real successor arriving later finds the generation live and arms nothing twice.
+// Recovery remains pending until activation hands off to a tracked arm or
+// scheduled retry. Timed activation failures surface through the failure-wake
+// path and leave recovery available to a later arm call or successor.
+// Single instance: the latest factory bind in this process owns the home
+// (.pi/extensions/lib/fm-watch-lifecycle.ts owns the registry). An earlier
+// instance retires its generation and its event handlers become no-ops, and
+// its arm tool and command forward to the current instance, so a session that
+// loaded this file twice still has exactly one live generation and one arm.
+// .pi/extensions/lib/fm-watch-lifecycle.ts owns the best-effort lifecycle record
+// at state/extensions/omp-primary-watch/lifecycle.log.
+//
+// Delivery versus consumption (stated once here):
+// A main wake is delivered once omp accepts it (sendUserMessage returns).
+// docs/watcher-continuity.md#omp-idle-wake-delivery owns idle delivery and
+// composer safety.
+// The successor pipeline never waits for the model to read it: a follow-up
+// queued while main is streaming joins the running run without ever raising
+// before_agent_start, so waiting on that event stalls every later close.
+// Consumption tracks which accepted wakes remain eligible for recovery or
+// replacement replay; docs/watcher-continuity.md owns the consumption contract.
+//
+// Restored-wake recovery is documented in docs/watcher-continuity.md.
+// Recovery must use the real editor and resend only this extension's unchanged
+// emitted wake, never submit the whole composer or alter operator draft bytes.
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+// typebox resolves inside omp's extension loader (verified, omp 18.1.11); the
+// injected TypeBox compatibility shim keeps it available for tool parameters.
+import { Type } from "typebox";
+// The operational-input encoder is shared with the omp extensions; its owner
+// resolves bin/fm-operational-input.sh relative to its own location, which is
+// the same repository root this file lives in.
+import { encodeFirstmateOperationalInput } from "../../.pi/extensions/lib/fm-operational-input.ts";
+import { bindWatchInstance, createLifecycleLog, setLifecycleDeadline } from "../../.pi/extensions/lib/fm-watch-lifecycle.ts";
+
+// The omp extension API surface this file uses. omp is a Pi fork and ships no
+// separately installable type package, so the contract is declared locally
+// rather than imported from the Pi package name.
+type ExtensionAPI = {
+  on?: (event: string, handler: (event: any, ctx: any) => unknown) => void;
+  sendUserMessage: (content: string, options?: { deliverAs?: string }) => unknown;
+  registerCommand?: (name: string, command: { description: string; handler: (args: string, ctx: any) => Promise<void> | void }) => void;
+  registerTool?: (tool: Record<string, unknown>) => void;
+};
+
+type ArmResult = {
+  ok: boolean;
+  message: string;
+};
+
+type LockOwnership = "owned" | "missing" | "other";
+
+type CloseClassification = {
+  kind: "actionable" | "failure";
+  message: string;
+};
+
+type PendingActionableClose = {
+  version: 1;
+  token: string;
+  message: string;
+  predecessorArmPid: string;
+  delivered?: true;
+};
+
+type ReplacementActionableHandoff = {
+  version: 2;
+  pending: PendingActionableClose[];
+};
+
+type UnconsumedWake = {
+  content: string;
+  pending?: PendingActionableClose;
+};
+
+type SessionGeneration = {
+  id: number;
+  stopping: boolean;
+  replacement: boolean;
+  child: ChildProcess | null;
+  retryTimer: ReturnType<typeof setTimeout> | null;
+  cleanupTimer: ReturnType<typeof setTimeout> | null;
+  retryFailures: number;
+  restoring: boolean;
+  seq: number;
+  pendingActionables: PendingActionableClose[];
+  cleanupFailure: string;
+  // Main wakes omp has accepted but not yet consumed, by pending token.
+  // Never cleared at shutdown: a delivery continuation that runs after the
+  // replacement began still needs to distinguish unconsumed wakes from
+  // consumed ones.
+  unconsumedWakes: Map<string, UnconsumedWake>;
+  // A verified successor's failure close that arrived while the pipeline was
+  // still delivering the wake it was started for; its bounded retry runs once
+  // that delivery settles instead of being skipped by the single-flight guard.
+  deferredClose: { message: string; predecessorArmPid: string } | null;
+};
+
+const extensionFile = fileURLToPath(import.meta.url);
+const extensionDir = dirname(extensionFile);
+const root = resolve(extensionDir, "../..");
+const fmHome = process.env.FM_HOME || process.env.FM_ROOT_OVERRIDE || root;
+const fmRoot = process.env.FM_ROOT_OVERRIDE || root;
+const state = process.env.FM_STATE_OVERRIDE || `${fmHome}/state`;
+const config = process.env.FM_CONFIG_OVERRIDE || `${fmHome}/config`;
+const armScript = `${fmRoot}/bin/fm-watch-arm.sh`;
+const hostScript = `${fmRoot}/bin/fm-supervision-host.sh`;
+const marker = `${state}/.omp-watch-extension-loaded`;
+const handoffDir = `${state}/extensions/omp-primary-watch`;
+const actionableHandoff = `${handoffDir}/session-replacement-actionable.json`;
+const lifecycleLogPath = `${handoffDir}/lifecycle.log`;
+const extensionVersion = `sha256:${createHash("sha256").update(readFileSync(extensionFile)).digest("hex")}`;
+const retryBaseMs = positiveInteger("FM_WATCH_REARM_RETRY_BASE_MS", 250);
+const retryMaxMs = positiveInteger("FM_WATCH_REARM_RETRY_MAX_MS", 4000);
+const retryLimit = positiveInteger("FM_WATCH_REARM_RETRY_LIMIT", 5);
+// 35s on Windows so the budget stays above arm's MSYS confirm default (30s in
+// bin/fm-watch-arm.sh): a slow but successful Git Bash cold start must not be
+// SIGTERMed mid-confirmation. Conditioned on win32 so other platforms keep 12s.
+const armReadyTimeoutMs = positiveInteger(
+  "FM_OMP_ARM_READY_TIMEOUT_MS",
+  process.platform === "win32" ? 35000 : 12000,
+);
+const hostReadyTimeoutMs = Math.max(armReadyTimeoutMs, 30000);
+const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
+const successorGraceMs = positiveInteger("FM_OMP_SUCCESSOR_GRACE_MS", 15000);
+const repairOnlyHint = "call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
+const shuttingDownMessage = "watcher: not armed - omp session is shutting down";
+
+let nextGenerationId = 0;
+let nextHandoffId = 0;
+let activeGeneration: SessionGeneration | null = null;
+let replacementHandoff: PendingActionableClose[] | null = null;
+type ReplacementActionableReceiver = (pending: PendingActionableClose) => void;
+type ActionableDeliveryClaim = {
+  owner: SessionGeneration;
+  settlement: Promise<"delivered" | "failed">;
+};
+type ReplacementCoordinator = {
+  receiver: ReplacementActionableReceiver | null;
+  pending: PendingActionableClose[];
+  nextTokenId: number;
+  deliveries: Map<string, ActionableDeliveryClaim>;
+};
+type ReplacementCoordinatorGlobal = typeof globalThis & {
+  __firstmateOmpWatchReplacements?: Map<string, ReplacementCoordinator>;
+};
+const replacementCoordinatorGlobal = globalThis as ReplacementCoordinatorGlobal;
+const replacementCoordinators = replacementCoordinatorGlobal.__firstmateOmpWatchReplacements ??= new Map<string, ReplacementCoordinator>();
+function replacementCoordinatorFor(handoff: string): ReplacementCoordinator {
+  const existing = replacementCoordinators.get(handoff);
+  if (existing) return existing;
+  const created: ReplacementCoordinator = {
+    receiver: null,
+    pending: [],
+    nextTokenId: 0,
+    deliveries: new Map(),
+  };
+  replacementCoordinators.set(handoff, created);
+  return created;
+}
+const replacementCoordinator = replacementCoordinatorFor(actionableHandoff);
+const armReadiness = new WeakMap<ChildProcess, Promise<boolean>>();
+const armClose = new WeakMap<ChildProcess, Promise<void>>();
+// Children the extension itself asked to exit; their close is not a failure
+// of the successor and never earns a deferred retry.
+const armRetired = new WeakSet<ChildProcess>();
+const armRecovery = new WeakMap<ChildProcess, { generation: string; watcherPid: string }>();
+const armPendingActionable = new WeakMap<ChildProcess, PendingActionableClose>();
+const armHostMode = new WeakMap<ChildProcess, boolean>();
+
+function positiveInteger(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return Math.floor(value);
+}
+
+function pidAlive(pid: string): boolean {
+  try {
+    process.kill(Number(pid), 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// The lock records the omp process that runs the extensions, and omp loads them
+// in that same process (verified live, omp 18.6.3: the recorded pid equals
+// process.pid). Only that process owns the home. A descendant omp that
+// auto-discovers these files from the same working directory - an `omp -p`
+// child a turn runs, for example - is another session: it must not arm a second
+// watcher in this home or record itself as the loaded session.
+function lockOwnership(): LockOwnership {
+  let lockPid = "";
+  try {
+    lockPid = readFileSync(`${state}/.lock`, "utf8").trim();
+  } catch {
+    return "missing";
+  }
+  if (!/^[0-9]+$/.test(lockPid) || lockPid === "1") return "other";
+  if (lockPid === String(process.pid)) return "owned";
+  return pidAlive(lockPid) ? "other" : "missing";
+}
+
+// Writes only on a change, so the turn-boundary calls below stay cheap.
+function markLoaded(): void {
+  if (lockOwnership() === "other") return;
+  const record = `${extensionVersion}\n${process.pid}\n`;
+  try {
+    if (readFileSync(marker, "utf8") === record) return;
+  } catch {
+    // Absent or unreadable: write it below.
+  }
+  mkdirSync(state, { recursive: true });
+  writeFileSync(marker, record);
+}
+
+function actionableLine(output: string): string {
+  const lines = output.split(/\r?\n/);
+  return lines.find((line) => /^(signal:|stale:|check:|heartbeat($|:))/.test(line)) || "";
+}
+
+function completedActionableLine(output: string): string {
+  const newline = output.lastIndexOf("\n");
+  return newline < 0 ? "" : actionableLine(output.slice(0, newline + 1));
+}
+
+// An away record, never quiet mode's (bin/fm-afk-contract.sh mode owns that
+// reading): a record whose mode cannot be read as quiet reads as away.
+function awayRecordPresent(): boolean {
+  if (!existsSync(`${state}/.afk-contract`)) return false;
+  const result = spawnSync("bash", [`${fmRoot}/bin/fm-afk-contract.sh`, "mode"], {
+    encoding: "utf8",
+    env: { ...process.env, FM_STATE_OVERRIDE: state },
+  });
+  return String(result.stdout || "").trim() !== "quiet";
+}
+
+// Whether this home runs the supervision host for an omp primary; the gate's
+// owner answers, and a query that cannot run reads as no host.
+function hostModeEnabled(): boolean {
+  const result = spawnSync("bash", [`${fmRoot}/bin/fm-supervision-engine-lib.sh`, "enabled", config, "omp"], {
+    stdio: "ignore",
+  });
+  return result.status === 0;
+}
+
+// The host-mode wake message: every "supervision-host:" line in order, wake
+// lines capped at eight, and the away note while an away record exists.
+function hostWakeMessage(output: string): string {
+  let shown = 0;
+  const lines = output.split(/\r?\n/).filter((line) => {
+    if (/^supervision-host:/.test(line)) return true;
+    if (/^(signal:|stale:|check:|heartbeat($|:))/.test(line) && shown < 8) {
+      shown += 1;
+      return true;
+    }
+    return false;
+  });
+  if (lines.length === 0) return "";
+  if (awayRecordPresent()) {
+    lines.push("This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.");
+  }
+  return lines.join("\n");
+}
+
+// The text omp carries in a user message_start: sendUserMessage wraps a string
+// as one text part, so the joined text parts equal the sent content.
+function userMessageText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  const parts: string[] = [];
+  for (const part of content) {
+    if (
+      typeof part === "object" && part !== null &&
+      (part as { type?: unknown }).type === "text" &&
+      typeof (part as { text?: unknown }).text === "string"
+    ) {
+      parts.push((part as { text: string }).text);
+    }
+  }
+  return parts.join("\n");
+}
+
+function nodeErrorCode(error: unknown): string {
+  return typeof error === "object" && error !== null && "code" in error
+    ? String((error as { code?: unknown }).code ?? "")
+    : "";
+}
+
+function createPendingActionable(message: string, predecessorArmPid: string): PendingActionableClose {
+  return {
+    version: 1,
+    token: `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`,
+    message,
+    predecessorArmPid,
+  };
+}
+
+function validatePendingActionable(value: unknown): PendingActionableClose {
+  if (
+    typeof value !== "object" || value === null ||
+    (value as { version?: unknown }).version !== 1 ||
+    typeof (value as { token?: unknown }).token !== "string" ||
+    !/^[0-9]+-[0-9]+-[0-9]+$/.test((value as { token: string }).token) ||
+    typeof (value as { message?: unknown }).message !== "string" ||
+    (!actionableLine((value as { message: string }).message) &&
+      !/^supervision-host:/m.test((value as { message: string }).message)) ||
+    typeof (value as { predecessorArmPid?: unknown }).predecessorArmPid !== "string" ||
+    !/^[0-9]*$/.test((value as { predecessorArmPid: string }).predecessorArmPid) ||
+    ((value as { delivered?: unknown }).delivered !== undefined &&
+      (value as { delivered?: unknown }).delivered !== true)
+  ) {
+    throw new Error(`invalid omp replacement actionable handoff at ${actionableHandoff}`);
+  }
+  return value as PendingActionableClose;
+}
+
+function validateReplacementHandoff(value: unknown): PendingActionableClose[] {
+  if (
+    typeof value !== "object" || value === null ||
+    (value as { version?: unknown }).version !== 2 ||
+    !Array.isArray((value as { pending?: unknown }).pending) ||
+    (value as { pending: unknown[] }).pending.length === 0
+  ) {
+    throw new Error(`invalid omp replacement actionable handoff at ${actionableHandoff}`);
+  }
+  const pending = (value as { pending: unknown[] }).pending.map(validatePendingActionable);
+  if (new Set(pending.map((item) => item.token)).size !== pending.length) {
+    throw new Error(`invalid omp replacement actionable handoff at ${actionableHandoff}`);
+  }
+  return pending;
+}
+
+function writeReplacementHandoff(pending: PendingActionableClose[]): void {
+  replacementHandoff = [...pending];
+  mkdirSync(handoffDir, { recursive: true });
+  const temporary = `${actionableHandoff}.tmp-${process.pid}-${++nextHandoffId}`;
+  const handoff: ReplacementActionableHandoff = { version: 2, pending };
+  try {
+    writeFileSync(temporary, `${JSON.stringify(handoff)}\n`, { mode: 0o600 });
+    renameSync(temporary, actionableHandoff);
+  } catch (error) {
+    try {
+      unlinkSync(temporary);
+    } catch {
+      // Preserve the original handoff publication error.
+    }
+    throw error;
+  }
+}
+
+function persistReplacementHandoff(pending: PendingActionableClose[]): void {
+  if (pending.length === 0) return;
+  writeReplacementHandoff(pending);
+}
+
+function loadReplacementHandoff(): PendingActionableClose[] {
+  try {
+    const pending = validateReplacementHandoff(JSON.parse(readFileSync(actionableHandoff, "utf8")));
+    replacementHandoff = pending;
+    return [...pending];
+  } catch (error) {
+    if (nodeErrorCode(error) === "ENOENT") {
+      replacementHandoff = null;
+      return [];
+    }
+    throw error;
+  }
+}
+
+function mergeReplacementHandoff(pending: PendingActionableClose): void {
+  let stored: PendingActionableClose[] = [];
+  try {
+    stored = validateReplacementHandoff(JSON.parse(readFileSync(actionableHandoff, "utf8")));
+  } catch (error) {
+    if (nodeErrorCode(error) !== "ENOENT") throw error;
+  }
+  if (!stored.some((item) => item.token === pending.token)) stored.push(pending);
+  writeReplacementHandoff(stored);
+}
+
+function clearReplacementHandoff(pending: PendingActionableClose): void {
+  try {
+    const stored = validateReplacementHandoff(JSON.parse(readFileSync(actionableHandoff, "utf8")));
+    const remaining = stored.filter((item) => item.token !== pending.token);
+    if (remaining.length === stored.length) return;
+    if (remaining.length > 0) {
+      writeReplacementHandoff(remaining);
+    } else {
+      replacementHandoff = null;
+      unlinkSync(actionableHandoff);
+    }
+  } catch (error) {
+    if (nodeErrorCode(error) !== "ENOENT") throw error;
+  }
+}
+
+function classifyClose(
+  hostMode: boolean,
+  stdout: string,
+  stderr: string,
+  code: number | null,
+  signal: NodeJS.Signals | null,
+): CloseClassification {
+  const combined = `${stdout}\n${stderr}`.trim();
+  if (hostMode) {
+    const message = hostWakeMessage(combined);
+    if (message) return { kind: "actionable", message };
+    const stoodDown = combined.split(/\r?\n/).find((line) => /^supervision-host stood down:/.test(line));
+    if (stoodDown) return { kind: "failure", message: `watcher: FAILED - ${stoodDown}` };
+  }
+  const reason = actionableLine(combined);
+  if (reason) return { kind: "actionable", message: reason };
+  const healthy = combined.split(/\r?\n/).find((line) => /^watcher: healthy\b/.test(line));
+  if (healthy) {
+    return {
+      kind: "failure",
+      message: `watcher: FAILED - omp extension arm child found an external healthy watcher instead of owning wake delivery\n${healthy}`,
+    };
+  }
+  const failed = combined.split(/\r?\n/).find((line) => /^watcher: FAILED/.test(line));
+  if (failed) return { kind: "failure", message: failed };
+  if (signal) {
+    return {
+      kind: "failure",
+      message: `watcher: FAILED - omp extension arm child ended from ${signal}${combined ? `\n${combined}` : ""}`,
+    };
+  }
+  if (code && code !== 0) {
+    const script = hostMode ? "fm-supervision-host.sh" : "fm-watch-arm.sh";
+    return {
+      kind: "failure",
+      message: `watcher: FAILED - ${script} exited ${code}${combined ? `\n${combined}` : ""}`,
+    };
+  }
+  return {
+    kind: "failure",
+    message: "watcher: FAILED - omp extension arm cycle ended without an actionable reason",
+  };
+}
+
+function createGeneration(): SessionGeneration {
+  return {
+    id: ++nextGenerationId,
+    stopping: false,
+    replacement: false,
+    child: null,
+    retryTimer: null,
+    cleanupTimer: null,
+    retryFailures: 0,
+    restoring: false,
+    seq: 0,
+    pendingActionables: [],
+    cleanupFailure: "",
+    unconsumedWakes: new Map(),
+    deferredClose: null,
+  };
+}
+
+function activateGeneration(generation: SessionGeneration): void {
+  activeGeneration = generation;
+}
+
+function generationIsLive(generation: SessionGeneration): boolean {
+  return activeGeneration === generation && !generation.stopping;
+}
+
+function stopGeneration(generation: SessionGeneration): ChildProcess | null {
+  generation.stopping = true;
+  if (generation.retryTimer) clearTimeout(generation.retryTimer);
+  if (generation.cleanupTimer) clearTimeout(generation.cleanupTimer);
+  generation.retryTimer = null;
+  generation.cleanupTimer = null;
+  const child = generation.child;
+  if (child) child.kill("SIGTERM");
+  generation.child = null;
+  return child;
+}
+
+async function waitForGenerationChildClose(
+  armChild: ChildProcess | null,
+  lifecycle: ReturnType<typeof createLifecycleLog>,
+): Promise<void> {
+  if (!armChild) return;
+  const closed = armClose.get(armChild);
+  if (!closed) return;
+  await new Promise<void>((resolveWait) => {
+    const timer = setLifecycleDeadline(() => {
+      lifecycle("bound-expired", {
+        waiter: "omp-watch-extension",
+        "waited-on": "shutdown-arm-close",
+        bound: `${armRetireTimeoutMs}ms`,
+        actual: `${timer.elapsedMs()}ms`,
+      });
+      resolveWait();
+    }, armRetireTimeoutMs);
+    void closed.then(() => {
+      timer.cancel();
+      resolveWait();
+    });
+  });
+}
+
+async function stopSessionGeneration(
+  generation: SessionGeneration,
+  replacement: boolean,
+  lifecycle: ReturnType<typeof createLifecycleLog>,
+): Promise<void> {
+  generation.replacement = replacement;
+  let persistedTokens = "";
+  const persistPending = (): boolean => {
+    try {
+      persistReplacementHandoff(generation.pendingActionables);
+      return true;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      for (const pending of generation.pendingActionables) {
+        if (replacementCoordinator.pending.some((item) => item.token === pending.token)) continue;
+        replacementCoordinator.pending.push({
+          ...pending,
+          message: `${pending.message}\n\nwatcher: FAILED - omp extension could not persist a replacement-session actionable wake\n${detail}`,
+        });
+      }
+      return false;
+    }
+  };
+  try {
+    if (replacement && generation.pendingActionables.length > 0 && persistPending()) {
+      persistedTokens = generation.pendingActionables.map((pending) => pending.token).join("\n");
+    }
+  } finally {
+    const child = stopGeneration(generation);
+    await waitForGenerationChildClose(child, lifecycle);
+  }
+  const currentTokens = generation.pendingActionables.map((pending) => pending.token).join("\n");
+  if (replacement && currentTokens && currentTokens !== persistedTokens) {
+    persistPending();
+  }
+}
+
+function removeRestoredWake(editor: string, content: string): string | null {
+  const marked = content.startsWith("\u2063");
+  const needle = (marked ? content.slice(1) : content).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = new RegExp(`(^|\\n\\n)${marked ? "\\u2063?" : ""}${needle}(?=\\n\\n|(?![\\s\\S]))`).exec(editor);
+  if (!match) return null;
+  const start = match.index;
+  let end = start + match[0].length;
+  if (match[1] === "" && editor.slice(end, end + 2) === "\n\n") end += 2;
+  return editor.slice(0, start) + editor.slice(end);
+}
+
+const cleanupOnProcessExit = () => {
+  if (activeGeneration) stopGeneration(activeGeneration);
+};
+process.once("exit", cleanupOnProcessExit);
+
+type OmpWatchInstanceApi = {
+  activate: (ctx?: unknown) => Promise<ArmResult>;
+  retire: () => { recovery: boolean; stopped: Promise<void>; context: unknown };
+};
+
+export default function (pi: ExtensionAPI) {
+  const instance = bindWatchInstance<OmpWatchInstanceApi>("__firstmateOmpWatchInstances", state);
+  const lifecycle = createLifecycleLog(lifecycleLogPath, () => instance.id);
+  let generation = createGeneration();
+  lifecycle("generation-create", { generation: generation.id, cause: "factory-bind" });
+  activateGeneration(generation);
+  lifecycle("generation-activate", { generation: generation.id, cause: "factory-bind" });
+  // The stop of the latest generation, so a self-heal never races the child
+  // retirement that stop is still waiting on.
+  let generationStopped: Promise<void> = Promise.resolve();
+  let healTimer: ReturnType<typeof setLifecycleDeadline> | null = null;
+  let recoveryPending = false;
+  let latestContext: any = null;
+  lifecycle("factory-bind", { generation: generation.id, superseded: instance.previous?.id });
+  if (instance.previous?.api) {
+    const predecessor = instance.previous.api.retire();
+    generationStopped = predecessor.stopped;
+    recoveryPending = predecessor.recovery;
+    rememberContext(predecessor.context);
+    if (recoveryPending) scheduleSelfHeal(generation);
+    void generationStopped.catch(() => {});
+  }
+  instance.previous = null;
+
+  function clearHealTimer(): void {
+    healTimer?.cancel();
+    healTimer = null;
+  }
+
+  // Bind the generation a live session runs on: the existing one when it is
+  // still live, otherwise a fresh one. session_start, the timed self-heal, and
+  // an arm call on a stopped generation all bind through here.
+  function bindLiveGeneration(cause: string): void {
+    clearHealTimer();
+    if (generation.stopping) {
+      generation = createGeneration();
+      lifecycle("generation-create", { generation: generation.id, cause });
+    }
+    activateGeneration(generation);
+    lifecycle("generation-activate", { generation: generation.id, cause });
+  }
+
+  function scheduleSelfHeal(stopped: SessionGeneration): void {
+    if (!instance.isCurrent() || generation !== stopped || !recoveryPending) return;
+    clearHealTimer();
+    const retirement = generationStopped;
+    const timer = setLifecycleDeadline(async () => {
+      if (healTimer === timer) healTimer = null;
+      try {
+        await retirement;
+        if (!instance.isCurrent() || generation !== stopped || generationStopped !== retirement || !recoveryPending) return;
+        const owned = lockOwnership() === "owned";
+        lifecycle("bound-expired", {
+          waiter: "omp-watch-extension",
+          "waited-on": "session_start",
+          bound: `${successorGraceMs}ms`,
+          actual: `${timer.elapsedMs()}ms`,
+          outcome: owned ? "self-heal" : "lock-not-owned",
+        });
+        if (!owned) return;
+        bindLiveGeneration("self-heal");
+        markLoaded();
+        const result = activateOwnedWatch(generation);
+        lifecycle("self-heal", { generation: generation.id, ok: result.ok });
+        if (!result.ok) surfaceFailure(generation, `watcher: FAILED - omp extension could not activate successor recovery\n${result.message}`);
+      } catch (error) {
+        if (!instance.isCurrent()) return;
+        const detail = error instanceof Error ? error.message : String(error);
+        lifecycle("self-heal-failed", { generation: generation.id, error: detail });
+        surfaceFailure(generation, `watcher: FAILED - omp extension could not activate successor recovery\n${detail}`);
+      }
+    }, successorGraceMs);
+    timer.unref();
+    healTimer = timer;
+  }
+
+  // The arm tool and command. A superseded instance forwards to the current
+  // one; a stopped generation is healed first, because the call itself proves
+  // the session is live.
+  async function armFromSession(ctx?: unknown): Promise<ArmResult> {
+    if (!instance.isCurrent()) {
+      const current = instance.current();
+      lifecycle("arm-forwarded", { to: current?.id });
+      if (current?.api) return await current.api.activate(ctx);
+      return { ok: false, message: shuttingDownMessage };
+    }
+    rememberContext(ctx);
+    const stopped = generation;
+    const retirement = generationStopped;
+    await retirement;
+    if (!instance.isCurrent() || generation !== stopped || generationStopped !== retirement) {
+      return armFromSession();
+    }
+    if (generation.stopping || recoveryPending) {
+      lifecycle("self-heal-requested", { generation: generation.id, cause: "arm-call" });
+      bindLiveGeneration("arm-call");
+      markLoaded();
+    }
+    return activateOwnedWatch(generation);
+  }
+
+  async function sendWake(
+    owner: SessionGeneration,
+    message: string,
+    pending?: PendingActionableClose,
+  ): Promise<boolean> {
+    if (!generationIsLive(owner)) return false;
+    const content = encodeFirstmateOperationalInput(
+      "watcher",
+      `FIRSTMATE WATCHER WAKE: ${message}\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.`,
+    ).replace(/\r\n?/g, "\n").replaceAll("\t", "   ").replace(/[\x00-\x09\x0b-\x1f]/g, "");
+    const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
+    owner.unconsumedWakes.set(token, { content, pending });
+    try {
+      if (sessionIsIdle()) await pi.sendUserMessage(content);
+      else await pi.sendUserMessage(content, { deliverAs: "followUp" });
+    } catch (error) {
+      owner.unconsumedWakes.delete(token);
+      throw error;
+    }
+    // Accepted by omp (sendUserMessage returns synchronously there; awaiting a
+    // non-promise resolves at once). A generation replaced while omp was
+    // accepting it may have lost the wake with the old session, so report
+    // it undelivered and let the replacement replay the still-pending record.
+    return generationIsLive(owner);
+  }
+
+  function consumeWake(owner: SessionGeneration, text: string): void {
+    for (const [token, wake] of owner.unconsumedWakes) {
+      if (wake.content !== text) continue;
+      owner.unconsumedWakes.delete(token);
+      if (!wake.pending) return;
+      wake.pending.delivered = true;
+      try {
+        finishPendingActionable(owner, wake.pending);
+      } catch (error) {
+        surfaceCleanupFailure(owner, error);
+        schedulePendingCleanup(owner);
+      }
+      return;
+    }
+  }
+
+  // Restored-wake recovery state. The context is whichever one omp passed to
+  // the latest event: timers run outside any handler, and a context that went
+  // stale with a replaced session throws on use, which only skips the check.
+  const restoreCheckMs = 2000;
+  const restoreAttemptLimit = 3;
+  const restoreAttempts = new Map<string, number>();
+  let restoreTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function rememberContext(ctx: unknown): void {
+    if (typeof ctx === "object" && ctx !== null) latestContext = ctx;
+  }
+
+  // Positive idle proof only; a missing or stale context keeps follow-up delivery.
+  function sessionIsIdle(): boolean {
+    try {
+      return typeof latestContext?.isIdle === "function" && latestContext.isIdle() === true;
+    } catch {
+      return false;
+    }
+  }
+
+  function recoverRestoredWake(owner: SessionGeneration): void {
+    if (!generationIsLive(owner) || owner.unconsumedWakes.size === 0) return;
+    const ctx = latestContext;
+    if (!ctx?.hasUI || typeof ctx.isIdle !== "function" || typeof ctx.ui?.getEditorText !== "function" || typeof ctx.ui?.setEditorText !== "function") return;
+    try {
+      // A turn that already started, or a queue that still holds messages,
+      // will consume the wake itself.
+      if (!ctx.isIdle() || ctx.hasPendingMessages?.()) return;
+      let editor = String(ctx.ui.getEditorText() ?? "");
+      for (const [token, wake] of [...owner.unconsumedWakes]) {
+        const attempts = restoreAttempts.get(token) ?? 0;
+        if (attempts >= restoreAttemptLimit) continue;
+        const remainder = removeRestoredWake(editor, wake.content);
+        if (remainder === null) continue;
+        restoreAttempts.set(token, attempts + 1);
+        editor = remainder;
+        ctx.ui.setEditorText(remainder);
+        // Idle, so this starts the turn that consumes the wake; the next
+        // agent_end re-checks any further restored wake.
+        pi.sendUserMessage(wake.content);
+        return;
+      }
+    } catch {}
+  }
+
+  function scheduleRestoredWakeCheck(owner: SessionGeneration): void {
+    if (restoreTimer || owner.unconsumedWakes.size === 0) return;
+    const timer = setTimeout(() => {
+      restoreTimer = null;
+      recoverRestoredWake(owner);
+    }, restoreCheckMs);
+    timer.unref();
+    restoreTimer = timer;
+  }
+
+  function confirmHandlingDelivery(recovery: { generation: string; watcherPid: string }): {
+    ok: boolean;
+    detail: string;
+  } {
+    try {
+      const result = spawnSync(
+        "bash",
+        [armScript, "--handling-delivered", recovery.generation, "--watcher-pid", recovery.watcherPid],
+        {
+          cwd: fmRoot,
+          encoding: "utf8",
+          env: { ...process.env, FM_HOME: fmHome, FM_STATE_OVERRIDE: state, FM_ROOT_OVERRIDE: fmRoot },
+        },
+      );
+      if (result.status === 0) return { ok: true, detail: "" };
+      const stderr = (result.stderr || "").trim();
+      return {
+        ok: false,
+        detail: `watcher: FAILED - handling delivery confirmation was rejected (status=${result.status ?? "none"} generation=${recovery.generation} watcherPid=${recovery.watcherPid})${stderr ? `\n${stderr}` : ""}`,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return {
+        ok: false,
+        detail: `watcher: FAILED - handling delivery confirmation could not be executed (generation=${recovery.generation} watcherPid=${recovery.watcherPid})\n${message}`,
+      };
+    }
+  }
+
+  function confirmHandlingDeliveryWithRetry(
+    owner: SessionGeneration,
+    recovery: { generation: string; watcherPid: string },
+  ): { ok: boolean; detail: string } {
+    const snapshot = (): { generation: string; watcherPid: string } => {
+      const current = owner.child ? armRecovery.get(owner.child) : undefined;
+      return current ?? recovery;
+    };
+    const first = confirmHandlingDelivery(snapshot());
+    if (first.ok) return first;
+    return confirmHandlingDelivery(snapshot());
+  }
+
+  async function deliverActionableWake(
+    owner: SessionGeneration,
+    message: string,
+    pending: PendingActionableClose,
+    recovery?: { generation: string; watcherPid: string },
+  ): Promise<boolean> {
+    if (!generationIsLive(owner)) return false;
+    if (recovery) {
+      const confirmed = confirmHandlingDeliveryWithRetry(owner, recovery);
+      if (!confirmed.ok) {
+        const watcherPid = recovery.watcherPid;
+        if (!pidAlive(watcherPid)) {
+          await retireArm(owner.child);
+        }
+        return await sendWake(owner, `${message}\n\n${confirmed.detail}`, pending);
+      }
+    }
+    // No supervision branch on omp: every actionable wake goes to main.
+    return await sendWake(owner, message, pending);
+  }
+
+  function surfaceFailure(owner: SessionGeneration, message: string): void {
+    void sendWake(owner, message).catch(() => {
+      // omp owns delivery errors; continuity restoration never waits on prompting.
+    });
+  }
+
+  function enqueuePendingActionable(
+    owner: SessionGeneration,
+    pending: PendingActionableClose,
+  ): void {
+    if (owner.pendingActionables.some((item) => item.token === pending.token)) return;
+    owner.pendingActionables.push(pending);
+    if (owner.stopping && owner.replacement) {
+      let replacementPending = pending;
+      try {
+        mergeReplacementHandoff(pending);
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : String(error);
+        replacementPending = {
+          ...pending,
+          message: `${pending.message}\n\nwatcher: FAILED - omp extension could not persist a late replacement-session actionable wake\n${detail}`,
+        };
+      }
+      if (replacementCoordinator.receiver) {
+        replacementCoordinator.receiver(replacementPending);
+      } else if (replacementPending !== pending) {
+        replacementCoordinator.pending.push(replacementPending);
+      }
+    }
+  }
+
+  function finishPendingActionable(owner: SessionGeneration, pending: PendingActionableClose): void {
+    clearReplacementHandoff(pending);
+    const index = owner.pendingActionables.findIndex((item) => item.token === pending.token);
+    if (index >= 0) owner.pendingActionables.splice(index, 1);
+    owner.cleanupFailure = "";
+  }
+
+  function surfaceCleanupFailure(
+    owner: SessionGeneration,
+    error: unknown,
+  ): void {
+    const detail = error instanceof Error ? error.message : String(error);
+    if (owner.cleanupFailure === detail) return;
+    owner.cleanupFailure = detail;
+    surfaceFailure(owner, `watcher: FAILED - omp extension could not clear a delivered replacement-session actionable wake\n${detail}`);
+  }
+
+  function schedulePendingCleanup(owner: SessionGeneration): void {
+    if (!generationIsLive(owner) || owner.cleanupTimer) return;
+    const timer = setTimeout(() => {
+      if (owner.cleanupTimer === timer) owner.cleanupTimer = null;
+      void processPendingActionables(owner);
+    }, retryDelay(1));
+    timer.unref();
+    owner.cleanupTimer = timer;
+  }
+
+  async function processPendingActionables(owner: SessionGeneration): Promise<void> {
+    if (!generationIsLive(owner) || owner.restoring || owner.pendingActionables.length === 0) return;
+    owner.restoring = true;
+    const attemptedCleanup = new Set<string>();
+    try {
+      while (generationIsLive(owner) && owner.pendingActionables.length > 0) {
+        for (const delivered of owner.pendingActionables.filter((item) => item.delivered && !attemptedCleanup.has(item.token))) {
+          attemptedCleanup.add(delivered.token);
+          try {
+            finishPendingActionable(owner, delivered);
+          } catch (error) {
+            surfaceCleanupFailure(owner, error);
+          }
+        }
+        // A record omp has accepted but not consumed is neither redelivered
+        // nor finished here: consumption finishes it, replacement replays it.
+        const pending = owner.pendingActionables.find(
+          (item) => !item.delivered && !owner.unconsumedWakes.has(item.token),
+        );
+        if (!pending) break;
+        const existingClaim = replacementCoordinator.deliveries.get(pending.token);
+        if (existingClaim && existingClaim.owner !== owner) {
+          const settlement = await existingClaim.settlement;
+          if (!generationIsLive(owner)) return;
+          if (settlement === "delivered") {
+            pending.delivered = true;
+            continue;
+          }
+          if (replacementCoordinator.deliveries.get(pending.token) === existingClaim) {
+            replacementCoordinator.deliveries.delete(pending.token);
+          }
+        }
+        let settleClaim: (settlement: "delivered" | "failed") => void = () => {};
+        const settlement = new Promise<"delivered" | "failed">((resolveSettlement) => {
+          settleClaim = resolveSettlement;
+        });
+        const deliveryClaim = { owner, settlement };
+        replacementCoordinator.deliveries.set(pending.token, deliveryClaim);
+        const releaseClaim = (): void => {
+          if (replacementCoordinator.deliveries.get(pending.token) === deliveryClaim) {
+            replacementCoordinator.deliveries.delete(pending.token);
+          }
+        };
+        try {
+          // A new restoration supersedes whatever became of the previous
+          // successor; only a failure during this delivery is retried after it.
+          owner.deferredClose = null;
+          const restoration = await restoreAfterActionableClose(owner, pending.predecessorArmPid);
+          if (!generationIsLive(owner)) {
+            settleClaim("failed");
+            releaseClaim();
+            return;
+          }
+          const message = restoration.failure ? `${pending.message}\n\n${restoration.failure}` : pending.message;
+          const delivered = await deliverActionableWake(owner, message, pending, restoration.recovery);
+          if (!delivered) {
+            settleClaim("failed");
+            releaseClaim();
+            return;
+          }
+          const awaitingConsumption = owner.unconsumedWakes.has(pending.token);
+          if (awaitingConsumption && !generationIsLive(owner)) {
+            // omp accepted the wake, then the session was replaced before
+            // this continuation ran: the shutdown persisted the still-pending
+            // record, so a replacement waiting on this claim must replay it.
+            settleClaim("failed");
+            releaseClaim();
+            return;
+          }
+          settleClaim("delivered");
+          if (!awaitingConsumption) {
+            // omp consumed it before this ran.
+            pending.delivered = true;
+            try {
+              finishPendingActionable(owner, pending);
+            } catch (error) {
+              surfaceCleanupFailure(owner, error);
+            }
+          }
+          releaseClaim();
+        } catch (error) {
+          settleClaim("failed");
+          releaseClaim();
+          throw error;
+        }
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      surfaceFailure(owner, `watcher: FAILED - omp extension could not deliver an actionable wake\n${detail}`);
+    } finally {
+      if (generationIsLive(owner)) {
+        owner.restoring = false;
+        if (owner.pendingActionables.some((pending) => pending.delivered)) schedulePendingCleanup(owner);
+        // No bare arm is launched here. A generation without a child at this
+        // point has either delivered a typed restoration failure after its
+        // bounded retries, which hands repair to main through fm_watch_arm_omp
+        // (one more silent launch past the bound could hold a hung child that
+        // the repair call would then report as "unchanged"), or lost a
+        // verified successor during the delivery, which takes the ordinary
+        // bounded, lock-checked retry it would have taken had the pipeline
+        // been idle.
+        const deferred = owner.deferredClose;
+        owner.deferredClose = null;
+        if (deferred && !owner.child && !owner.retryTimer) {
+          scheduleRetry(owner, deferred.message, deferred.predecessorArmPid);
+        }
+      }
+    }
+  }
+
+  const receiveReplacementActionable: ReplacementActionableReceiver = (pending) => {
+    if (!generationIsLive(generation)) return;
+    enqueuePendingActionable(generation, pending);
+    void processPendingActionables(generation);
+  };
+
+  function retryDelay(attempt: number): number {
+    return Math.min(retryMaxMs, retryBaseMs * 2 ** Math.max(0, attempt - 1));
+  }
+
+  function waitForRetry(attempt: number): Promise<void> {
+    return new Promise((resolveRetry) => {
+      const timer = setTimeout(resolveRetry, retryDelay(attempt));
+      timer.unref();
+    });
+  }
+
+  function waitForReadiness(armChild: ChildProcess): Promise<boolean> {
+    const readiness = armReadiness.get(armChild);
+    if (!readiness) return Promise.resolve(false);
+    const timeout = armHostMode.get(armChild) ? hostReadyTimeoutMs : armReadyTimeoutMs;
+    return new Promise((resolveReady) => {
+      const timer = setLifecycleDeadline(() => {
+        lifecycle("bound-expired", {
+          waiter: "omp-watch-extension",
+          "waited-on": armHostMode.get(armChild) ? "supervision-host-readiness" : "arm-readiness",
+          bound: `${timeout}ms`,
+          actual: `${timer.elapsedMs()}ms`,
+        });
+        resolveReady(false);
+      }, timeout);
+      timer.unref();
+      void readiness.then((ready) => {
+        timer.cancel();
+        resolveReady(ready);
+      });
+    });
+  }
+
+  async function retireArm(armChild: ChildProcess | null): Promise<boolean> {
+    if (!armChild) return true;
+    armRetired.add(armChild);
+    armChild.kill("SIGTERM");
+    const closed = armClose.get(armChild);
+    if (!closed) return false;
+    return new Promise((resolveRetired) => {
+      const timer = setLifecycleDeadline(() => {
+        lifecycle("bound-expired", {
+          waiter: "omp-watch-extension",
+          "waited-on": "unready-arm-close",
+          bound: `${armRetireTimeoutMs}ms`,
+          actual: `${timer.elapsedMs()}ms`,
+        });
+        resolveRetired(false);
+      }, armRetireTimeoutMs);
+      timer.unref();
+      void closed.then(() => {
+        timer.cancel();
+        resolveRetired(true);
+      });
+    });
+  }
+
+  async function restoreAfterActionableClose(owner: SessionGeneration, predecessorArmPid: string): Promise<{
+    failure: string;
+    recovery?: { generation: string; watcherPid: string };
+  }> {
+    let failure = "";
+    for (let attempt = 0; attempt <= retryLimit; attempt += 1) {
+      if (!generationIsLive(owner)) return { failure: "" };
+      const replacement = startArm(owner, predecessorArmPid);
+      const successorChild = owner.child;
+      if (replacement.ok && successorChild && await waitForReadiness(successorChild)) {
+        return { failure: "", recovery: armRecovery.get(successorChild) };
+      }
+      if (replacement.ok) {
+        failure = "watcher: FAILED - omp extension could not verify a ready successor watcher";
+        if (!(await retireArm(successorChild))) {
+          return {
+            failure: `${failure}\nwatcher: FAILED - omp extension could not restore watcher continuity because the unready successor arm did not exit within ${armRetireTimeoutMs}ms`,
+          };
+        }
+      } else {
+        failure = /(?:read-only|no live session)/.test(replacement.message)
+          ? `watcher: FAILED - omp extension cannot restore continuity because this session no longer owns the lock\n${replacement.message}`
+          : `watcher: FAILED - omp extension could not start the successor watcher cycle\n${replacement.message}`;
+        if (/(?:read-only|no live session)/.test(replacement.message)) break;
+      }
+      if (attempt === retryLimit) break;
+      await waitForRetry(attempt + 1);
+    }
+    return { failure: `${failure}\nwatcher: FAILED - omp extension could not restore watcher continuity after ${retryLimit} retries` };
+  }
+
+  function scheduleRetry(owner: SessionGeneration, message: string, predecessorArmPid: string): void {
+    if (!generationIsLive(owner) || owner.child || owner.retryTimer) return;
+    const ownership = lockOwnership();
+    if (ownership !== "owned") {
+      surfaceFailure(owner, `watcher: FAILED - omp extension cannot restore continuity because this session no longer owns the lock\n${message}`);
+      return;
+    }
+    owner.retryFailures += 1;
+    if (owner.retryFailures > retryLimit) {
+      surfaceFailure(owner, `watcher: FAILED - omp extension could not restore watcher continuity after ${retryLimit} retries\n${message}`);
+      return;
+    }
+    const timer = setTimeout(() => {
+      if (owner.retryTimer === timer) owner.retryTimer = null;
+      if (!generationIsLive(owner)) return;
+      const result = startArm(owner, predecessorArmPid);
+      if (!result.ok) {
+        surfaceFailure(owner, `watcher: FAILED - omp extension could not launch a continuity retry\n${result.message}`);
+      }
+    }, retryDelay(owner.retryFailures));
+    timer.unref();
+    owner.retryTimer = timer;
+  }
+
+  function startArm(owner: SessionGeneration, predecessorArmPid = ""): ArmResult {
+    if (!generationIsLive(owner)) return { ok: false, message: shuttingDownMessage };
+    const ownership = lockOwnership();
+    if (ownership === "other") return { ok: false, message: "watcher: read-only - session lock is held by another firstmate session" };
+    if (ownership === "missing") {
+      return {
+        ok: false,
+        message: "watcher: not armed - no live session holds the lock; run bin/fm-session-start.sh to reclaim it, then call fm_watch_arm_omp to re-arm",
+      };
+    }
+    markLoaded();
+    if (owner.child) {
+      return {
+        ok: true,
+        message: `watcher: unchanged - omp extension already owns an arm child; no manual re-arm needed; ${repairOnlyHint}`,
+      };
+    }
+    if (owner.retryTimer) {
+      return {
+        ok: true,
+        message: `watcher: unchanged - omp extension already owns a scheduled continuity retry; no manual re-arm needed; ${repairOnlyHint}`,
+      };
+    }
+    const id = ++owner.seq;
+    const hostMode = hostModeEnabled();
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      FM_HOME: fmHome,
+      FM_ROOT_OVERRIDE: fmRoot,
+      FM_CONFIG_OVERRIDE: config,
+      FM_WATCH_ARM_SCRIPT: hostMode ? hostScript : armScript,
+      FM_WATCH_PREDECESSOR_ARM_PID: predecessorArmPid,
+    };
+    if (hostMode) env.FM_SUPERVISION_HOST_PRIMARY = "omp";
+    const command = hostMode ? "exec \"$FM_WATCH_ARM_SCRIPT\" park --restart" : "exec \"$FM_WATCH_ARM_SCRIPT\" --restart";
+    const armChild = spawn("bash", ["-lc", `config_dir="\${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"; [ -f "$config_dir/x-mode.env" ] && . "$config_dir/x-mode.env"; ${command}`], {
+      cwd: fmRoot,
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    armHostMode.set(armChild, hostMode);
+    owner.child = armChild;
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    let readinessSettled = false;
+    let verified = false;
+    let resolveReadiness: (ready: boolean) => void = () => {};
+    let resolveClosed: () => void = () => {};
+    const readiness = new Promise<boolean>((resolveReady) => {
+      resolveReadiness = resolveReady;
+    });
+    armReadiness.set(armChild, readiness);
+    const closed = new Promise<void>((resolveClosedChild) => {
+      resolveClosed = resolveClosedChild;
+    });
+    armClose.set(armChild, closed);
+    const settleReadiness = (ready: boolean): void => {
+      if (readinessSettled) return;
+      readinessSettled = true;
+      verified = ready;
+      resolveReadiness(ready);
+    };
+    const observeEstablishedArm = (): void => {
+      const combined = `${stdout}\n${stderr}`;
+      const recovery = combined.match(/^watcher: started pid=([0-9]+).* recovery-generation=([A-Za-z0-9._-]+)$/m);
+      if (recovery) armRecovery.set(armChild, { watcherPid: recovery[1], generation: recovery[2] });
+      if (/^watcher: (?:started|attached)\b/m.test(combined)) {
+        settleReadiness(true);
+      }
+      if (hostMode) return;
+      const reason = completedActionableLine(stdout) || completedActionableLine(stderr);
+      if (reason && !armPendingActionable.has(armChild)) {
+        const pending = createPendingActionable(reason, String(armChild.pid ?? ""));
+        armPendingActionable.set(armChild, pending);
+        enqueuePendingActionable(owner, pending);
+      }
+    };
+    const releaseChild = (): void => {
+      if (owner.child === armChild) owner.child = null;
+    };
+    armChild.stdout.on("data", (chunk: Buffer) => {
+      stdout += chunk.toString();
+      observeEstablishedArm();
+    });
+    armChild.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString();
+      observeEstablishedArm();
+    });
+    armChild.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
+      if (settled) return;
+      settled = true;
+      resolveClosed();
+      settleReadiness(false);
+      releaseChild();
+      const classification = classifyClose(hostMode, stdout, stderr, code, signal);
+      const predecessor = String(armChild.pid ?? "");
+      if (classification.kind === "actionable") {
+        const pending = armPendingActionable.get(armChild) ?? createPendingActionable(classification.message, predecessor);
+        enqueuePendingActionable(owner, pending);
+        if (!generationIsLive(owner)) return;
+        owner.retryFailures = 0;
+        void processPendingActionables(owner);
+        return;
+      }
+      if (!generationIsLive(owner)) return;
+      if (owner.restoring) {
+        // The pipeline is still delivering the wake this successor was
+        // started for. A verified successor that failed on its own keeps its
+        // bounded retry for the end of that delivery; an unready child closing
+        // here was retired by the restoration itself.
+        if (verified && !armRetired.has(armChild)) {
+          owner.deferredClose = { message: classification.message, predecessorArmPid: predecessor };
+        }
+        return;
+      }
+      scheduleRetry(owner, classification.message, predecessor);
+    });
+    armChild.on("error", (error: Error) => {
+      if (settled) return;
+      settled = true;
+      resolveClosed();
+      settleReadiness(false);
+      releaseChild();
+      if (!generationIsLive(owner)) return;
+      if (owner.restoring) return;
+      scheduleRetry(owner, `watcher: FAILED - omp extension arm child ${id} failed: ${error.message}`, String(armChild.pid ?? ""));
+    });
+    return {
+      ok: true,
+      message: `watcher: started omp extension arm child ${id}; future ordinary re-arms are automatic; ${repairOnlyHint}`,
+    };
+  }
+
+  function activateOwnedWatch(owner: SessionGeneration): ArmResult {
+    if (!generationIsLive(owner)) return { ok: false, message: shuttingDownMessage };
+    if (lockOwnership() !== "owned") return startArm(owner);
+    replacementCoordinator.receiver = receiveReplacementActionable;
+    let pending: PendingActionableClose[] = [];
+    let loadFailure = "";
+    try {
+      pending = loadReplacementHandoff();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      loadFailure = `watcher: FAILED - omp extension could not load a replacement-session actionable wake\n${detail}`;
+    }
+    const inProcessPending = replacementCoordinator.pending.splice(0);
+    for (const actionable of [...inProcessPending, ...pending]) {
+      enqueuePendingActionable(owner, actionable);
+    }
+    if (owner.pendingActionables.length > 0) {
+      if (loadFailure) surfaceFailure(owner, loadFailure);
+      const armResult = startArm(owner, owner.pendingActionables[0].predecessorArmPid);
+      if (armResult.ok) recoveryPending = false;
+      if (!armResult.ok) {
+        surfaceFailure(owner, `watcher: FAILED - omp extension could not arm before replacement wake delivery\n${armResult.message}`);
+      }
+      void processPendingActionables(owner);
+      return armResult;
+    }
+    const result = startArm(owner);
+    if (result.ok) recoveryPending = false;
+    if (loadFailure) surfaceFailure(owner, `${loadFailure}\n${result.message}`);
+    return result;
+  }
+
+  pi.on?.("before_agent_start", (_event, ctx) => {
+    if (!instance.isCurrent()) return;
+    rememberContext(ctx);
+    markLoaded();
+  });
+  pi.on?.("message_start", (event, ctx) => {
+    if (!instance.isCurrent()) return;
+    rememberContext(ctx);
+    const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
+    if (!message || message.role !== "user") return;
+    consumeWake(generation, userMessageText(message.content));
+  });
+  // A run that ends with a wake still unconsumed either drains it into the next
+  // run at once or left it in the composer; the delayed check tells the two apart.
+  pi.on?.("agent_end", (_event, ctx) => {
+    if (!instance.isCurrent()) return;
+    rememberContext(ctx);
+    scheduleRestoredWakeCheck(generation);
+  });
+
+  pi.on?.("session_start", async (_event, ctx) => {
+    if (!instance.isCurrent()) {
+      lifecycle("session_start-ignored", { reason: "superseded-instance" });
+      return;
+    }
+    rememberContext(ctx);
+    lifecycle("session_start", { generation: generation.id, stopping: generation.stopping });
+    await generationStopped;
+    if (!instance.isCurrent()) return;
+    bindLiveGeneration("session_start");
+    markLoaded();
+    if (lockOwnership() !== "owned") return;
+    activateOwnedWatch(generation);
+  });
+  pi.on?.("session_shutdown", async (_event, ctx) => {
+    // omp carries no shutdown reason (verified: `reason` is undefined), so the
+    // replacement handoff is always persisted when anything is pending; a
+    // terminal quit then merely replays an already-drained wake next start.
+    if (!instance.isCurrent()) {
+      lifecycle("session_shutdown-ignored", { reason: "superseded-instance" });
+      return;
+    }
+    lifecycle("session_shutdown", { generation: generation.id });
+    if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
+    if (restoreTimer) clearTimeout(restoreTimer);
+    restoreTimer = null;
+    rememberContext(ctx);
+    const stopped = generation;
+    recoveryPending = true;
+    generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, true, lifecycle)]).then(() => {});
+    try {
+      await generationStopped;
+    } finally {
+      lifecycle("generation-stop", { generation: stopped.id });
+      scheduleSelfHeal(stopped);
+    }
+  });
+
+  pi.registerCommand?.("fm-watch-arm-omp", {
+    description: "Arm firstmate watcher supervision through the omp extension instead of foreground bash.",
+    handler: async (_args, ctx) => {
+      const result = await armFromSession(ctx);
+      ctx?.ui?.notify?.(result.message, result.ok ? "info" : "warning");
+    },
+  });
+
+  pi.registerTool?.({
+    name: "fm_watch_arm_omp",
+    label: "Arm firstmate watcher",
+    description: "Start the first required omp watcher cycle, or repair one only after a notification says the cycle is missing, failed, or unhealthy. Do not call after ordinary work or ordinary notifications; the omp extension re-arms automatically. Never run bin/fm-watch-arm.sh through bash.",
+    promptSnippet: "Start the first required omp watcher cycle or repair a cycle reported missing, failed, or unhealthy; ordinary re-arming is automatic.",
+    promptGuidelines: [
+      "Call fm_watch_arm_omp only for the first required cycle or after a notification says the cycle is missing, failed, or unhealthy. Do not call it after ordinary work, turn completion, or ordinary signal, stale, check, or heartbeat handling because the omp extension owns re-arming. Never run bin/fm-watch-arm.sh through bash.",
+    ],
+    parameters: Type.Object({}),
+    execute: async (_toolCallId: unknown, _params: unknown, _signal: unknown, _onUpdate: unknown, ctx: unknown) => {
+      const result = await armFromSession(ctx);
+      return {
+        content: [{ type: "text", text: result.message }],
+        details: result,
+      };
+    },
+  });
+
+  instance.publish({
+    activate: armFromSession,
+    retire: () => {
+      clearHealTimer();
+      lifecycle("instance-retired", { generation: generation.id, by: instance.current()?.id });
+      if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
+      if (restoreTimer) clearTimeout(restoreTimer);
+      restoreTimer = null;
+      const stopped = generation;
+      if (!stopped.stopping) {
+        recoveryPending = true;
+        generationStopped = Promise.all([generationStopped, stopSessionGeneration(stopped, true, lifecycle)]).then(() => {});
+      }
+      const retirement = generationStopped.finally(() => {
+        lifecycle("generation-stop", { generation: stopped.id, cause: "factory-retire" });
+      });
+      return { recovery: recoveryPending, stopped: retirement, context: latestContext };
+    },
+  });
+
+  markLoaded();
+}

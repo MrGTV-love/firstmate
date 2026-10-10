@@ -1,0 +1,33 @@
+ok - omp shutdown, arm and host readiness, and unready retirement each log one expiry
+ok - fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry
+ok - session lock and tmux liveness: omp is anchored, decoys stay out
+ok - fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension
+ok - omp ship and scout launches select replace edit mode only in the worker process
+ok - real omp spawns authorize firstmate only and carry project scope through the generated extension
+ok - fm-spawn: omp model validation is scoped to providers the listing can prove
+ok - fm-spawn: an omp launch with no model refuses a missing or unlisted default role and names the remedy
+ok - fm-spawn: global role inspection is read-only, unlayered, and honors PI_CODING_AGENT_DIR
+ok - fm-spawn: raw omp launches validate the default only without an effective model override
+ok - fm-spawn: raw role and catalog inspection honor the actual launch directory and uncertain evidence passes through
+ok - fm-spawn: omp profile flags, assignments, and invoking environment pass through without default-role catalog probes
+ok - fm-spawn: any expanded raw token passes through unchanged without evaluating it or probing the default-role catalog
+ok - fm-spawn: unquoted, single-quoted, and double-quoted literal evidence still refuses invalid defaults
+ok - fm-spawn: a real omp secondmate launch preserves primary posture and supervision
+ok - fm-spawn: the config/secondmate-harness model pin is validated against the omp catalog before launch
+ok - omp extension: agent_start busy, willContinue stays busy, plain agent_end idle, turn_end a notification, jev-guard tool hooks installed
+ok - control, composer, and supervision-model tables carry omp's verified values
+ok - fm-wake-lib: the omp ownership proof is keyed on its own extensions and gates the hand-off tolerance
+ok - .omp turn-end guard: digest delivery, seatbelt block, one compelled continuation, flagged stop stands down
+ok - .omp watch extension: fm_watch_arm_omp arms once, repeats as a no-op, and delivers an actionable close as one follow-up
+ok - .omp watch extension: an opted-in home runs the supervision host and relays every host line (away record)
+ok - .omp watch extension: an opted-in home runs the supervision host and relays every host line (quiet record)
+ok - .omp watch extension: a home without config/supervision-host or with an off file keeps the plain arm
+ok - .omp watch extension: a host-only boundary rides the replacement handoff and replays in the successor session
+ok - .omp watch extension: a host close split across stream chunks reaches main as one whole follow-up
+ok - .omp watch extension: an idle lane's wake starts its own turn behind an advisor tail; a wake omp restored to the composer is submitted again alone, bounded, and never over a draft or a running turn
+ok - .omp watch extension: isolated replacement, queue drain, running observations, accepted messages, and turn completion each restart the fifteen-check wait and once-only warning
+ok - .omp extensions: a descendant omp session neither records itself as the loaded session nor arms a watcher
+ok - .omp turn-end guard: the loaded marker follows the lock owner at turn boundaries instead of only at load
+ok - .omp watch extension: a generation stopped without a successor heals once; a real successor or arm call never double-arms
+ok - .omp watch extension: a double load keeps one live generation, one arm, and forwards the superseded tool
+ok - .omp watch extension: publication failure retains the wake and permits tool, command, and factory repair

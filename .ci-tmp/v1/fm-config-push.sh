@@ -1,0 +1,312 @@
+#!/usr/bin/env bash
+# Push declared inherited local material to live secondmate homes.
+# Usage: fm-config-push.sh [--help]
+#
+# Mid-session convergence for inherited local material such as
+# config/crew-dispatch.json, config/backend, or data/captain-shared.md updates.
+# This discovers live secondmate homes from state/*.meta, backfills
+# home= from data/secondmates.md for older meta records, and reuses the same
+# propagation machinery as bootstrap, but deliberately does not
+# fast-forward tracked files.
+# After a successful per-home propagation that changes any allowlisted config/*
+# item, local routes receive the generation-specific literal-content pointer from
+# fm-config-inherit-lib.sh. Remote routes receive one durable marked reread nudge
+# through their SSH route. Unchanged config and data/captain-shared.md-only
+# updates send no reread unless a previous send failure is pending for that home.
+# The shared delivery helper reports "config-reread: sent" only after a successful
+# enqueue, not an agent acknowledgment; retiring obsolete local reread
+# instructions without delivery is silent in focused push and bootstrap.
+# Warnings-only skips exit 0; real propagation or reread-send errors exit non-zero.
+# config/model-index.json is pushed only after its schema, the dispatch roles
+# it resolves, and bin/fm-model-index.sh check pass; a malformed index, an id
+# absent from a readable catalog, an unresolvable worker account pin, or
+# config/crew-dispatch.json roles that do not resolve against the index
+# withholds both files from every home, while the other material still pushes,
+# and the run exits non-zero.
+set -u
+
+usage() {
+  cat <<'EOF'
+Usage: fm-config-push.sh [--help]
+
+Push the primary firstmate home's declared inherited local material into each
+live secondmate home.
+
+This is local-material-only:
+  - does not fast-forward tracked files
+  - after successful config/* changes, sends a local literal-content pointer or
+    one durable marked remote reread nudge
+    (no message when config is unchanged unless a previous send failure is pending)
+  - reports each live home and each inheritable item as pushed, unchanged,
+    skipped, or error
+  - exits non-zero for real propagation errors or reread-send failures
+  - withholds config/model-index.json and config/crew-dispatch.json from
+    every home when the index is malformed, bin/fm-model-index.sh check finds
+    an id absent from a readable catalog, a worker account pin does not
+    resolve, or the dispatch roles do not resolve against the index
+
+Live homes come from state/*.meta records with kind=secondmate.
+data/secondmates.md is only a fallback for missing home= fields in older or
+incomplete meta records.
+
+Environment overrides follow the rest of firstmate:
+  FM_HOME            active firstmate home
+  FM_ROOT_OVERRIDE  firstmate repo root
+  FM_STATE_OVERRIDE state dir
+  FM_DATA_OVERRIDE  data dir
+  FM_CONFIG_OVERRIDE config dir
+EOF
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  "")
+    ;;
+  *)
+    echo "usage: fm-config-push.sh [--help]" >&2
+    exit 2
+    ;;
+esac
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
+FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
+CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
+DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
+SECONDMATES_MD="$DATA/secondmates.md"
+
+"$SCRIPT_DIR/fm-guard.sh" || true
+
+# shellcheck source=bin/fm-ff-lib.sh
+. "$SCRIPT_DIR/fm-ff-lib.sh"
+# shellcheck source=bin/fm-backend.sh
+. "$SCRIPT_DIR/fm-backend.sh"
+# shellcheck source=bin/fm-wake-lib.sh
+. "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-config-inherit-lib.sh
+. "$SCRIPT_DIR/fm-config-inherit-lib.sh"
+# shellcheck source=bin/fm-worker-account-lib.sh
+. "$SCRIPT_DIR/fm-worker-account-lib.sh"
+# shellcheck source=bin/fm-secondmate-nudge-lib.sh
+. "$SCRIPT_DIR/fm-secondmate-nudge-lib.sh"
+
+print_item_report() {
+  local report=$1 item status reason
+  while IFS=$'\t' read -r item status reason; do
+    [ -n "$item" ] || continue
+    if [ -n "$reason" ]; then
+      printf '  %s: %s - %s\n' "$item" "$status" "$reason"
+    else
+      printf '  %s: %s\n' "$item" "$status"
+    fi
+  done < "$report"
+}
+
+records=$(mktemp "${TMPDIR:-/tmp}/fm-config-push-records.XXXXXX" 2>/dev/null) || exit 1
+reports=""
+pair_dir=""
+# shellcheck disable=SC2317,SC2329 # Invoked by trap handlers below.
+cleanup() {
+  local report_file
+  rm -f "$records"
+  [ -z "$pair_dir" ] || rm -rf -- "$pair_dir"
+  for report_file in $reports; do
+    rm -f "$report_file"
+  done
+}
+trap cleanup EXIT
+
+live_secondmate_meta_records "$STATE" "$SECONDMATES_MD" > "$records"
+if [ ! -s "$records" ]; then
+  echo "config-push: no live secondmate homes found"
+  exit 0
+fi
+
+echo "config-push: $FM_HOME -> live secondmate homes"
+
+seen_homes=""
+errors=0
+# An edited fleet model index is checked before it reaches any home: each
+# harness's entries against that harness's catalog, under only that harness's
+# worker account pin. An id proven absent, or a declared pin that does not
+# resolve, keeps every home on its current index and the dispatch profiles
+# whose roles it resolves; so does an inheritable crew-dispatch.json that does
+# not resolve against the index. An unavailable catalog is only a notice.
+
+index_check() {
+  local harnesses harness selection root
+  fm_config_inherit_pair_valid "$pair_dir" || return 1
+  [ -e "$pair_dir/model-index.json" ] || return 0
+  harnesses=$(jq -r '[.roles[] | keys[]] | unique[]' "$pair_dir/model-index.json" 2>/dev/null) || return 1
+  for harness in $harnesses; do
+    selection=$(fm_worker_account_resolve "$harness" "$CONFIG") || return 1
+    if [ -n "$selection" ]; then
+      root=${selection#*$'\t'}
+      FM_CONFIG_OVERRIDE="$pair_dir" fm_worker_account_run "$harness" "${root%%$'\t'*}" \
+        "$SCRIPT_DIR/fm-model-index.sh" check "$harness" >/dev/null || return 1
+    else
+      FM_CONFIG_OVERRIDE="$pair_dir" "$SCRIPT_DIR/fm-model-index.sh" check "$harness" >/dev/null || return 1
+    fi
+  done
+}
+case " $FM_INHERITABLE_CONFIG " in
+  *" model-index.json "*|*" crew-dispatch.json "*)
+    remote=0
+    while IFS='|' read -r _id home _window meta; do
+      [ -n "$home" ] || continue
+      if [ -n "$(fm_meta_get "$meta" remote_host)" ]; then remote=1; break; fi
+    done < "$records"
+    if pair_dir=$(mktemp -d "${TMPDIR:-/tmp}/fm-config-push-pair.XXXXXX") &&
+      fm_config_inherit_pair_stage "$CONFIG" "$pair_dir" "$remote" &&
+      index_check; then
+      FM_CONFIG_INHERIT_PAIR_DIR=$pair_dir
+      export FM_CONFIG_INHERIT_PAIR_DIR
+    else
+      echo "config-push: model-index.json and crew-dispatch.json not pushed - the index or the dispatch roles it must resolve failed validation; every home keeps its current pair; fix them and rerun"
+      errors=1
+      inheritable=
+      for item in $FM_INHERITABLE_CONFIG; do
+        case "$item" in model-index.json | crew-dispatch.json) ;; *) inheritable="$inheritable $item" ;; esac
+      done
+      FM_INHERITABLE_CONFIG=${inheritable# }
+      export FM_INHERITABLE_CONFIG
+    fi
+    ;;
+esac
+while IFS='|' read -r id home _window meta; do
+  [ -n "$id" ] || continue
+  if [ -z "$home" ]; then
+    printf 'secondmate %s: skipped - no home= in %s and no registry home\n' "$id" "$meta"
+    continue
+  fi
+  remote_host=$(fm_meta_get "$meta" remote_host)
+  if [ -n "$remote_host" ]; then
+    printf 'secondmate %s (%s:%s):\n' "$id" "$remote_host" "$home"
+    remote_lock=$(fm_remote_inherit_transaction_lock_path "$STATE" "$id" 2>/dev/null || true)
+    if [ -z "$remote_lock" ] || ! fm_lock_acquire_wait "$remote_lock"; then
+      echo "  config-reread: transaction lock failed"
+      errors=1
+      continue
+    fi
+    remote_generation=$(fm_remote_inherit_generation_next "$STATE" "$id" 2>/dev/null || true)
+    if [ -z "$remote_generation" ]; then
+      echo "  config-reread: generation publication failed"
+      errors=1
+      fm_lock_release "$remote_lock" || true
+      continue
+    fi
+    remote_marker=$(fm_secondmate_nudge_marker_path "$STATE" "$id" 2>/dev/null || true)
+    remote_pending=0
+    if [ -f "$remote_marker" ] && [ "$(fm_meta_get "$remote_marker" remote)" = 1 ]; then remote_pending=1; fi
+    if ! fm_secondmate_nudge_write "$STATE" "$id" "$home" "" remote \
+      "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" 1; then
+      echo "  config-reread: retry marker failed"
+      errors=1
+      fm_lock_release "$remote_lock" || true
+      continue
+    fi
+    if remote_out=$(FM_CONFIG_INHERIT_LIVE=1 \
+      "$SCRIPT_DIR/fm-remote-inherit-push.sh" "$id" "$remote_generation" 2>&1); then
+      remote_ok=1
+    else
+      remote_ok=0
+      errors=1
+    fi
+    [ -z "$remote_out" ] || printf '%s\n' "$remote_out" | sed 's/^/  /'
+    remote_nudge=0
+    if printf '%s\n' "$remote_out" | grep -Eq '^(pushed|removed):'; then remote_nudge=1; fi
+    [ "$remote_pending" -eq 0 ] || remote_nudge=1
+    if [ "$remote_nudge" -eq 1 ]; then
+      if FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" FM_STATE_OVERRIDE="$STATE" \
+        "$SCRIPT_DIR/fm-send.sh" "fm-$id" "$FM_REMOTE_SECOND_MATE_NUDGE_MESSAGE" >/dev/null 2>&1; then
+        rm -f -- "$remote_marker"
+        echo "  config-reread: sent"
+      else
+        echo "  config-reread: send failed; retry retained"
+        errors=1
+      fi
+    elif [ "$remote_ok" -eq 1 ]; then
+      rm -f -- "$remote_marker"
+    fi
+    fm_lock_release "$remote_lock" || true
+    continue
+  fi
+  if ! validate_secondmate_home "$id" "$home"; then
+    printf 'secondmate %s (%s): skipped - unsafe home: %s\n' "$id" "$home" "$VALIDATION_ERROR"
+    continue
+  fi
+  home_real="$VALIDATED_HOME"
+  case " $seen_homes " in
+    *" $home_real "*)
+      printf 'secondmate %s (%s): skipped - already processed for another live meta\n' "$id" "$home_real"
+      continue
+      ;;
+  esac
+  seen_homes="$seen_homes $home_real"
+
+  printf 'secondmate %s (%s):\n' "$id" "$home_real"
+  dirty=$(dirty_status "$home_real" yes || true)
+  if [ -n "$dirty" ]; then
+    echo "  home: dirty working tree - local-material push continuing"
+  fi
+
+  mkdir -p "$home_real/state" || {
+    echo "  config-reread: error - could not create state directory"
+    errors=1
+    continue
+  }
+  home_lock=$(fm_config_inherit_lock_path "$home_real") || {
+    echo "  config-reread: error - could not resolve per-home lock"
+    errors=1
+    continue
+  }
+  fm_lock_acquire_wait "$home_lock" || {
+    echo "  config-reread: error - could not acquire per-home lock"
+    errors=1
+    continue
+  }
+  if fm_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
+    fm_config_reread_retry_pending "$id" "$home_real" || true
+    if fm_config_reread_retry_queue_is_full "$FM_HOME" "$id"; then
+      echo "  config-reread: error - retry instruction queue is full"
+      errors=1
+      fm_lock_release "$home_lock" || true
+      continue
+    fi
+  fi
+
+  report=$(mktemp "${TMPDIR:-/tmp}/fm-config-push-report.XXXXXX" 2>/dev/null) || {
+    echo "  home: error - could not create report file"
+    errors=1
+    fm_lock_release "$home_lock" || true
+    continue
+  }
+  reports="$reports $report"
+  if FM_CONFIG_INHERIT_REPORT="$report" FM_CONFIG_INHERIT_LIVE=1 \
+    propagate_secondmate_inheritance "$FM_HOME" "$home_real" "$CONFIG" "$DATA"; then
+    :
+  else
+    errors=1
+  fi
+  print_item_report "$report"
+  if reread_out=$(FM_HOME="$FM_HOME" FM_ROOT_OVERRIDE="$FM_ROOT" \
+    FM_STATE_OVERRIDE="$STATE" \
+    fm_config_send_reread_nudge "$id" "$home_real" "$report" 2>&1); then
+    [ -z "$reread_out" ] || printf '%s\n' "$reread_out"
+  else
+    errors=1
+    if [ -n "$reread_out" ]; then
+      printf '%s\n' "$reread_out"
+    else
+      printf '  config-reread: send failed\n'
+    fi
+  fi
+  fm_lock_release "$home_lock" || true
+done < "$records"
+
+[ "$errors" -eq 0 ] || exit 1
+exit 0

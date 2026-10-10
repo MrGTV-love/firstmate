@@ -1,0 +1,38 @@
+ok - the sweep retires finished boards and keeps every board that could still carry an answer
+ok - the sweep stops the resident poll of a finished board's live listener
+ok - deleted boards retain standing, feedback, ownership and captured-result protections
+ok - filesystem permission errors keep ended, sessionless and idle board listeners
+ok - stale sweeps preserve replacement generations and newly captured rounds
+ok - recent acknowledgements keep only their own listeners in literal home paths
+ok - unknown inbox evidence keeps listeners at sweep and locked retirement boundaries
+ok - unknown and dynamic card discovery keeps ended, sessionless and idle listeners
+ok - bound sweep keys share exact and legacy answer precedence without cross-source cache leakage
+ok - sweeps reuse migration note and prefix precedence and keep ambiguous or unreadable identities
+ok - marked hold reasons round-trip through public reads, fleet, startup, and return without changing other fields
+ok - new, active, and released holds require the origin first with and without deferral
+ok - historical self-inventories name a workable repair that preserves sibling entries
+ok - completion and verification compare backend identities for entries and current or stored origins
+ok - complete refuses the origin as its own captain-call inventory
+ok - complete refuses an entry held for another origin and flags one with none recorded
+ok - report-only unresolved captain call is reproduced and completion refuses before loss
+ok - internal retention and read-only admission preserve active captain drop classification
+ok - both body-decoding paths work without the allow_nonref default
+ok - cleanup preserves every byte of a retained body's non-ASCII characters
+ok - the completion gate attests captain-held inventory and transfers open status decisions
+ok - answer records the captain's words, closes idempotently, and releases routed work
+ok - release frees held work with the captain's words recorded and the body preserved
+ok - captain holds become visible only after their hold-set timestamp is durable
+ok - an interrupted answer preserves its hold age until close retry
+ok - a deferred captain call leaves the live Captain's Call until its date and stays answerable
+ok - an out-of-band close is recordable with the captain's word and nothing else
+ok - ended visual review follows the same captain-hold completion owner
+ok - resolved findings and decision-like prose do not create captain-held tasks
+ok - terminal single-owner stale status decisions do not block empty inventory
+not ok - secondmate investigation teardown failed: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: cannot establish nested worktree ownership under /Users/charlesabrooker/tmp/fm-captain-hold.9USwed/sample-mate-home/projects/missing-sample-mate-review; preserving the launch agents and task sample-mate-review.

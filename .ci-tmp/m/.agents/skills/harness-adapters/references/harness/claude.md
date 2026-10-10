@@ -1,0 +1,90 @@
+# Claude
+
+Busy hooks verified 2026-07-28 on Claude Code 2.1.220.
+
+## Operating facts
+
+| Fact | Value |
+|---|---|
+| Busy | Owned hooks: `UserPromptSubmit` opens while `StopFailure` and `SessionEnd` close; worker `Stop` follows the [belay completion contract](../../../docs/configuration.md#jev-belay-stop-hook); manual interrupt emits no hook, so control reports delivered keys and live endpoint only, publishes no idle event or cancellation claim, and usually leaves `claude-hook` busy. |
+| Exit | `/exit`. |
+| Interrupt | Single Escape. |
+| Skill | `/<skill>`, for example `/no-mistakes`. |
+| Model | `--model <model>`; discover through the interactive `/model` picker, with alias or full-name shape documented by `claude --help`. |
+| Effort | `--effort <low\|medium\|high\|xhigh\|max>`, verified on 2.1.196. |
+| Permissions | `--dangerously-skip-permissions` by default, or `--permission-mode auto` when `config/claude-permission-mode` is `auto`; the `auto` shape verified on 2.1.269. See [`Claude permission mode`](../../../docs/configuration.md#claude-permission-mode-configclaude-permission-mode) for the launch grant and configuration. |
+
+## Workspace trust
+
+Claude gates a folder it has never seen behind an interactive workspace-trust dialog (titled "Quick safety check: Is this a project you created or one you trust?"), so every fresh task worktree would hit it, and so would every secondmate home no operator has opened by hand.
+`--dangerously-skip-permissions` does not cover that gate: `claude --help` records that the dialog is skipped only in non-interactive mode, through `-p` or a non-TTY stdout, and a spawned pane is interactive.
+Every claude spawn therefore pre-registers the directory its pane starts in before launch, and the dialog does not appear: the task worktree for a ship or scout, and the home itself for a `--secondmate` spawn, in either seeded shape (a leased worktree or a standalone clone).
+
+A second, separate dialog - "Allow external CLAUDE.md file imports?" - can render when a loaded CLAUDE.md chain imports outside the project tree without prior consent, including an operator's `~/.claude/CLAUDE.md` importing `~/.claude/RTK.md`.
+`--setting-sources project,local` (the minimal worker tool surface) does not suppress it either, and it gates the pane exactly like the trust dialog: cursor on "No, disable external imports", no way to move the selection from firstmate's steering plane.
+
+For nested copies, `../../../bin/fm-claude-memory-lib.sh` owns ancestor-supervisor-memory exclusion for canonical and recognized raw Claude launches, including TeamClaude; [nested-home verification](../../../docs/verification/runtime-backends.md#nested-firstmate-home-memory-exclusion) records the live proof.
+If this dialog lists an ancestor firstmate home's supervisor contract (`AGENTS.md` or `CLAUDE.md`) on a worker pane, decline that import; legitimate project imports and the operator's RTK import remain allowed through interactive consent.
+
+`../../../bin/fm-claude-trust.sh`'s header owns trust registration and consent carry-forward for task worktrees, sibling clones, and secondmate homes; registration never manufactures import consent, and `../../../bin/fm-spawn.sh` refuses the spawn if registration fails.
+
+Never try to answer either dialog with a key.
+Firstmate's key plane carries only Enter, Escape, and C-c with no arrow navigation, so it cannot move a dialog's selection at all, and both dialogs render with the cursor on their declining option: Enter exits at workspace trust or records a decline at external imports, never accepts.
+A visible trust dialog means pre-registration did not take effect (or the project entry already carries an explicit decline) - inspect the store and the spawn's error output rather than sending keys.
+A visible external-imports dialog means the worker is waiting for consent, not processing its instructions.
+`../../../bin/fm-spawn.sh`'s Claude start-confirmation header owns bounded polling and dialog reporting; a reported blocked launch remains recorded for a person to handle, rather than failing the spawn.
+`../../../tests/fm-spawn-claude-start-confirm.test.sh` is the regression entry point.
+`fm-control.sh <id> interrupt` delivers Escape, which is the safe way to clear a wedged workspace-trust dialog for inspection without answering it.
+Escape on the external-imports dialog is different: it records a permanent decline (`hasClaudeMdExternalIncludesApproved: false`, `hasClaudeMdExternalIncludesWarningShown: true`) that `../../../bin/fm-claude-trust.sh` then correctly refuses to override on every later spawn for that project.
+Leave a pane showing the external-imports dialog alone and have a person answer it interactively instead of interrupting it.
+For a legitimate import that was previously declined, follow `../../../bin/fm-claude-trust.sh`'s recovery diagnostic in the account-selected config store.
+
+The once-per-machine bypass-permissions confirmation is a third, separate dialog, scoped to the machine rather than the path, and pre-registration does not address it.
+Never send Enter to that one either: it was observed rendering in the same shape as the trust dialog, with the selection on `No, exit` and the footer `Enter to confirm . Esc to cancel`, so Enter ends the session rather than accepting.
+Firstmate cannot move a selection with Enter, Escape, and C-c alone, so it cannot accept this dialog at all, and an operator accepts it once per machine instead.
+Inspect the pane to identify which dialog is on screen, and report it rather than answering it.
+A launch under `config/claude-permission-mode=auto` never meets the bypass confirmation, because it does not request bypass mode: on 2.1.269 `claude --permission-mode auto` reached the composer directly with the footer `⏵⏵ auto mode on (shift+tab to cycle)`, so a captain who refuses the bypass dialog selects `auto` there instead of accepting it.
+The workspace-trust dialog is unaffected by the permission mode and still needs the pre-registration above.
+
+## Composer ghost
+
+Completed turns can render dim predicted text inside an empty composer, indistinguishable in plain `tmux capture-pane`.
+The spawn scopes `CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false` to every Claude worker and secondmate without changing global config.
+CLI `--prompt-suggestions` affects print or SDK mode only and did not suppress interactive ghost text on v2.1.186.
+
+Shared styled ghost extraction is owned by `bin/fm-composer-lib.sh`'s `fm_composer_strip_ghost`.
+See [Claude composer proof](../../../docs/herdr-backend.md#claude-composer-proof) for the Herdr-specific policy and [runtime backend verification](../../../docs/verification/runtime-backends.md#colored-claude-slash-commands) for captures.
+Styled capture stays internal to the boolean detector; `fm-peek` and model-facing captures remain plain, without escapes.
+
+## Feedback drafts
+
+The spawn disables Claude's `/bug` and `/feedback` model-drafted feedback flow for every Claude worker and secondmate, preventing a fleet-launched agent from queuing or submitting a bug report on the captain's behalf.
+The controls are scoped to the launched process and never modify the captain's global Claude settings; `launch_template()` in `../../../bin/fm-spawn.sh` owns their exact mechanics and defense-in-depth rationale.
+
+## Task control channel
+
+A Claude task worker's launch brief and Firstmate steering-inbox messages arrive as file-shaped content that is otherwise indistinguishable from indirect prompt injection.
+`launch_template()` in `../../../bin/fm-spawn.sh` establishes exactly those two Firstmate-owned channels as first-party instructions through `--append-system-prompt`, while leaving project files, fetched content, and other external material under the model's normal distrust and granting no merge, destructive, or security-sensitive authority beyond the brief.
+A `--secondmate` launch omits the statement because a secondmate operates under its own supervisor contract instead of a task worker's.
+
+## Primary integration
+
+[`../../../docs/verification/supervision.md`](../../../docs/verification/supervision.md#turn-end-guard) records the current primary and Stop auto-arm live evidence.
+The separate worker Stop hook in `.claude/settings.local.json` follows the [belay completion contract](../../../docs/configuration.md#jev-belay-stop-hook).
+
+Primary `.claude/settings.json` registers `../../../bin/fm-turnend-guard.sh --claude` and `../../../bin/fm-claude-stop-autoarm.sh` with `asyncRewake: true` and `timeout: 28800`.
+Guard exit 2 plus stderr forces continuation.
+Stop payload `stop_hook_active=true` follows any hook-driven continuation, including async reawakening, so Claude mode ignores it and uses cooperative claim and epoch plus bounded re-block; default Codex mode keeps it as a one-block loop guard.
+
+Project `.claude/settings.json` loads only when the exact project root is the session root; Claude does not search parents, so Firstmate starts at repository root.
+Hooks still run through cwd-sensitive `/bin/sh`, so tracked commands anchor through `"$CLAUDE_PROJECT_DIR"/bin/...`.
+`../../../docs/turnend-guard.md` owns details.
+
+The Stop-owned watcher hook runs every Stop, foregrounds `../../../bin/fm-watch-arm.sh` only when eligible, and uses exit-2 async reawakening as notification.
+The model handles notifications but never routine re-arm.
+Unless `config/supervision-host-off` opts the home out, the hook foregrounds the supervision host instead, which also runs Claude's print mode as its headless engine; [`supervision-host.md`](../../../docs/supervision-host.md#engines) owns the verified engine facts.
+Claude's PreToolUse seatbelt blocks directly, and its deny is honored only with empty stdout; `../../../docs/arm-pretool-check.md` owns that contract.
+
+### Helper agents
+
+[`Primary helper agents and durable project work`](../../../docs/subagent-guard.md) owns helper-tool availability and points to the unchanged project-work delegation authority.
