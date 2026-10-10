@@ -1,0 +1,5 @@
+# rule_2 (strongest class) declares no stand-in: fallback []
+{"when":"unrelated strongest work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[]}
+$ fm-spawn.sh labr3b ... --harness omp --model openai-codex/gpt-6.1-sol --effort high   # real pool exhausted
+error: dispatch profile has exhausted capacity and no supported permitted fallback
+(no labr3b state files - no weaker model was substituted)

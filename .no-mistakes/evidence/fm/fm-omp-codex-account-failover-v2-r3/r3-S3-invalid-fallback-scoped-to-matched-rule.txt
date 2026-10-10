@@ -1,0 +1,6 @@
+# rule_2 (unrelated to labr3a) has an INVALID fallback (codex harness, effort ultra); labr3a spawn above still succeeded.
+$ fm-spawn.sh labr3b ... --harness omp --model openai-codex/gpt-6.1-sol --effort high   # matches rule_2 itself
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.74u3uJ/home
+error: invalid dispatch fallback configuration: jq: error (at <stdin>:4): fallback must be an array of explicit OMP profiles or TeamClaude-required Claude profiles
+exit=1
+(no labr3b state files - refused before publication)

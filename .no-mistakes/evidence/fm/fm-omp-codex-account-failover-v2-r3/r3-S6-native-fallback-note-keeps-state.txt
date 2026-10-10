@@ -1,0 +1,24 @@
+# real status file of labr3c, written by the worker and the generated omp extension:
+note [at=1791654915]: model-matrix fallback served google-antigravity/gemini-3.7-flash:low
+note [at=1791654919]: model-matrix fallback served google-antigravity/gemini-3.7-flash:low
+done: native fallback probe ready
+$ fm-crew-state.sh labr3c
+state: blocked · source: status-log · named head c2e2df50676850ec2a04187374ed1a426c8ff9b3 is unreachable outside the worker copy · model-drift: google-antigravity/gemini-3.7-flash live (recorded openai-codex/gpt-6-luna)
+
+# staged order: each terminal verb, then the REAL extension note line copied from above
+done then fallback note -> state: blocked · source: status-log · named head c2e2df50676850ec2a04187374ed1a426c8ff9b3 is unreachable outside the worker copy · model-drift: google-antigravity/gemini-3.7-flash live (recorded openai-codex/gpt-6-luna)
+needs-decision then fallback note -> state: parked · source: status-log · lab needs-decision probe · model-drift: google-antigravity/gemini-3.7-flash live (recorded openai-codex/gpt-6-luna)
+blocked then fallback note -> state: blocked · source: status-log · lab blocked probe · model-drift: google-antigravity/gemini-3.7-flash live (recorded openai-codex/gpt-6-luna)
+failed then fallback note -> state: failed · source: status-log · lab failed probe · model-drift: google-antigravity/gemini-3.7-flash live (recorded openai-codex/gpt-6-luna)
+paused then fallback note -> state: paused · source: status-log · lab paused probe · model-drift: google-antigravity/gemini-3.7-flash live (recorded openai-codex/gpt-6-luna)
+control: worker own free-form note after done -> state: unknown · source: none · no current-state source available · model-drift: google-antigravity/gemini-3.7-flash live (recorded openai-codex/gpt-6-luna)
+# live-model published by the extension
+model=google-antigravity/gemini-3.7-flash
+
+# shared reader (last_status_line in bin/fm-status-event-lib.sh) on the same staged files:
+done then fallback note -> last_status_line: done [at=1]: lab done probe
+needs-decision then fallback note -> last_status_line: needs-decision [at=1]: lab needs-decision probe
+blocked then fallback note -> last_status_line: blocked [at=1]: lab blocked probe
+failed then fallback note -> last_status_line: failed [at=1]: lab failed probe
+paused then fallback note -> last_status_line: paused [at=1]: lab paused probe
+# note: "done -> blocked" in fm-crew-state above is its separate done-proof check (the weak stand-in worker committed on a detached HEAD); the real file with no trailing note gives the same result, and last_status_line returns the done line.

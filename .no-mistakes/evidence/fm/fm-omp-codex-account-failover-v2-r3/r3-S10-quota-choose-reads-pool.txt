@@ -1,0 +1,6 @@
+$ quota-axi --json | bin/fm-quota-choose.sh --candidate omp:openai-codex/gpt-6-luna --candidate omp:openai-codex/gpt-6.1-sol   # real pool: both accounts exhausted
+none
+exit=1
+$ quota-axi --json | bin/fm-quota-choose.sh --candidate omp:openai-codex/gpt-6-luna --candidate claude:claude-sonnet-5-5
+claude claude-sonnet-5-5
+exit=0

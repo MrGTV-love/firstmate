@@ -1,0 +1,8 @@
+$ omp usage made unreadable in the lab PATH wrapper; then:
+$ bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/gpt-6-luna
+capacity: unknown
+accounts[0]{status,remaining,savedResets}:
+reason: omp usage failed or returned an invalid report
+
+# contrast: quota-axi codex view (single account, no pool)
+[{"provider":"codex","accounts":0}]

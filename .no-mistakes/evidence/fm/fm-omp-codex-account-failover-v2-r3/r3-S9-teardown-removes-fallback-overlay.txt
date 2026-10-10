@@ -1,0 +1,20 @@
+# labr3c state files before teardown
+labr3c.busy-gen
+labr3c.busy-state
+labr3c.git-hooks
+labr3c.live-model
+labr3c.meta
+labr3c.omp-ext.ts
+labr3c.omp-fallback.yml
+labr3c.status
+labr3c.turn-ended
+# lab operator landed the worker commit on the lab project main (git merge --ff-only), so teardown needs no discard
+$ fm-teardown.sh labr3c
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown labr3c complete (window firstmate:fm-labr3c, worktree /Users/charlesabrooker/tmp/fm-lab.74u3uJ/treehouse/.treehouse/notes-4486e5/2/notes)
+Backlog: labr3c just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.74u3uJ/home/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.74u3uJ/home/data/backlog.md - move labr3c to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+# labr3c state files after teardown
+labr3c.teardown-processes

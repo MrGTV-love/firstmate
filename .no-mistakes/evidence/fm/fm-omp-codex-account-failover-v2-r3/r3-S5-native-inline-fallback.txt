@@ -1,0 +1,45 @@
+# Codex pool capacity unreadable at spawn time (lab PATH wrapper) -> capacity unknown -> spawn keeps the Codex route and hands omp the rule chain
+$ fm-spawn.sh labr3c <lab>/projects/notes --mode local-only --yolo on --harness omp --model openai-codex/gpt-6-luna --effort medium
+spawned labr3c harness=omp kind=ship mode=local-only yolo=on window=firstmate:fm-labr3c worktree=/Users/charlesabrooker/tmp/fm-lab.74u3uJ/treehouse/.treehouse/notes-4486e5/2/notes
+exit=0
+# meta
+harness=omp
+model=openai-codex/gpt-6-luna
+effort=medium
+dispatch_rule=rule_1
+# per-task overlay given to omp
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "openai-codex/gpt-6-luna": [
+        "google-antigravity/gemini-3.7-flash:low"
+      ],
+      "openai-codex/gpt-6-luna:medium": [
+        "google-antigravity/gemini-3.7-flash:low"
+      ],
+      "google-antigravity/gemini-3.7-flash": [],
+      "google-antigravity/gemini-3.7-flash:low": []
+    }
+  }
+}
+
+# real Codex request hit usage_limit_reached; omp served the declared stand-in. Worker pane:
+ Warning: Fallback: openai-codex/gpt-6-luna:medium ->
+ "native fallback ok". Commit it on your task branch.
+ Fallback succeeded on google-antigravity/gemini-3.7-flash:low
+│   1 native fallback ok                                                       │
+ Warning: Fallback: openai-codex/gpt-6.1-sol:xhigh ->
+ Advisor request failed: Codex error event: The usage limit has been reached
+ (code=usage_limit_reached)
+│ $ git add NATIVE.txt && git commit -m "Add NATIVE.txt with native fallback   │
+│ [detached HEAD c2e2df5] Add NATIVE.txt with native fallback ok               │
+ Warning: Fallback: openai-codex/gpt-6-luna:medium ->
+ Advisor request failed: Codex error event: The usage limit has been reached
+ (code=usage_limit_reached)
+# status file lines written by the generated extension
+note [at=1791654915]: model-matrix fallback served google-antigravity/gemini-3.7-flash:low
+note [at=1791654919]: model-matrix fallback served google-antigravity/gemini-3.7-flash:low
+# worker commit on the stand-in
+c2e2df5 Add NATIVE.txt with native fallback ok

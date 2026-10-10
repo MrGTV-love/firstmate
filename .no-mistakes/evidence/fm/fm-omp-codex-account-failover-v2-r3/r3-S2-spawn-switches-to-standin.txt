@@ -1,0 +1,53 @@
+# commit under test: c6eb3237 (rebased on d69b2c5a)
+$ bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/gpt-6-luna   # real omp usage, both pooled accounts
+capacity: exhausted
+accounts[2]{status,remaining,savedResets}:
+  exhausted,0,1
+  exhausted,0,2
+# lab matrix (config/crew-dispatch.json)
+{"rules":[
+ {"when":"lab luna-class work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"medium"},
+  "fallback":[{"harness":"omp","model":"google-antigravity/gemini-3.7-flash","effort":"low"}]},
+ {"when":"unrelated strongest work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},
+  "fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"ultra"}]}
+]}
+$ fm-spawn.sh labr3a <lab>/projects/notes --mode local-only --yolo on --harness omp --model openai-codex/gpt-6-luna --effort medium
+spawned labr3a harness=omp kind=ship mode=local-only yolo=on window=firstmate:fm-labr3a  (exit 0)
+# state/labr3a.meta routing keys
+harness=omp
+model=google-antigravity/gemini-3.7-flash
+effort=low
+dispatch_rule=rule_1
+# state/labr3a.status
+working [at=1791654816]: model-matrix fallback launched omp google-antigravity/gemini-3.7-flash for rule_1
+# state/labr3a.omp-fallback.yml (per-task overlay)
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "google-antigravity/gemini-3.7-flash": [],
+      "google-antigravity/gemini-3.7-flash:low": []
+    }
+  }
+}
+
+# omp usage calls made by spawn (lab wrapper log; "real" = passed to real omp)
+1791654797 real
+1791654808 real
+1791654853 real
+# worker pane (lab tmux) - real worker ran on the stand-in and did the work
+│   1 lab probe ok                                                             │
+│   2                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭──────────────────────────────────────────────────────────────────────────────╮
+│ $ git add PROBE.txt && git commit -m "Add PROBE.txt with lab probe ok"       │
+├─── Output ───────────────────────────────────────────────────────────────────┤
+│ [detached HEAD 2f40da6] Add PROBE.txt with lab probe ok                      │
+│  1 file changed, 1 insertion(+)                                              │
+│  create mode 100644 PROBE.txt                                                │
+│ ⟦Wall: 0.28s | Timeout: 300s⟧                                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ FIRSTMATE_STATUS: done
+❯
+ π · ◔ Gemini 3.7 Flash 🙈 · 🌳 notes/notes · ⑂ detached · ◫ 1.0%/1M ⟲ · S0.03

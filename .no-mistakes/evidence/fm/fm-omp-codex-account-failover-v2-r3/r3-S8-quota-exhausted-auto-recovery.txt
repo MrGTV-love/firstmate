@@ -1,0 +1,36 @@
+# step 1: rule_1 had NO fallback; Codex capacity unreadable at spawn -> worker launched on openai-codex/gpt-6-luna
+spawned labr3d harness=omp kind=ship mode=local-only yolo=on window=firstmate:fm-labr3d worktree=/Users/charlesabrooker/tmp/fm-lab.74u3uJ/treehouse/.treehouse/notes-4486e5/3/notes
+exit=0
+# step 2: real Codex error in the worker pane
+────────────────────────────────────────────────────────────────────────────────
+ Error: Codex error event: The usage limit has been reached
+   (code=usage_limit_reached)
+ Error: Retry failed after 1 attempts: Provider requested 293515552ms wait,
+ exceeds retry.maxDelayMs (300000ms). Original error: Codex error event: The
+ usage limit has been reached (code=usage_limit_reached)
+❯
+ π · ◑ GPT-6-Luna 👁 · 🌳 notes/notes · ⑂ detached · ◫ 3.4%/272K ⟲ · (sub)
+# busy record written by the generated omp extension
+v1 gen=g1791655014.25490.31343 seq=3 state=idle source=omp-ext event=quota-exhausted ts=1791655018
+# step 3: an uncommitted file was placed in the worker copy; operator restored the rule_1 stand-in; one watcher tick ran fm_session_end_relaunch_scan
+# (tick run from `git archive HEAD` of c6eb3237 under the lab: the scan sets FM_STATE_OVERRIDE, which the gate-worktree guard refuses by design)
+scan_rc=0
+wake: check: labr3d auto-relaunched after quota exhaustion
+# meta
+harness=omp
+model=google-antigravity/gemini-3.7-flash
+effort=low
+dispatch_rule=rule_1
+# status
+working [at=1791655048]: model-matrix fallback relaunched omp google-antigravity/gemini-3.7-flash for rule_1
+# uncommitted work preserved
+uncommitted local edit kept
+# step 4: recovered worker on the stand-in
+│ ⟦Wall: 0.33s | Timeout: 300s⟧                                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ FIRSTMATE_OP: v1 done: Created RECOVERY.txt in worktree root and committed to
+ task branch.
+❯
+ π · ◔ Gemini 3.7 Flash 🙈 · 🌳 …es/notes · ⑂ detached ?1 · ◫ 1.1%/1M ⟲ · S0.04
+79e5ec6 Add RECOVERY.txt probe
+2ea22a4 seed

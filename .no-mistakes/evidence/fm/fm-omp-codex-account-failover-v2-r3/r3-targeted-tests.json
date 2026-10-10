@@ -1,0 +1,88 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 1340667,
+      "failed": 0,
+      "name": "pr-forge"
+    },
+    {
+      "count": 3,
+      "duration_ms": 1122070,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 2,
+      "duration_ms": 579619,
+      "failed": 0,
+      "name": "standalone"
+    }
+  ],
+  "finished_at": "2026-10-10T18:38:36Z",
+  "run_id": "fm-test-run-1791654756112-23533",
+  "scripts": [
+    {
+      "duration_ms": 259343,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-crew-state.test.sh"
+    },
+    {
+      "duration_ms": 38801,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-dispatch-capacity.test.sh"
+    },
+    {
+      "duration_ms": 823926,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-omp-harness.test.sh"
+    },
+    {
+      "duration_ms": 1340667,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pr-forge",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-teardown.test.sh"
+    },
+    {
+      "duration_ms": 245524,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-dispatch-resolve.test.sh"
+    },
+    {
+      "duration_ms": 334095,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-quota-choose.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=4",
+  "started_at": "2026-10-10T17:52:35Z",
+  "summary": {
+    "duration_ms": 2761162,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 6
+  }
+}

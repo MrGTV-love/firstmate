@@ -1,0 +1,30 @@
+# labr3a was running on the stand-in; operator asks for the Codex route again while the real pool is exhausted
+$ fm-control.sh labr3a relaunch --harness omp --model openai-codex/gpt-6-luna --effort medium --note ...
+relaunched labr3a harness=omp from=omp model=google-antigravity/gemini-3.7-flash effort=low backend=tmux endpoint=firstmate:fm-labr3a worktree=/Users/charlesabrooker/tmp/fm-lab.74u3uJ/treehouse/.treehouse/notes-4486e5/1/notes
+exit=0
+# status after relaunch
+working [at=1791654816]: model-matrix fallback launched omp google-antigravity/gemini-3.7-flash for rule_1
+working [at=1791654982]: model-matrix fallback relaunched omp google-antigravity/gemini-3.7-flash for rule_1
+
+# sticky: plain relaunch with no profile flags (no return-to-primary machinery)
+$ fm-control.sh labr3a relaunch --note "Sticky probe: end your turn."
+relaunched labr3a harness=omp from=omp model=google-antigravity/gemini-3.7-flash effort=low backend=tmux endpoint=firstmate:fm-labr3a worktree=/Users/charlesabrooker/tmp/fm-lab.74u3uJ/treehouse/.treehouse/notes-4486e5/1/notes
+exit=0
+# meta after sticky relaunch
+harness=omp
+model=google-antigravity/gemini-3.7-flash
+effort=low
+dispatch_rule=rule_1
+# omp usage calls during sticky relaunch: 0 (no capacity probe of the Codex primary)
+# overlay after relaunch
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "google-antigravity/gemini-3.7-flash": [],
+      "google-antigravity/gemini-3.7-flash:low": []
+    }
+  }
+}
+
