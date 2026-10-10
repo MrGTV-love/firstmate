@@ -1505,7 +1505,7 @@ A fresh usable sibling keeps the model available; an unmeasured sibling prevents
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
 The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
-Native Claude's default-account quota is not a TeamClaude proxy ledger, so a TeamClaude fallback candidate's capacity is unknown and native Claude exhaustion cannot veto that stand-in.
+Native Claude's default-account quota is not a TeamClaude proxy ledger, so a TeamClaude fallback candidate's capacity is unknown and native Claude exhaustion cannot veto that stand-in, including on recovery of a task already running on it while `config/claude-launcher` selects `teamclaude`.
 Claude-primary routes keep their existing quota-axi ranking, floors, and `fm-quota-choose.sh` treatment.
 
 Each fallback profile requires `harness`, `model`, and `effort`.

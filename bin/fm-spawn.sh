@@ -112,6 +112,9 @@
 #   build agent's variant, keyed to the resolved model, inside the
 #   OPENCODE_CONFIG_CONTENT JSON its launch already carries (config schema
 #   verified on opencode 1.18.32); without a model the axis is recorded but omitted.
+#   --dispatch-rule <rule_N|default> names the crew-dispatch rule whose declared
+#   fallback list this task may use; docs/configuration.md "Crew dispatch
+#   profiles" owns that policy and the stand-in switch on proven exhaustion.
 #   --backend <name> is the explicit runtime session-provider backend for this
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
 #   is authorized). Without it, the script resolves FM_BACKEND, then
