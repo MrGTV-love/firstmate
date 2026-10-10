@@ -1,0 +1,67 @@
+### S1: fresh checkout of target 8add77d9 tracks no scratch files
+$ git ls-files .live-lavish-validation | wc -l
+       0
+$ ls .live-lavish-validation
+ls: $W/target/.live-lavish-validation: No such file or directory
+
+### S2: the 9 scratch files are written again (byte-identical to the removed ones); git ignores them
+files on disk:
+.live-lavish-validation/claims/lavish-10e0fb1e81b6d2c0.claim
+.live-lavish-validation/deck-template.html
+.live-lavish-validation/guards.html
+.live-lavish-validation/lavish-state/server.log
+.live-lavish-validation/lavish-state/state.json
+.live-lavish-validation/ordinary.html
+.live-lavish-validation/reverse.html
+.live-lavish-validation/suppress.html
+.live-lavish-validation/unbound.html
+$ git status --porcelain --untracked-files=all
+(end status)
+$ git add -A && git diff --cached --name-only
+(end staged list)
+$ git check-ignore -v <each file>
+.gitignore:20:.live-lavish-validation/	.live-lavish-validation/claims/lavish-10e0fb1e81b6d2c0.claim
+.gitignore:20:.live-lavish-validation/	.live-lavish-validation/deck-template.html
+.gitignore:20:.live-lavish-validation/	.live-lavish-validation/guards.html
+.gitignore:20:.live-lavish-validation/	.live-lavish-validation/lavish-state/server.log
+.gitignore:20:.live-lavish-validation/	.live-lavish-validation/lavish-state/state.json
+.gitignore:20:.live-lavish-validation/	.live-lavish-validation/ordinary.html
+.gitignore:20:.live-lavish-validation/	.live-lavish-validation/reverse.html
+.gitignore:20:.live-lavish-validation/	.live-lavish-validation/suppress.html
+.gitignore:20:.live-lavish-validation/	.live-lavish-validation/unbound.html
+
+### S3 (adversarial): explicit git add of a scratch file is refused without -f; nested copy also ignored
+The following paths are ignored by one of your .gitignore files:
+.live-lavish-validation
+hint: Use -f if you really want to add them.
+hint: Disable this message with "git config set advice.addIgnoredFile false"
+exit=1
+(end staged list)
+.gitignore:20:.live-lavish-validation/	sub/.live-lavish-validation/a.html
+(end status)
+
+### S4 (regression proof): base d69b2c5a with only the deletion and no ignore rule -> files leak back as untracked
+$ git status --porcelain --untracked-files=all
+?? .live-lavish-validation/claims/lavish-10e0fb1e81b6d2c0.claim
+?? .live-lavish-validation/deck-template.html
+?? .live-lavish-validation/guards.html
+?? .live-lavish-validation/lavish-state/server.log
+?? .live-lavish-validation/lavish-state/state.json
+?? .live-lavish-validation/ordinary.html
+?? .live-lavish-validation/reverse.html
+?? .live-lavish-validation/suppress.html
+?? .live-lavish-validation/unbound.html
+
+### S5: change touches only .gitignore and the 9 scratch files
+M	.gitignore
+D	.live-lavish-validation/claims/lavish-10e0fb1e81b6d2c0.claim
+D	.live-lavish-validation/deck-template.html
+D	.live-lavish-validation/guards.html
+D	.live-lavish-validation/lavish-state/server.log
+D	.live-lavish-validation/lavish-state/state.json
+D	.live-lavish-validation/ordinary.html
+D	.live-lavish-validation/reverse.html
+D	.live-lavish-validation/suppress.html
+D	.live-lavish-validation/unbound.html
+remaining refs to live-lavish-validation in target tree:
+8add77d9:.gitignore:20:.live-lavish-validation/
