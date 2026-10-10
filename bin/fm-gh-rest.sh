@@ -90,6 +90,8 @@ prune_cache() {
   [ -d "$CACHE" ] || return 0
   if [ -z "$(find "$CACHE" -maxdepth 1 -name .pruned -mmin -60 2>/dev/null)" ]; then
     find "$CACHE" -maxdepth 1 -name '*.json' -mtime +7 -delete 2>/dev/null || true
+    find "$CACHE" -maxdepth 1 -name '.entry.*' -mmin +60 -delete 2>/dev/null || true
+    find "$STATE" -maxdepth 1 -name '.gh-ratelimit.*' -mmin +60 -delete 2>/dev/null || true
     : > "$CACHE/.pruned" 2>/dev/null || true
   fi
 }
@@ -158,6 +160,7 @@ fetch_page() {
       if [ -z "$next" ] && [ "$mode" = paginate ] && full_page "$endpoint" "$snapshot"; then
         record_response "$hdr" || true
         rm -f -- "$raw" "$hdr" "$err"
+        if quota_low core >&2; then return "$EX_TEMPFAIL"; fi
         fetch_page "$endpoint" "$body_out" unconditional
         return
       fi
@@ -227,7 +230,7 @@ cmd_get() {
     fi
     i=$((i + 1))
     if [ "$paginate" -eq 1 ]; then
-      endpoint=$(fetch_page "$endpoint" "$work/page.$i" paginate) || exit 1
+      endpoint=$(fetch_page "$endpoint" "$work/page.$i" paginate) || exit $?
     else
       fetch_page "$endpoint" "$work/page.$i" >/dev/null || exit 1
       endpoint=''

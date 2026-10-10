@@ -298,6 +298,24 @@ PY
   pass 'unwritable state and contended recording locks preserve prompt reads and forge errors'
 }
 
+test_prune_removes_abandoned_staged_files() {
+  local site name
+  site=$(new_site prune_staged)
+  mkdir -p "$site/state/gh-rest-cache"
+  for name in gh-rest-cache/.entry.old gh-rest-cache/.entry.live .gh-ratelimit.old .gh-ratelimit.live; do
+    printf 'staged\n' > "$site/state/$name"
+  done
+  touch -t 202001010000 "$site/state/gh-rest-cache/.entry.old" "$site/state/.gh-ratelimit.old"
+  get "$site" repos/o/r/items >/dev/null || fail 'read with abandoned staged files failed'
+  [ ! -e "$site/state/gh-rest-cache/.entry.old" ] || fail 'an abandoned staged cache entry was never removed'
+  [ ! -e "$site/state/.gh-ratelimit.old" ] || fail 'an abandoned staged quota record was never removed'
+  [ -e "$site/state/gh-rest-cache/.entry.live" ] || fail 'a staged cache entry still in flight was removed'
+  [ -e "$site/state/.gh-ratelimit.live" ] || fail 'a staged quota record still in flight was removed'
+  get "$site" repos/o/r/items >/dev/null || fail 'read after the prune failed'
+  assert_equals 1 "$(counted "$site")" 'the prune removed a live cache entry'
+  pass 'the prune pass removes staged files a killed helper left behind and keeps fresh ones'
+}
+
 guard() { # site args... : run guard against the recorded buckets
   local site=$1
   shift
@@ -438,6 +456,23 @@ test_get_stops_between_pages_at_the_floor() {
   pass 'fresh and cached pages stop pagination at the quota floor without partial output'
 }
 
+test_full_last_page_reread_stops_at_the_floor() {
+  local site status=0 out endpoint='repos/o/r/issues/1/comments?per_page=100'
+  site=$(new_site floor_full_last_page)
+  : > "$site/omit-304-link"
+  jq -nc '[[range(1; 101) | {id: .}]]' > "$site/pages.json"
+  get "$site" "$endpoint" --paginate --slurp >/dev/null || fail 'seed read of 100 comments failed'
+  : > "$site/calls"
+  printf '500\n' > "$site/remaining"
+  out=$(get "$site" "$endpoint" --paginate --slurp 2>"$site/error") || status=$?
+  assert_equals 75 "$status" 'a 304 reporting low quota did not stop the full-page re-read'
+  assert_equals '' "$out" 'a refused full-page re-read published data'
+  assert_equals 0 "$(counted "$site")" 'the full-page re-read spent a counted call below the floor'
+  assert_equals 1 "$(unmodified "$site")" 'the conditional read that reported the quota was not made'
+  assert_contains "$(cat "$site/error")" 'quota low (500 of 5000' 'the full-page refusal lost the quota reason'
+  pass 'a full cached last page is not re-read once its 304 reports quota below the floor'
+}
+
 test_304_serves_cached_body_without_a_counted_call
 test_changed_data_replaces_the_cache
 test_missing_or_corrupt_cache_falls_back_to_a_normal_get
@@ -453,3 +488,5 @@ test_older_windows_cannot_replace_newer_quota
 test_304_responses_also_record_headers
 test_get_refuses_below_the_floor_before_any_network_call
 test_get_stops_between_pages_at_the_floor
+test_full_last_page_reread_stops_at_the_floor
+test_prune_removes_abandoned_staged_files
