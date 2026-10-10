@@ -488,6 +488,44 @@ test_overbound_routine_event_stays_silent() {
   pass "an over-bound unclassifiable routine event stays silent"
 }
 
+test_append_during_latest_event_read_is_deferred() {
+  local dir state reader first second
+  dir=$(make_case append-during-latest-read)
+  state="$dir/state"
+  reader="$dir/span-reader"
+  first="$dir/first.out"
+  second="$dir/second.out"
+  # Only the bounded latest-event read is 64 KiB; the unread scan reads the
+  # complete, larger span. Mutate after the former read, before its validation.
+  perl -e 'print "working: padding\n" x 5000, "done: first completion\n"' > "$state/racing.status"
+  cat > "$reader" <<'SH'
+#!/usr/bin/env bash
+perl -e '
+  open my $f, "<", $ARGV[0] or exit 1;
+  seek($f, $ARGV[1], 0) or exit 1;
+  read($f, my $bytes, $ARGV[2]) == $ARGV[2] or exit 1;
+  print $bytes;
+' "$1" "$2" "$3" || exit 1
+if [ "$3" -eq 65536 ]; then
+  printf 'done: completion appended during read\n' >> "$1"
+fi
+SH
+  chmod +x "$reader"
+  FM_STATUS_SPAN_READER="$reader" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$first" \
+    || fail "drain failed while a latest event was changing"
+  if grep -F 'STATUS OUTCOME BACKSTOP (' "$first" >/dev/null; then
+    fail "a changing latest-event snapshot was presented: $(cat "$first")"
+  fi
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$second" \
+    || fail "retry drain failed after the append"
+  grep -F 'racing done: completion appended during read' "$second" >/dev/null \
+    || fail "the deferred completion was lost: $(cat "$second")"
+  if grep -F 'racing done: first completion' "$second" >/dev/null; then
+    fail "the retry presented the superseded completion"
+  fi
+  pass "a latest-event append is deferred and its final completion surfaces on retry"
+}
+
 test_backstop_output_is_bounded() {
   local dir state out old i payload count longest
   dir=$(make_case bounded-output)
@@ -530,4 +568,5 @@ test_held_lock_mode_rejects_an_unlocked_caller
 test_held_lock_mode_accepts_a_lock_owner_descendant
 test_index_self_heal_runs_under_the_outcome_lock
 test_overbound_routine_event_stays_silent
+test_append_during_latest_event_read_is_deferred
 test_backstop_output_is_bounded
