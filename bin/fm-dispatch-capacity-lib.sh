@@ -6,9 +6,10 @@
 # fm_omp_codex_capacity <model> [usage-json] prints model-specific pool evidence.
 # fm_dispatch_capacity <harness> <model> prints usable/exhausted/unknown evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
-# prints {rule, fallback}; only rules containing the profile must resolve. A
-# recorded rule that no longer contains it counts as none, and differing
-# unlabeled lists permit no fallback. rule is set only for a fallback policy.
+# prints {rule, fallback}; only rules containing the profile must resolve and
+# satisfy the fallback schema. A recorded rule that no longer contains it counts
+# as none, and differing unlabeled lists permit no fallback. rule is set only
+# for a fallback policy.
 # fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
 # prints the original profile unless it is proven exhausted, then the first
 # permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
@@ -87,21 +88,24 @@ fm_dispatch_capacity() {
   printf '%s\n' '{"status":"unknown","reason":"no measured quota for this route"}'
 }
 
+# One fallback schema, applied to matched rules here and to the whole file at typed intake.
+# shellcheck disable=SC2016 # jq source, not shell expansions.
+FM_DISPATCH_VALID_FALLBACK_JQ='
+  def valid_fallback:
+    type == "array" and all(.[];
+      type == "object" and (.harness == "omp" or .harness == "claude") and
+      (.model | type) == "string" and (.model | length) > 0 and
+      (.effort == "low" or .effort == "medium" or .effort == "high" or .effort == "xhigh" or .effort == "max") and
+      (if .harness == "claude" then .requires == "teamclaude" else (has("requires") | not) end));
+  def fallback_error: "fallback must be an array of explicit OMP profiles or TeamClaude-required Claude profiles";
+'
+
 fm_dispatch_fallbacks() {
   local config=$1 rule=$2 harness=$3 model=$4 effort=$5 file entries entry resolved rules='' result
   file=${6:-"$config/crew-dispatch.json"}
   [ -f "$file" ] || { printf '%s\n' '{"rule":"","fallback":[]}'; return; }
   entries=$(jq -sc '
-    def valid_fallback:
-      type == "array" and all(.[];
-        type == "object" and (.harness == "omp" or .harness == "claude") and
-        (.model | type) == "string" and (.model | length) > 0 and
-        (.effort == "low" or .effort == "medium" or .effort == "high" or .effort == "xhigh" or .effort == "max") and
-        (if .harness == "claude" then .requires == "teamclaude" else (has("requires") | not) end));
     if length != 1 or (.[0] | type) != "object" then error("dispatch must contain exactly one JSON object") else .[0] end |
-    if any((.rules // [])[]; has("fallback") and (.fallback | valid_fallback | not)) or
-       (has("default_fallback") and (.default_fallback | valid_fallback | not))
-    then error("fallback must be an array of explicit OMP profiles or TeamClaude-required Claude profiles") else . end |
     ((.rules // []) | to_entries[] | {rule: ("rule_" + ((.key + 1) | tostring)), use: .value.use, fallback: .value.fallback}),
     {rule: "default", use: (.default // []), fallback: .default_fallback}
   ' "$file" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$entries" >&2; return 1; }
@@ -114,16 +118,18 @@ fm_dispatch_fallbacks() {
     fi
     rules+=$'\n'
   done <<<"$entries"
-  result=$(jq -sc --arg rule "$rule" --arg h "$harness" --arg m "$model" --arg e "$effort" '
+  result=$(jq -sc --arg rule "$rule" --arg h "$harness" --arg m "$model" --arg e "$effort" "$FM_DISPATCH_VALID_FALLBACK_JQ"'
     def profiles: if type == "array" then . else [.] end;
     def axis: if . == null or . == "default" then "" else . end;
     def same: type == "object" and .harness == $h and (.model | axis) == ($m | axis) and (.effort | axis) == ($e | axis);
     def contains_profile: .resolved as $resolved |
-      any((.use | profiles)[]; same and ($resolved or (has("role") | not))) or any((.fallback // [])[]; same);
+      any((.use | profiles)[]; same and ($resolved or (has("role") | not))) or
+      any(.fallback | if type == "array" then .[] else empty end; same);
     . as $rules |
     [$rules[] | select($rule != "" and .rule == $rule and contains_profile)] as $recorded |
     (if ($recorded | length) > 0 then $recorded else [$rules[] | select(contains_profile)] end) as $matches |
-    if any($matches[]; .resolved | not) then
+    if any($matches[]; .fallback != null and (.fallback | valid_fallback | not)) then error(fallback_error)
+    elif any($matches[]; .resolved | not) then
       error("dispatch " + ([$matches[] | select(.resolved | not) | .rule] | join(", ")) + " names a retired model or unconfigured role")
     elif ($matches | map(.fallback // []) | unique | length) != 1 then {rule: "", fallback: []}
     else ($matches[0].fallback // []) as $fallback |

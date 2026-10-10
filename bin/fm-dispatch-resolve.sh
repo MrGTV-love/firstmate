@@ -232,7 +232,9 @@ rules_err=$(jq -r --argjson verified_harnesses "$VERIFIED_HARNESSES" --arg provi
   else empty end
 ' "$RULES" 2>/dev/null) || die "malformed rules file: $RULES_PATH (not JSON)"
 [ -z "$rules_err" ] || die "malformed rules file: $RULES_PATH - $rules_err"
-fm_dispatch_fallbacks "$MODEL_CONFIG" "" "" "" "" "$RULES" >/dev/null || die "malformed rules file: $RULES_PATH - invalid fallback configuration"
+jq -e "$FM_DISPATCH_VALID_FALLBACK_JQ"'all((.rules // [])[]; (has("fallback") | not) or (.fallback | valid_fallback)) and
+  ((has("default_fallback") | not) or (.default_fallback | valid_fallback))' "$RULES" >/dev/null 2>&1 \
+  || die "malformed rules file: $RULES_PATH - invalid fallback configuration"
 
 missing_provider=$(jq -r '
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
