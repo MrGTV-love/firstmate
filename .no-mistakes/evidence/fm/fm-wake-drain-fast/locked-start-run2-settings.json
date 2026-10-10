@@ -1,0 +1,1 @@
+{"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"python3 /Users/charlesabrooker/.no-mistakes/evidence/01M4H90MTFF5AXBWANAFDMBF3V/startup-hook.py","timeout":180}]}]}}

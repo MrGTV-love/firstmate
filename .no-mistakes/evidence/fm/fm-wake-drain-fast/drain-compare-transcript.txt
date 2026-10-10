@@ -1,0 +1,48 @@
+host: Darwin 27.0.0 arm64; bash under test: GNU bash, version 3.2.57(1)-release (arm64-apple-darwin26)
+fleet: 25 cold status logs x 60 keyed resolved/working pairs (+needs-decision/blocked/note on every 5th task)
+load at start: { 87.38 97.15 73.19 }
+
+=== base (/Users/charlesabrooker/tmp/fm-base.xG6Z8U) ===
+cold drain rep 1: exit=0 wall=36.729s load={ 69.88 91.45 72.21 }
+cold drain rep 2: exit=0 wall=38.501s load={ 60.15 86.64 71.23 }
+cold drain rep 3: exit=0 wall=34.103s load={ 58.57 83.32 70.64 }
+subshell entries (cold drain, DEBUG trap): 13571 exit=0
+external execs (cold drain, PATH shims): 488 exit=0
+  by command: perl=125 rm=109 basename=71 ps=29 mv=26 wc=25 dirname=25 tr=14 readlink=13 cat=12 sh=10 uname=5 mktemp=5 bash=5 rmdir=3 mkdir=3 ln=3 timeout=1 tasks-axi=1 node=1 git=1 awk=1 
+warm second drain: exit=0 wall=20.329s
+
+=== target (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H90MTFF5AXBWANAFDMBF3V) ===
+cold drain rep 1: exit=0 wall=3.923s load={ 51.11 73.70 68.30 }
+cold drain rep 2: exit=0 wall=3.982s load={ 50.94 73.29 68.18 }
+cold drain rep 3: exit=0 wall=3.759s load={ 49.26 72.57 67.96 }
+subshell entries (cold drain, DEBUG trap): 202 exit=0
+external execs (cold drain, PATH shims): 414 exit=0
+  by command: perl=100 rm=84 basename=46 ps=29 mv=26 wc=25 dirname=25 tr=14 readlink=13 cat=12 sh=10 uname=5 mktemp=5 bash=5 rmdir=3 mkdir=3 ln=3 git=2 timeout=1 tasks-axi=1 node=1 awk=1 
+warm second drain: exit=0 wall=3.604s
+
+load at end: { 51.29 71.83 67.77 }
+
+=== base vs target cold-drain stdout diff (rep1) ===
+IDENTICAL stdout
+=== base vs target open-decision cursor digests (ident= device:inode:mtime line excluded) ===
+IDENTICAL cursor bytes (25 files)
+=== target cold drain stdout (rep1) ===
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+task0 note: informational note for task 0
+task10 note: informational note for task 10
+task15 note: informational note for task 15
+task20 note: informational note for task 20
+task5 note: informational note for task 5
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task0 [key=pick-0] needs-decision: choose option for task 0
+task0 [key=wall-0] blocked: blocked on input 0
+task10 [key=pick-10] needs-decision: choose option for task 10
+task10 [key=wall-10] blocked: blocked on input 10
+task15 [key=pick-15] needs-decision: choose option for task 15
+task15 [key=wall-15] blocked: blocked on input 15
+task20 [key=pick-20] needs-decision: choose option for task 20
+task20 [key=wall-20] blocked: blocked on input 20
+task5 [key=pick-5] needs-decision: choose option for task 5
+task5 [key=wall-5] blocked: blocked on input 5
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+=== target cold drain stderr (rep1) ===

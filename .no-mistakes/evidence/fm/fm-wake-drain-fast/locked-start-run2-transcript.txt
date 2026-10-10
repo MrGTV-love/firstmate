@@ -1,0 +1,33 @@
+launch: tmux -L fm-lab (TMUX_TMPDIR=<lab>/tmux) new-session -d -s primary -x 120 -y 40 -c <run worktree> -e FM_HOME=<lab> claude --setting-sources  --settings /Users/charlesabrooker/.no-mistakes/evidence/01M4H90MTFF5AXBWANAFDMBF3V/locked-start-run2-settings.json --strict-mcp-config --tools  --no-session-persistence --max-budget-usd 0.10 -p Reply exactly LAB_STARTUP_OK. Do not use tools.
+wait-for exit=0
+pane:
+LAB_STARTUP_OK
+measurement:
+{
+  "elapsed_seconds": 9.684,
+  "limit_seconds": 20,
+  "under_limit": true,
+  "load_start": [
+    42.76904296875,
+    60.08203125,
+    63.52294921875
+  ],
+  "load_end": [
+    45.43359375,
+    60.0927734375,
+    63.48681640625
+  ],
+  "exit_code": 0,
+  "lock_pid": "85082",
+  "completion_pid": "85082",
+  "lock_owner_process": "85082 85073 claude",
+  "initial_state": {
+    "status_logs": 25,
+    "decision_checkpoints": 0,
+    "presentation_manifest_exists": false
+  },
+  "decision_checkpoints_after": 25,
+  "digest_complete": true,
+  "truncated": false
+}
+teardown: private fm-lab server killed; lab home removed (exists now: no)

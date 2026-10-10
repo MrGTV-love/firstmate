@@ -1,0 +1,12 @@
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+task0 [key=pick-0] needs-decision: choose option for task 0
+task0 [key=wall-0] blocked: blocked on input 0
+task10 [key=pick-10] needs-decision: choose option for task 10
+task10 [key=wall-10] blocked: blocked on input 10
+task15 [key=pick-15] needs-decision: choose option for task 15
+task15 [key=wall-15] blocked: blocked on input 15
+task20 [key=pick-20] needs-decision: choose option for task 20
+task20 [key=wall-20] blocked: blocked on input 20
+task5 [key=pick-5] needs-decision: choose option for task 5
+task5 [key=wall-5] blocked: blocked on input 5
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'

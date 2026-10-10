@@ -1,0 +1,22 @@
+Target e98f8c95 vs base 924f479c, real bin/fm-wake-drain.sh, /bin/bash 3.2, disposable marked lab homes.
+Fleet: 25 cold status logs x 60 keyed resolved/working pairs (1500 keyed resolutions) + needs-decision/blocked/note on every 5th task.
+
+Cold drain wall time:   base 36.7 / 38.5 / 34.1 s   target 3.9 / 4.0 / 3.8 s   (load ~50-70)
+Warm 2nd drain:         base 20.3 s                 target 3.6 s
+Subshell entries:       base 13,571                 target 202
+External execs:         base 488                    target 414
+Stdout base vs target:  IDENTICAL
+Open-decision cursors:  IDENTICAL bytes in all 25 files (ident= device:inode:mtime line excluded)
+
+Real Claude locked session start (fm-session-start.sh --source startup via SessionStart hook,
+private fm-lab tmux socket, 25 cold logs, no primed cursors):
+  run1  7.393 s  load 33.1 -> 32.1  lock=completion=claude pid 78562  digest complete, not truncated
+  run2  9.684 s  load 42.8 -> 45.4  lock=completion=claude pid 85082  digest complete, not truncated
+  run3 11.300 s  load 47.8 -> 49.5  lock=completion=claude pid 51341  digest complete, not truncated
+  limit 20 s: all three under.
+
+HEAD review fix: snapshot race driven through the real drain (note appended after the presentation
+snapshot is not acked; next drain shows it once; no replay). Retained helpers scan_unread_surface_lines
+and scan_unread_surface_snapshot still return unread rows.
+Targeted suites: tests/fm-wake-drain-unread-status.test.sh 19/19 ok; tests/fm-parent-channel-scan-exclusion.test.sh ok.
+All lab homes, private tmux servers, and the extracted base tree removed.

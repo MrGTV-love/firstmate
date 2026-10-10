@@ -1,0 +1,34 @@
+
+=== prime: present bootstrap note ===
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+race note: bootstrap line
+CHECK ok: contains 'bootstrap line'
+
+=== drain 1: note A present; note B appended after the presentation snapshot (inside the drain) ===
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+race note: A included in presentation snapshot
+CHECK ok: B was appended inside the drain, after the snapshot
+CHECK ok: contains 'A included in presentation snapshot'
+CHECK ok: does not contain 'B appended after presentation snapshot'
+
+=== drain 2: plain real drain ===
+UNREAD STATUS (new since last drain, not re-printed after this presentation):
+race note: B appended after presentation snapshot
+CHECK ok: contains 'B appended after presentation snapshot'
+CHECK ok: does not contain 'A included in presentation snapshot'
+CHECK ok: B shown exactly once
+
+=== drain 3: nothing replayed ===
+[]
+CHECK ok: does not contain 'B appended'
+CHECK ok: does not contain 'A included'
+
+=== retained helpers still work after de-batching ===
+lines:
+race	note: C for helper check
+snapshot:
+race	note: C for helper check
+CHECK ok: both helpers return the unread row
+
+=== result ===
+ALL CHECKS PASSED

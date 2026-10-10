@@ -1,0 +1,27 @@
+{
+  "elapsed_seconds": 11.3,
+  "limit_seconds": 20,
+  "under_limit": true,
+  "load_start": [
+    47.7763671875,
+    59.62841796875,
+    63.23828125
+  ],
+  "load_end": [
+    49.50439453125,
+    59.62060546875,
+    63.19384765625
+  ],
+  "exit_code": 0,
+  "lock_pid": "51341",
+  "completion_pid": "51341",
+  "lock_owner_process": "51341 51331 claude",
+  "initial_state": {
+    "status_logs": 25,
+    "decision_checkpoints": 0,
+    "presentation_manifest_exists": false
+  },
+  "decision_checkpoints_after": 25,
+  "digest_complete": true,
+  "truncated": false
+}

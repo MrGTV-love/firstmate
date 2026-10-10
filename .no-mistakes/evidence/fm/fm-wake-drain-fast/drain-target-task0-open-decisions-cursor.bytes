@@ -1,0 +1,5 @@
+version=11:unknown:ctype=C.UTF-8:collate=C.UTF-8
+offset=3606
+ident=strong:16777233:185963579:1791584631.454118041
+pick-0	needs-decision	choose option for task 0
+wall-0	blocked	blocked on input 0

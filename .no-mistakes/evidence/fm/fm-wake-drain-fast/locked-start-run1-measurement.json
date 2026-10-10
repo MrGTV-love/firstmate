@@ -1,0 +1,27 @@
+{
+  "elapsed_seconds": 7.393,
+  "limit_seconds": 20,
+  "under_limit": true,
+  "load_start": [
+    33.07421875,
+    61.58642578125,
+    64.2216796875
+  ],
+  "load_end": [
+    32.13671875,
+    60.43408203125,
+    63.78076171875
+  ],
+  "exit_code": 0,
+  "lock_pid": "78562",
+  "completion_pid": "78562",
+  "lock_owner_process": "78562 78538 claude",
+  "initial_state": {
+    "status_logs": 25,
+    "decision_checkpoints": 0,
+    "presentation_manifest_exists": false
+  },
+  "decision_checkpoints_after": 25,
+  "digest_complete": true,
+  "truncated": false
+}
