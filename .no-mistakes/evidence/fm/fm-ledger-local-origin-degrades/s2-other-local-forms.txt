@@ -1,0 +1,15 @@
+### Scenario 2 - origin = file:///Users/charlesabrooker/tmp/fm-lab.UcYXev/upstream.git (target 65fca9ad)
+published state/open-loops.json | complete = True
+ coverage row: no forge coverage: no-mistakes | informational = True | overdue = False
+   evidence: /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: local origin file:///Users/charlesabrooker/tmp/fm-lab.UcYXev/upstream.git
+
+### Scenario 2 - origin = ../../upstream.git (target 65fca9ad)
+published state/open-loops.json | complete = True
+ coverage row: no forge coverage: no-mistakes | informational = True | overdue = False
+   evidence: /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: local origin ../../upstream.git
+
+### Scenario 2 - origin = ./rel:with-colon/upstream.git (target 65fca9ad)
+published state/open-loops.json | complete = True
+ coverage row: no forge coverage: no-mistakes | informational = True | overdue = False
+   evidence: /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: local origin ./rel:with-colon/upstream.git
+

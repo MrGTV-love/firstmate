@@ -1,0 +1,25 @@
+### Scenario 3 (adversarial) - remote forge origin = https://gitlab.com/acme/project.git (target 65fca9ad)
+published state/open-loops.json | complete = False
+ coverage row: ledger degraded | informational = None | overdue = True
+   evidence: project origin /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: unsupported non-GitHub origin: https://gitlab.com/acme/project.git
+
+### Scenario 3 (adversarial) - remote forge origin = git@gitlab.com:acme/project.git (target 65fca9ad)
+published state/open-loops.json | complete = False
+ coverage row: ledger degraded | informational = None | overdue = True
+   evidence: project origin /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: unsupported non-GitHub origin: git@gitlab.com:acme/project.git
+
+### Scenario 3 (adversarial) - remote forge origin = ssh://git@bitbucket.org/acme/project.git (target 65fca9ad)
+published state/open-loops.json | complete = False
+ coverage row: ledger degraded | informational = None | overdue = True
+   evidence: project origin /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: unsupported non-GitHub origin: ssh://git@bitbucket.org/acme/project.git
+
+### Scenario 3 (adversarial) - remote forge origin = https://evilgithub.com/acme/project.git (target 65fca9ad)
+published state/open-loops.json | complete = False
+ coverage row: ledger degraded | informational = None | overdue = True
+   evidence: project origin /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: unsupported non-GitHub origin: https://evilgithub.com/acme/project.git
+
+### Scenario 3 (adversarial) - remote forge origin = gerrit.example.com:acme/project (target 65fca9ad)
+published state/open-loops.json | complete = False
+ coverage row: ledger degraded | informational = None | overdue = True
+   evidence: project origin /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: unsupported non-GitHub origin: gerrit.example.com:acme/project
+

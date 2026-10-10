@@ -1,0 +1,15 @@
+### Scenario 4 (adversarial) - local-origin project + unreadable peer project broken-peer (target 65fca9ad)
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4KVVB5138KDZY5SFDY2HM09/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1791668471
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"project origin /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/broken-peer: fatal: not a git repository: (null)"
+  "coverage","no forge coverage: no-mistakes","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: local origin /Users/charlesabrooker/tmp/fm-lab.UcYXev/upstream.git"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+fm-open-loops.sh --heartbeat exit=0
+published state/open-loops.json | complete = False
+ coverage row: ledger degraded | informational = None | overdue = True
+   evidence: project origin /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/broken-peer: fatal: not a git repository: (null)
+ coverage row: no forge coverage: no-mistakes | informational = True | overdue = False
+   evidence: /Users/charlesabrooker/tmp/fm-lab.UcYXev/projects/no-mistakes: local origin /Users/charlesabrooker/tmp/fm-lab.UcYXev/upstream.git
