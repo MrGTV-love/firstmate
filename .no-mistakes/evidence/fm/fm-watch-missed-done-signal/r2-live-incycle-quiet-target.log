@@ -1,0 +1,30 @@
+[18:26:20] code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83YE1DPHM1VRK scenario=incycle-quiet lab=/Users/charlesabrooker/tmp/fm-lab.q6tOhF
+registered: state/slow.check.sh
+[18:26:24] arm1-baseline exit=0 output:
+    watcher: started pid=44408 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.q6tOhF/state/scout-a.status
+[18:26:26] arm1 Main drain (stdout):
+    1791588383	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.q6tOhF/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: working: setup
+[18:26:27] arm1 acked through seq 2
+[18:26:27] settle: let Main consume the first open-loop-ledger wake
+[18:26:29] settle exit=0 output:
+    watcher: started pid=63825 (beacon fresh)
+    check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[18:26:36] watcher running a slow check: scout appends done line
+[18:26:44] arm2 exit=0 output:
+    watcher: started pid=83798 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.q6tOhF/state/scout-a.status
+[18:26:44] wake queue rows:
+    4	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.q6tOhF/state/scout-a.status
+    5	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.q6tOhF/state/scout-a.status
+[18:26:47] arm2 Main drain (stdout):
+    1791588403	5	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.q6tOhF/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: done [at=1791588396]: backlog triage finished
+    STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+    scout-a done [at=1791588396]: backlog triage finished
+[18:26:47] arm2 acked through seq 5
+[18:26:47] next arm after Main handled the batch:
+[18:28:18] arm3 exit=124 output:
+    watcher: started pid=22225 (beacon fresh)
+[18:28:18] lab removed

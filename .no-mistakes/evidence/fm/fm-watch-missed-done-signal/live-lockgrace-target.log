@@ -1,0 +1,24 @@
+[17:47:45] code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83YE1DPHM1VRK scenario=lockgrace lab=/Users/charlesabrooker/tmp/fm-lab.y3IlFf
+[17:47:49] arm1-baseline exit=0 output:
+    watcher: started pid=30970 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.y3IlFf/state/scout-a.status
+[17:47:51] arm1 Main drain (stdout):
+    1791586068	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.y3IlFf/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: working: setup
+[17:47:52] arm1 acked through seq 2
+[17:47:52] settle: let Main consume the first open-loop-ledger wake
+[17:47:53] settle exit=0 output:
+    watcher: started pid=52297 (beacon fresh)
+    check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[17:47:56] queued one process-event result; arming with a 6s signal grace
+[17:47:57] status line landed in the step-6..7 race window (injected=yes)
+[17:48:05] arm2 exit=0 output:
+    watcher: started pid=69781 (beacon fresh)
+    check: process-event result captured: procevent:live-lab:1
+[17:48:05] concurrent queue writer: 24 appends, max lock wait 938ms (signal grace = 6000ms)
+    signal row queued: scout-a.status
+    signal row queued: scout-a.status
+[17:48:07] arm3 exit=0 output:
+    watcher: started pid=6861 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.y3IlFf/state/scout-a.status
+[17:48:07] lab removed

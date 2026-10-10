@@ -1,0 +1,32 @@
+[17:39:15] code=/Users/charlesabrooker/tmp/fm-base-924f scenario=incycle-quiet lab=/Users/charlesabrooker/tmp/fm-lab.T1vRdF
+registered: state/slow.check.sh
+[17:39:21] arm1-baseline exit=0 output:
+    watcher: started pid=52100 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.T1vRdF/state/scout-a.status
+[17:39:23] arm1 Main drain (stdout):
+    1791585560	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.T1vRdF/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: working: setup
+[17:39:23] arm1 acked through seq 2
+[17:39:23] settle: let Main consume the first open-loop-ledger wake
+[17:39:25] settle exit=0 output:
+    watcher: started pid=75277 (beacon fresh)
+    check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[17:39:33] watcher running a slow check: scout appends done line
+[17:39:41] arm2 exit=0 output:
+    watcher: started pid=92692 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.T1vRdF/state/scout-a.status
+[17:39:41] wake queue rows:
+    4	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.T1vRdF/state/scout-a.status
+    5	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.T1vRdF/state/scout-a.status
+[17:39:43] arm2 Main drain (stdout):
+    1791585580	5	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.T1vRdF/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: done [at=1791585573]: backlog triage finished
+    STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+    scout-a done [at=1791585573]: backlog triage finished
+[17:39:44] arm2 acked through seq 5
+[17:39:44] next arm after Main handled the batch:
+[17:41:14] arm3 exit=124 output:
+    watcher: started pid=24304 (beacon fresh)
+    /Users/charlesabrooker/tmp/fm-base-924f/bin/fm-watch.sh: line 2164: 16558 Terminated: 15          ( FM_CHECK_OWNED_GROUP=1 run_check_process "$@" ) > "$FM_CHECK_OUTPUT" 2> /dev/null
+    /Users/charlesabrooker/tmp/fm-base-924f/bin/fm-watch.sh: line 2164: 25192 Terminated: 15          sleep 0.1
+[17:41:14] lab removed

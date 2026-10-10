@@ -1,0 +1,30 @@
+[17:30:19] code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83YE1DPHM1VRK scenario=keyed lab=/Users/charlesabrooker/tmp/fm-lab.6RbEcu
+[17:30:23] arm1-baseline exit=0 output:
+    watcher: started pid=51977 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+[17:30:24] arm1 Main drain (stdout):
+    1791585022	3	signal	vernant-d2.status	signal: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+    1791585022	4	signal	vernant-d3.status	signal: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: vernant-d2.status: working: setup
+    wake annotation: latest wake-EVENT observed at drain, not current state: vernant-d3.status: working: setup
+[17:30:25] arm1 acked through seq 4
+[17:30:25] no watcher running: lanes append keyed needs-decision and blocked lines
+[17:30:29] arm2 exit=0 output:
+    watcher: started pid=72671 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+[17:30:29] wake queue rows:
+    5	signal	vernant-d2.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+    6	signal	vernant-d3.status	signal: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+    7	signal	vernant-d2.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+    8	signal	vernant-d3.status	signal: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+[17:30:31] arm2 Main drain (stdout):
+    1791585028	7	signal	vernant-d2.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+    1791585028	8	signal	vernant-d3.status	signal: /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.6RbEcu/state/vernant-d3.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: vernant-d2.status: needs-decision [key=main996-preservation-diagnosis] [at=1791585025]: preserve or drop?
+    wake annotation: latest wake-EVENT observed at drain, not current state: vernant-d3.status: blocked [key=analytics-gre1948-native-validation]: need native validation access
+    OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+    vernant-d2 [key=main996-preservation-diagnosis] needs-decision: preserve or drop?
+    vernant-d3 [key=analytics-gre1948-native-validation] blocked: need native validation access
+    OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+[17:30:32] arm2 acked through seq 8
+[17:30:32] lab removed

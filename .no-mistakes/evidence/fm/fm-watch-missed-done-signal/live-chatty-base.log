@@ -1,0 +1,38 @@
+[17:46:54] code=/Users/charlesabrooker/tmp/fm-base-924f scenario=chatty lab=/Users/charlesabrooker/tmp/fm-lab.6MTaTZ
+registered: state/slow.check.sh
+[17:46:58] arm0-baseline exit=0 output:
+    watcher: started pid=46551 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.6MTaTZ/state/scout-a.status
+[17:47:00] arm0 Main drain (stdout):
+    1791586017	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.6MTaTZ/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: working: setup
+[17:47:00] arm0 acked through seq 2
+[17:47:00] settle: let Main consume the first open-loop-ledger wake
+[17:47:02] settle exit=0 output:
+    watcher: started pid=70356 (beacon fresh)
+    check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[17:47:06] round 1: fleet appended a status line; a due check also reports every round
+[17:47:08] arm1 exit=0 output:
+    watcher: started pid=88274 (beacon fresh)
+    check: /Users/charlesabrooker/tmp/fm-lab.6MTaTZ/state/slow.check.sh: slow: upstream PR merged
+[17:47:13] round 2: fleet appended a status line; a due check also reports every round
+[17:47:16] arm2 exit=0 output:
+    watcher: started pid=11755 (beacon fresh)
+    check: /Users/charlesabrooker/tmp/fm-lab.6MTaTZ/state/slow.check.sh: slow: upstream PR merged
+[17:47:20] round 3: fleet appended a status line; a due check also reports every round
+[17:47:22] arm3 exit=0 output:
+    watcher: started pid=35507 (beacon fresh)
+    check: /Users/charlesabrooker/tmp/fm-lab.6MTaTZ/state/slow.check.sh: slow: upstream PR merged
+[17:47:26] round 4: fleet appended a status line; a due check also reports every round
+[17:47:29] arm4 exit=0 output:
+    watcher: started pid=62012 (beacon fresh)
+    check: /Users/charlesabrooker/tmp/fm-lab.6MTaTZ/state/slow.check.sh: slow: upstream PR merged
+[17:47:33] round 5: fleet appended a status line; a due check also reports every round
+[17:47:36] arm5 exit=0 output:
+    watcher: started pid=87597 (beacon fresh)
+    check: /Users/charlesabrooker/tmp/fm-lab.6MTaTZ/state/slow.check.sh: slow: upstream PR merged
+[17:47:40] round 6: fleet appended a status line; a due check also reports every round
+[17:47:43] arm6 exit=0 output:
+    watcher: started pid=13253 (beacon fresh)
+    check: /Users/charlesabrooker/tmp/fm-lab.6MTaTZ/state/slow.check.sh: slow: upstream PR merged
+[17:47:45] lab removed

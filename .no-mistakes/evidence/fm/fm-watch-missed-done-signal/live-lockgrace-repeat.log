@@ -1,0 +1,125 @@
+=== run 1
+    signal: /Users/charlesabrooker/tmp/fm-lab.NGryMC/state/scout-a.status
+    1791586374	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.NGryMC/state/scout-a.status
+[17:53:04] queued one process-event result; arming with a 6s signal grace
+[17:53:20] slow append #19 waited 4444ms ending 1791586400.4
+    check: process-event result captured: procevent:live-lab:1
+[17:53:20] concurrent queue writer: 20 appends, max lock wait 4444ms (signal grace = 6000ms)
+    1791586386.1 holder=6748 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586386.5 holder=7915 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586386.8 holder=9124 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586387.2 holder=10541 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586387.6 holder=11964 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586388.1 holder=13460 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586388.5 holder= 
+    1791586388.7 holder=16249 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586389.4 holder=18671 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586389.8 holder=20046 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586390.0 holder=21845 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586390.6 holder=23143 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586390.8 holder=23143 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586391.3 holder=25083 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586391.8 holder=27000 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586392.0 holder=27000 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586392.3 holder=2372 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586392.9 holder=2372 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586393.6 holder=28588 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586393.8 holder=2372 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586394.0 holder=2372 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586394.3 holder=34494 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586394.7 holder=36898 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586395.0 holder=2372 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586395.4 holder=36898 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586395.7 holder=36898 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586396.2 holder= 
+    1791586396.5 holder=2372 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586397.7 holder= 
+    1791586399.2 holder=41733 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586399.4 holder=2372 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586399.7 holder=2372 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586400.2 holder=41733 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    signal row queued: scout-a.status
+    signal row queued: scout-a.status
+[17:53:22] arm3 exit=0 output:
+    signal: /Users/charlesabrooker/tmp/fm-lab.NGryMC/state/scout-a.status
+=== run 2
+    signal: /Users/charlesabrooker/tmp/fm-lab.VeBQlh/state/scout-a.status
+    1791586405	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.VeBQlh/state/scout-a.status
+[17:53:34] queued one process-event result; arming with a 6s signal grace
+    check: process-event result captured: procevent:live-lab:1
+[17:53:46] concurrent queue writer: 22 appends, max lock wait 1126ms (signal grace = 6000ms)
+    signal row queued: scout-a.status
+    signal row queued: scout-a.status
+[17:53:48] arm3 exit=0 output:
+    signal: /Users/charlesabrooker/tmp/fm-lab.VeBQlh/state/scout-a.status
+=== run 3
+    signal: /Users/charlesabrooker/tmp/fm-lab.ozF9ln/state/scout-a.status
+    1791586431	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.ozF9ln/state/scout-a.status
+[17:54:01] queued one process-event result; arming with a 6s signal grace
+    check: process-event result captured: procevent:live-lab:1
+[17:54:10] concurrent queue writer: 20 appends, max lock wait 954ms (signal grace = 6000ms)
+    signal row queued: scout-a.status
+    signal row queued: scout-a.status
+[17:54:12] arm3 exit=0 output:
+    signal: /Users/charlesabrooker/tmp/fm-lab.ozF9ln/state/scout-a.status
+=== run 4
+    signal: /Users/charlesabrooker/tmp/fm-lab.N6Ed0m/state/scout-a.status
+    1791586455	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.N6Ed0m/state/scout-a.status
+[17:54:24] queued one process-event result; arming with a 6s signal grace
+[17:54:34] slow append #19 waited 2212ms ending 1791586474.3
+    check: process-event result captured: procevent:live-lab:1
+[17:54:36] concurrent queue writer: 22 appends, max lock wait 2212ms (signal grace = 6000ms)
+    1791586465.9 holder=6576 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586466.1 holder=8033 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586466.6 holder=9625 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586466.8 holder=11096 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586467.2 holder=12473 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586467.7 holder=13824 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586467.9 holder=15230 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586468.4 holder=16675 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586468.8 holder=18042 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586469.0 holder=19455 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586469.4 holder=20642 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586469.7 holder=21859 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586470.1 holder=23128 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586470.5 holder=24544 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586471.0 holder=25750 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586471.2 holder=27075 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586471.6 holder=28385 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586471.9 holder=29661 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586472.9 holder=1636 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586473.2 holder= 
+    1791586473.4 holder=1636 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586473.6 holder=31027 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586473.9 holder= 
+    1791586474.1 holder=31027 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586474.6 holder=1636 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586474.8 holder=1636 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586475.0 holder=39609 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    1791586475.3 holder=1636 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586475.5 holder=1636 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83Y
+    1791586475.8 holder=43526 bash -c . "$1/bin/fm-wake-lib.sh"; fm_wake_append check "queue-writer:$2" "check
+    signal row queued: scout-a.status
+    signal row queued: scout-a.status
+[17:54:38] arm3 exit=0 output:
+    signal: /Users/charlesabrooker/tmp/fm-lab.N6Ed0m/state/scout-a.status
+=== run 5
+    signal: /Users/charlesabrooker/tmp/fm-lab.PMKoMB/state/scout-a.status
+    1791586480	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.PMKoMB/state/scout-a.status
+[17:54:49] queued one process-event result; arming with a 6s signal grace
+    check: process-event result captured: procevent:live-lab:1
+[17:54:58] concurrent queue writer: 20 appends, max lock wait 966ms (signal grace = 6000ms)
+    signal row queued: scout-a.status
+    signal row queued: scout-a.status
+[17:55:00] arm3 exit=0 output:
+    signal: /Users/charlesabrooker/tmp/fm-lab.PMKoMB/state/scout-a.status
+=== run 6
+    signal: /Users/charlesabrooker/tmp/fm-lab.PS6fdv/state/scout-a.status
+    1791586503	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.PS6fdv/state/scout-a.status
+[17:55:11] queued one process-event result; arming with a 6s signal grace
+    check: process-event result captured: procevent:live-lab:1
+[17:55:21] concurrent queue writer: 19 appends, max lock wait 1027ms (signal grace = 6000ms)
+    signal row queued: scout-a.status
+    signal row queued: scout-a.status
+[17:55:23] arm3 exit=0 output:
+    signal: /Users/charlesabrooker/tmp/fm-lab.PS6fdv/state/scout-a.status

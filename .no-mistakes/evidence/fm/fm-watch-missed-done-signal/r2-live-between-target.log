@@ -1,0 +1,22 @@
+[18:25:51] code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83YE1DPHM1VRK scenario=between lab=/Users/charlesabrooker/tmp/fm-lab.fuwQXI
+[18:25:55] arm1-baseline exit=0 output:
+    watcher: started pid=70111 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.fuwQXI/state/scout-a.status
+[18:25:57] arm1 Main drain (stdout):
+    1791588354	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.fuwQXI/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: working: setup
+[18:25:58] arm1 acked through seq 2
+[18:25:58] no watcher running: scout appends done line
+[18:26:01] arm2 exit=0 output:
+    watcher: started pid=90073 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.fuwQXI/state/scout-a.status
+[18:26:01] wake queue rows:
+    3	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.fuwQXI/state/scout-a.status
+    4	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.fuwQXI/state/scout-a.status
+[18:26:04] arm2 Main drain (stdout):
+    1791588361	4	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.fuwQXI/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: done [at=1791588358]: backlog triage finished
+    STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+    scout-a done [at=1791588358]: backlog triage finished
+[18:26:04] arm2 acked through seq 4
+[18:26:04] lab removed

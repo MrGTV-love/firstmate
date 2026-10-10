@@ -1,0 +1,33 @@
+[17:41:14] code=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83YE1DPHM1VRK scenario=incycle-loud lab=/Users/charlesabrooker/tmp/fm-lab.227Vys
+registered: state/slow.check.sh
+[17:41:19] arm1-baseline exit=0 output:
+    watcher: started pid=27770 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.227Vys/state/scout-a.status
+[17:41:22] arm1 Main drain (stdout):
+    1791585677	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.227Vys/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: working: setup
+[17:41:23] arm1 acked through seq 2
+[17:41:23] settle: let Main consume the first open-loop-ledger wake
+[17:41:25] settle exit=0 output:
+    watcher: started pid=52624 (beacon fresh)
+    check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[17:41:34] watcher running a slow check: scout appends done line
+[17:41:42] arm2 exit=0 output:
+    watcher: started pid=75467 (beacon fresh)
+    check: /Users/charlesabrooker/tmp/fm-lab.227Vys/state/slow.check.sh: slow: upstream PR merged
+[17:41:42] wake queue rows:
+    4	check	/Users/charlesabrooker/tmp/fm-lab.227Vys/state/slow.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.227Vys/state/slow.check.sh: slow: upstream PR merged
+    5	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.227Vys/state/scout-a.status
+    6	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.227Vys/state/scout-a.status
+[17:41:45] arm2 Main drain (stdout):
+    1791585699	4	check	/Users/charlesabrooker/tmp/fm-lab.227Vys/state/slow.check.sh	check: /Users/charlesabrooker/tmp/fm-lab.227Vys/state/slow.check.sh: slow: upstream PR merged
+    1791585701	6	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.227Vys/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: done [at=1791585694]: backlog triage finished
+    STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+    scout-a done [at=1791585694]: backlog triage finished
+[17:41:45] arm2 acked through seq 6
+[17:41:45] next arm after Main handled the batch:
+[17:43:18] arm3 exit=124 output:
+    watcher: started pid=16521 (beacon fresh)
+    /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4H906AJDNT83YE1DPHM1VRK/bin/fm-watch.sh: child setpgid (72789 to 72789): Operation not permitted
+[17:43:18] lab removed

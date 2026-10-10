@@ -1,0 +1,6 @@
+half fix: flush moved before lock, but grace still slept under held lock (only the under-lock skip reverted); expect FAIL on under-lock shape
+3227c3227
+<     [ "$signal_append" = fm_wake_append_locked ] || sleep "$SIGNAL_GRACE"
+---
+>     sleep "$SIGNAL_GRACE"
+rc=1 | not ok - under-lock slept the signal grace while holding the wake-queue lock 

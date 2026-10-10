@@ -1,0 +1,11 @@
+commit fab06b960a4023eb10a75d7721900325e752a32e test_procevent_wake_never_lingers_under_the_queue_lock, 10 isolated runs
+run 1 rc=0 31s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 46.49 46.59 48.66
+run 2 rc=0 32s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 48.47 47.08 48.75
+run 3 rc=0 33s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 57.00 49.41 49.54
+run 4 rc=0 35s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 65.76 52.38 50.62
+run 5 rc=0 35s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 71.35 55.37 51.78
+run 6 rc=0 36s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 71.22 57.39 52.68
+run 7 rc=0 37s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 68.18 58.35 53.25
+run 8 rc=0 35s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 61.99 57.82 53.26
+run 9 rc=0 36s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 64.00 59.09 53.92
+run 10 rc=0 29s | ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal  | load averages: 61.00 58.66 53.93

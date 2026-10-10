@@ -1,0 +1,24 @@
+[17:30:32] code=/Users/charlesabrooker/tmp/fm-base-924f scenario=keyed lab=/Users/charlesabrooker/tmp/fm-lab.PdGYk2
+[17:30:36] arm1-baseline exit=0 output:
+    watcher: started pid=95488 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.PdGYk2/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.PdGYk2/state/vernant-d3.status
+[17:30:38] arm1 Main drain (stdout):
+    1791585035	3	signal	vernant-d2.status	signal: /Users/charlesabrooker/tmp/fm-lab.PdGYk2/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.PdGYk2/state/vernant-d3.status
+    1791585035	4	signal	vernant-d3.status	signal: /Users/charlesabrooker/tmp/fm-lab.PdGYk2/state/vernant-d2.status /Users/charlesabrooker/tmp/fm-lab.PdGYk2/state/vernant-d3.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: vernant-d2.status: working: setup
+    wake annotation: latest wake-EVENT observed at drain, not current state: vernant-d3.status: working: setup
+[17:30:38] arm1 acked through seq 4
+[17:30:38] no watcher running: lanes append keyed needs-decision and blocked lines
+[17:30:40] arm2 exit=0 output:
+    watcher: started pid=21945 (beacon fresh)
+    check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[17:30:40] wake queue rows:
+    5	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[17:30:41] arm2 Main drain (stdout):
+    1791585039	5	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+    OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+    vernant-d2 [key=main996-preservation-diagnosis] needs-decision: preserve or drop?
+    vernant-d3 [key=analytics-gre1948-native-validation] blocked: need native validation access
+    OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+[17:30:42] arm2 acked through seq 5
+[17:30:42] lab removed

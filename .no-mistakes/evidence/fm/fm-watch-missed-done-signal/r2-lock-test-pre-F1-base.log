@@ -1,0 +1,4 @@
+pre-F1 product code (51774c6b bin/fm-watch.sh) + current test file; expect FAIL
+run 1 rc=1 | not ok - before-lock slept the signal grace while holding the wake-queue lock 
+run 2 rc=1 | not ok - before-lock slept the signal grace while holding the wake-queue lock 
+run 3 rc=1 | not ok - before-lock slept the signal grace while holding the wake-queue lock 

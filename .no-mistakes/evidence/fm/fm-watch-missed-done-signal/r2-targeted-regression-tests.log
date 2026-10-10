@@ -1,0 +1,11 @@
+commit fab06b960a4023eb10a75d7721900325e752a32e
+=== test_done_and_keyed_lines_surface_between_and_during_cycles: ok - done, keyed needs-decision, and keyed blocked lines surface whether written between cycles or during one 
+=== test_signal_not_held_behind_a_blocked_check: ok - done and keyed decision signals appended during quiet and actionable checks are delivered 
+=== test_flushed_signals_preserve_main_owned_routing: ok - late signals keep original stale routing and wake once independently, including Main-owned stale rows 
+=== test_heartbeat_late_signal_retains_fleet_scope: ok - a late routine signal preserves heartbeat fleet scope and gets one task-scoped follow-up 
+=== test_late_signal_follow_up_filters_drained_rows: ok - follow-ups filter drained rows and marker-store failures preserve one-shot check results in successor posture 
+=== test_late_signal_output_failure_retries: ok - follow-up and end-of-prelude output failures preserve signal markers until one successful successor ring 
+=== test_late_signal_marker_failure_before_procevent: ok - late marker failures deliver signals and leave interrupted process-event wakes owed 
+=== test_signal_not_preempted_by_an_overdue_ledger: ok - the signal wake goes first and the overdue ledger surfaces on the next cycle 
+=== test_cycle_work_runs_after_bounded_signal_deferrals: ok - maintenance debt survives early wakes until both stalled mates, process-events, and every due check run 
+=== test_invalid_prelude_deferral_marker_restores_the_previous_order: ok - an invalid deferral marker restores the previous cycle order 

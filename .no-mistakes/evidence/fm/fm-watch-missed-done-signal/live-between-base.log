@@ -1,0 +1,20 @@
+[17:29:16] code=/Users/charlesabrooker/tmp/fm-base-924f scenario=between lab=/Users/charlesabrooker/tmp/fm-lab.F1JTuj
+[17:29:21] arm1-baseline exit=0 output:
+    watcher: started pid=28120 (beacon fresh)
+    signal: /Users/charlesabrooker/tmp/fm-lab.F1JTuj/state/scout-a.status
+[17:29:23] arm1 Main drain (stdout):
+    1791584960	2	signal	scout-a.status	signal: /Users/charlesabrooker/tmp/fm-lab.F1JTuj/state/scout-a.status
+    wake annotation: latest wake-EVENT observed at drain, not current state: scout-a.status: working: setup
+[17:29:23] arm1 acked through seq 2
+[17:29:23] no watcher running: scout appends done line
+[17:29:25] arm2 exit=0 output:
+    watcher: started pid=54098 (beacon fresh)
+    check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[17:29:25] wake queue rows:
+    3	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+[17:29:27] arm2 Main drain (stdout):
+    1791584965	3	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+    STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+    scout-a done [at=1791584963]: backlog triage finished
+[17:29:28] arm2 acked through seq 3
+[17:29:28] lab removed

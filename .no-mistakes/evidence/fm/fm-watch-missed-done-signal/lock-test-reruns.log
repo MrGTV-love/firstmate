@@ -1,0 +1,10 @@
+ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal
+load averages: 49.22 55.56 56.24
+ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal
+load averages: 51.34 55.38 56.14
+not ok - before-lock queue writer waited 5s on the 6s signal grace
+load averages: 46.69 53.75 55.51
+ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal
+load averages: 43.15 52.13 54.85
+ok - a process-event wake never holds the queue lock across the signal grace and still delivers the signal
+load averages: 44.42 51.17 54.36
