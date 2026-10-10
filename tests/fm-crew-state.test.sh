@@ -2870,6 +2870,35 @@ test_newest_open_decision_supplies_the_reported_detail() {
   pass "the most recently opened decision supplies the reported state and detail"
 }
 
+test_model_fallback_notice_keeps_the_worker_state() {
+  reset_fakes
+  local d declared notice before_last before_current before_state out
+  d=$(new_case fallback-notice)
+  make_repo_on_branch "$d/wt" fm/task
+  make_fakebin "$d" >/dev/null
+  arm_idle_record "$d/state" task
+  fm_write_meta "$d/state/task.meta" "window=fm:fm-task" "worktree=$d/wt" "kind=ship" "harness=claude"
+  notice='note [at=1700000000]: model-matrix fallback served deepseek/deepseek-v4-flash:high'
+  for declared in 'working: implementing the change' 'done: PR opened' \
+    'needs-decision [key=choice]: pick a rollout order' 'blocked: the deploy host went away' \
+    'failed: the build cannot pass' 'paused: awaiting an upstream release'; do
+    printf '%s\n' "$declared" > "$d/state/task.status"
+    before_last=$(last_status_line "$d/state/task.status")
+    before_current=$(status_current_line "$d/state/task.status" ship)
+    before_state=$(run_crew_state "$d" task | grep '^ *state:')
+    assert_not_contains "$before_state" "harness state unavailable" "the fixture must read the log state for '$declared'"
+    printf '%s\n' "$notice" >> "$d/state/task.status"
+    assert_equals "$before_last" "$(last_status_line "$d/state/task.status")" "the fallback notice cannot replace '$declared' as the latest event"
+    assert_equals "$before_current" "$(status_current_line "$d/state/task.status" ship)" "the fallback notice cannot change the current line after '$declared'"
+    out=$(run_crew_state "$d" task)
+    assert_equals "$before_state" "$(grep '^ *state:' <<<"$out")" "the fallback notice cannot change the crew state after '$declared'"
+  done
+  printf 'done: PR opened\n%s\n' "$notice" > "$d/state/task.status"
+  out=$(run_crew_state "$d" task)
+  assert_contains "$out" "state: done" "a done task stays done after the fallback notice fires"
+  pass "a model-matrix fallback notice never changes the worker's declared state"
+}
+
 test_single_owner_terminal_declaration_supersedes_stale_decision() {
   reset_fakes
   local d kind opener terminal out key expected
@@ -5628,6 +5657,7 @@ test_genuine_daemon_down_reports_blocked
 test_secondmate_open_block_survives_unrelated_append
 test_newest_open_decision_supplies_the_reported_detail
 test_single_owner_terminal_declaration_supersedes_stale_decision
+test_model_fallback_notice_keeps_the_worker_state
 test_latest_status_preserves_legacy_completions
 test_latest_status_subshell_work_does_not_grow_with_history
 test_genuine_parked_not_superseded

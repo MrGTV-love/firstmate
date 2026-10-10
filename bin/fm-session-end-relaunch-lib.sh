@@ -153,7 +153,7 @@ fm_session_end_identity() {  # <state-dir> <id>
   [ -f "$rec" ] || return 1
   out=$(fm_busy_record_read "$state" "$id" 2>/dev/null) || return 1
   read -r r_state r_source r_event r_seq <<< "$out"
-  [ "$r_state" = idle ] && [ "$r_event" = session-end ] && [ -n "$r_seq" ] || return 1
+  [ "$r_state" = idle ] && { [ "$r_event" = session-end ] || [ "$r_event" = quota-exhausted ]; } && [ -n "$r_seq" ] || return 1
   fm_busy_current_gen_to gen "$state" "$id" || return 1
   printf '%s %s\n' "$gen" "$r_seq"
 }
@@ -188,7 +188,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   local identity gen seq last verb hold_rc marker marker_gen
   local journal phase lock recent day handled
   local handled_gen handled_seq handled_outcome
-  local bin out rc=0 reason key which
+  local bin out rc=0 reason key which quota_event busy_record
   FM_SESSION_END_ACTION=skip
   FM_SESSION_END_REASON=
   case "$id" in
@@ -208,6 +208,12 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   identity=$(fm_session_end_identity "$state" "$id") || return 0
   gen=${identity%% *}
   seq=${identity#* }
+  quota_event=0
+  busy_record=$(fm_busy_record_read "$state" "$id" 2>/dev/null) || return 0
+  if [[ "$busy_record" == *" quota-exhausted "* ]]; then
+    [ "$(fm_meta_get "$meta" harness)" = omp ] || return 0
+    quota_event=1
+  fi
   marker="$state/$id.control-exit"
   if [ -f "$marker" ] && [ ! -L "$marker" ]; then
     marker_gen=$(sed -n 's/^gen=//p' "$marker" | head -1)
@@ -248,7 +254,11 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   window=$(fm_meta_get "$meta" window 2>/dev/null || true)
   [ -n "$window" ] || return 0
   agent=$(fm_backend_agent_state "$backend" "$window" 2>/dev/null || printf 'unreadable')
-  [ "$agent" = dead ] || return 0
+  if [ "$quota_event" = 1 ]; then
+    [ "$agent" = alive ] || return 0
+  else
+    [ "$agent" = dead ] || return 0
+  fi
   if [ -n "${FM_HOME:-}" ] && [ -x "$_FM_SESSION_END_DIR/fm-captain-hold.sh" ]; then
     hold_rc=0
     FM_HOME="$FM_HOME" "$_FM_SESSION_END_DIR/fm-captain-hold.sh" open "$id" >/dev/null 2>&1 || hold_rc=$?
@@ -297,10 +307,14 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
   touch "$state/.last-watcher-beat" 2>/dev/null || true
   out=$(fm_run_timed "$FM_SESSION_END_TIMEOUT" env FM_HOME="${FM_HOME:-}" FM_STATE_OVERRIDE="$state" \
     FM_CONTROL_LAUNCH_WAIT="$FM_SESSION_END_LAUNCH_WAIT" \
-    "$bin" "$id" relaunch --note "$(fm_session_end_note)" 2>&1) || rc=$?
+    "$bin" "$id" relaunch --note "$(if [ "$quota_event" = 1 ]; then printf '%s' 'The previous model exhausted its quota after native account rotation. Continue from the preserved local copy and instructions using the permitted matrix fallback.'; else fm_session_end_note; fi)" 2>&1) || rc=$?
   if [ "$rc" -eq 0 ]; then
     fm_session_end_ledger_add "$state" "$id" relaunched || return 1
-    reason="check: $id auto-relaunched after session-end"
+    if [ "$quota_event" = 1 ]; then
+      reason="check: $id auto-relaunched after quota exhaustion"
+    else
+      reason="check: $id auto-relaunched after session-end"
+    fi
     key="session-end-relaunch-$id-$gen-$seq"
     fm_session_end_queue_wake "$key" "$reason" || return 1
     printf '%s\t%s\trelaunched\n' "$gen" "$seq" > "$handled" || return 1
@@ -309,7 +323,7 @@ fm_session_end_relaunch_consider() {  # <state-dir> <id>
     return 0
   fi
   fm_session_end_ledger_add "$state" "$id" failed || return 1
-  reason="check: $id auto-relaunch failed after session-end: $(fm_session_end_first_line "$out")"
+  reason="check: $id auto-relaunch failed after $(if [ "$quota_event" = 1 ]; then printf 'quota exhaustion'; else printf 'session-end'; fi): $(fm_session_end_first_line "$out")"
   key="session-end-relaunch-failed-$id-$gen-$seq"
   fm_session_end_queue_wake "$key" "$reason" || return 1
   printf '%s\t%s\tfailed\n' "$gen" "$seq" > "$handled" || return 1

@@ -38,15 +38,13 @@
 # not by this helper. Use this helper only when the brief already fixed the
 # candidate order and every candidate's provider is the harness's primary family.
 #
-# omp (Oh My Pi) has no single primary family, so its candidate model prefix
-# selects the family: openai-codex/<id> checks the codex row and
-# claude-bridge/<id> checks the claude row, each against the bare <id> for
-# model: and product: scopes. Any other or absent prefix is refused up front,
-# the same shape as an unknown harness, because no quota-axi row measures it.
-# quota-axi reports Codex quota unavailable on this host because omp carries
-# its own Codex login, so an openai-codex candidate reads as unknown quota here
-# and is never selected on this host; its runway is disclosed uncertainty for
-# the agent-side gates, not measured headroom.
+# omp (Oh My Pi) has no single primary family. openai-codex/<id> reads every
+# pooled account from one `omp usage --provider openai-codex --json` report:
+# native usable capacity wins over quota-axi's single-account exhaustion.
+# Unknown pool headroom is not positive; saved resets are never spent or counted.
+# claude-bridge/<id> retains the matched claude row and bare-id scoped bounds.
+# Other or absent prefixes are refused because this helper does not model them.
+# No pool spendPriority is invented; candidate order was fixed at intake.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -318,6 +316,19 @@ else
 fi
 
 printf '%s\n' "$QUOTA_JSON" | fm_quota_json_valid || die "invalid quota-axi provider data"
+# OMP's pool is a different quota surface from quota-axi's single Codex account.
+# Inspect it once per chooser invocation and never invent an economic rank.
+# shellcheck source=bin/fm-dispatch-capacity-lib.sh
+. "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
+OMP_USAGE=
+for c in "${CANDIDATES[@]}"; do
+  case "$c" in
+    omp:openai-codex/*)
+      OMP_USAGE=$(fm_run_timed 20 omp usage --provider openai-codex --json 2>/dev/null </dev/null) || OMP_USAGE='{}'
+      [ -n "$OMP_USAGE" ] || OMP_USAGE='{}'
+      break ;;
+  esac
+done
 
 # provider_for_harness <harness> [<model>]
 # The harness -> primary provider family table is owned by
@@ -376,6 +387,14 @@ for c in "${CANDIDATES[@]}"; do
   model=${c#*:}
   [ "$model" = "$c" ] && model="default"
   provider=$(provider_for_harness "$harness" "$model")
+  if [ "$harness" = omp ] && [[ "$model" == openai-codex/* ]]; then
+    pool=$(fm_omp_codex_capacity "$model" "$OMP_USAGE")
+    if [ "$(jq -r .status <<<"$pool")" = usable ]; then
+      chosen="$harness $model"
+      break
+    fi
+    continue
+  fi
   scope_model=$model
   [ "$harness" != omp ] || scope_model=${model#*/}
   lane=$(jq -rn --arg h "$harness" --arg m "$model" "$FM_QUOTA_ROW_JQ"'quota_lane($h; $m)')

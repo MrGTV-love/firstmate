@@ -188,10 +188,6 @@ case "${1:-}" in
         *cursor_y*) printf '1\n'; exit 0 ;;
         *pane_current_command*) cat "$D/command"; printf '\n'; exit 0 ;;
         *pane_current_path*)
-          if [ -n "${FM_FAKE_CWD_RACE_READY:-}" ] && [ ! -e "$FM_FAKE_CWD_RACE_READY" ]; then
-            : > "$FM_FAKE_CWD_RACE_READY"
-            /bin/sleep 1
-          fi
           cat "$D/cwd"; printf '\n'; exit 0 ;;
       esac
     done
@@ -457,6 +453,42 @@ fi
 exec "$FM_REAL_MV" "$@"
 SH
   chmod +x "$1/fakebin/mv"
+}
+
+make_spawn_return_barrier_stub() {
+  local dir=$1 real_bash
+  real_bash=$(command -v bash)
+  cat > "$dir/fakebin/bash" <<SH
+#!/bin/bash
+if [ "\${1:-}" != "$SPAWN" ]; then
+  exec "$real_bash" "\$@"
+fi
+"$real_bash" "\$@"
+rc=\$?
+printf '%s\n' "\$rc" > "\$FM_FAKE_SPAWN_RETURN_READY"
+deadline=\$((SECONDS + \${FM_TEST_STUB_MAX_BLOCK_SECONDS:-120}))
+while [ ! -e "\$FM_FAKE_SPAWN_RETURN_RELEASE" ]; do
+  if [ "\$SECONDS" -ge "\$deadline" ]; then
+    : > "\$FM_FAKE_SPAWN_RETURN_READY.expired"
+    exit 124
+  fi
+  /bin/sleep 0.05
+done
+exit "\$rc"
+SH
+  chmod +x "$dir/fakebin/bash"
+}
+
+wait_fixture_process() {
+  local pid=$1 deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
+  while kill -0 "$pid" 2>/dev/null; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      kill -KILL "$pid" 2>/dev/null || true
+      return 124
+    fi
+    /bin/sleep 0.05
+  done
+  wait "$pid"
 }
 
 make_rm_failure_stub() {  # <case-dir>
@@ -1878,29 +1910,44 @@ test_launch_failure_keeps_the_prior_record_and_reports_it() {
 }
 
 test_prepublication_failure_keeps_concurrent_durable_metadata() {
-  local dir control_pid link_out rc i=0
+  local dir control_pid link_pid link_out rc control_rc deadline
   dir=$(new_case rollback-race rl30)
   add_ship_task "$dir" rl30 claude
   printf '%s' "$dir/proj" > "$dir/fake/cwd"
-  FM_FAKE_CWD_RACE_READY="$dir/cwd-race-ready" \
+  make_spawn_return_barrier_stub "$dir"
+  FM_FAKE_SPAWN_RETURN_READY="$dir/spawn-return-ready" \
+    FM_FAKE_SPAWN_RETURN_RELEASE="$dir/spawn-return-release" \
     run_control "$dir" rl30 relaunch --harness codex --note "preserve concurrent metadata" \
       > "$dir/control.out" &
   control_pid=$!
-  while [ ! -e "$dir/cwd-race-ready" ] && [ "$i" -lt 200 ]; do
-    /bin/sleep 0.01
-    i=$((i + 1))
+  deadline=$((SECONDS + FM_TEST_STUB_MAX_BLOCK_SECONDS))
+  while [ ! -s "$dir/spawn-return-ready" ] && [ "$SECONDS" -lt "$deadline" ] && kill -0 "$control_pid" 2>/dev/null; do
+    /bin/sleep 0.05
   done
-  [ -e "$dir/cwd-race-ready" ] || {
-    kill "$control_pid" 2>/dev/null || true
-    wait "$control_pid" 2>/dev/null || true
-    fail "relaunch did not reach its pre-publication endpoint check"
+  [ -s "$dir/spawn-return-ready" ] || {
+    : > "$dir/spawn-return-release"
+    wait_fixture_process "$control_pid" 2>/dev/null || true
+    fail "relaunch did not reach its post-spawn rollback barrier: $(cat "$dir/control.out")"
   }
-  link_out=$(env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
+  if [ "$(cat "$dir/spawn-return-ready")" != 1 ] \
+     || [ -e "$dir/home/state/.meta-rl30.lock" ] \
+     || [ "$(journal_field "$dir" rl30 phase)" != launching ]; then
+    : > "$dir/spawn-return-release"
+    wait_fixture_process "$control_pid" 2>/dev/null || true
+    fail "spawn did not fail and release its metadata lock before rollback: $(cat "$dir/control.out")"
+  fi
+  env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$ROOT" \
     "$X_LINK" rl30 request-30 --carry-count 2 --carry-ts 1700000000 \
-      --carry-platform x --carry-max 280 2>&1); rc=$?
+      --carry-platform x --carry-max 280 > "$dir/link.out" 2>&1 &
+  link_pid=$!
+  wait_fixture_process "$link_pid"; rc=$?
+  link_out=$(cat "$dir/link.out")
+  : > "$dir/spawn-return-release"
+  wait_fixture_process "$control_pid"; control_rc=$?
   expect_code 0 "$rc" "concurrent durable metadata publication should succeed"$'\n'"$link_out"
-  wait "$control_pid"; rc=$?
-  expect_code 1 "$rc" "the staged pre-publication launch failure should fail closed"
+  expect_code 1 "$control_rc" "the staged pre-publication launch failure should fail closed"
+  assert_absent "$dir/spawn-return-ready.expired" \
+    "rollback must wait for publication by release, not by fixture timeout"
   [ "$(meta_field "$dir" rl30 x_request)" = request-30 ] \
     || fail "rollback erased the concurrent X request"
   [ "$(meta_field "$dir" rl30 x_followups)" = 2 ] \
@@ -4625,7 +4672,7 @@ run_session_end_scan() {
   mkdir -p "$dir/user-home"
   (
     unset HERDR_ENV HERDR_PANE_ID HERDR_SESSION HERDR_SOCKET_PATH HERDR_TAB_ID HERDR_WORKSPACE_ID
-    # shellcheck disable=SC2031 # This subshell's own environment is the point.
+    # shellcheck disable=SC2030,SC2031 # This subshell's own environment is the point.
     export PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
       HOME="$dir/user-home" CLAUDE_CONFIG_DIR='' FM_SPAWN_NO_GUARD=1 \
       FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05
@@ -4935,6 +4982,118 @@ if fm_tasks_axi_compatible; then
 else
   echo "skip - recovery admission fixtures require compatible tasks-axi"
 fi
+test_quota_exhaustion_relaunches_only_a_permitted_route() {
+  local dir model id meta out rc
+  for model in openai-codex/gpt-6-luna openai-codex/gpt-6.1-sol; do
+    id=rl-pool
+    dir=$(new_case pooled-quota "$id")
+    add_ship_task "$dir" "$id" omp
+    printf omp > "$dir/fake/command"
+    printf omp > "$dir/fake/becomes"
+    printf 'unfinished change\n' > "$dir/wt/unfinished.txt"
+    meta=$(cat "$dir/home/state/$id.meta")
+    meta=${meta/model=default/model=$model}
+    meta=${meta/effort=default/effort=high}
+    printf '%s\ndispatch_rule=rule_1\n' "$meta" > "$dir/home/state/$id.meta"
+    mkdir -p "$dir/home/config"
+    jq -n --arg model "$model" '{rules:[{when:"assigned work",
+      use:{harness:"omp",model:$model,effort:"high",provider:"codex"},
+      fallback:(if $model=="openai-codex/gpt-6-luna" then
+        [{harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"}] else [] end)},
+      {when:"invalid stand-in",use:{harness:"omp",model:"openai-codex/gpt-6-astra",effort:"high"},
+       fallback:[{harness:"pi",model:"deepseek/deepseek-v4-flash",effort:"high"}]}]}' > "$dir/home/config/crew-dispatch.json"
+    jq -n --argjson now "$(date +%s)" '{reports:[
+      {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
+      {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}
+    ]}' > "$dir/usage.json"
+    cat > "$dir/fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  usage) cat "$FM_FAKE_DIR/../usage.json" ;;
+  models) printf '%s\n' '{"models":[{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"}]}' ;;
+  *) exit 0 ;;
+esac
+SH
+    chmod +x "$dir/fakebin/omp"
+    "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" --state idle --source omp-ext --event quota-exhausted >/dev/null
+    mkdir -p "$dir/user-home"
+    # shellcheck disable=SC2031 # The helper subshell's PATH change does not reach here.
+    out=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+      -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
+      PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+      FM_WAKE_QUEUE="$dir/home/state/.wake-queue" \
+      HOME="$dir/user-home" FM_SPAWN_NO_GUARD=1 \
+      FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+      bash -s -- "$ROOT" <<'SH'
+. "$1/bin/fm-session-end-relaunch-lib.sh"
+fm_session_end_relaunch_scan "$FM_HOME/state" 180 || exit
+printf "%s\n" "$FM_SESSION_END_WAKE"
+SH
+    )
+    rc=$?
+    expect_code 0 "$rc" "supervised quota recovery must reconcile the route: $out"
+    assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "automatic replacement must preserve uncommitted work"
+    if [ "$model" = openai-codex/gpt-6-luna ]; then
+      assert_contains "$out" 'auto-relaunched after quota exhaustion' "an idle live OMP session must recover automatically"
+      assert_equals deepseek/deepseek-v4-flash "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
+      assert_equals complete "$(journal_field "$dir" "$id" phase)" "the real replacement transaction must complete"
+      assert_grep 'fallback relaunched' "$dir/home/state/$id.status" "the served route must be reported"
+    else
+      assert_contains "$out" 'auto-relaunch failed' "strongest-model exhaustion must be surfaced without a weak stand-in"
+      assert_equals omp "$(cat "$dir/fake/command")" "an unavailable strongest route must refuse before stopping the old agent"
+      assert_equals openai-codex/gpt-6.1-sol "$(meta_field "$dir" "$id" model)" "the strongest model identity must remain unchanged"
+      assert_no_grep '/quit' "$dir/fake/literal" "no exit may be sent when the strongest replacement is unavailable"
+    fi
+  done
+  pass "supervised OMP quota recovery uses the declared stand-in or preserves the strongest route and work"
+}
+
+test_retiring_omp_removes_only_its_generated_configuration() {
+  local dir out rc
+  dir=$(new_case omp-config-retirement rl-config)
+  add_ship_task "$dir" rl-config omp
+  printf 'dispatch_rule=rule_1\n' >> "$dir/home/state/rl-config.meta"
+  mkdir -p "$dir/home/config"
+  printf '{"rules":[{"when":"OMP work","use":{"harness":"omp"}}]}\n' > "$dir/home/config/crew-dispatch.json"
+  printf omp > "$dir/fake/command"
+  printf claude > "$dir/fake/becomes"
+  printf 'export default () => {};\n' > "$dir/home/state/rl-config.omp-ext.ts"
+  printf '{"retry":{"modelFallback":false}}\n' > "$dir/home/state/rl-config.omp-fallback.yml"
+  mkdir -p "$dir/wt/.omp"
+  printf 'user configuration\n' > "$dir/wt/.omp/config.yml"
+  out=$(run_control "$dir" rl-config relaunch --harness claude --note "replace the configured runtime explicitly"); rc=$?
+  expect_code 0 "$rc" "an explicit runtime replacement must complete: $out"
+  assert_absent "$dir/home/state/rl-config.omp-fallback.yml" "retired model policy must not survive replacement"
+  assert_absent "$dir/home/state/rl-config.omp-ext.ts" "retired callbacks must not survive replacement"
+  assert_equals 'user configuration' "$(cat "$dir/wt/.omp/config.yml")" "retirement must preserve user configuration"
+  out=$(run_control "$dir" rl-config relaunch --note "continue after the explicit runtime override"); rc=$?
+  expect_code 0 "$rc" "the retired rule must not block subsequent recovery: $out"
+  pass "OMP replacement retires generated policy without removing user configuration"
+}
+
+test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
+  local dir out rc recorded id
+  for recorded in none stale; do
+    id=rl-unlabeled-$recorded
+    dir=$(new_case "unlabeled-$recorded" "$id")
+    add_ship_task "$dir" "$id" claude
+    [ "$recorded" = none ] || printf 'dispatch_rule=rule_7\n' >> "$dir/home/state/$id.meta"
+    mkdir -p "$dir/home/config"
+    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
+    out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
+    expect_code 0 "$rc" "a $recorded recorded rule with an ambiguous match must relaunch as before: $out"
+    assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"
+    assert_no_grep 'dispatch_rule=' "$dir/home/state/$id.meta" "an ambiguous match records no fallback rule"
+  done
+  pass "relaunch without a usable recorded rule treats an ambiguous match as no fallback"
+}
+
+test_retiring_omp_removes_only_its_generated_configuration
+
+test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior
+
+test_quota_exhaustion_relaunches_only_a_permitted_route
+
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven

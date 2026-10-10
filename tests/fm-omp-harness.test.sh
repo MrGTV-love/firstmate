@@ -35,6 +35,8 @@ set -u
 
 # shellcheck source=bin/fm-busy-lib.sh
 . "$ROOT/bin/fm-busy-lib.sh"
+# shellcheck source=bin/fm-status-event-lib.sh
+. "$ROOT/bin/fm-status-event-lib.sh"
 # shellcheck source=bin/fm-composer-lib.sh
 . "$ROOT/bin/fm-composer-lib.sh"
 # shellcheck source=bin/fm-control-lib.sh
@@ -59,6 +61,17 @@ make_named_shells() {  # <dir> -> echoes <bindir>
   for name in omp ompd comp; do
     ln -sf /bin/bash "$dir/$name"
   done
+  # Keep the real process-name proof, but bound ancestry to the named fixture
+  # shell: this suite itself can legitimately run under an OMP ancestor.
+  cat > "$dir/ps" <<'SH'
+#!/usr/bin/env bash
+if [ "$*" = "-o ppid= -p ${FM_ANCESTRY_FIXTURE_PID:-}" ]; then
+  printf '1\n'
+else
+  exec /bin/ps "$@"
+fi
+SH
+  chmod +x "$dir/ps"
   printf '%s' "$dir"
 }
 
@@ -69,23 +82,23 @@ test_detection_anchored_name_and_marker_precedence() {
   bin=$(make_named_shells "$TMP_ROOT/named")
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
+    PATH="$bin:$PATH" "$bin/omp" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "a process named omp must detect as omp, got '$out'"
   for decoy in ompd comp; do
     # shellcheck disable=SC2016 # the quoted body expands inside the named shell
     out=$(env -u CLAUDECODE -u FM_OMP_HARNESS -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS \
-      "$bin/$decoy" -c '"$1"; :' _ "$HARNESS")
+      PATH="$bin:$PATH" "$bin/$decoy" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
     [ "$out" != omp ] || fail "'$decoy' merely contains omp and must not detect as omp"
   done
   # The marker beats an inherited CLAUDECODE only under a real omp ancestor.
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
-    "$bin/omp" -c '"$1"; :' _ "$HARNESS")
+    PATH="$bin:$PATH" "$bin/omp" -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = omp ] || fail "FM_OMP_HARNESS under an omp ancestor must outrank an inherited CLAUDECODE, got '$out'"
   # ...and is inert when it leaks into a worker with no omp ancestor.
   # shellcheck disable=SC2016 # the quoted body expands inside the named shell
   out=$(env -u PI_CODING_AGENT -u CURSOR_AGENT -u CURSOR_INVOKED_AS CLAUDECODE=1 FM_OMP_HARNESS=omp \
-    bash -c '"$1"; :' _ "$HARNESS")
+    PATH="$bin:$PATH" bash -c 'export FM_ANCESTRY_FIXTURE_PID=$$; "$1"; :' _ "$HARNESS")
   [ "$out" = claude ] || fail "a leaked FM_OMP_HARNESS without an omp ancestor must not relabel a claude worker, got '$out'"
   pass "fm-harness: omp detects by its anchored name; the marker is a precedence override that needs real omp ancestry"
 }
@@ -121,7 +134,10 @@ case "$1" in
       cat "$PI_CODING_AGENT_DIR/catalog.json"
       exit 0
     fi
-    printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
+    printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-astra","selector":"openai-codex/gpt-6-astra"},{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"},{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"},{"provider":"ollama","id":"qwen3:8b","selector":"ollama/qwen3:8b"}]}'
+    ;;
+  usage)
+    if [ -n "${OMP_USAGE_FIXTURE:-}" ]; then cat "$OMP_USAGE_FIXTURE"; else printf '{}\n'; fi
     ;;
 esac
 exit 0
@@ -158,6 +174,7 @@ run_scout_spawn() {  # <home> <wt> <fakebin> <launch-log> <spawn-args...>
   shift 4
   FM_FAKE_LAUNCH_LOG="$launchlog" fm_test_run_spawn "$home" "$wt" "$fakebin" "$@" --scout
 }
+
 
 test_spawn_launch_line_and_worker_wiring() {
   local rec id=omp-launch-q1 out status launch state
@@ -279,6 +296,131 @@ JS
     [ "$out" = scope-ok ] || fail "generated omp extension lost $project egress scope: $out"
   done
   pass "real omp spawns authorize firstmate only and carry project scope through the generated extension"
+}
+
+test_spawn_retains_pooled_capacity_and_declared_stand_ins() {
+  local rec id=omp-pool-q1 out status
+  rec=$(make_spawn_case pool omp "$id")
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/config"
+  cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
+JSON
+  jq -n --argjson now "$(date +%s)" '{reports:[
+    {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
+    {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}
+  ]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+  expect_code 0 $? "a healthy pooled sibling must permit launch: $out"
+  assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "pooled launch must retain Luna"
+
+  rec=$(make_spawn_case fallback omp omp-fallback-q2)
+  read_case_record "$rec"
+  id=omp-fallback-q2
+  mkdir -p "$HOME_DIR/config"
+  cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
+JSON
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+  status=$?
+  expect_code 0 "$status" "whole-pool exhaustion must select the permitted Luna stand-in: $out"
+  assert_grep 'model=deepseek/deepseek-v4-flash' "$HOME_DIR/state/$id.meta" "the replacement route must become durable"
+  assert_grep 'fallback launched' "$HOME_DIR/state/$id.status" "the changed serving route must be reported"
+  pass "launch preserves healthy pooled accounts and uses only the selected rule's stand-in"
+}
+
+test_spawn_native_fallback_preserves_destination_order() {
+  local rec id out status ordering expected
+  for ordering in cross-first native-first restricted; do
+    id="omp-order-$ordering"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/config"
+    printf 'teamclaude\n' > "$HOME_DIR/config/claude-launcher"
+    fm_test_fake_teamclaude "$FAKEBIN_DIR"
+    jq -n --arg order "$ordering" '
+      {harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"} as $native |
+      {harness:"claude",model:"claude-opus-5-5[1m]",effort:"high",requires:"teamclaude"} as $cross |
+      {harness:"omp",model:"ollama/qwen3:8b",effort:"high"} as $last |
+      {rules:[{when:"work",use:{harness:"omp",model:"openai-codex/gpt-6-luna",effort:"high"},
+        fallback:(if $order == "native-first" then [$native,$cross,$last] else [$cross,$native] end)}]}
+    ' > "$HOME_DIR/config/crew-dispatch.json"
+    if [ "$ordering" = restricted ]; then
+      printf 'omp-or-tc\n' > "$HOME_DIR/config/session-launch-policy"
+    fi
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
+    out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+    status=$?
+    expect_code 0 "$status" "ordered native fallback launch: $out"
+    expected='["deepseek/deepseek-v4-flash:high"]'
+    [ "$ordering" != cross-first ] || expected='[]'
+    assert_equals "$expected" "$(jq -c '.retry.fallbackChains["openai-codex/gpt-6-luna:high"]' "$HOME_DIR/state/$id.omp-fallback.yml")" \
+      "native fallback stops at the first supported cross-harness destination"
+    if [ "$ordering" = restricted ]; then
+      jq '.reports[].metadata.meterStates.chat={allowed:false,limitReached:true}' "$CASE_DIR/usage.json" > "$CASE_DIR/exhausted.json"
+      fm_test_spawn_brief "$HOME_DIR" "$id-empty"
+      out=$(OMP_USAGE_FIXTURE="$CASE_DIR/exhausted.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id-empty" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+      status=$?
+      expect_code 0 "$status" "restricted exhaustion must select the allowed native destination: $out"
+      assert_grep 'harness=omp' "$HOME_DIR/state/$id-empty.meta" "fallback must not bypass launch policy"
+      assert_grep 'model=deepseek/deepseek-v4-flash' "$HOME_DIR/state/$id-empty.meta" "fallback uses the next policy-eligible destination"
+    fi
+  done
+  pass "native chains preserve fallback order and shared launch policy"
+}
+
+test_spawn_rejects_retired_fallbacks_before_publication() {
+  local rec id out status capacity
+  for capacity in usable exhausted; do
+    id="omp-retired-$capacity"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/config"
+    printf '%s\n' '{"version":1,"roles":{},"retired":["deepseek-v4-flash"]}' > "$HOME_DIR/config/model-index.json"
+    printf '%s\n' '{"rules":[{"when":"work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+    jq -n --arg state "$capacity" --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:($state=="usable"),limitReached:($state=="exhausted")}}}}]}' > "$CASE_DIR/usage.json"
+    out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+    status=$?
+    expect_code 1 "$status" "a retired fallback must refuse for $capacity capacity: $out"
+    assert_absent "$HOME_DIR/state/$id.meta" "retired fallback refusal must precede task publication"
+    assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "retired fallback refusal must precede native chain emission"
+  done
+  pass "retired fallback refusal covers launch-time selection and runtime chains"
+}
+
+test_spawn_ignores_stale_unrelated_rules() {
+  local rec id=omp-unrelated-stale out status
+  rec=$(make_spawn_case "$id" omp "$id")
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/config"
+  printf '%s\n' '{"version":1,"roles":{},"retired":["deepseek-v4-flash"]}' > "$HOME_DIR/config/model-index.json"
+  printf '%s\n' '{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}},{"when":"unconfigured","use":{"harness":"omp","role":"missing-role"}},{"when":"strong work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6-astra","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"ultra"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+    metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high)
+  status=$?
+  expect_code 0 "$status" "a retired, unconfigured, or invalid unrelated rule must not block the launch: $out"
+  assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "the launch keeps its own route"
+  assert_no_grep 'dispatch_rule=' "$HOME_DIR/state/$id.meta" "a rule without a fallback policy records no identifier"
+  pass "stale unrelated dispatch rules do not block a launch"
+}
+
+
+test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
+  local rec id=omp-strongest-q3 out status
+  rec=$(make_spawn_case strongest omp "$id")
+  read_case_record "$rec"
+  printf 'unlanded work\n' > "$WT_DIR/unfinished.txt"
+  jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}},resetCredits:{availableCount:1}}]}' > "$CASE_DIR/usage.json"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6.1-sol --effort high)
+  status=$?
+  expect_code 1 "$status" "Sol without an available same-class stand-in must refuse: $out"
+  assert_absent "$HOME_DIR/state/$id.meta" "refused launch must publish no replacement"
+  assert_equals 'unlanded work' "$(cat "$WT_DIR/unfinished.txt")" "quota exhaustion must preserve work"
+  pass "strongest-model exhaustion neither spends saved resets nor weakens or discards the task"
 }
 
 test_spawn_model_validation_scoped_to_listed_providers() {
@@ -838,6 +980,10 @@ switch (process.env.MODE) {
   case "fallback": await handlers["retry_fallback_applied"]({ type: "retry_fallback_applied", from: "openai-codex/gpt-6.1-sol", to: "deepseek/deepseek-v4-pro" }, { ...ctx, model: { provider: "deepseek", id: "deepseek-v4-pro" } }); break;
   case "end-error": await handlers["agent_end"]({ type: "agent_end", messages: [{ role: "assistant", stopReason: "error", errorMessage: "402 This request would exceed your available credits." }] }, { ...ctx, model: { provider: "deepseek", id: "deepseek-v4-pro" } }); break;
   case "restore": await handlers["agent_start"]({ type: "agent_start" }, { ...ctx, model: { provider: "openai-codex", id: "gpt-6.1-sol" } }); break;
+  case "quota-error":
+    await handlers["agent_end"]({messages:[{role:"assistant",stopReason:"error",errorMessage:"usage_limit_reached"}]}, ctx); break;
+  case "fallback-served":
+    await handlers["retry_fallback_succeeded"]({model:"deepseek/deepseek-v4-flash:high"}, ctx); break;
   default: throw new Error("unknown mode " + process.env.MODE);
 }
 if (process.env.MODE === "turn-end") {
@@ -879,6 +1025,17 @@ test_busy_extension_lifecycle() {
 
   out=$(drive_omp_ext "$ext" end-final) || fail "final agent_end drive failed: $out"
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] || fail "a plain agent_end must classify 'idle omp-ext'"
+  out=$(drive_omp_ext "$ext" quota-error) || fail "quota error drive failed: $out"
+  assert_contains "$(fm_busy_record_read "$state" "$id")" 'quota-exhausted' "a terminal native usage failure must be actionable"
+  printf 'done: PR opened\n' > "$state/$id.status"
+  out=$(drive_omp_ext "$ext" fallback-served) || fail "fallback status drive failed: $out"
+  grep -Eq '^note \[at=[0-9]+\]: model-matrix fallback served deepseek/deepseek-v4-flash:high$' "$state/$id.status" \
+    || fail "native model fallback must publish the serving model as a note: $(cat "$state/$id.status")"
+  [ "$(last_status_line "$state/$id.status")" = 'done: PR opened' ] || fail "the fallback notice must not replace the worker's done declaration"
+  rm "$state/$id.busy-gen"
+  printf 'working: replacement owns this task\n' > "$state/$id.status"
+  out=$(drive_omp_ext "$ext" fallback-served) || fail "retired callback drive failed: $out"
+  assert_equals 'working: replacement owns this task' "$(cat "$state/$id.status")" "a retired callback must not publish a stale serving model"
 
   # The model serving the task is published for bin/fm-crew-state.sh: a fallback
   # moves it, an unrecovered run error is carried, and the next run clears the
@@ -906,7 +1063,7 @@ test_control_composer_and_model_tables() {
   [ "$(fm_control_interrupt_key omp)" = Escape ] || fail "omp interrupt key must be Escape"
   [ "$(fm_control_interrupt_repeat omp)" = 1 ] || fail "omp interrupts on a single press"
   [ -z "$(fm_control_interrupt_clear_key omp)" ] || fail "omp leaves its composer empty and needs no clear key"
-  [ "$(fm_control_harness_wiring_paths omp /wt /st id1)" = "/st/id1.omp-ext.ts" ] || fail "omp wiring path must be the state-resident extension"
+  [ "$(fm_control_harness_wiring_paths omp /wt /st id1)" = $'/st/id1.omp-ext.ts\n/st/id1.omp-fallback.yml' ] || fail "omp wiring paths must be the state-resident extension and fallback overlay"
   printf 'Working…\n' | fm_busy_lines_match omp || fail "omp busy regex must match the TUI ellipsis form"
   printf 'Working...\n' | fm_busy_lines_match omp && fail "omp busy regex must not match the three-dot form no supervised pane renders"
   printf ' ⠧ 11s  · gpt-6-astra\n' | fm_busy_lines_match omp || fail "omp busy regex must match the braille spinner plus elapsed cell"
@@ -2670,6 +2827,11 @@ test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_worker_replace_mode_environment
 test_worker_guard_project_scope
+test_spawn_retains_pooled_capacity_and_declared_stand_ins
+test_spawn_native_fallback_preserves_destination_order
+test_spawn_rejects_retired_fallbacks_before_publication
+test_spawn_ignores_stale_unrelated_rules
+test_spawn_exhausted_strongest_route_preserves_unlanded_work
 test_spawn_model_validation_scoped_to_listed_providers
 test_spawn_refuses_a_missing_or_unlisted_default_role
 test_spawn_global_config_is_read_only_and_unlayered
