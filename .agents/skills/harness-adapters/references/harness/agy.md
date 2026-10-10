@@ -21,7 +21,7 @@ Verified as a CREWMATE and SCOUT adapter only; `../../../bin/fm-spawn.sh` refuse
 | Resume | `--continue` and `--conversation` exist but carry no verified pane-resume contract; use deterministic relaunch. |
 | Model | `--model <id>` uses a bare id from `agy models`; native non-entry literals refuse when a reachable listing omits the id and launch with a notice when it is unreachable, while indexed selections follow the [fleet model-index contract](../../../docs/configuration.md#fleet-model-index-configmodel-indexjson). |
 | Effort | `--effort low\|medium\|high`; `xhigh` and `max` stay in task metadata under the record-and-omit contract. |
-| Composer | Borderless bare `>` row, which the shared classifier reads as `unknown` under the dead-shell rule, never `empty`; steering confirms delivery through native agent-state and the delivery footer instead, the cursor precedent. |
+| Composer | Bare `>` row between two `─` rules. On Herdr the shared classifier reads it under the native agy identity, so an idle worker proves `empty` and `exit` and `relaunch` proceed; tmux supplies no agy identity, so the row stays `unknown` there and both verbs refuse. Steering confirms delivery through native agent-state and the delivery footer. |
 
 ## Trust, and where the decision persists
 

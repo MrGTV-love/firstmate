@@ -117,10 +117,10 @@
 #                (herdr `agent get`), whose idle/done status is what proves
 #                empty; the `>` row must lead the interior, and any text after
 #                it or on a continuation row is pending. A working, blocked, or
-#                unreadable agy never reads empty. The idle footer
-#                (`? for shortcuts`) and the busy footer (`esc to cancel`)
-#                sit below the closing rule and are not read here: the native
-#                status owns idle versus busy.
+#                unreadable agy never reads empty. The native status owns
+#                idle versus busy; the busy footer (`esc to cancel`) below
+#                the closing rule is read only as a second veto on empty,
+#                and the idle footer (`? for shortcuts`) is never proof.
 #
 # KNOWN LIMIT: pasted omp frames inside drafts have unsafe Enter variants
 # tracked by follow-up fm-omp-composer-pasted-frame-variants. The native-band
@@ -172,7 +172,8 @@
 #
 # THE SAFETY RULE for prompt-bearing shapes: a bare shell glyph (`>` `$` `%` `#`) -
 # what a pane shows once its agent has exited to a plain login shell - is a
-# genuine empty agent composer ONLY inside a bordered container. On a bare row
+# genuine empty agent composer ONLY inside a bordered container, or inside the
+# `agy pair` above under a live agy identity. On a bare row
 # it is a dead-shell prompt and classifies `unknown` (never a safe injection
 # target). A `$` followed immediately by a digit is Pi's cost footer, not this
 # prompt (`FM_COMPOSER_PI_STATUS_RE_DEFAULT`).
@@ -2930,15 +2931,17 @@ _fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <i
 # _fm_composer_agy_pair_verdict: the Antigravity CLI composer inside a proven
 # rule pair. agy draws a plain `>` prompt row between its two rules, and a shell
 # glyph is never container proof, so the caller has already required a live agy
-# identity; this reads only the interior. The FIRST interior row must lead with
-# the `>`, otherwise the shape is unproven and the verdict is `unknown`. Text
-# after the glyph, or on any later interior row, is a draft and reads `pending`
-# in every agent state; ghost styling is deliberately not stripped, because
-# agy 1.3.3 draws no placeholder and a dim draft must never be read as empty. Only an idle or done agy proves an empty composer: a
-# working agy keeps the empty row drawn while its turn runs, and a blocked one
-# is parked on a prompt whose keys would answer that prompt instead. The pinned
-# `esc to cancel` footer also vetoes empty, so a status that lags the screen
-# cannot let a mid-turn composer through.
+# identity; this reads the interior, plus the footer below the closing rule as
+# a busy veto. The FIRST interior row must lead with the `>`, otherwise the
+# shape is unproven and the verdict is `unknown`. Text after the glyph, or on
+# any later interior row, is a draft and reads `pending` in every agent state;
+# ghost styling is deliberately not stripped, because agy 1.3.3 draws no
+# placeholder and a dim draft must never be read as empty. Only an idle or done
+# agy proves an empty composer: a working agy keeps the empty row drawn while
+# its turn runs, and a blocked one is parked on a prompt whose keys would
+# answer that prompt instead. The pinned `esc to cancel` footer also vetoes
+# empty, so a status that lags the screen cannot let a mid-turn composer
+# through.
 _fm_composer_agy_pair_verdict() {  # <screen> <agent-status>
   local screen=$1 agent_status=$2 row raw content first=1
   row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
@@ -2991,6 +2994,8 @@ _fm_composer_agy_pair_verdict() {  # <screen> <agent-status>
 # is drawn above the separator pair, so the composer region looks free while the
 # keys would answer the prompt instead of composing (issue #2797). Structure
 # cannot disprove that, so a blocked pi defers rather than claiming empty.
+# An agy identity over a valid pair with no agent-glyph row is handed to
+# _fm_composer_agy_pair_verdict instead; every other non-pi identity is denied.
 _fm_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
   local screen=$1 styled=$2 has_identity=$3 identity=$4 agent agent_status state denied=unknown
   if [ "$FM_COMPOSER_SCAN_PI_NATIVE_DRAFT_RISK" = 1 ] \
