@@ -1129,7 +1129,7 @@ export default function (pi: ExtensionAPI) {
       }
       let recovered = false;
       for (const [token, wake] of [...owner.unconsumedWakes]) {
-        if (!wake.pending || wake.pending.delivered) continue;
+        if (wake.pending?.delivered) continue;
         const remainder = removeRestoredWake(String(ctx.ui.getEditorText() ?? ""), wake.content);
         if (remainder === null) continue;
         ctx.ui.setEditorText(remainder);

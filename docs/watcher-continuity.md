@@ -113,7 +113,6 @@ The existing version-2 replacement handoff stores one `check: wake may be due` m
 An unconsumed watcher wake serializes sends until the next `agent_end`, when its pending mark becomes eligible for another queue read.
 Preparation that reaches `before_agent_start` but returns idle without user `message_start` also releases the outstanding wake, unless pending vendor messages still accompany that unconsumed watcher; operator edits remain untouched.
 [Restored-wake recovery](#omp-restored-wake-recovery) owns consumption and removal of the outstanding token.
-`tests/fm-omp-harness.test.sh --watch-queue` exercises the queue-read delivery paths, partial acknowledgement, external recovery, late replacement closes, host routing, token release, editor safety, failed queries, timeouts and slow queries. `tests/fm-wake-queue.test.sh --queued-query` exercises the public read-only queue interface and its main-only view of branch grants.
 The live guard and its evidence are recorded in [omp stale wake gating](verification/runtime-backends.md#2026-10-08-omp-stale-wake-gating).
 The Pi and OpenCode extensions still queue every wake as a follow-up and are not covered by this gating.
 
@@ -140,8 +139,6 @@ If none is there, the check takes the oldest unconsumed wake with attempts remai
 Each goes through omp's prompt-starting message API, which starts a turn and flushes the queue behind it, so the stuck copy can reach main too and the idempotent drain absorbs the repeat.
 Delivery is proven by the accepted user `message_start`; this is bounded to three attempts per tracked wake, and if every unconsumed wake exhausts them the extension reports the wait once through omp's own notification and leaves the durable queue and shutdown handoff to the parent's stalled-loop alarm.
 [Architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary, secondmate stalled-queue escalation, and idle-ring eligibility.
-`tests/fm-omp-harness.test.sh --watch-queue` covers restored-template removal, draft-byte preservation, refusal of edited, busy or queued editor text, and regeneration from a different still-owed payload.
-It also covers the stuck queue: a watcher wake, a restored wake, a failure notice, and a host hand-back behind a queue that never drains, regeneration from a different still-owed payload, silence when the rows were drained, resubmissions that start no turn, and episodes restarted by an accepted message, queue drainage, a running turn, turn completion, and session replacement.
 The flush-check delay and wait limits are fixed in production; the fixture controls timer scheduling in its Node host to accelerate bounded waits and to run single checks.
 The opt-in live guard and its evidence limits are recorded in [omp injected text through Herdr](verification/runtime-backends.md#2026-10-06-omp-injected-text-through-herdr).
 
@@ -159,7 +156,6 @@ Before template matching, every tracked wake must be accounted for by its own ex
 Accepted residual: with older-wiring wakes A and B in the composer, the poll removes A's segment and the queue read sends a fresh wake; if Escape cancels that wake's preparation before the user `message_start`, it stays tracked but absent, so the poll does not take B until an owner round removes the stall. Edited-copy and duplicate protections remain in force. The cure is assigned to the wake-replay option D round.
 Once the tracked-copy ownership gate is satisfied, the scan skips unchanged tracked wakes and stranded text that has exhausted its attempts, so neither can block a later eligible wake; removing that later wake preserves the skipped text and operator drafts.
 Removal is bounded to three attempts per distinct wake text.
-`tests/fm-omp-harness.test.sh --watch-queue` covers removal with and without the transport mark, delivery of the still-owed row in place of the stranded text, silence when no row is owed, operator drafts on both sides, several wakes, text that is not a whole wake, a running turn, text still changing, the attempt bound, and an unaccounted tracked wake with polling active.
 The live guard's stranded-wake step and its evidence are recorded in [omp stranded wake text and the queue panel](verification/runtime-backends.md#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
 
 ### Cursor stop hook

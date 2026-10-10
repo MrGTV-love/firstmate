@@ -4001,14 +4001,6 @@ if [ -n "${FM_TEST_ONLY:-}" ]; then
   exit $?
 fi
 
-if [ "${1:-}" = --queued-query ]; then
-  test_queued_preserves_rows_and_state_until_acknowledgement
-  test_queued_empty_and_missing_state_succeed_without_writes
-  test_queued_respects_live_and_stale_branch_grants
-  test_queued_refuses_invalid_arguments_and_failed_or_malformed_reads
-  exit 0
-fi
-
 test_queued_preserves_rows_and_state_until_acknowledgement
 test_queued_empty_and_missing_state_succeed_without_writes
 test_queued_respects_live_and_stale_branch_grants

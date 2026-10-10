@@ -2671,7 +2671,7 @@ if (scenario === "external") {
       // omp is idle with messages queued that it will not run; a prompt send
       // starts a turn and flushes them.
       const draft = "\noperator\u2063 draft\n\n";
-      if (scenario === "stuck-failure") {
+      if (scenario === "stuck-failure" || scenario === "stuck-restored-failure") {
         // A failure notice names no queued row, so it is resent as emitted.
         await accept(wake);
         const dir = `${state}/extensions/omp-primary-watch`;
@@ -2681,9 +2681,18 @@ if (scenario === "external") {
         unlinkSync(handoff);
         const failed = () => sent.filter(({ m }) => m.includes("watcher: FAILED"));
         if (failed().length !== 1 || failed()[0].o?.deliverAs !== "followUp") throw new Error(`expected one queued failure notice: ${JSON.stringify(sent)}`);
-        idle = true; queued = true; flushes = true;
-        await until(() => failed().length === 2, "a failure notice stuck in omp's idle queue was never sent through the prompt flow");
-        if (failed()[1].m !== failed()[0].m || failed()[1].o?.deliverAs !== undefined || queued || notices.length || sets) throw new Error("the stuck failure notice was not resent as emitted");
+        if (scenario === "stuck-restored-failure") {
+          // Escape returns the queued notice to the composer beside a draft.
+          editor = `${failed()[0].m}\n\n${draft}`;
+          flushes = true;
+          await end();
+          await until(() => failed().length === 2, "a failure notice restored to the composer was never sent again");
+          if (failed()[1].m !== failed()[0].m || failed()[1].o?.deliverAs !== undefined || editor !== draft || notices.length) throw new Error("the restored failure notice was not resent as emitted");
+        } else {
+          idle = true; queued = true; flushes = true;
+          await until(() => failed().length === 2, "a failure notice stuck in omp's idle queue was never sent through the prompt flow");
+          if (failed()[1].m !== failed()[0].m || failed()[1].o?.deliverAs !== undefined || queued || notices.length || sets) throw new Error("the stuck failure notice was not resent as emitted");
+        }
         await end();
         await sleep(600);
         if (failed().length !== 2 || wakes().length !== 1) throw new Error("a delivered failure notice was sent again");
@@ -2859,7 +2868,7 @@ EOF
 
 test_watch_extension_queue_read_delivery() {
   local scenario out status
-  for scenario in drained owed consumed release-consume mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued stuck-watcher stuck-restored stuck-new-row stuck-drained stuck-failure stuck-episodes stranded-owed stranded-unmarked stranded-drained stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-tracked; do
+  for scenario in drained owed consumed release-consume mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued stuck-watcher stuck-restored stuck-new-row stuck-drained stuck-failure stuck-restored-failure stuck-episodes stranded-owed stranded-unmarked stranded-drained stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-tracked; do
     out=$(run_watch_queue_read_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp queue-read scenario $scenario: $out"
@@ -3427,37 +3436,6 @@ test_watch_lifecycle_deadline_diagnostics() {
 }
 
 test_watch_lifecycle_deadline_diagnostics
-if [ "${1:-}" = --queue-read-delivery ]; then
-  test_watch_extension_queue_read_delivery
-  exit 0
-fi
-
-if [ "${1:-}" = --watch-queue ]; then
-  test_watch_extension_arms_and_delivers
-  test_watch_extension_reads_durable_payloads
-  test_watch_extension_runs_the_supervision_host
-  test_watch_extension_runs_the_supervision_host quiet
-  test_watch_extension_delivers_host_handbacks outcome
-  test_watch_extension_delivers_host_handbacks away-return
-  test_watch_extension_delivers_host_handbacks busy
-  test_watch_extension_delivers_host_handbacks stuck
-  test_watch_extension_delivers_host_handbacks rejected
-  test_watch_extension_delivers_host_handbacks unrestored
-  test_watch_extension_marks_host_closes_without_headlines boundary
-  test_watch_extension_marks_host_closes_without_headlines note
-  test_watch_extension_marks_host_closes_without_headlines archived
-  test_watch_extension_marks_host_closes_without_headlines diagnostic
-  test_watch_extension_marks_host_closes_without_headlines restore-boundary
-  test_watch_extension_marks_host_closes_without_headlines restore-diagnostic
-  test_watch_extension_redelivers_merged_host_notes rows
-  test_watch_extension_redelivers_merged_host_notes empty
-  test_watch_extension_replays_host_marks_from_the_handoff diagnostic
-  test_watch_extension_replays_host_marks_from_the_handoff boundary
-  test_watch_extension_delivers_a_split_host_close_whole
-  test_watch_extension_migrates_legacy_handoffs
-  test_watch_extension_queue_read_delivery
-  exit 0
-fi
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring

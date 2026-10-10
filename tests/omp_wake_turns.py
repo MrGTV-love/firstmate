@@ -1,8 +1,3 @@
-import argparse
-import json
-import sys
-
-
 def classify_turn(turn):
     if "FIRSTMATE WATCHER WAKE" not in turn.get("last", ""):
         return "non-wake"
@@ -31,18 +26,3 @@ def summarize(turns):
     measured = counts["owed"] + counts["empty"]
     return dict(counts, measured=measured,
                 empty_percent=100 * counts["empty"] / measured if measured else 0)
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("turns", help="JSONL turn records containing last and drain returncode/stdout/stderr")
-    args = parser.parse_args()
-    with open(args.turns) as handle:
-        report = summarize(json.loads(line) for line in handle if line.strip())
-    print(json.dumps(report, sort_keys=True))
-    return int(bool(report["failed"] or report["unmeasured"]
-                    or report["empty_percent"] > 5))
-
-
-if __name__ == "__main__":
-    sys.exit(main())
