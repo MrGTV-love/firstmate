@@ -26,7 +26,8 @@ All three shard summaries report `failed=0`, and each measured row reports `exit
 The new `tests/fm-omp-wake-restore-live-e2e.test.sh` hint is its successful 51 ms record from portable serial shard 3 of [run 37663635202](https://github.com/MrGTV-love/firstmate/actions/runs/37663635202) on 2026-10-07.
 That shard completed with zero failures; the live test took its opt-in capability skip, so this hint models ordinary portable CI gate evaluation, not live wake-recovery runtime.
 The 2026-10-08 merge-integration refresh uses successful per-script `FM_TEST_END` markers from [run 37821346234](https://github.com/MrGTV-love/firstmate/actions/runs/37821346234). It adds the newly merged serial members that completed successfully and refreshes existing members whose successful measurements grew by more than 30 seconds; other established weights remain conservative historical maxima. Failed invocations of the capacity, watcher-ledger, teardown, and runner suites are excluded, even though their jobs completed and uploaded artifacts.
-The new weights require ten serial shards to fit the unchanged 1200000 ms packing target. The runner and workflow matrix both use ten; no execution timeout was raised.
+The current weights require eleven serial shards to fit the unchanged 1200000 ms packing target.
+The runner and workflow matrix both use eleven; no execution timeout was raised.
 The capacity suite's 56263 ms hint is the successful Ubuntu `FM_TEST_END` baseline from upstream [run 37739997864, serial shard 9](https://github.com/kunchenguid/firstmate/actions/runs/37739997864/job/113188261544). It is not a measurement of this integration repair: the local repaired run passed the live-worker teardown but later failed the next spawn's existing backlog-read bound, so its duration is excluded.
 In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
 Collect successful per-script measurements for every member before calculating a split.
@@ -170,7 +171,7 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the current watch-triage floor alone exceeds that objective.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses fifteen long-lived Linux jobs (ten serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses sixteen long-lived Linux jobs (eleven serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 
