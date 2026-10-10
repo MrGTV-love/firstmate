@@ -851,6 +851,7 @@ EFFORT=
 DISPATCH_RULE=
 DISPATCH_FALLBACK='[]'
 DISPATCH_SWITCHED=false
+DISPATCH_PRIMARY=false
 BACKEND_ARG=
 MODE=
 YOLO=
@@ -2893,10 +2894,12 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
   DISPATCH_FALLBACK=$(jq -c .fallback <<<"$dispatch_set")
   if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
     dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "${MODEL:-default}" --arg e "${EFFORT:-default}" '{harness:$h, model:$m, effort:$e}')
-    dispatch_start=$(jq -c --argjson profile "$dispatch_profile" '.primary // $profile' <<<"$dispatch_set")
-    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_start" "$DISPATCH_FALLBACK" "" "$SPAWN_ROUTING_PAIR") || exit 1
+    dispatch_start=$(fm_dispatch_start "$CONFIG" "$KIND" "$dispatch_set" "$dispatch_profile")
+    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$(jq -c .profile <<<"$dispatch_start")" "$DISPATCH_FALLBACK" \
+      "$(jq -c '.capacity // empty' <<<"$dispatch_start")" "$SPAWN_ROUTING_PAIR") || exit 1
     DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
     if [ "$(jq -c .profile <<<"$dispatch_result")" != "$dispatch_profile" ]; then
+      [ "$DISPATCH_SWITCHED" = true ] || DISPATCH_PRIMARY=true
       HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
       MODEL=$(jq -r '.profile.model | if . == "default" then "" else . end' <<<"$dispatch_result")
       EFFORT=$(jq -r '.profile.effort | if . == "default" then "" else . end' <<<"$dispatch_result")
@@ -6574,5 +6577,7 @@ SPAWN_ACCOUNT=
 [ ! -e "$CONFIG/fleet-ledger" ] || [ "$RELAUNCH" -eq 1 ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$ID" "$KIND" "${PROJ_ABS##*/}" "$HARNESS" "$MODEL" || true
 if [ "$DISPATCH_SWITCHED" = true ]; then
   printf 'working [at=%s]: model-matrix fallback launched %s %s for %s\n' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+elif [ "$DISPATCH_PRIMARY" = true ]; then
+  printf 'working [at=%s]: model-matrix primary launched %s %s for %s\n' "$(date +%s)" "$HARNESS" "${MODEL:-default}" "$DISPATCH_RULE" >> "$STATE/$ID.status"
 fi
 echo "spawned $ID harness=$HARNESS kind=$KIND$SPAWN_DELIVERY window=$META_WINDOW worktree=$WT$SPAWN_ACCOUNT"

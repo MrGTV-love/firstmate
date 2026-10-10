@@ -315,6 +315,12 @@ JSON
   out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id-primary" "$PROJ_DIR" --harness omp --model deepseek/deepseek-v4-flash --effort high --dispatch-rule rule_1)
   expect_code 0 $? "a recorded stand-in launch must succeed: $out"
   assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id-primary.meta" "a recorded stand-in returns to its usable primary"
+  assert_grep 'primary launched omp openai-codex/gpt-6-luna for rule_1' "$HOME_DIR/state/$id-primary.status" "the return to the primary must be reported"
+  jq '.reports[].fetchedAt=0' "$CASE_DIR/usage.json" > "$CASE_DIR/unknown.json"
+  fm_test_spawn_brief "$HOME_DIR" "$id-unknown"
+  out=$(OMP_USAGE_FIXTURE="$CASE_DIR/unknown.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id-unknown" "$PROJ_DIR" --harness omp --model deepseek/deepseek-v4-flash --effort high --dispatch-rule rule_1)
+  expect_code 0 $? "a stand-in launch with an unknown primary must succeed: $out"
+  assert_grep 'model=deepseek/deepseek-v4-flash' "$HOME_DIR/state/$id-unknown.meta" "an unknown primary keeps the recorded stand-in"
 
   rec=$(make_spawn_case fallback omp omp-fallback-q2)
   read_case_record "$rec"

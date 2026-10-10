@@ -1147,9 +1147,10 @@ resolve_relaunch_profile() {
        || [ "$(jq -c .fallback <<<"$dispatch_set")" != '[]' ]; then
       dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
         --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
-      dispatch_start=$(jq -c --argjson profile "$dispatch_profile" '.primary // $profile' <<<"$dispatch_set")
+      dispatch_start=$(fm_dispatch_start "$config_dir" "$KIND" "$dispatch_set" "$dispatch_profile")
       dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
-        "$dispatch_start" "$(jq -c .fallback <<<"$dispatch_set")" "" "$RELAUNCH_PAIR_DIR") || return 1
+        "$(jq -c .profile <<<"$dispatch_start")" "$(jq -c .fallback <<<"$dispatch_set")" \
+        "$(jq -c '.capacity // empty' <<<"$dispatch_start")" "$RELAUNCH_PAIR_DIR") || return 1
       TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
       [ "$(jq -c .profile <<<"$dispatch_result")" = "$dispatch_profile" ] || TARGET_DISPATCH_ROUTED=true
       TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
@@ -1454,6 +1455,8 @@ do_relaunch() {
   RELAUNCH_ACTIVE=0
   if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
     printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s\n' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+  elif [ "$TARGET_DISPATCH_ROUTED" = true ]; then
+    printf 'working [at=%s]: model-matrix primary relaunched %s %s for %s\n' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_DISPATCH_RULE" >> "$STATE/$ID.status"
   fi
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }

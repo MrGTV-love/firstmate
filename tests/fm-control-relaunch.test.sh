@@ -5036,12 +5036,19 @@ SH
       assert_equals deepseek/deepseek-v4-flash "$(meta_field "$dir" "$id" model)" "Luna must recover on its declared stand-in"
       assert_equals complete "$(journal_field "$dir" "$id" phase)" "the real replacement transaction must complete"
       assert_grep 'fallback relaunched' "$dir/home/state/$id.status" "the served route must be reported"
-      jq '.reports[].metadata.meterStates.chat={allowed:true,limitReached:false}' "$dir/usage.json" > "$dir/usage-reset.json"
-      mv "$dir/usage-reset.json" "$dir/usage.json"
+      jq '.reports[].fetchedAt=0' "$dir/usage.json" > "$dir/usage-unknown.json"
+      mv "$dir/usage-unknown.json" "$dir/usage.json"
+      out=$(run_control "$dir" "$id" relaunch --note "continue while the primary is unmeasured"); rc=$?
+      expect_code 0 "$rc" "a relaunch with an unknown primary must succeed: $out"
+      assert_equals deepseek/deepseek-v4-flash "$(meta_field "$dir" "$id" model)" "an unknown primary keeps the stand-in"
+      assert_no_grep 'primary relaunched' "$dir/home/state/$id.status" "an unknown primary reports no return"
+      jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+        metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$dir/usage.json"
       out=$(run_control "$dir" "$id" relaunch --note "continue after the primary reset"); rc=$?
       expect_code 0 "$rc" "a relaunch after the primary resets must succeed: $out"
-      assert_equals openai-codex/gpt-6-luna "$(meta_field "$dir" "$id" model)" "the next relaunch returns to the primary"
+      assert_equals openai-codex/gpt-6-luna "$(meta_field "$dir" "$id" model)" "a measured usable primary takes the task back"
       assert_equals rule_1 "$(meta_field "$dir" "$id" dispatch_rule)" "the rule follows the task back to its primary"
+      assert_grep 'primary relaunched omp openai-codex/gpt-6-luna for rule_1' "$dir/home/state/$id.status" "the return to the primary must be reported"
     else
       assert_contains "$out" 'auto-relaunch failed' "strongest-model exhaustion must be surfaced without a weak stand-in"
       assert_equals omp "$(cat "$dir/fake/command")" "an unavailable strongest route must refuse before stopping the old agent"
@@ -5092,7 +5099,41 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
   pass "relaunch without a usable recorded rule treats an ambiguous match as no fallback"
 }
 
+test_relaunch_keeps_the_stand_in_when_policy_refuses_the_primary() {
+  local dir out rc id=rl-policy meta
+  dir=$(new_case policy-primary "$id")
+  add_ship_task "$dir" "$id" omp
+  printf omp > "$dir/fake/command"
+  printf omp > "$dir/fake/becomes"
+  meta=$(cat "$dir/home/state/$id.meta")
+  meta=${meta/model=default/model=deepseek/deepseek-v4-flash}
+  meta=${meta/effort=default/effort=high}
+  printf '%s\ndispatch_rule=rule_1\n' "$meta" > "$dir/home/state/$id.meta"
+  mkdir -p "$dir/home/config"
+  printf 'omp-or-tc\n' > "$dir/home/config/session-launch-policy"
+  printf '%s\n' '{"rules":[{"when":"assigned work","use":{"harness":"claude","model":"sonnet","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$dir/home/config/crew-dispatch.json"
+  cat > "$dir/fakebin/quota-axi" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' '{"schemaVersion":6,"providers":[{"provider":"claude","accountKey":"default","quotaSemantics":{"effectiveAvailability":[{"scope":"all_models","status":"known","effectivePercentRemaining":70}]}}]}'
+SH
+  cat > "$dir/fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  models) printf '%s\n' '{"models":[{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"}]}' ;;
+  *) exit 0 ;;
+esac
+SH
+  chmod +x "$dir/fakebin/quota-axi" "$dir/fakebin/omp"
+  out=$(run_control "$dir" "$id" relaunch --note "continue under the launch policy"); rc=$?
+  expect_code 0 "$rc" "a policy-refused primary must not block the stand-in relaunch: $out"
+  assert_equals omp "$(meta_field "$dir" "$id" harness)" "the task stays on its permitted harness"
+  assert_equals deepseek/deepseek-v4-flash "$(meta_field "$dir" "$id" model)" "the task stays on its stand-in"
+  pass "relaunch keeps a recorded stand-in when the launch policy refuses the rule's primary"
+}
+
 test_retiring_omp_removes_only_its_generated_configuration
+
+test_relaunch_keeps_the_stand_in_when_policy_refuses_the_primary
 
 test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior
 
