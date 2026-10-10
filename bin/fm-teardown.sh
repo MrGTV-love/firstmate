@@ -3135,8 +3135,10 @@ require_cleanup_copy_clearance() {
           echo "REFUSED: task $record_id's cleanup target $canonical is also task $(basename "$other_meta" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force." >&2
           return 1
         fi
-        copy_common=$(git -C "$copy_real" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
-          && copy_common=$(fm_task_copy_canonical_dir "$copy_common") || continue
+        if ! copy_common=$(git -C "$copy_real" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+           || ! copy_common=$(fm_task_copy_canonical_dir "$copy_common"); then
+          continue
+        fi
         fm_task_copy_paths_overlap "$canonical" "$copy_common" || continue
         echo "REFUSED: task $record_id's cleanup target $canonical overlaps Git common-dir storage $copy_common for task $(basename "$other_meta" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force." >&2
         return 1

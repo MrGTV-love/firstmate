@@ -1177,6 +1177,7 @@ SH
 
     FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
       run_check_entry "$dir" "$id" https://github.com/o/r/pull/1 > "$dir/direct.out" 2> "$dir/direct.err" &
+    # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
     direct_pid=$!
     i=0
     while [ "$i" -lt 100 ] && ! find "$dir/home/state" -name '.fm-pr-poll-check.*' -print | grep . >/dev/null; do
@@ -1190,6 +1191,7 @@ SH
     : > "$dir/direct-in-flight"
     FM_TEST_WATCH_BOUND_PAUSE="$dir/direct-in-flight" FM_TEST_GH_STATE=MERGED \
       run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err" &
+    # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
     watch_pid=$!
     direct_rc=0
     wait "$direct_pid" || direct_rc=$?
@@ -1466,6 +1468,7 @@ SH
     FM_SIGNAL_GRACE=0 FM_TEST_CUSTOM_CHILD_PID="$child_pid_file" \
     PATH="$dir/fakebin:$BASE_PATH" "$WATCH" \
     > "$dir/watch.out" 2> "$dir/watch.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   pid=$!
   i=0
   while [ "$i" -lt 100 ]; do
@@ -3142,6 +3145,7 @@ test_teardown_cannot_race_authority_consumption() {
     FM_TEST_GH_SLEEP=0.5 FM_TEST_CHECK_TIMEOUT=3 \
     run_watcher_bounded "$dir/home" "$dir/fakebin" \
       > "$dir/watch.out" 2> "$dir/watch.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   watcher_pid=$!
   i=0
   while [ ! -e "$dir/poll-started" ]; do
@@ -3457,6 +3461,7 @@ SH
   FM_TEST_ROOT="$ROOT" FM_TEST_LOCK="$PR_POLL_HOLDER_LOCK" \
     FM_TEST_ACQUIRED="$PR_POLL_HOLDER_ACQUIRED" FM_TEST_RELEASE="$PR_POLL_HOLDER_RELEASE" \
     "$dir/poll-publish-holder.sh" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   PR_POLL_HOLDER_PID=$!
   for i in $(seq 1 100); do
     [ -e "$PR_POLL_HOLDER_ACQUIRED" ] && return 0
@@ -3486,6 +3491,7 @@ test_device_rerecord_serializes_direct_rearm() {
   start_poll_publish_holder "$dir" "$state" task-a
   FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" FM_TEST_GUARD_LOG="$dir/guard.log" \
     PATH="$dir/fakebin:$BASE_PATH" "$PR_CHECK" task-a "$url_b" > "$dir/rearm.out" 2> "$dir/rearm.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   rearm_pid=$!
   for i in $(seq 1 100); do
     if fm_pr_metadata_identity_parse "$state/task-a.meta" && [ "$FM_PR_META_URL" = "$url_b" ]; then
@@ -3538,6 +3544,7 @@ SH
     FM_TEST_REGISTRATION_RENAMED="$dir/registration-renamed" FM_TEST_REAL_MV="$REAL_MV" \
     FM_TEST_GH_LOG="$dir/gh.log" FM_TEST_GH_STATE=OPEN \
     run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   watcher_pid=$!
   for i in $(seq 1 100); do
     [ -d "$state/.control-task-a.lock" ] && break

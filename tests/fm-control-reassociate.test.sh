@@ -27,6 +27,7 @@
 #      staging write publishes nothing.
 set -u
 
+# shellcheck source=tests/fixtures.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 CONTROL="$ROOT/bin/fm-control.sh"

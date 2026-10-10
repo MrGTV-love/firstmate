@@ -11,6 +11,7 @@
 #      warning line and skipped: the spawn still proceeds.
 set -u
 
+# shellcheck source=tests/fixtures.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-spawn-retained-copy)
