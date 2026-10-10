@@ -2474,7 +2474,6 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
 }
 
 fm_wake_main_rows() {
-  [ "$#" -eq 0 ] || return 1
   local rows="$STATE/.branch-eligible-rows" queued parent
   local owner="$STATE/.branch-eligible-owner" grant=''
   if [ ! -e "$FM_WAKE_QUEUE" ] && [ ! -L "$FM_WAKE_QUEUE" ]; then
