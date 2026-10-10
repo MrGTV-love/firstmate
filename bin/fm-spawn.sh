@@ -5529,6 +5529,7 @@ EOF
     guard_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guard_config" --arg state "$STATE_REAL" \
       --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" --arg project "$guard_project" \
       '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project}') || exit 1
+    rm -f "$STATE/$ID.live-model"
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
 // Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
@@ -6106,6 +6107,7 @@ if [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
   LAUNCH="$tc_env $LAUNCH"
 fi
 if [ "$KIND" = secondmate ]; then
+  [ "$HARNESS" != omp ] || rm -f "$PROJ_ABS/state/.omp-live-model"
   sq_home=$(shell_quote "$PROJ_ABS")
   sq_primary_home=$(shell_quote "$FM_HOME")
   # Keep this in step with fm_supervision_model (bin/fm-wake-lib.sh): Claude's

@@ -163,6 +163,8 @@ test_spawn_launch_line_and_worker_wiring() {
   local rec id=omp-launch-q1 out status launch state
   rec=$(make_spawn_case launch omp "$id")
   read_case_record "$rec"
+  mkdir -p "$HOME_DIR/state"
+  printf 'model=deepseek/deepseek-v4-pro\nerror=402 old run\n' > "$HOME_DIR/state/$id.live-model"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-astra --effort medium)
   status=$?
   expect_code 0 "$status" "omp scout spawn should succeed: $out"
@@ -172,6 +174,7 @@ test_spawn_launch_line_and_worker_wiring() {
   assert_grep "model=openai-codex/gpt-6-astra" "$state/$id.meta" "meta missing the pinned model"
   assert_grep "effort=medium" "$state/$id.meta" "meta missing the pinned effort"
   assert_present "$state/$id.omp-ext.ts" "omp spawn did not write the per-task extension"
+  assert_absent "$state/$id.live-model" "a launch must not keep a previous session's live-model record"
   launch=$(cat "$LAUNCH_LOG")
   assert_contains "$launch" "env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$FAKEBIN_DIR/omp'" \
     "omp launch did not clear foreign markers and establish its own at the launch boundary"
@@ -741,6 +744,8 @@ test_secondmate_launch_relies_on_discovery() {
   printf 'charter\n' > "$home/data/charter.md"
   printf '%s\n' 'projects/' 'state/' 'data/' 'config/' '.no-mistakes/' > "$home/.gitignore"
   git -C "$home" init -q -b main
+  mkdir -p "$home/state"
+  printf 'model=deepseek/deepseek-v4-pro\nerror=402 old run\n' > "$home/state/.omp-live-model"
   fakebin=$(make_spawn_fakebin "$world/fake" claude)
   make_fake_omp "$fakebin"
   launchlog="$world/launch.log"
@@ -765,6 +770,7 @@ test_secondmate_launch_relies_on_discovery() {
   assert_contains "$launch" "FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '$fakebin/omp'" "secondmate launch lost the omp marker or executable"
   assert_contains "$launch" "FM_SUPERVISION_MODEL=extension" "an omp secondmate must run the extension supervision model"
   assert_absent "$world/home/state/sm.omp-ext.ts" "a secondmate must not receive a per-task worker extension"
+  assert_absent "$home/state/.omp-live-model" "a secondmate launch must not keep its home's previous live-model record"
   pass "fm-spawn: a real omp secondmate launch preserves primary posture and supervision"
 }
 
