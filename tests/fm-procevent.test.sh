@@ -3482,6 +3482,38 @@ assert_contains "$zp_out" "failed=0" \
 pe "$HZP" retire zeropad-src >/dev/null 2>&1 || true
 pass "a zero-padded launch confirm window is honored as base 10"
 
+# --- a runner's identity is fixed once its launch hand-off unblocks ----------
+# Confirmation records the runner's identity as soon as the launcher reports
+# its first exec. A runner that reached its interpreter through a second exec
+# (the script's env shebang) changed identity after that read, so a healthy,
+# merely slow-to-claim runner was refused as exited. The PATH bash here takes a
+# second to become the real interpreter for a runner, which a shebang launch
+# goes through and a direct interpreter launch does not.
+HSE="$TMP_ROOT/hse"; new_home "$HSE"
+SE_TRIGGER="$TMP_ROOT/single-exec-trigger"
+mkdir -p "$TMP_ROOT/single-exec-bin"
+SE_REAL_BASH=$(command -v bash)
+cat > "$TMP_ROOT/single-exec-bin/bash" <<SH
+#!/bin/sh
+case " \$* " in *" _start "*) sleep 1 ;; esac
+exec "$SE_REAL_BASH" "\$@"
+SH
+chmod +x "$TMP_ROOT/single-exec-bin/bash"
+pe_register "$HSE" lavish single-exec-src -- "$BLOCKER" "$SE_TRIGGER" "single exec" >/dev/null \
+  || fail "fixture step failed: register single-exec-src"
+se_rc=0
+se_out=$(PATH="$TMP_ROOT/single-exec-bin:$PATH" pe "$HSE" reconcile 2>/dev/null) || se_rc=$?
+assert_contains "$se_out" "started=1" \
+  "a runner launched through a second exec lost its confirmation: $se_out"
+assert_contains "$se_out" "failed=0" \
+  "a runner launched through a second exec was reported failed: $se_out"
+[ "$se_rc" -eq 0 ] || fail "a runner launched through a second exec made reconcile exit non-zero: $se_out"
+[ "$(launch_failed_wake_count "$HSE" single-exec-src)" -eq 0 ] \
+  || fail "a healthy runner launched through a second exec published a launch-failed wake"
+: > "$SE_TRIGGER"
+pe "$HSE" retire single-exec-src >/dev/null 2>&1 || true
+pass "a detached runner keeps the identity its launch hand-off reported"
+
 # --- an unusable confirm window is refused by name --------------------------
 # A window this command cannot use makes every launch unconfirmable. Reported
 # from inside the confirmation it comes out as a fleet of healthy runners that

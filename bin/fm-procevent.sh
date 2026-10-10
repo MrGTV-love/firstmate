@@ -969,7 +969,7 @@ isolate_process() {  # <wait|detach> <private-pid-file-or-empty> <command> [argv
 }
 
 isolate_runner() {  # <wait|detach> <source-id> [private-pid-file]
-  isolate_process "$1" "${3-}" "$SCRIPT_DIR/fm-procevent.sh" _start "$2"
+  isolate_process "$1" "${3-}" "$BASH" "$SCRIPT_DIR/fm-procevent.sh" _start "$2"
 }
 
 require_isolated_group() {  # <role>
