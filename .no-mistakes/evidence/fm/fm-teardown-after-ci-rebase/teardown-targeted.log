@@ -1,0 +1,12 @@
+ok - a pushed but unmerged ship refuses, and only the captain's own words discard it
+ok - no-mistakes worktree with genuinely unlanded work is refused (safety preserved)
+ok - squash-merged PR accepts replayed unpushed local patches contained in the PR head
+ok - merged PR does not allow teardown after a later local commit
+ok - squash-merged task whose local branch followed the pipeline rebase is torn down
+ok - squash-merged same-path different content still refuses
+ok - squash-merged rebased local still refuses a genuinely unlanded follow-up commit
+ok - squash-merged stale local still refuses when the forge is unreachable
+ok - squash-merged PR accepts a pushed pre-rebase copy whose patches are all in the PR head
+ok - squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head
+Automatic merge went well; stopped before committing as requested
+ok - squash-merged PR still refuses a merge commit that carries a change of its own
