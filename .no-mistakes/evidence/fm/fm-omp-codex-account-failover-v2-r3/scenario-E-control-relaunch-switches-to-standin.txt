@@ -1,0 +1,82 @@
+## Scenario E: fm-control relaunch with the real exhausted pool switches the worker to the declared stand-in and keeps the work
+$ cat config/crew-dispatch.json (rule_1 fallback set to zai/glm-4.5-flash, cost 0, 131K context)
+{
+  "rules": [
+    {
+      "when": "easy work",
+      "use": {
+        "harness": "omp",
+        "model": "openai-codex/gpt-6-luna",
+        "effort": "high"
+      },
+      "fallback": [
+        {
+          "harness": "omp",
+          "model": "zai/glm-4.5-flash",
+          "effort": "high"
+        }
+      ]
+    },
+    {
+      "when": "sonnet-class work",
+      "use": {
+        "harness": "omp",
+        "model": "openai-codex/gpt-6-terra",
+        "effort": "high"
+      },
+      "fallback": [
+        {
+          "harness": "omp",
+          "model": "deepseek/deepseek-v4-flash",
+          "effort": "high"
+        }
+      ]
+    }
+  ]
+}
+
+$ printf "unlanded lab work" > <worktree>/unlanded.txt
+$ bin/fm-control.sh lab-s3 relaunch --note "<the quota-exhausted recovery note>"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+skill selection for lab-s3: unavailable - no TypeSafe or OpenRouter key
+relaunched lab-s3 harness=omp from=omp model=zai/glm-4.5-flash effort=high backend=tmux endpoint=primary:fm-lab-s3 worktree=/Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/treehouse/.treehouse/demo-b1d774/2/demo
+
+$ usage reads:
+1791627470 fixture
+1791627797 real
+
+$ grep state/lab-s3.meta
+harness=omp
+model=zai/glm-4.5-flash
+effort=high
+dispatch_rule=rule_1
+
+$ cat state/lab-s3.status
+working [at=1791627805]: model-matrix fallback relaunched omp zai/glm-4.5-flash for rule_1
+
+$ cat <worktree>/unlanded.txt
+unlanded lab work
+
+$ cat state/lab-s3.omp-fallback.yml
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "zai/glm-4.5-flash": [],
+      "zai/glm-4.5-flash:high": []
+    }
+  }
+}
+
+$ cat state/lab-s3.busy-state
+v1 gen=g1791627803.57995.11608 seq=3 state=idle source=omp-ext event=agent-end ts=1791627824
+
+$ tmux capture-pane lab-s3 (relaunched real omp worker)
+ I can see that there's no lab-s3.inbox directory, but there is a lab-s3.control-relaunch file and related files. The inbox directory doesn't exist yet, which means there are no messages to process.
+ Since there are no .msg files in the inbox directory, I can proceed with the lab check as instructed and reply with "ok".
+ ok
+❯
+ π · ◒ GLM-4.5-Flash 🙈 · 🌳 demo/demo · ⑂ detached ?1 · ◫ 13.3%/131K ⟲ · (sub)                                                                                       ✅ CHECK: Lab check · 🆔 01a12556

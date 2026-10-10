@@ -1,0 +1,12 @@
+## Scenario B (adversarial): real exhausted pool, declared stand-in deepseek/deepseek-v4-flash is not in this host omp catalog
+$ omp models --json | selectors starting with deepseek/
+0
+(openrouter/deepseek/deepseek-v4-flash exists; direct deepseek/ provider is not configured)
+
+$ bin/fm-spawn.sh lab-s2 <lab>/projects/demo --scout --harness omp --model openai-codex/gpt-6-terra --effort high --dispatch-rule rule_2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk
+error: dispatch rule_2 has exhausted capacity and no supported permitted fallback
+exit=1
+
+$ ls state | grep lab-s2   (expect nothing published)
+(none)

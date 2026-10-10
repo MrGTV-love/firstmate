@@ -1,0 +1,35 @@
+## Scenario D: real Codex usage_limit_reached in a live omp worker -> busy record becomes quota-exhausted; real watcher recovery scan attempts relaunch
+$ tmux capture-pane lab-s3 (real omp, real exhausted Codex pool, before relaunch)
+ Error: Codex error event: The usage limit has been reached (code=usage_limit_reached)
+ Error: Retry failed after 1 attempts: Provider requested 321056340ms wait, exceeds retry.maxDelayMs (300000ms). Original error: Codex error event: The usage limit has been reached
+ (code=usage_limit_reached)
+❯
+ π · ◒ GPT-6-Luna 👁 · 🌳 demo/demo · ⑂ detached · ◫ 3.4%/272K ⟲ · (sub)
+
+$ cat state/lab-s3.busy-state (before relaunch)
+v1 gen=g1791627473.75333.5203 seq=3 state=idle source=omp-ext event=quota-exhausted ts=1791627478
+
+Note: native chain to apple/on-device did not fire; apple/on-device has an 8192-token context window, smaller than the session (see Scenario A pane: "Prompt is too long: 10,221 > 8,192"). omp refuses fallbacks too small for the session.
+
+$ lab supervise loop: real bin/fm-wake-drain.sh + real bin/fm-watch.sh rounds
+== round 1 drain
+1791627624	4	signal	lab-s1.status	signal: /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/state/lab-s1.status /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/state/lab-s1.turn-ended /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/state/lab-s3.turn-ended
+1791627624	5	signal	lab-s1.turn-ended	signal: /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/state/lab-s1.status /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/state/lab-s1.turn-ended /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/state/lab-s3.turn-ended
+1791627624	6	signal	lab-s3.turn-ended	signal: /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/state/lab-s1.status /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/state/lab-s1.turn-ended /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/state/lab-s3.turn-ended
+1791627651	7	check	session-end-relaunch-failed-lab-s3-g1791627473.75333.5203-3	check: lab-s3 auto-relaunch failed after quota exhaustion: ++fm_run_timed:246: local seconds=
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 7 --recovery-generation 25379.1791627623.AtqfnV
+== round 1 watcher
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+watch rc=0
+harness=omp model=openai-codex/gpt-6-luna effort=high dispatch_rule=rule_1 
+== round 2 drain
+1791627762	8	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 8 --recovery-generation 69714.1791627762.98i8nL
+== round 2 watcher
+check: lab-s3 auto-relaunch failed after quota exhaustion: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+watch rc=0
+harness=omp model=openai-codex/gpt-6-luna effort=high dispatch_rule=rule_1 
+handled: g1791627473.75333.5203	3	failed
+
+Round 1 row 7 is from my own debug call that skipped fm_session_end_bounds (empty timeout); I reset the handled/ledger files before the loop.
+Round 2: the real watcher chose lab-s3 and invoked fm-control relaunch "after quota exhaustion". The gate guard refused it because the recovery hop passes FM_STATE_OVERRIDE (unchanged from base 8ce400ff), and lab allowance requires no *_OVERRIDE.

@@ -1,0 +1,17 @@
+## Scenario C: one pooled Codex account exhausted, sibling healthy -> spawn keeps the assigned Codex model
+(lab omp wrapper serves this disposable usage report to fm-spawn; the worker itself runs the real omp)
+$ bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/gpt-6-luna
+capacity: usable
+accounts[2]{status,remaining,savedResets}:
+  exhausted,0,1
+  usable,62,2
+
+$ bin/fm-spawn.sh lab-s3 <lab>/projects/demo --scout --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk
+skill selection for lab-s3: unavailable - no TypeSafe or OpenRouter key
+spawned lab-s3 harness=omp kind=scout window=primary:fm-lab-s3 worktree=/Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/treehouse/.treehouse/demo-b1d774/2/demo
+
+(meta at launch) harness=omp model=openai-codex/gpt-6-luna effort=high dispatch_rule=rule_1; no fallback status line was written
+
+$ cat state/lab-s3.omp-fallback.yml at launch (native chain = declared stand-in only, ambient default chain emptied)
+{"retry":{"modelFallback":true,"fallbackChains":{"default":[],"openai-codex/gpt-6-luna":["apple/on-device:high"],"openai-codex/gpt-6-luna:high":["apple/on-device:high"],"apple/on-device":[],"apple/on-device:high":[]}}}

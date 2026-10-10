@@ -1,0 +1,34 @@
+## Scenario F: worker launched on Codex (healthy-sibling view at launch); real Codex usage_limit_reached -> omp native chain serves only the declared stand-in and status reports it
+$ bin/fm-spawn.sh lab-s4 <lab>/projects/demo --scout --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+skill selection for lab-s4: unavailable - no TypeSafe or OpenRouter key
+spawned lab-s4 harness=omp kind=scout window=primary:fm-lab-s4 worktree=/Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/treehouse/.treehouse/demo-b1d774/3/demo
+
+$ grep state/lab-s4.meta
+harness=omp
+model=openai-codex/gpt-6-luna
+effort=high
+dispatch_rule=rule_1
+
+$ cat state/lab-s4.omp-fallback.yml
+{"retry":{"modelFallback":true,"fallbackChains":{"default":[],"openai-codex/gpt-6-luna":["zai/glm-4.5-flash:high"],"openai-codex/gpt-6-luna:high":["zai/glm-4.5-flash:high"],"zai/glm-4.5-flash":[],"zai/glm-4.5-flash:high":[]}}}
+
+$ tmux capture-pane lab-s4 (real omp)
+ This is a very simple task - just acknowledge with "ok".
+ ok
+ Fallback succeeded on zai/glm-4.5-flash:high
+ Warning: Fallback: openai-codex/gpt-6.1-sol:xhigh -> openai-codex/gpt-6-luna:high
+ Advisor request failed: Codex error event: The usage limit has been reached (code=usage_limit_reached)
+ Warning: Fallback: openai-codex/gpt-6-luna:high -> zai/glm-4.5-flash:high
+ Advisor request failed: Codex error event: The usage limit has been reached (code=usage_limit_reached)
+ Fallback succeeded on zai/glm-4.5-flash:high
+❯
+ π · ◒ GLM-4.5-Flash 🙈 · 🌳 demo/demo · ⑂ detached · ◫ 12.0%/131K ⟲ · (sub)                                                                                                                🆔 01a12557
+
+$ cat state/lab-s4.status
+working [at=1791627889]: model-matrix fallback served zai/glm-4.5-flash:high
+working [at=1791627898]: model-matrix fallback served zai/glm-4.5-flash:high
+
+$ cat state/lab-s4.busy-state
+v1 gen=g1791627881.24040.5648 seq=3 state=idle source=omp-ext event=agent-end ts=1791627889

@@ -1,0 +1,71 @@
+## Scenario A: real exhausted Codex pool -> spawn launches the declared stand-in
+$ bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/gpt-6-luna   (real omp usage, both pooled accounts)
+capacity: exhausted
+accounts[2]{status,remaining,savedResets}:
+  exhausted,0,1
+  exhausted,0,2
+
+$ quota-axi codex row (single account view)
+[{"scope":"all_models","effectivePercentRemaining":0,"runway":"exhausted_now"}]
+
+$ cat config/crew-dispatch.json (lab)
+{"rules":[
+ {"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"},
+  "fallback":[{"harness":"omp","model":"apple/on-device","effort":"high"}]},
+ {"when":"sonnet-class work","use":{"harness":"omp","model":"openai-codex/gpt-6-terra","effort":"high"},
+  "fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}
+]}
+
+$ bin/fm-spawn.sh lab-s1 <lab>/projects/demo --scout --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Vqf1Dk
+skill selection for lab-s1: unavailable - no TypeSafe or OpenRouter key
+spawned lab-s1 harness=omp kind=scout window=primary:fm-lab-s1 worktree=/Users/charlesabrooker/tmp/fm-lab.Vqf1Dk/treehouse/.treehouse/demo-b1d774/1/demo
+
+$ usage reads served by: 
+1791627400 real
+1791627434 real
+
+$ grep state/lab-s1.meta
+harness=omp
+kind=scout
+model=apple/on-device
+effort=high
+dispatch_rule=rule_1
+
+$ cat state/lab-s1.status
+working [at=1791627412]: model-matrix fallback launched omp apple/on-device for rule_1
+
+$ cat state/lab-s1.omp-fallback.yml
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "apple/on-device": [],
+      "apple/on-device:high": []
+    }
+  }
+}
+
+$ busy record
+lab-s1.busy-gen
+lab-s1.busy-state
+lab-s1.git-hooks
+lab-s1.meta
+lab-s1.omp-ext.ts
+lab-s1.omp-fallback.yml
+lab-s1.status
+lab-s1.turn-ended
+
+$ tmux capture-pane (real omp worker pane, footer shows serving model)
+ Warning: compaction: Compaction freed too little context to make progress — pausing automatic maintenance to avoid a compaction loop. The most recent turn alone is too large to reduce further;
+ shrink it (e.g. clear large tool output) or switch to a larger-context model.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ ✘ Prompt is too long: Provided 10,221 tokens, but the maximum allowed is 8,192. (context_size_exceeded)
+ Dismissed when you send your next message.
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯
+ π · ⬢ Apple AFM 3 Core Advanced 👁 · 🌳 demo/demo · ⑂ detached · ◫ 112.5%/8.2K ⟲                                                                                                            🆔 01a12550
+
+$ cat state/lab-s1.busy-state (non-quota error must stay agent-end)
+v1 gen=g1791627410.29288.29566 seq=3 state=idle source=omp-ext event=agent-end ts=1791627414
