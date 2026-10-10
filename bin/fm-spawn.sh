@@ -3089,6 +3089,18 @@ if [ "$MODEL_INDEXED" = 1 ]; then
   FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT" || exit 1
 fi
 
+# Model freshness (advisory): warn when the requested model is older than the
+# newest model of its family in the harness's own catalog. It never refuses the
+# spawn and never changes the model; the supervisor decides. The line is
+# recorded as model_stale= in the task record so fm-crew-state.sh keeps showing
+# it after this terminal output is gone. Run under the worker account pin so a
+# pinned account answers from its own catalog.
+MODEL_STALE=
+if [ "$RAW_LAUNCH" = 0 ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+  MODEL_STALE=$(fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" unavailable 2>/dev/null </dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || MODEL_STALE=
+  [ -z "$MODEL_STALE" ] || echo "warning: model is stale - $MODEL_STALE" >&2
+fi
+
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API
 # key would reach the worker, unless the caller explicitly opts in with
 # --allow-api-key. A key set in the spawning environment silently redirects
@@ -5862,7 +5874,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort dispatch_rule account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model model_stale effort dispatch_rule account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5882,6 +5894,7 @@ preserve_relaunch_meta() {
   echo "tasktmp=$TASK_TMP"
   [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
   echo "model=${MODEL:-default}"
+  [ -z "${MODEL_STALE:-}" ] || echo "model_stale=$MODEL_STALE"
   echo "effort=${EFFORT:-default}"
   [ -z "$SKILL_SELECTION_STATUS" ] || echo "skill_selection=$SKILL_SELECTION_STATUS"
   [ -z "$SKILL_SELECTION_REASON" ] || echo "skill_selection_reason=$SKILL_SELECTION_REASON"

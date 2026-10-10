@@ -43,6 +43,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | [`fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs) | Node preload enforcing the [belay egress policy](configuration.md#jev-belay-stop-hook) |
 | [`fm-jev-guard-hook.sh`](../bin/fm-jev-guard-hook.sh) | Run the ten-levels jev-guard as a Claude worker tool hook ([operator contract](configuration.md#jev-guard)) |
 | [`fm-model-index.sh`](../bin/fm-model-index.sh) | Validate the home model index and resolve dispatch model roles |
+| [`fm-model-freshness.sh`](../bin/fm-model-freshness.sh) | Report a dispatch or requested model that a newer model of its family has passed in its harness's catalog ([operator contract](configuration.md#model-freshness)) |
 | `fm-herdr-lab.sh`        | Provision and guardedly operate an isolated, never-default Herdr lab session         |
 | `fm-herdr-lab-viewer.py` | The pty engine behind `fm-herdr-lab.sh viewer`: one real foreground Herdr client on a non-zero window grid |
 | `fm-lab-home.sh`         | Mint disposable lab homes, manage isolated tmux socket directories, and diagnose refused teardown probes |

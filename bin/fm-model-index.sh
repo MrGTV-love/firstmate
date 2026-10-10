@@ -38,20 +38,17 @@
 # fixtures), <harness>.json, normalized as {"models":[{"id":"...",
 # "resolved_id":"..."}]}. resolved_id is optional except for aliases.
 # With a directory set, live discovery never runs; a missing export is a notice.
-# Live discovery: Codex models_cache.json; Claude SDK initialize (no prompt);
-# omp models --json; Pi --list-models; OpenCode models; Cursor --list-models;
-# agy models. Other harnesses need an export from their authoritative surface.
-# Commands are bounded at 30 seconds; no credential or catalog cache is changed.
+# Live discovery and its per-harness time limits are owned by
+# bin/fm-model-catalog-lib.sh. Other harnesses need an export from their
+# authoritative surface. No credential or catalog cache is changed.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-$FM_ROOT}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 INDEX="$CONFIG/model-index.json"
-# shellcheck source=bin/fm-timeout-lib.sh
-. "$SCRIPT_DIR/fm-timeout-lib.sh"
-# shellcheck source=bin/fm-cursor-lib.sh
-. "$SCRIPT_DIR/fm-cursor-lib.sh"
+# shellcheck source=bin/fm-model-catalog-lib.sh
+. "$SCRIPT_DIR/fm-model-catalog-lib.sh"
 
 die() { printf 'model-index: %s\n' "$*" >&2; exit 2; }
 notice() { printf 'model-index: notice: %s\n' "$*" >&2; }
@@ -121,51 +118,8 @@ fi
 jq -r '.roles | to_entries[] | .key as $role | .value | to_entries[] |
   .key as $h | (.value.model, .value.stand_in // empty) | [$role,$h,.] | @tsv' "$TMP/index.json" > "$TMP/entries"
 
-catalog() { # <harness>; output normalized ids and optional alias targets
-  local h=$1 raw bin
-  if [ -n "${FM_MODEL_CATALOG_DIR:-}" ]; then
-    cat "$FM_MODEL_CATALOG_DIR/$h.json"
-    return
-  fi
-  case "$h" in
-    codex)
-      jq '{models: [.models[] | {id: .slug}]}' "${CODEX_HOME:-$HOME/.codex}/models_cache.json"
-      ;;
-    claude)
-      printf '%s\n' '{"type":"control_request","request_id":"model-index","request":{"subtype":"initialize"}}' > "$TMP/initialize.json"
-      # Timed runners may detach stdin; reopen the protocol input in the child.
-      # shellcheck disable=SC2016 # Positional expansion belongs to the child.
-      raw=$(fm_run_timed 30 bash -c 'exec claude -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --setting-sources "" < "$1"' _ "$TMP/initialize.json") || return 1
-      jq -s '{models: [ .[] | select(.type == "control_response" and .response.request_id == "model-index" and .response.subtype == "success") |
-        .response.response.models[] | {id: .value, resolved_id: .resolvedModel}, {id: .resolvedModel} ] | unique_by(.id)}' <<< "$raw"
-      ;;
-    omp)
-      raw=$(OMP_SKIP_SETUP=1 fm_run_timed 30 omp models --json </dev/null) || return 1
-      jq '{models: [.models[] | {id: .selector}]}' <<< "$raw"
-      ;;
-    pi|pi-signed)
-      raw=$(fm_run_timed 30 "$h" --list-models </dev/null) || return 1
-      printf '%s\n' "$raw" | awk 'NR > 1 && NF >= 6 {print $1 "/" $2}' | jq -Rsc '{models: [split("\n")[] | select(length > 0) | {id: .}]}'
-      ;;
-    opencode)
-      raw=$(fm_run_timed 30 opencode models </dev/null) || return 1
-      jq -Rsc '{models: [split("\n")[] | select(test("^[^[:space:]]+/[^[:space:]]+$")) | {id: .}]}' <<< "$raw"
-      ;;
-    cursor)
-      bin=$(fm_cursor_resolve_binary) || return 1
-      raw=$(fm_cursor_list_models "$bin") || return 1
-      printf '%s\n' "$raw" | fm_cursor_catalog_ids | jq -Rsc '{models: [split("\n")[] | select(length > 0) | {id: .}]}'
-      ;;
-    agy)
-      raw=$(fm_run_timed 30 agy models </dev/null) || return 1
-      printf '%s\n' "$raw" | awk 'NF >= 2 {print $1}' | jq -Rsc '{models: [split("\n")[] | select(length > 0) | {id: .}]}'
-      ;;
-    *) return 1 ;;
-  esac
-}
-validate_catalog() {
-  jq -se 'length == 1 and (.[0] | type == "object" and (.models | type == "array" and length > 0 and all(.[]; type == "object" and (.id | type == "string" and length > 0) and ((has("resolved_id") | not) or (.resolved_id | type == "string" and length > 0)))))' "$1" >/dev/null 2>&1
-}
+catalog() { fm_model_catalog "$1" "$TMP"; } # <harness>; normalized ids and optional alias targets
+validate_catalog() { fm_model_catalog_valid "$1"; }
 check_entry() { # <role> <harness> <model>; refuses only on catalog evidence
   local role=$1 h=$2 m=$3 f="$TMP/catalog-$2.json"
   if [ "${FM_MODEL_CATALOG_CONTEXT:-}" = unavailable ] && [ -z "${FM_MODEL_CATALOG_DIR:-}" ]; then

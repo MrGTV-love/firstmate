@@ -35,6 +35,9 @@
 #   run-error: <message>
 #       the session's last run ended in an error that no retry or fallback
 #       recovered, so a session that stopped rather than downgrade says so.
+#   model-stale: <model> on <harness> is older than <newer> in the <harness> catalog
+#       any harness: the launch was told, at spawn, that a newer model of the
+#       same family was in its catalog (bin/fm-model-freshness.sh owns the rule).
 # Absence of either component is not evidence of health: a session that has not
 # published a record (not omp, not yet started, or remote) adds nothing.
 #
@@ -282,6 +285,13 @@ if [ "$HARNESS" = omp ] && [ -z "$REMOTE_HOST" ]; then
     [ -z "$_live_error" ] || LIVE_NOTE="$LIVE_NOTE${SEP}run-error: $_live_error"
   fi
 fi
+
+# The spawn-time freshness warning (bin/fm-model-freshness.sh) stays on the task
+# record, so a worker launched on a model a newer catalog model has passed keeps
+# saying so on every line.
+meta_value_to _model_stale model_stale
+_model_stale=${_model_stale//·/}
+[ -z "$_model_stale" ] || LIVE_NOTE="$LIVE_NOTE${SEP}model-stale: $_model_stale"
 
 # A torn-down (or never-created) worktree has no current state to read. A
 # remote secondmate's recorded worktree is a path on ITS host, so the local

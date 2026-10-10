@@ -585,6 +585,10 @@
       "audience": "maintainer-verification"
     },
     {
+      "path": "docs/verification/model-catalog-latency.md",
+      "audience": "maintainer-verification"
+    },
+    {
       "path": "docs/verification/muse.md",
       "audience": "maintainer-verification"
     },

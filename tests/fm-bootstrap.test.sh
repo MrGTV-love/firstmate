@@ -1010,6 +1010,34 @@ SH
   pass "bootstrap: every deferred mutating sweep rechecks fleet-lock ownership"
 }
 
+# The deferred phase compares every model in config/crew-dispatch.json with its
+# harness's own catalog (bin/fm-model-freshness.sh owns the rule): a stale model
+# is one MODEL_FRESHNESS line, a current one is silent, and the local half of a
+# split run never reads a catalog.
+test_model_freshness_is_a_deferred_diagnostic() {
+  local case_dir fakebin catalogs only_out skip_out
+  case_dir="$TMP_ROOT/model-freshness"
+  mkdir -p "$case_dir/home/config" "$case_dir/catalogs"
+  printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
+  printf '%s\n' '{"default":[{"harness":"agy","model":"gemini-3.1-pro-high","effort":"high"},{"harness":"claude","model":"opus"}]}' \
+    > "$case_dir/home/config/crew-dispatch.json"
+  printf '%s\n' '{"models":[{"id":"gemini-3.1-pro-high"},{"id":"gemini-3.8-flash-high"}]}' > "$case_dir/catalogs/agy.json"
+  printf '%s\n' '{"models":[{"id":"opus","resolved_id":"claude-opus-5-5"},{"id":"claude-opus-5-5"}]}' > "$case_dir/catalogs/claude.json"
+  fakebin=$(make_fake_toolchain "$case_dir")
+
+  only_out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=only FM_MODEL_FRESHNESS=1 FM_MODEL_CATALOG_DIR="$case_dir/catalogs" \
+    "$ROOT/bin/fm-bootstrap.sh")
+  assert_contains "$only_out" "MODEL_FRESHNESS: gemini-3.1-pro-high on agy is older than gemini-3.8-flash-high in the agy catalog" \
+    "the deferred phase did not report the stale model"
+  assert_not_contains "$only_out" "on claude" "an alias the harness keeps current was reported as stale"
+  skip_out=$(PATH="$fakebin:$BASE_PATH" FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/home" \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_BOOTSTRAP_NETWORK=skip FM_MODEL_FRESHNESS=1 FM_MODEL_CATALOG_DIR="$case_dir/catalogs" \
+    "$ROOT/bin/fm-bootstrap.sh")
+  assert_not_contains "$skip_out" "MODEL_FRESHNESS" "the local half read a harness catalog"
+  pass "bootstrap: a stale dispatch model is a deferred MODEL_FRESHNESS diagnostic"
+}
+
 # The verdict costs three subprocesses, so a caller that already has it can hand
 # it over - but only one hop, and never onward into a spawned agent's
 # environment, where it could outlive a tasks-axi upgrade.
@@ -1464,6 +1492,7 @@ test_fleet_sync_timeout_is_computed_before_launch
 test_routine_bootstrap_confirmations_are_silent
 test_routine_bootstrap_contract_runs_under_system_bash
 test_network_phase_partitions_the_run
+test_model_freshness_is_a_deferred_diagnostic
 test_network_sweeps_recheck_lock_ownership
 test_network_phases_record_per_step_elapsed_times
 test_tasks_axi_verdict_handoff_is_consumed_once
