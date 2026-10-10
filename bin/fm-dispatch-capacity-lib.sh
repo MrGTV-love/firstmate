@@ -6,15 +6,9 @@
 # fm_omp_codex_capacity <model> [usage-json] prints model-specific pool evidence.
 # fm_dispatch_capacity <harness> <model> prints usable/exhausted/unknown evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
-# prints {rule, fallback, primary}; only rules containing the profile must
-# resolve. A recorded rule that no longer contains it counts as none, and
-# differing unlabeled lists permit no fallback. rule is set only for a fallback
-# policy. primary is a recorded rule's first use profile when the profile is
-# only its stand-in.
-# fm_dispatch_start <config-dir> <kind> <fallbacks-json> <profile-json> prints
-# {profile, capacity}: that primary only when it passes every launch-readiness
-# check in fm_dispatch_launch_ready and its capacity is measured usable,
-# otherwise the task's own profile. It never refuses.
+# prints {rule, fallback}; only rules containing the profile must resolve. A
+# recorded rule that no longer contains it counts as none, and differing
+# unlabeled lists permit no fallback. rule is set only for a fallback policy.
 # fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
 # prints the original profile unless it is proven exhausted, then the first
 # permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
@@ -27,12 +21,6 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-quota-axi-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-session-launch-policy-lib.sh"
-# shellcheck source=bin/fm-control-lib.sh
-. "$FM_DISPATCH_CAPACITY_DIR/fm-control-lib.sh"
-# shellcheck source=bin/fm-worker-account-lib.sh
-. "$FM_DISPATCH_CAPACITY_DIR/fm-worker-account-lib.sh"
-# shellcheck source=bin/fm-exclude-tools-lib.sh
-. "$FM_DISPATCH_CAPACITY_DIR/fm-exclude-tools-lib.sh"
 
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
@@ -101,7 +89,7 @@ fm_dispatch_capacity() {
 fm_dispatch_fallbacks() {
   local config=$1 rule=$2 harness=$3 model=$4 effort=$5 file entries entry resolved rules='' result
   file=${6:-"$config/crew-dispatch.json"}
-  [ -f "$file" ] || { printf '%s\n' '{"rule":"","fallback":[],"primary":null}'; return; }
+  [ -f "$file" ] || { printf '%s\n' '{"rule":"","fallback":[]}'; return; }
   entries=$(jq -sc '
     def valid_fallback:
       type == "array" and all(.[];
@@ -129,21 +117,16 @@ fm_dispatch_fallbacks() {
     def profiles: if type == "array" then . else [.] end;
     def axis: if . == null or . == "default" then "" else . end;
     def same: type == "object" and .harness == $h and (.model | axis) == ($m | axis) and (.effort | axis) == ($e | axis);
-    def in_use: .resolved as $resolved | any((.use | profiles)[]; same and ($resolved or (has("role") | not)));
-    def contains_profile: in_use or any((.fallback // [])[]; same);
+    def contains_profile: .resolved as $resolved |
+      any((.use | profiles)[]; same and ($resolved or (has("role") | not))) or any((.fallback // [])[]; same);
     . as $rules |
     [$rules[] | select($rule != "" and .rule == $rule and contains_profile)] as $recorded |
     (if ($recorded | length) > 0 then $recorded else [$rules[] | select(contains_profile)] end) as $matches |
     if any($matches[]; .resolved | not) then
       error("dispatch " + ([$matches[] | select(.resolved | not) | .rule] | join(", ")) + " names a retired model or unconfigured role")
-    elif ($matches | map(.fallback // []) | unique | length) != 1 then {rule: "", fallback: [], primary: null}
+    elif ($matches | map(.fallback // []) | unique | length) != 1 then {rule: "", fallback: []}
     else ($matches[0].fallback // []) as $fallback |
-      ([$matches[] | .use | profiles | first] | unique) as $primaries |
-      {rule: (if ($matches | length) == 1 and ($fallback | length) > 0 then $matches[0].rule else "" end), fallback: $fallback,
-       primary: (if ($recorded | length) > 0 and ($fallback | length) > 0 and all($matches[]; in_use | not) and
-                    ($primaries | length) == 1 and ($primaries[0] | type) == "object"
-                 then $primaries[0] | {harness, model: (.model // "default"), effort: (.effort // "default")}
-                 else null end)} end
+      {rule: (if ($matches | length) == 1 and ($fallback | length) > 0 then $matches[0].rule else "" end), fallback: $fallback} end
   ' <<<"$rules" 2>&1) || { printf 'error: invalid dispatch fallback configuration: %s\n' "$result" >&2; return 1; }
   printf '%s\n' "$result"
 }
@@ -181,37 +164,6 @@ fm_dispatch_fallback_capacity() {
     return
   fi
   fm_dispatch_capacity "$(jq -r .harness <<<"$candidate")" "$(jq -r .model <<<"$candidate")"
-}
-
-fm_dispatch_launch_ready() (
-  config=$1 kind=$2 harness=$3 model=$4
-  [ "$model" != default ] || model=
-  fm_session_launch_policy_check "$config" "$harness" || exit 1
-  fm_control_harness_supports_kind "$harness" "$kind" || exit 1
-  if [ "$harness" = claude ]; then
-    # shellcheck source=/dev/null
-    . "$FM_DISPATCH_CAPACITY_DIR/fm-claude-launcher-lib.sh"
-    fm_claude_launcher_select "$config" || exit 1
-  fi
-  fm_worker_account_select "$harness" "$config" "$model" "$harness" || exit 1
-  fm_exclude_tools_check "$harness" 0 "$config" || exit 1
-) >/dev/null 2>&1
-
-fm_dispatch_start() {
-  local config=$1 kind=$2 profile=$4 primary harness model evidence
-  primary=$(jq -c '.primary // empty' <<<"$3")
-  if [ -n "$primary" ]; then
-    harness=$(jq -r .harness <<<"$primary")
-    model=$(jq -r .model <<<"$primary")
-    if fm_dispatch_launch_ready "$config" "$kind" "$harness" "$model"; then
-      evidence=$(fm_dispatch_capacity "$harness" "$model")
-      if [ "$(jq -r .status <<<"$evidence")" = usable ]; then
-        jq -cn --argjson profile "$primary" --argjson capacity "$evidence" '{profile: $profile, capacity: $capacity}'
-        return
-      fi
-    fi
-  fi
-  jq -cn --argjson profile "$profile" '{profile: $profile, capacity: null}'
 }
 
 fm_dispatch_select() {

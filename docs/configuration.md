@@ -1522,10 +1522,7 @@ Spawn and recovery resolve each rule against their frozen model-index and dispat
 Only rules that contain the launched profile must resolve, so a retired model or unconfigured role in an unrelated rule does not block a launch or recovery.
 When the matched rule has a fallback policy, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
 A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
-On every spawn and relaunch, a task on a recorded rule's stand-in returns to that rule's first `use` profile only when that primary can launch now and its capacity is measured usable.
-The primary can launch now when it passes the session launch policy, the task-kind check, the Claude launcher check, the worker account pin check, and the `config/crew-exclude-tools` check.
-A primary that fails any of these, or whose capacity is unknown or unmeasured, keeps the stand-in and never refuses the launch.
-An explicit relaunch `--harness`, `--model`, or `--effort` override keeps the requested route.
+A task that switched to a stand-in stays on it until it is launched again from the matrix.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
 OMP workers receive a later per-task configuration overlay with exact model-and-effort chains, preventing ambient chains from weakening the task.
 Those chains contain only the order-preserving eligible native prefix; the first supported cross-harness destination ends the prefix and leaves the transition to recovery.

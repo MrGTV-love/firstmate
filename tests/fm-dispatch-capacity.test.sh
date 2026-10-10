@@ -86,35 +86,14 @@ set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_9 omp openai-codex/gpt-6-lun
 assert_equals "$allowed" "$(jq -c .fallback <<<"$set")" "a missing recorded rule counts as no recorded rule"
 cp "$TMP_ROOT/config/crew-dispatch.json" "$TMP_ROOT/identical.json"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp ollama/qwen3:8b high) || fail "an edited recorded rule must not refuse"
-assert_equals '{"rule":"","fallback":[],"primary":null}' "$set" "a recorded rule that no longer contains the profile counts as absent"
-set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp deepseek/deepseek-v4-flash high)
-assert_equals "$primary" "$(jq -c .primary <<<"$set")" "a recorded stand-in prefers its rule's primary"
-standin='{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}'
-out=$(fm_dispatch_start "$TMP_ROOT/config" ship "$set" "$standin")
-assert_equals "$primary" "$(jq -c .profile <<<"$out")" "a measured usable primary takes the stand-in task back"
-out=$(OMP_USAGE_FIXTURE="$TMP_ROOT/stale.json" fm_dispatch_start "$TMP_ROOT/config" ship "$set" "$standin")
-assert_equals "$standin" "$(jq -c .profile <<<"$out")" "an unknown primary keeps the stand-in"
-printf 'omp-or-tc\n' > "$TMP_ROOT/config/session-launch-policy"
-out=$(fm_dispatch_start "$TMP_ROOT/config" ship "$(jq -c '.primary.harness="claude"' <<<"$set")" "$standin")
-assert_equals "$standin" "$(jq -c .profile <<<"$out")" "a policy-refused primary keeps the stand-in"
-rm "$TMP_ROOT/config/session-launch-policy"
-printf '%s\n' "$TMP_ROOT/missing-claude-account" > "$TMP_ROOT/config/claude-account"
-out=$(fm_dispatch_start "$TMP_ROOT/config" ship "$(jq -c '.primary.harness="claude"' <<<"$set")" "$standin")
-assert_equals "$standin" "$(jq -c .profile <<<"$out")" "a primary whose account pin refuses keeps the stand-in"
-rm "$TMP_ROOT/config/claude-account"
-printf 'hidden_tool\n' > "$TMP_ROOT/config/crew-exclude-tools"
-out=$(fm_dispatch_start "$TMP_ROOT/config" ship "$set" "$standin")
-assert_equals "$standin" "$(jq -c .profile <<<"$out")" "a primary that cannot hide excluded tools keeps the stand-in"
-rm "$TMP_ROOT/config/crew-exclude-tools"
-set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp deepseek/deepseek-v4-flash high)
-assert_equals null "$(jq -c .primary <<<"$set")" "an unrecorded stand-in keeps the explicitly requested route"
+assert_equals '{"rule":"","fallback":[]}' "$set" "a recorded rule that no longer contains the profile counts as absent"
 jq '.rules[0].fallback=[]' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6-luna high) || fail "differing unlabeled lists must not refuse"
-assert_equals '{"rule":"","fallback":[],"primary":null}' "$set" "differing unlabeled lists permit no fallback"
+assert_equals '{"rule":"","fallback":[]}' "$set" "differing unlabeled lists permit no fallback"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high)
-assert_equals '{"rule":"","fallback":[],"primary":null}' "$set" "an explicit rule retains its own no-fallback policy"
+assert_equals '{"rule":"","fallback":[]}' "$set" "an explicit rule retains its own no-fallback policy"
 set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" default omp openai-codex/gpt-6-luna high)
-assert_equals "$(jq -cn --argjson f "$allowed" '{rule:"default",fallback:$f,primary:null}')" "$set" "an explicit rule with a fallback policy is reported"
+assert_equals "$(jq -cn --argjson f "$allowed" '{rule:"default",fallback:$f}')" "$set" "an explicit rule with a fallback policy is reported"
 jq '.rules[0].fallback=[{harness:"claude",model:"opus",effort:"high"}]' "$TMP_ROOT/config/crew-dispatch.json" > "$TMP_ROOT/bad.json"
 mv "$TMP_ROOT/bad.json" "$TMP_ROOT/config/crew-dispatch.json"
 if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
