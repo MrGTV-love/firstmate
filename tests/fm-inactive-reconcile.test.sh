@@ -144,10 +144,13 @@ reported_outcome_key() { # <home> <id> <state>
   return 1
 }
 
-prime_seen() { # <state> <status>
+prime_seen() { # <state> <status|turn-ended>
   FM_STATE_OVERRIDE="$1" bash -c '
     . "$1"
-    fm_wake_status_mark_current "$2" "$3"
+    case "$3" in
+      *.status) fm_wake_status_mark_current "$2" "$3" ;;
+      *) fm_wake_signal_sig_to sig "$3" && printf "%s" "$sig" > "$(fm_wake_signal_seen_path "$2" "$3")" ;;
+    esac
   ' _ "$ROOT/bin/fm-wake-lib.sh" "$1" "$2"
 }
 
@@ -859,6 +862,9 @@ test_nonterminal_and_captain_held_states_do_not_report() {
 test_watcher_hook_and_idle_secondmate_exemption() {
   local out pid i
   make_world watcher; write_child "$MAIN" child 'done: green'; prime_seen "$MAIN/state" "$MAIN/state/child.status"
+  # The watcher delivers an unread signal ahead of this check, so the fixture
+  # leaves none: the reconciliation result is then the cycle's only wake.
+  prime_seen "$MAIN/state" "$MAIN/state/child.turn-ended"
   out="$WORLD/watch.out"
   PATH="$WORLD/fakebin:$PATH" FM_HOME="$MAIN" FM_STATE_OVERRIDE="$MAIN/state" \
     FM_INACTIVE_RECONCILE_SECS=60 FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/fm-crew-state.sh" \
@@ -892,6 +898,7 @@ test_watcher_poll_delivers_child_ledger_line_to_parent() {
   make_world watcher-ledger; bind_secondmate local
   write_child "$MATE" child 'done: PR https://example.test/owner/repo/pull/1 checks green'
   prime_seen "$MATE/state" "$MATE/state/child.status"
+  prime_seen "$MATE/state" "$MATE/state/child.turn-ended"
   PATH="$WORLD/fakebin:$PATH" FM_HOME="$MATE" FM_STATE_OVERRIDE="$MATE/state" FM_DATA_OVERRIDE="$MATE/data" \
     FM_CONFIG_OVERRIDE="$MATE/config" FM_INACTIVE_RECONCILE_SECS=60 \
     FM_INACTIVE_CREW_STATE_BIN="$WORLD/fakebin/fm-crew-state.sh" FM_FORGE_LOG="$WORLD/forge.log" \

@@ -3,9 +3,8 @@
 #
 # Both a merge performed by this home and a merge detected by its existing poll
 # use this operation, so neither outcome depends on an agent remembering it.
-# This operation publishes the poll's local actionable row; the watcher
-# immediately delivers that row as observation handling, not a second outcome
-# path.
+# This operation publishes the poll's local actionable row; the watcher owns
+# its later delivery as observation handling, not a second outcome path.
 #
 # The destination is the home's role, never the caller's choice:
 #   - a secondmate home reports upward on its parent channel, resolved and
