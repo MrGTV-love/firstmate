@@ -4670,6 +4670,17 @@ spawn_send_key() { # <target> <key>
   esac
 }
 
+# Run one backend send whose failure ends the spawn. Under `set -e` a failed send
+# would otherwise end the script with exit 1 and no text, leaving the endpoint and
+# its record behind with nothing to say why; name the backend and the send instead.
+spawn_send_or_abort() { # <what> <send-function> <arg>...
+  local what=$1
+  shift
+  "$@" && return 0
+  echo "error: $BACKEND backend send failed for task $ID ($what); spawn aborted" >&2
+  exit 1
+}
+
 # Enter the exact copy recorded for this task immediately before trust setup and
 # launch. Herdr restores a pane's shell cwd from its durable tab layout, so a
 # treehouse subshell's foreground cwd is not enough to keep a later pane restart
@@ -5073,7 +5084,7 @@ elif [ "$RELAUNCH" -eq 1 ]; then
   fi
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
-  spawn_send_text_line "$WT_TARGET" 'treehouse get'
+  spawn_send_or_abort "treehouse get" spawn_send_text_line "$WT_TARGET" 'treehouse get'
 
   # Wait for the treehouse subshell: the pane's cwd moves from the project to the worktree.
   # Target the stable window id, not the name: if the name is ever lost (e.g. an
@@ -6322,13 +6333,15 @@ spawn_record_traceparent() {
 # Export GOTMPDIR into the crewmate's pane shell so the agent and every child
 # process (go build, go test, ...) inherit it. Sent before the launch command so
 # the env is set when the agent starts; the brief sleep lets the export land.
-spawn_send_text_line "$T" "export GOTMPDIR=$TASK_TMP/gotmp"
+spawn_send_or_abort "export GOTMPDIR" spawn_send_text_line "$T" "export GOTMPDIR=$TASK_TMP/gotmp"
 # Export the compact-adviser kill switch into the pane shell through the same
 # pre-launch channel, so later commands in that shell inherit it too. The launch
 # command independently establishes the value for the agent process itself.
-spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
+spawn_send_or_abort "export COMPACT_ADVISER_DISABLE" \
+  spawn_send_text_line "$T" "export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH"
 if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
-  spawn_send_text_line "$T" "export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST")"
+  spawn_send_or_abort "export LAVISH_AXI_HOST" \
+    spawn_send_text_line "$T" "export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST")"
 fi
 # Mark the pane as a task worker so bin/fm-test-run.sh can refuse to run the
 # suite in the repository's primary checkout. Ship and scout workers are the
@@ -6336,7 +6349,7 @@ fi
 # The id reached a validated bare-slug charset above, so it carries no shell
 # syntax of its own.
 if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
-  spawn_send_text_line "$T" "export FM_TASK_ID=$ID"
+  spawn_send_or_abort "export FM_TASK_ID" spawn_send_text_line "$T" "export FM_TASK_ID=$ID"
 fi
 # Send through the exact channel that already ships GOTMPDIR, so every backend
 # and harness - ship, scout, and secondmate - gets it before launch. Skipped
@@ -6428,12 +6441,12 @@ if ! (umask 077 && printf '%s\n' "$LAUNCH" >"$LAUNCH_STAGE" &&
   exit 1
 fi
 sleep 0.3
-spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
+spawn_send_or_abort "launch command" spawn_send_literal "$T" ". $(shell_quote "$LAUNCH_FILE")"
 sleep 0.3
 if [ "${HERDR_PROJECTED:-0}" -eq 1 ]; then
   HERDR_PROJECTION_ABORT_CLEANUP=0
 fi
-spawn_send_key "$T" Enter
+spawn_send_or_abort "launch Enter" spawn_send_key "$T" Enter
 SPAWN_LAUNCH_SENT=1
 if [ "$HARNESS" = kimi ]; then
   if ! kimi_wait_for_ready; then
