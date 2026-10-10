@@ -2299,9 +2299,10 @@ task_nested_lane_for_path() {  # <root> <path>
 }
 
 # Refresh TASK_REGISTERED_LANES: every worktree, including missing or prunable
-# entries, registered strictly beneath a scan root by the recorded project,
-# git-backed scan roots, or available task projects in reachable local Firstmate
-# states. Project registries remain sources when the scan root is missing.
+# entries, registered strictly beneath a scan root by the git-backed recorded
+# project, scan roots, or available task projects in reachable local Firstmate
+# states. Project registries remain sources when the scan root is missing; a
+# recorded project that is gone or not a git repository has no registry to read.
 task_registered_lanes_under_roots() {  # <canonical-root>...
   local root src registry line lane state_dir meta project
   local -a sources
@@ -2310,7 +2311,7 @@ task_registered_lanes_under_roots() {  # <canonical-root>...
   for root in "$@"; do
     git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$root")
   done
-  [ -z "$PROJ" ] || sources+=("$PROJ")
+  [ -z "$PROJ" ] || ! git -C "$PROJ" rev-parse --show-toplevel >/dev/null 2>&1 || sources+=("$PROJ")
   collect_local_firstmate_states "$STATE" || return 1
   for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
@@ -2320,7 +2321,7 @@ task_registered_lanes_under_roots() {  # <canonical-root>...
       git -C "$project" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$project")
     done
   done
-  for src in "${sources[@]}"; do
+  for src in ${sources[@]+"${sources[@]}"}; do
     if ! registry=$(git -C "$src" worktree list --porcelain 2>/dev/null); then
       TASK_PIDS_FAILED_DIR=$src
       TASK_PIDS_ERROR="worktree registration could not be read"
