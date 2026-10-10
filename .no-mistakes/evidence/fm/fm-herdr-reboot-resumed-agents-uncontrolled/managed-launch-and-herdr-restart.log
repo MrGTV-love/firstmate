@@ -1,0 +1,122 @@
+installed omp integration to /Users/charlesabrooker/tmp/fm-mgd-reboot.gMiDLE/omp-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+
+### S4a: Firstmate launches omp through its own launch boundary (fm-spawn --relaunch on the agent-free endpoint)
+fm-spawn rc=0
+notice: omp provider 'openai-codex' is not in 'omp models --json' (extension-registered providers are never listed); launching 'openai-codex/gpt-6.1-sol:high' unvalidated
+warning: /Users/charlesabrooker/tmp/fm-lab.wNwFi5/data/mgd22711/launch-brief.md records no ship branch; defaulting to legacy branch fm/mgd22711
+warning: /Users/charlesabrooker/tmp/fm-lab.wNwFi5/data/mgd22711/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for mgd22711: unavailable - no TypeSafe or OpenRouter key
+spawned mgd22711 harness=omp kind=ship mode=no-mistakes yolo=off window=fm-lab-mgd-reboot-22720-9067:w1:p2 worktree=/Users/charlesabrooker/tmp/fm-mgd-reboot.gMiDLE/wt
+meta: launch_proof=env-v1 spawn_gen=s1791624959.26421.24435
+PASS: managed omp launch reads proof=managed composer=empty agent=alive
+agent pid=42100 argv: /Users/charlesabrooker/.bun/bin/omp --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J6PR8GSHGWWBXC1X0E6H1G/.omp/fm-session-overlay.yml --auto-approve --cwd /Users/charlesabrooker/tmp/fm-mgd-reboot.gMiDLE/wt --config /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J6PR8GSHGWWBXC1X0E6H1G/.omp/fm-worker-overlay.yml -e /Users/charlesabrooker/tmp/fm-lab.wNwFi5/sta
+PASS: agent environment carries FM_SPAWN_GEN=s1791624959.26421.24435
+pane shell pid=25927 (-zsh)
+PASS: persistent pane shell does not carry FM_SPAWN_GEN
+session proof: {"version":1,"spawn_gen":"s1791624959.26421.24435","pid":42100,"task_session_file":"/Users/charlesabrooker/tmp/fm-mgd-reboot.gMiDLE/omp-home/.omp/agent/sessions/-tmp-fm-mgd-reboot.gMiDLE-wt/2026-10-10T09-36-00-846Z_01a1252b-5b4e-706d-b4bf-42685919bd49.jsonl","current_session_file":"/Users/charlesabrooker/tmp/fm-mgd-reboot.gMiDLE/omp-home/.omp/agent/sessions/-tmp-fm-mgd-reboot.gMiDLE-wt/2026-10-10T09-36-00-846Z_01a1252b-5b4e-706d-b4bf-42685919bd49.jsonl"}
+composer screen (tail):
+ report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+ Captain intent authorized for --intent
+ Isolated lifecycle verification; reply ack and stay idle.
+ ack
+❯
+ π · ⬢ m1 · 🌳 proj/wt · ⑂ mgd22711 · ◫ 3.8%/200K ⟲                                                                 ack
+
+### S4b: reboot sweep stays quiet for a managed agent
+recover rc=0 output=[]
+PASS: sweep reports nothing for the managed agent
+
+### S4c: fm-control relaunch of the managed omp (exit through composer + fresh managed launch)
+relaunch rc=0
+notice: omp provider 'openai-codex' is not in 'omp models --json' (extension-registered providers are never listed); launching 'openai-codex/gpt-6.1-sol:high' unvalidated
+warning: /Users/charlesabrooker/tmp/fm-lab.wNwFi5/data/mgd22711/launch-brief.md records no ship branch; defaulting to legacy branch fm/mgd22711
+warning: /Users/charlesabrooker/tmp/fm-lab.wNwFi5/data/mgd22711/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for mgd22711: unavailable - no TypeSafe or OpenRouter key
+relaunched mgd22711 harness=omp from=omp model=default effort=default backend=herdr endpoint=fm-lab-mgd-reboot-22720-9067:w1:p2 worktree=/Users/charlesabrooker/tmp/fm-mgd-reboot.gMiDLE/wt
+PASS: relaunch replaced pid 42100 with 77885, new spawn_gen=s1791624972.65455.15270, proof=managed
+composer with draft: pending
+exit-with-draft rc=1: error: task mgd22711's composer visibly holds pending text; refusing to type the /quit exit command because it would concatenate onto that text. Clear or submit the pending text, then retry 'exit'
+PASS: managed exit refuses over a pending draft and keeps the agent
+composer after clearing draft: empty
+
+### S5: simulated reboot - stop the lab Herdr server, restart it, attach a viewer (native auto-resume)
+managed current session file: /Users/charlesabrooker/tmp/fm-mgd-reboot.gMiDLE/omp-home/.omp/agent/sessions/-tmp-fm-mgd-reboot.gMiDLE-wt/2026-10-10T09-36-13-597Z_01a1252b-8d1d-73c6-ab03-2de9d29ce3c2.jsonl
+server stopped
+PASS: server stop ended the managed omp (pid 77885)
+server restarted
+viewer attached to fm-lab-mgd-reboot-22720-9067 (pid 4463)
+viewer attached
+restored pid=6218 argv: /Users/charlesabrooker/.bun/bin/omp --resume=/Users/charlesabrooker/tmp/fm-mgd-reboot.gMiDLE/omp-home/.omp/agent/sessions/-tmp-fm-mgd-reboot.gMiDLE-wt/2026-10-10T09-36-13-597Z_01a1252b-8d1d-73c6-ab03-2de9d29ce3c2.jsonl
+PASS: Herdr natively restored a live agent in the recorded pane
+restored screen (tail):
+ you pass: resolve any report, decision, or PR the intent below refers to into its substance
+ rather than passing the pointer.
+ Captain intent authorized for --intent
+ Isolated lifecycle verification; reply ack and stay idle.
+ ack
+                                                                                           ack
+ π > ⬢ m1 > 🌳 proj/wt > ⑂ mgd22711 ▶──4%───────────────────────────────────╎────┃───────200K─
+╰─
+PASS: restored agent has no FM_SPAWN_GEN pin
+restored proof=unmanaged composer=empty agent=alive
+PASS: launch proof reads unmanaged after native restore
+
+### S6: lifecycle verbs refuse the unmanaged restore and change nothing
+pre-existing transaction files: mgd22711.control-relaunch mgd22711.control-relaunch.brief-prior mgd22711.control-relaunch.meta-prior mgd22711.control-relaunch.note 
+interrupt rc=1: error: task mgd22711 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+PASS: interrupt refused
+exit rc=1: error: task mgd22711 cannot positively attribute its live Herdr agent to this task; refusing lifecycle input
+PASS: exit refused
+relaunch rc=1: error: task mgd22711 cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input
+PASS: relaunch refused before checkpoint
+relaunch --recover-launch rc=0: recovery-skipped mgd22711 launch=unmanaged; no lifecycle action taken
+PASS: direct inspection reports unmanaged no-op
+PASS: restored pid unchanged after all verbs
+PASS: task record unchanged
+PASS: no state file created or removed by the refused verbs
+
+### S7: reboot sweep alerts (unbounded and bounded-once)
+recover rc=0: REBOOT_RECOVERY: mgd22711: live launch is unmanaged; no lifecycle action taken
+PASS: unbounded sweep reports the unmanaged restore
+--one #1 rc=0: [REBOOT_RECOVERY: mgd22711: live launch is unmanaged; no lifecycle action taken]
+--one #2 rc=0: []
+notice file: unmanaged fm-lab-mgd-reboot-22720-9067:w1:p2 6218 Sat Oct 10 04:36:24 2026
+PASS: bounded sweep notifies once per restored identity
+
+### S8: session-start deferred bootstrap phase surfaces the alert
+Note: switching to 'fefebdb20435c83f5695f66faafea947da828a41'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+plain clone HEAD=fefebdb20435c83f5695f66faafea947da828a41 (gate HEAD=fefebdb20435c83f5695f66faafea947da828a41)
+REBOOT_RECOVERY: mgd22711: live launch is unmanaged; no lifecycle action taken
+PASS: bootstrap deferred phase reports the unmanaged restore
+PASS: restored pid still unchanged after bootstrap
+
+### S9: the running watcher repeats the bounded scan and raises a check wake
+consuming pre-restart signals: mgd22711.turn-ended 
+watcher output:
+check: Herdr reboot launch recovery: REBOOT_RECOVERY: mgd22711: live launch is unmanaged; no lifecycle action taken
+wake queue:
+1791625003	1	check	reboot-launch-recovery-1791625003-44918-230228570	check: Herdr reboot launch recovery: REBOOT_RECOVERY: mgd22711: live launch is unmanaged; no lifecycle action taken
+PASS: watcher woke with a queued check record for the unmanaged restore
+PASS: restored pid still unchanged after the watcher
+
+### done
+FAILED=0
+teardown ok: fm-lab-mgd-reboot-22720-9067
+/Users/charlesabrooker/tmp/fm-managed-reboot-driver/driver.sh: line 24: 22800 Terminated: 15          python3 -I "$P/model.py" "$P/model.log" "$P/model.port"
+private trees removed

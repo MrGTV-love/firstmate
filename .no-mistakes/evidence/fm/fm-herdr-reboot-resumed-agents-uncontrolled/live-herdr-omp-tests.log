@@ -1,0 +1,57 @@
+=== reboot live
+installed omp integration to /Users/charlesabrooker/tmp/fm-omp-reboot.BfXd3X/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+native child captured: pid=12711 start=Sat Oct 10 04:19:53 2026    
+native child captured: pid=64042 start=Sat Oct 10 04:20:54 2026    
+Herdr lab runtime: {"client":{"version":"0.9.1","channel":"stable","protocol":22,"endpoint_protocol_generation":1,"endpoint_capabilities":["surface_interest","presentation_effects_fence","health_check"],"remote_host_bridge":true,"remote_bridge_idle_timeout":true,"binary":"/Users/charlesabrooker/.local/bin/herdr","session":"fm-lab-omp-reboot-9492-17756"},"server":{"status":"running","running":true,"version":"0.9.1","protocol":22,"capabilities":{"live_handoff":true,"detached_server_daemon":false,"endpoint_protocol_generation":1,"surface_interest":true,"health_check":true},"compatible":true,"endpoint_compatible":true,"socket":"/Users/charlesabrooker/.config/herdr/sessions/fm-lab-omp-reboot-9492-17756/herdr.sock","session":"fm-lab-omp-reboot-9492-17756","restart_needed":false,"server_binary_stale":false},"update":{"restart_needed":false,"server_binary_stale":false}}
+ok - native omp: task and local secondmate remain unmanaged and unchanged for empty/pending interrupt, exit, relaunch, direct recovery and reboot sweep
+guarded teardown completed for session 'fm-lab-omp-reboot-9492-17756'; waiting for native child exit
+native child exit confirmed: pid=12711 start=Sat Oct 10 04:19:53 2026    
+native child exit confirmed: pid=64042 start=Sat Oct 10 04:20:54 2026    
+private fixture tree removed: /Users/charlesabrooker/tmp/fm-omp-reboot.BfXd3X
+rc=0
+=== composer box live
+ok - live omp box composer: omp (omp/18.8.7) on herdr 0.9.1 draws the box shape (status in the top border, folded last row) in isolated session fm-lab-omp-composer-box-67103-2236
+ok - live omp box composer: omp (omp/18.8.7) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+not ok - omp (omp/18.8.7) on herdr 0.9.1: interrupt accepted the unmanaged native worker: interrupt-delivered ompbox23161 harness=omp backend=herdr verified=agent-alive cancel=unconfirmed
+native child exit confirmed: pid=74834 start=Sat Oct 10 04:22:02 2026    
+rc=1
+=== task session live
+ok - standalone omp loads production extension and proves its active task session
+rc=0
+=== control herdr smoke
+ok - real herdr: exit on a pane with no registered agent is idempotent success
+ok - real herdr 0.9.1: a gone session reads recoverable while a live pane and a malformed target do not
+warning: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/data/hsmoke/launch-brief.md records no ship branch; defaulting to legacy branch fm/hsmoke
+warning: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/data/hsmoke/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for hsmoke: unavailable - no TypeSafe or OpenRouter key
+ok - real herdr: a drifted agent-free shell returns to its worktree and reuses the same endpoint
+ok - real herdr: interrupt refuses when herdr's own agent registry reports no agent
+ok - real herdr: interrupt delivers the harness's key and proves the agent survived it
+ok - real herdr: no control verb removed the endpoint or the task's local copy
+ok - real herdr 0.9.1: a registration Herdr keeps after its agent exits reads stale-agent and recovers as dead
+ok - real herdr: exit on a pane with a stale registration is idempotent success
+warning: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/data/hsmoke/launch-brief.md records no ship branch; defaulting to legacy branch fm/hsmoke
+warning: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/data/hsmoke/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+skill selection for hsmoke: unavailable - no TypeSafe or OpenRouter key
+ok - real herdr: a stale registration no longer blocks relaunch, and the endpoint and local copy survive
+ok - real herdr: an agent behind an unproven composer fails closed instead of typing an exit command into it
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state/hsmoke.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg/home: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-control-herdr.Bwsdzg: Directory not empty
+rc=0

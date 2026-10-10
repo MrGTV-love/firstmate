@@ -1,0 +1,5 @@
+ok - live omp box composer: omp (omp/18.8.7) on herdr 0.9.1 draws the box shape (status in the top border, folded last row) in isolated session fm-lab-omp-composer-box-61251-24619
+ok - live omp box composer: omp (omp/18.8.7) on herdr 0.9.1 idle empty composer reads empty through the production Herdr adapter
+ok - live omp box composer: omp (omp/18.8.7) on herdr 0.9.1 reads a draft pending and refuses native interrupt, exit and relaunch without altering its PID, screen or draft
+ok - live omp box composer: omp (omp/18.8.7) on herdr 0.9.1 preserves the live unmanaged empty box-shaped worker, endpoint, metadata, instructions and dirty work after lifecycle refusals
+native child exit confirmed: pid=64639 start=Sat Oct 10 04:23:36 2026    

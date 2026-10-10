@@ -1,0 +1,40 @@
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.8.7
+
+                          Tip: Press ⌃R to search your prompt history and reuse a past message
+
+ Firstmate spec
+
+ Do not run tools or edit files.
+
+ Skill selection
+
+ Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+ Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill applies:
+ check your skill index for skills that fit this task before starting work.
+
+ Current no-mistakes intent contract
+
+ This section supersedes every earlier brief instruction about constructing --intent, but not later clarifications
+ actually supplied by the captain.
+ Use everything under ## Captain intent authorized for --intent through the end of this brief, including any nested
+ subheadings but excluding that heading, plus any later words the captain actually supplied as --intent; never include
+ Firstmate specification or other mixed Task content.
+ Preserve those words without adding speaker labels or direct address.
+ Firstmate-authored constraints, acceptance criteria, implementation details, decisions, and tradeoffs are
+ specification, not captain intent.
+ The Definition of done's rule that --intent must be self-sufficient still governs the string you pass: resolve any
+ report, decision, or PR the intent below refers to into its substance rather than passing the pointer.
+
+ Captain intent authorized for --intent
+
+ Isolated lifecycle verification; reply ack and stay idle.
+
+ ack
+
+❯
+ π · ⬢ m1 · 🌳 proj/wt · ⑂ mgd22711 · ◫ 3.8%/200K ⟲                                                                 ack
