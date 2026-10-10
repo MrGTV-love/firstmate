@@ -74,13 +74,14 @@ sys.path.insert(0, os.path.join(root, "tests"))
 from omp_wake_turns import classify_turn, summarize
 home = os.path.join(lab, mode, "home")
 agent = os.path.join(lab, mode, "agent")
-for d in (agent, os.path.join(home, ".omp", "extensions"), os.path.join(home, ".pi", "extensions", "lib"), os.path.join(home, "state")):
+for d in (agent, os.path.join(home, ".omp", "extensions", "lib"), os.path.join(home, ".pi", "extensions", "lib"), os.path.join(home, "state")):
     os.makedirs(d, exist_ok=True)
 
 # The real extension, its operational-input encoder, and the real bin/ (the real
 # drain and queue library); only the watcher arm is a stand-in.
 for src, dst in (
     (".omp/extensions/fm-primary-omp-watch.ts", ".omp/extensions/"),
+    (".omp/extensions/lib/fm-task-session.ts", ".omp/extensions/lib/"),
     (".pi/extensions/lib/fm-operational-input.ts", ".pi/extensions/lib/"),
     (".pi/extensions/lib/fm-watch-lifecycle.ts", ".pi/extensions/lib/"),
 ):

@@ -488,8 +488,9 @@ interrupt_queued_wake() {
 # extension under review with a stand-in arm script that closes on a trigger file.
 # ---------------------------------------------------------------------------
 IDLE="$LAB/idle"
-mkdir -p "$IDLE/agent" "$IDLE/home/.omp/extensions" "$IDLE/home/.pi/extensions/lib" "$IDLE/home/state"
+mkdir -p "$IDLE/agent" "$IDLE/home/.omp/extensions/lib" "$IDLE/home/.pi/extensions/lib" "$IDLE/home/state"
 cp "$PROJECT/.omp/extensions/fm-primary-omp-watch.ts" "$IDLE/home/.omp/extensions/"
+cp "$PROJECT/.omp/extensions/lib/fm-task-session.ts" "$IDLE/home/.omp/extensions/lib/"
 cp "$PROJECT/.omp/extensions/fm-lab-queue-probe.ts" "$IDLE/home/.omp/extensions/"
 cp "$PROJECT/.pi/extensions/lib/fm-operational-input.ts" "$IDLE/home/.pi/extensions/lib/"
 cp "$PROJECT/.pi/extensions/lib/fm-watch-lifecycle.ts" "$IDLE/home/.pi/extensions/lib/"
