@@ -1,0 +1,22 @@
+### Scenario 9: the same flow on the BASE commit (before the change)
+== BASE commit 8ce400ff scripts, lab home /Users/charlesabrooker/tmp/fm-lab.fyN4pj ==
+$ base/bin/fm-procevent-lavish.sh arm board-f.html
+registered: lavish-cc1b0268e1968e5d (lavish)
+armed: lavish-cc1b0268e1968e5d
+artifact: /private/tmp/fm-lvtest.BZslGF/boards/board-f.html
+rc=0
+$ base/bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cc1b0268e1968e5d      lavish       live       0
+captain clicked Send to Agent at 02:34:38
+capture lavish-cc1b0268e1968e5d.1.result exists
+$ base/bin/fm-procevent.sh list   (5s after the capture, no reconcile)
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cc1b0268e1968e5d      lavish       none       1
+runner file: absent
+poll processes for board F: 0
+captain clicked Send to Agent at 02:34:47
+NO CAPTURE of answer 2 within 30s (nothing is listening)
+$ base/bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cc1b0268e1968e5d      lavish       none       1

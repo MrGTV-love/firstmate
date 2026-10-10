@@ -1,0 +1,13 @@
+### Scenario 11: arm confirmation, 8 cycles on a loaded host
+host load: 23.38 37.75 41.13
+cycle 1: arm rc=0 armed-line=1 list-owner=live -> ok
+cycle 2: arm rc=0 armed-line=1 list-owner=live -> ok
+cycle 3: arm rc=0 armed-line=1 list-owner=live -> ok
+cycle 4: arm rc=0 armed-line=1 list-owner=live -> ok
+cycle 5: arm rc=0 armed-line=1 list-owner=live -> ok
+cycle 6: arm rc=0 armed-line=1 list-owner=live -> ok
+cycle 7: arm rc=0 armed-line=1 list-owner=live -> ok
+cycle 8: arm rc=0 armed-line=1 list-owner=live -> ok
+arm cycles ok=8 bad=0
+launch-failed wakes queued: 0
+poll processes left for board E: 0

@@ -1,0 +1,91 @@
+### Scenario 1: arm, then three captain answers with no reconcile
+$ date; bin/fm-procevent-lavish.sh arm /tmp/fm-lvtest.BZslGF/boards/decision-a.html
+01:51:44
+registered: lavish-cfd519a85d26b6d2 (lavish)
+armed: lavish-cfd519a85d26b6d2
+artifact: /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+arm rc=0
+
+$ bin/fm-procevent.sh list --age
+SOURCE                       ADAPTER      OWNER      PENDING AGE_SECONDS
+lavish-cfd519a85d26b6d2      lavish       live       0 1
+rc=0
+
+== BEFORE answer 1 ==
+01:52:49
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       0
+runner pid: 73845
+captain clicked Send to Agent at 01:52:53
+capture lavish-cfd519a85d26b6d2.1.result visible 3.7s after the send began
+
+== AFTER answer 1 (no reconcile was run) ==
+01:52:56
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       1
+runner pid: 73845
+
+$ ls state/procevent-inbox
+total 16
+drwx------  4 charlesabrooker  staff   128 Oct 10 01:52 .
+drwxr-xr-x  7 charlesabrooker  staff   224 Oct 10 01:52 ..
+-rw-------  1 charlesabrooker  staff     7 Oct 10 01:52 lavish-cfd519a85d26b6d2.1.adapter
+-rw-------  1 charlesabrooker  staff  2585 Oct 10 01:52 lavish-cfd519a85d26b6d2.1.result
+
+$ cat state/.wake-queue
+1791615174	1	check	procevent:lavish-cfd519a85d26b6d2:1	check: procevent lavish lavish-cfd519a85d26b6d2 1
+
+$ bin/fm-procevent-lavish.sh read lavish-cfd519a85d26b6d2.1.result
+CAPTAIN MESSAGE
+| Answer 1: Option A, deploy tonight.
+END CAPTAIN MESSAGE
+
+declared_items: 1
+presented_items: 1
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 0
+captain_message_count: 1
+
+ANNOTATIONS: (none)
+END LAVISH RESULT (1 of 1)
+
+== answer 2: sent while earlier answers are still unhandled; no reconcile run ==
+poll process before send:
+44407 73845    00:19 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+44415 73845    00:19 perl -e \012    use strict;\012    use warnings;\012    my ($stage) = @ARGV;\012    my $bare = "error: Lavish Editor poll respons
+captain clicked Send to Agent at 01:53:17
+capture lavish-cfd519a85d26b6d2.2.result visible 4.2s after the send began
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       2
+runner pid: 73845
+
+== answer 3: sent while earlier answers are still unhandled; no reconcile run ==
+poll process before send:
+35042 73845    00:09 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+35057 73845    00:09 perl -e \012    use strict;\012    use warnings;\012    my ($stage) = @ARGV;\012    my $bare = "error: Lavish Editor poll respons
+captain clicked Send to Agent at 01:53:32
+capture lavish-cfd519a85d26b6d2.3.result visible 4.0s after the send began
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       3
+runner pid: 73845
+
+$ cat state/.wake-queue
+1791615174	1	check	procevent:lavish-cfd519a85d26b6d2:1	check: procevent lavish lavish-cfd519a85d26b6d2 1
+1791615198	2	check	procevent:lavish-cfd519a85d26b6d2:2	check: procevent lavish lavish-cfd519a85d26b6d2 2
+1791615213	3	check	procevent:lavish-cfd519a85d26b6d2:3	check: procevent lavish lavish-cfd519a85d26b6d2 3
+
+$ bin/fm-procevent.sh classify (each capture)
+1: feedback
+2: feedback
+3: feedback
+
+captain text found in each raw result:
+Answer 1: Option A, deploy tonight.
+Answer 2: follow-up number 2 from the captain.
+Answer 3: follow-up number 3 from the captain.

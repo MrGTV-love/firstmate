@@ -1,0 +1,87 @@
+### Scenario 3: leftover polls (orphans) and the blocked listener
+== setup: open page B, then leave two stray polls running (like old days' leftovers) ==
+session:
+  file: /private/tmp/fm-lvtest.BZslGF/boards/review-b.html
+  url: "http://127.0.0.1:63849/session/5c51600f26890270"
+  status: opened
+stray native poll pid=97650 ; stray adapter poll pid=97656
+
+$ bin/fm-procevent-lavish.sh orphans   (page B is not registered in this home yet)
+rc=0
+kept: 16341 (owned by a claim) /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+kept: 16749 (owned by a claim) /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+kept: 16761 (owned by a claim) /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+kept: 97650 (not in this home's records) /tmp/fm-lvtest.BZslGF/boards/review-b.html
+orphans: found=0 killed=0 kept=84
+(lines for other homes' processes on this machine, all 'kept:': 81 incl. total line)
+
+== now arm page B: a real listener claims it AFTER the strays started ==
+$ bin/fm-procevent-lavish.sh arm /tmp/fm-lvtest.BZslGF/boards/review-b.html
+registered: lavish-5c51600f26890270 (lavish)
+armed: lavish-5c51600f26890270
+artifact: /private/tmp/fm-lvtest.BZslGF/boards/review-b.html
+arm rc=0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5c51600f26890270      lavish       none       1
+lavish-cfd519a85d26b6d2      lavish       live       5
+
+== while the leftover poll 97650 holds page B: two reconcile passes (what the watcher does each cycle) ==
+$ bin/fm-procevent.sh reconcile
+reconciled: published=6 started=1 stopped=0 uncertain=0 failed=0
+rc=0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5c51600f26890270      lavish       none       2
+lavish-cfd519a85d26b6d2      lavish       live       5
+$ bin/fm-procevent.sh reconcile
+reconciled: published=7 started=1 stopped=0 uncertain=0 failed=0
+rc=0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5c51600f26890270      lavish       none       3
+lavish-cfd519a85d26b6d2      lavish       live       5
+page B captures so far:
+lavish-5c51600f26890270.1.result: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 11175ms)"
+lavish-5c51600f26890270.2.result: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 71951ms)"
+lavish-5c51600f26890270.3.result: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 78892ms)"
+page B wakes queued: 3
+
+$ bin/fm-procevent-lavish.sh orphans
+rc=0
+kept: 16341 (owned by a claim) /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+kept: 16749 (owned by a claim) /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+kept: 16761 (owned by a claim) /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+orphan: 97650 lavish-5c51600f26890270 started=1791615294 last-claim=1791615374 /tmp/fm-lvtest.BZslGF/boards/review-b.html
+orphans: found=1 killed=0 kept=83
+orphan pids listed: 97650  ; stray native pid is 97650
+
+$ bin/fm-procevent-lavish.sh orphans --kill
+rc=0
+kept: 16341 (owned by a claim) /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+kept: 16749 (owned by a claim) /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+kept: 16761 (owned by a claim) /private/tmp/fm-lvtest.BZslGF/boards/decision-a.html
+killed: 97650 lavish-5c51600f26890270 started=1791615294 last-claim=1791615374 /tmp/fm-lvtest.BZslGF/boards/review-b.html
+orphans: found=1 killed=1 kept=83
+stray 97650 is gone
+page A listener untouched:
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       5
+
+== after cleanup: reconcile restarts page B; the captain answers page B ==
+$ bin/fm-procevent.sh reconcile
+reconciled: published=8 started=1 stopped=0 uncertain=0 failed=0
+rc=0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5c51600f26890270      lavish       live       3
+lavish-cfd519a85d26b6d2      lavish       live       5
+captain clicked Send to Agent at 01:56:39
+capture lavish-5c51600f26890270.4.result visible 4.5s after the send began
+CAPTAIN MESSAGE
+| Page B answer: approve the review.
+END CAPTAIN MESSAGE
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5c51600f26890270      lavish       live       4
+lavish-cfd519a85d26b6d2      lavish       live       5

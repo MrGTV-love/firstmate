@@ -1,0 +1,8 @@
+### Round 2: control. 60s owner lease, nothing refreshes it (fresh lab home, no primary, no watcher, no list/reconcile)
+03:39:38 $ FM_PROCEVENT_OWNER_LEASE_SECONDS=60 FM_PROCEVENT_OWNER_CHECK_SECONDS=5 bin/fm-procevent-lavish.sh arm board-e.html
+registered: lavish-b2fd17e79c21f78e (lavish)
+armed: lavish-b2fd17e79c21f78e
+artifact: /private/tmp/fm-lvtest2.YLToU5/boards/board-e.html
+03:39:43 runner pid 13655 ; lease file touched at 03:39:39
+03:40:44 runner 13655 STOPPED by its owner guard 65s after arm (lease 60s, check 5s)
+03:40:47 processes left in runner group: 0 ; poll processes for board E: 0

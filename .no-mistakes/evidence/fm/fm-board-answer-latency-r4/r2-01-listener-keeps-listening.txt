@@ -1,0 +1,59 @@
+### Round 2, scenario 1: arm page A, then three captain answers with no reconcile (target commit eaf50e64)
+host load: { 76.79 69.56 58.19 }
+$ bin/fm-procevent.sh list --age
+SOURCE                       ADAPTER      OWNER      PENDING AGE_SECONDS
+lavish-166173abff88f4f3      lavish       live       0 10
+runner pid: 93487
+
+== answer 1 (earlier answers stay unhandled; no reconcile is run) ==
+poll process before the click:
+95876 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lvtest2.YLToU5/boards/decision-a.html
+captain clicked 'Send to Agent' at 03:13:14 (epoch 1791619994)
+capture lavish-166173abff88f4f3.1.result visible 3s after the click (whole seconds)
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-166173abff88f4f3      lavish       live       1
+runner pid: 93487
+
+== answer 2 (earlier answers stay unhandled; no reconcile is run) ==
+poll process before the click:
+32336 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lvtest2.YLToU5/boards/decision-a.html
+captain clicked 'Send to Agent' at 03:13:31 (epoch 1791620011)
+capture lavish-166173abff88f4f3.2.result visible 4s after the click (whole seconds)
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-166173abff88f4f3      lavish       live       2
+runner pid: 93487
+
+== answer 3 (earlier answers stay unhandled; no reconcile is run) ==
+poll process before the click:
+76234 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lvtest2.YLToU5/boards/decision-a.html
+captain clicked 'Send to Agent' at 03:13:48 (epoch 1791620028)
+capture lavish-166173abff88f4f3.3.result visible 4s after the click (whole seconds)
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-166173abff88f4f3      lavish       live       3
+runner pid: 93487
+
+$ cat state/.wake-queue
+1791619996	1	check	procevent:lavish-166173abff88f4f3:1	check: procevent lavish lavish-166173abff88f4f3 1
+1791620014	2	check	procevent:lavish-166173abff88f4f3:2	check: procevent lavish lavish-166173abff88f4f3 2
+1791620031	3	check	procevent:lavish-166173abff88f4f3:3	check: procevent lavish lavish-166173abff88f4f3 3
+
+$ bin/fm-procevent-lavish.sh read <result 3>
+CAPTAIN MESSAGE
+| Round 2 answer 3 from the captain: option A.
+END CAPTAIN MESSAGE
+
+declared_items: 1
+presented_items: 1
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 0
+captain_message_count: 1
+
+classify 1: feedback
+classify 2: feedback
+classify 3: feedback

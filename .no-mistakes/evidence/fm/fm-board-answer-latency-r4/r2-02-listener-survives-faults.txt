@@ -1,0 +1,43 @@
+### Round 2, scenario 2: killed poll child, then Lavish server restart (page A)
+page A runner process: 93487
+
+== FAULT 1: the blocking 'lavish-axi poll' child is killed with no output ==
+poll pid before: 13736 ; captures before: 3
+sent KILL to 13736 at 03:23:45
+the same runner started a new poll pid 83939 within 10s; no reconcile was run
+captures after: 3 (a killed poll is not news)
+captain clicked 'Send to Agent' at 03:23:57 (epoch 1791620637)
+capture lavish-166173abff88f4f3.4.result visible 1s after the click (whole seconds)
+
+== FAULT 2: the Lavish server stops and restarts under three listeners ==
+poll pid before:  ; page A captures before: 4 ; all captures before: 18
+$ lavish-axi stop
+server:
+  status: stopped
+  port: 54796
+server stopped at 03:23:58
+the same runner started a new poll pid 6046 within 5s; no reconcile was run
+server listening again: node 6417 127.0.0.1:54796
+page A captures after: 4 ; all captures after: 18 (a server restart is not news)
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-13248e4087940e3a      lavish       live       5
+lavish-166173abff88f4f3      lavish       live       4
+lavish-a4ef954be212040e      lavish       live       9
+
+== after the restart: the captain reloads the page and answers ==
+captain clicked 'Send to Agent' at 03:24:21 (epoch 1791620661)
+capture lavish-166173abff88f4f3.5.result visible 1s after the click (whole seconds)
+CAPTAIN MESSAGE
+| Round 2 answer 5: sent after the Lavish server restarted.
+END CAPTAIN MESSAGE
+page A runner process now: 93487 (was 93487)
+$ grep pageA state/.wake-queue
+1791619996	1	check	procevent:lavish-166173abff88f4f3:1	check: procevent lavish lavish-166173abff88f4f3 1
+1791620014	2	check	procevent:lavish-166173abff88f4f3:2	check: procevent lavish lavish-166173abff88f4f3 2
+1791620031	3	check	procevent:lavish-166173abff88f4f3:3	check: procevent lavish lavish-166173abff88f4f3 3
+1791620638	18	check	procevent:lavish-166173abff88f4f3:4	check: procevent lavish lavish-166173abff88f4f3 4
+
+(checked 20s later) wake row for answer 5:
+1791620662	19	check	procevent:lavish-166173abff88f4f3:5	check: procevent lavish lavish-166173abff88f4f3 5
+(driver note: 'poll pid before' is empty in FAULT 2 because the read fell between two poll rounds, right after capture 4.)

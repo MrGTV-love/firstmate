@@ -1,0 +1,13 @@
+### Round 2: arm then retire, 8 cycles on a loaded host (covers the single-exec runner launch)
+host load: { 22.60 36.09 43.48 }
+cycle 1: arm rc=0 armed-line=1 list-owner=live runner-command='bash /tmp/fm-lvtest2.YLToU5/project/bin/fm-procevent.sh _own' -> ok
+cycle 2: arm rc=0 armed-line=1 list-owner=live runner-command='/bin/bash /tmp/fm-lvtest2.YLToU5/project/bin/fm-procevent.sh' -> ok
+cycle 3: arm rc=0 armed-line=1 list-owner=live runner-command='bash /tmp/fm-lvtest2.YLToU5/project/bin/fm-procevent.sh _own' -> ok
+cycle 4: arm rc=0 armed-line=1 list-owner=live runner-command='bash /tmp/fm-lvtest2.YLToU5/project/bin/fm-procevent.sh _own' -> ok
+cycle 5: arm rc=0 armed-line=1 list-owner=live runner-command='bash /tmp/fm-lvtest2.YLToU5/project/bin/fm-procevent.sh _own' -> ok
+cycle 6: arm rc=0 armed-line=1 list-owner=live runner-command='bash /tmp/fm-lvtest2.YLToU5/project/bin/fm-procevent.sh _own' -> ok
+cycle 7: arm rc=0 armed-line=1 list-owner=live runner-command='bash /tmp/fm-lvtest2.YLToU5/project/bin/fm-procevent.sh _own' -> ok
+cycle 8: arm rc=0 armed-line=1 list-owner=live runner-command='bash /tmp/fm-lvtest2.YLToU5/project/bin/fm-procevent.sh _own' -> ok
+arm cycles ok=8 bad=0
+launch-failed wakes queued: 0
+poll processes left for board D: 0

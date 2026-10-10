@@ -1,0 +1,41 @@
+### Round 3, scenario 4 (adversarial): a SECOND firstmate home arms page A while home 1's listener is live on it (target commit e04bd183)
+home 1: /Users/charlesabrooker/tmp/fm-lab.hGdLW7
+home 2: /Users/charlesabrooker/tmp/fm-lab.8el7HR
+home 1 runner: 26292
+page A poll processes:
+61897 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+62118 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+62123 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+
+== 04:36:03 home 2: bin/fm-procevent-lavish.sh arm page-a.html ==
+registered: lavish-f56f4f7994c6ae7c (lavish)
+still-listening: lavish-f56f4f7994c6ae7c
+artifact: /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+note: an earlier listener is still live and serving this board; this registration takes effect only after the source is retired and armed again
+arm rc=0
+
+== 04:36:28 20 s later ==
+home 1 runner alive: yes
+page A poll processes:
+61897 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+62118 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+62123 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+takeover polls on page A: 0
+$ home 1: bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5cdc7a56eebd0f5f      lavish       live       2
+lavish-81f80c12ced13950      lavish       live       2
+lavish-f56f4f7994c6ae7c      lavish       live       3
+$ home 2: bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-f56f4f7994c6ae7c      lavish       live       0
+home 2 results for page A:
+home 1 page A results: 3 (3 before)
+  lavish-f56f4f7994c6ae7c.1.result classify=feedback code=  file: /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+  lavish-f56f4f7994c6ae7c.2.result classify=feedback code=  file: /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+  lavish-f56f4f7994c6ae7c.3.result classify=feedback code=  file: /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+
+== 04:36:28 the captain answers page A: home 1 should capture it ==
+captain clicked 'Send to Agent' at 04:36:30 (epoch 1791624990): Round 3 page A answer 4: sent after a second home tried to arm the page.
+capture lavish-f56f4f7994c6ae7c.4.result visible 2s after the click (whole seconds)
+home 2 captured it: 0

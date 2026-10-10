@@ -1,0 +1,207 @@
+### Scenario 6: helper subagent tool events. The helper never gets the notice; the main session does.
+## run A driver log
+02:17:16 standing instruction sent
+02:19:28 idle: watcher=[41985 ] runner=[70216 alive]
+02:19:30 CAPTAIN sent answer 4 (primary idle)
+02:19:42 tick: watcher=[41985 ] runner=[70216 alive] lease-age=15s
+02:19:54 tick: watcher=[31173 ] runner=[70216 alive] lease-age=3s
+02:20:03 result 4 acknowledged (+33s)
+02:20:06 tick: watcher=[31173 ] runner=[70216 alive] lease-age=2s
+02:20:18 tick: watcher=[11531 ] runner=[70216 alive] lease-age=4s
+02:20:31 before answer 5: watcher=[11531 60593 ] runner=[70216 alive] lease-age=1s
+02:20:36 CAPTAIN sent answer 5 (primary waits on its helper)
+02:20:36 tick: watcher=[11531 ] runner=[70216 alive] lease-age=3s
+02:20:40 capture lavish-44c982f60522664f.5.result exists (+3s)
+02:20:40 non-owner shell ran the PostToolUse hook with result 5 pending: output=[rc=0]
+02:20:49 tick: watcher=[2308 ] runner=[70216 alive] lease-age=3s
+02:21:01 tick: watcher=[36779 ] runner=[70216 alive] lease-age=4s
+02:21:13 tick: watcher=[68097 ] runner=[70216 alive] lease-age=7s
+02:21:25 tick: watcher=[22034 ] runner=[70216 alive] lease-age=2s
+02:21:38 tick: watcher=[49394 ] runner=[70216 alive] lease-age=7s
+02:21:50 tick: watcher=[93606 ] runner=[70216 alive] lease-age=3s
+02:22:02 tick: watcher=[] runner=[70216 alive] lease-age=7s
+02:22:14 tick: watcher=[61106 ] runner=[70216 alive] lease-age=4s
+02:22:26 tick: watcher=[61106 ] runner=[70216 alive] lease-age=2s
+02:22:32 result 5 acknowledged (+116s after answer 5)
+02:22:38 tick: watcher=[61106 ] runner=[70216 alive] lease-age=7s
+02:22:41 primary printed LABTWO_DONE; runner=[70216 alive]
+
+## run A main transcript summary
+--:--:-- ASSISTANT: Captain, READYTWO.
+02:17:20 [turn end: Stop hooks ran]
+02:19:45 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.B
+--:--:--   TOOL_RESULT: 1791616771	5	check	procevent:lavish-44c982f60522664f:4	check: procevent lavish lavish-44c982f60522664f 4 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-
+02:19:51 HOOK_CONTEXT: ["A captured Lavish result is waiting: lavish-44c982f60522664f 4. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.B
+--:--:--   TOOL_RESULT: CAPTAIN MESSAGE | | Board C answer four: starts the helper turn. | END CAPTAIN MESSAGE |  | declared_items: 1 | presented_items: 1 | malformed_items: 0 | complete: yes | lifecy
+02:19:56 HOOK_CONTEXT: ["A captured Lavish result is waiting: lavish-44c982f60522664f 4. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.B
+--:--:--   TOOL_RESULT: handled: lavish-44c982f60522664f 4
+--:--:-- TOOL_USE Agent: Use the Bash tool to run this exact command five separate times, one Bash call each, one at a time. Do not combine them and do not background them:
+
+python3 -c 
+--:--:--   TOOL_RESULT: Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing
+--:--:-- ASSISTANT: Captain, I handled the board answer that started this turn. I read it, marked it handled, and acknowledged its row. Your message, quoted exactly:  > Board C answer four: starts the helper turn.  The h
+02:20:12 [turn end: Stop hooks ran]
+02:20:48 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, a new board answer came in. The helper is still running, and you told me to run no tools while it works. So I have not read the answer yet.  The answer is saved, so it will not be lost. When 
+02:20:55 [turn end: Stop hooks ran]
+02:20:59 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, the reminder came in again for the same board answer. The helper is still running, so I am still not running any tools.  The answer is saved. I will handle it when the helper finishes.
+02:21:04 [turn end: Stop hooks ran]
+02:21:08 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, the same reminder came in again. The helper is still running, so I am still not running any tools.  The board answer is saved. I will handle it when the helper finishes.
+02:21:12 [turn end: Stop hooks ran]
+02:21:16 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, the same reminder came in again. The helper is still running, so I am still not running any tools.  The board answer is saved. I will handle it when the helper finishes.
+02:21:21 [turn end: Stop hooks ran]
+02:21:25 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, the same reminder came in again. The helper is still running, so I am still not running any tools.  The board answer is saved. I will handle it when the helper finishes.
+02:21:29 [turn end: Stop hooks ran]
+02:21:33 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, the same reminder came in again. The helper is still running, so I am still not running any tools.  The board answer is saved. I will handle it when the helper finishes.
+02:21:37 [turn end: Stop hooks ran]
+02:21:41 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, the same reminder came in again. The helper is still running, so I am still not running any tools.  The board answer is saved. I will handle it when the helper finishes.
+02:21:45 [turn end: Stop hooks ran]
+02:21:49 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, the same reminder came in again. The helper is still running, so I am still not running any tools.  The board answer is saved. I will handle it when the helper finishes.
+02:21:53 [turn end: Stop hooks ran]
+02:21:57 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, the same reminder came in again. The helper is still running, so I am still not running any tools.  The board answer is saved. I will handle it when the helper finishes.
+02:22:01 [turn end: Stop hooks ran]
+02:22:05 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- ASSISTANT: Captain, the same reminder came in again. The helper is still running, so I am still not running any tools.  The board answer is saved. I will handle it when the helper finishes.
+02:22:09 [turn end: Stop hooks ran]
+02:22:09 USER: <task-notification> <task-id>a6566001ea17e8b00</task-id> <tool-use-id>toolu_01YKfunqgjH9mLykdaQVehYQ</tool-use-id> <output-file>/private/tmp/claude-501/-private-tmp-fm-lvtest-BZslGF-project/a70d3ad3-5
+--:--:-- ASSISTANT: Helper done. Now I handle the saved board answer.
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.B
+--:--:--   TOOL_RESULT: 1791616837	6	check	procevent:lavish-44c982f60522664f:5	check: procevent lavish lavish-44c982f60522664f 5 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-
+02:22:15 HOOK_CONTEXT: ["A captured Lavish result is waiting: lavish-44c982f60522664f 5. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-
+02:22:12 ATTACH queued_command 
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.B
+--:--:--   TOOL_RESULT: CAPTAIN MESSAGE | | Board C answer five: sent while only a helper is working. | END CAPTAIN MESSAGE |  | declared_items: 1 | presented_items: 1 | malformed_items: 0 | complet
+02:22:25 HOOK_CONTEXT: ["A captured Lavish result is waiting: lavish-44c982f60522664f 5. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.B
+--:--:--   TOOL_RESULT: handled: lavish-44c982f60522664f 5
+--:--:-- ASSISTANT: Captain, lab two is done. All steps worked.  1. **The board answer that started the turn.** I handled it and acknowledged its row before I started the helper. Your message, quoted exactly:    > Board 
+02:22:39 [turn end: Stop hooks ran]
+
+## run A helper transcript summary (no HOOK_CONTEXT lines)
+02:20:08 USER: Use the Bash tool to run this exact command five separate times, one Bash call each, one at a time. Do not combine them and do not background them:  python3 -c 'import time; time.sleep(20)'  After the
+02:20:08 ATTACH environment 
+02:20:08 ATTACH model 
+02:20:08 ATTACH instructions 
+02:20:08 ATTACH session_context 
+02:20:08 ATTACH date 
+02:20:08 ATTACH credential_org 
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+02:20:33 ATTACH auto_mode 
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- ASSISTANT: HELPER_DONE
+
+## run B driver log
+02:24:46 standing instruction sent
+02:25:03 idle: watcher=[69662 ] runner=[67697 alive]
+02:25:05 CAPTAIN sent answer 6 (primary idle)
+02:25:17 tick: watcher=[97498 ] runner=[67697 alive] lease-age=12s
+02:25:29 tick: watcher=[39527 ] runner=[67697 alive] lease-age=3s
+02:25:35 result 6 acknowledged (+30s)
+02:25:42 tick: watcher=[39527 ] runner=[67697 alive] lease-age=4s
+02:25:54 tick: watcher=[11108 ] runner=[67697 alive] lease-age=9s
+02:26:03 before answer 7: watcher=[11108 ] runner=[67697 alive] lease-age=2s
+02:26:05 CAPTAIN sent answer 7 (primary waits on its helper)
+02:26:08 capture lavish-44c982f60522664f.7.result exists (+3s)
+02:26:08 non-owner shell ran the PostToolUse hook with result 7 pending: output=[rc=0]
+02:26:08 tick: watcher=[11108 ] runner=[67697 alive] lease-age=7s
+02:26:21 tick: watcher=[98237 ] runner=[67697 alive] lease-age=4s
+02:26:33 tick: watcher=[98237 ] runner=[67697 alive] lease-age=1s
+02:26:42 result 7 acknowledged (+37s after answer 7)
+02:26:45 tick: watcher=[] runner=[67697 alive] lease-age=6s
+02:26:57 tick: watcher=[85921 ] runner=[67697 alive] lease-age=7s
+02:27:09 tick: watcher=[85921 ] runner=[67697 alive] lease-age=7s
+02:27:21 tick: watcher=[85921 ] runner=[67697 alive] lease-age=4s
+02:27:34 tick: watcher=[85921 ] runner=[67697 alive] lease-age=0s
+02:27:46 tick: watcher=[85921 ] runner=[67697 alive] lease-age=3s
+02:27:49 primary printed LABTHREE_DONE; runner=[67697 alive]
+
+## run B main transcript summary
+--:--:-- ASSISTANT: READYTHREE
+02:24:51 [turn end: Stop hooks ran]
+02:24:54 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- TOOL_USE Bash: bin/fm-wake-drain.sh
+--:--:--   TOOL_RESULT: WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 64540.1791617091.BN0DUJ
+--:--:-- TOOL_USE Bash: bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 64540.1791617091.BN0DUJ
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- ASSISTANT: Captain, shipshape.
+02:25:03 [turn end: Stop hooks ran]
+02:25:23 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- TOOL_USE Bash: bin/fm-wake-drain.sh
+--:--:-- TOOL_USE Skill: {"skill":"process-event-sources"}
+--:--:--   TOOL_RESULT: 1791617106	7	check	procevent:lavish-44c982f60522664f:6	check: procevent lavish lavish-44c982f60522664f 6 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-
+02:25:26 HOOK_CONTEXT: ["A captured Lavish result is waiting: lavish-44c982f60522664f 6. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-
+--:--:--   TOOL_RESULT: Launching skill: process-event-sources
+02:25:26 HOOK_CONTEXT: ["A captured Lavish result is waiting: lavish-44c982f60522664f 6. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-
+--:--:-- USER-TEXT: Base directory for this skill: /private/tmp/fm-lvtest.BZslGF/project/.claude/skills/process-event-sources  # process-event-sources  Load this before arming a long-polling source, before registering a 
+02:25:26 ATTACH command_permissions 
+--:--:-- TOOL_USE Bash: export FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-l
+--:--:--   TOOL_RESULT: Exit code 1 | feedback | --- | CAPTAIN MESSAGE | | Board C answer six: starts the foreground helper turn. | END CAPTAIN MESSAGE |  | declared_items: 1 | presented_items: 1 | malf
+--:--:-- TOOL_USE Bash: export FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-l
+--:--:--   TOOL_RESULT: handled: lavish-44c982f60522664f 6
+--:--:-- ASSISTANT: Now the foreground helper, per the standing lab instruction.
+--:--:-- TOOL_USE Agent: Use the Bash tool to run this exact command five separate times, one Bash call each, one after another (not in parallel, not combined): python3 -c 'import time;
+--:--:--   TOOL_RESULT: Async agent launched successfully. (This tool result is internal metadata — never quote or paste any part of it, including the agentId below, into a user-facing
+--:--:-- ASSISTANT: Captain, the board answer came in and is handled.  1. Board C sent one message: "Board C answer six: starts the foreground helper turn." 2. I marked that answer as done. I marked the notification as d
+02:25:43 [turn end: Stop hooks ran]
+02:26:19 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a ha
+--:--:-- TOOL_USE Bash: export FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-l
+--:--:--   TOOL_RESULT: 1791617166	8	check	procevent:lavish-44c982f60522664f:7	check: procevent lavish lavish-44c982f60522664f 7 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-
+02:26:32 HOOK_CONTEXT: ["A captured Lavish result is waiting: lavish-44c982f60522664f 7. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-
+--:--:-- TOOL_USE Bash: export FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-l
+--:--:--   TOOL_RESULT: handled: lavish-44c982f60522664f 7 | ACK_OK
+--:--:-- ASSISTANT: Captain, a second board answer came in. I handled it.  1. Board C said: "Board C answer seven: sent while only a foreground helper is working." 2. I marked that answer as done. 3. I marked the notific
+02:26:44 [turn end: Stop hooks ran]
+02:27:37 USER: <task-notification> <task-id>aa6ad5c4d0d09a0b6</task-id> <tool-use-id>toolu_0161w4PWmwraFuETBmHWyDzr</tool-use-id> <output-file>/private/tmp/claude-501/-private-tmp-fm-lvtest-BZslGF-project/e0593848-5
+--:--:-- TOOL_USE Bash: export FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-l
+--:--:--   TOOL_RESULT: lavish-44c982f60522664f.1.adapter | lavish-44c982f60522664f.1.handled | lavish-44c982f60522664f.1.result | lavish-44c982f60522664f.2.adapter | lavish-44c982f60522664f.2
+--:--:-- ASSISTANT: Captain, the helper finished. It replied HELPER_DONE.  While the helper ran, one more board answer came in. I handled it. I marked the answer and the notification as done.  The board message said: "Bo
+02:27:47 [turn end: Stop hooks ran]
+
+## run B helper transcript summary (no HOOK_CONTEXT lines)
+02:25:38 USER: Use the Bash tool to run this exact command five separate times, one Bash call each, one after another (not in parallel, not combined):
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(20)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- ASSISTANT: HELPER_DONE
+
+## run B PostToolUse events seen by a test-only logger hook (time, lease epoch, tool, agent_id)
+02:24:58 1791617092 tool=Bash agent_id=-
+02:25:02 1791617098 tool=Bash agent_id=-
+02:25:26 1791617121 tool=Bash agent_id=-
+02:25:26 1791617126 tool=Skill agent_id=-
+02:25:35 1791617135 tool=Bash agent_id=-
+02:25:38 1791617137 tool=Agent agent_id=-
+02:26:00 1791617145 tool=Bash agent_id=aa6ad5c4d0d09a0b6
+02:26:23 1791617176 tool=Bash agent_id=aa6ad5c4d0d09a0b6
+02:26:32 1791617183 tool=Bash agent_id=-
+02:26:39 1791617199 tool=Bash agent_id=-
+02:26:50 1791617206 tool=Bash agent_id=aa6ad5c4d0d09a0b6
+02:27:12 1791617222 tool=Bash agent_id=aa6ad5c4d0d09a0b6
+02:27:35 1791617254 tool=Bash agent_id=aa6ad5c4d0d09a0b6
+02:27:43 1791617256 tool=Bash agent_id=-

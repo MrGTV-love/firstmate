@@ -1,0 +1,72 @@
+### Round 3, scenario 3 (adversarial): a poll that is NOT a proved leftover holds page C (target commit e04bd183)
+== setup: another agent's own poll, 'lavish-axi poll page-c.html --owner captain-agent', holds page C ==
+73416 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-c.html --owner captain-agent
+
+== 04:29:37 arm page C while that poll holds it ==
+registered: lavish-81f80c12ced13950 (lavish)
+armed: lavish-81f80c12ced13950
+artifact: /private/tmp/fm-lv3.wPuBza/boards/page-c.html
+arm rc=0
+runner pid: 86011 ; claim: /Users/charlesabrooker/tmp/fm-lab.hGdLW7
+86011
+.claim.xSHVHp-86011
+Sat Oct 10 04:29:37 2026     /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent.sh _start lavish-81f80c12ced13950
+/Users/charlesabrooker/tmp/fm-lab.hGdLW7/state/procevent
+16777233:213087727
+active
+/Users/charlesabrooker/tmp/fm-lab.hGdLW7/state
+16777233
+212596780
+501
+755
+
+== watch for 300 s with NO reconcile ==
+04:30:13 +36s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+04:30:43 +66s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+04:31:13 +96s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+04:31:44 +127s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+04:32:14 +157s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+04:32:44 +187s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+04:33:14 +217s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+04:33:44 +247s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+04:34:14 +277s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+04:34:45 +308s holder-alive=yes runner=86011 pageC-results=1 pageC-wakes=1 lavish-polls-by-listener=0 takeover-polls=0
+claim unchanged: yes
+runner unchanged: yes
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5cdc7a56eebd0f5f      lavish       live       2
+lavish-81f80c12ced13950      lavish       live       1
+lavish-f56f4f7994c6ae7c      lavish       live       3
+--- lavish-81f80c12ced13950.1.result classify=waiting
+  | error: "Lavish Editor already has an active poll listener (current listener: captain-agent; active for 4389ms)"
+  | code: LISTENER_ACTIVE
+  | help[1]: Use --takeover only when you intend to displace the current listener
+  | held-page: another poll holds /private/tmp/fm-lv3.wPuBza/boards/page-c.html and is not a proved leftover, so it is not displaced; this listener keeps its claim, retries with back-off, and reports this hold once
+  | held-by: 73416 (artifact cannot be resolved)
+$ grep page C rows in state/.wake-queue
+1791624582	6	check	procevent:lavish-81f80c12ced13950:1	check: procevent lavish lavish-81f80c12ced13950 1
+holder output so far:
+  | [lavish-axi] Long-polling for user feedback on /private/tmp/fm-lv3.wPuBza/boards/page-c.html. This stays silent until the user sends feedback, ends the session, or leaves every review window disco
+
+== 04:34:57 the captain answers page C while the other agent's poll still holds it ==
+captain clicked 'Send to Agent' at 04:34:59 (epoch 1791624899): Round 3 page C answer one: sent while another agent's poll holds the page.
+holder alive: no (a native poll returns after it delivers feedback)
+holder received the answer: 1 line(s) (expected: that agent owns the page at this moment)
+firstmate results for page C containing it: 0
+
+== 04:35:05 the holder is gone; wait for the same runner to take page C (no reconcile, no re-arm) ==
+runner holds page C with poll pid 79572, 29s later
+captain clicked 'Send to Agent' at 04:35:38 (epoch 1791624938): Round 3 page C answer two: sent after the other poll went away.
+capture lavish-81f80c12ced13950.2.result visible 1s after the click (whole seconds)
+lavish-81f80c12ced13950.1.result: classify=waiting
+lavish-81f80c12ced13950.2.result: classify=feedback
+$ grep page C rows in state/.wake-queue
+1791624582	6	check	procevent:lavish-81f80c12ced13950:1	check: procevent lavish lavish-81f80c12ced13950 1
+1791624939	7	check	procevent:lavish-81f80c12ced13950:2	check: procevent lavish lavish-81f80c12ced13950 2
+held-page reports in total: 1
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5cdc7a56eebd0f5f      lavish       live       2
+lavish-81f80c12ced13950      lavish       live       2
+lavish-f56f4f7994c6ae7c      lavish       live       3

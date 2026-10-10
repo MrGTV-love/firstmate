@@ -1,0 +1,108 @@
+### Round 3, scenario 6: a real Claude primary (2.1.296 (Claude Code)) in lab home /Users/charlesabrooker/tmp/fm-lab.Od6eNa, plain-checkout clone of e04bd183. The captain answers while firstmate is mid-turn.
+== 04:44:33 arm page D in the lab home ==
+registered: lavish-611ebcfac66a4106 (lavish)
+armed: lavish-611ebcfac66a4106
+artifact: /private/tmp/fm-lv3.wPuBza/boards/page-d.html
+arm rc=0
+== 04:44:34 give the primary a long turn (six 25 s sleeps) ==
+04:44:49 mid-turn check, pane tail: ❯  ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────   Opus 5.5 ░░░░░░░░░░ 5% 52k/1.0M clone:0d705018   ⏵⏵ bypass permissions on (shift+tab to cycle)
+turn-done lines in pane before the answer: 0
+captain clicked 'Send to Agent' at 04:44:59 (epoch 1791625499): Round 3 page D answer: sent while firstmate is mid-turn.
+capture lavish-611ebcfac66a4106.1.result visible 2s after the click (whole seconds)
+04:45:19 primary marked lavish-611ebcfac66a4106.1.result handled +19s after the click
+turn-done lines in pane at that moment: 1  (0 = still mid-turn)
+sleep calls completed so far: 1
+04:48:11 primary reached turn end (+192s after the click)
+
+## pane at the end
+hes only commands containing a literal * at that position. Replace that * with the exact value you mean.
+ ▐▛███▛█   Claude Code v2.1.296
+▝▜██████▀  Opus 5.5 with high effort · Claude Max
+ ▝▝   ▝▝   /private/tmp/fm-lv3.wPuBza/clone
+❯ Lab test. Do exactly this and nothing else: run the Bash command python3 -c 'import time; time.sleep(25)' six times, one Bash call each, one after another. If a hook tells you a captured Lavish
+  result is waiting, handle it as it says (drain, read it, acknowledge it with handled), quote the captain message, then continue the sleeps. Treat any other wake (for example an open-loop row) as
+  lab noise: acknowledge it and continue. After the sixth sleep, print a short summary and the word LAB_TURN_DONE.
+  Ran 3 shell commands
+⏺ Captain message: "Round 3 page D answer: sent while firstmate is mid-turn."
+  Ran 6 shell commands
+⏺ Captain, five of six sleeps are done. One more is next.
+  Ran 1 shell command
+⏺ Captain, the lab run is done. It worked.
+  1. All six 25-second sleeps ran, one after another.
+  2. After sleep 1, a hook said a captured Lavish result was waiting. The result came from page D.
+  3. I drained the queue, read the result, and marked it handled. Then I confirmed the drained queue.
+  4. The captain message said: "Round 3 page D answer: sent while firstmate is mid-turn."
+  5. No other notifications came in during the run.
+  6. The drain also gave one warning: "WATCHER DOWN - SUPERVISION IS OFF". This means the background monitor was not running. The lab said to do nothing else, so I did not fix it.
+  You do not need to do anything now.
+  LAB_TURN_DONE
+✻ Baked for 3m 35s · done 4:48 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 5% 57k/1.0M clone:0d705018
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+
+(driver note: the 'turn-done lines in pane at that moment: 1' count above is a driver artifact: it matched the word LAB_TURN_DONE inside the prompt text itself. The real turn end is the LAB_TURN_DONE reply at 04:48:11, 172 s after the answer was handled at 04:45:19.)
+
+## transcript events (Claude session jsonl, 0d705018-dc51-4688-86bc-0f6556a9444d.jsonl), local time
+04:42:43 ATTACHMENT(hook_success): <persisted-output>
+Output too large (9.9KB). Full output saved to: /Users/charlesabrooker/.claude/projects/-private-tmp-fm-lv3-wPuBza-clone/0d705018-dc51-4688-86bc-0f6556a9444d/tool-results/hook-373b9eec-593c-454f-8cd2-97816b01efcb-stdout.txt
+
+Preview (first 2
+04:42:46 ATTACHMENT(hook_success): <persisted-output>
+Output too large (12.8KB). Full output saved to: /Users/charlesabrooker/.claude/projects/-private-tmp-fm-lv3-wPuBza-clone/0d705018-dc51-4688-86bc-0f6556a9444d/tool-results/hook-6b4ed0db-407c-4b46-8364-4bd6dfd56a7b-stdout.txt
+
+Preview (first 
+04:44:35 ATTACHMENT(environment): 
+04:44:35 ATTACHMENT(model): 
+04:44:35 ATTACHMENT(agent_listing_delta): 
+04:44:35 ATTACHMENT(mcp_instructions_delta): 
+04:44:35 ATTACHMENT(auto_mode): 
+04:44:36 ATTACHMENT(instructions): 
+04:44:36 ATTACHMENT(session_context): 
+04:44:36 ATTACHMENT(date): 
+04:44:36 ATTACHMENT(credential_org): 
+04:44:36 ATTACHMENT(prompt_snapshot): 
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+04:45:05 ATTACHMENT(hook_success): 
+04:45:05 ATTACHMENT(hook_additional_context): ["A captured Lavish result is waiting: lavish-611ebcfac66a4106 1. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.Od6eNa' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.Od6eNa/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lv3.wPuBza/clone' '/private/tmp/fm-lv
+04:45:05 ATTACHMENT(prompt_snapshot): 
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.Od6eNa' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.Od6eNa/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lv3.wPuB
+--:--:--   TOOL_RESULT: 1791625501	1	check	procevent:lavish-611ebcfac66a4106:1	check: procevent lavish lavish-611ebcfac66a4106 1
+WAKE_ACK_REQUIRED: after handling c
+04:45:09 ATTACHMENT(hook_success): 
+04:45:09 ATTACHMENT(hook_additional_context): ["A captured Lavish result is waiting: lavish-611ebcfac66a4106 1. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.Od6eNa' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.Od6eNa/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lv3.wPuBza/clone' '/private/tmp/fm-lv
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.Od6eNa' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.Od6eNa/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lv3.wPuB
+--:--:--   TOOL_RESULT: CAPTAIN MESSAGE
+| Round 3 page D answer: sent while firstmate is mid-turn.
+END CAPTAIN MESSAGE
+
+declared_items: 1
+presented_items: 1
+malform
+04:45:13 ATTACHMENT(hook_success): 
+04:45:13 ATTACHMENT(hook_additional_context): ["A captured Lavish result is waiting: lavish-611ebcfac66a4106 1. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.Od6eNa' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.Od6eNa/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lv3.wPuBza/clone' '/private/tmp/fm-lv
+--:--:-- ASSISTANT: Captain message: "Round 3 page D answer: sent while firstmate is mid-turn."
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.Od6eNa' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.Od6eNa/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lv3.wPuB
+--:--:--   TOOL_RESULT: handled: lavish-611ebcfac66a4106 1
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.Od6eNa' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.Od6eNa/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lv3.wPuB
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+04:47:35 ATTACHMENT(silent_turn_reminder): 
+--:--:-- ASSISTANT: Captain, five of six sleeps are done. One more is next.
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+--:--:-- ASSISTANT: Captain, the lab run is done. It worked.
+
+1. All six 25-second sleeps ran, one after another.
+2. After sleep 1, a hook said a captured Lavish result was waiting. The result came from page D.
+3. I drai

@@ -1,0 +1,33 @@
+### Round 3, scenario 8: 'orphans' after its per-process test was moved into orphan_verdict (target commit e04bd183); lab home 1
+== setup: page E is armed, then retired (its records stay), and a leftover poll is left on it ==
+registered: lavish-6bae41b8efc51b50 (lavish)
+armed: lavish-6bae41b8efc51b50
+retired: lavish-6bae41b8efc51b50
+stray on page E: 97542 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+(the stray started after page E's last claim record, so it is NOT yet provable; the orphans test must keep it)
+$ bin/fm-procevent-lavish.sh orphans   (lines for this lab only)
+kept: 21148 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+kept: 21277 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+kept: 21279 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+kept: 59103 (not in this home's records) /private/tmp/fm-lv3.wPuBza/boards/page-d.html
+kept: 59474 (not in this home's records) /private/tmp/fm-lv3.wPuBza/boards/page-d.html
+kept: 59482 (not in this home's records) /private/tmp/fm-lv3.wPuBza/boards/page-d.html
+kept: 97542 (started after the last claim) /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+kept: 99002 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-c.html
+kept: 99146 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-c.html
+kept: 99149 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-c.html
+orphans: found=0 killed=0 kept=94
+
+== 04:51:44 page E is armed again; its new claim is later than the stray, so the stray is now a proved leftover ==
+registered: lavish-6bae41b8efc51b50 (lavish)
+armed: lavish-6bae41b8efc51b50
+stray 97542 alive after 6s: no
+stray output tail:
+  | error: Lavish Editor poll listener was replaced by a takeover
+  | code: LISTENER_REPLACED
+  | help[1]: Re-run lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html only if you intend to take over listening
+page E results: 0 (no held-page report)
+$ bin/fm-procevent-lavish.sh orphans   (page E lines)
+kept: 2599 (artifact cannot be resolved) /private/tmp/fm-lv3.wPuBza/boards/page-e.html --takeover
+kept: 2600 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+kept: 94078 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-e.html

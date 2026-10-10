@@ -1,0 +1,38 @@
+### Scenario 8: Send & End retires page B; retire stops page A
+== page B: the captain types a final answer and clicks 'Send & End' ==
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5c51600f26890270      lavish       live       4
+lavish-cfd519a85d26b6d2      lavish       live       5
+lavish-d24da127affa785a      lavish       live       0
+page B runner pid 65138
+captain clicked Send & End at 02:33:57
+capture lavish-5c51600f26890270.6.result exists
+$ bin/fm-procevent-lavish.sh read lavish-5c51600f26890270.6.result (first lines)
+SESSION-ENDING MESSAGE
+| Page B final answer: approved, closing the review.
+END SESSION-ENDING MESSAGE
+lifecycle: feedback
+session_ended: true
+$ bin/fm-procevent.sh classify
+feedback
+wake queued for it: 1
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       5
+lavish-d24da127affa785a      lavish       live       0
+page B registration file present: no
+page B runner 65138 alive: no
+page B poll processes left: 0
+
+== page A: firstmate retires the listener ==
+page A runner pid 73845 ; group members before: 6
+$ bin/fm-procevent-lavish.sh retire /tmp/fm-lvtest.BZslGF/boards/decision-a.html
+retired: lavish-cfd519a85d26b6d2
+rc=0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-d24da127affa785a      lavish       live       0
+page A runner 73845 alive: no ; group members after: 0
+page A poll processes left: 0
+page A captured results kept: 6

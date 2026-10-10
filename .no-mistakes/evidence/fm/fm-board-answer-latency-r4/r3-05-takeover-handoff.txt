@@ -1,0 +1,38 @@
+### Round 3, scenario 5: another agent deliberately takes page B from firstmate's live listener with --takeover (target commit e04bd183)
+firstmate runner on page B: 68092
+page B results before: 2
+
+== 04:36:47 other agent: lavish-axi poll page-b.html --takeover ==
+== 04:37:02 15 s later ==
+other agent's poll alive: yes (62186)
+firstmate runner alive: no
+registration present: no (retired)
+page B results after: 3
+  lavish-5cdc7a56eebd0f5f.1.result classify=feedback terminal=no
+  lavish-5cdc7a56eebd0f5f.2.result classify=feedback terminal=no
+  lavish-5cdc7a56eebd0f5f.3.result classify=unknown terminal=yes
+--- latest result lavish-5cdc7a56eebd0f5f.3.result:
+  | error: Lavish Editor poll listener was replaced by a takeover
+  | code: LISTENER_REPLACED
+  | help[1]: Re-run lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html only if you intend to take over listening
+$ grep page B rows in state/.wake-queue
+1791624531	4	check	procevent:lavish-5cdc7a56eebd0f5f:1	check: procevent lavish lavish-5cdc7a56eebd0f5f 1
+1791624540	5	check	procevent:lavish-5cdc7a56eebd0f5f:2	check: procevent lavish lavish-5cdc7a56eebd0f5f 2
+1791625009	9	check	procevent:lavish-5cdc7a56eebd0f5f:3	check: procevent lavish lavish-5cdc7a56eebd0f5f 3
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-81f80c12ced13950      lavish       live       2
+lavish-f56f4f7994c6ae7c      lavish       live       4
+
+== 04:37:03 three reconcile passes: the handed-off page must not be relaunched ==
+reconciled: published=9 started=0 stopped=0 uncertain=0 failed=0
+reconciled: published=9 started=0 stopped=0 uncertain=0 failed=0
+reconciled: published=9 started=0 stopped=0 uncertain=0 failed=0
+firstmate poll processes on page B: 0
+other agent's poll still alive: yes
+page B results now: 3
+
+== 04:37:24 the captain answers page B: the other agent's poll should get it ==
+captain clicked 'Send to Agent' at 04:37:26 (epoch 1791625046): Round 3 page B answer three: sent after another agent took the page over.
+other agent's poll received it: 1 line(s)
+firstmate results containing it: 0

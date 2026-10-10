@@ -1,0 +1,53 @@
+### Round 3, scenario 1: page A is armed, then the captain sends three answers with no reconcile (target commit e04bd183, lavish-axi 0.1.79)
+host load: 29.88 24.93 25.74
+(page A was armed at 04:13:06 in lab home /Users/charlesabrooker/tmp/fm-lab.hGdLW7; a first driver attempt had a browser-click bug, so no answer was sent then)
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-f56f4f7994c6ae7c      lavish       live       0
+runner pid: 26292
+
+== 04:17:21 answer 1 (earlier answers stay unhandled; no reconcile is run) ==
+poll process before the click:
+27799 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+captain clicked 'Send to Agent' at 04:17:23 (epoch 1791623843): Round 3 answer 1 from the captain on page A.
+capture lavish-f56f4f7994c6ae7c.1.result visible 2s after the click (whole seconds)
+
+== 04:17:29 answer 2 (earlier answers stay unhandled; no reconcile is run) ==
+poll process before the click:
+15679 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+captain clicked 'Send to Agent' at 04:17:33 (epoch 1791623853): Round 3 answer 2 from the captain on page A.
+capture lavish-f56f4f7994c6ae7c.2.result visible 2s after the click (whole seconds)
+
+== 04:17:39 answer 3 (earlier answers stay unhandled; no reconcile is run) ==
+poll process before the click:
+46640 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-a.html
+captain clicked 'Send to Agent' at 04:17:40 (epoch 1791623860): Round 3 answer 3 from the captain on page A.
+capture lavish-f56f4f7994c6ae7c.3.result visible 2s after the click (whole seconds)
+
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-f56f4f7994c6ae7c      lavish       live       3
+runner pid now: 26292 (was 26292)
+$ grep page A rows in state/.wake-queue
+1791623845	1	check	procevent:lavish-f56f4f7994c6ae7c:1	check: procevent lavish lavish-f56f4f7994c6ae7c 1
+1791623855	2	check	procevent:lavish-f56f4f7994c6ae7c:2	check: procevent lavish lavish-f56f4f7994c6ae7c 2
+1791623862	3	check	procevent:lavish-f56f4f7994c6ae7c:3	check: procevent lavish lavish-f56f4f7994c6ae7c 3
+lavish-f56f4f7994c6ae7c.1.result: classify=feedback
+lavish-f56f4f7994c6ae7c.2.result: classify=feedback
+lavish-f56f4f7994c6ae7c.3.result: classify=feedback
+$ bin/fm-procevent-lavish.sh read lavish-f56f4f7994c6ae7c.3.result
+CAPTAIN MESSAGE
+| Round 3 answer 3 from the captain on page A.
+END CAPTAIN MESSAGE
+
+declared_items: 1
+presented_items: 1
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 0
+captain_message_count: 1
+
+ANNOTATIONS: (none)
+END LAVISH RESULT (1 of 1)

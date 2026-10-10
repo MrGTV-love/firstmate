@@ -1,0 +1,58 @@
+### Scenario 10: real fleet board build and a Captain's Call answer
+$ FM_HOME=<lab4> bin/fm-bearings-board.sh build board-payload.json
+board: /Users/charlesabrooker/tmp/fm-lab.fyN4pj/.lavish/bearings-board.html
+session:
+  file: /Users/charlesabrooker/tmp/fm-lab.fyN4pj/.lavish/bearings-board.html
+  url: "http://127.0.0.1:63849/session/dd9afd74337cb37c"
+  status: opened
+next_step: "Do not respond to the user just yet. Now you must run `lavish-axi poll /Users/charlesabrooker/tmp/fm-lab.fyN4pj/.lavish/bearings-board.html`. This command long-polls until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace perio
+session: live
+served: /Users/charlesabrooker/tmp/fm-lab.fyN4pj/.lavish/bearings-board.html
+bound: lavish-dd9afd74337cb37c
+armed: lavish-dd9afd74337cb37c
+rc=0
+
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-4f2c4ccb3c0b5269      lavish       none       0
+lavish-cc1b0268e1968e5d      lavish       none       1
+lavish-dd9afd74337cb37c      lavish       live       0
+
+== fleet board (bin/fm-bearings-board.sh build) in lab home /Users/charlesabrooker/tmp/fm-lab.fyN4pj ==
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-dd9afd74337cb37c      lavish       live       0
+board runner pid 60226
+captain picked 'Deploy tonight', queued it, and clicked Send to Agent at 02:36:28
+capture lavish-dd9afd74337cb37c.1.result exists 2s later
+$ bin/fm-procevent.sh list   (no reconcile was run)
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-dd9afd74337cb37c      lavish       live       1
+board runner pid now: 60226 (was 60226)
+$ bin/fm-procevent-lavish.sh answers lavish-dd9afd74337cb37c.1.result
+lab-deploy-window-decision	yes	Deploy window -> yes
+$ bin/fm-procevent-lavish.sh read lavish-dd9afd74337cb37c.1.result
+SESSION-ENDING MESSAGE: (none)
+
+declared_items: 1
+presented_items: 1
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 1
+captain_message_count: 0
+
+ANNOTATIONS
+ANNOTATION 1 of 1
+element_uid: 1
+element_selector: div#bb-call > div > div > form
+tag: choice
+text:
+| Deploy window -> yes
+END ANNOTATIONS
+END LAVISH RESULT (1 of 1)
+$ cat state/.wake-queue
+1791617679	1	check	procevent:lavish-cc1b0268e1968e5d:1	check: procevent lavish lavish-cc1b0268e1968e5d 1
+1791617790	2	check	procevent:lavish-dd9afd74337cb37c:1	check: procevent lavish lavish-dd9afd74337cb37c 1
+handled marker for round 1: no

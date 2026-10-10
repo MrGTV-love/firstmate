@@ -1,0 +1,21 @@
+### Round 2: the same flow on the BASE commit 8ce400ff (before the change), fresh lab home
+$ base/bin/fm-procevent-lavish.sh arm board-f.html
+registered: lavish-2bcce67232d451fd (lavish)
+armed: lavish-2bcce67232d451fd
+artifact: /private/tmp/fm-lvtest2.YLToU5/boards/board-f.html
+rc=0
+$ base/bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-2bcce67232d451fd      lavish       live       0
+captain clicked 'Send to Agent' at 03:41:02 (epoch 1791621662)
+capture lavish-2bcce67232d451fd.1.result visible 1s after the click (whole seconds)
+$ base/bin/fm-procevent.sh list   (8s after the capture, no reconcile)
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-2bcce67232d451fd      lavish       none       1
+runner file: absent ; poll processes for board F: 0
+captain clicked 'Send to Agent' at 03:41:13 (epoch 1791621673)
+NO CAPTURE of lavish-2bcce67232d451fd.2.result within 30s
+(nothing is listening: answer two waits unseen in Lavish)
+$ base/bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-2bcce67232d451fd      lavish       none       1

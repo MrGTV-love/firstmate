@@ -1,0 +1,34 @@
+### Round 2, scenario: Send & End retires page B; retire stops page A
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-13248e4087940e3a      lavish       live       5
+lavish-166173abff88f4f3      lavish       live       5
+lavish-a4ef954be212040e      lavish       live       9
+page B runner 76389 ; group members: 6 ; captures: 9
+captain clicked 'Send & End' at 03:24:42 (epoch 1791620682)
+capture lavish-a4ef954be212040e.10.result visible 2s after the click (whole seconds)
+SESSION-ENDING MESSAGE
+| Page B final answer: approved, closing the review.
+END SESSION-ENDING MESSAGE
+lifecycle: feedback
+session_ended: true
+classify: feedback ; terminal rc: 0
+wake row:
+1791620684	20	check	procevent:lavish-a4ef954be212040e:10	check: procevent lavish lavish-a4ef954be212040e 10
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-13248e4087940e3a      lavish       live       5
+lavish-166173abff88f4f3      lavish       live       5
+page B registration file present: no
+page B runner 76389 alive: no ; group members left: 0 ; poll processes left: 0
+
+== page A: firstmate retires the listener ==
+page A runner 93487 ; group members before: 6
+$ bin/fm-procevent-lavish.sh retire decision-a.html
+retired: lavish-166173abff88f4f3
+rc=0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-13248e4087940e3a      lavish       live       5
+page A runner 93487 alive: no ; group members after: 0 ; poll processes left: 0
+page A captured results kept: 5

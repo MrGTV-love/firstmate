@@ -1,0 +1,56 @@
+### Round 2: real fleet board build (bin/fm-bearings-board.sh build) and a Captain's Call answer, lab home
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build board-payload.json
+board: /Users/charlesabrooker/tmp/fm-lab.hiTXZQ/.lavish/bearings-board.html
+session:
+  file: /Users/charlesabrooker/tmp/fm-lab.hiTXZQ/.lavish/bearings-board.html
+  url: "http://127.0.0.1:54796/session/85da21631298239f"
+  status: opened
+session: live
+served: /Users/charlesabrooker/tmp/fm-lab.hiTXZQ/.lavish/bearings-board.html
+bound: lavish-85da21631298239f
+armed: lavish-85da21631298239f
+rc=0
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-85da21631298239f      lavish       live       0
+lavish-b2fd17e79c21f78e      lavish       none       0
+
+board runner pid 11688
+captain picked 'Deploy tonight', queued it, and clicked Send to Agent at 03:42:27
+capture lavish-85da21631298239f.1.result visible 1s after the click (whole seconds)
+$ bin/fm-procevent.sh list   (no reconcile was run)
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-85da21631298239f      lavish       live       1
+lavish-b2fd17e79c21f78e      lavish       none       0
+board runner pid now: 11688 (was 11688)
+$ bin/fm-procevent-lavish.sh answers <result 1>
+lab-deploy-window-decision	yes	Deploy window -> yes
+$ bin/fm-procevent-lavish.sh read <result 1>
+SESSION-ENDING MESSAGE: (none)
+
+declared_items: 1
+presented_items: 1
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 1
+captain_message_count: 0
+
+ANNOTATIONS
+ANNOTATION 1 of 1
+element_uid: 1
+element_selector: div#bb-call > div > div > form
+tag: choice
+text:
+| Deploy window -> yes
+END ANNOTATIONS
+END LAVISH RESULT (1 of 1)
+$ cat state/.wake-queue
+1791621748	1	check	procevent:lavish-85da21631298239f:1	check: procevent lavish lavish-85da21631298239f 1
+
+== a second answer on the same board, no reconcile: the listener is still there ==
+captain changed to 'Wait' and clicked Send to Agent at 03:42:39
+capture lavish-85da21631298239f.2.result visible 0s after the click (whole seconds)
+lab-deploy-window-decision	no	Deploy window -> no
+lavish-85da21631298239f      lavish       live       2

@@ -1,0 +1,102 @@
+### Round 2, scenario 3 (failed in round 1): a leftover poll holds page B when firstmate arms it (target commit eaf50e64, lavish-axi 0.1.79)
+== setup: a stray native 'lavish-axi poll' is left running on page B, in its own session (like a leftover from an earlier day) ==
+62184 node /Users/charlesabrooker/.local/bin/lavish-axi poll /tmp/fm-lvtest2.YLToU5/boards/review-b.html
+
+== 03:14:19 arm page B while the stray holds it ==
+$ bin/fm-procevent-lavish.sh arm review-b.html
+registered: lavish-a4ef954be212040e (lavish)
+armed: lavish-a4ef954be212040e
+artifact: /private/tmp/fm-lvtest2.YLToU5/boards/review-b.html
+arm rc=0
+
+== watch for 240s; NO reconcile is run; runner state is read from files (no list call) ==
+03:14:28 +8s runner=76389 alive=yes pageB-captures=2 pageB-wakes=1 stray-alive=62184
+03:14:44 +24s runner= alive=no pageB-captures=3 pageB-wakes=3 stray-alive=62184
+03:14:59 +39s runner= alive=no pageB-captures=3 pageB-wakes=3 stray-alive=62184
+03:15:14 +54s runner= alive=no pageB-captures=4 pageB-wakes=4 stray-alive=62184
+03:15:30 +70s runner= alive=no pageB-captures=4 pageB-wakes=4 stray-alive=62184
+03:15:45 +85s runner= alive=no pageB-captures=5 pageB-wakes=5 stray-alive=62184
+03:16:00 +100s runner= alive=no pageB-captures=5 pageB-wakes=5 stray-alive=62184
+03:16:16 +116s runner= alive=no pageB-captures=5 pageB-wakes=5 stray-alive=62184
+03:16:31 +131s runner= alive=no pageB-captures=5 pageB-wakes=5 stray-alive=62184
+03:16:46 +146s runner= alive=no pageB-captures=6 pageB-wakes=6 stray-alive=62184
+03:17:02 +162s runner= alive=no pageB-captures=6 pageB-wakes=6 stray-alive=62184
+03:17:17 +177s runner= alive=no pageB-captures=6 pageB-wakes=6 stray-alive=62184
+03:17:33 +193s runner= alive=no pageB-captures=6 pageB-wakes=6 stray-alive=62184
+03:17:48 +208s runner= alive=no pageB-captures=7 pageB-wakes=7 stray-alive=62184
+03:18:04 +224s runner= alive=no pageB-captures=7 pageB-wakes=7 stray-alive=62184
+03:18:19 +239s runner= alive=no pageB-captures=7 pageB-wakes=7 stray-alive=62184
+
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-166173abff88f4f3      lavish       live       3
+lavish-a4ef954be212040e      lavish       live       7
+
+page B capture times (seconds after arm) and class:
+lavish-a4ef954be212040e.1.result: +1s class=waiting silent_rc=1 :: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 8220ms)" code: LISTENER_ACTIVE 
+lavish-a4ef954be212040e.2.result: +8s class=waiting silent_rc=1 :: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 14846ms)" code: LISTENER_ACTIVE 
+lavish-a4ef954be212040e.3.result: +19s class=waiting silent_rc=1 :: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 26268ms)" code: LISTENER_ACTIVE 
+lavish-a4ef954be212040e.4.result: +41s class=waiting silent_rc=1 :: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 47840ms)" code: LISTENER_ACTIVE 
+lavish-a4ef954be212040e.5.result: +82s class=waiting silent_rc=1 :: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 89221ms)" code: LISTENER_ACTIVE 
+lavish-a4ef954be212040e.6.result: +144s class=waiting silent_rc=1 :: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 150996ms)" code: LISTENER_ACTIVE 
+lavish-a4ef954be212040e.7.result: +206s class=waiting silent_rc=1 :: error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 213037ms)" code: LISTENER_ACTIVE 
+
+$ grep pageB state/.wake-queue
+1791620062	4	check	procevent:lavish-a4ef954be212040e:1	check: procevent lavish lavish-a4ef954be212040e 1
+1791620068	5	check	procevent:lavish-a4ef954be212040e:2	check: procevent lavish lavish-a4ef954be212040e 2
+1791620080	6	check	procevent:lavish-a4ef954be212040e:3	check: procevent lavish lavish-a4ef954be212040e 3
+1791620101	7	check	procevent:lavish-a4ef954be212040e:4	check: procevent lavish lavish-a4ef954be212040e 4
+1791620143	8	check	procevent:lavish-a4ef954be212040e:5	check: procevent lavish lavish-a4ef954be212040e 5
+1791620205	9	check	procevent:lavish-a4ef954be212040e:6	check: procevent lavish lavish-a4ef954be212040e 6
+1791620267	10	check	procevent:lavish-a4ef954be212040e:7	check: procevent lavish lavish-a4ef954be212040e 7
+
+(driver note: the 'runner= alive=no' columns above are a driver artifact. The .runner file exists only while a poll round runs; it is absent during the back-off wait. The runner process itself stayed alive the whole time:)
+  PID  PGID ELAPSED COMMAND
+76389 76389   04:59 /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent.sh _start lavish-
+
+== 03:19:19 one-time cleanup ==
+$ bin/fm-procevent-lavish.sh orphans   (lines for this lab only; other homes on this machine print kept: lines)
+rc=0
+kept: 13537 (owned by a claim) /private/tmp/fm-lvtest2.YLToU5/boards/decision-a.html
+kept: 13736 (owned by a claim) /private/tmp/fm-lvtest2.YLToU5/boards/decision-a.html
+kept: 13741 (owned by a claim) /private/tmp/fm-lvtest2.YLToU5/boards/decision-a.html
+orphan: 62184 lavish-a4ef954be212040e started=1791620052 last-claim=1791620328 /tmp/fm-lvtest2.YLToU5/boards/review-b.html
+orphans: found=1 killed=0 kept=83
+orphan: lines in total: 1 ; lines that are not kept:/orphan:/orphans: = 0
+$ bin/fm-procevent-lavish.sh orphans --kill
+rc=0
+kept: 13537 (owned by a claim) /private/tmp/fm-lvtest2.YLToU5/boards/decision-a.html
+kept: 13736 (owned by a claim) /private/tmp/fm-lvtest2.YLToU5/boards/decision-a.html
+kept: 13741 (owned by a claim) /private/tmp/fm-lvtest2.YLToU5/boards/decision-a.html
+killed: 62184 lavish-a4ef954be212040e started=1791620053 last-claim=1791620328 /tmp/fm-lvtest2.YLToU5/boards/review-b.html
+orphans: found=1 killed=1 kept=83
+killed: lines in total: 1
+kill done at 03:19:28
+stray 62184 alive: no
+page A poll still alive: 13736 
+
+== wait for the SAME runner to take the page; NO reconcile, NO re-arm ==
+runner 76389 holds page B with poll pid 7299, 27s after the kill (poll age was 00:01, still alive 4s later)
+page B captures now: 8
+$ lavish-axi   (session list, page B row)
+  /private/tmp/fm-lvtest2.YLToU5/boards/review-b.html,open,"http://127.0.0.1:54796/session/a4ef954be212040e",0,agent-listener
+
+== the captain answers page B; the same runner captures it (no reconcile, no re-arm) ==
+captain clicked 'Send to Agent' at 03:20:05 (epoch 1791620405)
+capture lavish-a4ef954be212040e.9.result visible 2s after the click (whole seconds)
+CAPTAIN MESSAGE
+| Page B answer: approve the review.
+END CAPTAIN MESSAGE
+classify: feedback
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-166173abff88f4f3      lavish       live       3
+lavish-a4ef954be212040e      lavish       live       9
+page B runner process:
+  PID ELAPSED COMMAND
+76389   05:47 /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/
+page B wake rows: 9 ; last row:
+1791620407	12	check	procevent:lavish-a4ef954be212040e:9	check: procevent lavish lavish-a4ef954be212040e 9
+
+== quiet check: 75s more with the page free; capture count must not grow ==
+page B captures before=9 after=9

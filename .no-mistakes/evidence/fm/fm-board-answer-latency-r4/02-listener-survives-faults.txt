@@ -1,0 +1,55 @@
+### Scenario 2: killed poll child, Lavish server restart
+== FAULT 1: the blocking 'lavish-axi poll' child is killed with no output ==
+poll pid before: 93305 ; runner 73845
+sent KILL to 93305 at 01:53:55
+same runner started a new poll pid 96451 after 6.2s; no reconcile was run
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       3
+inbox result count: 3 (must still be 3: a killed poll is not news)
+captain clicked Send to Agent at 01:54:04
+capture lavish-cfd519a85d26b6d2.4.result visible 3.2s after the send began
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       4
+runner pid: 73845 (was 73845)
+1791615245	4	check	procevent:lavish-cfd519a85d26b6d2:4	check: procevent lavish lavish-cfd519a85d26b6d2 4
+
+== FAULT 2: the Lavish server stops and restarts under the listener ==
+poll pid before: 17567
+$ lavish-axi stop
+server:
+  status: stopped
+  port: 63849
+server stopped at 01:54:08
+same runner started a new poll pid 40588 after 5.5s; no reconcile was run
+server listening again: node 41379 127.0.0.1:63849
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       4
+inbox result count: 4 (must still be 4: a server restart is not news)
+
+== after the server restart: the captain reloads the page and answers ==
+captain clicked Send to Agent at 01:54:30
+capture lavish-cfd519a85d26b6d2.5.result visible 3.1s after the send began
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-cfd519a85d26b6d2      lavish       live       5
+runner pid: 73845 (first runner was 73845)
+$ ls state/procevent-inbox
+lavish-cfd519a85d26b6d2.1.adapter
+lavish-cfd519a85d26b6d2.1.result
+lavish-cfd519a85d26b6d2.2.adapter
+lavish-cfd519a85d26b6d2.2.result
+lavish-cfd519a85d26b6d2.3.adapter
+lavish-cfd519a85d26b6d2.3.result
+lavish-cfd519a85d26b6d2.4.adapter
+lavish-cfd519a85d26b6d2.4.result
+lavish-cfd519a85d26b6d2.5.adapter
+lavish-cfd519a85d26b6d2.5.result
+$ cat state/.wake-queue
+1791615174	1	check	procevent:lavish-cfd519a85d26b6d2:1	check: procevent lavish lavish-cfd519a85d26b6d2 1
+1791615198	2	check	procevent:lavish-cfd519a85d26b6d2:2	check: procevent lavish lavish-cfd519a85d26b6d2 2
+1791615213	3	check	procevent:lavish-cfd519a85d26b6d2:3	check: procevent lavish lavish-cfd519a85d26b6d2 3
+1791615245	4	check	procevent:lavish-cfd519a85d26b6d2:4	check: procevent lavish lavish-cfd519a85d26b6d2 4
+1791615271	5	check	procevent:lavish-cfd519a85d26b6d2:5	check: procevent lavish lavish-cfd519a85d26b6d2 5

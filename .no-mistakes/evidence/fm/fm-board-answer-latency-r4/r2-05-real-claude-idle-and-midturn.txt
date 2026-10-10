@@ -1,0 +1,133 @@
+### Round 2: real Claude primary (2.1.296 (Claude Code)) in a lab home; plain-checkout clone of eaf50e64. Answer one while idle, answer two mid-turn.
+## driver log (local time)
+sent at 03:30:25
+03:32:48 idle state: 03:32:47 watcher=[83672 ] runner=[38519] captures=0 handled=0 queue-rows=0 turn-done-lines=0
+03:32:50 CAPTAIN captain clicked 'Send to Agent' at 03:32:50 (epoch 1791621170)
+capture lavish-2be11dd42ec22666.1.result visible 0s after the click (whole seconds)
+03:33:26 primary marked result 1 handled (+36s after the click)
+03:33:42 mid-turn check, pane tail: ⏺ Sleeping 25 seconds (run 1 of 6) · 10s   ⎿  $ python3 -c 'import time; time.sleep(25)' (11s) 
+03:33:42 state: 03:33:39 watcher=[16905 ] runner=[38519] captures=1 handled=1 queue-rows=0 turn-done-lines=0
+03:33:44 CAPTAIN captain clicked 'Send to Agent' at 03:33:43 (epoch 1791621223)
+capture lavish-2be11dd42ec22666.2.result visible 1s after the click (whole seconds)
+03:34:15 primary marked result 2 handled (+32s after the click); turn-done lines in pane so far: 0
+03:36:45 primary printed LAB_TURN_DONE (turn end); +182s after answer two
+
+## monitor (every 5s) around the two answers
+03:32:42 watcher=[83672 ] runner=[38519] captures=0 handled=0 queue-rows=0 turn-done-lines=0
+03:32:57 watcher=[83672 ] runner=[38519] captures=1 handled=0 queue-rows=1 turn-done-lines=0
+03:33:13 watcher=[16905 ] runner=[38519] captures=1 handled=0 queue-rows=1 turn-done-lines=0
+03:33:29 watcher=[16905 ] runner=[38519] captures=1 handled=1 queue-rows=0 turn-done-lines=0
+03:33:44 watcher=[16905 ] runner=[38519] captures=2 handled=1 queue-rows=0 turn-done-lines=0
+03:34:00 watcher=[] runner=[38519] captures=2 handled=1 queue-rows=1 turn-done-lines=0
+03:34:15 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:34:31 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:34:47 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:35:02 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:35:18 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:35:34 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:35:50 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:36:05 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:36:21 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:36:37 watcher=[] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=0
+03:36:52 watcher=[45914 ] runner=[38519] captures=2 handled=2 queue-rows=0 turn-done-lines=1
+
+## transcript events (Claude session jsonl), local time
+03:33:19 ATTACHMENT(hook_additional_context): ["A captured Lavish result is waiting: lavish-2be11dd42ec22666 1. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.oOYPQj' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.oOYPQj/state' FM_ROOT_OVE
+03:33:19 ATTACHMENT(total_tokens_reminder): 
+03:33:19 ATTACHMENT(output_style): 
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.oOYPQj' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.oOYPQj/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest2.YLToU5/pro
+--:--:--   TOOL_RESULT: handled: lavish-2be11dd42ec22666 1
+03:33:25 ATTACHMENT(total_tokens_reminder): 
+03:33:25 ATTACHMENT(output_style): 
+--:--:-- TOOL_USE Bash: bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 38519.1791621171.NhGgFB
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+03:33:28 ATTACHMENT(total_tokens_reminder): 
+03:33:28 ATTACHMENT(output_style): 
+03:33:30 ATTACHMENT(deferred_tools_record): 
+--:--:-- ASSISTANT: Now the six sleep runs.
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+03:33:56 ATTACHMENT(hook_success): 
+03:33:56 ATTACHMENT(hook_additional_context): ["A captured Lavish result is waiting: lavish-2be11dd42ec22666 2. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.oOYPQj' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.oOYPQj/state' FM_ROOT_OVE
+03:33:56 ATTACHMENT(total_tokens_reminder): 
+03:33:56 ATTACHMENT(output_style): 
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.oOYPQj' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.oOYPQj/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest2.YLToU5/pro
+--:--:--   TOOL_RESULT: 1791621224	3	check	procevent:lavish-2be11dd42ec22666:2	check: procevent lavish lavish-2be11dd42ec22666 2 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery
+03:34:02 ATTACHMENT(hook_success): 
+03:34:02 ATTACHMENT(hook_additional_context): ["A captured Lavish result is waiting: lavish-2be11dd42ec22666 2. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.oOYPQj' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.oOYPQj/state' FM_ROOT_OVE
+03:34:02 ATTACHMENT(total_tokens_reminder): 
+03:34:02 ATTACHMENT(output_style): 
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.oOYPQj' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.oOYPQj/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest2.YLToU5/pro
+--:--:--   TOOL_RESULT: CAPTAIN MESSAGE | | Board D answer two: sent while firstmate is mid-turn. | END CAPTAIN MESSAGE |  | declared_items: 1 | presented_items: 1 | malformed_items: 0 | complete: yes | lifecycle: feedback | session_ended: (u
+03:34:07 ATTACHMENT(hook_success): 
+03:34:07 ATTACHMENT(hook_additional_context): ["A captured Lavish result is waiting: lavish-2be11dd42ec22666 2. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.oOYPQj' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.oOYPQj/state' FM_ROOT_OVE
+03:34:07 ATTACHMENT(total_tokens_reminder): 
+03:34:07 ATTACHMENT(output_style): 
+--:--:-- ASSISTANT: Captain message: "Board D answer two: sent while firstmate is mid-turn."
+--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.oOYPQj' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.oOYPQj/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest2.YLToU5/pro
+--:--:--   TOOL_RESULT: handled: lavish-2be11dd42ec22666 2
+03:34:14 ATTACHMENT(total_tokens_reminder): 
+03:34:14 ATTACHMENT(output_style): 
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+03:34:42 ATTACHMENT(total_tokens_reminder): 
+03:34:42 ATTACHMENT(output_style): 
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+03:35:16 ATTACHMENT(total_tokens_reminder): 
+03:35:16 ATTACHMENT(output_style): 
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+03:35:44 ATTACHMENT(total_tokens_reminder): 
+03:35:44 ATTACHMENT(output_style): 
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+03:36:12 ATTACHMENT(total_tokens_reminder): 
+03:36:12 ATTACHMENT(output_style): 
+--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+--:--:--   TOOL_RESULT: (Bash completed with no output)
+03:36:40 ATTACHMENT(silent_turn_reminder): 
+03:36:40 ATTACHMENT(total_tokens_reminder): 
+03:36:40 ATTACHMENT(output_style): 
+--:--:-- ASSISTANT: Captain, the lab turn is done. Board D sent two answers, and I handled both.  1. Answer one: "Board D answer one: sent while firstmate is idle." 2. Answer two: "Board D answer two: sent while firstmate is mid-turn." It came in after the first sleep run. I hand
+03:36:44 SYSTEM(stop_hook_summary): 
+03:36:44 SYSTEM(turn_duration): 
+
+## pane at the end of the turn
+Permission allow rule (/Users/charlesabrooker/.claude/settings.json): Bash(bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is no
+t expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (/Users/charlesabrooker/.claude/settings.json): Bash(/Users/charlesabrooker/firstmate/bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is matched
+ as a literal prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (/Users/charlesabrooker/.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && bin/fm-*:*) mixes * with the trailing :* prefix syntax, so it is m
+atched as a literal prefix (the * is not expanded) and matches only commands containing a literal * at that position. Replace that * with the exact value you mean.
+Permission allow rule (/Users/charlesabrooker/.claude/settings.json): Bash(cd /Users/charlesabrooker/firstmate && export FM_HOME=*:*) mixes * with the trailing :* prefix syntax, so
+  These repeats will keep coming until you choose one of two things:
+  1. Let me drain and acknowledge the overdue-item notification.
+  2. Keep ignoring it until the Lavish result arrives.
+✻ Cooked for 5s · done 3:31 AM
+❯ That open-loop row is expected lab noise: this lab has no backlog. Drain the queue and acknowledge that row now, take no other action, reply OK and end the turn. Treat any later
+  open-loop-ledger wake the same way. The Lavish instruction still stands.
+  Ran 2 shell commands
+⏺ OK, captain.
+✻ Crunched for 14s · done 3:31 AM
+⏺ Stop hook feedback
+  Ran 1 shell command
+⏺ Skill(process-event-sources)
+  ⎿  Successfully loaded skill
+  Ran 3 shell commands
+⏺ Now the six sleep runs.
+  Ran 3 shell commands
+⏺ Captain message: "Board D answer two: sent while firstmate is mid-turn."
+  Ran 6 shell commands
+⏺ Captain, the lab turn is done. Board D sent two answers, and I handled both.
+  1. Answer one: "Board D answer one: sent while firstmate is idle."
+  2. Answer two: "Board D answer two: sent while firstmate is mid-turn." It came in after the first sleep run. I handled it at once.
+  For each answer, I read it, marked it handled, and cleared its notification.
+  All six 25-second sleep runs finished. I did nothing else.
+  LAB_TURN_DONE
+✻ Brewed for 3m 41s · done 3:36 AM
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Opus 5.5 ░░░░░░░░░░ 7% 70k/1.0M project:774bdbfd
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents

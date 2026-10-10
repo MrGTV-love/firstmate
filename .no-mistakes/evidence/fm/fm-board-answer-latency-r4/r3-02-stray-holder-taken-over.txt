@@ -1,0 +1,70 @@
+### Round 3, scenario 2: a leftover poll holds page B when firstmate arms it (target commit e04bd183, lavish-axi 0.1.79)
+== setup: a stray native 'lavish-axi poll' is left running on page B in its own session, like a leftover from an earlier day ==
+55369 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html
+stray pid: 55369
+
+== 04:18:20 arm page B while the stray holds it ==
+$ bin/fm-procevent-lavish.sh arm page-b.html
+registered: lavish-5cdc7a56eebd0f5f (lavish)
+armed: lavish-5cdc7a56eebd0f5f
+artifact: /private/tmp/fm-lv3.wPuBza/boards/page-b.html
+arm rc=0
+
+== 04:18:27 after 7s ==
+stray alive: no
+stray poll output (what the leftover received):
+  | [lavish-axi] Long-polling for user feedback on /private/tmp/fm-lv3.wPuBza/boards/page-b.html. This stays silent until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period - leave it running. Detected layout issues do NOT return this poll: they wait in the user's Layout issues inbox until the user queues them as ordinary feedback. If it gets killed or times out before feedback arrives, re-run `lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html` - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely.
+  | error: Lavish Editor poll listener was replaced by a takeover
+  | code: LISTENER_REPLACED
+  | help[1]: Re-run lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html only if you intend to take over listening
+poll processes on page B now:
+70601 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html
+84635 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html --takeover
+84640 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5cdc7a56eebd0f5f      lavish       live       0
+lavish-f56f4f7994c6ae7c      lavish       live       3
+page B results so far: 0
+
+== 04:18:28 the captain answers page B ==
+answer: fill failed
+NO capture containing 'Round 3 page B answer one' within 60s
+
+(driver note: the first answer attempt at 04:18:28 failed inside the browser driver (fill), and the driver then hung on its own grep. The driver was fixed and restarted here. No reconcile or re-arm was run in between.)
+
+== 04:28:47 page B state, about 626s after arm, with no reconcile ==
+page B results so far: 0 (no 'waiting' or held-page announcements)
+poll processes on page B now:
+70601 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html
+84635 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html --takeover
+84640 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-b.html
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5cdc7a56eebd0f5f      lavish       live       0
+lavish-f56f4f7994c6ae7c      lavish       live       3
+
+== 04:28:47 the captain answers page B ==
+captain clicked 'Send to Agent' at 04:28:49 (epoch 1791624529): Round 3 page B answer one: sent after a leftover poll held the page.
+capture lavish-5cdc7a56eebd0f5f.1.result visible 2s after the click (whole seconds)
+$ bin/fm-procevent-lavish.sh read lavish-5cdc7a56eebd0f5f.1.result
+CAPTAIN MESSAGE
+| Round 3 page B answer one: sent after a leftover poll held the page.
+END CAPTAIN MESSAGE
+stray poll output file contains the answer: 0 times
+$ grep page B rows in state/.wake-queue
+1791624531	4	check	procevent:lavish-5cdc7a56eebd0f5f:1	check: procevent lavish lavish-5cdc7a56eebd0f5f 1
+== 04:28:51 a second answer ==
+captain clicked 'Send to Agent' at 04:28:58 (epoch 1791624538): Round 3 page B answer two: the listener still holds the page.
+capture lavish-5cdc7a56eebd0f5f.2.result visible 2s after the click (whole seconds)
+lavish-5cdc7a56eebd0f5f.1.result: classify=feedback
+lavish-5cdc7a56eebd0f5f.2.result: classify=feedback
+$ grep page B rows in state/.wake-queue
+1791624531	4	check	procevent:lavish-5cdc7a56eebd0f5f:1	check: procevent lavish lavish-5cdc7a56eebd0f5f 1
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-5cdc7a56eebd0f5f      lavish       live       2
+lavish-f56f4f7994c6ae7c      lavish       live       3
+== 04:29:11 wake queue re-read a few seconds later ==
+1791624531	4	check	procevent:lavish-5cdc7a56eebd0f5f:1	check: procevent lavish lavish-5cdc7a56eebd0f5f 1
+1791624540	5	check	procevent:lavish-5cdc7a56eebd0f5f:2	check: procevent lavish lavish-5cdc7a56eebd0f5f 2

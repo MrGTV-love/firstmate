@@ -1,0 +1,20 @@
+### Scenario 7: control. 60s owner lease with no refresher.
+02:28:22 arm board D in lab home 1 with FM_PROCEVENT_OWNER_LEASE_SECONDS=60 FM_PROCEVENT_OWNER_CHECK_SECONDS=5; nothing refreshes the lease afterwards
+registered: lavish-d24da127affa785a (lavish)
+armed: lavish-d24da127affa785a
+artifact: /private/tmp/fm-lvtest.BZslGF/boards/board-d.html
+02:28:23 runner pid 
+02:28:28 runner  STOPPED 5s after arm (lease age 5s)
+02:28:28 poll processes left for board D: 3
+(correction: the .runner file appeared a moment after arm returned; the earlier 'STOPPED 5s' line was a driver race reading an empty pid)
+02:28:40 runner pid 46080; lease last touched at 02:28:23
+02:31:11 runner 46080 STILL ALIVE (lease age 168s)
+02:31:14 board D processes left in that group: 6
+== control rerun in lab home /Users/charlesabrooker/tmp/fm-lab.fyN4pj (live owner pid 31005); no primary, no watcher, no list/reconcile ==
+02:32:17 $ FM_PROCEVENT_OWNER_LEASE_SECONDS=60 FM_PROCEVENT_OWNER_CHECK_SECONDS=5 bin/fm-procevent-lavish.sh arm board-e.html
+registered: lavish-4f2c4ccb3c0b5269 (lavish)
+armed: lavish-4f2c4ccb3c0b5269
+artifact: /private/tmp/fm-lvtest.BZslGF/boards/board-e.html
+02:32:19 runner pid 43764 ; owner guard pid 44985
+02:33:25 runner 43764 STOPPED by its owner guard 66s after arm (lease 60s, check 5s)
+02:33:27 processes left in runner group: 0; poll processes for board E: 0

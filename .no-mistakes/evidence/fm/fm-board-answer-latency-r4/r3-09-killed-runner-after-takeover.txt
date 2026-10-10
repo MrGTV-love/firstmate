@@ -1,0 +1,70 @@
+### Round 3, scenario 9 (adversarial): the runner that took page E over dies hard (SIGKILL) before the next answer; its own --takeover poll is left behind (target commit e04bd183)
+page E runner: 92978
+page E poll processes:
+2599 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html --takeover
+2600 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+94078 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+== 04:52:30 kill -KILL 92978 (runner only, like an OOM kill on a host with swap nearly full) ==
+left behind:
+2599 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html --takeover
+2600 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+94078 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-6bae41b8efc51b50      lavish       orphaned   0
+
+== 04:52:33 firstmate's normal recovery: bin/fm-procevent.sh reconcile ==
+reconciled: published=9 started=0 stopped=0 uncertain=1 failed=0
+page E poll processes:
+2599 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html --takeover
+2600 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+94078 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-6bae41b8efc51b50      lavish       orphaned   0
+page E results:
+$ bin/fm-procevent-lavish.sh orphans  (page E lines)
+kept: 2599 (artifact cannot be resolved) /private/tmp/fm-lv3.wPuBza/boards/page-e.html --takeover
+kept: 2600 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+kept: 94078 (owned by a claim) /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+
+== 04:52:57 the captain answers page E ==
+captain clicked 'Send to Agent' at 04:52:58 (epoch 1791625978): Round 3 page E answer: sent after the runner was killed.
+NO capture containing 'Round 3 page E answer' within 45s
+page E poll processes after the answer:
+firstmate results for page E containing the answer: 0
+
+== 04:54:07 after the answer: recovery check ==
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-6bae41b8efc51b50      lavish       none       0
+$ bin/fm-procevent.sh reconcile
+reconciled: published=9 started=1 stopped=0 uncertain=0 failed=0
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-6bae41b8efc51b50      lavish       live       0
+page E poll processes:
+67997 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+68176 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+68179 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J7AA79JHJBYCAYE9Q7QDJM/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-e.html
+### Round 3, scenario 9 control: the same hard runner kill on the BASE commit 8ce400ff, lab home /Users/charlesabrooker/tmp/fm-lab.dVkcTp
+registered: lavish-341d5fff2838c493 (lavish)
+armed: lavish-341d5fff2838c493
+page F runner: 51725
+57262 bash /private/tmp/fm-lv3.wPuBza/base/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-f.html
+57631 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-f.html
+57632 bash /private/tmp/fm-lv3.wPuBza/base/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-f.html
+== 04:55:33 kill -KILL 51725 ==
+left behind:
+57262 bash /private/tmp/fm-lv3.wPuBza/base/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-f.html
+57631 node /Users/charlesabrooker/.local/bin/lavish-axi poll /private/tmp/fm-lv3.wPuBza/boards/page-f.html
+57632 bash /private/tmp/fm-lv3.wPuBza/base/bin/fm-procevent-lavish.sh poll /private/tmp/fm-lv3.wPuBza/boards/page-f.html
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-341d5fff2838c493      lavish       orphaned   0
+$ reconcile (base)
+reconciled: published=0 started=0 stopped=0 uncertain=1 failed=0
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-341d5fff2838c493      lavish       orphaned   0
+== 04:55:53 the captain answers page F ==
+captain clicked 'Send to Agent' at 04:55:54 (epoch 1791626154): Round 3 base page F answer: sent after the runner was killed.
+NO capture containing 'base page F answer' within 45s
+firstmate results for page F containing the answer: 0

@@ -1,0 +1,62 @@
+### Round 2, scenario 4: page C held by a leftover poll. Reconcile passes, then the captain answers while it is still held.
+session:
+  file: /private/tmp/fm-lvtest2.YLToU5/boards/board-c.html
+  url: "http://127.0.0.1:54796/session/13248e4087940e3a"
+  status: opened
+stray poll on page C: 235 node /Users/charlesabrooker/.local/bin/lavish-axi poll /tmp/fm-lvtest2.YLToU5/boards/board-c.html
+
+== 03:21:38 arm page C ==
+registered: lavish-13248e4087940e3a (lavish)
+armed: lavish-13248e4087940e3a
+artifact: /private/tmp/fm-lvtest2.YLToU5/boards/board-c.html
+arm rc=0
+
+== three reconcile passes while the leftover poll holds page C (round 1: each pass said started=1 and added a capture) ==
+$ bin/fm-procevent.sh reconcile   (page C captures before: 2)
+reconciled: published=14 started=0 stopped=0 uncertain=0 failed=0
+rc=0 ; page C captures after: 3
+$ bin/fm-procevent.sh reconcile   (page C captures before: 3)
+reconciled: published=15 started=0 stopped=0 uncertain=0 failed=0
+rc=0 ; page C captures after: 3
+$ bin/fm-procevent.sh reconcile   (page C captures before: 3)
+reconciled: published=15 started=0 stopped=0 uncertain=0 failed=0
+rc=0 ; page C captures after: 4
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-13248e4087940e3a      lavish       live       4
+lavish-166173abff88f4f3      lavish       live       3
+lavish-a4ef954be212040e      lavish       live       9
+
+== the captain answers page C while the leftover poll still holds it ==
+captain clicked 'Send to Agent' at 03:22:28 (epoch 1791620548)
+stray poll output file (the leftover poll received the answer):
+6:  "","Page C answer one: sent while a leftover poll holds the page.","",message,Freeform message
+stray still alive: 
+firstmate inbox files for page C that contain the answer: 0
+
+== the leftover poll has exited; wait for the same runner to take the page (no reconcile, no re-arm) ==
+runner holds page C with poll pid 10276, 30s later
+captain clicked 'Send to Agent' at 03:23:12 (epoch 1791620592)
+capture lavish-13248e4087940e3a.5.result visible 1s after the click (whole seconds)
+CAPTAIN MESSAGE
+| Page C answer two: sent after the leftover poll went away.
+END CAPTAIN MESSAGE
+$ bin/fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-13248e4087940e3a      lavish       live       5
+lavish-166173abff88f4f3      lavish       live       3
+lavish-a4ef954be212040e      lavish       live       9
+
+page C captures and class:
+lavish-13248e4087940e3a.1.result: waiting
+lavish-13248e4087940e3a.2.result: waiting
+lavish-13248e4087940e3a.3.result: waiting
+lavish-13248e4087940e3a.4.result: waiting
+lavish-13248e4087940e3a.5.result: feedback
+
+== adversarial: a NEW stray poll tries to take page C from the live listener ==
+error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 285ms)"
+code: LISTENER_ACTIVE
+help[1]: Use --takeover only when you intend to displace the current listener
+$ bin/fm-procevent.sh list
+lavish-13248e4087940e3a      lavish       live       5

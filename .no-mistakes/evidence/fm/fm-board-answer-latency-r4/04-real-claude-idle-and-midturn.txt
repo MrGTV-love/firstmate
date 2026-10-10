@@ -1,0 +1,78 @@
+### Scenario 4+5: real Claude primary (Claude Code 2.1.296) in a lab home. Answer 2 while idle, answer 3 mid-turn.
+## driver log (wall clock, local time)
+02:09:29 standing instruction sent to the primary
+02:11:00 primary replied READY; now wait for it to sit idle with the watcher armed
+02:11:13 idle state: watcher pid(s)=[26183 ] runner=[70216 alive] wake-queue-rows=0
+02:11:22 CAPTAIN sent answer 2 (primary idle)
+02:11:26 capture lavish-44c982f60522664f.2.result exists (+12s after answer 2)
+02:11:38 tick: watcher pid(s)=[68067 ] runner=[70216 alive]
+02:11:53 tick: watcher pid(s)=[68067 ] runner=[70216 alive]
+02:12:08 tick: watcher pid(s)=[68067 ] runner=[70216 alive]
+02:12:11 primary acknowledged result 2 (+58s after answer 2)
+02:12:24 tick: watcher pid(s)=[68067 ] runner=[70216 alive]
+02:12:39 tick: watcher pid(s)=[68067 ] runner=[70216 alive]
+02:12:51 mid-turn state before answer 3: watcher pid(s)=[68067 ] runner=[70216 alive]
+02:12:54 CAPTAIN sent answer 3 (primary is mid-turn, running the timed commands)
+02:12:57 capture lavish-44c982f60522664f.3.result exists (+3s after answer 3); watcher pid(s)=[68067 ]
+02:12:57 tick: watcher pid(s)=[68067 ] runner=[70216 alive]
+02:13:12 tick: watcher pid(s)=[] runner=[70216 alive]
+02:13:28 tick: watcher pid(s)=[] runner=[70216 alive]
+02:13:43 tick: watcher pid(s)=[] runner=[70216 alive]
+02:13:58 tick: watcher pid(s)=[] runner=[70216 alive]
+02:14:10 primary acknowledged result 3 (+76s after answer 3); watcher pid(s)=[]
+02:14:13 tick: watcher pid(s)=[] runner=[70216 alive]
+02:14:29 tick: watcher pid(s)=[] runner=[70216 alive]
+02:14:44 tick: watcher pid(s)=[] runner=[70216 alive]
+02:14:59 tick: watcher pid(s)=[] runner=[70216 alive]
+02:15:14 tick: watcher pid(s)=[] runner=[70216 alive]
+02:15:30 tick: watcher pid(s)=[] runner=[70216 alive]
+02:15:45 tick: watcher pid(s)=[] runner=[70216 alive]
+02:16:01 tick: watcher pid(s)=[] runner=[70216 alive]
+02:16:16 tick: watcher pid(s)=[] runner=[70216 alive]
+02:16:19 primary printed LAB_TURN_DONE (turn end); runner=[70216 alive]
+02:16:19 summary: result2 handled=yes result3 handled=yes turn_done=yes
+02:16:19 result 3 was acknowledged 129s BEFORE the turn ended
+
+## primary transcript summary (local time)
+114:02:09:29 USER: Standing lab instruction for the next watcher wake only. When the next captured Lavish result wakes you, handle it fully (drain, read, acknowledge the result and the wake rows). Then, in that same turn, use Bash to run python3 -c 'import time; time.sleep(25)' 
+115:--:--:-- ASSISTANT: Captain, READY.  One note: the tool blocked `sleep 30` before, and its message said not to work around that block. A python sleep may get the same block. If it does, I will stop and tell you.
+116:02:09:37 [turn end: Stop hooks ran]
+117:02:11:33 USER: <task-notification> <summary>Stop hook feedback</summary> </task-notification> <system-reminder> Stop hook blocking error from command "Stop": firstmate watcher wake - one supervision event needs a handling turn now. check: process-event result captured: proce
+118:--:--:-- TOOL_USE Bash: bin/fm-wake-drain.sh
+119:--:--:--   TOOL_RESULT: 1791616283	3	check	procevent:lavish-44c982f60522664f:2	check: procevent lavish lavish-44c982f60522664f 2 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery
+120:02:11:42 HOOK_CONTEXT(PostToolUse): ["A captured Lavish result is waiting: lavish-44c982f60522664f 2. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/ch
+121:--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.BZslGF/project' '/private/tmp/fm-lvtest.B
+122:--:--:--   TOOL_RESULT: CAPTAIN MESSAGE | | Board C answer two: sent while firstmate is idle. | END CAPTAIN MESSAGE |  | declared_items: 1 | presented_items: 1 | malformed_items: 0 | complete: yes | lifecycle: feedback | session_ended: (unset
+123:02:11:55 HOOK_CONTEXT(PostToolUse): ["A captured Lavish result is waiting: lavish-44c982f60522664f 2. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/ch
+124:--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.BZslGF/project' '/private/tmp/fm-lvtest.B
+125:--:--:--   TOOL_RESULT: PreToolUse:Bash hook error: [[ -z "${GROK_AGENT:-}${GROK_HOOK_EVENT:-}" ] || exit 0; exec "$CLAUDE_PROJECT_DIR"/bin/fm-cd-pretool-check.sh --claude]: {"hookSpecificOutput":{"hookEventName":"PreToolUse
+126:--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.BZslGF/project' '/private/tmp/fm-lvtest.B
+127:--:--:--   TOOL_RESULT: handled: lavish-44c982f60522664f 2
+128:--:--:-- ASSISTANT: Board result handled and notification row acknowledged. Now the six timed runs.
+129:--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+130:--:--:--   TOOL_RESULT: (Bash completed with no output)
+131:--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+132:--:--:--   TOOL_RESULT: (Bash completed with no output)
+133:02:13:08 HOOK_CONTEXT(PostToolUse): ["A captured Lavish result is waiting: lavish-44c982f60522664f 3. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/ch
+134:--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.BZslGF/project' '/private/tmp/fm-lvtest.B
+135:--:--:--   TOOL_RESULT: 1791616375	4	check	procevent:lavish-44c982f60522664f:3	check: procevent lavish lavish-44c982f60522664f 3 | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery
+136:02:13:26 HOOK_CONTEXT(PostToolUse): ["A captured Lavish result is waiting: lavish-44c982f60522664f 3. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/ch
+137:--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.BZslGF/project' '/private/tmp/fm-lvtest.B
+138:--:--:--   TOOL_RESULT: CAPTAIN MESSAGE | | Board C answer three: sent while firstmate is mid-turn. | END CAPTAIN MESSAGE |  | declared_items: 1 | presented_items: 1 | malformed_items: 0 | complete: yes | lifecycle: feedback | session_ended: 
+139:02:14:03 HOOK_CONTEXT(PostToolUse): ["A captured Lavish result is waiting: lavish-44c982f60522664f 3. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/ch
+140:--:--:-- ASSISTANT: The board message says: "Board C answer three: sent while firstmate is mid-turn." Now I mark it handled and acknowledge the row.
+141:--:--:-- TOOL_USE Bash: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.BZslGF/project' '/private/tmp/fm-lvtest.B
+142:--:--:--   TOOL_RESULT: handled: lavish-44c982f60522664f 3
+143:--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+144:--:--:--   TOOL_RESULT: (Bash completed with no output)
+145:--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+146:--:--:--   TOOL_RESULT: (Bash completed with no output)
+147:--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+148:--:--:--   TOOL_RESULT: (Bash completed with no output)
+149:--:--:-- TOOL_USE Bash: python3 -c 'import time; time.sleep(25)'
+150:--:--:--   TOOL_RESULT: (Bash completed with no output)
+151:--:--:-- ASSISTANT: Captain, the lab turn is done. All steps worked.  1. **The board answer that started the turn.** I cleared the queue, read the answer, marked it handled, and acknowledged its row. Your message, quoted exactly:    > Board C answer two: sent while firstmate is i
+152:02:16:17 [turn end: Stop hooks ran]
+
+## full PostToolUse notice text delivered for result 3
+A captured Lavish result is waiting: lavish-44c982f60522664f 3. Run `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.BZslGF/project' '/private/tmp/fm-lvtest.BZslGF/project/bin/fm-wake-drain.sh'` now. If the drain has no row for this result, read it directly with `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.BZslGF/project' '/private/tmp/fm-lvtest.BZslGF/project/bin/fm-procevent-lavish.sh' read '/Users/charlesabrooker/tmp/fm-lab.cPADs9/state/procevent-inbox/lavish-44c982f60522664f.3.result'`. Handle the result, then acknowledge it with `FM_HOME='/Users/charlesabrooker/tmp/fm-lab.cPADs9' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.cPADs9/state' FM_ROOT_OVERRIDE='/private/tmp/fm-lvtest.BZslGF/project' '/private/tmp/fm-lvtest.BZslGF/project/bin/fm-procevent.sh' handled lavish-44c982f60522664f 3` before continuing.
