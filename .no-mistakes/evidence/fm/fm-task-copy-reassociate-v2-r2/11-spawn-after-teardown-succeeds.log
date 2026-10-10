@@ -1,0 +1,13 @@
+### fm-spawn labnext --scout after labship is retired
+skill selection for labnext: unavailable - no TypeSafe or OpenRouter key
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J53Z7PV6VG61D4MCRBMMRQ/bin/fm-home-summary-refresh.sh: child setpgid (66015 to 66015): Operation not permitted
+spawned labnext harness=claude kind=scout window=fmlab:fm-labnext worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+exit=
+labnext worktree: worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+slot 1 claim:
+task=labnext
+home=/Users/charlesabrooker/tmp/fm-lab.mqqjk3
+treehouse status:
+base  main  (repository default)
+1     in-use       ~/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj  (detached)
+                   zsh (54484), 2.1.296 (68775), caffeinate (71950)

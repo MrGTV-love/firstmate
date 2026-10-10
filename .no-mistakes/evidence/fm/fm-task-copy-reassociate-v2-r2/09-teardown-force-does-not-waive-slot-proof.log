@@ -1,0 +1,20 @@
+### fm-teardown labship --force: slot holds a late commit that is neither landed nor anchored
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+exit=1
+fingerprint before=4c4a5a8587010e9e after=4c4a5a8587010e9e UNCHANGED
+late.txt still in slot: late slot work
+nested copy still exists: yes
+worker window: home fm-labship 
+
+### fm-teardown labship --force --drop-file <captain words>: same late unanchored commit in the slot
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj would sweep away task labship's claimed pool slot /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj, whose HEAD c5709fb9cf0fa0c6d0b816a2876c96349112b01e is neither landed nor held by a refs/fm/anchor/labship-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+exit=1
+fingerprint before=84a810d474d17af4 after=84a810d474d17af4 UNCHANGED
+late.txt still in slot: late slot work
+nested copy still exists: yes
+windows: home fm-labship 
+record exists: yes

@@ -1,0 +1,31 @@
+### replacement copy is another home's task 'other' current copy
+REFUSED: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.I4nD2K/missing-home; nothing was changed
+error: could not prove that no other task record names the replacement copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/other-task-copy; nothing was changed
+exit=1 state-before=9b32ca48dcb2b690 state-after=9b32ca48dcb2b690 UNCHANGED
+
+### replacement copy is a subdirectory, not a worktree root
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/other-task-copy/sub is not an isolated worktree of /Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj: it is a subdirectory of worktree root '/Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/other-task-copy', not a worktree root; nothing was changed
+exit=1 state-before=9b32ca48dcb2b690 state-after=9b32ca48dcb2b690 UNCHANGED
+
+### replacement copy is a sibling clone (same origin, different ref store)
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/sibling-clone is not a checkout of task labthird's project repository (/Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj): it uses a different repository/ref store, even if it has the same origin; nothing was changed
+exit=1 state-before=9b32ca48dcb2b690 state-after=9b32ca48dcb2b690 UNCHANGED
+
+### record already carries pr=
+error: task labthird already records PR https://github.com/example/proj/pull/1, whose merge watch and landed-work proof follow the current copy's branch; land or close that PR before re-pointing the record under it
+exit=1 state-before=1fbf31da5a634da1 state-after=1fbf31da5a634da1 UNCHANGED
+
+### secondmates.md lists an unavailable local home (strict scan for reassociation)
+REFUSED: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.I4nD2K/missing-home; nothing was changed
+error: could not prove that no other task record names the replacement copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/labthird-v2; nothing was changed
+exit=1 state-before=9b32ca48dcb2b690 state-after=9b32ca48dcb2b690 UNCHANGED
+
+## (ghost home entry removed from data/secondmates.md; mate2 stays registered and readable)
+### replacement copy is task 'other' current copy in registered home mate2
+error: the replacement copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/other-task-copy is also task other's recorded worktree, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh labthird; bin/fm-crew-state.sh other) before reassociating
+exit=1 state-before=9b32ca48dcb2b690 state-after=9b32ca48dcb2b690 UNCHANGED
+
+### replacement copy is nested inside task 'other' current copy
+error: the replacement copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/other-task-copy/.nested/n is also task other's recorded worktree, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh labthird; bin/fm-crew-state.sh other) before reassociating
+exit=1 state-before=9b32ca48dcb2b690 state-after=9b32ca48dcb2b690 UNCHANGED
+

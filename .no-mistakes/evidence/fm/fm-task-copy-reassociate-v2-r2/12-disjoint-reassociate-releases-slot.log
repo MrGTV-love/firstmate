@@ -1,0 +1,38 @@
+## labnext record before
+window=fmlab:fm-labnext
+endpoint_task_id=labnext
+worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+project=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj
+harness=claude
+kind=scout
+tasktmp=/tmp/fm-labnext
+model=default
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791663168.63091.26834
+spawn_gen=s1791663169.42351.11576
+
+## crew-state before
+state: unknown · source: none · no current-state source available
+
+## worker S5 setup, disjoint copy outside the pool (d1 shape)
+8fca91a treehouse pool root
+slot HEAD: 8fca91a
+
+### fm-control labnext reassociate --worktree /Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/labnext-v2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+reassociated labnext worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/labnext-v2 prior=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+exit=0
+
+## record after
+worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/labnext-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+slot claim file exists: no
+anchors:
+refs/fm/anchor/labnext-8fca91a 8fca91a
+refs/fm/anchor/labship-e8501a9 e8501a9
+worker window still alive: home dead=0 fm-labnext dead=0 
+
+## crew-state after
+state: unknown · source: none · no current-state source available

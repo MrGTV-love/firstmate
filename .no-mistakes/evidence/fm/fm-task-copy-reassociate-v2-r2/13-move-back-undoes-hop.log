@@ -1,0 +1,29 @@
+### fm-control labnext reassociate --worktree <slot 1> (move back)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+reassociated labnext worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj prior=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/labnext-v2 slot=claimed
+exit=0
+
+## record after move back
+worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/labnext-v2
+slot claim:
+task=labnext
+home=/Users/charlesabrooker/tmp/fm-lab.mqqjk3
+
+## brief reassociation blocks
+## Copy reassociation (2026-10-10T20:13:54Z)
+
+This task's work moved to a replacement local copy.
+Work only in /Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/labnext-v2.
+It replaces /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj, whose pool slot was released for reuse; its commits are preserved at refs/fm/anchor/labnext-8fca91a.
+
+Scout moved to a fresh copy outside the pool.
+--
+## Copy reassociation (2026-10-10T20:14:09Z)
+
+This task's work moved to a replacement local copy.
+Work only in /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj.
+It replaces /Users/charlesabrooker/tmp/fm-labw.I4nD2K/copies/labnext-v2, which is preserved exactly as it was; do not change it.
+
+That copy was wrong; move back.

@@ -1,0 +1,47 @@
+## crew-state BEFORE reassociation
+state: unknown · source: none · no current-state source available
+
+## worker S5 setup (nested copy, d3 GRE-1937 shape)
++(eval):7> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj status --short --branch
+## HEAD (no branch)
++(eval):8> printf 'feature work\n'
++(eval):8> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj add feature.txt
++(eval):8> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj -c 'user.email=lab@x' -c 'user.name=lab' commit -qm 'feature work in old copy'
++(eval):9> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj bundle create /Users/charlesabrooker/tmp/fm-labw.I4nD2K/labship.bundle origin/main..fm/labship
+fatal: ambiguous argument 'origin/main..fm/labship': unknown revision or path not in the working tree.
+Use '--' to separate paths from revisions, like this:
+'git <command> [<revision>...] -- [<file>...]'
++(eval):10> mkdir -p /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees
++(eval):10> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj worktree add -q -b fm/labship-v2 /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 origin/main
++(eval):11> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 fetch -q /Users/charlesabrooker/tmp/fm-labw.I4nD2K/labship.bundle fm/labship
+fatal: '/Users/charlesabrooker/tmp/fm-labw.I4nD2K/labship.bundle' does not appear to be a git repository
+fatal: Could not read from remote repository.
+
+Please make sure you have the correct access rights
+and the repository exists.
++(eval):12> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 log --oneline -3
+8fca91a treehouse pool root
+4e42e36 base
++(eval):13> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj status --short --branch
+## HEAD (no branch)
+?? .claude/
++(eval):14> set +x
+
+## worker: put the slot's commit on its ship branch, then bundle and carry over
++(eval):6> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj switch -q -c fm/labship
++(eval):7> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj bundle create /Users/charlesabrooker/tmp/fm-labw.I4nD2K/labship.bundle origin/main..fm/labship
++(eval):8> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 fetch -q /Users/charlesabrooker/tmp/fm-labw.I4nD2K/labship.bundle fm/labship
++(eval):8> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 -c 'user.email=lab@x' -c 'user.name=lab' cherry-pick FETCH_HEAD
++(eval):9> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 log --oneline -3
+3643aa0 feature work in old copy
+8fca91a treehouse pool root
+4e42e36 base
++(eval):10> git -C /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj log --oneline -2
+e8501a9 feature work in old copy
+8fca91a treehouse pool root
++(eval):11> set +x
+
+## crew-state still reads the OLD copy (record names the slot)
+state: unknown · source: none · no current-state source available
+worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+branch=fm/labship

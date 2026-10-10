@@ -1,0 +1,22 @@
+### fm-spawn labnext --scout while pool slot 1 holds labship's nested current copy
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj contains task labship's current copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2; refusing allocation before treehouse get
+exit=1
+slot 1 claim:
+task=labship
+home=/Users/charlesabrooker/tmp/fm-lab.mqqjk3
+claim UNCHANGED
+labnext record exists: no
+pool slots:
+1
+treehouse-state.json
+treehouse-state.key
+treehouse-state.lock
+home
+fm-labship

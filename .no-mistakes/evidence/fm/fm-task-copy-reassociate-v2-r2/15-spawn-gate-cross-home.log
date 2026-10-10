@@ -1,0 +1,23 @@
+## data/secondmates.md
+- ghost - ghost (home: /Users/charlesabrooker/tmp/fm-labw.I4nD2K/missing-home; scope: lab fixture; projects: proj; added 2026-10-10)
+- mate2 - mate2 (home: /Users/charlesabrooker/tmp/fm-labw.I4nD2K/mate2; scope: lab fixture; projects: proj; added 2026-10-10)
+## mate2 holder record (another local home) names a nested copy inside slot 1
+window=fmses:fm-holder
+worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/hold
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+project=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj
+kind=ship
+
+### fm-spawn labthird --scout: ghost home missing, mate2 home holds a live nested copy in slot 1
+warning: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.I4nD2K/missing-home; its task records were not checked for a current copy inside a Treehouse pool slot
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj contains task holder's current copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/hold; refusing allocation before treehouse get
+labthird record exists: no
+
+### holder record retired; fm-spawn labthird --scout again (ghost home still missing)
+warning: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.I4nD2K/missing-home; its task records were not checked for a current copy inside a Treehouse pool slot
+skill selection for labthird: unavailable - no TypeSafe or OpenRouter key
+spawned labthird harness=claude kind=scout window=fmlab:fm-labthird worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+labthird record: worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+slot 1 claim:
+task=labthird
+home=/Users/charlesabrooker/tmp/fm-lab.mqqjk3

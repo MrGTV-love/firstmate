@@ -1,0 +1,44 @@
+## record diff (before -> after first forward reassociation)
+3c3
+< worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+---
+> worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2
+9c9
+< branch=fm/labship
+---
+> branch=fm/labship-v2
+16a17
+> prior_worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj
+
+## brief diff
+112c112
+< Ship branch: fm/labship
+---
+> Ship branch: fm/labship-v2
+118a119,126
+> 
+> ## Copy reassociation (2026-10-10T20:09:46Z)
+> 
+> This task's work moved to a replacement local copy.
+> Work only in /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2, on branch fm/labship-v2.
+> It replaces /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj, which is preserved exactly as it was; do not change it.
+> 
+> not the lock owner
+
+## slot claim
+task=labship
+home=/Users/charlesabrooker/tmp/fm-lab.mqqjk3
+
+## anchors in project ref store
+refs/fm/anchor/labship-e8501a9 e8501a9
+slot HEAD: e8501a9
+
+## old copy still intact
+e8501a9 feature work in old copy
+README.md
+feature.txt
+treehouse.toml
+
+## endpoint untouched: worker pane still alive
+home bash dead=0
+fm-labship 2.1.296 dead=0

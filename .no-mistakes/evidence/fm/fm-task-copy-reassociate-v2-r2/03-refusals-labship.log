@@ -1,0 +1,48 @@
+### worker caller (FM_TASK_ID set)
+$ labship reassociate --worktree /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 --note worker tries
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+error: workers cannot reassociate a task record
+exit=1 state-before=219fb28a11fd75c7 state-after=219fb28a11fd75c7 UNCHANGED
+
+### missing --note
+$ bin/fm-control.sh labship reassociate --worktree /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+error: reassociate requires --note (or --note-file) saying why the work moved; it is recorded in the task's instructions
+exit=1 state-before=219fb28a11fd75c7 state-after=219fb28a11fd75c7 UNCHANGED
+
+### replacement is the project checkout
+$ labship reassociate --worktree /Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj --note wrong target
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj is not an isolated worktree of /Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj: it is the project checkout itself; nothing was changed
+exit=1 state-before=219fb28a11fd75c7 state-after=219fb28a11fd75c7 UNCHANGED
+
+### replacement is not a directory
+$ labship reassociate --worktree /Users/charlesabrooker/tmp/fm-labw.I4nD2K/nope --note missing
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+error: --worktree '/Users/charlesabrooker/tmp/fm-labw.I4nD2K/nope' is not an existing directory
+exit=1 state-before=219fb28a11fd75c7 state-after=219fb28a11fd75c7 UNCHANGED
+
+### old copy has untracked uncommitted file
+$ labship reassociate --worktree /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 --note dirty
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+error: current copy /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj has uncommitted or untracked-unignored changes; commit or carry its work over, or reassociate the task back to it, before reassociating; nothing was changed:
+?? uncommitted.txt
+exit=1 state-before=bbbe82cb5d7421d0 state-after=bbbe82cb5d7421d0 UNCHANGED
+
+### relaunch-only flag on reassociate
+$ --worktree /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 --note n --model opus
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+error: --harness, --model, --effort, --claude-debug, and --reconcile-only apply to 'relaunch' only
+exit=1 state-before=219fb28a11fd75c7 state-after=219fb28a11fd75c7 UNCHANGED
+
+### non-lock-owner session (lab tmux pane shell, no harness ancestry)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+reassociated labship worktree=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 branch=fm/labship-v2 prior=/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj slot=kept
+exit=0
+record or brief: CHANGED
+### non-lock-owner session: state/.lock names another live harness (the lab worker's claude pid 9875)
+lock: held by live harness pid 9875
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+error: task copy reassociation requires the actual lock-owning main Firstmate
+exit=1
+record and brief: UNCHANGED

@@ -1,0 +1,9 @@
+### fm-teardown labship: nested copy landed, but slot holds a late commit that is neither landed nor anchored
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj would sweep away task labship's claimed pool slot /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj, whose HEAD 07e20b9bcef5c57b1a8d45711dc6455196729096 is neither landed nor held by a refs/fm/anchor/labship-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+exit=1
+fingerprint before=7d7bb0b14a678c66 after=7d7bb0b14a678c66 UNCHANGED
+late.txt still in slot: late slot work
+nested copy still exists: yes

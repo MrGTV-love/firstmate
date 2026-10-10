@@ -1,0 +1,45 @@
+### fm-teardown labship (plain): nested copy landed; slot clean and anchored
+treehouse status before:
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     in-use       ~/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj  [fm/labship]
+                   2.1.296 (9875), zsh (99302)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mqqjk3
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for labship: 9875 99302
+teardown: force-killing leaked worktree process(es) for labship: 99302
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown labship complete (window fmlab:fm-labship; nested reassociated worktree /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj/.claude/worktrees/fm-labship-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj returned)
+Backlog: labship is closed in /Users/charlesabrooker/tmp/fm-lab.mqqjk3/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+nested copy exists: no
+slot claim file exists: no
+task record exists: no
+nested branch kept: 3643aa0
+anchor kept: refs/fm/anchor/labship-e8501a9 e8501a9
+git worktrees:
+/Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj                               3643aa0 [main]
+/Users/charlesabrooker/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj 3643aa0 (detached HEAD)
+slot state: ## HEAD (no branch) 
+treehouse status after:
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     available    ~/tmp/fm-labw.I4nD2K/pool/.treehouse/proj-fe377a/1/proj  (detached)
+tmux windows: home 
+backlog row:
+task:
+  id: labship
+  title: Lab ship for copy reassociation
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"

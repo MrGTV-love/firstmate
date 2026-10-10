@@ -1,0 +1,9 @@
+### fm-merge-local.sh labship (lands the branch the record now names)
+branch=fm/labship-v2
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+merged fm/labship-v2 into local main (8fca91a -> 3643aa0) in /Users/charlesabrooker/tmp/fm-labw.I4nD2K/proj
+exit=0
+local main now:
+3643aa0 feature work in old copy
+8fca91a treehouse pool root
+4e42e36 base
