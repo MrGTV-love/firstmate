@@ -1015,7 +1015,7 @@ SH
 # is one MODEL_FRESHNESS line, a current one is silent, and the local half of a
 # split run never reads a catalog.
 test_model_freshness_is_a_deferred_diagnostic() {
-  local case_dir fakebin catalogs only_out skip_out
+  local case_dir fakebin only_out skip_out
   case_dir="$TMP_ROOT/model-freshness"
   mkdir -p "$case_dir/home/config" "$case_dir/catalogs"
   printf '%s\n' manual > "$case_dir/home/config/backlog-backend"
