@@ -431,7 +431,7 @@ For spawn-capable adapters, the runtime session-provider backend controls where 
 
 Treehouse remains the worktree provider for tmux, herdr, zellij, and cmux, since herdr, zellij, and cmux are session providers only; Orca provides both the task worktree and terminal endpoint.
 
-Every admitted Herdr runtime requires `python3` on its runtime PATH to read process environments and prove runtime ownership, including local homes and remote hosts on every supported platform.
+Every admitted Herdr runtime requires a `python3` on its runtime PATH that runs as Python 3 to read process environments and prove runtime ownership, including local homes and remote hosts on every supported platform.
 Remote launch-agent prerequisites and repair refusals are owned by [remote readiness](remote-secondmates.md#required-remote-tools).
 Ownership remains unproven rather than being accepted from an unreadable environment.
 

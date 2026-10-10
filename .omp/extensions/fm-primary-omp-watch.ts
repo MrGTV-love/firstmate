@@ -804,6 +804,9 @@ export default function (pi: ExtensionAPI) {
     return activateOwnedWatch(generation);
   }
   const parentTask = resolveLocalSecondmateTask(fmRoot, fmHome, state);
+  // A descendant omp (an `omp -p` child of the lock holder) must not rewrite its
+  // secondmate's proof. Each event rechecks ancestry rather than one load-time
+  // lock read, because a stale lock PID reused by an unrelated process is not an ancestor.
   if (parentTask) {
     installTaskSessionProof({
       pi: pi.pi,
