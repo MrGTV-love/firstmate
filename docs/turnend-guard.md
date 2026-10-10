@@ -325,7 +325,7 @@ It allows the stop when any of these holds:
 
 #### The wait's measured basis
 
-The wait is a floor in wall time, not a ceiling: the guard counts one 100 millisecond sleep per tenth of the setting, and each check between sleeps costs more as the host load rises.
+The wait is a floor in wall time, not a ceiling: the guard sleeps 100 milliseconds once per 100 milliseconds of the setting (120 sleeps at the default), and each check between sleeps costs more as the host load rises.
 A guard set to 800 milliseconds nominal that expired under the stress level below ran a median of 2.0 seconds and up to 7.2 seconds of wall time, so the setting is chosen against the claim latency itself.
 
 The latency that matters is the time from the guard starting to wait until the auto-arm publishes its generation claim.
@@ -358,8 +358,16 @@ Re-run at the 12 second default under the same stress, 60 trials gave 53 claims 
 The guard has no hook `timeout` of its own in `.claude/settings.json`, so Claude's default of 600 seconds for command hooks applies (Claude Code hooks reference, read 2026-10-10).
 A wait of 12 seconds nominal stayed inside it with a wide margin even at the 9 times wall-time stretch seen under stress (about 108 seconds).
 The cost lands whenever no claim is open at the end of the wait, not only when the auto-arm is absent.
-A fast-failed auto-arm that publishes no failure notice also leaves no open claim, so the guard waits the full 12 seconds before each of the three budgeted re-blocks, up to about 36 seconds of wait per turn end (about 2.4 seconds at the old default).
-The wait ends early only when the watcher is healthy, a claim is open, or a fresh actionable rewake is recorded; an explicit failed outcome does not end it early.
+Each blocked Stop waits the full 12 seconds first (0.8 seconds at the old default), so the cost is per Stop, and it adds up over the Stops of one failure episode:
+
+- With a failure notice on disk, the budget of three re-blocks runs out on the fourth Stop, which also waits the full 12 seconds before the verified fail-open, so the episode costs about 48 seconds of wait.
+- With no failure notice on disk, the verified fail-open never fires, so the re-blocks continue to Claude Code's 8-block override, about 96 seconds of wait.
+  The same holds in away mode with no live daemon, and for a Stop that pi-code delivers, because the auto-arm stands down there by design.
+
+These are nominal floors; wall time can stretch about 9 times under load.
+The wait ends before the full 12 seconds only when the watcher is healthy, the auto-arm's generation claim is open, a legacy build's lock-holding claim is live, or a fresh actionable rewake is recorded.
+The one failed outcome that also ends it at once is the first fresh `failed` epoch that has a failure notice and no budget file yet; that Stop counts as the automatic continuation and is allowed.
+No other explicit failed outcome ends the wait early.
 
 #### Auto-arm generation claim
 

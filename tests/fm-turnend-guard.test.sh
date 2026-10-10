@@ -1502,7 +1502,7 @@ test_hook_claude_mode_repeated_failed_to_arming_interleavings_reach_fail_open() 
     printf 'epoch=%s owner_pid=999 outcome=failed-suppressed updated_at=%s\n' "$epoch" "$(date +%s)" > "$dir/state/.claude-autoarm-epoch"
   done
 
-  out=$(run_hook_claude "$dir" true); status=$?
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
   expect_code 0 "$status" "repeated failed-to-arming interleavings must reach terminal fail-open"
   assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "arming interleavings stalled before the bounded fail-open"
   assert_present "$dir/state/.claude-autoarm-failure-alarmed" "arming interleavings did not consume the one-time alarm"
@@ -1548,6 +1548,7 @@ SH
         FM_TERMINAL_READY="$ready" \
         FM_TERMINAL_RELEASE="$release" \
         FM_TERMINAL_ONCE="$once" \
+        FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 \
         CLAUDECODE=1 FM_HOME="$dir" bash "$dir/bin/fm-turnend-guard.sh" --claude \
           > "$guard_out" 2>&1
     printf '%s\n' "$?" > "$guard_status"
@@ -1739,7 +1740,7 @@ test_hook_claude_mode_preserves_fresh_failed_progression() {
   count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
   [ "$count" = 0 ] || fail "the owned first failed epoch must not consume a blocked-stop count, got $count"
   printf 'epoch=4 owner_pid=999 outcome=failed-suppressed updated_at=%s\n' "$(date +%s)" > "$dir/state/.claude-autoarm-epoch"
-  out=$(run_hook_claude "$dir" true); status=$?
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
   expect_code 2 "$status" "a later fresh failed epoch must consume the bounded progression"
   assert_absent "$dir/state/.claude-autoarm-failure-alarmed" "fresh failure progression emitted the attended fail-open alarm too early"
   count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
@@ -2119,9 +2120,12 @@ test_hook_claude_mode_default_wait_covers_measured_claim_latency() {
     sleep 2.5
     FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" bash -c '
       . "$1/bin/fm-wake-lib.sh"
-      fm_autoarm_claim_next "$1/state" 300 || exit 1
       printf "%s\n" "$$" > "$1/holder.pid"
-      sleep 60
+      fm_autoarm_claim_next "$1/state" 300 || exit 1
+      sleep 60 &
+      spid=$!
+      trap "kill \"\$spid\" 2>/dev/null; exit 0" TERM
+      wait
       exit 0
     ' _ "$dir"
   ) &
