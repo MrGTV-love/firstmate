@@ -129,6 +129,7 @@ type ReplacementActionableHandoff = {
 
 type UnconsumedWake = {
   content: string;
+  message?: string;
   pending?: PendingActionableClose;
   prepared?: true;
 };
@@ -857,7 +858,7 @@ export default function (pi: ExtensionAPI) {
     }
     const content = wakeContent(operationalHandback(message) && awayRecordPresent() ? `${message}\n${awayNote}` : message);
     const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
-    return submitWake(owner, token, { content, pending });
+    return submitWake(owner, token, { content, message, pending });
   }
 
   function wakeContent(message: string): string {
@@ -1061,7 +1062,8 @@ export default function (pi: ExtensionAPI) {
   }
 
   // An unconsumed watcher wake becomes a mark again, so the queue read builds
-  // fresh text; an operational hand-back is sent again with its send-time note;
+  // fresh text; an operational hand-back is sent again with the message it was
+  // first sent with, plus its send-time note;
   // other text, which names no queued row, is resent as emitted.
   function redeliverWake(owner: SessionGeneration, token: string, wake: UnconsumedWake): void {
     if (!wake.pending) {
@@ -1070,7 +1072,7 @@ export default function (pi: ExtensionAPI) {
     }
     owner.unconsumedWakes.delete(token);
     if (operationalHandback(wake.pending.message)) {
-      void sendWake(owner, wake.pending.message, wake.pending).catch((error) => {
+      void sendWake(owner, wake.message ?? wake.pending.message, wake.pending).catch((error) => {
         const detail = error instanceof Error ? error.message : String(error);
         surfaceFailure(owner, `watcher: FAILED - omp extension could not deliver an operational hand-back\n${detail}`);
       });

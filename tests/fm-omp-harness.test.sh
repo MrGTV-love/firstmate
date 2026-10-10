@@ -1431,7 +1431,7 @@ EOF
   pass ".omp watch extension: a home without config/supervision-host or with an off file keeps the plain arm"
 }
 
-test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|stuck|rejected>
+test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|stuck|rejected|unrestored>
   local kind=${1:-outcome} repo home log out status
   repo="$TMP_ROOT/watch-host-handoff-$kind/repo"; home="$TMP_ROOT/watch-host-handoff-$kind/home"; log="$TMP_ROOT/watch-host-handoff-$kind/arm.log"
   install_omp_extension_fixture "$repo"
@@ -1449,6 +1449,7 @@ SH
   cat > "$repo/bin/fm-supervision-host.sh" <<'SH'
 #!/usr/bin/env bash
 printf 'host=%s\n' "$$" >> "${FM_ARM_LOG:?}"
+[ "$HAND_BACK_KIND" = unrestored ] && [ "$(grep -c '^host=' "$FM_ARM_LOG")" -gt 1 ] && exit 1
 printf 'watcher: started pid=%s (beacon fresh) recovery-generation=gen-%s\n' "$$" "$$"
 if [ "$(grep -c '^host=' "$FM_ARM_LOG")" -eq 1 ]; then
   sleep 1
@@ -1486,12 +1487,17 @@ if (stuck) globalThis.setTimeout = (callback, delay, ...args) => realSetTimeout(
 const mod = await import(pathToFileURL(process.env.EXT).href);
 mod.default(pi);
 let idle = !stuck;
+// A failure carried by the first send must survive omp restoring it to the editor.
+const failure = { rejected: "watcher: FAILED - handling delivery confirmation was rejected", unrestored: "watcher: FAILED - omp extension could not restore watcher continuity" }[process.env.HAND_BACK_KIND];
+let editor = "";
 const ctx = stuck
   ? { hasUI: true, isIdle: () => idle, hasPendingMessages: () => true, ui: { getEditorText: () => "", setEditorText() {} } }
-  : { isIdle: () => process.env.HAND_BACK_KIND !== "busy" };
+  : failure
+    ? { hasUI: true, isIdle: () => true, hasPendingMessages: () => false, ui: { getEditorText: () => editor, setEditorText: (value) => { editor = value; } } }
+    : { isIdle: () => process.env.HAND_BACK_KIND !== "busy" };
 await handlers.get("before_agent_start")({}, ctx);
 await tool.execute();
-for (let i = 0; i < 60 && sent.length < 1; i += 1) await new Promise((r) => setTimeout(r, 100));
+for (let i = 0; i < 100 && sent.length < 1; i += 1) await new Promise((r) => setTimeout(r, 100));
 if (sent.length !== 1 || !sent[0].m.includes("FIRSTMATE SUPERVISION HOST:")) throw new Error(`host hand-back was not delivered once: ${JSON.stringify(sent)}`);
 const expected = process.env.HAND_BACK_KIND === "away-return" ? "the captain returned" : "branch-outcome:";
 if (!sent[0].m.includes(expected)) throw new Error(`host hand-back lost its outcome: ${sent[0].m}`);
@@ -1499,6 +1505,14 @@ if (sent[0].m.includes("signal: already handled original")) throw new Error(`hos
 if (["busy", "stuck"].includes(process.env.HAND_BACK_KIND) ? sent[0].o?.deliverAs !== "followUp" : sent[0].o?.deliverAs !== undefined) throw new Error("host hand-back changed its idle/busy delivery routing");
 const rejected = sent[0].m.includes("watcher: FAILED - handling delivery confirmation was rejected");
 if (process.env.HAND_BACK_KIND === "rejected" ? !rejected : rejected) throw new Error(`a rejected handling confirmation must reach main exactly when it happens: ${sent[0].m}`);
+if (failure) {
+  if (!sent[0].m.includes(failure)) throw new Error(`the hand-back lost its failure on the first send: ${sent[0].m}`);
+  editor = sent[0].m;
+  for (let i = 0; i < 100 && sent.length < 2; i += 1) await new Promise((r) => setTimeout(r, 100));
+  const handbacks = sent.filter(({ m }) => m.includes("FIRSTMATE SUPERVISION HOST:"));
+  if (editor !== "" || handbacks.length !== 2) throw new Error(`the restored hand-back was not sent again: ${JSON.stringify(sent)}`);
+  if (!handbacks[1].m.includes(failure) || !handbacks[1].m.includes("branch-outcome:")) throw new Error(`the re-sent hand-back lost its failure: ${handbacks[1].m}`);
+}
 if (stuck) {
   // omp went idle and never ran the queued follow-up.
   idle = true;
@@ -1506,7 +1520,7 @@ if (stuck) {
   await new Promise((r) => setTimeout(r, 500));
   if (sent.length !== 2 || sent[1].m !== sent[0].m || sent[1].o?.deliverAs !== undefined) throw new Error(`a hand-back stuck in the idle omp queue was not sent through the prompt flow: ${JSON.stringify(sent)}`);
 }
-await handlers.get("message_start")({ message: { role: "user", content: sent[0].m } }, ctx);
+await handlers.get("message_start")({ message: { role: "user", content: sent.filter(({ m }) => m.includes("FIRSTMATE SUPERVISION HOST:")).pop().m } }, ctx);
 await handlers.get("session_shutdown")({}, {});
 if (existsSync(handoff)) throw new Error("a consumed host hand-back retained its handoff");
 process.exit(0);
@@ -3428,6 +3442,7 @@ if [ "${1:-}" = --watch-queue ]; then
   test_watch_extension_delivers_host_handbacks busy
   test_watch_extension_delivers_host_handbacks stuck
   test_watch_extension_delivers_host_handbacks rejected
+  test_watch_extension_delivers_host_handbacks unrestored
   test_watch_extension_marks_host_closes_without_headlines boundary
   test_watch_extension_marks_host_closes_without_headlines note
   test_watch_extension_marks_host_closes_without_headlines archived
@@ -3472,6 +3487,7 @@ test_watch_extension_delivers_host_handbacks away-return
 test_watch_extension_delivers_host_handbacks busy
 test_watch_extension_delivers_host_handbacks stuck
 test_watch_extension_delivers_host_handbacks rejected
+test_watch_extension_delivers_host_handbacks unrestored
 test_watch_extension_marks_host_closes_without_headlines boundary
 test_watch_extension_marks_host_closes_without_headlines note
 test_watch_extension_marks_host_closes_without_headlines archived
