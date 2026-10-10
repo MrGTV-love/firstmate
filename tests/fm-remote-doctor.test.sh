@@ -723,7 +723,7 @@ mkdir -p "$READINESS_BIN"
 cat > "$READINESS_BIN/fm-on.sh" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FM_TEST_READINESS_LOG"
-printf '%s\n' 'check herdr-owner-reader=human: python3 prerequisite does not resolve on the runtime PATH'
+printf '%s\n' 'check herdr-owner-reader=human: python3 prerequisite does not run on the runtime PATH'
 exit 1
 SH
 chmod +x "$READINESS_BIN/fm-on.sh"
@@ -931,6 +931,26 @@ for running in true false; do
   [ ! -s "$CASE_LAUNCHCTL_LOG" ] || fail "restored linux path invoked launchctl"
 done
 pass "linux requires Python before admitting or repairing running and stopped servers"
+
+BROKEN_PYTHON_TOOLS="$TMP_ROOT/broken-python-tools"
+mkdir -p "$BROKEN_PYTHON_TOOLS"
+cp -P "$NO_PYTHON_TOOLS"/* "$BROKEN_PYTHON_TOOLS"/
+printf '#!/bin/sh\necho "xcrun: error: invalid active developer path" >&2\nexit 1\n' > "$BROKEN_PYTHON_TOOLS/python3"
+chmod +x "$BROKEN_PYTHON_TOOLS/python3"
+new_case Linux with-herdr no-gui
+printf 'true\n' > "$CASE_HERDR_RUNNING"
+CASE_BASE_PATH=$BROKEN_PYTHON_TOOLS
+doctor
+expect_code 1 "$DOCTOR_RC" "linux accepted a running server with a python3 that cannot run"
+assert_contains "$DOCTOR_OUT" "required python3=$BROKEN_PYTHON_TOOLS/python3" "the fixture did not present a resolving python3"
+assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=human: python3 prerequisite does not run' "a python3 that cannot run was accepted as the reader"
+assert_contains "$DOCTOR_OUT" 'check herdr-server=human:' "linux admitted a server with a python3 that cannot run"
+doctor --fix
+expect_code 1 "$DOCTOR_RC" "linux repair accepted a python3 that cannot run"
+assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "linux repaired a server with a python3 that cannot run"
+[ "$(cat "$CASE_HERDR_RUNNING")" = true ] || fail "a python3 that cannot run let linux repair change server state"
+unset CASE_BASE_PATH
+pass "a python3 that resolves but cannot run is a reader prerequisite gap"
 
 # --- --fix may add only owned wrappers for version-manager tools -------------
 

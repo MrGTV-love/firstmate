@@ -385,6 +385,28 @@ expect_code 1 "$GUARD_RC" "the guard started a server without the Python prerequ
 assert_not_started "missing Python allowed a new server"
 [ ! -s "$CASE_LOG" ] || fail "missing Python reached the server CLI"
 
+for broken in failing no-interpreter; do
+  for state in running stopped; do
+    new_case "$state"
+    printf '%s\n' "$WORKER_PID" > "$CASE_OWNER"
+    load_job gui dev.firstmate.remote-job
+    rm "$TOOLS/python3"
+    case "$broken" in
+      failing) printf '#!/bin/sh\necho "xcrun: error: invalid active developer path" >&2\nexit 1\n' > "$TOOLS/python3" ;;
+      no-interpreter) printf '#!%s/no-such-python\n' "$TMP_ROOT" > "$TOOLS/python3" ;;
+    esac
+    chmod +x "$TOOLS/python3"
+    guard
+    rm "$TOOLS/python3"
+    ln -sf "$PYTHON" "$TOOLS/python3"
+    expect_code 1 "$GUARD_RC" "the guard did not refuse a $broken python3 with a $state session"
+    [ ! -s "$CASE_LOG" ] || fail "a $broken python3 reached the server CLI with a $state session"
+    assert_not_started "a $broken python3 allowed a server start with a $state session"
+    assert_contains "$GUARD_OUT" "python3 prerequisite" "the $broken python3 was not diagnosed as the reader prerequisite"
+  done
+done
+pass "a python3 that resolves but cannot run refuses takeover of a worker-born server"
+
 # --- a foreign owner is stopped, then the guard becomes the server -----------
 
 new_case running

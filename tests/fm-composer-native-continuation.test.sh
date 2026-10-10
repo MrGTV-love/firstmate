@@ -295,8 +295,9 @@ test_reported_one_space_nested_draft() {
   screen=$'────────\n❯ preface\n ❯ nested draft\n────────'
   assert_screen "enclosed one-space draft lazily probes identity" need-identity "$CAPS_STYLED" "$screen"
   assert_screen "enclosed one-space draft without identity" unknown-draft "$CAPS_STYLED_NOID" "$screen"
-  for identity in probe-absent $'claude\tidle' $'zsh\t'; do
-    assert_screen "enclosed one-space draft denied identity '$identity'" unknown-draft "$CAPS_STYLED" "$screen" '' "$identity"
+  assert_screen "enclosed one-space draft with an absent identity" unknown-draft "$CAPS_STYLED" "$screen" '' probe-absent
+  for identity in $'claude\tidle' $'zsh\t'; do
+    assert_screen "enclosed one-space draft under non-Pi identity '$identity'" pending "$CAPS_STYLED" "$screen" '' "$identity"
   done
   assert_screen "enclosed one-space draft proven Pi" pending "$CAPS_STYLED" "$screen" '' $'pi\tidle'
   screen="$screen"$'\n❯ '

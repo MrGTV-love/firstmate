@@ -270,6 +270,20 @@ function lockOwnership(): LockOwnership {
   return pidAlive(lockPid) ? "other" : "missing";
 }
 
+function lockHeldByAncestor(): boolean {
+  let lockPid = "";
+  try {
+    lockPid = readFileSync(`${state}/.lock`, "utf8").trim();
+  } catch {
+    return false;
+  }
+  for (let pid = process.ppid; pid >= 1;) {
+    if (String(pid) === lockPid) return true;
+    pid = Number(spawnSync("ps", ["-o", "ppid=", "-p", String(pid)], { encoding: "utf8" }).stdout?.trim());
+  }
+  return false;
+}
+
 // Writes only on a change, so the turn-boundary calls below stay cheap.
 function markLoaded(): void {
   if (lockOwnership() === "other") return;
@@ -790,7 +804,12 @@ export default function (pi: ExtensionAPI) {
     return activateOwnedWatch(generation);
   }
   const parentTask = resolveLocalSecondmateTask(fmRoot, fmHome, state);
-  if (parentTask && lockOwnership() !== "other") installTaskSessionProof(pi, parentTask.state, parentTask.id);
+  if (parentTask) {
+    installTaskSessionProof({
+      pi: pi.pi,
+      on: (event, handler) => pi.on?.(event, (payload, ctx) => lockHeldByAncestor() ? undefined : handler(payload, ctx)),
+    }, parentTask.state, parentTask.id);
+  }
 
   async function sendWake(
     owner: SessionGeneration,

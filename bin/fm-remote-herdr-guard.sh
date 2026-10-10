@@ -18,8 +18,8 @@
 # Decision, made once per launch (exit codes matter under SuccessfulExit=false:
 # 0 tells launchd the job is done until something restarts it, non-zero asks
 # for a retry after the throttle interval):
-#   ownership reader unavailable (python3 missing from launch agent PATH)
-#                                      -> exit 1 before server start or takeover
+#   ownership reader unavailable (python3 missing from, or not running on,
+#   the launch agent PATH)             -> exit 1 before server start or takeover
 #   no server owns the session socket  -> exec `herdr server --session <s>`
 #                                          (foreground, launchd-supervised)
 #   the owner was born in the Aqua session (launchd or the Aqua remote-job
@@ -55,7 +55,7 @@ SESSION=$2
 [ -n "$HERDR_BIN" ] && [ -x "$HERDR_BIN" ] || { printf 'fm-remote-herdr-guard: herdr is not executable: %s\n' "$HERDR_BIN" >&2; exit 1; }
 [ -n "$SESSION" ] || usage
 command -v jq >/dev/null 2>&1 || { printf 'fm-remote-herdr-guard: jq does not resolve on the launch agent PATH\n' >&2; exit 1; }
-fm_remote_herdr_owner_reader_available || { printf 'fm-remote-herdr-guard: python3 prerequisite does not resolve on the launch agent PATH; refusing server start or takeover\n' >&2; exit 1; }
+fm_remote_herdr_owner_reader_available || { printf 'fm-remote-herdr-guard: python3 prerequisite does not run on the launch agent PATH; refusing server start or takeover\n' >&2; exit 1; }
 STOP_WAIT_TENTHS=${FM_REMOTE_HERDR_GUARD_STOP_WAIT_TENTHS:-50}
 
 log() { printf 'fm-remote-herdr-guard: %s\n' "$*"; }

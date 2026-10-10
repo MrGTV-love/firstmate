@@ -2576,8 +2576,6 @@ test_secondmate_watch_proof_ignores_a_descendant_omp() {
     node --input-type=module 2>&1 <<'EOF'
 import { pathToFileURL } from "node:url";
 import { writeFileSync } from "node:fs";
-// The secondmate session itself (this test shell) holds the home lock.
-writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.ppid}\n`);
 writeFileSync(process.env.CHILD_SESSION, "{}\n");
 const handlers = new Map();
 const sessionManager = { getSessionId: () => "child", getSessionFile: () => process.env.CHILD_SESSION };
@@ -2587,7 +2585,10 @@ const pi = {
   registerCommand() {}, registerTool() {}, sendUserMessage() {}, sendMessage() {},
   pi: { AgentRegistry: { global: () => registry } },
 };
+// The child loads while the home lock is still missing; the secondmate session
+// itself (an ancestor of this process) claims it before the child session starts.
 (await import(pathToFileURL(process.env.WATCH_EXT).href)).default(pi);
+writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.ppid}\n`);
 const ctx = { sessionManager };
 for (const event of ["session_start", "session_shutdown"]) {
   for (const handler of handlers.get(event) ?? []) await handler({ type: event }, ctx);
@@ -2600,6 +2601,64 @@ EOF
   [ "$(cat "$proof")" = "$before" ] \
     || fail "a descendant omp rewrote its secondmate's task-session proof: $(cat "$proof")"
   pass ".omp extensions: a descendant omp neither rebinds nor clears its local secondmate's task-session proof"
+}
+
+# The secondmate's own omp must publish its proof whenever no ancestor holds the
+# home lock: before it claims the lock, once it owns it, and after a reboot left
+# the lock naming a pid an unrelated live process now has.
+test_secondmate_watch_proof_publishes_for_the_secondmate_itself() {
+  local repo home parent out status stranger lock_case
+  repo="$TMP_ROOT/secondmate-self/repo"; home="$TMP_ROOT/secondmate-self/home"
+  parent="$TMP_ROOT/secondmate-self/parent"
+  install_omp_extension_fixture "$repo"
+  mkdir -p "$home/state" "$parent/state" "$TMP_ROOT/secondmate-self/sessions"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$repo/bin/fm-watch-arm.sh"
+  chmod +x "$repo/bin/fm-watch-arm.sh"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" > "$home/.fm-secondmate-parent"
+  printf 'sm\n' > "$home/.fm-secondmate-home"
+  printf 'spawn_gen=secondmate-gen\n' > "$parent/state/sm.meta"
+  sleep 300 >/dev/null 2>&1 &
+  stranger=$!
+  for lock_case in missing self stranger; do
+    rm -f "$home/state/.lock" "$parent/state/sm.omp-session.json"
+    out=$(FM_HOME="$home" FM_ROOT_OVERRIDE="$repo" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+      FM_DATA_OVERRIDE="$home/data" FM_SPAWN_GEN=secondmate-gen FM_SESSIONSTART_OFF=1 LOCK_CASE="$lock_case" STRANGER="$stranger" \
+      WATCH_EXT="$repo/.omp/extensions/fm-primary-omp-watch.ts" SESSION="$TMP_ROOT/secondmate-self/sessions/$lock_case.jsonl" \
+      PROOF="$parent/state/sm.omp-session.json" node --input-type=module 2>&1 <<'EOF'
+import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync, writeFileSync } from "node:fs";
+const lock = `${process.env.FM_HOME}/state/.lock`;
+if (process.env.LOCK_CASE === "self") writeFileSync(lock, `${process.pid}\n`);
+if (process.env.LOCK_CASE === "stranger") writeFileSync(lock, `${process.env.STRANGER}\n`);
+writeFileSync(process.env.SESSION, "{}\n");
+const handlers = new Map();
+const sessionManager = { getSessionId: () => "self", getSessionFile: () => process.env.SESSION };
+const registry = { list: () => [{ kind: "main", session: { sessionManager, waitForSessionTransition: () => Promise.resolve() } }] };
+const pi = {
+  on(event, handler) { (handlers.get(event) ?? handlers.set(event, []).get(event)).push(handler); },
+  registerCommand() {}, registerTool() {}, sendUserMessage() {}, sendMessage() {},
+  pi: { AgentRegistry: { global: () => registry } },
+};
+(await import(pathToFileURL(process.env.WATCH_EXT).href)).default(pi);
+const ctx = { sessionManager };
+for (const handler of handlers.get("session_start") ?? []) await handler({ type: "session_start" }, ctx);
+let proof;
+try { proof = JSON.parse(readFileSync(process.env.PROOF, "utf8")); } catch (error) { throw new Error(`no task-session proof published: ${error.message}`); }
+if (proof.pid !== process.pid || proof.spawn_gen !== "secondmate-gen" || proof.current_session_file !== realpathSync(process.env.SESSION)) {
+  throw new Error(`task-session proof does not name this session: ${JSON.stringify(proof)}`);
+}
+process.exit(0);
+EOF
+)
+    status=$?
+    if [ "$status" -ne 0 ]; then
+      kill "$stranger" 2>/dev/null
+      expect_code 0 "$status" "a local secondmate with lock $lock_case must publish its task-session proof: $out"
+    fi
+  done
+  kill "$stranger" 2>/dev/null
+  wait "$stranger" 2>/dev/null
+  pass ".omp extensions: a local secondmate publishes its task-session proof with the lock missing, its own, or naming an unrelated live pid"
 }
 
 # The turn-end guard used to record itself only while the extension loaded,
@@ -3019,6 +3078,7 @@ test_watch_extension_resubmits_a_wake_omp_restored_to_the_composer
 test_watch_queue_episodes_reset_across_sessions_and_completion
 test_primary_extensions_ignore_a_descendant_session
 test_secondmate_watch_proof_ignores_a_descendant_omp
+test_secondmate_watch_proof_publishes_for_the_secondmate_itself
 test_turnend_marker_follows_the_lock_owner_at_turn_boundaries
 test_watch_extension_heals_a_generation_stopped_without_a_successor
 test_watch_extension_is_single_instance_per_home

@@ -17,4 +17,3 @@ config/
 graft/.cache/
 /jiti/
 /node-compile-cache/
-/.live-composer-*/home/.omp/run/daemons/

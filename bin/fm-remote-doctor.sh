@@ -689,13 +689,13 @@ launch_agent_owner_reader_available() {
 check_herdr_owner_reader() {
   local shell=$1
   if ! fm_remote_herdr_owner_reader_available; then
-    record herdr-owner-reader "human: python3 prerequisite does not resolve on the runtime PATH" \
-      "install Python 3 on that account and expose python3 on the remote runtime PATH; server reload cannot repair a missing ownership reader"
+    record herdr-owner-reader "human: python3 prerequisite does not run on the runtime PATH" \
+      "install a working Python 3 on that account and expose python3 on the remote runtime PATH; server reload cannot repair a missing ownership reader"
   elif [ "$PLATFORM" = darwin ] && ! launch_agent_owner_reader_available "$shell"; then
     record herdr-owner-reader "human: python3 prerequisite does not execute in the Aqua launch-agent login-shell environment" \
       "install Python 3 on that account and expose python3 through $shell -l -c under the GUI launchd environment; the worker-composed PATH is not inherited by the launch agent, and server reload cannot repair this prerequisite"
   else
-    record herdr-owner-reader "ok: python3 resolves on the runtime PATH"
+    record herdr-owner-reader "ok: python3 runs on the runtime PATH"
   fi
 }
 

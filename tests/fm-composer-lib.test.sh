@@ -2116,7 +2116,8 @@ test_blank_separated_indented_omp_frames_are_ambiguous() {
     for caps in "$CAPS_STYLED" $'styled=0\ncursor=0\nidentity=1\nrows=20'; do
       assert_screen "genuine Pi containment of blank-separated literal requests identity" need-identity "$caps" "$screen"
       assert_screen "genuine Pi containment of blank-separated literal stays pending" pending "$caps" "$screen" '' $'pi\tidle'
-      assert_screen "genuine Pi containment without Pi identity stays unproven" unknown-draft "$caps" "$screen" '' $'zsh\t'
+      assert_screen "genuine Pi containment with an absent identity stays unproven" unknown-draft "$caps" "$screen" '' probe-absent
+      assert_screen "enclosed literal under a proven non-Pi identity stays pending" pending "$caps" "$screen" '' $'zsh\t'
       out=$(fm_composer_extract_selected_content "$caps" "$screen") \
         || fail "genuine Pi blank-separated literal extraction refused"
       [ "$out" = "$expected" ] || fail "genuine Pi blank-separated extraction lost literal frame: '$out'"

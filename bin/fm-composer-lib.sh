@@ -117,6 +117,12 @@
 # and native-continuation regressions cover the currently supported containment
 # boundaries, not every possible pasted-frame variant.
 #
+# KNOWN LIMIT: an idle native omp band drawn below its own `❯ omp` shell launch
+# line with no transcript row between them (a fresh start) reads `unknown-draft`.
+# The launch line's `❯` roots a bare draft whose indented rows may continue
+# across the blank rows, so the band below it cannot prove emptiness. This is a
+# false refusal on the safe side; a visible draft never reads `empty`.
+#
 # THE COMPOSER FOOTER ZONE (task firstmate-doorbell-vals-pending-p1): a
 # harness draws its own furniture BELOW the composer - a user statusLine, a
 # permission-mode hint - and the cursorless "bottom-most shape wins" rule
@@ -1754,7 +1760,8 @@ _fm_composer_rule_pair_row_content() {
 # and separated shapes: pending beats empty, an unreadable row is unknown, and
 # geometry ambiguity turns pending into pending-unproven and empty into
 # unknown (an ambiguous container is not positive proof).
-# Native omp band input is literal after floor stripping, not an idle-placeholder match.
+# Native omp band input is literal after floor stripping, not an idle-placeholder match,
+# except that an unstyled floor reading exactly omp's idle hint is unknown.
 _fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <last-row> [omp-band]
   local screen=$1 styled=$2 ambiguous=$3 first=$4 last=$5 literal=${6:-0}
   local row raw content plain state unknown_seen=0
@@ -1769,7 +1776,14 @@ _fm_composer_classify_rows() {  # <screen> <styled> <ambiguous> <first-row> <las
       plain=$(_fm_composer_row_content "$raw" 0 "$literal")
     fi
     if [ "$literal" != 0 ]; then
-      if [ -n "$content" ]; then state=pending; else state=empty; fi
+      if [ -z "$content" ]; then
+        state=empty
+      elif [ "$literal" = 2 ] && [ "$row" -eq "$first" ] && [ "$styled" != 1 ] \
+           && fm_composer_idle_matches "$plain" "$FM_COMPOSER_OMP_BOX_HINT_RE_DEFAULT" sensitive; then
+        state=unknown
+      else
+        state=pending
+      fi
     else
       state=$(fm_composer_classify_content 1 "$content" \
         "${FM_COMPOSER_IDLE_RE:-$FM_COMPOSER_IDLE_RE_DEFAULT}" insensitive "$plain" 1 "$styled")
@@ -1815,6 +1829,21 @@ _fm_composer_classify_bare_row() {  # <screen> <styled> <row>
 # below a bare composer and must bound its wrap region exactly as an edge does.
 _fm_composer_row_is_omp_status() {  # <trimmed-row>
   fm_composer_idle_matches "$1" "${FM_COMPOSER_OMP_STATUS_RE:-$FM_COMPOSER_OMP_STATUS_RE_DEFAULT}" sensitive
+}
+
+# _fm_composer_text_below_band: 0 when any row below a native omp band's last
+# input row holds text other than omp's status line. The band has no closing
+# border, so that text may be draft input however many blank rows precede it.
+_fm_composer_text_below_band() {  # <plain-screen> <last-band-row>
+  local row=$(($2 + 1)) line
+  _fm_composer_rows_load "$1"
+  while [ "$row" -lt "${#_FM_COMPOSER_ROWS[@]}" ]; do
+    line=${_FM_COMPOSER_ROWS[$row]}
+    fm_composer_normalize_trim_var line
+    if [ -n "$line" ] && ! _fm_composer_row_is_omp_status "$line"; then return 0; fi
+    row=$((row + 1))
+  done
+  return 1
 }
 
 # _fm_composer_top_is_omp_box: 0 when the trimmed rounded top border carries
@@ -1995,7 +2024,6 @@ _fm_composer_wrap_region_ok() {  # <plain-screen> <glyph-row> <last-row> [allow-
       _fm_composer_screen_row_var line "$row" "$plain"
       indent=${line%%[![:space:]]*}
       case "$indent" in "$root_indent  "*) ;; *) return 1 ;; esac
-      [ "$blocked" = 1 ] || [ "$indent" = "$root_indent  " ] || return 1
     fi
     row=$((row + 1))
   done
@@ -2335,6 +2363,13 @@ _fm_composer_select_cursorless() {
         boundary=$next
       fi
     fi
+    if [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ]; then
+      if _fm_composer_text_below_band "$plain" "$boundary"; then
+        FM_COMPOSER_SELECTED_KIND=
+        return 2
+      fi
+      return 0
+    fi
     # The same footer zone, read from the other side: rows this envelope's own
     # glyph proved to be its furniture are not the lower live shape that makes
     # the envelope stale, so the staleness probe resumes past them.
@@ -2351,9 +2386,7 @@ _fm_composer_select_cursorless() {
     raw=$(_fm_composer_screen_row "$next" "$plain")
     trimmed=$raw
     fm_composer_normalize_trim_var trimmed
-    if [ -n "$trimmed" ] \
-       && { { [ "$FM_COMPOSER_SELECTED_KIND" = box ] && [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ]; } \
-            || ! fm_composer_row_has_edge "$trimmed"; }; then
+    if [ -n "$trimmed" ] && ! fm_composer_row_has_edge "$trimmed"; then
       FM_COMPOSER_SELECTED_KIND=
       return 1
     fi
@@ -2583,7 +2616,7 @@ EOF
       if [ "$FM_COMPOSER_SCAN_PI_PAIR_FOUND" = 1 ] \
          && [ "$FM_COMPOSER_SCAN_PI_OPEN" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
          && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
-        _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
+        _fm_composer_enclosed_draft_verdict "$screen" "$styled" "$has_identity" "$identity"
       else
         printf 'unknown-draft'
       fi
@@ -2607,15 +2640,9 @@ EOF
       if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ] && [ "$FM_COMPOSER_SCAN_BOX_AMBIG" = 1 ]; then
         printf 'unknown'; return 0
       fi
-      if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ]; then
-        local below below_row=$((FM_COMPOSER_SCAN_BOX_BOTTOM + 1))
-        _fm_composer_screen_row_var below "$below_row" "$plain"
-        fm_composer_normalize_trim_var below
-        if _fm_composer_row_is_omp_status "$below"; then
-          _fm_composer_screen_row_var below "$((below_row + 1))" "$plain"
-          fm_composer_normalize_trim_var below
-        fi
-        [ -z "$below" ] || { printf 'unknown'; return 0; }
+      if [ "$FM_COMPOSER_SCAN_BOX_OMP" = 2 ] \
+         && _fm_composer_text_below_band "$plain" "$FM_COMPOSER_SCAN_BOX_BOTTOM"; then
+        printf 'unknown-draft'; return 0
       fi
       local box_last=$((FM_COMPOSER_SCAN_BOX_BOTTOM - 1))
       [ "$FM_COMPOSER_SCAN_BOX_OMP" = 0 ] || box_last=$FM_COMPOSER_SCAN_BOX_BOTTOM
@@ -2702,9 +2729,7 @@ EOF
       if [ "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" -ge 0 ] \
          && [ "$FM_COMPOSER_SCAN_PI_OPEN" -lt "$FM_COMPOSER_SCAN_BARE_AMBIG_FIRST" ] \
          && [ "$FM_COMPOSER_SCAN_BARE_AMBIG_LAST" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; then
-        # An ambiguous native draft enclosed by the pair is Pi containment, so
-        # only a proven Pi identity may read it.
-        _fm_composer_pi_verdict "$screen" "$styled" "$has_identity" "$identity"
+        _fm_composer_enclosed_draft_verdict "$screen" "$styled" "$has_identity" "$identity"
       elif [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ]; then
         _fm_composer_pair_glyph_verdict "$screen" "$styled" "$has_identity" "$identity"
       else
@@ -2843,6 +2868,24 @@ _fm_composer_pair_glyph_verdict() {  # <screen> <styled> <has-identity> <identit
     if [ "$literal" = 1 ] && [ "$text" = 0 ]; then state=unknown-draft; fi
   fi
   printf '%s' "$state"
+}
+
+# An ambiguous native draft enclosed by a rule pair is Pi containment, so a Pi
+# or unidentified screen takes the Pi verdict. A glyph-proven pair under a
+# proven non-Pi identity keeps its visible draft pending for the Enter retry.
+_fm_composer_enclosed_draft_verdict() {  # <screen> <styled> <has-identity> <identity>
+  local state=
+  if [ "$3" = 1 ] && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -ge 0 ]; then
+    case "${4%%$'\t'*}" in
+      ''|probe-absent|pi) ;;
+      *) state=$(_fm_composer_pair_glyph_verdict "$@") ;;
+    esac
+  fi
+  if [ "$state" = pending ]; then
+    printf 'pending'
+    return 0
+  fi
+  _fm_composer_pi_verdict "$@"
 }
 
 _fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <identity> [bare-row] [last-row]

@@ -61,27 +61,45 @@ for state in empty pending; do
 done
 pass "saved omp 18.6.3 native empty and command draft bands agree across public APIs and locales"
 
-# A shell launch line above the transcript is not the idle band's draft root,
-# including a fresh start whose logo and tip precede any conversation row.
-for fresh in 0 1; do
-  screen=$(cat "$ROOT/tests/fixtures/omp-native-band-empty.ansi")
-  [ "$fresh" = 0 ] || screen=$(printf '%s\n' "$screen" | grep -v 'Disposable native renderer conversation')
-  screen=$'❯ omp\n'"$screen"
-  for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
-    assert_screen "idle native band (fresh=$fresh) below its shell launch line" empty "$caps" "$screen"
-    assert_content "idle native band (fresh=$fresh) below its shell launch line" '' "$caps" "$screen"
+# A shell launch line above the transcript is not the idle band's draft root.
+screen=$'❯ omp\n'"$(cat "$ROOT/tests/fixtures/omp-native-band-empty.ansi")"
+assert_screen "idle native band below its shell launch line" empty "$CAPS_STYLED" "$screen"
+assert_content "idle native band below its shell launch line" '' "$CAPS_STYLED" "$screen"
+pass "an idle native band keeps its own boundary below a transcript-separated shell line"
+
+# A draft row indented past its root across a blank row may still be that
+# root's input, so no frame, band or prompt below it can make the screen empty.
+for below in $'  ❯\nπ · model · 15.4%/272K' $'  ╭── π > model > path ─╮\n  ╰─ ─╯' $'   some draft\n'"$BAND"; do
+  for deep in '   make test' '    make test' '        make test'; do
+    screen=$'❯ please run:\n'"$deep"$'\n\n'"$below"
+    for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
+      assert_screen "draft indented past its root above '${below%%$'\n'*}'" unknown-draft "$caps" "$screen"
+    done
+    rows=$(printf '%s\n' "$screen" | wc -l)
+    for cursor in $(seq 0 $((rows - 1))); do
+      out=$(fm_composer_classify_screen "$CAPS_TMUX" "$screen" "$cursor" $'claude\tidle')
+      [ "$out" != empty ] || fail "draft indented past its root read empty at cursor $cursor: $screen"
+    done
   done
 done
-pass "an idle native band keeps its own boundary below a gap-separated shell line"
+pass "a draft row indented past its root never classifies as empty"
 
 # A band has no closing border, so text below its floor is unbounded input in
 # cursor mode exactly as it is cursorless.
 screen=$' π > ⬢ GPT-4.1 > 📁 /work > ⑂ main ▶─0.2%─────────────────────────────╎─┃─────1M─\n╰─'
 assert_screen "cursor on an idle band floor" empty "$CAPS_TMUX" "$screen" 1
-for below in 'draft|unknown' '  draft|unknown-draft'; do
-  want=${below#*|} below=${below%|*}
-  assert_screen "cursor on a band floor above '$below'" "$want" "$CAPS_TMUX" "$screen"$'\n'"$below" 1
-  assert_refused "band floor above '$below'" "$screen"$'\n'"$below" "$want"
+for floor in '╰─' '╰─ !git diff'; do
+  for gap in '' $'\n' $'\nπ · model · 15.4%/272K\n' $'\n\nπ · model · 15.4%/272K'; do
+    for below in 'draft' '  draft' '/model'; do
+      band="${screen%$'\n'*}"$'\n'"$floor$gap"$'\n'"$below"
+      assert_screen "cursor on a band floor '$floor' above '$below'" unknown-draft "$CAPS_TMUX" "$band" 1
+      assert_refused "band floor '$floor' above '$below'" "$band" unknown-draft
+    done
+  done
+done
+for status in $'\nπ · model · 15.4%/272K' $'\n\nπ · model · 15.4%/272K\n'; do
+  assert_screen "cursor on an idle band floor above its status" empty "$CAPS_TMUX" "$screen$status" 1
+  assert_screen "idle band floor above its status" empty "$CAPS_STYLED" "$screen$status"
 done
 pass "text below a native band floor is never read as an empty composer"
 
@@ -96,8 +114,8 @@ for layout in '' '-worktree'; do
   assert_screen "saved 18.8.1${layout} idle band with Pi identity" empty \
     "$CAPS_STYLED"$'\nidentity=1' "$screen" '' $'pi\tidle'
   assert_screen "saved 18.8.1${layout} idle band cursor" empty "$CAPS_TMUX" "$screen" "$floor" $'pi\tidle'
-  # Without styling, the right-aligned hint cannot prove the input is empty.
-  assert_screen "saved 18.8.1${layout} unstyled hint" pending "$CAPS_PLAIN" "$screen"
+  # Without styling, the right-aligned hint proves neither an empty input nor a draft.
+  assert_screen "saved 18.8.1${layout} unstyled hint" unknown "$CAPS_PLAIN" "$screen"
   assert_content "saved 18.8.1${layout} unstyled hint" '⇧⇥ to change thinking effort' "$CAPS_PLAIN" "$screen"
 done
 
@@ -108,7 +126,9 @@ for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
   assert_screen "current band empty floor" empty "$caps" "$CURRENT_BAND"
   assert_content "current band empty floor" '' "$caps" "$CURRENT_BAND"
   for draft in '!git diff' '⇧⇥ to change thinking effort'; do
-    assert_screen "current band literal draft '$draft'" pending "$caps" "$CURRENT_BAND $draft"
+    want=pending
+    [ "$caps" != "$CAPS_PLAIN" ] || [ "$draft" = '!git diff' ] || want=unknown
+    assert_screen "current band literal draft '$draft'" "$want" "$caps" "$CURRENT_BAND $draft"
     assert_content "current band literal draft '$draft'" "$draft" "$caps" "$CURRENT_BAND $draft"
   done
   screen="$CURRENT_BAND"$'\n   '"$CURRENT_HEADER"$'\n   ╰─'
@@ -134,7 +154,9 @@ done
 for draft in '!git diff' '!!git diff' '!python print(1)' '#' '>' '$' '%' '❯' '|draft|' '⇧⇥ to change thinking effort'; do
   screen="$BAND $draft"
   for caps in "$CAPS_STYLED" "$CAPS_PLAIN"; do
-    assert_screen "literal band draft '$draft'" pending "$caps" "$screen"
+    want=pending
+    [ "$caps" != "$CAPS_PLAIN" ] || [ "$draft" != '⇧⇥ to change thinking effort' ] || want=unknown
+    assert_screen "literal band draft '$draft'" "$want" "$caps" "$screen"
     assert_content "literal band draft '$draft'" "$draft" "$caps" "$screen"
   done
   assert_screen "literal band draft '$draft' cursor" pending "$CAPS_TMUX" "$screen" 1
@@ -212,7 +234,7 @@ assert_refused "band header alone" " $HEADER"
 assert_refused "band missing usage meter" $' π > model > 📁 /work > ⑂ main\n╰─'
 assert_refused "band misaligned floor" $'  '"$HEADER"$'\n╰─' unknown-draft
 assert_refused "band stale above shell" "$BAND"$'\n$ command'
-assert_refused "band stale above stray border" "$BAND"$'\n│ │'
+assert_refused "band stale above stray border" "$BAND"$'\n│ │' unknown-draft
 assert_screen "band header cannot claim cursor" unknown "$CAPS_TMUX" "$BAND" 0
 assert_screen "standalone compact omp box stays supported" empty "$CAPS_STYLED" $'╭── π > model > path ─╮\n╰─  ─╯'
 assert_screen "standalone band after independent shell stays supported" empty "$CAPS_STYLED" $'$ command\n'"$BAND"
@@ -310,8 +332,8 @@ test_bare_owned_band_resumed_continuations() {
             pending "$caps" "$enclosing" "$cursor" $'pi\tidle'
           assert_screen "denied Pi encloses $shape resumed band cursor=$cursor_cap, root '$prefix'" \
             unknown-draft "$caps" "$enclosing" "$cursor" probe-absent
-          assert_screen "foreign Pi encloses $shape resumed band cursor=$cursor_cap, root '$prefix'" \
-            unknown-draft "$caps" "$enclosing" "$cursor" $'claude\tidle'
+          assert_screen "proven non-Pi pair keeps $shape resumed band pending cursor=$cursor_cap, root '$prefix'" \
+            pending "$caps" "$enclosing" "$cursor" $'claude\tidle'
           assert_screen "unavailable Pi encloses $shape resumed band cursor=$cursor_cap, root '$prefix'" \
             unknown-draft "$(printf 'styled=%s\ncursor=%s\nidentity=0' "$cursor_cap" "$cursor_cap")" \
             "$enclosing" "$cursor"

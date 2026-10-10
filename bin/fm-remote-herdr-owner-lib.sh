@@ -52,7 +52,7 @@
 #     because leaving it in place silently reproduces the keychain failure.
 
 fm_remote_herdr_owner_reader_available() {
-  command -v python3 >/dev/null 2>&1
+  python3 -c 'import sys; sys.exit(sys.version_info[0] != 3)' </dev/null >/dev/null 2>&1
 }
 
 fm_remote_herdr_socket_owner() { # <socket-path>

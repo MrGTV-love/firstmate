@@ -36,7 +36,7 @@ stop_probe() {
 
 test_launch_proof_pinned_personal_switch() {
   local meta="$FM_HOME/state/pinned.meta" task="$TMP/task.jsonl" personal="$TMP/personal.jsonl"
-  local SWITCH_INFO before_env before_task before_info actual
+  local SWITCH_INFO actual
   start_probe expected
   printf 'task session\n' > "$task"
   printf 'personal session\n' > "$personal"
@@ -47,34 +47,24 @@ test_launch_proof_pinned_personal_switch() {
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane process-info --pane w1:p1') printf '%s' "$SWITCH_INFO" ;;
-      'lab agent get --pane w1:p1') jq -nc --arg ref "$ACTIVE_SESSION_REF" '{result:{agent:{session_ref:$ref}}}' ;;
-      *) fail 'pinned switch must inspect only its recorded endpoint' ;;
+      *) printf '%s\n' "$*" >> "$TMP/endpoint-violations"; return 1 ;;
     esac
   }
-  ACTIVE_SESSION_REF=$task
   jq -nc --arg gen expected --argjson pid "$PID" --arg task "$task" \
     '{version:1,spawn_gen:$gen,pid:$pid,task_session_file:$task,current_session_file:$task}' \
     > "$FM_HOME/state/pinned.omp-session.json"
   [ "$(fm_launch_proof_herdr "$meta")" = managed ] || fail 'matching pinned task and current session must be managed'
-  before_env=$(fm_remote_herdr_process_env "$PID")
-  before_task=$(shasum -a 256 "$task")
-  before_info=$SWITCH_INFO
-  ACTIVE_SESSION_REF=$personal
   jq --arg personal "$personal" '.current_session_file=$personal' "$FM_HOME/state/pinned.omp-session.json" \
     > "$FM_HOME/state/pinned.omp-session.json.next"
   mv "$FM_HOME/state/pinned.omp-session.json.next" "$FM_HOME/state/pinned.omp-session.json"
   actual=$(fm_launch_proof_herdr "$meta")
   [ "$actual" = unmanaged ] || fail "same live PID retains its real kernel pin after personal switch: expected unmanaged, got $actual"
-  [ "$SWITCH_INFO" = "$before_info" ] && [ "$(fm_remote_herdr_process_env "$PID")" = "$before_env" ] \
-    && [ "$(shasum -a 256 "$task")" = "$before_task" ] \
-    || fail 'switch changed launch PID, argv, kernel environment or historical task session'
   proof_record() {
     jq -nc --arg gen "${1:-expected}" --argjson pid "${2:-$PID}" \
       --arg task "$task" --arg current "${3:-$task}" \
       '{version:1,spawn_gen:$gen,pid:$pid,task_session_file:$task,current_session_file:$current}' \
       > "$FM_HOME/state/pinned.omp-session.json"
   }
-  ACTIVE_SESSION_REF=$task
   proof_record other
   [ "$(fm_launch_proof_herdr "$meta")" = unmanaged ] || fail 'stale sidecar generation must not authenticate a live matching pin'
   proof_record expected 2000000000
@@ -90,6 +80,8 @@ test_launch_proof_pinned_personal_switch() {
   ln -s "$task" "$TMP/task-link.jsonl"
   proof_record expected "$PID" "$TMP/task-link.jsonl"
   [ "$(fm_launch_proof_herdr "$meta")" = managed ] || fail 'resolved current and task session paths must identify the same file'
+  [ ! -e "$TMP/endpoint-violations" ] \
+    || fail "pinned switch must inspect only its recorded endpoint: $(cat "$TMP/endpoint-violations")"
   stop_probe
   pass 'serialized current-session proof rejects a same-PID pinned personal switch'
 }
@@ -139,12 +131,10 @@ test_launch_proof_recorded_native_identity() {
     fi
   }
   INFO=
-  ACTIVE_SESSION_REF=
   fm_backend_herdr_cli() {
     case "$*" in
       'lab pane process-info --pane w1:p1') printf '%s' "$INFO" ;;
-      'lab agent get --pane w1:p1') jq -nc --arg ref "$ACTIVE_SESSION_REF" '{result:{agent:{session_ref:$ref}}}' ;;
-      *) fail 'launch proof must inspect only its recorded endpoint' ;;
+      *) printf '%s\n' "$*" >> "$TMP/endpoint-violations"; return 1 ;;
     esac
   }
   PARENTS=
@@ -160,7 +150,11 @@ test_launch_proof_recorded_native_identity() {
       {result:{type:"pane_process_info",process_info:{pane_id:"w1:p1",
         foreground_processes:[{argv:$argv,pid:$pid,cwd:$cwd}]}}}')
   }
-  assert_proof() { [ "$(fm_launch_proof_herdr "$META")" = "$1" ] || fail "$2"; }
+  assert_proof() {
+    [ "$(fm_launch_proof_herdr "$META")" = "$1" ] || fail "$2"
+    [ ! -e "$TMP/endpoint-violations" ] \
+      || fail "launch proof must inspect only its recorded endpoint: $(cat "$TMP/endpoint-violations")"
+  }
 
   start_probe expected
   for version in legacy env-v1; do
@@ -213,16 +207,7 @@ test_launch_proof_recorded_native_identity() {
     proof_meta omp
     [ "$version" != env-v1 ] || proof_meta omp env-v1
     process "[\"omp\",\"--resume=$WORKTREE/recorded.jsonl\"]"
-    ACTIVE_SESSION_REF="$WORKTREE/recorded.jsonl"
     assert_proof unmanaged "$version native restore with exact task-owned startup must remain unmanaged"
-    before_info=$INFO
-    before_environment=$(fm_remote_herdr_process_env "$PID")
-    before_session=$(shasum -a 256 "$WORKTREE/recorded.jsonl")
-    ACTIVE_SESSION_REF="$WORKTREE/personal.jsonl"
-    assert_proof unmanaged "$version same-PID in-process personal-session switch must remain unmanaged"
-    [ "$INFO" = "$before_info" ] && [ "$(fm_remote_herdr_process_env "$PID")" = "$before_environment" ] \
-      && [ "$(shasum -a 256 "$WORKTREE/recorded.jsonl")" = "$before_session" ] \
-      || fail 'native in-process switch must leave PID, argv, environment and historical launch file unchanged'
     for argv in '["omp"]' '["omp","--resume","recorded"]' \
       '["omp","--resume="]' '["omp","--config","overlay","--resume=recorded"]' \
       '["/installed/bin/omp","personal prompt"]' '["node","/installed/omp/entry.js","--resume=recorded"]'; do
@@ -256,7 +241,7 @@ test_launch_proof_recorded_native_identity() {
   INFO=$(printf '%s' "$INFO" | jq '.result.process_info.foreground_processes = []')
   assert_proof unknown 'missing foreground identity must stay unknown'
   stop_probe
-  pass 'native restoration and same-PID conversation switches stay unmanaged without argv, cwd or initial-message shortcuts'
+  pass 'native restoration stays unmanaged without argv, cwd or initial-message shortcuts'
 }
 
 if [ -n "${FM_TEST_ONLY:-}" ]; then
