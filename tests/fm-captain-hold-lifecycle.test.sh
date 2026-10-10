@@ -33,6 +33,9 @@ make_home() {  # <name>
 EOF
   fakebin=$(fm_fakebin "$home")
   fm_fake_exit0 "$fakebin" tmux treehouse no-mistakes gh gh-axi
+  # Cleanup removes a task's own Docker objects, so without a stand-in it would
+  # reach this host's real Docker daemon.
+  fm_fake_docker "$fakebin"
   printf '%s\n' "$home"
   fm_test_track_procevent_home "$home" "$home/procevent-claims"
 }
@@ -159,13 +162,26 @@ run_pr_merge() {  # <home> <id> <url>
     FM_TEST_GH_AXI_LOG="$home/gh-axi.log" "$ROOT/bin/fm-pr-merge.sh" "$@"
 }
 
+# Wait for <path> to appear, or for <pid> to exit. The wait is on that event, never
+# on a poll count: how long cleanup takes to reach a barrier depends on host load.
+test_pid_exited() {  # <pid>
+  local stat
+  kill -0 "$1" 2>/dev/null || return 0
+  stat=$(ps -p "$1" -o stat= 2>/dev/null || true)
+  case "$stat" in ''|Z*) return 0 ;; esac
+  return 1
+}
+
 wait_for_test_file() {  # <path> <pid>
-  local path=$1 pid=$2 i=0
-  while [ "$i" -lt 500 ]; do
+  # The 120 s ceiling only bounds a hang; it is the fake treehouse barrier's own 120 s hold.
+  local path=$1 pid=$2 deadline=$((SECONDS + 120))
+  while [ "$SECONDS" -lt "$deadline" ]; do
     [ -e "$path" ] && return 0
-    kill -0 "$pid" 2>/dev/null || return 1
+    if test_pid_exited "$pid"; then
+      [ -e "$path" ]
+      return
+    fi
     sleep 0.01
-    i=$((i + 1))
   done
   return 1
 }
@@ -1828,8 +1844,44 @@ test_keyed_answer_releases_a_live_work_item() {
   pass "a keyed answer releases a live work item and still closes a question"
 }
 
+# The barrier wait follows the event, not a poll count: a slow producer is waited
+# for, and a process that exited without producing the file ends the wait at once
+# rather than after the ceiling. Polls are made free here, so a poll budget runs
+# out at once while the file is a real second away; how long a poll takes on the
+# host then cannot decide the outcome.
+test_wait_for_test_file_follows_the_event_not_a_poll_budget() {
+  local dir pid start elapsed
+  dir="$TMP_ROOT/wait-for-test-file"
+  rm -rf "$dir"
+  mkdir -p "$dir"
+  (
+    sleep() { :; }
+    ( /bin/sleep 1; : > "$dir/late" ) &
+    pid=$!
+    wait_for_test_file "$dir/late" "$pid"
+  ) || fail "a producer a real second away was given up on"
+  (
+    sleep() { :; }
+    ( exit 0 ) &
+    pid=$!
+    start=$SECONDS
+    if wait_for_test_file "$dir/never" "$pid"; then
+      exit 1
+    fi
+    elapsed=$((SECONDS - start))
+    [ "$elapsed" -lt 5 ] || exit 2
+  ) || fail "a producer that exited without the file did not end the wait at once"
+  (
+    sleep() { :; }
+    ( : > "$dir/made"; exit 0 ) &
+    pid=$!
+    wait_for_test_file "$dir/made" "$pid"
+  ) || fail "a file made just before its producer exited was reported missing"
+  pass "wait_for_test_file waits on the file or the exit, with one seconds ceiling"
+}
+
 test_keyed_answer_waits_for_cleanup_before_selecting_its_mode() {
-  local home id mode teardown_pid answer_pid teardown_rc answer_rc show
+  local home id mode teardown_pid answer_pid teardown_rc answer_rc show docker_calls
   local real_perl real_sleep
   real_perl=$(command -v perl)
   real_sleep=$(command -v sleep)
@@ -1861,6 +1913,7 @@ SH
     PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
       FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
       FM_CONFIG_OVERRIDE="$home/config" FM_TEST_REAL_PERL="$real_perl" FM_TEST_REAL_SLEEP="$real_sleep" \
+      FM_FAKE_DOCKER_LOG="$home/docker.log" \
       "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)" \
       > "$home/teardown.out" 2> "$home/teardown.err" &
     teardown_pid=$!
@@ -1896,6 +1949,12 @@ SH
     answer_rc=0
     wait "$answer_pid" || answer_rc=$?
     [ "$teardown_rc" -eq 0 ] || fail "cleanup failed: $(cat "$home/teardown.err")"
+    # Cleanup of a task that owns no Docker object lists the host's objects and
+    # removes nothing. The calls reaching the stand-in's log prove the case never
+    # reached the host's real Docker.
+    docker_calls=$(wc -l < "$home/docker.log" 2>/dev/null | tr -d ' ')
+    [ "${docker_calls:-0}" -ge 1 ] \
+      || fail "cleanup made no Docker call through the stand-in"
     assert_contains "$show" "state: queued" "cleanup did not queue its finished held task"
     assert_contains "$show" "held: yes" "cleanup released its finished held task"
     assert_absent "$home/state/$id.meta" "cleanup left the worker record behind"
@@ -6543,6 +6602,7 @@ test_secondmate_home_publishes_holds_and_answers
 test_secondmate_reconcile_publishes_before_request_retirement
 test_bound_channel_answers_close_at_answer_time
 test_keyed_answer_releases_a_live_work_item
+test_wait_for_test_file_follows_the_event_not_a_poll_budget
 test_keyed_answer_waits_for_cleanup_before_selecting_its_mode
 test_interrupted_keyed_release_closes_after_teardown
 test_completed_keyed_release_replays_after_publication_failure

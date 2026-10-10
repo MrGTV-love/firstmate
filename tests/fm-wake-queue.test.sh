@@ -18,6 +18,13 @@ GUARD="$ROOT/bin/fm-guard.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-wake-tests)
 
+# Every watcher launched here may run under a fake clock. Where the clock helper
+# reads `date +%s` (stock macOS bash 3.2), that clock makes every state file look
+# 999999 s old, so the open-loop stale wake fires before the step under test.
+# This suite pins none of the periodic open-loop or home-summary work, so switch
+# it off once for every watcher the cases launch.
+export FM_OPEN_LOOPS_INTERVAL=99999999 FM_HOME_SUMMARY_INTERVAL=99999999
+
 
 test_reemit_serializes_delivery_ownership() {
   local dir state phase records expected out identity claimant i real_sleep
@@ -320,6 +327,7 @@ foreign_stall_watch_leg() {  # <dir> <leg> <now> [observation]
   marker="$dir/state/.secondmate-wake-progress-mate"
   stall="$dir/state/.secondmate-wake-stall-mate"
   printf '%s\n' "$now" > "$dir/now"
+  clear_watcher_cycle "$dir/state"
   PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' \
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
@@ -337,11 +345,9 @@ foreign_stall_watch_leg() {  # <dir> <leg> <now> [observation]
     # TERM can leave bash waiting in a child on some runners; stop the owned
     # fixture process and clear only its watcher lifecycle state before the
     # next leg starts against the same queue and progress marker.
-    ! is_live_non_zombie "$pid" || kill -KILL "$pid" 2>/dev/null || true
-  fi
-  wait_for_exit "$pid" 600 || true
-  if [ -n "$observation" ]; then
-    rm -rf -- "$dir/state/.watch.lock" "$dir/state/.watcher-down"
+    stop_watcher_and_clear_cycle "$pid" "$dir/state" KILL
+  else
+    wait_for_exit "$pid" 600 || true
   fi
   if [ -n "$observation" ]; then
     [ "$(cat "$marker" 2>/dev/null || true)" = "$observation" ] \
@@ -457,6 +463,13 @@ stall_watch_has_wake() { # <out>
   grep -E '^(signal:|stale:|check:|heartbeat($|:))' "$1" >/dev/null 2>&1
 }
 
+# A recovery wake (check: rearm-resurface) can end a cycle that never reached the
+# stall step, so it is no proof that the stall tick ran.
+stall_watch_has_tick_wake() { # <out>
+  grep -E '^(signal:|stale:|check:|heartbeat($|:))' "$1" 2>/dev/null \
+    | grep -vF 'check: rearm-resurface' | grep . >/dev/null 2>&1
+}
+
 stall_watch_record_met() { # <mode> <marker> <want> <progress> <progress-start> <sent>
   local mode=$1 marker=$2 want=$3 progress=$4 start=$5 sent=$6
   case "$mode" in
@@ -529,7 +542,8 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
   # not suppress the first endpoint tick when its marker is absent; seed it so
   # every watcher launch and restart leaves the fixture endpoints untouched.
   touch "$dir/state/.secondmate-liveness-tick"
-  FM_OPEN_LOOPS_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >"$out" 2>"$err" &
+  clear_watcher_cycle "$dir/state"
+  FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >"$out" 2>"$err" &
   pid=$!
   case "$mode" in
     alert)
@@ -539,7 +553,8 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
           if grep -F 'secondmate wake-loop stalled' "$out" >/dev/null 2>&1; then
             return 0
           fi
-          FM_OPEN_LOOPS_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
+          clear_watcher_cycle "$dir/state"
+          FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
           pid=$!
         fi
         sleep 0.1
@@ -569,7 +584,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
             met=1
           fi
         fi
-        if [ "$met" -eq 0 ] && ! is_live_non_zombie "$pid" && stall_watch_has_wake "$out"; then
+        if [ "$met" -eq 0 ] && ! is_live_non_zombie "$pid" && stall_watch_has_tick_wake "$out"; then
           met=1
         fi
         ;;
@@ -615,7 +630,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
       wait_for_exit "$pid" 50 || true
       case "$mode" in
         tick)
-          stall_watch_has_wake "$out" && met=1
+          stall_watch_has_tick_wake "$out" && met=1
           ;;
         cleared)
           [ ! -e "$marker" ] && met=1
@@ -635,7 +650,8 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
         break
       fi
       rm -f "$beat"
-      FM_OPEN_LOOPS_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
+      clear_watcher_cycle "$dir/state"
+      FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
       pid=$!
       first=0
       mark=0
@@ -645,10 +661,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
   done
   [ "$met" -eq 1 ] \
     || fail "watcher leg $leg ($mode) did not observe the stall condition: $(cat "$out" 2>/dev/null) $(cat "$err" 2>/dev/null)"
-  if is_live_non_zombie "$pid"; then
-    kill -TERM "$pid" 2>/dev/null || true
-  fi
-  wait_for_exit "$pid" "$limit" || true
+  stop_watcher_and_clear_cycle "$pid" "$dir/state" TERM "$limit"
 }
 
 test_secondmate_declared_pause_rows_do_not_feed_stall_escalation() {
@@ -1108,6 +1121,12 @@ SH
   ( exec 3> "$fifo"; : > "$dir/capture-blocked"; exec sleep 30 ) &
   holder=$!
 
+  # A stop that lands after the stall step but before the cycle ends leaves the
+  # resumable-cycle marker at 7. The watcher launched next must still start from
+  # a clean cycle and reach the pane read, not resume past the stall step.
+  printf '7\n' > "$state/.prelude-progress"
+  clear_watcher_cycle "$state"
+
   printf '1002\n' > "$dir/now"
   touch "$state/.secondmate-liveness-tick"
   PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
@@ -1442,6 +1461,9 @@ test_empty_prefix_mate_preserves_other_mate_receipt() {
   round=1
   while [ "$round" -le 2 ]; do
     printf 'seed\n' > "$state/.secondmate-wake-progress-ios"
+    # A prior stop after the stall step leaves the resumable-cycle marker at 7;
+    # each round must still run the stall step itself.
+    printf '7\n' > "$state/.prelude-progress"
     PATH="$fakebin:$PATH" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
       FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_WINDOW='' \
       FM_FAKE_TMUX_LOG="$dir/tmux.log" FM_FAKE_TMUX_CAPTURE="$dir/fake-tmux/pane.txt" \
