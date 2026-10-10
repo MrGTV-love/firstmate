@@ -1,0 +1,18 @@
+== fixed extension (6f31c6a3) ==
+ok - .omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement
+ok - fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch
+ok - .omp watch extension: an unqueued host hand-back is delivered once (stuck-refused)
+ok - .omp watch extension: an unqueued host hand-back is delivered once (refused)
+exit=0
+== pre-fix extension (97a9705e) ==
+ok - .omp task-session proof: pending canonical binding survives persistence, personal resume, reload, return, and fresh-generation replacement
+ok - fm-spawn: unsupported omp refuses ships, scouts, and secondmates before launch
+not ok - omp watch extension host-only handoff: file:///Users/charlesabrooker/tmp/fm-prefix.kYwTuz/repo/[eval1]:74
+  if (refused !== 3 || warned().length !== 1 || sent.length !== 1) throw new Error(`a refused stuck-queue hand-back lost tracking or was not bounded: ${JSON.stringify({ refused, notices, sent })}`);
+                                                                         ^
+
+Error: a refused stuck-queue hand-back lost tracking or was not bounded: {"refused":2,"notices":[],"sent":[{"m":"⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE SUPERVISION HOST: supervision-host: branch-outcome: the supervision session handled this wake and recorded captain outcomes for you (store rows 1)\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.","o":{"deliverAs":"followUp"}}]}
+    at file:///Users/charlesabrooker/tmp/fm-prefix.kYwTuz/repo/[eval1]:74:74
+
+Node.js v26.4.0: expected exit 0, got 1
+exit=

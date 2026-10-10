@@ -1,0 +1,20 @@
+Note: switching to '68770c242d2bd7a679d82ed308dde3110cb0da76'.
+
+You are in 'detached HEAD' state. You can look around, make experimental
+changes and commit them, and you can discard any commits you make in this
+state without impacting any branches by switching back to a branch.
+
+If you want to create a new branch to retain commits you create, you may
+do so (now or later) by using -c with the switch command. Example:
+
+  git switch -c <new-branch-name>
+
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+ok - live omp idle wake: omp (omp/18.8.9) on herdr 0.9.1 started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent
+ok - live omp stranded wake: omp (omp/18.8.9) on herdr 0.9.1 removed wake text an older wiring left unsent in an idle composer, delivered the still-owed queue row in its place, and left the operator draft as typed
+rc=0

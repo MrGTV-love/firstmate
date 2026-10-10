@@ -1,0 +1,30 @@
+## 1. empty queue
+$ bin/fm-wake-drain.sh --queued
+[rc=0]
+## 2. append two rows through the real queue library
+$ bin/fm-wake-drain.sh --queued
+1791671594	1	signal	trig-a	signal: trig-a
+1791671595	2	stale	lane-x	stale: lane-x quiet
+[rc=0]
+## 3. query again: read-only, rows still there, no ack line
+$ bin/fm-wake-drain.sh --queued
+1791671594	1	signal	trig-a	signal: trig-a
+1791671595	2	stale	lane-x	stale: lane-x quiet
+[rc=0]
+## 4. extra argument refused
+$ bin/fm-wake-drain.sh --queued extra
+wake drain: unexpected queued arguments
+[rc=2]
+## 5. non-main actor refused
+$ env FM_SUPERVISION_ACTOR=branch bin/fm-wake-drain.sh --queued
+wake drain: --queued is main's view only
+[rc=2]
+## 6. normal drain presents rows and asks for ack
+$ bin/fm-wake-drain.sh
+1791671594	1	signal	trig-a	signal: trig-a
+1791671595	2	stale	lane-x	stale: lane-x quiet
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 29991.1791671594.7uvXsy
+[rc=0]
+## 7. malformed row: query fails with no partial rows
+$ bin/fm-wake-drain.sh --queued
+[rc=1]
