@@ -4671,8 +4671,8 @@ spawn_send_key() { # <target> <key>
 }
 
 # Run one backend send whose failure ends the spawn. Under `set -e` a failed send
-# would otherwise end the script with exit 1 and no text, leaving the endpoint and
-# its record behind with nothing to say why; name the backend and the send instead.
+# would otherwise end the script with exit 1, and a backend wrapper such as
+# Orca's adds no text saying why; name the backend and the send instead.
 spawn_send_or_abort() { # <what> <send-function> <arg>...
   local what=$1
   shift
