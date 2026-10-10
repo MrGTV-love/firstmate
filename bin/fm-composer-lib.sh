@@ -111,6 +111,16 @@
 #                pair rejected by that proof stays ambiguous: classification
 #                returns `unknown` or, for identified input risk, `unknown-draft`;
 #                extraction refuses, never falling back to a bare prompt inside it.
+#   agy pair   - Antigravity CLI (agy 1.3.3): the same two solid `─` rules with a
+#                plain SHELL-glyph `>` prompt row inside. The `>` is never proof
+#                on its own, so the pair is read only under a live agy identity
+#                (herdr `agent get`), whose idle/done status is what proves
+#                empty; the `>` row must lead the interior, and any text after
+#                it or on a continuation row is pending. A working, blocked, or
+#                unreadable agy never reads empty. The idle footer
+#                (`? for shortcuts`) and the busy footer (`esc to cancel`)
+#                sit below the closing rule and are not read here: the native
+#                status owns idle versus busy.
 #
 # KNOWN LIMIT: pasted omp frames inside drafts have unsafe Enter variants
 # tracked by follow-up fm-omp-composer-pasted-frame-variants. The native-band
@@ -2917,6 +2927,61 @@ _fm_composer_classify_bare_pi_overlap() {  # <screen> <styled> <has-identity> <i
   _fm_composer_classify_pi_rows "$screen" "$styled" "$FM_COMPOSER_SCAN_PI_GLYPH_ROW"
 }
 
+# _fm_composer_agy_pair_verdict: the Antigravity CLI composer inside a proven
+# rule pair. agy draws a plain `>` prompt row between its two rules, and a shell
+# glyph is never container proof, so the caller has already required a live agy
+# identity; this reads only the interior. The FIRST interior row must lead with
+# the `>`, otherwise the shape is unproven and the verdict is `unknown`. Text
+# after the glyph, or on any later interior row, is a draft and reads `pending`
+# in every agent state; ghost styling is deliberately not stripped, because
+# agy 1.3.3 draws no placeholder and a dim draft must never be read as empty. Only an idle or done agy proves an empty composer: a
+# working agy keeps the empty row drawn while its turn runs, and a blocked one
+# is parked on a prompt whose keys would answer that prompt instead. The pinned
+# `esc to cancel` footer also vetoes empty, so a status that lags the screen
+# cannot let a mid-turn composer through.
+_fm_composer_agy_pair_verdict() {  # <screen> <agent-status>
+  local screen=$1 agent_status=$2 row raw content first=1
+  row=$((FM_COMPOSER_SCAN_PI_OPEN + 1))
+  while [ "$row" -lt "$FM_COMPOSER_SCAN_PI_CLOSE" ]; do
+    raw=$(_fm_composer_screen_row "$row" "$screen")
+    content=$(printf '%s\n' "$raw" | fm_composer_strip_ansi)
+    fm_composer_normalize_trim_var content
+    if [ "$first" = 1 ]; then
+      first=0
+      case "$content" in
+        '>'|'>'[[:space:]]*)
+          content=${content#>}
+          fm_composer_normalize_trim_var content
+          ;;
+        *)
+          printf 'unknown'
+          return 0
+          ;;
+      esac
+    fi
+    if [ -n "$content" ]; then
+      printf 'pending'
+      return 0
+    fi
+    row=$((row + 1))
+  done
+  if [ "$first" = 1 ]; then
+    printf 'unknown'
+    return 0
+  fi
+  # The native status can lag the screen by a frame, so the pinned busy footer
+  # below the closing rule is a second, independent veto on `empty`.
+  if printf '%s\n' "$screen" | sed -n "$((FM_COMPOSER_SCAN_PI_CLOSE + 2)),\$p" \
+       | fm_composer_strip_ansi | grep -qE "$FM_DELIVERY_AGY_BUSY_REGEX_DEFAULT"; then
+    printf 'unknown'
+    return 0
+  fi
+  case "$agent_status" in
+    idle|done) printf 'empty' ;;
+    *) printf 'unknown' ;;
+  esac
+}
+
 # The pi separated-shape verdict: identity + structure conjunction (herdr's
 # rule, now fleet-wide). Missing identity leaves the shape unproven, preserving
 # identified draft risk. An unfetched identity on an identity-capable backend asks
@@ -2948,6 +3013,15 @@ _fm_composer_pi_verdict() {  # <screen> <styled> <has_identity> <identity>
   fi
   agent=${identity%%$'\t'*}
   agent_status=${identity#*$'\t'}
+  if [ "$agent" = agy ] && [ "$FM_COMPOSER_SCAN_PI_PAIR_VALID" = 1 ] \
+     && [ "$FM_COMPOSER_SCAN_PI_GLYPH_ROW" -lt 0 ]; then
+    if [ "$denied" != unknown ]; then
+      printf '%s' "$denied"
+    else
+      _fm_composer_agy_pair_verdict "$screen" "$agent_status"
+    fi
+    return 0
+  fi
   if [ "$agent" != pi ] || [ "$FM_COMPOSER_SCAN_PI_PAIR_VALID" != 1 ]; then
     printf '%s' "$denied"
     return 0

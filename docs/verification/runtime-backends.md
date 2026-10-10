@@ -1459,6 +1459,34 @@ ok - omp (omp/18.8.7): with the overlay a fallen-back session returns to its rec
 ok - omp (omp/18.8.7): control - without the overlay a global fallbackRevertPolicy: never keeps the session on the fallback
 ```
 
+### 2026-10-10 agy composer through Herdr
+
+Verified on 2026-10-10 on macOS arm64 against agy 1.3.3 in isolated Herdr 0.9.1 lab sessions, read through Herdr's ANSI capture with its exact capability descriptor (`styled=1`, `cursor=0`, `identity=1`) and Herdr's native `agent get` identity.
+agy draws a bare `>` row between two full-width `─` rules, with `? for shortcuts` below while idle and `esc to cancel` below during a turn.
+Before the shape was taught, every captured state read `unknown`, so `bin/fm-control.sh exit` refused an idle worker at its composer-empty proof and `relaunch` stopped in its `stopping` phase with the old worker alive; the 2026-10-10 vernant-pr3228 review worker could not be moved between models for that reason.
+The verdicts below are the shared classifier's answers on the screens captured live from agy 1.3.3, with the native status Herdr reported at each capture; the guard asserts the idle, pending, and never-empty rows against a live pane.
+
+```text
+idle                   identity=agy/idle     verdict=empty
+pending-text           identity=agy/idle     verdict=pending
+slash-popup            identity=agy/idle     verdict=unknown
+turn-in-flight         identity=agy/working  verdict=unknown
+idle-after-turn        identity=agy/idle     verdict=empty
+```
+
+With the classifier change reverted, the same states all read `unknown`.
+The live guard drives a real agy through boot, draft, popup, one turn, and `bin/fm-control.sh exit`, and prints a `timing:` line per phase; its header owns the measured wait limits and their margins.
+`tests/fm-composer-lib.test.sh` (`test_agy_rule_pair_composer`) carries the captured screens, including the identity and status combinations that must never read `empty`.
+The guard submits one prompt, so it is opt-in:
+
+```sh
+FM_AGY_COMPOSER_LIVE=1 tests/fm-agy-composer-live-e2e.test.sh
+```
+
+A full `bin/fm-control.sh relaunch` of an idle agy worker to `gemini-3.8-flash-high` also completed against the same lab (`relaunched ... harness=agy ... model=gemini-3.8-flash-high`, journal `phase=complete`, `exit_result=stopped`), and the replacement pane read `empty`.
+That run registered workspace trust through `bin/fm-agy-trust.sh` in the operator's real agy store, which a throwaway-HOME lab cannot avoid, so the committed guard stops at `exit`.
+tmux has no agy identity probe, so an agy pane on tmux still reads `unknown`; that backend was not exercised here.
+
 ## Steering-inbox doorbell
 
 The steering channel's one behavioral assumption - a real worker agent follows the constant self-describing doorbell line (list the inbox, read and act on its records in numeric order, then `mv` each into `handled/`) - was verified on 2026-08-23 against every installed verified harness, on tmux 3.6a, macOS arm64, on an isolated private socket, driving the REAL `bin/fm-send.sh` end to end (durable record plus doorbell, with one mid-wait re-ring playing the watcher's role).

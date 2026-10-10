@@ -135,14 +135,18 @@ Herdr tracks agy natively (`antigravity-cli` integration, detected as `agent=agy
 The tmux adapter classifies the anchored process name `agy` as `agent` through the shared name vocabulary in `bin/fm-agent-process-lib.sh`, the muse/omp precedent for short bare-word names.
 agy stays out of the session-lock name vocabulary in `bin/fm-session-lock-lib.sh`, where the other crewmate-only adapters are also absent.
 
-## Composer: unknown by design
+## Composer: proven empty only under a live agy identity
 
 Byte-level capture of the idle pane shows a bare unstyled `>` between two full-width `─` rules, with an unstyled `? for shortcuts` cell and a dim (`SGR 2`) model cell in the status row below.
-The shared classifier reads that bare `>` as `unknown` under the dead-shell rule, never `empty`.
+The same shape was re-captured live on `agy 1.3.3` (herdr 0.9.1, 2026-10-10), with a `┃` toast above the top rule and, mid-turn, a `esc to cancel` cell in place of `? for shortcuts` and the submitted prompt echoed above the pair.
+Typed text follows the `>` at default intensity, so a draft reads on a plain capture too, and the slash popup draws its own `>`-led menu rows below the closing rule.
+The dead-shell rule still holds: a bare `>` is a shell glyph and never proves a composer on its own, so the pair reads `unknown` on every backend that supplies no agy identity.
+Under Herdr's native `agent get` identity, `bin/fm-composer-lib.sh` reads the pair: a `>` row with nothing after it is `empty` only while the native status is `idle` or `done`, any text on the `>` row or a later interior row is `pending` in every status, and a `working`, `blocked`, or unreadable status, the `esc to cancel` footer, or the open slash popup is never `empty`.
+That proof is what `bin/fm-control.sh exit` and `relaunch` need before they type the exit command, and it was missing when the 2026-10-10 vernant-pr3228 review worker could not be moved between models: both attempts refused at the composer-empty proof of an idle agy.
+`tests/fm-composer-lib.test.sh` pins the logic against captured screens and `tests/fm-agy-composer-live-e2e.test.sh` pins the screens themselves against a real agy, including `bin/fm-control.sh exit` of an idle worker.
 Steering still confirms delivery: the Herdr submit core leads with the native `idle`-to-`working` transition, which agy performs, and the delivery footer regex covers the tmux path.
 agy renders the busy footer late for that confirm loop - about 1.5 s after Enter for a short steer and 4-5 s for a realistic longer brief, measured live on `agy 1.2.1` (2026-09-12) against the shared budget's 3 x 0.4 s - so `bin/fm-send.sh` gives agy typed targets a longer default submit-confirm budget (20 retries, about 8 s at the default cadence); an explicit `FM_SEND_RETRIES` still wins and every other harness keeps the shared 3-retry default.
 `tests/fm-send-agy-confirm.test.sh` pins the raised default and `tests/fm-agy-harness.test.sh` pins the Herdr transition path.
-This is the cursor precedent, not a gap to patch in shared code.
 
 ## Supervised task: spawn, steer, relaunch, and exit through the new path
 
@@ -159,6 +163,7 @@ The unauthenticated failure mode was never observed; this host's agy runs signed
 No slash-skill invocation form was verified, so skill invocation stays natural language.
 `--continue` and `--conversation` resume were never exercised; recovery uses deterministic relaunch from the brief on disk.
 No primary or secondmate behavior was built or tested, and none is claimed.
+tmux has no agy identity probe (its probe answers only for pi), so an agy pane on tmux still reads `unknown` and `exit` and `relaunch` refuse there; that gap was not exercised and is not claimed closed.
 
 ## Refreshing this record
 
@@ -167,4 +172,5 @@ Run the portable suite and the live guard after any agy upgrade, because the pro
 ```
 bin/fm-test-run.sh tests/fm-agy-harness.test.sh
 FM_AGY_SIGNALS_LIVE=1 bin/fm-test-run.sh tests/fm-agy-signals-live-e2e.test.sh
+FM_AGY_COMPOSER_LIVE=1 bin/fm-test-run.sh tests/fm-agy-composer-live-e2e.test.sh
 ```
