@@ -1,0 +1,6 @@
+ok - .omp watch extension: one idle queue-read boundary covers partial acknowledgements, recovery, replacement, token release, failures and slow queries
+ok - .omp extensions: a descendant omp session neither records itself as the loaded session nor arms a watcher
+ok - .omp turn-end guard: the loaded marker follows the lock owner at turn boundaries instead of only at load
+ok - .omp watch extension: a generation stopped without a successor heals once; a real successor or arm call never double-arms
+ok - .omp watch extension: a double load keeps one live generation, one arm, and forwards the superseded tool
+ok - .omp watch extension: publication failure retains the wake and permits tool, command, and factory repair

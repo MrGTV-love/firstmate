@@ -1,0 +1,52 @@
+## 1. empty home, no queue file
+$ /Users/charlesabrooker/tmp/fm-q.WK8zSl/bin/fm-wake-drain.sh --queued
+[exit 0]
+## 2. append three rows via the real queue library
+$ bash -c . /Users/charlesabrooker/tmp/fm-q.WK8zSl/bin/fm-wake-lib.sh; fm_wake_append signal a 'signal: a'; fm_wake_append stale b 'stale: b'; fm_wake_append signal a 'signal: a again'
+[exit 0]
+## 3. --queued lists every row, no dedupe, no ack line
+$ /Users/charlesabrooker/tmp/fm-q.WK8zSl/bin/fm-wake-drain.sh --queued
+1791654009	1	signal	a	signal: a
+1791654010	2	stale	b	stale: b
+1791654010	3	signal	a	signal: a again
+[exit 0]
+## 4. queue file is unchanged by the query (read-only)
+c7b71d4cc0d272450079606ccb91ad75
+.
+..
+.wake-queue
+.wake-queue.seq
+.watcher-down
+## 5. normal drain + ack
+1791654010	3	signal	a	signal: a again
+1791654010	2	stale	b	stale: b
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 66951.1791654009.hsuskU
+ack: fm-wake-drain.sh --ack-through 3 --recovery-generation 66951.1791654009.hsuskU
+$ /Users/charlesabrooker/tmp/fm-q.WK8zSl/bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 66951.1791654009.hsuskU
+[exit 0]
+## 6. after drain+ack, --queued shows no rows
+$ /Users/charlesabrooker/tmp/fm-q.WK8zSl/bin/fm-wake-drain.sh --queued
+[exit 0]
+## 7. adversarial: extra argument
+$ /Users/charlesabrooker/tmp/fm-q.WK8zSl/bin/fm-wake-drain.sh --queued extra
+wake drain: unexpected queued arguments
+[exit 2]
+## 8. adversarial: branch actor
+$ env FM_SUPERVISION_ACTOR=branch /Users/charlesabrooker/tmp/fm-q.WK8zSl/bin/fm-wake-drain.sh --queued
+wake drain: --queued is main's view only
+[exit 2]
+## 9. adversarial: malformed row after a valid one
+queue files: 
+## 9. read-only: hash queue + list state before and after --queued
+$ /Users/charlesabrooker/tmp/fm-q.WK8zSl/bin/fm-wake-drain.sh --queued
+1791654029	4	check	c	check: c
+[exit 0]
+hash before=c08df86e8116e17e3ee1ebe39e02877d after=c08df86e8116e17e3ee1ebe39e02877d
+state before: . .. .wake-queue .wake-queue.seq .watcher-down 
+state after:  . .. .wake-queue .wake-queue.seq .watcher-down 
+## 10. adversarial: malformed row (bad kind) after a valid row -> fail, no valid prefix printed
+$ /Users/charlesabrooker/tmp/fm-q.WK8zSl/bin/fm-wake-drain.sh --queued
+[exit 1]
+## 11. adversarial: queue path is a directory (unreadable as file)
+$ fm-wake-drain.sh --queued (queue is a dir)
+[exit 1]

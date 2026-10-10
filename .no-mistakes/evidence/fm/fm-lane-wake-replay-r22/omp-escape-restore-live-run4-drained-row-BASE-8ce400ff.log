@@ -1,0 +1,34 @@
+## [run4base] 1. idle lane: watcher close -> production idle wake captured by fixture (row stays owed)
+{"content":"⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: trigger-run4base\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.","idle":true}
+queued rows:
+1791654529	1	signal	trigger-run4base	signal: trigger-run4base
+## [run4base] 1b. lane drains and acknowledges every row (as a lane does inside a turn)
+1791654529	1	signal	trigger-run4base	signal: trigger-run4base
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 61075.1791654529.PRbihe
+ack rc=0
+queued rows after ack:
+(end rows)
+## [run4base] 2. busy turn (model calls bash sleep 40)
+1791654535 queued=0 idle=0
+## [run4base] 3. fixture queues the tracked wake text as a vendor follow-up during the busy turn
+1791654535 queued=1 idle=0
+## [run4base] 4. operator presses Escape (interrupt)
+## [run4base] 5. results
+-- setEditorText calls (extension edits to the composer):
+{"t":1791654537851,"before":"⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: trigger-run4base\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.","after":"","event":"session_start"}
+-- sendUserMessage calls by the extension:
+{"t":1791654529764,"idle":true,"deliverAs":null,"editor":"","content":"⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: trigger-run4base\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is ex"}
+{"t":1791654537852,"idle":true,"deliverAs":null,"editor":"","content":"⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: trigger-run4base\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is ex"}
+-- recovered:
+{"content":"⁣FIRSTMATE_OP: v1 watcher: FIRSTMATE WATCHER WAKE: signal: trigger-run4base\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.","idle":true,"deliverAs":null,"editor":""}
+-- probe now:
+1791654550 queued=0 idle=1
+-- composer now (editor log tail):
+1791654537 ""
+-- queued rows now:
+(end rows)
+-- model requests:
+1791654532 n=2 su sys='RFC 2119 keywords: MUST, REQUIRED, SHOULD, RECOMME' "ab.Hp5879/home'. Do not repeat this information in your reply.\n</system-reminder> BUSYLAB please run the sleep" bash sleep 40 
+1791654532 n=2 su sys='You name coding-agent sessions. Write a 3-6 word t' '<user>\nBUSYLAB please run the sleep\n</user>' bash sleep 40 
+1791654538 n=5 suatu sys='RFC 2119 keywords: MUST, REQUIRED, SHOULD, RECOMME' 'er-run4base\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.'  drain_rc=0 ack_rc=None
+1791654539 n=2 su sys='You name coding-agent sessions. Write a 3-6 word t' 'ase\n\nRun bin/fm-wake-drain.sh first and handle the queued wake. Watcher continuity is extension-owned.\n</user>'  drain_rc=0 ack_rc=None
