@@ -17,7 +17,8 @@
 #   2. the overlay stops the Sol chain: when the primary fails, the weak model
 #      receives no request, the run ends with the provider's error, and the
 #      live-model record carries that error and the recorded model
-#      (bin/fm-omp-live-model.ts);
+#      (bin/fm-omp-live-model.ts); another model's global chain still falls back
+#      under the overlay;
 #   3. return: for a chain that remains (the lab layers one on after the tracked
 #      overlay), omp's own revert restores the recorded model at the next prompt
 #      after the primary's suppression window ends, even when the global config
@@ -33,6 +34,8 @@ set -u
 fm_live_gate default-on FM_OMP_FALLBACK_LIVE omp python3
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=bin/fm-timeout-lib.sh
+. "$ROOT/bin/fm-timeout-lib.sh"
 LAB=$(fm_test_tmproot fm-omp-fallback)
 OVERLAY="$ROOT/.omp/fm-session-overlay.yml"
 VERSION=$(omp --version 2>/dev/null | head -1)
@@ -140,6 +143,8 @@ retry:
   fallbackChains:
     openai-codex/gpt-6.1-sol:
       - deepseek/deepseek-v4-pro
+    deepseek/deepseek-v4-pro:
+      - lab-equal/gpt-6.1-sol
 YML
   cat > "$dir/models.yml" <<YML
 providers:
@@ -160,7 +165,8 @@ retry:
 YML
 
 # run_omp <agent-dir> <overlay|none> <message>... -> sets OUT and RC
-# EXTRA_CONFIG, when set, is layered on after the overlay.
+# EXTRA_CONFIG, when set, is layered on after the overlay; MODEL, when set,
+# replaces the Sol model.
 
 run_omp() {
   local dir=$1 overlay=$2 args=()
@@ -169,8 +175,8 @@ run_omp() {
   [ -z "${EXTRA_CONFIG:-}" ] || args+=(--config "$EXTRA_CONFIG")
   rm -f "$LAB/record"
   OUT=$(cd "$LAB" && PI_CODING_AGENT_DIR=$dir OMP_SKIP_SETUP=1 FM_LAB_RECORD="$LAB/record" \
-    timeout 240 omp -p "$@" ${args[@]+"${args[@]}"} -e "$LAB/publisher.ts" --no-session \
-    --model openai-codex/gpt-6.1-sol --thinking off </dev/null 2>&1)
+    fm_run_timed 240 omp -p "$@" ${args[@]+"${args[@]}"} -e "$LAB/publisher.ts" --no-session \
+    --model "${MODEL:-openai-codex/gpt-6.1-sol}" --thinking off </dev/null 2>&1)
   RC=$?
 }
 requests() { wc -l < "$LAB/$1.log" | tr -d ' '; }
@@ -187,7 +193,7 @@ run_omp "$AGENT" none "say hi"
   || fail "$SUBJECT: without the overlay the global chain no longer reaches the weak model, so the lab does not reproduce the incident (weak saw: $(tr '\n' ' ' < "$LAB/weak.log")); output: $OUT"
 pass "$SUBJECT: control - the global Sol chain alone still falls to the weak model"
 
-: > "$LAB/codex.log"; : > "$LAB/weak.log"
+: > "$LAB/codex.log"; : > "$LAB/weak.log"; : > "$LAB/equal.log"
 run_omp "$AGENT" "$OVERLAY" "say hi"
 [ "$(requests codex)" -ge 1 ] \
   || fail "$SUBJECT: with the overlay the Sol session never tried its recorded model; output: $OUT"
@@ -201,6 +207,16 @@ record_has "model=openai-codex/gpt-6.1-sol" \
 record_has "error=" \
   || fail "$SUBJECT: the live-model record does not carry the unrecovered run error: $(cat "$LAB/record" 2>/dev/null)"
 pass "$SUBJECT: the overlay empties the Sol chain, the run stops with the provider error, and the record carries it"
+
+# The overlay replaces only the Sol chain: the global chain of another model
+# still reaches its fallback under it.
+serve weak limit 3600
+AGENT=$(agent_dir other never 300000)
+MODEL=deepseek/deepseek-v4-pro run_omp "$AGENT" "$OVERLAY" "say hi"
+[ "$(requests weak)" -ge 1 ] || fail "$SUBJECT: the other model's session never tried its recorded model; output: $OUT"
+[ "$(grep -c '^gpt-6.1-sol$' "$LAB/equal.log")" -ge 1 ] \
+  || fail "$SUBJECT: with the overlay another model's global chain no longer reaches its fallback, so the overlay replaced more than the Sol chain; output: $OUT"
+pass "$SUBJECT: the overlay leaves another model's global chain in place"
 
 # --- 3 and 4: the return -------------------------------------------------------
 # The primary refuses once and omp suppresses it for 5 seconds, the equal answers

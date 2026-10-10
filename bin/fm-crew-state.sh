@@ -232,24 +232,6 @@ emit() {  # <state> <source> [detail]
 
 [ -f "$META" ] || emit unknown none "no metadata for $ID"
 
-# The LAST value recorded for a key, read in one pass with no process started.
-meta_value_to() {  # <output-variable> <key>
-  local _line _value=''
-  while IFS= read -r _line || [ -n "$_line" ]; do
-    case "$_line" in
-      "$2="*) _value=${_line#*=} ;;
-    esac
-  done < "$META" 2>/dev/null || :
-  printf -v "$1" '%s' "$_value"
-}
-
-WT='' KIND='' HARNESS='' REMOTE_HOST='' META_MODE='' META_PROJECT=''
-meta_value_to WT worktree
-meta_value_to KIND kind
-meta_value_to HARNESS harness
-meta_value_to REMOTE_HOST remote_host
-[ -n "$KIND" ] || KIND=ship
-
 # The LAST value recorded for a key in a key=value file, read with no process
 # started. Absent or unreadable files yield an empty value.
 record_value_to() {  # <output-variable> <file> <key>
@@ -262,6 +244,17 @@ record_value_to() {  # <output-variable> <file> <key>
   printf -v "$1" '%s' "$_value"
 }
 
+meta_value_to() {  # <output-variable> <key>
+  record_value_to "$1" "$META" "$2"
+}
+
+WT='' KIND='' HARNESS='' REMOTE_HOST='' META_MODE='' META_PROJECT=''
+meta_value_to WT worktree
+meta_value_to KIND kind
+meta_value_to HARNESS harness
+meta_value_to REMOTE_HOST remote_host
+[ -n "$KIND" ] || KIND=ship
+
 # Live-model components for a local omp task. A secondmate publishes into its
 # own home's state; every other kind publishes into this home's state.
 if [ "$HARNESS" = omp ] && [ -z "$REMOTE_HOST" ]; then
@@ -273,6 +266,9 @@ if [ "$HARNESS" = omp ] && [ -z "$REMOTE_HOST" ]; then
   if [ -n "$_live_file" ] && [ -r "$_live_file" ]; then
     record_value_to _live_model "$_live_file" model
     record_value_to _live_error "$_live_file" error
+    # Record text never carries the component separator into the line.
+    _live_model=${_live_model//·/}
+    _live_error=${_live_error//·/}
     meta_value_to _recorded_model model
     # The launch records a model with an optional thinking suffix; the record
     # holds the bare provider/id. A bare fuzzy pattern cannot be compared.

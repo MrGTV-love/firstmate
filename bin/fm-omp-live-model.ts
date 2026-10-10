@@ -6,11 +6,10 @@
 //
 // Record format (key=value lines, rewritten atomically):
 //   model=<provider>/<id>   the model serving the session now
-//   since=<epoch seconds>   when that model became the live one
 //   error=<one line>        only when the last run ended in an error that no
 //                           retry or fallback recovered, cleared by the next run
 //
-// Events used (verified on omp 18.8.1, tests/fm-omp-fallback-chain-live-e2e.test.sh):
+// Events used (verified on omp 18.8.7, tests/fm-omp-fallback-chain-live-e2e.test.sh):
 //   session_start, agent_start, agent_end, retry_fallback_applied; every handler
 //   receives ctx.model, so the record follows the model whatever moved it:
 //   a fallback, a restore to the primary, or an operator's /model.
@@ -42,7 +41,6 @@ export function installLiveModelPublisher(
   eligible: () => boolean = () => true,
 ): void {
   let model = "";
-  let since = 0;
   let error = "";
   let written = "";
 
@@ -50,7 +48,7 @@ export function installLiveModelPublisher(
     if (!model) return;
     try {
       if (!eligible()) return;
-      const body = `model=${model}\nsince=${since}\n${error ? `error=${error}\n` : ""}`;
+      const body = `model=${model}\n${error ? `error=${error}\n` : ""}`;
       if (body === written) return;
       mkdirSync(dirname(file), { recursive: true });
       const staging = `${file}.${process.pid}.tmp`;
@@ -63,11 +61,7 @@ export function installLiveModelPublisher(
 
   const observe = (ctx: any): void => {
     const live = selector(ctx?.model);
-    if (!live) return;
-    if (live !== model) {
-      model = live;
-      since = Math.floor(Date.now() / 1000);
-    }
+    if (live) model = live;
   };
 
   pi.on("session_start", (_event: any, ctx: any) => {
