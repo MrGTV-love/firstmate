@@ -71,8 +71,8 @@
 #            Lavish session, so the board stays readable and `arm` brings it back.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
-#            and prints its response verbatim, absorbing only the one exact
-#            transient interruption described below. A staged reply still
+#            and prints its response verbatim, absorbing only the two exact
+#            transient responses described below. A staged reply still
 #            present when it starts is posted before the long-poll: through
 #            `lavish-axi reply` when supported, otherwise through the legacy
 #            best-effort `poll --agent-reply` path.
@@ -184,6 +184,60 @@
 # spent are all printed straight through and captured normally. The retry is a
 # Lavish fact, so the generic runner in bin/fm-procevent.sh stays
 # adapter-agnostic and learns nothing about it.
+#
+# BOUNDED QUIET RETRY WHILE THE SERVER ANSWERS SLOWLY, also owned here. The
+# published client decides "no server runs" from a health probe with a fixed
+# 500 ms timeout (HEALTH_PROBE_TIMEOUT_MS in lavish-axi's dist/cli.mjs, no
+# setting), then tries to start one and gives up with exactly this response:
+#
+#   error: Lavish Editor server did not start
+#   code: SERVER_ERROR
+#   help[1]: Run `lavish-axi server --port <port>` to inspect server startup
+#
+# (the two-line form without the help line is accepted too; the port must be the
+# board session's port). A server that is alive but answers slower than 500 ms
+# produced that response from every armed listener about every 6 minutes on
+# 2026-10-10 and woke the fleet each time, while no answer was lost. `poll`
+# therefore treats the response as transient while a lavish-axi server still
+# answers GET /health on the board session's host and port, and re-runs the
+# published poll quietly with exponential backoff, capturing nothing.
+#
+# The time limits come from measurement, not from a guess. Method: GET /health
+# round-trip time, 100 sequential requests 100 to 200 ms apart per condition,
+# sorted for p50/p95/p99/max, on an 18-core host whose load average was 45 to 90.
+# Healthy servers (a lab server on its own port and state directory, with a copy
+# of the real 875 KB session store, 20 live listeners, and 0, 36 or 108 added
+# CPU-bound processes; a freshly restarted production server) answered in 1 to
+# 5 ms at p50 and 45 ms at worst p99; the slowest single request in about 780
+# samples was 257 ms. The production server that caused the incident was
+# degraded by its own heap (4.5 GB resident at 197% CPU, fatal "JavaScript heap
+# out of memory" in server.log minutes later): p50 679 ms, p95 3.4 s, p99 3.9 s,
+# max 4.7 s, and 73 of 100 requests above 500 ms. Host load alone did not slow a
+# healthy server, so the fixed 500 ms is right for a healthy one and wrong only
+# for a degraded one. Derived limits:
+#
+#   HEALTH_PROBE_TIMEOUT_SECONDS 10   2x the slowest degraded response (4.7 s)
+#                                     and 3.5x the 2.85 s seen in the incident.
+#   START_RETRY_LIMIT 15              a 500 ms probe passed 27 of 100 times on the
+#                                     degraded server, so a listener that retries
+#                                     15 times is still shut out about 0.9% of
+#                                     the time (0.73^15); when it is, that is
+#                                     persistent degradation worth one wake.
+#   backoff 5, 10, 20, 40, then 60 s  about 12 minutes in all; the base is
+#                                     POLL_RETRY_DELAY and the 60 s ceiling keeps
+#                                     20 listeners from adding load to a server
+#                                     that is already struggling.
+#   START_GONE_LIMIT 3                a server that does not answer 3 health
+#                                     probes in a row (at least 15 s of backoff)
+#                                     is gone, not slow: a fresh server answered
+#                                     its first health request 164 to 342 ms
+#                                     after launch, and the client already
+#                                     waits 5 s for one before giving up.
+#
+# A server that is gone, and any survivor of the bound, prints the response
+# straight through and is captured and announced once, as for the interruption.
+# Only that exact response is retried; anything else, including the same words
+# with a different port, still surfaces on the first poll.
 #
 # LOSS LIMITATION, stated plainly. The published poll destructively clears
 # feedback before returning it. A result lost after that clearing and before the
@@ -444,6 +498,7 @@ cmd_arm() {
   [ -z "$reply_file" ] || [ -n "$task" ] || usage
   command -v lavish-axi >/dev/null 2>&1 || die "lavish-axi is not installed"
   poll_retry_delay >/dev/null
+  start_retry_cap >/dev/null
   id=$(cmd_source_id "$artifact") || exit 1
   # Check the listener's physical file before registration, including alias arms.
   real=$(perl -MCwd=realpath -e '$p = realpath($ARGV[0]); defined($p) or exit 1; print "$p\n"' "$artifact" 2>/dev/null) \
@@ -501,25 +556,37 @@ cmd_retire() {
   "$SCRIPT_DIR/fm-procevent.sh" retire "$id"
 }
 
-# The bounded quiet retry described in the header. The bound is a constant
+# The bounded quiet retries described in the header. Each bound is a constant
 # because it is a property of the transient response, not an operator choice;
-# only the delay takes an override, so a test can exercise the real bound
-# without waiting it out.
+# only the delay and the backoff ceiling take overrides, so a test can exercise
+# the real bounds without waiting them out.
 POLL_RETRY_LIMIT=12
 POLL_RETRY_DELAY_DEFAULT=5
 POLL_RETRY_DELAY_MIN=1
 POLL_RETRY_DELAY_MAX=60
+START_RETRY_LIMIT=15
+START_GONE_LIMIT=3
+HEALTH_PROBE_TIMEOUT_SECONDS=10
 
-# Exit 0 only for the exact two-line interruption, and nothing else. The whole
-# response must be those two lines with those exact bytes: whitespace variants,
-# a longer response that merely opens with them, and any other SERVER_ERROR are
-# genuine errors this adapter must never swallow.
-poll_response_filter() {  # <response-file>
+# Exit 10 for the exact two-line interruption and 11 for the exact "server did
+# not start" response, and nothing else. The whole response must be those exact
+# bytes: whitespace variants, a longer response that merely opens with them, the
+# start response for another port, and any other SERVER_ERROR are genuine errors
+# this adapter must never swallow. Anything that is not an exact match is printed
+# through unchanged, with exit 0.
+poll_response_filter() {  # <response-file> <port>
   perl -e '
     use strict;
     use warnings;
-    my ($stage) = @ARGV;
-    my $expected = "error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\n";
+    my ($stage, $port) = @ARGV;
+    my $start = "error: Lavish Editor server did not start\ncode: SERVER_ERROR\n";
+    my @expected = (
+      ["error: Lavish Editor poll response was interrupted\ncode: SERVER_ERROR\n", 10],
+      [$start, 11],
+      [$start . "help[1]: Run `lavish-axi server --port $port` to inspect server startup\n", 11],
+    );
+    my $longest = 0;
+    for my $e (@expected) { $longest = length $e->[0] if length $e->[0] > $longest; }
     open my $staged, ">", $stage or exit 2;
     binmode STDIN;
     binmode STDOUT;
@@ -542,22 +609,25 @@ poll_response_filter() {  # <response-file>
         write_all(*STDOUT, $chunk);
         next;
       }
-      my $room = length($expected) + 1 - length($candidate);
+      my $room = $longest + 1 - length($candidate);
       my $take = length($chunk) < $room ? length($chunk) : $room;
       my $prefix = substr($chunk, 0, $take);
       $candidate .= $prefix;
       write_all($staged, $prefix);
-      my $matches_prefix = length($candidate) <= length($expected)
-        && substr($expected, 0, length($candidate)) eq $candidate;
+      my $matches_prefix = grep {
+        length($candidate) <= length($_->[0]) && substr($_->[0], 0, length($candidate)) eq $candidate
+      } @expected;
       if (!$matches_prefix) {
         write_all(*STDOUT, $candidate);
         write_all(*STDOUT, substr($chunk, $take));
         $streaming = 1;
       }
     }
-    exit 10 if !$streaming && $candidate eq $expected;
-    write_all(*STDOUT, $candidate) unless $streaming;
-  ' "$1"
+    if (!$streaming) {
+      for my $e (@expected) { exit $e->[1] if $candidate eq $e->[0]; }
+      write_all(*STDOUT, $candidate);
+    }
+  ' "$1" "$2"
 }
 
 # Minimum seconds between retry attempt starts. FM_LAVISH_POLL_RETRY_DELAY is a
@@ -578,6 +648,68 @@ poll_retry_delay() {
   printf '%s\n' "$delay"
 }
 
+# Ceiling, in seconds, for the "server did not start" backoff.
+# FM_LAVISH_START_RETRY_CAP is a bounded test override with the same refusal rule
+# as the delay, so a test can run all START_RETRY_LIMIT retries quickly.
+start_retry_cap() {
+  local cap=${FM_LAVISH_START_RETRY_CAP-}
+  if [ -z "$cap" ]; then
+    printf '%s\n' "$POLL_RETRY_DELAY_MAX"
+    return 0
+  fi
+  case "$cap" in
+    *[!0-9]*) die "FM_LAVISH_START_RETRY_CAP must be whole seconds from $POLL_RETRY_DELAY_MIN to $POLL_RETRY_DELAY_MAX: $cap" ;;
+  esac
+  [ "$cap" -ge "$POLL_RETRY_DELAY_MIN" ] && [ "$cap" -le "$POLL_RETRY_DELAY_MAX" ] \
+    || die "FM_LAVISH_START_RETRY_CAP must be whole seconds from $POLL_RETRY_DELAY_MIN to $POLL_RETRY_DELAY_MAX: $cap"
+  printf '%s\n' "$cap"
+}
+
+# Seconds between the starts of retry <n> - 1 and retry <n>: the delay, doubling
+# each time, up to the ceiling.
+start_retry_wait() {  # <n> <delay> <cap>
+  local wait=$2 i
+  for ((i = 1; i < $1; i++)); do
+    wait=$((wait * 2))
+    [ "$wait" -lt "$3" ] || { wait=$3; break; }
+  done
+  [ "$wait" -le "$3" ] || wait=$3
+  printf '%s\n' "$wait"
+}
+
+# Exit 0 when a lavish-axi server answers GET /health on the board session's
+# host and port within HEALTH_PROBE_TIMEOUT_SECONDS. Anything else - a refused
+# connection, a foreign service, a non-2xx status, an unparsable body, or no
+# answer in time - is not an answer.
+lavish_server_answers() {  # <host> <port>
+  perl -MIO::Socket::IP -MIO::Select -MTime::HiRes=time -MJSON::PP -e '
+    use strict;
+    use warnings;
+    my ($host, $port, $limit) = @ARGV;
+    my $deadline = time + $limit;
+    my $socket = IO::Socket::IP->new(PeerHost => $host, PeerPort => $port, Type => SOCK_STREAM, Timeout => $limit)
+      or exit 1;
+    my $request = "GET /health HTTP/1.0\r\nHost: $host:$port\r\nConnection: close\r\n\r\n";
+    syswrite($socket, $request) == length($request) or exit 1;
+    my ($select, $response) = (IO::Select->new($socket), "");
+    while (1) {
+      my $left = $deadline - time;
+      exit 1 if $left <= 0;
+      $select->can_read($left) or exit 1;
+      my $count = sysread($socket, my $chunk, 65536);
+      exit 1 unless defined $count;
+      last if $count == 0;
+      $response .= $chunk;
+      exit 1 if length($response) > 262144;
+    }
+    my ($head, $body) = split /\r\n\r\n/, $response, 2;
+    defined $body && $head =~ m{\AHTTP/1\.[01] 2[0-9][0-9] } or exit 1;
+    my $health = eval { decode_json($body) };
+    ref($health) eq "HASH" && defined($health->{app}) && $health->{app} eq "lavish-axi" or exit 1;
+    exit 0;
+  ' "$1" "$2" "$HEALTH_PROBE_TIMEOUT_SECONDS" >/dev/null 2>&1
+}
+
 poll_iteration_started() {
   perl -MTime::HiRes=clock_gettime,CLOCK_MONOTONIC -e \
     'printf "%.6f\\n", clock_gettime(CLOCK_MONOTONIC)'
@@ -593,7 +725,7 @@ poll_iteration_floor_wait() {
 
 cmd_poll() {
   local artifact=${1-} delay attempt=0 response cleanup_command rc filter_rc iteration_started
-  local pipeline_status reply_file=''
+  local pipeline_status reply_file='' cap start_attempt=0 gone_strikes=0
   local reply_text='' reply_pending=0
   [ -n "$artifact" ] || usage
   if [ "$#" -eq 3 ] && [ "${2-}" = --agent-reply-file ]; then
@@ -603,6 +735,7 @@ cmd_poll() {
   fi
   command -v lavish-axi >/dev/null 2>&1 || die "lavish-axi is not installed"
   delay=$(poll_retry_delay) || exit 1
+  cap=$(start_retry_cap) || exit 1
   response=$(mktemp "${TMPDIR:-/tmp}/fm-lavish-poll.XXXXXX") || die "cannot stage the poll response"
   printf -v cleanup_command 'rm -f -- %q' "$response"
   # shellcheck disable=SC2064 # $cleanup_command must expand now, while the staged path is still set.
@@ -637,9 +770,9 @@ cmd_poll() {
       fi
     fi
     if [ "$reply_pending" -eq 1 ]; then
-      lavish-axi poll "$artifact" --agent-reply "$reply_text" | poll_response_filter "$response"
+      lavish-axi poll "$artifact" --agent-reply "$reply_text" | poll_response_filter "$response" "$LAVISH_AXI_PORT"
     else
-      lavish-axi poll "$artifact" | poll_response_filter "$response"
+      lavish-axi poll "$artifact" | poll_response_filter "$response" "$LAVISH_AXI_PORT"
     fi
     pipeline_status=("${PIPESTATUS[@]}")
     reply_pending=0
@@ -651,6 +784,24 @@ cmd_poll() {
         if [ "$attempt" -lt "$POLL_RETRY_LIMIT" ]; then
           attempt=$((attempt + 1))
           poll_iteration_floor_wait "$iteration_started" "$delay" \
+            || die "cannot enforce the poll rate governor"
+        else
+          cat -- "$response"
+          break
+        fi
+        ;;
+      11)
+        # The client's 500 ms health probe gave up on a server that may still be
+        # alive. Quiet retries need a server that really answers; a refusal is
+        # retried only until it has repeated START_GONE_LIMIT times in a row.
+        if lavish_server_answers "$LAVISH_AXI_HOST" "$LAVISH_AXI_PORT"; then
+          gone_strikes=0
+        else
+          gone_strikes=$((gone_strikes + 1))
+        fi
+        if [ "$start_attempt" -lt "$START_RETRY_LIMIT" ] && [ "$gone_strikes" -lt "$START_GONE_LIMIT" ]; then
+          start_attempt=$((start_attempt + 1))
+          poll_iteration_floor_wait "$iteration_started" "$(start_retry_wait "$start_attempt" "$delay" "$cap")" \
             || die "cannot enforce the poll rate governor"
         else
           cat -- "$response"
