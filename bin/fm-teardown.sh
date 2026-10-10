@@ -284,6 +284,8 @@
 #     sits beneath either root (registered by any repository, the project or
 #     a sibling clone, and including lanes this task's own worker created) is
 #     never signalled, because no record proves which task owns that lane.
+#     A lane that is itself a scan root - the task's own copy nested in the
+#     pool slot it returns - is scanned as its own root instead.
 #     Teardown refuses instead, even with --force, naming the pid, its birth
 #     identity, the matched path, and the lane. A lane is either a worktree
 #     the project, a git-backed scan root, or an available local task project's
@@ -2222,7 +2224,7 @@ report_worktree_dirt() {
 }
 
 validate_worktree_teardown_safety() {
-  local dirty_raw dirty unpushed_raw unpushed branch recorded_pr_state
+  local dirty_raw dirty unpushed_raw unpushed branch recorded_pr_state wt_real
   [ "$FORCE" != "--force" ] || return 0
   case "$KIND" in
     secondmate|scout) return 0 ;;
@@ -2247,7 +2249,9 @@ validate_worktree_teardown_safety() {
     echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
     return 1
   fi
-  dirty=$(fm_task_copy_dirty_status "$dirty_raw")
+  wt_real=$(fm_task_copy_canonical_dir "$WT") || wt_real=$WT
+  dirty=$(fm_task_copy_dirty_status "$dirty_raw" "$wt_real" \
+    ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"})
 
   if ! unpushed_raw=$(git -C "$WT" log --oneline HEAD --not --remotes -- 2>/dev/null); then
     if worktree_safety_blocked_by_lock "commits not on a remote"; then
@@ -2582,7 +2586,7 @@ task_pids_under_roots() {  # <dir>...
   TASK_PIDS_ERROR="lsof failed"
   TASK_PID_CWDS=()
   TASK_SCAN_PIDS=()
-  local dir dir_matches pid path lane identity pids=""
+  local dir dir_matches pid path lane identity root pids=""
   local -a scan_roots
   scan_roots=()
   for dir in "$@"; do
@@ -2613,6 +2617,10 @@ task_pids_under_roots() {  # <dir>...
         TASK_PIDS_ERROR="git could not classify the worktree holding process $pid's cwd"
         return 1
       fi
+      [ "$lane" != "$dir" ] || lane=
+      for root in "${scan_roots[@]}"; do
+        [ -z "$lane" ] || [ "$lane" != "$root" ] || continue 2
+      done
       if [ -n "$lane" ]; then
         identity=$(task_process_identity "$pid") || identity="identity unavailable"
         echo "REFUSED: process $pid ($identity) matched path $path inside registered nested worktree lane $lane, whose ownership by $ID is not proven; preserving it and task $ID without signalling." >&2
@@ -3152,41 +3160,24 @@ teardown_owns_worktree() {
 TEARDOWN_RETURN_SLOT=
 TEARDOWN_NESTED_COPIES=()
 teardown_own_copy_disposable() {  # <canonical-copy>
-  local copy=$1 what="recorded prior_worktree" top status dirty line nested head ref
+  local copy=$1 what="recorded prior_worktree" rc=0
   [ "$copy" != "$TEARDOWN_ENCLOSING_SLOT" ] || what="claimed pool slot"
-  top=$(git -C "$copy" rev-parse --show-toplevel 2>/dev/null) \
-    && top=$(fm_task_copy_canonical_dir "$top") && [ "$top" = "$copy" ] || {
-    echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, which is not a Git worktree root, so its contents cannot be proved landed; nothing was changed - not even with --force." >&2
-    return 1
-  }
-  status=$(git -C "$copy" status --porcelain --untracked-files=all 2>/dev/null) || {
-    echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, which cannot be inspected for uncommitted changes; nothing was changed - not even with --force." >&2
-    return 1
-  }
-  dirty=$(fm_task_copy_dirty_status "$status" | while IFS= read -r line; do
-    for nested in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
-      [ "$line" != "?? ${nested#"$copy"/}/" ] || continue 2
-    done
-    printf '%s\n' "$line"
-  done)
-  if [ -n "$dirty" ]; then
-    echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, which has uncommitted changes; nothing was changed - not even with --force." >&2
-    report_worktree_dirt "$dirty"
+  fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 \
+    ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} || rc=$?
+  case "$rc" in
+    0) return 0 ;;
+    2)
+      ! fm_task_copy_content_in_default "$copy" "$PROJ" "${BASE_BRANCH:-}" || return 0
+      echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, whose HEAD $FM_TASK_COPY_HEAD is neither landed nor held by a refs/fm/anchor/$ID-<sha> preservation anchor; nothing was changed - not even with --force." >&2
+      echo "Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown." >&2
+      return 1
+      ;;
+  esac
+  echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, which $FM_TASK_COPY_REASON; nothing was changed - not even with --force." >&2
+  if [ -n "$FM_TASK_COPY_DIRTY" ]; then
+    report_worktree_dirt "$FM_TASK_COPY_DIRTY"
     echo "Commit or carry them over, then re-run teardown." >&2
-    return 1
   fi
-  head=$(git -C "$copy" rev-parse --verify --quiet 'HEAD^{commit}') || {
-    echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, whose HEAD cannot be resolved; nothing was changed - not even with --force." >&2
-    return 1
-  }
-  while IFS= read -r ref; do
-    ref=${ref#"refs/fm/anchor/$ID-"}
-    case "$ref" in ''|*[!0-9a-f]*) continue ;; esac
-    case "$head" in "$ref"*) return 0 ;; esac
-  done < <(git -C "$PROJ" for-each-ref --points-at "$head" --format='%(refname)' "refs/fm/anchor/$ID-*" 2>/dev/null)
-  ! fm_task_copy_content_in_default "$copy" "$PROJ" "${BASE_BRANCH:-}" || return 0
-  echo "REFUSED: returning pool slot $TEARDOWN_RETURN_SLOT would sweep away task $ID's $what $copy, whose HEAD $head is neither landed nor held by a refs/fm/anchor/$ID-<sha> preservation anchor; nothing was changed - not even with --force." >&2
-  echo "Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown." >&2
   return 1
 }
 
@@ -4434,9 +4425,21 @@ fi
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
-  conclude_task_no_mistakes_run "$WT"
-  retire_task_private_nm_launch_agents "$WT" || exit 1
-  reap_task_worktree_processes worktree "$WT" "$TASK_TMP"
+  # A pool return also sweeps the slot it returns and the task's own copies
+  # nested in it (require_disposable_own_slot_copies), so each is concluded,
+  # retired and reaped as its own root, not only the current copy.
+  TEARDOWN_SWEPT_ROOTS=("$WT")
+  for teardown_swept_root in ${TEARDOWN_RETURN_SLOT:+"$TEARDOWN_RETURN_SLOT"} \
+      ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+    [ "$teardown_swept_root" -ef "$WT" ] || TEARDOWN_SWEPT_ROOTS+=("$teardown_swept_root")
+  done
+  for teardown_swept_root in "${TEARDOWN_SWEPT_ROOTS[@]}"; do
+    conclude_task_no_mistakes_run "$teardown_swept_root"
+  done
+  for teardown_swept_root in "${TEARDOWN_SWEPT_ROOTS[@]}"; do
+    retire_task_private_nm_launch_agents "$teardown_swept_root" || exit 1
+  done
+  reap_task_worktree_processes worktree "${TEARDOWN_SWEPT_ROOTS[@]}" "$TASK_TMP"
 elif [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes tasktmp "$TASK_TMP"
 fi

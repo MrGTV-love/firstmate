@@ -81,14 +81,93 @@ fm_task_copy_content_in_default() {
   [ "$merged_tree" = "$default_tree" ]
 }
 
-fm_task_copy_dirty_status() {
-  local status=$1 line
+# The porcelain status lines of <copy> that are its own uncommitted work:
+# Firstmate's hook files do not count, and neither does the untracked entry of
+# each of the task's own <nested-copy> paths inside <copy>, since each of those
+# is preserved or proved on its own.
+fm_task_copy_dirty_status() {  # <porcelain-status> [<copy> <nested-copy>...]
+  local status=$1 copy=${2:-} line nested
+  shift
+  [ "$#" -eq 0 ] || shift
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       ''|'?? .claude/'*|'?? .fm-grok-turnend'|'?? .fm-kimi-turnend') continue ;;
     esac
+    for nested in "$@"; do
+      case "$nested" in
+        "$copy"/*) [ "$line" != "?? ${nested#"$copy"/}/" ] || continue 2 ;;
+      esac
+    done
     printf '%s\n' "$line"
   done <<< "$status"
+}
+
+# The one rule for a task's own copy that a pool slot reset or release may
+# sweep away, shared by bin/fm-control.sh reassociate and bin/fm-teardown.sh:
+# <copy> must be a clean Git worktree root (fm_task_copy_dirty_status, with the
+# task's own <nested-copy> paths) whose HEAD a refs/fm/anchor/<task>-<sha>
+# preservation anchor in <project> holds. With <write> 1 a missing anchor is
+# written and verified; with 0 nothing is written and a missing anchor returns
+# 2. FM_TASK_COPY_HEAD and FM_TASK_COPY_ANCHOR name the HEAD and its anchor.
+# Any other failure returns 1 with FM_TASK_COPY_REASON, a clause following the
+# copy's path, and FM_TASK_COPY_DIRTY listing any dirt.
+FM_TASK_COPY_HEAD=
+FM_TASK_COPY_ANCHOR=
+FM_TASK_COPY_DIRTY=
+fm_task_copy_preserve() {  # <project> <task> <copy> <write> [<nested-copy>...]
+  local project=$1 task=$2 copy=$3 write=$4 top status ref short current
+  shift 4
+  FM_TASK_COPY_HEAD=
+  FM_TASK_COPY_ANCHOR=
+  FM_TASK_COPY_DIRTY=
+  FM_TASK_COPY_REASON=
+  top=$(git -C "$copy" rev-parse --show-toplevel 2>/dev/null) \
+    && top=$(fm_task_copy_canonical_dir "$top") && [ "$top" = "$copy" ] || {
+    FM_TASK_COPY_REASON="is not a Git worktree root, so its contents cannot be proved preserved"
+    return 1
+  }
+  status=$(git -C "$copy" status --porcelain --untracked-files=all --ignore-submodules=none 2>/dev/null) || {
+    FM_TASK_COPY_REASON="cannot be inspected for uncommitted changes"
+    return 1
+  }
+  FM_TASK_COPY_DIRTY=$(fm_task_copy_dirty_status "$status" "$copy" "$@")
+  if [ -n "$FM_TASK_COPY_DIRTY" ]; then
+    FM_TASK_COPY_REASON="has uncommitted or untracked-unignored changes"
+    return 1
+  fi
+  FM_TASK_COPY_HEAD=$(git -C "$copy" rev-parse --verify --quiet 'HEAD^{commit}') || {
+    FM_TASK_COPY_REASON="has a HEAD that cannot be resolved"
+    return 1
+  }
+  while IFS= read -r ref; do
+    short=${ref#"refs/fm/anchor/$task-"}
+    case "$short" in ''|*[!0-9a-f]*) continue ;; esac
+    case "$FM_TASK_COPY_HEAD" in
+      "$short"*)
+        FM_TASK_COPY_ANCHOR=$ref
+        return 0
+        ;;
+    esac
+  done < <(git -C "$project" for-each-ref --points-at "$FM_TASK_COPY_HEAD" --format='%(refname)' "refs/fm/anchor/$task-*" 2>/dev/null)
+  short=$(git -C "$copy" rev-parse --short "$FM_TASK_COPY_HEAD") || {
+    FM_TASK_COPY_REASON="has a HEAD $FM_TASK_COPY_HEAD that could not be named for its preservation anchor"
+    return 1
+  }
+  FM_TASK_COPY_ANCHOR="refs/fm/anchor/$task-$short"
+  if git -C "$project" rev-parse --verify --quiet "$FM_TASK_COPY_ANCHOR" >/dev/null; then
+    FM_TASK_COPY_REASON="cannot be anchored: preservation anchor $FM_TASK_COPY_ANCHOR already names a different commit"
+    return 1
+  fi
+  [ "$write" = 1 ] || return 2
+  git -C "$project" update-ref "$FM_TASK_COPY_ANCHOR" "$FM_TASK_COPY_HEAD" "" || {
+    FM_TASK_COPY_REASON="could not be anchored: writing $FM_TASK_COPY_ANCHOR at $FM_TASK_COPY_HEAD failed"
+    return 1
+  }
+  current=$(git -C "$project" rev-parse --verify "$FM_TASK_COPY_ANCHOR") \
+    && [ "$current" = "$FM_TASK_COPY_HEAD" ] || {
+    FM_TASK_COPY_REASON="could not be anchored: $FM_TASK_COPY_ANCHOR could not be verified at $FM_TASK_COPY_HEAD"
+    return 1
+  }
 }
 
 fm_task_copy_landed() {

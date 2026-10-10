@@ -22,7 +22,9 @@
 #      and malformed arguments - changes nothing at all.
 #   7. A ship reassociated into a copy nested in its own pool slot is retired by
 #      the real teardown once its work lands, and the slot is free for the next
-#      spawn.
+#      spawn. A later hop out of the pool proves and anchors that slot before
+#      releasing it, a vanished pool copy is released history, and a failed
+#      staging write publishes nothing.
 set -u
 
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -852,6 +854,112 @@ test_nested_reassociation_lands_tears_down_and_frees_the_slot() {
   pass "a nested reassociated ship lands, tears down under the landed and anchored proofs, and frees its slot for the next spawn"
 }
 
+# move_case_into_slot <case-dir> <id> -> slot path: the task's current copy
+# becomes a Treehouse pool slot it claims, on fm/<id>-slot.
+move_case_into_slot() {  # <case-dir> <id>
+  local dir=$1 id=$2 slot
+  slot=$(add_pool_slot "$dir" 1 "fm/$id-slot")
+  printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/1/.fm-slot-owner"
+  sed -i.bak "s|^worktree=.*|worktree=$slot|; s|^branch=.*|branch=fm/$id-slot|" "$dir/home/state/$id.meta"
+  sed -i.bak "s|^Ship branch: .*|Ship branch: fm/$id-slot|" "$dir/home/data/$id/brief.md"
+  rm -f "$dir/home/state/$id.meta.bak" "$dir/home/data/$id/brief.md.bak"
+  printf '%s\n' "$slot"
+}
+
+# The enclosing slot a nested reassociation kept is released by the next hop
+# out of the pool, and a reset of that slot loses whatever it gained since it
+# was anchored. So the hop proves it like the copy it leaves: work that is not
+# committed refuses, naming the slot and changing nothing, and committed work
+# is anchored before the slot is released.
+test_released_enclosing_slot_is_proved_and_anchored() {
+  local id=reassoc-enclosing-release dir slot new outside out rc head short
+  dir=$(new_case enclosing-release "$id")
+  slot=$(move_case_into_slot "$dir" "$id")
+  new="$slot/.claude/worktrees/fm-$id-v2"
+  mkdir -p "$slot/.claude/worktrees"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "nested S5 copy") \
+    || fail "nested reassociation failed: $out"
+  assert_equals "$slot" "$(meta_field "$dir" "$id" prior_worktree)" "the enclosing slot is not the prior copy"
+
+  printf 'late slot work\n' > "$slot/late.txt"
+  git -C "$slot" add late.txt
+  git -C "$slot" commit -qm "late slot work"
+  printf 'scratch\n' > "$slot/scratch.txt"
+  head=$(git -C "$slot" rev-parse HEAD)
+  outside="$dir/outside"
+  add_copy "$dir" "$outside" "fm/$id-v3"
+  git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/fm/anchor/ > "$dir/anchors-before"
+  cp "$dir/pool/1/.fm-slot-owner" "$dir/claim-before"
+  snapshot_case "$dir"
+  rc=0
+  out=$(run_control "$dir" "$id" reassociate --worktree "$outside" --note "out of the pool") || rc=$?
+  expect_code 1 "$rc" "releasing a slot with uncommitted work must refuse"$'\n'"$out"
+  assert_contains "$out" "copy $slot, which this reassociation releases to the pool," "the refusal did not name the slot"
+  assert_contains "$out" "scratch.txt" "the refusal did not name the slot's uncommitted work"
+  assert_case_unchanged "$dir" "the slot refusal"
+  git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/fm/anchor/ | cmp -s - "$dir/anchors-before" \
+    || fail "the slot refusal changed preservation anchors"
+  cmp -s "$dir/claim-before" "$dir/pool/1/.fm-slot-owner" || fail "the slot refusal changed the slot claim"
+  assert_equals "$head" "$(git -C "$slot" rev-parse HEAD)" "the slot refusal changed the slot's commit"
+  assert_equals "scratch" "$(cat "$slot/scratch.txt")" "the slot refusal changed the slot's file"
+
+  git -C "$slot" add scratch.txt
+  git -C "$slot" commit -qm "scratch"
+  head=$(git -C "$slot" rev-parse HEAD)
+  short=$(git -C "$slot" rev-parse --short "$head")
+  out=$(run_control "$dir" "$id" reassociate --worktree "$outside" --note "out of the pool") \
+    || fail "releasing a clean slot refused: $out"
+  assert_equals "$head" "$(git -C "$dir/proj" rev-parse "refs/fm/anchor/$id-$short")" \
+    "the released slot's commits were not anchored"
+  assert_line "released_worktree=$slot" "$dir/home/state/$id.meta" "the released slot is not history"
+  assert_no_line "prior_worktree=$slot" "$dir/home/state/$id.meta" "the released slot is still custody"
+  [ ! -e "$dir/pool/1/.fm-slot-owner" ] || fail "the released slot is still claimed"
+  pass "a hop out of the pool refuses an enclosing slot with uncommitted work and anchors its committed work before releasing it"
+}
+
+# A recorded copy that vanished from Treehouse's pool layout is a slot path,
+# not custody: it is recorded as history and its claim released, so it never
+# blocks the task Treehouse later hands that slot to.
+test_absent_pool_copy_is_released_not_preserved() {
+  local id=reassoc-absent-slot dir slot new out
+  dir=$(new_case absent-slot "$id")
+  slot=$(move_case_into_slot "$dir" "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  git -C "$dir/proj" worktree remove --force "$slot"
+  [ ! -e "$slot" ] && [ -f "$dir/pool/1/.fm-slot-owner" ] || fail "absent-slot setup failed"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "slot vanished") \
+    || fail "reassociating out of a vanished slot failed: $out"
+  assert_contains "$out" "prior_state=absent" "the vanished copy was not reported absent"
+  assert_line "released_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path is not history"
+  assert_no_line "prior_worktree=$slot" "$dir/home/state/$id.meta" "the vanished slot path became custody"
+  [ ! -e "$dir/pool/1/.fm-slot-owner" ] || fail "the vanished slot's claim was kept"
+  assert_contains "$(cat "$dir/home/data/$id/brief.md")" "It replaces $slot, whose pool slot was released for reuse." \
+    "the instructions did not record the released slot"
+  pass "a vanished pool copy is recorded as released history and its claim is dropped"
+}
+
+# A staging write that fails partway must refuse before anything is
+# published, even when the record's last staged line is skipped.
+test_staging_write_failure_publishes_nothing() {
+  local id=reassoc-stage-write dir slot new out rc
+  dir=$(new_case stage-write "$id")
+  slot=$(move_case_into_slot "$dir" "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  printf 'padding=%s\n' "$(head -c 6000 /dev/zero | tr '\0' x)" >> "$dir/home/state/$id.meta"
+  cp "$dir/pool/1/.fm-slot-owner" "$dir/claim-before"
+  snapshot_case "$dir"
+  rc=0
+  out=$(trap '' XFSZ; ulimit -f 4; run_control "$dir" "$id" reassociate --worktree "$new" --note moved) || rc=$?
+  expect_code 1 "$rc" "a failed record staging write must refuse"$'\n'"$out"
+  assert_contains "$out" "could not stage task $id's record" "the staging failure was not reported"
+  assert_case_unchanged "$dir" "the staging write failure"
+  cmp -s "$dir/claim-before" "$dir/pool/1/.fm-slot-owner" || fail "the staging write failure released the slot claim"
+  pass "a record staging write failure refuses and publishes nothing"
+}
+
 test_anchor_failure_refuses_record_publication() {
   local phase id dir new real_git out rc
   real_git=$(command -v git)
@@ -1074,6 +1182,9 @@ test_dirty_current_copy_refuses_without_publication
 test_provider_reset_preserves_spawned_copy_commits_via_anchor
 test_nested_replacement_blocks_slot_allocation
 test_nested_reassociation_lands_tears_down_and_frees_the_slot
+test_released_enclosing_slot_is_proved_and_anchored
+test_absent_pool_copy_is_released_not_preserved
+test_staging_write_failure_publishes_nothing
 test_firstmate_hook_artifacts_do_not_block_reassociation
 test_anchor_failure_refuses_record_publication
 test_non_pool_reassociation_serializes_copy_ownership

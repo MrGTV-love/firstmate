@@ -1647,9 +1647,15 @@ fm_treehouse_pool_slot() {  # <project-dir> <worktree>
 # The claim lives at <pool>/<slot>/.fm-slot-owner - a sibling of the repo
 # checkout rather than a file inside it - so claiming a slot can never dirty the
 # copy teardown's landed-work checks inspect, and a returned slot carries no
-# untracked leftover from it.
+# untracked leftover from it. A checkout path that no longer exists still names
+# the claim beside where it was, so a record of a vanished slot can release it.
 fm_treehouse_slot_owner_marker() {  # <worktree>
   local worktree=$1 slot
+  if [ ! -e "$worktree" ] && [ ! -L "$worktree" ]; then
+    slot=$(CDPATH='' cd -- "$(dirname "$worktree")" 2>/dev/null && pwd -P) || return 1
+    printf '%s/.fm-slot-owner\n' "$slot"
+    return 0
+  fi
   slot=$(CDPATH='' cd -- "$worktree" 2>/dev/null && pwd -P) || return 1
   printf '%s/.fm-slot-owner\n' "$(dirname "$slot")"
 }

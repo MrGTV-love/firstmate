@@ -585,8 +585,8 @@ do_reassociate() {
   local pre_wt pre_project old_wt project kind kind_count branch_count old_branch new_wt new_branch=""
   local old_real="" old_state=present slot_result=none pr stamp line prior prior_real slot backup
   local set_branch=0 brief_branch_other=0 old_released=0
-  local registered old_dirty nested_entry="" old_head old_short anchor anchor_head
-  local -a priors_kept=() left_slots=() new_slots=()
+  local registered anchor="" write rc label brief_text meta_text
+  local -a priors_kept=() left_slots=() new_slots=() own_copies=() proofs=() proved=()
 
   [ "$RELOCATE_SET" = 1 ] \
     || die "reassociate requires --worktree <replacement copy>"
@@ -708,65 +708,94 @@ do_reassociate() {
     fi
   done <<< "$registered"
 
+  # A recorded copy that is gone but sat in Treehouse's <pool>/<slot>/<repo>
+  # layout is a slot path, not custody: recording it as a prior copy would make
+  # it block whichever task Treehouse later hands that slot to. It is history,
+  # and this task's claim on it, if any, is released.
+  if [ "$old_state" = absent ] && [ -f "${old_wt%/*/*}/treehouse-state.json" ] \
+     && [ ! -L "${old_wt%/*/*}/treehouse-state.json" ]; then
+    old_released=1
+    fm_treehouse_slot_owner_state "$old_wt" "$ID"
+    [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || left_slots+=("$old_wt")
+  fi
+
   if [ -n "$old_real" ]; then
     fm_task_copy_same_repository "$old_real" "$project" \
       || die "current copy $old_real does not share $project's Git ref store: it uses a different repository/ref store, even if it has the same origin; its commits cannot be anchored there; nothing was changed"
-    old_dirty=$(git -C "$old_real" status --porcelain --untracked-files=all --ignore-submodules=none) \
-      || die "could not inspect current copy $old_real for uncommitted changes"
-    case "$new_wt" in
-      "$old_real"/*) nested_entry="?? ${new_wt#"$old_real"/}/" ;;
-    esac
-    old_dirty=$(fm_task_copy_dirty_status "$old_dirty" | while IFS= read -r line; do
-      [ "$line" = "$nested_entry" ] || printf '%s\n' "$line"
-    done)
-    [ -z "$old_dirty" ] \
-      || die "current copy $old_real has uncommitted or untracked-unignored changes; commit or carry them over before reassociating:
-$old_dirty"
-    old_head=$(git -C "$old_real" rev-parse --verify 'HEAD^{commit}') \
-      || die "could not resolve current copy $old_real's HEAD for preservation"
-    old_short=$(git -C "$old_real" rev-parse --short "$old_head") \
-      || die "could not name the preservation anchor for $old_real"
-    anchor="refs/fm/anchor/$ID-$old_short"
-    anchor_head=$(git -C "$project" rev-parse --verify "$anchor" 2>/dev/null) || anchor_head=
-    [ -z "$anchor_head" ] || [ "$anchor_head" = "$old_head" ] \
-      || die "preservation anchor $anchor already names a different commit; nothing was changed"
-    git -C "$project" update-ref "$anchor" "$old_head" "$anchor_head" \
-      || die "could not anchor current copy $old_real's HEAD at $anchor; the record was not changed"
-    anchor_head=$(git -C "$project" rev-parse --verify "$anchor") \
-      && [ "$anchor_head" = "$old_head" ] \
-      || die "could not verify preservation anchor $anchor at $old_head; the record was not changed"
   fi
+
+  # Every copy of this task a reset could reach once the record moves - the
+  # current copy, each pool slot it leaves, and each prior copy inside such a
+  # slot - must be clean and is anchored at refs/fm/anchor/<task>-<sha>
+  # (bin/fm-task-copy-lib.sh fm_task_copy_preserve). The task's own copies
+  # nested in one of them are proved or preserved on their own, so they are not
+  # its dirt. All are proved before any anchor is written.
+  own_copies=("$new_wt")
+  [ -z "$old_real" ] || own_copies+=("$old_real")
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      prior_worktree=?*)
+        prior_real=$(fm_task_copy_canonical_dir "${line#prior_worktree=}") || continue
+        own_copies+=("$prior_real")
+        for slot in ${left_slots[@]+"${left_slots[@]}"}; do
+          case "$prior_real" in "$slot"|"$slot"/*) proofs+=("$prior_real") ;; esac
+        done
+        ;;
+    esac
+  done < "$META"
+  for slot in ${left_slots[@]+"${left_slots[@]}"}; do
+    [ ! -d "$slot" ] || proofs+=("$slot")
+  done
+  [ -z "$old_real" ] || proofs=("$old_real" ${proofs[@]+"${proofs[@]}"})
+  for write in 0 1; do
+    proved=()
+    for slot in ${proofs[@]+"${proofs[@]}"}; do
+      rc=0
+      for prior in ${proved[@]+"${proved[@]}"}; do
+        [ "$prior" != "$slot" ] || rc=1
+      done
+      [ "$rc" = 0 ] || continue
+      proved+=("$slot")
+      label="current copy $slot"
+      [ "$slot" = "$old_real" ] || label="copy $slot, which this reassociation releases to the pool,"
+      fm_task_copy_preserve "$project" "$ID" "$slot" "$write" "${own_copies[@]}" || rc=$?
+      case "$rc" in
+        0|2) ;;
+        *)
+          die "$label $FM_TASK_COPY_REASON; commit or carry its work over, or reassociate the task back to it, before reassociating; nothing was changed${FM_TASK_COPY_DIRTY:+:
+$FM_TASK_COPY_DIRTY}"
+          ;;
+      esac
+      [ "$slot" != "$old_real" ] || anchor=$FM_TASK_COPY_ANCHOR
+    done
+  done
 
   # Stage every write before publishing any of them.
   REASSOCIATE_ACTIVE=1
   stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
   REASSOCIATE_BRIEF_TMP=$(mktemp "$DATA/$ID/.brief.reassociate.XXXXXX") \
     || die "could not stage task $ID's instructions"
-  {
+  # Each staged write is checked, and each source is read whole first, so a
+  # failed read or write refuses instead of publishing a truncated file.
+  brief_text=$(cat -- "$REASSOCIATE_BRIEF" && printf .) \
+    || die "could not read task $ID's instructions; nothing was changed"
+  brief_text=${brief_text%.}
+  (
     while IFS= read -r line || [ -n "$line" ]; do
       if [ "$set_branch" = 1 ] && [ "$line" = "Ship branch: $old_branch" ]; then
-        printf 'Ship branch: %s\n' "$new_branch"
+        printf 'Ship branch: %s\n' "$new_branch" || exit 1
       else
-        printf '%s\n' "$line"
+        printf '%s\n' "$line" || exit 1
       fi
-    done < "$REASSOCIATE_BRIEF"
-    echo
-    echo "## Copy reassociation ($stamp)"
-    echo
-    echo "This task's work moved to a replacement local copy."
-    if [ -n "$new_branch" ]; then
-      echo "Work only in $new_wt, on branch $new_branch."
-    else
-      echo "Work only in $new_wt."
-    fi
-    if [ "$old_released" = 1 ]; then
-      echo "It replaces $old_wt, whose pool slot was released for reuse; its commits are preserved at $anchor."
-    else
-      echo "It replaces $old_wt, which is preserved exactly as it was; do not change it."
-    fi
-    echo
-    printf '%s\n' "$NOTE"
-  } > "$REASSOCIATE_BRIEF_TMP" || die "could not stage task $ID's instructions"
+    done < <(printf '%s' "$brief_text")
+    line="Work only in $new_wt."
+    [ -z "$new_branch" ] || line="Work only in $new_wt, on branch $new_branch."
+    prior="It replaces $old_wt, which is preserved exactly as it was; do not change it."
+    [ "$old_released" != 1 ] \
+      || prior="It replaces $old_wt, whose pool slot was released for reuse${anchor:+; its commits are preserved at $anchor}."
+    printf '%s\n' "" "## Copy reassociation ($stamp)" "" \
+      "This task's work moved to a replacement local copy." "$line" "$prior" "" "$NOTE"
+  ) > "$REASSOCIATE_BRIEF_TMP" || die "could not stage task $ID's instructions"
 
   # Which recorded prior copies survive: one that IS the replacement copy is
   # dropped (moving the task back undoes that hop), and the current copy joins
@@ -774,15 +803,18 @@ $old_dirty"
   # releases is recorded as released_worktree= instead: history, not custody.
   CONTROL_META_TMP=$(mktemp "$STATE/.$ID.meta.reassociate.XXXXXX") \
     || die "could not stage task $ID's record"
-  {
+  meta_text=$(cat -- "$META" && printf .) \
+    || die "could not read task $ID's record; nothing was changed"
+  meta_text=${meta_text%.}
+  (
     while IFS= read -r line || [ -n "$line" ]; do
       case "$line" in
-        worktree=*) printf 'worktree=%s\n' "$new_wt" ;;
+        worktree=*) printf 'worktree=%s\n' "$new_wt" || exit 1 ;;
         branch=*)
           if [ "$set_branch" = 1 ]; then
-            printf 'branch=%s\n' "$new_branch"
+            printf 'branch=%s\n' "$new_branch" || exit 1
           else
-            printf '%s\n' "$line"
+            printf '%s\n' "$line" || exit 1
           fi
           ;;
         prior_worktree=*)
@@ -794,30 +826,30 @@ $old_dirty"
           for slot in ${left_slots[@]+"${left_slots[@]}"}; do
             case "$prior_real" in
               "$slot"|"$slot"/*)
-                printf 'released_worktree=%s\n' "$prior"
+                printf 'released_worktree=%s\n' "$prior" || exit 1
                 continue 2
                 ;;
             esac
           done
           priors_kept+=("$prior_real")
-          printf '%s\n' "$line"
+          printf '%s\n' "$line" || exit 1
           ;;
-        *) printf '%s\n' "$line" ;;
+        *) printf '%s\n' "$line" || exit 1 ;;
       esac
-    done < "$META"
+    done < <(printf '%s' "$meta_text")
     if [ "$set_branch" = 1 ] && [ "${branch_count:-0}" = 0 ]; then
-      printf 'branch=%s\n' "$new_branch"
+      printf 'branch=%s\n' "$new_branch" || exit 1
     fi
     line=${old_real:-$old_wt}
     if [ "$old_released" = 1 ]; then
-      printf 'released_worktree=%s\n' "$old_wt"
+      printf 'released_worktree=%s\n' "$old_wt" || exit 1
       line=
     fi
     for prior in ${priors_kept[@]+"${priors_kept[@]}"}; do
       [ "$prior" != "$line" ] || line=
     done
-    [ -z "$line" ] || printf 'prior_worktree=%s\n' "$old_wt"
-  } > "$CONTROL_META_TMP" || die "could not stage task $ID's record"
+    [ -z "$line" ] || printf 'prior_worktree=%s\n' "$old_wt" || exit 1
+  ) > "$CONTROL_META_TMP" || die "could not stage task $ID's record"
 
   # Publish: the slot claims, then the instructions, then the record last, so
   # every earlier failure rolls back to the record that was there.

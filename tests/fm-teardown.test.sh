@@ -7960,78 +7960,196 @@ test_slot_named_as_another_prior_copy_refuses() {
   pass "teardown refuses to return a pool slot another record preserves as a prior copy"
 }
 
-# A task's own prior copies never refuse its own teardown outright. A copy a
-# pool return would sweep away must instead be proved disposable, and a plain
-# directory cannot be: the pool cases refuse and change nothing, with or
-# without --force. A non-pool current copy is never returned, so its teardown
-# touches no prior copy and is not blocked by one.
+# A task's own prior copies never refuse its own teardown outright. A prior
+# copy nested in a pool slot the return sweeps away must be proved disposable,
+# and a plain directory cannot be: those cases refuse and change nothing, with
+# or without --force. A prior copy that IS the slot (reached through a symlink)
+# or that encloses it loses nothing beyond the current copy the landed-work test
+# covers, so teardown returns the slot and leaves an enclosing prior untouched.
+# A non-pool current copy is never returned, so no prior copy blocks it.
 test_own_prior_copies_block_only_an_unproven_pool_return() {
-  local case_dir rc slot prior shape force pool
+  local case_dir rc slot prior shape force pool label
   for pool in ordinary pool; do
     for shape in return ancestor descendant; do
-      case_dir=$(make_case "nested-prior-$pool-$shape")
-      mkdir -p "$case_dir/home/state"
-      slot=$case_dir/wt
-      cat > "$case_dir/fakebin/treehouse" <<SH
+      for force in normal force; do
+        label="nested-prior-$pool-$shape-$force"
+        case_dir=$(make_case "$label")
+        mkdir -p "$case_dir/home/state"
+        slot=$case_dir/wt
+        cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
 printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
 exit 0
 SH
-      if [ "$pool" = pool ]; then
-        mkdir -p "$case_dir/pool/1"
-        git -C "$case_dir/project" worktree move "$slot" "$case_dir/pool/1/project"
-        printf '{"worktrees":[]}\n' > "$case_dir/pool/treehouse-state.json"
-        slot=$case_dir/pool/1/project
-      fi
-      mkdir -p "$slot/nested-B"
-      printf 'preserved B work\n' > "$slot/nested-B/scratch.txt"
-      ln -s "$slot" "$case_dir/copy-A"
-      case "$shape" in
-        return) prior=$case_dir/copy-A ;;
-        ancestor) prior=${slot%/*} ;;
-        descendant) prior=$case_dir/copy-A/nested-B ;;
-      esac
-      fm_write_meta "$case_dir/state/task-x1.meta" \
-        "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
-        "worktree=$slot" "project=$case_dir/project" \
-        "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
-        "prior_worktree=$prior" "prior_worktree=$case_dir/copy-A/nested-B"
-      cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
-      for force in normal force; do
+        if [ "$pool" = pool ]; then
+          mkdir -p "$case_dir/pool/1"
+          git -C "$case_dir/project" worktree move "$slot" "$case_dir/pool/1/project"
+          printf '{"worktrees":[]}\n' > "$case_dir/pool/treehouse-state.json"
+          slot=$case_dir/pool/1/project
+        fi
+        ln -s "$slot" "$case_dir/copy-A"
+        case "$shape" in
+          return) prior=$case_dir/copy-A ;;
+          ancestor) prior=${slot%/*} ;;
+          descendant)
+            mkdir -p "$slot/nested-B"
+            printf 'preserved B work\n' > "$slot/nested-B/scratch.txt"
+            prior=$case_dir/copy-A/nested-B
+            ;;
+        esac
+        fm_write_meta "$case_dir/state/task-x1.meta" \
+          "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+          "worktree=$slot" "project=$case_dir/project" \
+          "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+          "prior_worktree=$prior"
+        cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
         rc=0
         if [ "$force" = force ]; then
-          FM_HOME="$case_dir/home" FM_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
+          FM_HOME="$case_dir/home" \
             run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         else
-          FM_HOME="$case_dir/home" FM_TEST_TREEHOUSE_LOG="$case_dir/treehouse.log" \
+          FM_HOME="$case_dir/home" \
             run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
         fi
-        assert_absent "$case_dir/treehouse.log" "nested-prior-$pool-$shape-$force: cleanup returned a copy"
-        assert_grep "preserved B work" "$slot/nested-B/scratch.txt" \
-          "nested-prior-$pool-$shape-$force: nested prior content changed"
-        if [ "$pool" = ordinary ] && [ "$force" = force ]; then
-          expect_code 0 "$rc" "nested-prior-$pool-$shape-$force: a teardown that returns nothing must not be blocked by its own prior copy: $(cat "$case_dir/stderr")"
-          assert_grep "reassociated worktree $slot left in place" "$case_dir/stdout" \
-            "nested-prior-$pool-$shape-$force: the current copy was not left in place"
-          assert_absent "$case_dir/state/task-x1.meta" "nested-prior-$pool-$shape-$force: the task record was not removed"
+        if [ "$shape" = descendant ]; then
+          assert_absent "$case_dir/treehouse.log" "$label: cleanup returned a copy"
+          assert_grep "preserved B work" "$slot/nested-B/scratch.txt" "$label: nested prior content changed"
+          if [ "$pool" = ordinary ] && [ "$force" = force ]; then
+            expect_code 0 "$rc" "$label: a teardown that returns nothing must not be blocked by its own prior copy: $(cat "$case_dir/stderr")"
+            assert_grep "reassociated worktree $slot left in place" "$case_dir/stdout" \
+              "$label: the current copy was not left in place"
+            assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+            continue
+          fi
+          expect_code 1 "$rc" "$label: unproven work must refuse cleanup"
+          if [ "$pool" = pool ]; then
+            assert_grep "recorded prior_worktree" "$case_dir/stderr" "$label: refusal did not identify the prior copy"
+            assert_grep "not a Git worktree root" "$case_dir/stderr" "$label: refusal did not name the reason"
+          else
+            assert_grep "has uncommitted changes" "$case_dir/stderr" \
+              "$label: the landed-work test did not report the untracked prior work"
+          fi
+          cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" || fail "$label: task metadata changed"
           continue
         fi
-        expect_code 1 "$rc" "nested-prior-$pool-$shape-$force: unproven work must refuse cleanup"
+        expect_code 0 "$rc" "$label: an own prior copy the return does not sweep must not block teardown: $(cat "$case_dir/stderr")"
+        assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
         if [ "$pool" = pool ]; then
-          assert_grep "recorded prior_worktree" "$case_dir/stderr" \
-            "nested-prior-$pool-$shape-$force: refusal did not identify the prior copy"
-          assert_grep "not a Git worktree root" "$case_dir/stderr" \
-            "nested-prior-$pool-$shape-$force: refusal did not name the reason"
+          assert_grep "return --force $slot" "$case_dir/treehouse.log" "$label: the pool slot was not returned"
         else
-          assert_grep "has uncommitted changes" "$case_dir/stderr" \
-            "nested-prior-$pool-$shape-$force: the landed-work test did not report the untracked prior work"
+          assert_absent "$case_dir/treehouse.log" "$label: a non-pool copy was returned"
+          assert_grep "reassociated worktree $slot left in place" "$case_dir/stdout" \
+            "$label: the current copy was not left in place"
         fi
-        cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" \
-          || fail "nested-prior-$pool-$shape-$force: task metadata changed"
+        if [ "$shape" = ancestor ]; then
+          assert_grep "prior copy $prior (from a reassociation) was left untouched" "$case_dir/stdout" \
+            "$label: the enclosing prior copy was not named as left untouched"
+          assert_present "$prior" "$label: the enclosing prior copy was removed"
+        elif [ "$pool" = pool ]; then
+          assert_no_grep "prior copy" "$case_dir/stdout" "$label: the returned slot was still reported as a prior copy"
+        fi
       done
     done
   done
-  pass "own prior copies refuse only a pool return that cannot prove them landed, including force and symlink overlap"
+  pass "own prior copies refuse only a pool return that cannot prove them landed; a prior that is or encloses the slot does not block it, with or without --force"
+}
+
+# make_nested_slot_case <name> <shape>: a ship whose copies are a Treehouse
+# pool slot S it claims and a clean worktree N nested in S on fm/task-x1-v2,
+# both at the landed main. shape=enclosing records worktree=N and
+# prior_worktree=S (the task moved into N); shape=reverse records worktree=S and
+# prior_worktree=N (the task moved back). Sets NESTED_CASE, NESTED_SLOT and
+# NESTED_COPY.
+make_nested_slot_case() {  # <name> <shape> <nested-relative-path>
+  local case_dir
+  case_dir=$(make_case "$1")
+  NESTED_CASE=$case_dir
+  mkdir -p "$case_dir/home/state" "$case_dir/pool/1"
+  git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+  printf '{"worktrees":[]}\n' > "$case_dir/pool/treehouse-state.json"
+  NESTED_SLOT=$(cd "$case_dir/pool/1/project" && pwd -P)
+  NESTED_COPY="$NESTED_SLOT/$3"
+  mkdir -p "${NESTED_COPY%/*}"
+  git -C "$case_dir/project" worktree add -q -b fm/task-x1-v2 "$NESTED_COPY" main
+  printf 'task=task-x1\nhome=%s\n' "$case_dir/home" > "$case_dir/pool/1/.fm-slot-owner"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  if [ "$2" = enclosing ]; then
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$NESTED_COPY" "branch=fm/task-x1-v2" "project=$case_dir/project" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+      "prior_worktree=$NESTED_SLOT"
+  else
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$NESTED_SLOT" "branch=fm/task-x1" "project=$case_dir/project" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+      "prior_worktree=$NESTED_COPY"
+  fi
+}
+
+# The reverse nested shape whose prior copy is not under .claude/: the slot is
+# the current copy, and its landed-work test must not count the task's own
+# nested prior copy as the slot's dirt. Teardown proves the nested copy,
+# removes it, and returns the slot.
+test_reverse_nested_prior_outside_claude_tears_down() {
+  local case_dir rc
+  make_nested_slot_case reverse-nested-plain reverse nested-v2
+  case_dir=$NESTED_CASE
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "reverse-nested-plain: a landed slot with its own landed nested prior copy must tear down: $(cat "$case_dir/stderr")"
+  assert_no_grep "uncommitted changes" "$case_dir/stderr" "reverse-nested-plain: the nested prior copy was counted as the slot's dirt"
+  assert_absent "$NESTED_COPY" "reverse-nested-plain: the nested prior copy was not removed before the return"
+  assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "reverse-nested-plain: the slot was not returned"
+  assert_absent "$case_dir/pool/1/.fm-slot-owner" "reverse-nested-plain: the slot claim survived the task"
+  git -C "$case_dir/project" rev-parse --verify --quiet refs/heads/fm/task-x1-v2 >/dev/null \
+    || fail "reverse-nested-plain: the nested prior copy's branch was deleted"
+  assert_absent "$case_dir/state/task-x1.meta" "reverse-nested-plain: the task record was not removed"
+  pass "the reverse nested shape with a prior copy outside .claude/ proves and removes it, then returns the slot"
+}
+
+# Returning the enclosing slot sweeps more than the nested current copy, so the
+# safety steps run on every copy swept: a run parked on the slot's own branch is
+# aborted and a task-private launch agent rooted in the slot is retired before
+# the return, not left holding a fleet slot or pointing into a reset copy.
+test_nested_slot_return_concludes_runs_and_agents_on_the_slot() {
+  local case_dir rc pid label agent_root slot_head
+  make_nested_slot_case nested-slot-safety enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  add_fake_launchctl "$case_dir"
+  agent_root="$NESTED_SLOT/.claude/nm/h"
+  mkdir -p "$agent_root"
+  teardown_fixture_start "$agent_root" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
+  kill -0 "$pid" 2>/dev/null || fail "nested-slot-safety: setup daemon did not start"
+  label="$NM_AGENT_PREFIX.5107aa11"
+  add_nm_launch_agent "$case_dir" 5107aa11 "$agent_root" "$pid"
+  slot_head=$(git -C "$NESTED_SLOT" rev-parse HEAD)
+  rc=0
+  FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+  FM_FAKE_AXI_STATUS="$(parked_axi_status_toon fm/task-x1 "$slot_head")" \
+  FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  if kill -0 "$pid" 2>/dev/null; then
+    teardown_fixture_stop "$pid"
+    fail "nested-slot-safety: the launch agent rooted in the returned slot survived teardown"
+  fi
+  expect_code 0 "$rc" "nested-slot-safety: teardown must finish: $(cat "$case_dir/stderr")"
+  assert_grep "abort --run 01RUN" "$case_dir/nm-abort.log" \
+    "nested-slot-safety: the run parked on the returned slot's branch was not aborted"
+  assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" \
+    "nested-slot-safety: the launch agent rooted in the returned slot was not booted out"
+  assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" \
+    "nested-slot-safety: the launch agent plist was not archived"
+  assert_absent "$NESTED_COPY" "nested-slot-safety: the nested copy was not removed"
+  assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "nested-slot-safety: the slot was not returned"
+  pass "returning the enclosing slot aborts its parked run and retires its launch agent before the return"
 }
 
 test_other_record_copy_overlap_is_component_aware() {
@@ -8708,6 +8826,8 @@ test_reassociated_unlanded_copy_still_refuses
 test_released_slot_record_keeps_current_copy
 test_slot_named_as_another_prior_copy_refuses
 test_own_prior_copies_block_only_an_unproven_pool_return
+test_reverse_nested_prior_outside_claude_tears_down
+test_nested_slot_return_concludes_runs_and_agents_on_the_slot
 test_other_record_copy_overlap_is_component_aware
 test_forced_descendant_preserved_copy_refuses_before_cleanup
 test_tasktmp_preserves_current_and_prior_reassociated_copies
