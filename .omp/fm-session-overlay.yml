@@ -7,7 +7,7 @@
 # Each key below pins one setting whose captain-facing value would park an
 # unattended worker on an interactive prompt, change its pinned model under it,
 # or make its composer unreadable to bin/fm-composer-lib.sh. Verified against
-# omp 18.1.11's own settings schema (`omp config list`); the retry keys against
+# omp 18.1.11's own settings schema (`omp config list`); the fallback keys against
 # omp 18.8.7 by tests/fm-omp-fallback-chain-live-e2e.test.sh.
 composer:
   # Pins the bare `❯` (U+276F) row for predictable worker rendering.
