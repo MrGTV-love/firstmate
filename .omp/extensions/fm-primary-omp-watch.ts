@@ -1112,12 +1112,6 @@ export default function (pi: ExtensionAPI) {
     const ctx = editorContext();
     if (!ctx) return false;
     try {
-      // A turn that already started will consume the wake itself.
-      if (!ctx.isIdle()) {
-        owner.restorePendingWaits = 0;
-        owner.queueStuckReported = false;
-        return false;
-      }
       // Queued messages normally drain into the next run within moments, and
       // so does a prompt this owner already resent that is still unconsumed
       // with no copy in the composer, so the check waits for either. Skipping
@@ -1141,15 +1135,32 @@ export default function (pi: ExtensionAPI) {
       let recovered = false;
       for (const [token, wake] of [...owner.unconsumedWakes]) {
         if (wake.pending?.delivered) continue;
-        const remainder = removeRestoredWake(String(ctx.ui.getEditorText() ?? ""), wake.content);
+        const editor = String(ctx.ui.getEditorText() ?? "");
+        const remainder = removeRestoredWake(editor, wake.content);
         if (remainder === null) continue;
+        const prompt = !wake.pending || operationalHandback(wake.pending.message);
+        const attempts = restoreAttempts.get(token) ?? 0;
+        if (prompt && attempts >= restoreAttemptLimit) continue;
         ctx.ui.setEditorText(remainder);
         recovered = true;
-        if (redeliverWake(owner, token, wake)) {
-          restoreAttempts.set(token, (restoreAttempts.get(token) ?? 0) + 1);
-          owner.restorePendingWaits = 0;
-          return true;
+        if (!prompt) {
+          redeliverWake(owner, token, wake);
+          continue;
         }
+        restoreAttempts.set(token, attempts + 1);
+        owner.restorePendingWaits = 0;
+        try {
+          redeliverWake(owner, token, wake);
+        } catch {
+          ctx.ui.setEditorText(editor);
+          if (attempts + 1 === restoreAttemptLimit) {
+            reportWait(
+              ctx,
+              `watcher: wake not delivered - omp refused ${restoreAttemptLimit} resubmissions of a restored wake; it stays in the composer`,
+            );
+          }
+        }
+        return true;
       }
       return queued && !recovered && flushStuckQueue(owner, ctx);
     } catch {}

@@ -2322,7 +2322,7 @@ globalThis.setTimeout = (callback, delay, ...args) => {
     flushChecks.add(timer);
     return timer;
   }
-  return realSetTimeout(callback, delay === 1000 && scenario.startsWith("stuck-") ? 20 : delay, ...args);
+  return realSetTimeout(callback, delay === 1000 && scenario.startsWith("stuck-") ? (scenario === "stuck-restored-failures" ? 60 : 20) : delay, ...args);
 };
 globalThis.clearTimeout = (timer) => { if (!flushChecks.delete(timer)) realClearTimeout(timer); };
 globalThis.setInterval = (callback, delay, ...args) => {
@@ -2330,12 +2330,17 @@ globalThis.setInterval = (callback, delay, ...args) => {
   return realSetInterval(callback, delay === 3000 && scenario.startsWith("stranded-") ? 100 : delay, ...args);
 };
 writeFileSync(`${state}/.lock`, `${process.pid}\n`);
-const handlers = new Map(); const sent = []; const notices = []; let tool = null;
-let idle = false, queued = false, editor = "", sets = 0, flushes = false;
+const handlers = new Map(); const sent = []; const notices = []; const refused = []; let tool = null;
+let idle = false, queued = false, editor = "", sets = 0, flushes = false, refusals = 0;
 const ctx = { hasUI: true, isIdle: () => { if (scenario === "unreadable" && idle) throw new Error("stale context"); return idle; }, hasPendingMessages: () => queued,
   ui: { getEditorText: () => editor, setEditorText: (value) => { editor = value; sets += 1; }, notify: (m, level) => { notices.push({ m, level }); } } };
 const pi = { on(name, handler) { handlers.set(name, handler); }, registerCommand() {}, registerTool(t) { tool = t; },
   sendUserMessage(m, o) {
+    if (refusals > 0 && !o?.deliverAs) {
+      refusals -= 1;
+      refused.push(m);
+      throw new Error("omp refused the prompt");
+    }
     sent.push({ m, o });
     if (flushes && !o?.deliverAs) {
       // omp's prompt flow starts a turn and flushes whatever sat in its queue.
@@ -2671,7 +2676,7 @@ if (scenario === "external") {
       // omp is idle with messages queued that it will not run; a prompt send
       // starts a turn and flushes them.
       const draft = "\noperator\u2063 draft\n\n";
-      if (["stuck-failure", "stuck-restored-failure", "stuck-restored-failures", "stuck-restored-failures-turn", "stuck-restored-failure-held", "stuck-restored-failure-no-turn"].includes(scenario)) {
+      if (["stuck-failure", "stuck-restored-failure", "stuck-restored-failures", "stuck-restored-failures-turn", "stuck-restored-failure-held", "stuck-restored-failure-no-turn", "stuck-restored-failure-refused"].includes(scenario)) {
         // A failure notice names no queued row, so it is resent as emitted.
         await accept(wake);
         const dir = `${state}/extensions/omp-primary-watch`;
@@ -2740,6 +2745,19 @@ if (scenario === "external") {
           const sentCount = sent.length;
           await sleep(600);
           if (sent.length !== sentCount || notices.filter(({ m }) => m.includes("wake not delivered")).length !== 1) throw new Error(`recovery sent again or warned again after the bound: ${JSON.stringify(notices)}`);
+        } else if (scenario === "stuck-restored-failure-refused") {
+          // omp throws on the restored prompt send: the notice stays in the
+          // composer, each refused send counts, and the third ends in one warning.
+          const original = `${failed()[0].m}\n\n${draft}`;
+          editor = original;
+          refusals = 3;
+          await end();
+          if (refused.length !== 1 || editor !== original) throw new Error(`a refused restored send lost the notice from the composer: ${JSON.stringify(editor)}`);
+          await until(() => refused.length === 3 && notices.some(({ m }) => m.includes("wake not delivered")), "refused restored sends did not end in the operator warning");
+          await sleep(600);
+          await end();
+          await sleep(300);
+          if (refused.length !== 3 || prompts().length !== 0 || editor !== original || notices.filter(({ m }) => m.includes("wake not delivered")).length !== 1) throw new Error(`refused restored sends were not bounded to three attempts and one warning: ${JSON.stringify({ refused: refused.length, notices })}`);
         } else if (scenario === "stuck-restored-failure") {
           // Escape returns the queued notice to the composer beside a draft.
           editor = `${failed()[0].m}\n\n${draft}`;
@@ -2752,7 +2770,7 @@ if (scenario === "external") {
           await until(() => failed().length === 2, "a failure notice stuck in omp's idle queue was never sent through the prompt flow");
           if (failed()[1].m !== failed()[0].m || failed()[1].o?.deliverAs !== undefined || queued || notices.length || sets) throw new Error("the stuck failure notice was not resent as emitted");
         }
-        if (scenario !== "stuck-restored-failure-no-turn") {
+        if (!["stuck-restored-failure-no-turn", "stuck-restored-failure-refused"].includes(scenario)) {
           await end();
           await sleep(600);
           if (failed().length !== 2 * records.length || wakes().length !== (scenario === "stuck-restored-failure-held" ? 2 : 1)) throw new Error("a delivered failure notice was sent again");
@@ -2929,7 +2947,7 @@ EOF
 
 test_watch_extension_queue_read_delivery() {
   local scenario out status
-  for scenario in drained owed consumed release-consume mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued stuck-watcher stuck-restored stuck-new-row stuck-drained stuck-failure stuck-restored-failure stuck-restored-failures stuck-restored-failures-turn stuck-restored-failure-held stuck-restored-failure-no-turn stuck-episodes stranded-owed stranded-unmarked stranded-drained stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-tracked; do
+  for scenario in drained owed consumed release-consume mixed same-close handoff late-handoff external host-drained host-owed advisor-tail advisor-tail-draft outstanding-end dropped removed edited failure timeout slow slow-pending slow-turn slow-turn-new-row query-close unreadable utf8 restore-alone restore-after restore-before restore-edited restore-queued restore-busy restore-new-row restore-drained restore-end-owed restore-end-drained restore-end-new-row restore-end-queued stuck-watcher stuck-restored stuck-new-row stuck-drained stuck-failure stuck-restored-failure stuck-restored-failures stuck-restored-failures-turn stuck-restored-failure-held stuck-restored-failure-no-turn stuck-restored-failure-refused stuck-episodes stranded-owed stranded-unmarked stranded-drained stranded-draft-after stranded-draft-before stranded-two stranded-human stranded-busy stranded-settling stranded-bounded stranded-tracked; do
     out=$(run_watch_queue_read_scenario "$scenario")
     status=$?
     expect_code 0 "$status" "omp queue-read scenario $scenario: $out"

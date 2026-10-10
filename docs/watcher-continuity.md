@@ -132,11 +132,12 @@ A restored failure notice names no queued row, so it is removed and resent as em
 One check sends at most one restored or stuck-queue prompt, and `agent_end` runs that same check once; it keeps no send flag.
 A prompt that was resent but is not yet consumed, and whose copy is no longer in the composer, counts as in flight. The check waits for it the same way it waits for queued messages, up to thirty further checks, before it sends another restored copy.
 That wait never blocks a held watcher wake: a restored prompt that starts no turn still lets the held wake go out, and the three-attempt retry and single warning below still run.
+Each restored prompt counts toward the same three-attempt bound before it is sent. If omp throws on the send, the copy is put back in the composer for the next check; after the third refused send the check warns once through omp's own notification and leaves the copy there.
 Turn-end release retains unconsumed emitted text until an idle editor check can remove an unchanged template before the next queue-read delivery. Pending vendor messages keep that unconsumed watcher serialized until they clear or the bounded wait below ends; a consumed watcher has no token or pending mark to release at turn end.
 While omp is idle and still reports queued messages with a wake unconsumed, the flush check waits for them to drain into a run, for up to thirty further one-second checks, rather than skipping for good.
 The wait count and once-per-episode warning belong to the session generation.
 A replacement starts with both cleared; accepted user `message_start` and `agent_end` clear both even when a whole turn runs between checks.
-A flush check or [composer poll](#omp-stranded-wake-text) that observes a running turn or an empty queue also clears both for the next episode.
+A flush check that sees no queued messages and no resent prompt in flight, or a [composer poll](#omp-stranded-wake-text) that observes a running turn or an empty queue, also clears both for the next episode.
 A queue that is still full once omp has stayed idle through that wait is stuck, because omp's follow-up gate refused to start a turn for it.
 An unchanged tracked wake sitting in the composer is then removed as above.
 If none is there, the check takes the oldest unconsumed wake with attempts remaining, without altering the editor: a watcher wake becomes a pending mark again, so the same queue-read boundary builds fresh text from current owed rows and sends nothing when none are owed; an operational hand-back is sent again; a failure notice, which names no queued row, is resent as emitted.
