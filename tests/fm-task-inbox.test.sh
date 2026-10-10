@@ -90,12 +90,14 @@ case "${1:-}" in
       if [ -n "${FM_RING_MARKS_RETRY:-}" ]; then
         printf '%s\n' "${FM_RING_MARKS_RETRY##*/}" > "${FM_RING_MARKS_RETRY%/*}/.retry-ring"
       fi
+    else
+      printf '%s\n' "${1:-}" >> "${FM_SEND_KEY_LOG:-/dev/null}"
     fi
     exit 0 ;;
   display-message)
     for a in "$@"; do
       case "$a" in
-        *cursor_y*) printf '1\n'; exit 0 ;;
+        *cursor_y*) printf '%s\n' "${FM_FAKE_TMUX_CURSOR_Y:-1}"; exit 0 ;;
         *pane_current_command*) [ -z "${FM_FAKE_TMUX_AGENT:-}" ] || { printf '%s\n' "$FM_FAKE_TMUX_AGENT"; exit 0; } ;;
         *pane_tty*) [ -z "${FM_FAKE_TMUX_AGENT:-}" ] || { printf '\n'; exit 0; } ;;
       esac
@@ -669,10 +671,16 @@ test_watcher_rerings_idle_pane_quietly() {
   local dir state out log pid rec
   dir=$(setup_watch_case rering)
   state="$dir/state"; out="$dir/watch.out"; log="$dir/send.log"; : > "$log"
+  printf 'unrecognized idle prompt\n' > "$dir/unknown.capture"
+  [ "$(PATH="$dir/fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$dir/unknown.capture" \
+    bash -c '. "$1"; fm_backend_composer_state tmux sess:fm-t1 fm-t1' \
+      _ "$ROOT/bin/fm-backend.sh")" = unknown ] \
+    || fail "the ordinary idle fixture must reach the real classifier's unknown verdict"
   rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue")
   age_path "$rec"
   watch_bg "$state" "$dir/fakebin" "$out" \
-    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$(idle_capture "$dir")" \
+    FM_SEND_LOG="$log" FM_FAKE_TMUX_CAPTURE="$dir/unknown.capture" \
+    FM_FAKE_TMUX_AGENT=claude \
     FM_TASK_INBOX_RING_MAX=99
   pid=$!
   local i=0
@@ -695,7 +703,51 @@ test_watcher_rerings_idle_pane_quietly() {
   sleep 2.5
   kill "$pid" 2>/dev/null; wait "$pid" 2>/dev/null
   [ ! -s "$log" ] || fail "the watcher kept ringing after the ack:"$'\n'"$(cat "$log")"
-  pass "watcher: an unhandled aged message on an idle pane re-rings without waking firstmate, and the ack silences it"
+  pass "watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it"
+}
+
+test_watcher_defers_ring_for_unknown_draft() {
+  local dir state out log keys pid rec rung rings epoch
+  dir=$(setup_watch_case "unknown-draft${1:+-native}")
+  state="$dir/state"; out="$dir/watch.out"; log="$dir/send.log"; keys="$dir/keys.log"
+  : > "$log"; : > "$keys"
+  fm_write_meta "$state/t1.meta" "window=sess:fm-t1" "kind=ship" "harness=claude"
+  "$ROOT/bin/fm-busy-event.sh" arm "$state" t1 >/dev/null \
+    || fail "could not arm the draft-risk task's busy contract"
+  "$ROOT/bin/fm-busy-event.sh" apply "$state" t1 idle --current-gen \
+    --source claude-hook --event stop >/dev/null \
+    || fail "could not mark the draft-risk task exactly idle"
+  printf '%s\n' "${1:-$'────────\n❯ preface\n ❯ nested draft\n────────'}" > "$dir/draft.capture"
+  cp "$dir/draft.capture" "$dir/draft-before"
+  [ "$(PATH="$dir/fakebin:$PATH" FM_FAKE_TMUX_CAPTURE="$dir/draft.capture" FM_FAKE_TMUX_CURSOR_Y=2 \
+    FM_FAKE_TMUX_AGENT=claude bash -c '. "$1"; fm_backend_composer_state tmux sess:fm-t1 fm-t1' \
+      _ "$ROOT/bin/fm-backend.sh")" = unknown-draft ] \
+    || fail "the draft-risk fixture must reach the real classifier's unknown-draft verdict"
+  rec=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "please continue after your draft")
+  age_path "$rec"
+  watch_bg "$state" "$dir/fakebin" "$out" \
+    FM_SEND_LOG="$log" FM_SEND_KEY_LOG="$keys" \
+    FM_FAKE_TMUX_CAPTURE="$dir/draft.capture" FM_FAKE_TMUX_CURSOR_Y=2 \
+    FM_FAKE_TMUX_AGENT=claude FM_TASK_INBOX_RING_MAX=1
+  pid=$!
+  wait_watcher_gone "$pid" \
+    || { kill "$pid" 2>/dev/null; fail "the watcher never escalated the deferred draft-risk attempt"; }
+  [ -s "$state/t1.inbox/.ring-state" ] || fail "draft risk bypassed the deferred ring ladder"
+  IFS=$'\t' read -r rung rings epoch < "$state/t1.inbox/.ring-state"
+  [ "$rung" = 001.msg ] && [ "$rings" = 1 ] \
+    || { kill "$pid" 2>/dev/null; fail "the deferred ring did not consume exactly one ladder attempt"; }
+  wait "$pid" 2>/dev/null || true
+  [ ! -s "$log" ] || fail "the watcher typed a doorbell into draft risk: $(cat "$log")"
+  [ ! -s "$keys" ] || fail "the watcher sent a key into draft risk: $(cat "$keys")"
+  [ -f "$rec" ] || fail "deferring the ring lost the durable steer"
+  [ "$(grep -cF 'unread firstmate instruction' "$state/.wake-queue" 2>/dev/null || true)" = 1 ] \
+    || fail "the protected draft-risk attempt did not produce exactly one parent escalation"
+  grep -qF "$rec" "$state/.wake-queue" || fail "the parent escalation omitted the durable record"
+  grep -qF 'stale:' "$out" || fail "draft risk did not escalate through the existing stale-wake path"
+  [ "$(inbox_lib "$state" fm_task_inbox_due_action "$state" t1)" = quiet ] \
+    || fail "an already escalated draft-risk record remained due"
+  cmp -s "$dir/draft-before" "$dir/draft.capture" || fail "the existing nested draft changed"
+  pass "watcher: a live idle task with draft risk defers without input, retains its record, and escalates once at the ladder budget"
 }
 
 # A fresh process for each check proves the busy budget survives watcher restarts.
@@ -1197,6 +1249,8 @@ test_fire_and_forget_retry_is_owed_once
 test_fire_and_forget_retry_is_quiet_without_the_flag
 test_ring_ladder_policy
 test_watcher_rerings_idle_pane_quietly
+test_watcher_defers_ring_for_unknown_draft
+test_watcher_defers_ring_for_unknown_draft $'────────\n╭── π > model > path ─╮\n│ typed draft │\n╰─  ─╯\n────────'
 test_watcher_waits_on_busy_pane
 test_watcher_busy_budget_resets_on_ring_and_ack
 test_watcher_busy_bookkeeping_failure_surfaces

@@ -38,7 +38,7 @@ Prerequisites:
 - Herdr protocol 14 or newer, installed from [herdr.dev](https://herdr.dev).
 - `jq` for JSON responses.
 - The universal harness and toolchain requirements in [`configuration.md`](configuration.md#toolchain).
-- `python3` only for optional protocol-16 presentation-space ordering and native event subscription.
+- `python3` for kernel-backed process-environment ownership proof, and for optional protocol-16 presentation-space ordering and native event subscription.
 
 Herdr is dual-licensed AGPL-3.0-or-later or commercial.
 Firstmate invokes its CLI as a separate process.
@@ -425,7 +425,7 @@ That presentation lock lives in a namespace private to the OS account, so anothe
 A namespace at this account's name that another account owns, or that is not mode 700, is still refused and is never adopted, chowned, or removed.
 
 A same-identity version 2 binding may replace one exact agent-free restart husk in place.
-A husk is a restored same-labeled tab with a missing pane or no registered agent, as [Restart and liveness behavior](#restart-and-liveness-behavior) describes.
+The [restart and liveness contract](#restart-and-liveness-behavior) owns husk proof; registration absence alone is not enough.
 The replacement is allowed only when all of these agree:
 
 - The physical home.
@@ -637,7 +637,8 @@ That comparison ignores whitespace and U+2063, the invisible mark that starts op
 It ignores U+2063 because Claude's Herdr read-back never shows it.
 
 Other harnesses, and panes with no native identity, skip this proof and keep the type-then-Enter path.
-Their pre-Enter typed-payload proof has not been live-verified; composer classification evidence is recorded separately in the [Composer classification matrix](verification/runtime-backends.md#composer-classification-matrix).
+Only Claude has this live-verified payload and paste-placeholder proof; recognizing another harness's composer does not establish payload ownership.
+Composer classification evidence is recorded separately in the [Composer classification matrix](verification/runtime-backends.md#composer-classification-matrix).
 
 ### Submit confirmation
 
@@ -651,6 +652,7 @@ On an idle or done native baseline, submit confirmation proceeds in this order:
 2. If native status stays idle, or identity is ineligible for native-transition-only proof, use the shared composer verdict as the next positive signal.
    A cleared composer is delivery; pending and unproven pending text without a recognized blocking dialog receive a fresh composer read before another Enter is allowed.
    If the initial or refreshed composer reads unknown, every positively identified non-omp harness receives another native confirmation window against the same idle baseline, without sending another Enter; omp and missing or unavailable identity remain fail-closed.
+   An identified draft-risk verdict returns unconfirmed without another Enter; the [send header](../bin/fm-send.sh) owns the typed-plane response to that result.
 3. After the retry budget, `fm_composer_queued_enter_verdict` accepts retained proven pending text only for positively identified OpenCode with native `working`, whose Enter queue semantics are verified.
    omp, Claude, unknown harnesses, and idle or unreadable busy signals remain pending; a different active turn is not delivery proof.
 
@@ -702,23 +704,17 @@ A human-blocked permission dialog has no busy banner and still surfaces.
 
 Herdr has no direct cursor-row primitive.
 The adapter is a thin capture.
-It hands the visible pane's ANSI viewport plus Herdr's capability facts to the fleet-wide classifier in `bin/fm-composer-lib.sh`, which owns every shape:
-
-- Bordered boxes.
-- omp's rounded box, with its status in the top border and its last input row folded into the bottom border.
-  The status opens with omp's identity glyph while idle and with a spinner frame plus the elapsed time while a turn runs, so a working lane's composer reads `empty` or `pending` like an idle one.
-  [Watcher continuity](watcher-continuity.md#omp-restored-wake-recovery) owns omp editor recovery and its known limits; [architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary.
-- Bare agent-glyph rows, including muse's `⟩`, which the adapter's retired local pattern silently omitted.
-- opencode's left bar.
-- The Pi separator region this adapter pioneered, admitted only when native `agent get` identity is exactly Pi and state is idle or done.
-- Claude's prompt-proven rule pair, with a plain or session-titled top rule and a plain closing rule.
+It hands the visible pane's ANSI viewport plus Herdr's capability facts to the fleet-wide classifier, whose [shape catalogue](../bin/fm-composer-lib.sh) owns supported containers and their proof requirements.
+omp's rounded box carries its status in the top border: its identity glyph while idle, and a spinner frame plus the elapsed time while a turn runs, so a working lane's composer reads `empty` or `pending` like an idle one.
+[Watcher continuity](watcher-continuity.md#omp-restored-wake-recovery) owns omp editor recovery and its known limits; [architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary.
 
 ### Pi composer states
 
 A blocked Pi is parked on an interactive prompt, so its blank composer region is a menu's and not a free composer's.
 That state defers instead of proving emptiness.
-A working Pi, pending middle row, missing identity, incomplete separator pair, or over-tall candidate remains unknown or pending.
 Identity stays a lazy read, consulted only when a separator pair or a composer row the two ghost ceilings strip differently could change the verdict.
+
+The [shared classifier](../bin/fm-composer-lib.sh) owns literal draft containment, including omp-looking floors inside Pi input; [runtime verification](verification/runtime-backends.md#bare-native-omp-restoration-and-managed-recovery) records the regression evidence.
 
 ### Placeholder and ghost text
 
@@ -729,15 +725,12 @@ For the Herdr-specific exception, see [Claude composer proof](#claude-composer-p
 omp's box has no prompt glyph, so typed `>`, `❯`, and `─` remain draft text and read `pending`, not `empty`.
 Its last-row `⇧⇥ to change thinking effort` hint proves emptiness only when styling distinguishes the dim hint from typed text.
 A plain capture of those exact bytes stays `unknown` and preserves them during content extraction; a bright typed copy stays `pending` even in a styled capture.
-The verified shape and live exit/relaunch refresh command are recorded in [omp box composer through Herdr](verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr).
+The verified shape and current native-launch refusal guard are recorded in [omp box composer through Herdr](verification/runtime-backends.md#2026-10-06-omp-box-composer-through-herdr).
 
 If the ANSI capture ever fails, the plain fallback declares itself unstyled.
 Unpaired bare agent-glyph rows and left-bar rows carrying trailing non-idle text then degrade to `unknown` instead of misreading ghost suggestions as typed input.
 That refusal defers injection and eventually raises the wedge alarm.
-A proven prompt-bearing rule pair instead retains its entire interior: any nonblank content surviving the capture's styling policy and removal of the single proving prompt glyph reads `pending`, even in a plain capture.
-Complete pasted containers, literal side characters, later prompt glyphs, and Braille remain draft content rather than nested-composer or animation furniture.
-Rendered rule pairs may be indented, provided the opening and closing rules have the same indentation.
-Ambiguous rule continuations and unsafe geometry still refuse proof; exact selection and refusal predicates are owned by `bin/fm-composer-lib.sh`.
+The [shared classifier's rule-pair contract](../bin/fm-composer-lib.sh) owns interior content, literal draft containment, indentation, and ambiguity refusal.
 The captured Claude shape, focused regression pointers, and live lifecycle refresh command are recorded in [Claude titled top border through Herdr](verification/runtime-backends.md#2026-10-06-claude-titled-top-border-through-herdr).
 
 ### Away-mode injection
@@ -759,12 +752,23 @@ No Herdr-specific copy of that protocol exists.
 
 ### Husks after a server restart
 
-Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids.
-The underlying harness processes and live agent registrations do not survive.
-A restored same-labeled tab with a missing pane or no registered agent is a husk.
+Stopping and restarting a named Herdr server preserves workspace, tab, pane, and label ids, but terminates the original harness processes.
+When a viewer attaches, Herdr's default `session.resume_agents_on_restore=true` can launch new processes from recorded native session references.
+Those bare resume commands do not reproduce Firstmate's launch configuration, model and effort flags, permission posture, or extensions.
+A restored same-labeled tab with a missing pane or a positively shell-only unregistered pane is a husk; a live native-resumed agent is not, even if `agent get` returns `agent_not_found`.
 
 Create replaces only a confidently dead or no-agent husk, creates the replacement before closing the old tab, and refuses live or unknown states.
 This prevents closing the workspace's last tab before a replacement exists.
+
+### Ownership after native restoration
+
+Firstmate leaves Herdr's global auto-resume configuration unchanged.
+Disabling `session.resume_agents_on_restore` would also disable restoration of unrelated agents in the same Herdr installation, outside the current home's recorded fleet.
+The supported 0.9.x interface has no verified per-pane switch or custom resume-argv registration; Herdr documents custom resume commands as a 0.10.0 addition ([upstream support contract](https://raw.githubusercontent.com/herdrdev/herdr/v0.9.3/docs/next/website/src/content/docs/add-herdr-support.mdx)).
+Changing a user's global configuration is therefore not the scoped repair.
+
+The [agent-control attribution contract](agent-control.md#live-herdr-task-attribution) owns live lifecycle authority, including omp's extension-recorded current-session proof; bare native restores remain unmanaged and inspection-only.
+The [runtime verification record](verification/runtime-backends.md) owns captured composer evidence and the current native-restoration preservation guard.
 
 ### Stale agent registrations
 
@@ -773,15 +777,15 @@ Herdr keeps a Pi registration after the Pi process has exited to a plain shell, 
 In that case `agent get` still reports `agent=pi` with its last status.
 That nested shell is the crew shape `treehouse get` leaves behind (measured on Herdr 0.9.0 - [verification](verification/runtime-backends.md) "Stale agent registration"; upstream issue #4115).
 
-So before a registered agent counts as live, the pane classifier reads `pane process-info` and the real process table.
+The pane classifier reads `pane process-info` and the real process table whether registration is present or absent.
 It uses the shared harness-process classifier in `bin/fm-agent-process-lib.sh`, the same rule the tmux adapter proves liveness with:
 
-| What the process view shows | Verdict |
-| --- | --- |
-| A harness in the foreground process group, or still a descendant of the pane shell | The registration stays live. |
-| A foreground that is nothing but shells, with no harness descendant | A `stale-agent` pane: agent-free, with that explicit reason. |
-| A foreground holding anything else | The registration stays live, but only after the same bounded settle window the idle-shell proof uses. |
-| An unreadable process view | The pane is `unknown`, trusting neither the registration nor its absence. |
+| What the process view shows | Registered agent | `agent_not_found` |
+| --- | --- | --- |
+| A harness in the foreground process group, or still a descendant of the pane shell | `live` | `live` |
+| A foreground that is nothing but shells, with no harness descendant | `stale-agent`: agent-free, with that explicit reason | `no-agent`: a proven agent-free shell |
+| A foreground holding anything else after the bounded settle window | `live`: registration retains authority | `unknown`: registration absence does not identify the process |
+| An unreadable, malformed, or mismatched process view | `unknown` | `unknown` |
 
 The settle window exists because an idle shell transiently hosts prompt helpers such as starship in its foreground group.
 The first agent or shell sample in that window decides.
@@ -805,7 +809,7 @@ The generic Herdr agent-liveness probe reuses that pane classifier, then applies
 | --- | --- |
 | A structurally gone pane, or a pane read from a session positively reported as having no running server | `missing` |
 | A restored agent-less shell, or a stale registration over a shell-only pane | `dead` |
-| A registered agent with a live process | `alive` |
+| A verified live harness, registered or not, or a registered agent backed by a non-shell process | `alive` |
 | Every other unexpected read | `unreadable` |
 
 Neither the stopped-server exception nor the stale-registration verdict widens husk detection or any close authority.
@@ -813,7 +817,7 @@ Those paths still refuse an unreadable pane.
 A `stale-agent` pane is reused by recovery, never closed as a husk, because the shell it holds may be a nested worktree shell.
 
 Native registration still identifies Pi by name where tmux would see a generic interpreter.
-The process-level proof only decides whether that registration is backed by a running process.
+The process-level proof decides liveness independently of registration absence; absence alone never licenses closing, relaunching, or recovery.
 `tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh` pins the live-Pi versus leftover-shell distinction.
 [`verification/runtime-backends.md`](verification/runtime-backends.md#agent-lifecycle-control) owns the versioned evidence.
 
@@ -918,6 +922,12 @@ The helper:
 
 Immediately before every destructive call it re-queries the named session and refuses empty, missing, literal `default`, or `default:true` identities.
 Its before/after tripwire requires the live default-session snapshot to remain byte-identical.
+
+Fixtures must successfully `prepare` a fresh name before claiming cleanup authority, and must call `teardown` only after that claim succeeds.
+`provision` accepts the prepared tripwire after checking it against the current default-session snapshot.
+A refused claim leaves existing running or stopped sessions and their tripwires untouched.
+The [reboot live fixture](../tests/fm-omp-reboot-live-e2e.test.sh) owns its dependency-preserving cleanup order: private resources remain until guarded teardown succeeds and native child exit is confirmed.
+The [runtime verification record](verification/runtime-backends.md#current-native-restoration-guard) owns its refresh commands.
 
 The helper's header and `--help` own exact commands.
 Tests use thin compatibility wrappers in `tests/herdr-test-safety.sh` and never duplicate the destructive policy.

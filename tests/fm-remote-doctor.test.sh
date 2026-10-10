@@ -5,7 +5,7 @@
 # a private HOME, a fake launchctl backed by state files, a fake herdr CLI, a
 # fake lsof that names a real holder process as the fm-remote socket owner, and
 # a fake uname that selects the platform under test. The holders are real
-# non-platform processes (jq blocked on a fifo) whose environment carries the
+# non-platform processes (Python blocked on a fifo) whose environment carries the
 # birth markers bin/fm-remote-herdr-owner-lib.sh reads, so the Aqua-versus-SSH
 # verdict is exercised for real. Nothing here touches the runner's own launch
 # agents, login session, or herdr server.
@@ -35,16 +35,17 @@ TOOLS="$TMP_ROOT/tools"
 mkdir -p "$TOOLS"
 ln -sf "$(command -v git)" "$TOOLS/git"
 ln -sf "$(command -v jq)" "$TOOLS/jq"
+ln -sf "$(command -v python3)" "$TOOLS/python3"
 BASE_PATH="$TOOLS:/usr/bin:/bin:/usr/sbin:/sbin"
 
-# Real socket-owner holders for the Darwin birth check: jq blocked on a fifo
+# Real socket-owner holders for the Darwin birth check: Python blocked on a fifo
 # this test keeps open, with exactly the marker environment each birth needs.
-JQ=$(command -v jq)
+PYTHON=$(command -v python3)
 HOLDER_FD=5
 hold() { # <marker-env...> -> HOLDER_PID
   local fifo="$TMP_ROOT/holder-$HOLDER_FD.fifo"
   mkfifo "$fifo"
-  env -i "$@" "$JQ" . "$fifo" &
+  env -i "$@" "$PYTHON" -c 'import sys; open(sys.argv[1], "rb").read()' "$fifo" &
   HOLDER_PID=$!
   HOLDER_PIDS+=("$HOLDER_PID")
   eval "exec ${HOLDER_FD}>\"\$fifo\""
@@ -76,6 +77,7 @@ new_case() {
   unset CASE_SECOND_LOGIN_SHELL
   unset CASE_ENV_SHELL
   unset CASE_RESOLVE_DSCL
+  unset CASE_LAUNCH_PATH
   CASE_N=$((CASE_N + 1))
   CASE_LOGIN_SHELL=${4:-/bin/sh}
   CASE_DIR="$TMP_ROOT/case$CASE_N"
@@ -123,7 +125,10 @@ case "${1:-}" in
         printf 'interactive default job\n'
         ;;
       */*/*) [ -f "$loaded" ] || exit 113; cat "$loaded" ;;
-      *) [ -f "$FM_FAKE_STATE/gui-session" ] || exit 113 ;;
+      *)
+        [ -f "$FM_FAKE_STATE/gui-session" ] || exit 113
+        printf 'environment = {\n\tPATH => %s\n}\n' "$FM_FAKE_LAUNCH_PATH"
+        ;;
     esac
     exit 0
     ;;
@@ -301,10 +306,11 @@ doctor() {
   DOCTOR_OUT=$(
     HOME="$CASE_HOME" \
     FM_HOME="$CASE_PROJECT_HOME" \
-    PATH="$CASE_HOME/.local/bin:$CASE_BIN:$BASE_PATH" \
+    PATH="$CASE_HOME/.local/bin:$CASE_BIN:${CASE_BASE_PATH:-$BASE_PATH}" \
     FM_FAKE_STATE="$CASE_STATE" \
     FM_FAKE_LAUNCHCTL_LOG="$CASE_LAUNCHCTL_LOG" \
     FM_FAKE_FORBIDDEN_LOG="$CASE_FORBIDDEN_LOG" \
+    FM_FAKE_LAUNCH_PATH="${CASE_LAUNCH_PATH:-$BASE_PATH}" \
     FM_FAKE_HERDR_RUNNING="$CASE_HERDR_RUNNING" \
     FM_FAKE_HERDR_BIN="$CASE_BIN/herdr" \
     FM_FAKE_HERDR_SOCKET="$CASE_STATE/herdr.sock" \
@@ -617,6 +623,122 @@ expect_code 0 "$DOCTOR_RC" "the Aqua-owner fixture could not be initialized"
 assert_contains "$DOCTOR_OUT" "check herdr-server=ok: session fm-remote is running in the Aqua login session (pid $AQUA_HOLDER_PID, launchd)" \
   "a launchd-born owner was not reported with its pid and birth"
 
+NO_PYTHON_TOOLS="$TMP_ROOT/no-python-tools"
+mkdir -p "$NO_PYTHON_TOOLS"
+for tool in bash sh id cat sed awk grep tr dirname basename readlink ps head tail sort cut wc date find mkdir chmod mv rm ln env git jq; do
+  real=$(command -v "$tool") || fail "test host lacks $tool"
+  ln -sf "$real" "$NO_PYTHON_TOOLS/$tool"
+done
+CASE_BASE_PATH=$NO_PYTHON_TOOLS
+: > "$CASE_LAUNCHCTL_LOG"
+doctor
+expect_code 1 "$DOCTOR_RC" "a missing Python prerequisite was reported ready"
+assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=human: python3 prerequisite' "the prerequisite was not named"
+assert_not_contains "$DOCTOR_OUT" 'check herdr-server=fixable:' "missing Python was misdiagnosed as server repair"
+doctor --fix
+expect_code 1 "$DOCTOR_RC" "--fix accepted missing Python"
+assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "missing Python caused server repair"
+assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" bootout "missing Python unloaded the launch agent"
+assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" bootstrap "missing Python reloaded the launch agent"
+assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" kickstart "missing Python restarted the launch agent"
+unset CASE_BASE_PATH
+doctor
+expect_code 0 "$DOCTOR_RC" "restoring Python did not restore Aqua ownership proof"
+pass "missing Python is a prerequisite rather than a server repair"
+
+for repair_state in absent drift scope loaded unloaded stopped foreign ready; do
+  new_case Darwin with-herdr gui
+  CASE_LOGIN_SHELL="$CASE_DIR/login-shell"
+  CASE_LAUNCH_PATH=$NO_PYTHON_TOOLS
+  printf '%s\n' "$TOOLS:$NO_PYTHON_TOOLS" > "$CASE_DIR/login-path"
+  cat > "$CASE_LOGIN_SHELL" <<SH
+#!/bin/sh
+[ "\$1" = -l ] && [ "\$2" = -c ] || exit 90
+[ "\$PATH" = '$NO_PYTHON_TOOLS' ] || exit 91
+[ -z "\${FM_REMOTE_JOB_ACTIVE-}" ] || exit 92
+PATH=\$(/bin/cat '$CASE_DIR/login-path')
+export PATH
+exec /bin/sh -c "\$3"
+SH
+  chmod +x "$CASE_LOGIN_SHELL"
+  doctor --fix
+  expect_code 0 "$DOCTOR_RC" "login-shell Python did not permit the launch-agent repair"
+  assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=ok:' "login-shell Python was not accepted"
+  case "$repair_state" in
+    absent) rm -f "$CASE_PLIST" "$CASE_STATE/loaded-$LABEL" ;;
+    drift) printf 'stale plist\n' > "$CASE_PLIST" ;;
+    scope)
+      cat > "$CASE_PLIST" <<XML
+<plist version="1.0"><dict><key>LimitLoadToSessionType</key><string>Background</string></dict></plist>
+XML
+      ;;
+    loaded) write_loaded_contract /obsolete/bin/herdr ;;
+    unloaded) rm -f "$CASE_STATE/loaded-$LABEL" ;;
+    stopped) printf 'false\n' > "$CASE_HERDR_RUNNING" ;;
+    foreign) printf '%s\n' "$SSH_HOLDER_PID" > "$CASE_STATE/socket-owner" ;;
+  esac
+  if [ -f "$CASE_PLIST" ]; then
+    cp "$CASE_PLIST" "$CASE_STATE/plist-before"
+  fi
+  if [ -f "$CASE_STATE/loaded-$LABEL" ]; then
+    cp "$CASE_STATE/loaded-$LABEL" "$CASE_STATE/loaded-before"
+  fi
+  printf '%s\n' "$NO_PYTHON_TOOLS" > "$CASE_DIR/login-path"
+  : > "$CASE_LAUNCHCTL_LOG"
+  doctor
+  expect_code 1 "$DOCTOR_RC" "$repair_state accepted doctor-only Python"
+  assert_contains "$DOCTOR_OUT" 'required python3=' "doctor Python was not reported"
+  assert_not_contains "$DOCTOR_OUT" 'required python3=MISSING' "the fixture removed doctor Python"
+  assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=human: python3 prerequisite does not execute in the Aqua launch-agent login-shell environment' \
+    "$repair_state did not diagnose the login-shell prerequisite"
+  doctor --fix
+  expect_code 1 "$DOCTOR_RC" "$repair_state --fix accepted doctor-only Python"
+  assert_not_contains "$DOCTOR_OUT" 'fix launchagent' "$repair_state attempted launch-agent repair"
+  assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "$repair_state attempted server repair"
+  for operation in bootout bootstrap kickstart; do
+    assert_not_contains "$(cat "$CASE_LAUNCHCTL_LOG")" "$operation" "$repair_state attempted $operation"
+  done
+  if [ -f "$CASE_STATE/plist-before" ]; then
+    cmp -s "$CASE_STATE/plist-before" "$CASE_PLIST" || fail "$repair_state replaced the plist"
+  else
+    assert_absent "$CASE_PLIST" "$repair_state installed a plist without launch Python"
+  fi
+  if [ -f "$CASE_STATE/loaded-before" ]; then
+    cmp -s "$CASE_STATE/loaded-before" "$CASE_STATE/loaded-$LABEL" || fail "$repair_state changed the loaded job"
+  else
+    assert_absent "$CASE_STATE/loaded-$LABEL" "$repair_state loaded a job without launch Python"
+  fi
+  printf '%s\n' "$TOOLS:$NO_PYTHON_TOOLS" > "$CASE_DIR/login-path"
+  doctor --fix
+  expect_code 0 "$DOCTOR_RC" "$repair_state did not recover with login-shell Python"
+done
+pass "launch-agent Python gates plist, loaded-job, and server repairs independently of doctor Python"
+
+new_case Darwin with-herdr gui
+doctor --fix
+expect_code 0 "$DOCTOR_RC" "the ownership fixture could not be restored after launch-shell cases"
+
+READINESS_BIN="$TMP_ROOT/readiness-bin"
+mkdir -p "$READINESS_BIN"
+cat > "$READINESS_BIN/fm-on.sh" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_TEST_READINESS_LOG"
+printf '%s\n' 'check herdr-owner-reader=human: python3 prerequisite does not run on the runtime PATH'
+exit 1
+SH
+chmod +x "$READINESS_BIN/fm-on.sh"
+export FM_TEST_READINESS_LOG="$TMP_ROOT/readiness-calls"
+. "$ROOT/bin/fm-remote-readiness-lib.sh"
+set +e
+fm_remote_readiness_ensure "$READINESS_BIN" fixture
+READINESS_RC=$?
+set -e
+expect_code 1 "$READINESS_RC" "readiness accepted the missing prerequisite"
+assert_contains "$FM_REMOTE_READINESS_OUT" 'check herdr-owner-reader=human:' "readiness lost the prerequisite diagnosis"
+[ "$(wc -l < "$FM_TEST_READINESS_LOG" | tr -d ' ')" = 1 ] || fail "readiness retried a missing Python prerequisite"
+assert_not_contains "$(cat "$FM_TEST_READINESS_LOG")" --fix "readiness attempted disruptive prerequisite repair"
+pass "readiness does not enter a missing-Python repair loop"
+
 printf '%s\n' "$BACKGROUND_HOLDER_PID" > "$CASE_STATE/socket-owner"
 printf 'background job\n' > "$CASE_STATE/user-loaded-$LABEL"
 doctor
@@ -706,7 +828,8 @@ pass "a bash Directory Services login shell is rendered with -l -c"
 new_case Darwin with-herdr gui
 CASE_LOGIN_SHELL="$CASE_DIR/My Shell/fish&dev"
 mkdir -p "$(dirname "$CASE_LOGIN_SHELL")"
-printf '#!/bin/sh\nexit 0\n' > "$CASE_LOGIN_SHELL"
+# shellcheck disable=SC2016 # The login-shell stub expands its own "$3".
+printf '#!/bin/sh\nexec /bin/sh -c "$3"\n' > "$CASE_LOGIN_SHELL"
 chmod +x "$CASE_LOGIN_SHELL"
 CASE_RESOLVE_DSCL=1
 doctor --fix
@@ -778,6 +901,56 @@ assert_contains "$DOCTOR_OUT" 'fix herdr-server=applied:' "--fix did not report 
 assert_contains "$DOCTOR_OUT" 'check herdr-server=ok:' "the started server was not confirmed by the re-check"
 [ ! -s "$CASE_LAUNCHCTL_LOG" ] || fail "the linux path invoked launchctl"
 pass "a non-darwin host skips launch agents and starts its herdr server directly"
+
+for running in true false; do
+  new_case Linux with-herdr no-gui
+  printf '%s\n' "$running" > "$CASE_HERDR_RUNNING"
+  CASE_BASE_PATH=$NO_PYTHON_TOOLS
+  doctor
+  expect_code 1 "$DOCTOR_RC" "linux accepted a $running server without Python"
+  assert_contains "$DOCTOR_OUT" 'required python3=MISSING' "linux did not report Python as required"
+  assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=human: python3 prerequisite' "linux did not name the reader prerequisite"
+  assert_contains "$DOCTOR_OUT" 'check herdr-server=human:' "linux admitted a server without the ownership reader"
+  assert_not_contains "$DOCTOR_OUT" 'check herdr-server=fixable:' "linux treated missing Python as server repair"
+  doctor --fix
+  expect_code 1 "$DOCTOR_RC" "linux repair accepted a $running server without Python"
+  assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "linux repaired a server without Python"
+  [ "$(cat "$CASE_HERDR_RUNNING")" = "$running" ] || fail "linux repair changed server state without Python"
+  [ ! -s "$CASE_LAUNCHCTL_LOG" ] || fail "linux missing-Python repair invoked launchctl"
+  unset CASE_BASE_PATH
+  doctor --fix
+  expect_code 0 "$DOCTOR_RC" "restoring Python did not restore linux readiness"
+  assert_contains "$DOCTOR_OUT" 'required python3=' "restored Python was not reported"
+  assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=ok:' "restored linux reader was not confirmed"
+  assert_contains "$DOCTOR_OUT" 'check herdr-server=ok:' "restored linux server was not admitted"
+  if [ "$running" = false ]; then
+    assert_contains "$DOCTOR_OUT" 'fix herdr-server=applied:' "restored Python did not permit linux server startup"
+  else
+    assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "restored Python restarted a running linux server"
+  fi
+  [ ! -s "$CASE_LAUNCHCTL_LOG" ] || fail "restored linux path invoked launchctl"
+done
+pass "linux requires Python before admitting or repairing running and stopped servers"
+
+BROKEN_PYTHON_TOOLS="$TMP_ROOT/broken-python-tools"
+mkdir -p "$BROKEN_PYTHON_TOOLS"
+cp -P "$NO_PYTHON_TOOLS"/* "$BROKEN_PYTHON_TOOLS"/
+printf '#!/bin/sh\necho "xcrun: error: invalid active developer path" >&2\nexit 1\n' > "$BROKEN_PYTHON_TOOLS/python3"
+chmod +x "$BROKEN_PYTHON_TOOLS/python3"
+new_case Linux with-herdr no-gui
+printf 'true\n' > "$CASE_HERDR_RUNNING"
+CASE_BASE_PATH=$BROKEN_PYTHON_TOOLS
+doctor
+expect_code 1 "$DOCTOR_RC" "linux accepted a running server with a python3 that cannot run"
+assert_contains "$DOCTOR_OUT" "required python3=$BROKEN_PYTHON_TOOLS/python3" "the fixture did not present a resolving python3"
+assert_contains "$DOCTOR_OUT" 'check herdr-owner-reader=human: python3 prerequisite does not run' "a python3 that cannot run was accepted as the reader"
+assert_contains "$DOCTOR_OUT" 'check herdr-server=human:' "linux admitted a server with a python3 that cannot run"
+doctor --fix
+expect_code 1 "$DOCTOR_RC" "linux repair accepted a python3 that cannot run"
+assert_not_contains "$DOCTOR_OUT" 'fix herdr-server=' "linux repaired a server with a python3 that cannot run"
+[ "$(cat "$CASE_HERDR_RUNNING")" = true ] || fail "a python3 that cannot run let linux repair change server state"
+unset CASE_BASE_PATH
+pass "a python3 that resolves but cannot run is a reader prerequisite gap"
 
 # --- --fix may add only owned wrappers for version-manager tools -------------
 
@@ -851,6 +1024,8 @@ assert_contains "$DOCTOR_OUT" 'fix remote-job-worker=applied:' "--fix did not re
 assert_contains "$DOCTOR_OUT" 'check remote-job-worker=ok:' "the refreshed worker was not confirmed ready"
 assert_contains "$DOCTOR_OUT" 'check remote-job-probe=ok: the remote job worker completed the required-tool probe' \
   "doctor did not probe tools through the refreshed worker"
+assert_contains "$DOCTOR_OUT" 'required python3=' "the actual worker probe omitted its Python fact"
+assert_not_contains "$DOCTOR_OUT" 'required python3=MISSING' "the actual worker did not resolve Python"
 DOCTOR_WORKER_PID=$(cat "$CASE_HOME/.firstmate/remote-job/worker.pid")
 kill -TERM "$DOCTOR_WORKER_PID"
 for _ in $(seq 1 100); do

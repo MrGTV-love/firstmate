@@ -39,6 +39,10 @@ cleanup() {
     kill "$watch_pid" 2>/dev/null || true
     wait "$watch_pid" 2>/dev/null || true
   fi
+  if [ -n "${pane_shell_pid:-}" ]; then
+    kill "$pane_shell_pid" 2>/dev/null || true
+    wait "$pane_shell_pid" 2>/dev/null || true
+  fi
   # The liveness-lock holder is otherwise stopped only by an inline kill.
   if [ -n "${liveness_holder_pid:-}" ]; then
     kill "$liveness_holder_pid" 2>/dev/null || true
@@ -1299,27 +1303,41 @@ assert_contains "$UPDATE_OUT" 'synced:' "remote update did not report a host-loc
 assert_present "$REMOTE_HOME/REMOTE_UPDATE_PROBE" "remote update did not materialize the code-root commit"
 pass "remote update imports and fast-forwards the persistent home on its configured host"
 
-# The remote restart verb is not a second implementation: its host-local leg runs
-# the ORDINARY control plane against a record that is plain and local on that
-# host. These two refusals can only come from that plane's own pre-stop
-# capability tables, and they leave the live agent exactly as it was - which is
-# the whole safety property of asking before anything is stopped.
-RELAUNCH_UNVERIFIED=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
-  relaunch ios notaharness - - 2>&1) && fail "an unverified runtime should refuse a remote restart"
-assert_contains "$RELAUNCH_UNVERIFIED" 'unverified remote secondmate harness' \
+# The remote restart verb delegates to the ordinary host-local control plane.
+# Both an unverified replacement and an unaccountable checkout must refuse
+# without lifecycle input. A synthetic native PID also lacks launch attribution,
+# so the live-owner gate may refuse before the checkout gate.
+restart_writes_before=$(grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true)
+restart_state_before=$(jq -c '{tabs,typed}' "$HERDR_STATE")
+if remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
+  relaunch ios notaharness - - > "$TMP_ROOT/relaunch-unverified.out" 2>&1; then
+  fail "an unverified runtime should refuse a remote restart"
+fi
+assert_contains "$(cat "$TMP_ROOT/relaunch-unverified.out")" 'unverified remote secondmate harness' \
   "the remote restart verb did not refuse an unverified runtime"
 RELAUNCH_ROUTE_META="$REMOTE_HOME/state/parent-route/ios.meta"
 cp "$RELAUNCH_ROUTE_META" "$TMP_ROOT/ios-before-relaunch.meta"
 mkdir -p "$TMP_ROOT/not-a-checkout"
 sed "s|^worktree=.*|worktree=$TMP_ROOT/not-a-checkout|" \
   "$TMP_ROOT/ios-before-relaunch.meta" > "$RELAUNCH_ROUTE_META"
-RELAUNCH_CHECKPOINT=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
-  relaunch ios codex - - 2>&1) && fail "a restart with no accountable checkout should refuse"
-assert_contains "$RELAUNCH_CHECKPOINT" 'refusing to relaunch without a checkout whose unlanded work can be accounted for' \
-  "the host-local restart did not reach the control plane's own pre-stop checkpoint"
+cp "$RELAUNCH_ROUTE_META" "$TMP_ROOT/ios-unaccountable.meta"
+if remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh \
+  relaunch ios codex - - > "$TMP_ROOT/relaunch-checkpoint.out" 2>&1; then
+  fail "a restart with no accountable checkout should refuse"
+fi
+grep -Eq 'cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint|refusing to relaunch without a checkout whose unlanded work can be accounted for' \
+  "$TMP_ROOT/relaunch-checkpoint.out" \
+  || fail "the host-local restart did not refuse in the control plane's own pre-stop gates: $(cat "$TMP_ROOT/relaunch-checkpoint.out")"
+cmp -s "$TMP_ROOT/ios-unaccountable.meta" "$RELAUNCH_ROUTE_META" \
+  || fail "a refused remote restart changed its route metadata"
 cp "$TMP_ROOT/ios-before-relaunch.meta" "$RELAUNCH_ROUTE_META"
 [ "$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh state ios)" = alive ] \
   || fail "a refused remote restart must leave the running agent untouched"
+[ "$(grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true)" = "$restart_writes_before" ] \
+  || fail "a refused remote restart sent lifecycle input"
+[ "$(jq -c '{tabs,typed}' "$HERDR_STATE")" = "$restart_state_before" ] \
+  || fail "a refused remote restart changed its endpoint"
+assert_absent "$REMOTE_HOME/state/parent-route/ios.control-relaunch" "a refused remote restart started a relaunch transaction"
 pass "the remote restart verb delegates to the host-local control plane and refuses before stopping anything"
 
 
@@ -1360,12 +1378,15 @@ cp "$PARENT/state/ios.meta" "$WATCH_STATE/ios.meta"
 cp "$PARENT/state/.remote-inherit-ios.generation" "$WATCH_STATE/" 2>/dev/null || true
 touch "$WATCH_STATE/home-summary.json"
 
-# A graceful agent exit leaves the pane with no registered agent - the exact
-# incident this tick exists for.
+# A graceful agent exit leaves the pane with no registered agent and only its
+# shell running - the exact incident this tick exists for. The shell is a real,
+# childless, bounded process so the process view can prove the pane agent-free.
 ios_pane=$(sed -n 's/^herdr_pane_id=//p' "$remote_route_meta")
 [ -n "$ios_pane" ] || fail "the remote route meta did not record its Herdr pane"
-jq --arg p "$ios_pane" \
-  '.typed |= with_entries(select(.key != $p)) | .working |= with_entries(select(.key != $p))' \
+sleep "$((FM_TEST_STUB_MAX_BLOCK_SECONDS * 5))" &
+pane_shell_pid=$!
+jq --arg p "$ios_pane" --argjson shell "$pane_shell_pid" \
+  '.typed |= with_entries(select(.key != $p)) | .working |= with_entries(select(.key != $p)) | .shell_pid = $shell' \
   "$HERDR_STATE" > "$TMP_ROOT/herdr-dead.json" && mv "$TMP_ROOT/herdr-dead.json" "$HERDR_STATE"
 [ "$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh state ios)" = dead ] \
   || fail "the agent-free remote pane did not classify dead"
@@ -1417,6 +1438,9 @@ assert_grep '- ios ' "$PARENT/data/secondmates.md" \
 # parent state out of scope, so fold both records back now.
 cp "$WATCH_STATE/ios.meta" "$PARENT/state/ios.meta"
 cp "$WATCH_STATE/.remote-inherit-ios.generation" "$PARENT/state/" 2>/dev/null || true
+kill "$pane_shell_pid" 2>/dev/null || true
+wait "$pane_shell_pid" 2>/dev/null || true
+pane_shell_pid=''
 pass "watch liveness: a dead remote secondmate is auto-relaunched on its own host with one wake"
 
 # Host loss mid-supervision is never evidence of death: the same tick on an

@@ -9,6 +9,14 @@
 #                                         [--effort <level>] [--claude-debug]
 #                                         [--reconcile-only] [--worktree <path>]
 #                                         (--note <text> | --note-file <path>)
+#        fm-control.sh <task-id> relaunch --recover-launch
+# --recover-launch is Herdr-only inspection under the control lock.
+# Managed and stopped agents are left untouched. Unmanaged live agents are
+# reported without lifecycle input; native restoration does not prove ownership.
+# Unknown proof on a versioned launch refuses. A legacy record (no launch_proof)
+# keeps exit and relaunch: an unpinned legacy omp is reported as such, and other
+# legacy-unproven launches skip.
+# This mode cannot change a profile or create a relaunch transaction.
 # --claude-debug is relaunch-only and off by default.
 # It is passed through to fm-spawn and refused unless the replacement harness is claude.
 # It turns on Claude's --debug log and its diagnostics file state/<id>.claude-diagnostics.jsonl, which names the signal of the next stop.
@@ -301,6 +309,7 @@ RECONCILE_ONLY=0
 RELOCATE_TO=
 RELOCATE_SET=0
 control_want_value=
+RECOVER_LAUNCH=0
 for control_arg in "$@"; do
   if [ -n "$control_want_value" ]; then
     case "$control_arg" in
@@ -339,6 +348,7 @@ for control_arg in "$@"; do
       NOTE_SET=1
       ;;
     --claude-debug) CLAUDE_DEBUG=1 ;;
+    --recover-launch) RECOVER_LAUNCH=1 ;;
     --reconcile-only) RECONCILE_ONLY=1 ;;
     *) die "unexpected argument '$control_arg'" ;;
   esac
@@ -349,8 +359,12 @@ if [ -n "$control_want_value" ]; then
 fi
 
 if [ "$VERB" != relaunch ]; then
+  [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
+    || die "--harness, --model, --effort, --note, --claude-debug, --recover-launch, --reconcile-only, and --worktree apply to 'relaunch' only"
+fi
+if [ "$RECOVER_LAUNCH" = 1 ]; then
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$NOTE_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] && [ "$RELOCATE_SET" = 0 ] \
-    || die "--harness, --model, --effort, --note, --claude-debug, --reconcile-only, and --worktree apply to 'relaunch' only"
+    || die "--recover-launch only inspects the recorded launch; it cannot be combined with replacement options, --reconcile-only, or --worktree"
 fi
 [ "$RELOCATE_SET" = 0 ] || [ -n "$RELOCATE_TO" ] || die "--worktree requires a value"
 
@@ -470,6 +484,12 @@ fm_control_harness_supported "$HARNESS" \
 
 fm_backend_validate "$BACKEND" || exit 1
 
+if [ "$BACKEND" = herdr ]; then
+  # shellcheck source=bin/fm-launch-proof-lib.sh
+  . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
+  fm_backend_source herdr || die "could not load Herdr lifecycle control"
+fi
+
 # --- shared helpers ---------------------------------------------------------
 
 agent_state() {
@@ -480,8 +500,24 @@ busy_verdict() {
   fm_busy_classify_meta "$META" "$ID" "$STATE"
 }
 
-# wait_agent_state <wanted...> <timeout>: poll until agent_state prints one of
-# the wanted values. Prints the final observed state; returns 0 on a match.
+require_live_task_attribution() {
+  local state=${1:-} absence
+  [ "$BACKEND" = herdr ] || return 0
+  [ -n "$state" ] || state=$(agent_state)
+  if [ "$state" = missing ]; then
+    absence=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T")
+    state=${absence%%$'\t'*}
+  fi
+  case "$state" in
+    dead|gone) return 0 ;;
+    alive) ;;
+    *) return 1 ;;
+  esac
+  fm_launch_proof_herdr_authorizes "$META"
+}
+
+# wait_agent_state <timeout> <wanted...>: poll until a wanted state is proven.
+# Herdr's alive postcondition also requires the managed launch incarnation.
 wait_agent_state() {  # <timeout> <wanted>...
   local timeout=$1 state want elapsed=0
   shift
@@ -489,6 +525,10 @@ wait_agent_state() {  # <timeout> <wanted>...
     state=$(agent_state)
     for want in "$@"; do
       if [ "$state" = "$want" ]; then
+        if [ "$want" = alive ] && [ "$BACKEND" = herdr ] \
+          && ! fm_launch_proof_herdr_authorizes "$META"; then
+          continue
+        fi
         printf '%s' "$state"
         return 0
       fi
@@ -666,6 +706,8 @@ verify_interrupt_running() {
 
 do_interrupt() {
   local proof cancel
+  require_live_task_attribution alive \
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
   cancel=$(deliver_interrupt) || return $?
   proof=$(verify_interrupt_running) || return $?
   printf '%s cancel=%s' "$proof" "$cancel"
@@ -781,6 +823,8 @@ do_exit() {
       ;;
     *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send a lifecycle command into an unattributed endpoint" ;;
   esac
+  require_live_task_attribution alive \
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
   # A busy agent is interrupted first before the exit command is submitted.
   case "$(busy_verdict)" in
     busy*)
@@ -1094,6 +1138,9 @@ resolve_relaunch_profile() {
   # transaction, where nothing has changed yet.
   fm_control_harness_supports_kind "$TARGET_HARNESS" "$KIND" \
     || die "'$TARGET_HARNESS' is not verified to run a $KIND task, so relaunching $ID onto it would stop the running agent for a launch that must be refused; choose an adapter verified for this kind"
+  if [ "$TARGET_HARNESS" = omp ]; then
+    fm_control_omp_launch_check || return 1
+  fi
   # A model or effort chosen for the previous harness does not transfer to a
   # different one, so an explicit harness change resets both axes unless the
   # caller names them too.
@@ -1280,6 +1327,35 @@ do_relaunch() {
   local -a spawn_args
 
   require_state_verified_backend relaunch
+  if [ "$RECOVER_LAUNCH" = 1 ]; then
+    [ "$BACKEND" = herdr ] || die "--recover-launch is supported only for recorded Herdr endpoints"
+    state=$(agent_state)
+    case "$state" in
+      dead|missing) echo "recovery-skipped $ID agent=$state"; return 0 ;;
+      alive) ;;
+      *) die "launch recovery for $ID cannot attribute its endpoint (agent=$state)" ;;
+    esac
+    state=$(fm_launch_proof_herdr "$META")
+    case "$state" in
+      managed) echo "recovery-skipped $ID launch=managed"; return 0 ;;
+      unmanaged)
+        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+          echo "recovery-skipped $ID launch=legacy record; exit and relaunch are allowed"
+          return 0
+        fi
+        echo "recovery-skipped $ID launch=unmanaged; no lifecycle action taken"
+        return 0
+        ;;
+      unknown)
+        if [ -z "$(fm_meta_get "$META" launch_proof)" ]; then
+          echo "recovery-skipped $ID launch=legacy-unproven"
+          return 0
+        fi
+        die "launch recovery for $ID cannot prove its live launch settings; no lifecycle action taken"
+        ;;
+      *) die "invalid launch proof for $ID: $state" ;;
+    esac
+  fi
   resolve_relaunch_profile
   if [ "$CLAUDE_DEBUG" = 1 ] && [ "$TARGET_HARNESS" != claude ]; then
     die "--claude-debug applies only to a claude relaunch; $ID would be replaced on $TARGET_HARNESS"
@@ -1334,6 +1410,11 @@ do_relaunch() {
       *) die "reconciliation-only recovery requires a proven exited owner (endpoint reads $state)" ;;
     esac
   fi
+  # Admission refusals above name the task's own state; only then does an
+  # unattributable live Herdr agent stop an ordinary relaunch, still before any
+  # checkpoint or lifecycle input.
+  require_live_task_attribution \
+    || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
   safe_checkpoint
   if [ "$KIND" = secondmate ]; then
     secondmate_home=$(fm_meta_get "$META" home)
@@ -1391,6 +1472,11 @@ do_relaunch() {
       T=$FM_BACKEND_VALIDATED_TARGET
       BACKEND=$FM_BACKEND_VALIDATED_BACKEND
       WT=$(fm_meta_get "$META" worktree)
+      if [ "$BACKEND" = herdr ] && ! declare -F fm_launch_proof_herdr >/dev/null 2>&1; then
+        # shellcheck source=bin/fm-launch-proof-lib.sh
+        . "$SCRIPT_DIR/fm-launch-proof-lib.sh"
+        fm_backend_source herdr || die "could not load Herdr lifecycle control"
+      fi
     else
       die "the replacement agent for $ID was launched, but task $ID's republished record no longer passes endpoint validation (the refusal above names the row), so this transaction cannot say which endpoint to confirm it on; reconcile $META before any further control action"
     fi
@@ -1403,6 +1489,9 @@ do_relaunch() {
   fi
 
   state=$(wait_agent_state "$LAUNCH_WAIT" alive) || {
+    if [ "$BACKEND" = herdr ] && [ "$state" = alive ]; then
+      die "the replacement agent for $ID is running but its managed launch incarnation could not be proven within ${LAUNCH_WAIT}s"
+    fi
     die "the replacement agent for $ID did not come up within ${LAUNCH_WAIT}s (endpoint reads '$state')"
   }
   RELAUNCH_AGENT_CONFIRMED=1

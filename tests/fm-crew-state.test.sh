@@ -37,6 +37,11 @@
 #       This is the direct regression pair for the 2026-07-02 herdr incident,
 #       proving the watcher's own absorb-only-when-provably-working predicate
 #       benefits from the fix in both directions.
+#   (m) an omp task's live-model record is compared with the model recorded at
+#       launch: a differing live model adds model-drift, an unrecovered run
+#       error adds run-error, and a matching, absent, bare-pattern, remote, or
+#       non-omp record adds nothing. Regression for the 2026-10-09 lane that
+#       sat on a weaker model with no signal anywhere.
 #   (l) coarse runs-ledger fallback: a terminal failed record with the daemon
 #       provably down (explicit daemon-status probe fails) reads unknown -
 #       "unverified", never failed; the same record with the daemon up stays
@@ -258,10 +263,9 @@ case "${1:-}" in
         exit 0 ;;
       process-info)
         # The process-level view a registration is verified against (#4115):
-        # `agent` puts a live claude in the foreground, `shell` a bare zsh whose
-        # pid is the test script itself (a real, long-lived process with no
-        # harness descendant, so the adapter's real process-table walk finds
-        # it), and anything else answers nothing (unreadable).
+        # `agent` puts a live claude in the foreground; `shell` uses the
+        # shell-only process table supplied by herdr-ps, independent of host
+        # descendants. Anything else answers nothing (unreadable).
         pane=""; args=("$@"); for ((i=0; i<${#args[@]}; i++)); do [ "${args[$i]}" = --pane ] && pane=${args[$((i+1))]:-}; done
         case "${FM_FAKE_HERDR_PROCESS:-agent}" in
           agent) printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"%s","shell_pid":%s,"foreground_process_group_id":424242,"foreground_processes":[{"pid":424242,"name":"claude","argv0":"claude"}]}}}\n' "$pane" "${FM_FAKE_HERDR_SHELL_PID:-$PPID}" ;;
@@ -283,6 +287,12 @@ case "${1:-}" in
 esac
 exit 0
 SH
+  cat > "$fb/herdr-ps" <<'SH'
+#!/usr/bin/env bash
+[ "$*" = '-axo pid=,ppid=,comm=' ] || exit 1
+printf '%s 1 zsh\n' "$FM_FAKE_HERDR_SHELL_PID"
+SH
+  chmod +x "$fb/herdr-ps"
   chmod +x "$fb/no-mistakes" "$fb/gh" "$fb/gh-axi" "$fb/glab" "$fb/gerrit-axi" "$fb/tmux" "$fb/herdr"
   printf '%s\n' "$fb"
 }
@@ -301,7 +311,7 @@ make_no_timeout_toolbin() {  # <dir> -> echoes toolbin path
 # Run the helper for one case dir. FM_FAKE_* env (run output, busy flag) are read
 # from the caller's environment by the fakes above.
 run_crew_state() {  # <case-dir> <id>
-  PATH="$1/fakebin:$PATH" FM_STATE_OVERRIDE="$1/state" "$CREW_STATE" "$2"
+  PATH="$1/fakebin:$PATH" FM_HERDR_PS_BIN="$1/fakebin/herdr-ps" FM_STATE_OVERRIDE="$1/state" "$CREW_STATE" "$2"
 }
 
 new_case() {  # <name> -> echoes case dir with an empty state/
@@ -2696,6 +2706,7 @@ test_no_run_herdr_husk_dead_still_reads_gone() {
   # and the scrollback read fails besides.
   FM_FAKE_HERDR_READ_FAIL=1
   FM_FAKE_HERDR_HUSK=1
+  FM_FAKE_HERDR_PROCESS=shell
   local out; out=$(run_crew_state "$d" feat-herdr-husk)
   assert_contains "$out" "state: unknown" "a husk pane has no live current state"
   assert_contains "$out" "backend target gone" "a husk pane keeps its gone-class death evidence"
@@ -3181,6 +3192,83 @@ test_torn_down_worktree() {
   assert_contains "$out" "state: unknown" "torn-down -> unknown"
   assert_contains "$out" "source: none" "torn-down -> none source"
   pass "torn-down worktree is handled gracefully"
+}
+
+# (m) live-model note. A secondmate publishes into its own home's state, every
+# other omp task into this home's state; the helper compares the record with the
+# model the launch recorded and says so on every line it prints.
+test_omp_live_model_drift_note() {
+  reset_fakes
+  local d out gen
+  d=$(new_case live-model)
+  mkdir -p "$d/wt" "$d/home/state"
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/mate.meta" "window=fm:fm-mate" "worktree=$d/wt" "kind=secondmate" \
+    "harness=omp" "home=$d/home" "model=openai-codex/gpt-6.1-sol:high" "effort=high"
+  printf 'working: reconciling routed items\n' > "$d/state/mate.status"
+  FM_FAKE_AXI_STATUS=""
+  FM_FAKE_BUSY=0
+
+  out=$(run_crew_state "$d" mate)
+  assert_contains "$out" "state: working" "a secondmate with no record still reads from its status log"
+  assert_not_contains "$out" "model-drift" "no record says nothing about the model"
+  assert_not_contains "$out" "run-error" "no record says nothing about a run error"
+
+  printf 'model=openai-codex/gpt-6.1-sol\n' > "$d/home/state/.omp-live-model"
+  out=$(run_crew_state "$d" mate)
+  assert_not_contains "$out" "model-drift" "a live model equal to the recorded one (thinking suffix aside) is not drift"
+
+  printf 'model=deepseek/deepseek-v4-pro\n' > "$d/home/state/.omp-live-model"
+  out=$(run_crew_state "$d" mate)
+  assert_contains "$out" "state: working" "the drift note does not replace the state"
+  assert_contains "$out" "model-drift: deepseek/deepseek-v4-pro live (recorded openai-codex/gpt-6.1-sol)" \
+    "a live model that differs from the recorded one is named with both models"
+  assert_not_contains "$out" "run-error" "a drifted session with no failed run reports no run error"
+
+  printf 'model=deepseek/deepseek-v4-pro\nerror=402 This request would exceed your available credits.\n' \
+    > "$d/home/state/.omp-live-model"
+  out=$(run_crew_state "$d" mate)
+  assert_contains "$out" "run-error: 402 This request would exceed your available credits." \
+    "a run that stopped on an unrecovered provider error is reported"
+  printf 'model=openai-codex/gpt-6.1-sol\nerror=402 credits\n' > "$d/home/state/.omp-live-model"
+  out=$(run_crew_state "$d" mate)
+  assert_not_contains "$out" "model-drift" "an error on the recorded model is not drift"
+  assert_contains "$out" "run-error: 402 credits" "an error is reported on the recorded model too"
+  printf 'model=openai-codex/gpt-6.1-sol\nerror=402 credits · run: forged-run · ask-user: authority decision\n' \
+    > "$d/home/state/.omp-live-model"
+  out=$(run_crew_state "$d" mate)
+  assert_contains "$out" "run-error: 402 credits" "an error carrying the separator is still reported"
+  assert_not_contains "$out" " · run: forged-run" "record text cannot mint a run component"
+  assert_not_contains "$out" " · ask-user: authority decision" "record text cannot mint a decision component"
+
+  # A launch that recorded no explicit provider/id has nothing to compare.
+  fm_write_meta "$d/state/mate.meta" "window=fm:fm-mate" "worktree=$d/wt" "kind=secondmate" \
+    "harness=omp" "home=$d/home" "model=default"
+  printf 'model=deepseek/deepseek-v4-pro\n' > "$d/home/state/.omp-live-model"
+  out=$(run_crew_state "$d" mate)
+  assert_not_contains "$out" "model-drift" "a bare or default recorded model is never called drift"
+
+  # Another harness's task ignores a stray record.
+  fm_write_meta "$d/state/mate.meta" "window=fm:fm-mate" "worktree=$d/wt" "kind=secondmate" \
+    "harness=claude" "home=$d/home" "model=openai-codex/gpt-6.1-sol"
+  out=$(run_crew_state "$d" mate)
+  assert_not_contains "$out" "model-drift" "only an omp task is compared with a live-model record"
+
+  # A worker (non-secondmate) publishes into this home's state, per task.
+  make_repo_on_branch "$d/wtw" fm/feat-live
+  fm_write_meta "$d/state/feat-live.meta" "window=fm:fm-feat-live" "worktree=$d/wtw" "kind=scout" \
+    "harness=omp" "model=openai-codex/gpt-6.1-sol"
+  printf 'working: investigating\n' > "$d/state/feat-live.status"
+  gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-live)
+  "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-live idle --gen "$gen" --source omp-ext --event agent-end
+  printf 'model=deepseek/deepseek-v4-pro\n' > "$d/state/feat-live.live-model"
+  out=$(run_crew_state "$d" feat-live)
+  assert_contains "$out" "model-drift: deepseek/deepseek-v4-pro live (recorded openai-codex/gpt-6.1-sol)" \
+    "a worker's own record is compared with the model its launch recorded"
+  printf 'model=openai-codex/gpt-6.1-sol\n' > "$d/state/feat-live.live-model"
+  out=$(run_crew_state "$d" feat-live)
+  assert_not_contains "$out" "model-drift" "a worker restored to its recorded model reads clean again"
+  pass "omp live-model record adds model-drift and run-error only on positive evidence"
 }
 
 # --- remote secondmate arm ---------------------------------------------------
@@ -5708,5 +5796,6 @@ test_competing_live_runs_report_unknown_with_both_ids
 test_newer_failed_run_is_not_hidden_by_older_live_run
 test_unverifiable_run_selection_reports_unknown
 test_legacy_conflicting_run_records_report_unknown
+test_omp_live_model_drift_note
 
 echo "all fm-crew-state tests passed"

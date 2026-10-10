@@ -538,6 +538,7 @@ test_indexed_native_catalog_guards_use_the_shared_boundary() {
       cat > "$FAKEBIN/$executable" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in
+  --version) printf '%s\n' '18.1.20' ;;
   --list-models|models)
     printf '%s\n' "\$*" >> '$CASE/native-catalogs'
     case '$harness' in
@@ -576,6 +577,7 @@ test_nonentry_literals_keep_the_native_catalog_guards() {
     cat > "$FAKEBIN/$executable" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in
+  --version) printf '%s\n' '18.1.20' ;;
   --list-models|models)
     printf '%s\n' "\$*" >> '$CASE/native-catalogs'
     case '$harness' in

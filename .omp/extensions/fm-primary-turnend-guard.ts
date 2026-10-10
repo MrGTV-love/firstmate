@@ -37,6 +37,7 @@ import {
   classifyFirstmateCurrentOperationalText,
   encodeFirstmateOperationalInput,
 } from "../../.pi/extensions/lib/fm-operational-input.ts";
+import { installLiveModelPublisher } from "../../bin/fm-omp-live-model.ts";
 
 // The omp extension API surface this file uses, declared locally: omp ships no
 // separately installable type package and is a Pi fork whose event names match
@@ -544,6 +545,13 @@ export default function (pi: ExtensionAPI) {
     sessionstartExitListenerRegistered = false;
   };
   registerSessionstartExitListener();
+
+  // The model serving this home's session now, for the parent's
+  // bin/fm-crew-state.sh drift note. Only the lock owner publishes, so a
+  // descendant omp (an `omp -p` child of a turn) never overwrites the record.
+  if (pi.on) {
+    installLiveModelPublisher(pi, `${state}/.omp-live-model`, () => existsSync(state) && lockOwnership() !== "other");
+  }
 
   pi.on?.("session_start", (_event, ctx) => {
     sessionStarts += 1;

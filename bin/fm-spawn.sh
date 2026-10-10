@@ -265,7 +265,14 @@
 #   .omp/fm-session-overlay.yml through --config. That overlay pins composer
 #   shape, plan mode off, prewalk off, and the non-interactive usage-reserve
 #   policy for the one session only (--auto-approve alone owns approval,
-#   forcing tools.approvalMode: yolo for the session).
+#   forcing tools.approvalMode: yolo for the session). It also empties the Sol
+#   model's fallback chain, so a failing Sol run stops and reports through the
+#   live-model record instead of moving to a weaker model, and it pins omp's own
+#   return to the recorded model once the primary serves again.
+#   Each session publishes the model it is serving through
+#   bin/fm-omp-live-model.ts (a crewmate or scout from its per-task extension, a
+#   secondmate from the home's tracked extension), and bin/fm-crew-state.sh
+#   reports a differing model or an unrecovered run error beside the state.
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
 #   Secondmate lanes keep their memory settings; the captain's own
@@ -399,6 +406,9 @@
 #   prevents equal task ids in different Firstmate homes from sharing a file.
 #   Spawn refuses an unsafe pre-existing task temp root or launch namespace, and
 #   task teardown removes only the current home's launch namespace.
+# Herdr launches record launch_proof=env-v1 and stamp FM_SPAWN_GEN with
+# spawn_gen inside the launch boundary. bin/fm-launch-proof-lib.sh owns live
+# lifecycle attribution; Herdr's bare native resume remains unmanaged.
 # Launch environment (config/launch-env-allowlist):
 #   Absent leaves ambient inheritance subject to harness-specific shedding.
 #   A present readable regular file opts every launch (ship, scout, secondmate,
@@ -1808,6 +1818,7 @@ clear_relaunch_harness_wiring() {
   done <<EOF
 $(fm_control_harness_wiring_paths "$harness" "$wt" "$state" "$id")
 EOF
+  rm -f -- "$state/$id.reboot-notice"
 }
 
 spawn_herdr_presentation_order_lock_release() {
@@ -2963,6 +2974,7 @@ omp)
     echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
     exit 1
   }
+  fm_control_omp_launch_check "$OMP_BIN" || exit 1
   OMP_SESSION_CFG="$FM_ROOT/.omp/fm-session-overlay.yml"
   OMP_WORKER_CFG="$FM_ROOT/.omp/fm-worker-overlay.yml"
   [ -f "$OMP_SESSION_CFG" ] || {
@@ -5522,6 +5534,7 @@ EOF
     guard_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guard_config" --arg state "$STATE_REAL" \
       --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" --arg project "$guard_project" \
       '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project}') || exit 1
+    rm -f "$STATE/$ID.live-model"
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
 // Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
@@ -5536,6 +5549,8 @@ EOF
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installJevGuard } from "$FM_ROOT/bin/fm-jev-guard.ts";
+import { installTaskSessionProof } from "$FM_ROOT/.omp/extensions/lib/fm-task-session.ts";
+import { installLiveModelPublisher } from "$FM_ROOT/bin/fm-omp-live-model.ts";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -5545,6 +5560,9 @@ const busyEvent = (state: string, event: string) =>
   });
 export default function (pi: any) {
   installJevGuard(pi, $guard_context);
+  installTaskSessionProof(pi, "$STATE_REAL", "$ID");
+  // The model serving this task now, for bin/fm-crew-state.sh's drift note.
+  installLiveModelPublisher(pi, "$STATE_REAL/$ID.live-model");
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;
@@ -5763,7 +5781,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5794,6 +5812,7 @@ preserve_relaunch_meta() {
   [ "$ALLOW_API_KEY" -eq 0 ] || echo "api_key=allow"
   [ -z "${BUSY_GEN:-}" ] || echo "busy_gen=$BUSY_GEN"
   echo "spawn_gen=$SPAWN_GEN"
+  [ "$BACKEND" != herdr ] || echo "launch_proof=env-v1"
   # Default-off writes no traceparent= line.
   # backend= is written only for a non-default (non-tmux) backend, so the
   # default path's meta stays byte-identical (absent backend= means tmux;
@@ -6096,6 +6115,7 @@ if [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
   LAUNCH="$tc_env $LAUNCH"
 fi
 if [ "$KIND" = secondmate ]; then
+  [ "$HARNESS" != omp ] || rm -f "$PROJ_ABS/state/.omp-live-model"
   sq_home=$(shell_quote "$PROJ_ABS")
   sq_primary_home=$(shell_quote "$FM_HOME")
   # Keep this in step with fm_supervision_model (bin/fm-wake-lib.sh).
@@ -6165,6 +6185,10 @@ fi
 # launch and the launch-env-allowlist `env -i` wrapper.
 LAUNCH="export FM_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
 LAUNCH="export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH; $COMPACT_ADVISER_HOOKS$LAUNCH"
+if [ "$BACKEND" = herdr ]; then
+  LAUNCH="(export FM_SPAWN_GEN=$(shell_quote "$SPAWN_GEN"); $LAUNCH
+)"
+fi
 # When the live-harness gate has exported DISABLE_AUTOUPDATER into this spawn's
 # own environment, carry it into the launch command text so Claude Code's
 # auto-updater cannot rewrite the shared binary during a live run. Embedding the

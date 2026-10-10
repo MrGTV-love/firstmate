@@ -67,7 +67,7 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(CDPATH='' cd "$SCRIPT_DIR/.." && pwd -P)}"
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-remote-herdr-owner-lib.sh
 . "$SCRIPT_DIR/fm-remote-herdr-owner-lib.sh"
-REQUIRED_TOOLS=(git jq herdr tasks-axi treehouse)
+REQUIRED_TOOLS=(git jq herdr tasks-axi treehouse python3)
 HARNESS_TOOLS=(claude codex opencode pi pi-signed grok kimi)
 OPTIONAL_TOOLS=(tmux no-mistakes gh)
 LAUNCH_AGENT_LABEL=dev.firstmate.herdr.fm-remote
@@ -451,7 +451,7 @@ report_required_tools() {
 
 report_required_tools_from_worker() {
   local job_id probe_stdout probe_stderr probe_exit line fact name value
-  local expected=6 count=0 valid=1 seen=' '
+  local expected=$((${#REQUIRED_TOOLS[@]} + 1)) count=0 valid=1 seen=' '
   if ! job_id=$(fm_remote_job_stage "${HOME:-}" "$FM_ROOT" "${FM_HOME:-}" \
     fm-remote-doctor.sh --worker-tool-probe </dev/null); then
     set_check remote-job-probe "fixable: the remote job worker could not accept the required-tool probe" \
@@ -475,7 +475,7 @@ report_required_tools_from_worker() {
     fact=${line#required }
     name=${fact%%=*}
     value=${fact#*=}
-    case "$name" in git|jq|herdr|tasks-axi|treehouse|harness) ;; *) valid=0; continue ;; esac
+    case "$name" in git|jq|herdr|tasks-axi|treehouse|python3|harness) ;; *) valid=0; continue ;; esac
     case "$seen" in *" $name "*) valid=0; continue ;; esac
     seen="$seen$name "
     count=$((count + 1))
@@ -657,7 +657,54 @@ check_launch_agent_loaded() { # <resolved-login-shell>
     "close the login-session gap first; a launch agent can only be bootstrapped into an existing GUI session"
 }
 
+launch_agent_owner_reader_available() {
+  local shell=$1 user domain_env line name value probe
+  local -a launch_env
+  user=$(id -un 2>/dev/null) || return 1
+  launch_env=("HOME=${HOME:-}" "USER=$user" "LOGNAME=$user" "SHELL=$shell" "PATH=/usr/bin:/bin:/usr/sbin:/sbin")
+  domain_env=$(launchctl print "gui/$UID_NUM" 2>/dev/null | awk '
+    /^[[:space:]]*environment = \{$/ { inside=1; next }
+    inside && /^[[:space:]]*\}/ { exit }
+    inside {
+      sub(/^[[:space:]]*/, "")
+      if ($0 ~ /^[A-Za-z_][A-Za-z_0-9]* => /) {
+        sub(/ => /, "=")
+        print
+      }
+    }
+  ')
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    name=${line%%=*}
+    value=${line#*=}
+    launch_env+=("$name=$value")
+  done <<< "$domain_env"
+  launch_env+=("XPC_SERVICE_NAME=$LAUNCH_AGENT_LABEL")
+  probe=$(cd / && /usr/bin/env -i "${launch_env[@]}" "$shell" -l -c \
+    'command -v python3 >/dev/null 2>&1 && exec python3 -c "import sys; sys.version_info.major == 3 and print(\"firstmate-python3-ready\")"' \
+    </dev/null 2>/dev/null) || return 1
+  [ "${probe##*$'\n'}" = firstmate-python3-ready ]
+}
+
+check_herdr_owner_reader() {
+  local shell=$1
+  if ! fm_remote_herdr_owner_reader_available; then
+    record herdr-owner-reader "human: python3 prerequisite does not run on the runtime PATH" \
+      "install a working Python 3 on that account and expose python3 on the remote runtime PATH; server reload cannot repair a missing ownership reader"
+  elif [ "$PLATFORM" = darwin ] && ! launch_agent_owner_reader_available "$shell"; then
+    record herdr-owner-reader "human: python3 prerequisite does not execute in the Aqua launch-agent login-shell environment" \
+      "install Python 3 on that account and expose python3 through $shell -l -c under the GUI launchd environment; the worker-composed PATH is not inherited by the launch agent, and server reload cannot repair this prerequisite"
+  else
+    record herdr-owner-reader "ok: python3 runs on the runtime PATH"
+  fi
+}
+
 check_herdr_server() {
+  if ! check_is_ok herdr-owner-reader; then
+    record herdr-server "human: server ownership cannot be proven without the python3 prerequisite" \
+      "close the herdr-owner-reader prerequisite gap first; the current server will not be reloaded or taken over"
+    return 0
+  fi
   if ! herdr_cli_available; then
     record herdr-server "human: herdr server status cannot be read without both herdr and jq on the runtime PATH" \
       "install the missing tool reported above, then rerun this command"
@@ -727,6 +774,7 @@ run_checks() { # <resolved-login-shell>
   check_gui_session
   check_remote_job_worker
   check_launch_agent "$shell"
+  check_herdr_owner_reader "$shell"
   check_herdr_server
   check_entrypoint_link
 }
@@ -846,6 +894,7 @@ apply_fixes() { # <resolved-login-shell>
         fix_remote_job_worker || true
         ;;
       launchagent|launchagent-scope)
+        [ "$PLATFORM" != darwin ] || check_is_ok herdr-owner-reader || continue
         [ "$launch_agent_written" -eq 0 ] || continue
         launch_agent_written=1
         write_launch_agent "$shell" || continue
@@ -856,11 +905,13 @@ apply_fixes() { # <resolved-login-shell>
         reload_launch_agent launchagent-loaded || true
         ;;
       launchagent-loaded)
+        check_is_ok herdr-owner-reader || continue
         [ "$launch_agent_reloaded" -eq 0 ] || continue
         launch_agent_reloaded=1
         reload_launch_agent launchagent-loaded || true
         ;;
       herdr-server)
+        check_is_ok herdr-owner-reader || continue
         # On darwin the launch agent owns the server, so restart it through
         # launchd rather than starting a stray one outside the Aqua session. A
         # reload earlier in this same pass has already done that.
