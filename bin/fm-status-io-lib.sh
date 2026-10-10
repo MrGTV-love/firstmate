@@ -166,7 +166,7 @@ _fm_status_stat_into() {  # <file> <ident-var> <size-var> <mtime-var>
 # unchanged. Consumers distinguish a missing manifest from a failed read of an
 # existing receipt, which must never become an empty or partial successful read.
 _fm_read_file_into() {  # <file> <out-var>
-  local __fm_rf_data= __fm_rf_size LC_ALL=C
+  local __fm_rf_data='' __fm_rf_size LC_ALL=C
   _fm_status_stat_raw "$1" '' __fm_rf_size '' || return 1
   case "$__fm_rf_size" in ''|*[!0-9]*) return 1 ;; esac
   { [ "$__fm_rf_size" -eq 0 ] || IFS= read -r -d '' -n "$__fm_rf_size" __fm_rf_data; } 2>/dev/null < "$1" || return 1
