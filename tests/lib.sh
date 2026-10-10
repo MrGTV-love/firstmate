@@ -407,6 +407,17 @@ fm_test_drop_file >/dev/null
 
 export FM_OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-/usr/bin/true}
 
+# Process-event source claims are machine-wide by default, so every suite gets a
+# private claim root; a suite that needs a specific one exports it after sourcing.
+# The private root starts with the standing pile-up detector's claim held by this
+# suite's shell, so a test bootstrap sees a live owner and launches no detector
+# runner. A suite that tests the detector exports an empty claim root instead.
+FM_PROCEVENT_CLAIM_ROOT=$(fm_test_tmproot fm-procevent-claims)/claims || return 1
+export FM_PROCEVENT_CLAIM_ROOT
+(umask 077; mkdir -p "$FM_PROCEVENT_CLAIM_ROOT" \
+  && printf '%s\n%s\n%s\n%s\n' "${FM_PROCEVENT_CLAIM_ROOT%/claims}/no-detector-home" "$$" \
+    fm-test-held "$FM_TEST_OWNER_IDENTITY" > "$FM_PROCEVENT_CLAIM_ROOT/proc-guard.claim") || return 1
+
 trap fm_test_cleanup EXIT
 trap 'fm_test_cleanup; exit 130' INT
 trap 'fm_test_cleanup; exit 143' TERM

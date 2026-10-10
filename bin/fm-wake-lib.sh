@@ -1231,6 +1231,7 @@ fm_lock_try_acquire() {
   steal="$lockdir.steal"
   if ! fm_lock_try_acquire_steal_mutex "$steal"; then
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
+    [ "$(cat "$steal/pid" 2>/dev/null || true)" != "$current" ] || FM_LOCK_HELD_PID=$current
     FM_LOCK_OWNER_DIR=
     return 1
   fi
@@ -1288,6 +1289,8 @@ fm_lock_try_acquire() {
     FM_LOCK_OWNER_DIR=
   fi
   fm_lock_release "$steal"
+  [ "$rc" -eq 0 ] || [ "$(cat "$steal/pid" 2>/dev/null || true)" != "$current" ] \
+    || FM_LOCK_HELD_PID=$current
   return "$rc"
 }
 
@@ -1297,16 +1300,21 @@ fm_lock_try_acquire() {
 # Returns 1 after that parent stays absent for five seconds, because no lock can
 # be created there and retrying would leave a deleted fixture or scratch copy
 # spinning indefinitely. A parent that returns inside the grace resets the wait.
+# It also returns 1 at once when failed self-reclamation leaves this process
+# named as the holder of the lock or its steal mutex.
 # Callers must stop before entering the critical section on failure, even if the
 # parent returns afterward; set held flags only on success and release any
 # already-held sibling locks. tests/fm-wake-queue.test.sh covers the grace, and
 # tests/fm-orphan-safety.test.sh covers failure propagation with returning state.
 fm_lock_acquire_wait() {
-  local lockdir=$1 parent gone_since=
+  local lockdir=$1 parent gone_since='' current=''
   parent=${lockdir%/*}
   [ "$parent" != "$lockdir" ] || parent=.
   [ -n "$parent" ] || parent=/
   while ! fm_lock_try_acquire "$lockdir"; do
+    # Failed self-reclamation cannot make progress by waiting for ourselves.
+    [ -n "$current" ] || fm_current_pid current || return 1
+    [ "$FM_LOCK_HELD_PID" != "$current" ] || return 1
     if [ -d "$parent" ]; then
       gone_since=
     elif [ -z "$gone_since" ]; then
@@ -1323,9 +1331,11 @@ fm_lock_acquire_wait() {
 # its trap, so the wait gives up after <seconds> and leaves the ordinary
 # stale-owner evidence for the next acquirer to reclaim.
 fm_lock_acquire_wait_max() {  # <lockdir> <max-seconds>
-  local lockdir=$1 seconds=$2 deadline
+  local lockdir=$1 seconds=$2 deadline current=''
   deadline=$((SECONDS + seconds))
   while ! fm_lock_try_acquire "$lockdir"; do
+    [ -n "$current" ] || fm_current_pid current || return 1
+    [ "$FM_LOCK_HELD_PID" != "$current" ] || return 1
     [ "$SECONDS" -lt "$deadline" ] || return 1
     sleep 0.1
   done
@@ -1378,6 +1388,7 @@ fm_lock_acquire_wait_bounded() {
   fi
 
   fm_current_pid caller_pid || return 1
+  [ "$FM_LOCK_HELD_PID" != "$caller_pid" ] || return 1
   # shellcheck disable=SC2016 # Positional parameters expand in the child shell.
   if fm_run_timed "$seconds" env \
     "FM_STATE_OVERRIDE=$STATE" \

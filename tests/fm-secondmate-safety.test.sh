@@ -2585,7 +2585,7 @@ SH
   err="$TMP_ROOT/taskset-state-absent.err"
   fakebin=$(make_fake_tmux "$TMP_ROOT/taskset-state-absent-fake")
   log="$TMP_ROOT/taskset-state-absent-fake/tmux.log"
-  PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
+  env -u FM_PROCEVENT_CLAIM_ROOT PATH="$fakebin:$PATH" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" \
     FM_FAKE_TMUX_CAPTURE="$TMP_ROOT/taskset-state-absent-fake/pane.txt" \
     XDG_STATE_HOME="$TMP_ROOT/taskset-state-absent-xdg" \
     FM_TASK_SET_TEST_READY="$ready" FM_TASK_SET_TEST_RELEASE="$release" \

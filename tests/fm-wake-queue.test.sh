@@ -2758,6 +2758,71 @@ test_self_held_lock_reclaims_instead_of_deadlocking() {
   pass "an abandoned same-process lock hold is reclaimed; a parent's live hold is not"
 }
 
+test_unremovable_self_held_lock_refuses_without_waiting() {
+  local dir representation waiter rc
+  dir=$(make_case unremovable-self-held-lock)
+  for representation in symlink directory; do
+    for waiter in fm_lock_acquire_wait fm_lock_acquire_wait_max fm_lock_acquire_wait_bounded; do
+      rc=0
+      # shellcheck disable=SC2016 # The child shell owns these expansions.
+      FM_STATE_OVERRIDE="$dir/state" bash -c '
+        . "$1"
+        lock="$2/.$3-$4.lock"
+        fm_current_pid current || exit 10
+        if [ "$3" = directory ]; then
+          mkdir "$lock" && printf "%s\n" "$current" > "$lock/pid" || exit 11
+        else
+          fm_lock_try_acquire "$lock" || exit 11
+        fi
+        rm() { return 1; }
+        sleep() { exit 90; }
+        export -f sleep
+        fm_lock_release "$lock"
+        "$4" "$lock" 5
+        rc=$?
+        [ "$rc" -eq 1 ] || exit 12
+        [ "$(cat "$lock/pid")" = "$current" ] || exit 13
+        unset -f rm sleep
+        fm_lock_release "$lock"
+        [ ! -e "$lock" ] && [ ! -L "$lock" ] || exit 14
+      ' _ "$ROOT/bin/fm-wake-lib.sh" "$dir/state" "$representation" "$waiter" || rc=$?
+      [ "$rc" -eq 0 ] || fail "$waiter did not refuse an unremovable $representation self-lock (rc=$rc)"
+    done
+  done
+  pass "all lock waiters refuse an unremovable self-held lock without waiting or claiming success"
+}
+
+test_unreclaimable_dead_lock_refuses_without_waiting() {
+  local dir representation waiter rc
+  dir=$(make_case unreclaimable-dead-lock)
+  for representation in symlink directory; do
+    for waiter in fm_lock_acquire_wait fm_lock_acquire_wait_max fm_lock_acquire_wait_bounded; do
+      rc=0
+      # shellcheck disable=SC2016 # The child shell owns these expansions.
+      FM_STATE_OVERRIDE="$dir/state" bash -c '
+        . "$1"
+        lock="$2/.$3-$4.lock"
+        if [ "$3" = directory ]; then
+          mkdir "$lock" && printf "%s\n" 999999 > "$lock/pid" || exit 10
+        else
+          ( fm_lock_try_acquire "$lock" ) || exit 10
+        fi
+        dead=$(cat "$lock/pid") || exit 11
+        ! fm_pid_alive "$dead" || exit 11
+        rm() { return 1; }
+        sleep() { exit 90; }
+        export -f sleep
+        "$4" "$lock" 5
+        rc=$?
+        [ "$rc" -eq 1 ] || exit 12
+        [ "$(cat "$lock/pid")" = "$dead" ] || exit 13
+      ' _ "$ROOT/bin/fm-wake-lib.sh" "$dir/state" "$representation" "$waiter" || rc=$?
+      [ "$rc" -eq 0 ] || fail "$waiter waited on its own unreclaimable steal of a dead $representation lock (rc=$rc)"
+    done
+  done
+  pass "all lock waiters refuse a dead lock they cannot reclaim instead of waiting on their own steal mutex"
+}
+
 # A waiter whose lock directory's parent vanished (a deleted test fixture, a
 # discarded scratch copy, a returned worktree slot) can never acquire: it used to
 # spin forever at ten sleeps a second, which is how fm-wake-grant.sh and watcher
@@ -3793,6 +3858,8 @@ SH
 
 test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking
+test_unremovable_self_held_lock_refuses_without_waiting
+test_unreclaimable_dead_lock_refuses_without_waiting
 test_lock_wait_ends_when_the_lock_directory_is_gone
 test_subshell_lock_ownership_without_bashpid
 test_bounded_lock_handoff_after_contention
