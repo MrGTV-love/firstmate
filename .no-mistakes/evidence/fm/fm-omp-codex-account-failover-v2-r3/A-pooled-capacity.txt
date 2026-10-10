@@ -1,0 +1,16 @@
+$ bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/gpt-6-luna
+capacity: exhausted
+accounts[2]{status,remaining,savedResets}:
+  exhausted,0,1
+  exhausted,0,2
+
+$ bin/fm-dispatch-capacity.sh --harness omp --model openai-codex/gpt-6.1-sol --json
+{"status":"exhausted","accounts":[{"status":"exhausted","remaining":0,"savedResets":1},{"status":"exhausted","remaining":0,"savedResets":2}]}
+
+# contrast: quota-axi codex row (one account only)
+{"provider":"codex","accounts":0,"rows":[{"scope":"all_models","effectivePercentRemaining":0,"runway":"exhausted_now"}]}
+
+# lab shim makes omp usage unreadable -> must be unknown, never exhausted
+capacity: unknown
+accounts[0]{status,remaining,savedResets}:
+reason: omp usage failed or returned an invalid report

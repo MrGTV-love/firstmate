@@ -1,0 +1,46 @@
+$ fm-control.sh labfo1 relaunch --harness omp --model openai-codex/gpt-6-luna --effort medium --note ...
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SFHVFt/home
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SFHVFt/home
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+skill selection for labfo1: unavailable - no TypeSafe or OpenRouter key
+relaunched labfo1 harness=omp from=omp model=google-antigravity/gemini-3.7-flash effort=low backend=tmux endpoint=firstmate:fm-labfo1 worktree=/Users/charlesabrooker/tmp/fm-lab.SFHVFt/treehouse/.treehouse/notes-4778b1/1/notes
+exit=0
+# meta after relaunch
+harness=omp
+model=google-antigravity/gemini-3.7-flash
+effort=low
+dispatch_rule=rule_1
+# status after relaunch
+working [at=1791633691]: model-matrix fallback launched omp google-antigravity/gemini-3.5-flash for rule_1
+working [at=1791633751]: model-matrix fallback relaunched omp google-antigravity/gemini-3.7-flash for rule_1
+# overlay after relaunch
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "google-antigravity/gemini-3.7-flash": [],
+      "google-antigravity/gemini-3.7-flash:low": []
+    }
+  }
+}
+├─── Output ───────────────────────────────────────────────────────────────────┤
+│ (no output)                                                                  │
+│ ⟦Wall: 0.00s | Timeout: 300s⟧                                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ Created PROBE.txt containing lab probe ok, committed to branch fm/labfo1, and
+ reported done to firstmate status.
+❯
+ π · ◔ Gemini 3.7 Flash 🙈 · 🌳 notes/notes · ⑂ fm/labfo1 · ◫ 1.4%/1M ⟲ · S0.09
+# status final
+working [at=1791633691]: model-matrix fallback launched omp google-antigravity/gemini-3.5-flash for rule_1
+working [at=1791633751]: model-matrix fallback relaunched omp google-antigravity/gemini-3.7-flash for rule_1
+done [at=1791633762]: ready in branch fm/labfo1
+d09d42b lab probe ok
+9cd438d seed

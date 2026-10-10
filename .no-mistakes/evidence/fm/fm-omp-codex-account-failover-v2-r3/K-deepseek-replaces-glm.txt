@@ -1,0 +1,5 @@
+$ FM_CONFIG_OVERRIDE=<copy of docs/examples> fm-model-index.sh model pi stand-in:sonnet-grade
+deepseek/deepseek-v4-flash
+exit=0
+$ grep -ri glm docs/examples docs/configuration.md
+(no GLM stand-in left)

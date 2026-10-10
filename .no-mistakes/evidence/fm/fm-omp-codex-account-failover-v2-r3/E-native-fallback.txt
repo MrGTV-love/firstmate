@@ -1,0 +1,56 @@
+# lab shim: omp usage unreadable at spawn time -> pool capacity unknown -> spawn keeps the Codex route
+$ fm-spawn.sh labfo2 <lab>/projects/notes --mode local-only --yolo on --harness omp --model openai-codex/gpt-6-luna --effort medium
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SFHVFt/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for labfo2: unavailable - no TypeSafe or OpenRouter key
+spawned labfo2 harness=omp kind=ship mode=local-only yolo=on window=firstmate:fm-labfo2 worktree=/Users/charlesabrooker/tmp/fm-lab.SFHVFt/treehouse/.treehouse/notes-4778b1/2/notes
+exit=0
+# meta
+harness=omp
+model=openai-codex/gpt-6-luna
+effort=medium
+dispatch_rule=rule_1
+# overlay given to omp
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "openai-codex/gpt-6-luna": [
+        "google-antigravity/gemini-3.7-flash:low"
+      ],
+      "openai-codex/gpt-6-luna:medium": [
+        "google-antigravity/gemini-3.7-flash:low"
+      ],
+      "google-antigravity/gemini-3.7-flash": [],
+      "google-antigravity/gemini-3.7-flash:low": []
+    }
+  }
+}
+# worker pane excerpt
+ done status line and end your turn. Do not do anything else.
+ Fallback succeeded on google-antigravity/gemini-3.7-flash:low
+ Warning: Fallback: openai-codex/gpt-6.1-sol:xhigh ->
+ Advisor request failed: Codex error event: The usage limit has been reached
+ (code=usage_limit_reached)
+ Warning: Fallback: openai-codex/gpt-6-luna:medium ->
+ Advisor request failed: Codex error event: The usage limit has been reached
+ (code=usage_limit_reached)
+ Fallback succeeded on google-antigravity/gemini-3.7-flash:low
+ branch fm/labfo2, and done status reported.
+   ▎ committed, done status appended) have been met. End turn.
+# live-model
+model=google-antigravity/gemini-3.7-flash
+# status file as the worker + extension wrote it
+note [at=1791633786]: model-matrix fallback served google-antigravity/gemini-3.7-flash:low
+note [at=1791633791]: model-matrix fallback served google-antigravity/gemini-3.7-flash:low
+done [at=1791633793]: ready in branch fm/labfo2
+$ fm-crew-state.sh labfo2
+state: done · source: status-log · ready in branch fm/labfo2 · model-drift: google-antigravity/gemini-3.7-flash live (recorded openai-codex/gpt-6-luna)
+# staged order: the real note line after each terminal verb
+done then fallback note -> fm-crew-state: state: done | last_status_line: done [at=1791633993]: lab done probe
+needs-decision then fallback note -> fm-crew-state: state: parked | last_status_line: needs-decision [at=1791633993]: lab needs-decision probe
+blocked then fallback note -> fm-crew-state: state: blocked | last_status_line: blocked [at=1791633994]: lab blocked probe
+failed then fallback note -> fm-crew-state: state: failed | last_status_line: failed [at=1791633994]: lab failed probe
+paused then fallback note -> fm-crew-state: state: paused | last_status_line: paused [at=1791633994]: lab paused probe
+control: worker's own note after done -> last_status_line: note [at=1791633994]: worker free-form note

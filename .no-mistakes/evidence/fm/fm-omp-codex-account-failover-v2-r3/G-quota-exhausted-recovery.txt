@@ -1,0 +1,96 @@
+# step 1: matrix rule_1 has NO fallback yet; omp usage unreadable at spawn -> Codex route kept
+{
+  "rules": [
+    {
+      "when": "lab luna-class work",
+      "use": {
+        "harness": "omp",
+        "model": "openai-codex/gpt-6-luna",
+        "effort": "medium"
+      },
+      "fallback": []
+    },
+    {
+      "when": "unrelated strongest work",
+      "use": {
+        "harness": "omp",
+        "model": "openai-codex/gpt-6.1-sol",
+        "effort": "high"
+      },
+      "fallback": [
+        {
+          "harness": "codex",
+          "model": "gpt-6.1-sol",
+          "effort": "ultra"
+        }
+      ]
+    }
+  ]
+}
+$ fm-spawn.sh labfo4 ... --harness omp --model openai-codex/gpt-6-luna --effort medium
+skill selection for labfo4: unavailable - no TypeSafe or OpenRouter key
+spawned labfo4 harness=omp kind=ship mode=local-only yolo=on window=firstmate:fm-labfo4 worktree=/Users/charlesabrooker/tmp/fm-lab.SFHVFt/treehouse/.treehouse/notes-4778b1/3/notes
+# overlay
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "openai-codex/gpt-6-luna": [],
+      "openai-codex/gpt-6-luna:medium": []
+    }
+  }
+}
+# step 2: worker pane after the real Codex error
+ fit this task before starting work.
+ Error: Codex error event: The usage limit has been reached
+   (code=usage_limit_reached)
+ Error: Retry failed after 1 attempts: Provider requested 314488590ms wait,
+ exceeds retry.maxDelayMs (300000ms). Original error: Codex error event: The
+ usage limit has been reached (code=usage_limit_reached)
+❯
+ π · ◑ GPT-6-Luna 👁 · 🌳 notes/notes · ⑂ detached · ◫ 4.4%/272K ⟲ · (sub)
+# busy record written by the generated omp extension
+v1 gen=g1791634041.63344.16392 seq=3 state=idle source=omp-ext event=quota-exhausted ts=1791634045
+
+# step 3: operator adds the rule_1 stand-in; one watcher tick runs fm_session_end_relaunch_scan
+{"when":"lab luna-class work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"medium"},"fallback":[{"harness":"omp","model":"google-antigravity/gemini-3.7-flash","effort":"low"}]}
+wake: check: labfo4 auto-relaunch failed after quota exhaustion: error: refusing fleet lifecycle from inside a no-mistakes gate worktree (/Users/charlesabrooker/.no-mistakes/repos/32d18ed9638d.git)
+exit=
+# meta
+harness=omp
+model=openai-codex/gpt-6-luna
+effort=medium
+# status
+cat: /Users/charlesabrooker/tmp/fm-lab.SFHVFt/home/state/labfo4.status: No such file or directory
+# step 3b: the gate guard refused the first tick (scripts in the no-mistakes gate worktree + FM_STATE_OVERRIDE). Re-run the same tick from a plain checkout of the same commit (/Users/charlesabrooker/tmp/fm-lab.SFHVFt/code, tree of caf064fe), after clearing that refused attempt's lab ledger rows
+wake: check: labfo4 auto-relaunched after quota exhaustion
+# meta
+harness=omp
+model=google-antigravity/gemini-3.7-flash
+effort=low
+dispatch_rule=rule_1
+# status
+working [at=1791634091]: model-matrix fallback relaunched omp google-antigravity/gemini-3.7-flash for rule_1
+# overlay
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "google-antigravity/gemini-3.7-flash": [],
+      "google-antigravity/gemini-3.7-flash:low": []
+    }
+  }
+}
+# step 4: recovered worker on the stand-in
+│ ⟦Wall: 0.01s | Timeout: 300s⟧                                                │
+╰──────────────────────────────────────────────────────────────────────────────╯
+ Created RECOVERY.txt containing recovery probe ok, committed to branch
+ fm/labfo4, and reported done status.
+❯
+ π · ◔ Gemini 3.7 Flash 🙈 · 🌳 notes/notes · ⑂ fm/labfo4 · ◫ 1.4%/1M ⟲ · S0.09
+working [at=1791634091]: model-matrix fallback relaunched omp google-antigravity/gemini-3.7-flash for rule_1
+done [at=1791634112]: ready in branch fm/labfo4
+5ec9749 Add RECOVERY.txt for quota-recovery probe
+9cd438d seed

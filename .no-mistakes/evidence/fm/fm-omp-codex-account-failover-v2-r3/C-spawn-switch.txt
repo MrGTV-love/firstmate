@@ -1,0 +1,37 @@
+$ fm-spawn.sh labfo1 <lab>/projects/notes --mode local-only --yolo on --harness omp --model openai-codex/gpt-6-luna --effort medium
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SFHVFt/home
+skill selection for labfo1: unavailable - no TypeSafe or OpenRouter key
+spawned labfo1 harness=omp kind=ship mode=local-only yolo=on window=firstmate:fm-labfo1 worktree=/Users/charlesabrooker/tmp/fm-lab.SFHVFt/treehouse/.treehouse/notes-4778b1/1/notes
+$ROOT/labrun.sh bin/fm-spawn.sh $ID $LAB/projects/notes --mode local-only  on  3.16s user 1.99s system 67% cpu 7.644 total
+exit=0
+# state/labfo1.meta (routing keys)
+harness=omp
+model=google-antigravity/gemini-3.5-flash
+effort=low
+dispatch_rule=rule_1
+# state/labfo1.status
+working [at=1791633691]: model-matrix fallback launched omp google-antigravity/gemini-3.5-flash for rule_1
+# state/labfo1.omp-fallback.yml
+{
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "google-antigravity/gemini-3.5-flash": [],
+      "google-antigravity/gemini-3.5-flash:low": []
+    }
+  }
+}
+# worker pane (lab tmux)
+ Skill selection was unavailable for this task (no TypeSafe or OpenRouter key).
+ This does not mean no skill applies: check your skill index for skills that
+ fit this task before starting work.
+ Gemini 3.5 Flash is no longer available. Please switch to Gemini 3.7 Flash in
+ the latest version of Antigravity.
+────────────────────────────────────────────────────────────────────────────────
+ ✘ Cloud Code Assist stream ended without a finish reason (connection dropped
+   or response truncated)
+ Dismissed when you send your next message.
+────────────────────────────────────────────────────────────────────────────────
+❯
+ π · ◔ Gemini 3.5 Flash 👁 · 🌳 notes/notes · ⑂ detached · ◫ 1.5%/1M ⟲ · (sub)

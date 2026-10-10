@@ -1,0 +1,3 @@
+$ quota-axi --json | fm-quota-choose.sh --candidate omp:openai-codex/gpt-6-luna --candidate omp:openai-codex/gpt-6.1-sol
+none
+exit=1

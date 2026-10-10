@@ -1,0 +1,19 @@
+# lab crew-dispatch.json
+{"rules":[
+ {"when":"lab luna-class work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"medium"},
+  "fallback":[{"harness":"omp","model":"google-antigravity/gemini-3.7-flash","effort":"low"}]},
+ {"when":"unrelated strongest work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},
+  "fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"ultra"}]}
+]}
+
+$ fm-spawn.sh labfo3 ... --harness omp --model openai-codex/gpt-6.1-sol --effort high   (matches rule_2, whose fallback is invalid)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.SFHVFt/home
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+error: invalid dispatch fallback configuration: jq: error (at <stdin>:4): fallback must be an array of explicit OMP profiles or TeamClaude-required Claude profiles
+exit=1
+# task record created?
+(no labfo3 state files)
+# lab tmux windows
+zsh
+fm-labfo1
+fm-labfo2
