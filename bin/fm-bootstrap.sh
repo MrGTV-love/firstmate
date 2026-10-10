@@ -1602,6 +1602,23 @@ detect_home_summary_publication() {
   fi
 }
 
+# The per-user process pile-up detector is host-wide and its source has one
+# machine-wide owner, so only a primary home arms it, never a secondmate or a
+# disposable lab that would hold the claim away from it. Exit 3 is a host the
+# guard cannot measure and stays silent. The adapter always resolves beside
+# this script, never under a fake code root.
+# Arming requests a detached runner without waiting for readiness; a consumer
+# that needs a ready listener checks it through the process-event interface.
+# It runs beside the diagnostics below rather than adding its own time to every
+# start, and its outcome is reported in its usual place.
+proc_detector_pid=
+if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase \
+  && [ ! -e "$FM_HOME/.fm-secondmate-home" ] && [ ! -e "$FM_HOME/.fm-lab-home" ] \
+  && [ -x "$SCRIPT_DIR/fm-procevent-proc.sh" ]; then
+  FM_ROOT_OVERRIDE='' FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-procevent-proc.sh" arm >/dev/null 2>&1 &
+  proc_detector_pid=$!
+fi
+
 # The order below is the order the diagnostics have always printed in, so a
 # `skip` run is the same output with the network lines removed rather than a
 # reshuffle. `gh auth status` sits between the two local blocks because that is
@@ -1670,16 +1687,8 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     "$SCRIPT_DIR/fm-contributions.sh" arm --if-owned >/dev/null \
       || echo "MISSING: contribution observation could not be armed; coverage is unconfirmed"
   fi
-  # The per-user process pile-up detector is host-wide and its source has one
-  # machine-wide owner, so only a primary home arms it, never a secondmate or a
-  # disposable lab that would hold the claim away from it. Exit 3 is a host the
-  # guard cannot measure and stays silent. The adapter always resolves beside
-  # this script, never under a fake code root.
-  # Arming requests a detached runner without waiting for readiness; a consumer
-  # that needs a ready listener checks it through the process-event interface.
-  if local_phase && [ ! -e "$FM_HOME/.fm-secondmate-home" ] && [ ! -e "$FM_HOME/.fm-lab-home" ] \
-    && [ -x "$SCRIPT_DIR/fm-procevent-proc.sh" ]; then
-    FM_ROOT_OVERRIDE='' FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-procevent-proc.sh" arm >/dev/null 2>&1 || [ "$?" -eq 3 ] \
+  if [ -n "$proc_detector_pid" ]; then
+    wait "$proc_detector_pid" || [ "$?" -eq 3 ] \
       || echo "MISSING: process pile-up detector could not be armed; coverage is unconfirmed"
   fi
   if [ -n "$fleet_sync_pid" ]; then
