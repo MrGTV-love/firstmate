@@ -593,6 +593,31 @@ for origin_url in ('https://evilgithub.com/test/lookalike.git',
     assert '/repos/test/lookalike/' not in (world / 'gh-requests').read_text(), origin_url
     assert rows(hostname_report, 'open_pr'), 'unsupported hosts must not hide healthy peers'
 git(no_origin, 'config', '--unset', 'remote.origin.url')
+
+# A project whose origin is a local filesystem path has no forge pull requests to collect: it is disclosed
+# by name as informational coverage and never degrades the ledger; a real read error still does.
+local_origin = home / 'projects/local-origin'
+out(['git', 'init', '-q', '-b', 'main', local_origin])
+for origin_url in (str(world / 'origin.git'), 'file://' + str(world / 'origin.git'), '../../origin.git'):
+    git(local_origin, 'config', 'remote.origin.url', origin_url)
+    (world / 'gh-requests').write_text('')
+    local_report = ledger()
+    assert local_report['complete'], (origin_url, local_report)
+    assert 'ledger degraded' not in rows(local_report, 'coverage'), (origin_url, local_report)
+    disclosed = rows(local_report, 'coverage')['no forge coverage: local-origin']
+    assert disclosed['informational'] and not disclosed['overdue'], disclosed
+    assert str(local_origin) in disclosed['evidence'] and origin_url in disclosed['evidence'], disclosed
+    assert rows(local_report, 'open_pr'), 'a local origin must not hide healthy GitHub peers'
+broken_peer = home / 'projects/broken-peer'
+broken_peer.mkdir(); (broken_peer / '.git').write_text('gitdir: /missing/open-loops-repository\n')
+still_blind = ledger()
+assert not still_blind['complete'], still_blind
+blind_evidence = rows(still_blind, 'coverage')['ledger degraded']['evidence']
+assert 'broken-peer' in blind_evidence and 'local-origin' not in blind_evidence, blind_evidence
+assert 'no forge coverage: local-origin' in rows(still_blind, 'coverage'), still_blind
+shutil.rmtree(broken_peer)
+shutil.rmtree(local_origin)
+print('PASS: local-path origins are disclosed without degrading the ledger', flush=True)
 unsupported_pr = dict(number=90, html_url='https://evilgithub.com/test/project/pull/90',
                       head=dict(sha='b' * 40), state='open', updated_at=iso(hours(2)))
 double['pulls'].append(unsupported_pr)

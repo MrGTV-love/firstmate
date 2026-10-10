@@ -647,6 +647,7 @@ Blocked, dated, and Done holds are excluded, and no historical audit or new pers
 For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
 GitHub repositories are discovered from recorded local task and backlog PR URLs as well as project origins, including fork-only delivery; their open PRs are classified before PR-head coverage can suppress unlanded commits.
 Only exact `github.com` hosts are admitted or projected, and unsupported origins or PR URLs disclose degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
+A project whose origin is a local filesystem path (an absolute or relative path or a `file://` URL) has no forge pull requests to collect, so it adds an informational `coverage` row named `no forge coverage: <project>` and does not degrade the ledger.
 An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage unless the worker recorded a stop.
 Unknown current task state adds degraded coverage independently of liveness, except when a recorded stop or a confirmed dead or missing agent with `backend target gone:` detail explains it.
 Only nonfuture progress timestamps count as work evidence.
