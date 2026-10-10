@@ -6123,6 +6123,7 @@ test_quota_exhaustion_relaunches_only_a_permitted_route() {
     cat > "$dir/fakebin/omp" <<'SH'
 #!/usr/bin/env bash
 case "$1" in
+  --version) printf 'omp/18.1.20\n' ;;
   usage) cat "$FM_FAKE_DIR/../usage.json" ;;
   models) printf '%s\n' '{"models":[{"provider":"deepseek","id":"deepseek-v4-flash","selector":"deepseek/deepseek-v4-flash"}]}' ;;
   *) exit 0 ;;
