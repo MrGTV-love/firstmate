@@ -1437,7 +1437,7 @@ An unreachable, empty, missing, or malformed catalog (including concatenated JSO
 
 `bin/fm-model-freshness.sh` reports a worker or reviewer model that a newer model of the same family has passed in its own harness's catalog, so a stale model is noticed instead of launched by habit.
 It is advisory: it exits 0 whatever it finds, refuses nothing, and edits no configuration file, so the supervisor decides what to change.
-Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each harness's discovery command and time limit.
+Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each harness's discovery command and its 30 second limit.
 
 - **Inputs.** Every model named in the effective home's `config/crew-dispatch.json` (role references resolve through the [model index](#fleet-model-index-configmodel-indexjson)), and the model requested at each `bin/fm-spawn.sh`.
 - **Catalog.** Each harness's own catalog, read with its own command; a name is never used to infer one.
@@ -1449,10 +1449,10 @@ Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each
 - **Session start.** The deferred network stage runs the scan beside its other checks and prints each line as a `MODEL_FRESHNESS:` diagnostic; an unreadable catalog is a `BOOTSTRAP_INFO` fact only under `FM_BOOTSTRAP_VERBOSE_FACTS=1`.
 - **Spawn.** `fm-spawn.sh` prints `warning: model is stale - ...`, records `model_stale=` in the task record, and `fm-crew-state.sh` repeats it as a `model-stale:` component on that task's state line; the spawn proceeds.
   The check runs under the worker account pin, so a pinned Claude account answers from its own catalog.
+  It is skipped when the model-index check treats the catalog context as unavailable (a raw launch, or a Claude custom launcher), and it reuses the catalog that index check read in the same spawn instead of reading the harness again.
 - **Off switch.** `FM_MODEL_FRESHNESS=0` turns the check off; the test suite sets it so no case reads a developer's real catalogs.
 
-Every catalog command's time limit is set from measured latency, idle and under heavy host load, with the margin stated beside the limit; [`docs/verification/model-catalog-latency.md`](verification/model-catalog-latency.md) records the measurements and the method to repeat them.
-`tests/fm-model-freshness.test.sh` covers the comparison, scan, spawn, and time-limit behavior against fixture catalogs.
+`tests/fm-model-freshness.test.sh` covers the comparison, scan, spawn, and catalog-reuse behavior against fixture catalogs.
 
 ## Project capacity (config/project-capacity)
 

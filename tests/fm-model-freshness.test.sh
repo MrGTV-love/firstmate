@@ -125,14 +125,14 @@ out=$(FM_MODEL_FRESHNESS=0 "$TOOL" check agy gemini-3.1-pro-high)
 [ -z "$out" ] || fail 'FM_MODEL_FRESHNESS=0 did not turn the check off'
 pass 'only a malformed call exits non-zero; FM_MODEL_FRESHNESS=0 turns the check off'
 
-# Real discovery: `agy models` is the harness's own catalog, and a hung command
-# is cut off at its bound instead of stalling the caller.
+# Real discovery: `agy models` is the harness's own catalog, and a command that
+# fails is a notice, never a verdict.
 FAKEBIN="$TMP_ROOT/fakebin"
 mkdir -p "$FAKEBIN"
 cat > "$FAKEBIN/agy" <<'SH'
 #!/usr/bin/env bash
 [ "${1:-}" = models ] || exit 2
-[ -z "${FM_FAKE_AGY_HANG:-}" ] || exec sleep 60
+[ -z "${FM_FAKE_AGY_FAIL:-}" ] || exit 1
 printf '%s\n' 'Fetching available models...' \
   "gemini-3.8-flash-high	Gemini 3.8 Flash (High)" \
   "gemini-3.1-pro-high	Gemini 3.1 Pro (High)"
@@ -140,14 +140,19 @@ SH
 chmod +x "$FAKEBIN/agy"
 out=$(env -u FM_MODEL_CATALOG_DIR PATH="$FAKEBIN:$PATH" "$TOOL" check agy gemini-3.1-pro-high 2>/dev/null)
 assert_contains "$out" 'gemini-3.1-pro-high on agy is older than gemini-3.8-flash-high' 'the live agy catalog path did not flag the stale model'
-start=$SECONDS
-out=$(env -u FM_MODEL_CATALOG_DIR PATH="$FAKEBIN:$PATH" FM_FAKE_AGY_HANG=1 FM_MODEL_CATALOG_BOUND_AGY=1 "$TOOL" check agy gemini-3.1-pro-high 2> "$TMP_ROOT/stderr")
-[ -z "$out" ] || fail "a hung catalog produced a verdict: $out"
-[ $((SECONDS - start)) -lt 20 ] || fail "a hung catalog was not cut off at its bound (took $((SECONDS - start))s)"
-assert_contains "$(cat "$TMP_ROOT/stderr")" 'agy catalog unavailable' 'a hung catalog must be reported as unavailable'
-bound=$(bash -c '. "$1/bin/fm-model-catalog-lib.sh"; fm_model_catalog_bound claude; FM_MODEL_CATALOG_BOUND_CLAUDE=0 fm_model_catalog_bound claude; FM_MODEL_CATALOG_BOUND_CLAUDE=7 fm_model_catalog_bound claude' _ "$ROOT" | tr '\n' ' ')
-[ "$bound" = '30 30 7 ' ] || fail "bounds must default to the measured limit, ignore a zero, and honor an override: $bound"
-pass 'live discovery reads the harness catalog and a hung command is cut off at its bound'
+out=$(env -u FM_MODEL_CATALOG_DIR PATH="$FAKEBIN:$PATH" FM_FAKE_AGY_FAIL=1 "$TOOL" check agy gemini-3.1-pro-high 2> "$TMP_ROOT/stderr")
+[ -z "$out" ] || fail "a failing catalog produced a verdict: $out"
+assert_contains "$(cat "$TMP_ROOT/stderr")" 'agy catalog unavailable' 'a failing catalog must be reported as unavailable'
+pass 'live discovery reads the harness catalog and a failing command is a notice, not a verdict'
+
+# A catalog handed over on stdin is compared as-is: no discovery runs, and an
+# unreadable one is a notice.
+out=$(env -u FM_MODEL_CATALOG_DIR PATH="$TMP_ROOT/no-such-bin:/usr/bin:/bin" FM_MODEL_FRESHNESS_CATALOG=stdin "$TOOL" check agy gemini-3.1-pro-high < "$CATALOGS/agy.json" 2>/dev/null)
+assert_contains "$out" 'gemini-3.1-pro-high on agy is older than gemini-3.8-flash-high' 'a catalog on stdin was not compared'
+out=$(printf '%s\n' '{"models":[]}' | FM_MODEL_FRESHNESS_CATALOG=stdin "$TOOL" check agy gemini-3.1-pro-high 2> "$TMP_ROOT/stderr")
+[ -z "$out" ] || fail "an empty catalog on stdin produced a verdict: $out"
+assert_contains "$(cat "$TMP_ROOT/stderr")" 'agy catalog unavailable' 'an empty catalog on stdin must be reported as unavailable'
+pass 'a catalog on stdin is compared without discovery, and an empty one is a notice'
 
 # Spawn: the warning is advisory (the spawn succeeds, nothing is refused), it is
 # printed for the supervisor, and it is recorded on the task.
@@ -175,5 +180,84 @@ out=$(fm_test_run_spawn "$SPAWN_HOME2" "$CASE2/wt" "$SPAWN_FAKEBIN2" freshness-z
 assert_not_contains "$out" 'model is stale' 'a current model drew the stale warning'
 assert_no_grep 'model_stale=' "$SPAWN_HOME2/state/freshness-z2.meta" 'a current model left a stale record'
 pass 'spawn warns, records the warning on the task, surfaces it in the crew state, and never refuses'
+
+# Spawn reads each catalog at most once. A claude spawn under a worker account
+# pin runs the model-index check against the real discovery path; a recording
+# fake `claude` counts every catalog read, so the number is observable.
+make_claude_fake() { # <fakebin> <read-log> <catalog-ids-file>
+  cat > "$1/claude" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = auth ] && [ "\${2:-}" = status ]; then
+  [ -f "\${CLAUDE_CONFIG_DIR:-\$HOME/.claude}/.credentials.json" ]
+  exit
+fi
+if [ "\${1:-}" = -p ] && [ "\${2:-}" = --input-format ]; then
+  printf 'read\n' >> '$2'
+  [ -f '$3' ] || exit 1
+  jq -Rsc '{type:"control_response",response:{subtype:"success",request_id:"model-index",
+    response:{models:[split("\n")[] | select(length > 0) | {value:., resolvedModel:.}]}}}' '$3'
+  exit 0
+fi
+exit 0
+SH
+  chmod +x "$1/claude"
+}
+# claude_spawn_case <name> -> sets CASE SPAWN_HOME FAKE READS; the home pins a
+# signed-in worker account and owns an index whose routine role is claude-sonnet-5.
+claude_spawn_case() {
+  CASE="$TMP_ROOT/$1"
+  SPAWN_HOME="$CASE/home"
+  READS="$CASE/reads"
+  fm_test_spawn_home "$SPAWN_HOME" claude
+  fm_git_worktree "$CASE/project" "$CASE/wt" "wt-$1"
+  fm_test_spawn_brief "$SPAWN_HOME" "$1"
+  FAKE=$(fm_test_make_spawn_fakebin "$CASE/fake")
+  mkdir -p "$CASE/work"
+  printf '{}\n' > "$CASE/work/.credentials.json"
+  printf '%s\n' "$CASE/work" > "$SPAWN_HOME/config/claude-account"
+  printf '%s\n' claude-sonnet-5 claude-sonnet-5-5 > "$CASE/catalog"
+  printf '%s\n' '{"version":1,"roles":{"routine":{"claude":{"model":"claude-sonnet-5"}}},"retired":[]}' > "$SPAWN_HOME/config/model-index.json"
+  : > "$READS"
+  make_claude_fake "$FAKE" "$READS" "$CASE/catalog"
+}
+reads_of() { wc -l < "$1" | tr -d ' '; }
+run_claude_spawn() { # <id> [spawn args...]
+  local id=$1
+  shift
+  (unset FM_MODEL_CATALOG_DIR; fm_test_run_spawn "$SPAWN_HOME" "$CASE/wt" "$FAKE" "$id" "$CASE/project" --mode no-mistakes --yolo off "$@")
+}
+
+claude_spawn_case reads-indexed
+out=$(run_claude_spawn reads-indexed --model role:routine) || fail "an indexed stale model must not refuse the spawn: $out"
+assert_contains "$out" 'warning: model is stale - claude-sonnet-5 on claude is older than claude-sonnet-5-5 in the claude catalog' 'the indexed model was not flagged from the shared catalog read'
+[ "$(reads_of "$READS")" = 1 ] || fail "an indexed model's catalog must be read once per spawn, read $(reads_of "$READS") times"
+assert_grep 'model_stale=claude-sonnet-5 on claude' "$SPAWN_HOME/state/reads-indexed.meta" 'the shared read did not reach the task record'
+
+claude_spawn_case reads-literal
+printf '%s\n' '{"version":1,"roles":{"routine":{"claude":{"model":"claude-sonnet-5-5"}}},"retired":[]}' > "$SPAWN_HOME/config/model-index.json"
+out=$(run_claude_spawn reads-literal --model claude-sonnet-5) || fail "a literal stale model must not refuse the spawn: $out"
+assert_contains "$out" 'warning: model is stale - claude-sonnet-5 on claude is older than claude-sonnet-5-5' 'a model outside the index was not checked'
+[ "$(reads_of "$READS")" = 1 ] || fail "a literal model's catalog must be read once per spawn, read $(reads_of "$READS") times"
+
+claude_spawn_case reads-unreadable
+rm -f "$CASE/catalog"
+out=$(run_claude_spawn reads-unreadable --model role:routine) || fail "an unreadable catalog must not refuse the spawn: $out"
+assert_not_contains "$out" 'model is stale' 'an unreadable catalog drew a stale warning'
+[ "$(reads_of "$READS")" = 1 ] || fail "a failed catalog read must not be repeated by the freshness check, read $(reads_of "$READS") times"
+pass 'a spawn reads the harness catalog once, for an indexed model, a literal model, and an unreadable catalog'
+
+# The freshness check follows the model-index rule: a custom Claude launcher
+# runs a catalog the plain claude binary does not hold, so nothing is read and
+# nothing is reported or recorded.
+claude_spawn_case reads-launcher
+fm_test_fake_teamclaude "$FAKE"
+make_claude_fake "$FAKE" "$READS" "$CASE/catalog"
+printf 'teamclaude\n' > "$SPAWN_HOME/config/claude-launcher"
+rm -f "$SPAWN_HOME/config/claude-account"
+out=$(run_claude_spawn reads-launcher --model claude-sonnet-5) || fail "a launcher spawn failed: $out"
+assert_not_contains "$out" 'model is stale' 'a custom launcher spawn reported a stale model from the plain claude catalog'
+[ "$(reads_of "$READS")" = 0 ] || fail "a custom launcher spawn read the plain claude catalog $(reads_of "$READS") times"
+assert_no_grep 'model_stale=' "$SPAWN_HOME/state/reads-launcher.meta" 'a custom launcher spawn recorded a stale model'
+pass 'a spawn through a custom Claude launcher reads no catalog and records no stale model'
 
 echo "# all fm-model-freshness tests passed"

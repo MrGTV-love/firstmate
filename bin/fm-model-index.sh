@@ -18,6 +18,9 @@
 # unreadable catalog, a harness without discovery, or an omp provider its
 # listing does not know (extension-registered providers are never listed)
 # passes with a notice on stderr.
+# With FM_MODEL_CATALOG_EMIT=1, check <harness> <model> also prints the catalog
+# it read on stdout (an empty one when the read failed), so bin/fm-spawn.sh can
+# hand it to bin/fm-model-freshness.sh instead of reading the harness again.
 # model and profiles resolve offline and never fetch a catalog: model emits
 # one id; profiles <file> requires exactly one JSON object and emits concrete
 # dispatch JSON. profiles with no file validates only the index and emits
@@ -38,9 +41,9 @@
 # fixtures), <harness>.json, normalized as {"models":[{"id":"...",
 # "resolved_id":"..."}]}. resolved_id is optional except for aliases.
 # With a directory set, live discovery never runs; a missing export is a notice.
-# Live discovery and its per-harness time limits are owned by
-# bin/fm-model-catalog-lib.sh. Other harnesses need an export from their
-# authoritative surface. No credential or catalog cache is changed.
+# Live discovery is owned by bin/fm-model-catalog-lib.sh and bounded at 30
+# seconds per command. Other harnesses need an export from their authoritative
+# surface. No credential or catalog cache is changed.
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -147,6 +150,13 @@ check_entry() { # <role> <harness> <model>; refuses only on catalog evidence
   esac
   die "id '$m' absent or retired in $h catalog (role '$role')"
 }
+emit_catalog() { # <harness>; the catalog check_entry just read, for the spawn freshness check
+  if [ -f "$TMP/catalog-$1.json" ]; then
+    cat "$TMP/catalog-$1.json"
+  elif [ -f "$TMP/catalog-$1.json.none" ]; then
+    printf '%s\n' '{"models":[]}'
+  fi
+}
 refuse_retired() { # <harness> <model> <where>
   if jq -e --arg m "$2" --slurpfile idx "$TMP/index.json" "$LIB_JQ"'retired($m)' -n >/dev/null; then
     die "retired id '$2' $3 ($1)"
@@ -161,6 +171,7 @@ if [ "$VERB" = check ]; then
     [ "$#" != 2 ] || [ "$model" = "$2" ] || continue
     refuse_retired "$harness" "$model" "in role '$role'"
     check_entry "$role" "$harness" "$model"
+    [ "$#" != 2 ] || [ "${FM_MODEL_CATALOG_EMIT:-}" != 1 ] || emit_catalog "$harness"
     [ "$#" != 2 ] || break
   done 3< "$TMP/entries"
   [ "$#" = 2 ] || printf 'model-index: active ids checked; none absent or retired\n'

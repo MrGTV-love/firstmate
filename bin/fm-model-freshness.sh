@@ -24,8 +24,7 @@
 # of any tier, because a newer generation of a family replaces an older one
 # across tiers (gemini-3.8-flash-high is newer than gemini-3.1-pro-high).
 # Never inferred from a name: the catalog is read from the harness's own
-# discovery command (bin/fm-model-catalog-lib.sh owns them and their time
-# limits), and an id the harness keeps current - an alias with no version in
+# discovery command (bin/fm-model-catalog-lib.sh owns them), and an id the harness keeps current - an alias with no version in
 # it, such as opus - is current by definition. A harness without a readable
 # catalog is reported as a notice, never guessed.
 #
@@ -35,6 +34,9 @@
 # FM_MODEL_CATALOG_DIR supplies catalog exports (and test fixtures) exactly as
 # for bin/fm-model-index.sh. FM_HOME / FM_CONFIG_OVERRIDE select the config.
 # FM_MODEL_FRESHNESS=0 turns the check off (tests that run no catalog).
+# With FM_MODEL_FRESHNESS_CATALOG=stdin, check reads the harness's catalog from
+# stdin (the normalized JSON bin/fm-model-index.sh check prints under
+# FM_MODEL_CATALOG_EMIT=1) and runs no discovery of its own.
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -70,20 +72,25 @@ else
 fi
 [ -s "$TMP/pairs" ] || exit 0
 
-# One catalog per harness, read concurrently so the slowest one sets the wall
-# clock instead of their sum.
-cut -f1 "$TMP/pairs" | sort -u > "$TMP/harnesses"
-while IFS= read -r harness; do
-  (
-    if fm_model_catalog "$harness" "$TMP" > "$TMP/catalog-$harness.json" 2>/dev/null </dev/null \
-      && fm_model_catalog_valid "$TMP/catalog-$harness.json"; then
-      :
-    else
-      rm -f "$TMP/catalog-$harness.json"
-    fi
-  ) &
-done < "$TMP/harnesses"
-wait
+if [ "$1" = check ] && [ "${FM_MODEL_FRESHNESS_CATALOG:-}" = stdin ]; then
+  cat > "$TMP/catalog-$2.json" 2>/dev/null
+  fm_model_catalog_valid "$TMP/catalog-$2.json" || rm -f "$TMP/catalog-$2.json"
+else
+  # One catalog per harness, read concurrently so the slowest one sets the wall
+  # clock instead of their sum.
+  cut -f1 "$TMP/pairs" | sort -u > "$TMP/harnesses"
+  while IFS= read -r harness; do
+    (
+      if fm_model_catalog "$harness" "$TMP" > "$TMP/catalog-$harness.json" 2>/dev/null </dev/null \
+        && fm_model_catalog_valid "$TMP/catalog-$harness.json"; then
+        :
+      else
+        rm -f "$TMP/catalog-$harness.json"
+      fi
+    ) &
+  done < "$TMP/harnesses"
+  wait
+fi
 
 # shellcheck disable=SC2016 # jq program: $-names are jq variables.
 FRESHNESS_JQ='

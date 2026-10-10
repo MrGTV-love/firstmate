@@ -3081,12 +3081,13 @@ if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
   fi
 fi
 
+MODEL_CATALOG_CONTEXT=selected
+if [ "$RAW_LAUNCH" = 1 ] || { [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; }; then
+  MODEL_CATALOG_CONTEXT=unavailable
+fi
+MODEL_CATALOG_READ=
 if [ "$MODEL_INDEXED" = 1 ]; then
-  MODEL_CATALOG_CONTEXT=selected
-  if [ "$RAW_LAUNCH" = 1 ] || { [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; }; then
-    MODEL_CATALOG_CONTEXT=unavailable
-  fi
-  FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT" || exit 1
+  MODEL_CATALOG_READ=$(FM_MODEL_CATALOG_EMIT=1 FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT") || exit 1
 fi
 
 # Model freshness (advisory): warn when the requested model is older than the
@@ -3094,10 +3095,16 @@ fi
 # spawn and never changes the model; the supervisor decides. The line is
 # recorded as model_stale= in the task record so fm-crew-state.sh keeps showing
 # it after this terminal output is gone. Run under the worker account pin so a
-# pinned account answers from its own catalog.
+# pinned account answers from its own catalog, and only where the model-index
+# check above would also read one. An indexed model's catalog was already read
+# by that check; it is handed over rather than read a second time.
 MODEL_STALE=
-if [ "$RAW_LAUNCH" = 0 ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
-  MODEL_STALE=$(fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" unavailable 2>/dev/null </dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || MODEL_STALE=
+if [ "$MODEL_CATALOG_CONTEXT" = selected ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+  if [ -n "$MODEL_CATALOG_READ" ]; then
+    MODEL_STALE=$(printf '%s\n' "$MODEL_CATALOG_READ" | FM_MODEL_FRESHNESS_CATALOG=stdin fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" 2>/dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || MODEL_STALE=
+  else
+    MODEL_STALE=$(fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" 2>/dev/null </dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || MODEL_STALE=
+  fi
   [ -z "$MODEL_STALE" ] || echo "warning: model is stale - $MODEL_STALE" >&2
 fi
 
