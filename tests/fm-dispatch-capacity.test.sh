@@ -145,7 +145,19 @@ if fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6.1-sol high
   fail "a matched rule with a retired stand-in must refuse"
 fi
 rm "$TMP_ROOT/config/model-index.json"
-pass "retirement applies to matched lists and direct fallback selection, not unrelated rules"
+jq -n --argjson use "$primary" '{rules:[
+    {when:"easy work",use:$use,fallback:[{harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"}]},
+    {when:"strong work",use:{harness:"omp",model:"openai-codex/gpt-6.1-sol",effort:"high"},
+     fallback:[{harness:"codex",model:"gpt-6.1-sol",effort:"ultra"}]}]}' > "$TMP_ROOT/config/crew-dispatch.json"
+for rule in '' rule_1; do
+  set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" "$rule" omp openai-codex/gpt-6-luna high) || fail "an invalid unrelated fallback must not block the lookup"
+  assert_equals deepseek/deepseek-v4-flash "$(jq -r '.fallback[0].model' <<<"$set")" "the matched rule keeps its stand-in beside an invalid unrelated rule"
+done
+if fm_dispatch_fallbacks "$TMP_ROOT/config" '' omp openai-codex/gpt-6.1-sol high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
+  fail "a matched rule with an invalid fallback must refuse"
+fi
+assert_contains "$(cat "$TMP_ROOT/error")" "fallback must be an array of explicit OMP profiles" "the matched invalid fallback keeps its error"
+pass "retirement and fallback schema apply to matched lists and direct fallback selection, not unrelated rules"
 
 cat > "$QUOTA_FIXTURE" <<'JSON'
 {"schemaVersion":6,"providers":[

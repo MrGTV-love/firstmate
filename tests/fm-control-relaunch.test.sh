@@ -4999,7 +4999,9 @@ test_quota_exhaustion_relaunches_only_a_permitted_route() {
     jq -n --arg model "$model" '{rules:[{when:"assigned work",
       use:{harness:"omp",model:$model,effort:"high",provider:"codex"},
       fallback:(if $model=="openai-codex/gpt-6-luna" then
-        [{harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"}] else [] end)}]}' > "$dir/home/config/crew-dispatch.json"
+        [{harness:"omp",model:"deepseek/deepseek-v4-flash",effort:"high"}] else [] end)},
+      {when:"invalid stand-in",use:{harness:"omp",model:"openai-codex/gpt-6-astra",effort:"high"},
+       fallback:[{harness:"pi",model:"deepseek/deepseek-v4-flash",effort:"high"}]}]}' > "$dir/home/config/crew-dispatch.json"
     jq -n --argjson now "$(date +%s)" '{reports:[
       {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}},
       {provider:"openai-codex",fetchedAt:($now*1000),metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}
@@ -5077,7 +5079,7 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
     add_ship_task "$dir" "$id" claude
     [ "$recorded" = none ] || printf 'dispatch_rule=rule_7\n' >> "$dir/home/state/$id.meta"
     mkdir -p "$dir/home/config"
-    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
+    printf '%s\n' '{"rules":[{"when":"Claude work","use":{"harness":"claude"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"unconfigured","use":{"harness":"claude","role":"missing-role"}},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"codex","model":"gpt-6.1-sol","effort":"high"}]}],"default":{"harness":"claude"}}' > "$dir/home/config/crew-dispatch.json"
     out=$(run_control "$dir" "$id" relaunch --note "resume after the matrix edit"); rc=$?
     expect_code 0 "$rc" "a $recorded recorded rule with an ambiguous match must relaunch as before: $out"
     assert_contains "$out" "relaunched $id harness=claude from=claude" "the relaunch keeps the task's own route"

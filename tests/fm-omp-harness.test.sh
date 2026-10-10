@@ -35,6 +35,8 @@ set -u
 
 # shellcheck source=bin/fm-busy-lib.sh
 . "$ROOT/bin/fm-busy-lib.sh"
+# shellcheck source=bin/fm-status-event-lib.sh
+. "$ROOT/bin/fm-status-event-lib.sh"
 # shellcheck source=bin/fm-composer-lib.sh
 . "$ROOT/bin/fm-composer-lib.sh"
 # shellcheck source=bin/fm-control-lib.sh
@@ -395,12 +397,12 @@ test_spawn_ignores_stale_unrelated_rules() {
   read_case_record "$rec"
   mkdir -p "$HOME_DIR/config"
   printf '%s\n' '{"version":1,"roles":{},"retired":["deepseek-v4-flash"]}' > "$HOME_DIR/config/model-index.json"
-  printf '%s\n' '{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}},{"when":"unconfigured","use":{"harness":"omp","role":"missing-role"}},{"when":"strong work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+  printf '%s\n' '{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}},{"when":"unconfigured","use":{"harness":"omp","role":"missing-role"}},{"when":"strong work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]},{"when":"invalid stand-in","use":{"harness":"omp","model":"openai-codex/gpt-6-astra","effort":"high"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"ultra"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
   jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
     metadata:{meterStates:{chat:{allowed:true,limitReached:false}}}}]}' > "$CASE_DIR/usage.json"
   out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high)
   status=$?
-  expect_code 0 "$status" "a retired or unconfigured unrelated rule must not block the launch: $out"
+  expect_code 0 "$status" "a retired, unconfigured, or invalid unrelated rule must not block the launch: $out"
   assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "the launch keeps its own route"
   assert_no_grep 'dispatch_rule=' "$HOME_DIR/state/$id.meta" "a rule without a fallback policy records no identifier"
   pass "stale unrelated dispatch rules do not block a launch"
@@ -1025,8 +1027,11 @@ test_busy_extension_lifecycle() {
   [ "$(fm_busy_classify tmux fake:w omp "$id" "$state")" = "idle omp-ext" ] || fail "a plain agent_end must classify 'idle omp-ext'"
   out=$(drive_omp_ext "$ext" quota-error) || fail "quota error drive failed: $out"
   assert_contains "$(fm_busy_record_read "$state" "$id")" 'quota-exhausted' "a terminal native usage failure must be actionable"
+  printf 'done: PR opened\n' > "$state/$id.status"
   out=$(drive_omp_ext "$ext" fallback-served) || fail "fallback status drive failed: $out"
-  assert_grep 'fallback served deepseek/deepseek-v4-flash:high' "$state/$id.status" "native model fallback must publish the serving model"
+  grep -Eq '^note \[at=[0-9]+\]: model-matrix fallback served deepseek/deepseek-v4-flash:high$' "$state/$id.status" \
+    || fail "native model fallback must publish the serving model as a note: $(cat "$state/$id.status")"
+  [ "$(last_status_line "$state/$id.status")" = 'done: PR opened' ] || fail "the fallback notice must not replace the worker's done declaration"
   rm "$state/$id.busy-gen"
   printf 'working: replacement owns this task\n' > "$state/$id.status"
   out=$(drive_omp_ext "$ext" fallback-served) || fail "retired callback drive failed: $out"

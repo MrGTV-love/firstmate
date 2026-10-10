@@ -44,6 +44,10 @@ FM_CLASSIFY_CAPTAIN_RE_DEFAULT='done:|needs-decision:|blocked:|failed:|PR ready|
 # drift between the two consumers. FM_CLASSIFY_PAUSED_VERB overrides it.
 FM_CLASSIFY_PAUSED_VERB_DEFAULT='paused'
 _FM_CLASSIFY_KEYLESS_PHASE=$'\036default'
+# The body of the note the generated OMP extension appends when a native model
+# fallback serves a request. It is a machine notice, not a status event, so it
+# never replaces the worker's own latest declaration.
+FM_STATUS_FALLBACK_NOTICE='model-matrix fallback served '
 # Return the last recognized status event, ignoring continuation prose and blanks
 # (empty if missing/blank), and with <previous-event-var> the event before it.
 # The optional previous event is what this reader returned before the latest one
@@ -148,6 +152,7 @@ _fm_status_event_scan() {
 # 0 when a nonblank <line> is a recognized status event for the scan above.
 _fm_status_line_is_event() {  # <line> <legacy-captain-re>
   local verb unstamped
+  case "$1" in "note [at="*"]: $FM_STATUS_FALLBACK_NOTICE"*) return 1 ;; esac
   case "$1" in *:*) status_line_verb "$1" verb ;; *) verb='' ;; esac
   _fm_status_verb_recognized "$verb" && return 0
   # Unrecognized verb-shaped prefixes (parked:, holding:, bad corr tokens) stay

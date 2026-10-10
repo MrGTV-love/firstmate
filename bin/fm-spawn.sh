@@ -823,6 +823,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
 # shellcheck source=bin/fm-busy-lib.sh
 . "$SCRIPT_DIR/fm-busy-lib.sh"
+# shellcheck source=bin/fm-status-event-lib.sh
+. "$SCRIPT_DIR/fm-status-event-lib.sh"
 # shellcheck source=bin/fm-cursor-lib.sh
 . "$SCRIPT_DIR/fm-cursor-lib.sh"
 # fm-dod-lib.sh also owns the PR and classification imports needed below.
@@ -5639,7 +5641,7 @@ export default function (pi: any) {
     }
     const model = String(event.model ?? "").replace(/[\\r\\n\\t]/g, " ");
     appendFileSync("$STATE_REAL/$ID.status",
-      "working [at=" + Math.floor(Date.now() / 1000) + "]: model-matrix fallback served " + model + "\\n");
+      "note [at=" + Math.floor(Date.now() / 1000) + "]: $FM_STATUS_FALLBACK_NOTICE" + model + "\\n");
   });
 }
 EOF

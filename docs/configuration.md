@@ -1529,6 +1529,8 @@ Those chains contain only the order-preserving eligible native prefix; the first
 Native OMP account rotation precedes model fallback, and successful native model switches publish the serving selector.
 An idle terminal quota error after native rotation is handled by the existing bounded recovery scan through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
 Launch and successful replacement append the selected route to task status.
+A stand-in the typed dispatch resolution kept as unknown is launched without a route line in the task status.
+A native model fallback appends a `note:` line naming the serving model, and status readers skip that note so the worker's own latest declaration stays the task state.
 Account pins and saved resets are unchanged; reviewer model selection remains owned by no-mistakes, not these worker controls.
 
 
