@@ -2020,44 +2020,6 @@ fm_autoarm_still_owner() {  # <state-dir> <gen>
   [ "$FM_AUTOARM_GEN" = "$gen" ] && [ "$FM_AUTOARM_OWNER" = "$pid" ]
 }
 
-# Claude Stop-hook latency record, state/.claude-autoarm-timing. The guard's
-# synchronous wait (FM_CLAUDE_AUTOARM_SYNC_WAIT_MS, docs/turnend-guard.md
-# "Claude cooperative mode") is only right if it outlasts the real delay between
-# the guard starting to wait and the auto-arm publishing its generation claim, so
-# both Stop participants append one tab-separated line per Stop:
-#   v1 <TAB> guard <TAB> <end-ms> <TAB> start_ms=<N> nominal_ms=<N> result=<allow|expired>
-#   v1 <TAB> claim <TAB> <claim-ms> <TAB> gen=<N>
-# The guard line is written when its wait ends, so claim-ms minus start_ms is the
-# latency the wait must cover, and an "expired" guard line followed by a later
-# claim line is a measured miss. Clocks are fm-timing-lib.sh's epoch
-# milliseconds. A diagnostic only: it never waits, locks, or changes a hook's
-# exit status, a failed append is discarded, and a missing clock library means no
-# record. The file is trimmed to its newest 500 lines once it passes 64 KiB.
-fm_autoarm_timing_now_ms() {
-  command -v fm_timing_now_ms >/dev/null 2>&1 || {
-    [ -r "$FM_WAKE_LIB_DIR/fm-timing-lib.sh" ] || return 1
-    # shellcheck source=bin/fm-timing-lib.sh
-    . "$FM_WAKE_LIB_DIR/fm-timing-lib.sh" || return 1
-  }
-  fm_timing_now_ms
-}
-
-fm_autoarm_timing_record() {  # <state-dir> <guard|claim> [key=value ...]
-  local state=$1 kind=$2 file now
-  shift 2
-  file="$state/.claude-autoarm-timing"
-  now=$(fm_autoarm_timing_now_ms 2>/dev/null) || return 0
-  printf 'v1\t%s\t%s\t%s\n' "$kind" "$now" "$*" >> "$file" 2>/dev/null || return 0
-  if [ -n "$(find "$file" -size +64k 2>/dev/null)" ]; then
-    if tail -n 500 "$file" > "$file.tmp.${BASHPID:-$$}" 2>/dev/null; then
-      mv -f "$file.tmp.${BASHPID:-$$}" "$file" 2>/dev/null || rm -f "$file.tmp.${BASHPID:-$$}" 2>/dev/null
-    else
-      rm -f "$file.tmp.${BASHPID:-$$}" 2>/dev/null
-    fi
-  fi
-  return 0
-}
-
 fm_autoarm_reset_owned() {  # <state-dir> <gen>
   local state=$1 gen=$2 lock pid
   lock="$state/.claude-autoarm.lock"

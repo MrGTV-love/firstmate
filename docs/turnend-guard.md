@@ -329,8 +329,7 @@ The wait is a floor in wall time, not a ceiling: the guard counts one 100 millis
 A guard set to 800 milliseconds nominal that expired under the stress level below ran a median of 2.0 seconds and up to 7.2 seconds of wall time, so the setting is chosen against the claim latency itself.
 
 The latency that matters is the time from the guard starting to wait until the auto-arm publishes its generation claim.
-Both Stop participants append one line per Stop to `state/.claude-autoarm-timing` (`fm_autoarm_timing_record` in `bin/fm-wake-lib.sh` owns the format), so this number is recorded for every real Stop and a miss shows as an `expired` guard line followed by a later `claim` line.
-No earlier log held it: the epoch ledger keeps only the newest entry at one-second resolution.
+No production log holds it: the epoch ledger keeps only the newest entry at one-second resolution.
 
 Measured on 2026-10-10, macOS, 18 cores, in an isolated lab home that ran the real guard and the real auto-arm in parallel the way Claude starts parallel Stop hooks, with the claim time read from the ledger file's own modification time.
 The host was never idle: other fleet lanes kept its 1-minute load average between 1.1 and 4.3 times the core count during the first two rows, so no row is an idle baseline.
@@ -358,9 +357,9 @@ Re-run at the 12 second default under the same stress, 60 trials gave 53 claims 
 
 The guard has no hook `timeout` of its own in `.claude/settings.json`, so Claude's default of 600 seconds for command hooks applies (Claude Code hooks reference, read 2026-10-10).
 A wait of 12 seconds nominal stayed inside it with a wide margin even at the 9 times wall-time stretch seen under stress (about 108 seconds).
-The cost lands only where the auto-arm is genuinely absent: each of the three budgeted re-blocks then waits the full wait before blocking.
-
-To re-derive the default, read `state/.claude-autoarm-timing`, subtract each guard line's `start_ms` from the next claim line's timestamp, and apply the same rule to the new maximum.
+The cost lands whenever no claim is open at the end of the wait, not only when the auto-arm is absent.
+A fast-failed auto-arm that publishes no failure notice also leaves no open claim, so the guard waits the full 12 seconds before each of the three budgeted re-blocks, up to about 36 seconds of wait per turn end (about 2.4 seconds at the old default).
+The wait ends early only when the watcher is healthy, a claim is open, or a fresh actionable rewake is recorded; an explicit failed outcome does not end it early.
 
 #### Auto-arm generation claim
 

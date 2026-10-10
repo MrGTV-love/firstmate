@@ -487,17 +487,9 @@ failure_episode_verified() {
   esac
 }
 
-# One latency record per wait (fm_autoarm_timing_record owns the format), so the
-# default wait stays tied to measured claim latency instead of a guess.
-WAIT_START_MS=$(fm_autoarm_timing_now_ms 2>/dev/null || true)
-guard_timing() {  # <allow|expired>
-  case "$WAIT_START_MS" in ''|*[!0-9]*) return 0 ;; esac
-  fm_autoarm_timing_record "$STATE" guard "start_ms=$WAIT_START_MS" "nominal_ms=$SYNC_WAIT_MS" "result=$1"
-}
 i=0
 while [ "$i" -lt $((SYNC_WAIT_MS / 100)) ]; do
   if autoarm_owns_recovery; then
-    guard_timing allow
     if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
       fm_failure_episode_reset "$STATE" || exit 2
     fi
@@ -507,13 +499,11 @@ while [ "$i" -lt $((SYNC_WAIT_MS / 100)) ]; do
   i=$((i + 1))
 done
 if autoarm_owns_recovery; then
-  guard_timing allow
   if fm_watcher_healthy "$STATE" "$WATCH" "$GRACE" "$FM_HOME"; then
     fm_failure_episode_reset "$STATE" || exit 2
   fi
   exit 0
 fi
-guard_timing expired
 
 # The auto-arm genuinely failed to establish: consume the bounded re-block
 # budget before considering the verified one-time attended fail-open.
