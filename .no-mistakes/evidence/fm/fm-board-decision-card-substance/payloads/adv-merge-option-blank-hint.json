@@ -1,0 +1,26 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "fm-lab",
+  "generated": "2026-10-10T09:00Z",
+  "prs_live": false,
+  "captains_call": [
+    {
+      "key": "pr-93",
+      "type": "merge",
+      "repo": "firstmate",
+      "title": "Merge watcher fix",
+      "pr_url": "https://github.com/MrGTV-love/firstmate/pull/93",
+      "risk": "Low: watcher only.",
+      "options": [
+        {
+          "value": "merge",
+          "label": "Merge now",
+          "hint": " "
+        }
+      ]
+    }
+  ],
+  "underway": [],
+  "landed": [],
+  "charted": []
+}

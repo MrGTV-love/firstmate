@@ -1,0 +1,41 @@
+$ FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=120 env -u NO_MISTAKES_GATE bash tests/fm-bearings-board.test.sh
+ok - path prints the stable home-scoped board location
+ok - build refuses malformed payloads before touching the board
+ok - charted kind is optional and accepts queued and warning
+ok - build injects the payload, binds any-origin, then arms the source
+ok - registration can consume answers only after any-origin binding exists
+ok - build establishes the Lavish session before binding and arming
+ok - rebuild refreshes the board in place without double-arming
+ok - build refuses a template without exactly one data slot
+ok - a board build reopens a session the captain ended instead of arming a dead one
+ok - build reopens a session that ends between establish and listing
+ok - build refuses to arm a poll on a session that stays ended
+ok - a rebuild starts a listener when an already-armed board has none
+ok - build drops decision cards whose subject already landed and keeps open ones
+ok - build keeps remote decisions absent from the main backlog
+ok - build fails when reconcile cannot prove a live listener
+ok - every decision card carries exactly one reconcile choice
+ok - build refuses a payload that occupies the reserved reconcile value
+ok - build reserves reconcile across non-decision cards
+ok - build refuses each recorded unusable decision card and names what is missing
+ok - build requires about, decide, hints, a named recommendation, its reason, facts, and counterfacts
+ok - build refuses bare letter or number labels and keeps descriptive ones
+ok - credential cards need about and decide
+ok - build refuses bare or hintless options on merge and credential cards
+ok - build refuses non-string facts and counterfacts on merge and credential cards
+ok - build refuses an option-less decision card by name and keeps freeform legal beside options
+rc=0
+
+$ FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=120 env -u NO_MISTAKES_GATE bash tests/fm-bearings-board-render.test.sh
+ok - overdue obligations survive an empty composed board with owner, next action, and age
+ok - a decision card shows the recommendation reason beside its option and both evidence lists
+ok - an underway row leads with the task name and still reports its run status
+ok - an underway identifier label is not replaced by run status
+ok - charted next renders the most recently filed work first
+ok - charted rows with no filed date follow the dated rows in payload order
+ok - a warning row badges needs repair while queued work keeps waiting
+ok - the charted next count counts queued work only, and still renders warnings
+ok - a warning-only board reports nothing queued and still shows the warning
+ok - omitted warnings remain separate from omitted queued work
+ok - an omitted kind renders exactly as queued work always did
+rc=0

@@ -1,0 +1,28 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "fm-lab",
+  "generated": "2026-10-10T09:00Z",
+  "prs_live": false,
+  "captains_call": [
+    {
+      "key": "codex-saved-reset",
+      "type": "decision",
+      "repo": "firstmate",
+      "title": "Codex saved reset",
+      "decide": "Your call.",
+      "options": [
+        {
+          "value": "spend",
+          "label": "Spend the GTT reset now"
+        },
+        {
+          "value": "wait",
+          "label": "Wait for the reset date"
+        }
+      ]
+    }
+  ],
+  "underway": [],
+  "landed": [],
+  "charted": []
+}

@@ -1,0 +1,45 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "fm-lab",
+  "generated": "2026-10-10T09:00Z",
+  "prs_live": false,
+  "captains_call": [
+    {
+      "key": "mac-mini-plan",
+      "type": "decision",
+      "repo": "firstmate",
+      "title": "Mac mini after the Mac Studio move",
+      "about": "The Mac Studio now runs the fleet, so the Mac mini has no job. This is open because the move finished on 2026-10-09.",
+      "decide": "What should the Mac mini do now?",
+      "options": [
+        {
+          "value": "spare",
+          "label": "Keep as cold spare",
+          "hint": "It stays powered off; it can take over in about an hour if the Studio fails."
+        },
+        {
+          "value": "ci",
+          "label": "Run CI runners",
+          "hint": "It runs the self-hosted test jobs; it uses about 20 W all day."
+        },
+        {
+          "value": "sell",
+          "label": "Sell it",
+          "hint": "It brings back cash now; there is no spare if the Studio fails."
+        }
+      ],
+      "recommend_value": "spare",
+      "recommend_reason": "A spare costs nothing while off and removes the single point of failure the move created.",
+      "facts": [
+        ""
+      ],
+      "counterfacts": [
+        "If hosted CI minutes run out, the CI option wins (billing page).",
+        "A resale price drops each quarter the mini stays idle."
+      ]
+    }
+  ],
+  "underway": [],
+  "landed": [],
+  "charted": []
+}

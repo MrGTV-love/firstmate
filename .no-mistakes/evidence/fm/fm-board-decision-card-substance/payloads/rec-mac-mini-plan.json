@@ -1,0 +1,33 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "fm-lab",
+  "generated": "2026-10-10T09:00Z",
+  "prs_live": false,
+  "captains_call": [
+    {
+      "key": "mac-mini-plan",
+      "type": "decision",
+      "repo": "firstmate",
+      "title": "Mac mini: A, B or C",
+      "about": "Open from the move to the Mac Studio.",
+      "decide": "Your call.",
+      "options": [
+        {
+          "value": "a",
+          "label": "A"
+        },
+        {
+          "value": "b",
+          "label": "B"
+        },
+        {
+          "value": "c",
+          "label": "C"
+        }
+      ]
+    }
+  ],
+  "underway": [],
+  "landed": [],
+  "charted": []
+}

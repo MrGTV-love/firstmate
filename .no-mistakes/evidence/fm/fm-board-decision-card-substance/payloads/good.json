@@ -1,0 +1,76 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "fm-lab",
+  "generated": "2026-10-10T09:00Z",
+  "prs_live": false,
+  "captains_call": [
+    {
+      "key": "mac-mini-plan",
+      "type": "decision",
+      "repo": "firstmate",
+      "title": "Mac mini after the Mac Studio move",
+      "about": "The Mac Studio now runs the fleet, so the Mac mini has no job. This is open because the move finished on 2026-10-09.",
+      "decide": "What should the Mac mini do now?",
+      "options": [
+        {
+          "value": "spare",
+          "label": "Keep as cold spare",
+          "hint": "It stays powered off; it can take over in about an hour if the Studio fails."
+        },
+        {
+          "value": "ci",
+          "label": "Run CI runners",
+          "hint": "It runs the self-hosted test jobs; it uses about 20 W all day."
+        },
+        {
+          "value": "sell",
+          "label": "Sell it",
+          "hint": "It brings back cash now; there is no spare if the Studio fails."
+        }
+      ],
+      "recommend_value": "spare",
+      "recommend_reason": "A spare costs nothing while off and removes the single point of failure the move created.",
+      "facts": [
+        "The Studio is now the only fleet host (fleet inventory, 2026-10-09).",
+        "Standard CI already runs on hosted runners (CI config)."
+      ],
+      "counterfacts": [
+        "If hosted CI minutes run out, the CI option wins (billing page).",
+        "A resale price drops each quarter the mini stays idle."
+      ]
+    },
+    {
+      "key": "pr-93",
+      "type": "merge",
+      "repo": "firstmate",
+      "title": "Merge watcher fix",
+      "pr_url": "https://github.com/MrGTV-love/firstmate/pull/93",
+      "risk": "Low: watcher only.",
+      "options": [
+        {
+          "value": "merge",
+          "label": "Merge now",
+          "hint": "The fix ships to the fleet on next sync."
+        }
+      ]
+    },
+    {
+      "key": "gh-login",
+      "type": "credential",
+      "repo": "firstmate",
+      "title": "GitHub login",
+      "about": "PR checks cannot run because the gh token expired; only you can sign in.",
+      "decide": "Run gh auth login on the Studio.",
+      "options": [
+        {
+          "value": "done",
+          "label": "I signed in",
+          "hint": "Workers retry the blocked PR checks."
+        }
+      ]
+    }
+  ],
+  "underway": [],
+  "landed": [],
+  "charted": []
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "fm-bearings-board.v1",
+  "home": "fm-lab",
+  "generated": "2026-10-10T09:00Z",
+  "prs_live": false,
+  "captains_call": [
+    {
+      "key": "watcher-future-file-age",
+      "type": "decision",
+      "repo": "firstmate",
+      "title": "Watcher future file age",
+      "decide": "Your call.",
+      "options": [
+        {
+          "value": "limit",
+          "label": "Add an age limit"
+        },
+        {
+          "value": "none",
+          "label": "No age limit"
+        }
+      ],
+      "recommend_value": "limit"
+    }
+  ],
+  "underway": [],
+  "landed": [],
+  "charted": []
+}

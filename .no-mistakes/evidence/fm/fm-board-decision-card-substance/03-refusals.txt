@@ -1,0 +1,135 @@
+=== rec-mac-mini-plan.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/rec-mac-mini-plan.json
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card is missing 'recommend_value' naming one authored option
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card is missing a non-empty 'recommend_reason' (why the recommended option beats the others)
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card needs 'facts' as a non-empty array of non-empty strings (each entry is evidence that supports the recommendation)
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card needs 'counterfacts' as a non-empty array of non-empty strings (each entry is evidence against the recommendation, or a condition that would flip it)
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'a' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'b' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'c' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'a' has the bare label 'A'; the label must say what the option is
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'b' has the bare label 'B'; the label must say what the option is
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'c' has the bare label 'C'; the label must say what the option is
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/rec-mac-mini-plan.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== rec-codex-saved-reset.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/rec-codex-saved-reset.json
+fm-bearings-board: captains_call[0] (codex-saved-reset): decision card is missing a non-empty 'about' (what the decision is and why it is open now)
+fm-bearings-board: captains_call[0] (codex-saved-reset): decision card is missing 'recommend_value' naming one authored option
+fm-bearings-board: captains_call[0] (codex-saved-reset): decision card is missing a non-empty 'recommend_reason' (why the recommended option beats the others)
+fm-bearings-board: captains_call[0] (codex-saved-reset): decision card needs 'facts' as a non-empty array of non-empty strings (each entry is evidence that supports the recommendation)
+fm-bearings-board: captains_call[0] (codex-saved-reset): decision card needs 'counterfacts' as a non-empty array of non-empty strings (each entry is evidence against the recommendation, or a condition that would flip it)
+fm-bearings-board: captains_call[0] (codex-saved-reset): option 'spend' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[0] (codex-saved-reset): option 'wait' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/rec-codex-saved-reset.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== rec-watcher-future-file-age.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/rec-watcher-future-file-age.json
+fm-bearings-board: captains_call[0] (watcher-future-file-age): decision card is missing a non-empty 'about' (what the decision is and why it is open now)
+fm-bearings-board: captains_call[0] (watcher-future-file-age): decision card is missing a non-empty 'recommend_reason' (why the recommended option beats the others)
+fm-bearings-board: captains_call[0] (watcher-future-file-age): decision card needs 'facts' as a non-empty array of non-empty strings (each entry is evidence that supports the recommendation)
+fm-bearings-board: captains_call[0] (watcher-future-file-age): decision card needs 'counterfacts' as a non-empty array of non-empty strings (each entry is evidence against the recommendation, or a condition that would flip it)
+fm-bearings-board: captains_call[0] (watcher-future-file-age): option 'limit' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[0] (watcher-future-file-age): option 'none' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/rec-watcher-future-file-age.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== rec-full-2026-10-10.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/rec-full-2026-10-10.json
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card is missing 'recommend_value' naming one authored option
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card is missing a non-empty 'recommend_reason' (why the recommended option beats the others)
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card needs 'facts' as a non-empty array of non-empty strings (each entry is evidence that supports the recommendation)
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card needs 'counterfacts' as a non-empty array of non-empty strings (each entry is evidence against the recommendation, or a condition that would flip it)
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'a' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'b' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'c' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'a' has the bare label 'A'; the label must say what the option is
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'b' has the bare label 'B'; the label must say what the option is
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'c' has the bare label 'C'; the label must say what the option is
+fm-bearings-board: captains_call[1] (codex-saved-reset): decision card is missing a non-empty 'about' (what the decision is and why it is open now)
+fm-bearings-board: captains_call[1] (codex-saved-reset): decision card is missing 'recommend_value' naming one authored option
+fm-bearings-board: captains_call[1] (codex-saved-reset): decision card is missing a non-empty 'recommend_reason' (why the recommended option beats the others)
+fm-bearings-board: captains_call[1] (codex-saved-reset): decision card needs 'facts' as a non-empty array of non-empty strings (each entry is evidence that supports the recommendation)
+fm-bearings-board: captains_call[1] (codex-saved-reset): decision card needs 'counterfacts' as a non-empty array of non-empty strings (each entry is evidence against the recommendation, or a condition that would flip it)
+fm-bearings-board: captains_call[1] (codex-saved-reset): option 'spend' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[1] (codex-saved-reset): option 'wait' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[2] (watcher-future-file-age): decision card is missing a non-empty 'about' (what the decision is and why it is open now)
+fm-bearings-board: captains_call[2] (watcher-future-file-age): decision card is missing a non-empty 'recommend_reason' (why the recommended option beats the others)
+fm-bearings-board: captains_call[2] (watcher-future-file-age): decision card needs 'facts' as a non-empty array of non-empty strings (each entry is evidence that supports the recommendation)
+fm-bearings-board: captains_call[2] (watcher-future-file-age): decision card needs 'counterfacts' as a non-empty array of non-empty strings (each entry is evidence against the recommendation, or a condition that would flip it)
+fm-bearings-board: captains_call[2] (watcher-future-file-age): option 'limit' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: captains_call[2] (watcher-future-file-age): option 'none' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/rec-full-2026-10-10.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== adv-whitespace-about.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/adv-whitespace-about.json
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card is missing a non-empty 'about' (what the decision is and why it is open now)
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/adv-whitespace-about.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== adv-disguised-bare-labels.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/adv-disguised-bare-labels.json
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'spare' has the bare label 'Option B'; the label must say what the option is
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'ci' has the bare label '(2)'; the label must say what the option is
+fm-bearings-board: captains_call[0] (mac-mini-plan): option 'sell' has the bare label 'c.'; the label must say what the option is
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/adv-disguised-bare-labels.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== adv-empty-fact-entry.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/adv-empty-fact-entry.json
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card needs 'facts' as a non-empty array of non-empty strings (each entry is evidence that supports the recommendation)
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/adv-empty-fact-entry.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== adv-no-counterfacts.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/adv-no-counterfacts.json
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card needs 'counterfacts' as a non-empty array of non-empty strings (each entry is evidence against the recommendation, or a condition that would flip it)
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/adv-no-counterfacts.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== adv-empty-reason.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/adv-empty-reason.json
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card is missing a non-empty 'recommend_reason' (why the recommended option beats the others)
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/adv-empty-reason.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== adv-freeform-only-decision.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/adv-freeform-only-decision.json
+fm-bearings-board: captains_call[0] (mac-mini-plan): decision card needs at least one authored option and a 'recommend_value' naming one of them; allow_freeform may be offered alongside options, never instead of them
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/adv-freeform-only-decision.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== adv-facts-not-array.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/adv-facts-not-array.json
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/adv-facts-not-array.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== adv-credential-no-about-decide.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/adv-credential-no-about-decide.json
+fm-bearings-board: captains_call[0] (gh-login): credential card is missing a non-empty 'about' (what breaks without it and why only the captain can do it)
+fm-bearings-board: captains_call[0] (gh-login): credential card is missing a non-empty 'decide' (the exact command or action)
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/adv-credential-no-about-decide.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+
+=== adv-merge-option-blank-hint.json
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/adv-merge-option-blank-hint.json
+fm-bearings-board: captains_call[0] (pr-93): option 'merge' is missing a non-empty 'hint' (that option's concrete consequence)
+fm-bearings-board: board data does not satisfy fm-bearings-board.v1: /Users/charlesabrooker/.no-mistakes/evidence/01M4KEQDFTSV5CPXZWVYK23TP4/payloads/adv-merge-option-blank-hint.json
+exit=1
+published board unchanged (c0438f9a61e98006)
+

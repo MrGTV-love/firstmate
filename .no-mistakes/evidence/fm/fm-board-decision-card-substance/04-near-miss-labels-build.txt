@@ -1,0 +1,19 @@
+# session still live after the 13 refusals:
+  /Users/charlesabrooker/tmp/fm-lab.PGsnTR/.lavish/bearings-board.html,open,"http://127.0.0.1:4387/session/7e0f8bcd2a4598dd",0,agent-listener
+
+$ FM_HOME=<lab> bin/fm-bearings-board.sh build payloads/ok-labels-not-bare.json   # labels 'A100 GPU box', 'I/O node'
+board: /Users/charlesabrooker/tmp/fm-lab.PGsnTR/.lavish/bearings-board.html
+session:
+  file: /Users/charlesabrooker/tmp/fm-lab.PGsnTR/.lavish/bearings-board.html
+  url: "http://127.0.0.1:4387/session/7e0f8bcd2a4598dd"
+  status: opened
+session: live
+served: /Users/charlesabrooker/tmp/fm-lab.PGsnTR/.lavish/bearings-board.html
+bound: lavish-7e0f8bcd2a4598dd
+already-armed: lavish-7e0f8bcd2a4598dd
+exit=0
+# rendered option labels now in the published board payload:
+"label":"A100 GPU box"
+"label":"I/O node"
+"label":"Keep as cold spare"
+"label":"Reconcile"
