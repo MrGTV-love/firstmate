@@ -265,7 +265,14 @@
 #   .omp/fm-session-overlay.yml through --config. That overlay pins composer
 #   shape, plan mode off, prewalk off, and the non-interactive usage-reserve
 #   policy for the one session only (--auto-approve alone owns approval,
-#   forcing tools.approvalMode: yolo for the session).
+#   forcing tools.approvalMode: yolo for the session). It also empties the Sol
+#   model's fallback chain, so a failing Sol run stops and reports through the
+#   live-model record instead of moving to a weaker model, and it pins omp's own
+#   return to the recorded model once the primary serves again.
+#   Each session publishes the model it is serving through
+#   bin/fm-omp-live-model.ts (a crewmate or scout from its per-task extension, a
+#   secondmate from the home's tracked extension), and bin/fm-crew-state.sh
+#   reports a differing model or an unrecovered run error beside the state.
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
 #   Secondmate lanes keep their memory settings; the captain's own
@@ -5527,6 +5534,7 @@ EOF
     guard_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guard_config" --arg state "$STATE_REAL" \
       --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" --arg project "$guard_project" \
       '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project}') || exit 1
+    rm -f "$STATE/$ID.live-model"
     cat >"$STATE/$ID.omp-ext.ts" <<EOF
 // Firstmate semantic busy-state events for omp (Oh My
 // Pi); written by fm-spawn under the contract owned by bin/fm-busy-lib.sh.
@@ -5542,6 +5550,7 @@ EOF
 import { execFile } from "node:child_process";
 import { installJevGuard } from "$FM_ROOT/bin/fm-jev-guard.ts";
 import { installTaskSessionProof } from "$FM_ROOT/.omp/extensions/lib/fm-task-session.ts";
+import { installLiveModelPublisher } from "$FM_ROOT/bin/fm-omp-live-model.ts";
 const busyEvent = (state: string, event: string) =>
   new Promise<void>((resolve) => {
     execFile("$FM_ROOT/bin/fm-busy-event.sh", [
@@ -5552,6 +5561,8 @@ const busyEvent = (state: string, event: string) =>
 export default function (pi: any) {
   installJevGuard(pi, $guard_context);
   installTaskSessionProof(pi, "$STATE_REAL", "$ID");
+  // The model serving this task now, for bin/fm-crew-state.sh's drift note.
+  installLiveModelPublisher(pi, "$STATE_REAL/$ID.live-model");
   pi.on("agent_start", () => busyEvent("busy", "agent-start"));
   pi.on("agent_end", (event: any) => {
     if (event && event.willContinue === true) return;
@@ -6104,6 +6115,7 @@ if [ "$CLAUDE_LAUNCH_BIN" != claude ]; then
   LAUNCH="$tc_env $LAUNCH"
 fi
 if [ "$KIND" = secondmate ]; then
+  [ "$HARNESS" != omp ] || rm -f "$PROJ_ABS/state/.omp-live-model"
   sq_home=$(shell_quote "$PROJ_ABS")
   sq_primary_home=$(shell_quote "$FM_HOME")
   # Keep this in step with fm_supervision_model (bin/fm-wake-lib.sh): Claude's

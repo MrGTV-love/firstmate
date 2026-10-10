@@ -1423,6 +1423,42 @@ Additional isolated live validation on 2026-10-09, with omp 18.8.1 on Herdr 0.9.
 After the bounded wait, the extension submitted the wake alone, omp consumed the queued follow-up, and the editor retained exactly the unsent draft.
 The before-change extension also reproduced the stranded older-wiring wake: it remained above the draft until the live check timed out; the changed extension delivered it and left exactly the draft.
 
+### 2026-10-09 omp fallback chain
+
+Verified on 2026-10-09 on macOS arm64 against omp 18.8.7, with the built-in `openai-codex` and `deepseek` providers pointed at scripted local servers through an isolated agent directory's `models.yml`, so no model tokens were spent.
+The agent directory's `config.yml` carries the operator's Sol chain as it stands, `openai-codex/gpt-6.1-sol` to `deepseek/deepseek-v4-pro`, and one other chain, `deepseek/deepseek-v4-pro` to a lab-only route.
+The guard drives `omp -p` with the tracked session overlay `.omp/fm-session-overlay.yml`, the overlay every Firstmate-launched omp session carries.
+
+- **The incident reproduces without the overlay.**
+  With the primary refusing, the global chain moved the session on to the weak model, which answered.
+  That is how a lane recorded on Sol ended on `deepseek-v4-flash` on 2026-10-09: the primary hit its usage limit, then the equal refused for credits.
+- **The overlay empties the Sol chain.**
+  With the overlay, the weak model received no request, the run exited non-zero with the primary's rate-limit error, and the live-model record named the recorded model and carried the error.
+  omp merges `--config` overlays key by key and replaces an array whole, so the overlay's empty Sol entry replaced the global Sol chain and left every other chain alone: with the overlay, a session on the other chain's model still moved to that chain's route when its model refused.
+  Fleet agents run on no OpenRouter route, so the equal is not a chain hop; a stand-in is chosen at dispatch or relaunch.
+- **omp returns to the recorded model by itself.**
+  `retry.fallbackRevertPolicy: cooldown-expiry` restores the original selector at the next prompt once its suppression window ends; it never steps back to an intermediate route, and a primary that is out of quota for days stays suppressed for days.
+  The guard layers a lab-only chain after the tracked overlay (a later `--config` wins) so a fallback can happen at all.
+  A refusal classed as a concurrency limit is suppressed for 5 seconds, so the guard's second prompt ran on the primary again and the record followed.
+  The overlay pins the policy, because a global `never` left the same session on its fallback in the control run.
+- **A provider's own short `retry-after` never reaches the chain.**
+  A 429 whose `retry-after` is a few seconds is waited out inside the provider call, so the session retries the same model and no fallback happens; only a refusal that surfaces to omp's retry layer, such as a long usage limit or a 402, moves a session.
+
+`bin/fm-crew-state.sh` reads the live-model record (`bin/fm-omp-live-model.ts`) and adds `model-drift` and `run-error` components, so a session that moved or stopped is visible rather than silent.
+The guard refreshes this entry after any omp upgrade and spends no tokens, so it runs wherever omp and python3 are installed:
+
+```sh
+FM_OMP_FALLBACK_LIVE=1 tests/fm-omp-fallback-chain-live-e2e.test.sh
+```
+
+```text
+ok - omp (omp/18.8.7): control - the global Sol chain alone still falls to the weak model
+ok - omp (omp/18.8.7): the overlay empties the Sol chain, the run stops with the provider error, and the record carries it
+ok - omp (omp/18.8.7): the overlay leaves another model's global chain in place
+ok - omp (omp/18.8.7): with the overlay a fallen-back session returns to its recorded model at the next prompt even under a global fallbackRevertPolicy: never
+ok - omp (omp/18.8.7): control - without the overlay a global fallbackRevertPolicy: never keeps the session on the fallback
+```
+
 ## Steering-inbox doorbell
 
 The steering channel's one behavioral assumption - a real worker agent follows the constant self-describing doorbell line (list the inbox, read and act on its records in numeric order, then `mv` each into `handled/`) - was verified on 2026-08-23 against every installed verified harness, on tmux 3.6a, macOS arm64, on an isolated private socket, driving the REAL `bin/fm-send.sh` end to end (durable record plus doorbell, with one mid-wait re-ring playing the watcher's role).
