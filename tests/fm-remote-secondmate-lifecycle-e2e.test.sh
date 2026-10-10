@@ -39,6 +39,10 @@ cleanup() {
     kill "$watch_pid" 2>/dev/null || true
     wait "$watch_pid" 2>/dev/null || true
   fi
+  if [ -n "${pane_shell_pid:-}" ]; then
+    kill "$pane_shell_pid" 2>/dev/null || true
+    wait "$pane_shell_pid" 2>/dev/null || true
+  fi
   # The liveness-lock holder is otherwise stopped only by an inline kill.
   if [ -n "${liveness_holder_pid:-}" ]; then
     kill "$liveness_holder_pid" 2>/dev/null || true
@@ -1374,12 +1378,15 @@ cp "$PARENT/state/ios.meta" "$WATCH_STATE/ios.meta"
 cp "$PARENT/state/.remote-inherit-ios.generation" "$WATCH_STATE/" 2>/dev/null || true
 touch "$WATCH_STATE/home-summary.json"
 
-# A graceful agent exit leaves the pane with no registered agent - the exact
-# incident this tick exists for.
+# A graceful agent exit leaves the pane with no registered agent and only its
+# shell running - the exact incident this tick exists for. The shell is a real,
+# childless, bounded process so the process view can prove the pane agent-free.
 ios_pane=$(sed -n 's/^herdr_pane_id=//p' "$remote_route_meta")
 [ -n "$ios_pane" ] || fail "the remote route meta did not record its Herdr pane"
-jq --arg p "$ios_pane" \
-  '.typed |= with_entries(select(.key != $p)) | .working |= with_entries(select(.key != $p))' \
+sleep "$((FM_TEST_STUB_MAX_BLOCK_SECONDS * 5))" &
+pane_shell_pid=$!
+jq --arg p "$ios_pane" --argjson shell "$pane_shell_pid" \
+  '.typed |= with_entries(select(.key != $p)) | .working |= with_entries(select(.key != $p)) | .shell_pid = $shell' \
   "$HERDR_STATE" > "$TMP_ROOT/herdr-dead.json" && mv "$TMP_ROOT/herdr-dead.json" "$HERDR_STATE"
 [ "$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh state ios)" = dead ] \
   || fail "the agent-free remote pane did not classify dead"
@@ -1431,6 +1438,9 @@ assert_grep '- ios ' "$PARENT/data/secondmates.md" \
 # parent state out of scope, so fold both records back now.
 cp "$WATCH_STATE/ios.meta" "$PARENT/state/ios.meta"
 cp "$WATCH_STATE/.remote-inherit-ios.generation" "$PARENT/state/" 2>/dev/null || true
+kill "$pane_shell_pid" 2>/dev/null || true
+wait "$pane_shell_pid" 2>/dev/null || true
+pane_shell_pid=''
 pass "watch liveness: a dead remote secondmate is auto-relaunched on its own host with one wake"
 
 # Host loss mid-supervision is never evidence of death: the same tick on an
