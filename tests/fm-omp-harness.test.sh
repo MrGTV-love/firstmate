@@ -1431,7 +1431,7 @@ EOF
   pass ".omp watch extension: a home without config/supervision-host or with an off file keeps the plain arm"
 }
 
-test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|stuck|rejected|unrestored>
+test_watch_extension_delivers_host_handbacks() {  # <outcome|away-return|busy|stuck|rejected|unrestored|refused>
   local kind=${1:-outcome} repo home log out status
   repo="$TMP_ROOT/watch-host-handoff-$kind/repo"; home="$TMP_ROOT/watch-host-handoff-$kind/home"; log="$TMP_ROOT/watch-host-handoff-$kind/arm.log"
   install_omp_extension_fixture "$repo"
@@ -1468,12 +1468,17 @@ import { pathToFileURL } from "node:url";
 import { writeFileSync, readFileSync, existsSync } from "node:fs";
 writeFileSync(`${process.env.FM_HOME}/state/.lock`, `${process.pid}\n`);
 const handoff = `${process.env.FM_HOME}/state/extensions/omp-primary-watch/session-replacement-actionable.json`;
-const handlers = new Map(); let tool = null; const sent = [];
+const handlers = new Map(); let tool = null; const sent = []; const notices = []; let refusals = 0, refused = 0;
 const pi = {
   on(e, h) { handlers.set(e, h); },
   registerCommand() {},
   registerTool(t) { tool = t; },
   sendUserMessage(m, o) {
+    if (refusals > 0 && !o?.deliverAs) {
+      refusals -= 1;
+      refused += 1;
+      throw new Error("omp refused the prompt");
+    }
     sent.push({ m, o });
     // The omp prompt flow starts a turn, which consumes the message.
     if (stuck && !o?.deliverAs) handlers.get("message_start")({ message: { role: "user", content: m } }, ctx);
@@ -1492,8 +1497,8 @@ const failure = { rejected: "watcher: FAILED - handling delivery confirmation wa
 let editor = "";
 const ctx = stuck
   ? { hasUI: true, isIdle: () => idle, hasPendingMessages: () => true, ui: { getEditorText: () => "", setEditorText() {} } }
-  : failure
-    ? { hasUI: true, isIdle: () => true, hasPendingMessages: () => false, ui: { getEditorText: () => editor, setEditorText: (value) => { editor = value; } } }
+  : failure || process.env.HAND_BACK_KIND === "refused"
+    ? { hasUI: true, isIdle: () => true, hasPendingMessages: () => false, ui: { getEditorText: () => editor, setEditorText: (value) => { editor = value; }, notify: (m) => { notices.push(m); } } }
     : { isIdle: () => process.env.HAND_BACK_KIND !== "busy" };
 await handlers.get("before_agent_start")({}, ctx);
 await tool.execute();
@@ -1512,6 +1517,17 @@ if (failure) {
   const handbacks = sent.filter(({ m }) => m.includes("FIRSTMATE SUPERVISION HOST:"));
   if (editor !== "" || handbacks.length !== 2) throw new Error(`the restored hand-back was not sent again: ${JSON.stringify(sent)}`);
   if (!handbacks[1].m.includes(failure) || !handbacks[1].m.includes("branch-outcome:")) throw new Error(`the re-sent hand-back lost its failure: ${handbacks[1].m}`);
+}
+if (process.env.HAND_BACK_KIND === "refused") {
+  // Escape restores the hand-back, then omp refuses every resend: the copy
+  // must survive in the composer, each refusal counts, and the third warns once.
+  editor = sent[0].m;
+  refusals = 3;
+  const warned = () => notices.filter((m) => m.includes("wake not delivered"));
+  for (let i = 0; i < 150 && (refused < 3 || warned().length < 1); i += 1) await new Promise((r) => setTimeout(r, 100));
+  if (refused !== 3 || warned().length !== 1 || editor !== sent[0].m || sent.length !== 1) throw new Error(`a refused restored hand-back was lost or not bounded: ${JSON.stringify({ refused, notices, editor, sent })}`);
+  await new Promise((r) => setTimeout(r, 1500));
+  if (refused !== 3 || warned().length !== 1 || editor !== sent[0].m || sent.length !== 1) throw new Error(`a refused restored hand-back was retried or warned again past its bound: ${JSON.stringify({ refused, notices })}`);
 }
 if (stuck) {
   // omp went idle and never ran the queued follow-up.
@@ -3545,6 +3561,7 @@ test_watch_extension_delivers_host_handbacks busy
 test_watch_extension_delivers_host_handbacks stuck
 test_watch_extension_delivers_host_handbacks rejected
 test_watch_extension_delivers_host_handbacks unrestored
+test_watch_extension_delivers_host_handbacks refused
 test_watch_extension_marks_host_closes_without_headlines boundary
 test_watch_extension_marks_host_closes_without_headlines note
 test_watch_extension_marks_host_closes_without_headlines archived

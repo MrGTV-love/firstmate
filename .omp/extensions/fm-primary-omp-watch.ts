@@ -1004,7 +1004,7 @@ export default function (pi: ExtensionAPI) {
     owner.flushing = true;
     try {
       if (!sessionIsIdle()) return "held";
-      if (recoverRestoredWake(owner)) return "held";
+      if (await recoverRestoredWake(owner)) return "held";
       releaseWatcherWakes(owner, true);
       const outstanding = [...owner.unconsumedWakes].some(([token, wake]) => wake.pending && !operationalHandback(wake.pending.message) && (!owner.heldWakes.has(token) || latestContext?.hasPendingMessages?.()));
       if (outstanding || owner.heldWakes.size === 0) return "held";
@@ -1061,23 +1061,30 @@ export default function (pi: ExtensionAPI) {
     } catch {}
   }
 
-  // An unconsumed watcher wake becomes a mark again, so the queue read builds
-  // fresh text; an operational hand-back is sent again with the message it was
-  // first sent with, plus its send-time note;
-  // other text, which names no queued row, is resent as emitted.
-  function redeliverWake(owner: SessionGeneration, token: string, wake: UnconsumedWake): boolean {
+  // An operational hand-back is sent again with the message it was first sent
+  // with, plus its send-time note; other text, which names no queued row, is
+  // resent as emitted. A refused send rejects either way.
+  async function resendPrompt(owner: SessionGeneration, token: string, wake: UnconsumedWake): Promise<void> {
     if (!wake.pending) {
-      pi.sendUserMessage(wake.content);
-      return true;
+      await pi.sendUserMessage(wake.content);
+      return;
     }
     owner.unconsumedWakes.delete(token);
-    if (operationalHandback(wake.pending.message)) {
-      void sendWake(owner, wake.message ?? wake.pending.message, wake.pending).catch((error) => {
+    await sendWake(owner, wake.message ?? wake.pending.message, wake.pending);
+  }
+
+  // An unconsumed watcher wake becomes a mark again, so the queue read builds
+  // fresh text; any other wake is resent as a prompt.
+  function redeliverWake(owner: SessionGeneration, token: string, wake: UnconsumedWake): boolean {
+    if (!wake.pending || operationalHandback(wake.pending.message)) {
+      void resendPrompt(owner, token, wake).catch((error) => {
+        if (!wake.pending) return;
         const detail = error instanceof Error ? error.message : String(error);
         surfaceFailure(owner, `watcher: FAILED - omp extension could not deliver an operational hand-back\n${detail}`);
       });
       return true;
     }
+    owner.unconsumedWakes.delete(token);
     owner.heldWakes.set(token, { pending: wake.pending });
     return false;
   }
@@ -1107,7 +1114,7 @@ export default function (pi: ExtensionAPI) {
   // The one place that decides a restored or stuck-queue prompt: it sends at
   // most one and reports whether it did. flushHeldWakes is its only caller, and
   // every trigger (turn end, flush timer, new work) goes through flushHeldWakes.
-  function recoverRestoredWake(owner: SessionGeneration): boolean {
+  async function recoverRestoredWake(owner: SessionGeneration): Promise<boolean> {
     if (!generationIsLive(owner)) return false;
     const ctx = editorContext();
     if (!ctx) return false;
@@ -1150,9 +1157,10 @@ export default function (pi: ExtensionAPI) {
         restoreAttempts.set(token, attempts + 1);
         owner.restorePendingWaits = 0;
         try {
-          redeliverWake(owner, token, wake);
+          await resendPrompt(owner, token, wake);
         } catch {
-          ctx.ui.setEditorText(editor);
+          owner.unconsumedWakes.set(token, wake);
+          if (String(ctx.ui.getEditorText() ?? "") === remainder) ctx.ui.setEditorText(editor);
           if (attempts + 1 === restoreAttemptLimit) {
             reportWait(
               ctx,
