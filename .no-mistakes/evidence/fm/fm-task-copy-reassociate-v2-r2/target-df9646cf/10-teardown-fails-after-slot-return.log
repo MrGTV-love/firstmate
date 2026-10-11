@@ -1,0 +1,28 @@
+## worker discarded the late slot commit: slot HEAD f642a68 (= anchor refs/fm/anchor/labship-f642a68, landed on main)
+## fault injected: a plain file at $LAB/state/terminal-outcomes, so fm-inactive-reconcile.sh report (a step AFTER the slot return) fails
+
+### bin/fm-teardown.sh labship   (plain, first run)
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for labship: 72677 81273
+teardown: force-killing leaked worktree process(es) for labship: 72677
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+mkdir: /Users/charlesabrooker/tmp/fm-lab.6UznEI/state/terminal-outcomes: File exists
+error: labship's final outcome has not reached the parent channel; retaining every durable task record so a rerun can retry the delivery
+exit=1
+
+nested copy exists: no
+nested branch kept: f642a68
+slot claim file exists: no
+task record exists: yes
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj/.claude/worktrees/fm-labship-v2
+mode=local-only
+branch=fm/labship-v2
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+treehouse status:
+
+base  main  (repository default)
+1     available    ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj  (detached)
+backlog state: in_flight

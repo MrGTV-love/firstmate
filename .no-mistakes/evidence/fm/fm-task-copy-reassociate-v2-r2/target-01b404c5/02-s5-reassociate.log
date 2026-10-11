@@ -1,0 +1,15 @@
+## worker S5 setup: commit in the slot, cut a fresh copy outside the pool (d1 shape)
+slot HEAD 73c8173
+fatal: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J53Z7PV6VG61D4MCRBMMRQ: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J53Z7PV6VG61D4MCRBMMRQ' is outside repository at '/Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj'
+73c8173 worker progress
+f126ba1 init
+
+### reassociate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.pAq1JQ
+reassociated labone worktree=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/copies/labone-v2 branch=fm/labone-v2 prior=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj
+exit=0
+
+worktree=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/copies/labone-v2
+branch=fm/labone-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj
+pane cwd: /Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj cmd=2.1.296

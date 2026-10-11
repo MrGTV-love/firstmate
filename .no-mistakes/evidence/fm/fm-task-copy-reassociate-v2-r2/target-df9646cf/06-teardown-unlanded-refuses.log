@@ -1,0 +1,7 @@
+### bin/fm-teardown.sh labship   (nested copy's commit is not on local main)
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+f642a68 feature work in old copy
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1 fingerprint before=3992620ff70b7365 after=3992620ff70b7365 UNCHANGED

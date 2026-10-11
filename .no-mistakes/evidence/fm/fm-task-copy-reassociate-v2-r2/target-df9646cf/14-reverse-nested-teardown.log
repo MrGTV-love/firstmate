@@ -1,0 +1,58 @@
+### bin/fm-teardown.sh labtwo   (current copy = slot 2, not landed yet)
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+0f07629 labtwo work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+record exists: yes; nested prior exists: yes
+
+### bin/fm-merge-local.sh labtwo
+
+### bin/fm-teardown.sh labtwo   (plain; slot landed; nested prior copy HEAD 3fbf314 held by anchor, not landed)
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+0f07629 labtwo work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+
+record exists: yes
+nested prior copy exists: yes
+nested prior branch kept: 3fbf314
+anchor kept: 3fbf314
+slot 2 claim exists: yes
+backlog: - [ ] labtwo - Lab ship two (reverse nested) (repo: proj) (kind: ship) (since 2026-10-10) - [ ] labnext - Lab scout two (repo: proj) (kind: scout) (since 2026-10-10) 
+treehouse status:
+
+base  main  (repository default)
+1     in-use       ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj  (detached)
+                   zsh (22736), 2.1.296 (32245)
+2     in-use       ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj  [fm/labtwo]
+                   zsh (27446), 2.1.296 (38527)
+
+## (setup) local main moved when labship landed; worker rebases fm/labtwo onto local main in slot 2
+7fe97f0 labtwo work
+f642a68 feature work in old copy
+
+### bin/fm-merge-local.sh labtwo
+merged fm/labtwo into local main (f642a68 -> 7fe97f0) in /Users/charlesabrooker/tmp/fm-labw.vuezng/proj
+
+### bin/fm-teardown.sh labtwo   (plain; slot landed; nested prior copy HEAD 3fbf314 held by anchor, not landed)
+teardown: reaping leaked worktree process(es) for labtwo: 27446 38527
+teardown: force-killing leaked worktree process(es) for labtwo: 27446
+🌳 Worktree returned to pool.
+teardown labtwo complete (window fmlab:fm-labtwo, worktree /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj)
+Backlog: labtwo is closed in /Users/charlesabrooker/tmp/fm-lab.6UznEI/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+record exists: no
+nested prior copy exists: no
+nested prior branch kept: 3fbf314
+anchor kept: 3fbf314
+slot 2 claim exists: no
+backlog: - [x] labtwo - Lab ship two (reverse nested) (repo: proj) (kind: ship) (done 2026-10-10)   local main 
+treehouse status:
+
+base  main  (repository default)
+1     in-use       ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj  (detached)
+                   zsh (22736), 2.1.296 (32245)
+2     available    ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj  (detached)

@@ -1,0 +1,46 @@
+## record before
+window=fmlab:fm-labship
+endpoint_task_id=labship
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+project=/Users/charlesabrooker/tmp/fm-labw.vuezng/proj
+harness=claude
+kind=ship
+mode=local-only
+yolo=off
+branch=fm/labship
+tasktmp=/tmp/fm-labship
+model=sonnet
+effort=low
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791687025.77567.25567
+spawn_gen=s1791687026.63325.30241
+
+## crew-state BEFORE reassociation
+state: unknown · source: pane · harness state unavailable (unknown launch-prompt)
+
+## worker S5 setup (nested copy, d3 GRE-1937 shape)
++(eval):8> git -C /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj switch -q -c fm/labship
++(eval):9> printf 'feature work\n'
++(eval):9> git -C /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj add feature.txt
++(eval):9> git -C /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj -c 'user.email=lab@x' -c 'user.name=lab' commit -qm 'feature work in old copy'
++(eval):10> git -C /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj bundle create -q /Users/charlesabrooker/tmp/fm-labw.vuezng/labship.bundle origin/main..fm/labship
++(eval):11> mkdir -p /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj/.claude/worktrees
++(eval):12> git -C /Users/charlesabrooker/tmp/fm-labw.vuezng/proj worktree add -q -b fm/labship-v2 /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj/.claude/worktrees/fm-labship-v2 origin/main
++(eval):13> git -C /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj/.claude/worktrees/fm-labship-v2 fetch -q /Users/charlesabrooker/tmp/fm-labw.vuezng/labship.bundle fm/labship
++(eval):14> git -C /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj/.claude/worktrees/fm-labship-v2 -c 'user.email=lab@x' -c 'user.name=lab' cherry-pick FETCH_HEAD
+[fm/labship-v2 f642a68] feature work in old copy
+ Date: Sat Oct 10 21:51:20 2026 -0500
+ 1 file changed, 1 insertion(+)
+ create mode 100644 feature.txt
++(eval):15> set +x
+f642a68 feature work in old copy
+f7bb7fb treehouse pool root
+8bd5128 base
+## fm/labship
+?? .claude/
+
+## crew-state still reads the OLD copy (record names the slot)
+state: unknown · source: pane · harness state unavailable (unknown launch-prompt)
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+branch=fm/labship

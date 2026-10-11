@@ -1,0 +1,10 @@
+### bin/fm-teardown.sh labship --force --drop-file <captain words>   (same late unanchored slot commit)
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj would sweep away task labship's claimed pool slot /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj, whose HEAD cd8b87f9477043e2f7a7dcf16d75abe3102bb650 is neither landed nor held by a refs/fm/anchor/labship-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+exit=1 fingerprint before=343bde0c44aa2cfa after=343bde0c44aa2cfa UNCHANGED
+late.txt still in slot: late slot work
+nested copy still exists: yes
+windows: home fm-labship 
+record exists: yes
+backlog state: in_flight

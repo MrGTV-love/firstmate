@@ -1,0 +1,9 @@
+pane cwd (unrecorded path): /Users/charlesabrooker/tmp/fm-lab.7B5Qyk/projects cmd=zsh
+worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/copies/labone-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/1/proj
+### relaunch must refuse
+error: task labone's endpoint is in '/Users/charlesabrooker/tmp/fm-lab.7B5Qyk/projects', not its recorded worktree '/Users/charlesabrooker/tmp/fm-labw.1el5BA/copies/labone-v2'; refusing to relaunch an agent outside the copy holding its work
+error: the replacement agent for labone could not be launched on claude
+error: labone's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-labw.1el5BA/copies/labone-v2
+exit=
+pane cwd after: /Users/charlesabrooker/tmp/fm-lab.7B5Qyk/projects cmd=zsh

@@ -1,0 +1,25 @@
+pane cwd before: /Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj cmd=zsh
+### fm-control labone relaunch (fixed fm-spawn.sh; record has released_worktree=<old slot>)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.pAq1JQ
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.pAq1JQ
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+warning: /Users/charlesabrooker/tmp/fm-lab.pAq1JQ/data/labone/launch-brief.md records no ship branch; relaunching on the task's recorded branch fm/labone-v2
+warning: /Users/charlesabrooker/tmp/fm-lab.pAq1JQ/data/labone/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: labone ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: labone ships branch=fm/labone-v2 while proj registers the ship-branch prefix 'fm/' (branch fm/labone) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labone: unavailable - no TypeSafe or OpenRouter key
+relaunched labone harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=fmlab:fm-labone worktree=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/copies/labone-v2
+exit=
+pane cwd after: /Users/charlesabrooker/tmp/fm-labw.WaTgxz/copies/labone-v2 cmd=2.1.296
+⏺ idle
+✻ Worked for 6s · done 11:23 PM
+                                                                                                  tmux focus-events off · add 'set -g focus-events on' to ~/.tmux.conf and reattach for focus tracking
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 3% 34k/1.0M fm/labone-v2 labone-v2:123bda13
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+worktree=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/copies/labone-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj
+claude cwd per lsof:
+pid 44184 treehouse get cwd=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/proj

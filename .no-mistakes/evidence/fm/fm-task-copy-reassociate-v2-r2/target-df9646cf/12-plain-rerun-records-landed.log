@@ -1,0 +1,29 @@
+## fault removed; slot 1 now belongs to labnext (claim task=labnext, HEAD f7bb7fb)
+
+### bin/fm-teardown.sh labship   (plain re-run: no --force, no --drop-file)
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown labship complete (window fmlab:fm-labship; nested reassociated worktree /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj/.claude/worktrees/fm-labship-v2 was already removed by an earlier teardown, and its pool slot /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj is no longer this task's, so it was left alone)
+Backlog: labship is closed in /Users/charlesabrooker/tmp/fm-lab.6UznEI/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+task record exists: no
+backlog row:
+task:
+  id: labship
+  title: Lab ship for copy reassociation
+  state: done
+  blocked: no
+  blocked_by: none
+captain-drop record exists: no
+slot 1 claim still labnext's and unchanged: yes
+task=labnext
+home=/Users/charlesabrooker/tmp/fm-lab.6UznEI
+slot 1 HEAD unchanged: yes
+labnext window alive: fm-labnext dead=0
+treehouse status:
+
+base  main  (repository default)
+1     in-use       ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj  (detached)
+                   zsh (22736), 2.1.296 (32245), caffeinate (37550)
+7:- [x] labship - Lab ship for copy reassociation (repo: proj) (kind: ship) (done 2026-10-10)
+8-  local main

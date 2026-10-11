@@ -1,0 +1,53 @@
+### spawn labthree
+spawned labthree harness=claude kind=ship mode=local-only yolo=off window=fmlab:fm-labthree worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj
+## worker S5: commit in slot, bundle, nested fresh copy from origin/main, carry over, one more commit in the fresh copy
+slot HEAD 8da5879; nested HEAD 3d63a36
+
+### bin/fm-control.sh labthree reassociate --worktree <nested> --note ...
+reassociated labthree worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj/.claude/worktrees/fm-labthree-v2 branch=fm/labthree-v2 prior=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj slot=kept
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj/.claude/worktrees/fm-labthree-v2
+branch=fm/labthree-v2
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj
+
+### bin/fm-spawn.sh labfour --scout   (slot 2 holds labthree's nested current copy; slot 1 is labnext's)
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj contains task labthree's current copy /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj/.claude/worktrees/fm-labthree-v2; refusing allocation before treehouse get
+labfour record exists: no
+
+### bin/fm-merge-local.sh labthree
+merged fm/labthree-v2 into local main (7fe97f0 -> 3d63a36) in /Users/charlesabrooker/tmp/fm-labw.vuezng/proj
+slot HEAD 8da5879 and its anchor (the carried-over commit kept the same sha, so the slot HEAD is also landed):
+refs/fm/anchor/labthree-8da5879 8da5879
+slot HEAD is ancestor of main
+
+### bin/fm-teardown.sh labthree   (plain, one run)
+teardown: reaping leaked worktree process(es) for labthree: 25133 32738 40564
+teardown: force-killing leaked worktree process(es) for labthree: 25133
+🌳 Worktree returned to pool.
+teardown labthree complete (window fmlab:fm-labthree; nested reassociated worktree /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj/.claude/worktrees/fm-labthree-v2 removed and its pool slot /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj returned)
+Backlog: labthree is closed in /Users/charlesabrooker/tmp/fm-lab.6UznEI/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+record exists: no
+nested copy exists: no
+nested branch kept: 3d63a36
+slot claim exists: no
+anchors kept:
+refs/fm/anchor/labthree-8da5879 8da5879
+backlog: - [x] labthree - Lab ship three (forward nested, one run) (repo: proj) (kind: ship) (done 2026-10-10)   local main 
+git worktrees:
+/Users/charlesabrooker/tmp/fm-labw.vuezng/proj                               3d63a36 [main]
+/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj f7bb7fb (detached HEAD)
+/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj 3d63a36 (detached HEAD)
+treehouse status:
+
+base  main  (repository default)
+1     in-use       ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj  (detached)
+                   zsh (22736), 2.1.296 (32245)
+2     available    ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj  (detached)
+
+### bin/fm-spawn.sh labfour --scout   (after labthree is retired)
+spawned labfour harness=claude kind=scout window=fmlab:fm-labfour worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj
+labfour record: worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj
+slot claim:
+task=labfour
+home=/Users/charlesabrooker/tmp/fm-lab.6UznEI

@@ -1,0 +1,20 @@
+## d1 shape: worker commits in the slot, cuts a fresh copy outside the pool
+fatal: a branch named 'fm/labone' already exists
+fm/labone
+3a7eca9 worker progress
+8867172 init
+### reassociate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.7B5Qyk
+error: reassociate requires --note (or --note-file) saying why the work moved; it is recorded in the task's instructions
+exit=1
+worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/1/proj
+branch=fm/labone
+pane cwd: /Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/1/proj cmd=2.1.296
+### reassociate (with --note)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.7B5Qyk
+reassociated labone worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/copies/labone-v2 branch=fm/labone-v2 prior=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/1/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/1/proj
+exit=0
+worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/copies/labone-v2
+branch=fm/labone-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/1/proj
+pane cwd before relaunch: /Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/1/proj cmd=2.1.296

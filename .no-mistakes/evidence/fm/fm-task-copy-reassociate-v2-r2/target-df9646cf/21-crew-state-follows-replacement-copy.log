@@ -1,0 +1,72 @@
+### spawn labsix
+skill selection for labsix: unavailable - no TypeSafe or OpenRouter key
+spawned labsix harness=claude kind=ship mode=local-only yolo=off window=fmlab:fm-labsix worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+## worker: one commit in the OLD copy on a detached HEAD (reachable from no branch), then a done: status line
+old copy HEAD 610ab54 branch: (detached)
+
+### bin/fm-crew-state.sh labsix   (record names the OLD copy)
+state: working · source: pane · harness busy (claude-hook)
+
+## worker S5: fresh copy outside the pool on branch fm/labsix, work carried over
+new copy HEAD 610ab54 branch: fm/labsix
+
+### bin/fm-crew-state.sh labsix   (work moved, record NOT yet re-pointed: still reads the old copy)
+state: working · source: pane · harness busy (claude-hook)
+
+### bin/fm-control.sh labsix reassociate --worktree $W/copies/labsix-v2 --note ...
+reassociated labsix worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2 branch=fm/labsix prior=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2
+branch=fm/labsix
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+
+### bin/fm-crew-state.sh labsix   (record names the REPLACEMENT copy)
+state: done · source: status-log · labsix finished
+
+## NOTE: the pair above is confounded: the worker was mid-turn during the first two reads (pane said busy) and idle by the third.
+## Clean A/B/A below, with the worker idle the whole time (pane checked before each read).
+## The old copy gets a commit reachable from no branch, so its done: claim cannot pass the named-head gate; the replacement copy's HEAD is on fm/labsix.
+old copy (slot) HEAD c526f61 on no branch; replacement copy HEAD 610ab54 on fm/labsix
+
+[A] record names the replacement copy: worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2
+pane: ✻ Sautéed for 4s · done 10:06 PM
+state: done · source: status-log · labsix finished
+
+### bin/fm-control.sh labsix reassociate --worktree <old slot copy>   (point the record back at the old copy)
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj has a detached HEAD; a ship's record names the branch it delivers, so check that branch out there first
+[B] (refused above, so the record still names the replacement copy): worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2
+pane: ✻ Sautéed for 4s · done 10:06 PM
+state: done · source: status-log · labsix finished
+
+### bin/fm-control.sh labsix reassociate --worktree $W/copies/labsix-v2   (forward again)
+error: task labsix's record already names /Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2; nothing to reassociate
+[A] record names the replacement copy: worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2
+pane: ✻ Sautéed for 4s · done 10:06 PM
+state: done · source: status-log · labsix finished
+
+## final record
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2
+branch=fm/labsix
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+anchors:
+refs/fm/anchor/labsix-610ab54 610ab54
+
+## Second clean check: the record names an old copy that no longer exists.
+## Worker does S5 again: fresh copy labsix-v3 on branch fm/labsix-v3 with the work, then deletes its own old copy labsix-v2.
+old copy labsix-v2 exists: no; replacement labsix-v3 HEAD 610ab54 on fm/labsix-v3
+
+[before] record: worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2
+pane: ✻ Sautéed for 4s · done 10:06 PM
+$ bin/fm-crew-state.sh labsix
+state: unknown · source: none · worktree gone (torn down?)
+
+### bin/fm-control.sh labsix reassociate --worktree $W/copies/labsix-v3 --note ...
+reassociated labsix worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v3 branch=fm/labsix-v3 prior=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2 prior_state=absent slot=none
+exit=0
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v3
+branch=fm/labsix-v3
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v2
+
+[after] pane: ✻ Sautéed for 4s · done 10:06 PM
+$ bin/fm-crew-state.sh labsix
+state: done · source: status-log · labsix finished

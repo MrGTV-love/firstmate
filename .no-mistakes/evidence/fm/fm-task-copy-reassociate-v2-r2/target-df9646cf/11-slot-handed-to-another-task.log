@@ -1,0 +1,14 @@
+### bin/fm-spawn.sh labnext $W/proj --scout   (labship's record is still there, its nested copy is gone, slot 1 is returned)
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+skill selection for labnext: unavailable - no TypeSafe or OpenRouter key
+spawned labnext harness=claude kind=scout window=fmlab:fm-labnext worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+exit=0
+labnext record: worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+slot 1 claim:
+task=labnext
+home=/Users/charlesabrooker/tmp/fm-lab.6UznEI
+treehouse status:
+
+base  main  (repository default)
+1     in-use       ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj  (detached)
+                   zsh (22736), 2.1.296 (32245), caffeinate (37550)

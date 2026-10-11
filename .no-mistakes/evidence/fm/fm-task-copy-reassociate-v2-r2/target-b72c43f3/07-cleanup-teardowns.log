@@ -1,0 +1,6 @@
+error: --drop-file requires a path
+teardown labone done
+error: --drop-file requires a path
+teardown labtwo done
+fmlab: 3 windows (created Sat Oct 10 23:37:47 2026)
+teardown via --force failed on argument syntax (my mistake); lab removed directly. Lab server killed through its own socket.

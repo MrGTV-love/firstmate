@@ -1,0 +1,30 @@
+## labnext record before
+window=fmlab:fm-labnext
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+kind=scout
+
+## worker S5 setup, disjoint copy outside the pool (d1 shape)
+slot HEAD: 2e695f8 (not landed)
+
+### bin/fm-control.sh labnext reassociate --worktree $W/copies/labnext-v2 --note ...
+reassociated labnext worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labnext-v2 prior=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+exit=0
+
+## record after
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labnext-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+slot 1 claim file exists: no
+anchors:
+refs/fm/anchor/labnext-2e695f8 2e695f8
+worker window still alive: fm-labnext dead=0
+old slot bytes untouched: HEAD 2e695f8, status ''
+
+### bin/fm-control.sh labnext reassociate --worktree <slot 1> --note ...   (move back: undo the hop)
+reassociated labnext worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj prior=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labnext-v2 slot=claimed
+exit=0
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labnext-v2
+slot 1 claim:
+task=labnext
+home=/Users/charlesabrooker/tmp/fm-lab.6UznEI

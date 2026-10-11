@@ -1,0 +1,36 @@
+## record after forward nested reassociation (labship: slot -> nested copy)
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj/.claude/worktrees/fm-labship-v2
+branch=fm/labship-v2
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+
+## brief tail
+112:Ship branch: fm/labship-v2
+## Copy reassociation (2026-10-11T02:53:13Z)
+
+This task's work moved to a replacement local copy.
+Work only in /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj/.claude/worktrees/fm-labship-v2, on branch fm/labship-v2.
+It replaces /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj, which is preserved exactly as it was; do not change it.
+
+not owner
+
+## slot claim
+task=labship
+home=/Users/charlesabrooker/tmp/fm-lab.6UznEI
+
+## anchors in project ref store
+refs/fm/anchor/labship-f642a68 f642a68
+slot HEAD: f642a68
+
+## old copy still intact
+f642a68 feature work in old copy
+README.md
+feature.txt
+treehouse.toml
+?? .claude/
+
+## endpoint untouched: worker pane still alive
+home dead=0
+fm-labship dead=0
+
+## crew-state after (reads the replacement copy)
+state: unknown · source: pane · harness state unavailable (unknown launch-prompt)

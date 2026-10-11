@@ -1,0 +1,27 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.7B5Qyk
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+spawned labtwo harness=claude kind=ship mode=local-only yolo=off window=fmlab:fm-labtwo worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/2/proj
+SLOT=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/2/proj
+## d3 nested shape: fresh copy cut INSIDE the slot
+07595bb worker progress 2
+8867172 init
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.7B5Qyk
+reassociated labtwo worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/2/proj/.claude/worktrees/x branch=fm/labtwo-v2 prior=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/2/proj slot=kept
+exit=0
+worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/2/proj/.claude/worktrees/x
+branch=fm/labtwo-v2
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/2/proj
+pane cwd before relaunch: /Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/2/proj cmd=2.1.296
+### relaunch (prior_worktree= shape)
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+relaunched labtwo harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=fmlab:fm-labtwo worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/2/proj/.claude/worktrees/x
+exit=
+pane cwd after: /Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/2/proj/.claude/worktrees/x cmd=2.1.296
+⏺ idle
+✻ Crunched for 10s · done 11:39 PM
+  tmux detected · scroll with PgUp/PgDn · or add 'set -g mouse on' to ~/.tmux…
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 4% 40k/1.0M fm/labtwo-v2 x:eb9808a2
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents

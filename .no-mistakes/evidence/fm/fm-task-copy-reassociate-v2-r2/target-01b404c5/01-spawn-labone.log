@@ -1,0 +1,7 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.pAq1JQ
+warning: /Users/charlesabrooker/tmp/fm-lab.pAq1JQ/data/labone/launch-brief.md records no ship branch; defaulting to legacy branch fm/labone
+warning: /Users/charlesabrooker/tmp/fm-lab.pAq1JQ/data/labone/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: labone ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labone: unavailable - no TypeSafe or OpenRouter key
+spawned labone harness=claude kind=ship mode=local-only yolo=off window=fmlab:fm-labone worktree=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj
+exit=0

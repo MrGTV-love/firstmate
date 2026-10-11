@@ -1,0 +1,16 @@
+### bin/fm-spawn.sh labnext $W/proj --scout   (pool slot 1 holds labship's nested current copy)
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj contains task labship's current copy /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj/.claude/worktrees/fm-labship-v2; refusing allocation before treehouse get
+exit=1
+slot 1 claim:
+task=labship
+home=/Users/charlesabrooker/tmp/fm-lab.6UznEI
+claim UNCHANGED
+labnext record exists: no
+pool slots:
+1
+treehouse-state.json
+treehouse-state.key
+treehouse-state.lock
+tmux windows:
+home
+fm-labship

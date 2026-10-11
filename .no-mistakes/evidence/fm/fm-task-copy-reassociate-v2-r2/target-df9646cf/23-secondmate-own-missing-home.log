@@ -1,0 +1,57 @@
+### bin/fm-home-seed.sh labmate $W/labmate-home --no-projects
+Or undo this operation with:
+
+  git switch -
+
+Turn off this advice by setting config variable advice.detachedHead to false
+
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.6UznEI/data/labmate/brief.md (secondmate charter)
+home=/Users/charlesabrooker/tmp/fm-labw.vuezng/labmate-home
+exit=0
+
+### bin/fm-spawn.sh labmate --secondmate
+warning: secondmate labmate sync skipped before launch: primary default-branch commit cannot be resolved
+spawned labmate harness=claude kind=secondmate mode=secondmate yolo=off window=fmlab:fm-labmate worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/labmate-home
+exit=0
+record:
+window=fmlab:fm-labmate
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/labmate-home
+kind=secondmate
+tasktmp=/tmp/fm-labmate
+home=/Users/charlesabrooker/tmp/fm-labw.vuezng/labmate-home
+registry:
+- mate2 - mate2 (home: /Users/charlesabrooker/tmp/fm-labw.vuezng/mate2; scope: lab fixture; projects: proj; added 2026-10-10)
+- labmate - Idle lab second mate for live validation. Do nothing reply idle. (home: /Users/charlesabrooker/tmp/fm-labw.vuezng/labmate-home; scope: lab fixture; projects: ; added 2026-10-10)
+task temp root exists: yes (/tmp/fm-labmate)
+
+## the secondmate's own registered home is deleted out from under it
+home exists: no
+
+### bin/fm-teardown.sh labmate   (plain retirement; own home gone; /tmp/fm-labmate still present; mate2 home readable)
+teardown labmate complete (window fmlab:fm-labmate, worktree /Users/charlesabrooker/tmp/fm-labw.vuezng/labmate-home)
+exit=0
+
+record exists: no
+registry now:
+- mate2 - mate2 (home: /Users/charlesabrooker/tmp/fm-labw.vuezng/mate2; scope: lab fixture; projects: proj; added 2026-10-10)
+task temp root exists: no
+home re-created: no
+windows: home 
+
+## adversarial: a DIFFERENT registered home is unavailable while retiring a secondmate whose own home is gone
+seed exit=0
+spawned labmate2 harness=claude kind=secondmate mode=secondmate yolo=off window=fmlab:fm-labmate2 worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/labmate2-home
+labmate2 home exists: no; ghost registered: 1
+
+### bin/fm-teardown.sh labmate2
+REFUSED: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.vuezng/missing-home; nothing was changed
+exit=1
+record exists: yes
+
+## ghost registry line removed; bin/fm-teardown.sh labmate2 again
+teardown labmate2 complete (window fmlab:fm-labmate2, worktree /Users/charlesabrooker/tmp/fm-labw.vuezng/labmate2-home)
+exit=0
+record exists: no
+registry now:
+- mate2 - mate2 (home: /Users/charlesabrooker/tmp/fm-labw.vuezng/mate2; scope: lab fixture; projects: proj; added 2026-10-10)
+task temp root exists: no

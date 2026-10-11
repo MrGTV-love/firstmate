@@ -1,0 +1,31 @@
+FM_TEST_BEGIN 2026-10-11T05:00:13Z tests/fm-control-reassociate.test.sh family=backend-dispatch expected_gate_skip=none
+ok - reassociate re-points worktree, branch, and brief, records the old copy and note, and touches nothing else
+ok - fm-crew-state reads the replacement copy's real run after reassociation
+ok - moving a task back to a prior copy undoes that hop
+ok - a replacement pool slot with no owner claim is claimed for the task
+ok - own enclosing-to-nested and nested-to-enclosing reassociation keep the slot claimed and exempt only the replacement's own path
+ok - a disjoint pool slot the task leaves is released, recorded as history, and reclaimable
+ok - reassociation leaves a historical separate log untouched and records its note only in the brief
+ok - a scout reassociates without gaining delivery-branch fields
+ok - both copies reject enclosing and nested cross-task custody through physical aliases
+ok - both copies reject foreign enclosing and nested managed pool slot claims
+ok - every reassociation refusal leaves the record, instructions, copy, and endpoint untouched
+ok - failed publication retains the original brief until restoration succeeds
+ok - unchanged-branch reassociation validates the brief and preserves matching branch declarations
+ok - ships and scouts refuse staged, unstaged, and unignored untracked bytes by name
+ok - spawned copy commits survive provider reset through the anchor, and the slot the task left is reusable
+ok - a slot holding a reassociated task's nested copy refuses a new allocation
+ok - a nested reassociated ship lands, tears down under the landed and anchored proofs, and frees its slot for the next spawn
+ok - a hop out of the pool refuses an enclosing slot with uncommitted work and anchors its committed work before releasing it
+ok - a vanished pool copy is recorded as released history and its claim is dropped
+ok - a record staging write failure refuses and publishes nothing
+ok - the old copy's dirty check exempts exactly the hook artifacts teardown exempts
+ok - anchor write and verification failures leave the copy, record, brief, and endpoint untouched
+ok - non-pool reassociation serializes ownership scans through publication for physical aliases
+ok - nested S5 reassociation admits validated owning ancestors through aliases but preserves every ancestor prior
+ok - same-origin copies in another ref store are refused in both roles without changing records, briefs, anchors, claims, or copies
+FM_TEST_END 2026-10-11T05:03:43Z tests/fm-control-reassociate.test.sh exit=0 duration_ms=209758 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=210112
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=209758 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-control-reassociate.test.sh duration_ms=209758
+exit=0

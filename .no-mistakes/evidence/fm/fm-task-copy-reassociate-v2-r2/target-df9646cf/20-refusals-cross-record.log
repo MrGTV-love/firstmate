@@ -1,0 +1,41 @@
+### a registered local home is unavailable (ghost) -> the custody scan cannot be completed
+$ bin/fm-control.sh labfive reassociate --worktree $W/copies/labfive-v2 --note ghost registered
+REFUSED: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.vuezng/missing-home; nothing was changed
+error: could not prove that no other task record names the replacement copy /Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labfive-v2; nothing was changed
+exit=1 state-before=a01826614d3a9e9e state-after=a01826614d3a9e9e UNCHANGED
+
+## ghost registry line removed; mate2 (readable) stays registered
+
+### replacement is another task's current copy in another local home (mate2/other)
+$ bin/fm-control.sh labfive reassociate --worktree $W/copies/other --note someone else's copy
+error: the replacement copy /Users/charlesabrooker/tmp/fm-labw.vuezng/copies/other is also task other's recorded worktree, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh labfive; bin/fm-crew-state.sh other) before reassociating
+exit=1 state-before=a01826614d3a9e9e state-after=a01826614d3a9e9e UNCHANGED
+
+### replacement is another task's prior_worktree in another local home
+$ bin/fm-control.sh labfive reassociate --worktree $W/copies/labnext-v2 --note someone else's prior copy
+error: the replacement copy /Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labnext-v2 is also task other's recorded prior_worktree, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh labfive; bin/fm-crew-state.sh other) before reassociating
+exit=1 state-before=a01826614d3a9e9e state-after=a01826614d3a9e9e UNCHANGED
+
+### replacement is a different repository
+$ bin/fm-control.sh labfive reassociate --worktree $W/foreign --note foreign repo
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.vuezng/foreign is not a checkout of task labfive's project repository (/Users/charlesabrooker/tmp/fm-labw.vuezng/proj): it uses a different repository/ref store, even if it has the same origin; nothing was changed
+exit=1 state-before=a01826614d3a9e9e state-after=a01826614d3a9e9e UNCHANGED
+
+### replacement is the pool slot it already holds (no move)
+$ bin/fm-control.sh labfive reassociate --worktree $W/pool/.treehouse/proj-9c686c/1/proj --note same copy
+error: task labfive's record already names /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj; nothing to reassociate
+exit=1 state-before=a01826614d3a9e9e state-after=a01826614d3a9e9e UNCHANGED
+
+### unknown task
+$ bin/fm-control.sh nosuchtask reassociate --worktree $W/copies/labfive-v2 --note x
+error: no task 'nosuchtask' in /Users/charlesabrooker/tmp/fm-lab.6UznEI/state (fm-control resolves an exact task id only)
+exit=1 state-before=a01826614d3a9e9e state-after=a01826614d3a9e9e UNCHANGED
+
+## positive control: the same replacement copy is accepted once nothing blocks it
+### valid disjoint move
+$ bin/fm-control.sh labfive reassociate --worktree $W/copies/labfive-v2 --note valid move
+reassociated labfive worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labfive-v2 prior=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+exit=0 state-before=a01826614d3a9e9e state-after=639ec746491a2efc CHANGED
+
+worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labfive-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj

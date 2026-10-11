@@ -1,0 +1,22 @@
+### bin/fm-captain-hold.sh complete labnext --none
+complete: labnext captain-call inventory reviewed
+
+### bin/fm-teardown.sh labnext   (scout; current copy = pool slot 1; prior copy = disjoint $W/copies/labnext-v2 holding an unlanded commit)
+teardown: reaping leaked worktree process(es) for labnext: 22736 32245
+teardown: force-killing leaked worktree process(es) for labnext: 22736
+🌳 Worktree returned to pool.
+teardown labnext complete (window fmlab:fm-labnext, worktree /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj)
+notice: labnext's prior copy /Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labnext-v2 (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted
+Backlog: labnext is closed in /Users/charlesabrooker/tmp/fm-lab.6UznEI/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+prior copy still exists with its commit: 7e76b7b prior copy work
+prior copy status: ''
+record exists: no
+slot 1 claim exists: no
+treehouse status:
+
+base  main  (repository default)
+1     available    ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj  (detached)
+2     in-use       ~/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/2/proj  (detached)
+                   zsh (95753), 2.1.296 (99869)

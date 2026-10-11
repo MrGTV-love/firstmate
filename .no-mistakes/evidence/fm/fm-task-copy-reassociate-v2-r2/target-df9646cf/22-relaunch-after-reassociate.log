@@ -1,0 +1,27 @@
+### bin/fm-control.sh labsix relaunch --note ...   (after reassociation; record names $W/copies/labsix-v3)
+pane cwd before: /Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj
+notice: labsix ships branch=fm/labsix-v3 while proj registers the ship-branch prefix 'fm/' (branch fm/labsix) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: task labsix's endpoint is in '/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj', not its recorded worktree '/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v3'; refusing to relaunch an agent outside the copy holding its work
+error: the replacement agent for labsix could not be launched on claude
+error: labsix's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v3
+exit=1
+
+## state after the failed relaunch
+pane: cwd=/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj cmd=zsh dead=0
+crew-state: state: unknown · source: pane · harness state unavailable (unknown missing)
+labsix.control-relaunch labsix.control-relaunch.brief-prior labsix.control-relaunch.meta-prior labsix.control-relaunch.note labsix.git-hooks labsix.inbox labsix.meta labsix.status labsix.turn-ended 
+
+### bin/fm-control.sh labsix relaunch --note ...   (second attempt, endpoint unchanged)
+error: task labsix's endpoint is in '/Users/charlesabrooker/tmp/fm-labw.vuezng/pool/.treehouse/proj-9c686c/1/proj', not its recorded worktree '/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v3'; refusing to relaunch an agent outside the copy holding its work
+error: the replacement agent for labsix could not be launched on claude
+error: labsix's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v3
+exit=1
+
+## workaround probe: close the stale endpoint (tmux kill-window on the lab socket), then relaunch
+### bin/fm-control.sh labsix relaunch --note ...   (endpoint gone)
+error: configured backend 'tmux' is not herdr; refusing to replace task labsix's proven-gone tmux endpoint
+error: the replacement agent for labsix could not be launched on claude
+error: labsix's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v3
+exit=1
+pane: can't find window: fm-labsix
+record: window=fmlab:fm-labsix worktree=/Users/charlesabrooker/tmp/fm-labw.vuezng/copies/labsix-v3 

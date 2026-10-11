@@ -1,0 +1,32 @@
+### fm-control labone relaunch (released_worktree= shape) on commit b72c43f3
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.7B5Qyk
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.7B5Qyk
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+notice: labone ships branch=fm/labone-v2 while proj registers the ship-branch prefix 'fm/' (branch fm/labone) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labone: unavailable - no TypeSafe or OpenRouter key
+relaunched labone harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=fmlab:fm-labone worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/copies/labone-v2
+exit=0
+pane cwd after: /Users/charlesabrooker/tmp/fm-labw.1el5BA/copies/labone-v2 cmd=2.1.296
+❯ : Firstmate operational input waiting: read '/Users/charlesabrooker/tmp/fm-la
+  b.7B5Qyk/state/operational-inbox/1791693513-8439d1ce35825aa7.msg' and handle
+  its contents as Firstmate operational input.
+  Read 1 file, ran 1 shell command
+⏺ idle
+✻ Crunched for 7s · done 11:38 PM
+  tmux detected · scroll with PgUp/PgDn · or add 'set -g mouse on' to ~/.tmux…
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Sonnet 5.5 ░░░░░░░░░░ 3% 39k/1.0M fm/labone-v2 labone-v2:39686dba
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents
+worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/copies/labone-v2
+branch=fm/labone-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.1el5BA/pool/.treehouse/proj-e43996/1/proj
+### crew-state
+state: done · source: status-log · lab check, no changes, idle

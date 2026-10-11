@@ -1,0 +1,33 @@
+### fm-control labone relaunch (after disjoint reassociate; pane shell still in the old slot)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.pAq1JQ
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.pAq1JQ
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: /Users/charlesabrooker/tmp/fm-lab.pAq1JQ/data/labone/launch-brief.md records no ship branch; relaunching on the task's recorded branch fm/labone-v2
+warning: /Users/charlesabrooker/tmp/fm-lab.pAq1JQ/data/labone/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode local-only - confirm its definition of done matches
+notice: labone ships mode=local-only while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+notice: labone ships branch=fm/labone-v2 while proj registers the ship-branch prefix 'fm/' (branch fm/labone) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: task labone's endpoint is in '/Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj', not its recorded worktree '/Users/charlesabrooker/tmp/fm-labw.WaTgxz/copies/labone-v2'; refusing to relaunch an agent outside the copy holding its work
+error: the replacement agent for labone could not be launched on claude
+error: labone's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-labw.WaTgxz/copies/labone-v2
+exit=1
+pane cwd: /Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj cmd=zsh
+ and matches only commands containing a literal * at that position. Use Bash(*>*/.claude/settings*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.claude/hooks/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded) a
+nd matches only commands containing a literal * at that position. Use Bash(*>*/.claude/hooks/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(rm*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(rm*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(mv*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../../../../../.claude/settings.json): Bash(*>*/.tac/governance/*:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal prefix (the * is not expanded)
+ and matches only commands containing a literal * at that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+Resume this session with:
+claude --resume f588cd5c-8a0c-4bec-ac50-929569e02ba8
+charlesabrooker@Mac-Studio proj %
+worktree=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/copies/labone-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.WaTgxz/pool/.treehouse/proj-2cf9b1/1/proj
