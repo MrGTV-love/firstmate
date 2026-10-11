@@ -42,9 +42,10 @@ Count semantics:
 Census document (schema 2):
   Counts by command and the 20 most common parent chains (parent_chains counts
   every distinct one), up to five deepest ancestry chains with leaf and
-  repeated-command samples, and up to five oldest and newest PIDs. A chain keeps at most its first 4 and last 8 command runs;
-  the runs between them collapse into one "..." gap, so a census of a chain
-  alternating between commands stays bounded.
+  repeated-command samples, and up to five oldest and newest PIDs.
+  A chain keeps at most its first 4 and last 8 command runs; the runs between
+  them collapse into one "..." gap, so a census of a chain alternating between
+  commands stays bounded.
   Includes capture time, count/limit, trigger, and census wall/CPU cost.
   The newest 20 census files are retained in the supplied state directory.
 
