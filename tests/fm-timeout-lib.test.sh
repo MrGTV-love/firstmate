@@ -604,6 +604,7 @@ SH
       # perl restores SIGINT, which a shell's background job otherwise ignores.
       TMPDIR="$dir/tmp" perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' \
         bash "$dir/caller.sh" "$ROOT" "$dir/bin" "$dir/command.pid" "$mech" >/dev/null 2>&1 &
+      # shellcheck disable=SC2031 # This shell just launched the caller; no subshell modifies $! here.
       caller_pid=$!
       wait_for_file "$dir/command.pid"
       command_pid=$(cat "$dir/command.pid")

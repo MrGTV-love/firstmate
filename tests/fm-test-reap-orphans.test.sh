@@ -538,6 +538,7 @@ done
 start_owner
 CLUTTER_MARKED=$(mktemp -d "$CLUTTER_SCAN/fm-clutter-marked.XXXXXX") || fail "could not make a marked root"
 printf '%s\n%s\n' "$OWNER" "$(fm_test_pid_identity "$OWNER")" > "$CLUTTER_MARKED/.fm-test-fixture"
+# shellcheck disable=SC2016 # The shim, not this shell, expands its variables.
 printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "$FM_TEST_FIND_LOG"\nexec "$FM_TEST_REAL_FIND" "$@"\n' > "$TMP_ROOT/find-shim/find"
 chmod +x "$TMP_ROOT/find-shim/find"
 : > "$TMP_ROOT/find.log"
