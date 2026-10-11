@@ -9261,7 +9261,9 @@ test_subordinate_slot_cleanup_preserves_ancestor_custody() {
       "spawn_gen=teardown-test-task-x1"
     case "$shape" in
       prior) printf 'prior_worktree=%s\n' "$slot" >> "$owner" ;;
-      unvalidated) mv "$owner" "$parent/state/impostor.meta"; owner="$parent/state/impostor.meta" ;;
+      # The registered mate record stays, so the parent binding resolves and
+      # the unregistered impostor naming the same home is what must refuse.
+      unvalidated) cp "$owner" "$parent/state/impostor.meta"; owner="$parent/state/impostor.meta" ;;
     esac
     cp "$owner" "$case_dir/owner.before"
     cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
