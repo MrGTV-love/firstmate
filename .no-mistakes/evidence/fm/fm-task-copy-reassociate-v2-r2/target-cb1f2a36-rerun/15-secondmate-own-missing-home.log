@@ -1,0 +1,27 @@
+### bin/fm-home-seed.sh labmate $W/labmate-home --no-projects
+
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.FXbqdc/data/labmate/brief.md (secondmate charter)
+home=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/labmate-home
+exit=0
+### bin/fm-spawn.sh labmate --secondmate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+warning: secondmate labmate sync skipped before launch: primary default-branch commit cannot be resolved
+spawned labmate harness=claude kind=secondmate mode=secondmate yolo=off window=fmlab:fm-labmate worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/labmate-home
+exit=0
+## registry
+- labmate - Idle lab second mate for live validation. Do nothing reply idle. (home: /Users/charlesabrooker/tmp/fm-labw.tS1h2j/labmate-home; scope: lab fixture; projects: ; added 2026-10-11)
+## its own registered home is deleted out from under it
+home exists: no
+## plain teardown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown labmate complete (window fmlab:fm-labmate, worktree /Users/charlesabrooker/tmp/fm-labw.tS1h2j/labmate-home)
+exit=0
+record gone: yes
+registry now: []
+home re-created: no
+## windows
+sleep
+fm-labfour
+fm-labscout

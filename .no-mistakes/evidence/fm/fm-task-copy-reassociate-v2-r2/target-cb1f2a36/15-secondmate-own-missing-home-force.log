@@ -1,0 +1,11 @@
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.WZsFPm/data/labmate2/brief.md (secondmate charter)
+spawned labmate2 harness=claude kind=secondmate mode=secondmate yolo=off window=fmlab:fm-labmate2 worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/labmate2-home
+## --force teardown, own home gone
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: unsafe secondmate home removal target /Users/charlesabrooker/tmp/fm-labw.ei4BHg/labmate2-home is not a seeded secondmate home
+exit=1
+record gone: no
+registry:
+- labmate2 - Idle lab second mate two. Do nothing reply idle. (home: /Users/charlesabrooker/tmp/fm-labw.ei4BHg/labmate2-home; scope: lab fixture two; projects: ; added 2026-10-11)
+home re-created: yes

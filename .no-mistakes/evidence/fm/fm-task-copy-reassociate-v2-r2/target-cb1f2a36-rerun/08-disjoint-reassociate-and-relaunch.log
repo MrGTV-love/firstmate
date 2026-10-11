@@ -1,0 +1,39 @@
+## worker S5 out of the pool (d1 shape): fresh copy outside the pool, work carried over
+copy made: /Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+
+## reassociate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+reassociated labgate worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2 branch=fm/labgate-v2 prior=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+exit=0
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+branch=fm/labgate-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+## slot claim after: none (released)
+## anchors
+d637dafce7888b69d45200f29b50807d0b532b5b commit	refs/fm/anchor/labgate-d637daf
+0f9b5fab46986b6a68f8225ced250815feda0c06 commit	refs/fm/anchor/labship-0f9b5fa
+34cee3dc0e25f275d59566a837c1d81eefb3c62e commit	refs/fm/anchor/labship-34cee3d
+## pane cwd BEFORE relaunch
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+
+## fm-control relaunch (tmux)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+notice: labgate ships branch=fm/labgate-v2 while proj registers the ship-branch prefix 'fm/' (branch fm/labgate) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labgate: unavailable - no TypeSafe or OpenRouter key
+relaunched labgate harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=fmlab:fm-labgate worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+exit=0
+## pane cwd AFTER relaunch
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+## window process
+2.1.296 pid=67495
+## record still names replacement
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+branch=fm/labgate-v2

@@ -1,0 +1,32 @@
+## worker S5 out of the pool (d1 shape): fresh copy outside the pool, carried work
+fatal: a branch named 'fm/labtwo' already exists
+copy made: /Users/charlesabrooker/tmp/fm-labw.ei4BHg/copies/labtwo-v2
+
+## reassociate
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+reassociated labtwo worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/copies/labtwo-v2 branch=fm/labtwo-v2 prior=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj
+worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/copies/labtwo-v2
+branch=fm/labtwo-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj
+## slot claim after
+cat: /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/../.fm-slot-owner: No such file or directory
+base  main  (repository default)
+1     in-use       ~/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj  [fm/labtwo]
+                   zsh (51702), 2.1.296 (65593), caffeinate (71987)
+## pane cwd BEFORE relaunch
+/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj
+
+## fm-control relaunch (tmux)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+notice: labtwo ships branch=fm/labtwo-v2 while proj registers the ship-branch prefix 'fm/' (branch fm/labtwo) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labtwo: unavailable - no TypeSafe or OpenRouter key
+relaunched labtwo harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=fmlab:fm-labtwo worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/copies/labtwo-v2
+exit=0
+## pane cwd AFTER relaunch
+/Users/charlesabrooker/tmp/fm-labw.ei4BHg/copies/labtwo-v2
+## window process
+2.1.296 pid=49044
+## record still names replacement
+worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/copies/labtwo-v2
+branch=fm/labtwo-v2

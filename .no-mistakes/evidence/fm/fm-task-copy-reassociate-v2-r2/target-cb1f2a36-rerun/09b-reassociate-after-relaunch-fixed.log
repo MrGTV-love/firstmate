@@ -1,0 +1,34 @@
+## same lab, same task, same journal; bin/fm-control.sh now carries the fix
+## journal left by the finished relaunch:
+task=labgate
+phase=complete
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+
+[before] record: worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2  (that copy exists: no)
+$ bin/fm-crew-state.sh labgate
+state: unknown · source: none · worktree gone (torn down?)
+
+### bin/fm-control.sh labgate reassociate --worktree $W/copies/labgate-v3 --note ...
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+reassociated labgate worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v3 branch=fm/labgate-v3 prior=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2 prior_state=absent slot=none
+exit=0
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v3
+branch=fm/labgate-v3
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+## journal untouched:
+task=labgate
+phase=complete
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+
+[after]
+$ bin/fm-crew-state.sh labgate
+state: done · source: status-log · labgate finished
+
+## ADVERSARIAL: an unfinished journal (phase=launching) still refuses
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+error: task labgate has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.FXbqdc/state/labgate.control-relaunch; reconcile it before reassociating
+exit=1
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v3
+branch=fm/labgate-v3
+Deleted branch fm/labgate-v4 (was d637daf).

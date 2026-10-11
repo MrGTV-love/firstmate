@@ -1,0 +1,18 @@
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.WZsFPm/data/labmate/brief.md (secondmate charter)
+changes and commit them, and you can discard any commits you make in this
+If you want to create a new branch to retain commits you create, you may
+home=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/labmate-home
+warning: secondmate labmate sync skipped before launch: primary default-branch commit cannot be resolved
+spawned labmate harness=claude kind=secondmate mode=secondmate yolo=off window=fmlab:fm-labmate worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/labmate-home
+## registry
+- labmate - Idle lab second mate for live validation. Do nothing reply idle. (home: /Users/charlesabrooker/tmp/fm-labw.ei4BHg/labmate-home; scope: lab fixture; projects: ; added 2026-10-11)
+## own registered home deleted out from under it
+home exists: no
+## plain teardown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown labmate complete (window fmlab:fm-labmate, worktree /Users/charlesabrooker/tmp/fm-labw.ei4BHg/labmate-home)
+exit=0
+record gone: yes
+registry now:
+home re-created: no

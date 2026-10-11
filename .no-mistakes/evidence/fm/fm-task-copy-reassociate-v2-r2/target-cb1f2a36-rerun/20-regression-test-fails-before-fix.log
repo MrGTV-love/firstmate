@@ -1,0 +1,3 @@
+## new test against the committed bin/fm-control.sh (cb1f2a36): must FAIL
+12:not ok - reassociate should succeed after a finished relaunch
+13:error: task reassoc-journal has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-control-reassociate.1l0zgP/journal/home/state/reassoc-journal.control-relaunch; reconcile it before reassociating: expected exit 0, got 1

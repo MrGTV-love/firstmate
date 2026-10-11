@@ -1,0 +1,7 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown labmate2 complete (window fmlab:fm-labmate2, worktree /Users/charlesabrooker/tmp/fm-labw.ei4BHg/labmate2-home)
+teardown labfour complete (window fmlab:fm-labfour, worktree /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj)
+Backlog: labfour is closed in /Users/charlesabrooker/tmp/fm-lab.WZsFPm/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+teardown labscout complete (window fmlab:fm-labscout, worktree /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/2/proj)
+Backlog: labscout is closed in /Users/charlesabrooker/tmp/fm-lab.WZsFPm/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+(eval):8: no matches found: /Users/charlesabrooker/tmp/fm-lab.WZsFPm/state/*.meta

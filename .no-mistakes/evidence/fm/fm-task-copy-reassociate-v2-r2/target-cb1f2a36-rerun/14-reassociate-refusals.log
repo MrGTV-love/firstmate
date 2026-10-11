@@ -1,0 +1,46 @@
+# 1 dirty current copy
+error: current copy /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj has uncommitted or untracked-unignored changes; commit or carry its work over, or reassociate the task back to it, before reassociating; nothing was changed:
+A  dirty.txt
+exit=1  record/brief/copy/anchors/claim unchanged: yes
+# 2 replacement is the project checkout
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.tS1h2j/proj is not an isolated worktree of /Users/charlesabrooker/tmp/fm-labw.tS1h2j/proj: it is the project checkout itself; nothing was changed
+exit=1  record/brief/copy/anchors/claim unchanged: yes
+# 3 replacement is not a git worktree
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.tS1h2j/plain is not an isolated worktree of /Users/charlesabrooker/tmp/fm-labw.tS1h2j/proj: it is not inside a git worktree; nothing was changed
+exit=1  record/brief/copy/anchors/claim unchanged: yes
+# 4 replacement is labscout's live pool slot (another task's copy)
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/2/proj has a detached HEAD; a ship's record names the branch it delivers, so check that branch out there first
+exit=1  record/brief/copy/anchors/claim unchanged: yes
+# 5 no --note
+error: reassociate requires --note (or --note-file) saying why the work moved; it is recorded in the task's instructions
+exit=1  record/brief/copy/anchors/claim unchanged: yes
+# 6 record already carries pr=
+error: task labfour already records PR https://github.com/example/repo/pull/9, whose merge watch and landed-work proof follow the current copy's branch; land or close that PR before re-pointing the record under it
+exit=1  record/brief/copy/anchors/claim unchanged: yes
+# 7 caller is a worker (FM_TASK_ID set)
+error: workers cannot reassociate a task record
+exit=1  unchanged: yes
+# 8 home lock names another live harness (lab worker claude pid ) and another session
+lock: stale (pid  dead or not a harness)
+error: task copy reassociation requires the actual lock-owning main Firstmate
+exit=1  unchanged: yes
+lock: held by live harness pid 26592
+
+# positive control: the same call as the owner succeeds
+reassociated labfour worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labfour-v2 branch=fm/labfour-v2 prior=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+
+## re-drive 4 and 8 with sharper fixtures
+# 4b replacement is labscout's live pool slot (on a branch)
+error: the replacement copy /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/2/proj is also task labscout's recorded worktree, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh labfour; bin/fm-crew-state.sh labscout) before reassociating
+exit=1  unchanged: yes
+lab worker pane shell 79201 -> child 80386 (treehouse)
+# 8b home lock names another live harness and another session
+lock: stale (pid 80386 dead or not a harness)
+error: task copy reassociation requires the actual lock-owning main Firstmate
+exit=1  unchanged: yes
+lock: held by live harness pid 26592
+# 8c lab worker harness pid 85899 (claude) recorded as lock holder, another session id
+lock: held by live harness pid 85899
+error: task copy reassociation requires the actual lock-owning main Firstmate
+exit=1  unchanged: yes
+lock: held by live harness pid 26592

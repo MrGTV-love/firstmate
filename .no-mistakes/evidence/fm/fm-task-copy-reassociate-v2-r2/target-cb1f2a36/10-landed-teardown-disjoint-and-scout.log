@@ -1,0 +1,27 @@
+REFUSED: fm/labtwo-v2 is not a fast-forward of main (it has diverged).
+Have the crewmate rebase fm/labtwo-v2 onto main, then retry.
+## plain teardown of labtwo after landing
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+b3c9128 v2 work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+replacement copy still on disk: yes
+record gone: no
+## scouts: teardown scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+fm-captain-hold: origin labscout has no completed captain-call inventory
+REFUSED: scout task labscout has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+exit=1
+## windows
+sleep
+fm-labtwo
+fm-labscout
+base  main  (repository default)
+1     in-use       ~/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj  [fm/labtwo]
+2     in-use       ~/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/2/proj  (detached)
+                   zsh (87037), 2.1.296 (95688), caffeinate (97049)

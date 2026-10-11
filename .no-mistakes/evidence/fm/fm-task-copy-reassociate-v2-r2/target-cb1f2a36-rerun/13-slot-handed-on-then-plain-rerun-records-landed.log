@@ -1,0 +1,21 @@
+## the returned slot is handed to a new task (labfour) while labthree's stale record still exists
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+skill selection for labfour: unavailable - no TypeSafe or OpenRouter key
+spawned labfour harness=claude kind=ship mode=local-only yolo=off window=fmlab:fm-labfour worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+exit=0
+labfour slot claim: task=labfour home=/Users/charlesabrooker/tmp/fm-lab.FXbqdc 
+
+## plain re-run of labthree teardown: no --force, no --drop-file
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown labthree complete (window fmlab:fm-labthree; nested reassociated worktree /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labthree-v2 was already removed by an earlier teardown, and its pool slot /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj is no longer this task's, so it was left alone)
+Backlog: labthree is closed in /Users/charlesabrooker/tmp/fm-lab.FXbqdc/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+record gone: yes; captain-drop record: none
+8:- [x] labthree - Lab ship labthree for copy reassociation (kind: ship) (done 2026-10-11)
+labfour's slot untouched: yes; claim: task=labfour home=/Users/charlesabrooker/tmp/fm-lab.FXbqdc 
+## windows
+sleep
+fm-labfour
+fm-labscout

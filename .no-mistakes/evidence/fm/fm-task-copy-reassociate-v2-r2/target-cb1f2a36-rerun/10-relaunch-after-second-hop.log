@@ -1,0 +1,21 @@
+## pane cwd BEFORE (the deleted v2 copy)
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+## fm-control relaunch after the second hop (journal from the earlier relaunch still names v2)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+notice: labgate ships branch=fm/labgate-v3 while proj registers the ship-branch prefix 'fm/' (branch fm/labgate) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+skill selection for labgate: unavailable - no TypeSafe or OpenRouter key
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4J53Z7PV6VG61D4MCRBMMRQ/bin/fm-home-summary-refresh.sh: child setpgid (87124 to 87124): Operation not permitted
+relaunched labgate harness=claude from=claude model=sonnet effort=low backend=tmux endpoint=fmlab:fm-labgate worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v3
+exit=0
+## pane cwd AFTER
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v3
+## window process
+2.1.296
+## journal now
+task=labgate
+phase=complete
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v3
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v3
+branch=fm/labgate-v3

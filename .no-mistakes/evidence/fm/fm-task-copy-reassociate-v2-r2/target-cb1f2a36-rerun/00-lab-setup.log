@@ -1,0 +1,53 @@
+fmlab: 1 windows (created Sun Oct 11 05:45:05 2026)
+lock: held by live harness pid 26592
+- proj [local-only] - lab project for copy reassociation (added 2026-10-11)
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.FXbqdc/data/labship/brief.md (ship, mode=local-only; replace {TASK} and {FIRSTMATE_SPEC})
+brief exit=0
+5:{TASK}
+8:{FIRSTMATE_SPEC}
+111:Delivery contract: mode=local-only
+112:Ship branch: fm/labship
+fm-tasks-axi.sh - run tasks-axi against THIS home's backlog from any working directory.
+
+Usage: fm-tasks-axi.sh [<tasks-axi command> [args...]]
+       fm-tasks-axi.sh --help
+
+Every routine firstmate backlog read or mutation goes through this command
+rather than a bare `tasks-axi`; `fm-tasks-axi.sh <command> --help` prints
+tasks-axi's own help. Accepted arguments reach tasks-axi as given except for
+captain-drop completion below and file addressing: a relative
+value of `--to` or any `--*-file` flag (`--body-file`, `--relation-file`, ...)
+is made absolute against the caller's working directory, because tasks-axi
+starts from the backlog root instead. `--report` stays as given: tasks-axi
+stores it verbatim as a link, which lifecycle transitions record relative to
+that same root.
+
+`show` (including `view`) and `list` decode stored captain-hold reasons
+through bin/fm-hold-reason-lib.sh, which owns the field-only decoding contract.
+Decoded reasons use quoted strings so embedded line breaks remain intact.
+
+Supported completion grammar: an optional `task` noun, `done` or `close`,
+exactly one ID, and --pr, --report, --note, --drop-file, --keep, --no-prune,
+--json, or --help. Valued options accept split or = forms; --keep requires a
+non-negative count. `start` and `reopen` accept the same noun and single-ID
+forms with only --json or --help. Exact unconsumed --help prints help without
+mutation and may omit the ID; a help token consumed as a value is refused.
+Unknown or global options (including --backend), option-like values, and
+extra positionals are refused before writes; use tasks-axi directly for
+unsupported grammar.
+
+Why it exists: a bare `tasks-axi` resolves the tracked `.tasks.toml` paths
+usage: tasks-axi add <id> "<title>" [flags]
+aliases: create
+flags:
+  --kind <ship|scout|docs|...>, --repo <name>, --body <text> or --body-file <path>
+  --start (place in In flight) | --queue (place in Queued, default)
+  --blocked-by <id> (repeatable, must exist), --pr <url>, --report <path>, --priority <0-4>
+  --mint [--prefix <p>]   mint a slug-xx id from the title instead of passing one
+  --json   print the resulting task as a JSON object
+examples:
+  tasks-axi add lavish-foo-q9 "fix summary toggle" --kind ship --repo lavish-axi --start
+  tasks-axi add fm-x "adopt lease" --blocked-by treehouse-lease-t4
+  tasks-axi add "quick note" --mintfm-tasks-axi: add --start would place a row In flight with no dispatch record; add it Queued and let bin/fm-spawn.sh start it
+exit=2
+cat: /Users/charlesabrooker/tmp/fm-lab.FXbqdc/data/backlog.md: No such file or directory

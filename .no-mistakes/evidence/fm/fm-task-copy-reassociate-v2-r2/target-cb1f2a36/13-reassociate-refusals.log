@@ -1,0 +1,13 @@
+## refusals leave the record untouched
+# 1 dirty current copy
+error: current copy /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj has uncommitted or untracked-unignored changes; commit or carry its work over, or reassociate the task back to it, before reassociating; nothing was changed:
+A  dirty.txt
+# 2 replacement is the project checkout
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.ei4BHg/proj is not an isolated worktree of /Users/charlesabrooker/tmp/fm-labw.ei4BHg/proj: it is the project checkout itself; nothing was changed
+# 3 replacement is not a git worktree root
+error: replacement copy /Users/charlesabrooker/tmp/fm-labw.ei4BHg/plain is not an isolated worktree of /Users/charlesabrooker/tmp/fm-labw.ei4BHg/proj: it is not inside a git worktree; nothing was changed
+# 4 record already carries pr=
+error: task labfour already records PR https://github.com/example/repo/pull/9, whose merge watch and landed-work proof follow the current copy's branch; land or close that PR before re-pointing the record under it
+# 5 caller does not own the session lock (lock names another live harness)
+error: task copy reassociation requires the actual lock-owning main Firstmate
+record unchanged: yes

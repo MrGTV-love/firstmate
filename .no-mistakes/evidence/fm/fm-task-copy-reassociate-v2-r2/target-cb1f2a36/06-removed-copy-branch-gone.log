@@ -1,0 +1,21 @@
+## anchor the slot HEAD, as a reassociate back-and-forth would
+6e90a86a3762398931aef824888d1f1a9a7a8e61 commit	refs/fm/anchor/labship-6e90a86
+ebb2930fa2b7df999733f29c2597eab08495c410 commit	refs/fm/anchor/labship-ebb2930
+## simulate: nested copy removed by an earlier run/harness, and its branch pruned after merge
+Deleted branch fm/labship-v2 (was 6e90a86).
+ls: /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2: No such file or directory
++ fm/labship
+
+## ADVERSARIAL: plain teardown, branch gone, no pr= recorded
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: task labship's nested copy /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2 is already removed and its branch is not landed; a pushed branch alone is not completion.
+Land its PR (or merge it to local main for a local-only ship), then re-run teardown, or get the captain's own words to drop it and pass --force --drop-file.
+record kept: yes
+
+## ADVERSARIAL: pr= recorded but forge does NOT report it merged (real gh, no stub, fake PR URL)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: task labship's nested copy /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2 is already removed and its branch is not landed; a pushed branch alone is not completion.
+Land its PR (or merge it to local main for a local-only ship), then re-run teardown, or get the captain's own words to drop it and pass --force --drop-file.
+record kept: yes

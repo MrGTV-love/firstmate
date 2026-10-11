@@ -1,0 +1,27 @@
+## worker S5 setup (nested copy, d3 GRE-1937 shape): plain git, as a worker does
++(eval):6> git -C /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj config user.email lab@example.test
++(eval):6> git -C /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj config user.name Lab
++(eval):7> git -C /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj switch -q -c fm/labship
++(eval):8> echo 'feature work'
++(eval):8> git -C /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj add feature.txt
++(eval):8> git -C /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj commit -qm 'feature work'
++(eval):9> git -C /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj worktree add -q /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2 -b fm/labship-v2 fm/labship
++(eval):10> set +x
+
+## reassociate into the nested copy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+reassociated labship worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2 branch=fm/labship-v2 prior=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj slot=kept
+exit=0
+
+## record after
+worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2
+branch=fm/labship-v2
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj
+## anchor refs
+6e90a86a3762398931aef824888d1f1a9a7a8e61 commit	refs/fm/anchor/labship-6e90a86
+## slot claim
+task=labship
+home=/Users/charlesabrooker/tmp/fm-lab.WZsFPm
+## worker window alive
+0: sleep* (1 panes) [200x50] [layout ac9d,200x50,0,0,0] @0 (active)
+1: fm-labship (1 panes) [200x50] [layout ac9e,200x50,0,0,1] @1

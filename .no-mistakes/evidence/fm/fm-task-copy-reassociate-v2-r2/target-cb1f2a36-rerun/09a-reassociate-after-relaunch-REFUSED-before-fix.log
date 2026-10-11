@@ -1,0 +1,18 @@
+## worker does S5 again: fresh copy labgate-v3 with the work, then deletes its own old copy labgate-v2, and reports done
+old copy labgate-v2 exists: no; replacement labgate-v3 HEAD d637daf on fm/labgate-v3
+
+[before] record: worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+$ bin/fm-crew-state.sh labgate
+state: unknown · source: none · worktree gone (torn down?)
+
+### bin/fm-control.sh labgate reassociate --worktree $W/copies/labgate-v3 --note ...
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+error: task labgate has an unfinished relaunch transaction at /Users/charlesabrooker/tmp/fm-lab.FXbqdc/state/labgate.control-relaunch; reconcile it before reassociating
+exit=1
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labgate-v2
+branch=fm/labgate-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+
+[after]
+$ bin/fm-crew-state.sh labgate
+state: unknown · source: none · worktree gone (torn down?)

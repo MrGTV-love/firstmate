@@ -1,0 +1,40 @@
+## crew-state BEFORE the move
+state: unknown · source: none · no current-state source available
+## worker S5 setup (nested copy, d3 GRE-1937 shape): plain git, as a worker does
++ git -C /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj config user.email lab@example.test
++ git -C /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj config user.name Lab
++ git -C /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj switch -q -c fm/labship
++ echo 'feature work'
++ git -C /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj add feature.txt
++ git -C /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj commit -qm 'feature work'
++ git -C /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj worktree add -q /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2 -b fm/labship-v2 fm/labship
++ set +x
+
+## reassociate into the nested copy
++ bin/fm-control.sh labship reassociate --worktree /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2 --note ...
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+reassociated labship worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2 branch=fm/labship-v2 prior=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj slot=kept
+exit=0
+
+## record after
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2
+branch=fm/labship-v2
+prior_worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+## brief after
+112:Ship branch: fm/labship-v2
+113-This task ships **local-only**: no remote, no PR, no pipeline.
+114-The task is complete only when committed on your branch `fm/labship`. Do NOT push, do NOT open a PR, do NOT merge.
+--
+120:## Copy reassociation (2026-10-11T10:46:06Z)
+121-
+122-This task's work moved to a replacement local copy.
+## anchor refs
+34cee3dc0e25f275d59566a837c1d81eefb3c62e commit	refs/fm/anchor/labship-34cee3d
+## slot claim
+task=labship
+home=/Users/charlesabrooker/tmp/fm-lab.FXbqdc
+## worker window alive
+sleep sleep
+fm-labship 2.1.296
+## crew-state AFTER the move
+state: unknown · source: none · no current-state source available

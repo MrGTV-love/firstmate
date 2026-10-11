@@ -1,0 +1,23 @@
+## --force --drop-file: does not waive the slot proof
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj would sweep away task labship's claimed pool slot /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj, whose HEAD ebb2930fa2b7df999733f29c2597eab08495c410 is neither landed nor held by a refs/fm/anchor/labship-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+## state after:
+/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj
+/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2
+record kept
+brief.md
+launch-brief.md
+
+## merge nested branch to local main
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+merged fm/labship-v2 into local main (2c5ce33 -> 6e90a86) in /Users/charlesabrooker/tmp/fm-labw.ei4BHg/proj
+6e90a86 feature work
+2c5ce33 base
+
+## teardown now: slot HEAD (late commit) neither landed nor anchored
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj would sweep away task labship's claimed pool slot /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj, whose HEAD ebb2930fa2b7df999733f29c2597eab08495c410 is neither landed nor held by a refs/fm/anchor/labship-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.

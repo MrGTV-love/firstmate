@@ -1,0 +1,24 @@
+## teardown labtwo (current copy is outside the pool; plain, landed work test on the copy)
+b3c9128 v2 work
+2c5ce33 base
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+b3c9128 v2 work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+replacement copy still on disk: yes
+record gone: no
+## anchors for the prior slot HEAD
+6e90a86a3762398931aef824888d1f1a9a7a8e61 commit	refs/fm/anchor/labship-6e90a86
+ebb2930fa2b7df999733f29c2597eab08495c410 commit	refs/fm/anchor/labship-ebb2930
+b3c912814bcdeb265626d115805f3198cdb3692d commit	refs/fm/anchor/labtwo-b3c9128
+
+## unreadable registered home: warn once, spawn proceeds (scout labscout)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+warning: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.ei4BHg/ghost-home; its task records were not checked for a current copy inside a Treehouse pool slot
+skill selection for labscout: unavailable - no TypeSafe or OpenRouter key
+spawned labscout harness=claude kind=scout window=fmlab:fm-labscout worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/2/proj
+exit=0

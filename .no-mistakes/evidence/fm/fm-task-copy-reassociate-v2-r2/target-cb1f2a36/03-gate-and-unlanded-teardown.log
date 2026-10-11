@@ -1,0 +1,26 @@
+## crew-state follows the replacement copy
+state: unknown · source: none · no current-state source available
+
+## spawn gate: nested live copy inside slot 1; registry also names an unreadable home (ghost)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.ei4BHg/ghost-home; its task records were not checked for a current copy inside a Treehouse pool slot
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj contains task labship's current copy /Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2; refusing allocation before treehouse get
+exit=1
+## windows
+sleep
+fm-labship
+## teardown while nested copy unlanded (plain)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.ei4BHg/ghost-home; nothing was changed
+exit=1
+## still there
+/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2
+17

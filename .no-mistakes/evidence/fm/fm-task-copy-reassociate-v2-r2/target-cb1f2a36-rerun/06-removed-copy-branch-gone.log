@@ -1,0 +1,33 @@
+## the worker's harness removes its own nested copy; the merged branch is pruned (as bin/fm-fleet-sync.sh does)
+Deleted branch fm/labship-v2 (was 34cee3d).
+ls: /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2: No such file or directory
++ fm/labship
+
+## ADVERSARIAL 1: plain teardown, copy gone, branch gone, no pr= recorded
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: task labship's nested copy /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2 is already removed and its branch is not landed; a pushed branch alone is not completion.
+Land its PR (or merge it to local main for a local-only ship), then re-run teardown, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+record kept: yes
+
+## fixture: record a PR URL on the task (pr=https://github.com/example/repo/pull/7)
+## ADVERSARIAL 2: real gh, which cannot confirm that PR merged
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: task labship's nested copy /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2 is already removed and its branch is not landed; a pushed branch alone is not completion.
+Land its PR (or merge it to local main for a local-only ship), then re-run teardown, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+record kept: yes
+
+## ADVERSARIAL 3: forge stand-in reports the recorded PR as OPEN (not merged)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: task labship's nested copy /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2 is already removed and its branch is not landed; a pushed branch alone is not completion.
+Land its PR (or merge it to local main for a local-only ship), then re-run teardown, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+record kept: yes
+## slot still claimed
+task=labship
+home=/Users/charlesabrooker/tmp/fm-lab.FXbqdc
+base  main  (repository default)

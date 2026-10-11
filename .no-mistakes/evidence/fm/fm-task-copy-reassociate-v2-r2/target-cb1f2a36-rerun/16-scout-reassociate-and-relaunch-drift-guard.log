@@ -1,0 +1,23 @@
+## scout labscout: worker cuts a fresh scratch copy outside the pool
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/2/proj
+kind=scout
+reassociated labscout worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labscout-v2 prior=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/2/proj slot=none released_slot=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/2/proj
+exit=0
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labscout-v2
+kind=scout
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/2/proj
+slot 2 claim: [end]
+scout window still running: 2.1.296
+
+## ADVERSARIAL: labfour's pane shell drifts to a path the record never named; relaunch must not adopt it
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labfour-v2
+released_worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+stopped labfour harness=claude backend=tmux endpoint=fmlab:fm-labfour worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labfour-v2
+pane cwd: /Users/charlesabrooker/tmp/fm-labw.tS1h2j/plain
+notice: labfour ships branch=fm/labfour-v2 while proj registers the ship-branch prefix 'fm/' (branch fm/labfour) - the task's branch and PR will read as firstmate-authored; proceed only on a current explicit captain instruction or an intake judgment you can state
+error: task labfour's endpoint is in '/Users/charlesabrooker/tmp/fm-labw.tS1h2j/plain', not its recorded worktree '/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labfour-v2'; refusing to relaunch an agent outside the copy holding its work
+error: the replacement agent for labfour could not be launched on claude
+error: labfour's agent was stopped but the replacement did not launch; no agent is running, and its work plus the recorded progress note are preserved at /Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labfour-v2
+exit=1
+pane cwd after: /Users/charlesabrooker/tmp/fm-labw.tS1h2j/plain  command: zsh
+worktree=/Users/charlesabrooker/tmp/fm-labw.tS1h2j/copies/labfour-v2

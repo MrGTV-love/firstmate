@@ -1,0 +1,16 @@
+## teardown while nested copy unlanded (ghost registration removed)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+6e90a86 feature work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=
+## --force on an unlanded task: slot proof must still hold
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+exit=
+## both copies still present
+/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj
+/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj/.claude/worktrees/fm-labship-v2
+ebb2930 late work in slot (not landed, not anchored)

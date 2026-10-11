@@ -1,0 +1,4 @@
++(eval):3> bin/fm-spawn.sh labship /Users/charlesabrooker/tmp/fm-labw.ei4BHg/proj --mode local-only --yolo off --harness claude --model sonnet --effort low
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+skill selection for labship: unavailable - no TypeSafe or OpenRouter key
+spawned labship harness=claude kind=ship mode=local-only yolo=off window=fmlab:fm-labship worktree=/Users/charlesabrooker/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj

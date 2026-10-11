@@ -1,0 +1,3 @@
+lab tmux dir teardown exit=0
+       6
+lab home exists: no; lab work dir exists: no; tmux dir exists: no

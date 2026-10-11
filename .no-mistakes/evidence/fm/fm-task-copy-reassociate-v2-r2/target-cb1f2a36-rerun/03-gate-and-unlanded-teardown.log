@@ -1,0 +1,43 @@
+## registry names a home that does not exist (ghost)
+- ghost - Missing lab home (home: /Users/charlesabrooker/tmp/fm-labw.tS1h2j/ghost-home; scope: lab ghost; projects: ; added 2026-10-11)
+
+## ADVERSARIAL: new spawn while slot 1 holds labship's live nested copy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+warning: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.tS1h2j/ghost-home; its task records were not checked for a current copy inside a Treehouse pool slot
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj contains task labship's current copy /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2; refusing allocation before treehouse get
+exit=1
+## windows (no fm-labgate expected)
+sleep
+fm-labship
+## labgate record exists: no
+
+## teardown while nested copy unlanded, ghost still registered (plain)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: registered local Firstmate home is unavailable: /Users/charlesabrooker/tmp/fm-labw.tS1h2j/ghost-home; nothing was changed
+exit=1
+
+## teardown while nested copy unlanded (ghost registration removed)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+34cee3d feature work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+exit=1
+
+## --force without captain words
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+exit=1
+## both copies still present, record kept
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2
+record kept

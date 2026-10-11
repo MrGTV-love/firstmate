@@ -1,0 +1,23 @@
+## worker rebases its replacement copy onto main (plain git), then Firstmate lands it
+f41d341 v2 work
+6e90a86 feature work
+2c5ce33 base
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+merged fm/labtwo-v2 into local main (6e90a86 -> f41d341) in /Users/charlesabrooker/tmp/fm-labw.ei4BHg/proj
+## plain teardown of labtwo after landing
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.WZsFPm
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for labtwo: 24381 51702
+teardown: force-killing leaked worktree process(es) for labtwo: 51702
+teardown labtwo complete (window fmlab:fm-labtwo; reassociated worktree /Users/charlesabrooker/tmp/fm-labw.ei4BHg/copies/labtwo-v2 left in place, since it is not a pool slot)
+Backlog: labtwo is closed in /Users/charlesabrooker/tmp/fm-lab.WZsFPm/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+exit=0
+replacement copy still on disk: yes
+record gone: yes
+## windows
+sleep
+fm-labscout
+base  main  (repository default)
+1     available    ~/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/1/proj  (detached)
+2     in-use       ~/tmp/fm-labw.ei4BHg/pool/.treehouse/proj-ab018d/2/proj  (detached)
+                   zsh (87037), 2.1.296 (95688), caffeinate (97049)

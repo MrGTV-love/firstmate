@@ -1,0 +1,32 @@
+## worker leaves a late commit in the slot (not landed, not anchored)
+0f9b5fa late work in slot (not landed, not anchored)
+
+## ADVERSARIAL: --force --drop-file must not waive the slot proof
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj would sweep away task labship's claimed pool slot /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj, whose HEAD 0f9b5fab46986b6a68f8225ced250815feda0c06 is neither landed nor held by a refs/fm/anchor/labship-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+exit=1
+## state after:
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2
+record kept
+brief.md
+launch-brief.md
+
+## land the nested branch on local main (bin/fm-merge-local.sh labship)
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+merged fm/labship-v2 into local main (bcca5d5 -> 34cee3d) in /Users/charlesabrooker/tmp/fm-labw.tS1h2j/proj
+exit=0
+34cee3d feature work
+bcca5d5 base
+
+## plain teardown now: nested work landed, but slot HEAD (late commit) neither landed nor anchored
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.FXbqdc
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: returning pool slot /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj would sweep away task labship's claimed pool slot /Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj, whose HEAD 0f9b5fab46986b6a68f8225ced250815feda0c06 is neither landed nor held by a refs/fm/anchor/labship-<sha> preservation anchor; nothing was changed - not even with --force.
+Land that commit, or move the task back to that copy and reassociate again so it is anchored, then re-run teardown.
+exit=1
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj
+/Users/charlesabrooker/tmp/fm-labw.tS1h2j/pool/.treehouse/proj-6cf95d/1/proj/.claude/worktrees/fm-labship-v2
+record kept
