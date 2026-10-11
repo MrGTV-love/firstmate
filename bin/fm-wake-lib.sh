@@ -2154,7 +2154,6 @@ fm_autoarm_release_abandoned() {  # <state-dir> [grace]
 fm_wake_clean_field() {
   LC_ALL=C tr '\t\r\n' '   '
 }
-
 fm_wake_append() {
   local status=0
   fm_lock_acquire_wait "$FM_WAKE_QUEUE_LOCK" || return 1
@@ -2464,6 +2463,33 @@ fm_wake_actor_pending_count() {  # <actor> [<rows-file> <owner-file>]
   # reaches END after failing to open the queue would otherwise report 0 rows.
   case "$count" in ''|*[!0-9]*) count=1 ;; esac
   printf '%s\n' "$count"
+}
+
+fm_wake_main_rows() {
+  local rows="$STATE/.branch-eligible-rows" queued parent
+  local owner="$STATE/.branch-eligible-owner" grant=''
+  if [ ! -e "$FM_WAKE_QUEUE" ] && [ ! -L "$FM_WAKE_QUEUE" ]; then
+    fm_dirname_to parent "$FM_WAKE_QUEUE"
+    [ -d "$parent" ] && [ -x "$parent" ] || return 1
+    return 0
+  fi
+  [ -f "$FM_WAKE_QUEUE" ] && [ -r "$FM_WAKE_QUEUE" ] || return 1
+  if fm_wake_branch_grant_live "$rows" "$owner" 2>/dev/null; then
+    grant=$rows
+  fi
+  queued=$(FM_WAKE_ROW_GRANT="$grant" awk -F '\t' '
+    BEGIN {
+      seqs = ENVIRON["FM_WAKE_ROW_GRANT"]
+      if (seqs != "") {
+        while ((status = getline line < seqs) > 0) reserved[line] = 1
+        if (status < 0) exit 1
+        close(seqs)
+      }
+    }
+    NF != 5 || $1 !~ /^[0-9]+$/ || $2 !~ /^[0-9]+$/ || $3 !~ /^(signal|stale|check|heartbeat)$/ { exit 1 }
+    !($2 in reserved) { print }
+  ' "$FM_WAKE_QUEUE" 2>/dev/null) || return 1
+  [ -z "$queued" ] || printf '%s\n' "$queued"
 }
 
 # Print which of the given sequence numbers are still queued, one per line.

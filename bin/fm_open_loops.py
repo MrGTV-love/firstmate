@@ -35,6 +35,18 @@ STOP_STATES = {"done", "parked", "paused"}
 SIGNATURE = re.compile(r"usage.?limit|rate.?limit|quota|auth|unauthorized|login|network|connection"
                        r"|timed? ?out|ECONN|ENOTFOUND|\b(?:error|failure|failed|exception|fatal)\b"
                        r"|\b(?-i:E[A-Z][A-Z0-9_]{2,})\b", re.I)
+
+
+def is_local_origin(origin):
+    """Git's own rule for a filesystem remote: a file:// URL, or neither a scheme URL nor scp-style host:path."""
+    if origin.startswith("file://"):
+        return True
+    if "://" in origin:
+        return False
+    colon, slash = origin.find(":"), origin.find("/")
+    return colon < 0 or 0 <= slash < colon
+
+
 SOURCE_ERRORS = (OSError, ValueError, KeyError, TypeError, RuntimeError, subprocess.TimeoutExpired,
                  sqlite3.Error, json.JSONDecodeError)
 
@@ -542,12 +554,16 @@ class Collector:
                 slugs.add(match[1])
                 self.owned_branches.update((match[1].casefold(), t["branch"]) for t in self.tasks
                                            if t.get("project") == path and t.get("branch"))
+            else:  # repo_origin admits only a GitHub or local-path origin, and a local path has no forge to read
+                self.add("coverage", "no forge coverage: " + Path(path).name,
+                         "none: this project's origin is a local path, so it has no forge pull requests to collect",
+                         None, evidence=f"{path}: local origin {origin}", informational=True)
         return sorted(slugs)
 
     def repo_origin(self, path):
         self.git(path, "rev-parse", "--git-dir")
         origin = self.run(["git", "-C", path, "config", "--get", "remote.origin.url"], missing_ok=True).strip()
-        if origin and not GITHUB_ORIGIN.fullmatch(origin):
+        if origin and not GITHUB_ORIGIN.fullmatch(origin) and not is_local_origin(origin):
             raise ValueError("unsupported non-GitHub origin: " + origin)
         return origin
 

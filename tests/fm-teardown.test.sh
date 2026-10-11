@@ -46,6 +46,9 @@
 #   (q3) no-mistakes + squash-merged, same file, different content   -> REFUSE
 #   (q4) no-mistakes + squash-merged rebased local plus extra commit -> REFUSE
 #   (q5) gh down + squash-merged stale local, content not in default -> REFUSE
+#   (q6) no-mistakes + squash-merged, pre-rebase copy pushed elsewhere, every patch in PR head -> ALLOW
+#   (q7) same, but one pre-rebase commit's change is missing from the PR head -> REFUSE
+#   (q8) same, but the merge of main carries a change of its own     -> REFUSE
 #
 # Also covers backlog teardown-lock-race: a git index.lock left in the worktree by a
 # killed crew process (bin/fm-teardown.sh's teardown_treehouse_return).
@@ -489,6 +492,77 @@ setup_squash_rebased_history() {
       fail "setup_squash_rebased_history: unknown local_mode $local_mode"
       ;;
   esac
+  printf '%s\n' "$pr_head"
+}
+
+# Squash-merged history whose pipeline rebased the task onto a newer main and
+# pushed the rebased copy as the PR head, while the task copy stayed on the
+# pre-rebase commits. Those commits were also pushed to a second remote (the
+# no-mistakes remote), so none of them counts as unpushed. The task copy holds a
+# merge of main. The PR head replays each commit's patch and adds one follow-up
+# that edits a.txt, so main's a.txt differs from the task copy's and the content
+# check cannot prove the copy landed.
+# mode: landed | missing-commit | edited-merge
+#   missing-commit: the PR head never replays "add b".
+#   edited-merge: the merge of main also carries a hand-written z.txt.
+# Echoes: <pr_head>
+setup_pushed_prerebase_history() {
+  local case_dir=$1 mode=$2 tmp pr_head
+  wt_commit_file "$case_dir" a.txt alpha "add a"
+  wt_commit_file "$case_dir" b.txt bravo "add b"
+
+  tmp="$case_dir/_main_move"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  printf '%s\n' moved > "$tmp/m.txt"
+  git -C "$tmp" add -- m.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "main moves"
+  git -C "$tmp" push -q origin main
+  rm -rf "$tmp"
+
+  git -C "$case_dir/wt" fetch -q origin
+  if [ "$mode" = edited-merge ]; then
+    git -C "$case_dir/wt" -c user.email=t@t -c user.name=t \
+      merge -q --no-commit --no-ff origin/main
+    printf '%s\n' zulu > "$case_dir/wt/z.txt"
+    git -C "$case_dir/wt" add -- z.txt
+    git -C "$case_dir/wt" -c user.email=t@t -c user.name=t \
+      commit -q -m "Merge main with a hand-written change"
+  else
+    git -C "$case_dir/wt" -c user.email=t@t -c user.name=t \
+      merge -q --no-ff --no-edit origin/main
+  fi
+  wt_commit_file "$case_dir" c.txt charlie "add c"
+
+  git init -q --bare "$case_dir/no-mistakes.git"
+  git -C "$case_dir/wt" remote add no-mistakes "$case_dir/no-mistakes.git"
+  git -C "$case_dir/wt" push -q no-mistakes HEAD:refs/heads/fm/task-x1
+
+  tmp="$case_dir/_pipeline"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" checkout -q -b fm/task-x1
+  printf '%s\n' alpha > "$tmp/a.txt"
+  git -C "$tmp" add -- a.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "add a"
+  if [ "$mode" != missing-commit ]; then
+    printf '%s\n' bravo > "$tmp/b.txt"
+    git -C "$tmp" add -- b.txt
+    git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "add b"
+  fi
+  printf '%s\n' charlie > "$tmp/c.txt"
+  git -C "$tmp" add -- c.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "add c"
+  printf '%s\n' alpha review-edit > "$tmp/a.txt"
+  git -C "$tmp" add -- a.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "review: edit a"
+  pr_head=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$tmp" checkout -q main
+  git -C "$tmp" merge -q --squash fm/task-x1 >/dev/null
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "feat: squash (#7)"
+  git -C "$tmp" push -q origin main
+  rm -rf "$tmp"
+
+  git -C "$case_dir/project" fetch -q origin
   printf '%s\n' "$pr_head"
 }
 
@@ -1354,6 +1428,82 @@ test_squash_merged_stale_local_refuses_when_forge_unreachable() {
   grep -q REFUSED "$case_dir/stderr" || fail "squash-stale-offline: no REFUSED line in stderr"
   assert_refusal_retained_task_state "$case_dir" squash-stale-offline "$local_head"
   pass "squash-merged stale local still refuses when the forge is unreachable"
+}
+
+# The task copy stayed on the pre-rebase commits after the pipeline pushed a
+# rebased copy as the PR head and the PR was squash-merged. Every commit's patch
+# is in the PR head and the merge of main adds nothing of its own, so the copy
+# is landed even though its commits sit on another remote.
+test_squash_merged_pushed_prerebase_copy_allows() {
+  local case_dir rc pr_head
+  case_dir=$(make_case squash-pushed-prerebase)
+  write_meta "$case_dir" no-mistakes ship
+  pr_head=$(setup_pushed_prerebase_history "$case_dir" landed)
+  printf '%s\n' \
+    'pr=https://github.com/example/repo/pull/7' \
+    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "squash-pushed-prerebase: teardown should accept a pre-rebase copy whose every patch is in the merged PR head"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-prerebase: teardown printed a REFUSED line"
+  pass "squash-merged PR accepts a pushed pre-rebase copy whose patches are all in the PR head"
+}
+
+# One pre-rebase commit's change never reached the PR head, so the copy still
+# holds work the merged PR lacks. The refusal must name that commit and keep
+# every recovery route.
+test_squash_merged_pushed_prerebase_copy_missing_commit_refuses() {
+  local case_dir rc pr_head local_head
+  case_dir=$(make_case squash-pushed-missing)
+  write_meta "$case_dir" no-mistakes ship
+  pr_head=$(setup_pushed_prerebase_history "$case_dir" missing-commit)
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  printf '%s\n' \
+    'pr=https://github.com/example/repo/pull/7' \
+    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "squash-pushed-missing: teardown should refuse when one pre-rebase commit's change is not in the PR head"$'\n'"$(cat "$case_dir/stderr")"
+  grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-missing: no REFUSED line in stderr"
+  grep -q 'add b' "$case_dir/stderr" || fail "squash-pushed-missing: the refusal does not name the commit missing from the PR head"
+  ! grep -q 'add a' "$case_dir/stderr" || fail "squash-pushed-missing: the refusal names a commit whose patch is in the PR head"
+  assert_refusal_retained_task_state "$case_dir" squash-pushed-missing "$local_head"
+  pass "squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head"
+}
+
+# A merge of main carries nothing of its own only when it is exactly what git
+# would produce. A merge commit with a hand-written change is unlanded work.
+test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses() {
+  local case_dir rc pr_head local_head
+  case_dir=$(make_case squash-pushed-edited-merge)
+  write_meta "$case_dir" no-mistakes ship
+  pr_head=$(setup_pushed_prerebase_history "$case_dir" edited-merge)
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  printf '%s\n' \
+    'pr=https://github.com/example/repo/pull/7' \
+    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 1 "$rc" "squash-pushed-edited-merge: teardown should refuse a merge commit with its own change"$'\n'"$(cat "$case_dir/stderr")"
+  grep -q REFUSED "$case_dir/stderr" || fail "squash-pushed-edited-merge: no REFUSED line in stderr"
+  grep -q 'hand-written change' "$case_dir/stderr" || fail "squash-pushed-edited-merge: the refusal does not name the edited merge"
+  assert_refusal_retained_task_state "$case_dir" squash-pushed-edited-merge "$local_head"
+  pass "squash-merged PR still refuses a merge commit that carries a change of its own"
 }
 
 test_pr_check_does_not_refresh_stale_pr_head() {
@@ -7213,6 +7363,9 @@ test_squash_merged_rebased_branch_allows
 test_squash_merged_same_file_different_content_refuses
 test_squash_merged_rebased_local_with_unlanded_commit_refuses
 test_squash_merged_stale_local_refuses_when_forge_unreachable
+test_squash_merged_pushed_prerebase_copy_allows
+test_squash_merged_pushed_prerebase_copy_missing_commit_refuses
+test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses
 test_pr_check_does_not_refresh_stale_pr_head
 test_pr_check_records_remote_head_when_local_lags
 test_content_in_default_fallback_allows
