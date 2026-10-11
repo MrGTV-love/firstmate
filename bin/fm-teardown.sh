@@ -53,7 +53,14 @@
 # (even ones pushed to another remote) is also accepted when every commit the PR
 # head and the default branch lack has a patch id among the PR head's own commits
 # and each merge commit is exactly what git produces from its parents; a refusal
-# then names the commits that are not proven. Anything else refuses.
+# then names the commits that are not proven. The pipeline's own review and
+# document steps rewrite and add commits, so a copy that was the pipeline's input
+# is also accepted when the no-mistakes run record proves it: a run whose pr_url is
+# the merged PR pushed exactly the merged PR head (last_pushed_sha), and the copy's
+# HEAD is that run's input head (submitted_head_sha) or an ancestor of it. A commit
+# made after the run started, a run that pushed another head, or a missing record
+# (state database, run row, pushed head, input head) refuses and names the record.
+# Anything else refuses.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
 # no pr= was ever recorded (e.g. a yolo-authorized merge on a repo with no PR CI,
 # where the usual "checks green" fm-pr-check.sh trigger never fires) - by looking
@@ -1730,6 +1737,124 @@ EOF
   [ -z "$unproven" ]
 }
 
+# Why the pipeline-input proof below did not hold, one line per reason, so a
+# refusal names the missing or mismatched record rather than guessing.
+TEARDOWN_PIPELINE_INPUT_REASON=
+
+# The pipeline's own review and document steps rewrite and add commits on the
+# branch it pushes, so a copy that was the pipeline's INPUT is neither an
+# ancestor of the merged PR head nor made of patches the PR head replays
+# unchanged. Such a copy is proven landed from the no-mistakes run record, never
+# from commit content: a recorded run for the merged PR pushed exactly the merged
+# PR head, that run started from a recorded input head (submitted_head_sha), and
+# this copy's HEAD is that input head or an ancestor of it. Every commit the
+# copy holds then went into the run whose pushed head merged. A commit made
+# after the run started is not an ancestor of its input head and refuses, as
+# does a run that pushed some other head; each missing record is named. Commit
+# subjects and times never count.
+pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
+  local pr_head=$1 pr_url=${2%/} current db rows kind id submitted pushed
+  local timeout=${NM_TEARDOWN_TIMEOUT:-10} runs=0 tied=0 reasons=
+  TEARDOWN_PIPELINE_INPUT_REASON=
+  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || current=
+  if [ -z "$current" ]; then
+    TEARDOWN_PIPELINE_INPUT_REASON="this copy's HEAD cannot be read"
+    return 1
+  fi
+  if [ -z "$pr_url" ]; then
+    TEARDOWN_PIPELINE_INPUT_REASON="the merged PR's URL is not known, so no run record can be tied to it"
+    return 1
+  fi
+  db=$(fm_nm_state_db "$WT")
+  if [ ! -f "$db" ]; then
+    TEARDOWN_PIPELINE_INPUT_REASON="no no-mistakes state database at $db, so no run record ties this copy to $pr_url"
+    return 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    TEARDOWN_PIPELINE_INPUT_REASON="python3 is not available, so the no-mistakes run record for $pr_url cannot be read"
+    return 1
+  fi
+  if ! rows=$(fm_nm_bounded "$WT" "$timeout" python3 -I - "$db" "$pr_url" 2>/dev/null <<'PY'
+import re
+import sqlite3
+import sys
+from contextlib import closing
+from pathlib import Path
+
+database, pr_url = sys.argv[1:]
+needed = ("id", "pr_url", "submitted_head_sha", "last_pushed_sha")
+try:
+    with closing(sqlite3.connect(Path(database).as_uri() + "?mode=ro", uri=True, timeout=30)) as db:
+        have = {row[1] for row in db.execute("PRAGMA table_info(runs)")}
+        missing = [name for name in needed if name not in have]
+        if missing:
+            print("missing-column|" + ",".join(missing))
+        else:
+            rows = db.execute(
+                "SELECT id, submitted_head_sha, last_pushed_sha FROM runs WHERE pr_url = ? "
+                "ORDER BY created_at, id", (pr_url,)
+            ).fetchall()
+            for row in rows:
+                values = ["" if value is None else str(value) for value in row]
+                if re.fullmatch(r"[A-Za-z0-9_-]+", values[0]):
+                    print("run|" + "|".join(values))
+except (OSError, ValueError, sqlite3.Error):
+    print("unreadable|")
+PY
+  ); then
+    TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
+    return 1
+  fi
+  while IFS='|' read -r kind id submitted pushed; do
+    case "$kind" in
+      missing-column)
+        TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run table in $db is missing column(s) $id, so no run record ties this copy to $pr_url"
+        return 1
+        ;;
+      unreadable)
+        TEARDOWN_PIPELINE_INPUT_REASON="the no-mistakes run record for $pr_url could not be read from $db"
+        return 1
+        ;;
+      run) ;;
+      *) continue ;;
+    esac
+    runs=$((runs + 1))
+    if [ -z "$pushed" ]; then
+      reasons="${reasons}run $id records no pushed head (last_pushed_sha), so it cannot be tied to the merged PR head ${pr_head:0:12}"$'\n'
+      continue
+    fi
+    if [ "$pushed" != "$pr_head" ]; then
+      reasons="${reasons}run $id pushed ${pushed:0:12}, not the merged PR head ${pr_head:0:12}"$'\n'
+      continue
+    fi
+    tied=$((tied + 1))
+    if ! fm_pr_head_valid "$submitted"; then
+      reasons="${reasons}run $id records no input head (submitted_head_sha), so this copy's HEAD cannot be placed in what the run started from"$'\n'
+      continue
+    fi
+    if [ "$submitted" = "$current" ]; then
+      return 0
+    fi
+    if ! git -C "$WT" cat-file -e "$submitted^{commit}" 2>/dev/null; then
+      reasons="${reasons}run $id input head ${submitted:0:12} is not an object in this copy, so this copy's HEAD cannot be placed in it"$'\n'
+      continue
+    fi
+    if git -C "$WT" merge-base --is-ancestor "$current" "$submitted" 2>/dev/null; then
+      return 0
+    fi
+    reasons="${reasons}run $id started from ${submitted:0:12}; this copy's HEAD ${current:0:12} is not that head or an ancestor of it, so commits were made after the run started"$'\n'
+  done <<EOF
+$rows
+EOF
+  if [ "$runs" -eq 0 ]; then
+    reasons="no no-mistakes run record names the merged PR $pr_url"$'\n'
+  elif [ "$tied" -eq 0 ]; then
+    reasons="${reasons}no recorded run pushed the merged PR head ${pr_head:0:12}"$'\n'
+  fi
+  TEARDOWN_PIPELINE_INPUT_REASON=${reasons%$'\n'}
+  return 1
+}
+
 # Is the worktree's PR merged for local work contained in that PR? Resolves the
 # PR from the recorded pr= URL first, then from the branch name, and asks GitHub
 # for both the PR state and head. Returns non-zero when the PR is not merged, the
@@ -1763,6 +1888,8 @@ pr_is_merged() {
   elif unpushed_patches_are_in_pr_head "$head"; then
     landed=1
   elif rebased_commits_are_in_pr_head "$head"; then
+    landed=1
+  elif pipeline_input_is_local_head "$head" "$resolved_url"; then
     landed=1
   fi
   [ "$landed" = 1 ] || return 1
@@ -2153,6 +2280,7 @@ validate_worktree_teardown_safety() {
       echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
       [ -z "$unpushed" ] || printf 'unpushed commits:\n%s\n' "$unpushed" >&2
       [ -z "$TEARDOWN_UNPROVEN_COMMITS" ] || printf 'commits whose change is not proven present in the merged PR head:\n%s\n' "$TEARDOWN_UNPROVEN_COMMITS" >&2
+      [ -z "$TEARDOWN_PIPELINE_INPUT_REASON" ] || printf 'this copy is not proven to be the input of the pipeline run that produced the merged PR head:\n%s\n' "$TEARDOWN_PIPELINE_INPUT_REASON" >&2
       if [ "$MODE" = local-only ]; then
         echo "Merge the branch into local $(default_branch 2>/dev/null || echo main) first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
       else

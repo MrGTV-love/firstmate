@@ -49,6 +49,8 @@
 #   (q6) no-mistakes + squash-merged, pre-rebase copy pushed elsewhere, every patch in PR head -> ALLOW
 #   (q7) same, but one pre-rebase commit's change is missing from the PR head -> REFUSE
 #   (q8) same, but the merge of main carries a change of its own     -> REFUSE
+#   (q9) no-mistakes + squash-merged, copy is the input of the run that pushed the merged PR head, pipeline rewrote it -> ALLOW
+#   (q10) same, but a commit was made after the run started, or no recorded run ties to the merged PR head, or a record is missing -> REFUSE
 #
 # Also covers backlog teardown-lock-race: a git index.lock left in the worktree by a
 # killed crew process (bin/fm-teardown.sh's teardown_treehouse_return).
@@ -566,6 +568,86 @@ setup_pushed_prerebase_history() {
   printf '%s\n' "$pr_head"
 }
 
+# Squash-merged history whose pipeline took the task copy as its INPUT, then
+# rewrote and added commits on the branch it pushed. The copy's commits are
+# neither ancestors of the PR head nor patches the PR head replays unchanged, and
+# main's content for a.txt conflicts with the copy's, so only the no-mistakes run
+# record proves the copy landed (pipeline_input_is_local_head in
+# bin/fm-teardown.sh). Commit subjects repeat on purpose: they prove nothing.
+# shape: diverged-iteration | rewritten-input
+#   diverged-iteration: the PR head shares no commit with the copy; the pipeline
+#     rebuilt the earlier iteration's work as different commits.
+#   rewritten-input: main moved and the copy merged it; the pipeline replayed the
+#     commits onto the moved main, rewrote "add a", and added a review commit.
+# Echoes: <pr_head>
+setup_pipeline_rewritten_history() {
+  local case_dir=$1 shape=$2 tmp pr_head
+  wt_commit_file "$case_dir" a.txt alpha "add a"
+  wt_commit_file "$case_dir" b.txt bravo "add b"
+  if [ "$shape" = rewritten-input ]; then
+    tmp="$case_dir/_main_move"
+    git clone -q "$case_dir/origin.git" "$tmp"
+    printf '%s\n' moved > "$tmp/m.txt"
+    git -C "$tmp" add -- m.txt
+    git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "main moves"
+    git -C "$tmp" push -q origin main
+    rm -rf "$tmp"
+    git -C "$case_dir/wt" fetch -q origin
+    git -C "$case_dir/wt" -c user.email=t@t -c user.name=t \
+      merge -q --no-ff --no-edit origin/main
+  fi
+
+  tmp="$case_dir/_pipeline"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" checkout -q -b fm/task-x1
+  printf '%s\n' alpha-reviewed > "$tmp/a.txt"
+  git -C "$tmp" add -- a.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "add a"
+  printf '%s\n' bravo > "$tmp/b.txt"
+  git -C "$tmp" add -- b.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "add b"
+  printf '%s\n' reviewed > "$tmp/r.txt"
+  git -C "$tmp" add -- r.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "review: add r"
+  pr_head=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$tmp" checkout -q main
+  git -C "$tmp" merge -q --squash fm/task-x1 >/dev/null
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "feat: squash (#7)"
+  git -C "$tmp" push -q origin main
+  rm -rf "$tmp"
+
+  git -C "$case_dir/project" fetch -q origin
+  printf '%s\n' "$pr_head"
+}
+
+# Write one row of the no-mistakes state database teardown reads at
+# $case_dir/nm/state.sqlite (run_teardown points NM_HOME there). An empty
+# submitted or pushed value is stored as NULL; omit-column leaves that column out
+# of the table entirely. Calling it again appends another run row.
+# Args: case_dir run_id pr_url submitted pushed [omit-column]
+write_nm_run_record() {
+  local case_dir=$1 id=$2 pr_url=$3 submitted=$4 pushed=$5 omit=${6:-}
+  mkdir -p "$case_dir/nm"
+  python3 -I - "$case_dir/nm/state.sqlite" "$id" "$pr_url" "$submitted" "$pushed" "$omit" <<'PY'
+import sqlite3
+import sys
+
+database, run_id, pr_url, submitted, pushed, omit = sys.argv[1:]
+columns = ["id", "branch", "pr_url", "submitted_head_sha", "last_pushed_sha", "created_at"]
+values = [run_id, "fm/task-x1", pr_url, submitted or None, pushed or None, 1]
+kept = [(name, value) for name, value in zip(columns, values) if name != omit]
+db = sqlite3.connect(database)
+db.execute("CREATE TABLE IF NOT EXISTS runs (%s)" % ", ".join(name for name, _ in kept))
+db.execute(
+    "INSERT INTO runs (%s) VALUES (%s)" % (
+        ", ".join(name for name, _ in kept), ", ".join("?" for _ in kept)),
+    [value for _, value in kept],
+)
+db.commit()
+PY
+}
+
 # A refusal must leave every recovery route intact: the isolated copy, its task
 # branch still at the unlanded commit, and the durable task record. A completed
 # teardown detaches and deletes that branch and removes the record, so these hold
@@ -848,6 +930,7 @@ run_teardown() {
   FM_STATE_OVERRIDE="$case_dir/state" \
   FM_DATA_OVERRIDE="$case_dir/data" \
   FM_CONFIG_OVERRIDE="$case_dir/config" \
+  NM_HOME="${NM_HOME:-$case_dir/nm}" \
   PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
     "$TEARDOWN" task-x1 "$@"
 }
@@ -1504,6 +1587,217 @@ test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses() {
   grep -q 'hand-written change' "$case_dir/stderr" || fail "squash-pushed-edited-merge: the refusal does not name the edited merge"
   assert_refusal_retained_task_state "$case_dir" squash-pushed-edited-merge "$local_head"
   pass "squash-merged PR still refuses a merge commit that carries a change of its own"
+}
+
+# Fixture for the pipeline-input cases: PR 7 is merged, its head is the commit the
+# pipeline pushed, and the task copy is the (rewritten) input the pipeline started
+# from. The recorded run is each test's own. Echoes: <pr_head>
+pipeline_input_case() {
+  local name=$1 shape=${2:-rewritten-input} case_dir pr_head
+  case_dir=$(make_case "$name")
+  write_meta "$case_dir" no-mistakes ship
+  pr_head=$(setup_pipeline_rewritten_history "$case_dir" "$shape")
+  printf '%s\n' \
+    'pr=https://github.com/example/repo/pull/7' \
+    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  printf '%s\n' "$pr_head"
+}
+
+# Run teardown on the fixture, keep its output in the case dir, echo the exit code.
+run_teardown_status() {
+  local case_dir=$1 rc
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  printf '%s\n' "$rc"
+}
+
+# The copy must refuse, name every given pattern, and keep every recovery route.
+# Args: case_dir label local_head pattern...
+assert_pipeline_input_refusal() {
+  local case_dir=$1 label=$2 local_head=$3 rc pattern
+  shift 3
+  rc=$(run_teardown_status "$case_dir")
+  expect_code 1 "$rc" "$label: teardown should refuse"$'\n'"$(cat "$case_dir/stderr")"
+  grep -q REFUSED "$case_dir/stderr" || fail "$label: no REFUSED line in stderr"
+  for pattern in "$@"; do
+    grep -qF -- "$pattern" "$case_dir/stderr" \
+      || fail "$label: the refusal does not name '$pattern'"$'\n'"$(cat "$case_dir/stderr")"
+  done
+  assert_refusal_retained_task_state "$case_dir" "$label" "$local_head"
+}
+
+# The copy was the pipeline's input and the pipeline rewrote it before the PR
+# merged. Without the run record the copy still refuses, which is the stuck
+# cleanup; with a record whose run pushed the merged head and started from this
+# copy's HEAD, it is landed.
+assert_pipeline_input_copy_allowed_by_record() {
+  local case_dir=$1 label=$2 pr_head=$3 local_head rc
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  assert_pipeline_input_refusal "$case_dir" "$label-no-record" "$local_head" \
+    "no no-mistakes state database"
+
+  write_nm_run_record "$case_dir" 01RUNINPUT "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+  rc=$(run_teardown_status "$case_dir")
+  expect_code 0 "$rc" "$label: teardown should accept the copy the merged run started from"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "$label: teardown printed a REFUSED line"
+}
+
+# PR 93 shape: the copy is an earlier iteration the pipeline rebuilt as different
+# commits, so the PR head shares nothing with it.
+test_pipeline_input_diverged_iteration_allows() {
+  local case_dir pr_head
+  pr_head=$(pipeline_input_case pipeline-input-diverged diverged-iteration)
+  case_dir="$TMP_ROOT/pipeline-input-diverged"
+  assert_pipeline_input_copy_allowed_by_record "$case_dir" pipeline-input-diverged "$pr_head"
+  pass "merged PR accepts a diverged earlier iteration that the recorded run started from"
+}
+
+# PR 103 shape: the copy is the input the pipeline replayed onto a moved main,
+# rewrote, and extended with its own review commits.
+test_pipeline_input_rewritten_by_pipeline_allows() {
+  local case_dir pr_head
+  pr_head=$(pipeline_input_case pipeline-input-rewritten rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-rewritten"
+  assert_pipeline_input_copy_allowed_by_record "$case_dir" pipeline-input-rewritten "$pr_head"
+  pass "merged PR accepts the local input that the recorded run rewrote and extended"
+}
+
+# A copy that lags the run's input head holds only commits the run started from.
+test_pipeline_input_local_head_behind_input_head_allows() {
+  local case_dir pr_head input_head local_head rc
+  pr_head=$(pipeline_input_case pipeline-input-behind rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-behind"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  wt_commit_file "$case_dir" extra.txt extra "input-only commit"
+  input_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/wt" reset -q --hard "$local_head"
+  write_nm_run_record "$case_dir" 01RUNBEHIND "https://github.com/example/repo/pull/7" "$input_head" "$pr_head"
+
+  rc=$(run_teardown_status "$case_dir")
+  expect_code 0 "$rc" "pipeline-input-behind: teardown should accept a copy that is an ancestor of the run's input head"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-behind: teardown printed a REFUSED line"
+  pass "merged PR accepts a copy that is an ancestor of the recorded run's input head"
+}
+
+# A run that pushed the merged head is the only one that can prove anything, and
+# an unrelated earlier run for the same PR must not stand in the way of it.
+test_pipeline_input_ties_the_run_by_pushed_head_allows() {
+  local case_dir pr_head local_head rc
+  pr_head=$(pipeline_input_case pipeline-input-reruns rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-reruns"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNEARLY "https://github.com/example/repo/pull/7" "$pr_head" "$local_head"
+  write_nm_run_record "$case_dir" 01RUNFINAL "https://github.com/example/repo/pull/7" "$local_head" "$pr_head"
+
+  rc=$(run_teardown_status "$case_dir")
+  expect_code 0 "$rc" "pipeline-input-reruns: teardown should accept the run that pushed the merged head"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-reruns: teardown printed a REFUSED line"
+  pass "merged PR is proven by the run that pushed its head, not by an earlier run on the same PR"
+}
+
+# A commit made after the run started is unlanded work whatever the record says.
+test_pipeline_input_refuses_commit_made_after_the_run_started() {
+  local case_dir pr_head input_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-late rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-late"
+  input_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNLATE "https://github.com/example/repo/pull/7" "$input_head" "$pr_head"
+  wt_commit_file "$case_dir" later.txt later "work after the run started"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-late "$local_head" \
+    "01RUNLATE" "after the run started"
+  pass "merged PR still refuses a copy with a commit made after the recorded run started"
+}
+
+# A recorded run that did not start from this copy proves nothing about it.
+test_pipeline_input_refuses_copy_outside_the_run_input() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-outside rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-outside"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNOUTSIDE "https://github.com/example/repo/pull/7" "$pr_head" "$pr_head"
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-outside "$local_head" \
+    "01RUNOUTSIDE" "started from"
+  pass "merged PR still refuses a copy that is not part of the recorded run's input"
+}
+
+# A run recorded for another PR does not tie to the merged PR.
+test_pipeline_input_refuses_run_recorded_for_another_pr() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-other-pr rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-other-pr"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNOTHERPR "https://github.com/example/repo/pull/8" "$local_head" "$pr_head"
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-other-pr "$local_head" \
+    "no no-mistakes run record names the merged PR https://github.com/example/repo/pull/7"
+  pass "merged PR still refuses when the only recorded run belongs to another PR"
+}
+
+# A run for this PR that pushed some other head is not the run whose head merged.
+test_pipeline_input_refuses_run_that_pushed_another_head() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-other-head rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-other-head"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNOTHERHEAD "https://github.com/example/repo/pull/7" "$local_head" "$local_head"
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-other-head "$local_head" \
+    "01RUNOTHERHEAD pushed" "not the merged PR head" "no recorded run pushed the merged PR head"
+  pass "merged PR still refuses when no recorded run pushed the merged PR head"
+}
+
+# Every missing record is named so the next step is to find it, not to guess.
+test_pipeline_input_refuses_when_the_state_database_is_missing() {
+  local case_dir local_head
+  pipeline_input_case pipeline-input-no-db rewritten-input >/dev/null
+  case_dir="$TMP_ROOT/pipeline-input-no-db"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-no-db "$local_head" \
+    "no no-mistakes state database at $case_dir/nm/state.sqlite"
+  pass "merged PR still refuses and names the state database when it is missing"
+}
+
+test_pipeline_input_refuses_when_the_input_head_is_not_recorded() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-no-input rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-no-input"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNNOINPUT "https://github.com/example/repo/pull/7" "" "$pr_head"
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-no-input "$local_head" \
+    "01RUNNOINPUT" "submitted_head_sha"
+  pass "merged PR still refuses and names the input head when the run did not record it"
+}
+
+test_pipeline_input_refuses_when_the_pushed_head_is_not_recorded() {
+  local case_dir local_head
+  pipeline_input_case pipeline-input-no-pushed rewritten-input >/dev/null
+  case_dir="$TMP_ROOT/pipeline-input-no-pushed"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNNOPUSH "https://github.com/example/repo/pull/7" "$local_head" ""
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-no-pushed "$local_head" \
+    "01RUNNOPUSH" "last_pushed_sha"
+  pass "merged PR still refuses and names the pushed head when the run did not record it"
+}
+
+test_pipeline_input_refuses_when_the_run_table_lacks_the_input_column() {
+  local case_dir pr_head local_head
+  pr_head=$(pipeline_input_case pipeline-input-no-column rewritten-input)
+  case_dir="$TMP_ROOT/pipeline-input-no-column"
+  local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  write_nm_run_record "$case_dir" 01RUNNOCOL "https://github.com/example/repo/pull/7" "$local_head" "$pr_head" submitted_head_sha
+
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-no-column "$local_head" \
+    "missing column(s) submitted_head_sha"
+  pass "merged PR still refuses and names the column when the run table has no input head"
 }
 
 test_pr_check_does_not_refresh_stale_pr_head() {
@@ -7366,6 +7660,18 @@ test_squash_merged_stale_local_refuses_when_forge_unreachable
 test_squash_merged_pushed_prerebase_copy_allows
 test_squash_merged_pushed_prerebase_copy_missing_commit_refuses
 test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses
+test_pipeline_input_diverged_iteration_allows
+test_pipeline_input_rewritten_by_pipeline_allows
+test_pipeline_input_local_head_behind_input_head_allows
+test_pipeline_input_ties_the_run_by_pushed_head_allows
+test_pipeline_input_refuses_commit_made_after_the_run_started
+test_pipeline_input_refuses_copy_outside_the_run_input
+test_pipeline_input_refuses_run_recorded_for_another_pr
+test_pipeline_input_refuses_run_that_pushed_another_head
+test_pipeline_input_refuses_when_the_state_database_is_missing
+test_pipeline_input_refuses_when_the_input_head_is_not_recorded
+test_pipeline_input_refuses_when_the_pushed_head_is_not_recorded
+test_pipeline_input_refuses_when_the_run_table_lacks_the_input_column
 test_pr_check_does_not_refresh_stale_pr_head
 test_pr_check_records_remote_head_when_local_lags
 test_content_in_default_fallback_allows
