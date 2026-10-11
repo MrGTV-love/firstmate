@@ -1,0 +1,7 @@
+code tree: /Users/charlesabrooker/tmp/nm-base.qBmK2u
+task records in home naming the same clone (/Users/charlesabrooker/tmp/fm-lab.wjTcnO/projects/demo): 150 extra + task-a
+teardown rc=0: teardown task-a complete (window firstmate:fm-task-a, worktree /Users/charlesabrooker/tmp/fm-lab.wjTcnO/treehouse/.treehouse/demo-1ea577/1/demo)
+wall time: 42.00s
+'git worktree list' calls: 459
+all git calls: 964
+DONE

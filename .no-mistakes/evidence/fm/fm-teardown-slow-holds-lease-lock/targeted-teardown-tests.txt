@@ -1,0 +1,2 @@
+ok - a steer to another task completes while a cleanup holds its own task's lease lock
+ok - the lane-registry scan reads each distinct registry once however many records name it

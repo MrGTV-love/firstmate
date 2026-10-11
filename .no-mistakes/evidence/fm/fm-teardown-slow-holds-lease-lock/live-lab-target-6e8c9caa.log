@@ -1,0 +1,15 @@
+[22:23:52 +  0.03s] code tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4MDH8SE4SA2P3HC7REV84RF (6e8c9caa)
+[22:23:52 +  0.05s] START real cleanup: bin/fm-teardown.sh task-a (environment made slow: first 'git worktree list' sleeps 40s)
+[22:23:56 +  3.54s] cleanup is stalled inside its run (pid 45747 alive: yes)
+[22:23:56 +  3.56s] held lease lock: .fm-lease-command-task-a.lock owner pid=45747
+[22:23:56 +  3.58s] SEND to OTHER task: bin/fm-send.sh task-b 'supervisor ruling for lane b'
+[22:23:58 +  5.85s] send to task-b returned rc=0 after 2.21s; cleanup still running: yes
+[22:23:58 +  5.89s] task-b inbox record: 001.msg handled  -> schema=fm-task-inbox.v1 at=2026-10-11T03:23:56Z -- supervisor ruling for lane b
+[22:23:58 +  5.91s] CLAIM lease on OTHER task: bin/fm-lease.sh claim task-b
+[22:23:58 +  6.28s] claim task-b rc=0 after 0.18s; check: main 60443 1791689038 stale; cleanup still running: yes
+[22:23:58 +  6.43s] release task-b rc=0
+[22:23:59 +  6.45s] ADVERSARIAL: SEND to SAME task while its cleanup holds the lock: bin/fm-send.sh task-a 'steer to a'
+[22:24:45 + 52.48s] send to task-a returned rc=1 after 45.99s; cleanup still running when it returned: no; send-a stderr tail: error: steer not sent to task-a: the task retired or changed endpoint during target resolution
+[22:24:45 + 52.50s] cleanup finished rc=0: teardown task-a complete (window firstmate:fm-task-a, worktree /Users/charlesabrooker/tmp/fm-lab.WMtvVW/treehouse/.treehouse/demo-80bc5f/1/demo)
+[22:24:45 + 52.52s] remaining lease locks: 0
+DONE

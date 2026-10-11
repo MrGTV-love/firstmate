@@ -1,0 +1,17 @@
+## Same task guarded twice in one process (real bin/fm-lease-lib.sh, lab home /Users/charlesabrooker/tmp/fm-lab.VlZI8s, supervision-host on)
+first guard ok, lock=.fm-lease-command-task-dup.lock
+second guard ok (no self-deadlock), lock=.fm-lease-command-task-dup.lock
+lock held while guarded
+lock released after one release
+exit=0
+
+## Branch-actor claim on a task whose guard is held waits; claim on another task does not
+claim task-other rc=0 in 0.15s (guard holder alive: yes)
+claim task-held rc=0 in 6.19s (guard holder alive after: no)
+
+## sweep and release-actor with per-task locks
+branch 34608 1791689300 stale
+branch 999999 1 stale
+sweep rc=0; stale-one lease present: no; task-other lease present: no
+release-actor rc=0; leases left: 0
+lease-command locks left: 0

@@ -1,0 +1,15 @@
+[22:25:25 +  0.04s] code tree: /Users/charlesabrooker/tmp/nm-base.qBmK2u (base-archive)
+[22:25:25 +  0.06s] START real cleanup: bin/fm-teardown.sh task-a (environment made slow: first 'git worktree list' sleeps 40s)
+[22:25:29 +  3.91s] cleanup is stalled inside its run (pid 41565 alive: yes)
+[22:25:29 +  3.93s] held lease lock: .fm-lease-command.lock owner pid=41565
+[22:25:29 +  3.95s] SEND to OTHER task: bin/fm-send.sh task-b 'supervisor ruling for lane b'
+[22:26:21 + 55.97s] send to task-b returned rc=0 after 51.98s; cleanup still running: no
+[22:26:21 + 56.00s] task-b inbox record: 001.msg handled  -> schema=fm-task-inbox.v1 at=2026-10-11T03:26:19Z -- supervisor ruling for lane b
+[22:26:21 + 56.01s] CLAIM lease on OTHER task: bin/fm-lease.sh claim task-b
+[22:26:22 + 56.57s] claim task-b rc=0 after 0.22s; check: main 66731 1791689181 stale; cleanup still running: no
+[22:26:22 + 56.77s] release task-b rc=0
+[22:26:22 + 56.79s] ADVERSARIAL: SEND to SAME task while its cleanup holds the lock: bin/fm-send.sh task-a 'steer to a'
+[22:26:23 + 57.41s] send to task-a returned rc=1 after 0.56s; cleanup still running when it returned: no; send-a stderr tail: error: target 'task-a' is not resolvable (tried meta=/Users/charlesabrooker/tmp/fm-lab.3730DP/state/task-a.meta; metadata window/terminal lookup; backend=none). Use fm-task-a for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.
+[22:26:23 + 57.44s] cleanup finished rc=0: teardown task-a complete (window firstmate:fm-task-a, worktree /Users/charlesabrooker/tmp/fm-lab.3730DP/treehouse/.treehouse/demo-d09d2b/1/demo)
+[22:26:23 + 57.46s] remaining lease locks: 0
+DONE
