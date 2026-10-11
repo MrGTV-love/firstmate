@@ -77,8 +77,12 @@ rc=$?
 ! kill -0 "$pid" 2>/dev/null || exit 22
 '''
 signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
+# The parent already swept stale fixtures when it sourced the library, so the
+# child must not repeat that scan inside its 15 second window.
+child_env = dict(os.environ, FM_TEST_SKIP_ORPHAN_REAP="1")
 p = subprocess.Popen([os.environ.get("BASH", "bash"), "-c", script, "_", sys.argv[1]],
-                     start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                     start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                     env=child_env)
 try:
     out, err = p.communicate(timeout=15)
 except subprocess.TimeoutExpired:

@@ -144,32 +144,68 @@ fm_run_bash_timeout() {
   return "$command_rc"
 }
 
+# fm_timeout_free_fd <floor>: print the lowest unused descriptor number >= floor.
+fm_timeout_free_fd() {
+  local fd=$1
+  while [ "$fd" -lt 200 ]; do
+    if ! { : >&"$fd"; } 2>/dev/null; then
+      printf '%s\n' "$fd"
+      return 0
+    fi
+    fd=$((fd + 1))
+  done
+  return 1
+}
+
+# The bounded command's own status travels in a file this function never leaves
+# on disk: the file is unlinked as soon as its write and read descriptors are
+# open, so a caller that dies by TERM, INT, HUP or KILL while waiting leaves no
+# fm-timeout-status.* behind. A named file removed only on the normal return
+# leaked one entry per interrupted call (2394 found in a shared temp dir). The
+# one remaining gap is a KILL between mktemp and the unlink.
 fm_run_external_timeout() {
-  local runner=$1 seconds=$2 status_file runner_pid runner_rc command_rc
+  local runner=$1 seconds=$2 status_file runner_pid runner_rc command_rc wfd rfd
   shift 2
   status_file=$(mktemp "${TMPDIR:-/tmp}/fm-timeout-status.XXXXXX" 2>/dev/null) || return 124
+  wfd=$(fm_timeout_free_fd 20) || wfd=
+  rfd=
+  [ -z "$wfd" ] || rfd=$(fm_timeout_free_fd $((wfd + 1))) || rfd=
+  if [ -z "$wfd" ] || [ -z "$rfd" ]; then
+    rm -f "$status_file" 2>/dev/null || true
+    return 124
+  fi
+  if ! { eval "exec $wfd>\"\$status_file\" $rfd<\"\$status_file\""; } 2>/dev/null; then
+    eval "exec $wfd>&- $rfd<&-" 2>/dev/null || true
+    rm -f "$status_file" 2>/dev/null || true
+    return 124
+  fi
+  rm -f "$status_file" 2>/dev/null || true
   # Run timeout asynchronously so its pid - also the process-group id created
   # by GNU/BSD timeout without --foreground - remains available for cleanup.
   # A shell wrapper can exit promptly on TERM while one of its descendants
   # ignores TERM; timeout then considers the command finished and does not send
   # its configured KILL. Explicitly reap that leftover group on a real timeout.
+  # The wrapper closes the read side and hides the write side from the command.
   # shellcheck disable=SC2016  # Expansion is deliberately deferred to the child shell.
   "$runner" -k 1 "$seconds" bash -c '
-    status_file=$1
-    shift
-    "$@"
+    wfd=$1
+    rfd=$2
+    shift 2
+    eval "exec $rfd<&-"
+    eval "\"\$@\" $wfd>&-"
     command_rc=$?
-    printf "%s\n" "$command_rc" > "$status_file"
+    printf "%s\n" "$command_rc" >&"$wfd"
     exit "$command_rc"
-  ' _ "$status_file" "$@" &
+  ' _ "$wfd" "$rfd" "$@" &
   runner_pid=$!
   if wait "$runner_pid"; then
     runner_rc=0
   else
     runner_rc=$?
   fi
-  command_rc=$(cat "$status_file" 2>/dev/null || true)
-  rm -f "$status_file" 2>/dev/null || true
+  command_rc=
+  IFS= read -r command_rc <&"$rfd" 2>/dev/null || true
+  eval "exec $wfd>&- $rfd<&-" 2>/dev/null || true
   case "$command_rc" in
     ''|*[!0-9]*) ;;
     *)

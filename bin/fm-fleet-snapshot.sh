@@ -782,7 +782,7 @@ prefetch_task_current_states() {
   local meta captured_meta id index=0 rc=0 read_slot=0 pid kind
   local -a pids=()
   snapshot_task_cleanup
-  SNAPSHOT_TASK_DIR=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-fleet-tasks.XXXXXX") || return 1
+  SNAPSHOT_TASK_DIR=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-fleet-tasks.$SNAPSHOT_OWNER_TOKEN.XXXXXX") || return 1
   # Keep the metadata generation that selected each task beside its observations.
   # Publishers replace metadata atomically, so copying before workers start gives
   # composition one coherent task manifest even if publication or teardown races it.
@@ -1517,7 +1517,7 @@ snapshot_cache_store() {  # <summary-json-file> <destination>
 
 prepare_remote_summary_collection() {  # <sampled-row-json-lines>
   local rows=$1 manifest collector row id home host cache_path remote_rows rc slot=0
-  SNAPSHOT_COLLECT_DIR=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-fleet-ledgers.XXXXXX") || return 1
+  SNAPSHOT_COLLECT_DIR=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-fleet-ledgers.$SNAPSHOT_OWNER_TOKEN.XXXXXX") || return 1
   SNAPSHOT_SUMMARY_FILTER="$SNAPSHOT_COLLECT_DIR/summary-filter.jq"
   cat > "$SNAPSHOT_SUMMARY_FILTER" <<'JQ'
 length == 1 and (.[0] |
@@ -1657,6 +1657,46 @@ snapshot_cleanup() {
 }
 trap snapshot_cleanup EXIT
 trap 'exit 143' TERM
+
+# The EXIT trap above cannot run when this process is KILLed, which is how a
+# bound that outlasts its grace ends it (2145 fm-fleet-tasks.* and 71
+# fm-fleet-snapshot.* entries piled up in a shared temp dir). Each scratch
+# directory therefore carries its owner's pid and start time in its name, and
+# the next run removes the directories of owners that have ended. Names without
+# that token (every directory made before this) are never touched.
+snapshot_start_token() {  # <pid> - the pid's start time as a filename-safe token
+  local start
+  start=$(LC_ALL=C ps -o lstart= -p "$1" 2>/dev/null) || return 1
+  start=${start#"${start%%[![:space:]]*}"}
+  start=${start%"${start##*[![:space:]]}"}
+  [ -n "$start" ] || return 1
+  printf '%s\n' "${start//[^A-Za-z0-9]/_}"
+}
+
+snapshot_reap_dead_owner_dirs() {
+  local stem dir name rest pid start current
+  for stem in fm-fleet-tasks fm-fleet-ledgers fm-fleet-snapshot; do
+    for dir in "${TMPDIR:-/tmp}/$stem".[0-9]*-*.??????; do
+      [ -d "$dir" ] && [ ! -L "$dir" ] && [ -O "$dir" ] || continue
+      name=${dir##*/}
+      rest=${name#"$stem".}
+      pid=${rest%%-*}
+      start=${rest#*-}
+      start=${start%.??????}
+      case "$pid" in '' | *[!0-9]*) continue ;; esac
+      if kill -0 "$pid" 2>/dev/null; then
+        # A live pid is the owner unless it was reused by a later process.
+        [ "$start" != na ] || continue
+        current=$(snapshot_start_token "$pid") || continue
+        [ "$current" != "$start" ] || continue
+      fi
+      rm -rf -- "$dir"
+    done
+  done
+}
+
+SNAPSHOT_OWNER_TOKEN=$$-$(snapshot_start_token "$$" || printf na)
+snapshot_reap_dead_owner_dirs
 
 bounded_parent_activities_json() {  # <status-file>
   local f=$1 out rc reason script
@@ -2166,7 +2206,7 @@ if [ "$OUTPUT_MODE" = contribution-input ]; then
   jq -n --argjson backlog "$BACKLOG_JSON" --argjson tasks "$contribution_tasks" '{backlog:$backlog,tasks:$tasks}'
   exit 0
 fi
-JSON_TRANSPORT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-fleet-snapshot.XXXXXX") \
+JSON_TRANSPORT_DIR=$(mktemp -d "${TMPDIR:-/tmp}/fm-fleet-snapshot.$SNAPSHOT_OWNER_TOKEN.XXXXXX") \
   || { echo "fm-fleet-snapshot: temporary transport directory creation failed" >&2; exit 1; }
 BACKLOG_JSON_FILE="$JSON_TRANSPORT_DIR/backlog.json"
 CONTRIBUTIONS_JSON_FILE="$JSON_TRANSPORT_DIR/contributions.json"

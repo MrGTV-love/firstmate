@@ -548,6 +548,46 @@ SH
   pass "an outer Perl bound reaps a TERM-resistant nested command"
 }
 
+# fm_run_timed keeps the bounded command's status in a temp file. A caller that
+# was interrupted while waiting used to leave that file behind, one per call
+# (2394 fm-timeout-status.* entries piled up in a shared temp dir). Every exit,
+# normal or not, must leave the temp dir empty.
+test_no_status_file_survives_any_exit_of_the_caller() {
+  local dir sig caller_pid command_pid mode
+  dir="$TMP_ROOT/status-leak"
+  mkdir -p "$dir/tmp" "$dir/bin"
+  printf '#!/bin/sh\nshift 3\nexec "$@"\n' > "$dir/bin/timeout"
+  chmod +x "$dir/bin/timeout"
+  cat > "$dir/caller.sh" <<'SH'
+. "$1/bin/fm-timeout-lib.sh"
+PATH="$2:$PATH"
+fm_run_timed "$4" bash -c 'printf "%s\n" "$$" > "$1"; exec sleep 60' _ "$3"
+SH
+  for mode in 60 1; do
+    rm -f "$dir/command.pid"
+    TMPDIR="$dir/tmp" bash -c '. "$1/bin/fm-timeout-lib.sh"; PATH="$2:$PATH"; fm_run_timed "$3" true' \
+      _ "$ROOT" "$dir/bin" "$mode" >/dev/null 2>&1
+    [ -z "$(ls -A "$dir/tmp")" ] || fail "a completed bounded call left a status file: $(ls -A "$dir/tmp")"
+  done
+  rm -f "$dir/command.pid"
+  TMPDIR="$dir/tmp" bash "$dir/caller.sh" "$ROOT" "$dir/bin" "$dir/command.pid" 1 >/dev/null 2>&1
+  [ -z "$(ls -A "$dir/tmp")" ] || fail "a bound that fired left a status file: $(ls -A "$dir/tmp")"
+  for sig in TERM INT HUP KILL; do
+    rm -f "$dir/command.pid"
+    # perl restores SIGINT, which a shell's background job otherwise ignores.
+    TMPDIR="$dir/tmp" perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' \
+      bash "$dir/caller.sh" "$ROOT" "$dir/bin" "$dir/command.pid" 60 >/dev/null 2>&1 &
+    caller_pid=$!
+    wait_for_file "$dir/command.pid"
+    command_pid=$(cat "$dir/command.pid")
+    kill -"$sig" "$caller_pid" 2>/dev/null || true
+    wait "$caller_pid" 2>/dev/null || true
+    kill -KILL "$command_pid" 2>/dev/null || true
+    [ -z "$(ls -A "$dir/tmp")" ] || fail "a caller ended by $sig left a status file: $(ls -A "$dir/tmp")"
+  done
+  pass "no bounded-call status file survives a normal, timed-out, or signalled exit of the caller"
+}
+
 test_passes_the_command_status_and_output_through
 test_system_bash_preserves_completion_and_signal_statuses
 test_run_timed_reports_the_bound_when_the_wrapper_records_a_signal_death
@@ -569,3 +609,4 @@ test_run_timed_perl_bound_reaches_a_child_slow_to_start
 test_nm_bounded_perl_bound_reaches_a_child_slow_to_start
 test_perl_bound_forwards_a_term_to_the_command
 test_nested_perl_bound_reaps_a_term_resistant_child
+test_no_status_file_survives_any_exit_of_the_caller

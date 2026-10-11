@@ -476,7 +476,7 @@ wait_gone "$NESTED_LIVE_STUB" 5 || fail "the live test's nested stub did not acc
 wait_gone "$NESTED_UNMARKED_STUB" 5 || fail "the unmarked nested stub did not accept its release"
 pass "startup recovery reaps killed parallel tests' nested stubs without crossing ownership boundaries"
 
-NESTED_LAB_ROOT="$SCAN/fm-lab-nested/home"
+NESTED_LAB_ROOT="$SCAN/fm-test-run.lab-nested/home"
 bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
 NESTED_LAB_OWNER=$!
 track "$NESTED_LAB_OWNER" "$(initialized_identity "$NESTED_LAB_OWNER" bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin")"
@@ -500,3 +500,31 @@ alive "$NESTED_LAB_UNMARKED_WATCH" || fail "the ended lab scan stopped an unmark
 touch "$NESTED_LAB_ROOT-unmarked/release"
 wait_gone "$NESTED_LAB_UNMARKED_WATCH" 5 || fail "the unmarked nested lab watcher did not accept its release"
 pass "nested marked lab watchers are reaped while unmarked nested homes are left alone"
+
+# Host clutter must not set the sweep's cost. Other tools leave tens of thousands
+# of fm-* entries in a shared temp dir (observed 2026-10-10: 47000 entries made
+# this sweep 62 seconds against a 15 second case limit), so the sweep may enter
+# only directories that are marked roots, runner containers or live labs.
+CLUTTER_SCAN="$TMP_ROOT/clutter-scan"
+mkdir -p "$CLUTTER_SCAN" "$TMP_ROOT/find-shim" "$CLUTTER_SCAN/fm-test-run.clutter-run/w1/tmp"
+i=0
+while [ "$i" -lt 40 ]; do
+  mkdir -p "$CLUTTER_SCAN/fm-fleet-tasks.leak$i"
+  : > "$CLUTTER_SCAN/fm-fleet-tasks.leak$i/task.meta"
+  : > "$CLUTTER_SCAN/fm-timeout-status.leak$i"
+  i=$((i + 1))
+done
+start_owner
+CLUTTER_MARKED=$(mktemp -d "$CLUTTER_SCAN/fm-clutter-marked.XXXXXX") || fail "could not make a marked root"
+printf '%s\n%s\n' "$OWNER" "$(fm_test_pid_identity "$OWNER")" > "$CLUTTER_MARKED/.fm-test-fixture"
+printf '#!/usr/bin/env bash\nprintf "%%s\\n" "$*" >> "$FM_TEST_FIND_LOG"\nexec "$FM_TEST_REAL_FIND" "$@"\n' > "$TMP_ROOT/find-shim/find"
+chmod +x "$TMP_ROOT/find-shim/find"
+: > "$TMP_ROOT/find.log"
+out=$(env PATH="$TMP_ROOT/find-shim:$PATH" FM_TEST_FIND_LOG="$TMP_ROOT/find.log" \
+  FM_TEST_REAL_FIND="$(command -v find)" "$REAPER" --tmpdir "$CLUTTER_SCAN" 2>&1) \
+  || fail "the clutter scan failed: $out"
+FIND_CALLS=$(wc -l < "$TMP_ROOT/find.log" | tr -d ' ')
+[ "$FIND_CALLS" -le 1 ] || fail "the sweep started $FIND_CALLS find processes for one scan"
+assert_not_contains "$(cat "$TMP_ROOT/find.log")" "fm-fleet-tasks" "the sweep entered unrelated fm-* clutter"
+assert_contains "$(cat "$TMP_ROOT/find.log")" "fm-test-run.clutter-run" "the sweep skipped a runner container"
+pass "the sweep never enters unrelated fm-* entries, so host clutter cannot set its cost"
