@@ -45,8 +45,9 @@
 #            both are proved: it is firstmate's own poll by exact identity - this
 #            adapter's `poll` whose pid and start time match the poller record it
 #            wrote in this home's registry for that source, or a native
-#            `lavish-axi poll` whose parent is such an adapter - and no live
-#            claim's process group contains it. `poll` writes its record at entry
+#            `lavish-axi poll <artifact> [--takeover] [--agent-reply <text>]`
+#            whose parent is such an adapter - and no live claim's process
+#            group contains it. `poll` writes its record at entry
 #            and removes it on exit, and each scan first drops records whose
 #            process is gone or started at another time, so a reused pid never
 #            matches. Anything unproved - an unresolvable artifact, no matching
@@ -1501,7 +1502,7 @@ orphan_poll_processes() {
       my ($pid, $ppid, $pgid, $lstart, $command) = ($1, $2, $3, $4, $5);
       $lstart =~ s/\s+/ /g;
       $start{$pid} = $lstart;
-      $command =~ m{(?:\A|[ /])(?:lavish-axi|fm-procevent-lavish\.sh) poll (.+?)(?: --agent-reply-file .+)?\z} or next;
+      $command =~ m{(?:\A|[ /])(?:lavish-axi|fm-procevent-lavish\.sh) poll (.+?)(?: --takeover)?(?: --agent-reply(?:-file)? .+)?\z} or next;
       my $artifact = $1;
       next if $artifact =~ /\t/;
       push @polls, [$pid, $pgid, $lstart, $ppid, $artifact];

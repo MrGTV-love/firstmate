@@ -7172,6 +7172,46 @@ kill "$orph_foreign_pid" 2>/dev/null || true
 wait "$orph_pid" "$orph_foreign_pid" 2>/dev/null || true
 pass "orphaned Lavish polls are listed by default and signalled only on request, only when proved by identity"
 
+# The native poll a ledgered adapter launches carries the options the adapter
+# adds - `--takeover` after a held page, the legacy `--agent-reply <text>` - and
+# is proved through its parent's poller record all the same. The same options on
+# a poll with no poller record prove nothing.
+(
+  bash "$ORPH/bin/lavish-axi" poll "$orph_art" --takeover & orph_takeover_pid=$!
+  bash "$ORPH/bin/lavish-axi" poll "$orph_art" --agent-reply 'staged reply text' & orph_reply_pid=$!
+  printf '%s\n%s\n' "$orph_takeover_pid" "$orph_reply_pid" > "$ORPH/children.tmp"
+  mv -f -- "$ORPH/children.tmp" "$ORPH/children"
+  wait
+) & orph_parent=$!
+bash "$ORPH/bin/lavish-axi" poll "$orph_art" --takeover & orph_bare_pid=$!
+wait_for "$ORPH/children" || fail "the ledgered adapter stand-in never started its native polls"
+{ read -r orph_takeover_pid; read -r orph_reply_pid; } < "$ORPH/children"
+poller_seed "$ORPH/home" "$orph_id" "$orph_parent"
+for _ in $(seq 1 100); do [ -n "$(orph_line "$orph_reply_pid")" ] && break; sleep 0.1; done
+assert_equals "orphan: $orph_takeover_pid $orph_id $orph_art" "$(orph_line "$orph_takeover_pid")" \
+  "a ledgered adapter's native --takeover poll is proved a stray of its page"
+assert_equals "orphan: $orph_reply_pid $orph_id $orph_art" "$(orph_line "$orph_reply_pid")" \
+  "a ledgered adapter's native --agent-reply poll is proved a stray of its page"
+assert_equals "kept: $orph_bare_pid (no poller record) $orph_art" "$(orph_line "$orph_bare_pid")" \
+  "a --takeover poll with no poller record is kept"
+orph_kill=$(orphans --kill)
+assert_contains "$orph_kill" "killed: $orph_takeover_pid $orph_id $orph_art" \
+  "the explicit flag signals the ledgered --takeover poll"
+assert_contains "$orph_kill" "killed: $orph_reply_pid $orph_id $orph_art" \
+  "the explicit flag signals the ledgered --agent-reply poll"
+assert_contains "$orph_kill" "kept: $orph_bare_pid (no poller record) $orph_art" \
+  "the explicit flag keeps the --takeover poll with no poller record"
+for _ in $(seq 1 100); do
+  kill -0 "$orph_takeover_pid" 2>/dev/null || kill -0 "$orph_reply_pid" 2>/dev/null || break
+  sleep 0.1
+done
+kill -0 "$orph_takeover_pid" 2>/dev/null && fail "the ledgered --takeover poll survived the explicit kill"
+kill -0 "$orph_reply_pid" 2>/dev/null && fail "the ledgered --agent-reply poll survived the explicit kill"
+kill -0 "$orph_bare_pid" 2>/dev/null || fail "the kill reached a --takeover poll with no poller record"
+kill "$orph_bare_pid" 2>/dev/null || true
+wait "$orph_parent" "$orph_bare_pid" 2>/dev/null || true
+pass "native polls with the adapter's own options are proved through a ledgered parent, and only then"
+
 # A held page: lavish-axi 0.1.79 refuses a poll with LISTENER_ACTIVE while
 # another poll holds the page. The fake keeps the page held while `held` exists;
 # a `--takeover` poll displaces the holder, which then reports LISTENER_REPLACED.
@@ -7487,5 +7527,65 @@ mv -f -- "$HELD/answer.tmp" "$HELD/answer"
 held_answer_announced 'answer after the leftover'
 PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
 pass "a ledgered firstmate leftover is proved by identity and taken over"
+
+# A leftover whose native poll itself took the page over runs as
+# `lavish-axi poll <page> --takeover`; its ledgered parent still proves it stray.
+HELD=$TMP_ROOT/held-leftover-takeover
+held_fixture "$HELD"
+export HELD
+held_art=$(cd "$HELD" && pwd -P)/review.html
+held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
+fm_test_track_procevent_home "$HELD/home"
+touch "$HELD/held"
+(
+  HELD_HOLDER=stray bash "$HELD/bin/lavish-axi" poll "$held_art" --takeover &
+  printf '%s\n' "$!" > "$HELD/holder.pid.tmp"
+  mv -f -- "$HELD/holder.pid.tmp" "$HELD/holder.pid"
+  wait
+) & held_parent=$!
+wait_for "$HELD/holder.pid" || fail "the leftover's native --takeover poll never started"
+held_native_pid=$(cat "$HELD/holder.pid")
+poller_seed "$HELD/home" "$held_id" "$held_parent"
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
+  || fail "arming a page held by a leftover --takeover poll failed: $(cat "$HELD/arm.out")"
+for _ in $(seq 1 200); do [ -f "$HELD/holder.out" ] && break; sleep 0.1; done
+assert_contains "$(cat "$HELD/holder.out" 2>/dev/null)" "code: LISTENER_REPLACED" \
+  "the ledgered leftover's native --takeover poll was displaced by a takeover"
+assert_contains "$(cat "$HELD/polls")" "$held_art --takeover" "the listener polled with --takeover"
+wait "$held_parent" 2>/dev/null || true
+kill -0 "$held_native_pid" 2>/dev/null && fail "the displaced native --takeover poll kept running"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,answer after the native takeover\n' > "$HELD/answer.tmp"
+mv -f -- "$HELD/answer.tmp" "$HELD/answer"
+held_answer_announced 'answer after the native takeover'
+PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
+pass "a ledgered leftover's native --takeover poll is proved through its parent and taken over"
+
+# A foreign `lavish-axi poll <page> --takeover` with no poller record is never
+# taken over or killed; its hold is reported once.
+HELD=$TMP_ROOT/held-foreign-takeover
+held_fixture "$HELD"
+export HELD
+held_art=$(cd "$HELD" && pwd -P)/review.html
+held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
+fm_test_track_procevent_home "$HELD/home"
+touch "$HELD/held"
+HELD_HOLDER=live bash "$HELD/bin/lavish-axi" poll "$held_art" --takeover & held_foreign_pid=$!
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
+  || fail "arming a page held by a foreign --takeover poll failed: $(cat "$HELD/arm.out")"
+wait_for_lines "$HELD/polls" 3 400 || true
+assert_absent "$HELD/taken-over" "a foreign --takeover holder is not displaced"
+wait_for_lines "$HELD/polls" 3 1 || fail "the held listener stopped retrying"
+kill -0 "$held_foreign_pid" 2>/dev/null || fail "the foreign --takeover holder was stopped"
+held_report=$(held_results "$HELD/home" "$held_id")
+assert_equals 1 "$(printf '%s\n' "$held_report" | grep -c .)" "the foreign --takeover hold is reported once"
+assert_contains "$(cat "$held_report")" "held-by: $held_foreign_pid (no poller record)" \
+  "the report names the foreign --takeover holder and why it is kept"
+held_orphans_keep "$held_foreign_pid" "the foreign --takeover holder"
+PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
+kill "$held_foreign_pid" 2>/dev/null || true
+wait "$held_foreign_pid" 2>/dev/null || true
+pass "a foreign --takeover poll with no poller record is never taken over or killed"
 
 printf '\nall procevent tests passed\n'
