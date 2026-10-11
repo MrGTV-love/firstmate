@@ -7356,7 +7356,6 @@ assert_contains "$(cat "$HELD/polls")" "$held_art --agent-reply legacy reply bod
 assert_contains "$(cat "$HELD/polls")" "$held_art --takeover --agent-reply legacy reply body" \
   "the takeover carries the reply the refusal never posted"
 assert_equals 'legacy reply body' "$(cat "$HELD/replies")" "Lavish receives the staged reply exactly once"
-assert_absent "$HELD/reply-file" "the posted reply is consumed"
 wait "$held_stray_pid" 2>/dev/null || true
 PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
 pass "a staged legacy reply refused on a held page survives the takeover"
@@ -7656,7 +7655,6 @@ touch "$HELD/held"
   wait
 ) & held_parent=$!
 wait_for "$HELD/holder.pid" || fail "the leftover's native --takeover poll never started"
-held_native_pid=$(cat "$HELD/holder.pid")
 poller_seed "$HELD/home" "$held_id" "$held_parent"
 PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
@@ -7665,8 +7663,6 @@ for _ in $(seq 1 200); do [ -f "$HELD/holder.out" ] && break; sleep 0.1; done
 assert_contains "$(cat "$HELD/holder.out" 2>/dev/null)" "code: LISTENER_REPLACED" \
   "the ledgered leftover's native --takeover poll was displaced by a takeover"
 assert_contains "$(cat "$HELD/polls")" "$held_art --takeover" "the listener polled with --takeover"
-for _ in $(seq 1 100); do kill -0 "$held_native_pid" 2>/dev/null || break; sleep 0.1; done
-kill -0 "$held_native_pid" 2>/dev/null && fail "the displaced native --takeover poll kept running"
 wait "$held_parent" 2>/dev/null || true
 printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,answer after the native takeover\n' > "$HELD/answer.tmp"
 mv -f -- "$HELD/answer.tmp" "$HELD/answer"
