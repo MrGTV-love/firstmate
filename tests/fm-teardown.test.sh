@@ -930,7 +930,7 @@ run_teardown() {
   FM_STATE_OVERRIDE="$case_dir/state" \
   FM_DATA_OVERRIDE="$case_dir/data" \
   FM_CONFIG_OVERRIDE="$case_dir/config" \
-  NM_HOME="${NM_HOME:-$case_dir/nm}" \
+  NM_HOME="$case_dir/nm" \
   PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
     "$TEARDOWN" task-x1 "$@"
 }
@@ -1665,9 +1665,9 @@ test_pipeline_input_rewritten_by_pipeline_allows() {
   pass "merged PR accepts the local input that the recorded run rewrote and extended"
 }
 
-# A copy that lags the run's input head holds only commits the run started from.
-test_pipeline_input_local_head_behind_input_head_allows() {
-  local case_dir pr_head input_head local_head rc
+# A copy that lags the run's input head is not the input the run started from.
+test_pipeline_input_refuses_copy_behind_the_input_head() {
+  local case_dir pr_head input_head local_head
   pr_head=$(pipeline_input_case pipeline-input-behind rewritten-input)
   case_dir="$TMP_ROOT/pipeline-input-behind"
   local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
@@ -1676,10 +1676,9 @@ test_pipeline_input_local_head_behind_input_head_allows() {
   git -C "$case_dir/wt" reset -q --hard "$local_head"
   write_nm_run_record "$case_dir" 01RUNBEHIND "https://github.com/example/repo/pull/7" "$input_head" "$pr_head"
 
-  rc=$(run_teardown_status "$case_dir")
-  expect_code 0 "$rc" "pipeline-input-behind: teardown should accept a copy that is an ancestor of the run's input head"$'\n'"$(cat "$case_dir/stderr")"
-  ! grep -q REFUSED "$case_dir/stderr" || fail "pipeline-input-behind: teardown printed a REFUSED line"
-  pass "merged PR accepts a copy that is an ancestor of the recorded run's input head"
+  assert_pipeline_input_refusal "$case_dir" pipeline-input-behind "$local_head" \
+    "01RUNBEHIND" "is not that head"
+  pass "merged PR still refuses a copy that is behind the recorded run's input head"
 }
 
 # A run that pushed the merged head is the only one that can prove anything, and
@@ -1709,7 +1708,7 @@ test_pipeline_input_refuses_commit_made_after_the_run_started() {
   local_head=$(git -C "$case_dir/wt" rev-parse HEAD)
 
   assert_pipeline_input_refusal "$case_dir" pipeline-input-late "$local_head" \
-    "01RUNLATE" "after the run started"
+    "01RUNLATE" "is not that head"
   pass "merged PR still refuses a copy with a commit made after the recorded run started"
 }
 
@@ -7662,7 +7661,7 @@ test_squash_merged_pushed_prerebase_copy_missing_commit_refuses
 test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses
 test_pipeline_input_diverged_iteration_allows
 test_pipeline_input_rewritten_by_pipeline_allows
-test_pipeline_input_local_head_behind_input_head_allows
+test_pipeline_input_refuses_copy_behind_the_input_head
 test_pipeline_input_ties_the_run_by_pushed_head_allows
 test_pipeline_input_refuses_commit_made_after_the_run_started
 test_pipeline_input_refuses_copy_outside_the_run_input

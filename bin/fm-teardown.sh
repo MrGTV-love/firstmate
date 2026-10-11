@@ -57,8 +57,8 @@
 # document steps rewrite and add commits, so a copy that was the pipeline's input
 # is also accepted when the no-mistakes run record proves it: a run whose pr_url is
 # the merged PR pushed exactly the merged PR head (last_pushed_sha), and the copy's
-# HEAD is that run's input head (submitted_head_sha) or an ancestor of it. A commit
-# made after the run started, a run that pushed another head, or a missing record
+# HEAD is that run's input head (submitted_head_sha). A copy at any other commit,
+# a run that pushed another head, or a missing record
 # (state database, run row, pushed head, input head) refuses and names the record.
 # Anything else refuses.
 # The PR itself is resolved from the task's recorded pr= when present, or - when
@@ -1747,13 +1747,12 @@ TEARDOWN_PIPELINE_INPUT_REASON=
 # unchanged. Such a copy is proven landed from the no-mistakes run record, never
 # from commit content: a recorded run for the merged PR pushed exactly the merged
 # PR head, that run started from a recorded input head (submitted_head_sha), and
-# this copy's HEAD is that input head or an ancestor of it. Every commit the
-# copy holds then went into the run whose pushed head merged. A commit made
-# after the run started is not an ancestor of its input head and refuses, as
-# does a run that pushed some other head; each missing record is named. Commit
-# subjects and times never count.
+# this copy's HEAD is exactly that input head. The copy is then the input of the
+# run whose pushed head merged. A copy at any other commit refuses, as does a run
+# that pushed some other head; each missing record is named. Commit subjects and
+# times never count.
 pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
-  local pr_head=$1 pr_url=${2%/} current db rows kind id submitted pushed
+  local pr_head=$1 pr_url=$2 current db rows kind id submitted pushed
   local timeout=${NM_TEARDOWN_TIMEOUT:-10} runs=0 tied=0 reasons=
   TEARDOWN_PIPELINE_INPUT_REASON=
   current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || current=
@@ -1835,14 +1834,7 @@ PY
     if [ "$submitted" = "$current" ]; then
       return 0
     fi
-    if ! git -C "$WT" cat-file -e "$submitted^{commit}" 2>/dev/null; then
-      reasons="${reasons}run $id input head ${submitted:0:12} is not an object in this copy, so this copy's HEAD cannot be placed in it"$'\n'
-      continue
-    fi
-    if git -C "$WT" merge-base --is-ancestor "$current" "$submitted" 2>/dev/null; then
-      return 0
-    fi
-    reasons="${reasons}run $id started from ${submitted:0:12}; this copy's HEAD ${current:0:12} is not that head or an ancestor of it, so commits were made after the run started"$'\n'
+    reasons="${reasons}run $id started from ${submitted:0:12}; this copy's HEAD ${current:0:12} is not that head, so this copy is not the input the run started from"$'\n'
   done <<EOF
 $rows
 EOF
