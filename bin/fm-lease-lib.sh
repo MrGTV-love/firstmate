@@ -108,8 +108,8 @@
 # this task right now - retry after the lease clears".
 FM_LEASE_REFUSE_EXIT=6
 FM_LEASE_LIB_DIR="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)"
-# The per-task lease-command locks fm_lease_guard retains until its release.
-FM_LEASE_GUARD_LOCKS=()
+# The per-task lease-command lock fm_lease_guard retains until its release.
+FM_LEASE_GUARD_LOCK=
 
 fm_lease_lock_helpers() {
   command -v fm_lock_acquire_wait >/dev/null 2>&1 && return 0
@@ -221,7 +221,7 @@ fm_lease_clear_stale() {
 # the caller's mutation; the caller must invoke fm_lease_guard_release from its
 # EXIT cleanup. This closes the check/use race with a concurrent claim.
 fm_lease_guard() {
-  local task=$1 action=$2 actor lock lease_actor held held_lock
+  local task=$1 action=$2 actor lock lease_actor
   fm_lease_valid_id "$task" || return 0
   actor=$(fm_lease_actor) || exit "$FM_LEASE_REFUSE_EXIT"
   case "${PI_CODING_AGENT:-}:${FM_SUPERVISION_ACTOR:-}" in
@@ -234,13 +234,9 @@ fm_lease_guard() {
   lock=$(fm_lease_lock_path "$task")
   # A caller with more than one guarded phase already excludes claims until
   # its shared cleanup; do not recursively acquire the non-reentrant lock.
-  held=0
-  for held_lock in ${FM_LEASE_GUARD_LOCKS[@]+"${FM_LEASE_GUARD_LOCKS[@]}"}; do
-    [ "$held_lock" != "$lock" ] || held=1
-  done
-  if [ "$held" = 0 ]; then
+  if [ "$FM_LEASE_GUARD_LOCK" != "$lock" ]; then
     fm_lock_acquire_wait "$lock" || exit "$FM_LEASE_REFUSE_EXIT"
-    FM_LEASE_GUARD_LOCKS+=("$lock")
+    FM_LEASE_GUARD_LOCK=$lock
   fi
   if ! fm_lease_live "$task"; then
     fm_lease_clear_stale "$task" || { fm_lease_guard_release; return 1; }
@@ -254,15 +250,13 @@ fm_lease_guard() {
   fi
 }
 
-# Release the claim/guard serialization locks retained by fm_lease_guard.
+# Release the claim/guard serialization lock retained by fm_lease_guard.
 # Idempotent so callers can use it unconditionally from existing EXIT cleanup.
 fm_lease_guard_release() {
-  local lock status=0
-  for lock in ${FM_LEASE_GUARD_LOCKS[@]+"${FM_LEASE_GUARD_LOCKS[@]}"}; do
-    fm_lock_release "$lock" || status=1
-  done
-  FM_LEASE_GUARD_LOCKS=()
-  return "$status"
+  local lock=$FM_LEASE_GUARD_LOCK
+  [ -n "$lock" ] || return 0
+  FM_LEASE_GUARD_LOCK=
+  fm_lock_release "$lock"
 }
 
 # fm_lease_away_relocated: 0 iff main's standing authority is relocated to the
