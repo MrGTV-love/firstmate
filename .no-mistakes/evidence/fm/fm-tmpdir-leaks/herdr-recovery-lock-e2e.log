@@ -1,0 +1,7 @@
+tests/fm-backend-herdr-recovery-lock-e2e.test.sh: line 299:  3169 Terminated: 15          ( cd "$1" && exec python3 -c 'import os, pathlib, sys; pathlib.Path(sys.argv[1]).touch(); os.execlp("sleep", "sleep", "3600")' "$TEST_DIR/ready-${1##*/}" )
+ok - offline executable inventory and reaper remove only generated owned processes before Herdr provisioning
+# herdr 0.9.1 recovery custody lab
+ok - cross-home recovery completes while unrelated allocation is held, preserving task custody, exact binding, generation and focus
+ok - recovery and failed-setup abort cleanup complete beside a held fresh projection allocation, preserving exact custody and focus
+ok - fresh-projection abort cleanup completes beside a teardown held in its worktree return, preserving exact custody and focus
+exit=143 wall=1181s

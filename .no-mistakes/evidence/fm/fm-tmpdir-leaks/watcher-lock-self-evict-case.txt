@@ -1,0 +1,18 @@
+## head, TMPDIR=clean (load averages: 55.21 54.69 56.41)
+exit=1 wall=51s
+ok - disposable watcher refuses inherited state outside its marked lab
+wait_for_exit: owned pid 67717 exceeded 400 polls; sending TERM
+67717 66298 U    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4MEAZQFRDDWNPSHAQZ88539/bin/fm-watch-arm.sh
+not ok - self-evicted arm did not fail nonzero (status 124)
+## head, TMPDIR=clutter (load averages: 54.60 54.80 56.37)
+exit=1 wall=51s
+ok - disposable watcher refuses inherited state outside its marked lab
+wait_for_exit: owned pid 91908 exceeded 400 polls; sending TERM
+91908 88296 S    bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4MEAZQFRDDWNPSHAQZ88539/bin/fm-watch-arm.sh
+not ok - self-evicted arm did not fail nonzero (status 124)
+## base 7235e6bc, TMPDIR=clean (load averages: 71.51 59.08 57.83)
+exit=1 wall=49s
+ok - disposable watcher refuses inherited state outside its marked lab
+wait_for_exit: owned pid 34793 exceeded 400 polls; sending TERM
+34793 33584 S    bash /Users/charlesabrooker/tmp/nm-test-scratch.jcBEeg/base/bin/fm-watch-arm.sh
+not ok - self-evicted arm did not fail nonzero (status 124)

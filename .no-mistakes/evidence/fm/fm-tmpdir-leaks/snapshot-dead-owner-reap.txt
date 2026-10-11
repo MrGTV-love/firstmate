@@ -1,0 +1,19 @@
+dead pid=85534 (reaped)  live pid=85530 (sleep 300)
+--- before snapshot:
+fm-fleet-ledgers.85534-na.BBBBBB
+fm-fleet-snapshot.85530-Sat_Oct_10_22_45_14_2026.CCCCCC
+fm-fleet-tasks.85530-Mon_Jan__1_00_00_00_2001.DDDDDD
+fm-fleet-tasks.85534-Sat_Oct_10_01_02_03_2026.AAAAAA
+fm-fleet-tasks.85534-na.LLLLLL
+fm-fleet-tasks.LEGACY1
+fm-fleet-tasks.x9Y8z7
+fm-other-tool.85534-na.EEEEEE
+target
+--- bin/fm-fleet-snapshot.sh --json (FM_HOME=lab) rc=0 in 0s; stdout bytes=    2348; stderr: 
+--- after snapshot:
+fm-fleet-snapshot.85530-Sat_Oct_10_22_45_14_2026.CCCCCC
+fm-fleet-tasks.85534-na.LLLLLL
+fm-fleet-tasks.LEGACY1
+fm-fleet-tasks.x9Y8z7
+fm-other-tool.85534-na.EEEEEE
+target

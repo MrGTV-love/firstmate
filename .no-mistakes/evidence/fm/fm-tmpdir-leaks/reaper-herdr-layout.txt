@@ -1,0 +1,12 @@
+lab home under MARKED root:   herdrscan.TEIBIP/fmlab.herdr-recovery-lock.oEQQw0/home-forced/nested  (orphan sleep pid=5303, ppid=1)
+lab home under UNMARKED root: herdrscan.TEIBIP/fm-herdr-recovery-lock.nptZ8x/home-forced/nested  (orphan sleep pid=5313, ppid=1)
+markers: fm-lab-home v1 / owner_pid=4679 (live owner=4679)
+--- head reaper while owner is alive:
+[]
+    marked orphan alive: yes; unmarked orphan alive: yes
+--- owner killed (SIGKILL, like a killed standalone e2e run). head reaper:
+[reaped pid=5303 root=herdrscan.TEIBIP/fmlab.herdr-recovery-lock.oEQQw0/home-forced/nested cmd=sleep 600]
+    marked orphan alive: no; unmarked orphan alive: yes
+--- for contrast, base 7235e6bc reaper on the same tree:
+[reaped pid=5313 root=herdrscan.TEIBIP/fm-herdr-recovery-lock.nptZ8x/home-forced/nested cmd=sleep 600]
+    unmarked orphan alive: no

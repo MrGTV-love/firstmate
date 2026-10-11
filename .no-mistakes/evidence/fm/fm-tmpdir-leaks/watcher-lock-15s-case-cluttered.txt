@@ -1,0 +1,12 @@
+# Original failing case, isolated: FM_TEST_ONLY=test_wait_deadline_reaps_a_stopped_child, TMPDIR=<disposable clutter, 67341 entries>
+## head  (load averages: 48.74 53.05 55.96)
+child-side cost of sourcing tests/wake-helpers.sh (lib.sh orphan sweep) with no skip flag: 1s
+test exit=0 wall=5s
+ok - disposable watcher refuses inherited state outside its marked lab
+ok - wait deadline diagnoses and reaps a stopped test child without hanging
+## base  (load averages: 54.45 54.17 56.33)
+child-side cost of sourcing tests/wake-helpers.sh (lib.sh orphan sweep) with no skip flag: 13s
+test exit=1 wall=28s
+ok - disposable watcher refuses inherited state outside its marked lab
+wait_for_exit hung after its deadline on a stopped child
+not ok - bounded child cleanup regression

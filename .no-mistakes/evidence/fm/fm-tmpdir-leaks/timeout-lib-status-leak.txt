@@ -1,0 +1,68 @@
+# fm_run_timed with the REAL host timeout (/opt/homebrew/bin/timeout) and the bash fallback; private TMPDIR
+timeout ok: fm_run_timed 20 bash -c 'true' -> rc=0 after 1s; leftover in TMPDIR: []
+timeout fail3: fm_run_timed 20 bash -c 'exit 3' -> rc=3 after 0s; leftover in TMPDIR: []
+timeout bound: fm_run_timed 1 bash -c 'sleep 30' -> rc=124 after 1s; leftover in TMPDIR: []
+timeout caller killed by TERM (mechanism=timeout): caller rc=143; named entries while waiting: []; leftover after: []
+timeout caller killed by INT (mechanism=timeout): caller rc=129; named entries while waiting: []; leftover after: []
+timeout caller killed by HUP (mechanism=timeout): caller rc=129; named entries while waiting: []; leftover after: []
+timeout caller killed by KILL (mechanism=timeout): caller rc=137; named entries while waiting: []; leftover after: []
+bash ok: fm_run_timed 20 bash -c 'true' -> rc=0 after 0s; leftover in TMPDIR: []
+bash fail3: fm_run_timed 20 bash -c 'exit 3' -> rc=3 after 0s; leftover in TMPDIR: []
+bash bound: fm_run_timed 1 bash -c 'sleep 30' -> rc=124 after 2s; leftover in TMPDIR: []
+bash caller killed by TERM (mechanism=bash): caller rc=143; named entries while waiting: []; leftover after: []
+bash caller killed by INT (mechanism=bash): caller rc=129; named entries while waiting: []; leftover after: []
+bash caller killed by HUP (mechanism=bash): caller rc=129; named entries while waiting: []; leftover after: []
+bash caller killed by KILL (mechanism=bash): caller rc=137; named entries while waiting: []; leftover after: []
+--- same driver on base 7235e6bc ---
+# fm_run_timed with the REAL host timeout (/opt/homebrew/bin/timeout) and the bash fallback; private TMPDIR
+timeout ok: fm_run_timed 20 bash -c 'true' -> rc=0 after 0s; leftover in TMPDIR: []
+timeout fail3: fm_run_timed 20 bash -c 'exit 3' -> rc=3 after 0s; leftover in TMPDIR: []
+timeout bound: fm_run_timed 1 bash -c 'sleep 30' -> rc=124 after 1s; leftover in TMPDIR: []
+timeout caller killed by TERM (mechanism=timeout): caller rc=143; named entries while waiting: [fm-timeout-status.Y1kFL9 ]; leftover after: [fm-timeout-status.Y1kFL9]
+timeout caller killed by INT (mechanism=timeout): caller rc=129; named entries while waiting: [fm-timeout-status.AmfyLb fm-timeout-status.Y1kFL9 ]; leftover after: [fm-timeout-status.AmfyLb
+fm-timeout-status.Y1kFL9]
+timeout caller killed by HUP (mechanism=timeout): caller rc=129; named entries while waiting: [fm-timeout-status.AmfyLb fm-timeout-status.BIK760 fm-timeout-status.Y1kFL9 ]; leftover after: [fm-timeout-status.AmfyLb
+fm-timeout-status.BIK760
+fm-timeout-status.Y1kFL9]
+timeout caller killed by KILL (mechanism=timeout): caller rc=137; named entries while waiting: [fm-timeout-status.AmfyLb fm-timeout-status.BIK760 fm-timeout-status.Y1kFL9 fm-timeout-status.jYzOkt ]; leftover after: [fm-timeout-status.AmfyLb
+fm-timeout-status.BIK760
+fm-timeout-status.Y1kFL9
+fm-timeout-status.jYzOkt]
+bash ok: fm_run_timed 20 bash -c 'true' -> rc=0 after 0s; leftover in TMPDIR: [fm-timeout-status.AmfyLb
+fm-timeout-status.BIK760
+fm-timeout-status.Y1kFL9
+fm-timeout-status.jYzOkt]
+bash fail3: fm_run_timed 20 bash -c 'exit 3' -> rc=3 after 0s; leftover in TMPDIR: [fm-timeout-status.AmfyLb
+fm-timeout-status.BIK760
+fm-timeout-status.Y1kFL9
+fm-timeout-status.jYzOkt]
+bash bound: fm_run_timed 1 bash -c 'sleep 30' -> rc=124 after 2s; leftover in TMPDIR: [fm-timeout-status.AmfyLb
+fm-timeout-status.BIK760
+fm-timeout-status.Y1kFL9
+fm-timeout-status.jYzOkt]
+bash caller killed by TERM (mechanism=bash): caller rc=143; named entries while waiting: [fm-bash-timeout-command.pR8xM6 fm-timeout-status.AmfyLb fm-timeout-status.BIK760 fm-timeout-status.Y1kFL9 fm-timeout-status.jYzOkt ]; leftover after: [fm-bash-timeout-command.pR8xM6
+fm-timeout-status.AmfyLb
+fm-timeout-status.BIK760
+fm-timeout-status.Y1kFL9
+fm-timeout-status.jYzOkt]
+bash caller killed by INT (mechanism=bash): caller rc=129; named entries while waiting: [fm-bash-timeout-command.pR8xM6 fm-bash-timeout-command.yVgK0j fm-timeout-status.AmfyLb fm-timeout-status.BIK760 fm-timeout-status.Y1kFL9 fm-timeout-status.jYzOkt ]; leftover after: [fm-bash-timeout-command.pR8xM6
+fm-bash-timeout-command.yVgK0j
+fm-timeout-status.AmfyLb
+fm-timeout-status.BIK760
+fm-timeout-status.Y1kFL9
+fm-timeout-status.jYzOkt]
+bash caller killed by HUP (mechanism=bash): caller rc=129; named entries while waiting: [fm-bash-timeout-command.pR8xM6 fm-bash-timeout-command.qtnOqv fm-bash-timeout-command.yVgK0j fm-timeout-status.AmfyLb fm-timeout-status.BIK760 fm-timeout-status.Y1kFL9 fm-timeout-status.jYzOkt ]; leftover after: [fm-bash-timeout-command.pR8xM6
+fm-bash-timeout-command.qtnOqv
+fm-bash-timeout-command.yVgK0j
+fm-timeout-status.AmfyLb
+fm-timeout-status.BIK760
+fm-timeout-status.Y1kFL9
+fm-timeout-status.jYzOkt]
+bash caller killed by KILL (mechanism=bash): caller rc=137; named entries while waiting: [fm-bash-timeout-command.KikzMO fm-bash-timeout-command.pR8xM6 fm-bash-timeout-command.qtnOqv fm-bash-timeout-command.yVgK0j fm-timeout-status.AmfyLb fm-timeout-status.BIK760 fm-timeout-status.Y1kFL9 fm-timeout-status.jYzOkt ]; leftover after: [fm-bash-timeout-command.KikzMO
+fm-bash-timeout-command.pR8xM6
+fm-bash-timeout-command.qtnOqv
+fm-bash-timeout-command.yVgK0j
+fm-timeout-status.AmfyLb
+fm-timeout-status.BIK760
+fm-timeout-status.Y1kFL9
+fm-timeout-status.jYzOkt]

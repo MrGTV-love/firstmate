@@ -1,0 +1,7 @@
+ok - a completed snapshot leaves no scratch directory
+ok - a snapshot ended by TERM leaves no scratch directory
+ok - a snapshot ended by INT leaves no scratch directory
+ok - a snapshot ended by HUP leaves no scratch directory
+ok - the next snapshot removes the directories a KILLed one left
+ok - a second snapshot leaves a live snapshot's directories alone
+ok - directories that name no owner are never removed

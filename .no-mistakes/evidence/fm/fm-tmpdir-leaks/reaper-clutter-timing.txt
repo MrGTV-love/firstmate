@@ -1,0 +1,6 @@
+# Orphan sweep over a disposable cluttered temp dir (7540 top-level entries, 28781 total)
+# host: 22:42  up 1 day,  9:16, 5 users, load averages: 29.55 43.93 57.68
+run1 base rc=0 elapsed=8.58s output=[]
+run1 head rc=0 elapsed=0.39s output=[]
+run2 base rc=0 elapsed=9.60s output=[]
+run2 head rc=0 elapsed=0.42s output=[]
