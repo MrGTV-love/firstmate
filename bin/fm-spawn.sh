@@ -5033,6 +5033,22 @@ claude_confirm_start() {
   return 0
 }
 
+# True when <path> is one of this task's own prior_worktree= copies. A
+# reassociation leaves the endpoint's shell in the copy it left, so only that
+# known move, not an arbitrary drift, may be told to cd into the recorded copy
+# on a backend that does not recover drifted endpoints itself.
+spawn_path_is_prior_copy() { # <path>
+  local path_real prior line
+  [ -n "${1:-}" ] || return 1
+  path_real=$(real_path_or_raw "$1")
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in prior_worktree=?*) ;; *) continue ;; esac
+    prior=${line#prior_worktree=}
+    [ "$(real_path_or_raw "$prior")" != "$path_real" ] || return 0
+  done <"$STATE/$ID.meta"
+  return 1
+}
+
 if [ "$RELAUNCH" -eq 1 ] && [ "$BACKEND" = orca ]; then
   [ "$KIND" = secondmate ] || validate_spawn_worktree "relaunch" "$T"
 elif [ "$RELAUNCH" -eq 1 ]; then
@@ -5048,7 +5064,7 @@ elif [ "$RELAUNCH" -eq 1 ]; then
     sleep 0.5
   done
   if [ -z "$relaunch_seen" ] || [ "$(real_path_or_raw "$relaunch_seen")" != "$relaunch_wt_real" ]; then
-    if [ "$BACKEND" != herdr ]; then
+    if [ "$BACKEND" != herdr ] && ! spawn_path_is_prior_copy "$relaunch_seen"; then
       echo "error: task $ID's endpoint is in '${relaunch_seen:-unknown}', not its recorded worktree '$WT'; refusing to relaunch an agent outside the copy holding its work" >&2
       exit 1
     fi

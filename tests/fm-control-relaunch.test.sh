@@ -2577,6 +2577,21 @@ test_spawn_relaunch_refuses_a_pane_outside_the_worktree() {
   pass "fm-spawn --relaunch: refuses to start a replacement outside the copy holding its work"
 }
 
+test_spawn_relaunch_moves_a_pane_left_in_a_prior_copy() {
+  local dir out rc
+  dir=$(new_case priorcwd rl18b)
+  add_ship_task "$dir" rl18b claude
+  mkdir -p "$dir/prior"
+  printf 'prior_worktree=%s\n' "$dir/prior" >> "$dir/home/state/rl18b.meta"
+  printf 'zsh' > "$dir/fake/command"
+  printf '%s' "$dir/prior" > "$dir/fake/cwd"
+  out=$(run_spawn "$dir" rl18b --relaunch --harness claude); rc=$?
+  expect_code 0 "$rc" "a pane left in the task's own prior copy should be moved into the recorded worktree"
+  assert_grep "cd -- '$dir/wt'" "$dir/fake/keys" "the replacement launch must enter the recorded worktree"
+  [ "$(meta_field "$dir" rl18b worktree)" = "$dir/wt" ] || fail "the recorded worktree must survive the relaunch"
+  pass "fm-spawn --relaunch: a pane left in the task's prior copy is moved into the recorded copy before the replacement starts"
+}
+
 # --- 7. reclaiming a task whose endpoint is gone ----------------------------
 #
 # Before this, `missing` was a terminal state: fm-spawn --relaunch accepted only
@@ -6280,6 +6295,7 @@ test_spawn_relaunch_refuses_a_pending_authoritative_close
 test_spawn_relaunch_refuses_contradicting_flags
 test_spawn_relaunch_refuses_an_unrecorded_task
 test_spawn_relaunch_refuses_a_pane_outside_the_worktree
+test_spawn_relaunch_moves_a_pane_left_in_a_prior_copy
 test_tmux_gone_endpoint_is_proven_despite_unrelated_servers
 test_tmux_worktree_local_recovery_with_real_lsof
 test_tmux_refuses_while_the_recorded_endpoint_may_be_live
