@@ -94,7 +94,11 @@
 #            transient responses described below. A staged reply still
 #            present when it starts is posted before the long-poll: through
 #            `lavish-axi reply` when supported, otherwise through the legacy
-#            best-effort `poll --agent-reply` path.
+#            best-effort `poll --agent-reply` path. Lavish refuses a held page
+#            before it publishes that legacy reply, so a reply refused with
+#            LISTENER_ACTIVE is staged again and carried by the takeover, the
+#            next quiet retry or the next round. Any other response may follow
+#            publication, so that reply is never posted twice.
 # deliver-reply
 #            Run by `fm-procevent.sh register-task` under the source lock, only
 #            after the task is eligible to own the board, with the listener argv
@@ -177,8 +181,10 @@
 # unproved poll, which `classify` reports as waiting, once per hold. While the
 # latest capture is that report, later refusals stay quiet and retry after the
 # quiet delay, doubling to POLL_RETRY_DELAY_MAX, under the same runner and claim.
-# A LISTENER_REPLACED result means another poll took this listener's page over;
-# `terminal` treats it as a handoff, so the source retires instead of relaunching.
+# A LISTENER_REPLACED result means another poll took this listener's page over.
+# `classify` reports it as waiting and `terminal` keeps the source armed, so it
+# is that hold's one report: later refusals stay quiet with the same back-off,
+# and the listener regains the page when the other poll ends.
 # browser_disconnected
 # means the session remains open and is handled as a silent reconnect wait.
 # Before each poll attempt, resolve the artifact's saved URL from Lavish's own
@@ -863,7 +869,7 @@ held_page_reported() {  # <source-id>
       my $first = <$in> // "";
       my $second = <$in> // "";
       close $in;
-      $held = $first =~ /\Aerror:/ && $second =~ /\Acode:[ \t]*LISTENER_ACTIVE[ \t]*\n?\z/ ? 1 : 0;
+      $held = $first =~ /\Aerror:/ && $second =~ /\Acode:[ \t]*LISTENER_(?:ACTIVE|REPLACED)[ \t]*\n?\z/ ? 1 : 0;
     }
     exit($held ? 0 : 1);
   ' "$(fm_procevent_inbox_dir "${FM_STATE_OVERRIDE:-$FM_HOME/state}")/$1".*.result 2>/dev/null
@@ -967,10 +973,14 @@ cmd_poll() {
       lavish-axi poll "$artifact" ${takeover[@]+"${takeover[@]}"} | poll_response_filter "$response"
     fi
     pipeline_status=("${PIPESTATUS[@]}")
-    reply_pending=0
     takeover=()
     rc=${pipeline_status[0]}
     filter_rc=${pipeline_status[1]}
+    if [ "$reply_pending" -eq 1 ] && [ "$filter_rc" = 11 ]; then
+      (umask 077; printf '%s\n' "$reply_text" > "$reply_file") \
+        || die "cannot restage agent reply file: $reply_file"
+    fi
+    reply_pending=0
     case "$filter_rc" in
       0) break ;;
       10)
@@ -1074,8 +1084,9 @@ cmd_classify() {
   error_code=$(result_error_code "$file")
   if [ "$error_code" = NOT_FOUND ] || [[ "$error_message" == "No active Lavish Editor session"* ]]; then
     printf 'missing\n'
-  elif [ "$error_code" = LISTENER_ACTIVE ]; then
-    # Releases that refuse a second poller instead of answering `waiting`.
+  elif [ "$error_code" = LISTENER_ACTIVE ] || [ "$error_code" = LISTENER_REPLACED ]; then
+    # Releases that refuse a second poller instead of answering `waiting`, or
+    # that end this poll because another one took the page over.
     printf 'waiting\n'
   else
     printf 'unknown\n'
@@ -1087,9 +1098,9 @@ cmd_classify() {
 # session produces nothing further, a missing session has nothing left to
 # produce, and the published poll delivers the final feedback of a `Send & End`
 # review marked with session_ended and returns only empty ended sessions after
-# it. A LISTENER_REPLACED result means another poll took this page over on
-# purpose, so this listener hands the page off instead of fighting for it.
-# Anything else - including an unreadable result - keeps the source armed.
+# it. A LISTENER_REPLACED result is a held page, not an end: the listener
+# waits for the other poll to finish and then listens again. Anything else -
+# including an unreadable result - keeps the source armed.
 cmd_terminal() {
   local file=${1-}
   [ -n "$file" ] || usage
@@ -1097,7 +1108,6 @@ cmd_terminal() {
   case "$(cmd_classify "$file")" in
     ended|missing) return 0 ;;
   esac
-  [ "$(result_error_code "$file")" != LISTENER_REPLACED ] || return 0
   case "$(session_field "$file" session_ended)" in
     true|True|TRUE) return 0 ;;
   esac

@@ -558,6 +558,19 @@ test_hook_registered_check_only_blocks_with_check_banner() {
   pass "fm-turnend-guard: registered-check-only supervision is named in the block banner"
 }
 
+test_hook_queue_only_blocks_with_queue_banner() {
+  local dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/hook-queue-only")
+  printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+    "$(date +%s)" > "$dir/state/.wake-queue"
+  out=$(run_hook "$dir" false); status=$?
+  expect_code 2 "$status" "default hook mode must block a queue-only blind turn"
+  assert_contains "$out" "●  Unread wake(s) queued, but no live watcher holds this home lock" \
+    "queue-only blind stop must identify its supervision need"
+  assert_not_contains "$out" "X-mode relay polling needs supervision" "queue-only blind stop must not be misreported as relay polling"
+  pass "fm-turnend-guard: an unread-wake-only supervision need is named in the block banner"
+}
+
 test_hook_ignores_repo_state_when_fm_home_set() {
   local dir home out status
   dir=$(make_primary_dir "$TMP_ROOT/hook-fm-home-ignore-root")
@@ -1855,6 +1868,28 @@ test_hook_claude_mode_terminal_fail_open_clears_abandoned_claim() {
   pass "fm-turnend-guard --claude: the terminal path clears an abandoned claim instead of stepping aside silently"
 }
 
+test_hook_claude_mode_terminal_fail_open_names_queue_only_need() {
+  local dir out status pid
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-queue-terminal")
+  printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+    "$(date +%s)" > "$dir/state/.wake-queue"
+  : > "$dir/state/.claude-autoarm-failure-notified"
+  seed_claude_budget "$dir" 4 3
+  sleep 60 &
+  pid=$!
+  record_autoarm_owner "$dir" "$pid"
+  printf 'epoch=3 owner_pid=%s outcome=failed-suppressed updated_at=1\n' "$pid" > "$dir/state/.claude-autoarm-epoch"
+  touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  expect_code 0 "$status" "the verified attended fail-open ends a queue-only turn once it is spent"
+  assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN: unread wake(s) queued,' \
+    "the queue-only fail-open alarm must name its supervision need"
+  assert_not_contains "$out" "X-mode relay polling active" "the queue-only fail-open alarm must not be misreported as relay polling"
+  pass "fm-turnend-guard --claude: the terminal fail-open names an unread-wake-only need"
+}
+
 test_hook_claude_mode_preserves_fresh_failed_progression() {
   local dir out status count
   dir=$(make_primary_dir "$TMP_ROOT/hook-claude-failed-epoch")
@@ -2554,6 +2589,7 @@ test_hook_blocks_from_fm_home_state
 test_hook_x_mode_reason_sources_cadence
 test_hook_x_mode_only_blocks_in_default_mode
 test_hook_registered_check_only_blocks_with_check_banner
+test_hook_queue_only_blocks_with_queue_banner
 test_hook_ignores_repo_state_when_fm_home_set
 test_hook_uses_state_override
 test_hook_loop_guard_allows_retry
@@ -2595,6 +2631,7 @@ test_hook_claude_mode_blocks_on_stuck_arming_claim
 test_hook_claude_mode_allows_on_open_generation_claim
 test_hook_claude_mode_blocks_on_stuck_generation_claim
 test_hook_claude_mode_terminal_fail_open_clears_abandoned_claim
+test_hook_claude_mode_terminal_fail_open_names_queue_only_need
 test_hook_claude_mode_preserves_fresh_failed_progression
 test_hook_claude_mode_integrated_monotonic_fail_open
 test_hook_claude_mode_frozen_epoch_reaches_bounded_fail_open

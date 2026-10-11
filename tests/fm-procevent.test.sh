@@ -4248,6 +4248,10 @@ printf '%s\n' 'error: "Lavish Editor already has an active poll listener (curren
   'code: LISTENER_ACTIVE' 'help[1]: Use --takeover only when you intend to displace the current listener' > "$CLS"
 assert_equals waiting "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$CLS")" \
   "a second poller refused with LISTENER_ACTIVE classifies as waiting"
+printf '%s\n' 'error: Lavish Editor poll listener was replaced by a takeover' 'code: LISTENER_REPLACED' \
+  'help[1]: Re-run lavish-axi poll /a.html only if you intend to take over listening' > "$CLS"
+assert_equals waiting "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$CLS")" \
+  "a listener replaced by another poll classifies as waiting"
 printf 'garbage that is not a session block\n' > "$CLS"
 assert_contains "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$CLS")" unknown "malformed output classifies as unknown rather than a lifecycle state"
 pass "the adapter classifies published poll output safely"
@@ -4397,6 +4401,10 @@ printf 'error: No active Lavish Editor session for this file\ncode: NOT_FOUND\n'
 "$ROOT/bin/fm-procevent-lavish.sh" terminal "$TRM" || fail "a missing session was not reported terminal"
 printf 'session:\n  file: /a.html\n  status: waiting\n' > "$TRM"
 "$ROOT/bin/fm-procevent-lavish.sh" terminal "$TRM" && fail "a waiting session was reported terminal"
+printf '%s\n' 'error: Lavish Editor poll listener was replaced by a takeover' 'code: LISTENER_REPLACED' \
+  'help[1]: Re-run lavish-axi poll /a.html only if you intend to take over listening' > "$TRM"
+"$ROOT/bin/fm-procevent-lavish.sh" terminal "$TRM" \
+  && fail "a listener replaced by another poll was reported terminal"
 printf 'session:\n  file: /a.html\n  status: browser_disconnected\n' > "$TRM"
 "$ROOT/bin/fm-procevent-lavish.sh" terminal "$TRM" \
   && fail "a browser-disconnected session was reported terminal"
@@ -7213,13 +7221,17 @@ wait "$orph_parent" "$orph_bare_pid" 2>/dev/null || true
 pass "native polls with the adapter's own options are proved through a ledgered parent, and only then"
 
 # A held page: lavish-axi 0.1.79 refuses a poll with LISTENER_ACTIVE while
-# another poll holds the page. The fake keeps the page held while `held` exists;
-# a `--takeover` poll displaces the holder, which then reports LISTENER_REPLACED.
+# another poll holds the page, before it publishes any `--agent-reply`. The fake
+# keeps the page held while `held` exists; a `--takeover` poll displaces the
+# holder, which then reports LISTENER_REPLACED. `replaced` makes a listening
+# poll report LISTENER_REPLACED once and leaves the page held by the taker.
+# An accepted poll records its `--agent-reply` text in `replies`.
 held_fixture() {  # <dir>
   mkdir -p "$1/bin" "$1/home/state"
   cat > "$1/bin/lavish-axi" <<'SH'
 #!/usr/bin/env bash
 replaced() { printf 'error: Lavish Editor poll listener was replaced by a takeover\ncode: LISTENER_REPLACED\n'; }
+[ "${1-}" != --version ] || { printf '0.1.79\n'; exit 0; }
 if [ -n "${HELD_HOLDER-}" ]; then
   while [ -f "$HELD/held" ]; do [ "$SECONDS" -lt 120 ] || exit 1; sleep 0.05; done
   [ ! -f "$HELD/taken-over" ] || replaced > "$HELD/holder.out"
@@ -7236,9 +7248,15 @@ if [ -f "$HELD/held" ]; then
     'code: LISTENER_ACTIVE' 'help[1]: Use --takeover only when you intend to displace the current listener'
   exit 1
 fi
+case " $* " in *" --agent-reply "*) printf '%s\n' "${!#}" >> "$HELD/replies" ;; esac
+printf listening > "$HELD/listening"
 while ! mv "$HELD/answer" "$HELD/answer.sent" 2>/dev/null; do
   [ "$SECONDS" -lt 120 ] || exit 75
-  [ ! -f "$HELD/replaced" ] || { replaced; exit 1; }
+  if mv "$HELD/replaced" "$HELD/replaced.sent" 2>/dev/null; then
+    touch "$HELD/held"
+    replaced
+    exit 1
+  fi
   if [ -n "${HELD_LEFTOVER-}" ] && [ -f "$HELD/taken-over" ]; then
     replaced
     touch "$HELD/leftover-replaced"
@@ -7315,10 +7333,73 @@ held_answer_announced 'answer after takeover'
 PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
 pass "a page held by a proved stray poll is taken over and the next answer is captured"
 
+# A staged legacy worker reply refused with LISTENER_ACTIVE was never posted, so
+# the takeover carries it and Lavish receives it exactly once.
+HELD=$TMP_ROOT/held-stray-reply
+held_fixture "$HELD"
+export HELD
+held_art=$(cd "$HELD" && pwd -P)/review.html
+held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
+fm_test_track_procevent_home "$HELD/home"
+new_task_endpoint "$HELD/home" worker-held
+touch "$HELD/held"
+HELD_HOLDER=stray bash "$HELD/bin/lavish-axi" poll "$held_art" & held_stray_pid=$!
+poller_seed "$HELD/home" "$held_id" "$held_stray_pid"
+printf 'legacy reply body\n' > "$HELD/reply-file"
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" --for worker-held \
+  --agent-reply-file "$HELD/reply-file" > "$HELD/arm.out" 2>&1 \
+  || fail "arming a held page with a staged legacy reply failed: $(cat "$HELD/arm.out")"
+wait_for "$HELD/replies" 200 || fail "the takeover did not post the staged legacy reply"
+assert_contains "$(cat "$HELD/polls")" "$held_art --agent-reply legacy reply body" \
+  "the refused first attempt carried the staged reply"
+assert_contains "$(cat "$HELD/polls")" "$held_art --takeover --agent-reply legacy reply body" \
+  "the takeover carries the reply the refusal never posted"
+assert_equals 'legacy reply body' "$(cat "$HELD/replies")" "Lavish receives the staged reply exactly once"
+assert_absent "$HELD/reply-file" "the posted reply is consumed"
+wait "$held_stray_pid" 2>/dev/null || true
+PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
+pass "a staged legacy reply refused on a held page survives the takeover"
+
+# The same refused reply on a page an unproved poll holds is staged again before
+# the hold report, so the next round posts it exactly once when the page frees.
+HELD=$TMP_ROOT/held-live-reply
+held_fixture "$HELD"
+export HELD
+held_art=$(cd "$HELD" && pwd -P)/review.html
+held_id=$("$ROOT/bin/fm-procevent-lavish.sh" source-id "$held_art")
+touch "$HELD/held"
+HELD_HOLDER=live bash "$HELD/bin/lavish-axi" poll "$held_art" & held_live_pid=$!
+printf 'legacy reply body\n' > "$HELD/reply-file"
+held_rc=0
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" poll "$held_art" --agent-reply-file "$HELD/reply-file" \
+  > "$HELD/round1.out" 2>&1 || held_rc=$?
+[ "$held_rc" -ne 0 ] || fail "the held round did not report its hold"
+assert_contains "$(cat "$HELD/round1.out")" "held-page: another poll holds $held_art" "the round reports the held page"
+assert_contains "$(cat "$HELD/polls")" "$held_art --agent-reply legacy reply body" \
+  "the refused attempt carried the staged reply"
+assert_absent "$HELD/replies" "no reply is posted while the page is held"
+assert_equals 'legacy reply body' "$(cat "$HELD/reply-file" 2>/dev/null)" \
+  "the refused reply is staged again before the hold report"
+kill -0 "$held_live_pid" 2>/dev/null || fail "the unproved holder was stopped"
+assert_absent "$HELD/taken-over" "a staged reply never makes the listener displace an unproved holder"
+rm -f "$HELD/held"
+wait "$held_live_pid" 2>/dev/null || true
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,answer after the hold\n' > "$HELD/answer"
+PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=1 \
+  "$ROOT/bin/fm-procevent-lavish.sh" poll "$held_art" --agent-reply-file "$HELD/reply-file" \
+  > "$HELD/round2.out" 2>&1 || fail "the next round failed: $(cat "$HELD/round2.out")"
+assert_contains "$(cat "$HELD/round2.out")" "answer after the hold" "the next round collects the answer"
+assert_equals 'legacy reply body' "$(cat "$HELD/replies")" "Lavish receives the refused reply exactly once"
+assert_absent "$HELD/reply-file" "the posted reply is consumed"
+pass "a staged legacy reply refused on a page an unproved poll holds is posted by the next round"
+
 # A holder the `orphans` test cannot prove stray - here a poll with options
 # firstmate never passes - is never displaced. The hold is reported once while
-# the same runner keeps its claim and retries with back-off, and a later
-# LISTENER_REPLACED hands the page off instead of relaunching.
+# the same runner keeps its claim and retries with back-off. A later
+# LISTENER_REPLACED is reported once too, and the listener regains the page
+# when the poll that took it over ends.
 HELD=$TMP_ROOT/held-live
 held_fixture "$HELD"
 export HELD
@@ -7345,20 +7426,40 @@ assert_equals 1 "$(wake_payloads "$HELD/home" | grep -c "procevent lavish $held_
   "the hold wakes firstmate once"
 [ "$(cat "$FM_PROCEVENT_CLAIM_ROOT/$held_id.claim")" = "$held_claim" ] \
   || fail "the hold replaced the listener's exclusive claim"
-touch "$HELD/replaced"
-rm -f "$HELD/held"
-for _ in $(seq 1 400); do
-  [ -e "$HELD/home/state/procevent/$held_id.source" ] || break
-  sleep 0.1
-done
-assert_absent "$HELD/home/state/procevent/$held_id.source" "LISTENER_REPLACED retires the source"
-held_polls=$(wc -l < "$HELD/polls" | tr -d ' ')
-PATH="$HELD/bin:$PATH" pe "$HELD/home" reconcile >/dev/null || fail "fixture step failed: reconcile HELD"
-sleep 1
-assert_equals "$held_polls" "$(wc -l < "$HELD/polls" | tr -d ' ')" "a handed-off page is not relaunched"
 kill "$held_live_pid" 2>/dev/null || true
 wait "$held_live_pid" 2>/dev/null || true
-pass "an unproved holder is never displaced, its hold is reported once, and a takeover by another poll hands the page off"
+# Once the listener regains the page, another poll takes it over: the listener's
+# poll returns LISTENER_REPLACED and the page stays held by the taker.
+touch "$HELD/replaced"
+rm -f "$HELD/held"
+held_replaced=''
+for _ in $(seq 1 400); do
+  held_replaced=$(grep -l 'code: LISTENER_REPLACED' "$HELD/home/state/procevent-inbox/$held_id".*.result 2>/dev/null | head -n 1)
+  [ -n "$held_replaced" ] && break
+  sleep 0.1
+done
+[ -n "$held_replaced" ] || fail "the takeover by another poll was not captured"
+assert_equals waiting "$("$ROOT/bin/fm-procevent-lavish.sh" classify "$held_replaced")" \
+  "a LISTENER_REPLACED result classifies as waiting"
+HELD_HOLDER=live bash "$HELD/bin/lavish-axi" poll "$held_art" --takeover & held_taker_pid=$!
+held_polls=$(wc -l < "$HELD/polls" | tr -d ' ')
+wait_for_lines "$HELD/polls" $((held_polls + 2)) 300 || fail "the replaced listener stopped retrying"
+assert_present "$HELD/home/state/procevent/$held_id.source" "LISTENER_REPLACED keeps the source"
+assert_absent "$HELD/taken-over" "the replaced listener never displaces the poll that took the page over"
+kill -0 "$held_taker_pid" 2>/dev/null || fail "the poll that took the page over was stopped"
+assert_equals 2 "$(held_results "$HELD/home" "$held_id" | wc -l | tr -d ' ')" \
+  "the takeover is reported once, beside the earlier hold"
+assert_equals 2 "$(wake_payloads "$HELD/home" | grep -c "procevent lavish $held_id ")" \
+  "the takeover wakes firstmate once"
+[ "$(cat "$FM_PROCEVENT_CLAIM_ROOT/$held_id.claim")" = "$held_claim" ] \
+  || fail "the takeover replaced the listener's exclusive claim"
+rm -f "$HELD/held"
+wait "$held_taker_pid" 2>/dev/null || true
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,answer after the other poll ended\n' > "$HELD/answer.tmp"
+mv -f -- "$HELD/answer.tmp" "$HELD/answer"
+held_answer_announced 'answer after the other poll ended'
+PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
+pass "an unproved holder is never displaced, its hold is reported once, and after a takeover by another poll the listener regains the page"
 
 # A bare `lavish-axi poll` that starts after this listener's claim has no
 # poller record, so neither the refusal nor the held-page report written after
@@ -7403,12 +7504,23 @@ fm_test_track_procevent_home "$HELD/home"
 PATH="$HELD/bin:$PATH" FM_HOME="$HELD/home" FM_LAVISH_POLL_RETRY_DELAY=4 \
   "$ROOT/bin/fm-procevent-lavish.sh" arm "$held_art" > "$HELD/arm.out" 2>&1 \
   || fail "arming the page before the round failed: $(cat "$HELD/arm.out")"
+wait_for "$HELD/listening" || fail "the listener never reached its first poll"
+touch "$HELD/gate"  # the next round's poll waits here until the holder is live
 printf 'session:\n  status: browser_disconnected\n' > "$HELD/answer.tmp"
 mv -f -- "$HELD/answer.tmp" "$HELD/answer"
 wait_for "$HELD/home/state/procevent-inbox/$held_id.1.result" || fail "the first round was not captured"
 sleep 1  # the holder must start after the captured round, inside the relisten delay
 touch "$HELD/held"
 HELD_HOLDER=live bash "$HELD/bin/lavish-axi" poll "$held_art" & held_gap_pid=$!
+for _ in $(seq 1 100); do
+  case "$(ps -o command= -p "$held_gap_pid" 2>/dev/null)" in *"lavish-axi poll $held_art"*) break ;; esac
+  sleep 0.1
+done
+case "$(ps -o command= -p "$held_gap_pid" 2>/dev/null)" in
+  *"lavish-axi poll $held_art"*) ;;
+  *) fail "the between-rounds holder never became a visible poll" ;;
+esac
+rm -f "$HELD/gate"
 wait_for_lines "$HELD/polls" 4 400 || true
 assert_absent "$HELD/taken-over" "a holder that started between rounds is not displaced by either refusal"
 wait_for_lines "$HELD/polls" 4 1 || fail "the held listener stopped retrying"
@@ -7553,8 +7665,9 @@ for _ in $(seq 1 200); do [ -f "$HELD/holder.out" ] && break; sleep 0.1; done
 assert_contains "$(cat "$HELD/holder.out" 2>/dev/null)" "code: LISTENER_REPLACED" \
   "the ledgered leftover's native --takeover poll was displaced by a takeover"
 assert_contains "$(cat "$HELD/polls")" "$held_art --takeover" "the listener polled with --takeover"
-wait "$held_parent" 2>/dev/null || true
+for _ in $(seq 1 100); do kill -0 "$held_native_pid" 2>/dev/null || break; sleep 0.1; done
 kill -0 "$held_native_pid" 2>/dev/null && fail "the displaced native --takeover poll kept running"
+wait "$held_parent" 2>/dev/null || true
 printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,answer after the native takeover\n' > "$HELD/answer.tmp"
 mv -f -- "$HELD/answer.tmp" "$HELD/answer"
 held_answer_announced 'answer after the native takeover'

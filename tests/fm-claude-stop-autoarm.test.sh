@@ -460,7 +460,8 @@ test_terminal_source_wake_survives_retirement() {
     out=$(run_autoarm "$dir" 2>/dev/null); status=$?
     expect_code 2 "$status" "the last source's final wake must reach Claude when captured $when"
     assert_contains "$out" 'procevent:lavish-final:1' "the final capture must be the rewake reason"
-    assert_absent "$dir/state/procevent/lavish-final.source" "the source must have retired"
+    grep -F 'procevent:lavish-final:1' "$dir/state/.wake-queue" >/dev/null \
+      || fail "the final wake must stay queued until it is acknowledged when captured $when"
     [ "$(epoch_outcome "$dir")" = rewake ] || fail "final feedback must record a rewake, not clean"
     : > "$dir/state/.wake-queue"
     before=$(wc -l < "$dir/state/arm-ran")
@@ -1939,13 +1940,18 @@ test_stands_down_only_on_pi_code_transcript_path
 # Mid-turn result delivery uses the same primary and session-owner boundary,
 # but it must neither arm supervision nor consume the pending review.
 POST_HOME=$(make_primary_dir "$TMP_ROOT/posttool")
+for post_script in fm-procevent-posttool-check.sh fm-procevent-lib.sh fm-procevent-lavish.sh \
+  fm-pr-lib.sh fm-status-wake-lib.sh; do
+  cp "$ROOT/bin/$post_script" "$POST_HOME/bin/$post_script"
+done
+write_arm_fixture "$POST_HOME" actionable
 posttool() {
   local payload=${1:-'{"session_id":"posttool"}'}
   printf '%s\n' "$payload" \
     | FM_ROOT_OVERRIDE="$POST_HOME" FM_HOME="$POST_HOME" "$FAKE_CLAUDE" -c '
         printf "%s\n" "$$" > "$FM_HOME/state/.lock"
-        "$1/bin/fm-procevent-posttool-check.sh"
-      ' _ "$ROOT"
+        "$FM_HOME/bin/fm-procevent-posttool-check.sh"
+      '
 }
 [ -z "$(posttool)" ] || fail "empty PostToolUse emitted a notice"
 mkdir -p "$POST_HOME/state/procevent-inbox"
@@ -1967,8 +1973,7 @@ post_read_out=$(env -u FM_HOME -u FM_STATE_OVERRIDE -u FM_ROOT_OVERRIDE bash -c 
 assert_contains "$post_read_out" "review answer" "recovery reads the actual unpublished answer"
 assert_contains "$post_context" 'handled lavish-review 1' \
   "the notice identifies the exact durable acknowledgement"
-[ -z "$(cat "$POST_HOME/state/arm-ran" 2>/dev/null || true)" ] \
-  || fail "PostToolUse launched supervision instead of giving context"
+assert_absent "$POST_HOME/state/arm-ran" "PostToolUse launched supervision instead of giving context"
 [ ! -e "$POST_BASE.handled" ] || fail "PostToolUse acknowledged a review without handling it"
 [ -n "$(posttool)" ] || fail "unhandled review became invisible after its first notice"
 printf 'error: No active Lavish Editor session for this file\ncode: NOT_FOUND\n' > "$POST_BASE.result"
