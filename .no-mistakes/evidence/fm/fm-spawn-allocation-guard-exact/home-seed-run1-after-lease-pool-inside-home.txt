@@ -1,0 +1,8 @@
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-lab.wSx6KF/treehouse/.treehouse/fm-7d61e5/2/fm. Run 'treehouse return ~/tmp/fm-lab.wSx6KF/treehouse/.treehouse/fm-7d61e5/2/fm' to release it.
+error: secondmate home cannot be inside the active firstmate home: /Users/charlesabrooker/tmp/fm-lab.wSx6KF/treehouse/.treehouse/fm-7d61e5/2/fm
+REFUSED: unsafe treehouse-acquired home rollback target /Users/charlesabrooker/tmp/fm-lab.wSx6KF/treehouse/.treehouse/fm-7d61e5/2/fm is inside the active firstmate home
+exit=1

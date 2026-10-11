@@ -1,0 +1,15 @@
+FM_TEST_BEGIN 2026-10-11T21:46:30Z tests/fm-spawn-retained-copy.test.sh family=backend-dispatch expected_gate_skip=none
+fm-cpu-pass: waiting 2s for 1 CPU pass(es) for fm-test-run tests/fm-spawn-retained-copy.test.sh: another request is collecting passes; pool size 18; holders: pid=47064 passes=18 since=1791754262 label=shard_map engine-0; pid=47064 passes=18 since=1791754262 label=shard_map engine-0; pid=47064 passes=18 since=1791754262 label=shard_map engine-0; pid=47064 passes=18 since=1791754262 label=shard_map engine-0; pid=70418 passes=1 since=1791754270 label=fm-test-run tests/fm-session-launch-policy.test.sh; and 13 more
+fm-cpu-pass: waiting 62s for 1 CPU pass(es) for fm-test-run tests/fm-spawn-retained-copy.test.sh: another request is collecting passes; pool size 18; holders: pid=47064 passes=18 since=1791754262 label=shard_map engine-0; pid=47064 passes=18 since=1791754262 label=shard_map engine-0; pid=47064 passes=18 since=1791754262 label=shard_map engine-0; pid=47064 passes=18 since=1791754262 label=shard_map engine-0; pid=70418 passes=1 since=1791754270 label=fm-test-run tests/fm-session-launch-policy.test.sh; and 13 more
+fm-cpu-pass: waiting 122s for 1 CPU pass(es) for fm-test-run tests/fm-spawn-retained-copy.test.sh: all passes in use; pool size 18; holders: pid=89293 passes=18 since=1791755289 label=shard_map engine-1; pid=89293 passes=18 since=1791755289 label=shard_map engine-1; pid=89293 passes=18 since=1791755289 label=shard_map engine-1; pid=89293 passes=18 since=1791755289 label=shard_map engine-1; pid=89293 passes=18 since=1791755289 label=shard_map engine-1; and 13 more
+fm-cpu-pass: got 1 CPU pass(es) for fm-test-run tests/fm-spawn-retained-copy.test.sh after 179s
+ok - a pool slot holding a live record's nested current copy refuses allocation until that record is retired
+ok - a pool slot whose hold Treehouse's state cannot prove still refuses allocation and names how to inspect or hold it
+ok - a nested current copy inside a slot Treehouse's state leases does not stop an unrelated spawn
+ok - a leased secondmate home slot holding another project's task copy does not stop a spawn
+ok - a pool slot a reassociated task left is acquired and claimed by a new task
+ok - an unavailable registered local home is named in one warning and the spawn proceeds
+FM_TEST_END 2026-10-11T21:50:19Z tests/fm-spawn-retained-copy.test.sh exit=0 duration_ms=229420 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=230039
+FM_TEST_SUMMARY_FAMILY family=backend-dispatch count=1 duration_ms=229420 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-spawn-retained-copy.test.sh duration_ms=229420

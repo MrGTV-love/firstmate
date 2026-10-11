@@ -1,0 +1,57 @@
+# Live lab: real bin/fm-spawn.sh + real Treehouse (v2.3.1-fm.e58947de) + real tmux (private fm-lab socket) in marked lab home
+# Lab home: /Users/charlesabrooker/tmp/fm-lab.ekCjhI (removed after run). Pool: /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab
+# Task 'holder' record: worktree=/Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo/.claude/worktrees/holder-copy (nested git worktree with one unlanded commit)
+# Crew harness: codex. Each allowed spawn's window was killed at Codex's folder-trust prompt (no model turn ran).
+
+## s1-unleased  (exit 1)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ekCjhI
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo contains task holder's current copy /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo/.claude/worktrees/holder-copy and is not leased in Treehouse state /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from /Users/charlesabrooker/tmp/fm-lab.ekCjhI/projects/demo lists slot 1 at /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo, then run: (cd '/Users/charlesabrooker/tmp/fm-lab.ekCjhI/projects/demo' && treehouse lease '1' --lease-holder 'holder')
+
+## s1-leased  (exit 0)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ekCjhI
+skill selection for lab-new-b: unavailable - no TypeSafe or OpenRouter key
+spawned lab-new-b harness=codex kind=scout window=primary:fm-lab-new-b worktree=/Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/2/demo
+
+## s1-recovered-nonhome  (exit 1)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ekCjhI
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo contains task holder's current copy /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo/.claude/worktrees/holder-copy and is not a Firstmate home and carries only Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; refusing allocation before treehouse get
+treehouse lease refuses a slot that is already leased; inspect it with: (cd '/Users/charlesabrooker/tmp/fm-lab.ekCjhI/projects/demo' && treehouse status)
+
+## s1-recovered-home  (exit 0)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ekCjhI
+skill selection for lab-new-d: unavailable - no TypeSafe or OpenRouter key
+spawned lab-new-d harness=codex kind=scout window=primary:fm-lab-new-d worktree=/Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/3/demo
+
+## s1-bigpool-recovered  (exit 1)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ekCjhI
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo contains task holder's current copy /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo/.claude/worktrees/holder-copy and is not a Firstmate home and carries only Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; refusing allocation before treehouse get
+treehouse lease refuses a slot that is already leased; inspect it with: (cd '/Users/charlesabrooker/tmp/fm-lab.ekCjhI/projects/demo' && treehouse status)
+
+## s1-bigpool-leased  (exit 0)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ekCjhI
+skill selection for lab-new-e: unavailable - no TypeSafe or OpenRouter key
+spawned lab-new-e harness=codex kind=scout window=primary:fm-lab-new-e worktree=/Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/3/demo
+
+## main-recovered-home  (exit 1)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ekCjhI
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo contains task holder's current copy /Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo/.claude/worktrees/holder-copy; refusing allocation before treehouse get
+
+## branch-recovered-home  (exit 0)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ekCjhI
+skill selection for lab-new-g: unavailable - no TypeSafe or OpenRouter key
+spawned lab-new-g harness=codex kind=scout window=primary:fm-lab-new-g worktree=/Users/charlesabrooker/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/3/demo
+
+## remedy printed by s1-unleased, run verbatim (TREEHOUSE_ROOT=lab):
+(cd '/Users/charlesabrooker/tmp/fm-lab.ekCjhI/projects/demo' && treehouse lease '1' --lease-holder 'holder')
+-> treehouse status: 1 leased ... (held by holder)
+
+## treehouse lease 1 on recovered-lease slot: worktree 1 is already leased (holder: "recovered: state file was corrupt or truncated; verify before reuse")
+
+## slot 1 + nested holder copy fingerprint (HEAD, status, nested HEAD, file cksum) at end vs start: UNCHANGED
+
+## final treehouse status
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/1/demo  (detached)  (held by recovered: state file was corrupt or truncated; verify before reuse)
+2     leased       ~/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/2/demo  (detached)  (held by recovered: state file was corrupt or truncated; verify before reuse)
+3     available    ~/tmp/fm-lab.ekCjhI/treehouse/.treehouse/demo-bd7cab/3/demo  (detached)

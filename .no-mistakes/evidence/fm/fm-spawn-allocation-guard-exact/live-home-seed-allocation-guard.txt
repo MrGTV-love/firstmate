@@ -1,0 +1,33 @@
+# Live: real bin/fm-home-seed.sh (clone of target commit 9a9ba276) + real Treehouse v2.3.1-fm.e58947de; lab home /Users/charlesabrooker/tmp/fm-lab.n6NkGI/home; pool /Users/charlesabrooker/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18
+# Task 'holder' record in lab home: worktree=/Users/charlesabrooker/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm/.claude/worktrees/holder-copy (nested copy, one unlanded commit)
+
+## 1. seed sm1: slot 1 NOT leased, holds holder's nested copy
+base  main  (repository default)
+1     dirty        ~/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm  (detached)
+error: Treehouse pool slot /Users/charlesabrooker/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm contains task holder's current copy /Users/charlesabrooker/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm/.claude/worktrees/holder-copy and is not leased in Treehouse state /Users/charlesabrooker/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from /Users/charlesabrooker/tmp/fm-lab.n6NkGI/fm lists slot 1 at /Users/charlesabrooker/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm, then run: (cd '/Users/charlesabrooker/tmp/fm-lab.n6NkGI/fm' && treehouse lease '1' --lease-holder 'holder')
+exit=
+-- pool after:
+base  main  (repository default)
+1     dirty        ~/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm  (detached)
+
+## 2. run the printed remedy verbatim
+(cd '/Users/charlesabrooker/tmp/fm-lab.n6NkGI/fm' && treehouse lease '1' --lease-holder 'holder')
+
+🌳 Leased worktree 1 at ~/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm. Run 'treehouse return ~/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm' to release it.
+/Users/charlesabrooker/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm
+
+## 3. seed sm1 again: slot 1 leased
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/2/fm. Run 'treehouse return ~/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/2/fm' to release it.
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.n6NkGI/home/data/sm1/brief.md (secondmate charter)
+home=/Users/charlesabrooker/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/2/fm
+exit=
+-- pool after:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/1/fm  (detached)  (held by holder)
+2     leased       ~/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/2/fm  (detached)  (held by sm1)
+-- registry:
+- sm1 - Lab allocation probe home. (home: /Users/charlesabrooker/tmp/fm-lab.n6NkGI/treehouse/.treehouse/fm-037a18/2/fm; scope: lab probe; projects: ; added 2026-10-11)
+## slot 1 nested holder copy after all runs: unlanded, holder.txt=unlanded
