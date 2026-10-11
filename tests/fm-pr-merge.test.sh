@@ -2616,6 +2616,148 @@ test_github_red_checks_refuse_and_allow_red_waives_named() {
   pass "fm-pr-merge refuses red GitHub checks and waives only a named --allow-red check"
 }
 
+# A direct-PR task's worker copy whose HEAD is a commit no remote ref holds: the
+# worker pushed branches from this copy and then moved on, as a multi-PR task's
+# copy is by the time its later PRs are merged. Echoes the case directory.
+make_direct_pr_local_tip_case() {  # <name>
+  local case_dir
+  case_dir=$(make_case "$1")
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    "window=fm-task-x1" \
+    "worktree=$case_dir/wt" \
+    "project=$case_dir/project" \
+    "kind=ship" \
+    "mode=direct-PR"
+  git -C "$case_dir/wt" commit -q --allow-empty -m 'local tip no remote ref holds'
+  printf '%s\n' "$case_dir"
+}
+
+# One ready report per PR URL, as a worker appends it when each PR is ready.
+write_ready_reports() {  # <case_dir> <url>...
+  local case_dir=$1 url
+  shift
+  for url in "$@"; do
+    printf 'done [at=1791600000]: PR %s checks green\n' "$url" >> "$case_dir/state/task-x1.status"
+  done
+}
+
+# Recorded 2026-10-10, task vernant-phase-a-gre-2030, PRs 3197-3202: the worker
+# copy's HEAD was a local unpushed tip whose content was already in the pushed
+# PRs, and every merge was refused as "named head ... unreachable outside the
+# worker copy". The merge must judge the head of the PR the call names.
+test_multi_pr_task_merges_named_pr_when_copy_head_is_a_local_tip() {
+  local case_dir tip forge_head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  case_dir=$(make_direct_pr_local_tip_case multi-pr-local-tip)
+  tip=$(git -C "$case_dir/wt" rev-parse HEAD)
+  add_gh_mocks "$case_dir" "$forge_head"
+  write_ready_reports "$case_dir" \
+    https://github.com/example/repo/pull/3196 \
+    https://github.com/example/repo/pull/3197 \
+    https://github.com/example/repo/pull/3198
+
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/3197 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "multi-pr-local-tip: the named green PR was refused: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 3197 example/repo --squash
+  assert_grep "pr_head=$forge_head" "$case_dir/state/task-x1.meta" \
+    "multi-pr-local-tip: the recorded head was not the named PR's forge head"
+  assert_no_grep "$tip" "$case_dir/gh.log" \
+    "multi-pr-local-tip: the local tip reached the forge call"
+  pass "a multi-PR task merges the named green PR although the copy's HEAD is a local-only tip"
+}
+
+# Recorded the same day, PR 3197: the copy rested on PR 3202's head, that PR
+# merged, and its branch was deleted, so the head named by the copy was no
+# longer on any remote ref.
+test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head() {
+  local case_dir forge_head=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
+  case_dir=$(make_direct_pr_local_tip_case multi-pr-merged-sibling)
+  add_gh_mocks "$case_dir" "$forge_head"
+  printf 'pr=%s\n' https://github.com/example/repo/pull/3202 >> "$case_dir/state/task-x1.meta"
+  printf '%s\n' fm-pr-poll-merge-notified-v1 github github.com example/repo 3202 \
+    > "$case_dir/state/task-x1.pr-poll-merge-notified"
+  chmod 600 "$case_dir/state/task-x1.pr-poll-merge-notified"
+
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/3197 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" \
+    || fail "multi-pr-merged-sibling: the named green PR was refused: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 3197 example/repo --squash
+  assert_grep "pr=https://github.com/example/repo/pull/3197" "$case_dir/state/task-x1.meta" \
+    "multi-pr-merged-sibling: the named PR was not recorded"
+  pass "a multi-PR task merges the named green PR after a sibling merged and lost its branch"
+}
+
+# A task with one PR is judged exactly as before: a HEAD that only the copy
+# holds is refused even though the forge reports the PR's head.
+test_single_pr_task_with_a_local_only_head_is_still_refused() {
+  local case_dir tip rc
+  case_dir=$(make_direct_pr_local_tip_case single-pr-local-tip)
+  tip=$(git -C "$case_dir/wt" rev-parse HEAD)
+  add_gh_mocks "$case_dir" cccccccccccccccccccccccccccccccccccccccc
+  write_ready_reports "$case_dir" https://github.com/example/repo/pull/3197
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/3197 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "single-pr-local-tip: a head only the copy holds must refuse"
+  assert_grep "named head $tip is unreachable outside the worker copy" "$case_dir/stderr" \
+    "single-pr-local-tip: the refusal did not name the local-only head"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "single-pr-local-tip: gh pr merge ran on a refused claim"
+  pass "a single-PR task whose copy HEAD exists only locally is still refused at merge"
+}
+
+# The forge must report the named PR's head. Without it the claim is judged on
+# the copy's HEAD, which a never-pushed commit fails whatever else the task owns.
+test_multi_pr_task_without_a_reported_forge_head_is_still_refused() {
+  local case_dir tip rc
+  case_dir=$(make_direct_pr_local_tip_case multi-pr-no-forge-head)
+  tip=$(git -C "$case_dir/wt" rev-parse HEAD)
+  add_gh_mocks "$case_dir" dddddddddddddddddddddddddddddddddddddddd
+  rm -f "$case_dir/github-head"
+  write_ready_reports "$case_dir" \
+    https://github.com/example/repo/pull/3196 \
+    https://github.com/example/repo/pull/3197
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/3197 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "multi-pr-no-forge-head: an unreported forge head must refuse"
+  assert_grep "named head $tip is unreachable outside the worker copy" "$case_dir/stderr" \
+    "multi-pr-no-forge-head: the refusal did not name the local-only head"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "multi-pr-no-forge-head: gh pr merge ran with no forge head"
+  pass "a multi-PR task whose named PR reports no forge head is still refused at merge"
+}
+
+# Judging the PR's own head does not loosen the live checks: a red head still
+# refuses, and the merge is bound to the forge head that was verified.
+test_multi_pr_task_with_a_red_head_is_still_refused() {
+  local case_dir rc head=eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+  case_dir=$(make_direct_pr_local_tip_case multi-pr-red-head)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_red_json "$case_dir" "$head" lint
+  write_ready_reports "$case_dir" \
+    https://github.com/example/repo/pull/3196 \
+    https://github.com/example/repo/pull/3197
+
+  set +e
+  run_pr_merge "$case_dir" task-x1 https://github.com/example/repo/pull/3197 \
+    > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  expect_code 1 "$rc" "multi-pr-red-head: a red head must refuse"
+  assert_grep "check 'lint' is not green" "$case_dir/stderr" \
+    "multi-pr-red-head: the red check was not named"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" \
+    "multi-pr-red-head: gh pr merge ran on a red PR"
+  pass "a multi-PR task's red PR head is still refused at merge"
+}
+
 # A draft cannot be merged, and neither can a pull request whose draft state the
 # forge did not report as a boolean; both refuse before any merge call.
 test_github_draft_or_unreadable_draft_state_refuses() {
@@ -3852,6 +3994,11 @@ test_untraversable_user_backend_config_directory_refuses_the_merge
 test_absent_user_backend_config_directory_and_backlog_still_merge
 test_backend_override_bypasses_unreadable_user_config
 test_github_red_checks_refuse_and_allow_red_waives_named
+test_multi_pr_task_merges_named_pr_when_copy_head_is_a_local_tip
+test_multi_pr_task_merges_named_pr_when_copy_head_is_a_merged_siblings_head
+test_single_pr_task_with_a_local_only_head_is_still_refused
+test_multi_pr_task_without_a_reported_forge_head_is_still_refused
+test_multi_pr_task_with_a_red_head_is_still_refused
 test_github_draft_or_unreadable_draft_state_refuses
 test_superseded_failed_check_run_no_longer_refuses
 test_check_runs_never_supersede_status_contexts

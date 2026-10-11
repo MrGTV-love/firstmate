@@ -735,6 +735,29 @@ test_direct_pr_unpushed_commit_refuses_registration() {
   pass "fm-pr-check refuses a direct-PR registration while a later commit is only in the copy"
 }
 
+# Owning several PRs relaxes the head judged for a merge call only. A ready
+# claim - the registration of a PR a worker reported - still names the copy's
+# HEAD, and one that exists only in the copy is refused whatever else the task
+# owns.
+test_multi_pr_task_registration_still_refuses_a_local_only_head() {
+  local dir pushed later
+  dir=$(make_case multi-pr-registration)
+  fm_write_meta "$dir/home/state/task-a.meta" \
+    "window=firstmate:fm-task-a" "endpoint_task_id=task-a" "worktree=$dir/wt" \
+    "project=$dir/project" "kind=ship" "mode=direct-PR"
+  printf 'done [at=1]: PR %s checks green\ndone [at=2]: PR %s checks green\n' \
+    https://github.com/o/r/pull/3 https://github.com/o/r/pull/4 > "$dir/home/state/task-a.status"
+  pushed=$(git -C "$dir/wt" rev-parse HEAD)
+  git -C "$dir/wt" commit -q --allow-empty -m 'tip only in the copy'
+  later=$(git -C "$dir/wt" rev-parse HEAD)
+  FM_TEST_GH_HEAD=$pushed run_check_entry "$dir" task-a https://github.com/o/r/pull/4 \
+    > "$dir/stdout" 2> "$dir/stderr" && fail "a multi-PR registration with a local-only head was accepted"
+  grep -Fq "named head $later is unreachable outside the worker copy" "$dir/stderr" \
+    || fail "the registration refusal did not name the local-only head: $(cat "$dir/stderr")"
+  [ ! -e "$dir/home/state/task-a.check.sh" ] || fail "the refused registration still armed a poll"
+  pass "fm-pr-check registration refuses a multi-PR task's local-only head; only a merge call judges the PR's head"
+}
+
 test_valid_recording_and_merge_derivation() {
   local dir expected sidecar count rc
   dir=$(make_case valid-recording)
@@ -3465,6 +3488,7 @@ test_draft_pull_request_is_not_armed
 test_secondmate_record_refuses_a_pr_watch
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
+test_multi_pr_task_registration_still_refuses_a_local_only_head
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract
