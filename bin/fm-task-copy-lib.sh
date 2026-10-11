@@ -382,13 +382,19 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, recovered, or unknown; and
 # on failure FM_TASK_COPY_SLOT_REASON to a clause following the slot's path.
 # Returns 0 when held, 1 otherwise.
+# The last state file read and its entries are kept in
+# FM_TASK_COPY_POOL_STATE_FILE and FM_TASK_COPY_POOL_STATE_ENTRIES, so a scan
+# reads each pool's state once; a scan clears both before it starts.
 FM_TASK_COPY_SLOT_NAME=
 FM_TASK_COPY_SLOT_STATE=
 FM_TASK_COPY_SLOT_REASON=
+FM_TASK_COPY_POOL_STATE_FILE=
+FM_TASK_COPY_POOL_STATE_ENTRIES=
 fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
-  local slot=$1 state entries name leased holder path real home matched=0 is_home=0
+  local slot=$1 state leaf entries name leased holder path real home matched=0 is_home=0
   shift
   state="${slot%/*/*}/treehouse-state.json"
+  leaf=${slot#"${slot%/*/*}"}
   FM_TASK_COPY_SLOT_NAME=
   FM_TASK_COPY_SLOT_STATE=unknown
   FM_TASK_COPY_SLOT_REASON=
@@ -399,10 +405,16 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   # One line per entry. Each field carries a one-letter prefix so none is ever
   # empty: tab is IFS whitespace, so read would otherwise merge an empty field
   # into its neighbour.
-  entries=$(jq -r '.worktrees[]? | [("L" + (if .leased == true then "leased" else "unleased" end)), ("H" + (.lease_holder // "" | tostring)), ("N" + (.name // "" | tostring)), ("P" + (.path // "" | tostring))] | @tsv' "$state" 2>/dev/null) || {
-    FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state cannot be read"
-    return 1
-  }
+  if [ "$state" = "$FM_TASK_COPY_POOL_STATE_FILE" ]; then
+    entries=$FM_TASK_COPY_POOL_STATE_ENTRIES
+  else
+    entries=$(jq -r '.worktrees[]? | [("L" + (if .leased == true then "leased" else "unleased" end)), ("H" + (.lease_holder // "" | tostring)), ("N" + (.name // "" | tostring)), ("P" + (.path // "" | tostring))] | @tsv' "$state" 2>/dev/null) || {
+      FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state cannot be read"
+      return 1
+    }
+    FM_TASK_COPY_POOL_STATE_FILE=$state
+    FM_TASK_COPY_POOL_STATE_ENTRIES=$entries
+  fi
   for home in "$@"; do
     [ "$home" != "$slot" ] || is_home=1
   done
@@ -410,6 +422,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
     path=${path#P}
     [ -n "$path" ] || continue
     if [ "$path" != "$slot" ]; then
+      [ "${path#"${path%/*/*}"}" = "$leaf" ] || continue
       real=$(fm_task_copy_canonical_dir "$path") || continue
       [ "$real" = "$slot" ] || continue
     fi
@@ -449,6 +462,8 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
 fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
   local project=$1 record_state=$2 state_dir meta copy slot skipped id home
   local -a homes=()
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
   fm_local_firstmate_state_dirs "$record_state" tolerant
   for skipped in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
     echo "warning: $skipped; its task records were not checked for a current copy inside a Treehouse pool slot" >&2
