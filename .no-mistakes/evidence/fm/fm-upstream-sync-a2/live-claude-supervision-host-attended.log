@@ -1,0 +1,43 @@
+skip: control: set FM_SUPERVISION_HOST_ATTENDED_LIVE_CONTROL_REF to a pre-fix ref to run the negative control
+# 21:04:15 positive step 1: primary idle (claude pid 54372, 2.1.296 (Claude Code), model haiku); tracked Stop hook registered; config/supervision-host present; host pid 88631 parked on watcher 2912; listener runner 5873; captain prompts so far: 1
+# 21:04:15 positive transcript: /Users/charlesabrooker/.claude/projects/-Users-charlesabrooker-tmp-fm-sh-attended-live-4GOXG8-positive-fm/6f79beac-390e-4acc-be80-e09b842ffde1.jsonl
+# 21:04:15 positive step 2: event 1 appended at 1791684255 (demo.status needs-decision)
+not ok - positive: event 1 was not a main-only pass-through
+--- host log
+1791684250	start	gen=host-88631-1791684250	primary=claude
+1791684282	handled	turn=host-88631-1791684250.1	posture=attended	rc=0	reports=2	error=0 cost=0.064426 conversation_cost=0.064426 input=12 cache_read=69336 cache_write=12077 output=916 turns=6	signal: /Users/charlesabrooker/tmp/fm-sh-attended-live.4GOXG8/positive/fm/state/demo.status /Users/charlesabrooker/tmp/fm-sh-attended-live.4GOXG8/positive/fm/state/demo2.status
+1791684282	to-main	branch-outcome: the supervision session handled this wake and recorded captain outcomes for you (store rows 1); run bin/fm-wake-drain.sh, act on its BRANCH OUTCOMES section, and acknowledge them as it prints
+1791684292	start	gen=host-6864-1791684292	primary=claude
+--- cycle exits
+arm_pid=90309	watcher_pid=90619	origin=started	started_at=1791684250	ended_at=1791684253	exit_code=0	signal=none	reason=actionable-signal
+arm_pid=2720	watcher_pid=2912	origin=started	started_at=1791684254	ended_at=1791684257	exit_code=0	signal=none	reason=actionable-signal
+--- queue
+
+--- ledger: epoch=2 owner_pid=5429 outcome=arming updated_at=1791684292
+--- marker: acked:handling:90619.1791684251.BW39Yc
+--- screen
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 6% 64k/1.0M main fm:6f79beac
+  ⏵⏵ bypass permissions on (shift+tab to cycle) · ← for agents

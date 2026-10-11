@@ -1,0 +1,31 @@
+$ git log --first-parent --format="%h %p | %s" -7 HEAD
+c3df2263 a095da77 | no-mistakes(test): test: align attended live e2e with lab setup and take-over
+a095da77 d6613ba3 60775fa1 | merge: bring origin/main forward into the upstream sync branch
+d6613ba3 20eaa665 8f9ac500 | merge: bring origin/main forward into the upstream sync branch
+20eaa665 26fe5ffc | test: retry the interrupted winner read in the stale-lock steal race
+26fe5ffc 41fbccd8 | fix: restore two upstream hunks the squashed sync (#43) dropped
+41fbccd8 4b9be5e0 fb75c1f9 | merge: bring in upstream main through fb75c1f9 (upstream #6814, #6787, #6823, #6818, #6887, #6920, #6956)
+4b9be5e0 d69b2c5a 2ce57d00 | merge: record upstream through 2ce57d00 as merged (content landed squashed in #43, fd9b8b02; real merge history on fm/fm-upstream-sync e24c85ae, identical tree 00cbc3bd)
+
+## ours-merge 4b9be5e0 tree vs parent d69b2c5a
+104878b5d2c15a39701cbe288be5a3579ed16bcc 104878b5d2c15a39701cbe288be5a3579ed16bcc
+
+## Upstream commits are ancestors of HEAD
+2ce57d00 ancestor
+329ad4ed ancestor
+3c58ec8e ancestor
+0ec1c5a4 ancestor
+b062eb94 ancestor
+19fcbbde ancestor
+b75658b6 ancestor
+fb75c1f9 ancestor
+
+## Next sync: merge-base(HEAD, fb75c1f9) = fb75c1f9
+## merge-tree HEAD + upstream fb75c1f9
+exit=0 result_tree=e605e1d34ff323c86ac8920d28dc08fa88ba83c0 head_tree=e605e1d34ff323c86ac8920d28dc08fa88ba83c0
+## Adversarial: merge-tree old origin/main 60775fa1 + fb75c1f9 (pre-A2)
+exit=1 conflicted_files=81
+
+## Diff HEAD vs a095da77 (round-1 commit): only test file
+ .../fm-supervision-host-attended-live-e2e.test.sh  | 38 ++++++++++++++--------
+ 1 file changed, 24 insertions(+), 14 deletions(-)

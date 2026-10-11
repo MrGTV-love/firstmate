@@ -1,0 +1,30 @@
+lab session: fm-lab-probe-39486-13473
+
+== 1. Probe a target whose lab session has NO server (prepared only)
+session before: []
+visible_capture rc=1 elapsed=0s
+composer_state: unknown
+session after: []  (expect empty or running:false - no server autostarted)
+
+== 2. Provision the lab server and probe a real pane
+pane=w1:p2
+visible_capture rc=0; marker seen: 3 line(s)
+composer_state: unknown
+session: [{"name":"fm-lab-probe-39486-13473","running":true}]
+
+== 3. Stop the lab server (guarded) and probe the same pane again
+stop rc=0
+session after stop: [{"name":"fm-lab-probe-39486-13473","running":false}]
+visible_capture rc=1 elapsed=0s
+composer_state: unknown
+session after probes: [{"name":"fm-lab-probe-39486-13473","running":false}]  (expect running:false - probe did not restart the server)
+
+== 4. Contrast: lifecycle path (target_ready) still autostarts by design
+caller env: COMPACT_ADVISER_DISABLE=1 FM_COMPACT_ADVISER_DISABLE=1 FM_COMPACT_ADVISER_HOOKS=probe 
+target_ready rc=0
+session: [{"name":"fm-lab-probe-39486-13473","running":true}]
+server pid=58820; stdin (fd 0) of the server started by fm_backend_herdr_server_ensure:
+  fd0 -> /dev/null
+pid 58820: herdr server --session fm-lab-probe-39486-13473
+  matching env: []
+teardown rc=0

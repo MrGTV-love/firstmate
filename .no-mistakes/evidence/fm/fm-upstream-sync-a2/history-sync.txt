@@ -1,0 +1,31 @@
+## Scenario: upstream history is real merge history (A2)
+$ git log --first-parent --format='%h %p | %s' -6 a095da77
+a095da77 d6613ba3 60775fa1 | merge: bring origin/main forward into the upstream sync branch
+d6613ba3 20eaa665 8f9ac500 | merge: bring origin/main forward into the upstream sync branch
+20eaa665 26fe5ffc | test: retry the interrupted winner read in the stale-lock steal race
+26fe5ffc 41fbccd8 | fix: restore two upstream hunks the squashed sync (#43) dropped
+41fbccd8 4b9be5e0 fb75c1f9 | merge: bring in upstream main through fb75c1f9 (upstream #6814, #6787, #6823, #6818, #6887, #6920, #6956)
+4b9be5e0 d69b2c5a 2ce57d00 | merge: record upstream through 2ce57d00 as merged (content landed squashed in #43, fd9b8b02; real merge history on fm/fm-upstream-sync e24c85ae, identical tree 00cbc3bd)
+
+## ours-merge 4b9be5e0 changes no files (tree equals parent d69b2c5a = origin/main at sync time)
+4b9be5e0^{tree} = 104878b5d2c15a39701cbe288be5a3579ed16bcc
+d69b2c5a^{tree} = 104878b5d2c15a39701cbe288be5a3579ed16bcc
+git diff --stat d69b2c5a 4b9be5e0: []
+
+## Ancestry of upstream commits in a095da77
+2ce57d00 docs(skills): index the six missing agent-only skill triggers (#6784): ancestor
+329ad4ed test: make agent process fixtures compatible with multicall sleep (#68: ancestor
+3c58ec8e fix(bin): keep the supervision host's successor watcher alive after th: ancestor
+0ec1c5a4 test: make tmux Claude readiness checks independent of permission foot: ancestor
+b062eb94 test(herdr): accept safe exit refusals and clean lab once (#6818): ancestor
+19fcbbde test: stabilize watcher lock race fixtures (#6887): ancestor
+b75658b6 fix(bin): keep herdr composer probes observable-only without autostart: ancestor
+fb75c1f9 fix(tests): clear inherited Git repository location in fixture helper : ancestor
+
+## Next sync simulation: merge-base(a095da77, upstream fb75c1f9) = fb75c1f9
+## Adversarial: merge upstream fb75c1f9 into OLD origin/main 60775fa1 (pre-A2) via merge-tree
+exit=1 conflicted_files=81
+## Same merge into NEW a095da77
+exit=0 result_tree=5e850eabedbbb93bac81fe74743eff214506305b head_tree=5e850eabedbbb93bac81fe74743eff214506305b
+## Merge 2ce57d00 into a095da77
+exit=0 tree_same_as_head=yes

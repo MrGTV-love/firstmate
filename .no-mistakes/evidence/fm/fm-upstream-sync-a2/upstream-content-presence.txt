@@ -1,0 +1,20 @@
+## Upstream content presence: reverse-apply each upstream commit's patch against a095da77 per file
+329ad4ed docs/verification/runtime-backends.md: NOT-REVERSE-APPLICABLE
+329ad4ed tests/fm-backend-herdr.test.sh: present
+329ad4ed tests/fm-control-herdr-smoke.test.sh: NOT-REVERSE-APPLICABLE
+329ad4ed tests/fm-test-fixtures.test.sh: NOT-REVERSE-APPLICABLE
+329ad4ed tests/fm-tmux-agent-liveness.test.sh: present
+329ad4ed tests/lib.sh: present
+3c58ec8e bin/fm-supervision-host.sh: present
+3c58ec8e docs/supervision-host.md: present
+3c58ec8e tests/fm-supervision-host.test.sh: NOT-REVERSE-APPLICABLE
+0ec1c5a4 docs/verification/supervision.md: present
+0ec1c5a4 tests/fm-host-mirror-live-e2e.test.sh: present
+0ec1c5a4 tests/fm-supervision-host-attended-live-e2e.test.sh: present
+b062eb94 tests/fm-control-herdr-smoke.test.sh: present
+19fcbbde tests/fm-watcher-lock.test.sh: NOT-REVERSE-APPLICABLE
+b75658b6 bin/backends/herdr.sh: NOT-REVERSE-APPLICABLE
+b75658b6 tests/fm-backend-herdr.test.sh: present
+fb75c1f9 CONTRIBUTING.md: NOT-REVERSE-APPLICABLE
+fb75c1f9 tests/fm-test-fixtures.test.sh: present
+fb75c1f9 tests/git-config-helpers.sh: present
