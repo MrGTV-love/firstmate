@@ -1063,14 +1063,11 @@ detached_launch_state_locked() {
 }
 
 detach_for_launch_state() {  # <source-id> <detached-launch-state>
-  local status
   [ "$2" -ne 0 ] || return 0
   [ "$2" -eq 1 ] || die "cannot safely launch source: $1"
-  detach_runner "$1"
-  status=$?
-  # Register --detach confirms nothing, so it discards the launch PID handoff.
-  [ -z "${DETACHED_RUNNER_HANDOFF-}" ] || rm -f -- "$DETACHED_RUNNER_HANDOFF"
-  return "$status"
+  # Register --detach confirms nothing, so it launches with no PID handoff and
+  # never waits for the runner's exec.
+  isolate_runner detach "$1"
 }
 
 cmd_start_public() {
