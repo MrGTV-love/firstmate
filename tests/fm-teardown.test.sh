@@ -50,7 +50,7 @@
 #   (q7) same, but one pre-rebase commit's change is missing from the PR head -> REFUSE
 #   (q8) same, but the merge of main carries a change of its own     -> REFUSE
 #   (q9) no-mistakes + squash-merged, copy is the input of the run that pushed the merged PR head, pipeline rewrote it -> ALLOW
-#   (q10) same, but a commit was made after the run started, or no recorded run ties to the merged PR head, or a record is missing -> REFUSE
+#   (q10) same, but the copy's HEAD is not exactly the run's input head (behind it, past it, or elsewhere), or no recorded run ties to the merged PR head, or a record is missing -> REFUSE
 #
 # Also covers backlog teardown-lock-race: a git index.lock left in the worktree by a
 # killed crew process (bin/fm-teardown.sh's teardown_treehouse_return).
