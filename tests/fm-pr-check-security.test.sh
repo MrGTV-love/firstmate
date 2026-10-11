@@ -155,6 +155,7 @@ case "${1:-} ${2:-}" in
         exit 0
         ;;
       *" --json isDraft "*)
+        [ -z "${FM_TEST_GH_DRAFT_HOOK:-}" ] || "$FM_TEST_GH_DRAFT_HOOK"
         printf '%s\n' "{\"isDraft\":${FM_TEST_GH_DRAFT:-false}}"
         exit 0
         ;;
@@ -758,6 +759,106 @@ test_multi_pr_task_registration_still_refuses_a_local_only_head() {
   pass "fm-pr-check registration refuses a multi-PR task's local-only head; only a merge call judges the PR's head"
 }
 
+test_registration_identity_revalidation() {
+  local provider mutation phase dir state url head rc artifact lock_path draft_hook
+  for provider in github gitlab gerrit; do
+    case "$provider" in
+      github) url=https://github.com/o/r/pull/4 ;;
+      gitlab) url=https://gitlab.example/g/p/-/merge_requests/4 ;;
+      gerrit) url=https://gerrit.example/c/group/apps/console/+/4201 ;;
+    esac
+    for mutation in worktree branch unchanged draft-worktree draft-branch draft-unchanged; do
+      phase=preparation
+      case "$mutation" in
+        draft-*)
+          [ "$provider" = github ] || continue
+          phase=draft
+          mutation=${mutation#draft-}
+          ;;
+      esac
+      dir=$(make_case "registration-identity-$provider-$mutation-$phase")
+      state="$dir/home/state"
+      write_task_meta "$dir"
+      printf 'branch=fm/task-a\n' >> "$state/task-a.meta"
+      ln -s "$REAL_JQ" "$dir/fakebin/jq"
+      head=$(git -C "$dir/wt" rev-parse HEAD)
+      git -C "$dir/wt" worktree add -q -b fm/replacement "$dir/replacement-wt" HEAD
+      git -C "$dir/replacement-wt" commit -q --allow-empty -m replacement
+      cat > "$dir/mutate-copy" <<'SH'
+#!/usr/bin/env bash
+set -eu
+  . "$FM_TEST_ROOT/bin/fm-wake-lib.sh"
+  lock=$(fm_meta_lock_path "$FM_TEST_META")
+  fm_lock_acquire_wait "$lock"
+  tmp="$FM_TEST_META.test-replacement"
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$FM_TEST_MUTATION:$line" in
+      worktree:worktree=*) line="worktree=$FM_TEST_NEW_WT" ;;
+      branch:branch=*) line=branch=fm/replacement ;;
+    esac
+    printf '%s\n' "$line"
+  done < "$FM_TEST_META" > "$tmp"
+  chmod 0600 "$tmp"
+  mv "$tmp" "$FM_TEST_META"
+  "$FM_TEST_REAL_CP" "$FM_TEST_META" "$FM_TEST_EXPECTED_META"
+  fm_lock_release "$lock"
+  : > "$FM_TEST_PREPARED"
+SH
+      chmod +x "$dir/mutate-copy"
+      draft_hook=
+      if [ "$phase" = draft ]; then
+        draft_hook="$dir/mutate-copy"
+      else
+        cat > "$dir/fakebin/cp" <<'SH'
+#!/usr/bin/env bash
+set -eu
+if [ "$1" = "$FM_TEST_POLL_TEMPLATE" ]; then
+  "$FM_TEST_MUTATION_HOOK"
+fi
+exec "$FM_TEST_REAL_CP" "$@"
+SH
+      fi
+      [ "$phase" != preparation ] || chmod +x "$dir/fakebin/cp"
+      rc=0
+      FM_TEST_POLL_TEMPLATE="$POLL" FM_TEST_ROOT="$ROOT" \
+        FM_TEST_GH_DRAFT_HOOK="$draft_hook" FM_TEST_MUTATION_HOOK="$dir/mutate-copy" \
+        FM_TEST_META="$state/task-a.meta" FM_TEST_MUTATION="$mutation" \
+        FM_TEST_NEW_WT="$dir/replacement-wt" FM_TEST_REAL_CP="$REAL_CP" \
+        FM_TEST_EXPECTED_META="$dir/meta.expected" FM_TEST_PREPARED="$dir/prepared" \
+        FM_TEST_GH_HEAD="$head" FM_TEST_GERRIT_REVISION="$head" \
+        run_check_entry "$dir" task-a "$url" > "$dir/stdout" 2> "$dir/stderr" || rc=$?
+      [ -f "$dir/prepared" ] \
+        || fail "$provider/$mutation/$phase did not reach the registration hook: $(cat "$dir/stderr")"
+      if [ "$mutation" = unchanged ]; then
+        [ "$rc" -eq 0 ] || fail "$provider unchanged registration failed: $(cat "$dir/stderr")"
+        grep -qxF "pr=$url" "$state/task-a.meta" || fail "$provider did not record unchanged registration"
+        fm_pr_poll_artifacts_valid "$state" task-a "$POLL" \
+          || fail "$provider did not publish an authenticated unchanged poll"
+      else
+        [ "$rc" -ne 0 ] || fail "$provider accepted a changed $mutation"
+        grep -Fq 'task worktree or branch changed' "$dir/stderr" \
+          || fail "$provider/$mutation did not report the identity change"
+        cmp -s "$dir/meta.expected" "$state/task-a.meta" \
+          || fail "$provider/$mutation published metadata after the identity change"
+        for artifact in task-a.check.sh task-a.pr-poll task-a.pr-poll-registration; do
+          [ ! -e "$state/$artifact" ] || fail "$provider/$mutation published $artifact"
+        done
+        for artifact in "$state"/.fm-pr-meta.* "$state"/.fm-pr-poll-*; do
+          [ ! -e "$artifact" ] || fail "$provider/$mutation retained a preparation file"
+        done
+        lock_path=$(
+          FM_STATE_OVERRIDE="$state"
+          . "$ROOT/bin/fm-wake-lib.sh"
+          fm_meta_lock_path "$state/task-a.meta"
+        ) || fail "$provider/$mutation could not resolve its metadata lock"
+        [ ! -e "$lock_path" ] && [ ! -L "$lock_path" ] \
+          || fail "$provider/$mutation retained its metadata lock"
+      fi
+    done
+  done
+  pass "registration revalidates worktree and branch before metadata and poll publication for every forge"
+}
+
 test_valid_recording_and_merge_derivation() {
   local dir expected sidecar count rc
   dir=$(make_case valid-recording)
@@ -1076,6 +1177,7 @@ SH
 
     FM_TEST_GH_HEAD=0123456789abcdef0123456789abcdef01234567 \
       run_check_entry "$dir" "$id" https://github.com/o/r/pull/1 > "$dir/direct.out" 2> "$dir/direct.err" &
+    # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
     direct_pid=$!
     i=0
     while [ "$i" -lt 100 ] && ! find "$dir/home/state" -name '.fm-pr-poll-check.*' -print | grep . >/dev/null; do
@@ -1089,6 +1191,7 @@ SH
     : > "$dir/direct-in-flight"
     FM_TEST_WATCH_BOUND_PAUSE="$dir/direct-in-flight" FM_TEST_GH_STATE=MERGED \
       run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err" &
+    # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
     watch_pid=$!
     direct_rc=0
     wait "$direct_pid" || direct_rc=$?
@@ -1365,6 +1468,7 @@ SH
     FM_SIGNAL_GRACE=0 FM_TEST_CUSTOM_CHILD_PID="$child_pid_file" \
     PATH="$dir/fakebin:$BASE_PATH" "$WATCH" \
     > "$dir/watch.out" 2> "$dir/watch.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   pid=$!
   i=0
   while [ "$i" -lt 100 ]; do
@@ -3041,6 +3145,7 @@ test_teardown_cannot_race_authority_consumption() {
     FM_TEST_GH_SLEEP=0.5 FM_TEST_CHECK_TIMEOUT=3 \
     run_watcher_bounded "$dir/home" "$dir/fakebin" \
       > "$dir/watch.out" 2> "$dir/watch.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   watcher_pid=$!
   i=0
   while [ ! -e "$dir/poll-started" ]; do
@@ -3356,6 +3461,7 @@ SH
   FM_TEST_ROOT="$ROOT" FM_TEST_LOCK="$PR_POLL_HOLDER_LOCK" \
     FM_TEST_ACQUIRED="$PR_POLL_HOLDER_ACQUIRED" FM_TEST_RELEASE="$PR_POLL_HOLDER_RELEASE" \
     "$dir/poll-publish-holder.sh" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   PR_POLL_HOLDER_PID=$!
   for i in $(seq 1 100); do
     [ -e "$PR_POLL_HOLDER_ACQUIRED" ] && return 0
@@ -3385,6 +3491,7 @@ test_device_rerecord_serializes_direct_rearm() {
   start_poll_publish_holder "$dir" "$state" task-a
   FM_ROOT_OVERRIDE="$dir/root" FM_HOME="$dir/home" FM_TEST_GUARD_LOG="$dir/guard.log" \
     PATH="$dir/fakebin:$BASE_PATH" "$PR_CHECK" task-a "$url_b" > "$dir/rearm.out" 2> "$dir/rearm.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   rearm_pid=$!
   for i in $(seq 1 100); do
     if fm_pr_metadata_identity_parse "$state/task-a.meta" && [ "$FM_PR_META_URL" = "$url_b" ]; then
@@ -3437,6 +3544,7 @@ SH
     FM_TEST_REGISTRATION_RENAMED="$dir/registration-renamed" FM_TEST_REAL_MV="$REAL_MV" \
     FM_TEST_GH_LOG="$dir/gh.log" FM_TEST_GH_STATE=OPEN \
     run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err" &
+  # shellcheck disable=SC2031 # The background PID is captured immediately in this shell.
   watcher_pid=$!
   for i in $(seq 1 100); do
     [ -d "$state/.control-task-a.lock" ] && break
@@ -3489,6 +3597,7 @@ test_secondmate_record_refuses_a_pr_watch
 test_unpushed_named_head_refuses_registration
 test_direct_pr_unpushed_commit_refuses_registration
 test_multi_pr_task_registration_still_refuses_a_local_only_head
+test_registration_identity_revalidation
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract

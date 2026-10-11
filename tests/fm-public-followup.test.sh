@@ -898,9 +898,13 @@ test_secondmate_teardown_resolves_parent_from_durable_record_when_env_lost() {
 
   seed_commitment "$parent" pf-durable req-durable x secondmate:mate work-child
   fm_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+  # The ship's copy sits inside the home, as a real one does; the home itself is
+  # the parent's recorded home= custody, which teardown never cleans up.
+  fm_git_init_commit "$child/projects/worktree"
   fm_write_meta "$child/state/work-child.meta" \
     "window=firstmate:fm-work-child" "endpoint_task_id=work-child" \
-    "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
+    "worktree=$child/projects/worktree" "project=$child/projects/worktree" \
+    "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
   # No FM_PUBLIC_FOLLOWUP_PRIMARY_HOME at all here: a restart of the secondmate
   # agent that drops the launch-time prefix must still find the real parent
@@ -1541,9 +1545,11 @@ test_dropped_baton_now_surfaces_open_loop() {
   assert_present "$parent/state/public-followup/registry/public-final-pi-rearm-repro" \
     "delivery must retain the registration"
 
+  fm_git_init_commit "$child/projects/worktree"
   fm_write_meta "$child/state/pi-rearm-loop-fix-r1.meta" \
     "window=firstmate:fm-pi-rearm-loop-fix-r1" "endpoint_task_id=pi-rearm-loop-fix-r1" \
-    "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
+    "worktree=$child/projects/worktree" "project=$child/projects/worktree" \
+    "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
 
   PATH="$parent/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$parent" \
     FM_STATE_OVERRIDE="$parent/state" "$PF" guard-work secondmate:mate pi-rearm-loop-fix-r1 \
@@ -1577,9 +1583,11 @@ test_control_registered_followon_is_guarded() {
   seed_repro_commitment "$parent" public-final-pi-rearm-ship req-pirearm2 \
     secondmate:mate pi-rearm-loop-fix-r1
   fm_write_meta "$parent/state/mate.meta" "kind=secondmate" "home=$child"
+  fm_git_init_commit "$child/projects/worktree"
   fm_write_meta "$child/state/pi-rearm-loop-fix-r1.meta" \
     "window=firstmate:fm-pi-rearm-loop-fix-r1" "endpoint_task_id=pi-rearm-loop-fix-r1" \
-    "worktree=$child" "project=$child" "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
+    "worktree=$child/projects/worktree" "project=$child/projects/worktree" \
+    "kind=ship" "mode=local-only" "spawn_gen=public-followup-fixture"
   PATH="$child/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$child" \
     FM_STATE_OVERRIDE="$child/state" FM_DATA_OVERRIDE="$child/data" \
     expect_failure "registered follow-on must be guarded" "$TEARDOWN" pi-rearm-loop-fix-r1

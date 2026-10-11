@@ -18,7 +18,7 @@ The failure repeated across harnesses and homes, and the workaround (remember to
 
 `bin/fm-control-lib.sh` is the single executable owner of three capability tables, which have no side effects, so they can be read as a contract:
 
-- The **verb allowlist**: `interrupt`, `exit`, `relaunch`, `authorize-continuation`.
+- The **verb allowlist**: `interrupt`, `exit`, `relaunch`, `authorize-continuation`, `reassociate`.
   There is no arbitrary-text and no generic raw-key entry point.
   A caller either names an allowlisted verb or is refused.
 - **Per-harness mechanics**: the key that cancels a running turn, how many times it must be delivered, whether the composer needs clearing afterwards, the command that exits the agent, and which task kinds the adapter is verified to run.
@@ -39,6 +39,7 @@ A recorded `harness=` is not always an exact adapter name: a task launched from 
 | `exit` | Stop the agent, preserving the endpoint, the worktree, and every uncommitted change. | The backend's recovery-grade classifier reports the agent gone. Already-stopped is idempotent success. A `missing` endpoint goes through the shared [absence proof](#reclaiming-a-task-whose-endpoint-is-gone): proven gone reports `endpoint-gone`, a surviving idle pane reports `already-stopped`, and a surviving agent takes the ordinary interrupt-then-exit path. Unproven absence refuses. |
 | `relaunch` | Replace the running agent with a new one in the same worktree by default (see the [missing-worktree exception](#relocating-a-task-whose-worktree-is-gone)) - and the same endpoint whenever that endpoint still exists - on the exact recorded adapter or an explicitly chosen harness, model, and effort. | The new agent is alive on the endpoint the task's record now names, and that record names the harness that is actually running. |
 | `authorize-continuation` | Clear a ship or scout's recorded reconciliation-only restriction without launching or messaging a worker. | Only `recovery=reconcile-only` is removed atomically; unrelated metadata, holds, and dependencies are preserved. |
+| `reassociate` | Re-point a ship or scout's record at the replacement copy its work moved to, without stopping, starting, or removing anything. | The record names the replacement copy and the copy it left as `prior_worktree=` (or `released_worktree=` for a pool slot it left); the old copy, the endpoint, and any pipeline run are untouched. See [Reassociating a task with a replacement copy](#reassociating-a-task-with-a-replacement-copy). |
 
 An exit that delivers lifecycle input but cannot prove the agent stopped fails with `exit=unconfirmed`, reports the observed agent state and any interrupt cancellation claim, and never claims that nothing changed.
 Interrupt never rewrites busy state as proof of its own success.
@@ -178,6 +179,81 @@ Missing, foreign, or dead session ownership, a worker, and the supervision branc
 It does not start a worker or send conversational text.
 After clearance, send a new continuation instruction with `fm-send` to a live owner, or use ordinary `fm-control <task-id> relaunch --note ...` for an exited owner.
 An `fm-send` message never clears recovery by its text.
+
+### Reassociating a task with a replacement copy
+
+A worker sometimes moves a task's work into a fresh local copy: it bundles the work, cuts a new copy with the right owned paths, carries the work over, and starts one fresh validation run there.
+Until the record follows, `worktree=` still names the old copy, so `bin/fm-crew-state.sh`, the watcher's write probe, and every landing path read the old copy and its old run.
+`relaunch` cannot fix that, because it deliberately reuses the recorded copy.
+
+The actual lock-owning main Firstmate runs `fm-control <task-id> reassociate --worktree <replacement-copy> --note <why>`.
+It updates metadata and preservation refs only: it never stops or starts an agent, closes an endpoint, aborts a run, or deletes, resets, or returns a copy.
+It takes the task's lifecycle lock, then the shared Treehouse project lock, then the record lock, and revalidates the record under them.
+
+It refuses without changing the record, instructions, or copies when:
+
+- the caller is a worker, the supervision branch in any posture, or a session that does not own the home's lock;
+- the task is a secondmate, a remotely placed task, or an Orca task, whose recorded `orca_worktree_id=` binds the copy Orca created;
+- the record already carries `pr=`, because that PR's merge watch and landed-work proof follow the current copy's branch;
+- a pending backlog close or an unfinished relaunch transaction exists;
+- the task has no regular `brief.md` to carry the note, the record already names the replacement copy, or the record carries more than one `kind=` line, more than one `branch=` line for a ship, or a `project=` that is not a directory;
+- the replacement copy is not an isolated worktree root of the project's own repository, or is the project or primary checkout itself;
+- a ship's replacement copy has a detached HEAD, or any brief `Ship branch:` line disagrees with the recorded branch, even when the replacement keeps that branch;
+- either copy equals, contains, or is contained by another task record's `worktree=`, `home=`, or `prior_worktree=` in this home or any locally registered home; physical paths are compared, including aliases;
+- either copy overlaps a managed pool worktree whose owner claim names another task or cannot be read;
+- the existing current copy, a pool slot it leaves, or a prior copy inside such a slot is not a Git worktree root, has uncommitted or untracked-unignored changes (the refusal names them), cannot be inspected, or the current copy does not share the project's Git ref store; the dirty check is teardown's, from [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh)'s `fm_task_copy_preserve`, so only untracked `.claude/` contents, the exact `.fm-grok-turnend` and `.fm-kimi-turnend` files, and the paths of the task's own copies nested inside are exempt;
+- any of those HEADs cannot be durably anchored and verified in the project's shared Git ref store.
+
+Before publishing the replacement, it anchors the HEAD of the existing current copy, of each pool slot it leaves, and of each prior copy inside such a slot at `refs/fm/anchor/<task>-<shortsha>` in the project's shared common Git directory (an anchor already holding that HEAD is reused) and verifies each ref resolves to that exact commit. Every copy is checked before any anchor is written. This preserves every ancestor, including all unlanded commits, even if an existing interactive Treehouse owner later detaches and resets the old slot on shell exit. Commit or carry over all uncommitted and untracked-unignored changes first; reassociation does not stash them or change the provider's release lifecycle. Ignored files are not protected by the commit anchor.
+
+Every reassociation holds the shared project lock through both copies' ownership scans and record publication, whether or not either copy is a pool slot. A concurrent allocation, return, or reassociation refuses rather than racing the ownership proof.
+
+It then publishes, in order, so an earlier failure rolls back to the record that was there:
+
+1. pool slot claims: a managed pool slot that overlaps the replacement copy is claimed for the task, keeping an existing claim's home, and one that overlaps only the copy it leaves has the task's claim released, so the pool may hand it out again;
+2. the brief, with a ship's `Ship branch:` line moved to the replacement copy's branch and a `## Copy reassociation (<timestamp>)` block carrying the note, so a later relaunch agrees with the record and its worker knows where to work;
+3. the record, with `worktree=` and a ship's `branch=` naming the replacement copy and one more `prior_worktree=` line naming the copy it left, or a `released_worktree=` line when that copy lies in a released pool slot (an earlier prior copy inside that slot moves to `released_worktree=` too). A recorded copy that no longer exists but sat in Treehouse's `<pool>/<slot>/<repo>` layout beside its pool state file is recorded as `released_worktree=` as well, and the task's claim beside it is released, so the vanished path never blocks the task Treehouse later hands that slot to.
+
+The brief and record are each read whole and staged with every write checked, so a read or write failure refuses before anything is published.
+The brief is the durable reassociation narrative; no separate reassociation audit log is created.
+If record publication fails and the original brief cannot be restored, its exact backup is retained at the path reported by the refusal for recovery.
+Preservation anchors remain durable even if later publication fails; they are not rolled back or removed automatically.
+Moving a task back to one of its prior copies removes that copy from `prior_worktree=`, so a mistaken reassociation is undone by reassociating again.
+Own enclosing-to-nested and nested-to-enclosing moves are supported; the enclosing slot stays claimed by the task while it holds the task's current copy.
+Teardown retires both shapes: see the nested-copy rule below.
+
+After it, every reader of `worktree=` follows the replacement copy, so `fm-crew-state` reports that copy's real run.
+A prior copy stays the task's preserved custody: its bytes are untouched, and [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh)'s record scan counts enclosing and nested custody as well as exact matches, so another task's cleanup cannot reach it.
+A released pool slot is not custody: `released_worktree=` records only where the task was, and the slot's commits survive through the preservation anchor.
+A reassociation leaves the endpoint's shell in the copy the task left, so a later `relaunch` that finds the shell in one of the task's `prior_worktree=` or `released_worktree=` copies sends it into the recorded copy before it launches; [`bin/fm-spawn.sh`](../bin/fm-spawn.sh)'s `spawn_path_is_prior_copy` owns that test, and a shell found anywhere else is treated as for any other relaunch.
+Reassociation, the allocation gate below, and teardown use the same local-home traversal: the current home, the local root, and recursively registered local descendants. Remote entries are excluded; for reassociation and teardown an unsafe registry or unavailable registered local home refuses the scan. The one exception is teardown's custody scan while retiring a secondmate whose own registered home is already gone: that entry alone is skipped, since nothing there can be lost, and every other unavailable registered home still refuses. A validated owning ancestor's enclosing current home/worktree is not competing custody for a subordinate copy; its prior copies and Git common-directory storage remain protected.
+[`bin/fm-teardown.sh`](../bin/fm-teardown.sh) checks worktrees, tasktmp and launch-namespace roots, secondmate homes, and recursive child cleanup against copy custody before process or endpoint cleanup, including forced cleanup. Both containment directions count, across this record and all local homes: temporary cleanup roots cannot overlap any current, home, or prior copy, and copy/home removal cannot overlap preserved priors or records outside the admitted cleanup. A pool slot return is the one narrower case: against another ordinary task's current `worktree=` it refuses only on an exact path match, because the return resets that one slot, while `home=`, `prior_worktree=`, and a secondmate's `worktree=` keep the overlap rule. These checks also protect the shared Git common directory of preserved copies, including their objects and preservation anchors. Forced child cleanup admits its locked ordinary current records, not preserved prior or reassociated non-pool copies. For disjoint copies teardown still runs the landed-work test on the current copy, returns it only when it is a pool slot, and otherwise leaves it in place; recursive forced cleanup likewise leaves reassociated non-pool copies and their hooks untouched.
+For a child secondmate, both its worktree root and home root use home admission: ordinary current copies of its locked descendants may be inside either root, while all preserved copies, their Git common directories, and records outside the locked cleanup set remain protected.
+A reassigned child pool slot outside the retiring homes is left untouched while its stale child record is retired. This records-only exemption applies in both recursive preflight and cleanup; it does not exempt home or removal-root deletion from custody checks.
+Recursive retirement validates each child against its owning home's registry and retires that registration under the owning registry lock after successful home removal, before checking later siblings. An unrelated unavailable registered home still refuses cleanup.
+It never touches a prior copy outside the slot it returns and names each one it left, to be returned or removed only after its contents are confirmed landed or unwanted.
+
+A task's own prior copies are not competing custody against the cleanup of its own current copy or slot, so a nested reassociation can be retired once the proof below passes.
+[`bin/fm-teardown.sh`](../bin/fm-teardown.sh)'s `teardown_nested_slot` is the one owner of returning the enclosing slot once the task's own nested copy goes. It works in three phases, and a re-run derives its input from the record's `branch=` and `prior_worktree=`, never from the nested copy still existing:
+
+1. **Proof, with no side effects.** The nested copy passes the ordinary landed-work test. When an earlier teardown already removed it, that test runs on its `branch=` ref read from the project: local-main ancestry for a local-only ship, then a merged PR, then the merge-tree content check, so neither the copy nor a recorded `pr=` URL is needed. When that branch ref is gone too, for example pruned after its PR merged, the forge's word on the recorded `pr=` settles it as for any missing worktree: a merged PR finishes with a plain re-run and is recorded as landed, while no recorded PR, or one the forge does not report merged, refuses. The slot and every own copy nested in it are clean worktree roots whose HEAD is landed by that same rule or held by the task's `refs/fm/anchor/<task>-<sha>` anchor, and the slot's claim is this task's. Otherwise teardown stops before changing anything and names the copy and the reason.
+2. **Retire, on every swept root.** Before any destructive step, teardown concludes a parked no-mistakes run, retires a task-private launch agent, and reaps leaked processes on the current copy, the slot and each nested copy, each as its own root.
+3. **Execute.** Teardown proves the slot and the nested copies again with the lock held and refuses before removing anything. Then it removes the nested copy (its branch stays), detaches the slot, returns it, and drops the claim. If the return removes a stale `index.lock`, the slot is proved once more before the reset.
+
+`--force` skips the landed-work test on the current copy as always and does not waive the slot proof.
+The same function covers the reverse shape, where the current copy is the pool slot and a prior copy is nested inside it: that copy is proved and removed before the ordinary return.
+A refusal after the nested copy is gone leaves the record and the slot claim in place. A plain re-run, with no `--force` and no captain words, finds the slot through the task's own `prior_worktree=`, proves it again under the same rule, and returns it; a landed ship is recorded as landed, never as dropped.
+The stale-lock proof covers the slot only: nested copies teardown already removed are not proved again.
+If a later step fails after the slot was returned and its claim released, the re-run still judges the removed copy by its `branch=` ref, so the ship is again recorded as landed. The slot is no longer this task's, so it is neither returned a second time nor named in the prior-copy notice, and the completion line says the copy was already removed.
+A nested current copy whose enclosing slot the task does not claim is left in place like any other reassociated non-pool copy.
+
+Before a fresh spawn sends `treehouse get`, and before secondmate home seeding sends `treehouse get --lease`, each under the shared project lock used for allocation and return, [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh) checks whether a pool slot of the project strictly contains a task record's current copy (`worktree=`) in this home or any locally registered home.
+`treehouse get` resets the slot it hands out and offers no exclusion option, so such a slot (the nested replacement-copy case) refuses the allocation until that record moves or is retired.
+This check scans every local home it can read: a registered local home or registry it cannot read is named in one warning line and skipped, so one broken home does not stop every allocation for a project.
+A slot is recognized by the rule teardown uses: Treehouse's `<pool>/<slot>/<repo>` layout beside its pool state file, sharing the project's Git common directory.
+A slot a task merely left holds no record's current copy, so it never blocks allocation, and the check needs no tool beyond those every home already requires.
+
+Standalone PR registration locks its task-copy snapshot before retirement recovery, guard execution, or any forge request, and refuses publication if the recorded worktree or branch changed while the PR was being checked.
 
 ### Reclaiming a task whose endpoint is gone
 

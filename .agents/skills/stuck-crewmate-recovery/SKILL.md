@@ -4,6 +4,7 @@ description: >-
   Agent-only playbook for stuck or missing ordinary Firstmate direct reports.
   Use when the session-start digest reports an ordinary direct report's endpoint dead or its metadata has no window, or after a stale wake, looping pane, repeated confusion, an answered-by-brief question, an unresponsive crewmate, or a failed steer.
   Also use on the inverse case: a live crewmate reporting the no-mistakes pipeline dead, unreachable, or timed out.
+  Also use when a task record still names a local copy its worker has moved the work out of.
   Reconciles recorded work before escalating from targeted inspection through safe relaunch or failure.
 user-invocable: false
 metadata:
@@ -20,6 +21,7 @@ Follow the crew-hosted Lavish board contract in [`docs/configuration.md`](../../
 Interrupt, stop, and relaunch a worker through `bin/fm-control.sh <task-id> interrupt|exit|relaunch`, which resolves the recorded runtime itself, verifies each action, and never tears down or discards anything ([`docs/agent-control.md`](../../../docs/agent-control.md)).
 That plane covers workers running in this home; a remotely placed secondmate is refused by name and reconciled through `secondmate-provisioning` instead.
 A relaunch admission refusal is not a failed launch; reconcile it through the [instruction-owner recovery policy](../../../docs/agent-control.md#recovering-an-exited-instruction-owner), not by stopping the preserved live owner or marking the task failed.
+When a worker moved the task's work into a replacement copy and the record still names the old one, re-point the record with `bin/fm-control.sh <task-id> reassociate` ([`docs/agent-control.md`](../../../docs/agent-control.md#reassociating-a-task-with-a-replacement-copy)) instead of supervising around it by run id.
 Load `harness-adapters` before a resume command or a harness-specific skill invocation, and whenever the adapter's own quirks matter.
 The target window's harness is recorded as `harness=` in `state/<id>.meta`.
 

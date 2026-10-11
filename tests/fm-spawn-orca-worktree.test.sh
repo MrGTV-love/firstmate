@@ -30,7 +30,7 @@ SPAWN="$ROOT/bin/fm-spawn.sh"
 TMP_ROOT=$(fm_test_tmproot fm-spawn-orca-worktree)
 
 # make_orca_fakebin <dir>: a fake `orca` CLI that performs a REAL `git
-# worktree add` for `worktree create` (so spawn_worktree_isolated's checks are
+# worktree add` for `worktree create` (so fm_task_copy_isolated's checks are
 # exercised against a genuine, isolated worktree) and answers every other
 # lifecycle call (status/repo/terminal/send) with the minimal JSON shape
 # bin/backends/orca.sh's node-based parsers accept.

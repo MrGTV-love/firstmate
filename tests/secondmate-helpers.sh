@@ -91,6 +91,13 @@ set -u
 printf 'treehouse %s\n' "$*" >> "${FM_FAKE_TMUX_LOG:-/dev/null}"
 case "${1:-}" in
   get)
+    if [ -n "${FM_FAKE_TREEHOUSE_PROJECT_LOCK:-}" ]; then
+      [ -e "$FM_FAKE_TREEHOUSE_PROJECT_LOCK" ] || [ -L "$FM_FAKE_TREEHOUSE_PROJECT_LOCK" ] || exit 18
+    fi
+    if [ -n "${FM_FAKE_TREEHOUSE_GET_FAIL:-}" ]; then
+      printf '%s\n' "${FM_FAKE_TREEHOUSE_HOME:-}"
+      exit 17
+    fi
     # Durable lease: print only the worktree path to stdout (banners to stderr),
     # and record the lease holder so tests can assert it is set and later cleared.
     shift

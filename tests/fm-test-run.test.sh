@@ -423,6 +423,46 @@ test_supervision_groups_share_coverage_and_changed_selection() {
   pass "both supervision groups retain family coverage and direct/transitive changed selection"
 }
 
+test_changed_task_copy_lib_selects_retained_and_secondmate() {
+  local tmp repo listed path family expected
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-allocation.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  printf '#!/usr/bin/env bash\n' >"$repo/tests/fm-spawn-retained-copy.test.sh"
+  chmod +x "$repo/tests/fm-spawn-retained-copy.test.sh"
+  : >"$repo/bin/fm-task-copy-lib.sh"
+  : >"$repo/bin/fm-spawn.sh"
+  : >"$repo/bin/fm-wake-lib.sh"
+  git -C "$repo" add bin tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm allocation-fixture
+
+  listed=$("$repo/bin/fm-test-run.sh" --list --family backend-dispatch)
+  assert_contains "$listed" "tests/fm-spawn-retained-copy.test.sh" \
+    "retained-spawn belongs to backend-dispatch"
+
+  for path in bin/fm-task-copy-lib.sh bin/fm-spawn.sh bin/fm-wake-lib.sh; do
+    printf '\n' >>"$repo/$path"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD | LC_ALL=C sort) \
+      || fail "$path production-only selection failed"
+    case "$path" in
+      bin/fm-task-copy-lib.sh) set -- backend-dispatch pr-forge session-bootstrap secondmate ;;
+      bin/fm-spawn.sh) set -- backend-dispatch pure-contract-unit ;;
+      bin/fm-wake-lib.sh) set -- watcher-wake-lock ;;
+    esac
+    expected=$(
+      for family in "$@"; do
+        "$repo/bin/fm-test-run.sh" --list --family "$family"
+      done | LC_ALL=C sort -u
+    )
+    [ "$listed" = "$expected" ] \
+      || fail "$path must select exactly its consuming families: $listed"
+    git -C "$repo" add "$path"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm allocation-owner
+  done
+  rm -rf "$tmp"
+  pass "a task-copy change selects retained-spawn and secondmate safety; spawn and wake changes keep their own families"
+}
+
 test_changed_dependency_selection_and_unmapped_failure() {
   local tmp repo listed rc source script
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-changed.XXXXXX")
@@ -2663,6 +2703,7 @@ test_changed_file_selection_is_conservative
 test_task_marker_refuses_the_primary_checkout
 test_changed_runner_surfaces_select_their_family
 test_shell_line_ending_policy_selects_runner_contract
+test_changed_task_copy_lib_selects_retained_and_secondmate
 test_changed_dependency_selection_and_unmapped_failure
 test_changed_wake_classifier_selects_both_consumers
 test_supervision_groups_share_coverage_and_changed_selection
