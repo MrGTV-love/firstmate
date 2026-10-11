@@ -476,7 +476,7 @@ wait_gone "$NESTED_LIVE_STUB" 5 || fail "the live test's nested stub did not acc
 wait_gone "$NESTED_UNMARKED_STUB" 5 || fail "the unmarked nested stub did not accept its release"
 pass "startup recovery reaps killed parallel tests' nested stubs without crossing ownership boundaries"
 
-NESTED_LAB_ROOT="$SCAN/fm-test-run.lab-nested/home"
+NESTED_LAB_ROOT="$SCAN/fm-lab-nested/home"
 bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
 NESTED_LAB_OWNER=$!
 track "$NESTED_LAB_OWNER" "$(initialized_identity "$NESTED_LAB_OWNER" bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$NESTED_LAB_ROOT" "$TMP_ROOT/lab-git-bin")"
@@ -501,10 +501,31 @@ touch "$NESTED_LAB_ROOT-unmarked/release"
 wait_gone "$NESTED_LAB_UNMARKED_WATCH" 5 || fail "the unmarked nested lab watcher did not accept its release"
 pass "nested marked lab watchers are reaped while unmarked nested homes are left alone"
 
+# tests/fm-backend-herdr-recovery-lock-e2e.test.sh makes an unmarked
+# fm-herdr-recovery-lock.XXXXXX root and a lab home two directories below it.
+# A run of that test that was killed standalone must still have its lab found.
+HERDR_LAB_ROOT="$SCAN/fm-herdr-recovery-lock.AbC123/home-forced/nested"
+bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$HERDR_LAB_ROOT" "$TMP_ROOT/lab-git-bin" &
+HERDR_LAB_OWNER=$!
+track "$HERDR_LAB_OWNER" "$(initialized_identity "$HERDR_LAB_OWNER" bash "$TMP_ROOT/lab-owner.sh" "$ROOT/bin/fm-lab-home.sh" "$HERDR_LAB_ROOT" "$TMP_ROOT/lab-git-bin")"
+wait_file "$HERDR_LAB_ROOT/ready" 5 || fail "the herdr-layout lab creator did not finish"
+mkdir -p "$HERDR_LAB_ROOT/bin"
+write_stub "$HERDR_LAB_ROOT/bin/fm-watch.sh"
+orphan "$TMP_ROOT/herdr-lab-watch.pid" bash "$HERDR_LAB_ROOT/bin/fm-watch.sh" "$HERDR_LAB_ROOT/release"
+HERDR_LAB_WATCH=$(cat "$TMP_ROOT/herdr-lab-watch.pid")
+out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the herdr-layout scan failed: $out"
+alive "$HERDR_LAB_WATCH" || fail "the reaper stopped a live creator's lab watcher in an unmarked root"
+kill -KILL "$HERDR_LAB_OWNER" 2>/dev/null || true
+wait "$HERDR_LAB_OWNER" 2>/dev/null || true
+out=$("$REAPER" --tmpdir "$SCAN" 2>&1) || fail "the ended herdr-layout scan failed: $out"
+assert_contains "$out" "reaped pid=$HERDR_LAB_WATCH root=$HERDR_LAB_ROOT " "the scan missed a lab home two levels below an unmarked fm-* root"
+wait_gone "$HERDR_LAB_WATCH" 10 || fail "the ended herdr-layout lab's watcher survived"
+pass "a lab home two levels below an unmarked fm-* root is still found and reaped"
+
 # Host clutter must not set the sweep's cost. Other tools leave tens of thousands
 # of fm-* entries in a shared temp dir (observed 2026-10-10: 47000 entries made
-# this sweep 62 seconds against a 15 second case limit), so the sweep may enter
-# only directories that are marked roots, runner containers or live labs.
+# this sweep 62 seconds against a 15 second case limit), so the sweep may start
+# no process per entry and may run find only in marked roots and runner containers.
 CLUTTER_SCAN="$TMP_ROOT/clutter-scan"
 mkdir -p "$CLUTTER_SCAN" "$TMP_ROOT/find-shim" "$CLUTTER_SCAN/fm-test-run.clutter-run/w1/tmp"
 i=0

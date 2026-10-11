@@ -52,14 +52,15 @@
 #   --tmpdir DIR    directory holding lab/test containers to scan (repeatable).
 #                   Defaults to $TMPDIR (when set) and /tmp. Scans discover
 #                   .fm-test-fixture and .fm-lab-home directly inside every
-#                   immediate fm-* and fmlab.* directory, and at any depth inside
-#                   an fm-test-run.* or fmlab.* directory or a directory that
+#                   immediate fm-* and fmlab.* directory, up to two directories
+#                   below any other fm-* directory, and at any depth inside an
+#                   fm-test-run.* or fmlab.* directory or a directory that
 #                   itself carries a marker (so parallel workers' wN/tmp roots
 #                   and labs nested in a fixture are found), without following
 #                   directory symlinks; .fm-live-lab is read at immediate
-#                   fmlab.* roots only. Any other fm-* entry is never entered,
-#                   so the scan cost does not grow with what other tools leave
-#                   in a shared temp dir.
+#                   fmlab.* roots only. The scan starts no process per entry,
+#                   so its cost does not grow with what other tools leave in a
+#                   shared temp dir.
 #                   An unmarked container or sibling is not ownership evidence.
 #   --owner-pid PID with --root, the caller's own pid: reap what this owner left
 #                   under its own roots. Refused unless PID is this process or
@@ -219,11 +220,12 @@ physical_dir() { CDPATH='' cd -P -- "$1" 2>/dev/null && pwd -P; }
 
 # scan_containers <dir>: print, NUL-separated, the marker files under <dir>.
 # Cost must not grow with unrelated fm-* entries other tools leave in a shared
-# temp dir (47000 entries, 62 seconds, measured 2026-10-10): a depth-one marker
-# is read by glob with no fork, and `find` runs, in one batch, only inside a
-# directory that is itself a marked root, a runner container, or a live lab.
+# temp dir (47000 entries, 62 seconds, measured 2026-10-10): no fork runs per
+# entry. Markers up to two directories below any fm-* entry are read by glob;
+# `find` runs once, in one batch, only inside a directory that is itself a
+# marked root, a runner container, or a live lab, where markers sit at any depth.
 scan_containers() {
-  local dir=$1 container marker nested
+  local dir=$1 container marker walk nested
   local -a deep=()
   for container in "$dir"/fm-* "$dir"/fmlab.*; do
     [ -d "$container" ] && [ ! -L "$container" ] || continue
@@ -234,7 +236,20 @@ scan_containers() {
       printf '%s\0' "$marker"
       nested=1
     done
-    [ "$nested" -eq 0 ] || deep+=("$container")
+    if [ "$nested" -eq 1 ]; then
+      deep+=("$container")
+      continue
+    fi
+    for marker in "$container"/*/.fm-lab-home "$container"/*/.fm-test-fixture \
+      "$container"/*/*/.fm-lab-home "$container"/*/*/.fm-test-fixture; do
+      [ -f "$marker" ] && [ ! -L "$marker" ] || continue
+      walk=${marker%/*}
+      while [ "$walk" != "$container" ]; do
+        [ ! -L "$walk" ] || continue 2
+        walk=${walk%/*}
+      done
+      printf '%s\0' "$marker"
+    done
   done
   [ "${#deep[@]}" -gt 0 ] || return 0
   find "${deep[@]}" -mindepth 2 -type f \( -name .fm-lab-home -o -name .fm-test-fixture \) -print0 2>/dev/null

@@ -1675,23 +1675,23 @@ snapshot_start_token() {  # <pid> - the pid's start time as a filename-safe toke
 
 snapshot_reap_dead_owner_dirs() {
   local stem dir name rest pid start current
-  for stem in fm-fleet-tasks fm-fleet-ledgers fm-fleet-snapshot; do
-    for dir in "${TMPDIR:-/tmp}/$stem".[0-9]*-*.??????; do
-      [ -d "$dir" ] && [ ! -L "$dir" ] && [ -O "$dir" ] || continue
-      name=${dir##*/}
-      rest=${name#"$stem".}
-      pid=${rest%%-*}
-      start=${rest#*-}
-      start=${start%.??????}
-      case "$pid" in '' | *[!0-9]*) continue ;; esac
-      if kill -0 "$pid" 2>/dev/null; then
-        # A live pid is the owner unless it was reused by a later process.
-        [ "$start" != na ] || continue
-        current=$(snapshot_start_token "$pid") || continue
-        [ "$current" != "$start" ] || continue
-      fi
-      rm -rf -- "$dir"
-    done
+  for dir in "${TMPDIR:-/tmp}"/fm-fleet-*.[0-9]*-*.??????; do
+    [ -d "$dir" ] && [ ! -L "$dir" ] && [ -O "$dir" ] || continue
+    name=${dir##*/}
+    stem=${name%%.*}
+    case "$stem" in fm-fleet-tasks | fm-fleet-ledgers | fm-fleet-snapshot) ;; *) continue ;; esac
+    rest=${name#"$stem".}
+    pid=${rest%%-*}
+    start=${rest#*-}
+    start=${start%.??????}
+    case "$pid" in '' | *[!0-9]*) continue ;; esac
+    if kill -0 "$pid" 2>/dev/null; then
+      # A live pid is the owner unless it was reused by a later process.
+      [ "$start" != na ] || continue
+      current=$(snapshot_start_token "$pid") || continue
+      [ "$current" != "$start" ] || continue
+    fi
+    rm -rf -- "$dir"
   done
 }
 

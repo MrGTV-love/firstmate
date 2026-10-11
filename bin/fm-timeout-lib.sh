@@ -99,51 +99,6 @@ fm_timeout_mechanism() {
   fi
 }
 
-fm_run_bash_timeout() {
-  local seconds=$1 command_status deadline_status child_pid watchdog_pid command_rc recorded_rc monitor_was_on=0
-  shift
-  command_status=$(mktemp "${TMPDIR:-/tmp}/fm-bash-timeout-command.XXXXXX" 2>/dev/null) || return 124
-  deadline_status="${command_status}.deadline"
-  case $- in *m*) monitor_was_on=1 ;; esac
-  set -m
-  (
-    set +m
-    "$@"
-    command_rc=$?
-    printf '%s\n' "$command_rc" > "$command_status"
-    exit "$command_rc"
-  ) &
-  child_pid=$!
-  (
-    set +m
-    sleep "$seconds"
-    printf 'expired\n' > "$deadline_status"
-    kill -TERM -- "-$child_pid" 2>/dev/null || true
-    sleep 0.2
-    kill -KILL -- "-$child_pid" 2>/dev/null || true
-    exit 124
-  ) &
-  watchdog_pid=$!
-  [ "$monitor_was_on" -eq 1 ] || set +m
-
-  if wait "$child_pid" 2>/dev/null; then
-    command_rc=0
-  else
-    command_rc=$?
-  fi
-  if [ -s "$deadline_status" ]; then
-    wait "$watchdog_pid" 2>/dev/null || true
-    command_rc=124
-  else
-    kill -TERM -- "-$watchdog_pid" 2>/dev/null || kill "$watchdog_pid" 2>/dev/null || true
-    wait "$watchdog_pid" 2>/dev/null || true
-    recorded_rc=$(cat "$command_status" 2>/dev/null || true)
-    case "$recorded_rc" in ''|*[!0-9]*) ;; *) command_rc=$recorded_rc ;; esac
-  fi
-  rm -f "$command_status" "$deadline_status" 2>/dev/null || true
-  return "$command_rc"
-}
-
 # fm_timeout_free_fd <floor>: print the lowest unused descriptor number >= floor.
 fm_timeout_free_fd() {
   local fd=$1
@@ -157,29 +112,97 @@ fm_timeout_free_fd() {
   return 1
 }
 
-# The bounded command's own status travels in a file this function never leaves
-# on disk: the file is unlinked as soon as its write and read descriptors are
-# open, so a caller that dies by TERM, INT, HUP or KILL while waiting leaves no
-# fm-timeout-status.* behind. A named file removed only on the normal return
-# leaked one entry per interrupted call (2394 found in a shared temp dir). The
-# one remaining gap is a KILL between mktemp and the unlink.
-fm_run_external_timeout() {
-  local runner=$1 seconds=$2 status_file runner_pid runner_rc command_rc wfd rfd
-  shift 2
-  status_file=$(mktemp "${TMPDIR:-/tmp}/fm-timeout-status.XXXXXX" 2>/dev/null) || return 124
+# fm_timeout_open_status <prefix>: make a status file, open a write and a read
+# descriptor on it, and unlink it at once. The numbers go to FM_TIMEOUT_WFD and
+# FM_TIMEOUT_RFD. Nothing named stays on disk, so a caller that dies by TERM,
+# INT, HUP or KILL while waiting leaves no file behind. The one remaining gap is
+# a KILL between mktemp and the unlink.
+fm_timeout_open_status() {
+  local status_file wfd rfd
+  FM_TIMEOUT_WFD=
+  FM_TIMEOUT_RFD=
+  status_file=$(mktemp "${TMPDIR:-/tmp}/$1.XXXXXX" 2>/dev/null) || return 1
   wfd=$(fm_timeout_free_fd 20) || wfd=
   rfd=
   [ -z "$wfd" ] || rfd=$(fm_timeout_free_fd $((wfd + 1))) || rfd=
   if [ -z "$wfd" ] || [ -z "$rfd" ]; then
     rm -f "$status_file" 2>/dev/null || true
-    return 124
+    return 1
   fi
   if ! { eval "exec $wfd>\"\$status_file\" $rfd<\"\$status_file\""; } 2>/dev/null; then
     eval "exec $wfd>&- $rfd<&-" 2>/dev/null || true
     rm -f "$status_file" 2>/dev/null || true
-    return 124
+    return 1
   fi
   rm -f "$status_file" 2>/dev/null || true
+  FM_TIMEOUT_WFD=$wfd
+  FM_TIMEOUT_RFD=$rfd
+}
+
+# The command's exit status and the watchdog's "expired" line share one
+# unlinked file (see fm_timeout_open_status).
+fm_run_bash_timeout() {
+  local seconds=$1 child_pid watchdog_pid command_rc recorded content wfd rfd monitor_was_on=0
+  shift
+  fm_timeout_open_status fm-bash-timeout-command || return 124
+  wfd=$FM_TIMEOUT_WFD
+  rfd=$FM_TIMEOUT_RFD
+  case $- in *m*) monitor_was_on=1 ;; esac
+  set -m
+  (
+    set +m
+    eval "exec $rfd<&-"
+    eval "\"\$@\" $wfd>&-"
+    command_rc=$?
+    printf '%s\n' "$command_rc" >&"$wfd"
+    exit "$command_rc"
+  ) &
+  child_pid=$!
+  (
+    set +m
+    eval "exec $rfd<&-"
+    sleep "$seconds"
+    printf 'expired\n' >&"$wfd"
+    kill -TERM -- "-$child_pid" 2>/dev/null || true
+    sleep 0.2
+    kill -KILL -- "-$child_pid" 2>/dev/null || true
+    exit 124
+  ) &
+  watchdog_pid=$!
+  [ "$monitor_was_on" -eq 1 ] || set +m
+
+  if wait "$child_pid" 2>/dev/null; then
+    command_rc=0
+  else
+    command_rc=$?
+  fi
+  content=$(cat <&"$rfd" 2>/dev/null || true)
+  case "$content" in
+    *expired*)
+      wait "$watchdog_pid" 2>/dev/null || true
+      command_rc=124
+      ;;
+    *)
+      kill -TERM -- "-$watchdog_pid" 2>/dev/null || kill "$watchdog_pid" 2>/dev/null || true
+      wait "$watchdog_pid" 2>/dev/null || true
+      recorded=${content%%$'\n'*}
+      case "$recorded" in ''|*[!0-9]*) ;; *) command_rc=$recorded ;; esac
+      ;;
+  esac
+  eval "exec $wfd>&- $rfd<&-" 2>/dev/null || true
+  return "$command_rc"
+}
+
+# The bounded command's own status travels in the unlinked file of
+# fm_timeout_open_status. A named file removed only on the normal return leaked
+# one entry per interrupted call (2394 fm-timeout-status.* found in a shared
+# temp dir).
+fm_run_external_timeout() {
+  local runner=$1 seconds=$2 runner_pid runner_rc command_rc wfd rfd
+  shift 2
+  fm_timeout_open_status fm-timeout-status || return 124
+  wfd=$FM_TIMEOUT_WFD
+  rfd=$FM_TIMEOUT_RFD
   # Run timeout asynchronously so its pid - also the process-group id created
   # by GNU/BSD timeout without --foreground - remains available for cleanup.
   # A shell wrapper can exit promptly on TERM while one of its descendants
