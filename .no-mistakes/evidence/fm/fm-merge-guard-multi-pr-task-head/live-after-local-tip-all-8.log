@@ -1,0 +1,80 @@
+=== scenario: local-tip-all-8   (bin from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4MDD1MCZPQGJMC1GFZR05HK)
+copy HEAD=7afcabd7140f0ebd1b976e3f5fabaa543f585db0; on any origin ref: 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3196   # forge head of PR 3196 = de729478da77a00a94cf54079d886cc4569941df
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    armed: state/task-x1.check.sh
+    verified: https://github.com/example/vernant/pull/3196 is open and mergeable, with every unwaived required check reported and every unwaived check green at head de729478da77a00a94cf54079d886cc4569941df
+    verified: https://github.com/example/vernant/pull/3196 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+    exit=0
+    gh merge calls: pr merge 3196 --repo example/vernant --match-head-commit de729478da77a00a94cf54079d886cc4569941df --squash
+    meta pr=pr=https://github.com/example/vernant/pull/3196 pr_head=de729478da77a00a94cf54079d886cc4569941df
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3197   # forge head of PR 3197 = b9110770695342428c58dd62f52b6371e1786e72
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+    armed: state/task-x1.check.sh
+    verified: https://github.com/example/vernant/pull/3197 is open and mergeable, with every unwaived required check reported and every unwaived check green at head b9110770695342428c58dd62f52b6371e1786e72
+    verified: https://github.com/example/vernant/pull/3197 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+    exit=0
+    gh merge calls: pr merge 3197 --repo example/vernant --match-head-commit b9110770695342428c58dd62f52b6371e1786e72 --squash
+    meta pr=pr=https://github.com/example/vernant/pull/3197 pr_head=b9110770695342428c58dd62f52b6371e1786e72
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3198   # forge head of PR 3198 = 98fb015cec5755a65cb42c254369477302869524
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+    armed: state/task-x1.check.sh
+    verified: https://github.com/example/vernant/pull/3198 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 98fb015cec5755a65cb42c254369477302869524
+    verified: https://github.com/example/vernant/pull/3198 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+    exit=0
+    gh merge calls: pr merge 3198 --repo example/vernant --match-head-commit 98fb015cec5755a65cb42c254369477302869524 --squash
+    meta pr=pr=https://github.com/example/vernant/pull/3198 pr_head=98fb015cec5755a65cb42c254369477302869524
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3199   # forge head of PR 3199 = e55f7cb03bb3fd56b486d89f9b345e43e8776055
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+    armed: state/task-x1.check.sh
+    verified: https://github.com/example/vernant/pull/3199 is open and mergeable, with every unwaived required check reported and every unwaived check green at head e55f7cb03bb3fd56b486d89f9b345e43e8776055
+    verified: https://github.com/example/vernant/pull/3199 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+    exit=0
+    gh merge calls: pr merge 3199 --repo example/vernant --match-head-commit e55f7cb03bb3fd56b486d89f9b345e43e8776055 --squash
+    meta pr=pr=https://github.com/example/vernant/pull/3199 pr_head=e55f7cb03bb3fd56b486d89f9b345e43e8776055
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3200   # forge head of PR 3200 = b86fecbe220e451bb168c8b344d134678626f16e
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+    armed: state/task-x1.check.sh
+    verified: https://github.com/example/vernant/pull/3200 is open and mergeable, with every unwaived required check reported and every unwaived check green at head b86fecbe220e451bb168c8b344d134678626f16e
+    verified: https://github.com/example/vernant/pull/3200 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+    exit=0
+    gh merge calls: pr merge 3200 --repo example/vernant --match-head-commit b86fecbe220e451bb168c8b344d134678626f16e --squash
+    meta pr=pr=https://github.com/example/vernant/pull/3200 pr_head=b86fecbe220e451bb168c8b344d134678626f16e
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3201   # forge head of PR 3201 = cb103da3972e80f964fc1024ce2e3dbe68eec9f0
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+    armed: state/task-x1.check.sh
+    verified: https://github.com/example/vernant/pull/3201 is open and mergeable, with every unwaived required check reported and every unwaived check green at head cb103da3972e80f964fc1024ce2e3dbe68eec9f0
+    verified: https://github.com/example/vernant/pull/3201 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+    exit=0
+    gh merge calls: pr merge 3201 --repo example/vernant --match-head-commit cb103da3972e80f964fc1024ce2e3dbe68eec9f0 --squash
+    meta pr=pr=https://github.com/example/vernant/pull/3201 pr_head=cb103da3972e80f964fc1024ce2e3dbe68eec9f0
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3202   # forge head of PR 3202 = 3a4945cca17971945e95e92fb4d046e21e081bd6
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+    armed: state/task-x1.check.sh
+    verified: https://github.com/example/vernant/pull/3202 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 3a4945cca17971945e95e92fb4d046e21e081bd6
+    verified: https://github.com/example/vernant/pull/3202 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+    exit=0
+    gh merge calls: pr merge 3202 --repo example/vernant --match-head-commit 3a4945cca17971945e95e92fb4d046e21e081bd6 --squash
+    meta pr=pr=https://github.com/example/vernant/pull/3202 pr_head=3a4945cca17971945e95e92fb4d046e21e081bd6
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3203   # forge head of PR 3203 = fb1215b55e2d56e11d60151759da30ef59a46ef7
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+    armed: state/task-x1.check.sh
+    verified: https://github.com/example/vernant/pull/3203 is open and mergeable, with every unwaived required check reported and every unwaived check green at head fb1215b55e2d56e11d60151759da30ef59a46ef7
+    verified: https://github.com/example/vernant/pull/3203 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+    exit=0
+    gh merge calls: pr merge 3203 --repo example/vernant --match-head-commit fb1215b55e2d56e11d60151759da30ef59a46ef7 --squash
+    meta pr=pr=https://github.com/example/vernant/pull/3203 pr_head=fb1215b55e2d56e11d60151759da30ef59a46ef7
+RESULT merged=8 refused=0

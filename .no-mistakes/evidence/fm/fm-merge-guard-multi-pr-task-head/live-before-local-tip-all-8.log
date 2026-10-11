@@ -1,0 +1,57 @@
+=== scenario: local-tip-all-8   (bin from /Users/charlesabrooker/tmp/fm-scen.i4seFL/base)
+copy HEAD=f1a97244468e171513c26ed202b480ea7ae5a546; on any origin ref: 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3196   # forge head of PR 3196 = dd68697dbf050d5dbfa2fffdfae79e976a2e4dc8
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    error: named head f1a97244468e171513c26ed202b480ea7ae5a546 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+    meta pr= 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3197   # forge head of PR 3197 = c91729c852323d262768c7b37fe7e46a160ab369
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    error: named head f1a97244468e171513c26ed202b480ea7ae5a546 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+    meta pr= 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3198   # forge head of PR 3198 = bb0de42c4ced5d6c0a5f271be69b3fe5bdcc6ea0
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    error: named head f1a97244468e171513c26ed202b480ea7ae5a546 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+    meta pr= 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3199   # forge head of PR 3199 = 3a8b26498692c916979479238463d3adef86fed1
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    error: named head f1a97244468e171513c26ed202b480ea7ae5a546 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+    meta pr= 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3200   # forge head of PR 3200 = 1c26d1ace8ddadfef717c77ab519be200cd86e97
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    error: named head f1a97244468e171513c26ed202b480ea7ae5a546 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+    meta pr= 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3201   # forge head of PR 3201 = d3b274e362ea32a6a3de7c5d1a4c0421f94e687a
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    error: named head f1a97244468e171513c26ed202b480ea7ae5a546 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+    meta pr= 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3202   # forge head of PR 3202 = 023b1f51a5960c89abd06332bf72ae1bff3c0819
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    error: named head f1a97244468e171513c26ed202b480ea7ae5a546 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+    meta pr= 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3203   # forge head of PR 3203 = ad23f9e7f7670a874b390ce41ece67ee1051c105
+    WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+    error: named head f1a97244468e171513c26ed202b480ea7ae5a546 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+    meta pr= 
+RESULT merged=0 refused=8

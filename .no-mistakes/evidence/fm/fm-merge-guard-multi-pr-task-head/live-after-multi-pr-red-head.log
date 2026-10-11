@@ -1,0 +1,17 @@
+=== scenario: multi-pr-red-head   (bin from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4MDD1MCZPQGJMC1GFZR05HK)
+copy HEAD=df0c57515fef6b1acaf3cf73edfedd9cc97c791d; on any origin ref: 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3197   # forge head of PR 3197 = a4ee9dc27e6047161a89a0f19d571ff5d8a2379f
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    armed: state/task-x1.check.sh
+    error: refusing to merge https://github.com/example/vernant/pull/3197
+      - check 'lint' is not green
+    error: these checks are not green: lint
+    exit=1
+    gh merge calls: 
+RESULT exit=1

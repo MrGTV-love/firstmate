@@ -1,0 +1,14 @@
+=== scenario: registration-local-tip   (bin from /Users/charlesabrooker/tmp/fm-scen.i4seFL/base)
+copy HEAD=fd5797f509d5001371b2c0402caad57116ecee63; on any origin ref: 
+$ fm-pr-check.sh task-x1 https://github.com/example/vernant/pull/3197   # registration, no merge
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    error: named head fd5797f509d5001371b2c0402caad57116ecee63 is unreachable outside the worker copy
+    exit=1
+    poll armed: no
+RESULT exit=1

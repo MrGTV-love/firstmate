@@ -1,0 +1,16 @@
+=== scenario: merged-sibling-gone   (bin from /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4MDD1MCZPQGJMC1GFZR05HK)
+copy HEAD=a1e9018f1608fa8208a35768cf67d26688f3519a; on any origin ref: 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3197   # forge head of PR 3197 = 5bbd1716c64afbde5930f40bf02a44b5b9987a73
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    armed: state/task-x1.check.sh
+    verified: https://github.com/example/vernant/pull/3197 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 5bbd1716c64afbde5930f40bf02a44b5b9987a73
+    verified: https://github.com/example/vernant/pull/3197 is merged (state=MERGED, merged=true, isInMergeQueue=false)
+    exit=0
+    gh merge calls: pr merge 3197 --repo example/vernant --match-head-commit 5bbd1716c64afbde5930f40bf02a44b5b9987a73 --squash
+RESULT exit=0

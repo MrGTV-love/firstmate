@@ -1,0 +1,28 @@
+Live merge-guard scenarios: real bin/fm-pr-merge.sh and bin/fm-pr-check.sh, lab FM_HOME from bin/fm-lab-home.sh,
+real git project + bare origin + worker copy, local gh stand-in reporting each PR's origin branch sha.
+before = base 7235e6bc, after = target 0d28d40f
+
+local-tip-all-8            before: RESULT merged=0 refused=8    after: RESULT merged=8 refused=0
+merged-sibling-gone        before: RESULT exit=1                after: RESULT exit=0
+single-pr-local-tip        before: RESULT exit=1                after: RESULT exit=1
+multi-pr-no-forge-head     before: RESULT exit=1                after: RESULT exit=1
+multi-pr-red-head          before: RESULT exit=1                after: RESULT exit=1
+decoy-records              before: RESULT exit=1                after: RESULT exit=1
+registration-local-tip     before: RESULT exit=1                after: RESULT exit=1
+
+refusal text, before, incident 1:
+    error: named head f1a97244468e171513c26ed202b480ea7ae5a546 is unreachable outside the worker copy
+refusal text, before, incident 2:
+    error: named head eaf37641fb3c11f8ba9b646bd170b9b9031db04a is unreachable outside the worker copy
+
+merge calls, after, incident 1:
+    gh merge calls: pr merge 3196 --repo example/vernant --match-head-commit de729478da77a00a94cf54079d886cc4569941df --squash
+    gh merge calls: pr merge 3197 --repo example/vernant --match-head-commit b9110770695342428c58dd62f52b6371e1786e72 --squash
+    gh merge calls: pr merge 3198 --repo example/vernant --match-head-commit 98fb015cec5755a65cb42c254369477302869524 --squash
+    gh merge calls: pr merge 3199 --repo example/vernant --match-head-commit e55f7cb03bb3fd56b486d89f9b345e43e8776055 --squash
+    gh merge calls: pr merge 3200 --repo example/vernant --match-head-commit b86fecbe220e451bb168c8b344d134678626f16e --squash
+    gh merge calls: pr merge 3201 --repo example/vernant --match-head-commit cb103da3972e80f964fc1024ce2e3dbe68eec9f0 --squash
+    gh merge calls: pr merge 3202 --repo example/vernant --match-head-commit 3a4945cca17971945e95e92fb4d046e21e081bd6 --squash
+    gh merge calls: pr merge 3203 --repo example/vernant --match-head-commit fb1215b55e2d56e11d60151759da30ef59a46ef7 --squash
+merge call, after, incident 2:
+    gh merge calls: pr merge 3197 --repo example/vernant --match-head-commit 5bbd1716c64afbde5930f40bf02a44b5b9987a73 --squash

@@ -1,0 +1,14 @@
+=== scenario: decoy-records   (bin from /Users/charlesabrooker/tmp/fm-scen.i4seFL/base)
+copy HEAD=8e2f0065c007a8b1804c15d31e97b00e47987833; on any origin ref: 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3197   # forge head of PR 3197 = 9625e14077564d0f6c439453b52bc9b5c502ce55
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    error: named head 8e2f0065c007a8b1804c15d31e97b00e47987833 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+RESULT exit=1

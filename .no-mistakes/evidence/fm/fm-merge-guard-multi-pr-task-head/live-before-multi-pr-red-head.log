@@ -1,0 +1,14 @@
+=== scenario: multi-pr-red-head   (bin from /Users/charlesabrooker/tmp/fm-scen.i4seFL/base)
+copy HEAD=7418c07ff2b55b3babd7bfceae54d65c7dffbf29; on any origin ref: 
+$ fm-pr-merge.sh task-x1 https://github.com/example/vernant/pull/3197   # forge head of PR 3197 = 71e3ac4bef16d0b408e4083f6cccc3e4d853d72d
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    ●  WATCHER DOWN - SUPERVISION IS OFF
+    ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+    ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    ●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+    ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    error: named head 7418c07ff2b55b3babd7bfceae54d65c7dffbf29 is unreachable outside the worker copy
+    exit=1
+    gh merge calls: 
+RESULT exit=1
