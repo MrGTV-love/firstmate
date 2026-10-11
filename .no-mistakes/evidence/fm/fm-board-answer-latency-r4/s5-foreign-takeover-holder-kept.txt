@@ -1,0 +1,48 @@
+$ FM_LAVISH_POLL_RETRY_DELAY=1 fm-procevent-lavish.sh arm board3.html   (held by foreign bare --takeover poll 11114)
+registered: lavish-0ad107a387389cf1 (lavish)
+armed: lavish-0ad107a387389cf1
+artifact: /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html
+exit=0
+$ ps (board3 after 45 s)
+11114     1 11114 Sat Oct 10 21:54:06 2026     node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html --takeover
+55822 39000 39000 Sat Oct 10 21:55:19 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html
+$ fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-0ad107a387389cf1      lavish       live       1
+lavish-9abe506a8dd67824      lavish       live       1
+lavish-e600251bbf3a22a8      lavish       live       2
+$ results for board3
+== /Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent-inbox/lavish-0ad107a387389cf1.1.result  classify=waiting
+error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 67121ms)"
+code: LISTENER_ACTIVE
+help[1]: Use --takeover only when you intend to displace the current listener
+held-page: another poll holds /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html and is not a proved leftover, so it is not displaced; this listener keeps its claim, retries with back-off, and reports this hold once
+held-by: 11114 (no poller record)
+$ wake queue rows for board3
+check	procevent:lavish-0ad107a387389cf1:1	check: procevent lavish lavish-0ad107a387389cf1 1
+
+### re-check 22:03:08 (about 7 minutes after arm)
+$ ps board3
+11114     1 11114 Sat Oct 10 21:54:06 2026     node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html --takeover
+55822 39000 39000 Sat Oct 10 21:55:19 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/boa
+$ results for board3 (count)
+1
+$ wake rows for board3 (count)
+1
+$ fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-0ad107a387389cf1      lavish       live       0
+lavish-9abe506a8dd67824      lavish       live       0
+lavish-e600251bbf3a22a8      lavish       live       0
+$ foreign holder ends (kill 11114, as its own agent would), then captain answers board3
+answered at 22:03:10
+{"status":"queued","pending_prompts":1,"chat":[{"r
+result 2 seen at 22:03:19
+-rw-------  1 charlesabrooker  staff     7 Oct 10 21:55:17 2026 lavish-0ad107a387389cf1.1.adapter
+-rw-------  1 charlesabrooker  staff     0 Oct 10 21:57:30 2026 lavish-0ad107a387389cf1.1.handled
+-rw-------  1 charlesabrooker  staff   472 Oct 10 21:55:17 2026 lavish-0ad107a387389cf1.1.result
+-rw-------  1 charlesabrooker  staff     7 Oct 10 22:03:19 2026 lavish-0ad107a387389cf1.2.adapter
+-rw-------  1 charlesabrooker  staff  2162 Oct 10 22:03:19 2026 lavish-0ad107a387389cf1.2.result
+CAPTAIN MESSAGE
+| board3 answer after the foreign poll left
+END CAPTAIN MESSAGE

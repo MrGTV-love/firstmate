@@ -1,0 +1,34 @@
+$ fm-procevent-lavish.sh arm board2.html   (page held by the ledgered leftover native --takeover poll 73849)
+registered: lavish-9abe506a8dd67824 (lavish)
+armed: lavish-9abe506a8dd67824
+artifact: /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+exit=0
+$ ps (board2 after arm)
+56242 53687 53687 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+64238 56242 53687 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html --takeover
+64242 56242 53687 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+--- leftover adapter 61362 output tail:
+error: Lavish Editor poll listener was replaced by a takeover
+code: LISTENER_REPLACED
+help[1]: Re-run lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html only if you intend to take over listening
+$ fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-9abe506a8dd67824      lavish       live       0
+lavish-e600251bbf3a22a8      lavish       live       2
+captain answers board2 at 21:52:54
+{"status":"queued","pending_prompts":1,"chat":[{"role":"user
+(eval):9: no matches found: /Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent-inbox/lavish-9abe506a8dd67824.*.result
+(eval):9: no matches found: /Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent-inbox/lavish-9abe506a8dd67824.*.result
+(eval):9: no matches found: /Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent-inbox/lavish-9abe506a8dd67824.*.result
+captured at 21:52:56
+== /Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent-inbox/lavish-9abe506a8dd67824.1.result
+CAPTAIN MESSAGE
+| board2 answer after the leftover takeover
+END CAPTAIN MESSAGE
+$ wake queue rows
+check	procevent:lavish-e600251bbf3a22a8:1	check: procevent lavish lavish-e600251bbf3a22a8 1
+check	procevent:lavish-e600251bbf3a22a8:2	check: procevent lavish lavish-e600251bbf3a22a8 2
+$ wake queue rows (re-read)
+check	procevent:lavish-e600251bbf3a22a8:1	check: procevent lavish lavish-e600251bbf3a22a8 1
+check	procevent:lavish-e600251bbf3a22a8:2	check: procevent lavish lavish-e600251bbf3a22a8 2
+check	procevent:lavish-9abe506a8dd67824:1	check: procevent lavish lavish-9abe506a8dd67824 1

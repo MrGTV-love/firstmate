@@ -1,0 +1,33 @@
+$ ps (board3: foreign bare --takeover poll, no ledger; board4: ledgered leftover with native --agent-reply; board5: ledgered leftover with native --takeover)
+11114     1 11114 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html --takeover
+11117     1 11117 bash bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html --agent-reply-file /Users/charlesabrooker/tmp/fm-lab.S7IajT/reply4.txt
+12054 11117 11117 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html --agent-reply firstmate staged reply text
+12060 11117 11117 bash bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html --agent-reply-file /Users/charlesabrooker/tmp/fm-lab.S7IajT/reply4.txt
+19816     1 19816 bash bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+31287 19816 19816 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html --takeover
+31294 19816 19816 bash bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+$ ls state/procevent | grep poller
+lavish-480f5c872817c2c1.11117.poller
+lavish-9abe506a8dd67824.76313.poller
+lavish-cced9052994be7aa.19816.poller
+lavish-e600251bbf3a22a8.93802.poller
+
+$ NEW fm-procevent-lavish.sh orphans
+kept: 11114 (no poller record) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html
+orphan: 11117 lavish-480f5c872817c2c1 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html
+orphan: 12054 lavish-480f5c872817c2c1 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html
+orphan: 12060 lavish-480f5c872817c2c1 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html
+orphan: 19816 lavish-cced9052994be7aa /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+orphan: 31287 lavish-cced9052994be7aa /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+orphan: 31294 lavish-cced9052994be7aa /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+orphans: found=6 killed=0 kept=74
+
+$ OLD (80aca90f) fm-procevent-lavish.sh orphans
+kept: 11114 (artifact cannot be resolved) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html --takeover
+orphan: 11117 lavish-480f5c872817c2c1 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html
+kept: 12054 (artifact cannot be resolved) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html --agent-reply firstmate staged reply text
+orphan: 12060 lavish-480f5c872817c2c1 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html
+orphan: 19816 lavish-cced9052994be7aa /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+kept: 31287 (artifact cannot be resolved) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html --takeover
+orphan: 31294 lavish-cced9052994be7aa /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+orphans: found=4 killed=0 kept=76

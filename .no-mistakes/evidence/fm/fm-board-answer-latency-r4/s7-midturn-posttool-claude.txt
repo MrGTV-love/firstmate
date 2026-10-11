@@ -1,0 +1,55 @@
+Live Claude primary (Claude Code 2.1.296 (Claude Code)) in lab project clone of 1bac87bd, FM_HOME=/Users/charlesabrooker/tmp/fm-lab.S7IajT, real PostToolUse hook bin/fm-procevent-posttool-check.sh.
+Turn started 21:57:49 local. All earlier captures were marked handled first, so only a mid-turn answer can produce a notice.
+captain answers mid-turn at 21:58:05
+captured by runner at 21:58:06
+
+== Claude tool calls and results, with timestamps (UTC) ==
+2026-10-11T02:58:00.352Z TOOL_USE: sleep 45; printf "MIDTURN_WORK_DONE\n"
+2026-10-11T02:58:00.357Z TOOL_RESULT: <tool_use_error>Blocked: sleep 45 followed by: printf "MIDTURN_WORK_DONE\n". To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`). To wait for a command you started, use run_in_background: true. Do not chain shorter sleeps to work around this block.</tool_use_error>
+2026-10-11T02:58:05.291Z TOOL_USE: sleep 45; printf "MIDTURN_WORK_DONE\n"
+2026-10-11T02:58:07.000Z TOOL_RESULT: Command running in background with ID: bt17t9c03. Output is being written to: /private/tmp/claude-501/-Users-charlesabrooker-tmp-fm-lab-S7IajT-project/220bddce-e59f-4c7e-8c2b-5c6fc3e5a83a/tasks/bt17t9c03.output. You will be notified when it completes. To check interim output, use Read on that file path.
+2026-10-11T02:58:19.027Z TOOL_USE: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.S7IajT' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.S7IajT/state' FM_ROOT_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.S7IajT/project' '/Users/charlesabrooker/tmp/fm-lab.S7IajT/project/bin/fm-wake-drain.sh'
+2026-10-11T02:58:22.446Z TOOL_RESULT: 1791686896	1	check	procevent:lavish-e600251bbf3a22a8:1	check: procevent lavish lavish-e600251bbf3a22a8 1
+1791686989	2	check	procevent:lavish-e600251bbf3a22a8:2	check: procevent lavish lavish-e600251bbf3a22a8 2
+1791687176	3	check	procevent:lavish-9abe506a8dd67824:1	check: procevent lavish lavish-9abe506a8dd67824 1
+1791687317	4	check	procevent:lavish-0ad107a387389cf1:1	check: procevent lavish lavish-0ad107a387389cf1 1
+1791687487	5	check	procevent:lavish-e600251bbf3a22a8:3	check: procevent lavish lavish-e600251bbf3a22a8 3
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-
+2026-10-11T02:58:28.163Z TEXT: The queue has a row for this result. I'll read it.
+2026-10-11T02:58:30.021Z TOOL_USE: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.S7IajT' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.S7IajT/state' FM_ROOT_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.S7IajT/project' '/Users/charlesabrooker/tmp/fm-lab.S7IajT/project/bin/fm-procevent-lavish.sh' read '/Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent-inbox/lavish-e600251bbf3a22a8.3.result'
+2026-10-11T02:58:30.787Z TOOL_RESULT: CAPTAIN MESSAGE
+| mid-turn captain answer: approve option B
+END CAPTAIN MESSAGE
+
+declared_items: 1
+presented_items: 1
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 0
+captain_message_count: 1
+
+ANNOTATIONS: (none)
+END LAVISH RESULT (1 of 1)
+2026-10-11T02:58:34.809Z TOOL_USE: FM_HOME='/Users/charlesabrooker/tmp/fm-lab.S7IajT' FM_STATE_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.S7IajT/state' FM_ROOT_OVERRIDE='/Users/charlesabrooker/tmp/fm-lab.S7IajT/project' '/Users/charlesabrooker/tmp/fm-lab.S7IajT/project/bin/fm-procevent.sh' handled lavish-e600251bbf3a22a8 3
+2026-10-11T02:58:35.347Z TOOL_USE: printf "mid-turn captain answer: approve option B\n"
+2026-10-11T02:58:36.145Z TOOL_RESULT: handled: lavish-e600251bbf3a22a8 3
+2026-10-11T02:58:36.592Z TOOL_RESULT: mid-turn captain answer: approve option B
+2026-10-11T02:58:44.144Z TEXT: Captain, the hook test ran the capture branch and finished it.
+
+- **First command:** the harness blocked the foreground `sleep 45` call. I re-ran the same command in the background, and the hook context came back on that run with a waiting Lavish result.
+- **Capture handled:** I found result `lavish-e600251bbf3a22a8 3` in the wake queue, read it, and marked it handled. Your message was: "mid-turn captain answer: approve option B". I printed that with `printf`.
+- **No-notice branch:** never run.
+
+Your brief kept this test narrow, so I left the other four queued Lavish wakes unhandled. I did not acknowledge the queue up to item 5. The drain also warned that monitoring has been down since this session started. Those wakes are still durable and waiting to be handled.
+
+POSTTOOL_DONE
+2026-10-11T02:58:54.782Z TEXT: Captain, the background run of the first command has now finished normally. That completes the experiment: the capture branch handled your Lavish message ("mid-turn captain answer: approve option B"), and the no-notice branch was never run. The other four queued Lavish wakes are still waiting to be handled.
+
+POSTTOOL_DONE
+
+== inbox state after the turn ==
+-rw-------  1 charlesabrooker  staff     7 Oct 10 21:58:06 2026 /Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent-inbox/lavish-e600251bbf3a22a8.3.adapter
+-rw-------  1 charlesabrooker  staff     0 Oct 10 21:58:35 2026 /Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent-inbox/lavish-e600251bbf3a22a8.3.handled
+-rw-------  1 charlesabrooker  staff  2164 Oct 10 21:58:06 2026 /Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent-inbox/lavish-e600251bbf3a22a8.3.result

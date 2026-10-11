@@ -1,0 +1,25 @@
+captain answers board2 while its runner is dead (owner orphaned) at 22:00:17
+{"status":"queued","pending_prompts":1,"chat":[{"role":"user
+$ ps group 53687
+$ ls state/procevent | grep 9abe
+-rw-------   1 charlesabrooker  staff  2159 Oct 10 22:00 .lavish-9abe506a8dd67824..claim.4KzZ2x-53687.output
+-rw-------   1 charlesabrooker  staff    20 Oct 10 21:59 .lavish-9abe506a8dd67824.stranded
+-rw-------   1 charlesabrooker  staff    14 Oct 10 21:52 lavish-9abe506a8dd67824.16777233-246548566.last-launch
+-rw-------   1 charlesabrooker  staff     6 Oct 10 21:52 lavish-9abe506a8dd67824.runner
+-rw-------   1 charlesabrooker  staff   205 Oct 10 21:52 lavish-9abe506a8dd67824.source
+$ ls inbox | grep 9abe
+lavish-9abe506a8dd67824.1.adapter
+lavish-9abe506a8dd67824.1.handled
+lavish-9abe506a8dd67824.1.result
+$ fm-procevent.sh reconcile
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+exit=0
+$ fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-0ad107a387389cf1      lavish       live       0
+lavish-9abe506a8dd67824      lavish       live       0
+lavish-e600251bbf3a22a8      lavish       live       0
+$ ls inbox | grep 9abe
+lavish-9abe506a8dd67824.1.adapter
+lavish-9abe506a8dd67824.1.handled
+lavish-9abe506a8dd67824.1.result

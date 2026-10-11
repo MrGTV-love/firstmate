@@ -1,0 +1,9 @@
+$ fm-procevent-lavish.sh arm review.html
+registered: lavish-e600251bbf3a22a8 (lavish)
+armed: lavish-e600251bbf3a22a8
+artifact: /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+$LAB/run.sh bin/fm-procevent-lavish.sh arm "$PG/review.html"  0.21s user 0.43s system 38% cpu 1.662 total
+exit=0
+$ fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-e600251bbf3a22a8      lavish       live       0

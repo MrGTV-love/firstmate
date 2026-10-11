@@ -1,0 +1,24 @@
+### Same crash sequence on main (ebff0b7e), home /Users/charlesabrooker/tmp/fm-lab.w3QOXU
+$ arm board6
+registered: lavish-70712963451574fa (lavish)
+armed: lavish-70712963451574fa
+artifact: /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board6.html
+exit=0
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-70712963451574fa      lavish       live       0
+45383     1 45383 bash /Users/charlesabrooker/tmp/fm-lab.S7IajT/mainrepo/bin/fm-procevent.sh _start lavish-70712963451574fa
+46646     1 46646 bash /Users/charlesabrooker/tmp/fm-lab.S7IajT/mainrepo/bin/fm-procevent.sh _owner-watchdog lavish-70712963451574fa 45383 Sat Oct 10 22:02:05 2
+47866 47627 45383 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board6.html
+$ kill -KILL 45383 (runner leader)
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-70712963451574fa      lavish       orphaned   0
+captain answers board6 at 22:02:17
+{"status":"queued","pending_prompts":1,"chat":[{"r
+$ reconcile
+reconciled: published=0 started=1 stopped=0 uncertain=0 failed=0
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-70712963451574fa      lavish       live       0
+$ ls inbox
+ls: /Users/charlesabrooker/tmp/fm-lab.w3QOXU/state/procevent-inbox: No such file or directory
+$ grep answer in state
+(grep rc=1)

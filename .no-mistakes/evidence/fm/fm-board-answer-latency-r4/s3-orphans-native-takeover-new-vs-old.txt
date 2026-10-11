@@ -1,0 +1,22 @@
+$ ps (board2: leftover firstmate adapter 61362 and its native --takeover poll)
+61362     1 61362 bash bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+73849 61362 61362 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html --takeover
+73853 61362 61362 bash bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+
+$ NEW (1bac87bd) fm-procevent-lavish.sh orphans
+orphan: 61362 lavish-9abe506a8dd67824 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+orphan: 73849 lavish-9abe506a8dd67824 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+orphan: 73853 lavish-9abe506a8dd67824 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+kept: 93802 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+kept: 94166 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+kept: 94172 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+orphans: found=3 killed=0 kept=16
+
+$ OLD (80aca90f, before this fix) fm-procevent-lavish.sh orphans
+orphan: 61362 lavish-9abe506a8dd67824 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+kept: 73849 (artifact cannot be resolved) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html --takeover
+orphan: 73853 lavish-9abe506a8dd67824 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+kept: 93802 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+kept: 94166 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+kept: 94172 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+orphans: found=2 killed=0 kept=17

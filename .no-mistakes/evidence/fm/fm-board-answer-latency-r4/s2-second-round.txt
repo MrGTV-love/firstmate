@@ -1,0 +1,15 @@
+answer 2 posted at 21:49:47
+{"status":"queued","pending_prompts":1,"chat":[{"role":"user","kind":"message","
+result 2 seen at 21:49:49
+total 32
+-rw-------  1 charlesabrooker  staff     7 Oct 10 21:48:15 2026 lavish-e600251bbf3a22a8.1.adapter
+-rw-------  1 charlesabrooker  staff  2156 Oct 10 21:48:15 2026 lavish-e600251bbf3a22a8.1.result
+-rw-------  1 charlesabrooker  staff     7 Oct 10 21:49:48 2026 lavish-e600251bbf3a22a8.2.adapter
+-rw-------  1 charlesabrooker  staff  2166 Oct 10 21:49:48 2026 lavish-e600251bbf3a22a8.2.result
+check	procevent:lavish-e600251bbf3a22a8:1	check: procevent lavish lavish-e600251bbf3a22a8 1
+CAPTAIN MESSAGE
+| captain answer round two: also fix the docs
+END CAPTAIN MESSAGE
+$ fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-e600251bbf3a22a8      lavish       live       2

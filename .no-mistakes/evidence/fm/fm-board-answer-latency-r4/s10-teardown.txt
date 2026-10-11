@@ -1,0 +1,12 @@
+retired: lavish-0ad107a387389cf1
+retired: lavish-9abe506a8dd67824
+retired: lavish-e600251bbf3a22a8
+retired: lavish-70712963451574fa
+$ list
+no sources registered
+$ ps lab leftovers
+$ lavish-axi stop (private server)
+server:
+  status: stopped
+  port: 24871
+port 24871 listeners above (none expected)

@@ -1,0 +1,13 @@
+$ fm-wake-drain.sh
+1791686896	1	check	procevent:lavish-e600251bbf3a22a8:1	check: procevent lavish lavish-e600251bbf3a22a8 1
+1791686989	2	check	procevent:lavish-e600251bbf3a22a8:2	check: procevent lavish lavish-e600251bbf3a22a8 2
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 19540.1791686896.DUpdbd
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 process-event source(s) registered, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+exit=0

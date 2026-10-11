@@ -1,0 +1,35 @@
+$ cat state/.wake-queue
+1791686896	1	check	procevent:lavish-e600251bbf3a22a8:1	check: procevent lavish lavish-e600251bbf3a22a8 1
+
+$ fm-procevent-lavish.sh read <result 1>
+CAPTAIN MESSAGE
+| captain answer round one: ship it
+END CAPTAIN MESSAGE
+
+declared_items: 1
+presented_items: 1
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 0
+captain_message_count: 1
+
+ANNOTATIONS: (none)
+END LAVISH RESULT (1 of 1)
+
+$ fm-procevent.sh list   (after capture)
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-e600251bbf3a22a8      lavish       live       1
+$ ps (lab page polls)
+85593 19540 19540 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+85932 85593 19540 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+85934 85593 19540 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+$ ls state/procevent
+lavish-e600251bbf3a22a8.16777233-246370479.last-launch
+lavish-e600251bbf3a22a8.85593.poller
+lavish-e600251bbf3a22a8.runner
+lavish-e600251bbf3a22a8.source
+85593
+Sat Oct 10 21:48:16 2026
+19540

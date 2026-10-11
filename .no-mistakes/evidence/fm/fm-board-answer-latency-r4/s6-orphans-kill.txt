@@ -1,0 +1,29 @@
+$ fm-procevent-lavish.sh orphans --kill   (lab lines + total)
+kept: 11114 (no poller record) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html
+killed: 11117 lavish-480f5c872817c2c1 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html
+killed: 12054 lavish-480f5c872817c2c1 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html
+killed: 12060 lavish-480f5c872817c2c1 /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board4.html
+killed: 19816 lavish-cced9052994be7aa /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+killed: 31287 lavish-cced9052994be7aa /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+killed: 31294 lavish-cced9052994be7aa /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board5.html
+kept: 55822 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html
+kept: 76313 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+kept: 76728 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+kept: 76730 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+kept: 93802 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+kept: 94166 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+kept: 94172 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+orphans: found=6 killed=6 kept=75
+$ ps (lab pages after --kill)
+11114     1 11114 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html --takeover
+55822 39000 39000 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board3.html
+76313 53687 53687 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+76728 76313 53687 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+76730 76313 53687 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+93802 19540 19540 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+94166 93802 19540 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+94172 93802 19540 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/review.html
+$ ls state/procevent | grep poller
+lavish-0ad107a387389cf1.55822.poller
+lavish-9abe506a8dd67824.76313.poller
+lavish-e600251bbf3a22a8.93802.poller

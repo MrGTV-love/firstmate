@@ -1,0 +1,11 @@
+$ ps (board2 polls: two leftover firstmate adapters, no runner, no claim)
+52830 52826 52830 bash bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+58431 52830 52830 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+58434 52830 52830 bash bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+61362 52826 61362 bash bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+$ ls state/procevent (poller ledger)
+lavish-9abe506a8dd67824.52830.poller
+lavish-9abe506a8dd67824.61362.poller
+lavish-e600251bbf3a22a8.93802.poller
+--- L1 adapter output:
+[lavish-axi] Long-polling for user feedback on /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html. This stays silent until the user sends feedback, ends the session, or leaves every review window disconnected past the reconnect grace period - leave it running. Detected layout issues do NOT return this poll: they wait in the user's Layout issues inbox until the user queues them as ordinary feedback. If it gets killed or times out before feedback arrives, re-run `lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html` - feedback remains queued until delivery. Poll delivery consumes the response, so read it completely.

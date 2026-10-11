@@ -1,0 +1,27 @@
+$ kill -KILL 53687   (runner leader of board2 only; adapter 76313 and native poll 76728 survive)
+54940     1 54940 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent.sh _owner-watchdog lavish-9abe506a8dd67824 53687 Sat Oct 10 21:52:48 2026     /bin/bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent.sh _start lavish-9abe506a8dd67824 /Users/charlesabrooker/tmp/fm-lab.S7IajT/state/procevent/.owner-guard-ready.E6eoC0 16777233 246343713
+76313     1 53687 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+76728 76313 53687 node /Users/charlesabrooker/.local/bin/lavish-axi poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+76730 76313 53687 bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M7DRS7N2X3YBBVZPMEJ7S1/bin/fm-procevent-lavish.sh poll /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+$ fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-0ad107a387389cf1      lavish       live       0
+lavish-9abe506a8dd67824      lavish       orphaned   0
+lavish-e600251bbf3a22a8      lavish       live       0
+$ fm-procevent.sh reconcile
+reconciled: published=0 started=0 stopped=0 uncertain=1 failed=0
+exit=0
+$ fm-procevent.sh list
+SOURCE                       ADAPTER      OWNER      PENDING
+lavish-0ad107a387389cf1      lavish       live       0
+lavish-9abe506a8dd67824      lavish       orphaned   0
+lavish-e600251bbf3a22a8      lavish       live       0
+$ fm-procevent-lavish.sh orphans (board2 lines)
+kept: 76313 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+kept: 76728 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+kept: 76730 (owned by a claim) /Users/charlesabrooker/tmp/fm-lab-pages.DW645P/board2.html
+orphans: found=0 killed=0 kept=75
+$ wake queue rows after 3 (kind key)
+check	procevent:lavish-9abe506a8dd67824:stranded:.claim.4KzZ2x-53687
+$ stranded wake payload
+check: process-event source lavish-9abe506a8dd67824 is registered but nothing can arm it: its runner died and its polling child may still be attached to the source's session, so reconcile preserves that claim and starts no replacement, and nothing automatic will touch that group. Verify whether anything is still polling lavish-9abe506a8dd67824; once that process group is empty, the next reconcile reclaims the source on its own.
