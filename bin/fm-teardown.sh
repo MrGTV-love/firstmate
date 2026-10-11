@@ -76,6 +76,8 @@
 # An absent recorded copy or one that is not a Git worktree completes only
 # when its recorded GitHub PR is confirmed merged by the forge, or through
 # captain-authorized forced discard below; otherwise the backlog stays open.
+# The one exception is a task's own nested copy that an earlier teardown
+# removed: teardown_nested_slot judges it first by its branch= ref.
 # Scout tasks (kind=scout in meta) carve out of that check: their worktree is
 # declared scratch and the regular, nonsymlink, nonempty report at
 # data/<task-id>/report.md is the work product. Non-forced teardown also requires

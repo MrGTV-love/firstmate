@@ -635,8 +635,14 @@ do_reassociate() {
     || die "task $ID already records PR $pr, whose merge watch and landed-work proof follow the current copy's branch; land or close that PR before re-pointing the record under it"
   [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
     || die "task $ID has a pending authoritative backlog close from an interrupted cleanup; finish or repair it before reassociating"
-  [ ! -e "$STATE/$ID.control-relaunch" ] && [ ! -L "$STATE/$ID.control-relaunch" ] \
-    || die "task $ID has an unfinished relaunch transaction at $STATE/$ID.control-relaunch; reconcile it before reassociating"
+  # A finished relaunch keeps its journal as that transaction's durable record,
+  # so only a journal that is this task's and reads phase=complete is finished.
+  if [ -e "$STATE/$ID.control-relaunch" ] || [ -L "$STATE/$ID.control-relaunch" ]; then
+    [ -f "$STATE/$ID.control-relaunch" ] && [ ! -L "$STATE/$ID.control-relaunch" ] \
+      && [ "$(fm_meta_get "$STATE/$ID.control-relaunch" task)" = "$ID" ] \
+      && [ "$(fm_meta_get "$STATE/$ID.control-relaunch" phase)" = complete ] \
+      || die "task $ID has an unfinished relaunch transaction at $STATE/$ID.control-relaunch; reconcile it before reassociating"
+  fi
 
   REASSOCIATE_BRIEF="$DATA/$ID/brief.md"
   [ -f "$REASSOCIATE_BRIEF" ] && [ ! -L "$REASSOCIATE_BRIEF" ] \

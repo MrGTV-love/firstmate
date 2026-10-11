@@ -544,6 +544,39 @@ test_refusals_change_nothing() {
   pass "every reassociation refusal leaves the record, instructions, copy, and endpoint untouched"
 }
 
+# write_relaunch_journal <case-dir> <id> <phase> [task]: state/<id>.control-relaunch
+# as fm-control relaunch persists it, at the given phase.
+write_relaunch_journal() {  # <case-dir> <id> <phase> [task]
+  printf 'v1\ntask=%s\nphase=%s\nts=2026-01-01T00:00:00Z\nbackend=tmux\nendpoint=fmses:fm-%s\nworktree=%s\nkind=ship\n' \
+    "${4:-$2}" "$3" "$2" "$1/old" > "$1/home/state/$2.control-relaunch"
+}
+
+test_finished_relaunch_journal_does_not_block_reassociation() {
+  local id=reassoc-journal dir new new_real phase out rc=0
+  dir=$(new_case journal "$id")
+  new="$dir/new"
+  add_copy "$dir" "$new" "fm/$id-v2"
+  new_real=$(cd "$new" && pwd -P)
+  for phase in checkpoint noted stopping exited launching failed:launching; do
+    write_relaunch_journal "$dir" "$id" "$phase"
+    expect_refusal "$dir" "a relaunch journal at phase $phase" "unfinished relaunch transaction" 1 \
+      "$id" reassociate --worktree "$new" --note n
+  done
+  write_relaunch_journal "$dir" "$id" complete someone-else
+  expect_refusal "$dir" "a complete relaunch journal that names another task" "unfinished relaunch transaction" 1 \
+    "$id" reassociate --worktree "$new" --note n
+
+  # A relaunch that finished leaves its journal in place until teardown.
+  write_relaunch_journal "$dir" "$id" complete
+  cp "$dir/home/state/$id.control-relaunch" "$dir/journal.before"
+  out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note "Moved after an earlier relaunch.") || rc=$?
+  expect_code 0 "$rc" "reassociate should succeed after a finished relaunch"$'\n'"$out"
+  assert_equals "$new_real" "$(meta_field "$dir" "$id" worktree)" "worktree= did not follow the replacement copy"
+  assert_equals "$dir/old" "$(meta_field "$dir" "$id" prior_worktree)" "the copy left behind was not recorded"
+  cmp -s "$dir/journal.before" "$dir/home/state/$id.control-relaunch" || fail "reassociate changed the relaunch journal"
+  pass "a finished relaunch journal does not block reassociation, and an unfinished one refuses without changes"
+}
+
 test_failed_publication_keeps_brief_recovery_until_restored() {
   local restore id dir new out rc real_mv backup count
   real_mv=$(command -v mv)
@@ -1177,6 +1210,7 @@ test_scout_reassociation_keeps_branch_fields
 test_record_containment_refusals_preserve_both_copies
 test_slot_claim_containment_refusals_preserve_both_copies
 test_refusals_change_nothing
+test_finished_relaunch_journal_does_not_block_reassociation
 test_failed_publication_keeps_brief_recovery_until_restored
 test_unchanged_ship_branch_requires_consistent_brief
 test_dirty_current_copy_refuses_without_publication
