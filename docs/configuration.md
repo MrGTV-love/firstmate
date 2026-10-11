@@ -1426,7 +1426,7 @@ Spawn, intake, and relaunch checks report unavailable catalog evidence when the 
 Offline model/profile resolution and bootstrap's local diagnostics never fetch catalogs; `fm-model-index.sh check` and selected-entry checks at intake, spawn, and relaunch may fetch them under the evidence contract below.
 The command snapshots the index once per invocation and queries each required harness catalog once; it never rewrites dispatch rules, credentials, or vendor catalogs.
 
-The command's header and `--help` own discovery commands and the authoritative-export interface.
+The command's header and `--help` own the authoritative-export interface, and `bin/fm-model-catalog-lib.sh` owns the discovery commands.
 Native discovery covers Codex, Claude, omp, Pi, OpenCode, Cursor, and Antigravity; other harnesses accept a current export from their own documented discovery surface.
 An export directory is used instead of live discovery, never mixed with it.
 Only concrete contradictory evidence refuses: an id absent from a readable catalog, or a catalog alias whose resolved id is retired.
