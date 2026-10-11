@@ -548,6 +548,75 @@ SH
   pass "an outer Perl bound reaps a TERM-resistant nested command"
 }
 
+# fm_run_timed keeps the bounded command's status in a temp file. A caller that
+# was interrupted while waiting used to leave that file behind, one per call
+# (2394 fm-timeout-status.* entries piled up in a shared temp dir, and the bash
+# fallback left fm-bash-timeout-command.* the same way). Every exit, normal or
+# not, must leave the temp dir empty, for the external-timeout and bash mechanisms.
+status_leak_call() {  # <dir> <bin-dir> <mechanism> <seconds> <command...>
+  local dir=$1 bindir=$2 mech=$3 seconds=$4
+  shift 4
+  TMPDIR="$dir/tmp" bash -c '
+    . "$1/bin/fm-timeout-lib.sh"
+    PATH="$2:$PATH"
+    [ "$3" != bash ] || export FM_TIMEOUT_MECHANISM_OVERRIDE=bash
+    shift 3
+    fm_run_timed "$@"
+  ' _ "$ROOT" "$bindir" "$mech" "$seconds" "$@" >/dev/null 2>&1
+}
+
+test_no_status_file_survives_any_exit_of_the_caller() {
+  local dir sig caller_pid command_pid mech rc
+  dir="$TMP_ROOT/status-leak"
+  mkdir -p "$dir/tmp" "$dir/bin" "$dir/fired-bin"
+  printf '#!/bin/sh\nshift 3\nexec "$@"\n' > "$dir/bin/timeout"
+  printf '#!/bin/sh\nshift 3\n"$@"\nexit 124\n' > "$dir/fired-bin/timeout"
+  chmod +x "$dir/bin/timeout" "$dir/fired-bin/timeout"
+  cat > "$dir/caller.sh" <<'SH'
+. "$1/bin/fm-timeout-lib.sh"
+PATH="$2:$PATH"
+[ "$4" != bash ] || export FM_TIMEOUT_MECHANISM_OVERRIDE=bash
+fm_run_timed 20 bash -c 'printf "%s\n" "$$" > "$1"; exec sleep 60' _ "$3"
+SH
+  for mech in timeout bash; do
+    rc=0
+    status_leak_call "$dir" "$dir/bin" "$mech" 20 true || rc=$?
+    [ "$rc" -eq 0 ] || fail "$mech: a completed bounded call reported $rc"
+    [ -z "$(ls -A "$dir/tmp")" ] || fail "$mech: a completed bounded call left a status file: $(ls -A "$dir/tmp")"
+    rc=0
+    status_leak_call "$dir" "$dir/bin" "$mech" 20 bash -c 'exit 3' || rc=$?
+    [ "$rc" -eq 3 ] || fail "$mech: a failing bounded call reported $rc, not its own status 3"
+    [ -z "$(ls -A "$dir/tmp")" ] || fail "$mech: a failing bounded call left a status file: $(ls -A "$dir/tmp")"
+    # The external mechanism needs a timeout that applies the bound; the bash
+    # mechanism enforces a real one-second bound on a command that outlasts it.
+    rc=0
+    if [ "$mech" = bash ]; then
+      status_leak_call "$dir" "$dir/bin" bash 1 sleep 30 || rc=$?
+    else
+      status_leak_call "$dir" "$dir/fired-bin" timeout 1 bash -c 'exit 143' || rc=$?
+    fi
+    [ "$rc" -eq 124 ] || fail "$mech: a bound that fired reported $rc, not 124"
+    [ -z "$(ls -A "$dir/tmp")" ] || fail "$mech: a bound that fired left a status file: $(ls -A "$dir/tmp")"
+  done
+  for mech in timeout bash; do
+    for sig in TERM INT HUP KILL; do
+      rm -f "$dir/command.pid"
+      # perl restores SIGINT, which a shell's background job otherwise ignores.
+      TMPDIR="$dir/tmp" perl -e '$SIG{INT} = "DEFAULT"; exec @ARGV' \
+        bash "$dir/caller.sh" "$ROOT" "$dir/bin" "$dir/command.pid" "$mech" >/dev/null 2>&1 &
+      # shellcheck disable=SC2031 # This shell just launched the caller; no subshell modifies $! here.
+      caller_pid=$!
+      wait_for_file "$dir/command.pid"
+      command_pid=$(cat "$dir/command.pid")
+      kill -"$sig" "$caller_pid" 2>/dev/null || true
+      wait "$caller_pid" 2>/dev/null || true
+      kill -KILL "$command_pid" 2>/dev/null || true
+      [ -z "$(ls -A "$dir/tmp")" ] || fail "$mech: a caller ended by $sig left a status file: $(ls -A "$dir/tmp")"
+    done
+  done
+  pass "no bounded-call status file survives a normal, failing, timed-out, or signalled exit of the caller"
+}
+
 test_passes_the_command_status_and_output_through
 test_system_bash_preserves_completion_and_signal_statuses
 test_run_timed_reports_the_bound_when_the_wrapper_records_a_signal_death
@@ -569,3 +638,4 @@ test_run_timed_perl_bound_reaches_a_child_slow_to_start
 test_nm_bounded_perl_bound_reaches_a_child_slow_to_start
 test_perl_bound_forwards_a_term_to_the_command
 test_nested_perl_bound_reaps_a_term_resistant_child
+test_no_status_file_survives_any_exit_of_the_caller
