@@ -406,6 +406,7 @@ family_for_basename() {
     fm-pi-watch-loader-live.test.sh|\
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|fm-omp-reboot-live-e2e.test.sh|\
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|fm-omp-fallback-chain-live-e2e.test.sh|\
+    fm-omp-stale-wake-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
     fm-pr-state-live-e2e.test.sh|\
     fm-sessionstart-hook-live-e2e.test.sh|fm-sessionstart-instruction-refresh-live-e2e.test.sh|\
@@ -1500,6 +1501,10 @@ families_for_changed_path() {
     tests/fm-backend-herdr-eventwait.test.py)
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
+      ;;
+    tests/omp_wake_turns.py)
+      printf '%s\n' "__script__:fm-omp-wake-turns.test.sh"
+      printf '%s\n' "__script__:fm-omp-stale-wake-live-e2e.test.sh"
       ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family

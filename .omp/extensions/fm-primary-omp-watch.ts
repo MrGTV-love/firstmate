@@ -13,8 +13,7 @@
 //     activation, through session_start, self-heal, or an arm call, replays it;
 //     a later process can also replay the durable handoff. If publication fails,
 //     the pending wake and failure detail remain in process memory for recovery.
-//     Replaying a wake main has already drained is harmless (the queue is durable
-//     and the drain is idempotent); losing one across /new is not.
+//     Watcher delivery re-reads the durable queue rather than replaying headlines.
 //   - Replacement shutdown retires the established predecessor arm before the
 //     successor arms; unlike Pi, it is not retained until a distinct active
 //     successor generation commits its own arm, so omp keeps the plain
@@ -29,10 +28,10 @@
 //     bin/fm-supervision-engine-lib.sh enabled answers; config/supervision-host-off opts out) spawns
 //     bin/fm-supervision-host.sh park --restart in the arm's place, which
 //     takes away-posture wakes itself and closes only when main is needed; its
-//     header owns the output read here. A "supervision-host:" line is
-//     actionable like a wake line, and the message delivered at the host's
-//     close carries every such line in order while wake lines keep an
-//     eight-line cap. The host
+//     header owns the output read here. Operational hand-backs carry only the
+//     "supervision-host:" lines, deduplicated by hostNotes; no wake line from
+//     the close is injected. Every other host close is a queue-read mark under
+//     docs/watcher-continuity.md#omp-stale-wake-gating. The host
 //     prints the first cycle's status line as soon as it is verified, so
 //     readiness and the handling handoff work as they do for the arm, with a
 //     longer readiness budget for the host's own startup. On a home that does
@@ -70,20 +69,13 @@
 //
 // Delivery versus consumption (stated once here):
 // A main wake is delivered once omp accepts it (sendUserMessage returns).
-// docs/watcher-continuity.md#omp-idle-wake-delivery owns idle delivery and
-// composer safety.
-// The successor pipeline never waits for the model to read it: a follow-up
-// queued while main is streaming joins the running run without ever raising
-// before_agent_start, so waiting on that event stalls every later close.
-// Consumption tracks which accepted wakes remain eligible for recovery or
-// replacement replay; docs/watcher-continuity.md owns the consumption contract.
+// docs/watcher-continuity.md owns idle queue-read delivery, consumption, and
+// restored-editor safety; accepted watcher text is never replay authority.
 //
-// Restored-wake recovery is documented in docs/watcher-continuity.md.
-// Recovery must use the real editor and resend only this extension's unchanged
-// emitted wake, never submit the whole composer or alter operator draft bytes.
 // Complete wake text left unsent in an idle composer by other wiring is found
-// by a low-rate poll and delivered the same way; docs/watcher-continuity.md
-// (omp stranded wake text) owns what it may touch.
+// by a low-rate poll, removed, and marked like a watcher close, so the queue
+// read decides what is sent; docs/watcher-continuity.md (omp stranded wake
+// text) owns what it may touch.
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
@@ -137,7 +129,13 @@ type ReplacementActionableHandoff = {
 
 type UnconsumedWake = {
   content: string;
+  message?: string;
   pending?: PendingActionableClose;
+  prepared?: true;
+};
+
+type HeldWake = {
+  pending: PendingActionableClose;
 };
 
 type SessionGeneration = {
@@ -157,6 +155,11 @@ type SessionGeneration = {
   // replacement began still needs to distinguish unconsumed wakes from
   // consumed ones.
   unconsumedWakes: Map<string, UnconsumedWake>;
+  // Actionable wakes held for an idle session, by pending token, in close order.
+  heldWakes: Map<string, HeldWake>;
+  flushTimer: ReturnType<typeof setTimeout> | null;
+  flushing: boolean;
+  queueReadFailures: number;
   restorePendingWaits: number;
   queueStuckReported: boolean;
   // A verified successor's failure close that arrived while the pipeline was
@@ -173,6 +176,7 @@ const fmRoot = process.env.FM_ROOT_OVERRIDE || root;
 const state = process.env.FM_STATE_OVERRIDE || `${fmHome}/state`;
 const config = process.env.FM_CONFIG_OVERRIDE || `${fmHome}/config`;
 const armScript = `${fmRoot}/bin/fm-watch-arm.sh`;
+const drainScript = `${fmRoot}/bin/fm-wake-drain.sh`;
 const hostScript = `${fmRoot}/bin/fm-supervision-host.sh`;
 const marker = `${state}/.omp-watch-extension-loaded`;
 const handoffDir = `${state}/extensions/omp-primary-watch`;
@@ -193,12 +197,13 @@ const hostReadyTimeoutMs = Math.max(armReadyTimeoutMs, 30000);
 const armRetireTimeoutMs = positiveInteger("FM_WATCH_ARM_RETIRE_TIMEOUT_MS", 1000);
 const successorGraceMs = positiveInteger("FM_OMP_SUCCESSOR_GRACE_MS", 15000);
 const repairOnlyHint = "call fm_watch_arm_omp again only after a later notification says the cycle is missing, failed, or unhealthy";
+const wakeDueMessage = "check: wake may be due";
+const awayNote = "This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.";
 const shuttingDownMessage = "watcher: not armed - omp session is shutting down";
 
 let nextGenerationId = 0;
 let nextHandoffId = 0;
 let activeGeneration: SessionGeneration | null = null;
-let replacementHandoff: PendingActionableClose[] | null = null;
 type ReplacementActionableReceiver = (pending: PendingActionableClose) => void;
 type ActionableDeliveryClaim = {
   owner: SessionGeneration;
@@ -297,9 +302,10 @@ function markLoaded(): void {
   writeFileSync(marker, record);
 }
 
+const headlinePattern = /^(signal:|stale:|check:|heartbeat($|:))/;
+
 function actionableLine(output: string): string {
-  const lines = output.split(/\r?\n/);
-  return lines.find((line) => /^(signal:|stale:|check:|heartbeat($|:))/.test(line)) || "";
+  return output.split(/\r?\n/).find((line) => headlinePattern.test(line)) || "";
 }
 
 function completedActionableLine(output: string): string {
@@ -327,23 +333,34 @@ function hostModeEnabled(): boolean {
   return result.status === 0;
 }
 
-// The host-mode wake message: every "supervision-host:" line in order, wake
-// lines capped at eight, and the away note while an away record exists.
+function operationalHandback(message: string): boolean {
+  return /^(?:FIRSTMATE SUPERVISION HOST: )?supervision-host: (?:branch-outcome:|outcome [0-9]+\b|.*\bthe captain returned\b)/m.test(message);
+}
+
+function hostNotes(message: string): string[] {
+  return [...new Set(message.split(/\r?\n/).filter((line) => /^supervision-host:/.test(line)))];
+}
+
+function diagnosticNote(line: string): boolean {
+  return /^supervision-host: (?!cycle boundary\b)/.test(line);
+}
+
+function watcherMark(message: string): string {
+  return [wakeDueMessage, ...hostNotes(message)].join("\n");
+}
+
+function operationalMessage(message: string): string {
+  const lines = message.replace(/^FIRSTMATE SUPERVISION HOST: /, "").split(/\r?\n/).filter((line) => !headlinePattern.test(line) && line !== awayNote);
+  return `FIRSTMATE SUPERVISION HOST: ${lines.join("\n")}`;
+}
+
+// Operational hand-backs carry outcomes even without a durable wake row;
+// every other host close is only a hint until the queue is read.
 function hostWakeMessage(output: string): string {
-  let shown = 0;
-  const lines = output.split(/\r?\n/).filter((line) => {
-    if (/^supervision-host:/.test(line)) return true;
-    if (/^(signal:|stale:|check:|heartbeat($|:))/.test(line) && shown < 8) {
-      shown += 1;
-      return true;
-    }
-    return false;
-  });
-  if (lines.length === 0) return "";
-  if (awayRecordPresent()) {
-    lines.push("This wake comes from automatic supervision under the away-posture record, not from the captain: it is not a return, so handle it under the away posture.");
-  }
-  return lines.join("\n");
+  const lines = hostNotes(output);
+  const operational = operationalHandback(output);
+  if (!operational && !actionableLine(output) && lines.length === 0) return "";
+  return operational ? `FIRSTMATE SUPERVISION HOST: ${lines.join("\n")}` : watcherMark(lines.join("\n"));
 }
 
 // The text omp carries in a user message_start: sendUserMessage wraps a string
@@ -374,7 +391,7 @@ function createPendingActionable(message: string, predecessorArmPid: string): Pe
   return {
     version: 1,
     token: `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`,
-    message,
+    message: operationalHandback(message) ? message : watcherMark(message),
     predecessorArmPid,
   };
 }
@@ -386,8 +403,7 @@ function validatePendingActionable(value: unknown): PendingActionableClose {
     typeof (value as { token?: unknown }).token !== "string" ||
     !/^[0-9]+-[0-9]+-[0-9]+$/.test((value as { token: string }).token) ||
     typeof (value as { message?: unknown }).message !== "string" ||
-    (!actionableLine((value as { message: string }).message) &&
-      !/^supervision-host:/m.test((value as { message: string }).message)) ||
+    (value as { message: string }).message.trim() === "" ||
     typeof (value as { predecessorArmPid?: unknown }).predecessorArmPid !== "string" ||
     !/^[0-9]*$/.test((value as { predecessorArmPid: string }).predecessorArmPid) ||
     ((value as { delivered?: unknown }).delivered !== undefined &&
@@ -411,11 +427,25 @@ function validateReplacementHandoff(value: unknown): PendingActionableClose[] {
   if (new Set(pending.map((item) => item.token)).size !== pending.length) {
     throw new Error(`invalid omp replacement actionable handoff at ${actionableHandoff}`);
   }
-  return pending;
+  let watcher: PendingActionableClose | undefined;
+  return pending.filter((item) => {
+    if (operationalHandback(item.message)) {
+      item.message = operationalMessage(item.message);
+      return true;
+    }
+    item.message = watcherMark(item.message);
+    if (item.delivered) return true;
+    if (watcher) {
+      watcher.message = watcherMark(`${watcher.message}\n${item.message}`);
+      return false;
+    }
+    watcher = item;
+    return true;
+  });
 }
 
 function writeReplacementHandoff(pending: PendingActionableClose[]): void {
-  replacementHandoff = [...pending];
+  pending = validateReplacementHandoff({ version: 2, pending });
   mkdirSync(handoffDir, { recursive: true });
   const temporary = `${actionableHandoff}.tmp-${process.pid}-${++nextHandoffId}`;
   const handoff: ReplacementActionableHandoff = { version: 2, pending };
@@ -439,12 +469,13 @@ function persistReplacementHandoff(pending: PendingActionableClose[]): void {
 
 function loadReplacementHandoff(): PendingActionableClose[] {
   try {
-    const pending = validateReplacementHandoff(JSON.parse(readFileSync(actionableHandoff, "utf8")));
-    replacementHandoff = pending;
+    const stored = JSON.parse(readFileSync(actionableHandoff, "utf8"));
+    const original = JSON.stringify(stored.pending);
+    const pending = validateReplacementHandoff(stored);
+    if (JSON.stringify(pending) !== original) writeReplacementHandoff(pending);
     return [...pending];
   } catch (error) {
     if (nodeErrorCode(error) === "ENOENT") {
-      replacementHandoff = null;
       return [];
     }
     throw error;
@@ -452,25 +483,19 @@ function loadReplacementHandoff(): PendingActionableClose[] {
 }
 
 function mergeReplacementHandoff(pending: PendingActionableClose): void {
-  let stored: PendingActionableClose[] = [];
-  try {
-    stored = validateReplacementHandoff(JSON.parse(readFileSync(actionableHandoff, "utf8")));
-  } catch (error) {
-    if (nodeErrorCode(error) !== "ENOENT") throw error;
-  }
+  const stored = loadReplacementHandoff();
   if (!stored.some((item) => item.token === pending.token)) stored.push(pending);
   writeReplacementHandoff(stored);
 }
 
 function clearReplacementHandoff(pending: PendingActionableClose): void {
   try {
-    const stored = validateReplacementHandoff(JSON.parse(readFileSync(actionableHandoff, "utf8")));
+    const stored = loadReplacementHandoff();
     const remaining = stored.filter((item) => item.token !== pending.token);
     if (remaining.length === stored.length) return;
     if (remaining.length > 0) {
       writeReplacementHandoff(remaining);
     } else {
-      replacementHandoff = null;
       unlinkSync(actionableHandoff);
     }
   } catch (error) {
@@ -536,6 +561,10 @@ function createGeneration(): SessionGeneration {
     pendingActionables: [],
     cleanupFailure: "",
     unconsumedWakes: new Map(),
+    heldWakes: new Map(),
+    flushTimer: null,
+    flushing: false,
+    queueReadFailures: 0,
     restorePendingWaits: 0,
     queueStuckReported: false,
     deferredClose: null,
@@ -554,8 +583,10 @@ function stopGeneration(generation: SessionGeneration): ChildProcess | null {
   generation.stopping = true;
   if (generation.retryTimer) clearTimeout(generation.retryTimer);
   if (generation.cleanupTimer) clearTimeout(generation.cleanupTimer);
+  if (generation.flushTimer) clearTimeout(generation.flushTimer);
   generation.retryTimer = null;
   generation.cleanupTimer = null;
+  generation.flushTimer = null;
   const child = generation.child;
   if (child) child.kill("SIGTERM");
   generation.child = null;
@@ -592,7 +623,7 @@ async function stopSessionGeneration(
   lifecycle: ReturnType<typeof createLifecycleLog>,
 ): Promise<void> {
   generation.replacement = replacement;
-  let persistedTokens = "";
+  let persisted = "";
   const persistPending = (): boolean => {
     try {
       persistReplacementHandoff(generation.pendingActionables);
@@ -611,14 +642,14 @@ async function stopSessionGeneration(
   };
   try {
     if (replacement && generation.pendingActionables.length > 0 && persistPending()) {
-      persistedTokens = generation.pendingActionables.map((pending) => pending.token).join("\n");
+      persisted = JSON.stringify(generation.pendingActionables);
     }
   } finally {
     const child = stopGeneration(generation);
     await waitForGenerationChildClose(child, lifecycle);
   }
-  const currentTokens = generation.pendingActionables.map((pending) => pending.token).join("\n");
-  if (replacement && currentTokens && currentTokens !== persistedTokens) {
+  const current = JSON.stringify(generation.pendingActionables);
+  if (replacement && generation.pendingActionables.length > 0 && current !== persisted) {
     persistPending();
   }
 }
@@ -813,45 +844,60 @@ export default function (pi: ExtensionAPI) {
       on: (event, handler) => pi.on?.(event, (payload, ctx) => lockHeldByAncestor() ? undefined : handler(payload, ctx)),
     }, parentTask.state, parentTask.id);
   }
+  const wakeTemplate = encodeFirstmateOperationalInput("watcher", "{body}");
 
   async function sendWake(
     owner: SessionGeneration,
     message: string,
     pending?: PendingActionableClose,
-  ): Promise<boolean> {
+  ): Promise<"sent" | "held" | "dropped" | false> {
     if (!generationIsLive(owner)) return false;
-    const content = encodeFirstmateOperationalInput(
-      "watcher",
-      `${wakeBodyPrefix}${message}${wakeBodySuffix}`,
-    ).replace(/\r\n?/g, "\n").replaceAll("\t", "   ").replace(/[\x00-\x09\x0b-\x1f]/g, "");
+    if (pending && !operationalHandback(pending.message)) {
+      owner.heldWakes.set(pending.token, { pending });
+      return await flushHeldWakes(owner);
+    }
+    const content = wakeContent(operationalHandback(message) && awayRecordPresent() ? `${message}\n${awayNote}` : message);
     const token = pending?.token ?? `${process.pid}-${Date.now()}-${++replacementCoordinator.nextTokenId}`;
-    owner.unconsumedWakes.set(token, { content, pending });
+    return submitWake(owner, token, { content, message, pending });
+  }
+
+  function wakeContent(message: string): string {
+    const body = `${operationalHandback(message) ? message : `${wakeBodyPrefix}${message}`}${wakeBodySuffix}`;
+    return wakeTemplate.replace("{body}", () => body)
+      .replace(/\r\n?/g, "\n").replaceAll("\t", "   ").replace(/[\x00-\x09\x0b-\x1f]/g, "");
+  }
+
+  async function submitWake(
+    owner: SessionGeneration,
+    token: string,
+    wake: UnconsumedWake,
+  ): Promise<"sent" | "held" | "dropped" | false> {
+    if (!generationIsLive(owner)) return false;
+    const watcher = wake.pending && !operationalHandback(wake.pending.message);
+    if (watcher && !sessionIsIdle()) return "held";
+    owner.unconsumedWakes.set(token, wake);
     try {
-      if (sessionIsIdle()) {
-        await pi.sendUserMessage(content);
-      } else {
-        await pi.sendUserMessage(content, { deliverAs: "followUp" });
-        // A follow-up omp never starts a turn for (an idle state read wrongly,
-        // or the turn ending around the call) raises no agent_end to look again.
-        scheduleRestoredWakeCheck(owner);
-      }
+      if (watcher || sessionIsIdle()) await pi.sendUserMessage(wake.content);
+      else await pi.sendUserMessage(wake.content, { deliverAs: "followUp" });
     } catch (error) {
       owner.unconsumedWakes.delete(token);
       throw error;
     }
+    if (generationIsLive(owner)) scheduleWakeFlush(owner);
     // Accepted by omp (sendUserMessage returns synchronously there; awaiting a
     // non-promise resolves at once). A generation replaced while omp was
     // accepting it may have lost the wake with the old session, so report
     // it undelivered and let the replacement replay the still-pending record.
-    return generationIsLive(owner);
+    return generationIsLive(owner) ? "sent" : false;
   }
 
   function consumeWake(owner: SessionGeneration, text: string): void {
     for (const [token, wake] of owner.unconsumedWakes) {
       if (wake.content !== text) continue;
+      if (wake.pending) wake.pending.delivered = true;
       owner.unconsumedWakes.delete(token);
+      owner.heldWakes.delete(token);
       if (!wake.pending) return;
-      wake.pending.delivered = true;
       try {
         finishPendingActionable(owner, wake.pending);
       } catch (error) {
@@ -862,32 +908,143 @@ export default function (pi: ExtensionAPI) {
     }
   }
 
-  // Restored-wake recovery state. The context is whichever one omp passed to
-  // the latest event: timers run outside any handler, and a context that went
-  // stale with a replaced session throws on use, which only skips the check.
-  const restoreCheckMs = 2000;
+  let sessionActivity = 0;
+  // Editor and stuck-queue recovery state. The context is whichever one omp
+  // passed to the latest event: timers run outside any handler, and a context
+  // that went stale with a replaced session throws on use, which only skips
+  // the check.
   const restoreAttemptLimit = 3;
-  // Further checks that wait for omp's queue to drain into a run before an idle
-  // session's queue counts as stuck; a compaction can hold the queue for a while.
-  const restorePendingWaitLimit = 15;
+  // Further one-second flush checks that wait for omp's queue to drain into a
+  // run before an idle session's queue counts as stuck; a compaction can hold
+  // the queue for a while.
+  const restorePendingWaitLimit = 30;
   const strandedPollMs = 3000;
   const restoreAttempts = new Map<string, number>();
   const strandedAttempts = new Map<string, number>();
-  let restoreTimer: ReturnType<typeof setTimeout> | null = null;
   let strandedTimer: ReturnType<typeof setInterval> | null = null;
   let strandedSeen = "";
-  let nextStrandedId = 0;
 
   function rememberContext(ctx: unknown): void {
     if (typeof ctx === "object" && ctx !== null) latestContext = ctx;
   }
 
-  // Positive idle proof only; a missing or stale context keeps follow-up delivery.
   function sessionIsIdle(): boolean {
     try {
       return typeof latestContext?.isIdle === "function" && latestContext.isIdle() === true;
     } catch {
       return false;
+    }
+  }
+
+  function readWakeQueue(): Promise<string[]> {
+    return new Promise((resolveRows, rejectRows) => {
+      let output = "";
+      const child = spawn("bash", [drainScript, "--queued"], {
+        cwd: fmRoot,
+        env: { ...process.env, FM_HOME: fmHome, FM_STATE_OVERRIDE: state, FM_ROOT_OVERRIDE: fmRoot, FM_SUPERVISION_ACTOR: "main" },
+        stdio: ["ignore", "pipe", "ignore"],
+      });
+      const timer = setTimeout(() => {
+        child.kill("SIGKILL");
+        rejectRows(new Error("wake queue query timed out"));
+      }, 10000);
+      timer.unref();
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk: string) => { output += chunk; });
+      child.once("error", (error: Error) => {
+        clearTimeout(timer);
+        rejectRows(error);
+      });
+      child.once("close", (code: number | null) => {
+        clearTimeout(timer);
+        if (code !== 0) { rejectRows(new Error(`wake queue query exited ${code}`)); return; }
+        const rows = output.split(/\r?\n/).filter((line) => line !== "");
+        if (rows.some((row) => { const fields = row.split("\t"); return fields.length < 5 || !/^[0-9]+$/.test(fields[1]); })) {
+          rejectRows(new Error("wake queue query returned invalid rows"));
+          return;
+        }
+        resolveRows(rows);
+      });
+    });
+  }
+
+  function releaseWatcherWakes(owner: SessionGeneration, droppedOnly = false): void {
+    for (const [token, wake] of [...owner.unconsumedWakes]) {
+      if (!wake.pending || operationalHandback(wake.pending.message)) continue;
+      if (droppedOnly && !wake.prepared) continue;
+      owner.heldWakes.set(token, { pending: wake.pending });
+    }
+  }
+
+  function retirePending(owner: SessionGeneration, pending: PendingActionableClose): void {
+    owner.unconsumedWakes.delete(pending.token);
+    owner.heldWakes.delete(pending.token);
+    pending.delivered = true;
+    try {
+      finishPendingActionable(owner, pending);
+    } catch (error) {
+      surfaceCleanupFailure(owner, error);
+      schedulePendingCleanup(owner);
+    }
+  }
+
+  function scheduleWakeFlush(owner: SessionGeneration): void {
+    if (!generationIsLive(owner) || owner.flushTimer || (owner.heldWakes.size === 0 && owner.unconsumedWakes.size === 0)) return;
+    const timer = setTimeout(() => {
+      if (owner.flushTimer === timer) owner.flushTimer = null;
+      void flushHeldWakes(owner);
+    }, 1000);
+    timer.unref();
+    owner.flushTimer = timer;
+  }
+
+  async function flushHeldWakes(owner: SessionGeneration): Promise<"sent" | "held" | "dropped" | false> {
+    if (!generationIsLive(owner)) return false;
+    if (owner.flushing) return "held";
+    owner.flushing = true;
+    try {
+      if (!sessionIsIdle()) return "held";
+      if (await recoverRestoredWake(owner)) return "held";
+      releaseWatcherWakes(owner, true);
+      const outstanding = [...owner.unconsumedWakes].some(([token, wake]) => wake.pending && !operationalHandback(wake.pending.message) && (!owner.heldWakes.has(token) || latestContext?.hasPendingMessages?.()));
+      if (outstanding || owner.heldWakes.size === 0) return "held";
+      const held = [...owner.heldWakes.values()];
+      const activity = sessionActivity;
+      let rows: string[];
+      try {
+        rows = await readWakeQueue();
+      } catch {
+        if (!generationIsLive(owner)) return false;
+        owner.queueReadFailures += 1;
+        if (owner.queueReadFailures === 3) surfaceFailure(owner, "watcher: FAILED - could not read the wake queue");
+        return "held";
+      }
+      if (!generationIsLive(owner)) return false;
+      owner.queueReadFailures = 0;
+      if (activity !== sessionActivity || !sessionIsIdle()) return "held";
+      const notes = hostNotes(held.map((item) => item.pending.message).join("\n"));
+      if (rows.length === 0 && !notes.some(diagnosticNote)) {
+        for (const { pending } of held) retirePending(owner, pending);
+        return "dropped";
+      }
+      const pending = held[0].pending;
+      pending.message = watcherMark(held.map((item) => item.pending.message).join("\n"));
+      const headline = rows.length === 0 ? wakeDueMessage : rows[0].split("\t").slice(4).join("\t");
+      if (awayRecordPresent() && hostModeEnabled()) notes.push(awayNote);
+      const message = [`${headline}${rows.length > 1 ? `\nand ${rows.length - 1} more queued` : ""}`, ...notes].join("\n");
+      const delivered = await submitWake(owner, pending.token, { content: wakeContent(message), pending });
+      if (delivered === "sent") {
+        owner.heldWakes.delete(pending.token);
+        for (const item of held.slice(1)) retirePending(owner, item.pending);
+      }
+      return delivered;
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      surfaceFailure(owner, `watcher: FAILED - omp extension could not deliver a held actionable wake\n${detail}`);
+      return "held";
+    } finally {
+      owner.flushing = false;
+      scheduleWakeFlush(owner);
     }
   }
 
@@ -904,87 +1061,116 @@ export default function (pi: ExtensionAPI) {
     } catch {}
   }
 
+  // An operational hand-back is sent again with the message it was first sent
+  // with, plus its send-time note; other text, which names no queued row, is
+  // resent as emitted. A refused send leaves the wake tracked as it was, so
+  // every caller keeps its attempt bound and its pending record stays owed.
+  async function resendPrompt(owner: SessionGeneration, token: string, wake: UnconsumedWake): Promise<boolean> {
+    if (wake.pending) owner.unconsumedWakes.delete(token);
+    try {
+      if (wake.pending) await sendWake(owner, wake.message ?? wake.pending.message, wake.pending);
+      else await pi.sendUserMessage(wake.content);
+      return true;
+    } catch {
+      owner.unconsumedWakes.set(token, wake);
+      scheduleWakeFlush(owner);
+      return false;
+    }
+  }
+
+  // An unconsumed watcher wake becomes a mark again, so the queue read builds
+  // fresh text; any other wake is resent as a prompt.
+  function redeliverWake(owner: SessionGeneration, token: string, wake: UnconsumedWake): boolean {
+    if (!wake.pending || operationalHandback(wake.pending.message)) {
+      void resendPrompt(owner, token, wake);
+      return true;
+    }
+    owner.unconsumedWakes.delete(token);
+    owner.heldWakes.set(token, { pending: wake.pending });
+    return false;
+  }
+
   // omp is idle with messages still queued after the bounded wait, so nothing
-  // will run them: the follow-up gate refused to start a turn for them. Sending
-  // an unconsumed wake through the prompt-starting API starts that turn and
-  // flushes the queue behind it, and the wake's own consumption proves delivery.
-  // The wake can then reach main twice, which the idempotent drain absorbs.
-  function flushStuckQueue(owner: SessionGeneration, ctx: any): void {
+  // will run them: the follow-up gate refused to start a turn for them. A
+  // prompt-starting send starts that turn and flushes the queue behind it, and
+  // the wake's own consumption proves delivery. The stuck copy can then reach
+  // main too, which the idempotent drain absorbs.
+  function flushStuckQueue(owner: SessionGeneration, ctx: any): boolean {
     for (const [token, wake] of [...owner.unconsumedWakes]) {
+      if (wake.pending?.delivered) continue;
       const attempts = restoreAttempts.get(token) ?? 0;
       if (attempts >= restoreAttemptLimit) continue;
       restoreAttempts.set(token, attempts + 1);
-      pi.sendUserMessage(wake.content);
-      scheduleRestoredWakeCheck(owner);
-      return;
+      return redeliverWake(owner, token, wake);
     }
-    if (owner.queueStuckReported) return;
+    if (owner.queueStuckReported) return false;
     owner.queueStuckReported = true;
     reportWait(
       ctx,
       `watcher: wake not delivered - omp is idle with queued messages it will not run, and ${restoreAttemptLimit} resubmissions did not start a turn; the wake stays in the durable queue for bin/fm-wake-drain.sh`,
     );
+    return false;
   }
 
-  function recoverRestoredWake(owner: SessionGeneration): void {
-    if (!generationIsLive(owner)) return;
+  // The one place that decides a restored or stuck-queue prompt: it sends at
+  // most one and reports whether it did. flushHeldWakes is its only caller, and
+  // every trigger (turn end, flush timer, new work) goes through flushHeldWakes.
+  async function recoverRestoredWake(owner: SessionGeneration): Promise<boolean> {
+    if (!generationIsLive(owner)) return false;
     const ctx = editorContext();
-    if (!ctx) return;
+    if (!ctx) return false;
     try {
-      // A turn that already started will consume the wake itself.
-      if (!ctx.isIdle()) {
-        owner.restorePendingWaits = 0;
-        owner.queueStuckReported = false;
-        return;
-      }
-      // Queued messages normally drain into the next run within moments, so the
-      // check waits for that. Skipping for good would strand a queue omp will
-      // never run; after the bounded wait the stuck queue is handled below.
+      // Queued messages normally drain into the next run within moments, and
+      // so does a prompt this owner already resent that is still unconsumed
+      // with no copy in the composer, so the check waits for either. Skipping
+      // for good would strand a queue omp will never run; after the bounded
+      // wait the stuck queue is handled below.
       const queued = ctx.hasPendingMessages?.() === true;
-      if (!queued) {
+      const inFlight = [...owner.unconsumedWakes].some(([token, wake]) => {
+        const attempts = restoreAttempts.get(token) ?? 0;
+        return !wake.pending?.delivered && attempts > 0 && attempts < restoreAttemptLimit &&
+          removeRestoredWake(String(ctx.ui.getEditorText() ?? ""), wake.content) === null;
+      });
+      if (!queued && !inFlight) {
         owner.restorePendingWaits = 0;
         owner.queueStuckReported = false;
       }
-      if (owner.unconsumedWakes.size === 0) return;
-      if (queued && owner.restorePendingWaits < restorePendingWaitLimit) {
+      if (owner.unconsumedWakes.size === 0) return false;
+      if ((queued || inFlight) && owner.restorePendingWaits < restorePendingWaitLimit) {
         owner.restorePendingWaits += 1;
-        scheduleRestoredWakeCheck(owner);
-        return;
+        return false;
       }
-      let editor = String(ctx.ui.getEditorText() ?? "");
+      let recovered = false;
       for (const [token, wake] of [...owner.unconsumedWakes]) {
-        const attempts = restoreAttempts.get(token) ?? 0;
-        if (attempts >= restoreAttemptLimit) continue;
+        if (wake.pending?.delivered) continue;
+        const editor = String(ctx.ui.getEditorText() ?? "");
         const remainder = removeRestoredWake(editor, wake.content);
         if (remainder === null) continue;
-        restoreAttempts.set(token, attempts + 1);
-        editor = remainder;
+        const prompt = !wake.pending || operationalHandback(wake.pending.message);
+        const attempts = restoreAttempts.get(token) ?? 0;
+        if (prompt && attempts >= restoreAttemptLimit) continue;
         ctx.ui.setEditorText(remainder);
-        // Idle, so this starts the turn that consumes the wake; the next
-        // agent_end re-checks any further restored wake.
-        pi.sendUserMessage(wake.content);
-        return;
+        recovered = true;
+        if (!prompt) {
+          redeliverWake(owner, token, wake);
+          continue;
+        }
+        restoreAttempts.set(token, attempts + 1);
+        owner.restorePendingWaits = 0;
+        if (!(await resendPrompt(owner, token, wake))) {
+          if (String(ctx.ui.getEditorText() ?? "") === remainder) ctx.ui.setEditorText(editor);
+          if (attempts + 1 === restoreAttemptLimit) {
+            reportWait(
+              ctx,
+              `watcher: wake not delivered - omp refused ${restoreAttemptLimit} resubmissions of a restored wake; it stays in the composer`,
+            );
+          }
+        }
+        return true;
       }
-      if (queued) flushStuckQueue(owner, ctx);
+      return queued && !recovered && flushStuckQueue(owner, ctx);
     } catch {}
-  }
-
-  // Every later check keeps a pending one. The check that follows an agent_end
-  // replaces it instead, so the editor is read two full seconds after the run
-  // ended - the settle time that tells a wake omp drained from one it left behind.
-  function scheduleRestoredWakeCheck(owner: SessionGeneration, afterRunEnd = false): void {
-    if (owner.unconsumedWakes.size === 0) return;
-    if (restoreTimer) {
-      if (!afterRunEnd) return;
-      clearTimeout(restoreTimer);
-      restoreTimer = null;
-    }
-    const timer = setTimeout(() => {
-      restoreTimer = null;
-      recoverRestoredWake(owner);
-    }, restoreCheckMs);
-    timer.unref();
-    restoreTimer = timer;
+    return false;
   }
 
   // Tracked wakes retain ownership even when their composer copies are missing
@@ -1031,19 +1217,15 @@ export default function (pi: ExtensionAPI) {
       }
       const attempts = strandedAttempts.get(found.content) ?? 0;
       strandedAttempts.set(found.content, attempts + 1);
-      const token = `stranded-${process.pid}-${++nextStrandedId}`;
-      owner.unconsumedWakes.set(token, { content: found.content });
-      try {
-        // Idle, so this starts the turn that consumes the wake. The composer is
-        // cleared only once omp has taken it.
-        pi.sendUserMessage(found.content);
-      } catch (error) {
-        owner.unconsumedWakes.delete(token);
-        throw error;
-      }
+      // The text is never submitted as found: it may name rows main already
+      // drained. Removing it marks that a wake may be due, like a watcher
+      // close, and the queue read decides what is sent.
       ctx.ui.setEditorText(found.remainder);
       strandedSeen = "";
-      scheduleRestoredWakeCheck(owner);
+      const pending = createPendingActionable(wakeDueMessage, "");
+      owner.pendingActionables.push(pending);
+      owner.heldWakes.set(pending.token, { pending });
+      void flushHeldWakes(owner);
     } catch {}
   }
 
@@ -1107,7 +1289,7 @@ export default function (pi: ExtensionAPI) {
     message: string,
     pending: PendingActionableClose,
     recovery?: { generation: string; watcherPid: string },
-  ): Promise<boolean> {
+  ): Promise<"sent" | "held" | "dropped" | false> {
     if (!generationIsLive(owner)) return false;
     if (recovery) {
       const confirmed = confirmHandlingDeliveryWithRetry(owner, recovery);
@@ -1116,7 +1298,9 @@ export default function (pi: ExtensionAPI) {
         if (!pidAlive(watcherPid)) {
           await retireArm(owner.child);
         }
-        return await sendWake(owner, `${message}\n\n${confirmed.detail}`, pending);
+        if (operationalHandback(pending.message)) return await sendWake(owner, `${message}\n\n${confirmed.detail}`, pending);
+        surfaceFailure(owner, confirmed.detail);
+        return await sendWake(owner, message, pending);
       }
     }
     // No supervision branch on omp: every actionable wake goes to main.
@@ -1133,8 +1317,14 @@ export default function (pi: ExtensionAPI) {
     owner: SessionGeneration,
     pending: PendingActionableClose,
   ): void {
-    if (owner.pendingActionables.some((item) => item.token === pending.token)) return;
-    owner.pendingActionables.push(pending);
+    if (!operationalHandback(pending.message)) {
+      const failure = pending.message.indexOf("\n\nwatcher: FAILED - ");
+      if (failure >= 0) surfaceFailure(owner, pending.message.slice(failure + 2));
+      pending.message = watcherMark(pending.message);
+    }
+    const existing = owner.pendingActionables.find((item) => item.token === pending.token);
+    if (existing && !owner.stopping) return;
+    if (!existing) owner.pendingActionables.push(pending);
     if (owner.stopping && owner.replacement) {
       let replacementPending = pending;
       try {
@@ -1198,7 +1388,7 @@ export default function (pi: ExtensionAPI) {
         // A record omp has accepted but not consumed is neither redelivered
         // nor finished here: consumption finishes it, replacement replays it.
         const pending = owner.pendingActionables.find(
-          (item) => !item.delivered && !owner.unconsumedWakes.has(item.token),
+          (item) => !item.delivered && !owner.unconsumedWakes.has(item.token) && !owner.heldWakes.has(item.token),
         );
         if (!pending) break;
         const existingClaim = replacementCoordinator.deliveries.get(pending.token);
@@ -1234,12 +1424,26 @@ export default function (pi: ExtensionAPI) {
             releaseClaim();
             return;
           }
+          if (restoration.failure && !operationalHandback(pending.message)) surfaceFailure(owner, restoration.failure);
           const message = restoration.failure ? `${pending.message}\n\n${restoration.failure}` : pending.message;
           const delivered = await deliverActionableWake(owner, message, pending, restoration.recovery);
           if (!delivered) {
             settleClaim("failed");
             releaseClaim();
             return;
+          }
+          if (delivered === "held") {
+            // Queued behind nothing: the flush delivers or retires it once the
+            // session is idle. A replacement generation that was waiting on
+            // this claim takes the still-pending record from the handoff.
+            settleClaim("failed");
+            releaseClaim();
+            continue;
+          }
+          if (delivered === "dropped") {
+            settleClaim("delivered");
+            releaseClaim();
+            continue;
           }
           const awaitingConsumption = owner.unconsumedWakes.has(pending.token);
           if (awaitingConsumption && !generationIsLive(owner)) {
@@ -1490,12 +1694,14 @@ export default function (pi: ExtensionAPI) {
     const releaseChild = (): void => {
       if (owner.child === armChild) owner.child = null;
     };
-    armChild.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
+    armChild.stdout.setEncoding("utf8");
+    armChild.stderr.setEncoding("utf8");
+    armChild.stdout.on("data", (chunk: string) => {
+      stdout += chunk;
       observeEstablishedArm();
     });
-    armChild.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
+    armChild.stderr.on("data", (chunk: string) => {
+      stderr += chunk;
       observeEstablishedArm();
     });
     armChild.on("close", (code: number | null, signal: NodeJS.Signals | null) => {
@@ -1507,7 +1713,8 @@ export default function (pi: ExtensionAPI) {
       const classification = classifyClose(hostMode, stdout, stderr, code, signal);
       const predecessor = String(armChild.pid ?? "");
       if (classification.kind === "actionable") {
-        const pending = armPendingActionable.get(armChild) ?? createPendingActionable(classification.message, predecessor);
+        const pending = (owner.stopping && !operationalHandback(classification.message) ? undefined : armPendingActionable.get(armChild))
+          ?? createPendingActionable(classification.message, predecessor);
         enqueuePendingActionable(owner, pending);
         if (!generationIsLive(owner)) return;
         owner.retryFailures = 0;
@@ -1578,11 +1785,16 @@ export default function (pi: ExtensionAPI) {
 
   pi.on?.("before_agent_start", (_event, ctx) => {
     if (!instance.isCurrent()) return;
+    sessionActivity += 1;
     rememberContext(ctx);
     markLoaded();
+    for (const wake of generation.unconsumedWakes.values()) {
+      if (wake.pending && !operationalHandback(wake.pending.message) && !wake.pending.delivered) wake.prepared = true;
+    }
   });
   pi.on?.("message_start", (event, ctx) => {
     if (!instance.isCurrent()) return;
+    sessionActivity += 1;
     rememberContext(ctx);
     const message = (event as { message?: { role?: unknown; content?: unknown } })?.message;
     if (!message || message.role !== "user") return;
@@ -1590,14 +1802,15 @@ export default function (pi: ExtensionAPI) {
     generation.queueStuckReported = false;
     consumeWake(generation, userMessageText(message.content));
   });
-  // A run that ends with a wake still unconsumed either drains it into the next
-  // run at once or left it in the composer; the delayed check tells the two apart.
   pi.on?.("agent_end", (_event, ctx) => {
     if (!instance.isCurrent()) return;
+    sessionActivity += 1;
     rememberContext(ctx);
     generation.restorePendingWaits = 0;
     generation.queueStuckReported = false;
-    scheduleRestoredWakeCheck(generation, true);
+    releaseWatcherWakes(generation);
+    void flushHeldWakes(generation);
+    scheduleWakeFlush(generation);
   });
 
   pi.on?.("session_start", async (_event, ctx) => {
@@ -1615,17 +1828,15 @@ export default function (pi: ExtensionAPI) {
     activateOwnedWatch(generation);
   });
   pi.on?.("session_shutdown", async (_event, ctx) => {
-    // omp carries no shutdown reason (verified: `reason` is undefined), so the
-    // replacement handoff is always persisted when anything is pending; a
-    // terminal quit then merely replays an already-drained wake next start.
+    // omp carries no shutdown reason, so pending work is always persisted;
+    // watcher delivery re-reads the queue on the next owning activation.
     if (!instance.isCurrent()) {
       lifecycle("session_shutdown-ignored", { reason: "superseded-instance" });
       return;
     }
     lifecycle("session_shutdown", { generation: generation.id });
     if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
-    if (restoreTimer) clearTimeout(restoreTimer);
-    restoreTimer = null;
+    releaseWatcherWakes(generation);
     stopStrandedPoll();
     rememberContext(ctx);
     const stopped = generation;
@@ -1672,8 +1883,7 @@ export default function (pi: ExtensionAPI) {
       stopStrandedPoll();
       lifecycle("instance-retired", { generation: generation.id, by: instance.current()?.id });
       if (replacementCoordinator.receiver === receiveReplacementActionable) replacementCoordinator.receiver = null;
-      if (restoreTimer) clearTimeout(restoreTimer);
-      restoreTimer = null;
+      releaseWatcherWakes(generation);
       const stopped = generation;
       if (!stopped.stopping) {
         recoveryPending = true;

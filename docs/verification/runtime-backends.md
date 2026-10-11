@@ -1317,14 +1317,17 @@ Three behaviors of omp left Firstmate-injected text unsubmitted or unseen in a l
 `tests/fm-omp-harness.test.sh` carries restored-wake editor recovery, descendant sessions, and marker self-repair; `tests/fm-composer-lib.test.sh` carries working-box fixtures captured during this verification; backend submit regressions carry dropped-Enter and stale-frame reread protections, and `tests/fm-wake-queue.test.sh` carries the ordinary stalled-loop alarm and idle-ring boundaries.
 
 The live guard that refreshes this entry submits real prompts and stays opt-in.
-Current queue-readiness and post-Escape restoration assertions are described in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
+Because production no longer queues watcher work while busy, a fixture-only wrapper captures a real idle wake and queues the same tracked text through omp's vendor follow-up API during a running turn.
+Both recovery probes require that text to be observed after Escape, then verify production's idle recovery send and the preserved editor before queue drainage or draft preservation can count as recovery proof.
+If restoration is not observed, the probe retries from a fresh busy turn at most three times, then fails rather than accepting ordinary queued delivery as recovery.
+Current queue-readiness and post-Escape restoration signals are described in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
 
 ```sh
 FM_OMP_WAKE_RESTORE_LIVE=1 tests/fm-omp-wake-restore-live-e2e.test.sh
 ```
 
-The latest complete guard run, on omp 18.8.1, is recorded in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel).
-Historical output below predates its fresh queued-wake and post-Escape restoration assertions, pre-parent-repair marker check, successful child-command evidence, and current busy-state checks at observations and submission.
+The latest complete guard run, on omp 18.8.1, is recorded in [omp stranded wake text and the queue panel](#2026-10-08-omp-stranded-wake-text-and-the-queue-panel); it predates the fixture wrapper and queue-read delivery, so the current interactive restored-wake contract remains unproven live.
+Historical output below predates that wrapper, its fresh queued-wake and post-Escape restoration assertions, pre-parent-repair marker check, successful child-command evidence, and current busy-state checks at observations and submission.
 These results do not establish the current recovery contract; output for the removed parent Enter recovery is omitted.
 
 ```text
@@ -1334,6 +1337,51 @@ ok - live omp markers: omp (omp/18.7.0) on herdr 0.9.1 kept both loaded markers 
 ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 reads empty and pending while a turn runs
 ok - live omp busy composer: omp (omp/18.7.0) on herdr 0.9.1 took an injected doorbell mid-turn and left the composer empty
 ```
+
+### 2026-10-08 omp stale wake gating
+
+Historical observation: verified on 2026-10-08 on macOS arm64 against omp 18.8.1, headless over its RPC protocol with the then-current real watch extension, the real wake queue and recovery marker, and the real `bin/fm-wake-drain.sh`.
+In that recorded run only the watcher arm was a stand-in, and a scripted local OpenAI-compatible model answered every request, so no model tokens were spent.
+The guard plays the lane's part by running the real drain and acknowledgement at the moments a lane would.
+
+- **A lane's drain strands every queued headline.**
+  With the historical disable setting (`FM_OMP_WAKE_HOLD_MAX_MS=0`, no longer supported), three watcher closes during a long turn were queued as three follow-ups.
+  The lane drained and acknowledged all three rows inside that turn, and omp then started one wake turn per follow-up, each finding nothing to drain.
+- **A held wake is delivered only to an idle lane that is still owed one.**
+  With the gate on, the same closes produced no wake turn after the lane drained.
+  When the lane did not drain during the long turn, exactly one wake turn followed, the lane drained inside it, and no further wake turn followed.
+
+[Watcher continuity](../watcher-continuity.md#omp-stale-wake-gating) owns the current queue-read delivery contract.
+The guard spends no model tokens, so it runs by default wherever omp is installed:
+
+```sh
+tests/fm-omp-stale-wake-live-e2e.test.sh
+```
+
+The output below belongs to the historical run, not a run of the updated contract or fixture.
+
+```text
+ok - live omp stale wake: omp (omp/18.8.1) delivered no wake turn after the lane drained and acknowledged every row inside a long turn (stale: no wake turn after the lane drained and acknowledged every row)
+ok - live omp owed wake: omp (omp/18.8.1) delivered exactly one wake turn to a lane that had not drained, and none after the drain that turn ran (owed: one wake turn, and none after the drain it triggered covered every row)
+ok - live omp control: omp (omp/18.8.1) with the gate disabled still shows the stale wake turns the guard exists to prevent (legacy: 3 stale wake turns without the gate)
+```
+
+The current control uses a small fixture-only legacy extension that deliberately queues watcher headlines without production gating; it does not patch or assert production source and does not use the old timing options. It fails the guard unless stale turns appear, so the other two scenarios cannot pass vacuously.
+The guard drives omp's `isIdle()` as the extension context reports it; an omp release that changes that signal fails the guard naming the version.
+
+Historical intermediate observation: on 2026-10-09, the guard passed against omp 18.8.1 on macOS arm64 with the subsequently replaced per-headline gate and fixture-only legacy control.
+The current scripted model waits for the driver to release the long turn after the rows have been fired and, for stale/control scenarios, drained and acknowledged; elapsed startup or re-arm time cannot end that turn prematurely.
+Focused executable watcher regressions also passed for initial delivery, editor recovery and draft preservation, mixed acknowledged-A/pending-B holds and replacement replay, unreadable idle state, and an hour-old busy hold. The real drain's focused queue regression passed exact payload, actor ownership, acknowledgement, literal serialization, failed-read, and marker-only checks.
+
+```text
+ok - live omp stale wake: omp (omp/18.8.1) delivered no wake turn after the lane drained and acknowledged every row inside a long turn (stale: no wake turn after the lane drained and acknowledged every row)
+ok - live omp owed wake: omp (omp/18.8.1) delivered exactly one wake turn to a lane that had not drained, and none after the drain that turn ran (owed: one wake turn, and none after the drain it triggered covered every row)
+ok - live omp control: omp (omp/18.8.1) with the fixture-only legacy injector still shows the stale wake turns the guard exists to prevent (legacy: 3 stale wake turns from the fixture-only ungated injector)
+```
+
+On 2026-10-09, the authorized queue-read design passed the real omp 18.8.1 RPC guard on macOS arm64: zero wake turns after an in-turn drain, exactly one owed wake naming the oldest payload and two additional rows, and three legacy control turns whose drains showed no rows. The public `--queued` regressions and shared classifier tests passed. Focused extension scenarios passed partial acknowledgements within one close, external recovery, legacy handoffs, late replacement callbacks, host checks and operational hand-backs, outstanding-token release at turn end and dropped preparation, query failure notices and retries, timeout recovery, slow queries, closes during an empty query, and editor draft preservation with fresh queued payloads. The interactive restore guard received a syntax check only; it was not run in this review round.
+
+The current guard classifies wake turns with `tests/omp_wake_turns.py`. An empty wake turn requires a successful `fm-wake-drain.sh` result with captured string-valued stdout containing no TSV wake rows; `WAKE_ACK_REQUIRED` alone, including recovery-only acknowledgement through zero, does not prove a row was owed. Failed drain evidence is a failure; missing or non-string stdout is unmeasured, not an empty turn and not a passing measurement. The live guard uses the same classifier for its owed turn and each legacy control turn rather than labeling every injected headline stale.
 
 ### 2026-10-08 omp idle wake behind an advisor note
 
@@ -1398,6 +1446,10 @@ The stranded-wake step now reads the full editor through `fm_backend_herdr_compo
 The idle-session launch uses the same box overlay as the spawned lane so the full-editor reader can identify the composer independently of omp's default shape.
 The guard also waits for the probe's fresh idle-context answer before typing setup prompts; the module-loaded marker and native idle report can appear before omp accepts input.
 The recorded run below predates this stronger assertion: its bottom-row-only check could miss multiline wake text remaining above the draft.
+It also predates [queue-read delivery](../watcher-continuity.md#omp-stale-wake-gating): at that time the stranded-wake poll submitted the composer copy as found, and restored-wake recovery re-submitted the exact wake.
+The extension now removes that text and lets the queue read decide what is sent, and the restored-wake probes use the fixture-only wrapper described under [omp injected text](#2026-10-06-omp-injected-text-through-herdr) with the probe's `hasPendingMessages()` answer as queue readiness.
+The stranded-wake step now requires the stranded text never to reach the model and the still-owed queue row to be delivered again in its place.
+The guard in that combined form received a syntax check only; it has not been run live.
 
 ```text
 ok - live omp idle wake: omp (omp/18.8.1) on herdr 0.9.1 started its own turn for a wake that reached an idle lane behind an advisor note and left the operator draft unsent
