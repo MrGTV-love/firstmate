@@ -1712,18 +1712,18 @@ EOF
 }
 
 # The default-branch ref that already-landed history is read from, resolved the
-# way content_in_default resolves it but without fetching: origin's copy when the
-# copy has an origin remote, else the local branch. A stale ref is still sound
-# because every commit reachable from it is in the default branch.
+# way fm_task_copy_content_in_default resolves it but without fetching: origin's
+# copy when the copy has an origin remote, else the local branch. A stale ref is
+# still sound because every commit reachable from it is in the default branch.
 landed_default_ref() {
-  local name=${BASE_BRANCH:-} ref
-  [ -n "$name" ] || name=$(default_branch) || return 1
-  if git -C "$WT" remote get-url origin >/dev/null 2>&1; then
+  local name=${BASE_BRANCH:-} ref dir=${TEARDOWN_LANDED_DIR:-$WT}
+  [ -n "$name" ] || name=$(fm_task_copy_default_branch "$PROJ") || return 1
+  if git -C "$dir" remote get-url origin >/dev/null 2>&1; then
     ref="refs/remotes/origin/$name"
   else
     ref="refs/heads/$name"
   fi
-  git -C "$WT" rev-parse --quiet --verify "$ref^{commit}" >/dev/null 2>&1 || return 1
+  git -C "$dir" rev-parse --quiet --verify "$ref^{commit}" >/dev/null 2>&1 || return 1
   printf '%s\n' "$ref"
 }
 
@@ -1745,15 +1745,16 @@ TEARDOWN_UNPROVEN_COMMITS=
 rebased_commits_are_in_pr_head() {
   local pr_head=$1 current default_ref base pr_commits pr_patch_ids candidates commit parents
   local patch_id tree merged proven unproven=
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   local -a fields
   TEARDOWN_UNPROVEN_COMMITS=
-  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || return 1
+  current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || return 1
   default_ref=$(landed_default_ref) || default_ref=
   if [ -n "$default_ref" ]; then
-    pr_commits=$(git -C "$WT" rev-list --no-merges "$pr_head" --not "$default_ref" -- 2>/dev/null) || return 1
+    pr_commits=$(git -C "$dir" rev-list --no-merges "$pr_head" --not "$default_ref" -- 2>/dev/null) || return 1
   else
-    base=$(git -C "$WT" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
-    pr_commits=$(git -C "$WT" rev-list --no-merges "$base..$pr_head" -- 2>/dev/null) || return 1
+    base=$(git -C "$dir" merge-base "$current" "$pr_head" 2>/dev/null) || return 1
+    pr_commits=$(git -C "$dir" rev-list --no-merges "$base..$pr_head" -- 2>/dev/null) || return 1
   fi
   pr_patch_ids=$(
     printf '%s\n' "$pr_commits" \
@@ -1764,11 +1765,11 @@ rebased_commits_are_in_pr_head() {
       | sed '/^$/d' \
       | sort -u
   ) || return 1
-  candidates=$(git -C "$WT" rev-list "$current" --not "$pr_head" ${default_ref:+"$default_ref"} -- 2>/dev/null) || return 1
+  candidates=$(git -C "$dir" rev-list "$current" --not "$pr_head" ${default_ref:+"$default_ref"} -- 2>/dev/null) || return 1
   [ -n "$candidates" ] || return 1
   while IFS= read -r commit; do
     [ -n "$commit" ] || continue
-    parents=$(git -C "$WT" rev-list --parents -n 1 "$commit" 2>/dev/null) || return 1
+    parents=$(git -C "$dir" rev-list --parents -n 1 "$commit" 2>/dev/null) || return 1
     read -r -a fields <<EOF
 $parents
 EOF
@@ -1781,8 +1782,8 @@ EOF
         fi
         ;;
       3)
-        tree=$(git -C "$WT" rev-parse --verify "$commit^{tree}" 2>/dev/null) || tree=
-        if merged=$(git -C "$WT" merge-tree --write-tree "${fields[1]}" "${fields[2]}" 2>/dev/null); then
+        tree=$(git -C "$dir" rev-parse --verify "$commit^{tree}" 2>/dev/null) || tree=
+        if merged=$(git -C "$dir" merge-tree --write-tree "${fields[1]}" "${fields[2]}" 2>/dev/null); then
           merged=$(printf '%s\n' "$merged" | head -1)
           if [ -n "$tree" ] && [ "$merged" = "$tree" ]; then
             proven=1
@@ -1790,7 +1791,7 @@ EOF
         fi
         ;;
     esac
-    [ "$proven" = 1 ] || unproven="$unproven$(git -C "$WT" log -1 --format='%h %s' "$commit" 2>/dev/null)"$'\n'
+    [ "$proven" = 1 ] || unproven="$unproven$(git -C "$dir" log -1 --format='%h %s' "$commit" 2>/dev/null)"$'\n'
   done <<EOF
 $candidates
 EOF
@@ -1815,8 +1816,9 @@ TEARDOWN_PIPELINE_INPUT_REASON=
 pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
   local pr_head=$1 pr_url=$2 current db rows kind id submitted pushed
   local timeout=${NM_TEARDOWN_TIMEOUT:-10} runs=0 tied=0 reasons=
+  local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   TEARDOWN_PIPELINE_INPUT_REASON=
-  current=$(git -C "$WT" rev-parse --verify HEAD 2>/dev/null) || current=
+  current=$(git -C "$dir" rev-parse --verify "$ref" 2>/dev/null) || current=
   if [ -z "$current" ]; then
     TEARDOWN_PIPELINE_INPUT_REASON="this copy's HEAD cannot be read"
     return 1
@@ -1825,7 +1827,7 @@ pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
     TEARDOWN_PIPELINE_INPUT_REASON="the merged PR's URL is not known, so no run record can be tied to it"
     return 1
   fi
-  db=$(fm_nm_state_db "$WT")
+  db=$(fm_nm_state_db "$dir")
   if [ ! -f "$db" ]; then
     TEARDOWN_PIPELINE_INPUT_REASON="no no-mistakes state database at $db, so no run record ties this copy to $pr_url"
     return 1
@@ -1834,7 +1836,7 @@ pipeline_input_is_local_head() {  # <merged pr head> <merged pr url>
     TEARDOWN_PIPELINE_INPUT_REASON="python3 is not available, so the no-mistakes run record for $pr_url cannot be read"
     return 1
   fi
-  if ! rows=$(fm_nm_bounded "$WT" "$timeout" python3 -I - "$db" "$pr_url" 2>/dev/null <<'PY'
+  if ! rows=$(fm_nm_bounded "$dir" "$timeout" python3 -I - "$db" "$pr_url" 2>/dev/null <<'PY'
 import re
 import sqlite3
 import sys
@@ -1960,6 +1962,9 @@ pr_is_merged() {
 work_is_landed() {
   local branch=$1
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
+  # Each call reports on its own directory and ref, never on an earlier call's.
+  TEARDOWN_UNPROVEN_COMMITS=
+  TEARDOWN_PIPELINE_INPUT_REASON=
   if [ "$MODE" = local-only ]; then
     local name
     name=$(fm_task_copy_default_branch "$PROJ") || name=

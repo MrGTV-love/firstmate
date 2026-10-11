@@ -1589,6 +1589,57 @@ test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses() {
   pass "squash-merged PR still refuses a merge commit that carries a change of its own"
 }
 
+# Main moved after the PR head was cut, and the copy merged that move in. The
+# commit the merge brought is already in the default branch, so it is not the
+# copy's own work and needs no proof in the PR head; judged without the default
+# branch it would count as a commit the PR head lacks.
+test_squash_merged_prerebase_copy_with_a_later_main_merge_allows() {
+  local case_dir rc tmp pr_head
+  case_dir=$(make_case squash-prerebase-later-main)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" a.txt alpha "add a"
+
+  tmp="$case_dir/_pipeline"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" checkout -q -b fm/task-x1
+  printf '%s\n' alpha > "$tmp/a.txt"
+  git -C "$tmp" add -- a.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "add a"
+  printf '%s\n' alpha review-edit > "$tmp/a.txt"
+  git -C "$tmp" add -- a.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "review: edit a"
+  pr_head=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/pull/7/head"
+
+  git -C "$tmp" checkout -q main
+  printf '%s\n' moved > "$tmp/m.txt"
+  git -C "$tmp" add -- m.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "main moves"
+  git -C "$tmp" push -q origin main
+  git -C "$case_dir/wt" fetch -q origin
+  git -C "$case_dir/wt" -c user.email=t@t -c user.name=t \
+    merge -q --no-ff --no-edit origin/main
+
+  git -C "$tmp" merge -q --squash fm/task-x1 >/dev/null
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "feat: squash (#7)"
+  git -C "$tmp" push -q origin main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin
+  printf '%s\n' \
+    'pr=https://github.com/example/repo/pull/7' \
+    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+
+  set +e
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+
+  expect_code 0 "$rc" "squash-prerebase-later-main: teardown should accept a pre-rebase copy that merged a main commit the PR head lacks"$'\n'"$(cat "$case_dir/stderr")"
+  ! grep -q REFUSED "$case_dir/stderr" || fail "squash-prerebase-later-main: teardown printed a REFUSED line"
+  pass "squash-merged PR accepts a pre-rebase copy that merged a later main commit the PR head lacks"
+}
+
 # Fixture for the pipeline-input cases: PR 7 is merged, its head is the commit the
 # pipeline pushed, and the task copy is the (rewritten) input the pipeline started
 # from. The recorded run is each test's own. Echoes: <pr_head>
@@ -8327,6 +8378,87 @@ test_nested_rerun_gone_copy_needs_its_branch_landed() {
   pass "a removed nested copy is judged by its own branch ref: unlanded refuses, content landed by squash passes"
 }
 
+# nested_pipeline_input_case <name>: make_nested_slot_case's enclosing shape
+# whose nested current copy was the input of the pipeline run behind merged
+# PR 7. The pipeline rewrote the copy's one commit, so only the no-mistakes run
+# record proves the copy landed (pipeline_input_is_local_head in
+# bin/fm-teardown.sh).
+nested_pipeline_input_case() {  # <name>
+  local case_dir tmp pr_head
+  make_nested_slot_case "$1" enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  printf '%s\n' alpha > "$NESTED_COPY/a.txt"
+  git -C "$NESTED_COPY" add a.txt
+  git -C "$NESTED_COPY" -c user.email=t@t -c user.name=t commit -qm "add a"
+  tmp="$case_dir/_pipeline"
+  git clone -q "$case_dir/origin.git" "$tmp"
+  git -C "$tmp" checkout -q -b fm/task-x1-v2
+  printf '%s\n' alpha-reviewed > "$tmp/a.txt"
+  git -C "$tmp" add -- a.txt
+  git -C "$tmp" -c user.email=t@t -c user.name=t commit -q -m "add a"
+  pr_head=$(git -C "$tmp" rev-parse HEAD)
+  git -C "$tmp" push -q origin "HEAD:refs/pull/7/head"
+  git -C "$tmp" push -q origin HEAD:main
+  rm -rf "$tmp"
+  git -C "$case_dir/project" fetch -q origin
+  printf '%s\n' \
+    'pr=https://github.com/example/repo/pull/7' \
+    "pr_head=$pr_head" >> "$case_dir/state/task-x1.meta"
+  add_gh_pr_merged_for_head "$case_dir" "$pr_head"
+  write_nm_run_record "$case_dir" run-1 https://github.com/example/repo/pull/7 \
+    "$(git -C "$NESTED_COPY" rev-parse HEAD)" "$pr_head"
+}
+
+# The run record proves the nested current copy, not the slot around it. A
+# slot holding a later commit of its own is measured at its own HEAD: it is
+# refused until that commit is anchored or landed, and returned once it is.
+test_nested_slot_is_not_proven_by_the_current_copys_pipeline_input() {
+  local case_dir rc slot_head label=nested-slot-pipeline-input
+  nested_pipeline_input_case "$label"
+  case_dir=$NESTED_CASE
+  printf 'late slot work\n' > "$NESTED_SLOT/late.txt"
+  git -C "$NESTED_SLOT" add late.txt
+  git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm "late slot work"
+  slot_head=$(git -C "$NESTED_SLOT" rev-parse HEAD)
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "$label: the slot's own unanchored commit must stop the return: $(cat "$case_dir/stderr")"
+  assert_grep "claimed pool slot $NESTED_SLOT" "$case_dir/stderr" "$label: the refusal did not name the slot"
+  assert_grep "neither landed nor held" "$case_dir/stderr" "$label: the refusal did not name the reason"
+  assert_no_grep "the ship deliverable is not landed" "$case_dir/stderr" "$label: the current copy's own run record did not prove it"
+  assert_absent "$case_dir/treehouse.log" "$label: the unproved slot was returned"
+  assert_present "$NESTED_COPY" "$label: the refusal removed the nested copy"
+  [ "$(git -C "$NESTED_SLOT" rev-parse HEAD)" = "$slot_head" ] || fail "$label: the slot lost its commit"
+  assert_present "$case_dir/state/task-x1.meta" "$label: the task record was removed"
+
+  git -C "$case_dir/project" update-ref \
+    "refs/fm/anchor/task-x1-$(git -C "$NESTED_SLOT" rev-parse --short HEAD)" "$slot_head"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "$label: an anchored slot around a copy its run record proves must tear down: $(cat "$case_dir/stderr2")"
+  assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the anchored slot was not returned"
+  assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+  pass "the enclosing slot is measured at its own HEAD, not proven by the nested copy's pipeline-input record"
+}
+
+# A nested copy an earlier teardown already removed is judged by its branch ref
+# under every landed-work proof, the run record included: a plain re-run
+# finishes without --force or captain words.
+test_nested_rerun_gone_copy_is_proven_by_its_pipeline_input() {
+  local case_dir rc label=nested-gone-pipeline-input
+  nested_pipeline_input_case "$label"
+  case_dir=$NESTED_CASE
+  git -C "$case_dir/project" worktree remove --force "$NESTED_COPY"
+  assert_absent "$NESTED_COPY" "$label: setup did not remove the nested copy"
+  rc=0
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "$label: a removed copy whose branch was the merged run's input must finish with a plain re-run: $(cat "$case_dir/stderr")"
+  assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the slot was not returned"
+  assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim survived the task"
+  assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+  pass "a removed nested copy whose branch was the merged run's input is proven by the run record"
+}
+
 # A fake tmux whose window cannot be closed while <case-dir>/endpoint-stuck
 # exists: kill-window fails and the window inventory still lists it. Without
 # the file every call succeeds silently.
@@ -9164,6 +9296,7 @@ test_squash_merged_stale_local_refuses_when_forge_unreachable
 test_squash_merged_pushed_prerebase_copy_allows
 test_squash_merged_pushed_prerebase_copy_missing_commit_refuses
 test_squash_merged_pushed_prerebase_copy_with_edited_merge_refuses
+test_squash_merged_prerebase_copy_with_a_later_main_merge_allows
 test_pipeline_input_diverged_iteration_allows
 test_pipeline_input_rewritten_by_pipeline_allows
 test_pipeline_input_refuses_copy_behind_the_input_head
@@ -9270,6 +9403,8 @@ test_nested_slot_reproof_refusal_is_rerunnable
 test_nested_rerun_local_only_ship_is_recorded_landed
 test_nested_rerun_matrix_refusal_at_each_phase
 test_nested_rerun_gone_copy_needs_its_branch_landed
+test_nested_slot_is_not_proven_by_the_current_copys_pipeline_input
+test_nested_rerun_gone_copy_is_proven_by_its_pipeline_input
 test_nested_rerun_after_slot_return_records_landed
 test_nested_post_lock_reprove_skips_removed_nested_priors
 test_other_record_copy_overlap_is_component_aware
