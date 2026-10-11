@@ -45,9 +45,19 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-wake-lib.sh"
 
 mkdir -p "$STATE"
-LEASE_COMMAND_LOCK="$STATE/.fm-lease-command.lock"
-fm_lock_acquire_wait "$LEASE_COMMAND_LOCK"
-trap 'fm_lock_release "$LEASE_COMMAND_LOCK"' EXIT
+# Each command serializes on the lease-command lock of the one task it touches
+# (fm_lease_lock_path owns the name), never on a lock for the whole home, so a
+# claim or sweep on one task does not wait behind a guarded mutation of another.
+LEASE_COMMAND_LOCK=
+lease_lock_take() {  # <task>
+  LEASE_COMMAND_LOCK=$(fm_lease_lock_path "$1")
+  fm_lock_acquire_wait "$LEASE_COMMAND_LOCK"
+}
+lease_lock_drop() {
+  [ -z "$LEASE_COMMAND_LOCK" ] || fm_lock_release "$LEASE_COMMAND_LOCK"
+  LEASE_COMMAND_LOCK=
+}
+trap lease_lock_drop EXIT
 
 usage() {
   echo "usage: fm-lease.sh claim|release <task> [--actor main|branch] | release-actor --actor main|branch | check <task> | sweep" >&2
@@ -99,6 +109,10 @@ case "$CMD" in
     [ "$#" -eq 0 ] || usage
     ;;
   *) usage ;;
+esac
+
+case "$CMD" in
+  claim|release|check) lease_lock_take "$TASK" ;;
 esac
 
 case "$CMD" in
@@ -172,9 +186,11 @@ case "$CMD" in
       case "$LEASE" in *.lock) continue ;; esac
       TASK=${LEASE##*/.lease-}
       fm_lease_valid_id "$TASK" || continue
+      lease_lock_take "$TASK"
       if fm_lease_read "$TASK" && [ "$FM_LEASE_ACTOR" = "$ACTOR" ]; then
         rm -f -- "$LEASE"
       fi
+      lease_lock_drop
     done
     ;;
   sweep)
@@ -183,7 +199,9 @@ case "$CMD" in
       case "$LEASE" in *.lock) continue ;; esac
       TASK=${LEASE##*/.lease-}
       fm_lease_valid_id "$TASK" || continue
+      lease_lock_take "$TASK"
       fm_lease_clear_stale "$TASK"
+      lease_lock_drop
     done
     ;;
 esac
