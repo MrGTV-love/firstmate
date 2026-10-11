@@ -743,7 +743,16 @@ test_lock_stale_steal_single_winner_under_concurrency() {
     pids="$pids $!"
     i=$((i + 1))
   done
-  IFS= read -r winner < "$gate"
+  # A contender exit can interrupt the FIFO open (EINTR) and bash does not
+  # retry it; an empty winner would then wait on the winner below forever.
+  winner=
+  for ((i = 0; i < 100; i++)); do
+    IFS= read -r winner 2>/dev/null < "$gate" && [ -n "$winner" ] && break
+  done
+  if [ -z "$winner" ]; then
+    for pid in "$waiter" $pids; do kill "$pid" 2>/dev/null || true; done
+    fail "no stale-lock contender reported its win"
+  fi
   [ "$winner" = "$waiter" ] || { kill "$waiter" 2>/dev/null || true; wait "$waiter" 2>/dev/null || true; }
   for pid in $pids; do
     [ "$pid" = "$winner" ] || wait "$pid" 2>/dev/null || true
