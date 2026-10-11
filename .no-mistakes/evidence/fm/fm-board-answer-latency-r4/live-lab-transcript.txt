@@ -1,0 +1,32 @@
+# Live lab run: real lavish-axi 0.1.79 server (isolated state dir + port 47391), real fm-procevent-lavish.sh / fm-procevent.sh in a marked lab FM_HOME
+## wake queue (one wake per captured answer / hold report)
+1791700043	1	check	procevent:lavish-4cec4ffe5f1b5494:1	check: procevent lavish lavish-4cec4ffe5f1b5494 1
+1791700061	2	check	procevent:lavish-4cec4ffe5f1b5494:2	check: procevent lavish lavish-4cec4ffe5f1b5494 2
+1791700066	3	check	procevent:lavish-4cec4ffe5f1b5494:3	check: procevent lavish lavish-4cec4ffe5f1b5494 3
+1791700095	4	check	procevent:lavish-4cec4ffe5f1b5494:stranded:.claim.X7EelK-76186	check: process-event source lavish-4cec4ffe5f1b5494 is registered but nothing can arm it: its runner died and its poll
+1791700119	5	check	procevent:lavish-4cec4ffe5f1b5494:4	check: procevent lavish lavish-4cec4ffe5f1b5494 4
+1791700149	6	check	procevent:lavish-4cec4ffe5f1b5494:5	check: procevent lavish lavish-4cec4ffe5f1b5494 5
+1791700163	7	check	procevent:lavish-4cec4ffe5f1b5494:stranded:.claim.Z7LrPh-79081	check: process-event source lavish-4cec4ffe5f1b5494 is registered but nothing can arm it: its runner died and its poll
+1791700207	8	check	procevent:lavish-4cec4ffe5f1b5494:6	check: procevent lavish lavish-4cec4ffe5f1b5494 6
+1791700237	9	check	procevent:lavish-4cec4ffe5f1b5494:7	check: procevent lavish lavish-4cec4ffe5f1b5494 7
+1791700290	10	check	procevent:lavish-4cec4ffe5f1b5494:8	check: procevent lavish lavish-4cec4ffe5f1b5494 8
+1791700321	11	check	procevent:lavish-4cec4ffe5f1b5494:9	check: procevent lavish lavish-4cec4ffe5f1b5494 9
+1791700426	12	check	procevent:lavish-4cec4ffe5f1b5494:10	check: procevent lavish lavish-4cec4ffe5f1b5494 10
+
+## captured results
+lavish-4cec4ffe5f1b5494.1.result: Choose A, ship it
+lavish-4cec4ffe5f1b5494.10.result: answer round 1
+lavish-4cec4ffe5f1b5494.2.result: answer round 2
+lavish-4cec4ffe5f1b5494.3.result: answer round 3
+lavish-4cec4ffe5f1b5494.4.result: NOT_FOUND
+lavish-4cec4ffe5f1b5494.5.result: answer round 5 after reconcile
+lavish-4cec4ffe5f1b5494.6.result: answer round 7 after second reconcile
+lavish-4cec4ffe5f1b5494.7.result: code: LISTENER_ACTIVE
+lavish-4cec4ffe5f1b5494.8.result: answer round 8 after foreign holder ended
+lavish-4cec4ffe5f1b5494.9.result: code: LISTENER_ACTIVE
+
+## held-page report (foreign unledgered poll held the page; kept, reported once, never killed)
+error: "Lavish Editor already has an active poll listener (current listener: agent-listener; active for 4639ms)"
+code: LISTENER_ACTIVE
+help[1]: Use --takeover only when you intend to displace the current listener
+held-page: another poll holds /Users/charlesabrooker/tmp/fm-lab.Syv6pK/pages/board.html and is not a proved leftover, so it is not displaced; this listener keeps its claim, retries with back-off, and 
