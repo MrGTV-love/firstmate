@@ -1444,12 +1444,16 @@ Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each
   A harness without a readable catalog, or a catalog command that hits its time limit, gives a notice and no verdict.
 - **Stale.** The catalog lists a model of the same family and provider prefix with a higher version.
   A version that carries no number, such as the `opus` alias a harness keeps current itself, is current by definition.
-  The newer model named is the same tier when one exists, otherwise the newest of any tier, marked `(other tier: ...)`.
+  The newer model named is the same tier when one exists, otherwise the newest of any tier, marked `(other tier: ...)`; a newer id with no tier word, such as `gpt-5.2`, is marked `(other tier: base model)`.
+  A dated snapshot suffix such as `-2024-08-06` is never read as a version.
 - **Output.** One line per stale model: `MODEL_FRESHNESS: <model> on <harness> is older than <newer> in the <harness> catalog`.
 - **Session start.** The deferred network stage runs the scan beside its other checks and prints each line as a `MODEL_FRESHNESS:` diagnostic; an unreadable catalog is a `BOOTSTRAP_INFO` fact only under `FM_BOOTSTRAP_VERBOSE_FACTS=1`.
+  When `config/claude-launcher` selects a custom launcher, claude models are not checked, because the plain `claude` catalog is not the one those workers use.
 - **Spawn.** `fm-spawn.sh` prints `warning: model is stale - ...`, records `model_stale=` in the task record, and `fm-crew-state.sh` repeats it as a `model-stale:` component on that task's state line; the spawn proceeds.
-  The check runs under the worker account pin, so a pinned Claude account answers from its own catalog.
-  It is skipped when the model-index check treats the catalog context as unavailable (a raw launch, or a Claude custom launcher), and it reuses the catalog that index check read in the same spawn instead of reading the harness again.
+  The advisory reads the catalog from the spawn's own environment, under the worker account pin when one is set, so a pinned Claude account answers from its own catalog.
+  It reads there even where the model-index check treats the worker account context as unavailable, such as an unpinned launch, because it gates nothing; its read never stands in for the worker's catalog in the index check.
+  It is skipped for a raw launch and for a Claude custom launcher.
+  A spawn reads each catalog at most once: the advisory reuses the catalog the model-index check or the agy, omp, or cursor model validator already read, and runs its own read only when no earlier read happened.
 - **Off switch.** `FM_MODEL_FRESHNESS=0` turns the check off; the test suite sets it so no case reads a developer's real catalogs.
 
 `tests/fm-model-freshness.test.sh` covers the comparison, scan, spawn, and catalog-reuse behavior against fixture catalogs.

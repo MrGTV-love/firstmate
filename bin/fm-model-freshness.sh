@@ -9,6 +9,7 @@
 #          is about to launch.
 # Output: one line on stdout per stale model, nothing else:
 #   MODEL_FRESHNESS: <model> on <harness> is older than <newer> in the <harness> catalog[ (other tier: <tier>)]
+# where <tier> is "base model" for a newer id with no tier word (gpt-5.2).
 # Notices (a catalog that could not be read) go to stderr as
 #   model-freshness: notice: <detail>
 # The check is advisory. It exits 0 whatever it finds, refuses nothing, and
@@ -16,7 +17,8 @@
 #
 # What stale means. The model id is split into a family (its leading name, such
 # as gemini, gpt, claude, glm), a version (the first run of numeric parts, so
-# 3.1, 6.1 and the claude-sonnet-5-5 spelling of 5.5 all compare as numbers), a
+# 3.1, 6.1 and the claude-sonnet-5-5 spelling of 5.5 all compare as numbers,
+# looked for only before a dated snapshot suffix such as -2024-08-06), a
 # tier (pro, flash, sonnet, sol, ...) and an effort variant (high, low, ...).
 # A model is stale when its own harness catalog lists a model of the same
 # family, from the same provider prefix, whose version is higher. The newer
@@ -24,9 +26,12 @@
 # of any tier, because a newer generation of a family replaces an older one
 # across tiers (gemini-3.8-flash-high is newer than gemini-3.1-pro-high).
 # Never inferred from a name: the catalog is read from the harness's own
-# discovery command (bin/fm-model-catalog-lib.sh owns them), and an id the harness keeps current - an alias with no version in
-# it, such as opus - is current by definition. A harness without a readable
-# catalog is reported as a notice, never guessed.
+# discovery command (bin/fm-model-catalog-lib.sh owns them), and an id the
+# harness keeps current - an alias with no version in it, such as opus - is
+# current by definition. A harness without a readable catalog is reported as a
+# notice, never guessed. A home whose config/claude-launcher routes Claude
+# through a custom launcher (TeamClaude) gets no claude verdict: the plain
+# claude catalog is not the one its workers use.
 #
 # Catalogs are read in the caller's environment. bin/fm-spawn.sh runs the check
 # under the worker account pin, so a pinned Claude account answers for itself;
@@ -35,8 +40,8 @@
 # for bin/fm-model-index.sh. FM_HOME / FM_CONFIG_OVERRIDE select the config.
 # FM_MODEL_FRESHNESS=0 turns the check off (tests that run no catalog).
 # With FM_MODEL_FRESHNESS_CATALOG=stdin, check reads the harness's catalog from
-# stdin (the normalized JSON bin/fm-model-index.sh check prints under
-# FM_MODEL_CATALOG_EMIT=1) and runs no discovery of its own.
+# stdin (normalized as bin/fm-model-catalog-lib.sh prints it) and runs no
+# discovery of its own; bin/fm-spawn.sh hands over the catalog it already read.
 set -u
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
@@ -69,6 +74,12 @@ else
     | map(select(type == "object" and (.harness | type) == "string" and (.model | type) == "string" and (.model | length) > 0))
     | map([.harness, .model] | @tsv) | unique[]' <<< "$resolved" > "$TMP/pairs" 2>/dev/null \
     || { notice "could not read models from $file; nothing checked"; exit 0; }
+fi
+if [ -e "$CONFIG/claude-launcher" ] || [ -L "$CONFIG/claude-launcher" ]; then
+  awk -F'\t' '$1 == "claude" {print $2}' "$TMP/pairs" | while IFS= read -r model; do
+    notice "claude catalog not read (config/claude-launcher selects a custom launcher); '$model' not checked"
+  done
+  awk -F'\t' '$1 != "claude"' "$TMP/pairs" > "$TMP/pairs.kept" && mv "$TMP/pairs.kept" "$TMP/pairs"
 fi
 [ -s "$TMP/pairs" ] || exit 0
 
@@ -103,7 +114,9 @@ FRESHNESS_JQ='
     | ($parts | map(select(length > 0))) as $parts
     | ($parts | last // "") as $leaf
     | ($parts[:-1] | join("/")) as $prov
-    | ($leaf | split("-")) as $tok
+    | ($leaf | split("-")) as $all
+    | ($all | map(test("^[0-9]{4,}$")) | index(true)) as $date
+    | (if $date == null then $all else $all[:$date] end) as $tok
     | ($tok | map(test("^v?[0-9]{1,3}(\\.[0-9]{1,3})*$"))) as $isv
     | ($isv | index(true)) as $first
     | if $first == null then {raw: $raw, version: [], prov: $prov}
@@ -130,7 +143,7 @@ FRESHNESS_JQ='
           | ($pool | map(.version) | max) as $best
           | ($pool | map(select(.version == $best))
               | sort_by([(.variant != $c.variant), (.ctx != $c.ctx)]) | .[0]) as $pick
-          | [$pick.raw, (if $pick.tier != $c.tier then $pick.tier else "" end)] | @tsv
+          | [$pick.raw, (if $pick.tier == $c.tier then "" elif $pick.tier == "" then "base model" else $pick.tier end)] | @tsv
         end
     end'
 
