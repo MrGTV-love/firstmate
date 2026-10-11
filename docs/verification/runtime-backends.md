@@ -640,6 +640,10 @@ TypeSafe answered with model `jev-1.13.0` in 174-193 ms per call, using 373-558 
 A current live refresh must launch fresh Claude and omp workers through `fm-spawn.sh` in an authorized disposable lab with an isolated backend, exercise firstmate-scoped allow, block and banner paths, and verify that non-firstmate scopes reach neither provider.
 Repeat the live refresh after a Claude Code or omp upgrade; the scratch-project sessions above alone cannot refresh the current egress or spawn guarantees.
 
+## Claude primary feedback
+
+Claude Code 2.1.291 native feedback was revalidated through TeamClaude 1.1.21-affinity.0 on 2026-10-06; [`supervision.md`](supervision.md#claude-mid-turn-lavish-feedback-2026-09-30) owns the real-review, queued-answer, unpublished-capture, handled-answer and Stop-rewake evidence.
+
 ## Claude workspace trust
 
 Verified 2026-09-03 on Claude Code 2.1.259.

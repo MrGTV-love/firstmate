@@ -1510,7 +1510,7 @@ test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only() {
   fm_test_track_process "$case_dir/cold-launch.pid" "$fakebin/perl"
   cat > "$fakebin/perl" <<SH
 #!/usr/bin/env bash
-if [ "\${3-}" = detach ] && [ "\${5-}" = _start ] && [ "\${6-}" = proc-guard ]; then
+if [ "\${3-}" = detach ] && [ "\${@: -2:1}" = _start ] && [ "\${@: -1}" = proc-guard ]; then
   fm_test_record_process '$case_dir/cold-launch.pid'
   printf 'launch\n' >> '$case_dir/cold-launches'
   : > '$case_dir/cold-started'

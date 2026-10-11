@@ -10,32 +10,149 @@
 # hook's launch is healthy.
 # The project and FM_HOME are isolated; Claude keeps using its existing managed
 # authentication. No live fleet home, worktree, or session is touched.
+# Print launches close unused stdin and keep JSON stdout separate from stderr;
+# cleanup reports captured diagnostics on success or failure before removal.
 # shellcheck disable=SC2016 # the model, not this test shell, reads the prompt text
 set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-fm_live_gate opt-in FM_CLAUDE_LIVE_E2E claude
+fm_live_gate opt-in FM_CLAUDE_LIVE_E2E
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+tool_result_text() {  # <native-jsonl>
+  jq -r 'select(.type == "user") | .message.content[]?
+    | select(.type == "tool_result") | .content
+    | if type == "string" then .
+      elif type == "array" then .[]? | select(.type == "text") | .text
+      else empty end' "$1"
+}
+
 fail() {
   printf 'not ok - %s\n' "$1" >&2
+  local evidence
+  for evidence in "${LAB:-/nonexistent}"/posttool*.jsonl; do
+    [ -f "$evidence" ] || continue
+    printf 'native failure evidence: %s\n' "$evidence" >&2
+    jq -r 'select(.type == "assistant") | .message.content[]?
+      | select(.type == "tool_use") | .input.command // empty' "$evidence" >&2 || true
+    tool_result_text "$evidence" >&2 || true
+  done
   exit 1
 }
+
+"$ROOT/bin/fm-teamclaude-launch.sh" --check || fail "TeamClaude launcher preflight failed"
 
 LAB="$ROOT/.claude-autoarm-live-e2e.$$"
 PROJECT="$LAB/project"
 HOME_DIR="$LAB/fmhome"
 LIVE_OWNER_HOME="$LAB/live-owner-home"
 TRANSCRIPT="$LAB/claude.jsonl"
-CLAUDE_VERSION=$(claude --version)
 
 cleanup() {
+  local diagnostic
+  for diagnostic in "$LAB"/*.stderr; do
+    [ -s "$diagnostic" ] || continue
+    printf 'native Claude diagnostics: %s\n' "$diagnostic" >&2
+    cat "$diagnostic" >&2
+  done
+  if [ -s "$LAB/opener.log" ]; then
+    cat "$LAB/opener.log"
+  fi
   rm -rf "$LAB"
 }
 trap cleanup EXIT
+
+mkdir -p "$LAB/fakebin"
+cat > "$LAB/fakebin/open" <<'SH'
+#!/usr/bin/env bash
+printf 'blocked macOS open:' >> "$FM_LIVE_OPEN_LOG"
+printf ' %q' "$@" >> "$FM_LIVE_OPEN_LOG"
+printf '\n' >> "$FM_LIVE_OPEN_LOG"
+SH
+chmod +x "$LAB/fakebin/open"
+export FM_LIVE_OPEN_LOG="$LAB/opener.log"
+export PATH="$LAB/fakebin:$PATH"
+printf 'live isolation: project=%s home=%s opener=%s\n' "$PROJECT" "$HOME_DIR" "$LAB/fakebin/open"
+CLAUDE_VERSION=$("$ROOT/bin/fm-teamclaude-launch.sh" --version) || fail "Claude version check through TeamClaude failed"
+
+test_posttool_delivery() {
+# Prove the native PostToolUse context channel against Claude, before any Stop
+# event, in a separate isolated primary. Use the production hook registration;
+# only session-start is narrowed to claiming this fixture's session lock.
+mkdir -p "$LAB"
+POST_PROJECT="$LAB/posttool-project"
+POST_HOME="$LAB/posttool-home"
+POST_TRANSCRIPT="$LAB/posttool.jsonl"
+git clone -q "$ROOT" "$POST_PROJECT"
+cp -R "$ROOT/bin/." "$POST_PROJECT/bin/"
+mkdir -p "$POST_HOME/state/procevent-inbox"
+jq '{hooks: {
+  SessionStart: [{hooks: [{type: "command", command: "\"$CLAUDE_PROJECT_DIR\"/bin/fm-lock.sh"}]}],
+  PostToolUse: .hooks.PostToolUse
+}}' "$ROOT/.claude/settings.json" > "$POST_PROJECT/.claude/settings.json"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,Review reply for mid-turn delivery\n' \
+  > "$POST_HOME/state/procevent-inbox/lavish-midturn.1.result"
+printf 'lavish\n' > "$POST_HOME/state/procevent-inbox/lavish-midturn.1.adapter"
+printf '%s\t1\tcheck\tprocevent:lavish-midturn:1\tcheck: procevent lavish lavish-midturn 1\n' \
+  "$(date +%s)" > "$POST_HOME/state/.wake-queue"
+printf '1\n' > "$POST_HOME/state/.wake-queue.seq"
+POST_PROMPT='This is a bounded hook-integration experiment, not project work. First run exactly `printf "MIDTURN_START\n"` with Bash. Choose the following branch exactly once, based only on the hook context returned from that first Bash call: if it tells you a captured Lavish result is waiting, follow its instructions to find, read and acknowledge that capture. Otherwise run exactly `printf "NO_FEEDBACK_NOTICE\n"`. Never switch to the no-notice branch after handling a capture, even though acknowledgement clears the notice. End with exactly POSTTOOL_DONE. Use only Bash; do not delegate, inspect the fleet, or run a Stop watcher.'
+(
+  cd "$POST_PROJECT" || exit 1
+  FM_HOME="$POST_HOME" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
+    "$POST_PROJECT/bin/fm-teamclaude-launch.sh" -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
+    --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
+) </dev/null > "$POST_TRANSCRIPT" 2> "$LAB/posttool.stderr" || fail "Claude PostToolUse experiment failed"
+[ -f "$POST_HOME/state/procevent-inbox/lavish-midturn.1.handled" ] \
+  || fail "real Claude never handled the mid-turn review notice"
+! tool_result_text "$POST_TRANSCRIPT" | grep -qx 'NO_FEEDBACK_NOTICE' \
+  || fail "Claude took the no-notice path instead of handling feedback mid-turn"
+# Successful synchronous PostToolUse context is not serialized as hook_response
+# in Claude's print stream. Prove native delivery through the next action and
+# its counterfactual instead: once handled, the same prompt takes no-notice.
+# Model the crash window after durable capture but before its wake publication.
+# The prompt deliberately names no candidate: only the hook can identify it.
+# Use the default home here: FM_HOME is absent from Claude and its tool
+# environment, so the notice must carry the resolved path, not an env template.
+mkdir -p "$POST_PROJECT/state/procevent-inbox"
+printf 'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,Reply captured before wake publication\n' \
+  > "$POST_PROJECT/state/procevent-inbox/lavish-unpublished.2.result"
+printf 'lavish\n' > "$POST_PROJECT/state/procevent-inbox/lavish-unpublished.2.adapter"
+POST_UNPUBLISHED="$LAB/posttool-unpublished.jsonl"
+(
+  cd "$POST_PROJECT" || exit 1
+  CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
+    env -u FM_HOME -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE \
+    "$POST_PROJECT/bin/fm-teamclaude-launch.sh" -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
+    --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
+) </dev/null > "$POST_UNPUBLISHED" 2> "$LAB/posttool-unpublished.stderr" || fail "Claude unpublished-capture experiment failed"
+[ -f "$POST_PROJECT/state/procevent-inbox/lavish-unpublished.2.handled" ] \
+  || fail "Claude drained an empty queue but did not recover and handle the unpublished answer"
+unpublished_calls=$(jq -r 'select(.type == "assistant") | .message.content[]?
+  | select(.type == "tool_use") | .input.command // empty' "$POST_UNPUBLISHED")
+printf '%s\n' "$unpublished_calls" | grep -q 'fm-wake-drain.sh' \
+  || fail "Claude did not check the durable queue before direct capture recovery"
+! tool_result_text "$POST_UNPUBLISHED" | grep -qx 'NO_FEEDBACK_NOTICE' \
+  || fail "an unpublished answer was mistaken for absent feedback"
+POST_NEGATIVE="$LAB/posttool-handled.jsonl"
+(
+  cd "$POST_PROJECT" || exit 1
+  CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
+    env -u FM_HOME -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE \
+    "$POST_PROJECT/bin/fm-teamclaude-launch.sh" -p "$POST_PROMPT" --dangerously-skip-permissions --setting-sources project,local \
+    --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
+) </dev/null > "$POST_NEGATIVE" 2> "$LAB/posttool-handled.stderr" || fail "Claude handled-review counterfactual failed"
+negative_calls=$(jq -r 'select(.type == "assistant") | .message.content[]?
+  | select(.type == "tool_use") | .input.command // empty' "$POST_NEGATIVE")
+tool_result_text "$POST_NEGATIVE" | grep -qx 'NO_FEEDBACK_NOTICE' \
+  || fail "handled feedback did not take the no-notice path"
+! printf '%s\n' "$negative_calls" | grep -q 'fm-wake-drain.sh' \
+  || fail "handled feedback still caused a mid-turn drain"
+printf 'ok - Claude %s delivered and handled captured Lavish feedback through native PostToolUse before turn end\n' "$CLAUDE_VERSION"
+}
 
 mkdir -p "$LAB"
 # git clone of this worktree carries only committed state, so copy the
@@ -81,8 +198,13 @@ printf '9999999\n' > "$HOME_DIR/state/.lock"
 # a misbehaving session can never loop forever.
 cat > "$PROJECT/bin/fm-watch-arm.sh" <<'SH'
 #!/usr/bin/env bash
+if [ -n "${FM_WATCH_PREDECESSOR_ARM_PID:-}" ]; then
+  printf 'predecessor=%s\n' "$FM_WATCH_PREDECESSOR_ARM_PID" >> "$FM_HOME/state/successor-ran"
+  printf 'watcher: started pid=%s (beacon fresh)\n' "$$"
+  exit 0
+fi
 N=$(cat "$FM_HOME/state/arm-count" 2>/dev/null || echo 0); N=$((N+1)); echo "$N" > "$FM_HOME/state/arm-count"
-echo "arm-run=$N pid=$$" >> "$FM_HOME/state/arm-ran"
+echo "arm-run=$N pid=$$ predecessor=${FM_WATCH_PREDECESSOR_ARM_PID:-none}" >> "$FM_HOME/state/arm-ran"
 if [ "$N" -ge 3 ]; then
   rm -f "$FM_HOME/state/task.meta"
   printf 'watcher: attached pid=%s (beacon 2s)\n' "$$"
@@ -113,12 +235,14 @@ PROMPT='After reading the complete session-start digest, reply with exactly CYCL
 (
   cd "$PROJECT" || exit 1
   FM_HOME="$HOME_DIR" CLAUDE_CODE_ENABLE_PROMPT_SUGGESTION=false CLAUDE_CODE_SEND_FEEDBACK=0 \
-    claude -p "$PROMPT" --dangerously-skip-permissions --settings '{"feedbackDrafts":"off"}' \
-    --effort low --output-format stream-json --verbose
-) > "$TRANSCRIPT" 2>&1 || fail "Claude credentialed auto-arm session failed: $(tail -20 "$TRANSCRIPT")"
+    "$PROJECT/bin/fm-teamclaude-launch.sh" -p "$PROMPT" --dangerously-skip-permissions --setting-sources project,local \
+    --settings '{"feedbackDrafts":"off"}' --effort low --output-format stream-json --verbose
+) </dev/null > "$TRANSCRIPT" 2> "$LAB/claude.stderr" || fail "Claude credentialed auto-arm session failed: $(tail -20 "$TRANSCRIPT")"
 
 ARM_RUNS=$(wc -l < "$HOME_DIR/state/arm-ran" 2>/dev/null | tr -d ' ')
-[ "$ARM_RUNS" = 2 ] || fail "expected exactly 2 hook-owned arm cycles, got $ARM_RUNS: $(cat "$HOME_DIR/state/arm-ran" 2>/dev/null)"
+[ "$ARM_RUNS" = 2 ] || fail "expected exactly 2 hook-owned arm cycles, got $ARM_RUNS: $(cat "$HOME_DIR/state/arm-ran"); drains=$(cat "$HOME_DIR/state/drain-count" 2>/dev/null); calls=$(cat "$HOME_DIR/state/tool-calls.log" 2>/dev/null)"
+SUCCESSOR_RUNS=$(wc -l < "$HOME_DIR/state/successor-ran" 2>/dev/null | tr -d ' ')
+[ "$SUCCESSOR_RUNS" = 2 ] || fail "expected one handling successor per actionable close, got ${SUCCESSOR_RUNS:-0}: $(cat "$HOME_DIR/state/successor-ran" 2>/dev/null)"
 DRAIN_RUNS=$(wc -l < "$HOME_DIR/state/drain-ran" 2>/dev/null | tr -d ' ')
 [ "$DRAIN_RUNS" = 3 ] || fail "expected one session-start drain plus two model wake drains, got $DRAIN_RUNS drains"
 REWAKES=$(jq -r '
@@ -182,5 +306,6 @@ printf '%s\n' '{"session_id":"live-owner-control"}' \
 [ ! -e "$LIVE_OWNER_HOME/state/.claude-autoarm-epoch" ] || fail "competing Stop hook wrote an epoch while another live session owned the home"
 [ ! -s "$LAB/live-owner.out" ] && [ ! -s "$LAB/live-owner.err" ] || fail "competing Stop hook produced a rewake while another live session owned the home"
 wait "$LIVE_OWNER_PID"
+test_posttool_delivery
 
 printf 'ok - Claude %s live E2E reclaimed a stale session lock through session start, completed two tokenless Stop-owned rewake cycles, and preserved the competing-live-owner boundary\n' "$CLAUDE_VERSION"

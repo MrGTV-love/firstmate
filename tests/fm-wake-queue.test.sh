@@ -1099,6 +1099,9 @@ test_term_stops_a_watcher_blocked_in_the_drain_ring_idle_capture() {
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_POLL=1 FM_SIGNAL_GRACE=0 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     secondmate_stall_watch_leg "$dir" "first" progress mate "$(printf '1000\t100-7')"
+  # The first leg's stop published watcher downtime; acknowledge it so the
+  # blocked leg reaches the ring instead of exiting on check: rearm-resurface.
+  drain_liveness_wakes "$dir"
 
   # The active-turn read returns, then the idle-proof read blocks on a FIFO
   # whose write end the holder keeps open without writing.
@@ -1129,6 +1132,7 @@ SH
   PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_SENT="$dir/sent" \
     FM_FAKE_TMUX_CAPTURE="$fifo" FM_FAKE_CAPTURE_COUNT="$dir/captures" \
+    FM_OPEN_LOOPS_INTERVAL=999999 \
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
     FM_POLL=1 FM_SIGNAL_GRACE=0 FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 \
     "$WATCH" > "$out" 2>&1 &
@@ -3242,7 +3246,7 @@ SH
 # mutation lock keeps its blocking all-or-nothing acknowledgement contract.
 test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   local dir state status queue_out queue_err first_out first_err second_out second_err replay_out replay_err
-  local queue_holder presentation_holder ack_holder i start elapsed rc advisory_count
+  local queue_holder presentation_holder ack_holder i start elapsed rc advisory_count ack_count
   dir=$(make_case presentation-lock-deadline)
   state="$dir/state"
   status="$state/task.status"
@@ -3314,6 +3318,19 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
   [ -s "$dir/presentation.ready" ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation holder never acquired its lock"; }
 
+  # Assert helper silence at its own boundary, not against the drain's valid
+  # supervision alarms for the still-unacknowledged wake.
+  rc=0
+  FM_STATE_OVERRIDE="$state" bash -c '
+    . "$1"
+    fm_lock_acquire_wait_bounded "$2" 1
+  ' _ "$ROOT/bin/fm-wake-lib.sh" "$state/.status-presentation-lock" \
+    > "$dir/presentation-helper.out" 2> "$dir/presentation-helper.err" || rc=$?
+  [ "$rc" -eq 124 ] \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation helper did not report its deadline (rc=$rc)"; }
+  [ ! -s "$dir/presentation-helper.err" ] \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation deadline leaked helper-process diagnostics"; }
+
   start=$(date +%s)
   FM_STATE_OVERRIDE="$state" FM_STATUS_PRESENTATION_LOCK_TIMEOUT=1 \
     "$DRAIN" > "$first_out" 2> "$first_err" \
@@ -3326,9 +3343,20 @@ test_live_presentation_holder_is_deadlined_without_weakening_ack() {
     "$first_out" || true)
   [ "$advisory_count" -eq 1 ] \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "presentation deadline did not emit exactly one holder advisory"; }
-  if grep -v '^WAKE_ACK_REQUIRED:' "$first_err" | grep . >/dev/null; then
+  ack_count=$(grep -c '^WAKE_ACK_REQUIRED:' "$first_err" || true)
+  [ "$ack_count" -eq 1 ] \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded presentation did not emit exactly one acknowledgement command"; }
+  [ "$(grep -c '^●  Unread wake(s) queued, but ' "$first_err" || true)" -eq 1 ] \
+    || { kill "$presentation_holder" 2>/dev/null || true; fail "the queue-only supervision alarm did not name its unread wake: $(cat "$first_err")"; }
+  if grep -F 'X-mode relay polling' "$first_err" >/dev/null; then
     kill "$presentation_holder" 2>/dev/null || true
-    fail "presentation deadline leaked helper-process diagnostics"
+    fail "the queue-only supervision alarm was misreported as relay polling: $(cat "$first_err")"
+  fi
+  if grep -v -e '^WAKE_ACK_REQUIRED:' -e '^●' \
+    -e '^WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else\.$' \
+    "$first_err" | grep . >/dev/null; then
+    kill "$presentation_holder" 2>/dev/null || true
+    fail "presentation deadline leaked diagnostics beyond its acknowledgement and queue-only supervision alarm: $(cat "$first_err")"
   fi
   grep "$(printf '\tsignal\t')" "$first_out" >/dev/null \
     || { kill "$presentation_holder" 2>/dev/null || true; fail "bounded presentation dropped the durable wake row"; }

@@ -77,13 +77,21 @@ test_predicate_healthy_fresh_beacon() {
 
 test_predicate_queue_pending_flag() {
   local state="$TMP_ROOT/pred-queue/state"
-  mkdir -p "$state"
-  fm_supervision_status "$state" 300
-  [ "$FM_SUP_QUEUE_PENDING" = false ] || fail "empty/absent wake queue must not read as pending"
-  printf 'record\n' > "$state/.wake-queue"
-  fm_supervision_status "$state" 300
-  [ "$FM_SUP_QUEUE_PENDING" = true ] || fail "a non-empty wake queue must read as pending"
-  pass "fm_supervision_status: FM_SUP_QUEUE_PENDING tracks state/.wake-queue"
+  mkdir -p "$state/procevent"
+  fm_supervision_needed "$state" 300 && fail "an empty home must not need supervision"
+  : > "$state/procevent/lavish-final.source"
+  fm_supervision_needed "$state" 300 || fail "the source must need supervision before its final capture"
+  printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+    "$(date +%s)" > "$state/.wake-queue"
+  rm "$state/procevent/lavish-final.source"
+  fm_supervision_needed "$state" 300 || fail "retiring the last source must not suppress its unread final wake"
+  [ "$FM_SUP_SOURCES" -eq 0 ] || fail "the terminal source must actually be absent"
+  [ "$FM_SUP_IN_FLIGHT" -eq 0 ] || fail "the pending wake must not depend on a live task"
+  [ "$FM_SUP_QUEUE_PENDING" = true ] || fail "the final wake must remain pending"
+  : > "$state/.wake-queue"
+  fm_supervision_needed "$state" 300 && fail "an acknowledged last wake must release supervision need"
+  [ "$FM_SUP_QUEUE_PENDING" = false ] || fail "the cleared queue must not remain pending"
+  pass "fm_supervision_needed: a final unread wake survives source retirement and releases need after acknowledgement"
 }
 
 test_predicate_x_mode_needs_supervision() {
@@ -366,21 +374,59 @@ test_hook_blocks_when_dead_lock_has_fresh_beacon() {
 }
 
 test_hook_silent_with_live_lock_and_fresh_beacon() {
-  local dir pid identity out status
+  local dir pid identity out status ready hold signal current alive
   dir=$(make_primary_dir "$TMP_ROOT/hook-live-lock-fresh")
   : > "$dir/state/task1.meta"
-  sleep 60 &
+  ready="$dir/holder-ready"
+  hold="$dir/holder-hold"
+  mkfifo "$ready" "$hold" || fail "could not create live watcher holder FIFOs"
+  exec 3<>"$ready"
+  # Signal only after bash has exec'd and opened its bounded, builtin-only wait.
+  bash -c '
+    exec 4<>"$1"
+    printf "ready\n" >&3
+    exec 3>&-
+    IFS= read -r -t 60 -u 4 _
+  ' _ "$hold" &
   pid=$!
-  identity=$(watcher_identity "$dir" "$pid") || {
+  signal=''
+  if ! IFS= read -r -t 10 -u 3 signal || [ "$signal" != ready ]; then
+    printf 'live watcher holder readiness failed: pid=%s ready=%s hold=%s\n' "$pid" "$ready" "$hold" >&2
     kill "$pid" 2>/dev/null || true
     wait "$pid" 2>/dev/null || true
+    exec 3>&-
+    rm -f "$ready" "$hold"
+    fail "live watcher holder did not become ready"
+  fi
+  exec 3>&-
+  identity=$(watcher_identity "$dir" "$pid") || {
+    printf 'could not identify ready live watcher holder: pid=%s home=%s\n' "$pid" "$dir" >&2
+    kill "$pid" 2>/dev/null || true
+    wait "$pid" 2>/dev/null || true
+    rm -f "$ready" "$hold"
     fail "could not identify live watcher holder"
   }
   record_watcher_lock "$dir" "$pid" "$identity"
   touch "$dir/state/.last-watcher-beat"
   out=$(run_hook "$dir" false); status=$?
+  if [ "$status" -ne 0 ] || [ -n "$out" ]; then
+    current=$(watcher_identity "$dir" "$pid" 2>&1) || true
+    alive=false
+    kill -0 "$pid" 2>/dev/null && alive=true
+    fm_supervision_unhealthy "$dir/state" 300 || true
+    {
+      printf 'live watcher hook failure: status=%s pid=%s alive=%s\n' "$status" "$pid" "$alive"
+      printf 'hook output:\n%s\nrecorded identity: %s\ncurrent identity: %s\n' "$out" "$identity" "$current"
+      printf 'home=%s state=%s lock=%s watcher=%s beacon=%s beacon-age=%s\n' \
+        "$dir" "$dir/state" "$dir/state/.watch.lock" "$dir/bin/fm-watch.sh" \
+        "$dir/state/.last-watcher-beat" "$FM_SUP_BEACON_DESC"
+      printf 'hook env: FM_HOME=%s CLAUDECODE=1 PATH=%s\n' "$dir" "$BLIND_BIN:$PATH"
+      printf 'identity env: FM_STATE_OVERRIDE=%s\n' "$dir/state"
+    } >&2
+  fi
   kill "$pid" 2>/dev/null || true
   wait "$pid" 2>/dev/null || true
+  rm -f "$ready" "$hold"
   expect_code 0 "$status" "hook must exit 0 with a live identity-matched watcher lock and fresh beacon"
   [ -z "$out" ] || fail "hook produced output despite a live fresh watcher lock: $out"
   pass "fm-turnend-guard: silent no-op with a live watcher lock and fresh beacon"
@@ -510,6 +556,19 @@ test_hook_registered_check_only_blocks_with_check_banner() {
   assert_contains "$out" "1 registered custom check(s), but no live watcher" "check-only blind stop must identify its supervision need"
   assert_not_contains "$out" "X-mode relay polling needs supervision" "check-only blind stop must not be misreported as relay polling"
   pass "fm-turnend-guard: registered-check-only supervision is named in the block banner"
+}
+
+test_hook_queue_only_blocks_with_queue_banner() {
+  local dir out status
+  dir=$(make_primary_dir "$TMP_ROOT/hook-queue-only")
+  printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+    "$(date +%s)" > "$dir/state/.wake-queue"
+  out=$(run_hook "$dir" false); status=$?
+  expect_code 2 "$status" "default hook mode must block a queue-only blind turn"
+  assert_contains "$out" "●  Unread wake(s) queued, but no live watcher holds this home lock" \
+    "queue-only blind stop must identify its supervision need"
+  assert_not_contains "$out" "X-mode relay polling needs supervision" "queue-only blind stop must not be misreported as relay polling"
+  pass "fm-turnend-guard: an unread-wake-only supervision need is named in the block banner"
 }
 
 test_hook_ignores_repo_state_when_fm_home_set() {
@@ -939,6 +998,7 @@ const contracts = {
   'fm-host-mirror.sh': ['UserPromptSubmit', 'Stop'],
   'fm-turnend-guard.sh': ['Stop'],
   'fm-claude-stop-autoarm.sh': ['Stop'],
+  'fm-procevent-posttool-check.sh': ['PostToolUse'],
 };
 const registrations = Object.entries(settings.hooks).flatMap(([event, groups]) =>
   groups.flatMap(group => {
@@ -964,17 +1024,31 @@ function reset(home, target, ordinary = false) {
   fs.rmSync(path.join(home, 'state'), { recursive: true, force: true });
   fs.mkdirSync(path.join(home, 'state'));
   fs.rmSync(path.join(home, 'config', 'supervision-host'), { force: true });
-  if (target === 'fm-host-mirror.sh' || target === 'fm-claude-stop-autoarm.sh') {
+  if (['fm-host-mirror.sh', 'fm-claude-stop-autoarm.sh', 'fm-procevent-posttool-check.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, '.lock'), `${owner}\n`);
   }
   if (target === 'fm-host-mirror.sh') fs.writeFileSync(path.join(home, 'config', 'supervision-host'), '');
   if (!ordinary && ['fm-turnend-guard.sh', 'fm-claude-stop-autoarm.sh'].includes(target)) {
     fs.writeFileSync(statePath(home, 'task1.meta'), '');
   }
+  if (target === 'fm-procevent-posttool-check.sh') {
+    const inbox = statePath(home, 'procevent-inbox');
+    fs.mkdirSync(inbox);
+    fs.writeFileSync(path.join(inbox, 'lavish-config-consumer.1.result'),
+      'session:\n  status: feedback\nprompts[1]{tag,prompt}:\n  message,config consumer answer\n');
+    fs.writeFileSync(path.join(inbox, 'lavish-config-consumer.1.adapter'), 'lavish\n');
+  }
 }
 function snapshot(home) {
-  return fs.readdirSync(path.join(home, 'state')).sort().map(name =>
-    [name, fs.readFileSync(statePath(home, name), 'utf8')]);
+  function entries(directory, prefix = '') {
+    return fs.readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))
+      .flatMap(entry => {
+        const name = path.join(prefix, entry.name);
+        const filename = path.join(directory, entry.name);
+        return entry.isDirectory() ? entries(filename, name) : [[name, fs.readFileSync(filename, 'utf8')]];
+      });
+  }
+  return entries(path.join(home, 'state'));
 }
 function invoke(registration, home, context, payload) {
   const env = {
@@ -1066,6 +1140,52 @@ if (mode === 'contexts') {
                 assert.match(fs.readFileSync(statePath(home, '.claude-autoarm-epoch'), 'utf8'), /(?:^| )outcome=failed(?: |$)/, label);
                 assert.ok(fs.existsSync(statePath(home, '.claude-autoarm-failure-notified')), `${label}: no failure receipt`);
                 break;
+              case 'fm-procevent-posttool-check.sh': {
+                assert.equal(result.status, 0, label);
+                assert.equal(result.stderr, '', label);
+                const output = JSON.parse(result.stdout);
+                assert.equal(output.hookSpecificOutput.hookEventName, 'PostToolUse', label);
+                assert.deepEqual(snapshot(home), before, `${label}: notification changed pending state`);
+                const commands = [...output.hookSpecificOutput.additionalContext.matchAll(/`([^`]+)`/g)]
+                  .map(match => match[1]);
+                assert.equal(commands.length, 3, `${label}: missing executable recovery commands`);
+                const otherBefore = snapshot(task);
+                const runCommand = command => {
+                  const recovery = spawnSync('/bin/bash', ['-c', command], {
+                    cwd: task,
+                    env: {
+                      PATH: process.env.PATH, HOME: path.join(home, 'pane-home'),
+                      XDG_CONFIG_HOME: path.join(home, 'pane-home', '.config'),
+                      XDG_STATE_HOME: path.join(home, 'pane-home', '.state'),
+                      FM_HOME: task, FM_STATE_OVERRIDE: statePath(task, ''), FM_ROOT_OVERRIDE: task,
+                      FM_GATE_REFUSE_BYPASS: '1', FM_TEST_SEAM: '1',
+                      FM_PROCEVENT_CLAIM_ROOT: path.join(home, 'pane-home', 'claims'),
+                    },
+                    encoding: 'utf8', timeout: 15000,
+                  });
+                  assert.ifError(recovery.error);
+                  assert.equal(recovery.signal, null, `${label}: recovery command did not settle`);
+                  assert.equal(recovery.status, 0, `${label}: ${recovery.stderr}`);
+                  return recovery;
+                };
+                runCommand(commands[0]);
+                assert.equal(fs.readFileSync(statePath(home, '.wake-queue'), 'utf8'), '',
+                  `${label}: drain did not inspect the unpublished capture's home`);
+                assert.ok(runCommand(commands[1]).stdout.includes('config consumer answer'),
+                  `${label}: direct recovery did not read the captured answer`);
+                const inbox = statePath(home, 'procevent-inbox');
+                const handled = path.join(inbox, 'lavish-config-consumer.1.handled');
+                assert.ok(!fs.existsSync(handled), `${label}: drain or read acknowledged before handling`);
+                runCommand(commands[2]);
+                assert.ok(fs.lstatSync(handled).isFile(), `${label}: acknowledgement missed the captured round`);
+                assert.deepEqual(fs.readdirSync(inbox).filter(name => name.endsWith('.handled')),
+                  ['lavish-config-consumer.1.handled'], `${label}: acknowledgement changed another round`);
+                assert.deepEqual(snapshot(task), otherBefore, `${label}: recovery changed another home's state`);
+                const acknowledged = snapshot(home);
+                silent(invoke(registration, home, context, payloadFor(registration, tool)), `${label}/handled`);
+                assert.deepEqual(snapshot(home), acknowledged, `${label}: handled notification changed state`);
+                break;
+              }
               default: assert.fail(`unhandled hook: ${registration.target}`);
             }
           }
@@ -1746,6 +1866,28 @@ test_hook_claude_mode_terminal_fail_open_clears_abandoned_claim() {
   assert_absent "$dir/state/.claude-autoarm.lock" "abandoned-claim terminal path left the stale claim in place"
   assert_absent "$dir/state/.claude-autoarm.lock.steal" "abandoned-claim reclaim left its serialization mutex behind"
   pass "fm-turnend-guard --claude: the terminal path clears an abandoned claim instead of stepping aside silently"
+}
+
+test_hook_claude_mode_terminal_fail_open_names_queue_only_need() {
+  local dir out status pid
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-queue-terminal")
+  printf '%s\t1\tcheck\tprocevent:lavish-final:1\tcheck: procevent lavish lavish-final 1\n' \
+    "$(date +%s)" > "$dir/state/.wake-queue"
+  : > "$dir/state/.claude-autoarm-failure-notified"
+  seed_claude_budget "$dir" 4 3
+  sleep 60 &
+  pid=$!
+  record_autoarm_owner "$dir" "$pid"
+  printf 'epoch=3 owner_pid=%s outcome=failed-suppressed updated_at=1\n' "$pid" > "$dir/state/.claude-autoarm-epoch"
+  touch -t 202001010000 "$dir/state/.claude-autoarm-epoch"
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=200 run_hook_claude "$dir" true); status=$?
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  expect_code 0 "$status" "the verified attended fail-open ends a queue-only turn once it is spent"
+  assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN: unread wake(s) queued,' \
+    "the queue-only fail-open alarm must name its supervision need"
+  assert_not_contains "$out" "X-mode relay polling active" "the queue-only fail-open alarm must not be misreported as relay polling"
+  pass "fm-turnend-guard --claude: the terminal fail-open names an unread-wake-only need"
 }
 
 test_hook_claude_mode_preserves_fresh_failed_progression() {
@@ -2447,6 +2589,7 @@ test_hook_blocks_from_fm_home_state
 test_hook_x_mode_reason_sources_cadence
 test_hook_x_mode_only_blocks_in_default_mode
 test_hook_registered_check_only_blocks_with_check_banner
+test_hook_queue_only_blocks_with_queue_banner
 test_hook_ignores_repo_state_when_fm_home_set
 test_hook_uses_state_override
 test_hook_loop_guard_allows_retry
@@ -2488,6 +2631,7 @@ test_hook_claude_mode_blocks_on_stuck_arming_claim
 test_hook_claude_mode_allows_on_open_generation_claim
 test_hook_claude_mode_blocks_on_stuck_generation_claim
 test_hook_claude_mode_terminal_fail_open_clears_abandoned_claim
+test_hook_claude_mode_terminal_fail_open_names_queue_only_need
 test_hook_claude_mode_preserves_fresh_failed_progression
 test_hook_claude_mode_integrated_monotonic_fail_open
 test_hook_claude_mode_frozen_epoch_reaches_bounded_fail_open
