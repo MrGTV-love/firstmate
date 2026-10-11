@@ -1,0 +1,4 @@
+/Users/charlesabrooker/.local/bin/agy
+MODEL_FRESHNESS: gemini-3.1-pro-high on agy is older than gemini-3.8-flash-high in the agy catalog (other tier: flash)
+rc=0
+rc=0

@@ -1,0 +1,72 @@
+## check agy stale (the captain case)
+MODEL_FRESHNESS: gemini-3.1-pro-high on agy is older than gemini-3.8-flash-high in the agy catalog (other tier: flash)
+rc=0
+## check agy current
+rc=0
+## check opencode gpt-5.1 (dated snapshots must not win)
+MODEL_FRESHNESS: openai/gpt-5.1 on opencode is older than openai/gpt-5.2 in the opencode catalog
+rc=0
+## check opencode grok-code-fast-1 (no tier word => marker)
+MODEL_FRESHNESS: xai/grok-code-fast-1 on opencode is older than xai/grok-4 in the opencode catalog (other tier: base model)
+rc=0
+## claude current
+rc=0
+## scan
+MODEL_FRESHNESS: gemini-3.1-pro-high on agy is older than gemini-3.8-flash-high in the agy catalog (other tier: flash)
+MODEL_FRESHNESS: openai/gpt-5.1 on opencode is older than openai/gpt-5.2 in the opencode catalog
+MODEL_FRESHNESS: xai/grok-code-fast-1 on opencode is older than xai/grok-4 in the opencode catalog (other tier: base model)
+rc=0
+## scan with custom launcher
+model-freshness: notice: claude catalog not read (config/claude-launcher selects a custom launcher); 'claude-sonnet-5-5' not checked
+MODEL_FRESHNESS: gemini-3.1-pro-high on agy is older than gemini-3.8-flash-high in the agy catalog (other tier: flash)
+MODEL_FRESHNESS: openai/gpt-5.1 on opencode is older than openai/gpt-5.2 in the opencode catalog
+MODEL_FRESHNESS: xai/grok-code-fast-1 on opencode is older than xai/grok-4 in the opencode catalog (other tier: base model)
+rc=0
+## unreadable catalog
+model-freshness: notice: agy catalog unavailable (no readable listing or FM_MODEL_CATALOG_DIR export); 'gemini-3.1-pro-high' not checked
+rc=0
+## malformed call
+fm-model-freshness.sh - report a worker or reviewer model that a newer model of
+the same family has passed in its own harness's catalog.
+Usage: fm-model-freshness.sh scan
+         Check every model named in this home's config/crew-dispatch.json.
+         Silent when that file is absent or every model is current.
+       fm-model-freshness.sh check <harness> <model>
+         Check one requested model; bin/fm-spawn.sh calls it for the model it
+         is about to launch.
+Output: one line on stdout per stale model, nothing else:
+  MODEL_FRESHNESS: <model> on <harness> is older than <newer> in the <harness> catalog[ (other tier: <tier>)]
+where <tier> is "base model" for a newer id with no tier word (gpt-5.2).
+Notices (a catalog that could not be read) go to stderr as
+  model-freshness: notice: <detail>
+The check is advisory. It exits 0 whatever it finds, refuses nothing, and
+writes no config file; the supervisor decides. Exit 2 is a malformed call.
+
+What stale means. The model id is split into a family (its leading name, such
+as gemini, gpt, claude, glm), a version (the first run of numeric parts, so
+3.1, 6.1 and the claude-sonnet-5-5 spelling of 5.5 all compare as numbers,
+looked for only before a dated snapshot suffix such as -2024-08-06), a
+tier (pro, flash, sonnet, sol, ...) and an effort variant (high, low, ...).
+A model is stale when its own harness catalog lists a model of the same
+family, from the same provider prefix, whose version is higher. The newer
+model named is the same tier when one exists, otherwise the highest version
+of any tier, because a newer generation of a family replaces an older one
+across tiers (gemini-3.8-flash-high is newer than gemini-3.1-pro-high).
+Never inferred from a name: the catalog is read from the harness's own
+discovery command (bin/fm-model-catalog-lib.sh owns them), and an id the
+harness keeps current - an alias with no version in it, such as opus - is
+current by definition. A harness without a readable catalog is reported as a
+notice, never guessed. A home whose config/claude-launcher routes Claude
+through a custom launcher (TeamClaude) gets no claude verdict: the plain
+claude catalog is not the one its workers use.
+
+Catalogs are read in the caller's environment. bin/fm-spawn.sh runs the check
+under the worker account pin, so a pinned Claude account answers for itself;
+a session-start scan reads the supervisor's own account.
+FM_MODEL_CATALOG_DIR supplies catalog exports (and test fixtures) exactly as
+for bin/fm-model-index.sh. FM_HOME / FM_CONFIG_OVERRIDE select the config.
+FM_MODEL_FRESHNESS=0 turns the check off (tests that run no catalog).
+With FM_MODEL_FRESHNESS_CATALOG=stdin, check reads the harness's catalog from
+stdin (normalized as bin/fm-model-catalog-lib.sh prints it) and runs no
+discovery of its own; bin/fm-spawn.sh hands over the catalog it already read.
+rc=2
