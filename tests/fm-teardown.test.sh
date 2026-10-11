@@ -8346,6 +8346,59 @@ test_nested_rerun_local_only_ship_is_recorded_landed() {
   pass "a plain re-run of a landed local-only nested ship is recorded as landed, not dropped"
 }
 
+# A removed nested copy whose branch ref is gone too leaves no ref to measure.
+# The forge's word on the recorded PR then settles it, as it does for any
+# missing worktree: a merged recorded PR finishes with a plain re-run, returns
+# the enclosing slot and records the ship as landed, never as dropped. With no
+# recorded PR, or one the forge does not report merged, it still refuses and
+# changes nothing.
+test_nested_rerun_gone_copy_and_branch_uses_recorded_merged_pr() {
+  local case_dir rc shape label
+  for shape in merged no-pr not-merged; do
+    label="nested-gone-branch-pr-$shape"
+    make_nested_slot_case "$label" enclosing .claude/worktrees/x
+    case_dir=$NESTED_CASE
+    seed_backlog_in_flight "$case_dir"
+    printf 'gone ship work\n' > "$NESTED_COPY/ship.txt"
+    git -C "$NESTED_COPY" add ship.txt
+    git -C "$NESTED_COPY" -c user.email=t@t -c user.name=t commit -qm "gone ship work"
+    git -C "$case_dir/project" worktree remove --force "$NESTED_COPY"
+    git -C "$case_dir/project" branch -D fm/task-x1-v2 >/dev/null
+    assert_absent "$NESTED_COPY" "$label: setup did not remove the nested copy"
+    if git -C "$case_dir/project" rev-parse --verify --quiet refs/heads/fm/task-x1-v2 >/dev/null; then
+      fail "$label: setup did not delete the branch"
+    fi
+    case "$shape" in
+      merged)
+        append_pr_meta_url "$case_dir"
+        add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/project" rev-parse HEAD)"
+        ;;
+      not-merged) append_pr_meta_url "$case_dir" ;;
+    esac
+    cp "$case_dir/state/task-x1.meta" "$case_dir/meta.before"
+    rc=0
+    FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    if [ "$shape" = merged ]; then
+      expect_code 0 "$rc" "$label: a merged recorded PR must finish with a plain re-run: $(cat "$case_dir/stderr")"
+      assert_no_grep "get the captain's own words" "$case_dir/stderr" "$label: the re-run asked for captain words for landed work"
+      assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the slot was not returned"
+      assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the slot claim survived the task"
+      assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+      assert_absent "$case_dir/data/task-x1/captain-drop.md" "$label: landed work was recorded as a captain drop"
+      grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null || fail "$label: the backlog row was not closed"
+      assert_no_grep "dropped" "$case_dir/data/backlog.md" "$label: landed work was recorded as dropped"
+      assert_grep "pull/7" "$case_dir/data/backlog.md" "$label: the row does not record the merged PR"
+    else
+      expect_code 1 "$rc" "$label: a removed copy with no merged PR must still refuse: $(cat "$case_dir/stderr")"
+      assert_grep "is already removed and its branch is not landed" "$case_dir/stderr" "$label: the refusal did not name the reason"
+      cmp -s "$case_dir/meta.before" "$case_dir/state/task-x1.meta" || fail "$label: the refusal changed the task record"
+      assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the refusal dropped the slot claim"
+      assert_absent "$case_dir/treehouse.log" "$label: the refusal returned the slot"
+    fi
+  done
+  pass "a removed nested copy whose branch is gone is settled by its recorded PR: merged finishes as landed, otherwise it refuses"
+}
+
 # The landed-work test of a nested copy an earlier teardown already removed
 # reads its branch ref from the project. An unlanded branch is refused and
 # changes nothing, so the project's own HEAD is never mistaken for the copy's;
@@ -9403,6 +9456,7 @@ test_nested_slot_reproof_refusal_is_rerunnable
 test_nested_rerun_local_only_ship_is_recorded_landed
 test_nested_rerun_matrix_refusal_at_each_phase
 test_nested_rerun_gone_copy_needs_its_branch_landed
+test_nested_rerun_gone_copy_and_branch_uses_recorded_merged_pr
 test_nested_slot_is_not_proven_by_the_current_copys_pipeline_input
 test_nested_rerun_gone_copy_is_proven_by_its_pipeline_input
 test_nested_rerun_after_slot_return_records_landed

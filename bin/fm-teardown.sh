@@ -2263,6 +2263,19 @@ report_worktree_dirt() {
   ' >&2
 }
 
+teardown_record_branch() {
+  local branch
+  branch=$(fm_meta_get "$META" branch)
+  [ -n "$branch" ] || branch=fm/$ID
+  printf '%s\n' "$branch"
+}
+
+teardown_refuse_removed_nested_copy() {
+  echo "REFUSED: task $ID's nested copy $WT is already removed and its branch is not landed; a pushed branch alone is not completion." >&2
+  echo "Land its PR (or merge it to local main for a local-only ship), then re-run teardown, or get the captain's own words to drop it and pass --force --drop-file." >&2
+  return 1
+}
+
 validate_worktree_teardown_safety() {
   local dirty_raw dirty unpushed_raw unpushed branch recorded_pr_state wt_real
   [ "$FORCE" != "--force" ] || return 0
@@ -2273,9 +2286,9 @@ validate_worktree_teardown_safety() {
     if teardown_nested_slot landed; then
       return 0
     fi
-    if [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ]; then
-      echo "REFUSED: task $ID's nested copy $WT is already removed and its branch is not landed; a pushed branch alone is not completion." >&2
-      echo "Land its PR (or merge it to local main for a local-only ship), then re-run teardown, or get the captain's own words to drop it and pass --force --drop-file." >&2
+    if [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ] \
+       && git -C "$PROJ" rev-parse --verify --quiet "refs/heads/$(teardown_record_branch)^{commit}" >/dev/null; then
+      teardown_refuse_removed_nested_copy
       return 1
     fi
     if [[ "$PR_URL" =~ ^https://github[.]com/([^/]+/[^/]+)/pull/([0-9]+)$ ]] \
@@ -2283,6 +2296,10 @@ validate_worktree_teardown_safety() {
         && [ "$recorded_pr_state" = MERGED ]; then
       TEARDOWN_RECORDED_PR_ONLY=1
       return 0
+    fi
+    if [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ]; then
+      teardown_refuse_removed_nested_copy
+      return 1
     fi
     echo "REFUSED: task $ID has no recorded Git worktree; completion requires a recorded GitHub PR confirmed merged by the forge." >&2
     echo "Restore its copy, land its recorded PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
@@ -3339,8 +3356,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       ;;
     landed)
       [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ] || return 1
-      branch=$(fm_meta_get "$META" branch)
-      [ -n "$branch" ] || branch=fm/$ID
+      branch=$(teardown_record_branch)
       git -C "$PROJ" rev-parse --verify --quiet "refs/heads/$branch^{commit}" >/dev/null || return 1
       teardown_landed "$PROJ" "refs/heads/$branch" "$branch"
       ;;
