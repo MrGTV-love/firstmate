@@ -830,6 +830,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-status-event-lib.sh"
 # shellcheck source=bin/fm-cursor-lib.sh
 . "$SCRIPT_DIR/fm-cursor-lib.sh"
+# shellcheck source=bin/fm-model-catalog-lib.sh
+. "$SCRIPT_DIR/fm-model-catalog-lib.sh"
 # fm-dod-lib.sh also owns the PR and classification imports needed below.
 # shellcheck source=bin/fm-dod-lib.sh
 . "$SCRIPT_DIR/fm-dod-lib.sh"
@@ -2336,6 +2338,16 @@ pi_supports_approve() {
   printf '%s\n' "$help" | grep -Eq -- '(^|[[:space:]])--approve([^[:alnum:]_-]|$)'
 }
 
+# MODEL_CATALOG_READ is the normalized harness catalog this spawn has already
+# read, an empty catalog when that read failed, and empty when no read happened.
+# The model validators below and the model-index check fill it, so the
+# freshness check compares against it instead of reading the harness again.
+MODEL_CATALOG_READ=
+hold_model_catalog() { # <harness> <raw-listing>
+  MODEL_CATALOG_READ=$(printf '%s\n' "$2" | fm_model_catalog_normalize "$1" 2>/dev/null) || MODEL_CATALOG_READ=
+  [ -n "$MODEL_CATALOG_READ" ] || MODEL_CATALOG_READ='{"models":[]}'
+}
+
 # omp pre-launch validation for non-index-entry literals. `omp models --json`
 # (omp 18.1.11) prints
 # {"models":[{"provider","id","selector":"<provider>/<id>",...}]} for built-in and
@@ -2346,11 +2358,13 @@ pi_supports_approve() {
 # through with a notice, a bare fuzzy pattern is omp's own matcher's job, and an
 # unreadable listing establishes nothing (harness-adapters model-and-effort.md).
 omp_model_validate() { # <omp-bin> <model>
-  local bin=$1 model=$2 provider verdict
+  local bin=$1 model=$2 provider verdict listing
   [ -n "$model" ] && [ "$model" != default ] || return 0
   case "$model" in */*) ;; *) return 0 ;; esac
   provider=${model%%/*}
-  verdict=$(omp_catalog_verdict "$bin" "$model")
+  listing=$(omp_models_listing "$bin")
+  hold_model_catalog omp "$listing"
+  verdict=$(omp_catalog_verdict "$listing" "$model")
   case "$verdict" in
   listed | unreadable) return 0 ;;
   unknown-provider)
@@ -2362,13 +2376,21 @@ omp_model_validate() { # <omp-bin> <model>
   return 1
 }
 
-# Shared catalog verdict for a <provider>/<id> selector, printed on stdout:
-# listed, unlisted (provider listed, id not), unknown-provider, or unreadable
-# (no jq, no listing, or an empty one - which establishes nothing).
-omp_catalog_verdict() { # <omp-bin> <provider/id>
-  local bin=$1 model=$2 provider listing providers
-  command -v jq >/dev/null 2>&1 || { echo unreadable; return 0; }
-  listing=$(OMP_SKIP_SETUP=1 "$bin" models --json 2>/dev/null) || { echo unreadable; return 0; }
+# The raw `omp models --json` listing, or nothing when it cannot be read or
+# jq is not there to read it.
+omp_models_listing() { # <omp-bin>
+  local listing
+  command -v jq >/dev/null 2>&1 || return 0
+  listing=$(OMP_SKIP_SETUP=1 "$1" models --json 2>/dev/null) || return 0
+  printf '%s\n' "$listing"
+}
+
+# Shared catalog verdict for a <provider>/<id> selector against that listing,
+# printed on stdout: listed, unlisted (provider listed, id not),
+# unknown-provider, or unreadable (no jq, no listing, or an empty one - which
+# establishes nothing).
+omp_catalog_verdict() { # <listing> <provider/id>
+  local listing=$1 model=$2 provider providers
   providers=$(printf '%s' "$listing" | jq -r '.models[]?.provider // empty' 2>/dev/null | sort -u) || { echo unreadable; return 0; }
   [ -n "$providers" ] || { echo unreadable; return 0; }
   provider=${model%%/*}
@@ -2468,7 +2490,7 @@ print role.to_s
   *:off | *:minimal | *:low | *:medium | *:high | *:xhigh | *:max | *:auto) selector=${role%:*} ;;
   esac
   case "$selector" in */*) ;; *) return 0 ;; esac
-  verdict=$(PI_CODING_AGENT_DIR="$agent_dir" omp_catalog_verdict "$bin" "$selector")
+  verdict=$(omp_catalog_verdict "$(PI_CODING_AGENT_DIR="$agent_dir" omp_models_listing "$bin")" "$selector")
   case "$verdict" in
   unknown-provider)
     echo "notice: omp provider '${selector%%/*}' is not in 'omp models --json' (extension-registered providers are never listed); launching '$role' unvalidated" >&2
@@ -2498,6 +2520,8 @@ agy_model_validate() {  # <agy-bin> <model>
   case "$bound" in ''|*[!0-9]*|0*) bound=15 ;; esac
   [ -n "$model" ] && [ "$model" != default ] || return 0
   listing=$(fm_run_timed "$bound" "$bin" models 2>/dev/null < /dev/null) || rc=$?
+  [ "$rc" -eq 0 ] || listing=
+  hold_model_catalog agy "$listing"
   if [ "$rc" -ne 0 ] || [ -z "$listing" ]; then
     if [ "$rc" -eq 124 ]; then
       echo "notice: 'agy models' did not answer within ${bound}s; launching with --model '$model' unvalidated" >&2
@@ -3004,10 +3028,13 @@ cursor)
   CURSOR_BIN=$(fm_cursor_resolve_binary) || exit 1
   if [ "$MODEL_INDEXED" = 0 ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
     if CURSOR_MODELS=$(fm_cursor_list_models "$CURSOR_BIN"); then
+      hold_model_catalog cursor "$CURSOR_MODELS"
       if ! printf '%s\n' "$CURSOR_MODELS" | fm_cursor_catalog_has_model "$MODEL"; then
         echo "error: Cursor model '$MODEL' is not available from '$CURSOR_BIN --list-models'; choose an id listed by that command or omit --model" >&2
         exit 1
       fi
+    else
+      hold_model_catalog cursor ''
     fi
   fi
   ;;
@@ -3081,12 +3108,31 @@ if [ -n "$WORKER_ACCOUNT" ] && [ "$HARNESS" = claude ]; then
   fi
 fi
 
+MODEL_CATALOG_CONTEXT=selected
+if [ "$RAW_LAUNCH" = 1 ] || { [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; }; then
+  MODEL_CATALOG_CONTEXT=unavailable
+fi
 if [ "$MODEL_INDEXED" = 1 ]; then
-  MODEL_CATALOG_CONTEXT=selected
-  if [ "$RAW_LAUNCH" = 1 ] || { [ "$HARNESS" = claude ] && [ "$CLAUDE_LAUNCH_BIN" != claude ]; }; then
-    MODEL_CATALOG_CONTEXT=unavailable
+  MODEL_CATALOG_READ=$(FM_MODEL_CATALOG_EMIT=1 FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT") || exit 1
+fi
+
+# Model freshness (advisory): warn when the requested model is older than the
+# newest model of its family in the harness's own catalog. It never refuses the
+# spawn and never changes the model; the supervisor decides. The line is
+# recorded as model_stale= in the task record so fm-crew-state.sh keeps showing
+# it after this terminal output is gone. Run under the worker account pin so a
+# pinned account answers from its own catalog; skipped for a raw launch and a
+# Claude custom launcher, whose catalog this environment does not hold. A
+# catalog this spawn already read (MODEL_CATALOG_READ) is handed over rather
+# than read a second time.
+MODEL_STALE=
+if [ "$MODEL_CATALOG_CONTEXT" = selected ] && [ -n "$MODEL" ] && [ "$MODEL" != default ]; then
+  if [ -n "$MODEL_CATALOG_READ" ]; then
+    MODEL_STALE=$(printf '%s\n' "$MODEL_CATALOG_READ" | FM_MODEL_FRESHNESS_CATALOG=stdin fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" 2>/dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || MODEL_STALE=
+  else
+    MODEL_STALE=$(fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-freshness.sh" "$HARNESS" "$MODEL" 2>/dev/null </dev/null | sed -n 's/^MODEL_FRESHNESS: //p' | head -n 1) || MODEL_STALE=
   fi
-  FM_CONFIG_OVERRIDE="$SPAWN_ROUTING_PAIR" fm_worker_account_check_entry "$WORKER_ACCOUNT" "$SCRIPT_DIR/fm-model-index.sh" "$HARNESS" "$MODEL" "$MODEL_CATALOG_CONTEXT" || exit 1
+  [ -z "$MODEL_STALE" ] || echo "warning: model is stale - $MODEL_STALE" >&2
 fi
 
 # Claude API key guard: refuse to launch a Claude worker when an Anthropic API
@@ -5873,7 +5919,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model effort dispatch_rule account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model model_stale effort dispatch_rule account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5893,6 +5939,7 @@ preserve_relaunch_meta() {
   echo "tasktmp=$TASK_TMP"
   [ -z "$BASE_BRANCH" ] || echo "base_branch=$BASE_BRANCH"
   echo "model=${MODEL:-default}"
+  [ -z "${MODEL_STALE:-}" ] || echo "model_stale=$MODEL_STALE"
   echo "effort=${EFFORT:-default}"
   [ -z "$SKILL_SELECTION_STATUS" ] || echo "skill_selection=$SKILL_SELECTION_STATUS"
   [ -z "$SKILL_SELECTION_REASON" ] || echo "skill_selection_reason=$SKILL_SELECTION_REASON"
