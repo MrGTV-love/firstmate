@@ -52,6 +52,12 @@ export FM_GATE_REFUSE_BYPASS=1
 # leaked harness pin alone stays inert outside a suite.
 export FM_TEST_SEAM=1
 
+# Model freshness (bin/fm-model-freshness.sh) reads each harness's live catalog,
+# which would run the developer's real claude, omp and agy from every spawn and
+# bootstrap case. The suite turns it off; tests/fm-model-freshness.test.sh turns
+# it back on against fixture catalogs.
+export FM_MODEL_FRESHNESS=0
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
