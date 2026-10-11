@@ -5033,7 +5033,8 @@ claude_confirm_start() {
   return 0
 }
 
-# True when <path> is one of this task's own prior_worktree= copies. A
+# True when <path> is a copy this task's record says it left: a prior_worktree=
+# copy, or a released_worktree= copy when the move gave its pool slot back. A
 # reassociation leaves the endpoint's shell in the copy it left, so only that
 # known move, not an arbitrary drift, may be told to cd into the recorded copy
 # on a backend that does not recover drifted endpoints itself.
@@ -5042,8 +5043,11 @@ spawn_path_is_prior_copy() { # <path>
   [ -n "${1:-}" ] || return 1
   path_real=$(real_path_or_raw "$1")
   while IFS= read -r line || [ -n "$line" ]; do
-    case "$line" in prior_worktree=?*) ;; *) continue ;; esac
-    prior=${line#prior_worktree=}
+    case "$line" in
+      prior_worktree=?*) prior=${line#prior_worktree=} ;;
+      released_worktree=?*) prior=${line#released_worktree=} ;;
+      *) continue ;;
+    esac
     [ "$(real_path_or_raw "$prior")" != "$path_real" ] || return 0
   done <"$STATE/$ID.meta"
   return 1
