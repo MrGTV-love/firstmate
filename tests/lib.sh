@@ -52,6 +52,12 @@ export FM_GATE_REFUSE_BYPASS=1
 # leaked harness pin alone stays inert outside a suite.
 export FM_TEST_SEAM=1
 
+# Model freshness (bin/fm-model-freshness.sh) reads each harness's live catalog,
+# which would run the developer's real claude, omp and agy from every spawn and
+# bootstrap case. The suite turns it off; tests/fm-model-freshness.test.sh turns
+# it back on against fixture catalogs.
+export FM_MODEL_FRESHNESS=0
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
@@ -406,6 +412,17 @@ fm_test_drop_file() {
 fm_test_drop_file >/dev/null
 
 export FM_OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-/usr/bin/true}
+
+# Process-event source claims are machine-wide by default, so every suite gets a
+# private claim root; a suite that needs a specific one exports it after sourcing.
+# The private root starts with the standing pile-up detector's claim held by this
+# suite's shell, so a test bootstrap sees a live owner and launches no detector
+# runner. A suite that tests the detector exports an empty claim root instead.
+FM_PROCEVENT_CLAIM_ROOT=$(fm_test_tmproot fm-procevent-claims)/claims || return 1
+export FM_PROCEVENT_CLAIM_ROOT
+(umask 077; mkdir -p "$FM_PROCEVENT_CLAIM_ROOT" \
+  && printf '%s\n%s\n%s\n%s\n' "${FM_PROCEVENT_CLAIM_ROOT%/claims}/no-detector-home" "$$" \
+    fm-test-held "$FM_TEST_OWNER_IDENTITY" > "$FM_PROCEVENT_CLAIM_ROOT/proc-guard.claim") || return 1
 
 trap fm_test_cleanup EXIT
 trap 'fm_test_cleanup; exit 130' INT

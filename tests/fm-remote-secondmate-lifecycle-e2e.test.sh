@@ -28,7 +28,7 @@ TMUX_STATE="$TMP_ROOT/remote-tmux.state"
 # One fixture value names the remote route's steering-inbox surface, so the
 # charter render assertions and the delivery checks below cannot drift apart.
 PARENT_ROUTE_INBOX="$REMOTE_HOME/state/parent-route/ios.inbox"
-CLAIMS="$TMP_ROOT/claims"
+CLAIMS="$FM_PROCEVENT_CLAIM_ROOT"
 mkdir -p "$PARENT/data" "$PARENT/state" "$PARENT/config" "$PARENT/projects" "$REMOTE_ROOT" "$CLAIMS"
 cleanup() {
   local worker_pid=''

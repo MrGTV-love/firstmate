@@ -115,6 +115,27 @@ test_predicate_source_needs_supervision() {
   pass "fm_supervision_unhealthy: source-only home needs supervision"
 }
 
+test_predicate_standing_detector_alone_needs_no_supervision() {
+  local home="$TMP_ROOT/pred-detector" state
+  state="$home/state"
+  mkdir -p "$state"
+  register_source() {  # <adapter> <source-id>
+    FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$ROOT/bin/fm-procevent.sh" register "$1" "$2" -- /bin/true >/dev/null \
+      || fail "could not register $2 with the $1 adapter"
+  }
+  register_source proc proc-guard
+  fm_supervision_needed "$state" 300 && fail "the standing process pile-up detector alone must not need supervision"
+  [ "$FM_SUP_SOURCES" -eq 0 ] || fail "the standing detector must not count as a registered source"
+  fm_supervision_unhealthy "$state" 300 && fail "an idle home with only the standing detector must not be unhealthy"
+  register_source lavish other
+  fm_supervision_unhealthy "$state" 300 || fail "a real source beside the detector must still need supervision"
+  [ "$FM_SUP_SOURCES" -eq 1 ] || fail "expected exactly the real source to count, got $FM_SUP_SOURCES"
+  register_source lavish proc-guard
+  fm_supervision_status "$state" 300
+  [ "$FM_SUP_SOURCES" -eq 2 ] || fail "another adapter registered under the detector's id must count, got $FM_SUP_SOURCES"
+  pass "fm_supervision_needed: only the built-in standing process pile-up detector needs no supervision"
+}
+
 # Register a custom check the way an operator does, through the real
 # bin/fm-check-register.sh, so these cases bind to the shipped registration
 # artifacts rather than to a hand-written imitation of them.
@@ -1609,7 +1630,7 @@ test_hook_claude_mode_repeated_failed_to_arming_interleavings_reach_fail_open() 
     printf 'epoch=%s owner_pid=999 outcome=failed-suppressed updated_at=%s\n' "$epoch" "$(date +%s)" > "$dir/state/.claude-autoarm-epoch"
   done
 
-  out=$(run_hook_claude "$dir" true); status=$?
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
   expect_code 0 "$status" "repeated failed-to-arming interleavings must reach terminal fail-open"
   assert_contains "$out" 'FIRSTMATE SUPERVISION IS GENUINELY DOWN' "arming interleavings stalled before the bounded fail-open"
   assert_present "$dir/state/.claude-autoarm-failure-alarmed" "arming interleavings did not consume the one-time alarm"
@@ -1655,6 +1676,7 @@ SH
         FM_TERMINAL_READY="$ready" \
         FM_TERMINAL_RELEASE="$release" \
         FM_TERMINAL_ONCE="$once" \
+        FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 \
         CLAUDECODE=1 FM_HOME="$dir" bash "$dir/bin/fm-turnend-guard.sh" --claude \
           > "$guard_out" 2>&1
     printf '%s\n' "$?" > "$guard_status"
@@ -1846,7 +1868,7 @@ test_hook_claude_mode_preserves_fresh_failed_progression() {
   count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
   [ "$count" = 0 ] || fail "the owned first failed epoch must not consume a blocked-stop count, got $count"
   printf 'epoch=4 owner_pid=999 outcome=failed-suppressed updated_at=%s\n' "$(date +%s)" > "$dir/state/.claude-autoarm-epoch"
-  out=$(run_hook_claude "$dir" true); status=$?
+  out=$(FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=100 run_hook_claude "$dir" true); status=$?
   expect_code 2 "$status" "a later fresh failed epoch must consume the bounded progression"
   assert_absent "$dir/state/.claude-autoarm-failure-alarmed" "fresh failure progression emitted the attended fail-open alarm too early"
   count=$(sed -n '2s/^count=//p' "$dir/state/.turnend-claude-blocks")
@@ -2214,6 +2236,43 @@ test_hook_claude_mode_waits_for_late_claim() {
   pass "fm-turnend-guard --claude: bounded claim wait avoids a token-consuming forced continuation"
 }
 
+# The default wait must cover the measured claim latency (docs/turnend-guard.md
+# "The wait's measured basis"): a claim published by the real claim path 2.5
+# seconds into the wait - past the old 800 ms default, inside the measured
+# window - lets the stop end without a block or a consumed continuation.
+test_hook_claude_mode_default_wait_covers_measured_claim_latency() {
+  local dir helper out status holder
+  dir=$(make_primary_dir "$TMP_ROOT/hook-claude-default-wait")
+  : > "$dir/state/task1.meta"
+  (
+    sleep 2.5
+    FM_HOME="$dir" FM_STATE_OVERRIDE="$dir/state" bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      printf "%s\n" "$$" > "$1/holder.pid"
+      fm_autoarm_claim_next "$1/state" 300 || exit 1
+      sleep 60 &
+      spid=$!
+      trap "kill \"\$spid\" 2>/dev/null; exit 0" TERM
+      wait
+      exit 0
+    ' _ "$dir"
+  ) &
+  helper=$!
+  # shellcheck disable=SC2016 # the child shell expands its own argument.
+  out=$(env -u FM_CLAUDE_AUTOARM_SYNC_WAIT_MS bash -c '
+    printf "{\"stop_hook_active\":false,\"session_id\":\"sess-claude-mode\"}" \
+      | CLAUDECODE=1 FM_HOME="$1" bash "$1/bin/fm-turnend-guard.sh" --claude 2>&1
+  ' _ "$dir"); status=$?
+  holder=$(cat "$dir/holder.pid" 2>/dev/null || true)
+  [ -z "$holder" ] || kill "$holder" 2>/dev/null || true
+  kill "$helper" 2>/dev/null || true
+  wait "$helper" 2>/dev/null || true
+  expect_code 0 "$status" "the default wait must outlast a claim published 2.5s into it"
+  [ -z "$out" ] || fail "default-wait late claim produced output: $out"
+  assert_absent "$dir/state/.turnend-claude-blocks" "a covered late claim must not consume a block"
+  pass "fm-turnend-guard --claude: default wait covers a claim 2.5s after the wait starts"
+}
+
 test_hook_claude_mode_secondmate_reblocks_like_primary() {
   local dir pid out status
   dir=$(make_secondmate_dir "$TMP_ROOT/hook-claude-sm-reblock")
@@ -2477,6 +2536,7 @@ test_predicate_healthy_fresh_beacon
 test_predicate_queue_pending_flag
 test_predicate_x_mode_needs_supervision
 test_predicate_source_needs_supervision
+test_predicate_standing_detector_alone_needs_no_supervision
 test_predicate_registered_check_needs_supervision
 test_predicate_registered_check_survives_rebinding_drift
 test_predicate_unregistered_check_needs_nothing
@@ -2548,6 +2608,7 @@ test_hook_claude_mode_fail_open_requires_notice_and_failure_epoch
 test_hook_claude_mode_away_mode_never_uses_stop_autoarm_fail_open
 test_hook_claude_mode_allow_resets_budget
 test_hook_claude_mode_waits_for_late_claim
+test_hook_claude_mode_default_wait_covers_measured_claim_latency
 test_hook_claude_mode_secondmate_reblocks_like_primary
 test_hook_away_daemon_allows_between_watcher_cycles
 test_hook_away_daemon_allows_over_dead_watcher_lock

@@ -654,6 +654,7 @@ Only nonfuture progress timestamps count as work evidence.
 Pipeline progress uses each task's worktree to resolve a relative `NM_HOME`; unset or empty values select `$HOME/.no-mistakes`.
 Progress remains scoped to that resolved store and the task's project and branch.
 The ledger covers this home's current backlog, ordinary task records, status questions, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
+A recorded PR head that is not a local object in the task's copy cannot be compared, so PR coverage is skipped for that task alone: its unlanded-commit row names the absent head and counts every commit not on the default branch, and the ledger stays complete.
 Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
 The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
 
@@ -1427,12 +1428,37 @@ Spawn, intake, and relaunch checks report unavailable catalog evidence when the 
 Offline model/profile resolution and bootstrap's local diagnostics never fetch catalogs; `fm-model-index.sh check` and selected-entry checks at intake, spawn, and relaunch may fetch them under the evidence contract below.
 The command snapshots the index once per invocation and queries each required harness catalog once; it never rewrites dispatch rules, credentials, or vendor catalogs.
 
-The command's header and `--help` own discovery commands and the authoritative-export interface.
+The command's header and `--help` own the authoritative-export interface, and `bin/fm-model-catalog-lib.sh` owns the discovery commands.
 Native discovery covers Codex, Claude, omp, Pi, OpenCode, Cursor, and Antigravity; other harnesses accept a current export from their own documented discovery surface.
 An export directory is used instead of live discovery, never mixed with it.
 Only concrete contradictory evidence refuses: an id absent from a readable catalog, or a catalog alias whose resolved id is retired.
 An unreachable, empty, missing, or malformed catalog (including concatenated JSON documents), and an omp provider its listing does not know (extension-registered providers such as `claude-bridge` are never listed), pass with a notice, so no spawn, intake, or relaunch is refused for missing evidence.
 `tests/fm-model-index.test.sh` exercises role resolution, stand-ins, retirement, unavailable catalogs, absent ids, native catalog parsing, and inherited index changes; `tests/fm-worker-account.test.sh` proves the pinned account's catalog decides the spawn verdict.
+
+## Model freshness
+
+`bin/fm-model-freshness.sh` reports a worker or reviewer model that a newer model of the same family has passed in its own harness's catalog, so a stale model is noticed instead of launched by habit.
+It is advisory: it exits 0 whatever it finds, refuses nothing, and edits no configuration file, so the supervisor decides what to change.
+Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each harness's discovery command and its 30 second limit.
+
+- **Inputs.** Every model named in the effective home's `config/crew-dispatch.json` (role references resolve through the [model index](#fleet-model-index-configmodel-indexjson)), and the model requested at each `bin/fm-spawn.sh`.
+- **Catalog.** Each harness's own catalog, read with its own command; a name is never used to infer one.
+  A harness without a readable catalog, or a catalog command that hits its time limit, gives a notice and no verdict.
+- **Stale.** The catalog lists a model of the same family and provider prefix with a higher version.
+  A version that carries no number, such as the `opus` alias a harness keeps current itself, is current by definition.
+  The newer model named is the same tier when one exists, otherwise the newest of any tier, marked `(other tier: ...)`; a newer id with no tier word, such as `gpt-5.2`, is marked `(other tier: base model)`.
+  A dated snapshot suffix such as `-2024-08-06` is never read as a version.
+- **Output.** One line per stale model: `MODEL_FRESHNESS: <model> on <harness> is older than <newer> in the <harness> catalog`.
+- **Session start.** The deferred network stage runs the scan beside its other checks and prints each line as a `MODEL_FRESHNESS:` diagnostic; an unreadable catalog is a `BOOTSTRAP_INFO` fact only under `FM_BOOTSTRAP_VERBOSE_FACTS=1`.
+  When `config/claude-launcher` selects a custom launcher, claude models are not checked, because the plain `claude` catalog is not the one those workers use.
+- **Spawn.** `fm-spawn.sh` prints `warning: model is stale - ...`, records `model_stale=` in the task record, and `fm-crew-state.sh` repeats it as a `model-stale:` component on that task's state line; the spawn proceeds.
+  The advisory reads the catalog from the spawn's own environment, under the worker account pin when one is set, so a pinned Claude account answers from its own catalog.
+  It reads there even where the model-index check treats the worker account context as unavailable, such as an unpinned launch, because it gates nothing; its read never stands in for the worker's catalog in the index check.
+  It is skipped for a raw launch and for a Claude custom launcher.
+  A spawn reads each catalog at most once: the advisory reuses the catalog the model-index check or the agy, omp, or cursor model validator already read, and runs its own read only when no earlier read happened.
+- **Off switch.** `FM_MODEL_FRESHNESS=0` turns the check off; the test suite sets it so no case reads a developer's real catalogs.
+
+`tests/fm-model-freshness.test.sh` covers the comparison, scan, spawn, and catalog-reuse behavior against fixture catalogs.
 
 ## Project capacity (config/project-capacity)
 
@@ -2655,7 +2681,7 @@ This section is the single owner of the runner's operating contract.
 - A queued `check` delivery is reported at most once per captured source and sequence while any records for that key remain queued.
 - Publication coalesces an already-queued `check` for the same captured source and sequence under the queue lock, so reconciliation during handling cannot strand a duplicate beyond the presented acknowledgement snapshot.
 - A durable handled acknowledgement stops future source re-announcement, while a record already queued remains under the durable queue's authority until the ordinary drain's sequence-bound post-handling acknowledgement consumes it.
-- By default, a runner releases its claim after one poll; adapter-owned continuation and registration-adoption rules are defined in the `bin/fm-procevent.sh` header.
+- By default, a runner releases its claim after one poll; adapter-owned continuation and registration-adoption rules are defined in the `bin/fm-procevent.sh` header, and the standing-source exception is defined below.
   [Remote secondmates](remote-secondmates.md#how-remote-lines-are-mirrored) owns the reply listener's behavior; ordinary Lavish review continuation is defined above.
 
 **Reconcile sources**
@@ -2751,7 +2777,7 @@ Ownership is machine-wide per canonical source, because separate homes can share
 - Claims live under `$XDG_STATE_HOME/firstmate/procevent-claims` (override with `FM_PROCEVENT_CLAIM_ROOT`).
 - Each claim binds its caller-reported home and runner PID to a process identity, unique claim generation, exact registration-file generation, and resolved state-root identity.
 - Registration, acquisition, replacement, retirement, and generation-bound release are serialized at one machine-wide boundary per source.
-- A live identity-matched owner is never displaced, and release removes only the exact generation the caller acquired.
+- A live identity-matched owner is never displaced by another home, and release removes only the exact generation the caller acquired.
 
 **Prove ownership before stopping a runner**
 
@@ -2856,9 +2882,18 @@ Detaching a runner into its own process group is what lets a persistent source o
 - That guard accepts the lease only while the state root retains the device/inode identity recorded by the runner's claim, and initiates the verified stop after two consecutive reads cannot prove that identity and lease freshness, so one unreadable read cannot kill a live runner.
 - Those two reads are spaced half a check interval apart, so the pair the debounce requires completes inside one check interval instead of costing two of them.
 
+The built-in `proc` adapter opts into `standing` lifetime: its guard requires the recorded physical state root and its registration, rather than recent home activity.
+An extension bound under the `proc` adapter name is not the built-in registration and keeps the home lease.
+An identical standing registration is preserved; changing its command stops and releases only this home's identity-proved runner before publishing the replacement, leaving another home's canonical owner untouched.
+Bootstrap's `arm` requests a detached canonical listener without waiting for startup, and returns immediately when a live runner already owns the claim; consumers that need readiness use `fm-procevent.sh ensure-listening <source-id>`.
+If cleanup leaves the arming process holding an unremovable source lock or its reclamation mutex, reacquisition refuses it rather than waiting indefinitely on itself.
+`relisten` continues after an unhandled pile-up capture while preserving that claim.
+Retirement and physical state-root disappearance still stop the detector through the same identity-gated runner cleanup.
+Other adapters retain the home-lease and handled-capture requirements.
+
 **Detection and stop timing**
 
-For a runner whose ownership can still be proved, the nominal detection bound is the lease plus one check interval.
+For a lease-bound runner whose ownership can still be proved, the nominal detection bound is the lease plus one check interval; for a standing source's missing registration or changed physical state root, it is one check interval.
 The verified stop then runs within its own grace period.
 The lease age is compared in whole seconds, so the configured lease is honoured until that age reads one second past it.
 
@@ -2878,8 +2913,8 @@ The group signal reaches the blocking child and everything under it exactly as r
 
 | Setting | Default | Range | Purpose |
 | --- | --- | --- | --- |
-| `FM_PROCEVENT_OWNER_LEASE_SECONDS` | 600 | 1..86400 | How long a runner continues without activity in its owning home. |
-| `FM_PROCEVENT_OWNER_CHECK_SECONDS` | 15 | 1..3600 | Guard detection interval; it reads the lease and recorded state-root identity twice per interval, half an interval apart, so both debounce reads fit inside one interval. |
+| `FM_PROCEVENT_OWNER_LEASE_SECONDS` | 600 | 1..86400 | How long a lease-bound runner continues without activity in its owning home; not the lifetime of a standing source. |
+| `FM_PROCEVENT_OWNER_CHECK_SECONDS` | 15 | 1..3600 | Guard detection interval; it reads lifetime authorization and recorded state-root identity twice per interval, half an interval apart, so both debounce reads fit inside one interval. |
 | `FM_PROCEVENT_LAUNCH_FLOOR_SECONDS` | 1 | 1..3600 | Minimum time between consecutive launches of one registration generation's stored command; bounds immediately returning sources during the lease window. |
 
 The generation's first launch is immediate, later launches share its monotonic pacing timestamp, a timestamp from before a reboot is treated as expired, and replacing the registration starts a fresh pacing generation.
@@ -3092,7 +3127,7 @@ FM_PF_RETRY_BACKOFF_SECS=900   # seconds before the next attempt after a retryab
 FM_LOCK_STALE_AFTER=2   # grace seconds for missing or nonnumeric lock-owner PIDs (minimum 2s); dead numeric PIDs have no age grace
 FM_GUARD_GRACE=300      # beacon freshness threshold for guard verdicts, arm health checks, and the primary turn-end guard; see docs/turnend-guard.md for model-aware exceptions
 FM_CLAUDE_AUTOARM_ATTEMPTS=2   # bounded Stop-owned arm attempts per Claude auto-arm cycle; accepted values are 1, 2, or 3
-FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=800   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression
+FM_CLAUDE_AUTOARM_SYNC_WAIT_MS=12000   # milliseconds the --claude turn-end guard waits for watcher health, an open Stop auto-arm generation claim, or a fresh epoch before deciding recovery ownership or failure progression; the default and its measured basis are in docs/turnend-guard.md
 FM_CLAUDE_AUTOARM_EPOCH_FRESH=15   # seconds a recorded auto-arm outcome remains eligible for the current event epoch's recovery or failure decision
 FM_CLAUDE_TURNEND_BLOCK_BUDGET=3   # consecutive --claude guard re-blocks before the verified one-time attended fail-open; safely below Claude Code's 8-block override
 FM_ARM_CONFIRM_TIMEOUT=10   # seconds fm-watch-arm waits to confirm a fresh watcher before reporting FAILED; default 30 on Git Bash/MSYS

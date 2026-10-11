@@ -12,6 +12,7 @@
 #                 "STARTUP_MEMORY_BUDGET: invalid config/startup-memory-budget - <reason>",
 #                 "CREW_DISPATCH: invalid config/crew-dispatch.json - <reason>",
 #                 "CREW_DISPATCH: warning - literal model '<id>' for <harness> is not an index entry; ...",
+#                 "MODEL_FRESHNESS: <model> on <harness> is older than <newer> in the <harness> catalog",
 #                 "FLEET_SYNC: <repo>: skipped|recovered|STUCK: <detail>",
 #                 "HOME_SUMMARY: <ledger never published|not republished since
 #                 <stamp>>; <n> failed attempt(s) ... last: <recorded failure>",
@@ -1067,6 +1068,24 @@ EOF
   echo "FMX: X mode on - relay poll armed via state/x-watch.check.sh; 30s watcher cadence in config/x-mode.env"
 }
 
+# Network-phase, read-only: compare every model in config/crew-dispatch.json with
+# the newest model of its family in that harness's own catalog. bin/fm-model-freshness.sh
+# owns the rule and its notices; a stale model is a diagnostic for the supervisor
+# to act on, never a refusal and never a config edit. An unreadable catalog is
+# only a BOOTSTRAP_INFO fact, shown on request, so a harness without discovery
+# does not add a line to every session start.
+model_freshness_sweep() {
+  local notes
+  [ -f "$CONFIG/crew-dispatch.json" ] && [ -x "$SCRIPT_DIR/fm-model-freshness.sh" ] || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  notes=$(mktemp "${TMPDIR:-/tmp}/fm-bootstrap-model-freshness.XXXXXX" 2>/dev/null) || return 0
+  "$SCRIPT_DIR/fm-model-freshness.sh" scan 2>"$notes" || true
+  if [ "${FM_BOOTSTRAP_VERBOSE_FACTS:-0}" = 1 ]; then
+    sed -n 's/^model-freshness: notice: /BOOTSTRAP_INFO: model freshness: /p' "$notes"
+  fi
+  rm -f "$notes"
+}
+
 crew_dispatch_validate() {
   local file err verified_harnesses resolved index_notes typed_active=false
   file="$CONFIG/crew-dispatch.json"
@@ -1604,6 +1623,23 @@ detect_home_summary_publication() {
   fi
 }
 
+# The per-user process pile-up detector is host-wide and its source has one
+# machine-wide owner, so only a primary home arms it, never a secondmate or a
+# disposable lab that would hold the claim away from it. Exit 3 is a host the
+# guard cannot measure and stays silent. The adapter always resolves beside
+# this script, never under a fake code root.
+# Arming requests a detached runner without waiting for readiness; a consumer
+# that needs a ready listener checks it through the process-event interface.
+# It runs beside the diagnostics below rather than adding its own time to every
+# start, and its outcome is reported in its usual place.
+proc_detector_pid=
+if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ] && local_phase \
+  && [ ! -e "$FM_HOME/.fm-secondmate-home" ] && [ ! -e "$FM_HOME/.fm-lab-home" ] \
+  && [ -x "$SCRIPT_DIR/fm-procevent-proc.sh" ]; then
+  FM_ROOT_OVERRIDE='' FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-procevent-proc.sh" arm >/dev/null 2>&1 &
+  proc_detector_pid=$!
+fi
+
 # The order below is the order the diagnostics have always printed in, so a
 # `skip` run is the same output with the network lines removed rather than a
 # reshuffle. `gh auth status` sits between the two local blocks because that is
@@ -1622,6 +1658,20 @@ if network_phase; then
   __fm_timing_stamp=$(fm_timing_now_ms)
   gh auth status >/dev/null 2>&1 || echo "NEEDS_GH_AUTH"
   fm_timing_record phase gh-auth "$__fm_timing_stamp"
+fi
+# The catalog reads overlap the rest of the deferred phase, like clone refresh.
+model_freshness_pid=
+model_freshness_out=
+if network_phase && [ -f "$CONFIG/crew-dispatch.json" ]; then
+  model_freshness_out=$(mktemp "${TMPDIR:-/tmp}/fm-bootstrap-freshness.XXXXXX") || model_freshness_out=
+  if [ -n "$model_freshness_out" ]; then
+    (
+      __fm_timing_stamp=$(fm_timing_now_ms)
+      model_freshness_sweep
+      fm_timing_record phase model-freshness "$__fm_timing_stamp"
+    ) >"$model_freshness_out" 2>&1 &
+    model_freshness_pid=$!
+  fi
 fi
 local_phase && detect_local_config
 
@@ -1672,6 +1722,10 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
     "$SCRIPT_DIR/fm-contributions.sh" arm --if-owned >/dev/null \
       || echo "MISSING: contribution observation could not be armed; coverage is unconfirmed"
   fi
+  if [ -n "$proc_detector_pid" ]; then
+    wait "$proc_detector_pid" || [ "$?" -eq 3 ] \
+      || echo "MISSING: process pile-up detector could not be armed; coverage is unconfirmed"
+  fi
   if [ -n "$fleet_sync_pid" ]; then
     wait "$fleet_sync_pid" || true
     cat "$fleet_sync_out"
@@ -1680,6 +1734,11 @@ if [ "${FM_BOOTSTRAP_DETECT_ONLY:-0}" != 1 ]; then
   if network_phase && network_sweep_authorized 'Herdr reboot launch recovery'; then
     FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$SCRIPT_DIR/fm-reboot-recover.sh" recover || true
   fi
+fi
+if [ -n "$model_freshness_pid" ]; then
+  wait "$model_freshness_pid" || true
+  cat "$model_freshness_out"
+  rm -f "$model_freshness_out"
 fi
 local_phase && secondmate_handoff_detect
 exit 0
