@@ -4,6 +4,13 @@
 # Refuses when bin/fm-dod-lib.sh will not accept the named head as reachable
 # outside the worker's disposable copy; in no-mistakes mode a forge-reported
 # head is that named head and is already stored on the forge.
+# A merge call (FM_PR_CHECK_MERGE=1) on a GitHub task that owns several pull
+# requests (bin/fm-dod-lib.sh fm_dod_task_owns_several_prs) is judged on the
+# forge's head for the PR it names instead, because the worker copy's HEAD
+# rests on a different PR or a local tip. That head is held by the forge, and
+# bin/fm-pr-merge.sh's live checks still refuse a red or unreported head and
+# merge only the exact head it verified. A head the forge did not report, a
+# single-PR task, and a plain registration stay judged on the copy's HEAD.
 # The watcher check source is byte-for-byte bin/fm-pr-poll.sh; task and PR data
 # live only in a private sidecar and are never interpolated into shell source.
 # A GitHub pull request URL, a GitLab merge request URL, and a Gerrit change URL
@@ -144,10 +151,22 @@ case "$PROVIDER:$MODE" in
   *:no-mistakes|*:) DONE_LINE="done: PR $URL checks green" ;;
   *) DONE_LINE="done: PR $URL" ;;
 esac
-if { [ -z "$PR_HEAD" ] || ! fm_dod_forge_head_is_named_head "$MODE"; } \
-  && ! GATE_REASON=$(fm_dod_accept_ship_done "${KIND:-ship}" "$MODE" "$WT" "$PROJECT" "$DONE_LINE" "$STATE" "$ID" "$META"); then
-  echo "error: $GATE_REASON" >&2
-  exit 1
+if { [ -z "$PR_HEAD" ] || ! fm_dod_forge_head_is_named_head "$MODE"; }; then
+  # A merge call on a task that owns several PRs names one PR, and the forge
+  # holds that PR's head: the worker copy's HEAD may rest on another PR, on a
+  # local tip carrying several PRs' content, or on a PR that already merged and
+  # lost its branch, so it is not the head being merged. Judge the named PR's
+  # forge head instead. The live checks in bin/fm-pr-merge.sh still refuse a red
+  # head or an unreported required check and bind the merge to that exact head.
+  # A head the forge did not report keeps the gate on the copy's HEAD, and a
+  # single-PR task or a plain registration is judged on that HEAD as before.
+  if [ "${FM_PR_CHECK_MERGE:-}" = 1 ] && [ -n "$PR_HEAD" ] \
+    && fm_dod_task_owns_several_prs "$STATE" "$ID" "$META" "$URL"; then
+    :
+  elif ! GATE_REASON=$(fm_dod_accept_ship_done "${KIND:-ship}" "$MODE" "$WT" "$PROJECT" "$DONE_LINE" "$STATE" "$ID" "$META"); then
+    echo "error: $GATE_REASON" >&2
+    exit 1
+  fi
 fi
 
 META_TMP=
