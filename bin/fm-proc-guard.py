@@ -40,8 +40,11 @@ Count semantics:
          that UID's threads. An unlimited RLIMIT_NPROC leaves the limit unknown.
 
 Census document (schema 2):
-  Counts by command and parent chain, up to five deepest ancestry chains with
-  leaf and repeated-command samples, and up to five oldest and newest PIDs.
+  Counts by command and the 20 most common parent chains (parent_chains counts
+  every distinct one), up to five deepest ancestry chains with leaf and
+  repeated-command samples, and up to five oldest and newest PIDs. A chain keeps at most its first 4 and last 8 command runs;
+  the runs between them collapse into one "..." gap, so a census of a chain
+  alternating between commands stays bounded.
   Includes capture time, count/limit, trigger, and census wall/CPU cost.
   The newest 20 census files are retained in the supplied state directory.
 
@@ -81,6 +84,9 @@ WARN_PERCENT = 60
 CRITICAL_PERCENT = 90
 CLEAR_PERCENT = 50
 CENSUS_TOP = 5
+CENSUS_CHAINS = 20
+CHAIN_HEAD = 4
+CHAIN_TAIL = 8
 CENSUS_KEEP = 20
 MAX_SKIPPED_SAMPLES = 30
 
@@ -293,10 +299,24 @@ def process_identifier(executable, argv):
     return {"executable": executable, "script": script}
 
 
+def append_segment(segments, segment):
+    """Adds one (command, depth, runs) segment; runs past the head and tail fold into
+    one (None, depth, runs) gap, so a chain never holds more than CHAIN_HEAD + 1 +
+    CHAIN_TAIL segments."""
+    segments += (segment,)
+    if len(segments) > CHAIN_HEAD + 1 + CHAIN_TAIL:
+        gap, folded = segments[CHAIN_HEAD], segments[CHAIN_HEAD + 1]
+        segments = (segments[:CHAIN_HEAD] + ((None, gap[1] + folded[1], gap[2] + folded[2]),)
+                    + segments[CHAIN_HEAD + 2:])
+    return segments
+
+
 def segments_text(segments, repeats):
     parts = []
-    for command, run, _first in segments:
-        if run > 1:
+    for command, run, runs in segments:
+        if command is None:
+            parts.append("...(%d more)" % runs if repeats else "...")
+        elif run > 1:
             parts.append("%s(x%d)" % (command, run) if repeats else command + "+")
         else:
             parts.append(command)
@@ -342,7 +362,7 @@ def build_census(source, count, limit, limit_source, threshold, trigger):
                 last = segments[-1]
                 segments = segments[:-1] + ((last[0], last[1] + 1, last[2]),)
             else:
-                segments = segments + ((proc.command, 1, proc.pid),)
+                segments = append_segment(segments, (proc.command, 1, 1))
             memo[proc.pid] = (depth, segments)
         return memo[pid]
 
@@ -385,7 +405,8 @@ def build_census(source, count, limit, limit_source, threshold, trigger):
         # The longest run of one command (shallowest on a tie) is the pile itself; its
         # first, middle, and last members show what each level was running, because the
         # first member can be an unrelated shell that merely started the recursion.
-        longest = max(range(len(segments)), key=lambda i: (segments[i][1], -i))
+        longest = max(range(len(segments)),
+                      key=lambda i: (segments[i][0] is not None, segments[i][1], -i))
         first = sum(segment[1] for segment in segments[:longest])
         members = chain_pids(pid)[first:first + segments[longest][1]]
         samples = []
@@ -436,8 +457,10 @@ def build_census(source, count, limit, limit_source, threshold, trigger):
                       deepest_depth),
         "by_command": [{"command": c, "count": n} for c, n in
                        sorted(by_command.items(), key=lambda item: (-item[1], item[0]))],
+        "parent_chains": len(by_chain),
         "by_parent_chain": [{"chain": c, "count": n} for c, n in
-                            sorted(by_chain.items(), key=lambda item: (-item[1], item[0]))],
+                            sorted(by_chain.items(),
+                                   key=lambda item: (-item[1], item[0]))[:CENSUS_CHAINS]],
         "deepest_chains": deepest,
         "oldest": oldest,
         "newest": newest,

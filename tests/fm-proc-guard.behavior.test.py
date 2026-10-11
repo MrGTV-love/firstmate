@@ -8,6 +8,7 @@ from pathlib import Path
 import resource
 import sys
 import tempfile
+import tracemalloc
 import unittest
 from contextlib import ExitStack, contextmanager
 from types import SimpleNamespace
@@ -375,6 +376,43 @@ class GuardBehavior(unittest.TestCase):
                 self.assertIn("armed: no\n", result)
                 self.assertFalse((root / "second").exists())
 
+    def test_alternating_chain_census_stays_bounded(self):
+        depth = 4000
+
+        class Alternating:
+            name, uid = "controlled", 1234
+
+            def pids(self):
+                return range(1000, 1000 + depth)
+
+            def info(self, pid):
+                if not 1000 <= pid < 1000 + depth:
+                    return None
+                return guard.Proc(pid, pid - 1 if pid > 1000 else 1,
+                                  "script" if pid % 2 == 0 else "timeout", "S", pid, 1)
+
+            def identifier(self, pid):
+                return guard.process_identifier(b"/bin/sh", [b"sh", b"/private/script"])
+
+        tracemalloc.start()
+        try:
+            census = guard.build_census(Alternating(), depth, 10666, "controlled", 6399.6,
+                                        {"reason": "requested"})
+            peak = tracemalloc.get_traced_memory()[1]
+        finally:
+            tracemalloc.stop()
+        with tempfile.TemporaryDirectory() as state:
+            size = os.path.getsize(guard.write_census(state, census))
+        self.assertLess(peak, 32 * 1024 * 1024)
+        self.assertLess(size, 64 * 1024)
+        self.assertEqual(census["census_processes"], depth)
+        self.assertLessEqual(len(census["by_parent_chain"]), guard.CENSUS_CHAINS)
+        self.assertEqual(sum(entry["count"] for entry in census["by_parent_chain"]), depth)
+        top = census["deepest_chains"][0]
+        self.assertEqual((top["depth"], top["leaf"]["pid"]), (depth, 1000 + depth - 1))
+        self.assertEqual(top["chain"], " > ".join(
+            ["script", "timeout"] * 2 + ["...(%d more)" % (depth - 12)] + ["script", "timeout"] * 4))
+        self.assertEqual([sample["pid"] for sample in top["run_samples"]], [1000])
 
 
 if __name__ == "__main__":

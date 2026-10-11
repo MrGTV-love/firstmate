@@ -1418,7 +1418,7 @@ proc_shadow_owner=$(printf '%s\n' "$proc_shadow_registration" | sed -n 's/^owner
   [ "$FM_SUP_SOURCES" -eq 1 ]
 ) || fail "an extension registered as proc-guard was exempted from supervision"
 FM_HOME="$H_PROC_SHADOW" FM_PROCEVENT_OWNER_LEASE_SECONDS=1 FM_PROCEVENT_OWNER_CHECK_SECONDS=1 \
-  "$PROCEVENT" start --detach proc-guard >/dev/null || fail "the shadow extension runner did not launch"
+  "$PROCEVENT" reconcile | grep -q ' started=1 ' || fail "the shadow extension runner did not launch"
 wait_for_file "$proc_shadow_marker" || fail "the shadow extension runner never entered its poll"
 fm_test_wait_until 30 test -s "$H_PROC_SHADOW/state/procevent/proc-guard.runner" \
   || fail "the shadow extension runner recorded no listener"

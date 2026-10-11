@@ -7,7 +7,7 @@
 #   fm-procevent.sh register <adapter> <source-id> [--detach] -- <argv>...
 #   fm-procevent.sh register-task <adapter> <source-id> <task-id> -- <argv>...
 #   fm-procevent.sh register-extension <adapter> <source-id> --config-ref <reference>
-#   fm-procevent.sh start [--detach] <source-id>
+#   fm-procevent.sh start <source-id>
 #   fm-procevent.sh ensure-listening <source-id>
 #   fm-procevent.sh reconcile
 #   fm-procevent.sh classify <result-file>
@@ -67,8 +67,6 @@
 #            when it says so, so a source that has ended stops being restarted.
 #            A task-owned source instead keeps its terminal round open and
 #            registered until its owner concludes it with `handled`.
-#            --detach requests a launch without waiting for readiness, or returns
-#            immediately if a live canonical runner already holds the claim.
 # reconcile  Idempotent liveness entry the watcher calls on its ordinary cycle:
 #            republish every durably captured result with no handled
 #            acknowledgement yet - regardless of any earlier publication - and
@@ -1040,27 +1038,10 @@ detach_for_launch_state() {  # <source-id> <detached-launch-state>
 }
 
 cmd_start_public() {
-  local id identity keeper status detached=0
-  if [ "${1-}" = --detach ]; then
-    detached=1
-    shift
-  fi
-  id=${1-}
+  local id=${1-} identity keeper status
   [ "$#" -eq 1 ] || usage
   fm_procevent_source_id_valid "$id" || die "source id must be path-safe: $id"
   owner_lease_refresh
-  if [ "$detached" -eq 1 ]; then
-    fm_procevent_source_lock_acquire "$id" || die "cannot lock source: $id"
-    if [ ! -f "$(source_file "$id")" ] || [ -L "$(source_file "$id")" ]; then
-      fm_procevent_source_lock_release "$id"
-      die "source is not registered: $id"
-    fi
-    detached_launch_state_locked "$id"
-    status=$?
-    fm_procevent_source_lock_release "$id"
-    detach_for_launch_state "$id" "$status"
-    return $?
-  fi
   identity=$(fm_pid_identity "$$" 2>/dev/null) || die "cannot identify the attached owner"
   owner_lease_keepalive "$$" "$identity" &
   keeper=$!
