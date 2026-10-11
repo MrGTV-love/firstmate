@@ -1387,6 +1387,28 @@ fm_pr_poll_merge_already_notified() {  # <state> <id> <provider> <host> <path> <
     "$provider" "$host" "$path" "$number"
 }
 
+# 0 when the task's marker is a readable, well-formed record naming a PR other
+# than the one given: a sibling PR of the task has already merged. An absent,
+# malformed, or matching marker is 1, so only positive evidence counts.
+fm_pr_poll_merge_marker_names_other() {  # <state> <id> <provider> <host> <path> <number>
+  local state=$1 id=$2 provider=$3 host=$4 path=$5 number=$6 marker state_device
+  local version marked_provider marked_host marked_path marked_number
+  fm_pr_task_id_valid "$id" || return 1
+  [ -d "$state" ] && [ ! -L "$state" ] || return 1
+  state_device=$(fm_pr_file_device "$state") || return 1
+  marker="$state/$id.pr-poll-merge-notified"
+  fm_pr_private_file_valid "$marker" 600 "$state_device" || return 1
+  {
+    IFS= read -r version && IFS= read -r marked_provider && IFS= read -r marked_host \
+      && IFS= read -r marked_path && IFS= read -r marked_number
+  } < "$marker" || return 1
+  [ "$version" = fm-pr-poll-merge-notified-v1 ] || return 1
+  [ -n "$marked_provider" ] && [ -n "$marked_host" ] && [ -n "$marked_path" ] \
+    && [ -n "$marked_number" ] || return 1
+  [ "$marked_provider" != "$provider" ] || [ "$marked_host" != "$host" ] \
+    || [ "$marked_path" != "$path" ] || [ "$marked_number" != "$number" ]
+}
+
 fm_pr_poll_merge_mark_notified() {  # <state> <id> <provider> <host> <path> <number>
   local state=$1 id=$2 provider=$3 host=$4 path=$5 number=$6 marker tmp state_device
   fm_pr_task_id_valid "$id" || return 1

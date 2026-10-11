@@ -384,6 +384,63 @@ test_pr_based_dod_draft_check_uses_gh_axi() {
 
 # A scout spawned on a named base keeps that base through promotion: the ship
 # instructions start from it and the PR targets it; local-only cannot carry it.
+# A task owns several PRs only on positive evidence in its own records: a
+# recorded pr= or a landed merge that is another PR, or a ready report naming
+# another PR of the same project. Anything absent, malformed, or about the same
+# PR is a single-PR task, which the merge guard judges on its copy's HEAD.
+test_task_owns_several_prs_only_on_positive_evidence() {
+  local state meta url=https://github.com/o/r/pull/10 other=https://github.com/o/r/pull/11
+  state="$TMP_ROOT/several-prs-state"
+  mkdir -p "$state"
+  meta="$state/t.meta"
+  fm_write_meta "$meta" 'kind=ship' 'mode=direct-PR'
+
+  fm_dod_task_owns_several_prs "$state" t "$meta" "$url" \
+    && fail "a task with no other PR on record was read as owning several"
+  fm_dod_task_owns_several_prs "$state" t "$state/absent.meta" "$url" \
+    && fail "an absent meta was read as owning several"
+
+  fm_write_meta "$meta" 'kind=ship' 'mode=direct-PR' "pr=$url"
+  fm_dod_task_owns_several_prs "$state" t "$meta" "$url" \
+    && fail "a recorded pr= that is the named PR was read as owning several"
+  printf 'done [at=1]: PR %s checks green\n' "$url" > "$state/t.status"
+  fm_dod_task_owns_several_prs "$state" t "$meta" "$url" \
+    && fail "a ready report for the named PR alone was read as owning several"
+
+  fm_write_meta "$meta" 'kind=ship' 'mode=direct-PR' "pr=$other"
+  fm_dod_task_owns_several_prs "$state" t "$meta" "$url" \
+    || fail "a recorded pr= that is another PR was not read as owning several"
+
+  fm_write_meta "$meta" 'kind=ship' 'mode=direct-PR' "pr=$url"
+  write_merge_marker "$state" t github github.com o/r 11
+  fm_dod_task_owns_several_prs "$state" t "$meta" "$url" \
+    || fail "a landed merge of another PR was not read as owning several"
+  write_merge_marker "$state" t github github.com o/r 10
+  fm_dod_task_owns_several_prs "$state" t "$meta" "$url" \
+    && fail "a landed merge of the named PR was read as owning several"
+  printf 'not-a-marker\ngithub\ngithub.com\no/r\n11\n' > "$state/t.pr-poll-merge-notified"
+  chmod 600 "$state/t.pr-poll-merge-notified"
+  fm_dod_task_owns_several_prs "$state" t "$meta" "$url" \
+    && fail "a malformed merge marker was read as owning several"
+  rm -f "$state/t.pr-poll-merge-notified"
+
+  printf 'done [at=2]: PR %s checks green\n' "$other" >> "$state/t.status"
+  fm_dod_task_owns_several_prs "$state" t "$meta" "$url" \
+    || fail "a ready report naming another PR was not read as owning several"
+
+  # Prose that merely mentions a PR, another project's PR, and a non-ready
+  # verb are not ready reports for another PR of this project.
+  printf 'done [at=1]: PR %s checks green\n' "$url" > "$state/t.status"
+  {
+    printf 'working [at=2]: PR %s is the sibling to rebase on\n' "$other"
+    printf 'done [at=3]: PR https://github.com/o/elsewhere/pull/11 checks green\n'
+    printf 'done [at=4]: see https://github.com/o/r/pull/11 for context\n'
+  } >> "$state/t.status"
+  fm_dod_task_owns_several_prs "$state" t "$meta" "$url" \
+    && fail "a mention, another project's PR, or a non-ready line was read as owning several"
+  pass "a task owns several PRs only on positive evidence in its own records"
+}
+
 test_promotion_keeps_the_recorded_base_branch() {
   local home id meta out status mode
   home="$TMP_ROOT/promote-base-home"
@@ -442,6 +499,7 @@ test_standalone_local_only_needs_project_ref
 test_non_done_lines_are_not_gated
 test_fenced_and_indented_captain_lines_are_not_intent
 test_pr_based_dod_draft_check_uses_gh_axi
+test_task_owns_several_prs_only_on_positive_evidence
 test_promotion_keeps_the_recorded_base_branch
 
 # The launch role is the generated text a worker receives. It must keep the

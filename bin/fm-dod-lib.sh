@@ -42,6 +42,10 @@
 # also hold the result of a passed run. These live reads are the one check at the ready
 # decision; a later rebase or patch set on the server does not revoke an armed
 # task's done. Teardown's landed-work test remains the complete discard gate.
+# At merge time bin/fm-pr-check.sh asks fm_dod_task_owns_several_prs first: a
+# task that owns several PRs is judged on the head the forge reports for the PR
+# the merge call names, not on the worker copy's HEAD, which rests on another
+# PR or a local tip there; a single-PR task and a ready claim are not.
 # The block opens with the fixed machine-readable "Delivery contract: mode=<mode>"
 # line that bin/fm-spawn.sh checks a ship brief against; a forge=gerrit block
 # appends " forge=gerrit shape=squash" to that line. The "Ship branch: <branch>"
@@ -592,6 +596,47 @@ fm_dod_recorded_pr_on_forge() {  # <state> <id> <meta> <mode> <url>
     && { [ "$FM_PR_PROVIDER" = gerrit ] \
       || fm_pr_poll_merge_already_notified "$state" "$id" \
         "$FM_PR_PROVIDER" "$FM_PR_HOST" "$FM_PR_PATH" "$FM_PR_NUMBER"; } )
+}
+
+# 0 when the task's own durable records name a pull request of <url>'s project
+# other than <url> itself, so the task owns several PRs: its recorded pr= is
+# another PR, a merge it already landed (state/<id>.pr-poll-merge-notified) is
+# another PR, or a `done: PR <url>` ready report in state/<id>.status names
+# another PR. The worker copy of such a task rests on one PR's head, on a local
+# tip that carries several PRs' content, or on a PR already merged whose branch
+# is gone, so its HEAD is not the head of the PR a merge call names;
+# bin/fm-pr-check.sh judges that PR's forge head instead at merge time. Only
+# positive evidence counts: absent, unreadable, or malformed records answer 1,
+# and a single-PR task is judged on its copy's HEAD exactly as before.
+fm_dod_task_owns_several_prs() {  # <state> <id> <meta> <url>
+  # A subshell, because parsing a URL overwrites the caller's FM_PR_* identity.
+  (
+    state=$1 id=$2 meta=$3
+    fm_pr_url_parse "$4" || exit 1
+    provider=$FM_PR_PROVIDER host=$FM_PR_HOST path=$FM_PR_PATH number=$FM_PR_NUMBER
+    url=$FM_PR_URL
+    if [ -n "$meta" ] && [ -f "$meta" ]; then
+      recorded=$(fm_dod_meta_value "$meta" pr)
+      [ -z "$recorded" ] || [ "$recorded" = "$url" ] || exit 0
+    fi
+    fm_pr_poll_merge_marker_names_other "$state" "$id" "$provider" "$host" "$path" "$number" \
+      && exit 0
+    status="$state/$id.status"
+    [ -f "$status" ] && [ ! -L "$status" ] || exit 1
+    while IFS= read -r candidate; do
+      [ -n "$candidate" ] || continue
+      if fm_pr_url_parse "$candidate" \
+        && [ "$FM_PR_PROVIDER" = "$provider" ] && [ "$FM_PR_HOST" = "$host" ] \
+        && [ "$FM_PR_PATH" = "$path" ] && [ "$FM_PR_NUMBER" != "$number" ]; then
+        exit 0
+      fi
+    done <<EOF
+$(grep -E '^done([[:space:]]|\[|:)' "$status" 2>/dev/null \
+      | grep -oE 'PR[[:space:]]+https?://[^[:space:]]+' \
+      | sed -E 's/^PR[[:space:]]+//; s/[.,;:)]+$//')
+EOF
+    exit 1
+  )
 }
 
 # 0 when <url> names a Gerrit change whose current patch set carries the tree of

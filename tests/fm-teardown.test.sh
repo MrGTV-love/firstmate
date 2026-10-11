@@ -7311,7 +7311,124 @@ SH
   pass "task teardown completes without reaping another home's abandoned worker"
 }
 
+# A cleanup holds its task's lease-command lock until it ends (bin/fm-lease-lib.sh
+# owns the contract), and that lock once covered the whole home: one slow
+# cleanup left every steer to every other task undelivered until it finished.
+# The fixture stalls the cleanup at its endpoint close, which runs inside the
+# guard, and requires a steer to a different task to complete while the cleanup
+# is still stalled. Ordering against the stalled cleanup is the assertion, so no
+# time bound is involved; on a home-wide lock the steer waits until the stub's
+# own bound lets the cleanup finish, and the cleanup is no longer running.
+test_teardown_never_holds_up_a_steer_to_another_task() {
+  local case_dir fakebin rc teardown_pid send_rc
+  case_dir=$(make_case guard-scope)
+  fakebin="$case_dir/fakebin"
+  write_meta "$case_dir" local-only ship
+  wt_commit_file "$case_dir" feature.txt landed "merged work"
+  git -C "$case_dir/project" update-ref refs/heads/main "$(git -C "$case_dir/wt" rev-parse HEAD)"
+  fm_write_meta "$case_dir/state/task-y2.meta" "window=firstmate:fm-task-y2" "kind=ship"
+  : > "$case_dir/config/supervision-host"
+  cat > "$fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  kill-window)
+    : > "$FM_TEST_READY"
+    n=0
+    while [ ! -e "$FM_TEST_RELEASE" ] && [ "$n" -lt 2000 ]; do sleep 0.01; n=$((n + 1)); done
+    exit 0 ;;
+  send-keys) printf 'send-keys %s\n' "$*" >> "$FM_TEST_TMUX_LOG"; exit 0 ;;
+  display-message)
+    case " $* " in
+      *cursor_y*) printf '1\n' ;;
+      *pane_current_command*) printf 'claude\n' ;;
+      *) printf '%%1\n' ;;
+    esac
+    exit 0 ;;
+  capture-pane) printf '╭────╮\n│    │\n╰────╯\n'; exit 0 ;;
+esac
+exit 0
+SH
+  chmod +x "$fakebin/tmux"
+
+  FM_TEST_READY="$case_dir/kill-ready" FM_TEST_RELEASE="$case_dir/kill-release" \
+    FM_TEST_TMUX_LOG="$case_dir/tmux.log" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" &
+  teardown_pid=$!
+  fm_test_wait_until 60 test -e "$case_dir/kill-ready" \
+    || { : > "$case_dir/kill-release"; wait "$teardown_pid" 2>/dev/null; fail "guard-scope: teardown never reached its endpoint close: $(cat "$case_dir/stderr")"; }
+  compgen -G "$case_dir/state/.fm-lease-command*.lock" >/dev/null \
+    || { : > "$case_dir/kill-release"; wait "$teardown_pid" 2>/dev/null; fail "guard-scope: the cleanup held no lease-command lock, so the case proves nothing"; }
+
+  send_rc=0
+  PATH="$fakebin:$PATH" FM_HOME="$case_dir/primary-home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_CONFIG_OVERRIDE="$case_dir/config" FM_SEND_SETTLE=0 \
+    FM_TEST_TMUX_LOG="$case_dir/tmux.log" \
+    "$case_dir/code-root/bin/fm-send.sh" task-y2 "ruling for the other lane" \
+    > "$case_dir/send.out" 2> "$case_dir/send.err" || send_rc=$?
+  kill -0 "$teardown_pid" 2>/dev/null \
+    || fail "guard-scope: the steer to another task returned only after the cleanup ended (rc=$send_rc): $(cat "$case_dir/send.err")"
+  expect_code 0 "$send_rc" "guard-scope: the steer to another task failed: $(cat "$case_dir/send.err")"
+  grep -qF 'ruling for the other lane' "$case_dir/state/task-y2.inbox/001.msg" \
+    || fail "guard-scope: the steer to another task was not recorded in its inbox"
+
+  : > "$case_dir/kill-release"
+  rc=0
+  wait "$teardown_pid" || rc=$?
+  expect_code 0 "$rc" "guard-scope: the stalled cleanup did not complete: $(cat "$case_dir/stderr")"
+  pass "a steer to another task completes while a cleanup holds its own task's lease lock"
+}
+
+# The lane-registry scan runs three times in one cleanup and reads the worktree
+# registry of every project named by every task record in every local home.
+# Records naming one clone used to be read once each, so the scan cost grew with
+# the fleet's record count and reached over a minute per scan; each distinct
+# registry is now read once per scan. The assertion compares one home with and
+# without a large set of extra records naming the same clone.
+test_lane_registry_scan_reads_each_distinct_registry_once() {
+  local case_dir variant homes metas h m reads_with='' reads_without=''
+  for variant in without with; do
+    case_dir=$(make_case registry-scan-$variant)
+    write_meta "$case_dir" local-only ship
+    wt_commit_file "$case_dir" feature.txt landed "merged work"
+    git -C "$case_dir/project" update-ref refs/heads/main "$(git -C "$case_dir/wt" rev-parse HEAD)"
+    mkdir -p "$case_dir/primary-home/data"
+    : > "$case_dir/primary-home/data/secondmates.md"
+    homes=3 metas=0
+    [ "$variant" != with ] || metas=6
+    for ((h = 1; h <= homes; h++)); do
+      mkdir -p "$case_dir/fleet-home-$h/state" "$case_dir/fleet-home-$h/data"
+      printf -- '- lane-%s - scan lane (home: %s; scope: scan; projects: p; added 2026-10-10)\n' \
+        "$h" "$case_dir/fleet-home-$h" >> "$case_dir/primary-home/data/secondmates.md"
+      for ((m = 1; m <= metas; m++)); do
+        printf 'project=%s\nkind=ship\n' "$case_dir/project" > "$case_dir/fleet-home-$h/state/lane-$h-task-$m.meta"
+      done
+    done
+    cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" worktree list "*) printf '%s\n' "\$*" >> "$case_dir/worktree-list.log" ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+    chmod +x "$case_dir/fakebin/git"
+    : > "$case_dir/worktree-list.log"
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" \
+      || fail "registry-scan-$variant: teardown failed: $(cat "$case_dir/stderr")"
+    if [ "$variant" = with ]; then
+      reads_with=$(wc -l < "$case_dir/worktree-list.log" | tr -d ' ')
+    else
+      reads_without=$(wc -l < "$case_dir/worktree-list.log" | tr -d ' ')
+    fi
+  done
+  [ "$reads_without" -gt 0 ] || fail "registry-scan: the cleanup never read a worktree registry, so the case proves nothing"
+  [ "$reads_with" = "$reads_without" ] \
+    || fail "registry-scan: $reads_with registry reads with 18 extra records naming one clone, $reads_without without; the scan must read each distinct registry once"
+  pass "the lane-registry scan reads each distinct registry once however many records name it"
+}
+
 teardown_test_cases=(
+test_teardown_never_holds_up_a_steer_to_another_task
+test_lane_registry_scan_reads_each_distinct_registry_once
 test_task_teardown_preserves_another_homes_abandoned_worker
 test_missing_startup_source_refuses_before_cleanup
 test_unreadable_startup_source_refuses_before_cleanup

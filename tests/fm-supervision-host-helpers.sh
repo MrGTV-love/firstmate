@@ -303,9 +303,13 @@ append_status() {  # <home> <text>
 
 
 # Make a previously accepted close main-only at its turn boundary.
-turn_main_only_at_second_offer() {  # <home>
-  local real_node
+turn_main_only_at_second_offer() {  # <home> [quiet]
+  local real_node turn
   real_node=$(command -v node)
+  turn='printf '"'"'needs-decision [at=%s]: which export format?\n'"'"' "$(date +%s)" >> "$FM_HOME/state/demo.status"'
+  # Quiet: the offer alone turns main-only, with no status line for the
+  # successor watcher to close on.
+  [ "${2:-}" != quiet ] || turn='echo eligible=0; exit 0'
   cat > "$1/fakebin/node" <<SH
 #!/usr/bin/env bash
 case "\$*" in
@@ -314,7 +318,7 @@ case "\$*" in
     count=\$((count + 1))
     printf '%s\n' "\$count" > "\$FM_HOME/offer-count"
     if [ "\$count" -eq 2 ]; then
-      printf 'needs-decision [at=%s]: which export format?\n' "\$(date +%s)" >> "\$FM_HOME/state/demo.status"
+      $turn
     fi ;;
 esac
 exec "$real_node" "\$@"

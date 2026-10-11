@@ -2392,30 +2392,44 @@ task_nested_lane_for_path() {  # <root> <path>
   done
 }
 
+# Adds one candidate registry source to TASK_LANE_SOURCES (read and written by
+# task_registered_lanes_under_roots, which resets it) when it is a git work tree.
+# Each distinct path is judged and read once: a fleet's task records name the
+# same few project clones hundreds of times, and each repeat cost two git
+# processes here and one more full registry read below, which made a single
+# scan run for over a minute under a loaded fleet.
+task_lane_source_add() {  # <path>
+  case "$TASK_LANE_SOURCES_SEEN" in *$'\n'"$1"$'\n'*) return 0 ;; esac
+  TASK_LANE_SOURCES_SEEN="$TASK_LANE_SOURCES_SEEN$1"$'\n'
+  git -C "$1" rev-parse --show-toplevel >/dev/null 2>&1 || return 0
+  TASK_LANE_SOURCES+=("$1")
+}
+
 # Refresh TASK_REGISTERED_LANES: every worktree, including missing or prunable
 # entries, registered strictly beneath a scan root by the git-backed recorded
 # project, scan roots, or available task projects in reachable local Firstmate
 # states. Project registries remain sources when the scan root is missing; a
 # recorded project that is gone or not a git repository has no registry to read.
+# Every distinct source registry is read once per call.
 task_registered_lanes_under_roots() {  # <canonical-root>...
   local root src registry line lane state_dir meta project
-  local -a sources
   TASK_REGISTERED_LANES=()
-  sources=()
+  TASK_LANE_SOURCES=()
+  TASK_LANE_SOURCES_SEEN=$'\n'
   for root in "$@"; do
-    git -C "$root" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$root")
+    task_lane_source_add "$root"
   done
-  [ -z "$PROJ" ] || ! git -C "$PROJ" rev-parse --show-toplevel >/dev/null 2>&1 || sources+=("$PROJ")
+  [ -z "$PROJ" ] || task_lane_source_add "$PROJ"
   collect_local_firstmate_states "$STATE" || return 1
   for state_dir in "${TREEHOUSE_OWNER_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
       [ -f "$meta" ] && [ ! -L "$meta" ] || continue
       project=$(fm_meta_get "$meta" project)
       [ -n "$project" ] || continue
-      git -C "$project" rev-parse --show-toplevel >/dev/null 2>&1 && sources+=("$project")
+      task_lane_source_add "$project"
     done
   done
-  for src in ${sources[@]+"${sources[@]}"}; do
+  for src in ${TASK_LANE_SOURCES[@]+"${TASK_LANE_SOURCES[@]}"}; do
     if ! registry=$(git -C "$src" worktree list --porcelain 2>/dev/null); then
       TASK_PIDS_FAILED_DIR=$src
       TASK_PIDS_ERROR="worktree registration could not be read"

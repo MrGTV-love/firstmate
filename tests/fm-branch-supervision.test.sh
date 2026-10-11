@@ -815,7 +815,7 @@ test_home_without_branch_is_untouched() {
   out=$(env -u PI_CODING_AGENT -u FM_SUPERVISION_ACTOR FM_TEST_HARNESS=codex STATE="$home/state" bash -c '
     . "$1"
     fm_lease_guard task-none "probe"
-    if [ -e "$STATE/.fm-lease-command.lock" ]; then echo lock-taken; else echo no-lock; fi
+    if [ -e "$(fm_lease_lock_path task-none)" ]; then echo lock-taken; else echo no-lock; fi
   ' _ "$ROOT/bin/fm-lease-lib.sh" 2>&1)
   [ "$out" = no-lock ] || fail "an unmarked guard with no lease file engaged the lease-command lock: $out"
 
@@ -977,7 +977,7 @@ test_host_home_unmarked_guard_excludes_the_first_claim() {
     env -u PI_CODING_AGENT -u FM_SUPERVISION_ACTOR CLAUDECODE=1 FM_TEST_HARNESS="$1" FM_HOME="$home" STATE="$home/state" bash -c '
       . "$1"
       fm_lease_guard task-first "probe"
-      if [ -e "$STATE/.fm-lease-command.lock" ]; then echo lock-taken; else echo no-lock; fi
+      if [ -e "$(fm_lease_lock_path task-first)" ]; then echo lock-taken; else echo no-lock; fi
       fm_lease_guard_release
     ' _ "$ROOT/bin/fm-lease-lib.sh" 2>&1
   }
@@ -1186,6 +1186,60 @@ test_guard_holds_exclusivity_through_mutation() {
   wait "$claim_pid"; claim_status=$?
   [ "$claim_status" -eq 0 ] || fail "claim did not proceed after guarded mutation ended: $claim_status"
   pass "lease guard excludes a concurrent actor for the complete mutation"
+}
+
+# A guard retains its lock for the whole guarded mutation, so the lock must name
+# the one task being mutated: a post-landing cleanup of one task once held the
+# only lock for the home for minutes and every steer to every other task waited
+# behind it. The fixture holds task-slow's guard open and requires a guard, a
+# claim, and a release on task-other to finish while it is still held, with the
+# holder's liveness as the proof rather than a time bound.
+test_guard_on_one_task_never_delays_another_task() {
+  local home operation_pid claim_status out
+  home="$TMP_ROOT/guard-scope-home"
+  mkdir -p "$home/state"
+  printf '%s\n' "$$" > "$home/state/.lock"
+
+  PI_CODING_AGENT=true STATE="$home/state" FM_TEST_READY="$home/operation-ready" \
+    FM_TEST_RELEASE="$home/operation-release" bash -c '
+      . "$1"
+      fm_lease_guard task-slow "probe"
+      trap "fm_lease_guard_release" EXIT
+      : > "$FM_TEST_READY"
+      i=0
+      while [ ! -e "$FM_TEST_RELEASE" ] && [ "$i" -lt 1500 ]; do sleep 0.01; i=$((i + 1)); done
+    ' _ "$ROOT/bin/fm-lease-lib.sh" &
+  operation_pid=$!
+  while [ ! -e "$home/operation-ready" ]; do sleep 0.01; done
+
+  # The positional parameter belongs to the nested shell.
+  # shellcheck disable=SC2016
+  PI_CODING_AGENT=true STATE="$home/state" bash -c '. "$1"; fm_lease_guard task-other "probe"; fm_lease_guard_release; echo guarded' \
+    _ "$ROOT/bin/fm-lease-lib.sh" > "$home/other-guard.out" 2>&1
+  kill -0 "$operation_pid" 2>/dev/null \
+    || fail "a guard on another task waited for task-slow's guarded mutation to end"
+  assert_contains "$(cat "$home/other-guard.out")" guarded "the guard on another task did not complete"
+
+  PI_CODING_AGENT=true FM_HOME="$home" FM_SUPERVISION_ACTOR=branch FM_LEASE_HOLDER_PID=$$ \
+    "$ROOT/bin/fm-lease.sh" claim task-other --actor branch >/dev/null 2>&1
+  claim_status=$?
+  kill -0 "$operation_pid" 2>/dev/null \
+    || fail "a claim on another task waited for task-slow's guarded mutation to end"
+  [ "$claim_status" -eq 0 ] || fail "the claim on another task failed with $claim_status"
+  out=$(FM_HOME="$home" "$ROOT/bin/fm-lease.sh" check task-other) || fail "the claim on another task left no lease"
+  case "$out" in
+    "branch $$ "*" live") ;;
+    *) fail "the claim on another task recorded: $out" ;;
+  esac
+  PI_CODING_AGENT=true FM_HOME="$home" FM_SUPERVISION_ACTOR=branch \
+    "$ROOT/bin/fm-lease.sh" release task-other --actor branch >/dev/null 2>&1 \
+    || fail "the release on another task failed"
+  kill -0 "$operation_pid" 2>/dev/null \
+    || fail "a release on another task waited for task-slow's guarded mutation to end"
+
+  : > "$home/operation-release"
+  wait "$operation_pid" || fail "guarded mutation fixture failed"
+  pass "a guarded mutation of one task never delays a guard, claim, or release on another task"
 }
 
 test_claim_refuses_the_other_actors_name_loudly() {
@@ -1568,6 +1622,7 @@ test_lease_liveness_binds_to_the_session_lock
 test_concurrent_stale_lease_claims_have_one_winner
 test_guard_stale_clear_cannot_delete_a_new_claim
 test_guard_holds_exclusivity_through_mutation
+test_guard_on_one_task_never_delays_another_task
 test_claim_refuses_the_other_actors_name_loudly
 test_release_actor_drops_only_that_actors_leases
 test_branch_cannot_force_teardown_or_directly_relaunch
