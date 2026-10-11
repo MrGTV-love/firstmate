@@ -316,12 +316,41 @@ Under the default one-shot behavior, that re-opened the 2026-07-21 blind window.
 
 Before the Claude cooperative budget can re-block a Stop, the guard checks for a live foreign session-lock owner and takes the same safe diagnostic exit described under "Guard predicates" ([foreign session-lock owner](#foreign-session-lock-owner)).
 
-The Claude mode waits up to `FM_CLAUDE_AUTOARM_SYNC_WAIT_MS` (default 800 milliseconds).
+The Claude mode waits up to `FM_CLAUDE_AUTOARM_SYNC_WAIT_MS` (default 12000 milliseconds, set from measured claim latency in [the wait's measured basis](#the-waits-measured-basis)).
 It allows the stop when any of these holds:
 
 - The watcher is healthy.
 - The auto-arm's generation claim is open.
 - `state/.claude-autoarm-epoch` contains a fresh actionable rewake owned by this event epoch.
+
+#### The wait's measured basis
+
+The wait is a floor in wall time, not a ceiling: the guard sleeps 100 milliseconds once per 100 milliseconds of the setting (120 sleeps at the default), and each check between sleeps costs more as the host load rises.
+The setting is therefore chosen against the claim latency itself: the time from the guard starting to wait until the auto-arm publishes its generation claim.
+Under host load that latency ranged from a median of 90 milliseconds to a stress-level maximum of 10.7 seconds, and the former 800 millisecond default expired in half of the stress trials.
+[`verification/supervision.md`](verification/supervision.md#claude-stop-auto-arm-claim-latency-2026-10-10) records the method, the numbers, and the load.
+
+The margin rule is the claim path's own bound plus the longest uncontended latency measured.
+`fm_autoarm_claim_next` waits at most 10 seconds for the wake-queue lock and then gives up without claiming, so no claim is ever published later than 10 seconds plus the normal latency.
+The longest normal latency under CPU load was 2.0 seconds, so the default is 10 + 2 = 12 seconds.
+That covers every claim the stress level published, and a longer wait would buy nothing.
+A claim that never publishes because the lock wait gave up is not fixable by any wait; it remains the existing re-block path.
+`test_hook_claude_mode_default_wait_covers_measured_claim_latency` in `tests/fm-turnend-guard.test.sh` pins the default against a claim published past the former 800 millisecond default.
+
+The guard has no hook `timeout` of its own in `.claude/settings.json`, so Claude's default of 600 seconds for command hooks applies.
+A wait of 12 seconds nominal stays inside it with a wide margin even at the 9 times wall-time stretch seen under stress (about 108 seconds).
+
+The cost lands whenever no claim is open at the end of the wait, not only when the auto-arm is absent.
+Each blocked Stop waits the full 12 seconds first, so the cost is per Stop, and it adds up over the Stops of one failure episode:
+
+- With a failure notice on disk, the budget of three re-blocks runs out on the fourth Stop, which also waits the full 12 seconds before the verified fail-open, so the episode costs about 48 seconds of wait.
+- With no failure notice on disk, the verified fail-open never fires, so the re-blocks continue to Claude Code's 8-block override, about 96 seconds of wait.
+  The same holds in away mode with no live daemon, and for a Stop that pi-code delivers, because the auto-arm stands down there by design.
+
+These are nominal floors; wall time can stretch about 9 times under load.
+The wait ends before the full 12 seconds only when the watcher is healthy, the auto-arm's generation claim is open, a legacy build's lock-holding claim is live, or a fresh actionable rewake is recorded.
+The one failed outcome that also ends it at once is the first fresh `failed` epoch that has a failure notice and no budget file yet; that Stop counts as the automatic continuation and is allowed.
+No other explicit failed outcome ends the wait early.
 
 #### Auto-arm generation claim
 

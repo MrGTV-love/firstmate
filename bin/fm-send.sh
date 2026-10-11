@@ -1117,9 +1117,10 @@ else
     ;;
   *) settle=0.3 ;;
   esac
-  # Per-harness submit-confirm budget. agy's bare `>` composer verdict is
-  # `unknown`, so a landed submit is acknowledged only by the idle-to-busy
-  # transition poll, and agy renders its verified busy footer well after the
+  # Per-harness submit-confirm budget. Without a live agy identity (tmux has
+  # no agy probe) agy's bare `>` composer verdict is `unknown`, so a landed
+  # submit is acknowledged only by the idle-to-busy transition poll there,
+  # and on every backend agy renders its verified busy footer well after the
   # shared budget expires: ~1.5s after Enter for a short steer, ~4-5s for a
   # realistic longer brief (live-measured, agy 1.2.1), against the shared
   # default's 3 x 0.4s. With the shared default a typed steer to an agy

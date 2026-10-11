@@ -39,6 +39,17 @@ SH
   chmod +x "$1/fake-sweep"
 }
 
+# Runs the real sweep for the first call only and does nothing afterwards, so a
+# watcher that keeps polling cannot publish a second report over the first.
+install_run_once() {  # <fakebin> <real-sweep>
+  cat > "$1/reap-once" <<SH
+#!/usr/bin/env bash
+mkdir "$1/reap-once.started" 2>/dev/null || exit 0
+exec "$2" "\$@"
+SH
+  chmod +x "$1/reap-once"
+}
+
 sweep_calls() {  # <state>
   if [ -f "$1/.sweep-calls" ]; then
     wc -l < "$1/.sweep-calls" | tr -d ' '
@@ -222,13 +233,17 @@ test_stock_lab_watcher_reaps_through_real_teardown() (
   FM_HOME="$home" "$ROOT/bin/fm-captain-hold.sh" complete lab-worker --none >/dev/null \
     || fail "could not complete the scout's captain-call inventory"
   prime_status_seen "$state" "$state/lab-worker.status"
+  # The real sweep runs once. Reaping removes lab-worker.meta, and the watcher keeps polling
+  # until its own stale wake retires it, so a later real sweep finds no task and
+  # replaces the report with a header-only one, which is correct but not what this test reads.
+  install_run_once "$fakebin" "$dir/code-root/bin/fm-idle-session-reap.sh"
   start_watcher "$state" "$fakebin" "$out" -u FM_STATE_OVERRIDE -u FM_GATE_REFUSE_BYPASS \
     NO_MISTAKES_GATE=1 FM_HOME="$home" FM_IDLE_REAP_INTERVAL=1 FM_WATCH_HANDLING_SUCCESSOR=1 \
-    FM_IDLE_REAP_BIN="$dir/code-root/bin/fm-idle-session-reap.sh" \
+    FM_IDLE_REAP_BIN="$fakebin/reap-once" \
     FM_IDLE_REAP_TEARDOWN_BIN="$dir/code-root/bin/fm-teardown.sh" FM_TEARDOWN_GUARD_DONE=1
   pid=$!
-  fm_test_wait_until 100 test -f "$state/idle-sessions.report" \
-    || { stop_owned_watcher "$pid"; fail "the lab watcher did not publish a cleanup report: $(cat "$out.err")"; }
+  fm_test_wait_until 100 grep -q $'reaped\tlab-worker\t' "$state/idle-sessions.report" \
+    || { stop_owned_watcher "$pid"; fail "the lab watcher did not report the reaped task: $(cat "$state/idle-sessions.report" 2>/dev/null) $(cat "$out.err")"; }
   stop_owned_watcher "$pid"
   assert_grep $'reaped\tlab-worker\t' "$state/idle-sessions.report" \
     "real teardown must admit the eligible task under lab authority: $(cat "$state/idle-sessions.report")"

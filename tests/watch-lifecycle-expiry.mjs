@@ -101,6 +101,10 @@ printf '%s\\n' "$$" >> "$FM_ARM_LOG"
 if [ "$first" = 1 ]; then
   printf 'watcher: started pid=%s (beacon fresh)\\n' "$$"
   if [ "$FM_EXPIRY_SCENARIO" != shutdown ]; then
+    if [ '${kind}' = omp ]; then
+      . "$FM_ROOT_OVERRIDE/bin/fm-wake-lib.sh"
+      fm_wake_append signal expiry-regression 'signal: expiry regression wake' || exit 1
+    fi
     printf 'signal: expiry regression wake\\n'
     exit 0
   fi
@@ -131,7 +135,8 @@ mod.default({
   sendUserMessage(message) { sent.push(message); },
   events: { on() {}, emit() {} },
 });
-await handlers.get("session_start")({}, {});
+const ctx = kind === "omp" ? { isIdle: () => true } : {};
+await handlers.get("session_start")({}, ctx);
 if (scenario === "shutdown") {
   await waitFor(() => rows().length === 1);
   await sleep(100);
@@ -139,7 +144,14 @@ if (scenario === "shutdown") {
 } else {
   await waitFor(() => sent.some((message) => message.includes("unready successor arm did not exit within 60ms")));
   assert.equal(rows().length, 2, "an unretired arm must not overlap another retry");
-  assert.ok(sent.some((message) => message.includes("signal: expiry regression wake")), "the original wake must survive failed restoration");
+  if (kind === "omp") {
+    await waitFor(() => sent.some((message) => message.includes("FIRSTMATE WATCHER WAKE: signal: expiry regression wake")));
+    const queued = spawnSync("bash", [`${root}/bin/fm-wake-drain.sh`, "--queued"], { encoding: "utf8" });
+    assert.equal(queued.status, 0, queued.stderr);
+    assert.equal(queued.stdout.trim().split("\t").slice(4).join("\t"), "signal: expiry regression wake", "the failed restoration must leave the original durable row owed");
+  } else {
+    assert.ok(sent.some((message) => message.includes("signal: expiry regression wake")), "the original wake must survive failed restoration");
+  }
 }
 const log = readFileSync(`${state}/extensions/${kind}-primary-watch/lifecycle.log`, "utf8");
 const records = log.trim().split("\n").map((line) => Object.fromEntries(line.split(" ").slice(1).map((field) => field.split("="))));

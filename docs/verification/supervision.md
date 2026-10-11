@@ -515,6 +515,32 @@ The timeout hook trapped `TERM`, backgrounded `sleep 300`, waited, and on `TERM`
 | Control, exit 2 before the timeout | started +2, exited 2 at +12 | `Stop hook feedback` followed by the requested reply |
 | Timeout, exit 2 from the `TERM` handler | started +2, `TERM` and exit 2 at +32 | no `Stop hook feedback` and no reply, still idle at +111 |
 
+### Claude Stop auto-arm claim latency, 2026-10-10
+
+This supports the 12000 millisecond `FM_CLAUDE_AUTOARM_SYNC_WAIT_MS` default stated in [the wait's measured basis](../turnend-guard.md#the-waits-measured-basis).
+No production log holds the latency: the epoch ledger keeps only the newest entry at one-second resolution.
+The measurement ran on macOS with 18 cores, in an isolated lab home that ran the real guard and the real auto-arm in parallel the way Claude starts parallel Stop hooks.
+The claim time was read from the ledger file's own modification time, and the latency is counted from the moment the guard starts to wait.
+
+The host was never idle: other fleet lanes kept its 1-minute load average between 1.1 and 4.3 times the core count during the first two rows, so no row is an idle baseline.
+
+| Level | Trials | p50 | p95 | p99 | max | 1-minute load, times cores |
+| --- | --- | --- | --- | --- | --- | --- |
+| Ambient fleet load | 300 | 90 ms | 270 ms | 894 ms | 2001 ms | 1.1 to 3.9, mean 2.4 |
+| Ambient plus 18 busy loops | 60 | 153 ms | 745 ms | 1241 ms | 1241 ms | 1.4 to 4.3, mean 3.7 |
+| Wake-queue lock stress, 3 continuous real enqueuers | 174 of 200 | 2284 ms | 8615 ms | 9393 ms | 10731 ms | 1.8 to 6.7, mean 3.8 |
+
+- Counted from the Stop hook's own start (the launcher's clock just before it forked both hooks) to the claim, the same trials gave a p50 of 532, 1035, and 3429 ms, a p99 of 2778, 11528, and 13773 ms, and a max of 6512, 11528, and 16585 ms.
+  Most of that is the guard and auto-arm starting up under load, and the guard's wait only has to cover the part after it begins waiting.
+- At the former 800 millisecond default the guard never expired in the 360 CPU-load trials, and it expired in 101 of 200 stress trials.
+- A guard set to 800 milliseconds nominal that expired under the stress level ran a median of 2.0 seconds and up to 7.2 seconds of wall time.
+- The 26 stress trials that never claimed at all were the lock wait giving up after 10 seconds, which no guard wait can cover.
+- Re-run at the 12 second default under the same stress, 60 trials gave 53 claims all allowed with none expired, and 7 trials with no claim that still blocked.
+
+The stress level is a worst case, not a calibrated production rate: three loops held the wake-queue lock back to back, which no real home does continuously.
+It reproduces the 2026-10-10 14:24 and 14:25 blocks, where the claim arrived seconds after the guard gave up at host load 62 on 18 cores.
+Production wake-queue hold times were not measured, so the stress level bounds the effect without proving the cause of that incident.
+
 ## Watcher continuity
 
 The cross-harness evidence combines the 2026-07-17 live pass with Claude's replacement Stop-owned path revalidated on 2026-09-21, all against isolated project and home state.

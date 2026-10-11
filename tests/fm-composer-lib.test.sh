@@ -2587,3 +2587,72 @@ test_glyph_led_continuations_stay_pending_and_bounded() {
   pass "glyph-led continuation rows keep Enter-retry proof and classify without re-walking the draft"
 }
 test_glyph_led_continuations_stay_pending_and_bounded
+
+# --- Antigravity CLI (agy): a rule pair around a plain `>` prompt row --------
+#
+# Captured live from agy 1.3.3 on Herdr (task fm-control-agy-relaunch-composer):
+# the composer is two solid `─` rules with a bare `>` row between them, the
+# idle footer `? for shortcuts` or the busy footer `esc to cancel` below, and a
+# `┃` toast above. Every one of these read `unknown` before the shape was
+# taught, so `fm-control.sh relaunch` refused an idle agy worker at its
+# composer-empty proof and the lane had to start a new task. The `>` is a shell
+# glyph and never proves a composer, so the pair reads only under a live agy
+# identity, and only an idle or done status proves it empty.
+test_agy_rule_pair_composer() {
+  local rule banner toast idle_footer busy_footer idle typed busy popup echoed wrapped blank_first
+  local styled_idle styled_typed shell no_glyph st
+  local agy_idle agy_done agy_working agy_blocked agy_unknown
+  rule=$(rule_n 118)
+  banner=$'                  Antigravity CLI 1.3.3\n                  worker@example.invalid (Google AI Pro)\n                  Gemini 3.8 Flash (Low)\n                  /work/tree\n'
+  toast=$' ┃ New Models Available\n ┃ Claude Opus 5.5 and Claude Sonnet 5.5 now available in your plan!\n ┃ esc to dismiss\n'
+  idle_footer='? for shortcuts                                                       Gemini 3.8 Flash · low'
+  busy_footer='esc to cancel                                                         Gemini 3.8 Flash · low'
+  agy_idle=$(printf 'agy\tidle'); agy_done=$(printf 'agy\tdone'); agy_working=$(printf 'agy\tworking')
+  agy_blocked=$(printf 'agy\tblocked'); agy_unknown=$(printf 'agy\tunknown')
+
+  idle="$banner$toast$rule"$'\n>\n'"$rule"$'\n'"$idle_footer"
+  typed="$banner$toast$rule"$'\n> hello pending text\n'"$rule"$'\n                                       Gemini 3.8 Flash · low'
+  busy="$banner$rule"$'\n> Add 12345 and 67890.\n⣟  Generating...\n'"$rule"$'\n>\n'"$rule"$'\n'"$busy_footer"
+  popup="$banner$rule"$'\n> /\n'"$rule"$'\n> /add-dir                   Add a directory to the workspace\n  /agents                    List available custom agents\n  ↑/↓ Navigate · enter Select · tab Complete\n'"$busy_footer"
+  echoed="$banner$rule"$'\n> Add 12345 and 67890.\n  80235\n'"$rule"$'\n>\n'"$rule"$'\n'"$idle_footer"
+  wrapped="$banner$rule"$'\n> first line of a long draft\n  second line of it\n'"$rule"$'\n'"$idle_footer"
+  blank_first="$banner$rule"$'\n>\n  text on the second row\n'"$rule"$'\n'"$idle_footer"
+  styled_idle="$banner$toast$rule"$'\n\e[0m\e[38;5;12m>\e[0m\n'"$rule"$'\n'"$idle_footer"
+  styled_typed="$banner$toast$rule"$'\n\e[0m\e[38;5;12m> \e[0mhello pending text\n'"$rule"$'\n'"$idle_footer"
+  shell=$'transcript line\n'"$rule"$'\n>\n'"$rule"
+  no_glyph=$'transcript line\n'"$rule"$'\n\n'"$rule"$'\n'"$idle_footer"
+
+  for st in "$agy_idle" "$agy_done"; do
+    assert_screen "agy idle composer under native $st" empty "$CAPS_STYLED" "$idle" '' "$st"
+    assert_screen "agy idle composer with a transcript echo under native $st" empty "$CAPS_STYLED" "$echoed" '' "$st"
+    assert_screen "agy styled idle composer under native $st" empty "$CAPS_STYLED" "$styled_idle" '' "$st"
+    assert_screen "agy idle composer on a plain capture under native $st" empty $'styled=0\ncursor=0\nidentity=1' "$idle" '' "$st"
+  done
+  for st in "$agy_working" "$agy_blocked" "$agy_unknown"; do
+    assert_screen "agy empty composer is never proven empty under native $st" unknown "$CAPS_STYLED" "$idle" '' "$st"
+    assert_screen "agy in-flight turn under native $st" unknown "$CAPS_STYLED" "$busy" '' "$st"
+  done
+  # The native status can lag the screen, so the busy footer vetoes `empty` alone.
+  assert_screen "agy in-flight turn with a lagging idle status" unknown "$CAPS_STYLED" "$busy" '' "$agy_idle"
+  assert_screen "agy in-flight turn with a lagging done status" unknown "$CAPS_STYLED" "$busy" '' "$agy_done"
+  for st in "$agy_idle" "$agy_done" "$agy_working" "$agy_blocked" "$agy_unknown"; do
+    assert_screen "agy draft under native $st" pending "$CAPS_STYLED" "$typed" '' "$st"
+    assert_screen "agy styled draft under native $st" pending "$CAPS_STYLED" "$styled_typed" '' "$st"
+    assert_screen "agy wrapped draft under native $st" pending "$CAPS_STYLED" "$wrapped" '' "$st"
+    assert_screen "agy draft on a later row under native $st" pending "$CAPS_STYLED" "$blank_first" '' "$st"
+    [ "$(fm_composer_classify_screen "$CAPS_STYLED" "$popup" '' "$st")" != empty ] \
+      || fail "agy slash popup must never read empty under native $st"
+  done
+  # Structure without a live agy identity stays unproven: a `>` between two rules
+  # is also what a dead shell and a pasted transcript look like.
+  for st in probe-absent "$(printf 'claude\tidle')" "$(printf 'codex\tidle')"; do
+    assert_screen "agy-shaped pair under identity '$st'" unknown "$CAPS_STYLED" "$idle" '' "$st"
+    assert_screen "dead shell between rules under identity '$st'" unknown "$CAPS_STYLED" "$shell" '' "$st"
+  done
+  assert_screen "agy-shaped pair with no identity on the capture" unknown "$CAPS_STYLED_NOID" "$idle"
+  assert_screen "agy-shaped pair on a plain capture with no identity" unknown "$CAPS_PLAIN" "$idle"
+  assert_screen "a pair without the agy prompt row stays unproven under agy idle" unknown "$CAPS_STYLED" "$no_glyph" '' "$agy_idle"
+  assert_screen "agy pair asks the adapter for identity first" need-identity "$CAPS_STYLED" "$idle" '' ''
+  pass "agy composer: idle/done proves empty, and a working, pending, popup, or unidentified one never does"
+}
+test_agy_rule_pair_composer

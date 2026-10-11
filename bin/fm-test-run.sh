@@ -329,6 +329,7 @@ family_for_basename() {
     fm-calm-claude-mod.test.sh|\
     fm-harness-adapter-references.test.sh|\
     fm-send-popup-settle.test.sh|fm-send-settle.test.sh|\
+    fm-dispatch-capacity.test.sh|\
     fm-supervision-instructions.test.sh|fm-task-delivery.test.sh|\
     fm-timeout-lib.test.sh|\
     fm-tmux-submit-busy.test.sh|fm-trace-context-lib.test.sh|\
@@ -394,6 +395,7 @@ family_for_basename() {
     fm-grok-stop-live-e2e.test.sh|fm-harness-adapter-instructions-live-e2e.test.sh|\
     fm-harness-liveness-drift-live-e2e.test.sh|\
     fm-devin-signals-live-e2e.test.sh|fm-muse-signals-live-e2e.test.sh|fm-rovo-signals-live-e2e.test.sh|fm-agy-signals-live-e2e.test.sh|\
+    fm-agy-composer-live-e2e.test.sh|\
     fm-launch-prompt-signals-live-e2e.test.sh|fm-claude-nested-home-live-e2e.test.sh|\
     fm-pi-seeded-home-trust-live-e2e.test.sh|\
     fm-herdr-version-floor-live-e2e.test.sh|\
@@ -404,6 +406,7 @@ family_for_basename() {
     fm-pi-watch-loader-live.test.sh|\
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|fm-omp-reboot-live-e2e.test.sh|\
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|fm-omp-fallback-chain-live-e2e.test.sh|\
+    fm-omp-stale-wake-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
     fm-pr-state-live-e2e.test.sh|\
     fm-sessionstart-hook-live-e2e.test.sh|fm-sessionstart-instruction-refresh-live-e2e.test.sh|\
@@ -733,6 +736,7 @@ tests/fm-afk-contract.test.sh 15645
 tests/fm-afk-inject-e2e.test.sh 41958
 tests/fm-afk-pi-herdr-return-e2e.test.sh 52
 tests/fm-afk-return.test.sh 47380
+tests/fm-agy-composer-live-e2e.test.sh 53
 tests/fm-agy-harness.test.sh 50959
 tests/fm-agy-signals-live-e2e.test.sh 53
 tests/fm-ask-user-authority.test.sh 171
@@ -1498,6 +1502,10 @@ families_for_changed_path() {
       printf '%s\n' real-herdr-gated
       printf '%s\n' backend-dispatch
       ;;
+    tests/omp_wake_turns.py)
+      printf '%s\n' "__script__:fm-omp-wake-turns.test.sh"
+      printf '%s\n' "__script__:fm-omp-stale-wake-live-e2e.test.sh"
+      ;;
     tests/*.test.sh)
       # A single test file change selects only that script via basename family
       # resolution in the caller; emit a marker family of __script__
@@ -1641,6 +1649,14 @@ families_for_changed_path() {
     bin/fm-bootstrap.sh)
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-brief.test.sh"
+      ;;
+    bin/fm-dispatch-capacity*)
+      printf '%s\n' "__script__:fm-dispatch-capacity.test.sh"
+      printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
+      printf '%s\n' "__script__:fm-quota-choose.test.sh"
+      printf '%s\n' "__script__:fm-omp-harness.test.sh"
+      printf '%s\n' "__script__:fm-control-relaunch.test.sh"
+      printf '%s\n' "__script__:fm-session-end-relaunch.test.sh"
       ;;
     bin/fm-quota-axi-lib.sh)
       printf '%s\n' session-bootstrap

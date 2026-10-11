@@ -236,6 +236,23 @@ for name in ('covered', 'merged'):
     assert '1 commit(s)' in rows(corrected, 'unlanded_commit')[name]['evidence'], corrected
     assert 'local correction B' in rows(corrected, 'unlanded_commit')[name]['evidence'], corrected
 
+# A PR head that is not a local object cannot be read, so its coverage is skipped for that one task: the
+# task keeps its own row naming the absent head, and the ledger stays complete instead of degrading whole.
+absent_head = 'd' * 40
+present_head = double['single']['5']['head']['sha']
+double['single']['5']['head']['sha'] = absent_head
+(world / 'gh.json').write_text(json.dumps(double))
+missing_head = ledger()
+assert missing_head['complete'] is True and 'ledger degraded' not in rows(missing_head), missing_head
+missing_evidence = rows(missing_head, 'unlanded_commit')['merged']['evidence']
+assert f'PR head {absent_head[:8]} is not in this copy, so PR coverage was not applied' in missing_evidence, missing_evidence
+assert '2 commit(s)' in missing_evidence and 'local correction B' in missing_evidence, missing_evidence
+assert 'merged' in rows(missing_head, 'failed_task'), missing_head
+assert 'PR head' not in rows(missing_head, 'unlanded_commit')['covered']['evidence'], missing_head
+double['single']['5']['head']['sha'] = present_head
+(world / 'gh.json').write_text(json.dumps(double))
+assert ledger()['complete'] is True
+
 # Failed deliverables actually landed in the current PR head, in default, or dropped are not owed.
 double['single']['5']['head']['sha'] = git(merged, 'rev-parse', 'HEAD')
 (world / 'gh.json').write_text(json.dumps(double))
@@ -593,6 +610,31 @@ for origin_url in ('https://evilgithub.com/test/lookalike.git',
     assert '/repos/test/lookalike/' not in (world / 'gh-requests').read_text(), origin_url
     assert rows(hostname_report, 'open_pr'), 'unsupported hosts must not hide healthy peers'
 git(no_origin, 'config', '--unset', 'remote.origin.url')
+
+# A project whose origin is a local filesystem path has no forge pull requests to collect: it is disclosed
+# by name as informational coverage and never degrades the ledger; a real read error still does.
+local_origin = home / 'projects/local-origin'
+out(['git', 'init', '-q', '-b', 'main', local_origin])
+for origin_url in (str(world / 'origin.git'), 'file://' + str(world / 'origin.git'), '../../origin.git'):
+    git(local_origin, 'config', 'remote.origin.url', origin_url)
+    (world / 'gh-requests').write_text('')
+    local_report = ledger()
+    assert local_report['complete'], (origin_url, local_report)
+    assert 'ledger degraded' not in rows(local_report, 'coverage'), (origin_url, local_report)
+    disclosed = rows(local_report, 'coverage')['no forge coverage: local-origin']
+    assert disclosed['informational'] and not disclosed['overdue'], disclosed
+    assert str(local_origin) in disclosed['evidence'] and origin_url in disclosed['evidence'], disclosed
+    assert rows(local_report, 'open_pr'), 'a local origin must not hide healthy GitHub peers'
+broken_peer = home / 'projects/broken-peer'
+broken_peer.mkdir(); (broken_peer / '.git').write_text('gitdir: /missing/open-loops-repository\n')
+still_blind = ledger()
+assert not still_blind['complete'], still_blind
+blind_evidence = rows(still_blind, 'coverage')['ledger degraded']['evidence']
+assert 'broken-peer' in blind_evidence and 'local-origin' not in blind_evidence, blind_evidence
+assert 'no forge coverage: local-origin' in rows(still_blind, 'coverage'), still_blind
+shutil.rmtree(broken_peer)
+shutil.rmtree(local_origin)
+print('PASS: local-path origins are disclosed without degrading the ledger', flush=True)
 unsupported_pr = dict(number=90, html_url='https://evilgithub.com/test/project/pull/90',
                       head=dict(sha='b' * 40), state='open', updated_at=iso(hours(2)))
 double['pulls'].append(unsupported_pr)
@@ -636,6 +678,13 @@ status_blind = ledger()
 assert not status_blind['complete'] and len(rows(status_blind, 'coverage')) == 1, status_blind
 assert 'questions unreadable.status' in rows(status_blind, 'coverage')['ledger degraded']['evidence'], status_blind
 unreadable.chmod(0o600); unreadable.unlink()
+# A byte cap can cut a multibyte character; an invalid UTF-8 byte must not blind the questions source.
+cut = home / 'state/cut.status'
+cut.write_bytes(f'needs-decision [at={hours(1)}] [key=cut]: caf\xe9 question\n'.encode('latin-1'))
+cut_report = ledger()
+assert cut_report['complete'] and not rows(cut_report, 'coverage'), cut_report
+assert 'cut:cut' in rows(cut_report, 'unanswered_question'), cut_report
+cut.unlink()
 (home / 'state/symlink.status').symlink_to(home / 'state/asker.status')
 assert ledger()['complete'], 'symlink status exclusion is not coverage failure'
 state_mode = (home / 'state').stat().st_mode & 0o777

@@ -18,6 +18,13 @@ GUARD="$ROOT/bin/fm-guard.sh"
 
 TMP_ROOT=$(fm_test_tmproot fm-wake-tests)
 
+# Every watcher launched here may run under a fake clock. Where the clock helper
+# reads `date +%s` (stock macOS bash 3.2), that clock makes every state file look
+# 999999 s old, so the open-loop stale wake fires before the step under test.
+# This suite pins none of the periodic open-loop or home-summary work, so switch
+# it off once for every watcher the cases launch.
+export FM_OPEN_LOOPS_INTERVAL=99999999 FM_HOME_SUMMARY_INTERVAL=99999999
+
 
 test_reemit_serializes_delivery_ownership() {
   local dir state phase records expected out identity claimant i real_sleep
@@ -320,6 +327,7 @@ foreign_stall_watch_leg() {  # <dir> <leg> <now> [observation]
   marker="$dir/state/.secondmate-wake-progress-mate"
   stall="$dir/state/.secondmate-wake-stall-mate"
   printf '%s\n' "$now" > "$dir/now"
+  clear_watcher_cycle "$dir/state"
   PATH="$dir/fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
     FM_STATE_OVERRIDE="$dir/state" FM_FAKE_TMUX_WINDOW='firstmate:fm-mate' \
     FM_SECONDMATE_WAKE_STALL_SECS=1 FM_SECONDMATE_LIVENESS_SECS=99999999 \
@@ -337,11 +345,9 @@ foreign_stall_watch_leg() {  # <dir> <leg> <now> [observation]
     # TERM can leave bash waiting in a child on some runners; stop the owned
     # fixture process and clear only its watcher lifecycle state before the
     # next leg starts against the same queue and progress marker.
-    ! is_live_non_zombie "$pid" || kill -KILL "$pid" 2>/dev/null || true
-  fi
-  wait_for_exit "$pid" 600 || true
-  if [ -n "$observation" ]; then
-    rm -rf -- "$dir/state/.watch.lock" "$dir/state/.watcher-down"
+    stop_watcher_and_clear_cycle "$pid" "$dir/state" KILL
+  else
+    wait_for_exit "$pid" 600 || true
   fi
   if [ -n "$observation" ]; then
     [ "$(cat "$marker" 2>/dev/null || true)" = "$observation" ] \
@@ -457,6 +463,13 @@ stall_watch_has_wake() { # <out>
   grep -E '^(signal:|stale:|check:|heartbeat($|:))' "$1" >/dev/null 2>&1
 }
 
+# A recovery wake (check: rearm-resurface) can end a cycle that never reached the
+# stall step, so it is no proof that the stall tick ran.
+stall_watch_has_tick_wake() { # <out>
+  grep -E '^(signal:|stale:|check:|heartbeat($|:))' "$1" 2>/dev/null \
+    | grep -vF 'check: rearm-resurface' | grep . >/dev/null 2>&1
+}
+
 stall_watch_record_met() { # <mode> <marker> <want> <progress> <progress-start> <sent>
   local mode=$1 marker=$2 want=$3 progress=$4 start=$5 sent=$6
   case "$mode" in
@@ -529,7 +542,8 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
   # not suppress the first endpoint tick when its marker is absent; seed it so
   # every watcher launch and restart leaves the fixture endpoints untouched.
   touch "$dir/state/.secondmate-liveness-tick"
-  FM_OPEN_LOOPS_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >"$out" 2>"$err" &
+  clear_watcher_cycle "$dir/state"
+  FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >"$out" 2>"$err" &
   pid=$!
   case "$mode" in
     alert)
@@ -539,7 +553,8 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
           if grep -F 'secondmate wake-loop stalled' "$out" >/dev/null 2>&1; then
             return 0
           fi
-          FM_OPEN_LOOPS_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
+          clear_watcher_cycle "$dir/state"
+          FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
           pid=$!
         fi
         sleep 0.1
@@ -569,7 +584,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
             met=1
           fi
         fi
-        if [ "$met" -eq 0 ] && ! is_live_non_zombie "$pid" && stall_watch_has_wake "$out"; then
+        if [ "$met" -eq 0 ] && ! is_live_non_zombie "$pid" && stall_watch_has_tick_wake "$out"; then
           met=1
         fi
         ;;
@@ -615,7 +630,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
       wait_for_exit "$pid" 50 || true
       case "$mode" in
         tick)
-          stall_watch_has_wake "$out" && met=1
+          stall_watch_has_tick_wake "$out" && met=1
           ;;
         cleared)
           [ ! -e "$marker" ] && met=1
@@ -635,7 +650,8 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
         break
       fi
       rm -f "$beat"
-      FM_OPEN_LOOPS_INTERVAL=999999 FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
+      clear_watcher_cycle "$dir/state"
+      FM_SECONDMATE_LIVENESS_SECS=99999999 "$WATCH" >>"$out" 2>>"$err" &
       pid=$!
       first=0
       mark=0
@@ -645,10 +661,7 @@ secondmate_stall_watch_leg() { # <dir> <leg> <mode> [arg...]
   done
   [ "$met" -eq 1 ] \
     || fail "watcher leg $leg ($mode) did not observe the stall condition: $(cat "$out" 2>/dev/null) $(cat "$err" 2>/dev/null)"
-  if is_live_non_zombie "$pid"; then
-    kill -TERM "$pid" 2>/dev/null || true
-  fi
-  wait_for_exit "$pid" "$limit" || true
+  stop_watcher_and_clear_cycle "$pid" "$dir/state" TERM "$limit"
 }
 
 test_secondmate_declared_pause_rows_do_not_feed_stall_escalation() {
@@ -1105,6 +1118,12 @@ SH
   ( exec 3> "$fifo"; : > "$dir/capture-blocked"; exec sleep 30 ) &
   holder=$!
 
+  # A stop that lands after the stall step but before the cycle ends leaves the
+  # resumable-cycle marker at 7. The watcher launched next must still start from
+  # a clean cycle and reach the pane read, not resume past the stall step.
+  printf '7\n' > "$state/.prelude-progress"
+  clear_watcher_cycle "$state"
+
   printf '1002\n' > "$dir/now"
   touch "$state/.secondmate-liveness-tick"
   PATH="$fakebin:$PATH" FM_FAKE_NOW_FILE="$dir/now" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
@@ -1438,6 +1457,9 @@ test_empty_prefix_mate_preserves_other_mate_receipt() {
   round=1
   while [ "$round" -le 2 ]; do
     printf 'seed\n' > "$state/.secondmate-wake-progress-ios"
+    # A prior stop after the stall step leaves the resumable-cycle marker at 7;
+    # each round must still run the stall step itself.
+    printf '7\n' > "$state/.prelude-progress"
     PATH="$fakebin:$PATH" FM_HOME="$dir" FM_ROOT_OVERRIDE="$ROOT" \
       FM_STATE_OVERRIDE="$state" FM_FAKE_TMUX_WINDOW='' \
       FM_FAKE_TMUX_LOG="$dir/tmux.log" FM_FAKE_TMUX_CAPTURE="$dir/fake-tmux/pane.txt" \
@@ -1832,6 +1854,38 @@ test_main_is_never_told_to_drain_rows_only_the_branch_owns() {
   pass "a branch-held row raises no queued-wake warning for main, and the same row is presented and acknowledged once the grant clears"
 }
 
+test_queued_preserves_rows_and_state_until_acknowledgement() {
+  local dir state literal query_pid
+  dir=$(make_case queued-read-only)
+  state="$dir/state"
+  literal=$'signal: literal \\n \\t \\123 "quote" [.*] $dollar\tab\rcr\nline'
+  append_wake "$state" signal same.status "$literal" || fail "first append failed"
+  append_wake "$state" signal same.status "signal: newer same-key row" || fail "second append failed"
+  cp "$state/.wake-queue" "$dir/expected"
+  mkdir "$state/.wake-queue.lock"
+  printf '%s\n' "$$" > "$state/.wake-queue.lock/pid"
+  printf 'leftover scratch\n' > "$state/.wake-queue.retire.abandoned"
+  cp -R "$state" "$dir/state.before"
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued \
+    > "$dir/queued.out" 2> "$dir/queued.err" &
+  query_pid=$!
+  wait_for_exit "$query_pid" 100 || fail "read-only query waited for the queue lock"
+  cmp -s "$dir/expected" "$dir/queued.out" || fail "query changed TSV bytes, append order, or same-key rows"
+  [ ! -s "$dir/queued.err" ] || fail "successful query emitted presentation diagnostics"
+  diff -r "$dir/state.before" "$state" >/dev/null || fail "query changed durable state or scratch/lock ownership"
+  rm -rf "$state/.wake-queue.lock"
+
+  FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" || fail "presentation failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" || fail "presented query failed"
+  cmp -s "$dir/expected" "$dir/queued.out" || fail "presentation consumed unacknowledged rows"
+  append_wake "$state" signal late.status "$literal" || fail "late append failed"
+  awk -F '\t' '$2 == 3' "$state/.wake-queue" > "$dir/late.expected"
+  ack_drain_err "$state" "$dir/drain.err" > "$dir/ack.out" 2> "$dir/ack.err" || fail "acknowledgement failed"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" || fail "post-ack query failed"
+  cmp -s "$dir/late.expected" "$dir/queued.out" || fail "partial acknowledgement hid or changed the late row"
+  pass "--queued returns exact append-order rows without presentation, locks, or acknowledgement side effects"
+}
+
 # The pending-warning condition must also survive a queue nobody could read: a
 # queue that exists but cannot be counted is not evidence that it was drained.
 # The per-actor count runs awk over the queue, and awk implementations differ on
@@ -1987,6 +2041,116 @@ test_main_ack_leaves_a_row_that_arrived_after_its_drain_unclaimed() {
     || fail "main's next drain did not present the late row: $(cat "$dir/main2.out" "$dir/main2.err")"
 
   pass "main's acknowledgement leaves a row that arrived after its drain for whichever actor takes it next"
+}
+
+test_queued_empty_and_missing_state_succeed_without_writes() {
+  local dir state marker
+  dir=$(make_case queued-empty)
+  state="$dir/missing-state"
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued \
+    > "$dir/queued.out" 2> "$dir/queued.err" || fail "missing-state query failed"
+  [ ! -s "$dir/queued.out" ] && [ ! -s "$dir/queued.err" ] || fail "missing-state query was not empty"
+  state="$dir/state"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" || fail "missing-queue query failed"
+  [ ! -s "$dir/queued.out" ] && [ ! -e "$state/.wake-queue" ] || fail "missing queue was created or returned work"
+  : > "$state/.wake-queue"
+  for marker in pending:downtime:g1 announced:downtime:g2 pending:handling:g3 announced:handling:g4 acked:downtime:g5 'not a marker'; do
+    printf '%s\n' "$marker" > "$state/.watcher-down"
+    FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" || fail "empty query failed for $marker"
+    [ ! -s "$dir/queued.out" ] && [ ! -s "$dir/queued.err" ] || fail "marker-only state returned work or diagnostics"
+    [ "$(cat "$state/.watcher-down")" = "$marker" ] || fail "empty query changed recovery state"
+  done
+  pass "--queued succeeds empty for missing state/queue and marker-only state without creating records"
+}
+
+test_queued_respects_live_and_stale_branch_grants() {
+  local dir state owner
+  dir=$(make_case queued-actor-grants)
+  state="$dir/state"
+  append_wake "$state" signal branch.status "signal: branch" || fail "branch row append failed"
+  sleep 30 &
+  owner=$!
+  FM_STATE_OVERRIDE="$state" "$GRANT" activate "$owner" queued-grant || {
+    kill "$owner" 2>/dev/null || true
+    fail "branch activation failed"
+  }
+  FM_STATE_OVERRIDE="$state" "$GRANT" publish queued-grant 1 || {
+    kill "$owner" 2>/dev/null || true
+    fail "branch grant failed"
+  }
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued > "$dir/main.out" || fail "held-only query failed"
+  [ ! -s "$dir/main.out" ] || fail "main received a live branch-reserved row"
+  append_wake "$state" signal main.status "signal: main" || fail "main row append failed"
+  awk -F '\t' '$2 == 2' "$state/.wake-queue" > "$dir/main.expected"
+  cp -R "$state" "$dir/live.before"
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued > "$dir/main.out" || fail "main query failed"
+  cmp -s "$dir/main.expected" "$dir/main.out" || fail "main query did not return exactly its unreserved row"
+  diff -r "$dir/live.before" "$state" >/dev/null || fail "live-grant queries changed ownership state"
+  kill "$owner" 2>/dev/null || true
+  wait "$owner" 2>/dev/null || true
+  cp -R "$state" "$dir/stale.before"
+  FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR=main "$DRAIN" --queued > "$dir/main.out" || fail "stale-grant main query failed"
+  cmp -s "$state/.wake-queue" "$dir/main.out" || fail "stale grant did not return all rows to main"
+  diff -r "$dir/stale.before" "$state" >/dev/null || fail "query reclaimed stale-grant files rather than only reading"
+  pass "--queued filters live branch ownership and reads stale grants without repairing state"
+}
+
+test_queued_refuses_invalid_arguments_and_failed_or_malformed_reads() {
+  local dir state rc record
+  dir=$(make_case queued-failures)
+  state="$dir/state"
+  append_wake "$state" signal valid.status "signal: valid" || fail "seed append failed"
+  cp "$state/.wake-queue" "$dir/valid.queue"
+  cp -R "$state" "$dir/state.before"
+  for record in extra --reemit; do
+    rc=0
+    FM_STATE_OVERRIDE="$state" "$DRAIN" --queued "$record" > "$dir/queued.out" 2> "$dir/queued.err" || rc=$?
+    [ "$rc" -eq 2 ] || fail "query accepted extra argument $record (rc=$rc)"
+    [ ! -s "$dir/queued.out" ] || fail "invalid arguments returned rows"
+  done
+  for record in invalid branch; do
+    rc=0
+    FM_STATE_OVERRIDE="$state" FM_SUPERVISION_ACTOR="$record" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" || rc=$?
+    [ "$rc" -eq 2 ] || fail "query accepted actor $record (rc=$rc)"
+    [ ! -s "$dir/queued.out" ] || fail "actor $record received rows"
+  done
+  diff -r "$dir/state.before" "$state" >/dev/null || fail "argument failures changed state"
+
+  mkdir "$dir/failed-awk"
+  cat > "$dir/failed-awk/awk" <<'SH'
+#!/usr/bin/env bash
+printf '1\t1\tsignal\tkey\tsignal: false read\n'
+exit 2
+SH
+  chmod +x "$dir/failed-awk/awk"
+  PATH="$dir/failed-awk:$PATH" FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+    && fail "failed queue read succeeded"
+  [ ! -s "$dir/queued.out" ] || fail "failed read leaked rows"
+  chmod 000 "$state/.wake-queue" || fail "could not make queue unreadable"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+    && { chmod 600 "$state/.wake-queue"; fail "unreadable queue succeeded"; }
+  chmod 600 "$state/.wake-queue" || fail "could not restore queue permissions"
+  [ ! -s "$dir/queued.out" ] || fail "unreadable query returned rows"
+  chmod 000 "$state" || fail "could not make state inaccessible"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+    && { chmod 700 "$state"; fail "inaccessible queue path succeeded as empty"; }
+  chmod 700 "$state" || fail "could not restore state permissions"
+  [ ! -s "$dir/queued.out" ] || fail "inaccessible queue path returned rows"
+  for record in $'1\tbad\tsignal\tkey\tpayload' 'invalid' $'1\t9\tsignal\tkey' $'1\t9\tsignal\tkey\tpayload\textra' $'bad\t9\tsignal\tkey\tpayload' $'1\t9\tunknown\tkey\tpayload'; do
+    cat "$dir/valid.queue" > "$state/.wake-queue"
+    printf '%s\n' "$record" >> "$state/.wake-queue"
+    cp "$state/.wake-queue" "$dir/malformed.before"
+    FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+      && fail "malformed record query succeeded: $record"
+    [ ! -s "$dir/queued.out" ] || fail "malformed queue leaked its valid prefix"
+    cmp -s "$dir/malformed.before" "$state/.wake-queue" || fail "query repaired malformed records"
+  done
+  rm "$state/.wake-queue"
+  mkdir "$state/.wake-queue"
+  FM_STATE_OVERRIDE="$state" "$DRAIN" --queued > "$dir/queued.out" 2> "$dir/queued.err" \
+    && fail "queue directory succeeded as an empty queue"
+  [ ! -s "$dir/queued.out" ] || fail "invalid queue path returned rows"
+  pass "--queued rejects invalid arguments, unreadable paths, failed reads, and malformed rows without returning work"
 }
 
 test_actor_filter_precedes_same_key_deduplication() {
@@ -3859,6 +4023,10 @@ if [ -n "${FM_TEST_ONLY:-}" ]; then
   exit $?
 fi
 
+test_queued_preserves_rows_and_state_until_acknowledgement
+test_queued_empty_and_missing_state_succeed_without_writes
+test_queued_respects_live_and_stale_branch_grants
+test_queued_refuses_invalid_arguments_and_failed_or_malformed_reads
 test_reemit_serializes_delivery_ownership
 test_self_held_lock_reclaims_instead_of_deadlocking
 test_lock_wait_ends_when_the_lock_directory_is_gone

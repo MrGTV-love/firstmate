@@ -1,0 +1,28 @@
+def classify_turn(turn):
+    if "FIRSTMATE WATCHER WAKE" not in turn.get("last", ""):
+        return "non-wake"
+    drain = turn.get("drain")
+    if not isinstance(drain, dict):
+        return "unmeasured"
+    stdout = drain.get("stdout")
+    if not isinstance(stdout, str):
+        return "unmeasured"
+    if drain.get("returncode") != 0:
+        return "failed"
+    for line in stdout.splitlines():
+        fields = line.split("\t")
+        if (len(fields) >= 5 and fields[0].isdigit() and fields[1].isdigit()
+                and fields[2] in ("signal", "stale", "check", "heartbeat")):
+            return "owed"
+    return "empty"
+
+
+def summarize(turns):
+    counts = {kind: 0 for kind in ("owed", "empty", "failed", "unmeasured")}
+    for turn in turns:
+        kind = classify_turn(turn)
+        if kind in counts:
+            counts[kind] += 1
+    measured = counts["owed"] + counts["empty"]
+    return dict(counts, measured=measured,
+                empty_percent=100 * counts["empty"] / measured if measured else 0)

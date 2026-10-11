@@ -11,6 +11,15 @@
 # retirement; docs/watcher-continuity.md owns the recovery contract.
 # --reemit is the context-refresh presentation mode; the same document's
 # "Who presents queued wakes between turns" section owns its delivery exclusion.
+# --queued is a standalone read-only query, not a presentation or acknowledgement.
+# It prints append-order TSV rows (epoch, sequence, kind, key, payload), preserving
+# row fields without same-key deduplication. It is main's view only: rows not
+# reserved by a live branch grant. A missing/stale grant reserves nothing. This
+# mode takes no locks, repairs nothing, and emits no status sections, liveness
+# checks, or WAKE_ACK_REQUIRED. Missing/empty queues succeed with no rows; unreadable paths,
+# failed reads, or malformed rows fail without returning even a valid prefix.
+# Valid rows have exactly five fields, decimal epoch/sequence, and kind signal,
+# stale, check, or heartbeat. Extra query arguments and any actor but main exit 2.
 # Every scratch file this script mints (.main-eligible-rows.tmp.*,
 # .wake-rows.consume.*, .wake-queue.retire.*, .wake-queue.ack.*,
 # .wake-queue.actor-view.*) is created and removed under the queue lock, so one
@@ -226,6 +235,12 @@ case "${1:-}" in
     [ "$#" -eq 1 ] || { echo "wake drain: unexpected re-emit arguments" >&2; exit 2; }
     REEMIT=true
     ;;
+  --queued)
+    [ "$#" -eq 1 ] || { echo "wake drain: unexpected queued arguments" >&2; exit 2; }
+    [ "$ACTOR" = main ] || { echo "wake drain: --queued is main's view only" >&2; exit 2; }
+    fm_wake_main_rows
+    exit $?
+    ;;
   --ack-through)
     ACK_THROUGH=${2:-}
     case "$ACK_THROUGH" in ''|*[!0-9]*) echo "wake drain: invalid acknowledgement sequence" >&2; exit 2 ;; esac
@@ -235,7 +250,7 @@ case "${1:-}" in
     case "$ACK_GENERATION" in ''|*[!A-Za-z0-9._-]*) echo "wake drain: invalid recovery generation" >&2; exit 2 ;; esac
     [ "$#" -eq 4 ] || { echo "wake drain: unexpected acknowledgement arguments" >&2; exit 2; }
     ;;
-  *) echo "usage: fm-wake-drain.sh [--reemit | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
+  *) echo "usage: fm-wake-drain.sh [--reemit | --queued | --ack-through SEQUENCE --recovery-generation GENERATION]" >&2; exit 2 ;;
 esac
 
 [ "$ACTOR" != branch ] || require_branch_eligible_rows || exit 1

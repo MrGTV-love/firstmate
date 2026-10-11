@@ -2,6 +2,17 @@
 # Shared emission-time metadata and retry identity for status records.
 # Sourcing this library only defines functions; it does not initialize globals.
 
+# Match a status line against a regex one byte at a time, leaving the captures
+# in BASH_REMATCH. A line can hold a byte run that is not valid in the caller's
+# locale (a byte cap that cut a multibyte character), and a multibyte regex
+# match refuses such a line outright. Callers pass only ASCII literals and
+# negated ASCII sets, which select the same bytes in every locale; a
+# locale-dependent class like [[:space:]] stays in the caller's own expansions.
+_fm_status_bytes_match() {  # <string> <regex> -> 0 on match
+  local LC_ALL=C
+  [[ "$1" =~ $2 ]]
+}
+
 # --- optional event emission time -------------------------------------------
 # New writers may append "[at=<epoch>]" before the first colon, alongside key
 # and corr tags in any order. Epoch is UTC Unix seconds: canonical unsigned
@@ -17,9 +28,10 @@
 # Internals carry a reserved prefix: bash locals are dynamically scoped, so a
 # plain name here would shadow the caller's out-var of the same name.
 _fm_status_at_epoch() {  # <status-line> <out-var> -> 0 and the epoch when known
-  local __fm_at_head __fm_at_value __fm_at_rest
+  local __fm_at_head __fm_at_value __fm_at_rest __fm_at_re='^([^:]*)'
   printf -v "$2" '%s' ''
-  case "$1" in *:*) __fm_at_head=${1%%:*} ;; *) return 1 ;; esac
+  _fm_status_bytes_match "$1" "$__fm_at_re" && __fm_at_head=${BASH_REMATCH[1]}
+  case "$1" in *:*) ;; *) return 1 ;; esac
   case "$__fm_at_head" in *\[at=*\]*) ;; *) return 1 ;; esac
   __fm_at_rest=${__fm_at_head#*\[at=}
   __fm_at_value=${__fm_at_rest%%\]*}
@@ -105,13 +117,22 @@ _fm_status_untimed() {  # <status-line> <out-var> -> line without a time tag
 # untouched: this writes a throwaway copy used for matching only.
 _fm_status_unstamped() {  # <status-line> <out-var> -> line with its stamp removed
   local __fm_unstamped_rest=$1 __fm_unstamped_keep='' __fm_unstamped_before
-  while :; do
-    case "$__fm_unstamped_rest" in *\[at=*\]*) ;; *) break ;; esac
-    __fm_unstamped_before=${__fm_unstamped_rest%%\[at=*}
-    case "$__fm_unstamped_before" in *:*) break ;; esac
-    __fm_unstamped_keep=$__fm_unstamped_keep${__fm_unstamped_before% }
-    __fm_unstamped_rest=${__fm_unstamped_rest#*\[at=}
-    __fm_unstamped_rest=${__fm_unstamped_rest#*\]}
+  local __fm_unstamped_prefix_re='^([^:[]*)(.*)$' __fm_unstamped_tag_re='^\[at=[^]]*\](.*)$'
+  # Match short head segments in the regex engine instead of glob-trimming the
+  # entire (potentially very wide) note for each tag under bash 3.2.
+  while _fm_status_bytes_match "$__fm_unstamped_rest" "$__fm_unstamped_prefix_re"; do
+    __fm_unstamped_before=${BASH_REMATCH[1]}
+    __fm_unstamped_rest=${BASH_REMATCH[2]}
+    if _fm_status_bytes_match "$__fm_unstamped_rest" "$__fm_unstamped_tag_re"; then
+      __fm_unstamped_keep=$__fm_unstamped_keep${__fm_unstamped_before% }
+      __fm_unstamped_rest=${BASH_REMATCH[1]}
+      continue
+    fi
+    __fm_unstamped_keep=$__fm_unstamped_keep$__fm_unstamped_before
+    case "$__fm_unstamped_rest" in
+      \[*) __fm_unstamped_keep=$__fm_unstamped_keep'['; __fm_unstamped_rest=${__fm_unstamped_rest#\[} ;;
+      *) break ;;
+    esac
   done
   printf -v "$2" '%s' "$__fm_unstamped_keep$__fm_unstamped_rest"
 }
