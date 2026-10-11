@@ -7356,6 +7356,7 @@ assert_contains "$(cat "$HELD/polls")" "$held_art --agent-reply legacy reply bod
 assert_contains "$(cat "$HELD/polls")" "$held_art --takeover --agent-reply legacy reply body" \
   "the takeover carries the reply the refusal never posted"
 assert_equals 'legacy reply body' "$(cat "$HELD/replies")" "Lavish receives the staged reply exactly once"
+for held_staged in "$HELD/home/state/procevent/.$held_id.reply."*; do assert_absent "$held_staged" "the posted reply is consumed"; done
 wait "$held_stray_pid" 2>/dev/null || true
 PATH="$HELD/bin:$PATH" pe "$HELD/home" retire "$held_id" >/dev/null || fail "fixture step failed: retire HELD"
 pass "a staged legacy reply refused on a held page survives the takeover"
