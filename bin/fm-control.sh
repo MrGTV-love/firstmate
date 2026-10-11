@@ -894,6 +894,7 @@ do_exit() {
     [ "$VERB" != exit ] || rm -f -- "$STATE/$ID.control-exit"
     die "the exit command could not be sent to task $ID on $BACKEND"
   fi
+  # The submitting Enter can open the picker. The agent is still alive, and
   # another Enter would confirm the selected row. A dead agent may leave the
   # same text behind; that is not a prompt still waiting.
   if [ -s "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
