@@ -1,0 +1,100 @@
+[19:17:54] host kern.maxprocperuid=10666; base user process count=1454; drive limit=3424 (60% threshold = base + 600); hold=5s interval=1s (production defaults)
+[19:17:54] == S1 arm the standing detector in the lab home (register --detach path)
+registered: proc-guard (proc)
+armed: proc-guard
+[19:17:55] arm exit=0 returned in 1.02 s; runner file at return: not yet
+[19:17:56] runner pid=54773 alive=yes; claim owner home=/Users/charlesabrooker/tmp/fm-lab.GBhM8Y/home
+[19:17:56] registration:
+  | adapter=proc
+  | argc=4
+  | argv:
+  | /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4M2X22JXPEVE52MPJP237BC/bin/fm-procevent-proc.sh
+  | poll
+  | --limit
+  | 3424
+[19:17:56] == S2 removed public path: fm-procevent.sh start --detach is refused and launches nothing
+[19:17:56] start --detach proc-guard exit=2; first output line: Generic process-to-event runner: supervise a registered long-polling child
+[19:17:57] start --detach (no id) exit=1; output: error: source is not registered: --detach
+[19:17:57] runner after refused calls: pid=54773 (unchanged=yes) alive=yes claim_pid=54773
+[19:17:57] == S3 adversarial: a pile that stays high for less than the 5 s hold
+[19:18:02] crossed: WARNING 2171 63.4 pile=753
+/Users/charlesabrooker/.no-mistakes/evidence/01M4M2X22JXPEVE52MPJP237BC/round4-live-drive.sh: line 68: 59669 Terminated: 15          PILE_DEPTH=$DEPTH "$LAB/shim/basename" > /dev/null 2>&1
+[19:18:05] count back below threshold 3.01 s after it crossed; now OK 1661 48.5
+[19:18:14] after 8 s quiet: inbox result=none census_files=0 episode=none
+[19:18:14] == S4 a real self-recursive pile held above 60% for more than 5 s
+[19:18:19] crossed: WARNING 2129 62.2 pile=614
+[19:18:27] result captured 7.75 s after the threshold was crossed
+[19:18:27] captured result document:
+  | proc-guard: proc-guard
+  | status: pileup
+  | count: 2534
+  | limit: 3424
+  | threshold: 2054
+  | held_seconds: 6.00
+  | census: /Users/charlesabrooker/tmp/fm-lab.GBhM8Y/home/state/proc-census.1791677904.57456.json
+  | summary: 2534 of 3424 processes; most common command bash x1324; deepest ancestry 1102
+  | sampler_samples: 29
+  | sampler_cpu_ms_per_sample: 0.237
+  | sampler_peak_rss_kb: 25888
+[19:18:27] census file: /Users/charlesabrooker/tmp/fm-lab.GBhM8Y/home/state/proc-census.1791677904.57456.json mode=600 bytes=35569
+  census schema 2 platform darwin user_process_count 2534 limit 3424
+  trigger: {'reason': 'count above threshold', 'held_seconds': 6.0, 'hold_seconds': 5.0}
+  census cost ms: 20.4 cpu ms: 14.0
+  summary: 2534 of 3424 processes; most common command bash x1324; deepest ancestry 1102
+  by_command top 3: [('bash', 1324), ('zsh', 202), ('SetStoreUpdateService', 65)]
+  parent_chains: 603 by_parent_chain entries: 20
+  by_parent_chain top 2: [('no-mistakes > 2.1.296 > zsh > bash+', 1098), ('zsh > herdr+ > zsh', 120)]
+  deepest chains: 5 first depth 1102 chain no-mistakes > 2.1.296 > zsh > bash(x1099)
+  oldest: 5 newest: 5
+[19:18:27] durable wake queue rows:
+  | 1791677905	1	check	procevent:proc-guard:1	check: procevent proc proc-guard 1
+[19:18:27] wake presentation through bin/fm-wake-drain.sh in the lab home:
+  | 1791677905	1	check	procevent:proc-guard:1	check: procevent proc proc-guard 1
+  | WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 54773.1791677905.3LWkq6
+[19:18:30] pile still alive after census: pile=1201 (never kills)
+[19:18:30] == S5 the pile stays high 12 s more: no second census or wake
+[19:18:43] result.2=none census_files=1 check_wakes=1 episode=open runner_alive=yes pile=1201
+[19:18:43] == S6 the pile ends; the episode closes after >5 s quiet; a new pile is reported again
+/Users/charlesabrooker/.no-mistakes/evidence/01M4M2X22JXPEVE52MPJP237BC/round4-live-drive.sh: line 153:  1419 Terminated: 15          PILE_DEPTH=$DEPTH "$LAB/shim/basename" > /dev/null 2>&1
+[19:18:44] pile killed; now OK 1357 39.6
+[19:18:49] episode=closed
+[19:18:54] second pile crossed: WARNING 2134 62.3
+[19:19:01] result.2=PRESENT census_files=2 check_wakes=2
+[19:19:01] durable wake queue rows:
+  | 1791677905	1	check	procevent:proc-guard:1	check: procevent proc proc-guard 1
+  | 1791677941	2	check	procevent:proc-guard:2	check: procevent proc proc-guard 2
+/Users/charlesabrooker/.no-mistakes/evidence/01M4M2X22JXPEVE52MPJP237BC/round4-live-drive.sh: line 163: 70006 Terminated: 15          PILE_DEPTH=$DEPTH "$LAB/shim/basename" > /dev/null 2>&1
+[19:19:07] episode after kill=closed
+[19:19:07] == S7 adversarial (F1): an ALTERNATING pile bash > zsh > bash > zsh held above 60%
+[19:19:25] crossed: WARNING 2098 61.3 pile=622
+[19:19:31] result.3=PRESENT
+  | proc-guard: proc-guard
+  | status: pileup
+  | count: 2153
+  | limit: 3424
+  | threshold: 2054
+  | held_seconds: 5.00
+  | census: /Users/charlesabrooker/tmp/fm-lab.GBhM8Y/home/state/proc-census.1791677969.3868.json
+  | summary: 2153 of 3424 processes; most common command bash x551; deepest ancestry 698
+  | sampler_samples: 28
+  | sampler_cpu_ms_per_sample: 0.252
+  | sampler_peak_rss_kb: 25744
+[19:19:53] runner census file bytes=36056 pile=1201
+  user_process_count 2153 census cost ms: 312.7 cpu ms: 12.6
+  summary: 2153 of 3424 processes; most common command bash x551; deepest ancestry 698
+  parent_chains (distinct): 625 by_parent_chain entries kept: 20
+  longest by_parent_chain string: 93
+  longest deepest_chains[].chain string: 110
+  deepest chain[0]: no-mistakes > 2.1.296 > zsh > bash(x2) > ...(684 more) > zsh > bash > zsh > bash > zsh > bash > zsh > bash(x2)
+  deepest depth: 698 run_length: 2
+  top by_parent_chain: [('no-mistakes > 2.1.296 > zsh > bash+ > ... > zsh > bash > zsh > bash > zsh > bash > zsh > bash', 342), ('no-mistakes > 2.1.296 > zsh > bash+ > ... > bash > zsh > bash > zsh > bash > zsh > bash > zsh', 341), ('zsh > herdr+ > zsh', 120)]
+[19:19:55] same live alternating pile, one-shot census: head engine vs pre-fix engine (4902df58)
+  head   bytes=36122 processes=2687 by_parent_chain=20 longest_chain_chars=124 cost_ms=36.0 cpu_ms=16.4 peak_rss_mb=26.4
+  prefix bytes=4852835 processes=2684 by_parent_chain=1812 longest_chain_chars=7839 cost_ms=198.2 cpu_ms=44.7 peak_rss_mb=36.9
+[19:20:03] alternating pile still alive after both censuses: pile=1201 (never kills)
+/Users/charlesabrooker/.no-mistakes/evidence/01M4M2X22JXPEVE52MPJP237BC/round4-live-drive.sh: line 67: 19182 Terminated: 15          PILE_DEPTH=$DEPTH /bin/bash "$LAB/shim/alt-a" > /dev/null 2>&1
+[19:20:04] == S8 retire stops the standing runner
+retired: proc-guard
+retire exit=0
+[19:20:05] runner alive after retire: no; census files kept=3
+[19:20:05] lab removed at exit: /Users/charlesabrooker/tmp/fm-lab.GBhM8Y

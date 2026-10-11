@@ -1,0 +1,6 @@
+primary     exit=0 seconds=2.37 registration=yes claim_at_return=.claim.JDCqHF-18587 runner_up_within_10s=yes missing_line=0
+lab         exit=0 seconds=3.38 registration=no claim_at_return=none runner_up_within_10s=no missing_line=0
+secondmate  exit=0 seconds=3.22 registration=no claim_at_return=none runner_up_within_10s=no missing_line=0
+detect-only exit=0 seconds=1.33 registration=no claim_at_return=none runner_up_within_10s=no missing_line=0
+suite       exit=0 seconds=1.71 registration=yes claim_at_return=fm-test-held runner_up_within_10s=no missing_line=0
+suite: new fm-proc-guard samplers started by the held-claim bootstrap=0
