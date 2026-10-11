@@ -1,0 +1,129 @@
+######## A. PRE-FIX code (base 7235e6bc), PR 103 copy, correct run record present
+== copy: fm/fm-model-freshness-check @ 52fd30efa97e7297a662d93c2420a1c53ac60dc6
+== PR (real GitHub): https://github.com/MrGTV-love/firstmate/pull/103 head 1f94a2543b6f9124f35a34f14d97af77722e5d22
+== run records:
+    ('01RUN103', 'https://github.com/MrGTV-love/firstmate/pull/103', '52fd30efa97e7297a662d93c2420a1c53ac60dc6', '1f94a2543b6f9124f35a34f14d97af77722e5d22')
+== $ bin/fm-teardown.sh fm-model-freshness-check
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.94QOV4
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+66a46326 test: drop unused variable in the model freshness bootstrap case
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+commits whose change is not proven present in the merged PR head:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+== exit code: 1
+== after: worktree present; task record present; branch present
+
+######## B. FIXED code, same copy, no no-mistakes state database
+== copy: fm/fm-model-freshness-check @ 52fd30efa97e7297a662d93c2420a1c53ac60dc6
+== PR (real GitHub): https://github.com/MrGTV-love/firstmate/pull/103 head 1f94a2543b6f9124f35a34f14d97af77722e5d22
+== run records:
+    (no state database)
+== $ bin/fm-teardown.sh fm-model-freshness-check
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.94QOV4
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+66a46326 test: drop unused variable in the model freshness bootstrap case
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+commits whose change is not proven present in the merged PR head:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+no no-mistakes state database at /Users/charlesabrooker/tmp/fm-lab.94QOV4/nm-fm-model-freshness-check/state.sqlite, so no run record ties this copy to https://github.com/MrGTV-love/firstmate/pull/103
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+== exit code: 1
+== after: worktree present; task record present; branch present
+
+######## C. FIXED code, only run record is for another PR (pull/102)
+== copy: fm/fm-model-freshness-check @ 52fd30efa97e7297a662d93c2420a1c53ac60dc6
+== PR (real GitHub): https://github.com/MrGTV-love/firstmate/pull/103 head 1f94a2543b6f9124f35a34f14d97af77722e5d22
+== run records:
+    ('01RUN102', 'https://github.com/MrGTV-love/firstmate/pull/102', '52fd30efa97e7297a662d93c2420a1c53ac60dc6', '1f94a2543b6f9124f35a34f14d97af77722e5d22')
+== $ bin/fm-teardown.sh fm-model-freshness-check
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.94QOV4
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+66a46326 test: drop unused variable in the model freshness bootstrap case
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+commits whose change is not proven present in the merged PR head:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+no no-mistakes run record names the merged PR https://github.com/MrGTV-love/firstmate/pull/103
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+== exit code: 1
+== after: worktree present; task record present; branch present
+
+######## D. FIXED code, run record URL has a trailing slash (no alias allowed)
+== copy: fm/fm-model-freshness-check @ 52fd30efa97e7297a662d93c2420a1c53ac60dc6
+== PR (real GitHub): https://github.com/MrGTV-love/firstmate/pull/103 head 1f94a2543b6f9124f35a34f14d97af77722e5d22
+== run records:
+    ('01RUNSLASH', 'https://github.com/MrGTV-love/firstmate/pull/103/', '52fd30efa97e7297a662d93c2420a1c53ac60dc6', '1f94a2543b6f9124f35a34f14d97af77722e5d22')
+== $ bin/fm-teardown.sh fm-model-freshness-check
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.94QOV4
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+66a46326 test: drop unused variable in the model freshness bootstrap case
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+commits whose change is not proven present in the merged PR head:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+no no-mistakes run record names the merged PR https://github.com/MrGTV-love/firstmate/pull/103
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+== exit code: 1
+== after: worktree present; task record present; branch present
+
+######## E. FIXED code, the run for PR 103 pushed a different head (the input itself)
+== copy: fm/fm-model-freshness-check @ 52fd30efa97e7297a662d93c2420a1c53ac60dc6
+== PR (real GitHub): https://github.com/MrGTV-love/firstmate/pull/103 head 1f94a2543b6f9124f35a34f14d97af77722e5d22
+== run records:
+    ('01RUNOTHERHEAD', 'https://github.com/MrGTV-love/firstmate/pull/103', '52fd30efa97e7297a662d93c2420a1c53ac60dc6', '52fd30efa97e7297a662d93c2420a1c53ac60dc6')
+== $ bin/fm-teardown.sh fm-model-freshness-check
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.94QOV4
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+66a46326 test: drop unused variable in the model freshness bootstrap case
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+commits whose change is not proven present in the merged PR head:
+52fd30ef Merge remote-tracking branch 'origin/main' into fm/fm-model-freshness-check
+9b5e27bb feat(bin): report worker and reviewer models older than the newest in their harness catalog
+this copy is not proven to be the input of the pipeline run that produced the merged PR head:
+run 01RUNOTHERHEAD pushed 52fd30efa97e, not the merged PR head 1f94a2543b6f
+no recorded run pushed the merged PR head 1f94a2543b6f
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+== exit code: 1
+== after: worktree present; task record present; branch present
+
+######## F. FIXED code, run for PR 103 started from this copy's HEAD and pushed the merged head
+== copy: fm/fm-model-freshness-check @ 52fd30efa97e7297a662d93c2420a1c53ac60dc6
+== PR (real GitHub): https://github.com/MrGTV-love/firstmate/pull/103 head 1f94a2543b6f9124f35a34f14d97af77722e5d22
+== run records:
+    ('01RUNEARLY', 'https://github.com/MrGTV-love/firstmate/pull/103', '1f94a2543b6f9124f35a34f14d97af77722e5d22', '52fd30efa97e7297a662d93c2420a1c53ac60dc6')
+    ('01RUN103', 'https://github.com/MrGTV-love/firstmate/pull/103', '52fd30efa97e7297a662d93c2420a1c53ac60dc6', '1f94a2543b6f9124f35a34f14d97af77722e5d22')
+== $ bin/fm-teardown.sh fm-model-freshness-check
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.94QOV4
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+firstmate: already current
+teardown fm-model-freshness-check complete (window firstmate:fm-fm-model-freshness-check, worktree /Users/charlesabrooker/tmp/fm-lab.94QOV4/wt-fm-model-freshness-check)
+Backlog: fm-model-freshness-check just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.94QOV4/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.94QOV4/data/backlog.md - move fm-model-freshness-check to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== exit code: 0
+== after: worktree present; task record removed; branch deleted

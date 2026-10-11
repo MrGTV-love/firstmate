@@ -1,0 +1,38 @@
+######## I. PRE-FIX code (base 7235e6bc), PR 93 copy at 3ff5544c, correct run record present
+== copy: fm/fm-lane-wake-replay-r22 @ 3ff5544c20827cc60e28121999cdd98a573ee302
+== PR (real GitHub): https://github.com/MrGTV-love/firstmate/pull/93 head 68770c242d2bd7a679d82ed308dde3110cb0da76
+== run records:
+    ('01RUN93', 'https://github.com/MrGTV-love/firstmate/pull/93', '3ff5544c20827cc60e28121999cdd98a573ee302', '68770c242d2bd7a679d82ed308dde3110cb0da76')
+== $ bin/fm-teardown.sh fm-lane-wake-replay-r22
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.94QOV4
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+3ff5544c fix: drop the redundant argument guard from fm_wake_main_rows so lint passes
+1c175020 Merge remote-tracking branch 'origin/main' into fm/fm-lane-wake-replay-r22
+cc31ea7a no-mistakes(review): Re-send operational hand-backs with their original failure text
+fffdcdd4 no-mistakes(review): Keep hand-back confirmation failures and merged host notes; main-only query
+f8b04918 fix: route stranded and stuck-queue omp wakes through the queue read after rebase
+commits whose change is not proven present in the merged PR head:
+76407871 no-mistakes(review): Replace watcher identity matching with idle queue reads
+480c0fb5 no-mistakes(review): Fix wake emission ownership, host gating, and legacy handoffs
+bf90d72a no-mistakes(review): Validate durable headlines and eliminate stale wake replay
+992653ad fix: stop omp lanes receiving watcher headlines the durable queue no longer owes
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+== exit code: 1
+== after: worktree present; task record present; branch present
+
+######## J. FIXED code, same PR 93 copy, same run record
+== copy: fm/fm-lane-wake-replay-r22 @ 3ff5544c20827cc60e28121999cdd98a573ee302
+== PR (real GitHub): https://github.com/MrGTV-love/firstmate/pull/93 head 68770c242d2bd7a679d82ed308dde3110cb0da76
+== run records:
+    ('01RUN93', 'https://github.com/MrGTV-love/firstmate/pull/93', '3ff5544c20827cc60e28121999cdd98a573ee302', '68770c242d2bd7a679d82ed308dde3110cb0da76')
+== $ bin/fm-teardown.sh fm-lane-wake-replay-r22
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.94QOV4
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+firstmate: already current
+teardown fm-lane-wake-replay-r22 complete (window firstmate:fm-fm-lane-wake-replay-r22, worktree /Users/charlesabrooker/tmp/fm-lab.94QOV4/wt-fm-lane-wake-replay-r22)
+Backlog: fm-lane-wake-replay-r22 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.94QOV4/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.94QOV4/data/backlog.md - move fm-lane-wake-replay-r22 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+== exit code: 0
+== after: worktree present; task record removed; branch deleted

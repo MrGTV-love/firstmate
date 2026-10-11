@@ -1,0 +1,17 @@
+ambient NM_HOME=/Users/charlesabrooker/.no-mistakes
+ok - a pushed but unmerged ship refuses, and only the captain's own words discard it
+ok - squash-merged PR accepts a pushed pre-rebase copy whose patches are all in the PR head
+ok - squash-merged PR still refuses a pushed pre-rebase copy with a commit missing from the PR head
+ok - merged PR accepts a diverged earlier iteration that the recorded run started from
+ok - merged PR accepts the local input that the recorded run rewrote and extended
+ok - merged PR still refuses a copy that is behind the recorded run's input head
+ok - merged PR is proven by the run that pushed its head, not by an earlier run on the same PR
+ok - merged PR still refuses a copy with a commit made after the recorded run started
+ok - merged PR still refuses a copy that is not part of the recorded run's input
+ok - merged PR still refuses when the only recorded run belongs to another PR
+ok - merged PR still refuses when no recorded run pushed the merged PR head
+ok - merged PR still refuses and names the state database when it is missing
+ok - merged PR still refuses and names the input head when the run did not record it
+ok - merged PR still refuses and names the pushed head when the run did not record it
+ok - merged PR still refuses and names the column when the run table has no input head
+rc=0
