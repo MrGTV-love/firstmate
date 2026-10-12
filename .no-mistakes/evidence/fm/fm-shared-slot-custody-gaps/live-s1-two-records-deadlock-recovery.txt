@@ -1,0 +1,88 @@
+
+### setup: real Treehouse slot 1 at /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj (unleased)
+1     available    /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj  (detached)
+records:
+/Users/charlesabrooker/tmp/fm-lab.6tW0TB/state/live-finished-a.meta:worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj
+/Users/charlesabrooker/tmp/fm-lab.6tW0TB/state/live-parked-b.meta:worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj
+claim:
+task=live-finished-a
+home=/Users/charlesabrooker/tmp/fm-lab.6tW0TB
+lab tmux windows:
+shell
+fm-live-finished-a
+fm-live-parked-b
+
+### step 1: before the fix this deadlocked. Plain cleanup of finished A while the slot is unleased
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: shared pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj is not leased in Treehouse state /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/treehouse-state.json, so treehouse get may hand it out; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed.
+Hold it in place without touching its contents: (cd '/private/tmp/fm-live.UI8CJx/proj' && treehouse lease '1' --lease-holder 'live-parked-b')
+[exit 1]
+CHECK PASS: unleased cleanup refuses
+CHECK PASS: refusal names exact lease command with sole holder B
+CHECK PASS: A record unchanged
+CHECK PASS: A claim unchanged
+CHECK PASS: A window still alive
+
+### step 2: operator runs the printed state-only lease command (real treehouse)
+printed: (cd '/private/tmp/fm-live.UI8CJx/proj' && treehouse lease '1' --lease-holder 'live-parked-b')
+$ th lease 1 --lease-holder live-parked-b
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Leased worktree 1 at /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj. Run 'treehouse return /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj' to release it.
+/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj
+[exit 0]
+1     leased       /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj  [fm/live-finished-a]  (held by live-parked-b)
+{"name":"1","leased":true,"lease_holder":"live-parked-b"}
+CHECK PASS: lease did not change slot bytes
+
+### step 3: plain cleanup of finished A (no --force)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+notice: task live-finished-a shares recorded pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj with task live-parked-b; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+teardown live-finished-a complete (window fmses:fm-live-finished-a; shared pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: live-finished-a just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md - move live-finished-a to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+CHECK PASS: cleanup succeeds
+CHECK PASS: A record retired
+CHECK PASS: A's own claim released
+CHECK PASS: B record byte-identical
+CHECK PASS: slot root bytes unchanged
+CHECK PASS: parked nested copy bytes unchanged
+CHECK PASS: branches unchanged
+CHECK PASS: slot still leased to B
+lab tmux windows after:
+shell
+fm-live-parked-b
+CHECK PASS: A window closed
+CHECK PASS: B window still alive
+
+### step 4: reassociate parked B to its real nested copy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+reassociated live-parked-b worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj/.claude/worktrees/live-parked-b branch=fm/live-parked-b prior=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj slot=claimed
+[exit 0]
+CHECK PASS: reassociate succeeds
+CHECK PASS: B record names nested copy
+CHECK PASS: slot claim now names B
+CHECK PASS: parked nested copy bytes still unchanged
+CHECK PASS: slot root bytes still unchanged
+B record now:
+window=fmses:fm-live-parked-b
+endpoint_task_id=live-parked-b
+worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj/.claude/worktrees/live-parked-b
+project=/private/tmp/fm-live.UI8CJx/proj
+harness=claude
+kind=ship
+mode=no-mistakes
+branch=fm/live-parked-b
+spawn_gen=s1.1.2
+prior_worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj
+
+### S1 result: FAILS=0

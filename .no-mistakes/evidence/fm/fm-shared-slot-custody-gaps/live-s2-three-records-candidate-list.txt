@@ -1,0 +1,44 @@
+
+### setup: real Treehouse slot 2 at /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/2/proj (unleased), three root records
+
+### cleanup of finished A with two other root records and no lease
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: shared pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/2/proj is not leased in Treehouse state /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/treehouse-state.json, so treehouse get may hand it out; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed.
+Hold it in place without touching its contents: (cd '/private/tmp/fm-live.UI8CJx/proj' && treehouse lease '2' --lease-holder <remaining-task>)
+Several other root records name this slot; select the live one whose work stays in it as <remaining-task>. Each candidate's last recorded status:
+  live3-finished-c: 2026-10-11T09:00:00Z done: PR merged, finished
+  live3-working-b: 2026-10-12T10:00:00Z working: parked unpushed work in nested copy
+[exit 1]
+CHECK PASS: refuses
+CHECK PASS: names no single holder (placeholder)
+CHECK PASS: does not name B as holder
+CHECK PASS: does not name C as holder
+CHECK PASS: tells operator to select the live one
+CHECK PASS: lists B with its recorded status
+CHECK PASS: lists C with its recorded status
+CHECK PASS: A record unchanged
+CHECK PASS: A claim unchanged
+CHECK PASS: slot bytes unchanged
+CHECK PASS: Treehouse state unchanged
+
+### operator selects live B, leases, then retires A and C without --force
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+notice: task live3-finished-a shares recorded pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/2/proj with task live3-finished-c live3-working-b; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+teardown live3-finished-a complete (window fmses:fm-live3-finished-a; shared pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/2/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: live3-finished-a just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md - move live3-finished-a to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+CHECK PASS: A retires after lease
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+notice: task live3-finished-c shares recorded pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/2/proj with task live3-working-b; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q181EP2V9JFRYXTJ2TPTW0/bin/fm-home-summary-refresh.sh: child setpgid (86336 to 86336): Operation not permitted
+teardown live3-finished-c complete (window fmses:fm-live3-finished-c; shared pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/2/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: live3-finished-c just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md - move live3-finished-c to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+CHECK PASS: C retires records-only
+CHECK PASS: B record survives
+CHECK PASS: slot bytes unchanged after both retirements
+
+### S2 result: FAILS=0

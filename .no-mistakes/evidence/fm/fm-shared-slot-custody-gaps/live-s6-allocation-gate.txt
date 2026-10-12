@@ -1,0 +1,47 @@
+
+### records and lease state before
+live-parked-b.meta: worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/1/proj/.claude/worktrees/live-parked-b
+live3-working-b.meta: worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/2/proj
+liver-finished-a.meta: worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/5/proj
+liver2-claimant-b.meta: worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj/.claude/worktrees/liver2-claimant-b
+3     leased       /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/3/proj  [fm/liveu-unfinished-a]  (held by liveu-parked-b)
+4     leased       /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/4/proj  (detached)  (held by liven-parked-b)
+5     leased       /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/5/proj  [fm/liver-claimant-b]  (held by liver-finished-a)
+6     available    /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/6/proj  [fm/cmp-clean-base-b]
+7     available    /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/7/proj  [fm/cmp-clean-change-b]
+8     dirty        /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/8/proj  [fm/cmp-dirty-base-b]
+9     dirty        /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/9/proj  [fm/cmp-dirty-change-b]
+10    dirty        /tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj  (detached)
+
+### step 1: start a new scout while liver2-claimant-b's nested current copy sits in unleased slot 10
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+error: Treehouse pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj contains task liver2-claimant-b's current copy /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj/.claude/worktrees/liver2-claimant-b and is not leased in Treehouse state /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from /private/tmp/fm-live.UI8CJx/proj lists slot 10 at /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj, then run: (cd '/private/tmp/fm-live.UI8CJx/proj' && treehouse lease '10' --lease-holder 'liver2-claimant-b')
+[exit 1]
+CHECK PASS: refuses
+CHECK PASS: refusal names slot 10 and the task
+CHECK PASS: refusal prints the state-only lease remedy
+CHECK PASS: leased slot 1 (nested current copy) is not blamed
+CHECK PASS: no new record published
+CHECK PASS: Treehouse state unchanged by refused start
+CHECK PASS: no worker window opened
+
+### step 2: run the printed lease command (state-only)
+/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj
+CHECK PASS: lease did not change the nested copy
+
+### step 3: start the new scout again
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+skill selection for live-new-scout2: unavailable - no TypeSafe or OpenRouter key
+spawned live-new-scout2 harness=omp kind=scout window=fmses:fm-live-new-scout2 worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/11/proj
+[exit 0]
+CHECK PASS: allocation check passes: no refusal
+CHECK PASS: a new slot was allocated and the scout spawned
+CHECK PASS: the new worker did not take a leased slot (1,2,3,4,5,10)
+CHECK PASS: leased slot 10 nested copy unchanged
+shell
+fm-live-new-scout2
+fm-live-parked-b
+stopped lab worker window fm-live-new-scout2 (no model configured in the lab HOME)
+
+### S6 result: FAILS=0

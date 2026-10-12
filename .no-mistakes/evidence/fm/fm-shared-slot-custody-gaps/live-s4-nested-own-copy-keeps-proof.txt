@@ -1,0 +1,46 @@
+
+### setup: leased slot 4, parked B names root, A names nested copy; gh says https://github.com/MrGTV-love/firstmate/pull/109 is MERGED
+
+### 4a: merged PR, but A's nested copy has a later LOCAL commit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+notice: task liven-nested-a shares recorded pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/4/proj with task liven-parked-b; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+ab31baf late local commit
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+[exit 1]
+CHECK PASS: 4a refuses
+CHECK PASS: 4a record unchanged
+CHECK PASS: 4a claim unchanged
+CHECK PASS: 4a copy bytes unchanged
+
+### 4b: merged PR, landed HEAD, but a TRACKED edit in A's nested copy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+notice: task liven-nested-a shares recorded pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/4/proj with task liven-parked-b; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+REFUSED: worktree /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/4/proj/.claude/worktrees/liven-nested-a has uncommitted changes.
+uncommitted changes present (includes tracked edits)
+Commit them (or get the captain's explicit OK to discard, then --force).
+[exit 1]
+CHECK PASS: 4b refuses
+CHECK FAIL: 4b refusal names the dirty file
+CHECK PASS: 4b record unchanged
+CHECK PASS: 4b claim unchanged
+CHECK PASS: 4b copy bytes unchanged
+
+### 4c: clean and landed nested copy: records-only retirement, copy left in place
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+notice: task liven-nested-a shares recorded pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/4/proj with task liven-parked-b; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+teardown liven-nested-a complete (window fmses:fm-liven-nested-a; shared pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/4/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: liven-nested-a just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md - move liven-nested-a to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+CHECK PASS: 4c succeeds
+CHECK PASS: 4c A record retired
+CHECK PASS: 4c nested copy still present, bytes unchanged
+CHECK PASS: 4c slot root bytes unchanged
+CHECK PASS: 4c B record unchanged
+CHECK PASS: 4c slot still leased
+
+### S4 result: FAILS=1

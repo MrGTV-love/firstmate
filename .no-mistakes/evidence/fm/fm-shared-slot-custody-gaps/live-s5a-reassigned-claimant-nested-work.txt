@@ -1,0 +1,29 @@
+
+### plain cleanup of A; claim names B; slot unleased
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+warning: task liver2-finished-a's recorded worktree /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj was reassigned to task liver2-claimant-b (home /Users/charlesabrooker/tmp/fm-lab.6tW0TB), which claimed that pool slot after this record was written; that slot is no longer liver2-finished-a's, so its processes, copy, and claim are left untouched and only liver2-finished-a's own cleanup runs.
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+/private/tmp/fm-live.UI8CJx/proj: already current
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q181EP2V9JFRYXTJ2TPTW0/bin/fm-home-summary-refresh.sh: child setpgid (1034 to 1034): Operation not permitted
+teardown liver2-finished-a complete (window fmses:fm-liver2-finished-a; pool slot /private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj left to task liver2-claimant-b (home /Users/charlesabrooker/tmp/fm-lab.6tW0TB), which it was reassigned to)
+Backlog: liver2-finished-a just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.6tW0TB/data/backlog.md - move liver2-finished-a to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+[exit 0]
+CHECK PASS: succeeds without --force
+CHECK PASS: no lease requested
+CHECK PASS: A record retired
+CHECK PASS: B record unchanged
+CHECK PASS: B claim unchanged
+CHECK PASS: slot root bytes unchanged
+CHECK PASS: B nested copy bytes unchanged
+CHECK PASS: branches unchanged
+CHECK PASS: Treehouse state unchanged
+
+### B reassociates to its nested copy
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.6tW0TB
+reassociated liver2-claimant-b worktree=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj/.claude/worktrees/liver2-claimant-b branch=fm/liver2-claimant-b prior=/private/tmp/fm-live.UI8CJx/pool/.treehouse/proj-94bea6/10/proj slot=kept
+[exit 0]
+CHECK PASS: reassociate succeeds
+CHECK PASS: B nested bytes unchanged
+
+### S5a-realistic result: FAILS=0
