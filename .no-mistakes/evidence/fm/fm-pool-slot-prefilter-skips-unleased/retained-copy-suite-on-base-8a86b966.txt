@@ -1,0 +1,4 @@
+not ok - jq/trailing-slash: conflicting unleased alias counted as held (exit 0)
+not ok - jq/dot: conflicting unleased alias counted as held (exit 0)
+not ok - jq/double-slash: conflicting unleased alias counted as held (exit 0)
+not ok - noncanonical unleased entries bypassed the lease check

@@ -1,0 +1,14 @@
+=== case: pristine alias spelled none ===
+--- Treehouse state entries (leased, holder, path) before the spawn ---
+true	holder	<LAB>/pool/.treehouse/demo-5a8984/1/demo
+--- bin/fm-spawn.sh new-pristine-none <project> --scout (stdout+stderr, then exit code) ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+skill selection for new-pristine-none: unavailable - no TypeSafe or OpenRouter key
+spawned new-pristine-none harness=codex kind=scout window=primary:fm-new-pristine-none worktree=<LAB>/pool/.treehouse/demo-5a8984/2/demo
+exit=0
+--- after ---
+pool state file: CHANGED
+leased slot and nested copy: unchanged
+task record new-pristine-none.meta: published
+worktree=<LAB>/pool/.treehouse/demo-5a8984/2/demo
+lab tmux windows: primary:bash primary:fm-new-pristine-none 

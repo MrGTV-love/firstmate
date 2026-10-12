@@ -1,0 +1,12 @@
+One real leased Treehouse entry plus one alias entry for the same slot.
+Verdict of fm_task_copy_pool_slot_held. rc=0 means held, so a spawn is allowed.
+alias      spelling        base-8a86b966            target-e87751e5         
+unleased   trailing-slash  rc=0 state=held          rc=1 state=unleased     
+unleased   dot             rc=0 state=held          rc=1 state=unleased     
+unleased   double-slash    rc=0 state=held          rc=1 state=unleased     
+recovered  trailing-slash  rc=0 state=held          rc=1 state=recovered    
+recovered  dot             rc=0 state=held          rc=1 state=recovered    
+recovered  double-slash    rc=0 state=held          rc=1 state=recovered    
+ordinary   trailing-slash  rc=0 state=held          rc=0 state=held         
+ordinary   dot             rc=0 state=held          rc=0 state=held         
+ordinary   double-slash    rc=0 state=held          rc=0 state=held         

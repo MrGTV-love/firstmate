@@ -1,0 +1,10 @@
+=== case: slot 1 holds an ordinary real Treehouse lease; jq is not on PATH ===
+jq on the spawn PATH: none
+--- bin/fm-spawn.sh new-nojq <project> --scout (stdout+stderr, then exit code) ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+bin/fm-spawn.sh: line 2862: jq: command not found
+exit=127
+--- after ---
+pool state file: unchanged
+task record new-nojq.meta: not published
+lab tmux windows: primary:bash 

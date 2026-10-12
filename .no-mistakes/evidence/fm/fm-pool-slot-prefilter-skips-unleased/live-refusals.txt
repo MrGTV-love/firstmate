@@ -1,0 +1,90 @@
+=== case: unleased alias spelled trailing-slash ===
+--- Treehouse state entries (leased, holder, path) before the spawn ---
+true	holder	<LAB>/pool/.treehouse/demo-5a8984/1/demo
+false	-	<LAB>/pool/.treehouse/demo-5a8984/1/demo/
+--- bin/fm-spawn.sh new-unleased-trailing-slash <project> --scout (stdout+stderr, then exit code) ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+error: Treehouse pool slot <LAB>/pool/.treehouse/demo-5a8984/1/demo contains task holder's current copy <LAB>/pool/.treehouse/demo-5a8984/1/demo/.claude/worktrees/nested-holder and is not leased in Treehouse state <LAB>/pool/.treehouse/demo-5a8984/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from <LAB>/projects/demo lists slot 1 at <LAB>/pool/.treehouse/demo-5a8984/1/demo, then run: (cd '<LAB>/projects/demo' && treehouse lease '1' --lease-holder 'holder')
+exit=1
+--- after ---
+pool state file: unchanged
+leased slot and nested copy: unchanged
+task record new-unleased-trailing-slash.meta: not published
+lab tmux windows: primary:bash 
+
+=== case: unleased alias spelled dot ===
+--- Treehouse state entries (leased, holder, path) before the spawn ---
+true	holder	<LAB>/pool/.treehouse/demo-5a8984/1/demo
+false	-	<LAB>/pool/.treehouse/demo-5a8984/1/demo/./
+--- bin/fm-spawn.sh new-unleased-dot <project> --scout (stdout+stderr, then exit code) ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+error: Treehouse pool slot <LAB>/pool/.treehouse/demo-5a8984/1/demo contains task holder's current copy <LAB>/pool/.treehouse/demo-5a8984/1/demo/.claude/worktrees/nested-holder and is not leased in Treehouse state <LAB>/pool/.treehouse/demo-5a8984/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from <LAB>/projects/demo lists slot 1 at <LAB>/pool/.treehouse/demo-5a8984/1/demo, then run: (cd '<LAB>/projects/demo' && treehouse lease '1' --lease-holder 'holder')
+exit=1
+--- after ---
+pool state file: unchanged
+leased slot and nested copy: unchanged
+task record new-unleased-dot.meta: not published
+lab tmux windows: primary:bash 
+
+=== case: unleased alias spelled double-slash ===
+--- Treehouse state entries (leased, holder, path) before the spawn ---
+true	holder	<LAB>/pool/.treehouse/demo-5a8984/1/demo
+false	-	<LAB>/pool/.treehouse/demo-5a8984/1//demo
+--- bin/fm-spawn.sh new-unleased-double-slash <project> --scout (stdout+stderr, then exit code) ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+error: Treehouse pool slot <LAB>/pool/.treehouse/demo-5a8984/1/demo contains task holder's current copy <LAB>/pool/.treehouse/demo-5a8984/1/demo/.claude/worktrees/nested-holder and is not leased in Treehouse state <LAB>/pool/.treehouse/demo-5a8984/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from <LAB>/projects/demo lists slot 1 at <LAB>/pool/.treehouse/demo-5a8984/1/demo, then run: (cd '<LAB>/projects/demo' && treehouse lease '1' --lease-holder 'holder')
+exit=1
+--- after ---
+pool state file: unchanged
+leased slot and nested copy: unchanged
+task record new-unleased-double-slash.meta: not published
+lab tmux windows: primary:bash 
+
+=== case: recovered alias spelled trailing-slash ===
+--- Treehouse state entries (leased, holder, path) before the spawn ---
+true	holder	<LAB>/pool/.treehouse/demo-5a8984/1/demo
+true	recovered: state file was corrupt or truncated; verify before reuse	<LAB>/pool/.treehouse/demo-5a8984/1/demo/
+--- bin/fm-spawn.sh new-recovered-trailing-slash <project> --scout (stdout+stderr, then exit code) ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+error: Treehouse pool slot <LAB>/pool/.treehouse/demo-5a8984/1/demo contains task holder's current copy <LAB>/pool/.treehouse/demo-5a8984/1/demo/.claude/worktrees/nested-holder and is not a Firstmate home and carries only Treehouse's recovered-state lease in <LAB>/pool/.treehouse/demo-5a8984/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; refusing allocation before treehouse get
+treehouse lease refuses a slot that is already leased; inspect it with: (cd '<LAB>/projects/demo' && treehouse status)
+exit=1
+--- after ---
+pool state file: unchanged
+leased slot and nested copy: unchanged
+task record new-recovered-trailing-slash.meta: not published
+lab tmux windows: primary:bash 
+
+=== case: recovered alias spelled dot ===
+--- Treehouse state entries (leased, holder, path) before the spawn ---
+true	holder	<LAB>/pool/.treehouse/demo-5a8984/1/demo
+true	recovered: state file was corrupt or truncated; verify before reuse	<LAB>/pool/.treehouse/demo-5a8984/1/demo/./
+--- bin/fm-spawn.sh new-recovered-dot <project> --scout (stdout+stderr, then exit code) ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+error: Treehouse pool slot <LAB>/pool/.treehouse/demo-5a8984/1/demo contains task holder's current copy <LAB>/pool/.treehouse/demo-5a8984/1/demo/.claude/worktrees/nested-holder and is not a Firstmate home and carries only Treehouse's recovered-state lease in <LAB>/pool/.treehouse/demo-5a8984/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; refusing allocation before treehouse get
+treehouse lease refuses a slot that is already leased; inspect it with: (cd '<LAB>/projects/demo' && treehouse status)
+exit=1
+--- after ---
+pool state file: unchanged
+leased slot and nested copy: unchanged
+task record new-recovered-dot.meta: not published
+lab tmux windows: primary:bash 
+
+=== case: recovered alias spelled double-slash ===
+--- Treehouse state entries (leased, holder, path) before the spawn ---
+true	holder	<LAB>/pool/.treehouse/demo-5a8984/1/demo
+true	recovered: state file was corrupt or truncated; verify before reuse	<LAB>/pool/.treehouse/demo-5a8984/1//demo
+--- bin/fm-spawn.sh new-recovered-double-slash <project> --scout (stdout+stderr, then exit code) ---
+fm-gate-refuse: gate agent lifecycle permitted only against lab home <LAB>
+error: Treehouse pool slot <LAB>/pool/.treehouse/demo-5a8984/1/demo contains task holder's current copy <LAB>/pool/.treehouse/demo-5a8984/1/demo/.claude/worktrees/nested-holder and is not a Firstmate home and carries only Treehouse's recovered-state lease in <LAB>/pool/.treehouse/demo-5a8984/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; refusing allocation before treehouse get
+treehouse lease refuses a slot that is already leased; inspect it with: (cd '<LAB>/projects/demo' && treehouse status)
+exit=1
+--- after ---
+pool state file: unchanged
+leased slot and nested copy: unchanged
+task record new-recovered-double-slash.meta: not published
+lab tmux windows: primary:bash 
+
