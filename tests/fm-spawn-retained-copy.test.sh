@@ -112,6 +112,45 @@ assert_retained_spawn() {
   assert_grep "worktree=$SLOT_DIR" "$HOME_DIR/state/new-$name.meta" "$msg: spawn did not publish the slot"
 }
 
+# A clean leased alias must not mask an entry that cannot be transported or
+# resolved safely. Build JSON through jq so the fixture preserves real bytes.
+test_unsupported_entry_paths_are_unproved() (
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local shape dir slot alias path character rc failed=0
+  for shape in backslash tab newline relative; do
+    dir="$TMP_ROOT/unsupported-$shape"
+    character=
+    case "$shape" in
+      backslash) character=$'\\' ;;
+      tab) character=$'\t' ;;
+      newline) character=$'\n' ;;
+    esac
+    slot="$dir/a${character}b/pool/1/project"
+    mkdir -p "$slot" "$dir/unrelated"
+    slot=$(cd "$slot" && pwd -P)
+    ln -s "${slot%/*/*}" "$dir/clean-pool"
+    alias="$dir/clean-pool/1/project"
+    path=$slot
+    [ "$shape" != relative ] || path=1/project
+    jq -n --arg held "$alias" --arg unsafe "$path" \
+      '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder"}, {name: "1", path: $unsafe}]}' \
+      > "${slot%/*/*}/treehouse-state.json"
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    cd "$dir/unrelated" || fail "cannot enter unrelated working directory"
+    rc=0
+    fm_task_copy_pool_slot_held "$slot" || rc=$?
+    if [ "$rc" != 1 ] || [ "$FM_TASK_COPY_SLOT_STATE" != unknown ]; then
+      printf 'not ok - %s: unsupported conflicting entry counted as %s (exit %s)\n' \
+        "$shape" "$FM_TASK_COPY_SLOT_STATE" "$rc" >&2
+      failed=1
+    fi
+  done
+  [ "$failed" = 0 ] || fail "unsupported state paths bypassed the lease proof"
+  pass "escaped or relative entry paths cannot prove a slot held beside a clean leased alias"
+)
+
 # Conflicting entries must be judged by directory identity, not raw spelling.
 # Source before hiding PATH so the missing-jq case exercises the real fallback.
 test_unleased_alias_beside_leased_entry_is_not_held() (
@@ -152,6 +191,42 @@ test_unleased_alias_beside_leased_entry_is_not_held() (
   done
   [ "$failed" = 0 ] || fail "noncanonical unleased entries bypassed the lease check"
   pass "all unleased path spellings beside a leased entry remain unsafe with and without jq"
+)
+
+test_unleased_directory_identity_aliases_are_not_held() (
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local spelling dir slot alias rc
+  for spelling in symlink case-variant; do
+    dir="$TMP_ROOT/identity-$spelling"
+    slot="$dir/pool/1/Project"
+    mkdir -p "$slot"
+    slot=$(cd "$slot" && pwd -P)
+    case "$spelling" in
+      symlink)
+        alias="$dir/project-link"
+        ln -s "$slot" "$alias"
+        ;;
+      case-variant)
+        alias="${slot%/*}/pROJECT"
+        if [ ! -d "$alias" ]; then
+          printf 'skip: case-variant directory alias requires a case-insensitive filesystem\n'
+          continue
+        fi
+        ;;
+    esac
+    [ "$alias" -ef "$slot" ] || fail "$spelling: fixture does not name the same directory"
+    jq -n --arg held "$slot" --arg unleased "$alias" \
+      '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder"}, {name: "1", path: $unleased}]}' \
+      > "${slot%/*/*}/treehouse-state.json"
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    rc=0
+    fm_task_copy_pool_slot_held "$slot" || rc=$?
+    expect_code 1 "$rc" "$spelling: unleased alias must not count as held"
+    [ "$FM_TASK_COPY_SLOT_STATE" = unleased ] || fail "$spelling: directory identity was not recognized"
+    pass "$spelling unleased alias beside a leased entry prevents a held verdict"
+  done
 )
 
 # A recovered-lease alias beside an ordinary lease is no durable hold either.
@@ -407,7 +482,9 @@ test_unreadable_local_home_warns_and_proceeds() {
   pass "an unavailable registered local home is named in one warning and the spawn proceeds"
 }
 
+test_unsupported_entry_paths_are_unproved || exit 1
 test_unleased_alias_beside_leased_entry_is_not_held || exit 1
+test_unleased_directory_identity_aliases_are_not_held || exit 1
 test_recovered_alias_beside_leased_entry_is_not_held || exit 1
 test_slot_holding_live_nested_current_copy_refuses
 test_conflicting_unleased_alias_refuses_before_allocation

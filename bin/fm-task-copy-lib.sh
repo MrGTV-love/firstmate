@@ -421,6 +421,19 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   while IFS=$'\t' read -r leased holder name path; do
     path=${path#P}
     [ -n "$path" ] || continue
+    # @tsv escapes backslashes and line/field separators; relative paths
+    # depend on the caller's working directory. Neither can prove identity.
+    case "$path" in
+      *\\*)
+        FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state contains an escaped entry path that cannot be compared safely"
+        return 1
+        ;;
+      /*) ;;
+      *)
+        FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state contains a relative entry path"
+        return 1
+        ;;
+    esac
     if [ "$path" != "$slot" ]; then
       # Only ordinary leased entries may be skipped by their raw suffix:
       # skipping an unleased or recovered-lease alias can hide a conflict
