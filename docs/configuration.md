@@ -1826,6 +1826,7 @@ A plain path begins with `/` or a character in `[A-Za-z0-9_.-]`, has no URL-sche
 The shared guard blocks every other spelling without a Jev call because omp can rewrite such paths before execution, except for these exact native-device `write` invocations:
 
 - `xd://lsp` with JSON `action` equal to `references`, `definition`, `implementation`, `type_definition`, `hover`, or document `symbols`, and a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
+  The `file` must not contain U+00A0, U+2000-U+200A, U+202F, U+205F, or U+3000, which omp replaces with ASCII spaces before resolving the path; rejecting those spellings keeps the realpath check on the execution target without banning ordinary Unicode or ASCII-space names.
   The session's real working directory must equal that worktree.
   Workspace-wide `file: "*"` or file-less forms, directories, missing files, glob spellings, symlink escapes, `diagnostics`, raw requests, rename, code actions, formatting, reload, and every other action remain blocked.
   The installer sets process-local `PI_DISABLE_LSPMUX=1` before native LSP startup to prevent shared rust-analyzer multiplexing.
