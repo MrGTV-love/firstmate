@@ -1825,12 +1825,12 @@ File write and edit paths must use a plain absolute or worktree-relative spellin
 A plain path begins with `/` or a character in `[A-Za-z0-9_.-]`, has no URL-scheme or drive-letter prefix matching `^[A-Za-z][A-Za-z0-9+.-]*:`, and does not end with `]`.
 The shared guard blocks every other spelling without a Jev call because omp can rewrite such paths before execution, except for these exact native-device `write` invocations:
 
-- `xd://lsp` with JSON `action` equal to `references`, `definition`, `implementation`, `type_definition`, `hover`, `symbols`, or `diagnostics`, and a plain `file` whose existing realpath is inside the worker's task worktree.
-  The session's real working directory must equal that worktree; `file: "*"` is allowed only for workspace `symbols` and `diagnostics` in that directory.
-  Missing files, glob spellings, symlink escapes, raw requests, rename, code actions, formatting, reload, and every other action remain blocked.
+- `xd://lsp` with JSON `action` equal to `references`, `definition`, `implementation`, `type_definition`, `hover`, or document `symbols`, and a plain `file` whose realpath is an existing regular file inside the worker's task worktree.
+  The session's real working directory must equal that worktree.
+  Workspace-wide `file: "*"` or file-less forms, directories, missing files, glob spellings, symlink escapes, `diagnostics`, raw requests, rename, code actions, formatting, reload, and every other action remain blocked.
   The installer sets process-local `PI_DISABLE_LSPMUX=1` before native LSP startup to prevent shared rust-analyzer multiplexing.
-- `proc://<id>/kill` when the exact `<id>` appears in the current session's owner-filtered running or recent job snapshot at call time.
-  Missing jobs, named project services absent from that snapshot, stdin, mode changes, and every other proc write remain blocked.
+- `proc://<id>/kill` when the exact `<id>` appears in the running jobs of the current session's owner-filtered job snapshot at call time.
+  Finished or missing jobs, named project services absent from that snapshot, stdin, mode changes, and every other proc write remain blocked.
 
 Admitted devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can still send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.

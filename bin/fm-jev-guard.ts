@@ -5,7 +5,7 @@
 // The upstream extension runs unchanged. Firstmate's boundary and compatibility
 // requirements are owned by docs/configuration.md "Jev guard"; SOURCE.md records
 // why root selection, handler budgets and input restrictions are necessary.
-import { realpathSync } from "node:fs";
+import { realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import jevGuard from "./ten-levels/extensions/jev-guard.ts";
@@ -29,7 +29,6 @@ const navigationActions: Readonly<Record<string, true>> = {
   type_definition: true,
   hover: true,
   symbols: true,
-  diagnostics: true,
 };
 
 function plainPath(path: string): boolean {
@@ -53,15 +52,16 @@ function admittedDevice(input: { path?: unknown; content?: unknown }, ctx: unkno
         || typeof args.file !== "string") return false;
       const root = realpathSync(worktree);
       if (realpathSync(ctx.cwd) !== root) return false;
-      if (args.file === "*") return args.action === "symbols" || args.action === "diagnostics";
-      return plainPath(args.file) && insideRepo(realpathSync(resolve(worktree, args.file)), root);
+      if (!plainPath(args.file)) return false;
+      const file = realpathSync(resolve(worktree, args.file));
+      return statSync(file).isFile() && insideRepo(file, root);
     }
     const job = typeof input.path === "string" ? /^proc:\/\/([A-Za-z0-9][A-Za-z0-9._-]*)\/kill$/.exec(input.path) : null;
     if (!job || !object(ctx) || typeof ctx.getAsyncJobSnapshot !== "function") return false;
     const snapshot: unknown = ctx.getAsyncJobSnapshot();
     if (!object(snapshot)) return false;
-    return [snapshot.running, snapshot.recent].some((jobs) =>
-      Array.isArray(jobs) && jobs.some((entry: unknown) => object(entry) && entry.id === job[1]));
+    return Array.isArray(snapshot.running)
+      && snapshot.running.some((entry: unknown) => object(entry) && entry.id === job[1]);
   } catch {
     return false;
   }

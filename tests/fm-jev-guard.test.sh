@@ -436,9 +436,7 @@ for (const project of ["firstmate", "vernant", "", undefined]) {
   const failures = [];
   const lsp = (args) => ({ path: "xd://lsp", content: JSON.stringify(args) });
   for (const input of [
-    ...["references", "definition", "implementation", "type_definition", "hover", "symbols", "diagnostics"].map(action => lsp({ action, file: "source.ts", line: 1, symbol: "value" })),
-    lsp({ action: "symbols", file: "*", query: "value" }),
-    lsp({ action: "diagnostics", file: "*" }),
+    ...["references", "definition", "implementation", "type_definition", "hover", "symbols"].map(action => lsp({ action, file: "source.ts", line: 1, symbol: "value" })),
     lsp({ action: "references", file: `${process.env.WT}/source.ts`, line: 1, symbol: "value" }),
     { path: "proc://bg_1/kill" },
   ]) {
@@ -459,33 +457,29 @@ for (const project of ["firstmate", "vernant", "", undefined]) {
     assert.match(result.reason, /plain absolute or worktree-relative path.*report if that is not possible/);
     assert.equal(requests(), before, "refused devices must reach neither provider");
   };
-  for (const action of ["request", "rename", "rename_file", "code_actions", "format", "reload", "status", "capabilities", "unknown", "References", ""]) {
+  for (const action of ["diagnostics", "request", "rename", "rename_file", "code_actions", "format", "reload", "status", "capabilities", "unknown", "References", ""]) {
     await deny(lsp({ action, file: "source.ts", query: "workspace/executeCommand", apply: true }));
   }
-  for (const file of ["/etc/hosts", `${process.env.TASK_DATA}/outside.ts`, "escape.ts", "../outside.ts", "missing.ts", "file:///etc/hosts", "~/.env", "@source.ts", ":./source.ts", "[source.ts]", "src/**/*.ts", ""]) {
+  for (const file of ["/etc/hosts", `${process.env.TASK_DATA}/outside.ts`, "escape.ts", "../outside.ts", "missing.ts", ".", process.env.WT, "/", "file:///etc/hosts", "~/.env", "@source.ts", ":./source.ts", "[source.ts]", "src/**/*.ts", ""]) {
     await deny(lsp({ action: "references", file, line: 1, symbol: "value" }));
   }
-  await deny(lsp({ action: "references", file: "*", line: 1, symbol: "value" }));
+  for (const action of ["references", "symbols", "diagnostics"]) await deny(lsp({ action, file: "*", line: 1, symbol: "value", query: "value" }));
+  await deny(lsp({ action: "symbols", query: "value" }));
   await deny(lsp({ action: "references", line: 1, symbol: "value" }));
   for (const content of ["", "not json", "null", "[]", "1", '{"action":"references","file":1}']) await deny({ path: "xd://lsp", content });
   await deny(lsp({ action: "references", file: "source.ts" }), { ...ctx, cwd: process.env.TASK_DATA });
   await deny(lsp({ action: "references", file: "source.ts" }), { cwd: process.env.WT });
   await deny({ path: "xd://lsp", old_string: "a", new_string: "b" }, ctx, "edit");
   for (const path of ["proc://bg_2/kill", "proc://lookalike-service/kill", "proc:///kill", "proc://bg_1/kill/", "proc://bg_1/kill#x", "PROC://bg_1/kill"]) await deny({ path });
-  for (const getAsyncJobSnapshot of [undefined, () => null, () => ({ running: [], recent: [] }), () => ({ running: [null, { id: "bg_2" }], recent: [] }), () => { throw new Error("snapshot unavailable"); }]) {
+  for (const getAsyncJobSnapshot of [undefined, () => null, () => ({ running: [], recent: [] }), () => ({ running: [null, { id: "bg_2" }], recent: [] }), () => ({ running: [], recent: [{ id: "bg_1", status: "completed" }] }), () => { throw new Error("snapshot unavailable"); }]) {
     await deny({ path: "proc://bg_1/kill" }, { cwd: process.env.WT, getAsyncJobSnapshot });
   }
-  const before = requests();
-  assert.equal(await handlers.tool_call({ toolName: "write", input: { path: "proc://bg_3/kill" } }, {
-    ...ctx, getAsyncJobSnapshot: () => ({ running: [], recent: [{ id: "bg_3", status: "completed" }] }),
-  }), undefined, "recent owned jobs are still in the current snapshot");
-  assert.equal(requests(), before);
 }
 console.log("devices-ok");
 JS
 ) || fail "omp session device verification failed: $out"
   [ "$out" = devices-ok ] || fail "omp session device contract failed: $out"
-  pass "omp: LSP references and own-job cancellation pass without file-write judgment"
+  pass "omp: file-scoped LSP navigation and running own-job cancellation pass without file-write judgment"
 }
 
 test_handler_deadlines() {
