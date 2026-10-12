@@ -43,7 +43,12 @@
 # releasing the task's claim and recording it as released_worktree=), and
 # writing the note in the brief. It stops, starts,
 # deletes, resets, and returns nothing: the old copy's bytes, the endpoint, and
-# any pipeline run are untouched.
+# any pipeline run are untouched. A recorded GitHub PR is retained only when
+# the replacement's HEAD equals or descends from its recorded head and the
+# current forge head when readable. Missing or contradictory proof refuses.
+# For duplicate slot-root records, first retire the finished records with
+# plain fm-teardown; it preserves the slot and releases only their own claim,
+# then reassociate the remaining record to its real copy.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
@@ -581,6 +586,45 @@ reassociate_publish_slot_claim() {  # <slot> <claim|release>
     || die "could not claim pool slot $slot for task $ID; nothing was changed"
 }
 
+# A recorded PR can follow its work into a new copy only when no published
+# history is lost. Check the recorded head and, when the forge answers, its
+# current head. A successful but malformed forge answer is not an outage.
+reassociate_require_pr_head() {  # <pr-url> <replacement-copy> <project>
+  local pr=$1 copy=$2 project=$3 recorded live="" head number
+  local -a heads=()
+  [ -n "$pr" ] || return 0
+  fm_pr_url_parse "$pr" || die "recorded PR $pr has no supported identity for a PR head proof; nothing was changed"
+  [ "$FM_PR_PROVIDER" = github ] \
+    || die "recorded PR $pr is not a GitHub PR; its PR head cannot be verified by reassociate; nothing was changed"
+  number=$FM_PR_NUMBER
+  if ! recorded=$(fm_backend_meta_exact_value "$META" pr_head); then
+    ! grep -q '^pr_head=' "$META" \
+      || die "task $ID has no single nonempty recorded PR head; reconcile its PR registration before reassociating; nothing was changed"
+    recorded=
+  fi
+  if [ -n "$recorded" ]; then
+    fm_pr_head_valid "$recorded" \
+      || die "recorded PR head '$recorded' is not a full commit SHA; nothing was changed"
+    heads+=("$recorded")
+  fi
+  if live=$(gh pr view "$pr" --json headRefOid -q .headRefOid 2>/dev/null); then
+    fm_pr_head_valid "$live" \
+      || die "the forge returned no valid PR head for $pr; nothing was changed"
+    [ "$live" = "$recorded" ] || heads+=("$live")
+  fi
+  [ "${#heads[@]}" -gt 0 ] \
+    || die "task $ID already records PR $pr, but no recorded PR head or reachable forge head proves its history; restore forge access or register the PR head with bin/fm-pr-check.sh $ID '$pr' before reassociating; nothing was changed"
+  for head in "${heads[@]}"; do
+    if ! git -C "$project" cat-file -e "$head^{commit}" 2>/dev/null; then
+      git -C "$project" fetch --quiet origin "refs/pull/$number/head" >/dev/null 2>&1 || true
+    fi
+    git -C "$project" cat-file -e "$head^{commit}" 2>/dev/null \
+      || die "PR head $head for $pr is missing from $project's Git objects; fetch that PR's history before reassociating; nothing was changed"
+    git -C "$copy" merge-base --is-ancestor "$head" HEAD \
+      || die "replacement copy $copy does not contain PR head $head for $pr; use the copy whose branch tip equals or descends from that head; nothing was changed"
+  done
+}
+
 do_reassociate() {
   local pre_wt pre_project old_wt project kind kind_count branch_count old_branch new_wt new_branch=""
   local old_real="" old_state=present slot_result=none pr stamp line prior prior_real slot backup
@@ -631,8 +675,6 @@ do_reassociate() {
   esac
 
   pr=$(fm_meta_get "$META" pr)
-  [ -z "$pr" ] \
-    || die "task $ID already records PR $pr, whose merge watch and landed-work proof follow the current copy's branch; land or close that PR before re-pointing the record under it"
   [ ! -e "$STATE/$ID.backlog-close" ] && [ ! -L "$STATE/$ID.backlog-close" ] \
     || die "task $ID has a pending authoritative backlog close from an interrupted cleanup; finish or repair it before reassociating"
   # A finished relaunch keeps its journal as that transaction's durable record,
@@ -686,6 +728,8 @@ do_reassociate() {
     [ "$brief_branch_other" = 0 ] \
       || die "task $ID's instructions name a Ship branch other than its recorded branch $old_branch; reconcile the two before reassociating"
   fi
+
+  reassociate_require_pr_head "$pr" "$new_wt" "$project"
 
   # Ownership: neither copy may be named by another task record, and a pool
   # slot either copy overlaps must be claimed by this task or by no one. A

@@ -17,14 +17,19 @@
 #   5. A replacement pool slot with no claim is claimed for the task.
 #   6. Every refusal - a copy that is not an isolated worktree of the same
 #      project, a copy another record names, a pool slot claimed by another task
-#      or carrying an unreadable claim, a detached ship copy, a recorded PR, a
-#      worker, the supervision branch, a session that does not own the home,
+#      or carrying an unreadable claim, a detached ship copy, an unproved PR
+#      head, a worker, the supervision branch, a session that does not own the home,
 #      and malformed arguments - changes nothing at all.
 #   7. A ship reassociated into a copy nested in its own pool slot is retired by
 #      the real teardown once its work lands, and the slot is free for the next
 #      spawn. A later hop out of the pool proves and anchors that slot before
 #      releasing it, a vanished pool copy is released history, and a failed
 #      staging write publishes nothing.
+#   8. Two or three records sharing a slot root retire finished ship/scout
+#      records without touching any copy, then reassociate parked unlanded
+#      work, including a branch in an external locked copy.
+#   9. A recorded PR survives reassociation only when Git proves that the
+#      replacement contains its recorded and reachable forge heads.
 set -u
 
 # shellcheck source=tests/fixtures.sh disable=SC1091
@@ -77,8 +82,12 @@ case "${1:-} ${2:-}" in
 esac
 exit 0
 SH
+  cat > "$fb/gh" <<'SH'
+#!/usr/bin/env bash
+exit 1
+SH
   fm_fake_exit0 "$fb" treehouse
-  chmod +x "$fb/ps" "$fb/tmux" "$fb/no-mistakes"
+  chmod +x "$fb/ps" "$fb/tmux" "$fb/no-mistakes" "$fb/gh"
 }
 
 # new_case <name> <id>: a home whose session lock this shell owns, a project
@@ -510,7 +519,7 @@ test_refusals_change_nothing() {
   git -C "$new" checkout --quiet "fm/$id-v2"
 
   printf 'pr=https://github.com/o/r/pull/9\n' >> "$dir/home/state/$id.meta"
-  expect_refusal "$dir" "a task with a recorded PR" "already records PR" 1 \
+  expect_refusal "$dir" "a recorded PR with no head proof" "no recorded PR head or reachable forge head" 1 \
     "$id" reassociate --worktree "$new" --note n
   sed -i.bak '/^pr=/d' "$dir/home/state/$id.meta"
   rm -f "$dir/home/state/$id.meta.bak"
@@ -796,7 +805,9 @@ SH
     cat > "$tb/gh" <<'SH'
 #!/usr/bin/env bash
 case "${1:-} ${2:-}" in
-  "pr view") echo "error: pull request not found" >&2 ; exit 1 ;;
+  "pr view")
+    [ -n "${FM_SHARED_PR_STATE:-}" ] || { echo "error: pull request not found" >&2; exit 1; }
+    printf '%s\n' "$FM_SHARED_PR_STATE" ;;
 esac
 exit 0
 SH
@@ -809,6 +820,133 @@ SH
     FM_STATE_OVERRIDE="$dir/home/state" FM_DATA_OVERRIDE="$dir/home/data" \
     FM_CONFIG_OVERRIDE="$dir/home/config" PATH="$tb:$PATH" \
     "$ROOT/bin/fm-teardown.sh" "$id" 2>&1
+}
+
+# Shared slot roots must not deadlock a finished record's cleanup against a
+# parked record's reassociation. Exercise the operator sequence with real Git
+# copies, including a third, finished scout record with no branch.
+test_shared_slot_cleanup_then_reassociate_preserves_all_copies() {
+  local shape id dir slot nested finished scout scout_copy out rc n claim
+  for shape in two three nested-scout nested-scout-prior outside parked-claim; do
+    id="shared-parked-$shape"
+    finished="shared-finished-$shape"
+    scout="shared-scout-$shape"
+    dir=$(new_case "shared-$shape" "$id")
+    slot=$(add_pool_slot "$dir" 139 "fm/$finished")
+    printf '{"worktrees":[{"name":"139","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+    cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
+    nested="$slot/.claude/worktrees/$id"
+    [ "$shape" != outside ] || nested="$dir/locked-parked-copy"
+    mkdir -p "$slot/.claude/worktrees"
+    add_copy "$dir" "$nested" "fm/$id-v2"
+    [ "$shape" != outside ] || git -C "$dir/proj" worktree lock --reason 'parked live branch' "$nested"
+    for n in 1 2 3; do
+      printf 'unlanded commit %s\n' "$n" > "$nested/commit-$n.txt"
+      git -C "$nested" add "commit-$n.txt"
+      git -C "$nested" commit -qm "parked commit $n"
+    done
+    for n in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23; do
+      printf 'untracked bytes %s\n' "$n" > "$nested/scratch-$n.txt"
+    done
+    printf 'tracked unfinished edit\n' >> "$nested/commit-1.txt"
+    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
+      "endpoint_task_id=$id" "worktree=$slot" "project=$dir/proj" \
+      "kind=ship" "mode=no-mistakes" "branch=fm/$id" "spawn_gen=parked"
+    fm_write_meta "$dir/home/state/$finished.meta" "window=fmses:fm-$finished" \
+      "endpoint_task_id=$finished" "worktree=$slot" "project=$dir/proj" \
+      "kind=ship" "mode=no-mistakes" "branch=fm/$finished" "spawn_gen=finished" \
+      "pr=https://github.com/example/repo/pull/7"
+    add_copy "$dir" "$slot/.claude/worktrees/$finished" "fm/$finished-v2"
+    if [ "$shape" = three ] || [ "$shape" = nested-scout ] || [ "$shape" = nested-scout-prior ]; then
+      scout_copy=$slot
+      if [ "$shape" = nested-scout ] || [ "$shape" = nested-scout-prior ]; then
+        scout_copy="$slot/.claude/worktrees/scout"
+        git -C "$dir/proj" worktree add --quiet --detach "$scout_copy"
+        printf 'preserved scout scratch\n' > "$scout_copy/scout-scratch.txt"
+      fi
+      fm_write_meta "$dir/home/state/$scout.meta" "window=fmses:fm-$scout" \
+        "endpoint_task_id=$scout" "worktree=$scout_copy" "project=$dir/proj" \
+        "kind=scout" "mode=no-mistakes" "spawn_gen=scout"
+      [ "$shape" != nested-scout-prior ] || printf 'prior_worktree=%s\n' "$slot" >> "$dir/home/state/$scout.meta"
+      mkdir -p "$dir/home/data/$scout"
+      printf 'Completed scout findings.\n' > "$dir/home/data/$scout/report.md"
+      FM_HOME="$dir/home" "$ROOT/bin/fm-captain-hold.sh" complete "$scout" --none >/dev/null \
+        || fail "cannot inventory the fixture scout"
+      cp "$dir/home/state/$scout.meta" "$dir/scout-before"
+    fi
+    claim="$dir/pool/139/.fm-slot-owner"
+    if [ "$shape" = parked-claim ]; then
+      printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$claim"
+      cp "$claim" "$dir/claim-before"
+    else
+      printf 'task=%s\nhome=%s\n' "$finished" "$dir/home" > "$claim"
+    fi
+    copy_fingerprint "$slot" > "$dir/slot-before"
+    copy_fingerprint "$nested" > "$dir/nested-before"
+    git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ > "$dir/branches-before"
+    git -C "$dir/proj" worktree list --porcelain > "$dir/registrations-before"
+    cp "$dir/home/state/$id.meta" "$dir/parked-before"
+    rc=0
+    out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$finished") || rc=$?
+    expect_code 0 "$rc" "$shape records: finished cleanup must retire only its record"$'\n'"$out"
+    [ ! -e "$dir/home/state/$finished.meta" ] || fail "$shape: finished record survived"
+    if [ "$shape" = parked-claim ]; then
+      cmp -s "$dir/claim-before" "$claim" || fail "$shape: cleanup changed the parked task's claim"
+    else
+      [ ! -e "$claim" ] || fail "$shape: finished task's claim still blocks reassociation"
+    fi
+    [ ! -e "$dir/treehouse.log" ] || fail "$shape: cleanup invoked Treehouse"
+    cmp -s "$dir/parked-before" "$dir/home/state/$id.meta" || fail "$shape: parked record changed"
+    if [ "$shape" = three ] || [ "$shape" = nested-scout ] || [ "$shape" = nested-scout-prior ]; then
+      cmp -s "$dir/scout-before" "$dir/home/state/$scout.meta" || fail "$shape: finished ship cleanup changed the scout record"
+      out=$(run_case_teardown "$dir" "$scout") || fail "finished scout cleanup refused: $out"
+      [ ! -e "$dir/home/state/$scout.meta" ] || fail "finished scout record survived"
+    fi
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: cleanup changed slot bytes"
+    copy_fingerprint "$nested" | cmp -s - "$dir/nested-before" || fail "$shape: cleanup changed parked copy"
+    git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ | cmp -s - "$dir/branches-before" \
+      || fail "$shape: cleanup changed branches"
+    git -C "$dir/proj" worktree list --porcelain | cmp -s - "$dir/registrations-before" \
+      || fail "$shape: cleanup changed copy registrations"
+    out=$(run_control "$dir" "$id" reassociate --worktree "$nested" --note 'Recover parked nested copy after finished records retire.') \
+      || fail "$shape: remaining record cannot reassociate: $out"
+    assert_equals "$nested" "$(meta_field "$dir" "$id" worktree)" "$shape: parked record did not follow its copy"
+    if [ "$shape" = outside ]; then
+      [ ! -e "$claim" ] || fail "outside: the old slot is still claimed"
+    else
+      assert_line "task=$id" "$claim" "$shape: replacement copy's slot was not claimed"
+    fi
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: reassociation changed slot bytes"
+    copy_fingerprint "$nested" | cmp -s - "$dir/nested-before" || fail "$shape: reassociation changed unlanded work"
+    git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ | cmp -s - "$dir/branches-before" \
+      || fail "$shape: reassociation changed branches"
+    [ ! -e "$dir/treehouse.log" ] || fail "$shape: reassociation invoked Treehouse"
+    cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$shape: recovery changed Treehouse's lease"
+
+  done
+  pass "two and three shared records retire finished ship/scout records and reassociate parked work without changing any copy"
+}
+
+test_unfinished_shared_slot_record_cannot_retire() {
+  local id=shared-unfinished dir slot out rc=0
+  dir=$(new_case shared-unfinished "$id")
+  slot=$(add_pool_slot "$dir" 42 "fm/$id-slot")
+  printf '{"worktrees":[{"name":"42","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+  fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
+    "endpoint_task_id=$id" "worktree=$slot" "project=$dir/proj" \
+    "kind=ship" "mode=no-mistakes" "spawn_gen=unfinished" \
+    "pr=https://github.com/example/repo/pull/7"
+  fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
+  printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
+  cp "$dir/pool/42/.fm-slot-owner" "$dir/claim-before"
+  cp "$dir/home/state/$id.meta" "$dir/meta-before"
+  out=$(FM_SHARED_PR_STATE=OPEN run_case_teardown "$dir" "$id") || rc=$?
+  expect_code 1 "$rc" "an unfinished shared record must not be reported completed"$'\n'"$out"
+  assert_contains "$out" 'its own branch fm/shared-unfinished is not proved landed' 'unfinished refusal lost its delivery proof boundary'
+  cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "unfinished cleanup retired its record"
+  cmp -s "$dir/claim-before" "$dir/pool/42/.fm-slot-owner" || fail "unfinished cleanup released its claim"
+  [ ! -e "$dir/treehouse.log" ] || fail "unfinished cleanup touched Treehouse"
+  pass "an unfinished shared record keeps its record and slot claim"
 }
 
 # The whole nested lifecycle: a ship in a pool slot is reassociated into a copy
@@ -1199,6 +1337,221 @@ test_same_origin_different_ref_store_refuses_without_changes() {
   pass "same-origin copies in another ref store are refused in both roles without changing records, briefs, anchors, claims, or copies"
 }
 
+test_unleased_shared_slot_gates_only_the_claimant() {
+  local id=shared-unleased claimant dir slot out rc
+  for claimant in "$id" absent parked; do
+    dir=$(new_case "shared-unleased-$claimant" "$id")
+    slot=$(add_pool_slot "$dir" 42 "fm/$id-slot")
+    printf '{"worktrees":[{"name":"42","path":"%s","leased":false}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
+      "endpoint_task_id=$id" "worktree=$slot" "project=$dir/proj" \
+      "kind=ship" "spawn_gen=finished" "pr=https://github.com/example/repo/pull/7"
+    fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
+    [ "$claimant" = absent ] || printf 'task=%s\nhome=%s\n' "$claimant" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
+    : > "$dir/claim-before"
+    [ "$claimant" = absent ] || cp "$dir/pool/42/.fm-slot-owner" "$dir/claim-before"
+    cp "$dir/home/state/$id.meta" "$dir/meta-before"
+    cp "$dir/home/state/parked.meta" "$dir/parked-before"
+    cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
+    copy_fingerprint "$slot" > "$dir/slot-before"
+    git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ > "$dir/branches-before"
+    git -C "$dir/proj" worktree list --porcelain > "$dir/registrations-before"
+    rc=0
+    out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$id") || rc=$?
+    if [ "$claimant" = parked ]; then
+      expect_code 0 "$rc" "a finished record whose slot was reassigned must retire without a durable lease"$'\n'"$out"
+      [ ! -e "$dir/home/state/$id.meta" ] || fail 'reassigned-slot cleanup left the finished record'
+      assert_contains "$out" 'was reassigned to task parked' 'reassigned-slot cleanup did not name the claimant'
+    else
+      expect_code 1 "$rc" "$claimant claim: shared-root cleanup must not open an allocation window before reassociation"$'\n'"$out"
+      assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" 'the lease refusal must name the state-only remedy'
+      cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$claimant claim: unleased cleanup retired its record"
+    fi
+    cmp -s "$dir/parked-before" "$dir/home/state/parked.meta" || fail "$claimant claim: cleanup changed the parked record"
+    if [ "$claimant" = absent ]; then
+      [ ! -e "$dir/pool/42/.fm-slot-owner" ] || fail 'unleased cleanup wrote a slot claim'
+    else
+      cmp -s "$dir/claim-before" "$dir/pool/42/.fm-slot-owner" || fail "$claimant claim: cleanup changed the slot claim"
+    fi
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$claimant claim: cleanup changed slot bytes"
+    git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ | cmp -s - "$dir/branches-before" \
+      || fail "$claimant claim: cleanup changed branches"
+    git -C "$dir/proj" worktree list --porcelain | cmp -s - "$dir/registrations-before" \
+      || fail "$claimant claim: cleanup changed copy registrations"
+    cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$claimant claim: cleanup changed Treehouse's lease state"
+    [ ! -e "$dir/treehouse.log" ] || fail "$claimant claim: cleanup touched Treehouse"
+  done
+  pass 'an unleased shared slot refuses its claimant and an unclaimed record, and retires a reassigned record without touching the claimant, its claim, branches or copy bytes'
+}
+
+# The lease remedy names the remaining record that stays in the slot, never
+# whichever other root record the state glob lists first.
+test_unleased_shared_slot_names_the_remaining_lease_holder() {
+  local id=shared-holder shape dir slot out rc
+  for shape in nested-finished root-finished; do
+    dir=$(new_case "shared-holder-$shape" "$id")
+    slot=$(add_pool_slot "$dir" 42 "fm/$id-slot")
+    printf '{"worktrees":[{"name":"42","path":"%s","leased":false}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
+      "endpoint_task_id=$id" "worktree=$slot" "project=$dir/proj" \
+      "kind=ship" "spawn_gen=finished" "pr=https://github.com/example/repo/pull/7"
+    if [ "$shape" = nested-finished ]; then
+      git -C "$dir/proj" worktree add --quiet --detach "$slot/.claude/worktrees/scout"
+      fm_write_meta "$dir/home/state/a-finished.meta" "worktree=$slot/.claude/worktrees/scout" "kind=scout"
+    else
+      fm_write_meta "$dir/home/state/a-finished.meta" "worktree=$slot" "kind=ship"
+      fm_write_meta "$dir/home/state/b-finished.meta" "worktree=$slot" "kind=ship"
+      printf 'working: started\ndone: PR https://github.com/example/repo/pull/8 merged\n' > "$dir/home/state/a-finished.status"
+      printf 'done: report delivered\n' > "$dir/home/state/b-finished.status"
+      printf 'working: parked with unlanded commits\n' > "$dir/home/state/parked.status"
+    fi
+    fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
+    printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
+    cp "$dir/home/state/$id.meta" "$dir/meta-before"
+    cp "$dir/pool/42/.fm-slot-owner" "$dir/claim-before"
+    copy_fingerprint "$slot" > "$dir/slot-before"
+    rc=0
+    out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$id") || rc=$?
+    expect_code 1 "$rc" "$shape: an unleased shared slot must refuse its claimant's cleanup"$'\n'"$out"
+    case "$out" in *"--lease-holder 'a-finished'"*|*"--lease-holder 'b-finished'"*) fail "$shape: the lease remedy named a finished record: $out" ;; esac
+    if [ "$shape" = nested-finished ]; then
+      assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" "$shape: the lease remedy must name the remaining root record"
+    else
+      assert_contains "$out" "--lease-holder <remaining-task>)" "$shape: an ambiguous remedy must not guess a holder"
+      case "$out" in *"--lease-holder 'parked'"*) fail "$shape: the remedy inferred a single holder among several: $out" ;; esac
+      assert_contains "$out" 'select the live one whose work stays in it as <remaining-task>' "$shape: the remedy must leave the choice to the operator"
+      assert_contains "$out" '  a-finished: done: PR https://github.com/example/repo/pull/8 merged' "$shape: a candidate lost its last status"
+      assert_contains "$out" '  b-finished: done: report delivered' "$shape: a candidate lost its last status"
+      assert_contains "$out" '  parked: working: parked with unlanded commits' "$shape: the live candidate lost its last status"
+    fi
+    cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$shape: refused cleanup changed its record"
+    cmp -s "$dir/claim-before" "$dir/pool/42/.fm-slot-owner" || fail "$shape: refused cleanup changed the claim"
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: refused cleanup changed slot bytes"
+    [ ! -e "$dir/treehouse.log" ] || fail "$shape: refused cleanup touched Treehouse"
+  done
+  pass 'the unleased shared-slot remedy names the sole remaining root record and lists every candidate with its status among several'
+}
+
+# A finished ship whose own copy is nested in a shared slot keeps the ordinary
+# dirty and landed-work proof on that copy: a merged PR never waives later
+# local commits or tracked edits, and no outcome touches the copy's bytes.
+test_nested_shared_ship_keeps_own_copy_proof() {
+  local id=shared-nested-ship shape dir slot nested out rc
+  for shape in local-commit tracked-dirt landed; do
+    dir=$(new_case "shared-nested-ship-$shape" "$id")
+    slot=$(add_pool_slot "$dir" 54 "fm/parked-slot")
+    printf '{"worktrees":[{"name":"54","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+    nested="$slot/.claude/worktrees/$id"
+    mkdir -p "$slot/.claude/worktrees"
+    add_copy "$dir" "$nested" "fm/$id-v2"
+    printf 'delivered\n' > "$nested/delivered.txt"
+    git -C "$nested" add delivered.txt
+    git -C "$nested" commit -qm 'delivered work'
+    git -C "$nested" push -q origin "HEAD:main"
+    git -C "$nested" checkout -q --detach
+    case "$shape" in
+      local-commit)
+        printf 'later\n' > "$nested/later.txt"
+        git -C "$nested" add later.txt
+        git -C "$nested" commit -qm 'later local work'
+        ;;
+      tracked-dirt) printf 'uncommitted edit\n' >> "$nested/delivered.txt" ;;
+    esac
+    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
+      "endpoint_task_id=$id" "worktree=$nested" "project=$dir/proj" \
+      "kind=ship" "mode=no-mistakes" "branch=fm/$id-v2" "spawn_gen=finished" \
+      "pr=https://github.com/example/repo/pull/7"
+    fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
+    printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/54/.fm-slot-owner"
+    cp "$dir/home/state/$id.meta" "$dir/meta-before"
+    cp "$dir/home/state/parked.meta" "$dir/parked-before"
+    copy_fingerprint "$nested" > "$dir/nested-before"
+    copy_fingerprint "$slot" > "$dir/slot-before"
+    rc=0
+    out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$id") || rc=$?
+    case "$shape" in
+      landed)
+        expect_code 0 "$rc" "$shape: a landed nested shared ship must retire records-only"$'\n'"$out"
+        [ ! -e "$dir/home/state/$id.meta" ] || fail "$shape: the landed record survived"
+        ;;
+      *)
+        expect_code 1 "$rc" "$shape: a merged PR must not waive the nested copy's own proof"$'\n'"$out"
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$shape: the refusal retired the record"
+        assert_line "task=$id" "$dir/pool/54/.fm-slot-owner" "$shape: the refusal released the claim"
+        ;;
+    esac
+    [ -d "$nested" ] || fail "$shape: cleanup removed the nested copy"
+    copy_fingerprint "$nested" | cmp -s - "$dir/nested-before" || fail "$shape: cleanup changed the nested copy's bytes"
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: cleanup changed slot bytes"
+    cmp -s "$dir/parked-before" "$dir/home/state/parked.meta" || fail "$shape: cleanup changed the parked record"
+    [ ! -e "$dir/treehouse.log" ] || fail "$shape: cleanup touched Treehouse"
+  done
+  pass 'a nested shared ship keeps its own dirty and landed proof under a merged PR, and no outcome touches its copy'
+}
+
+test_recorded_pr_reassociation_requires_contained_head() {
+  local shape id dir new head live out rc
+  for shape in equal descendant live-only offline live-advanced unrelated missing malformed; do
+    id="reassoc-pr-$shape"
+    dir=$(new_case "pr-$shape" "$id")
+    new="$dir/new"
+    head=$(git -C "$dir/old" rev-parse HEAD)
+    git -C "$dir/proj" worktree add --quiet -b "fm/$id-v2" "$new" "$head"
+    if [ "$shape" = descendant ] || [ "$shape" = offline ]; then
+      printf 'later work\n' > "$new/later.txt"
+      git -C "$new" add later.txt
+      git -C "$new" commit -qm 'later work'
+    fi
+    live=$head
+    case "$shape" in
+      offline) live= ;;
+      live-advanced)
+        git -C "$dir/old" commit -qm 'PR advanced' --allow-empty
+        live=$(git -C "$dir/old" rev-parse HEAD)
+        ;;
+      unrelated)
+        git -C "$dir/old" commit -qm 'unrelated PR tip' --allow-empty
+        head=$(git -C "$dir/old" rev-parse HEAD)
+        live=$head
+        ;;
+      missing) head=1111111111111111111111111111111111111111; live= ;;
+      malformed) live=not-a-commit ;;
+    esac
+    printf 'pr=https://github.com/example/repo/pull/7\n' >> "$dir/home/state/$id.meta"
+    [ "$shape" = live-only ] || printf 'pr_head=%s\n' "$head" >> "$dir/home/state/$id.meta"
+    cat > "$dir/fakebin/gh" <<EOF
+#!/usr/bin/env bash
+[ -n '$live' ] || exit 1
+printf '%s\n' '$live'
+EOF
+    chmod +x "$dir/fakebin/gh"
+    snapshot_case "$dir"
+    copy_fingerprint "$new" > "$dir/new-before"
+    rc=0
+    out=$(run_control "$dir" "$id" reassociate --worktree "$new" --note 'Follow the existing PR into its replacement copy.') || rc=$?
+    case "$shape" in
+      equal|descendant|live-only|offline)
+        expect_code 0 "$rc" "$shape: a replacement containing the PR head must reassociate"$'\n'"$out"
+        assert_line 'pr=https://github.com/example/repo/pull/7' "$dir/home/state/$id.meta" "$shape: PR identity changed"
+        assert_equals "$new" "$(meta_field "$dir" "$id" worktree)" "$shape: record did not move"
+        ;;
+      *)
+        expect_code 1 "$rc" "$shape: an unproved PR head must refuse"$'\n'"$out"
+        assert_contains "$out" 'PR head' "$shape: refusal did not name the missing proof"
+        assert_case_unchanged "$dir" "$shape: PR proof refusal"
+        ;;
+    esac
+    copy_fingerprint "$new" | cmp -s - "$dir/new-before" || fail "$shape: PR proof changed replacement bytes"
+  done
+  pass 'recorded PR reassociation accepts equal/descendant tips and refuses missing, unrelated, advanced or malformed head proof'
+}
+
+test_unleased_shared_slot_gates_only_the_claimant
+test_unleased_shared_slot_names_the_remaining_lease_holder
+test_nested_shared_ship_keeps_own_copy_proof
+test_recorded_pr_reassociation_requires_contained_head
+test_shared_slot_cleanup_then_reassociate_preserves_all_copies
+test_unfinished_shared_slot_record_cannot_retire
 test_happy_path_repoints_record_and_preserves_old_copy
 test_crew_state_reads_the_replacement_run
 test_moving_back_undoes_the_hop
