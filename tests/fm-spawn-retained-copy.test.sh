@@ -5,11 +5,15 @@
 #   1. A slot Treehouse could hand out (not leased in its pool state) that
 #      contains a live task record's current copy (the nested replacement-copy
 #      case) refuses allocation before treehouse get, names the treehouse lease
-#      command that holds the slot in place, and changes nothing; once that
-#      record is retired the gate lets it through.
-#   2. A slot whose hold cannot be proved still refuses: a live owner process
-#      only, no state entry, an unreadable state file, or Treehouse's
-#      recovered-state lease on a slot that is not a Firstmate home.
+#      command that holds the slot in place when the slot has one uniquely
+#      named entry, and changes nothing; once that record is retired the gate
+#      lets it through.
+#   2. A slot whose hold cannot be proved still refuses, without naming a lease
+#      as the remedy: a live owner process only, no state entry, an unreadable
+#      state file, missing jq, conflicting records (including an unleased or
+#      recovered-lease alias of the slot's directory), a relative or
+#      TSV-escaped entry path, or Treehouse's recovered-state lease on a slot
+#      that is not a Firstmate home.
 #   3. A slot Treehouse's state durably leases does not block allocation even
 #      with a live record's nested copy inside it: treehouse get never hands it
 #      out, so the spawn proceeds into another slot and leaves it untouched.

@@ -371,12 +371,14 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # handed out by a later get until treehouse return releases it); a live owner
 # process, dirt, or an unmerged HEAD also make a get skip a slot, but each of
 # those can change before the get runs, so none of them counts here. Every
-# entry recording <slot>'s path must be leased: an ordinary lease holds; a
+# entry naming <slot>'s directory, however its path is spelled, must be leased:
+# an ordinary lease holds; a
 # recovered lease (FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER) holds only when
 # <slot> is one of the given local Firstmate <home> directories, since a home
 # freed and handed out is lost whole, nested copies or not. Reading the state
-# needs jq; without it, or with an unreadable state file or no entry for
-# <slot>, the slot is not proved held.
+# needs jq; without it, with an unreadable state file, with no entry for
+# <slot>, or with any relative or TSV-escaped entry path in the state, the slot
+# is not proved held.
 # Sets FM_TASK_COPY_SLOT_NAME to the slot's name in Treehouse state (the name
 # treehouse status and treehouse lease use), or empty when no entry records
 # <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, conflicting, recovered,
