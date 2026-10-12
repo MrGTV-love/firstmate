@@ -379,8 +379,9 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # <slot>, the slot is not proved held.
 # Sets FM_TASK_COPY_SLOT_NAME to the slot's name in Treehouse state (the name
 # treehouse status and treehouse lease use), or empty when no entry records
-# <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, recovered, or unknown; and
-# on failure FM_TASK_COPY_SLOT_REASON to a clause following the slot's path.
+# <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, recovered, escaped,
+# relative, or unknown; and on failure FM_TASK_COPY_SLOT_REASON to a clause
+# following the slot's path.
 # Returns 0 when held, 1 otherwise.
 # The last state file read and its entries are kept in
 # FM_TASK_COPY_POOL_STATE_FILE and FM_TASK_COPY_POOL_STATE_ENTRIES, so a scan
@@ -425,11 +426,13 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
     # depend on the caller's working directory. Neither can prove identity.
     case "$path" in
       *\\*)
+        FM_TASK_COPY_SLOT_STATE=escaped
         FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state contains an escaped entry path that cannot be compared safely"
         return 1
         ;;
       /*) ;;
       *)
+        FM_TASK_COPY_SLOT_STATE=relative
         FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state contains a relative entry path"
         return 1
         ;;
@@ -474,11 +477,12 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
 # allocatable; a slot Treehouse's state durably holds
 # (fm_task_copy_pool_slot_held) is never handed out, whatever lies inside it,
 # and a slot a task merely left is not a record's current copy, so neither
-# stops the allocation. The refusal names the treehouse lease command that
-# holds the slot in place without touching it; teardown's treehouse return
-# releases that lease with the slot. A registered local home that cannot be
-# read is named in one warning line and skipped: one broken home must not stop
-# every allocation for a project.
+# stops the allocation. The refusal for a slot that is not leased names the
+# treehouse lease command that holds the slot in place without touching it;
+# teardown's treehouse return releases that lease with the slot. No other
+# refusal names a lease, which would not clear it. A registered local home
+# that cannot be read is named in one warning line and skipped: one broken home
+# must not stop every allocation for a project.
 fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
   local project=$1 record_state=$2 state_dir meta copy slot skipped id home remedy
   local -a homes=()
@@ -507,8 +511,11 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
         recovered)
           remedy="treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)"
           ;;
+        escaped|relative)
+          remedy="The pool state holds an entry whose path cannot be proved, and a lease does not clear this refusal; report that entry for repair."
+          ;;
         *)
-          remedy="Inspect it with (cd '$project' && treehouse status); a slot listed there as not leased is held in place, without touching its contents, by: (cd '$project' && treehouse lease <name> --lease-holder '$id')"
+          remedy="A lease does not clear this refusal; inspect the pool with: (cd '$project' && treehouse status)"
           ;;
       esac
       echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2

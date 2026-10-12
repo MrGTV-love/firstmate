@@ -88,12 +88,13 @@ run_retained_spawn() {
 }
 
 assert_retained_refusal() {
-  local name=$1 reason=$2 remedy=${3:-} out rc=0
+  local name=$1 reason=$2 remedy=${3:-} forbidden=${4:-} out rc=0
   retained_fingerprint > "$CASE_DIR/before-copy"
   out=$(run_retained_spawn "$name") || rc=$?
   [ "$rc" -ne 0 ] || fail "spawn accepted an unsafe pool slot: $out"
   assert_contains "$out" "$reason" "allocation refusal lost its reason"
   [ -z "$remedy" ] || assert_contains "$out" "$remedy" "allocation refusal did not name the command that clears it"
+  [ -z "$forbidden" ] || assert_not_contains "$out" "$forbidden" "allocation refusal named a command that cannot clear it"
   assert_contains "$out" "before treehouse get" "allocation did not refuse at the pre-acquisition boundary"
   ! grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "refused allocation sent treehouse get"
   ! grep -Eq 'reset|treehouse return' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "refused allocation sent a destructive command"
@@ -117,10 +118,12 @@ assert_retained_spawn() {
 test_unsupported_entry_paths_are_unproved() (
   # shellcheck source=bin/fm-task-copy-lib.sh
   . "$ROOT/bin/fm-task-copy-lib.sh"
-  local shape dir slot alias path character rc failed=0
+  local shape dir slot alias path character expected rc failed=0
+  command -v jq >/dev/null 2>&1 || fail "the jq regressions require jq"
   for shape in backslash tab newline relative; do
     dir="$TMP_ROOT/unsupported-$shape"
     character=
+    expected=escaped
     case "$shape" in
       backslash) character=$'\\' ;;
       tab) character=$'\t' ;;
@@ -132,20 +135,24 @@ test_unsupported_entry_paths_are_unproved() (
     ln -s "${slot%/*/*}" "$dir/clean-pool"
     alias="$dir/clean-pool/1/project"
     path=$slot
-    [ "$shape" != relative ] || path=1/project
+    if [ "$shape" = relative ]; then
+      path=1/project
+      expected=relative
+    fi
     jq -n --arg held "$alias" --arg unsafe "$path" \
       '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder"}, {name: "1", path: $unsafe}]}' \
-      > "${slot%/*/*}/treehouse-state.json"
+      > "${slot%/*/*}/treehouse-state.json" || fail "$shape: cannot build the pool state fixture"
     FM_TASK_COPY_POOL_STATE_FILE=
     FM_TASK_COPY_POOL_STATE_ENTRIES=
     cd "$dir/unrelated" || fail "cannot enter unrelated working directory"
     rc=0
     fm_task_copy_pool_slot_held "$slot" || rc=$?
-    if [ "$rc" != 1 ] || [ "$FM_TASK_COPY_SLOT_STATE" != unknown ]; then
+    if [ "$rc" != 1 ] || [ "$FM_TASK_COPY_SLOT_STATE" != "$expected" ]; then
       printf 'not ok - %s: unsupported conflicting entry counted as %s (exit %s)\n' \
         "$shape" "$FM_TASK_COPY_SLOT_STATE" "$rc" >&2
       failed=1
     fi
+    assert_contains "$FM_TASK_COPY_SLOT_REASON" "$expected entry path" "$shape: unsupported-path refusal lost its reason"
   done
   [ "$failed" = 0 ] || fail "unsupported state paths bypassed the lease proof"
   pass "escaped or relative entry paths cannot prove a slot held beside a clean leased alias"
@@ -346,14 +353,35 @@ test_conflicting_recovered_alias_refuses_before_allocation() {
   pass "conflicting recovered-lease aliases refuse a spawn before allocation without changing pool state"
 }
 
+test_unprovable_entry_path_refusal_names_no_lease() {
+  local shape name path
+  command -v jq >/dev/null 2>&1 || fail "the jq regressions require jq"
+  for shape in escaped relative; do
+    name="entry-path-$shape"
+    make_retained_case "$name"
+    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+    path=1/project
+    [ "$shape" != escaped ] || path="$CASE_DIR/pool/9/back\\slash"
+    jq -n --arg held "$SLOT_DIR" --arg unsafe "$path" \
+      '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder"}, {name: "9", path: $unsafe}]}' \
+      > "$CASE_DIR/pool/treehouse-state.json" || fail "$shape: cannot build the pool state fixture"
+    cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+    assert_retained_refusal "$name" "$shape entry path" \
+      "a lease does not clear this refusal; report that entry for repair" "treehouse lease"
+    cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$shape: refusal changed pool state"
+  done
+  pass "an escaped or relative entry path refuses a spawn and asks for a repair report, never a lease"
+}
+
 test_unprovable_slot_hold_still_refuses() {
-  local shape name entry reason remedy
+  local shape name entry reason remedy forbidden
   local recovered='recovered: state file was corrupt or truncated; verify before reuse'
   for shape in live-owner no-entry unreadable recovered-not-home; do
     name="unproved-$shape"
     make_retained_case "$name"
     add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
     remedy=
+    forbidden=
     case "$shape" in
       live-owner)
         printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s,"owner_started_at":1}]}\n' \
@@ -366,11 +394,13 @@ test_unprovable_slot_hold_still_refuses() {
           "$CASE_DIR" > "$CASE_DIR/pool/treehouse-state.json"
         reason="has no entry in Treehouse state"
         remedy="(cd '$PROJECT_DIR' && treehouse status)"
+        forbidden="treehouse lease"
         ;;
       unreadable)
         printf '{"worktrees":[{"name":"1","path":"%s","leased":true\n' "$SLOT_DIR" > "$CASE_DIR/pool/treehouse-state.json"
         reason="cannot be read"
         remedy="(cd '$PROJECT_DIR' && treehouse status)"
+        forbidden="treehouse lease"
         ;;
       recovered-not-home)
         entry=$(printf ',"leased":true,"lease_holder":"%s"' "$recovered")
@@ -380,7 +410,7 @@ test_unprovable_slot_hold_still_refuses() {
         ;;
     esac
     cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
-    assert_retained_refusal "$name" "$reason" "$remedy"
+    assert_retained_refusal "$name" "$reason" "$remedy" "$forbidden"
     cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "$shape: refusal changed the holder's record"
     assert_grep 'nested unlanded commit' "$NESTED_COPY/nested-owned.txt" "$shape: refusal lost the nested work"
   done
@@ -489,6 +519,7 @@ test_recovered_alias_beside_leased_entry_is_not_held || exit 1
 test_slot_holding_live_nested_current_copy_refuses
 test_conflicting_unleased_alias_refuses_before_allocation
 test_conflicting_recovered_alias_refuses_before_allocation
+test_unprovable_entry_path_refusal_names_no_lease
 test_unprovable_slot_hold_still_refuses
 test_nested_copy_in_leased_slot_allows_allocation
 test_secondmate_home_slot_with_other_project_copy_allows_allocation
