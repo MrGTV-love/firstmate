@@ -20,6 +20,7 @@ export interface JevGuardContext {
   worktree: string;
   data: string;
   project?: string;
+  noHelpers?: boolean;
 }
 
 const navigationActions: Readonly<Record<string, true>> = {

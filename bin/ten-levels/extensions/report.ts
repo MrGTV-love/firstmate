@@ -24,6 +24,7 @@ let config = resolve(home, "config");
 let ledger: string | undefined;
 let task = "";
 let project: string | undefined;
+let noHelpers = false;
 
 const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
 
@@ -46,12 +47,13 @@ function preflightTimeout(): number {
 }
 
 /** Firstmate: the owning home, its config and state directories, and the task this session runs. */
-export function configure(c: { home: string; config: string; state: string; task: string; project?: string }): void {
+export function configure(c: { home: string; config: string; state: string; task: string; project?: string; noHelpers?: boolean }): void {
   home = c.home;
   config = c.config;
   ledger = resolve(c.state, "jev-guard.jsonl");
   task = c.task;
   project = c.project;
+  noHelpers = c.noHelpers === true;
 }
 
 /** Firstmate: the single primary-home key, resolved at call time and never placed in the environment. */
@@ -63,17 +65,9 @@ function typesafeKey(): string {
   });
 }
 
-/** Firstmate: fallback-key lookup is owned by fm_openrouter_key in bin/fm-typesafe-lib.sh. */
-function openrouterKey(): string {
-  return execFileSync("bash", ["-c", '. "$1"; fm_openrouter_key "$2" && printf %s "$OPENROUTER_API_KEY_PRIVATE"', "jev-guard", lib, home], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-    timeout: preflightTimeout(),
-  });
-}
-
 /** Firstmate: the existing config/dispatch-never-send policy decides what may leave the machine. */
 function permitted(state: State): void {
+  if (noHelpers) throw new Error("Model-assisted tools are disabled for this worker.");
   if (project !== "firstmate") throw new Error("Jev guard data egress is authorized only for the firstmate project.");
   execFileSync("bash", ["-c", '. "$1"; s=$(mktemp) || exit 1; fm_typesafe_permitted "$(cat)" "$2" "$s"; rc=$?; rm -f "$s"; exit "$rc"', "jev-guard", lib, resolve(config, "dispatch-never-send")], {
     input: JSON.stringify(state),
@@ -83,24 +77,6 @@ function permitted(state: State): void {
 }
 
 const seam = (name: string) => process.env.FM_TEST_SEAM === "1" ? process.env[name] || undefined : undefined;
-let client: JevClient | undefined;
-export const jev = () => (client ??= new JevClient({ provider: "typesafe", apiKey: typesafeKey(), baseUrl: seam("FM_JEV_GUARD_BASE_URL"), timeoutMs: 10_000 }));
-let fallback: JevClient | undefined;
-const openrouter = () => (fallback ??= new JevClient({ provider: "openrouter", apiKey: openrouterKey(), baseUrl: seam("FM_JEV_GUARD_OPENROUTER_URL"), timeoutMs: 10_000 }));
-
-/** Firstmate: TypeSafe direct first; OpenRouter only when the direct call is unavailable or fails. */
-async function systemOne(state: State, questions: Questions) {
-  try {
-    return await jev().systemOne(state, questions, { signal: budgets.getStore()?.signal });
-  } catch (direct) {
-    try {
-      preflightTimeout();
-      return await openrouter().systemOne(state, questions, { signal: budgets.getStore()?.signal });
-    } catch {
-      throw direct;
-    }
-  }
-}
 
 /** The level config the lab passed in, JEV_LEVEL_CONFIG as JSON. */
 export function levelConfig<T extends object>(fallback: T): T {
@@ -136,7 +112,8 @@ export async function decide(pi: any, source: string, state: State, questions: Q
   validateQuestions(questions);
   permitted(state);
   const started = performance.now();
-  const result = await systemOne(state, questions);
+  const client = new JevClient({ provider: "typesafe", apiKey: typesafeKey(), baseUrl: seam("FM_JEV_GUARD_BASE_URL"), timeoutMs: 10_000 });
+  const result = await client.systemOne(state, questions, { signal: budgets.getStore()?.signal });
   const out: Decision = { answers: result.answers, usage: result.usage, model: result.model, ms: Math.round(performance.now() - started) };
   report(pi, "jev", { source, state, questions, answers: out.answers, usage: out.usage, model: out.model, ms: out.ms, provider: result.meta.provider, ...extra });
   return out;

@@ -1036,8 +1036,9 @@ Its `remove` action excises only the marker-delimited Firstmate region and remov
 For Pi and pi-signed secondmate launches, `fm-spawn.sh` starts the selected executable with `-e` pointed at the secondmate home's own tracked `.pi/extensions/fm-primary-pi-watch.ts` and `.pi/extensions/fm-primary-turnend-guard.ts`, both already present from the secondmate home's git worktree.
 Pi-family secondmates can start unattended in Firstmate-seeded homes without accepting project trust manually; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the capability requirement, session-only approval scope, and older-version fallback, with [regression evidence](verification/runtime-backends.md#pi-seeded-secondmate-project-trust).
 
-For omp session posture, worker-only memory scope, safe secondmate extension loading, and shared Default-role validation (including remedies and evidence limits), see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
+For omp session posture, worker-only memory scope, direct-only native Jev credentials, the per-worker `--omp-no-helpers` switch, safe secondmate extension loading, and shared Default-role validation (including remedies and evidence limits), see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
 The [portable omp regression suite](../tests/fm-omp-harness.test.sh) covers default-role admission and raw-command model selection without an omp installation; its model-flag expectations preserve literal shell quoting across Bash versions.
+[Native direct-route and no-helper verification](verification/runtime-backends.md#omp-direct-judge-and-primary-model-only-workers) records the real-runtime fake-key probes, unavailable-provider boundary, interactive speech check and evidence limits.
 
 ## Claude permission mode (config/claude-permission-mode)
 
@@ -1845,17 +1846,19 @@ On Claude the banner arrives as added context next to the unchanged output, beca
 
 The captain data-egress decision 2026-10-08 authorizes Jev guard requests only for the `firstmate` project.
 `fm-spawn.sh` determines the project once by comparing physical roots: `firstmate` when the project root equals the Firstmate code root, otherwise the project directory's basename.
-Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to TypeSafe or OpenRouter, with no provider fallback.
-This authorization check runs once at the shared `decide` preflight before either provider is selected.
+Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to a model provider.
+This authorization check runs once at the shared `decide` preflight before resolving a credential.
 For `firstmate` only, shell screening sends the command and working directory, write screening sends the path and first 4,000 characters of content, and result screening sends the tool name and first 6,000 characters of output.
-It calls TypeSafe direct first, resolving the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its client is first constructed; no key enters the worker environment.
-Only when an authorized direct call is unavailable or fails does it ask OpenRouter, using `fm_openrouter_key` from [`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh), which owns fallback-key lookup for both this guard and [worker skill selection](#worker-skill-selection); with no key there is no fallback call.
-Each provider client snapshots its credentials: omp reuses it for the session, while Claude constructs clients in each hook process.
-A tool state matching the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key), or an invalid or unreadable policy, is withheld from both providers.
-Each provider has a 10-second total request budget including upstream retries and response bodies, and each complete handler has a shared 25-second cancellation budget.
+It calls only TypeSafe direct, resolving the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) for every decision; no key enters the worker environment, configuration, files or command arguments.
+Each decision constructs a fresh client, so key rotation and removal take effect on the next call, including within a long-running omp session.
+An unavailable or failed TypeSafe call never falls back to OpenRouter, even when an OpenRouter key exists.
+A tool state matching the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key), or an invalid or unreadable policy, is withheld from TypeSafe.
+The client has a 10-second total request budget including upstream retries and response bodies, and each complete handler has a shared 25-second cancellation budget.
 omp's native tool-call deadline and both Claude hook timeouts are 30 seconds; omp result screening relies on the shared 25-second handler budget rather than `extensionHandlers.toolCallTimeoutMs`.
 A withheld request, missing keys, exhausted budget or any other inference failure lets the tool call proceed, as upstream does, while writes outside the allowed roots, unsupported path spellings and unsupported edit schemas still block without a Jev call.
 The guard supplements, never replaces, existing deterministic protections or required approvals.
+An omp worker launched with `--omp-no-helpers` withholds every guard judgment before credential lookup, using the same no-key behavior while retaining the deterministic path and edit-schema blocks.
+[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that opt-in switch's session scope, other helper restrictions and relaunch behavior; it does not change an already running worker.
 The owning home's private `state/jev-guard.jsonl` receives one line per reported `jev`, `hook` or `error` event, selecting answers, usage, model, answering provider, latency and hook outcome without commands, paths, request bodies, reasons, banners or error messages.
 Ledger writes are best-effort and do not gate execution; early adapter rejections for unsupported paths or edit schemas return before upstream reporting.
 omp session entries retain the full upstream report payload, including request-derived state; the Claude adapter supplies no session-entry writer.

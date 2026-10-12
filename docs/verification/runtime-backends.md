@@ -1001,6 +1001,35 @@ Refresh this measurement after an omp upgrade by repeating both overlay combinat
 `bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh` checks worker/scout versus secondmate overlay routing without model credentials.
 [`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns launch routing and memory scope.
 
+## omp direct judge and primary-model-only workers
+
+Verified 2026-10-12 on macOS arm64 with omp 18.9.2, using isolated configuration, fake primary-home keys and loopback model endpoints only.
+The real omp runtime loaded the session, worker and task-model fallback overlays in canonical order and an extension calling `installTypesafeJudge` and `installJevGuard`.
+The fake OpenRouter judge was credentialed and available; a separately credentialed `secondary/tiny` model was available for speech enhancement.
+The actual primary-model provider was the scripted `fixture/main`, not a paid fleet account.
+
+| Session | TypeSafe semantic-search requests | OpenRouter requests | Other secondary-model requests | Observed result |
+| --- | ---: | ---: | ---: | --- |
+| Ordinary worker, healthy TypeSafe | 3 | 0 | 0 | Native `find` returned the matching file and line |
+| Ordinary worker, TypeSafe HTTP 503 | 9 | 0 | 0 | Native `find` failed with no semantic result |
+| No-helper print session | 0 | 0 | 0 | A read-tool round trip produced two assistant messages, both `fixture/main` |
+| No-helper interactive TUI | 0 | 0 | 0 | The same read and answer were visible on the actual TUI; both assistant messages were `fixture/main` |
+
+The unavailable-provider probe used a distinct query because omp's semantic-result cache otherwise reused the earlier successful judgment without reaching the failing endpoint.
+The TypeSafe command credential resolved the fake key through `fm_typesafe_key` and the worker's parent-home record; no key value entered provider configuration, argv or the worker environment.
+Provider discovery can resolve that command before a judgment, and omp caches a successful result in process memory until relaunch.
+Worker-only `find.enabled=on` is required because built-in tool admission precedes extension provider registration; the final no-helper overlay sets it back to `off`.
+Unrelated model-role entries survived the worker overlay, and the later task-model fallback overlay did not restore judge fallbacks.
+
+Both no-helper probes began with ambient `speech.enabled=true` and `speech.enhanced=true`, and a reachable credentialed `@tiny` provider.
+The final no-helper overlay suppressed the speech-enhancement route, not merely its credentials.
+The interactive probe used a task-owned PTY and the supported extension-context shutdown after the final answer.
+All model endpoints were local fakes, so these smokes spent USD 0.00; that figure does not describe a supervising session's standing guard usage.
+Every private endpoint and PTY process was stopped.
+These observations verify the installed runtime and worker argument/extension contract, not live fleet activation or a real provider's billing.
+Refresh after an omp upgrade using fake keys, a credentialed fallback trap, distinct healthy/failing queries, and both print and interactive sessions with ambient enhanced speech enabled.
+[`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns the runtime credential and `--omp-no-helpers` launch contract.
+
 ## Codex hook trust
 
 Verified 2026-09-16 on codex-cli 0.151.0, macOS arm64, in a fresh linked worktree of this repository.

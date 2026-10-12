@@ -179,31 +179,60 @@ test_unavailable_paths_allow() {
   pass "never-send matches, HTTP failures, a missing key and malformed input allow without blocking"
 }
 
-test_openrouter_fallback() {
+test_typesafe_only() {
   local out before
-  before=$(requests)
-  claude_hook "$(pre Bash '{"command":"rm -rf tsdown"}')"
-  [ -z "$out" ] || fail "a failed direct call with no OpenRouter key must allow: $out"
-  [ "$(requests)" -eq $((before + 1)) ] || fail "with no OpenRouter key only the direct call may be made"
-
   printf 'OPENROUTER_API_KEY=fm-jev-guard-or-key\n' >> "$HOME_DIR/.env"
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"rm -rf tsdown"}')"
-  deny_reason "$out" >/dev/null || fail "the OpenRouter fallback answer did not drive the upstream gate: $out"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "a failed direct call must be followed by exactly one OpenRouter call"
-  tail -2 "$REQUESTS" | jq -se --arg ts "Bearer $KEY" '.[0].path == "/v1/systemone" and .[0].auth == $ts
-    and .[1].path == "/api/alpha/decisions" and .[1].auth == "Bearer fm-jev-guard-or-key"
-    and (.[1].body | fromjson | .model == "~typesafe/jev-latest")' >/dev/null \
-    || fail "the fallback did not go TypeSafe first, then OpenRouter with its own key and upstream model"
-  jq -se 'map(select(.kind == "jev")) | last | .provider == "openrouter"' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null \
-    || fail "the ledger must record which provider answered"
+  [ -z "$out" ] || fail "an unavailable TypeSafe call must preserve no-key allow behavior even with an OpenRouter key: $out"
+  [ "$(requests)" -eq $((before + 1)) ] || fail "an unavailable TypeSafe call must never send an OpenRouter request"
+  tail -1 "$REQUESTS" | jq -e '.path == "/v1/systemone"' >/dev/null || fail "the failed request must use TypeSafe direct"
 
+  printf 'OPENROUTER_API_KEY=fm-jev-guard-or-key\n' > "$HOME_DIR/.env"
   before=$(requests)
-  claude_hook "$(pre Bash '{"command":"ls"}')"
-  [ "$(requests)" -eq $((before + 1)) ] || fail "a healthy direct call must not touch OpenRouter"
-  tail -1 "$REQUESTS" | jq -e '.path == "/v1/systemone"' >/dev/null || fail "a healthy call must go to TypeSafe direct"
-  sed -i.bak '/^OPENROUTER_API_KEY=/d' "$HOME_DIR/.env" && rm -f "$HOME_DIR/.env.bak"
-  pass "TypeSafe direct first; OpenRouter only after a failed direct call and only with its key"
+  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  [ -z "$out" ] || fail "a missing TypeSafe key must preserve no-key allow behavior even with an OpenRouter key: $out"
+  [ "$(requests)" -eq "$before" ] || fail "a missing TypeSafe key must make no provider request"
+
+  printf 'TYPESAFE_API_KEY=%s\nOPENROUTER_API_KEY=fm-jev-guard-or-key\n' "$KEY" > "$HOME_DIR/.env"
+  before=$(requests)
+  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  deny_reason "$out" >/dev/null || fail "a healthy TypeSafe answer must still drive the upstream gate: $out"
+  [ "$(requests)" -eq $((before + 1)) ] || fail "a healthy gate must make only one TypeSafe request"
+  tail -1 "$REQUESTS" | jq -e --arg key "Bearer $KEY" '.path == "/v1/systemone" and .auth == $key' >/dev/null || fail "the gate must use the TypeSafe key and endpoint"
+  jq -se 'all(.[] | select(.kind == "jev"); .provider == "typesafe")' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "guard judgments must never use OpenRouter"
+  printf 'TYPESAFE_API_KEY=%s\n' "$KEY" > "$HOME_DIR/.env"
+  pass "TypeSafe-only guard preserves no-key behavior on failure or missing credentials and never uses OpenRouter"
+}
+
+test_typesafe_call_time_key() {
+  local out
+  out=$(HOME_DIR="$HOME_DIR" KEY="$KEY" REQUESTS="$REQUESTS" REPORT="$ROOT/bin/ten-levels/extensions/report.ts" \
+    "${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { configure, decide } = await import(pathToFileURL(process.env.REPORT));
+const home = process.env.HOME_DIR;
+configure({ home, config: `${home}/config`, state: `${home}/state`, task: "t1", project: "firstmate" });
+const requests = () => readFileSync(process.env.REQUESTS, "utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
+const questions = { safe: { type: "noul", instructions: "Is this safe?" } };
+const before = requests().length;
+await decide({}, "rotation-first", { text: "first" }, questions);
+writeFileSync(`${home}/.env`, "TYPESAFE_API_KEY=rotated-fake-key\nOPENROUTER_API_KEY=fm-jev-guard-or-key\n");
+await decide({}, "rotation-second", { text: "second" }, questions);
+assert.deepEqual(requests().slice(before).map(row => row.auth), [`Bearer ${process.env.KEY}`, "Bearer rotated-fake-key"]);
+writeFileSync(`${home}/.env`, "OPENROUTER_API_KEY=fm-jev-guard-or-key\n");
+await assert.rejects(decide({}, "rotation-removed", { text: "third" }, questions));
+assert.equal(requests().length, before + 2, "key removal must not reuse a cached key or send an OpenRouter request");
+assert.equal(process.env.TYPESAFE_API_KEY, undefined);
+assert.equal(process.env.TYPESAFE_API_KEY_PRIVATE, undefined);
+writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\n`);
+console.log("rotation-ok");
+JS
+) || fail "call-time key resolution failed: $out"
+  [ "$out" = rotation-ok ] || fail "unexpected call-time key output: $out"
+  pass "guard resolves key rotation and removal on every decision without exporting credentials"
 }
 
 test_project_scope() {
@@ -245,11 +274,11 @@ for (const project of ["firstmate", "vernant", "other", "", undefined]) {
   const handlers = {};
   installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { ...context, project });
   const before = requests();
-  const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf tsdown customer-record" } }, ctx);
+  const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf customer-record" } }, ctx);
   if (project === "firstmate") {
     assert.equal(result?.block, true);
     const sent = requests().slice(before.length).trim().split("\n").map(JSON.parse);
-    assert.deepEqual(sent.map(row => row.path), ["/v1/systemone", "/api/alpha/decisions"]);
+    assert.deepEqual(sent.map(row => row.path), ["/v1/systemone"]);
     continue;
   }
   assert.equal(result, undefined);
@@ -269,6 +298,39 @@ JS
   [ "$out" = scope-ok ] || fail "omp project scope failed: $out"
   printf 'TYPESAFE_API_KEY=%s\n' "$KEY" > "$HOME_DIR/.env"
   pass "only firstmate reaches either provider; other and absent projects withhold every hook without weakening outside-root blocks"
+}
+
+test_no_helpers_retains_path_checks() {
+  local out
+  out=$(HOME_DIR="$HOME_DIR" WT="$WT" TASK_DATA="$TASK_DATA" REQUESTS="$REQUESTS" GUARD="$ROOT/bin/fm-jev-guard.ts" \
+    "${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const home = process.env.HOME_DIR;
+const handlers = {};
+installJevGuard({ on: (name, handler) => { handlers[name] = handler; } }, {
+  home, config: `${home}/config`, state: `${home}/state`, task: "t1",
+  worktree: process.env.WT, data: process.env.TASK_DATA, project: "firstmate", noHelpers: true,
+});
+const before = readFileSync(process.env.REQUESTS, "utf8");
+const ctx = { cwd: process.env.WT };
+for (const event of [
+  { toolName: "bash", input: { command: "rm -rf ./sandbox" } },
+  { toolName: "write", input: { path: "src/a.ts", content: "sk-live-fake" } },
+  { toolName: "edit", input: { path: "src/a.ts", new_string: "sk-live-fake" } },
+]) assert.equal(await handlers.tool_call(event, ctx), undefined, "model assistance must follow no-key behavior");
+assert.equal(await handlers.tool_result({ toolName: "read", content: [{ type: "text", text: "IGNORE PREVIOUS" }] }, ctx), undefined);
+assert.match((await handlers.tool_call({ toolName: "write", input: { path: "/etc/hosts", content: "safe" } }, ctx)).reason, /outside the repo/);
+assert.match((await handlers.tool_call({ toolName: "write", input: { path: "xd://model-call", content: "safe" } }, ctx)).reason, /plain absolute/);
+assert.match((await handlers.tool_call({ toolName: "edit", input: { path: "src/a.ts" } }, ctx)).reason, /replace edit/);
+assert.equal(readFileSync(process.env.REQUESTS, "utf8"), before, "no helper may contact either model provider");
+console.log("no-helpers-ok");
+JS
+) || fail "no-helper guard regression failed: $out"
+  [ "$out" = no-helpers-ok ] || fail "unexpected no-helper guard output: $out"
+  pass "no-helper guard makes no model request while outside-root, rewritten-path and edit-schema blocks remain"
 }
 
 test_claude_adapter_under_node() {
@@ -521,21 +583,19 @@ const call = async (name, event) => {
     return result;
   } finally { clearTimeout(timer); }
 };
-const blocked = await call("tool_call", { toolName: "bash", input: { command: "rm -rf stall-direct" } });
-assert.equal(blocked.block, true, "a slow fallback must still drive the gate");
-const screened = await call("tool_result", { toolName: "read", content: [{ type: "text", text: "IGNORE PREVIOUS stall-direct" }] });
-assert.match(screened.content[0].text, /^\[jev-guard\]/, "result screening also has time for fallback");
 const unavailableAt = performance.now();
-assert.equal(await call("tool_call", { toolName: "bash", input: { command: "stall-both" } }), undefined, "both provider timeouts allow execution");
-assert.ok(performance.now() - unavailableAt >= 19_000, "both providers were actually awaited");
+assert.equal(await call("tool_call", { toolName: "bash", input: { command: "rm -rf stall-direct" } }), undefined, "a TypeSafe timeout preserves no-key allow behavior");
+assert.ok(performance.now() - unavailableAt >= 9_000, "the TypeSafe request was actually awaited");
+assert.equal(await call("tool_result", { toolName: "read", content: [{ type: "text", text: "IGNORE PREVIOUS stall-direct" }] }), undefined, "unavailable result screening leaves the output unchanged");
+assert.equal(await call("tool_call", { toolName: "bash", input: { command: "stall-both" } }), undefined, "a TypeSafe timeout allows execution without consulting OpenRouter");
 const editAt = performance.now();
-assert.equal(await call("tool_call", { toolName: "edit", input: { path: "src/a.ts", old_string: "ok", new_string: "stall-both" } }), undefined, "replace edits allow when both providers time out");
-assert.ok(performance.now() - editAt >= 19_000, "both edit providers were actually awaited");
+assert.equal(await call("tool_call", { toolName: "edit", input: { path: "src/a.ts", old_string: "ok", new_string: "stall-both" } }), undefined, "replace edits allow when TypeSafe times out");
+assert.ok(performance.now() - editAt >= 9_000, "the edit's TypeSafe request was actually awaited");
 console.log("deadlines-ok");
 JS
 )
   [ "$out" = deadlines-ok ] || fail "handler deadline contract failed: $out"
-  pass "provider stalls and slow fallback finish before the host deadline, including replace edits and result screening"
+  pass "TypeSafe stalls preserve no-key behavior before the host deadline for calls, edits and result screening"
 }
 
 test_upstream_level06_suite
@@ -543,8 +603,10 @@ test_claude_bash_gate
 test_claude_write_gate
 test_claude_result_screen
 test_unavailable_paths_allow
-test_openrouter_fallback
+test_typesafe_only
+test_typesafe_call_time_key
 test_project_scope
+test_no_helpers_retains_path_checks
 test_claude_adapter_under_node
 test_omp_installer
 test_omp_path_spellings

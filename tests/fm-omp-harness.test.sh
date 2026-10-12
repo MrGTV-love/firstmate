@@ -253,6 +253,27 @@ test_spawn_launch_line_and_worker_wiring() {
   pass "fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension"
 }
 
+test_no_helpers_rejects_nonworker_launches() {
+  local rec id out status kind
+  for kind in claude secondmate; do
+    id="no-helper-invalid-$kind"
+    rec=$(make_spawn_case "$id" "$kind" "$id")
+    read_case_record "$rec"
+    if [ "$kind" = secondmate ]; then
+      out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+        "$id" "$HOME_DIR" --secondmate --harness omp --omp-no-helpers)
+    else
+      out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+        "$id" "$PROJ_DIR" --harness claude --omp-no-helpers)
+    fi
+    status=$?
+    expect_code 1 "$status" "no-helper posture must refuse $kind: $out"
+    assert_absent "$HOME_DIR/state/$id.meta" "unsupported no-helper launch must not publish a task"
+    [ ! -s "$LAUNCH_LOG" ] || fail "unsupported no-helper posture launched an agent"
+  done
+  pass "no-helper posture rejects other runtimes and supervisor sessions before publishing or launching"
+}
+
 test_worker_replace_mode_environment() {
   local kind rec id out status launch seen
   for kind in ship scout; do
@@ -303,7 +324,7 @@ const server = createServer((req, res) => {
   req.on("data", chunk => { body += chunk; });
   req.on("end", () => {
     requests.push({ path: req.url, state: JSON.parse(body).state });
-    if (req.url === "/direct") { res.writeHead(500).end("{}"); return; }
+    if (req.url === "/fallback") { res.writeHead(500).end("{}"); return; }
     const answers = {};
     for (const [id, q] of Object.entries(JSON.parse(body).questions)) {
       const keys = Object.keys(q.criteria ?? {});
@@ -321,11 +342,11 @@ try {
   process.env.FM_JEV_GUARD_BASE_URL = `${base}/direct`;
   process.env.FM_JEV_GUARD_OPENROUTER_URL = `${base}/fallback`;
   const handlers = {};
-  (await import(pathToFileURL(process.env.EXT_PATH))).default({ on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
+  (await import(pathToFileURL(process.env.EXT_PATH))).default({ registerProvider() {}, on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
   const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf customer-record" } }, { cwd: process.env.WT });
   if (process.env.PROJECT === "firstmate") {
     assert.equal(result?.block, true);
-    assert.deepEqual(requests.map(row => row.path), ["/direct", "/fallback"]);
+    assert.deepEqual(requests.map(row => row.path), ["/direct"]);
     assert.ok(requests.every(row => row.state.command === "rm -rf customer-record"));
   } else {
     assert.equal(result, undefined);
@@ -1008,7 +1029,7 @@ const registered = {};
 const handlers = {};
 // The extension API exposes the host SDK; the session proof only reads the
 // live registry from it inside its own handlers, which these modes never fire.
-mod.default({ on: (name, fn) => {
+mod.default({ registerProvider() {}, on: (name, fn) => {
   (registered[name] ||= []).push(fn);
   handlers[name] = async (...args) => { for (const h of registered[name]) await h(...args); };
 }, pi: { AgentRegistry: { global: () => ({}) } } });
@@ -2509,7 +2530,7 @@ globalThis.setTimeout = (callback, delay, ...args) => {
 };
 globalThis.clearTimeout = (timer) => { if (!flushChecks.delete(timer)) realClearTimeout(timer); };
 globalThis.setInterval = (callback, delay, ...args) => {
-  if (manual && delay === 3000) { pollCheck = () => callback(...args); return { unref() {} }; }
+  if ((manual || scenario === "stranded-two") && delay === 3000) { pollCheck = () => callback(...args); return { unref() {} }; }
   return realSetInterval(callback, delay === 3000 && scenario.startsWith("stranded-") ? 100 : delay, ...args);
 };
 writeFileSync(`${state}/.lock`, `${process.pid}\n`);
@@ -3016,13 +3037,18 @@ if (scenario === "external") {
         }
         case "stranded-two": {
           await settle();
+          // One stable poll removes one block. Do not let a later poll race
+          // the assertion while the first asynchronous queue read is in flight.
+          writeFileSync(`${state}/query-slow`, "");
           const first = stale("check: old headline one"), second = stale("check: old headline two");
           editor = `${first}\n\n${second}`;
+          pollCheck(); pollCheck();
           await until(() => wakes().length === 2, "the first stranded wake was never handled");
           fresh(1);
           if (editor !== second) throw new Error(`the first stranded wake was not removed alone: ${JSON.stringify(editor)}`);
           await accept(wakes()[1]);
           await end();
+          pollCheck(); pollCheck();
           await until(() => wakes().length === 3, "the second stranded wake was never handled");
           fresh(2);
           if (editor !== "") throw new Error("the second stranded wake was not removed");
@@ -3701,6 +3727,7 @@ test_watch_lifecycle_deadline_diagnostics
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
+test_no_helpers_rejects_nonworker_launches
 test_worker_replace_mode_environment
 test_worker_guard_project_scope
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
