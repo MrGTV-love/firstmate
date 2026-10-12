@@ -207,7 +207,7 @@ It refuses without changing the record, instructions, or copies when:
 
 When finished and parked ordinary tasks both record the same pool slot root, reassociation cannot go first: the other root record overlaps the replacement copy and may still claim the slot.
 Before retiring a record that still holds the slot's Firstmate claim, or any record when the slot carries no claim, Treehouse's state must durably lease the slot under the existing [`fm_task_copy_pool_slot_held`](../bin/fm-task-copy-lib.sh) proof.
-An absent claim counts as ownership for this protection, as it does for teardown's slot-owner check, and base already refused that shape.
+An absent claim counts as ownership for this protection, as it does for teardown's slot-owner check.
 Otherwise cleanup refuses with the command to lease that exact slot in place without changing its contents.
 When exactly one other root record names the slot, the command names it as the lease holder; when several do, it names none, lists every candidate with its last recorded status line, and the operator selects the live one.
 This prevents another allocation from resetting the parked copies between cleanup and reassociation, while the remaining record still names only the root.
