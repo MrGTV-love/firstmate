@@ -379,6 +379,12 @@ test_procevent_marker_failure_exits_and_replays() {
   pass "marker failure exits through the shared wake owner, releases its lock, and replays later"
 }
 
+# FM_TEST_ONLY runs one named case without the rest of this group.
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
+
 test_procevent_captured_result_surfaces_proactively
 test_procevent_unacknowledged_result_redrains_until_handled
 test_recovery_discovered_during_poll_preserves_acknowledgement

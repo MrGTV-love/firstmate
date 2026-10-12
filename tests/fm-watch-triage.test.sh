@@ -1376,6 +1376,12 @@ test_permission_recovery_surfaces_preserved_status() {
   pass "permission recovery surfaces content from the unadvanced position"
 }
 
+# FM_TEST_ONLY runs one named case without the rest of this group.
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
+
 test_working_note_not_working_surfaced
 test_secondmate_status_note_surfaced_despite_busy_agent
 test_secondmate_routine_progress_absorbed_then_note_surfaced

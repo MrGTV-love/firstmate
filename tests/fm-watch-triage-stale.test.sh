@@ -1663,6 +1663,12 @@ SH
   pass "triage log capping handles wc byte counts with leading spaces"
 }
 
+# FM_TEST_ONLY runs one named case without the rest of this group.
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
+
 test_terminal_stale_surfaced
 test_stale_terminal_status_overridden_by_active_run
 test_nonterminal_stale_provably_working_absorbed_then_escalated

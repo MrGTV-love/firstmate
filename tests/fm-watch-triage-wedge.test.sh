@@ -807,6 +807,12 @@ test_identical_dead_display_of_a_successor_still_reports() {
   pass "a successor's byte-identical dead display reports in full, and the same incarnation still absorbs"
 }
 
+# FM_TEST_ONLY runs one named case without the rest of this group.
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
+
 test_gone_endpoint_reports_once_instead_of_escalating_forever
 test_live_and_unproven_endpoints_still_wedge_escalate
 test_gone_report_rearms_when_the_endpoint_comes_back

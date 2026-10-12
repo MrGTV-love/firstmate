@@ -585,6 +585,12 @@ test_paused_until_that_passed_is_rechecked_before_the_cadence() {
   pass "a declared wait whose until time has passed is rechecked at once, then held to the cadence"
 }
 
+# FM_TEST_ONLY runs one named case without the rest of this group.
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
+
 test_open_captain_call_bounds_stale_churn
 test_stale_churn_without_a_captain_call_still_alarms
 test_failed_wake_append_does_not_arm_the_captain_hold_throttle

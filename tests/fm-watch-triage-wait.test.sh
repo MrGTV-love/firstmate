@@ -705,6 +705,12 @@ test_live_paused_until_controls_recheck_time() {
   pass "a live paused worker stays absorbed until its declared time, then rechecks"
 }
 
+# FM_TEST_ONLY runs one named case without the rest of this group.
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit 0
+fi
+
 test_nonterminal_stale_paused_absorbed_then_resurfaced
 test_exited_declared_pause_is_bounded_but_live_gate_surfaces
 test_own_work_wait_keeps_first_alert_then_long_cadence

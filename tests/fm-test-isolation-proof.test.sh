@@ -249,9 +249,21 @@ test_family_map_labels_this_contract() {
   safe_max=$("$RUNNER" --concurrent-safe-family-jobs-max pure-contract-unit)
   [ "$safe_max" -eq 4 ] || fail "runner exposed the wrong contract-unit family worker cap: $safe_max"
   watch=$("$RUNNER" --list --family watcher-wake-lock)
-  longest=$(awk 'NR == FNR { member[$0] = 1; next } ($0 in member) { print; exit }' \
-    <(printf '%s\n' "$watch") <("$RUNNER" --list-scheduled --all))
-  [ -n "$longest" ] || fail "runner scheduled no watcher family member in the complete selection"
+  longest=$(awk '
+    NR == FNR {
+      if ($0 ~ /^PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=[0-9]+$/) { sub(/^[^=]*=/, ""); def = $0 + 0 }
+      else if ($0 == "portable_serial_weight_hints() {") table = 1
+      else if (table && $0 == "EOF") table = 0
+      else if (table && NF == 2 && $2 ~ /^[0-9]+$/ && !($1 in hint)) hint[$1] = $2 + 0
+      next
+    }
+    NF {
+      ms = ($0 in hint) ? hint[$0] : def
+      if (best == "" || ms > best_ms || (ms == best_ms && $0 < best)) { best = $0; best_ms = ms }
+    }
+    END { print best }
+  ' "$RUNNER" <(printf '%s\n' "$watch"))
+  [ -n "$longest" ] || fail "could not find the longest-hint watcher family member in the runner's hint table"
   scheduled_first=$("$RUNNER" --list-scheduled --family watcher-wake-lock | head -n 1)
   [ "$scheduled_first" = "$longest" ] \
     || fail "runner scheduled the watcher family out of longest-hint order: $scheduled_first before $longest"
