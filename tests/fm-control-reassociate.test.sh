@@ -1400,6 +1400,10 @@ test_unleased_shared_slot_names_the_remaining_lease_holder() {
       fm_write_meta "$dir/home/state/a-finished.meta" "worktree=$slot/.claude/worktrees/scout" "kind=scout"
     else
       fm_write_meta "$dir/home/state/a-finished.meta" "worktree=$slot" "kind=ship"
+      fm_write_meta "$dir/home/state/b-finished.meta" "worktree=$slot" "kind=ship"
+      printf 'working: started\ndone: PR https://github.com/example/repo/pull/8 merged\n' > "$dir/home/state/a-finished.status"
+      printf 'done: report delivered\n' > "$dir/home/state/b-finished.status"
+      printf 'working: parked with unlanded commits\n' > "$dir/home/state/parked.status"
     fi
     fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
     printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
@@ -1409,19 +1413,80 @@ test_unleased_shared_slot_names_the_remaining_lease_holder() {
     rc=0
     out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$id") || rc=$?
     expect_code 1 "$rc" "$shape: an unleased shared slot must refuse its claimant's cleanup"$'\n'"$out"
-    case "$out" in *"--lease-holder 'a-finished'"*) fail "$shape: the lease remedy named the glob-first record: $out" ;; esac
+    case "$out" in *"--lease-holder 'a-finished'"*|*"--lease-holder 'b-finished'"*) fail "$shape: the lease remedy named a finished record: $out" ;; esac
     if [ "$shape" = nested-finished ]; then
       assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" "$shape: the lease remedy must name the remaining root record"
     else
       assert_contains "$out" "--lease-holder <remaining-task>)" "$shape: an ambiguous remedy must not guess a holder"
-      assert_contains "$out" '(a-finished parked)' "$shape: an ambiguous remedy must list every remaining root record"
+      case "$out" in *"--lease-holder 'parked'"*) fail "$shape: the remedy inferred a single holder among several: $out" ;; esac
+      assert_contains "$out" 'select the live one whose work stays in it as <remaining-task>' "$shape: the remedy must leave the choice to the operator"
+      assert_contains "$out" '  a-finished: done: PR https://github.com/example/repo/pull/8 merged' "$shape: a candidate lost its last status"
+      assert_contains "$out" '  b-finished: done: report delivered' "$shape: a candidate lost its last status"
+      assert_contains "$out" '  parked: working: parked with unlanded commits' "$shape: the live candidate lost its last status"
     fi
     cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$shape: refused cleanup changed its record"
     cmp -s "$dir/claim-before" "$dir/pool/42/.fm-slot-owner" || fail "$shape: refused cleanup changed the claim"
     copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: refused cleanup changed slot bytes"
     [ ! -e "$dir/treehouse.log" ] || fail "$shape: refused cleanup touched Treehouse"
   done
-  pass 'the unleased shared-slot remedy names the sole remaining root record and never guesses among several'
+  pass 'the unleased shared-slot remedy names the sole remaining root record and lists every candidate with its status among several'
+}
+
+# A finished ship whose own copy is nested in a shared slot keeps the ordinary
+# dirty and landed-work proof on that copy: a merged PR never waives later
+# local commits or tracked edits, and no outcome touches the copy's bytes.
+test_nested_shared_ship_keeps_own_copy_proof() {
+  local id=shared-nested-ship shape dir slot nested out rc
+  for shape in local-commit tracked-dirt landed; do
+    dir=$(new_case "shared-nested-ship-$shape" "$id")
+    slot=$(add_pool_slot "$dir" 54 "fm/parked-slot")
+    printf '{"worktrees":[{"name":"54","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+    nested="$slot/.claude/worktrees/$id"
+    mkdir -p "$slot/.claude/worktrees"
+    add_copy "$dir" "$nested" "fm/$id-v2"
+    printf 'delivered\n' > "$nested/delivered.txt"
+    git -C "$nested" add delivered.txt
+    git -C "$nested" commit -qm 'delivered work'
+    git -C "$nested" push -q origin "HEAD:main"
+    git -C "$nested" checkout -q --detach
+    case "$shape" in
+      local-commit)
+        printf 'later\n' > "$nested/later.txt"
+        git -C "$nested" add later.txt
+        git -C "$nested" commit -qm 'later local work'
+        ;;
+      tracked-dirt) printf 'uncommitted edit\n' >> "$nested/delivered.txt" ;;
+    esac
+    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
+      "endpoint_task_id=$id" "worktree=$nested" "project=$dir/proj" \
+      "kind=ship" "mode=no-mistakes" "branch=fm/$id-v2" "spawn_gen=finished" \
+      "pr=https://github.com/example/repo/pull/7"
+    fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
+    printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/54/.fm-slot-owner"
+    cp "$dir/home/state/$id.meta" "$dir/meta-before"
+    cp "$dir/home/state/parked.meta" "$dir/parked-before"
+    copy_fingerprint "$nested" > "$dir/nested-before"
+    copy_fingerprint "$slot" > "$dir/slot-before"
+    rc=0
+    out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$id") || rc=$?
+    case "$shape" in
+      landed)
+        expect_code 0 "$rc" "$shape: a landed nested shared ship must retire records-only"$'\n'"$out"
+        [ ! -e "$dir/home/state/$id.meta" ] || fail "$shape: the landed record survived"
+        ;;
+      *)
+        expect_code 1 "$rc" "$shape: a merged PR must not waive the nested copy's own proof"$'\n'"$out"
+        cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$shape: the refusal retired the record"
+        assert_line "task=$id" "$dir/pool/54/.fm-slot-owner" "$shape: the refusal released the claim"
+        ;;
+    esac
+    [ -d "$nested" ] || fail "$shape: cleanup removed the nested copy"
+    copy_fingerprint "$nested" | cmp -s - "$dir/nested-before" || fail "$shape: cleanup changed the nested copy's bytes"
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: cleanup changed slot bytes"
+    cmp -s "$dir/parked-before" "$dir/home/state/parked.meta" || fail "$shape: cleanup changed the parked record"
+    [ ! -e "$dir/treehouse.log" ] || fail "$shape: cleanup touched Treehouse"
+  done
+  pass 'a nested shared ship keeps its own dirty and landed proof under a merged PR, and no outcome touches its copy'
 }
 
 test_recorded_pr_reassociation_requires_contained_head() {
@@ -1483,6 +1548,7 @@ EOF
 
 test_unleased_shared_slot_gates_only_the_claimant
 test_unleased_shared_slot_names_the_remaining_lease_holder
+test_nested_shared_ship_keeps_own_copy_proof
 test_recorded_pr_reassociation_requires_contained_head
 test_shared_slot_cleanup_then_reassociate_preserves_all_copies
 test_unfinished_shared_slot_record_cannot_retire

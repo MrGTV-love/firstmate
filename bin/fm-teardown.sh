@@ -111,9 +111,10 @@
 # cleanup of a finished ship or scout sharing a pool slot with another
 # ordinary root record is records-only, even for a nested copy: it skips
 # all slot cleanup, proves
-# delivery from its recorded PR or own branch (a scout still needs its report
-# and completion gate), and releases only its own Firstmate claim beside the
-# slot. Before that, while this task still holds the slot's claim or the slot
+# delivery from its recorded PR or own branch when its record names the shared
+# root (a nested own copy keeps the ordinary dirty and landed-work proof and
+# stays in place; a scout still needs its report and completion gate), and
+# releases only its own Firstmate claim beside the slot. Before that, while this task still holds the slot's claim or the slot
 # carries none, Treehouse's state must durably hold the slot under
 # fm_task_copy_pool_slot_held's proof, protecting the interval before the
 # remaining record moves; a refusal names the state-only lease remedy. A root
@@ -204,6 +205,9 @@
 #   Repeat for any other finished root record, including a completed scout.
 #   FM_HOME=/path/to/owning-home bin/fm-control.sh <remaining-task> reassociate \
 #     --worktree /path/to/remaining-copy --note 'Recover the actual task copy'
+#   Only if that lease was added and the copy is outside the slot: inspect every
+#   copy in the slot, then (cd /path/to/project && treehouse return \
+#     /path/to/slot --if-lease-holder <remaining-task>); docs/agent-control.md.
 #   --force skips ordinary-task dirty and landed-work checks, skips scout report
 #   checks, and discards secondmate child work for kind=secondmate. Only use it
 #   when the captain has explicitly said to discard the work. Ordinary work
@@ -2312,7 +2316,8 @@ validate_worktree_teardown_safety() {
   case "$KIND" in
     secondmate|scout) return 0 ;;
   esac
-  if [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
+  wt_real=$(fm_task_copy_canonical_dir "$WT") || wt_real=$WT
+  if [ "$TEARDOWN_SLOT_SHARED" = 1 ] && [ "$wt_real" = "$TEARDOWN_SHARED_SLOT" ]; then
     # The shared root's HEAD and dirt may belong to the remaining task. Use
     # the retiring record's own delivery evidence, never that root's contents.
     if [[ "$PR_URL" =~ ^https://github[.]com/([^/]+/[^/]+)/pull/([0-9]+)$ ]] \
@@ -2362,7 +2367,6 @@ validate_worktree_teardown_safety() {
     echo "Restore the git index state, or get the captain's explicit OK to discard, then --force." >&2
     return 1
   fi
-  wt_real=$(fm_task_copy_canonical_dir "$WT") || wt_real=$WT
   dirty=$(fm_task_copy_dirty_status "$dirty_raw" "$wt_real" \
     ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"})
 
@@ -3286,8 +3290,8 @@ require_owned_task_worktree_slot() {
 TEARDOWN_SLOT_SHARED=0
 TEARDOWN_SHARED_SLOT=
 require_shared_task_worktree_slot() {
-  local slot state_dir other_meta copy kind marker holder
-  local -a sharers=()
+  local slot state_dir other_meta copy kind marker holder i last
+  local -a sharers=() sharer_metas=()
   [ "$FORCE" != --force ] || return 0
   teardown_owns_worktree || return 0
   slot=$(teardown_live_slot_path) || {
@@ -3308,6 +3312,7 @@ require_shared_task_worktree_slot() {
       copy=$(fm_task_copy_canonical_dir "$(fm_meta_get "$other_meta" worktree)") || continue
       [ "$copy" = "$slot" ] || continue
       sharers+=("$(basename "$other_meta" .meta)")
+      sharer_metas+=("$other_meta")
     done
   done
   [ "${#sharers[@]}" -gt 0 ] || return 0
@@ -3326,8 +3331,14 @@ require_shared_task_worktree_slot() {
         else
           echo "Inspect its lease with: (cd '$PROJ' && treehouse status); an unleased slot can be held with treehouse lease <name> --lease-holder $holder." >&2
         fi
-        [ "${#sharers[@]}" -eq 1 ] \
-          || echo "Several other root records name this slot (${sharers[*]}); <remaining-task> is the one whose work stays in it." >&2
+        if [ "${#sharers[@]}" -ne 1 ]; then
+          echo "Several other root records name this slot; select the live one whose work stays in it as <remaining-task>. Each candidate's last recorded status:" >&2
+          for ((i=0; i < ${#sharers[@]}; i++)); do
+            last=
+            [ ! -f "${sharer_metas[$i]%.meta}.status" ] || last=$(tail -1 "${sharer_metas[$i]%.meta}.status" 2>/dev/null)
+            echo "  ${sharers[$i]}: ${last:-(no status recorded)}" >&2
+          done
+        fi
         return 1
       fi
       TEARDOWN_SLOT_REASSIGNED_TO=${sharers[*]}

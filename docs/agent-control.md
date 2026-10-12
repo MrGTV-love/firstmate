@@ -207,21 +207,26 @@ It refuses without changing the record, instructions, or copies when:
 
 When finished and parked ordinary tasks both record the same pool slot root, reassociation cannot go first: the other root record overlaps the replacement copy and may still claim the slot.
 Before retiring a record that still holds the slot's Firstmate claim, or any record when the slot carries no claim, Treehouse's state must durably lease the slot under the existing [`fm_task_copy_pool_slot_held`](../bin/fm-task-copy-lib.sh) proof.
+An absent claim counts as ownership for this protection, as it does for teardown's slot-owner check, and base already refused that shape.
 Otherwise cleanup refuses with the command to lease that exact slot in place without changing its contents.
+When exactly one other root record names the slot, the command names it as the lease holder; when several do, it names none, lists every candidate with its last recorded status line, and the operator selects the live one.
 This prevents another allocation from resetting the parked copies between cleanup and reassociation, while the remaining record still names only the root.
 A finished root record whose slot claim already names another task, such as a slot an ordinary spawn handed on under a process-only lease, no longer owns the slot: it keeps teardown's existing reassigned-slot cleanup, retiring records-only with no lease proof and no shared-route delivery proof, and leaves the claimant's record, claim, branches, and copy untouched.
 Then run ordinary `bin/fm-teardown.sh <finished-task>` in that record's owning `FM_HOME` first.
 The shared-root route reuses record-only retirement: it closes the finished task's endpoint and records, releases only that task's Firstmate claim beside the slot, and never returns the slot or touches its contents, nested copies, or branches.
 Slot-wide run/process cleanup is skipped; task-owned temporary resources retain the existing record-only cleanup behavior.
 It leaves Treehouse's durable lease intact and skips post-cleanup branch pruning.
-A ship must have its own recorded PR confirmed merged or its recorded branch proved landed independently of the shared root's HEAD and dirt.
+A ship whose record names the shared root must have its own recorded PR confirmed merged or its recorded branch proved landed independently of that root's HEAD and dirt.
 A scout still needs its regular nonempty report and the ordinary completed decision inventory; it needs no branch.
 With three records sharing the slot, retire each finished root record this way, including a finished branch-less scout.
-A finished record whose copy is nested in the slot also uses record-only retirement while another ordinary record still names the enclosing slot root; its nested copy is never returned or removed.
+A finished record whose copy is nested in the slot also uses record-only retirement while another ordinary record still names the enclosing slot root; its nested copy is never returned or removed, and a ship's nested copy keeps the ordinary dirty and landed-work proof on that copy itself, so a merged PR does not waive later local commits or tracked edits.
 Then reassociate the remaining task to its real nested or external copy with `bin/fm-control.sh <remaining-task> reassociate --worktree <copy> --note <why>`.
 The existing component-aware exclusivity proof still requires finished nested scout records to retire first when they overlap the old root, even if their copy is disjoint from the replacement.
 Do not retire an unfinished task to clear custody: it keeps its record and claim until its own delivery proof passes.
 A surviving recorded PR follows only under the head-containment proof above.
+A durable lease added for this recovery stays on the slot after the remaining task moves to a copy outside it, so no record names the slot and teardown never returns it.
+Release it by hand only after inspecting every copy left in the slot with `git -C <slot> status --untracked-files=all` and `git -C <project> worktree list --porcelain`, and only when no record names the slot or a copy inside it and nothing there is unlanded: `(cd <project> && treehouse return <slot-path> --if-lease-holder <remaining-task>)`, where the holder is the one passed to `treehouse lease`.
+That return is not state-only: it terminates lingering processes in the slot and may clean and reset it, so carry over or land any remaining work first.
 `--force` retains its existing collision refusals and is neither needed nor used for this route.
 The script headers own the command syntax, and `tests/fm-control-reassociate.test.sh` exercises the complete sequence with unpushed commits, untracked files, and an external locked copy.
 
