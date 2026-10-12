@@ -1,0 +1,33 @@
+ok - vendored upstream level 6 tests pass unchanged
+ok - Claude Bash: upstream bash gate denies destructive commands and allows read-only ones
+ok - Claude Write/Edit: outside paths and device URIs block in code; allowed-root writes reach Jev; credentials block
+ok - Claude Read/Bash results: flagged output gets the upstream banner as added context
+ok - never-send matches, HTTP failures, a missing key and malformed input allow without blocking
+ok - TypeSafe direct first; OpenRouter only after a failed direct call and only with its key
+ok - only firstmate reaches either provider; other and absent projects withhold every hook without weakening outside-root blocks
+ok - the Claude adapter runs under node type stripping as well as bun
+ok - omp: the unchanged upstream extension blocks, allows task-data writes and prepends the banner
+ok - omp write/edit: rewritten paths block without requests; plain paths retain credential judgment and project withholding
+not ok - omp session device verification failed: node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {"path":"xd://lsp","content":"{\"action\":\"references\",\"file\":\"x .ts\",\"line\":1,\"symbol\":\"value\"}"} must block
++ actual - expected
+
++ undefined
+- true
+
+    at deny (file:///Users/charlesabrooker/tmp/fm-lab.Y4isBE/regress/[eval1]:54:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///Users/charlesabrooker/tmp/fm-lab.Y4isBE/regress/[eval1]:62:5 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.4.0
+exit=1

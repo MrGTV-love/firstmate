@@ -1,0 +1,27 @@
+{"hook":"tool_call","tool":"read","path":"xd://lsp"}
+{"hook":"tool_result","tool":"read","isError":false,"content":"[{\"type\":\"text\",\"text\":\"# lsp \\u2014 LSP\\n\\nSymbol-aware code intelligence from language servers \\u2014 navigation, refactors, and diagnostics where text tools miss callsites.\\n\\n<operations>\\n- Position-based: `file` + `line` + `symbol` (substring; `#N` for Nth match). `line` is 1-indexed.\\n- `rename` \\u2014 applies by default; `apply: false` previews. Project-aware lookups ERROR without `symbol` \\u2014 no silent fallback on missing/ambiguous matches.\\n- `code_actions` \\u2014 lists by default; apply ONE with `apply: true` + `query` (title substring or index).\\n- `rename_file` \\u2014 moves file AND rewrites all imports/references; applies by default.\\n- `diagnostics` \\u2014 path, glob (`src/**/*.ts`), or `file: \\\"*\\\"` for workspace.\\n- `symbols` \\u2014 `file` lists file symbols; `file: \\\"*\\\"` + `query` searches workspace.\\n- `reload` \\u2014 restart one server (`file`) or all (`*`); `reload *` re-reads LSP config.\\n- `request` \\u2014 raw: `query` = method, `payload` = JSON params (else auto-built).\\n</operations>\\n\\n<critical>\\n- Symbol-aware work (rename, references, definition, code actions) MUST use `lsp` whenever a server is available.\\n  It follows shadowing, re-exports, and cross-file usages text tools miss.\\n- NEVER do a cross-file rename with `ast_edit`/`sed`/hand edits when `lsp` `rename`/`rename_file` can \\u2014 text renames silently drop callsites.\\n- Reach for `code_actions` on imports, quick-fixes, and server-known refactors before editing by hand.\\n</critical>\\n\\n## Schema\\n```ts\\ntype Args = {\\n  action: \\\"diagnostics\\\" | \\\"definition\\\" | \\\"references\\\" | \\\"hover\\\" | \\\"symbols\\\" | \\\"rename\\\" | \\\"rename_file\\\" | \\\"code_actions\\\" | \\\"type_definition\\\" | \\\"implementation\\\" | \\\"status\\\" | \\\"reload\\\" | \\\"capabilities\\\" | \\\"request\\\";\\n  file?: string;\\n  line?: number;\\n  symbol?: string;\\n  query?: string;\\n  new_name?: string;\\n  apply?: boolean;\\n  /** Timeout in seconds (default 20; range 5\\u2013300). */\\n  timeout?: number;\\n  payload?: string;\\n};\\n```\\nExecute by writing JSON to xd://lsp.\"}]"}
+{"hook":"tool_call","tool":"write","path":"xd://lsp","content":"{\"action\":\"symbols\",\"file\":\"x\\u00a0.py\"}"}
+{"hook":"tool_call","tool":"lsp"}
+{"hook":"tool_result","tool":"lsp","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in x .py:\\n\\u27f2 OUTSIDE_SECRET_MARKER @ line 1\"}]"}
+{"hook":"tool_result","tool":"write","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in x .py:\\n\\u27f2 OUTSIDE_SECRET_MARKER @ line 1\"}]"}
+{"hook":"tool_call","tool":"write","path":"xd://lsp","content":"{\"action\":\"symbols\",\"file\":\"x\\u3000.py\"}"}
+{"hook":"tool_call","tool":"lsp"}
+{"hook":"tool_result","tool":"lsp","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in x .py:\\n\\u27f2 OUTSIDE_SECRET_MARKER @ line 1\"}]"}
+{"hook":"tool_result","tool":"write","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in x .py:\\n\\u27f2 OUTSIDE_SECRET_MARKER @ line 1\"}]"}
+{"hook":"tool_call","tool":"write","path":"xd://lsp","content":"{\"action\":\"symbols\",\"file\":\"/Users/charlesabrooker/tmp/fm-lab.Y4isBE/wt/x\\u00a0.py\"}"}
+{"hook":"tool_call","tool":"lsp"}
+{"hook":"tool_result","tool":"lsp","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in x .py:\\n\\u27f2 OUTSIDE_SECRET_MARKER @ line 1\"}]"}
+{"hook":"tool_result","tool":"write","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in x .py:\\n\\u27f2 OUTSIDE_SECRET_MARKER @ line 1\"}]"}
+{"hook":"tool_call","tool":"write","path":"xd://lsp","content":"{\"action\":\"symbols\",\"file\":\"plain space.py\"}"}
+{"hook":"tool_call","tool":"lsp"}
+{"hook":"tool_result","tool":"lsp","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in plain space.py:\\n\\u27f2 plain_space_value @ line 1\"}]"}
+{"hook":"tool_result","tool":"write","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in plain space.py:\\n\\u27f2 plain_space_value @ line 1\"}]"}
+{"hook":"tool_call","tool":"write","path":"xd://lsp","content":"{\"action\":\"symbols\",\"file\":\"source.py\"}"}
+{"hook":"tool_call","tool":"lsp"}
+{"hook":"tool_result","tool":"lsp","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in source.py:\\n\\u27f2 plain_source @ line 1\"}]"}
+{"hook":"tool_result","tool":"write","isError":false,"content":"[{\"type\":\"text\",\"text\":\"Symbols in source.py:\\n\\u27f2 plain_source @ line 1\"}]"}
+{"hook":"tool_call","tool":"write","path":"XD://lsp","content":"{\"action\":\"symbols\",\"file\":\"source.py\"}"}
+{"hook":"tool_call","tool":"edit","path":"xd://lsp"}
+{"hook":"tool_call","tool":"read","path":"proc://bg_1/kill"}
+{"hook":"tool_result","tool":"read","isError":true,"content":"[{\"type\":\"text\",\"text\":\"proc://<id>/kill is writable only\"}]"}
+{"hook":"tool_call","tool":"edit","path":"proc://bg_1/kill"}
