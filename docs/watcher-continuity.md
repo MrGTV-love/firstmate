@@ -598,11 +598,11 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 - The once-per-generation announcement bound with the real Pi extension against a refused handling handshake.
 - A handling successor that must surface a real crew event instead of going blind.
 
-`tests/fm-watch-triage.test.sh` proves an unbounded pane capture stops refreshing the beacon, and TERM stops that watcher while still releasing its lock and recording an acknowledgeable stop.
+`tests/fm-watch-triage-stale.test.sh` proves an unbounded pane capture stops refreshing the beacon, and TERM stops that watcher while still releasing its lock and recording an acknowledgeable stop.
 It also exercises a single TERM with a live foreign downtime-marker lock holder, retained stale singleton and subsequent arm-style recovery, including decimal `08` and zero `00` cleanup bounds.
-It checks that a newly appended keyed decision is classified without rereading earlier status bytes, so signal handling can return to the watcher's beacon refresh even when the status history is long.
+`tests/fm-watch-triage.test.sh` checks that a newly appended keyed decision is classified without rereading earlier status bytes, so signal handling can return to the watcher's beacon refresh even when the status history is long.
 Completed-cycle waits observe the test-owned terminal poll-wait boundary in the fixture's explicit state directory, not intermediate progress-beacon writes.
-Process-event fixtures pass both the home and its matching explicit state directory to every watcher launch, including output-failure launches, so the same completed-cycle boundary covers replay, handling acknowledgement, and the absence of duplicate wakes.
+`tests/fm-watch-triage-procevent.test.sh` fixtures pass both the home and its matching explicit state directory to every watcher launch, including output-failure launches, so the same completed-cycle boundary covers replay, handling acknowledgement, and the absence of duplicate wakes.
 `tests/fm-wake-queue.test.sh` proves TERM likewise stops a watcher blocked in the drain-ring idle check's pane capture.
 The proactive-delivery and redrain fixtures use actionable terminal feedback and require exactly one captured generation plus terminal retirement before watcher launch, so handling sequence 1 exhausts all seeded process-event work.
 A deterministic late-publication fixture acknowledges poll-discovered recovery after its reason is printed but before delivery cleanup, then proves that cleanup preserves the retired generation and the next watcher stays quiet.

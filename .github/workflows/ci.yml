@@ -185,7 +185,7 @@ jobs:
       # Every shard reports so one failure never hides another shard's result.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -465,7 +465,7 @@ jobs:
           # marked churn window expands an empty array that only stock Bash
           # treats as an unbound variable under set -u.
           churn_output=$(FM_TEST_ONLY=test_turn_ended_churn_existing_marker_absorbed \
-            /bin/bash tests/fm-watch-triage.test.sh)
+            /bin/bash tests/fm-watch-triage-turnend.test.sh)
           printf '%s\n' "$churn_output"
 
           # The fork-free hot-path helpers must stay byte-identical to the

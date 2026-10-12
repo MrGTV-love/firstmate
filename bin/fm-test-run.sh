@@ -216,10 +216,10 @@ JOBS_MAX=8
 MAX_WALL_MS=
 PER_SCRIPT_TIMEOUT_SECS=0
 # Bound applied automatically on the automatic --changed path, derived from
-# measured healthy runtimes with margin rather than picked: the slowest measured
-# script is tests/fm-watch-triage.test.sh at about 1075s under CI load (the hint
-# table below records that loaded figure). 1500s keeps every measured script
-# under the bound with roughly 1.4x headroom over the slowest loaded measurement,
+# the historical healthy combined watch-triage baseline of about 1075s under CI
+# load, before that suite was split. The retained 1500s bound gave that baseline
+# roughly 1.4x headroom; splitting and refreshing packing hints does not raise
+# this execution tripwire,
 # and it stays under the 30-minute normal CI tier so a wedged script fails here,
 # with its output, before the job cap
 # cancels the lane. It is a guard, not a speed control: a HUNG script becomes a
@@ -229,7 +229,7 @@ CHANGED_DEFAULT_TIMEOUT_SECS=1500
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=13
+PORTABLE_SERIAL_SHARDS=14
 
 # Conservative balance hint for a portable-serial script with no measurement.
 # Rounded above the current CI mean, including the capability-skipped scripts.
@@ -346,7 +346,7 @@ family_for_basename() {
     fm-mail.test.sh|fm-mail-check.test.sh|\
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
-    fm-watch-triage.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-triage.test.sh|fm-watch-triage-*.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -727,7 +727,7 @@ list_portable_serial() {
 # Measured portable-serial script durations in milliseconds, from the CI timing
 # artifacts recorded in docs/fm-test-portable-shards.md. Each value is the
 # slowest successful sample in the referenced complete/partial runs, with the
-# version/platform and split-supervision baseline exceptions documented there.
+# version/platform and split-suite calibration exceptions documented there.
 # These are balance hints only: the shard
 # partition stays complete and disjoint whatever they say, so a stale hint costs
 # balance rather than coverage. That doc owns the refresh procedure.
@@ -992,7 +992,13 @@ tests/fm-watch-checkpoint.test.sh 11234
 tests/fm-watch-idle-reap.test.sh 80937
 tests/fm-watch-open-loops.test.sh 249165
 tests/fm-watch-recovery-loop.test.sh 59092
-tests/fm-watch-triage.test.sh 1074843
+tests/fm-watch-triage-away.test.sh 203942
+tests/fm-watch-triage-procevent.test.sh 72412
+tests/fm-watch-triage-stale.test.sh 158958
+tests/fm-watch-triage-turnend.test.sh 89571
+tests/fm-watch-triage-wait.test.sh 424257
+tests/fm-watch-triage-wedge.test.sh 348219
+tests/fm-watch-triage.test.sh 304976
 tests/fm-watcher-lock.test.sh 108940
 tests/fm-watchdog-check.test.sh 23000
 tests/fm-worker-account-live-e2e.test.sh 3179
