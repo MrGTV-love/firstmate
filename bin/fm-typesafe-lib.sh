@@ -19,8 +19,8 @@
 # docs/configuration.md "What the model receives", "Never-send list", and
 # "Worker skill selection" own the extraction and privacy contracts.
 # A refusal sets FM_TYPESAFE_WITHHELD_REASON and returns 1, without echoing text.
-# fm_openrouter_key <home> resolves OPENROUTER_API_KEY for both the jev-guard
-# and worker skill-selection OpenRouter fallbacks into the non-exported
+# fm_openrouter_key <home> resolves OPENROUTER_API_KEY for the worker
+# skill-selection OpenRouter fallback into the non-exported
 # OPENROUTER_API_KEY_PRIVATE.
 
 TYPESAFE_API_KEY_PRIVATE=${TYPESAFE_API_KEY_PRIVATE:-${TYPESAFE_API_KEY:-}}

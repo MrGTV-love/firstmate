@@ -1848,9 +1848,10 @@ The captain data-egress decision 2026-10-08 authorizes Jev guard requests only f
 `fm-spawn.sh` determines the project once by comparing physical roots: `firstmate` when the project root equals the Firstmate code root, otherwise the project directory's basename.
 Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to a model provider.
 This authorization check runs once at the shared `decide` preflight before resolving a credential.
+The same decision governs omp's native model routes: only a `firstmate`-project omp worker receives the native TypeSafe judge credential and `find.enabled=on`, while every other worker keeps the direct-only judge role with no credential and `find.enabled=off`, so its native find, thinking and stop judgments send nothing to TypeSafe or OpenRouter; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that launch contract.
 For `firstmate` only, shell screening sends the command and working directory, write screening sends the path and first 4,000 characters of content, and result screening sends the tool name and first 6,000 characters of output.
-It calls only TypeSafe direct, resolving the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) for every decision; no key enters the worker environment, configuration, files or command arguments.
-Each decision constructs a fresh client, so key rotation and removal take effect on the next call, including within a long-running omp session.
+It calls only TypeSafe direct, resolving the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its client is first constructed; no key enters the worker environment, configuration, files or command arguments.
+The client snapshots its key: omp reuses it for the session, while Claude constructs it in each hook process; a decision with no key constructs no client, so the next decision looks the key up again.
 An unavailable or failed TypeSafe call never falls back to OpenRouter, even when an OpenRouter key exists.
 A tool state matching the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key), or an invalid or unreadable policy, is withheld from TypeSafe.
 The client has a 10-second total request budget including upstream retries and response bodies, and each complete handler has a shared 25-second cancellation budget.
@@ -1923,7 +1924,7 @@ Privacy-hidden promotion instructions never revive the superseded spec.
 The picker uses the shared [TypeSafe key lookup](#typed-dispatch-resolution-env-typesafe_api_key), including the local primary-home fallback, and asks TypeSafe directly first when that key is available.
 When the TypeSafe key is absent or a direct request fails and `fm_openrouter_key` resolves a key, the same request and the rest of that pick go through OpenRouter.
 Privacy refusals, question-validation failures, and expiry of the picker's overall deadline stop selection without triggering provider fallback.
-[`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) owns the shared OpenRouter fallback-key lookup used by the picker and the [Jev guard](#jev-guard).
+[`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) owns the OpenRouter fallback-key lookup used only by the picker; the [Jev guard](#jev-guard) has no OpenRouter fallback.
 This is the captain's accepted policy: “openrouter is a fallback from directly using the typesafe api.”
 Fallback provenance is retained for picked, no-selection, and unavailable outcomes.
 Missing optional catalog directories are skipped; failures inspecting existing catalogs are unavailable with their actionable reason, not successful no-selection results.

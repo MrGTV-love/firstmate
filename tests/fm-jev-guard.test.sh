@@ -205,7 +205,7 @@ test_typesafe_only() {
   pass "TypeSafe-only guard preserves no-key behavior on failure or missing credentials and never uses OpenRouter"
 }
 
-test_typesafe_call_time_key() {
+test_typesafe_session_key() {
   local out
   out=$(HOME_DIR="$HOME_DIR" KEY="$KEY" REQUESTS="$REQUESTS" REPORT="$ROOT/bin/ten-levels/extensions/report.ts" \
     "${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
@@ -218,21 +218,23 @@ configure({ home, config: `${home}/config`, state: `${home}/state`, task: "t1", 
 const requests = () => readFileSync(process.env.REQUESTS, "utf8").trim().split("\n").filter(Boolean).map(JSON.parse);
 const questions = { safe: { type: "noul", instructions: "Is this safe?" } };
 const before = requests().length;
-await decide({}, "rotation-first", { text: "first" }, questions);
-writeFileSync(`${home}/.env`, "TYPESAFE_API_KEY=rotated-fake-key\nOPENROUTER_API_KEY=fm-jev-guard-or-key\n");
-await decide({}, "rotation-second", { text: "second" }, questions);
-assert.deepEqual(requests().slice(before).map(row => row.auth), [`Bearer ${process.env.KEY}`, "Bearer rotated-fake-key"]);
 writeFileSync(`${home}/.env`, "OPENROUTER_API_KEY=fm-jev-guard-or-key\n");
-await assert.rejects(decide({}, "rotation-removed", { text: "third" }, questions));
-assert.equal(requests().length, before + 2, "key removal must not reuse a cached key or send an OpenRouter request");
+await assert.rejects(decide({}, "session-missing", { text: "first" }, questions));
+assert.equal(requests().length, before, "a missing key must send no request to either provider");
+writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\nOPENROUTER_API_KEY=fm-jev-guard-or-key\n`);
+await decide({}, "session-first", { text: "second" }, questions);
+writeFileSync(`${home}/.env`, "TYPESAFE_API_KEY=rotated-fake-key\n");
+await decide({}, "session-second", { text: "third" }, questions);
+assert.deepEqual(requests().slice(before).map(row => [row.path, row.auth]),
+  [["/v1/systemone", `Bearer ${process.env.KEY}`], ["/v1/systemone", `Bearer ${process.env.KEY}`]]);
 assert.equal(process.env.TYPESAFE_API_KEY, undefined);
 assert.equal(process.env.TYPESAFE_API_KEY_PRIVATE, undefined);
 writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\n`);
-console.log("rotation-ok");
+console.log("session-ok");
 JS
-) || fail "call-time key resolution failed: $out"
-  [ "$out" = rotation-ok ] || fail "unexpected call-time key output: $out"
-  pass "guard resolves key rotation and removal on every decision without exporting credentials"
+) || fail "session key resolution failed: $out"
+  [ "$out" = session-ok ] || fail "unexpected session key output: $out"
+  pass "guard resolves its key at first use, reuses one TypeSafe client for the session and exports no credential"
 }
 
 test_project_scope() {
@@ -604,7 +606,7 @@ test_claude_write_gate
 test_claude_result_screen
 test_unavailable_paths_allow
 test_typesafe_only
-test_typesafe_call_time_key
+test_typesafe_session_key
 test_project_scope
 test_no_helpers_retains_path_checks
 test_claude_adapter_under_node

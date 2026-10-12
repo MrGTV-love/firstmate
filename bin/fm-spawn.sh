@@ -283,19 +283,27 @@
 #   OMP model fallbacks, with an empty default chain so ambient role chains
 #   cannot weaken the assigned model.
 #   Workers pin the native judge to typesafe/jev-latest with judge: [] fallbacks.
-#   Worker-only find.enabled=on admits that tool before credential extensions
-#   load; the no-helper overlay overrides it to off. Global settings stay intact.
-#   Their extension supplies a private !command credential lookup through
-#   fm_typesafe_key. omp memoizes successful lookups for that process; relaunch
-#   picks up primary-key changes. No key is stored in config, argv or worker env.
+#   Under the captain data-egress decision 2026-10-08, only a firstmate-project
+#   worker (the Jev guard's physical-root test) gets the task-overlay
+#   find.enabled=on, which admits that tool before credential extensions load,
+#   and a private !command credential lookup through fm_typesafe_key. omp
+#   memoizes successful lookups for that process; relaunch picks up primary-key
+#   changes. Every other project gets find.enabled=off and a failing judge
+#   credential, so native judgments reach neither TypeSafe nor OpenRouter.
+#   No key is stored in config, argv or worker env; global settings stay intact.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
 #   routes. It layers .omp/fm-no-helpers-overlay.yml, fixes non-auto effort,
 #   disables title/extension/skill/rule discovery and speech (including the
 #   enhanced-speech @tiny route), exposes only deterministic core tools,
 #   withholds native judge credentials and guard judgments, and
 #   empties main-model fallbacks. Deterministic guard path/edit checks remain.
+#   omp compaction can fall back from the primary model to role-assigned or
+#   other credentialed models, so the overlay sets compaction.enabled=false: a
+#   long no-helper task stops at the context limit instead of compacting. It
+#   also sets memory.backend=off, so the session has no memory recall.
 #   The choice is recorded as omp_no_helpers=on and inherited on relaunch;
-#   switching such a task to another harness is refused rather than losing it.
+#   fm-control refuses to switch such a task to another harness before it stops
+#   the running worker.
 #   It does not sandbox Bash or prevent explicit external API commands.
 #   Secondmate lanes keep their memory settings; the captain's own
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written or
@@ -5645,10 +5653,12 @@ EOF
       native_fallback=$(jq -cn --argjson prefix "$native_fallback" --argjson profile "$candidate" '$prefix + [$profile]') || exit 1
     done < <(jq -c '.[]' <<<"$DISPATCH_FALLBACK")
     [ "$OMP_NO_HELPERS" = 0 ] || native_fallback='[]'
-    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" '
+    native_find=off
+    [ "$guard_project" != firstmate ] || [ "$OMP_NO_HELPERS" = 1 ] || native_find=on
+    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" --arg find "$native_find" '
       def effort_key($m; $e): if $e == "" then $m else $m + ":" + $e end;
       ([$fallback[] | effort_key(.model; .effort)]) as $chain |
-      {retry: {modelFallback: ($model | contains("/")), fallbackChains:
+      {find: {enabled: $find}, retry: {modelFallback: ($model | contains("/")), fallbackChains:
         (reduce ([{model:$model, effort:$effort}] + $fallback)[] as $p
           ({default: []}; if ($p.model | contains("/")) then
             .[$p.model] = [] | .[effort_key($p.model; $p.effort)] = [] else . end)
@@ -5683,7 +5693,7 @@ const busyEvent = (state: string, event: string) =>
   });
 export default function (pi: any) {
   const guardContext = $guard_context;
-  installTypesafeJudge(pi, guardContext.home, guardContext.noHelpers);
+  installTypesafeJudge(pi, guardContext);
   installJevGuard(pi, guardContext);
   installTaskSessionProof(pi, "$STATE_REAL", "$ID");
   // The model serving this task now, for bin/fm-crew-state.sh's drift note.

@@ -305,17 +305,26 @@ printf '%s\n' \"\$PI_EDIT_VARIANT\"") \
 }
 
 test_worker_guard_project_scope() {
-  local project rec id out
-  for project in firstmate vernant; do
-    id="omp-scope-$project"
-    rec=$(make_spawn_case "scope-$project" omp "$id" "$project")
+  local scope project rec id out expected
+  local -a extra
+  for scope in firstmate vernant no-helpers; do
+    project=$scope
+    extra=()
+    [ "$scope" != no-helpers ] || { project=firstmate; extra=(--omp-no-helpers); }
+    id="omp-scope-$scope"
+    rec=$(make_spawn_case "scope-$scope" omp "$id" "$project")
     read_case_record "$rec"
-    out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
-    expect_code 0 $? "omp $project spawn should succeed: $out"
+    out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp ${extra[@]+"${extra[@]}"})
+    expect_code 0 $? "omp $scope spawn should succeed: $out"
+    expected=off
+    [ "$scope" != firstmate ] || expected=on
+    assert_equals "$expected" "$(jq -r .find.enabled "$HOME_DIR/state/$id.omp-fallback.yml")" \
+      "the task overlay must admit native find only for a firstmate-project worker"
     printf 'TYPESAFE_API_KEY=omp-scope-key\nOPENROUTER_API_KEY=omp-fallback-key\n' > "$HOME_DIR/.env"
-    out=$(EXT_PATH="$HOME_DIR/state/$id.omp-ext.ts" PROJECT="$project" WT="$WT_DIR" FM_TEST_SEAM=1 \
+    out=$(EXT_PATH="$HOME_DIR/state/$id.omp-ext.ts" PROJECT="$scope" WT="$WT_DIR" FM_TEST_SEAM=1 \
       node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 const requests = [];
@@ -324,7 +333,6 @@ const server = createServer((req, res) => {
   req.on("data", chunk => { body += chunk; });
   req.on("end", () => {
     requests.push({ path: req.url, state: JSON.parse(body).state });
-    if (req.url === "/fallback") { res.writeHead(500).end("{}"); return; }
     const answers = {};
     for (const [id, q] of Object.entries(JSON.parse(body).questions)) {
       const keys = Object.keys(q.criteria ?? {});
@@ -340,15 +348,19 @@ await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 try {
   const base = `http://127.0.0.1:${server.address().port}`;
   process.env.FM_JEV_GUARD_BASE_URL = `${base}/direct`;
-  process.env.FM_JEV_GUARD_OPENROUTER_URL = `${base}/fallback`;
   const handlers = {};
-  (await import(pathToFileURL(process.env.EXT_PATH))).default({ registerProvider() {}, on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
+  const providers = [];
+  (await import(pathToFileURL(process.env.EXT_PATH))).default({ registerProvider: (name, config) => providers.push({ name, ...config }), on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
+  assert.deepEqual(providers.map(row => [row.name, row.baseUrl]), [["typesafe", "https://api.typesafe.ai"]]);
+  const credential = () => execFileSync("/bin/sh", ["-c", providers[0].apiKey.slice(1)], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf customer-record" } }, { cwd: process.env.WT });
   if (process.env.PROJECT === "firstmate") {
+    assert.equal(credential(), "omp-scope-key");
     assert.equal(result?.block, true);
     assert.deepEqual(requests.map(row => row.path), ["/direct"]);
     assert.ok(requests.every(row => row.state.command === "rm -rf customer-record"));
   } else {
+    assert.throws(credential, "a non-firstmate worker must have no native judge credential");
     assert.equal(result, undefined);
     assert.deepEqual(requests, []);
   }
@@ -358,9 +370,9 @@ try {
 console.log("scope-ok");
 JS
 )
-    [ "$out" = scope-ok ] || fail "generated omp extension lost $project egress scope: $out"
+    [ "$out" = scope-ok ] || fail "generated omp extension lost $scope egress scope: $out"
   done
-  pass "real omp spawns authorize firstmate only and carry project scope through the generated extension"
+  pass "real omp spawns give firstmate alone, without no-helpers, native find, a judge credential and guard egress"
 }
 
 test_spawn_retains_pooled_capacity_and_declared_stand_ins() {

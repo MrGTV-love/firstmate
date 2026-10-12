@@ -1522,6 +1522,53 @@ test_relaunch_onto_an_unverified_harness_is_refused() {
   pass "fm-control relaunch: refuses to relaunch onto an adapter with no verified mechanics"
 }
 
+test_no_helper_task_refuses_a_harness_switch_before_stopping() {
+  local dir out rc id path
+  for path in explicit stand-in; do
+    id=rl-nohelp
+    dir=$(new_case "nohelp-$path" "$id")
+    add_ship_task "$dir" "$id" omp
+    printf omp > "$dir/fake/command"
+    printf omp > "$dir/fake/becomes"
+    if [ "$path" = stand-in ]; then
+      sed -i.bak -e 's/^model=default$/model=openai-codex\/gpt-6-luna/' -e 's/^effort=default$/effort=high/' "$dir/home/state/$id.meta"
+      rm -f "$dir/home/state/$id.meta.bak"
+      echo "dispatch_rule=rule_1" >> "$dir/home/state/$id.meta"
+      mkdir -p "$dir/home/config"
+      printf 'teamclaude\n' > "$dir/home/config/claude-launcher"
+      fm_test_fake_teamclaude "$dir/fakebin"
+      jq -n '{rules:[{when:"assigned work",use:{harness:"omp",model:"openai-codex/gpt-6-luna",effort:"high"},
+        fallback:[{harness:"claude",model:"claude-opus-5-5[1m]",effort:"high",requires:"teamclaude"}]}]}' \
+        > "$dir/home/config/crew-dispatch.json"
+      jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+        metadata:{meterStates:{chat:{allowed:false,limitReached:true}}}}]}' > "$dir/usage.json"
+      cat > "$dir/fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  --version) printf 'omp/18.1.20\n' ;;
+  usage) cat "$FM_FAKE_DIR/../usage.json" ;;
+  *) exit 0 ;;
+esac
+SH
+      chmod +x "$dir/fakebin/omp"
+    fi
+    echo "omp_no_helpers=on" >> "$dir/home/state/$id.meta"
+    cp "$dir/home/state/$id.meta" "$dir/prior.meta"
+    if [ "$path" = explicit ]; then
+      out=$(run_control "$dir" "$id" relaunch --harness codex --note "switch runtime"); rc=$?
+    else
+      out=$(run_control "$dir" "$id" relaunch --note "quota stand-in"); rc=$?
+    fi
+    expect_code 1 "$rc" "a no-helper task must refuse a $path harness switch: $out"
+    assert_contains "$out" "omp_no_helpers=on" "the $path refusal must name the recorded posture"
+    assert_equals omp "$(cat "$dir/fake/command")" "a $path refusal must keep the running omp agent alive"
+    [ ! -s "$dir/fake/keys" ] && [ ! -s "$dir/fake/literal" ] || fail "a $path refusal sent lifecycle or launch input"
+    cmp -s "$dir/prior.meta" "$dir/home/state/$id.meta" || fail "a $path refusal changed task metadata"
+    assert_absent "$dir/home/state/$id.control-relaunch" "a $path refusal must precede the relaunch transaction"
+  done
+  pass "fm-control relaunch: a no-helper task refuses explicit and stand-in harness switches before the agent stops"
+}
+
 test_prior_harness_turnend_registry_entry_is_cleared() {
   local dir auth
   dir=$(new_case grokauth rl9)
@@ -6283,6 +6330,7 @@ test_pi_exclude_tools_follow_the_relaunch
 test_exclude_tools_refusals_happen_before_the_agent_stops
 test_explicit_model_wins_over_the_recorded_one
 test_relaunch_onto_an_unverified_harness_is_refused
+test_no_helper_task_refuses_a_harness_switch_before_stopping
 test_prior_harness_turnend_registry_entry_is_cleared
 test_wiring_removal_failure_refuses_before_replacement_arm
 test_turnend_auth_paths_are_owned_by_the_control_adapter

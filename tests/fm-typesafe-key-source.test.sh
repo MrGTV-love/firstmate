@@ -78,19 +78,23 @@ import { pathToFileURL } from "node:url";
 const { installTypesafeJudge } = await import(pathToFileURL(`${process.env.ROOT}/bin/fm-omp-jev.ts`));
 let provider, config;
 const api = { registerProvider(name, value) { provider = name; config = value; } };
-installTypesafeJudge(api, process.env.LANE);
+installTypesafeJudge(api, { home: process.env.LANE, project: "firstmate" });
 assert.equal(provider, "typesafe");
+assert.equal(config.baseUrl, "https://api.typesafe.ai");
 assert.ok(!config.apiKey.includes("primary-key"), "configuration must store only the lookup command");
 assert.equal(execFileSync("/bin/sh", ["-c", config.apiKey.slice(1)], { encoding: "utf8" }), "primary-key");
 assert.equal(process.env.TYPESAFE_API_KEY, undefined);
 assert.equal(process.env.TYPESAFE_API_KEY_PRIVATE, undefined);
-installTypesafeJudge(api, process.env.LANE, true);
-assert.throws(() => execFileSync("/bin/sh", ["-c", config.apiKey.slice(1)], { encoding: "utf8", stdio: "pipe" }), "no-helper lookup must supply no credential even when the primary has one");
+for (const context of [{ project: "firstmate", noHelpers: true }, { project: "vernant" }, { project: "" }, {}]) {
+  installTypesafeJudge(api, { home: process.env.LANE, ...context });
+  assert.throws(() => execFileSync("/bin/sh", ["-c", config.apiKey.slice(1)], { encoding: "utf8", stdio: "pipe" }),
+    `${JSON.stringify(context)} must supply no credential even when the primary has one`);
+}
 console.log("native-key-ok");
 JS
 ) || fail "native command-key boundary failed: $NATIVE_OUT"
 [ "$NATIVE_OUT" = native-key-ok ] || fail "unexpected native key probe: $NATIVE_OUT"
-pass "native omp command credentials reach the primary privately and stay unavailable with no helpers"
+pass "native omp command credentials reach the primary privately for firstmate only and stay unavailable with no helpers"
 
 # The jev-guard hook is a separate process; it must reach the primary key too.
 cat > "$TMP_ROOT/fake-jev.mjs" <<'JS'

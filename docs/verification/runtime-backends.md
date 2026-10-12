@@ -1018,8 +1018,10 @@ The actual primary-model provider was the scripted `fixture/main`, not a paid fl
 The unavailable-provider probe used a distinct query because omp's semantic-result cache otherwise reused the earlier successful judgment without reaching the failing endpoint.
 The TypeSafe command credential resolved the fake key through `fm_typesafe_key` and the worker's parent-home record; no key value entered provider configuration, argv or the worker environment.
 Provider discovery can resolve that command before a judgment, and omp caches a successful result in process memory until relaunch.
-Worker-only `find.enabled=on` is required because built-in tool admission precedes extension provider registration; the final no-helper overlay sets it back to `off`.
+A worker-level `find.enabled=on` was required because built-in tool admission precedes extension provider registration; the final no-helper overlay set it back to `off`.
 Unrelated model-role entries survived the worker overlay, and the later task-model fallback overlay did not restore judge fallbacks.
+These probes reached the fake TypeSafe endpoint through an `FM_OMP_JEV_BASE_URL` test seam that has since been removed, and they ran before the project scope below and before the guard client became session-cached.
+They do not prove that later behavior.
 
 Both no-helper probes began with ambient `speech.enabled=true` and `speech.enhanced=true`, and a reachable credentialed `@tiny` provider.
 The final no-helper overlay suppressed the speech-enhancement route, not merely its credentials.
@@ -1029,6 +1031,24 @@ Every private endpoint and PTY process was stopped.
 These observations verify the installed runtime and worker argument/extension contract, not live fleet activation or a real provider's billing.
 Refresh after an omp upgrade using fake keys, a credentialed fallback trap, distinct healthy/failing queries, and both print and interactive sessions with ambient enhanced speech enabled.
 [`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns the runtime credential and `--omp-no-helpers` launch contract.
+
+### Firstmate-only native judge scope
+
+Verified 2026-10-12 with omp 18.9.2 under the same isolation, after `find.enabled` and the native judge credential were restricted to `firstmate`-project workers.
+The smoke extension called the production `installTypesafeJudge` and `installJevGuard` and moved only the TypeSafe endpoint to a loopback fake through a task-local provider registration override, keeping the production credential command.
+Ambient settings kept the built-in `openrouter/~typesafe/jev-latest` judge fallback, and a credentialed fake OpenRouter judge was available in every session.
+Each session loaded the session and worker overlays and a task overlay matching `fm-spawn`'s `find.enabled` value.
+
+| Session | Thinking | `find` admitted | TypeSafe judgment requests | OpenRouter requests | Other secondary-model requests | Observed result |
+| --- | --- | --- | ---: | ---: | ---: | --- |
+| `firstmate` worker | `high` | Yes | 3 | 0 | 0 | Native `find` returned the matching file using the primary-home fake key |
+| `vernant` worker | `auto` | No | 0 | 0 | 0 | A read round trip completed on `fixture/main` |
+| `vernant` worker | `high` | No | 0 | 0 | 0 | A read round trip completed on `fixture/main` |
+
+The `firstmate` session also made one TypeSafe model-list request; the `vernant` sessions made no TypeSafe request of any kind.
+All endpoints were local fakes, so these smokes spent USD 0.00.
+They do not exercise unexpected-stop judgments, which need a model stop that the fixture did not produce.
+The task-owned driver remains outside the commit; `bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh` checks the generated overlay and credential for both directions without omp.
 
 ## Codex hook trust
 

@@ -28,7 +28,7 @@ Firstmate supplies shorter client budgets through the upstream constructor optio
 Upstream's `report.ts` is the lab's side channel, so it is the one upstream file Firstmate changes.
 Each change and its reason:
 
-- `extensions/report.ts`'s `decide` constructs a fresh TypeSafe-only client for each decision, enforcing the 2026-10-09 prohibition on OpenRouter fleet calls instead of retaining the previous provider fallback.
+- `extensions/report.ts`'s `jev` keeps upstream's single-provider TypeSafe client snapshot, memoized for the session; Firstmate's former OpenRouter fallback client is removed under the 2026-10-09 prohibition on OpenRouter fleet calls.
   Unavailable TypeSafe follows upstream's existing no-key error behavior; it never tries another provider.
   The constructor shortens the total request budget; [the operator contract](../../docs/configuration.md#jev-guard) owns current budgets and host limits.
   `seam` reads test endpoint overrides only when `FM_TEST_SEAM=1`.
@@ -36,7 +36,7 @@ Each change and its reason:
   `preflightTimeout` bounds synchronous key and policy preflight to the remaining handler budget.
   `decide` passes the shared cancellation signal to the upstream client so a request cannot outlive its handler.
   omp 18.8.1's supported `extensionHandlers.toolCallTimeoutMs` setting covers only tool calls, not result screening, so Firstmate bounds both paths without extending the host deadline.
-- `extensions/report.ts`'s `typesafeKey` reads the key through `bin/fm-typesafe-lib.sh` (`fm_typesafe_key`) for every decision because Firstmate keeps the worker environment free of keys and must honor primary-key rotation and removal.
+- `extensions/report.ts`'s `typesafeKey` reads the key through `bin/fm-typesafe-lib.sh` (`fm_typesafe_key`) when the client is first constructed because Firstmate keeps the worker environment free of keys.
 - `extensions/report.ts`'s `permitted` preflight enforces the captain data-egress decision 2026-10-08, withholding all other, missing or empty project scopes before resolving a credential.
   A withheld request throws, so upstream's own error path allows the tool call while the outside-root write block remains deterministic.
 - `extensions/report.ts`'s `permitted` also checks authorized requests against `config/dispatch-never-send` through the existing `fm_typesafe_permitted` policy.
