@@ -206,10 +206,10 @@ It refuses without changing the record, instructions, or copies when:
 - any of those HEADs cannot be durably anchored and verified in the project's shared Git ref store.
 
 When finished and parked ordinary tasks both record the same pool slot root, reassociation cannot go first: the other root record overlaps the replacement copy and may still claim the slot.
-Before retiring any root record, Treehouse's state must durably lease the slot under the existing [`fm_task_copy_pool_slot_held`](../bin/fm-task-copy-lib.sh) proof.
+Before retiring a record that still holds the slot's Firstmate claim, or any record when the slot carries no claim, Treehouse's state must durably lease the slot under the existing [`fm_task_copy_pool_slot_held`](../bin/fm-task-copy-lib.sh) proof.
 Otherwise cleanup refuses with the command to lease that exact slot in place without changing its contents.
-The lease requirement also applies when the remaining task already owns the Firstmate claim; cleanup leaves that claim intact.
 This prevents another allocation from resetting the parked copies between cleanup and reassociation, while the remaining record still names only the root.
+A finished root record whose slot claim already names another task, such as a slot an ordinary spawn handed on under a process-only lease, no longer owns the slot: it keeps teardown's existing reassigned-slot cleanup, retiring records-only with no lease proof and no shared-route delivery proof, and leaves the claimant's record, claim, branches, and copy untouched.
 Then run ordinary `bin/fm-teardown.sh <finished-task>` in that record's owning `FM_HOME` first.
 The shared-root route reuses record-only retirement: it closes the finished task's endpoint and records, releases only that task's Firstmate claim beside the slot, and never returns the slot or touches its contents, nested copies, or branches.
 Slot-wide run/process cleanup is skipped; task-owned temporary resources retain the existing record-only cleanup behavior.

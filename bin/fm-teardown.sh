@@ -113,11 +113,13 @@
 # all slot cleanup, proves
 # delivery from its recorded PR or own branch (a scout still needs its report
 # and completion gate), and releases only its own Firstmate claim beside the
-# slot. Before that, Treehouse's state must durably hold the slot under
+# slot. Before that, while this task still holds the slot's claim or the slot
+# carries none, Treehouse's state must durably hold the slot under
 # fm_task_copy_pool_slot_held's proof, protecting the interval before the
-# remaining record moves; a refusal names the state-only lease remedy. This
-# proof also applies when the remaining task already owns the claim, which
-# is left intact rather than released.
+# remaining record moves; a refusal names the state-only lease remedy. A root
+# record whose slot claim names another task is not on this route: the slot
+# was reassigned, so it needs no lease proof and keeps the reassigned-slot
+# cleanup below, which leaves that claim intact.
 # Treehouse's lease and every copy, branch and file under the slot stay
 # untouched; slot-wide run/process cleanup and post-cleanup branch pruning
 # are skipped. Retire other finished shared records the same way, then use
@@ -195,7 +197,8 @@
 # Usage: fm-teardown.sh <task-id> [--force [--drop-file <path>]] [--legacy-record]
 # Shared slot-root recovery (from the lock-owning main session):
 #   (cd /path/to/project && treehouse status)
-#   If not already leased: (cd /path/to/project && treehouse lease <slot-name> \
+#   If not already leased and the finished task holds the slot claim (or none
+#   exists): (cd /path/to/project && treehouse lease <slot-name> \
 #     --lease-holder <remaining-task>)
 #   FM_HOME=/path/to/owning-home bin/fm-teardown.sh <finished-task>
 #   Repeat for any other finished root record, including a completed scout.
@@ -3277,12 +3280,15 @@ require_owned_task_worktree_slot() {
 # A non-forcing cleanup sharing a slot with another ordinary root record
 # retires only this record, using the reassigned-slot path. This record may
 # name the root or a nested copy. Nothing under the slot is inspected for
-# disposal or touched; completion is proved independently below.
+# disposal or touched; completion is proved independently below. A root record
+# whose claim already names another task keeps require_owned_task_worktree_slot's
+# determination and never enters this route.
 TEARDOWN_SLOT_SHARED=0
 TEARDOWN_SHARED_SLOT=
 require_shared_task_worktree_slot() {
   local slot state_dir other_meta copy kind marker
   [ "$FORCE" != --force ] || return 0
+  teardown_owns_worktree || return 0
   slot=$(teardown_live_slot_path) || {
     [ "$KIND" != secondmate ] || return 0
     copy=$(fm_task_copy_canonical_dir "$WT") || return 0
@@ -3300,21 +3306,21 @@ require_shared_task_worktree_slot() {
       case "$kind" in ''|ship|scout) ;; *) continue ;; esac
       copy=$(fm_task_copy_canonical_dir "$(fm_meta_get "$other_meta" worktree)") || continue
       [ "$copy" = "$slot" ] || continue
-      # Until reassociation, root-only records do not trigger the allocation
-      # guard for nested current copies. Keep Treehouse itself from handing
-      # out this slot throughout that interval, not just during our lock.
-      if ! fm_task_copy_pool_slot_held "$slot"; then
-        echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring any root record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed." >&2
-        if [ "$FM_TASK_COPY_SLOT_STATE" = unleased ]; then
-          echo "Hold it in place without touching its contents: (cd '$PROJ' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$(basename "$other_meta" .meta)')" >&2
-        else
-          echo "Inspect its lease with: (cd '$PROJ' && treehouse status); an unleased slot can be held with treehouse lease <name> --lease-holder '$(basename "$other_meta" .meta)'." >&2
-        fi
-        return 1
-      fi
       fm_treehouse_slot_owner_state "$slot" "$ID"
       case "$FM_TREEHOUSE_SLOT_OWNER" in
         mine|absent)
+          # Until reassociation, root-only records do not trigger the allocation
+          # guard for nested current copies. Keep Treehouse itself from handing
+          # out this slot throughout that interval, not just during our lock.
+          if ! fm_task_copy_pool_slot_held "$slot"; then
+            echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed." >&2
+            if [ "$FM_TASK_COPY_SLOT_STATE" = unleased ]; then
+              echo "Hold it in place without touching its contents: (cd '$PROJ' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder <remaining-task>)" >&2
+            else
+              echo "Inspect its lease with: (cd '$PROJ' && treehouse status); an unleased slot can be held with treehouse lease <name> --lease-holder <remaining-task>." >&2
+            fi
+            return 1
+          fi
           TEARDOWN_SLOT_REASSIGNED_TO=$(basename "$other_meta" .meta)
           TEARDOWN_SLOT_REASSIGNED_HOME=${state_dir%/*}
           ;;

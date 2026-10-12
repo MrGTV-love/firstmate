@@ -1337,9 +1337,9 @@ test_same_origin_different_ref_store_refuses_without_changes() {
   pass "same-origin copies in another ref store are refused in both roles without changing records, briefs, anchors, claims, or copies"
 }
 
-test_unleased_shared_slot_keeps_finished_record_and_claim() {
+test_unleased_shared_slot_gates_only_the_claimant() {
   local id=shared-unleased claimant dir slot out rc
-  for claimant in "$id" parked; do
+  for claimant in "$id" absent parked; do
     dir=$(new_case "shared-unleased-$claimant" "$id")
     slot=$(add_pool_slot "$dir" 42 "fm/$id-slot")
     printf '{"worktrees":[{"name":"42","path":"%s","leased":false}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
@@ -1347,22 +1347,41 @@ test_unleased_shared_slot_keeps_finished_record_and_claim() {
       "endpoint_task_id=$id" "worktree=$slot" "project=$dir/proj" \
       "kind=ship" "spawn_gen=finished" "pr=https://github.com/example/repo/pull/7"
     fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
-    printf 'task=%s\nhome=%s\n' "$claimant" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
+    [ "$claimant" = absent ] || printf 'task=%s\nhome=%s\n' "$claimant" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
+    : > "$dir/claim-before"
+    [ "$claimant" = absent ] || cp "$dir/pool/42/.fm-slot-owner" "$dir/claim-before"
     cp "$dir/home/state/$id.meta" "$dir/meta-before"
     cp "$dir/home/state/parked.meta" "$dir/parked-before"
-    cp "$dir/pool/42/.fm-slot-owner" "$dir/claim-before"
+    cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
     copy_fingerprint "$slot" > "$dir/slot-before"
+    git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ > "$dir/branches-before"
+    git -C "$dir/proj" worktree list --porcelain > "$dir/registrations-before"
     rc=0
     out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$id") || rc=$?
-    expect_code 1 "$rc" "$claimant claim: shared-root cleanup must not open an allocation window before reassociation"$'\n'"$out"
-    assert_contains "$out" "treehouse lease '42' --lease-holder 'parked'" 'the lease refusal must name the state-only remedy'
-    cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'unleased cleanup retired its record'
-    cmp -s "$dir/parked-before" "$dir/home/state/parked.meta" || fail 'unleased cleanup changed the parked record'
-    cmp -s "$dir/claim-before" "$dir/pool/42/.fm-slot-owner" || fail 'unleased cleanup changed the slot claim'
-    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail 'unleased cleanup changed slot bytes'
-    [ ! -e "$dir/treehouse.log" ] || fail 'unleased cleanup touched Treehouse'
+    if [ "$claimant" = parked ]; then
+      expect_code 0 "$rc" "a finished record whose slot was reassigned must retire without a durable lease"$'\n'"$out"
+      [ ! -e "$dir/home/state/$id.meta" ] || fail 'reassigned-slot cleanup left the finished record'
+      assert_contains "$out" 'was reassigned to task parked' 'reassigned-slot cleanup did not name the claimant'
+    else
+      expect_code 1 "$rc" "$claimant claim: shared-root cleanup must not open an allocation window before reassociation"$'\n'"$out"
+      assert_contains "$out" "treehouse lease '42' --lease-holder <remaining-task>" 'the lease refusal must name the state-only remedy'
+      cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$claimant claim: unleased cleanup retired its record"
+    fi
+    cmp -s "$dir/parked-before" "$dir/home/state/parked.meta" || fail "$claimant claim: cleanup changed the parked record"
+    if [ "$claimant" = absent ]; then
+      [ ! -e "$dir/pool/42/.fm-slot-owner" ] || fail 'unleased cleanup wrote a slot claim'
+    else
+      cmp -s "$dir/claim-before" "$dir/pool/42/.fm-slot-owner" || fail "$claimant claim: cleanup changed the slot claim"
+    fi
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$claimant claim: cleanup changed slot bytes"
+    git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ | cmp -s - "$dir/branches-before" \
+      || fail "$claimant claim: cleanup changed branches"
+    git -C "$dir/proj" worktree list --porcelain | cmp -s - "$dir/registrations-before" \
+      || fail "$claimant claim: cleanup changed copy registrations"
+    cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$claimant claim: cleanup changed Treehouse's lease state"
+    [ ! -e "$dir/treehouse.log" ] || fail "$claimant claim: cleanup touched Treehouse"
   done
-  pass 'an unleased shared slot refuses regardless of its claim owner, preserving both records, the claim and copy bytes'
+  pass 'an unleased shared slot refuses its claimant and an unclaimed record, and retires a reassigned record without touching the claimant, its claim, branches or copy bytes'
 }
 
 test_recorded_pr_reassociation_requires_contained_head() {
@@ -1422,7 +1441,7 @@ EOF
   pass 'recorded PR reassociation accepts equal/descendant tips and refuses missing, unrelated, advanced or malformed head proof'
 }
 
-test_unleased_shared_slot_keeps_finished_record_and_claim
+test_unleased_shared_slot_gates_only_the_claimant
 test_recorded_pr_reassociation_requires_contained_head
 test_shared_slot_cleanup_then_reassociate_preserves_all_copies
 test_unfinished_shared_slot_record_cannot_retire
