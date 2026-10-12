@@ -422,13 +422,15 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
     path=${path#P}
     [ -n "$path" ] || continue
     if [ "$path" != "$slot" ]; then
-      # Only leased entries may be skipped by their raw suffix: skipping an
-      # unleased alias can hide a conflict with a matching leased entry.
-      if [ "${leased#L}" = leased ]; then
-        [ "${path#"${path%/*/*}"}" = "$leaf" ] || continue
-      fi
+      # Only ordinary leased entries may be skipped by their raw suffix:
+      # skipping an unleased or recovered-lease alias can hide a conflict
+      # with a matching leased entry.
+      case "$leased$holder" in
+        Lunleased*|"LleasedH$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER") ;;
+        *) [ "${path#"${path%/*/*}"}" = "$leaf" ] || continue ;;
+      esac
       # Bash's inode/device comparison resolves aliases without a subshell
-      # and cd/pwd for every unleased entry in an unmatched scan.
+      # and cd/pwd for every entry that reaches it in an unmatched scan.
       [ "$path" -ef "$slot" ] || continue
     fi
     matched=1
@@ -465,7 +467,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
 # read is named in one warning line and skipped: one broken home must not stop
 # every allocation for a project.
 fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
-  local project=$1 record_state=$2 state_dir meta copy slot skipped id home
+  local project=$1 record_state=$2 state_dir meta copy slot skipped id home remedy
   local -a homes=()
   FM_TASK_COPY_POOL_STATE_FILE=
   FM_TASK_COPY_POOL_STATE_ENTRIES=
@@ -482,21 +484,22 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       copy=$(fm_meta_get "$meta" worktree)
       copy=$(fm_task_copy_canonical_dir "$copy") || continue
       slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy") || continue
-      fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} && continue
+      fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} || true
       id=$(basename "$meta" .meta)
-      echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
       case "$FM_TASK_COPY_SLOT_STATE" in
         held) continue ;;
         unleased)
-          echo "To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')" >&2
+          remedy="To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')"
           ;;
         recovered)
-          echo "treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)" >&2
+          remedy="treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)"
           ;;
         *)
-          echo "Inspect it with (cd '$project' && treehouse status); a slot listed there as not leased is held in place, without touching its contents, by: (cd '$project' && treehouse lease <name> --lease-holder '$id')" >&2
+          remedy="Inspect it with (cd '$project' && treehouse status); a slot listed there as not leased is held in place, without touching its contents, by: (cd '$project' && treehouse lease <name> --lease-holder '$id')"
           ;;
       esac
+      echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
+      echo "$remedy" >&2
       return 1
     done
   done

@@ -154,6 +154,47 @@ test_unleased_alias_beside_leased_entry_is_not_held() (
   pass "all unleased path spellings beside a leased entry remain unsafe with and without jq"
 )
 
+# A recovered-lease alias beside an ordinary lease is no durable hold either.
+test_recovered_alias_beside_leased_entry_is_not_held() (
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local spelling dir slot alias rc failed=0
+  command -v jq >/dev/null 2>&1 || fail "the jq regressions require jq"
+  for spelling in trailing-slash dot double-slash; do
+    dir="$TMP_ROOT/recovered-alias-$spelling"
+    slot="$dir/pool/1/project"
+    mkdir -p "$slot"
+    slot=$(cd "$slot" && pwd -P)
+    case "$spelling" in
+      trailing-slash) alias="$slot/" ;;
+      dot) alias="$slot/./" ;;
+      double-slash) alias="${slot%/*}//${slot##*/}" ;;
+    esac
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
+      "$slot" "$alias" "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" > "$dir/pool/treehouse-state.json"
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    rc=0
+    fm_task_copy_pool_slot_held "$slot" || rc=$?
+    if [ "$rc" != 1 ] || [ "$FM_TASK_COPY_SLOT_STATE" != recovered ]; then
+      printf 'not ok - %s: conflicting recovered-lease alias counted as %s (exit %s)\n' \
+        "$spelling" "$FM_TASK_COPY_SLOT_STATE" "$rc" >&2
+      failed=1
+    fi
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    rc=0
+    fm_task_copy_pool_slot_held "$slot" "$slot" || rc=$?
+    if [ "$rc" != 0 ] || [ "$FM_TASK_COPY_SLOT_STATE" != held ]; then
+      printf 'not ok - %s: recovered-lease alias on a Firstmate home counted as %s (exit %s)\n' \
+        "$spelling" "$FM_TASK_COPY_SLOT_STATE" "$rc" >&2
+      failed=1
+    fi
+  done
+  [ "$failed" = 0 ] || fail "noncanonical recovered-lease entries bypassed the lease check"
+  pass "all recovered-lease path spellings beside a leased entry remain unsafe off a Firstmate home"
+)
+
 test_slot_holding_live_nested_current_copy_refuses() {
   local spelling name nested out
   for spelling in direct alias; do
@@ -206,6 +247,28 @@ test_conflicting_unleased_alias_refuses_before_allocation() {
     cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$spelling: refusal changed pool state"
   done
   pass "conflicting unleased aliases refuse a spawn before allocation without changing pool state"
+}
+
+test_conflicting_recovered_alias_refuses_before_allocation() {
+  local spelling name alias
+  local recovered='recovered: state file was corrupt or truncated; verify before reuse'
+  for spelling in trailing-slash dot double-slash; do
+    name="recovered-conflict-$spelling"
+    make_retained_case "$name"
+    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+    case "$spelling" in
+      trailing-slash) alias="$SLOT_DIR/" ;;
+      dot) alias="$SLOT_DIR/./" ;;
+      double-slash) alias="${SLOT_DIR%/*}//${SLOT_DIR##*/}" ;;
+    esac
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
+      "$SLOT_DIR" "$alias" "$recovered" > "$CASE_DIR/pool/treehouse-state.json"
+    cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+    assert_retained_refusal "$name" "carries only Treehouse's recovered-state lease" \
+      "(cd '$PROJECT_DIR' && treehouse status)"
+    cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$spelling: refusal changed pool state"
+  done
+  pass "conflicting recovered-lease aliases refuse a spawn before allocation without changing pool state"
 }
 
 test_unprovable_slot_hold_still_refuses() {
@@ -345,8 +408,10 @@ test_unreadable_local_home_warns_and_proceeds() {
 }
 
 test_unleased_alias_beside_leased_entry_is_not_held || exit 1
+test_recovered_alias_beside_leased_entry_is_not_held || exit 1
 test_slot_holding_live_nested_current_copy_refuses
 test_conflicting_unleased_alias_refuses_before_allocation
+test_conflicting_recovered_alias_refuses_before_allocation
 test_unprovable_slot_hold_still_refuses
 test_nested_copy_in_leased_slot_allows_allocation
 test_secondmate_home_slot_with_other_project_copy_allows_allocation

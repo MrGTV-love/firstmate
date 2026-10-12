@@ -251,7 +251,8 @@ Before a fresh spawn sends `treehouse get`, and before secondmate home seeding s
 `treehouse get` resets and hands out only a slot its pool state file records as not leased, so such a slot (the nested replacement-copy case) refuses the allocation unless Treehouse's state durably holds it.
 A slot is held only when every state entry resolving to its canonical path is leased.
 An unleased entry spelled with trailing slashes, `/.` components, or repeated slashes still makes the slot unsafe even beside a leased entry.
-The raw path-suffix prefilter skips only leased entries, so it cannot hide a conflicting unleased alias; skipping a leased alias can still leave the slot unproved and refuse allocation.
+The same holds for an entry spelled that way that carries Treehouse's recovered-state holder on a slot that is not a local Firstmate home.
+The raw path-suffix prefilter skips only entries with an ordinary lease, so it cannot hide a conflicting unleased or recovered-lease alias; skipping an ordinary leased alias can still leave the slot unproved and refuse allocation.
 A lease carrying Treehouse's recovered-state holder counts only when the slot is itself a local Firstmate home, because Treehouse 3.1.0 and later release that lease on their own once the slot is idle, clean, and landed.
 A live owner process, dirt, or an unmerged HEAD also makes a get skip a slot, but each can change before the get runs, so none of them counts; a slot with no state entry, an unreadable state file, or a host without `jq` to read it refuses as unproved.
 So a nested copy inside a leased slot, including another project's task copy under a leased secondmate home's `projects/` clone, never stops an unrelated start.
