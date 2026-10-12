@@ -391,7 +391,7 @@ FM_TASK_COPY_SLOT_REASON=
 FM_TASK_COPY_POOL_STATE_FILE=
 FM_TASK_COPY_POOL_STATE_ENTRIES=
 fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
-  local slot=$1 state leaf entries name leased holder path real home matched=0 is_home=0
+  local slot=$1 state leaf entries name leased holder path home matched=0 is_home=0
   shift
   state="${slot%/*/*}/treehouse-state.json"
   leaf=${slot#"${slot%/*/*}"}
@@ -427,8 +427,9 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
       if [ "${leased#L}" = leased ]; then
         [ "${path#"${path%/*/*}"}" = "$leaf" ] || continue
       fi
-      real=$(fm_task_copy_canonical_dir "$path") || continue
-      [ "$real" = "$slot" ] || continue
+      # Bash's inode/device comparison resolves aliases without a subshell
+      # and cd/pwd for every unleased entry in an unmatched scan.
+      [ "$path" -ef "$slot" ] || continue
     fi
     matched=1
     FM_TASK_COPY_SLOT_NAME=${name#N}
