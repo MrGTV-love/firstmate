@@ -7,6 +7,7 @@
 // why root selection, handler budgets and input restrictions are necessary.
 import { realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { resolve } from "node:path";
 import jevGuard from "./ten-levels/extensions/jev-guard.ts";
 import { configure, withDecisionBudget } from "./ten-levels/extensions/report.ts";
 import { insideRepo } from "./ten-levels/src/levels/level06/index.ts";
@@ -21,6 +22,51 @@ export interface JevGuardContext {
   project?: string;
 }
 
+const navigationActions: Readonly<Record<string, true>> = {
+  references: true,
+  definition: true,
+  implementation: true,
+  type_definition: true,
+  hover: true,
+  symbols: true,
+  diagnostics: true,
+};
+
+function plainPath(path: string): boolean {
+  return /^[/A-Za-z0-9_.-]/.test(path) && !/^[A-Za-z][A-Za-z0-9+.-]*:/.test(path)
+    && !path.endsWith("]");
+}
+
+function object(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+// Device payloads are tool invocations, not file contents for the upstream judge.
+// These are bounded trusted operations, not a filesystem or process sandbox.
+function admittedDevice(input: { path?: unknown; content?: unknown }, ctx: unknown, worktree: string): boolean {
+  try {
+    if (input.path === "xd://lsp") {
+      if (typeof input.content !== "string" || !object(ctx) || typeof ctx.cwd !== "string"
+        || typeof ctx.getAsyncJobSnapshot !== "function") return false;
+      const args: unknown = JSON.parse(input.content);
+      if (!object(args) || typeof args.action !== "string" || navigationActions[args.action] !== true
+        || typeof args.file !== "string") return false;
+      const root = realpathSync(worktree);
+      if (realpathSync(ctx.cwd) !== root) return false;
+      if (args.file === "*") return args.action === "symbols" || args.action === "diagnostics";
+      return plainPath(args.file) && insideRepo(realpathSync(resolve(worktree, args.file)), root);
+    }
+    const job = typeof input.path === "string" ? /^proc:\/\/([A-Za-z0-9][A-Za-z0-9._-]*)\/kill$/.exec(input.path) : null;
+    if (!job || !object(ctx) || typeof ctx.getAsyncJobSnapshot !== "function") return false;
+    const snapshot: unknown = ctx.getAsyncJobSnapshot();
+    if (!object(snapshot)) return false;
+    return [snapshot.running, snapshot.recent].some((jobs) =>
+      Array.isArray(jobs) && jobs.some((entry: unknown) => object(entry) && entry.id === job[1]));
+  } catch {
+    return false;
+  }
+}
+
 function real(path: string): string[] {
   try {
     return [path, realpathSync(path)];
@@ -30,6 +76,8 @@ function real(path: string): string[] {
 }
 
 export function installJevGuard(pi: any, c: JevGuardContext): void {
+  // Set before native LSP startup; this is process-local, never a profile setting.
+  process.env.PI_DISABLE_LSPMUX = "1";
   configure(c);
   const roots = [...new Set([c.worktree, ...real(c.data), ...real(tmpdir()), ...real("/tmp")])];
   const writeRoot = (event: any, ctx: any) => {
@@ -47,8 +95,8 @@ export function installJevGuard(pi: any, c: JevGuardContext): void {
         }
         if (name === "tool_call" && (event?.toolName === "write" || event?.toolName === "edit")) {
           const path = String(event.input?.path ?? "");
-          if (!/^[/A-Za-z0-9_.-]/.test(path) || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(path)
-            || path.endsWith("]")) {
+          if (event.toolName === "write" && admittedDevice(event.input ?? {}, ctx, c.worktree)) return;
+          if (!plainPath(path)) {
             return { block: true, reason: "jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block." };
           }
         }
