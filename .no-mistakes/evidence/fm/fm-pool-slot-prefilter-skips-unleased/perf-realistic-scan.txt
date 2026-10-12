@@ -1,0 +1,7 @@
+pool-sized state: 9 entries (target leased, 4 other leased, 4 other unleased), 200 fresh scans each incl. jq read
+round 1 base: 2.666s; rc=0 state=held
+round 1 head: 2.278s; rc=0 state=held
+round 2 base: 2.261s; rc=0 state=held
+round 2 head: 2.444s; rc=0 state=held
+round 3 base: 2.092s; rc=0 state=held
+round 3 head: 2.137s; rc=0 state=held

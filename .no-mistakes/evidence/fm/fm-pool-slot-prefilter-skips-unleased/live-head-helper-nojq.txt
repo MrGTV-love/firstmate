@@ -1,0 +1,2 @@
+mode=jq rc=1 state=unleased reason=is not leased in Treehouse state $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json, so treehouse get may hand it out
+mode=no-jq rc=1 state=unknown reason=cannot be proved leased: reading Treehouse state $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json needs jq, which is not installed

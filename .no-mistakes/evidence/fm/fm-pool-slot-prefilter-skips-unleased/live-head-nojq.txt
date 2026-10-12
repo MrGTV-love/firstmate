@@ -1,0 +1,12 @@
+=== scenario nojq-unleased-trailing (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project/","leased":null,"lease_holder":null}
+--- fm-spawn.sh output:
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX/bin/fm-spawn.sh: line 2862: jq: command not found
+--- exit code: 127
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 

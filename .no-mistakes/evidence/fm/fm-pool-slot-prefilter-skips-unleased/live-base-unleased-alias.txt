@@ -1,0 +1,19 @@
+=== scenario base-unleased-trailing (root=$LABWORK/base)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project/","leased":null,"lease_holder":null}
+--- fm-spawn.sh output:
+skill selection for new-base-unleased-trailing: unavailable - no TypeSafe or OpenRouter key
+spawned new-base-unleased-trailing harness=codex kind=scout window=primary:fm-new-base-unleased-trailing worktree=$LABWORK/pools/.treehouse/project-ae9080/2/project
+--- exit code: 0
+pool state file: CHANGED
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project/","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+{"name":"2","path":"$LABWORK/pools/.treehouse/project-ae9080/2/project","leased":null,"lease_holder":null}
+slot 1 + nested copy: unchanged
+task meta published:
+window=primary:fm-new-base-unleased-trailing
+worktree=$LABWORK/pools/.treehouse/project-ae9080/2/project
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash primary:fm-new-base-unleased-trailing 
+062bb17 unlanded

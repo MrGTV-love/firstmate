@@ -1,0 +1,126 @@
+=== scenario unleased-trailing (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project/","leased":null,"lease_holder":null}
+--- fm-spawn.sh output:
+error: Treehouse pool slot $LABWORK/pools/.treehouse/project-ae9080/1/project contains task holder's current copy $LABWORK/pools/.treehouse/project-ae9080/1/project/.claude/worktrees/holder-branch and is not leased in Treehouse state $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from $LABWORK/project lists slot 1 at $LABWORK/pools/.treehouse/project-ae9080/1/project, then run: (cd '$LABWORK/project' && treehouse lease '1' --lease-holder 'holder')
+--- exit code: 1
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 
+
+=== scenario unleased-dot (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project/./","leased":null,"lease_holder":null}
+--- fm-spawn.sh output:
+error: Treehouse pool slot $LABWORK/pools/.treehouse/project-ae9080/1/project contains task holder's current copy $LABWORK/pools/.treehouse/project-ae9080/1/project/.claude/worktrees/holder-branch and is not leased in Treehouse state $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from $LABWORK/project lists slot 1 at $LABWORK/pools/.treehouse/project-ae9080/1/project, then run: (cd '$LABWORK/project' && treehouse lease '1' --lease-holder 'holder')
+--- exit code: 1
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 
+
+=== scenario unleased-double (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1//project","leased":null,"lease_holder":null}
+--- fm-spawn.sh output:
+error: Treehouse pool slot $LABWORK/pools/.treehouse/project-ae9080/1/project contains task holder's current copy $LABWORK/pools/.treehouse/project-ae9080/1/project/.claude/worktrees/holder-branch and is not leased in Treehouse state $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from $LABWORK/project lists slot 1 at $LABWORK/pools/.treehouse/project-ae9080/1/project, then run: (cd '$LABWORK/project' && treehouse lease '1' --lease-holder 'holder')
+--- exit code: 1
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 
+
+=== scenario unleased-symlink (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pool-link/1/project","leased":null,"lease_holder":null}
+--- fm-spawn.sh output:
+error: Treehouse pool slot $LABWORK/pools/.treehouse/project-ae9080/1/project contains task holder's current copy $LABWORK/pools/.treehouse/project-ae9080/1/project/.claude/worktrees/holder-branch and is not leased in Treehouse state $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from $LABWORK/project lists slot 1 at $LABWORK/pools/.treehouse/project-ae9080/1/project, then run: (cd '$LABWORK/project' && treehouse lease '1' --lease-holder 'holder')
+--- exit code: 1
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 
+
+=== scenario recovered-trailing (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project/","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+--- fm-spawn.sh output:
+error: Treehouse pool slot $LABWORK/pools/.treehouse/project-ae9080/1/project contains task holder's current copy $LABWORK/pools/.treehouse/project-ae9080/1/project/.claude/worktrees/holder-branch and is not a Firstmate home and carries only Treehouse's recovered-state lease in $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; refusing allocation before treehouse get
+treehouse lease refuses a slot that is already leased; inspect it with: (cd '$LABWORK/project' && treehouse status)
+--- exit code: 1
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 
+
+=== scenario recovered-dot (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project/./","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+--- fm-spawn.sh output:
+error: Treehouse pool slot $LABWORK/pools/.treehouse/project-ae9080/1/project contains task holder's current copy $LABWORK/pools/.treehouse/project-ae9080/1/project/.claude/worktrees/holder-branch and is not a Firstmate home and carries only Treehouse's recovered-state lease in $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; refusing allocation before treehouse get
+treehouse lease refuses a slot that is already leased; inspect it with: (cd '$LABWORK/project' && treehouse status)
+--- exit code: 1
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 
+
+=== scenario recovered-double (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1//project","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+--- fm-spawn.sh output:
+error: Treehouse pool slot $LABWORK/pools/.treehouse/project-ae9080/1/project contains task holder's current copy $LABWORK/pools/.treehouse/project-ae9080/1/project/.claude/worktrees/holder-branch and is not a Firstmate home and carries only Treehouse's recovered-state lease in $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; refusing allocation before treehouse get
+treehouse lease refuses a slot that is already leased; inspect it with: (cd '$LABWORK/project' && treehouse status)
+--- exit code: 1
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 
+
+=== scenario escaped (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"9","path":"$LABWORK/pools/.treehouse/project-ae9080/9/back\\slash","leased":null,"lease_holder":null}
+--- fm-spawn.sh output:
+error: Treehouse pool slot $LABWORK/pools/.treehouse/project-ae9080/1/project contains task holder's current copy $LABWORK/pools/.treehouse/project-ae9080/1/project/.claude/worktrees/holder-branch and cannot be proved leased: Treehouse state $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json contains an escaped entry path that cannot be compared safely; refusing allocation before treehouse get
+The pool state holds an entry whose path cannot be proved, and a lease does not clear this refusal; report that entry for repair.
+--- exit code: 1
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 
+
+=== scenario relative (root=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Q1Q1R4Y3YG8FFJXJM73ACX)
+state entries:
+{"name":"1","path":"$LABWORK/pools/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":null}
+{"name":"9","path":"1/project","leased":null,"lease_holder":null}
+--- fm-spawn.sh output:
+error: Treehouse pool slot $LABWORK/pools/.treehouse/project-ae9080/1/project contains task holder's current copy $LABWORK/pools/.treehouse/project-ae9080/1/project/.claude/worktrees/holder-branch and cannot be proved leased: Treehouse state $LABWORK/pools/.treehouse/project-ae9080/treehouse-state.json contains a relative entry path; refusing allocation before treehouse get
+The pool state holds an entry whose path cannot be proved, and a lease does not clear this refusal; report that entry for repair.
+--- exit code: 1
+pool state file: unchanged
+slot 1 + nested copy: unchanged
+task meta: not published
+pool slots on disk: 1 2 treehouse-state.key treehouse-state.lock 
+tmux windows: primary:bash 
+

@@ -1,0 +1,13 @@
+real treehouse get --lease against the B1 state (what a wrongly-allowed spawn would send next):
+exit=0 handed_out=$LABWORK/bs<CR>oot/.treehouse/project-ae9080/2/project
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-lab-work.z0xkeQ/bs\root/.treehouse/project-ae9080/2/project. Run 'treehouse return ~/tmp/fm-lab-work.z0xkeQ/bs\root/.treehouse/project-ae9080/2/project' to release it.
+slot 1 nested task copy before: d82058b unlanded2
+slot 1 nested task copy after:  d82058b unlanded2
+holder2-branch
+{"name":"1","path":"$LABWORK/bpool-link/1/project","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+{"name":"1","path":"$LABWORK/bs\\root/.treehouse/project-ae9080/1/project","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+{"name":"2","path":"$LABWORK/bs\\root/.treehouse/project-ae9080/2/project","leased":true,"lease_holder":null}
+note: the handed_out line was printed by zsh echo, which turned the "\r" in "bs\root" into a carriage return (shown as <CR>); the real path is $LABWORK/bs\root/.treehouse/project-ae9080/2/project, as Treehouse itself prints above.
+note: this Treehouse build (v2.3.1-fm.e58947de) rewrote the duplicate slot-1 entries as recovered leases and created slot 2, so slot 1 was not reset in this run. The fix is about the spawn gate wrongly calling the slot held; it does not depend on this Treehouse behaviour.

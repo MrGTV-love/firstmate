@@ -1,0 +1,14 @@
+ok - escaped or relative entry paths cannot prove a slot held beside a clean leased alias
+ok - all unleased path spellings beside a leased entry remain unsafe with and without jq
+ok - symlink unleased alias beside a leased entry prevents a held verdict
+ok - case-variant unleased alias beside a leased entry prevents a held verdict
+ok - all recovered-lease path spellings beside a leased entry remain unsafe off a Firstmate home
+ok - a pool slot holding a live record's nested current copy refuses allocation until that record is retired
+ok - conflicting unleased aliases refuse a spawn before allocation without changing pool state
+ok - conflicting recovered-lease aliases refuse a spawn before allocation without changing pool state
+ok - an escaped or relative entry path refuses a spawn and asks for a repair report, never a lease
+ok - a pool slot whose hold Treehouse's state cannot prove still refuses allocation and names how to inspect or hold it
+ok - a nested current copy inside a slot Treehouse's state leases does not stop an unrelated spawn
+ok - a leased secondmate home slot holding another project's task copy does not stop a spawn
+ok - a pool slot a reassociated task left is acquired and claimed by a new task
+ok - an unavailable registered local home is named in one warning and the spawn proceeds
