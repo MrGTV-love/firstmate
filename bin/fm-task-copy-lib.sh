@@ -379,8 +379,8 @@ FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or tr
 # <slot>, the slot is not proved held.
 # Sets FM_TASK_COPY_SLOT_NAME to the slot's name in Treehouse state (the name
 # treehouse status and treehouse lease use), or empty when no entry records
-# <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, recovered, escaped,
-# relative, or unknown; and on failure FM_TASK_COPY_SLOT_REASON to a clause
+# <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, conflicting, recovered,
+# escaped, relative, missing-jq, or unknown; and on failure FM_TASK_COPY_SLOT_REASON to a clause
 # following the slot's path.
 # Returns 0 when held, 1 otherwise.
 # The last state file read and its entries are kept in
@@ -393,6 +393,7 @@ FM_TASK_COPY_POOL_STATE_FILE=
 FM_TASK_COPY_POOL_STATE_ENTRIES=
 fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   local slot=$1 state leaf entries name leased holder path home matched=0 is_home=0
+  local has_unleased=0 has_recovered=0 named=0
   shift
   state="${slot%/*/*}/treehouse-state.json"
   leaf=${slot#"${slot%/*/*}"}
@@ -400,6 +401,7 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
   FM_TASK_COPY_SLOT_STATE=unknown
   FM_TASK_COPY_SLOT_REASON=
   if ! command -v jq >/dev/null 2>&1; then
+    FM_TASK_COPY_SLOT_STATE=missing-jq
     FM_TASK_COPY_SLOT_REASON="cannot be proved leased: reading Treehouse state $state needs jq, which is not installed"
     return 1
   fi
@@ -427,13 +429,13 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
     case "$path" in
       *\\*)
         FM_TASK_COPY_SLOT_STATE=escaped
-        FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state contains an escaped entry path that cannot be compared safely"
+        FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state contains an escaped entry path for entry '${name#N}': '$path' (TSV-escaped), which cannot be compared safely"
         return 1
         ;;
       /*) ;;
       *)
         FM_TASK_COPY_SLOT_STATE=relative
-        FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state contains a relative entry path"
+        FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state contains a relative entry path for entry '${name#N}': '$path'"
         return 1
         ;;
     esac
@@ -449,20 +451,45 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
       # and cd/pwd for every entry that reaches it in an unmatched scan.
       [ "$path" -ef "$slot" ] || continue
     fi
-    matched=1
+    matched=$((matched + 1))
     FM_TASK_COPY_SLOT_NAME=${name#N}
     if [ "${leased#L}" != leased ]; then
-      FM_TASK_COPY_SLOT_STATE=unleased
-      FM_TASK_COPY_SLOT_REASON="is not leased in Treehouse state $state, so treehouse get may hand it out"
-      return 1
-    fi
-    if [ "${holder#H}" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ] && [ "$is_home" = 0 ]; then
-      FM_TASK_COPY_SLOT_STATE=recovered
-      FM_TASK_COPY_SLOT_REASON="is not a Firstmate home and carries only Treehouse's recovered-state lease in $state, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed"
-      return 1
+      has_unleased=1
+    elif [ "${holder#H}" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ] && [ "$is_home" = 0 ]; then
+      has_recovered=1
     fi
   done <<< "$entries"
-  if [ "$matched" = 1 ]; then
+  if [ "$has_unleased" = 1 ]; then
+    if [ "$matched" = 1 ]; then
+      # Ordinary leases safely skipped on the held path still affect the
+      # remedy: any leased directory alias makes this a mixed slot, and a
+      # duplicate name makes LeaseExisting select only its first record.
+      while IFS=$'\t' read -r leased holder name path; do
+        [ "${name#N}" != "$FM_TASK_COPY_SLOT_NAME" ] || named=$((named + 1))
+        if [ "$leased" = Lleased ] && [ "${path#P}" -ef "$slot" ]; then
+          matched=$((matched + 1))
+          break
+        fi
+        [ "$named" -le 1 ] || break
+      done <<< "$entries"
+    fi
+    if [ "$matched" -gt 1 ] || [ "$named" -gt 1 ]; then
+      # LeaseExisting changes only the first entry with a given name: one
+      # lease cannot reliably clear duplicate records in either entry order.
+      FM_TASK_COPY_SLOT_STATE=conflicting
+      FM_TASK_COPY_SLOT_REASON="has conflicting lease records in Treehouse state $state, including an unleased entry, so its hold cannot be proved"
+    else
+      FM_TASK_COPY_SLOT_STATE=unleased
+      FM_TASK_COPY_SLOT_REASON="is not leased in Treehouse state $state, so treehouse get may hand it out"
+    fi
+    return 1
+  fi
+  if [ "$has_recovered" = 1 ]; then
+    FM_TASK_COPY_SLOT_STATE=recovered
+    FM_TASK_COPY_SLOT_REASON="is not a Firstmate home and carries Treehouse's recovered-state lease in $state, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed"
+    return 1
+  fi
+  if [ "$matched" -gt 0 ]; then
     FM_TASK_COPY_SLOT_STATE=held
     return 0
   fi
@@ -477,10 +504,12 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
 # allocatable; a slot Treehouse's state durably holds
 # (fm_task_copy_pool_slot_held) is never handed out, whatever lies inside it,
 # and a slot a task merely left is not a record's current copy, so neither
-# stops the allocation. The refusal for a slot that is not leased names the
-# treehouse lease command that holds the slot in place without touching it;
-# teardown's treehouse return releases that lease with the slot. No other
-# refusal names a lease, which would not clear it. A registered local home
+# stops the allocation. A uniquely recorded unleased slot names the treehouse
+# lease command that holds it in place without touching it; teardown's
+# treehouse return releases that lease with the slot. Conflicting records
+# instead need inspection and repair: lease selects only the first matching
+# name, so it cannot reliably clear that refusal. No other refusal names a
+# lease as a remedy. A registered local home
 # that cannot be read is named in one warning line and skipped: one broken home
 # must not stop every allocation for a project.
 fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
@@ -508,11 +537,17 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
         unleased)
           remedy="To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')"
           ;;
+        conflicting)
+          remedy="Inspect the pool with: (cd '$project' && treehouse status); report the conflicting entries for repair before retrying. A lease cannot reliably clear this conflict."
+          ;;
         recovered)
           remedy="treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)"
           ;;
         escaped|relative)
-          remedy="The pool state holds an entry whose path cannot be proved, and a lease does not clear this refusal; report that entry for repair."
+          remedy="Have the pool owner remove or rename the offending entry so its recorded path is absolute and contains no TSV-escaped characters, then retry; a lease does not clear this refusal. A real path containing those characters remains unsupported while the entry exists."
+          ;;
+        missing-jq)
+          remedy="Install jq so the pool state can be read, then retry; a lease does not clear this refusal."
           ;;
         *)
           remedy="A lease does not clear this refusal; inspect the pool with: (cd '$project' && treehouse status)"

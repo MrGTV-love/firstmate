@@ -255,13 +255,18 @@ The same holds for an entry spelled that way that carries Treehouse's recovered-
 The raw path-suffix prefilter skips only entries with an ordinary lease, so it cannot hide a conflicting unleased or recovered-lease alias; skipping an ordinary leased alias can still leave the slot unproved and refuse allocation.
 A lease carrying Treehouse's recovered-state holder counts only when the slot is itself a local Firstmate home, because Treehouse 3.1.0 and later release that lease on their own once the slot is idle, clean, and landed.
 A live owner process, dirt, or an unmerged HEAD also makes a get skip a slot, but each can change before the get runs, so none of them counts; a slot with no state entry, an unreadable state file, or a host without `jq` to read it refuses as unproved.
-The check also refuses to prove a hold when any entry path is relative or escaped by the TSV transport, including paths containing backslashes, tabs, carriage returns, or newlines.
-So a nested copy inside a leased slot, including another project's task copy under a leased secondmate home's `projects/` clone, never stops an unrelated start.
-A refusal for a slot that is not leased names the command that clears it: `treehouse lease <name> --lease-holder <task>`, run from the project once `treehouse status` there lists that slot, holds the slot in place without touching its contents, and teardown's `treehouse return` releases that lease with the slot.
-No other refusal names a lease as its remedy, because a lease does not clear it.
+The check refuses to prove any slot held when any entry path is relative or escaped by the TSV transport, including paths containing backslashes, tabs, carriage returns, or newlines.
+It cannot safely exclude such an entry as unrelated without proving its directory identity, since even a different spelling can alias the requested slot.
+The refusal names the offending entry and its path in TSV-escaped notation and asks the pool owner to remove or rename that entry so its recorded path is absolute and contains none of those characters.
+This includes a legitimate directory containing a backslash: its state is not corrupt, but the pool remains unsupported while that entry exists, so merely reporting it or adding a lease cannot clear the refusal.
+A nested copy inside a slot proved durably held, including another project's task copy under a leased secondmate home's `projects/` clone, does not stop an unrelated start.
+For a singly recorded unleased slot with a unique state name, the refusal names `treehouse lease <name> --lease-holder <task>`, run from the project once `treehouse status` there lists that slot, to hold it in place without touching its contents; teardown's `treehouse return` releases that lease with the slot.
+When an unleased entry's state name is duplicated or another entry names the same directory, the refusal instead requires `treehouse status` inspection and a repair report.
+Treehouse leases only the first entry with the requested name, so a lease cannot reliably clear a duplicate-entry refusal in either entry order, and the refusal does not describe a partly leased slot as unleased.
+No other refusal names a lease as its remedy.
 A refusal for a recovered-state lease points to `treehouse status` instead, because `treehouse lease` refuses a slot that is already leased.
-A refusal for a relative or escaped entry path says that the pool state holds an entry whose path cannot be proved and that the entry must be reported for repair.
-A refusal for a slot with no state entry, an unreadable state file, or a host without `jq` points to `treehouse status` for inspection.
+A missing-`jq` refusal says to install `jq` and retry, including when reached through secondmate home seeding.
+A refusal for a slot with no state entry or an unreadable state file points to `treehouse status` for inspection.
 This check scans every local home it can read: a registered local home or registry it cannot read is named in one warning line and skipped, so one broken home does not stop every allocation for a project.
 A slot is recognized by the rule teardown uses: Treehouse's `<pool>/<slot>/<repo>` layout beside its pool state file, sharing the project's Git common directory.
 A slot a task merely left holds no record's current copy, so it never blocks allocation.

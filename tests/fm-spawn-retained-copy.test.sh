@@ -182,13 +182,14 @@ test_unleased_alias_beside_leased_entry_is_not_held() (
       FM_TASK_COPY_POOL_STATE_ENTRIES=
       rc=0
       if [ "$mode" = no-jq ]; then
+        hash -r
         PATH="$dir/no-tools" fm_task_copy_pool_slot_held "$slot" || rc=$?
         expect_code 1 "$rc" "$mode/$spelling: an unproved slot must not count as held"
-        [ "$FM_TASK_COPY_SLOT_STATE" = unknown ] || fail "$mode/$spelling: missing jq must leave the lease unproved"
+        [ "$FM_TASK_COPY_SLOT_STATE" = missing-jq ] || fail "$mode/$spelling: missing jq must leave the lease unproved"
         assert_contains "$FM_TASK_COPY_SLOT_REASON" "needs jq" "$mode/$spelling: missing-jq refusal lost its reason"
       else
         fm_task_copy_pool_slot_held "$slot" || rc=$?
-        if [ "$rc" != 1 ] || [ "$FM_TASK_COPY_SLOT_STATE" != unleased ]; then
+        if [ "$rc" != 1 ] || [ "$FM_TASK_COPY_SLOT_STATE" != conflicting ]; then
           printf 'not ok - %s/%s: conflicting unleased alias counted as %s (exit %s)\n' \
             "$mode" "$spelling" "$FM_TASK_COPY_SLOT_STATE" "$rc" >&2
           failed=1
@@ -197,7 +198,63 @@ test_unleased_alias_beside_leased_entry_is_not_held() (
     done
   done
   [ "$failed" = 0 ] || fail "noncanonical unleased entries bypassed the lease check"
-  pass "all unleased path spellings beside a leased entry remain unsafe with and without jq"
+  pass "jq checks unleased aliases; without jq the check refuses before alias logic"
+)
+
+test_prefiltered_leased_alias_still_needs_repair() (
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local order dir slot alias leased_name rc
+  for order in leased-first unleased-first all-unleased leaf-leased-first leaf-unleased-first; do
+    dir="$TMP_ROOT/prefiltered-$order"
+    slot="$dir/pool/1/project"
+    mkdir -p "$slot"
+    alias="$slot/"
+    leased_name=1
+    case "$order" in
+      leaf-*)
+        alias="$dir/leaf-link"
+        leased_name=2
+        ln -s "$slot" "$alias"
+        ;;
+    esac
+    jq -n --arg slot "$slot" --arg alias "$alias" --arg leased_name "$leased_name" --arg order "$order" \
+      '{worktrees: ([{name: $leased_name, path: $alias, leased: ($order != "all-unleased"), lease_holder: "holder"}, {name: "1", path: $slot}] | if ($order | endswith("unleased-first")) then reverse else . end)}' \
+      > "$dir/pool/treehouse-state.json" || fail "cannot build duplicate-name fixture"
+    FM_TASK_COPY_POOL_STATE_FILE=
+    FM_TASK_COPY_POOL_STATE_ENTRIES=
+    rc=0
+    fm_task_copy_pool_slot_held "$slot" || rc=$?
+    expect_code 1 "$rc" "$order: duplicate-name slot cannot be proved held"
+    [ "$FM_TASK_COPY_SLOT_STATE" = conflicting ] || fail "$order: duplicate names must not suggest a first-entry-only lease"
+  done
+  pass "prefiltered leased aliases and duplicate unleased names require repair, not a lease"
+)
+
+test_missing_jq_refusal_names_install() (
+  local name=missing-jq tool out rc=0
+  make_retained_case "$name"
+  add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+  FM_HOME=$HOME_DIR
+  # shellcheck source=bin/fm-backend.sh
+  . "$ROOT/bin/fm-backend.sh"
+  # shellcheck source=bin/fm-secondmate-parent-lib.sh
+  . "$ROOT/bin/fm-secondmate-parent-lib.sh"
+  # shellcheck source=bin/fm-wake-lib.sh
+  . "$ROOT/bin/fm-wake-lib.sh"
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  mkdir -p "$CASE_DIR/no-jq"
+  for tool in basename dirname git cat; do
+    ln -s "$(command -v "$tool")" "$CASE_DIR/no-jq/$tool"
+  done
+  hash -r
+  out=$(PATH="$CASE_DIR/no-jq" fm_task_copy_pool_slots_hold_no_current_copy "$PROJECT_DIR" "$HOME_DIR/state" 2>&1) || rc=$?
+  expect_code 1 "$rc" "missing jq must refuse before allocation"
+  assert_contains "$out" "Install jq" "missing-jq refusal omitted the actual remedy"
+  assert_not_contains "$out" "treehouse status" "missing-jq refusal must not substitute pool inspection for installation"
+  assert_not_contains "$out" "treehouse lease" "missing-jq refusal must not recommend a lease"
+  pass "the shared public allocation guard tells a jq-free caller to install jq"
 )
 
 test_unleased_directory_identity_aliases_are_not_held() (
@@ -231,7 +288,7 @@ test_unleased_directory_identity_aliases_are_not_held() (
     rc=0
     fm_task_copy_pool_slot_held "$slot" || rc=$?
     expect_code 1 "$rc" "$spelling: unleased alias must not count as held"
-    [ "$FM_TASK_COPY_SLOT_STATE" = unleased ] || fail "$spelling: directory identity was not recognized"
+    [ "$FM_TASK_COPY_SLOT_STATE" = conflicting ] || fail "$spelling: directory identity was not recognized"
     pass "$spelling unleased alias beside a leased entry prevents a held verdict"
   done
 )
@@ -311,24 +368,38 @@ test_slot_holding_live_nested_current_copy_refuses() {
 }
 
 test_conflicting_unleased_alias_refuses_before_allocation() {
-  local spelling name alias
-  for spelling in trailing-slash dot double-slash; do
-    name="conflicting-$spelling"
-    make_retained_case "$name"
-    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
-    case "$spelling" in
-      trailing-slash) alias="$SLOT_DIR/" ;;
-      dot) alias="$SLOT_DIR/./" ;;
-      double-slash) alias="${SLOT_DIR%/*}//${SLOT_DIR##*/}" ;;
-    esac
-    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s"}]}\n' \
-      "$SLOT_DIR" "$alias" > "$CASE_DIR/pool/treehouse-state.json"
-    cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
-    assert_retained_refusal "$name" "is not leased in Treehouse state" \
-      "(cd '$PROJECT_DIR' && treehouse lease '1' --lease-holder 'holder')"
-    cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$spelling: refusal changed pool state"
+  local spelling order name alias out rc failed=0
+  for order in leased-first unleased-first; do
+    for spelling in trailing-slash dot double-slash; do
+      name="conflicting-$order-$spelling"
+      make_retained_case "$name"
+      add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+      case "$spelling" in
+        trailing-slash) alias="$SLOT_DIR/" ;;
+        dot) alias="$SLOT_DIR/./" ;;
+        double-slash) alias="${SLOT_DIR%/*}//${SLOT_DIR##*/}" ;;
+      esac
+      jq -n --arg slot "$SLOT_DIR" --arg alias "$alias" --arg order "$order" \
+        '{worktrees: ([{name: "1", path: $slot, leased: true, lease_holder: "holder"}, {name: "1", path: $alias}] | if $order == "unleased-first" then reverse else . end)}' \
+        > "$CASE_DIR/pool/treehouse-state.json" || fail "cannot build conflicting-entry fixture"
+      cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+      retained_fingerprint > "$CASE_DIR/before-copy"
+      rc=0
+      out=$(run_retained_spawn "$name") || rc=$?
+      if [ "$rc" = 0 ] || [[ "$out" != *"has conflicting lease records"* ]] || \
+        [[ "$out" != *"report the conflicting entries for repair"* ]] || [[ "$out" == *"treehouse lease"* ]] || \
+        [[ "$out" != *"(cd '$PROJECT_DIR' && treehouse status)"* ]]; then
+        printf 'not ok - %s/%s: mixed-entry refusal must name status/repair, not a lease or an unleased-only verdict: %s\n' "$order" "$spelling" "$out" >&2
+        failed=1
+      fi
+      assert_contains "$out" "before treehouse get" "mixed-entry refusal did not precede acquisition"
+      ! grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "mixed-entry refusal allocated a slot"
+      retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "mixed-entry refusal changed the copy"
+      cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$spelling: refusal changed pool state"
+    done
   done
-  pass "conflicting unleased aliases refuse a spawn before allocation without changing pool state"
+  [ "$failed" = 0 ] || fail "mixed-entry refusal recommends an order-dependent lease remedy"
+  pass "mixed leased/unleased aliases refuse with status/repair guidance in both entry orders"
 }
 
 test_conflicting_recovered_alias_refuses_before_allocation() {
@@ -346,7 +417,7 @@ test_conflicting_recovered_alias_refuses_before_allocation() {
     printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
       "$SLOT_DIR" "$alias" "$recovered" > "$CASE_DIR/pool/treehouse-state.json"
     cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
-    assert_retained_refusal "$name" "carries only Treehouse's recovered-state lease" \
+    assert_retained_refusal "$name" "carries Treehouse's recovered-state lease" \
       "(cd '$PROJECT_DIR' && treehouse status)"
     cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$spelling: refusal changed pool state"
   done
@@ -354,7 +425,7 @@ test_conflicting_recovered_alias_refuses_before_allocation() {
 }
 
 test_unprovable_entry_path_refusal_names_no_lease() {
-  local shape name path
+  local shape name path display_path
   command -v jq >/dev/null 2>&1 || fail "the jq regressions require jq"
   for shape in escaped relative; do
     name="entry-path-$shape"
@@ -366,11 +437,12 @@ test_unprovable_entry_path_refusal_names_no_lease() {
       '{worktrees: [{name: "1", path: $held, leased: true, lease_holder: "holder"}, {name: "9", path: $unsafe}]}' \
       > "$CASE_DIR/pool/treehouse-state.json" || fail "$shape: cannot build the pool state fixture"
     cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
-    assert_retained_refusal "$name" "$shape entry path" \
-      "a lease does not clear this refusal; report that entry for repair" "treehouse lease"
+    display_path=$(jq -rn --arg path "$path" '[$path] | @tsv') || fail "cannot encode the offending path"
+    assert_retained_refusal "$name" "$shape entry path for entry '9': '$display_path'" \
+      "remove or rename the offending entry" "treehouse lease"
     cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$shape: refusal changed pool state"
   done
-  pass "an escaped or relative entry path refuses a spawn and asks for a repair report, never a lease"
+  pass "unsupported entry refusals identify the entry and path, and require removal or renaming, never a lease"
 }
 
 test_unprovable_slot_hold_still_refuses() {
@@ -405,7 +477,7 @@ test_unprovable_slot_hold_still_refuses() {
       recovered-not-home)
         entry=$(printf ',"leased":true,"lease_holder":"%s"' "$recovered")
         add_free_second_slot "$entry"
-        reason="is not a Firstmate home and carries only Treehouse's recovered-state lease"
+        reason="is not a Firstmate home and carries Treehouse's recovered-state lease"
         remedy="treehouse lease refuses a slot that is already leased"
         ;;
     esac
@@ -512,12 +584,14 @@ test_unreadable_local_home_warns_and_proceeds() {
   pass "an unavailable registered local home is named in one warning and the spawn proceeds"
 }
 
+test_conflicting_unleased_alias_refuses_before_allocation || exit 1
 test_unsupported_entry_paths_are_unproved || exit 1
 test_unleased_alias_beside_leased_entry_is_not_held || exit 1
+test_prefiltered_leased_alias_still_needs_repair || exit 1
+test_missing_jq_refusal_names_install || exit 1
 test_unleased_directory_identity_aliases_are_not_held || exit 1
 test_recovered_alias_beside_leased_entry_is_not_held || exit 1
 test_slot_holding_live_nested_current_copy_refuses
-test_conflicting_unleased_alias_refuses_before_allocation
 test_conflicting_recovered_alias_refuses_before_allocation
 test_unprovable_entry_path_refusal_names_no_lease
 test_unprovable_slot_hold_still_refuses
