@@ -1,0 +1,7 @@
+# omp 18.9.2 live session, OLD guard (base 8a86b966), same fixture: reproduces the reported bug
+{"call":"write","args":{"path":"xd://lsp","content":"{\"action\":\"references\",\"file\":\"src/model.ts\",\"line\":1,\"symbol\":\"AnalyticsRow\"}"}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+{"call":"bash","args":{"command":"sleep 300","timeout":400,"cwd":null,"pty":null,"async":true,"name":null,"ready":null}}
+{"result":"bash","isError":false,"text":"Backgrounded as job bg_1 (killed once it has run 400s in total; `timeout: 0` disables the deadline); its output is injected into the conversation as a follow-up the moment it finishes. Do NOT poll for it (no `sleep`, `ps`, `pgrep`, `top`, `pidwait`, log tailing): every poll is a wasted turn. Do other work, or end your reply and wait to be woken."}
+{"call":"write","args":{"path":"proc://bg_1/kill","content":null}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}

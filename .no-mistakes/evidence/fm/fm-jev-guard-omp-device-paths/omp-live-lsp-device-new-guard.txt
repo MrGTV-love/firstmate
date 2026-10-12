@@ -1,0 +1,32 @@
+# omp 18.9.2 live session, NEW guard (HEAD 450ffe97), project=vernant, inherited PI_DISABLE_LSPMUX=0
+# fixture: /Users/charlesabrooker/tmp/fm-lab.adkzcc/wt (git repo, package.json+tsconfig, local typescript-language-server + typescript 5.9.3); src/escape.ts -> symlink outside the worktree
+# launch mirrors fm-spawn omp worker: --config .omp/fm-session-overlay.yml --auto-approve --cwd WT --config .omp/fm-worker-overlay.yml -e <ext calling installJevGuard>
+# session_start recorder: {"event":"session_start","cwd":"/Users/charlesabrooker/tmp/fm-lab.adkzcc/wt","PI_DISABLE_LSPMUX":"1"}
+{"call":"read","args":{"path":"xd://lsp"}}
+{"result":"read","isError":false,"text":"# lsp — LSP\n\nSymbol-aware code intelligence from language servers — navigation, refactors, and diagnostics where text tools miss callsites.\n\n<operations>\n- Position-based: `file` + `line` + `symbol` (substring; `#N` for Nth match). `line` is 1-indexed.\n- `rename` — applies by default; `apply: false` previews. Project-aware lookups ERROR without `symbol` — no silent fallback on missing/ambiguous ma"}
+{"call":"write","args":{"path":"xd://lsp","content":"{\"action\":\"references\",\"file\":\"src/model.ts\",\"line\":1,\"symbol\":\"AnalyticsRow\"}"}}
+{"result":"write","isError":false,"text":"Found 6 reference(s):\n  src/model.ts:1:18\n    1: export interface AnalyticsRow {\n    2:   sheet: string;\n  src/model.ts:6:56\n    5: \n    6: export function makeRow(sheet: string, value: number): AnalyticsRow {\n    7:   return { sheet, value };\n  src/report.ts:1:15\n    1: import type { AnalyticsRow } from \"./model.ts\";\n    2: \n  src/report.ts:3:29\n    2: \n    3: export function total(rows: Analytic"}
+{"call":"write","args":{"path":"xd://lsp","content":"{\"action\":\"definition\",\"file\":\"src/wiring.ts\",\"line\":3,\"symbol\":\"makeRow\"}"}}
+{"result":"write","isError":false,"text":"Found 1 definition(s):\n  src/model.ts:6:17\n    5: \n    6: export function makeRow(sheet: string, value: number): AnalyticsRow {\n    7:   return { sheet, value };"}
+{"call":"write","args":{"path":"xd://lsp","content":"{\"action\":\"hover\",\"file\":\"src/report.ts\",\"line\":3,\"symbol\":\"total\"}"}}
+{"result":"write","isError":false,"text":"\n```typescript\nfunction total(rows: AnalyticsRow[]): number\n```\n"}
+{"call":"write","args":{"path":"xd://lsp","content":"{\"action\":\"symbols\",\"file\":\"src/model.ts\"}"}}
+{"result":"write","isError":false,"text":"Symbols in src/model.ts:\n⬢ AnalyticsRow @ line 1\n  • sheet @ line 2\n  • value @ line 3\n⟲ makeRow @ line 6\n  • sheet @ line 7\n  • value @ line 7"}
+{"call":"write","args":{"path":"xd://lsp","content":"{\"action\":\"diagnostics\",\"file\":\"src/model.ts\"}"}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+{"call":"write","args":{"path":"xd://lsp","content":"{\"action\":\"symbols\",\"file\":\"*\",\"query\":\"AnalyticsRow\"}"}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+{"call":"write","args":{"path":"xd://lsp","content":"{\"action\":\"rename\",\"file\":\"src/model.ts\",\"line\":1,\"symbol\":\"AnalyticsRow\",\"new_name\":\"Renamed\"}"}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+{"call":"write","args":{"path":"xd://lsp","content":"{\"action\":\"references\",\"file\":\"src/escape.ts\",\"line\":1,\"symbol\":\"outside\"}"}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+{"call":"write","args":{"path":"xd://report_issue","content":"{\"tool\":\"write\",\"report\":\"verification probe only\"}"}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+{"call":"bash","args":{"command":"printf 'PI_DISABLE_LSPMUX=%s\\n' \"$PI_DISABLE_LSPMUX\"","timeout":null,"cwd":null,"pty":null,"async":null,"name":null,"ready":null}}
+{"result":"bash","isError":false,"text":"PI_DISABLE_LSPMUX=1\n\n\nWall time: 0.01 seconds"}
+# fixture git status after session (rename must not have applied):
+ M package.json   (npm install of the local LSP toolchain before the session)
+?? notes/         (written later by the proc session step 7)
+?? package-lock.json
+# judge requests during this session: 0 (project vernant withholds every provider call, unchanged behavior; Jev-skip for devices is shown in the proc transcript under project firstmate)
+src/ unchanged

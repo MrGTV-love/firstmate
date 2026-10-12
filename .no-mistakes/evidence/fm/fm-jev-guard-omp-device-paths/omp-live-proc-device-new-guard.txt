@@ -1,0 +1,23 @@
+# omp 18.9.2 live session, NEW guard (HEAD 450ffe97), project=firstmate, fake loopback Jev judge
+{"call":"bash","args":{"command":"sleep 300","timeout":400,"cwd":null,"pty":null,"async":true,"name":null,"ready":null}}
+{"result":"bash","isError":false,"text":"Backgrounded as job bg_1 (killed once it has run 400s in total; `timeout: 0` disables the deadline); its output is injected into the conversation as a follow-up the moment it finishes. Do NOT poll for it (no `sleep`, `ps`, `pgrep`, `top`, `pidwait`, log tailing): every poll is a wasted turn. Do other work, or end your reply and wait to be woken."}
+{"call":"write","args":{"path":"proc://bg_1/kill","content":null}}
+{"result":"write","isError":false,"text":"## Cancelled (1)\n\n- Cancelled background job bg_1.\n\n## Completed (1)\n\n### bg_1 [bash] — cancelled\nLabel: sleep 300"}
+{"call":"read","args":{"path":"proc://bg_1"}}
+{"result":"read","isError":false,"text":"bg_1 [bash] — cancelled — sleep 300\nError: [Command cancelled]"}
+{"call":"write","args":{"path":"proc://bg_1/kill","content":null}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+{"call":"write","args":{"path":"proc://bg_99/kill","content":null}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+{"call":"write","args":{"path":"proc://bg_1/mode","content":"persist"}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+{"call":"write","args":{"path":"notes/probe.txt","content":"hello from the device lab"}}
+{"result":"write","isError":false,"text":"Successfully wrote 25 bytes to notes/probe.txt"}
+{"call":"write","args":{"path":"file:///tmp/fm-devlab-probe.txt","content":"hello"}}
+{"result":"write","isError":true,"text":"jev-guard needs a plain absolute or worktree-relative path. Use one, and report if that is not possible rather than working around this block."}
+# fake Jev judge requests during this session (device writes must be absent; plain write notes/probe.txt must be present):
+{"path":"/v1/systemone","state":{"command":"sleep 300","cwd":"/Users/charlesabrooker/tmp/fm-lab.adkzcc/wt"}}
+{"path":"/v1/systemone","state":{"tool":"bash","content":"Backgrounded as job bg_1 (killed once it has run 400s in total; `timeout: 0` disables the deadline); its output is injected into the conversation as a follow-up t
+{"path":"/v1/systemone","state":{"tool":"read","content":"bg_1 [bash] — cancelled — sleep 300\nError: [Command cancelled]"}}
+{"path":"/v1/systemone","state":{"path":"notes/probe.txt","content":"hello from the device lab"}}
+# file:///tmp/fm-devlab-probe.txt exists? no
