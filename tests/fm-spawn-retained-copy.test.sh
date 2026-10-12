@@ -112,6 +112,48 @@ assert_retained_spawn() {
   assert_grep "worktree=$SLOT_DIR" "$HOME_DIR/state/new-$name.meta" "$msg: spawn did not publish the slot"
 }
 
+# Conflicting entries must be judged by directory identity, not raw spelling.
+# Source before hiding PATH so the missing-jq case exercises the real fallback.
+test_unleased_alias_beside_leased_entry_is_not_held() (
+  # shellcheck source=bin/fm-task-copy-lib.sh
+  . "$ROOT/bin/fm-task-copy-lib.sh"
+  local mode spelling dir slot alias rc failed=0
+  command -v jq >/dev/null 2>&1 || fail "the jq regressions require jq"
+  for mode in jq no-jq; do
+    for spelling in trailing-slash dot double-slash; do
+      dir="$TMP_ROOT/conflicting-$mode-$spelling"
+      slot="$dir/pool/1/project"
+      mkdir -p "$slot" "$dir/no-tools"
+      slot=$(cd "$slot" && pwd -P)
+      case "$spelling" in
+        trailing-slash) alias="$slot/" ;;
+        dot) alias="$slot/./" ;;
+        double-slash) alias="${slot%/*}//${slot##*/}" ;;
+      esac
+      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s"}]}\n' \
+        "$slot" "$alias" > "$dir/pool/treehouse-state.json"
+      FM_TASK_COPY_POOL_STATE_FILE=
+      FM_TASK_COPY_POOL_STATE_ENTRIES=
+      rc=0
+      if [ "$mode" = no-jq ]; then
+        PATH="$dir/no-tools" fm_task_copy_pool_slot_held "$slot" || rc=$?
+        expect_code 1 "$rc" "$mode/$spelling: an unproved slot must not count as held"
+        [ "$FM_TASK_COPY_SLOT_STATE" = unknown ] || fail "$mode/$spelling: missing jq must leave the lease unproved"
+        assert_contains "$FM_TASK_COPY_SLOT_REASON" "needs jq" "$mode/$spelling: missing-jq refusal lost its reason"
+      else
+        fm_task_copy_pool_slot_held "$slot" || rc=$?
+        if [ "$rc" != 1 ] || [ "$FM_TASK_COPY_SLOT_STATE" != unleased ]; then
+          printf 'not ok - %s/%s: conflicting unleased alias counted as %s (exit %s)\n' \
+            "$mode" "$spelling" "$FM_TASK_COPY_SLOT_STATE" "$rc" >&2
+          failed=1
+        fi
+      fi
+    done
+  done
+  [ "$failed" = 0 ] || fail "noncanonical unleased entries bypassed the lease check"
+  pass "all unleased path spellings beside a leased entry remain unsafe with and without jq"
+)
+
 test_slot_holding_live_nested_current_copy_refuses() {
   local spelling name nested out
   for spelling in direct alias; do
@@ -143,6 +185,27 @@ test_slot_holding_live_nested_current_copy_refuses() {
       || fail "a slot whose nested copy no record names did not reach treehouse get: $out"
   done
   pass "a pool slot holding a live record's nested current copy refuses allocation until that record is retired"
+}
+
+test_conflicting_unleased_alias_refuses_before_allocation() {
+  local spelling name alias
+  for spelling in trailing-slash dot double-slash; do
+    name="conflicting-$spelling"
+    make_retained_case "$name"
+    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+    case "$spelling" in
+      trailing-slash) alias="$SLOT_DIR/" ;;
+      dot) alias="$SLOT_DIR/./" ;;
+      double-slash) alias="${SLOT_DIR%/*}//${SLOT_DIR##*/}" ;;
+    esac
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"1","path":"%s"}]}\n' \
+      "$SLOT_DIR" "$alias" > "$CASE_DIR/pool/treehouse-state.json"
+    cp "$CASE_DIR/pool/treehouse-state.json" "$CASE_DIR/before-state"
+    assert_retained_refusal "$name" "is not leased in Treehouse state" \
+      "(cd '$PROJECT_DIR' && treehouse lease '1' --lease-holder 'holder')"
+    cmp -s "$CASE_DIR/before-state" "$CASE_DIR/pool/treehouse-state.json" || fail "$spelling: refusal changed pool state"
+  done
+  pass "conflicting unleased aliases refuse a spawn before allocation without changing pool state"
 }
 
 test_unprovable_slot_hold_still_refuses() {
@@ -281,7 +344,9 @@ test_unreadable_local_home_warns_and_proceeds() {
   pass "an unavailable registered local home is named in one warning and the spawn proceeds"
 }
 
+test_unleased_alias_beside_leased_entry_is_not_held || exit 1
 test_slot_holding_live_nested_current_copy_refuses
+test_conflicting_unleased_alias_refuses_before_allocation
 test_unprovable_slot_hold_still_refuses
 test_nested_copy_in_leased_slot_allows_allocation
 test_secondmate_home_slot_with_other_project_copy_allows_allocation

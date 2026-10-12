@@ -422,7 +422,11 @@ fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
     path=${path#P}
     [ -n "$path" ] || continue
     if [ "$path" != "$slot" ]; then
-      [ "${path#"${path%/*/*}"}" = "$leaf" ] || continue
+      # Only leased entries may be skipped by their raw suffix: skipping an
+      # unleased alias can hide a conflict with a matching leased entry.
+      if [ "${leased#L}" = leased ]; then
+        [ "${path#"${path%/*/*}"}" = "$leaf" ] || continue
+      fi
       real=$(fm_task_copy_canonical_dir "$path") || continue
       [ "$real" = "$slot" ] || continue
     fi
@@ -481,6 +485,7 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       id=$(basename "$meta" .meta)
       echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
       case "$FM_TASK_COPY_SLOT_STATE" in
+        held) continue ;;
         unleased)
           echo "To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')" >&2
           ;;
