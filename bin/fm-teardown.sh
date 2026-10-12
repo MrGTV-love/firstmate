@@ -3286,7 +3286,8 @@ require_owned_task_worktree_slot() {
 TEARDOWN_SLOT_SHARED=0
 TEARDOWN_SHARED_SLOT=
 require_shared_task_worktree_slot() {
-  local slot state_dir other_meta copy kind marker
+  local slot state_dir other_meta copy kind marker holder
+  local -a sharers=()
   [ "$FORCE" != --force ] || return 0
   teardown_owns_worktree || return 0
   slot=$(teardown_live_slot_path) || {
@@ -3306,41 +3307,46 @@ require_shared_task_worktree_slot() {
       case "$kind" in ''|ship|scout) ;; *) continue ;; esac
       copy=$(fm_task_copy_canonical_dir "$(fm_meta_get "$other_meta" worktree)") || continue
       [ "$copy" = "$slot" ] || continue
-      fm_treehouse_slot_owner_state "$slot" "$ID"
-      case "$FM_TREEHOUSE_SLOT_OWNER" in
-        mine|absent)
-          # Until reassociation, root-only records do not trigger the allocation
-          # guard for nested current copies. Keep Treehouse itself from handing
-          # out this slot throughout that interval, not just during our lock.
-          if ! fm_task_copy_pool_slot_held "$slot"; then
-            echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed." >&2
-            if [ "$FM_TASK_COPY_SLOT_STATE" = unleased ]; then
-              echo "Hold it in place without touching its contents: (cd '$PROJ' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder <remaining-task>)" >&2
-            else
-              echo "Inspect its lease with: (cd '$PROJ' && treehouse status); an unleased slot can be held with treehouse lease <name> --lease-holder <remaining-task>." >&2
-            fi
-            return 1
-          fi
-          TEARDOWN_SLOT_REASSIGNED_TO=$(basename "$other_meta" .meta)
-          TEARDOWN_SLOT_REASSIGNED_HOME=${state_dir%/*}
-          ;;
-        other)
-          TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
-          TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
-          ;;
-        *)
-          marker=$(fm_treehouse_slot_owner_marker "$slot" 2>/dev/null) || marker="beside $slot"
-          echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed." >&2
-          return 1
-          ;;
-      esac
-      TEARDOWN_SHARED_SLOT=$slot
-      TEARDOWN_SLOT_SHARED=1
-      TEARDOWN_SLOT_REASSIGNED=1
-      echo "notice: task $ID shares recorded pool slot $slot with task $TEARDOWN_SLOT_REASSIGNED_TO; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched." >&2
-      return 0
+      sharers+=("$(basename "$other_meta" .meta)")
     done
   done
+  [ "${#sharers[@]}" -gt 0 ] || return 0
+  fm_treehouse_slot_owner_state "$slot" "$ID"
+  case "$FM_TREEHOUSE_SLOT_OWNER" in
+    mine|absent)
+      # Until reassociation, root-only records do not trigger the allocation
+      # guard for nested current copies. Keep Treehouse itself from handing
+      # out this slot throughout that interval, not just during our lock.
+      if ! fm_task_copy_pool_slot_held "$slot"; then
+        holder='<remaining-task>'
+        [ "${#sharers[@]}" -ne 1 ] || holder="'${sharers[0]}'"
+        echo "REFUSED: shared pool slot $slot $FM_TASK_COPY_SLOT_REASON; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed." >&2
+        if [ "$FM_TASK_COPY_SLOT_STATE" = unleased ]; then
+          echo "Hold it in place without touching its contents: (cd '$PROJ' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder $holder)" >&2
+        else
+          echo "Inspect its lease with: (cd '$PROJ' && treehouse status); an unleased slot can be held with treehouse lease <name> --lease-holder $holder." >&2
+        fi
+        [ "${#sharers[@]}" -eq 1 ] \
+          || echo "Several other root records name this slot (${sharers[*]}); <remaining-task> is the one whose work stays in it." >&2
+        return 1
+      fi
+      TEARDOWN_SLOT_REASSIGNED_TO=${sharers[*]}
+      TEARDOWN_SLOT_REASSIGNED_HOME=
+      ;;
+    other)
+      TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
+      TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
+      ;;
+    *)
+      marker=$(fm_treehouse_slot_owner_marker "$slot" 2>/dev/null) || marker="beside $slot"
+      echo "REFUSED: shared pool slot $slot carries an unreadable owner claim at $marker; nothing was changed." >&2
+      return 1
+      ;;
+  esac
+  TEARDOWN_SHARED_SLOT=$slot
+  TEARDOWN_SLOT_SHARED=1
+  TEARDOWN_SLOT_REASSIGNED=1
+  echo "notice: task $ID shares recorded pool slot $slot with task $TEARDOWN_SLOT_REASSIGNED_TO; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched." >&2
   return 0
 }
 

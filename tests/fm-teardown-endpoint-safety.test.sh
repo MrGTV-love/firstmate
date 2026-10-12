@@ -1099,6 +1099,45 @@ test_stale_record_on_claimed_slot_retires_then_claimant_tears_down() {
   grep -Fq "treehouse <return>" "$dir/runtime.log" \
     || fail "claimant teardown did not return its pool slot: $(cat "$dir/runtime.log")"
 
+  # Ordinary non-forcing cleanup of a stale ship record with no recorded PR
+  # and a pruned branch, while the claimant holds only a process lease, keeps
+  # the records-only route: no durable lease or new delivery proof is needed.
+  dir=$(make_case slot-reassigned-both-records-unforced)
+  mark_case_as_treehouse_pool "$dir"
+  rm -f "$dir/worktree/sentinel"
+  fm_write_meta "$dir/home/state/$id.meta" \
+    "window=firstmate:fm-$id" "endpoint_task_id=$id" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=ship" "branch=fm/$id"
+  fm_write_meta "$dir/home/state/$other.meta" \
+    "window=firstmate:fm-$other" "endpoint_task_id=$other" \
+    "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
+  claim_pool_slot "$dir" "$other"
+  cp "$dir/home/state/$other.meta" "$dir/other-before"
+  cp "$dir/pool/1/.fm-slot-owner" "$dir/claim-before"
+  cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
+  git -C "$dir/project" for-each-ref --format='%(refname) %(objectname)' > "$dir/refs-before"
+  git -C "$dir/pool/1/project" status --porcelain --untracked-files=all > "$dir/status-before"
+  git -C "$dir/pool/1/project" rev-parse HEAD > "$dir/head-before"
+
+  set +e
+  FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" \
+  FM_RUNTIME_LOG="$dir/runtime.log" PATH="$dir/fakebin:$PATH" \
+    "$TEARDOWN" "$id" > "$dir/stdout" 2> "$dir/stderr"
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "non-forcing records-only teardown of a stale ship on a claimed slot failed: $(cat "$dir/stderr")"
+  assert_reassigned_slot_left_alone "$dir" "$id" "$other" "stale ship beside the claimant's record without --force"
+  cmp -s "$dir/other-before" "$dir/home/state/$other.meta" || fail "non-forcing records-only teardown changed the claimant's record"
+  cmp -s "$dir/claim-before" "$dir/pool/1/.fm-slot-owner" || fail "non-forcing records-only teardown changed the claimant's claim"
+  cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "non-forcing records-only teardown changed Treehouse state"
+  git -C "$dir/project" for-each-ref --format='%(refname) %(objectname)' | cmp -s - "$dir/refs-before" \
+    || fail "non-forcing records-only teardown changed branches"
+  git -C "$dir/pool/1/project" status --porcelain --untracked-files=all | cmp -s - "$dir/status-before" \
+    || fail "non-forcing records-only teardown changed the claimant's copy"
+  git -C "$dir/pool/1/project" rev-parse HEAD | cmp -s - "$dir/head-before" \
+    || fail "non-forcing records-only teardown moved the claimant's HEAD"
+  ! grep -Fq "treehouse lease" "$dir/stderr" || fail "non-forcing records-only teardown asked for a lease: $(cat "$dir/stderr")"
+
   pass "fm-teardown: a stale record on a claimed slot retires, then the claimant tears down"
 }
 

@@ -1364,7 +1364,7 @@ test_unleased_shared_slot_gates_only_the_claimant() {
       assert_contains "$out" 'was reassigned to task parked' 'reassigned-slot cleanup did not name the claimant'
     else
       expect_code 1 "$rc" "$claimant claim: shared-root cleanup must not open an allocation window before reassociation"$'\n'"$out"
-      assert_contains "$out" "treehouse lease '42' --lease-holder <remaining-task>" 'the lease refusal must name the state-only remedy'
+      assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" 'the lease refusal must name the state-only remedy'
       cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$claimant claim: unleased cleanup retired its record"
     fi
     cmp -s "$dir/parked-before" "$dir/home/state/parked.meta" || fail "$claimant claim: cleanup changed the parked record"
@@ -1382,6 +1382,46 @@ test_unleased_shared_slot_gates_only_the_claimant() {
     [ ! -e "$dir/treehouse.log" ] || fail "$claimant claim: cleanup touched Treehouse"
   done
   pass 'an unleased shared slot refuses its claimant and an unclaimed record, and retires a reassigned record without touching the claimant, its claim, branches or copy bytes'
+}
+
+# The lease remedy names the remaining record that stays in the slot, never
+# whichever other root record the state glob lists first.
+test_unleased_shared_slot_names_the_remaining_lease_holder() {
+  local id=shared-holder shape dir slot out rc
+  for shape in nested-finished root-finished; do
+    dir=$(new_case "shared-holder-$shape" "$id")
+    slot=$(add_pool_slot "$dir" 42 "fm/$id-slot")
+    printf '{"worktrees":[{"name":"42","path":"%s","leased":false}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
+      "endpoint_task_id=$id" "worktree=$slot" "project=$dir/proj" \
+      "kind=ship" "spawn_gen=finished" "pr=https://github.com/example/repo/pull/7"
+    if [ "$shape" = nested-finished ]; then
+      git -C "$dir/proj" worktree add --quiet --detach "$slot/.claude/worktrees/scout"
+      fm_write_meta "$dir/home/state/a-finished.meta" "worktree=$slot/.claude/worktrees/scout" "kind=scout"
+    else
+      fm_write_meta "$dir/home/state/a-finished.meta" "worktree=$slot" "kind=ship"
+    fi
+    fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
+    printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
+    cp "$dir/home/state/$id.meta" "$dir/meta-before"
+    cp "$dir/pool/42/.fm-slot-owner" "$dir/claim-before"
+    copy_fingerprint "$slot" > "$dir/slot-before"
+    rc=0
+    out=$(FM_SHARED_PR_STATE=MERGED run_case_teardown "$dir" "$id") || rc=$?
+    expect_code 1 "$rc" "$shape: an unleased shared slot must refuse its claimant's cleanup"$'\n'"$out"
+    case "$out" in *"--lease-holder 'a-finished'"*) fail "$shape: the lease remedy named the glob-first record: $out" ;; esac
+    if [ "$shape" = nested-finished ]; then
+      assert_contains "$out" "treehouse lease '42' --lease-holder 'parked')" "$shape: the lease remedy must name the remaining root record"
+    else
+      assert_contains "$out" "--lease-holder <remaining-task>)" "$shape: an ambiguous remedy must not guess a holder"
+      assert_contains "$out" '(a-finished parked)' "$shape: an ambiguous remedy must list every remaining root record"
+    fi
+    cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail "$shape: refused cleanup changed its record"
+    cmp -s "$dir/claim-before" "$dir/pool/42/.fm-slot-owner" || fail "$shape: refused cleanup changed the claim"
+    copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$shape: refused cleanup changed slot bytes"
+    [ ! -e "$dir/treehouse.log" ] || fail "$shape: refused cleanup touched Treehouse"
+  done
+  pass 'the unleased shared-slot remedy names the sole remaining root record and never guesses among several'
 }
 
 test_recorded_pr_reassociation_requires_contained_head() {
@@ -1442,6 +1482,7 @@ EOF
 }
 
 test_unleased_shared_slot_gates_only_the_claimant
+test_unleased_shared_slot_names_the_remaining_lease_holder
 test_recorded_pr_reassociation_requires_contained_head
 test_shared_slot_cleanup_then_reassociate_preserves_all_copies
 test_unfinished_shared_slot_record_cannot_retire
