@@ -1835,7 +1835,7 @@ The shared guard blocks every other spelling without a Jev call because omp can 
 Admitted devices skip Jev and file-root selection because their payloads are native tool arguments, not repository file contents.
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can still send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
 `xd://report_issue` remains blocked because it can upload reports; all other xd devices and schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked with the existing plain-path reason.
-Device `edit` calls remain blocked, and every refusal tells the agent to use a plain path and report if that is not possible.
+Device `edit` calls remain blocked, and every path-spelling refusal tells the agent to use a plain path and report if that is not possible.
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the unchanged upstream write gate.
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
