@@ -51,9 +51,11 @@ Each change and its reason:
   Its `writeRoot` selects the worktree, task-data or temporary root that holds the target, preserving intentional report and scratch writes.
 - `bin/fm-jev-guard.ts`'s edit-schema check blocks inputs without a string `path` and `new_string`, telling the agent to report that omp replace edit mode is required.
   omp's default hashline schema differs from pi's, while replace mode matches the unchanged upstream gate without projecting or changing execution arguments.
-- `bin/fm-jev-guard.ts`'s path-spelling check enforces the [operator contract](../../docs/configuration.md#jev-guard) for plain write and edit paths.
-  Every other spelling blocks before root selection without a Jev call, requiring a plain absolute or worktree-relative path and a report if that is not possible.
-  This allowlist prevents omp 18.8.1's rewritten spellings from making the unchanged upstream lexical gate judge a different target without reimplementing host resolution or mutating execution arguments.
+- `bin/fm-jev-guard.ts`'s path-spelling check enforces the [operator contract](../../docs/configuration.md#jev-guard) for plain file paths and its exact bounded native-device write exceptions.
+  Device admission returns before upstream file-root selection and judgment because LSP arguments and job cancellation are not file writes.
+  Other spellings block without a Jev call, requiring a plain absolute or worktree-relative path and a report if that is not possible.
+  The installer disables shared LSP multiplexing process-locally; the operator contract owns the allowed actions, realpath and snapshot checks, and residual native-server edit and snapshot-to-dispatch risks.
+  This allowlist prevents omp's rewritten file spellings from making the unchanged upstream lexical gate judge a different target without reimplementing host resolution or mutating execution arguments.
 - `bin/fm-jev-guard-claude.ts:31-48`: Claude has no pi extension API, so the adapter maps Claude's `PreToolUse` and `PostToolUse` payloads to the pi events the upstream handlers read (`file_path` to `path`, `tool_response` to text content).
   `:37` turns an upstream block into a Claude `deny`.
   `:47` delivers the banner as `additionalContext`, because a Claude hook cannot replace a built-in tool's output.

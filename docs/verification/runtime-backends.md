@@ -636,6 +636,14 @@ Both ledgers held one `hook` row per step with the matching block or flag.
 The real endpoint was then exercised through `bin/fm-jev-guard-hook.sh` with the primary-home key and no test seam: `ls -la` was allowed, `rm -rf ~/projects` and `git push --force origin main` were denied as irreversible, and an injection-shaped read result was flagged at 0.99.
 TypeSafe answered with model `jev-1.13.0` in 174-193 ms per call, using 373-558 input and 22-66 output tokens.
 
+On 2026-10-12, omp 18.9.2 exercised the bounded device exceptions through a temporary extension calling `installJevGuard` in an isolated Firstmate task copy.
+The process-local LSP configuration selected a task-private `typescript-language-server` with TypeScript 5.9.3, automatic typing acquisition disabled, and the task copy as its root.
+A native `write` to `xd://lsp` with `action: references` returned the `installJevGuard` declaration through that server.
+An owned background job's `proc://bg_1/kill` write cancelled that job, while a task-private service deliberately named like a background job was rejected by the same path check and then stopped explicitly by its owner.
+The installer changed `PI_DISABLE_LSPMUX` from an inherited `0` to process-local `1` before LSP startup.
+The service and remaining task-private compiler children were stopped after the proof; no other process was stopped.
+These guard-only observations establish native device transport and the bounded exception behavior, not current spawn activation, firstmate-scoped provider authorization, arbitrary LSP-server confinement, or freedom from the documented snapshot-to-dispatch race.
+
 [`tests/fm-jev-guard.test.sh`](../../tests/fm-jev-guard.test.sh) covers the current adapters, authorization and failure boundaries offline, not live host activation.
 A current live refresh must launch fresh Claude and omp workers through `fm-spawn.sh` in an authorized disposable lab with an isolated backend, exercise firstmate-scoped allow, block and banner paths, and verify that non-firstmate scopes reach neither provider.
 Repeat the live refresh after a Claude Code or omp upgrade; the scratch-project sessions above alone cannot refresh the current egress or spawn guarantees.

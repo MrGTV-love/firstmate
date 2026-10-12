@@ -123,7 +123,14 @@ test_claude_write_gate() {
   claude_hook "$(pre Edit '{"file_path":"src/app.ts","old_string":"a","new_string":"token = sk-live-123"}')"
   reason=$(deny_reason "$out") || fail "an edit adding a credential was not denied: $out"
   case "$reason" in "jev-guard blocked this edit: contains a credential"*) ;; *) fail "unexpected credential reason: $reason" ;; esac
-  pass "Claude Write/Edit: outside paths block in code; worktree, task data and temp writes reach Jev; credentials block"
+  before=$(requests)
+  for path in xd://lsp proc://bg_1/kill; do
+    claude_hook "$(pre Write "$(jq -cn --arg p "$path" '{file_path: $p, content: "{\"action\":\"references\",\"file\":\"source.ts\"}"}')")"
+    reason=$(deny_reason "$out") || fail "Claude must not treat $path as an omp device: $out"
+    case "$reason" in *"plain absolute or worktree-relative path"*) ;; *) fail "unexpected Claude URI reason: $reason" ;; esac
+  done
+  [ "$(requests)" -eq "$before" ] || fail "Claude URI writes must not reach Jev"
+  pass "Claude Write/Edit: outside paths and device URIs block in code; allowed-root writes reach Jev; credentials block"
 }
 
 test_claude_result_screen() {
@@ -356,7 +363,10 @@ for (const project of ["firstmate", "vernant", "", undefined]) {
       "~/a", "~other/a", ":~/a", ":./a", ":../a", ":/tmp/a",
       "@/tmp/a", "@~/a", "file:///tmp/a", "FILE:///tmp/a",
       "[/Users/x/a]", "[/Users/x/a#ABCD]", "src/a#ABCD]",
-      "https://example.com/a", "C:/a", "+note.txt", "",
+      "http://example.com/a", "https://example.com/a", "s3://bucket/a", "made-up://a",
+      "xd://report_issue", "xd://security_scan", "xd://unknown", "xd://lsp/topic",
+      "proc://other-service/kill", "proc://bg_1/mode", "proc://bg_1", "proc://bg_1/kill?x=1",
+      "C:/a", "+note.txt", "",
     ]) {
       const event = { toolName, input: toolName === "write" ? { path, content: "hello" } : { path, old_string: "old", new_string: "hello" } };
       const original = JSON.stringify(event);
@@ -397,6 +407,79 @@ JS
   [ "$out" = paths-ok ] || fail "omp path spelling contract failed: $out"
   printf 'TYPESAFE_API_KEY=%s\n' "$KEY" > "$HOME_DIR/.env"
   pass "omp write/edit: rewritten paths block without requests; plain paths retain credential judgment and project withholding"
+}
+
+test_omp_session_devices() {
+  local out
+  out=$(HOME_DIR="$HOME_DIR" WT="$WT" TASK_DATA="$TASK_DATA" REQUESTS="$REQUESTS" GUARD="$ROOT/bin/fm-jev-guard.ts" \
+    "${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from "node:assert/strict";
+import { readFileSync, writeFileSync, symlinkSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const home = process.env.HOME_DIR;
+const requests = () => readFileSync(process.env.REQUESTS, "utf8");
+writeFileSync(`${process.env.WT}/source.ts`, "export const value = 1;\n");
+writeFileSync(`${process.env.TASK_DATA}/outside.ts`, "export const outside = 1;\n");
+symlinkSync(`${process.env.TASK_DATA}/outside.ts`, `${process.env.WT}/escape.ts`);
+for (const project of ["firstmate", "vernant", "", undefined]) {
+  const handlers = {};
+  process.env.PI_DISABLE_LSPMUX = "0";
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, {
+    home, config: `${home}/config`, state: `${home}/state`, task: "t1",
+    worktree: process.env.WT, data: process.env.TASK_DATA, project,
+  });
+  const ctx = {
+    cwd: process.env.WT,
+    getAsyncJobSnapshot: () => ({ running: [{ id: "bg_1", type: "bash", status: "running" }], recent: [] }),
+  };
+  const failures = [];
+  const lsp = (args) => ({ path: "xd://lsp", content: JSON.stringify(args) });
+  for (const input of [
+    ...["references", "definition", "implementation", "type_definition", "hover", "symbols"].map(action => lsp({ action, file: "source.ts", line: 1, symbol: "value" })),
+    lsp({ action: "references", file: `${process.env.WT}/source.ts`, line: 1, symbol: "value" }),
+    { path: "proc://bg_1/kill" },
+  ]) {
+    const event = { toolName: "write", input };
+    const before = requests();
+    const original = JSON.stringify(event);
+    const result = await handlers.tool_call(event, ctx);
+    if (result !== undefined) failures.push(`${input.path}: ${JSON.stringify(result)}`);
+    assert.equal(requests(), before, "device payloads must never be judged as repository file writes");
+    assert.equal(JSON.stringify(event), original, "device execution arguments must not be rewritten");
+  }
+  assert.deepEqual(failures, [], `${project}: bounded device writes must pass`);
+  assert.equal(process.env.PI_DISABLE_LSPMUX, "1", "install must disable shared lspmux before LSP execution");
+  const deny = async (input, context = ctx, toolName = "write") => {
+    const before = requests();
+    const result = await handlers.tool_call({ toolName, input }, context);
+    assert.equal(result?.block, true, `${JSON.stringify(input)} must block`);
+    assert.match(result.reason, /plain absolute or worktree-relative path.*report if that is not possible/);
+    assert.equal(requests(), before, "refused devices must reach neither provider");
+  };
+  for (const action of ["diagnostics", "request", "rename", "rename_file", "code_actions", "format", "reload", "status", "capabilities", "unknown", "References", ""]) {
+    await deny(lsp({ action, file: "source.ts", query: "workspace/executeCommand", apply: true }));
+  }
+  for (const file of ["/etc/hosts", `${process.env.TASK_DATA}/outside.ts`, "escape.ts", "../outside.ts", "missing.ts", ".", process.env.WT, "/", "file:///etc/hosts", "~/.env", "@source.ts", ":./source.ts", "[source.ts]", "src/**/*.ts", ""]) {
+    await deny(lsp({ action: "references", file, line: 1, symbol: "value" }));
+  }
+  for (const action of ["references", "symbols", "diagnostics"]) await deny(lsp({ action, file: "*", line: 1, symbol: "value", query: "value" }));
+  await deny(lsp({ action: "symbols", query: "value" }));
+  await deny(lsp({ action: "references", line: 1, symbol: "value" }));
+  for (const content of ["", "not json", "null", "[]", "1", '{"action":"references","file":1}']) await deny({ path: "xd://lsp", content });
+  await deny(lsp({ action: "references", file: "source.ts" }), { ...ctx, cwd: process.env.TASK_DATA });
+  await deny(lsp({ action: "references", file: "source.ts" }), { cwd: process.env.WT });
+  await deny({ path: "xd://lsp", old_string: "a", new_string: "b" }, ctx, "edit");
+  for (const path of ["proc://bg_2/kill", "proc://lookalike-service/kill", "proc:///kill", "proc://bg_1/kill/", "proc://bg_1/kill#x", "PROC://bg_1/kill"]) await deny({ path });
+  for (const getAsyncJobSnapshot of [undefined, () => null, () => ({ running: [], recent: [] }), () => ({ running: [null, { id: "bg_2" }], recent: [] }), () => ({ running: [], recent: [{ id: "bg_1", status: "completed" }] }), () => { throw new Error("snapshot unavailable"); }]) {
+    await deny({ path: "proc://bg_1/kill" }, { cwd: process.env.WT, getAsyncJobSnapshot });
+  }
+}
+console.log("devices-ok");
+JS
+) || fail "omp session device verification failed: $out"
+  [ "$out" = devices-ok ] || fail "omp session device contract failed: $out"
+  pass "omp: file-scoped LSP navigation and running own-job cancellation pass without file-write judgment"
 }
 
 test_handler_deadlines() {
@@ -450,5 +533,6 @@ test_project_scope
 test_claude_adapter_under_node
 test_omp_installer
 test_omp_path_spellings
+test_omp_session_devices
 test_handler_deadlines
 test_ledger_privacy
