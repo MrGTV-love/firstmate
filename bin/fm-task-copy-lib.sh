@@ -9,8 +9,8 @@
 #   - bin/fm-teardown.sh refuses to return a pool slot that another task record
 #     still names (fm_task_copy_other_record);
 #   - bin/fm-spawn.sh and bin/fm-home-seed.sh refuse a Treehouse allocation
-#     while a pool slot contains a task record's current copy
-#     (fm_task_copy_pool_slots_hold_no_current_copy);
+#     while a pool slot that Treehouse's state does not durably hold contains a
+#     task record's current copy (fm_task_copy_pool_slots_hold_no_current_copy);
 #   - bin/fm-control.sh reassociate re-points a record at a replacement copy only
 #     when both hold for that copy and it shares the project's repository
 #     (fm_task_copy_same_repository).
@@ -358,18 +358,118 @@ fm_task_copy_enclosing_pool_slot() {  # <project> <canonical-path>
   return 1
 }
 
-# True when no pool slot of <project> strictly contains the current copy
-# (worktree=) of a task record in this home or any locally registered Firstmate
-# home. treehouse get resets whichever slot it hands out, so a slot holding a
-# live record's nested copy must not be allocated; a slot a task merely left is
-# not a record's current copy and stays allocatable. A registered local home
-# that cannot be read is named in one warning line and skipped: one broken home
-# must not stop every allocation for a project.
+# The lease holder Treehouse writes on every entry it rebuilds from a corrupt
+# or truncated state file. Treehouse 3.1.0 and later free such an entry on their
+# own, under the state lock of whichever pool command runs next (treehouse get
+# included), once the slot is idle, tracked-clean, and landed; an ordinary lease
+# is released only by treehouse return.
+FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER='recovered: state file was corrupt or truncated; verify before reuse'
+
+# Whether Treehouse's own pool state durably holds pool slot <slot>, so that
+# treehouse get cannot hand it out. treehouse get reuses only a slot its state
+# file records as not leased (`treehouse get --help`: a leased worktree is never
+# handed out by a later get until treehouse return releases it); a live owner
+# process, dirt, or an unmerged HEAD also make a get skip a slot, but each of
+# those can change before the get runs, so none of them counts here. Every
+# entry recording <slot>'s path must be leased: an ordinary lease holds; a
+# recovered lease (FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER) holds only when
+# <slot> is one of the given local Firstmate <home> directories, since a home
+# freed and handed out is lost whole, nested copies or not. Reading the state
+# needs jq; without it, or with an unreadable state file or no entry for
+# <slot>, the slot is not proved held.
+# Sets FM_TASK_COPY_SLOT_NAME to the slot's name in Treehouse state (the name
+# treehouse status and treehouse lease use), or empty when no entry records
+# <slot>; FM_TASK_COPY_SLOT_STATE to held, unleased, recovered, or unknown; and
+# on failure FM_TASK_COPY_SLOT_REASON to a clause following the slot's path.
+# Returns 0 when held, 1 otherwise.
+# The last state file read and its entries are kept in
+# FM_TASK_COPY_POOL_STATE_FILE and FM_TASK_COPY_POOL_STATE_ENTRIES, so a scan
+# reads each pool's state once; a scan clears both before it starts.
+FM_TASK_COPY_SLOT_NAME=
+FM_TASK_COPY_SLOT_STATE=
+FM_TASK_COPY_SLOT_REASON=
+FM_TASK_COPY_POOL_STATE_FILE=
+FM_TASK_COPY_POOL_STATE_ENTRIES=
+fm_task_copy_pool_slot_held() {  # <slot> [<home>...]
+  local slot=$1 state leaf entries name leased holder path real home matched=0 is_home=0
+  shift
+  state="${slot%/*/*}/treehouse-state.json"
+  leaf=${slot#"${slot%/*/*}"}
+  FM_TASK_COPY_SLOT_NAME=
+  FM_TASK_COPY_SLOT_STATE=unknown
+  FM_TASK_COPY_SLOT_REASON=
+  if ! command -v jq >/dev/null 2>&1; then
+    FM_TASK_COPY_SLOT_REASON="cannot be proved leased: reading Treehouse state $state needs jq, which is not installed"
+    return 1
+  fi
+  # One line per entry. Each field carries a one-letter prefix so none is ever
+  # empty: tab is IFS whitespace, so read would otherwise merge an empty field
+  # into its neighbour.
+  if [ "$state" = "$FM_TASK_COPY_POOL_STATE_FILE" ]; then
+    entries=$FM_TASK_COPY_POOL_STATE_ENTRIES
+  else
+    entries=$(jq -r '.worktrees[]? | [("L" + (if .leased == true then "leased" else "unleased" end)), ("H" + (.lease_holder // "" | tostring)), ("N" + (.name // "" | tostring)), ("P" + (.path // "" | tostring))] | @tsv' "$state" 2>/dev/null) || {
+      FM_TASK_COPY_SLOT_REASON="cannot be proved leased: Treehouse state $state cannot be read"
+      return 1
+    }
+    FM_TASK_COPY_POOL_STATE_FILE=$state
+    FM_TASK_COPY_POOL_STATE_ENTRIES=$entries
+  fi
+  for home in "$@"; do
+    [ "$home" != "$slot" ] || is_home=1
+  done
+  while IFS=$'\t' read -r leased holder name path; do
+    path=${path#P}
+    [ -n "$path" ] || continue
+    if [ "$path" != "$slot" ]; then
+      [ "${path#"${path%/*/*}"}" = "$leaf" ] || continue
+      real=$(fm_task_copy_canonical_dir "$path") || continue
+      [ "$real" = "$slot" ] || continue
+    fi
+    matched=1
+    FM_TASK_COPY_SLOT_NAME=${name#N}
+    if [ "${leased#L}" != leased ]; then
+      FM_TASK_COPY_SLOT_STATE=unleased
+      FM_TASK_COPY_SLOT_REASON="is not leased in Treehouse state $state, so treehouse get may hand it out"
+      return 1
+    fi
+    if [ "${holder#H}" = "$FM_TASK_COPY_TREEHOUSE_RECOVERED_HOLDER" ] && [ "$is_home" = 0 ]; then
+      FM_TASK_COPY_SLOT_STATE=recovered
+      FM_TASK_COPY_SLOT_REASON="is not a Firstmate home and carries only Treehouse's recovered-state lease in $state, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed"
+      return 1
+    fi
+  done <<< "$entries"
+  if [ "$matched" = 1 ]; then
+    FM_TASK_COPY_SLOT_STATE=held
+    return 0
+  fi
+  FM_TASK_COPY_SLOT_REASON="has no entry in Treehouse state $state, so its lease cannot be proved"
+  return 1
+}
+
+# True when no pool slot of <project> that treehouse get could hand out strictly
+# contains the current copy (worktree=) of a task record in this home or any
+# locally registered Firstmate home. treehouse get resets and reassigns the slot
+# it hands out, so a slot holding a live record's nested copy must not be
+# allocatable; a slot Treehouse's state durably holds
+# (fm_task_copy_pool_slot_held) is never handed out, whatever lies inside it,
+# and a slot a task merely left is not a record's current copy, so neither
+# stops the allocation. The refusal names the treehouse lease command that
+# holds the slot in place without touching it; teardown's treehouse return
+# releases that lease with the slot. A registered local home that cannot be
+# read is named in one warning line and skipped: one broken home must not stop
+# every allocation for a project.
 fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
-  local project=$1 record_state=$2 state_dir meta copy slot skipped
+  local project=$1 record_state=$2 state_dir meta copy slot skipped id home
+  local -a homes=()
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
   fm_local_firstmate_state_dirs "$record_state" tolerant
   for skipped in ${FM_LOCAL_FIRSTMATE_SKIPPED[@]+"${FM_LOCAL_FIRSTMATE_SKIPPED[@]}"}; do
     echo "warning: $skipped; its task records were not checked for a current copy inside a Treehouse pool slot" >&2
+  done
+  for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
+    home=$(fm_task_copy_canonical_dir "${state_dir%/*}") && homes+=("$home")
   done
   for state_dir in "${FM_LOCAL_FIRSTMATE_STATES[@]}"; do
     for meta in "$state_dir"/*.meta; do
@@ -377,7 +477,20 @@ fm_task_copy_pool_slots_hold_no_current_copy() {  # <project> <record-state>
       copy=$(fm_meta_get "$meta" worktree)
       copy=$(fm_task_copy_canonical_dir "$copy") || continue
       slot=$(fm_task_copy_enclosing_pool_slot "$project" "$copy") || continue
-      echo "error: Treehouse pool slot $slot contains task $(basename "$meta" .meta)'s current copy $copy; refusing allocation before treehouse get" >&2
+      fm_task_copy_pool_slot_held "$slot" ${homes[@]+"${homes[@]}"} && continue
+      id=$(basename "$meta" .meta)
+      echo "error: Treehouse pool slot $slot contains task $id's current copy $copy and $FM_TASK_COPY_SLOT_REASON; refusing allocation before treehouse get" >&2
+      case "$FM_TASK_COPY_SLOT_STATE" in
+        unleased)
+          echo "To hold that slot in place without touching its contents, confirm that treehouse status run from $project lists slot $FM_TASK_COPY_SLOT_NAME at $slot, then run: (cd '$project' && treehouse lease '$FM_TASK_COPY_SLOT_NAME' --lease-holder '$id')" >&2
+          ;;
+        recovered)
+          echo "treehouse lease refuses a slot that is already leased; inspect it with: (cd '$project' && treehouse status)" >&2
+          ;;
+        *)
+          echo "Inspect it with (cd '$project' && treehouse status); a slot listed there as not leased is held in place, without touching its contents, by: (cd '$project' && treehouse lease <name> --lease-holder '$id')" >&2
+          ;;
+      esac
       return 1
     done
   done

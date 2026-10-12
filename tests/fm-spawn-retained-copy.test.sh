@@ -2,12 +2,23 @@
 # fm-spawn.sh's pre-allocation gate for Treehouse pool slots a task left or
 # still works inside (bin/fm-task-copy-lib.sh
 # fm_task_copy_pool_slots_hold_no_current_copy):
-#   1. A slot that contains a live task record's current copy (the nested
-#      replacement-copy case) refuses allocation before treehouse get, and
-#      changes nothing; once that record is retired the gate lets it through.
-#   2. A slot a reassociated task left behind does not block allocation: a new
+#   1. A slot Treehouse could hand out (not leased in its pool state) that
+#      contains a live task record's current copy (the nested replacement-copy
+#      case) refuses allocation before treehouse get, names the treehouse lease
+#      command that holds the slot in place, and changes nothing; once that
+#      record is retired the gate lets it through.
+#   2. A slot whose hold cannot be proved still refuses: a live owner process
+#      only, no state entry, an unreadable state file, or Treehouse's
+#      recovered-state lease on a slot that is not a Firstmate home.
+#   3. A slot Treehouse's state durably leases does not block allocation even
+#      with a live record's nested copy inside it: treehouse get never hands it
+#      out, so the spawn proceeds into another slot and leaves it untouched.
+#   4. A registered secondmate home slot, leased ordinarily or by Treehouse's
+#      recovered-state lease, holding another project's task copy under its
+#      projects/ clone does not block allocation.
+#   5. A slot a reassociated task left behind does not block allocation: a new
 #      spawn acquires and claims it, whatever its commits.
-#   3. A registered local Firstmate home that cannot be read is named in one
+#   6. A registered local Firstmate home that cannot be read is named in one
 #      warning line and skipped: the spawn still proceeds.
 set -u
 
@@ -30,8 +41,33 @@ make_retained_case() {
   mkdir -p "$HOME_DIR/user-home"
   fm_git_worktree "$PROJECT_DIR" "$SLOT_DIR" "retained-$name"
   printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":99999999,"owner_started_at":1}]}\n' "$SLOT_DIR" > "$CASE_DIR/pool/treehouse-state.json"
+  PANE_DIR=$SLOT_DIR
   : > "$CASE_DIR/pane-log"
   : > "$CASE_DIR/launch-log"
+}
+
+# A second, free slot of the same pool for the spawn's own treehouse get to land
+# in, as Treehouse would when slot 1 is leased. <slot1-entry> is slot 1's JSON
+# state entry body after its name and path.
+add_free_second_slot() {  # <slot1-entry>
+  PANE_DIR="$CASE_DIR/pool/2/project"
+  git -C "$PROJECT_DIR" worktree add --quiet --detach "$PANE_DIR"
+  printf '{"worktrees":[{"name":"1","path":"%s"%s},{"name":"2","path":"%s"}]}\n' \
+    "$SLOT_DIR" "$1" "$PANE_DIR" > "$CASE_DIR/pool/treehouse-state.json"
+}
+
+# A task record whose current copy is a linked worktree of <repo>, nested in
+# <parent>/.claude/worktrees with one unlanded commit. Sets NESTED_COPY.
+add_nested_record() {  # <meta> <repo> <parent> <branch>
+  local meta=$1 repo=$2 parent=$3 branch=$4
+  NESTED_COPY="$parent/.claude/worktrees/$branch"
+  mkdir -p "$parent/.claude/worktrees"
+  git -C "$repo" worktree add --quiet -b "$branch" "$NESTED_COPY"
+  printf 'nested unlanded commit\n' > "$NESTED_COPY/nested-owned.txt"
+  git -C "$NESTED_COPY" add nested-owned.txt
+  git -C "$NESTED_COPY" commit -qm nested-unlanded
+  fm_write_meta "$meta" "window=fmses:fm-$(basename "$meta" .meta)" \
+    "worktree=$NESTED_COPY" "project=$repo" "kind=ship"
 }
 
 retained_fingerprint() {
@@ -47,16 +83,17 @@ retained_fingerprint() {
 
 run_retained_spawn() {
   FM_FAKE_PANE_LOG="$CASE_DIR/pane-log" FM_FAKE_LAUNCH_LOG="$CASE_DIR/launch-log" \
-    fm_test_run_spawn "$HOME_DIR" "$SLOT_DIR" "$FAKEBIN_DIR" \
+    fm_test_run_spawn "$HOME_DIR" "$PANE_DIR" "$FAKEBIN_DIR" \
     "new-$1" "$PROJECT_DIR" --scout
 }
 
 assert_retained_refusal() {
-  local name=$1 reason=$2 out rc=0
+  local name=$1 reason=$2 remedy=${3:-} out rc=0
   retained_fingerprint > "$CASE_DIR/before-copy"
   out=$(run_retained_spawn "$name") || rc=$?
   [ "$rc" -ne 0 ] || fail "spawn accepted an unsafe pool slot: $out"
   assert_contains "$out" "$reason" "allocation refusal lost its reason"
+  [ -z "$remedy" ] || assert_contains "$out" "$remedy" "allocation refusal did not name the command that clears it"
   assert_contains "$out" "before treehouse get" "allocation did not refuse at the pre-acquisition boundary"
   ! grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "refused allocation sent treehouse get"
   ! grep -Eq 'reset|treehouse return' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "refused allocation sent a destructive command"
@@ -93,7 +130,8 @@ test_slot_holding_live_nested_current_copy_refuses() {
     fm_write_meta "$HOME_DIR/state/holder.meta" "window=fmses:fm-holder" \
       "worktree=$nested" "prior_worktree=$SLOT_DIR" "project=$PROJECT_DIR" "kind=ship"
     cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
-    assert_retained_refusal "$name" "contains task holder's current copy"
+    assert_retained_refusal "$name" "contains task holder's current copy" \
+      "(cd '$PROJECT_DIR' && treehouse lease '1' --lease-holder 'holder')"
     cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "refusal changed the holder's record"
     assert_grep 'nested unlanded commit' "$nested/nested-owned.txt" "refusal lost the nested work"
     rm "$HOME_DIR/state/holder.meta"
@@ -105,6 +143,113 @@ test_slot_holding_live_nested_current_copy_refuses() {
       || fail "a slot whose nested copy no record names did not reach treehouse get: $out"
   done
   pass "a pool slot holding a live record's nested current copy refuses allocation until that record is retired"
+}
+
+test_unprovable_slot_hold_still_refuses() {
+  local shape name entry reason remedy
+  local recovered='recovered: state file was corrupt or truncated; verify before reuse'
+  for shape in live-owner no-entry unreadable recovered-not-home; do
+    name="unproved-$shape"
+    make_retained_case "$name"
+    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+    remedy=
+    case "$shape" in
+      live-owner)
+        printf '{"worktrees":[{"name":"1","path":"%s","owner_pid":%s,"owner_started_at":1}]}\n' \
+          "$SLOT_DIR" "$$" > "$CASE_DIR/pool/treehouse-state.json"
+        reason="is not leased in Treehouse state"
+        remedy="(cd '$PROJECT_DIR' && treehouse lease '1' --lease-holder 'holder')"
+        ;;
+      no-entry)
+        printf '{"worktrees":[{"name":"9","path":"%s/pool/9/project","leased":true,"lease_holder":"other"}]}\n' \
+          "$CASE_DIR" > "$CASE_DIR/pool/treehouse-state.json"
+        reason="has no entry in Treehouse state"
+        remedy="(cd '$PROJECT_DIR' && treehouse status)"
+        ;;
+      unreadable)
+        printf '{"worktrees":[{"name":"1","path":"%s","leased":true\n' "$SLOT_DIR" > "$CASE_DIR/pool/treehouse-state.json"
+        reason="cannot be read"
+        remedy="(cd '$PROJECT_DIR' && treehouse status)"
+        ;;
+      recovered-not-home)
+        entry=$(printf ',"leased":true,"lease_holder":"%s"' "$recovered")
+        add_free_second_slot "$entry"
+        reason="is not a Firstmate home and carries only Treehouse's recovered-state lease"
+        remedy="treehouse lease refuses a slot that is already leased"
+        ;;
+    esac
+    cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
+    assert_retained_refusal "$name" "$reason" "$remedy"
+    cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "$shape: refusal changed the holder's record"
+    assert_grep 'nested unlanded commit' "$NESTED_COPY/nested-owned.txt" "$shape: refusal lost the nested work"
+  done
+  pass "a pool slot whose hold Treehouse's state cannot prove still refuses allocation and names how to inspect or hold it"
+}
+
+test_nested_copy_in_leased_slot_allows_allocation() {
+  local spelling name out rc
+  for spelling in direct alias; do
+    name="leased-$spelling"
+    make_retained_case "$name"
+    add_nested_record "$HOME_DIR/state/holder.meta" "$PROJECT_DIR" "$SLOT_DIR" "nested-$name"
+    add_free_second_slot ',"leased":true,"lease_holder":"holder"'
+    if [ "$spelling" = alias ]; then
+      # Treehouse state spelling the leased slot through a symlinked pool still
+      # names that slot.
+      ln -s "$CASE_DIR/pool" "$CASE_DIR/pool-alias"
+      printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"holder"},{"name":"2","path":"%s"}]}\n' \
+        "$CASE_DIR/pool-alias/1/project" "$PANE_DIR" > "$CASE_DIR/pool/treehouse-state.json"
+    fi
+    retained_fingerprint > "$CASE_DIR/before-copy"
+    cp "$HOME_DIR/state/holder.meta" "$CASE_DIR/before-meta"
+    rc=0
+    out=$(run_retained_spawn "$name") || rc=$?
+    expect_code 0 "$rc" "$spelling: a nested copy in a leased slot stopped the spawn"$'\n'"$out"
+    assert_not_contains "$out" "refusing allocation" "$spelling: a leased slot still blocked allocation"
+    assert_contains "$out" "spawned new-$name" "$spelling: spawn did not launch"
+    grep -Fq 'treehouse get' "$CASE_DIR/pane-log" "$CASE_DIR/launch-log" || fail "$spelling: spawn never acquired a slot"
+    assert_grep "task=new-$name" "$CASE_DIR/pool/2/.fm-slot-owner" "$spelling: spawn did not claim the slot it acquired"
+    [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "$spelling: spawn claimed the leased slot"
+    retained_fingerprint | cmp -s - "$CASE_DIR/before-copy" || fail "$spelling: spawn changed the leased slot"
+    cmp -s "$CASE_DIR/before-meta" "$HOME_DIR/state/holder.meta" || fail "$spelling: spawn changed the holder's record"
+    assert_grep 'nested unlanded commit' "$NESTED_COPY/nested-owned.txt" "$spelling: spawn lost the nested work"
+  done
+  pass "a nested current copy inside a slot Treehouse's state leases does not stop an unrelated spawn"
+}
+
+test_secondmate_home_slot_with_other_project_copy_allows_allocation() {
+  local lease name sm_home other out rc entry
+  local recovered='recovered: state file was corrupt or truncated; verify before reuse'
+  for lease in ordinary recovered; do
+    name="home-$lease"
+    make_retained_case "$name"
+    sm_home=$SLOT_DIR
+    mkdir -p "$sm_home/state" "$sm_home/data" "$sm_home/projects"
+    printf -- '- sm - sm (home: %s; scope: fixture; projects: other; added 2026-10-11)\n' \
+      "$sm_home" > "$HOME_DIR/data/secondmates.md"
+    other="$sm_home/projects/other"
+    fm_git_init_commit "$other"
+    add_nested_record "$sm_home/state/foreign.meta" "$other" "$other" "foreign-$name"
+    if [ "$lease" = ordinary ]; then
+      entry=',"leased":true,"lease_holder":"sm"'
+    else
+      entry=$(printf ',"leased":true,"lease_holder":"%s"' "$recovered")
+    fi
+    add_free_second_slot "$entry"
+    cp "$sm_home/state/foreign.meta" "$CASE_DIR/before-meta"
+    git -C "$NESTED_COPY" rev-parse HEAD > "$CASE_DIR/before-head"
+    rc=0
+    out=$(run_retained_spawn "$name") || rc=$?
+    expect_code 0 "$rc" "$lease: a secondmate home slot holding another project's copy stopped the spawn"$'\n'"$out"
+    assert_not_contains "$out" "refusing allocation" "$lease: a leased secondmate home slot still blocked allocation"
+    assert_contains "$out" "spawned new-$name" "$lease: spawn did not launch"
+    assert_grep "task=new-$name" "$CASE_DIR/pool/2/.fm-slot-owner" "$lease: spawn did not claim the slot it acquired"
+    [ ! -e "$CASE_DIR/pool/1/.fm-slot-owner" ] || fail "$lease: spawn claimed the secondmate home slot"
+    cmp -s "$CASE_DIR/before-meta" "$sm_home/state/foreign.meta" || fail "$lease: spawn changed the foreign record"
+    git -C "$NESTED_COPY" rev-parse HEAD | cmp -s - "$CASE_DIR/before-head" || fail "$lease: spawn moved the foreign copy"
+    assert_grep 'nested unlanded commit' "$NESTED_COPY/nested-owned.txt" "$lease: spawn lost the foreign copy's work"
+  done
+  pass "a leased secondmate home slot holding another project's task copy does not stop a spawn"
 }
 
 test_slot_left_by_reassociated_task_is_allocatable() {
@@ -137,5 +282,8 @@ test_unreadable_local_home_warns_and_proceeds() {
 }
 
 test_slot_holding_live_nested_current_copy_refuses
+test_unprovable_slot_hold_still_refuses
+test_nested_copy_in_leased_slot_allows_allocation
+test_secondmate_home_slot_with_other_project_copy_allows_allocation
 test_slot_left_by_reassociated_task_is_allocatable
 test_unreadable_local_home_warns_and_proceeds

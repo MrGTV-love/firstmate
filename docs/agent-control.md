@@ -248,10 +248,15 @@ If a later step fails after the slot was returned and its claim released, the re
 A nested current copy whose enclosing slot the task does not claim is left in place like any other reassociated non-pool copy.
 
 Before a fresh spawn sends `treehouse get`, and before secondmate home seeding sends `treehouse get --lease`, each under the shared project lock used for allocation and return, [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh) checks whether a pool slot of the project strictly contains a task record's current copy (`worktree=`) in this home or any locally registered home.
-`treehouse get` resets the slot it hands out and offers no exclusion option, so such a slot (the nested replacement-copy case) refuses the allocation until that record moves or is retired.
+`treehouse get` resets and hands out only a slot its pool state file records as not leased, so such a slot (the nested replacement-copy case) refuses the allocation unless Treehouse's state durably holds it.
+A slot is held when every state entry for its path is leased; a lease carrying Treehouse's recovered-state holder counts only when the slot is itself a local Firstmate home, because Treehouse 3.1.0 and later release that lease on their own once the slot is idle, clean, and landed.
+A live owner process, dirt, or an unmerged HEAD also makes a get skip a slot, but each can change before the get runs, so none of them counts; a slot with no state entry, an unreadable state file, or a host without `jq` to read it refuses as unproved.
+So a nested copy inside a leased slot, including another project's task copy under a leased secondmate home's `projects/` clone, never stops an unrelated start.
+A refusal for a slot that is not leased or not proved leased names the command that clears it: `treehouse lease <name> --lease-holder <task>`, run from the project once `treehouse status` there lists that slot, holds the slot in place without touching its contents, and teardown's `treehouse return` releases that lease with the slot.
+A refusal for a recovered-state lease points to `treehouse status` instead, because `treehouse lease` refuses a slot that is already leased.
 This check scans every local home it can read: a registered local home or registry it cannot read is named in one warning line and skipped, so one broken home does not stop every allocation for a project.
 A slot is recognized by the rule teardown uses: Treehouse's `<pool>/<slot>/<repo>` layout beside its pool state file, sharing the project's Git common directory.
-A slot a task merely left holds no record's current copy, so it never blocks allocation, and the check needs no tool beyond those every home already requires.
+A slot a task merely left holds no record's current copy, so it never blocks allocation.
 
 Standalone PR registration locks its task-copy snapshot before retirement recovery, guard execution, or any forge request, and refuses publication if the recorded worktree or branch changed while the PR was being checked.
 
