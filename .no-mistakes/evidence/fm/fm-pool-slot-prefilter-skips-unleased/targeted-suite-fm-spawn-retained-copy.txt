@@ -1,0 +1,17 @@
+ok - mixed leased/unleased aliases refuse with status/repair guidance in both entry orders
+ok - escaped or relative entry paths cannot prove a slot held beside a clean leased alias
+ok - jq checks unleased aliases; without jq the check refuses before alias logic
+ok - prefiltered leased aliases and duplicate unleased names require repair, not a lease
+ok - the shared public allocation guard tells a jq-free caller to install jq
+ok - symlink unleased alias beside a leased entry prevents a held verdict
+ok - case-variant unleased alias beside a leased entry prevents a held verdict
+ok - all recovered-lease path spellings beside a leased entry remain unsafe off a Firstmate home
+ok - a pool slot holding a live record's nested current copy refuses allocation until that record is retired
+ok - conflicting recovered-lease aliases refuse a spawn before allocation without changing pool state
+ok - unsupported entry refusals identify the entry and path, and require removal or renaming, never a lease
+ok - a pool slot whose hold Treehouse's state cannot prove still refuses allocation and names how to inspect or hold it
+ok - a nested current copy inside a slot Treehouse's state leases does not stop an unrelated spawn
+ok - a leased secondmate home slot holding another project's task copy does not stop a spawn
+ok - a pool slot a reassociated task left is acquired and claimed by a new task
+ok - an unavailable registered local home is named in one warning and the spawn proceeds
+exit=0

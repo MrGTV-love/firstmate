@@ -1,0 +1,18 @@
+== state entries ==
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"task-a"}
+{"name":"2","path":"$LAB/work/pool/.treehouse/project-7f58a1/2/project","leased":null,"lease_holder":null}
+== fm-spawn output ==
+skill selection for new-held-after-lease: unavailable - no TypeSafe or OpenRouter key
+spawned new-held-after-lease harness=codex kind=scout window=primary:fm-new-held-after-lease worktree=$LAB/work/pool/.treehouse/project-7f58a1/2/project
+rc=0
+== state/slot/records CHANGED ==
+1c1
+< 13a266dc9b9affbff914e107de01509b6e34e058  $LAB/work/pool/.treehouse/project-7f58a1/treehouse-state.json
+---
+> 4e8a98496cd40b563c370bd8f9f7b3c79dd6240a  $LAB/work/pool/.treehouse/project-7f58a1/treehouse-state.json
+8a9
+> 2
+16a18,20
+> home-summary.json
+> new-held-after-lease.git-hooks
+> new-held-after-lease.meta

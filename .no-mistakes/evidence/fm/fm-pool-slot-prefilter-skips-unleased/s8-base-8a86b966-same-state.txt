@@ -1,0 +1,19 @@
+== state entries ==
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"holder"}
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project/","leased":null,"lease_holder":null}
+{"name":"2","path":"$LAB/work/pool/.treehouse/project-7f58a1/2/project","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+{"name":"3","path":"$LAB/work/pool/.treehouse/project-7f58a1/3/project","leased":null,"lease_holder":null}
+== fm-spawn output ==
+skill selection for new-base-lf-trailing: unavailable - no TypeSafe or OpenRouter key
+spawned new-base-lf-trailing harness=codex kind=scout window=primary:fm-new-base-lf-trailing worktree=$LAB/work/pool/.treehouse/project-7f58a1/3/project
+rc=0
+== state/slot/records CHANGED ==
+1c1
+< b83853ccce66f2b80a8c3b72ed8cf57fb39713bb  $LAB/work/pool/.treehouse/project-7f58a1/treehouse-state.json
+---
+> 5c63d152364d77a8becbd5d44ddbc514728c4169  $LAB/work/pool/.treehouse/project-7f58a1/treehouse-state.json
+9a10
+> 3
+18a20,21
+> new-base-lf-trailing.git-hooks
+> new-base-lf-trailing.meta

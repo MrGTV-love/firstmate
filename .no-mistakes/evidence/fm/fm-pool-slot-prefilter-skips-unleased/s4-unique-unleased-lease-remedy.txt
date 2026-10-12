@@ -1,0 +1,7 @@
+== state entries ==
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":false,"lease_holder":null}
+== fm-spawn output ==
+error: Treehouse pool slot $LAB/work/pool/.treehouse/project-7f58a1/1/project contains task task-a's current copy $LAB/work/pool/.treehouse/project-7f58a1/1/project/.claude/worktrees/task-a and is not leased in Treehouse state $LAB/work/pool/.treehouse/project-7f58a1/treehouse-state.json, so treehouse get may hand it out; refusing allocation before treehouse get
+To hold that slot in place without touching its contents, confirm that treehouse status run from $LAB/work/project lists slot 1 at $LAB/work/pool/.treehouse/project-7f58a1/1/project, then run: (cd '$LAB/work/project' && treehouse lease '1' --lease-holder 'task-a')
+rc=1
+== state/slot/records unchanged: yes ==

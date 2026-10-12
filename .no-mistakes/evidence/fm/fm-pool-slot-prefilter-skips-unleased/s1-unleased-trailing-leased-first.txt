@@ -1,0 +1,8 @@
+== state entries ==
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"holder"}
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project/","leased":false,"lease_holder":null}
+== fm-spawn output ==
+error: Treehouse pool slot $LAB/work/pool/.treehouse/project-7f58a1/1/project contains task task-a's current copy $LAB/work/pool/.treehouse/project-7f58a1/1/project/.claude/worktrees/task-a and has conflicting lease records in Treehouse state $LAB/work/pool/.treehouse/project-7f58a1/treehouse-state.json, including an unleased entry, so its hold cannot be proved; refusing allocation before treehouse get
+Inspect the pool with: (cd '$LAB/work/project' && treehouse status); report the conflicting entries for repair before retrying. A lease cannot reliably clear this conflict.
+rc=1
+== state/slot/records unchanged: yes ==

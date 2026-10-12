@@ -1,0 +1,16 @@
+## Operator runs the printed remedy exactly (state = unique unleased entry from s4):
+$ (cd '$LAB/work/project' && treehouse status)
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     dirty        $LAB/work/pool/.treehouse/project-7f58a1/1/project  (detached)
+$ (cd '$LAB/work/project' && treehouse lease '1' --lease-holder 'task-a')
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Leased worktree 1 at $LAB/work/pool/.treehouse/project-7f58a1/1/project. Run 'treehouse return $LAB/work/pool/.treehouse/project-7f58a1/1/project' to release it.
+$LAB/work/pool/.treehouse/project-7f58a1/1/project
+lease rc=0
+## State after lease:
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"task-a"}

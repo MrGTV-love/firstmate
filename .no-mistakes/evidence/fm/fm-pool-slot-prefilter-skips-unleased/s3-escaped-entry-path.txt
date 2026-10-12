@@ -1,0 +1,8 @@
+== state entries ==
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"holder"}
+{"name":"9","path":"/tmp/fm-lab-elsewhere/a\\b/9/project","leased":false,"lease_holder":null}
+== fm-spawn output ==
+error: Treehouse pool slot $LAB/work/pool/.treehouse/project-7f58a1/1/project contains task task-a's current copy $LAB/work/pool/.treehouse/project-7f58a1/1/project/.claude/worktrees/task-a and cannot be proved leased: Treehouse state $LAB/work/pool/.treehouse/project-7f58a1/treehouse-state.json contains an escaped entry path for entry '9': '/tmp/fm-lab-elsewhere/a\\b/9/project' (TSV-escaped), which cannot be compared safely; refusing allocation before treehouse get
+Have the pool owner remove or rename the offending entry so its recorded path is absolute and contains no TSV-escaped characters, then retry; a lease does not clear this refusal. A real path containing those characters remains unsupported while the entry exists.
+rc=1
+== state/slot/records unchanged: yes ==

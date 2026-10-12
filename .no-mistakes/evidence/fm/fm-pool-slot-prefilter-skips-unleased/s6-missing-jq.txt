@@ -1,0 +1,6 @@
+== state entries ==
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"holder"}
+== fm-spawn output ==
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4RQJHQTR8VBF4Q7R5RRWJJJ/bin/fm-spawn.sh: line 2862: jq: command not found
+rc=127
+== state/slot/records unchanged: yes ==

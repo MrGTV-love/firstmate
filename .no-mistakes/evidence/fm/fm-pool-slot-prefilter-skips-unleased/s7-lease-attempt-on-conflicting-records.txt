@@ -1,0 +1,30 @@
+## order=lf (state before lease):
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"holder"}
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project/","leased":false,"lease_holder":null}
+$ treehouse lease 1 --lease-holder task-a
+worktree 1 is already leased (holder: "holder")
+lease rc=1
+## state after lease attempt:
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"holder"}
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project/","leased":false,"lease_holder":null}
+1
+2
+treehouse-state.json
+treehouse-state.key
+treehouse-state.lock
+## order=uf (state before lease):
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project/","leased":false,"lease_holder":null}
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"holder"}
+$ treehouse lease 1 --lease-holder task-a
+🌳 Leased worktree 1 at $LAB/work/pool/.treehouse/project-7f58a1/1/project/. Run 'treehouse return $LAB/work/pool/.treehouse/project-7f58a1/1/project/' to release it.
+$LAB/work/pool/.treehouse/project-7f58a1/1/project/
+lease rc=0
+## state after lease attempt:
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project/","leased":true,"lease_holder":"task-a"}
+{"name":"1","path":"$LAB/work/pool/.treehouse/project-7f58a1/1/project","leased":true,"lease_holder":"holder"}
+{"name":"2","path":"$LAB/work/pool/.treehouse/project-7f58a1/2/project","leased":true,"lease_holder":"recovered: state file was corrupt or truncated; verify before reuse"}
+1
+2
+treehouse-state.json
+treehouse-state.key
+treehouse-state.lock

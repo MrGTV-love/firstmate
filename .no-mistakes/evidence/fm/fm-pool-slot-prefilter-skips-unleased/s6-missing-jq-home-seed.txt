@@ -1,0 +1,5 @@
+$ FM_HOME=$LAB FM_SECONDMATE_CHARTER='lab charter' env PATH=<all PATH tools except jq> $LAB/work/fmroot/bin/fm-home-seed.sh sm-nojq - --no-projects
+error: Treehouse pool slot $LAB/work/pool/.treehouse/fmroot-11fbf7/1/fmroot contains task task-r's current copy $LAB/work/pool/.treehouse/fmroot-11fbf7/1/fmroot/.claude/worktrees/task-r and cannot be proved leased: reading Treehouse state $LAB/work/pool/.treehouse/fmroot-11fbf7/treehouse-state.json needs jq, which is not installed; refusing allocation before treehouse get
+Install jq so the pool state can be read, then retry; a lease does not clear this refusal.
+rc=1
+== pool state, pool dir and task records unchanged: yes ==
