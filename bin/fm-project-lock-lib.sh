@@ -97,7 +97,8 @@
 # by default, minimum 1s for fixture overrides), naming the
 # current holder's operation/PID or the earlier waiter whose turn is reserved.
 # A refusal returns nonzero with an "fm-project-lock:" line naming its class
-# (invalid input, registration failure, filesystem error, stall limit), so
+# (invalid input, registration failure, filesystem error, sampling error, stall
+# limit), so
 # callers retain their existing refusal and safety checks; capacity admission
 # remains inside the acquired project lock.
 
