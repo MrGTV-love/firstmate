@@ -396,6 +396,7 @@ test_duration_fixture_isolation() (
   printf 'existing production ledger\n' > "$dir/ambient/data/command-durations.jsonl"
   cp "$dir/ambient/data/command-durations.jsonl" "$dir/expected"
   out=$(FM_DURATION_FILE="$dir/ambient/data/command-durations.jsonl" \
+    FM_DURATION_HOME="$dir/ambient" \
     FM_HOME="$dir/ambient" FM_DATA_OVERRIDE="$dir/ambient/data" \
     bash -eu -s -- "$ROOT" "$dir/isolated/durations.jsonl" <<'SH'
 # shellcheck source=tests/lib.sh
@@ -404,6 +405,7 @@ test_duration_fixture_isolation() (
 . "$1/bin/fm-duration-lib.sh"
 fm_duration_record fixture.ambient 42 0
 [ "$FM_DURATION_FILE" = off ]
+[ -z "${FM_DURATION_HOME:-}" ]
 export FM_DURATION_FILE="$2"
 fm_duration_record fixture.isolated 42 0
 # Re-sourcing must retain an explicit fixture override, not reset test state.

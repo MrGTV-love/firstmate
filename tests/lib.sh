@@ -62,6 +62,7 @@ export FM_MODEL_FRESHNESS=0
 # operational home's ledger into fixtures; timing-specific cases explicitly
 # select an isolated file after sourcing this helper.
 export FM_DURATION_FILE=off
+unset FM_DURATION_HOME
 
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout

@@ -81,8 +81,8 @@
 #                   slowest CI hint with margin; exceeding it becomes a bounded
 #                   failure, not proof of a hang. --max-wall-ms is checked
 #                   after the run and so cannot catch a hang on its own.
-#                   External interruption cleanup is outside this runner's
-#                   guarantee; configured per-script bounds remain authoritative.
+#                   HUP, INT and TERM remove this runner's scratch directory
+#                   before it exits; configured per-script bounds remain authoritative.
 #   --max-wall-ms N fail the run when its measured invocation wall clock exceeds
 #                   N milliseconds, including an empty selection. It is
 #                   evaluated after selection and suite execution and cannot
@@ -2672,6 +2672,9 @@ cleanup_run() {
 }
 
 trap cleanup_run EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 RUN_ID="fm-test-run-${RUN_STARTED_MS}-$$"
 TOTAL=0
@@ -2712,7 +2715,7 @@ family_bump() {
 
 record_script_result() {
   local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5 load_start=${6:-}
-  local base family expected gate_skip gate_reason fail_delta token
+  local base family expected gate_skip gate_reason fail_delta token timed_out=0
   base=$(basename "$script")
   family=$(family_for_basename "$base")
   expected=$(expected_gate_skip_for_family "$family")
@@ -2748,7 +2751,10 @@ record_script_result() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" >>"$RECORDS"
   if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1; then
-    fm_duration_record "test.$script" "$duration" "$rc" '' 1 "$load_start"
+    if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ] && [ "$rc" -eq 124 ]; then
+      timed_out=1
+    fi
+    fm_duration_record "test.$script" "$duration" "$rc" '' 1 "$load_start" "$timed_out"
   fi
   family_bump "$family" "$duration" "$fail_delta"
   TOTAL=$((TOTAL + 1))
@@ -3062,6 +3068,6 @@ if [ -n "$MAX_WALL_MS" ]; then
 fi
 
 if declare -F fm_duration_record >/dev/null 2>&1; then
-  fm_duration_record "test-suite.$SELECTION_DESC" "$RUN_DURATION" "$AGG_RC" '' 1 "$RUN_STARTED_LOAD"
+  fm_duration_record "test-suite.$SELECTION_DESC" "$RUN_DURATION" "$AGG_RC" '' 1 "$RUN_STARTED_LOAD" 0
 fi
 exit "$AGG_RC"

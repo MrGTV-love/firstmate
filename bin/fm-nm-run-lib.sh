@@ -61,7 +61,7 @@ fm_nm_run_checked() {  # <dir> <timeout_secs> <args...>
     helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
     if [ -n "$run_id" ] && [ -r "$helper" ] && command -v python3 >/dev/null 2>&1; then
       database=$(fm_nm_state_db "$1")
-      python3 "$helper" import-nm "$database" "$run_id" >&2 || true
+      (cd "$1" 2>/dev/null && python3 "$helper" import-nm "$database" "$run_id" >&2) || true
     fi
   fi
   return "$result"

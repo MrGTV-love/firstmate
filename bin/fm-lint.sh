@@ -1700,7 +1700,7 @@ fi
 TMP_ROOT=$(mktemp -d "${TMPDIR:-/tmp}/fm-lint.XXXXXX") || exit 1
 ACTIVE_PIDS=()
 # shellcheck disable=SC2329 # Registered by the EXIT and signal traps below.
-fm_lint_cleanup() {
+fm_lint_stop_workers() {
   local pid
   for pid in "${ACTIVE_PIDS[@]:-}"; do
     [ -n "$pid" ] || continue
@@ -1715,6 +1715,11 @@ fm_lint_cleanup() {
   for pid in "${ACTIVE_PIDS[@]:-}"; do
     [ -n "$pid" ] && wait "$pid" 2>/dev/null || true
   done
+  ACTIVE_PIDS=()
+}
+# shellcheck disable=SC2329 # Registered by the EXIT and signal traps below.
+fm_lint_cleanup() {
+  fm_lint_stop_workers
   rm -rf "$TMP_ROOT"
 }
 FM_LINT_DURATION_LOAD=
@@ -1725,6 +1730,7 @@ FM_LINT_DURATION_START=$(fm_lint_now_ms)
 # shellcheck disable=SC2329 # Invoked by EXIT trap.
 fm_lint_finish() {
   local result=$? calibration=0
+  fm_lint_stop_workers
   if [ "$EXPLICIT_PATHS" -eq 0 ] && [ "$CHANGED_MODE" -eq 0 ] && [ -s "${ROOTS_LOG:-}" ]; then
     calibration=$(awk -F '\t' '$1 == "end" { count++; if ($13 != 1) ineligible++ } END { print (count > 0 && !ineligible) ? 1 : 0 }' "$ROOTS_LOG")
   fi
@@ -1734,9 +1740,9 @@ fm_lint_finish() {
   if declare -F fm_duration_record_batch >/dev/null 2>&1; then
     {
       if [ -s "${ROOTS_LOG:-}" ]; then
-        awk -F '\t' -v OFS='\t' '$1 == "end" { print "lint-root." ($5 == "" ? "full" : $5) "." $3, $8, $9, $13, $14, $15 }' "$ROOTS_LOG"
+        awk -F '\t' -v OFS='\t' '$1 == "end" { print "lint-root." ($5 == "" ? "full" : $5) "." $3, $8, $9, $13, $14, $15, ($9 == "timeout" ? 1 : 0) }' "$ROOTS_LOG"
       fi
-      printf 'lint.%s.%s\t%s\t%s\t%s\t%s\t%s\n' "$ANALYSIS_MODE" "${PARTITION:-whole}" \
+      printf 'lint.%s.%s\t%s\t%s\t%s\t%s\t%s\t0\n' "$ANALYSIS_MODE" "${PARTITION:-whole}" \
         "$(( $(fm_lint_now_ms) - FM_LINT_DURATION_START ))" "$result" "$calibration" \
         "$FM_LINT_DURATION_LOAD" "$(fm_duration_load)"
     } | fm_duration_record_batch

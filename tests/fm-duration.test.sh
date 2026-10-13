@@ -10,6 +10,7 @@ export FM_DURATION_TEST_ROOT="$ROOT" FM_DURATION_TEST_TMP="$TMP_ROOT"
 import hashlib
 import json
 import os
+import signal
 from pathlib import Path
 import platform
 import shutil
@@ -27,8 +28,21 @@ for name in ('data', 'config', 'state'):
 (tmp / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
 
 
-def cli(*args, expected=0, tool=helper):
-    result = subprocess.run([sys.executable, str(tool), *map(str, args)], env=env, capture_output=True, text=True)
+def make_repo(name, origin=None):
+    path = tmp / name
+    path.mkdir()
+    subprocess.run(['git', 'init', '-q', str(path)], check=True)
+    if origin:
+        subprocess.run(['git', '-C', str(path), 'remote', 'add', 'origin', origin], check=True)
+    return path
+
+
+workrepo = make_repo('work-x', 'git@github.com:acme/widgets.git')
+REPO = 'acme/widgets'
+
+
+def cli(*args, expected=0, tool=helper, cwd=None):
+    result = subprocess.run([sys.executable, str(tool), *map(str, args)], env=env, cwd=cwd or workrepo, capture_output=True, text=True)
     assert result.returncode == expected, (args, result.returncode, result.stdout, result.stderr)
     return result
 
@@ -44,7 +58,9 @@ def write_rows(rows_to_add, path=None):
 
 
 def sample(key, duration, code=0, **extra):
-    return dict(host=platform.node(), key=key, duration_ms=duration, exit=code, **extra)
+    row = dict(host=platform.node(), repo=REPO, key=key, duration_ms=duration, exit=code)
+    row.update(extra)
+    return row
 
 
 cold = cli('limit', 'lint.full.whole', '--fallback', 30)
@@ -85,7 +101,7 @@ adapter = subprocess.run(['bash', '-c', '. "$1/bin/fm-duration-lib.sh"; fm_durat
                          env=dict(env, FM_DURATION_FILE=str(corrupt)), capture_output=True, text=True)
 assert adapter.returncode == 0 and adapter.stdout == '30\n' and 'existing fallback 30s' in adapter.stderr, adapter
 
-batch = subprocess.run([sys.executable, str(helper), 'record-batch'], env=env, input='batch.a\t100\t0\t1\t1.5\t2.5\nbatch.b\t200\t3\t0\t\t\n', capture_output=True, text=True)
+batch = subprocess.run([sys.executable, str(helper), 'record-batch'], env=env, cwd=workrepo, input='batch.a\t100\t0\t1\t1.5\t2.5\t0\nbatch.b\t200\t3\t0\t\t\t0\n', capture_output=True, text=True)
 assert batch.returncode == 0, batch
 batched = {r['key']: r for r in rows() if r.get('key', '').startswith('batch.')}
 assert (batched['batch.a']['duration_ms'], batched['batch.a']['load_start'], batched['batch.a']['load_end'], batched['batch.a']['calibration']) == (100, 1.5, 2.5, True)
@@ -134,6 +150,80 @@ for key in ('orphan', 'orphan.cold'):
     with open(gate, 'w') as opener:
         opener.write('release\n')
 
+# A timeout is reported by the owner of the limit, never inferred from an exit code.
+for code in (124, 137, 124, 137):
+    cli('record', 'inferred', 5, code)
+assert not any(r.get('event') for r in rows() if r.get('key') == 'inferred')
+cli('run', 'sigkilled', '--', 'bash', '-c', 'kill -9 $$', expected=137)
+cli('run', 'sigkilled', '--', 'bash', '-c', 'kill -9 $$', expected=137)
+assert rows()[-1]['exit'] == 137 and not any(r.get('event') for r in rows() if r.get('key') == 'sigkilled')
+cli('record', 'flagged', 5, 124, '--timed-out')
+assert [r['key'] for r in rows() if r.get('event') == 'timeout'].count('flagged') == 1
+
+# Keys are scoped to the repository: another repository's slow samples, or rows
+# that carry no repository, never set this repository's limit.
+other = make_repo('work-y', 'https://github.com/acme/other.git')
+norepo = make_repo('no-origin')
+write_rows([sample('scope.lint', 40000, repo='acme/other') for _ in range(5)] + [sample('scope.lint', 40000, repo=None) for _ in range(5)])
+scoped = cli('limit', 'scope.lint', '--fallback', 30)
+assert scoped.stdout.strip() == '30' and '0 of 5 samples' in scoped.stderr, scoped
+assert cli('limit', 'scope.lint', '--fallback', 30, cwd=other).stdout.strip() == '120'
+cli('record', 'scope.lint', 7, 0, cwd=norepo)
+assert rows()[-1]['repo'] == 'no-origin' and rows()[-1]['key'] == 'scope.lint'
+cli('record', 'scope.lint', 7, 0, cwd=other)
+assert rows()[-1]['repo'] == 'acme/other'
+
+# A command that had no deadline keeps none: fallback 0 records and never kills.
+write_rows([sample('zero.key', 1) for _ in range(5)])
+assert cli('limit', 'zero.key').stdout.strip() == '1'
+zero = subprocess.run(['bash', '-c', '. "$1/bin/fm-duration-lib.sh"; fm_duration_limit zero.key 0; fm_duration_timed zero.key 0 bash -c "sleep 2; echo finished"', '_', str(root)],
+                      env=env, cwd=workrepo, capture_output=True, text=True)
+assert zero.returncode == 0 and zero.stdout == '0\nfinished\n', zero
+assert rows()[-1]['key'] == 'zero.key' and rows()[-1]['exit'] == 0 and not any(r.get('event') for r in rows() if r.get('key') == 'zero.key')
+
+# A ceiling expiry sends TERM and waits for the leader: its own TERM cleanup of
+# a child in a separate process group runs and leaves no survivor.
+write_rows([sample('trapped', 400) for _ in range(5)])
+trap_dir = tmp / 'trap'
+trap_dir.mkdir()
+leader = r'''
+import os, pathlib, signal, subprocess, sys, time
+home = pathlib.Path(sys.argv[1])
+child = subprocess.Popen([sys.executable, '-c', 'import time\nwhile True: time.sleep(1)'], start_new_session=True)
+(home / 'child.pid').write_text(str(child.pid))
+def on_term(sig, frame):
+    os.killpg(child.pid, signal.SIGKILL)
+    child.wait()
+    (home / 'trap-ran').write_text('yes')
+    sys.exit(0)
+signal.signal(signal.SIGTERM, on_term)
+print('started', flush=True)
+while True:
+    time.sleep(0.1)
+'''
+cli('run', 'trapped', '--', sys.executable, '-c', leader, trap_dir, expected=124)
+assert (trap_dir / 'trap-ran').read_text() == 'yes'
+try:
+    os.kill(int((trap_dir / 'child.pid').read_text()), 0)
+    raise AssertionError('the leader\'s child group survived the runner kill')
+except ProcessLookupError:
+    pass
+
+# A leader that ignores TERM is killed only by a second forwarded signal.
+stubborn = tmp / 'stubborn.pid'
+code = 'import os, pathlib, signal, sys, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\npathlib.Path(sys.argv[1]).write_text(str(os.getpid()))\nprint("started", flush=True)\nwhile True: time.sleep(0.1)'
+job = subprocess.Popen([sys.executable, str(helper), 'run', 'stubborn', '--', sys.executable, '-c', code, str(stubborn)], env=env, cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+assert job.stdout.readline() == 'started\n'
+job.send_signal(signal.SIGTERM)
+job.send_signal(signal.SIGINT)
+job.communicate(timeout=60)
+assert job.returncode in (130, 143), job.returncode
+try:
+    os.kill(int(stubborn.read_text()), 0)
+    raise AssertionError('the second signal did not kill the TERM-ignoring leader')
+except ProcessLookupError:
+    pass
+
 # Completed no-mistakes step imports are idempotent samples whose historical
 # load is unknown; after five samples the step key has a measured limit.
 database = tmp / 'nm.sqlite'
@@ -154,7 +244,7 @@ assert cli('limit', 'no-mistakes.review', '--fallback', 30).stdout.strip() == '1
 compact_ledger = tmp / 'compact.jsonl'
 write_rows([sample('busy', n) for n in range(1, 201)] + [sample('quiet', n) for n in range(1, 51)]
            + [dict(host=platform.node(), key='busy', event=event, duration_ms=1) for event in ('timeout', 'read-wait', 'filed')], compact_ledger)
-subprocess.run([sys.executable, str(helper), 'record', 'busy', '201', '0'], env=dict(env, FM_DURATION_FILE=str(compact_ledger)), check=True, capture_output=True)
+subprocess.run([sys.executable, str(helper), 'record', 'busy', '201', '0'], env=dict(env, FM_DURATION_FILE=str(compact_ledger)), cwd=workrepo, check=True, capture_output=True)
 kept = [json.loads(line) for line in compact_ledger.read_text().splitlines()]
 assert [r['duration_ms'] for r in kept if r['key'] == 'busy' and 'exit' in r] == list(range(102, 202))
 assert len([r for r in kept if r['key'] == 'quiet']) == 50
@@ -178,7 +268,7 @@ assert (checkout / 'data/command-durations.jsonl').exists()
 
 if shutil.which('tasks-axi'):
     key = 'repeat.consumer'
-    task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + key).encode()).hexdigest()[:16]
+    task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + key).encode()).hexdigest()[:16]
     wrapper = root / 'bin/fm-tasks-axi.sh'
     cli('timeout', key, 120000, '--event-id', 'first')
     before = subprocess.run([str(wrapper), 'show', task, '--full'], env=env, capture_output=True, text=True)
@@ -209,13 +299,13 @@ if shutil.which('tasks-axi'):
     worker_env['FM_DURATION_HOME'] = str(owner)
 
     def worker(*args):
-        result = subprocess.run([sys.executable, str(worktree / 'bin/fm-duration.py'), *map(str, args)], env=worker_env, capture_output=True, text=True)
+        result = subprocess.run([sys.executable, str(worktree / 'bin/fm-duration.py'), *map(str, args)], env=worker_env, cwd=workrepo, capture_output=True, text=True)
         assert result.returncode == 0, (args, result.stdout, result.stderr)
         assert 'not durable' not in result.stderr
         return result
 
     key = 'worker.lint'
-    first = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + key).encode()).hexdigest()[:16]
+    first = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + key).encode()).hexdigest()[:16]
     for event_id in ('w1', 'w2', 'w3'):
         worker('timeout', key, 1200000, '--event-id', event_id)
     owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
@@ -243,19 +333,22 @@ if shutil.which('tasks-axi'):
     original_env = env
     env = dict(env, FM_HOME=str(retry_home), FM_DATA_OVERRIDE=str(retry_home / 'data'), FM_CONFIG_OVERRIDE=str(retry_home / 'config'), FM_STATE_OVERRIDE=str(retry_home / 'state'))
     with sqlite3.connect(database) as db:
-        db.executemany('INSERT INTO step_results VALUES(?,?,?,?,?,?)', [('retry1','retry-run','retry',10000,124,1), ('retry2','retry-run','retry',20000,124,1)])
-    cli('import-nm', database, 'retry-run', expected=1)
-    assert len([r for r in rows() if r.get('key') == 'no-mistakes.retry' and 'exit' in r]) == 2
-    assert not any(r.get('key') == 'no-mistakes.retry' and r.get('event') == 'filed' for r in rows())
-    retry_backlog.rmdir()
-    retry_backlog.write_text('## In flight\n\n## Queued\n\n## Done\n')
+        db.executemany('INSERT INTO step_results VALUES(?,?,?,?,?,?)', [('retry1','retry-run','retry',10000,124,1), ('retry2','retry-run','retry',20000,137,1)])
     cli('import-nm', database, 'retry-run')
     assert len([r for r in rows() if r.get('key') == 'no-mistakes.retry' and 'exit' in r]) == 2
-    assert len([r for r in rows() if r.get('key') == 'no-mistakes.retry' and r.get('event') == 'timeout']) == 2
-    assert len([r for r in rows() if r.get('key') == 'no-mistakes.retry' and r.get('event') == 'filed']) == 1
+    assert not any(r.get('key') == 'no-mistakes.retry' and 'event' in r for r in rows()), 'an imported exit code was guessed to be a timeout'
+    cli('timeout', 'retry.key', 10000, '--event-id', 'retry1')
+    cli('timeout', 'retry.key', 20000, '--event-id', 'retry2', expected=1)
+    assert len([r for r in rows() if r.get('key') == 'retry.key' and r.get('event') == 'timeout']) == 2
+    assert not any(r.get('key') == 'retry.key' and r.get('event') == 'filed' for r in rows())
+    retry_backlog.rmdir()
+    retry_backlog.write_text('## In flight\n\n## Queued\n\n## Done\n')
+    cli('timeout', 'retry.key', 20000, '--event-id', 'retry2')
+    assert len([r for r in rows() if r.get('key') == 'retry.key' and r.get('event') == 'timeout']) == 2
+    assert len([r for r in rows() if r.get('key') == 'retry.key' and r.get('event') == 'filed']) == 1
     assert retry_backlog.read_text().count('- [ ] fm-timeout-') == 1
     env = original_env
-    print('ok - repeated pipeline imports recover failed backlog publication without duplicating samples or events')
+    print('ok - a failed backlog publication is retried without duplicating events, and imports never guess a timeout')
 
 # The guard runs as a real CLI over a committed baseline and current files.
 repo = tmp / 'literal-repo'

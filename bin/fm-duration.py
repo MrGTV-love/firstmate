@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Host-local command timing and timeout ownership.
 
-Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibrated] [--load-start LOAD]
-       fm-duration.py record-batch < KEY<TAB>MS<TAB>EXIT<TAB>CALIBRATION<TAB>LOAD_START<TAB>LOAD_END lines
+Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibrated] [--timed-out] [--load-start LOAD]
+       fm-duration.py record-batch < KEY<TAB>MS<TAB>EXIT<TAB>CALIBRATION<TAB>LOAD_START<TAB>LOAD_END<TAB>TIMED_OUT lines
        fm-duration.py limit KEY [--percentile 95|99] [--margin N] [--fallback SECONDS]
        fm-duration.py run KEY -- COMMAND [ARGS...]
        fm-duration.py import-nm DATABASE RUN_ID
@@ -22,7 +22,11 @@ and readers a shared one. Recording and process-group execution require POSIX
 Python; pure literal lint works on native Windows Python, while limit explicitly
 preserves the existing fallback when POSIX locks are absent.
 
-Rows carry host, command key, wall milliseconds, exit, timestamp, the 1-minute
+Every row, limit and filing is scoped to host and repository: the helper derives
+the repository from the origin remote of the working directory (owner/name), else
+the top-level directory name, so one repository's samples never set another's
+ceiling; rows without a repository are not used for limits. Keys stay short.
+Rows carry host, repository, command key, wall milliseconds, exit, timestamp, the 1-minute
 load at start and at end (data only, never a selection rule) and CPU count;
 optional sample ids deduplicate imported no-mistakes steps, whose historical
 load is unknown. Only successful completed calibration-eligible samples enter
@@ -37,9 +41,11 @@ margin), rounded up to whole seconds, so measurement can raise an operator bound
 but never lower it. Sample-count policy: a host/key needs MIN_SAMPLES eligible
 samples before its measured value applies; below that, limit reports the missing
 calibration and returns the caller's fallback, or zero (no destructive deadline
-while gathering calibration). Retention policy: compaction keeps the newest
-KEEP_SAMPLES samples per host and key once any host/key exceeds COMPACT_AT
-sample rows; timeout, read-wait and filed rows are always kept.
+while gathering calibration). A shell caller whose fallback is 0 had no deadline
+before this table existed, so fm_duration_limit keeps it record-only and never
+applies a measured kill. Retention policy: compaction keeps the newest
+KEEP_SAMPLES samples per host, repository and key once any of them exceeds
+COMPACT_AT sample rows; timeout, read-wait and filed rows are always kept.
 
 The default margin is 3; run uses p99 x 3 for its outer ceiling. Polling cadence
 is observation, not a failure deadline. Output growth and cumulative process-tree
@@ -47,13 +53,20 @@ CPU time report progress; neither an idle or failed sample nor an elapsed read
 wait kills work. Completion of the command's leader, signal, or the measured
 outer ceiling ends the run; descendants that outlive the leader and still hold
 its output streams are neither awaited nor counted as live work.
+A ceiling expiry or the first forwarded signal sends SIGTERM to the process group
+and then waits for the leader to exit, with no guessed grace number. SIGKILL goes
+to the group only when the leader has exited and group members remain, on a
+second forwarded signal, or when a further full measured ceiling passes with the
+leader still alive, so a leader's own TERM cleanup always gets to run.
 run exports FM_DURATION_MANAGED_KEY so a self-instrumented command with the same
 key leaves its one complete wall-time sample to the outer runner.
 It also exports a task-local FM_DURATION_CALIBRATION_FILE: self-instrumented
 commands write 0 there to exclude a warm/partial run, or 1 for eligible work.
 The runner propagates the classification to its own sample and removes the file.
 
-A timeout is a real limit that stopped a command. The second timeout for a
+A timeout is a real limit that stopped a command, reported by the owner of that
+limit (run's ceiling, fm_run_timed, the lint root bound, the per-script bound,
+or record --timed-out); an exit code of 124 or 137 alone never counts. The second timeout for a
 host/key files a deterministic ship item through the owning home's
 fm-tasks-axi.sh (FM_HOME set to FM_DURATION_HOME when present) with the observed
 lower bounds; later events update the ledger without duplicating an open item.
@@ -77,6 +90,7 @@ import argparse
 import collections
 import contextlib
 import datetime
+import functools
 try:
     import fcntl
 except ImportError:
@@ -142,17 +156,35 @@ def load_now():
         return None
 
 
+@functools.lru_cache(maxsize=None)
+def repo():
+    def query(*args):
+        try:
+            done = subprocess.run(['git', *args], capture_output=True, text=True)
+        except OSError:
+            return ''
+        return done.stdout.strip() if done.returncode == 0 else ''
+    parts = [part for part in re.split(r'[/:]', query('remote', 'get-url', 'origin')) if part]
+    if len(parts) >= 2:
+        return re.sub(r'\.git$', '', '/'.join(parts[-2:]))
+    return Path(query('rev-parse', '--show-toplevel') or os.getcwd()).name
+
+
+def mine(row, key=None):
+    return row.get('host') == HOST and row.get('repo') == repo() and (key is None or row.get('key') == key)
+
+
 def sample_rows(rows):
     return [r for r in rows if r.get('event') not in EVENTS]
 
 
 def compact(path, rows):
-    counts = collections.Counter((r.get('host'), r.get('key')) for r in sample_rows(rows))
+    counts = collections.Counter((r.get('host'), r.get('repo'), r.get('key')) for r in sample_rows(rows))
     if not counts or max(counts.values()) <= COMPACT_AT:
         return
     kept, seen = [], collections.Counter()
     for row in reversed(rows):
-        identity = row.get('host'), row.get('key')
+        identity = row.get('host'), row.get('repo'), row.get('key')
         if row.get('event') not in EVENTS:
             seen[identity] += 1
             if seen[identity] > KEEP_SAMPLES:
@@ -205,10 +237,10 @@ def now_iso():
     return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-def observation(key, milliseconds, code, sample_id=None, calibration=True, load_start=None, load_end=None):
-    return dict(host=HOST, key=key, duration_ms=milliseconds, exit=code, recorded_at=now_iso(),
+def observation(key, milliseconds, code, sample_id=None, calibration=True, load_start=None, load_end=None, timed_out=False):
+    return dict(host=HOST, repo=repo(), key=key, duration_ms=milliseconds, exit=code, recorded_at=now_iso(),
                 load_start=load_start, load_end=load_end,
-                cpus=os.cpu_count() or 1, sample_id=sample_id, calibration=calibration)
+                cpus=os.cpu_count() or 1, sample_id=sample_id, calibration=calibration, timed_out=timed_out)
 
 
 def record_many(entries):
@@ -219,13 +251,13 @@ def record_many(entries):
             if not sample_id or not any(r.get('host') == HOST and r.get('sample_id') == sample_id for r in rows):
                 append(handle, rows, observation(**entry))
     for entry in entries:
-        if entry['code'] in (124, 137):
+        if entry.get('timed_out'):
             own_timeout(entry['key'], entry['milliseconds'], entry.get('sample_id'))
 
 
-def record(key, milliseconds, code, sample_id=None, calibration=True, load_start=None):
+def record(key, milliseconds, code, sample_id=None, calibration=True, load_start=None, timed_out=False):
     record_many([dict(key=key, milliseconds=milliseconds, code=code, sample_id=sample_id,
-                      calibration=calibration, load_start=load_start, load_end=load_now())])
+                      calibration=calibration, load_start=load_start, load_end=load_now(), timed_out=timed_out)])
 
 
 def optional_load(value):
@@ -237,12 +269,12 @@ def record_batch(lines):
     for line in lines:
         if not line.strip():
             continue
-        key, milliseconds, code, calibration, load_start, load_end = line.rstrip('\n').split('\t')
+        key, milliseconds, code, calibration, load_start, load_end, timed_out = line.rstrip('\n').split('\t')
         if int(milliseconds) < 0 or int(code) < 0:
             raise ValueError(f'negative duration or exit for {key}')
         entries.append(dict(key=key, milliseconds=int(milliseconds), code=int(code),
                             calibration=calibration == '1', load_start=optional_load(load_start),
-                            load_end=optional_load(load_end)))
+                            load_end=optional_load(load_end), timed_out=timed_out == '1'))
     record_many(entries)
 
 
@@ -252,7 +284,7 @@ def limit(key, percentile, margin, fallback, verbose=True):
         scalar('fallback', f'{fallback}s existing caller limit' if fallback else 'no destructive deadline; use the Firstmate POSIX shell to collect samples', sys.stderr)
         return fallback
     with ledger(write=False) as (_, rows):
-        samples = sorted(r['duration_ms'] for r in sample_rows(rows) if r.get('host') == HOST and r.get('key') == key
+        samples = sorted(r['duration_ms'] for r in sample_rows(rows) if mine(r, key)
                          and r.get('exit') == 0 and r.get('calibration', True))
     if len(samples) < MIN_SAMPLES:
         if verbose:
@@ -289,11 +321,11 @@ def note_event(key, milliseconds, event_id, event):
     with ledger() as (handle, rows):
         if handle is None:
             return None
-        if not event_id or not any(r.get('host') == HOST and r.get('key') == key and r.get('event') == event
+        if not event_id or not any(mine(r, key) and r.get('event') == event
                                    and r.get('event_id') == event_id for r in rows):
-            append(handle, rows, dict(host=HOST, key=key, event=event, duration_ms=milliseconds,
+            append(handle, rows, dict(host=HOST, repo=repo(), key=key, event=event, duration_ms=milliseconds,
                                       event_id=event_id, recorded_at=now_iso()))
-        return [r for r in rows if r.get('host') == HOST and r.get('key') == key and r.get('event') in EVENTS]
+        return [r for r in rows if mine(r, key) and r.get('event') in EVENTS]
 
 
 def own_timeout(key, milliseconds, event_id=None):
@@ -305,43 +337,38 @@ def own_timeout(key, milliseconds, event_id=None):
     if len(timeouts) < 2 or (filed and timeouts[-1] < filed[-1]):
         return
     cmd, env = backlog()
-    base = 'fm-timeout-' + hashlib.sha256((HOST + '\0' + key).encode()).hexdigest()[:16]
+    base = 'fm-timeout-' + hashlib.sha256((HOST + '\0' + repo() + '\0' + key).encode()).hexdigest()[:16]
     previous = history[filed[-1]]['task'] if filed else None
     if previous and not task_closed(cmd, env, previous):
         return
     task = base if not filed else f'{base}-{len(filed) + 1}'
-    body = f'Repeated timeout for command key {key} on host {HOST}. Observed lower bounds (ms): ' + ', '.join(str(history[i]['duration_ms']) for i in timeouts)
+    body = f'Repeated timeout for command key {key} in repository {repo()} on host {HOST}. Observed lower bounds (ms): ' + ', '.join(str(history[i]['duration_ms']) for i in timeouts)
     if previous:
         body += f'. The timeout recurred after {previous} was closed'
     body += '. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.'
     # Inspect before retrying an interrupted publication, using the deterministic id.
     if subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
-        result = subprocess.run(cmd + ['add', task, f'Measure and repair repeated timeout: {key}', '--kind', 'ship', '--repo', 'firstmate', '--body', body], capture_output=True, text=True, env=env)
+        result = subprocess.run(cmd + ['add', task, f'Measure and repair repeated timeout: {repo()} {key}', '--kind', 'ship', '--repo', 'firstmate', '--body', body], capture_output=True, text=True, env=env)
         if result.returncode and subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
             raise RuntimeError('timeout work could not be filed: ' + result.stderr.strip() + result.stdout.strip())
     with ledger() as (handle, rows):
-        if not any(r.get('host') == HOST and r.get('key') == key and r.get('event') == 'filed' and r.get('task') == task for r in rows):
-            append(handle, rows, dict(host=HOST, key=key, event='filed', task=task, previous=previous, recorded_at=now_iso()))
+        if not any(mine(r, key) and r.get('event') == 'filed' and r.get('task') == task for r in rows):
+            append(handle, rows, dict(host=HOST, repo=repo(), key=key, event='filed', task=task, previous=previous, recorded_at=now_iso()))
     scalar('timeout_work', task, sys.stderr)
 
 
 def import_nm(database, run_id):
     with contextlib.closing(sqlite3.connect(Path(database).absolute().as_uri() + '?mode=ro', uri=True)) as db:
         steps = db.execute('SELECT id, step_name, duration_ms, exit_code FROM step_results WHERE run_id = ? AND completed_at IS NOT NULL AND duration_ms > 0 AND exit_code IS NOT NULL', (run_id,)).fetchall()
-    timeouts = []
     with ledger() as (handle, rows):
         known = {r.get('sample_id') for r in rows}
         for identity, name, duration, code in steps:
             sample_id = 'nm:' + str(Path(database).absolute()) + ':' + str(identity)
             if sample_id not in known:
                 # Imported timings have no historical load evidence.
-                append(handle, rows, dict(host=HOST, key='no-mistakes.' + name, duration_ms=duration,
+                append(handle, rows, dict(host=HOST, repo=repo(), key='no-mistakes.' + name, duration_ms=duration,
                                           exit=code, sample_id=sample_id, load_start=None, load_end=None,
                                           cpus=None, recorded_at=now_iso()))
-            if code in (124, 137):
-                timeouts.append(('no-mistakes.' + name, duration, sample_id))
-    for key, duration, sample_id in timeouts:
-        own_timeout(key, duration, sample_id)
 
 
 def tree_cpu(pid, observed):
@@ -416,9 +443,17 @@ def run(key, command, calibration_file):
     streams.register(child.stderr, selectors.EVENT_READ, sys.stderr.buffer)
     output_bytes = 0
     interrupted = []
+    stopping_since = []
+    def begin_stop():
+        if not stopping_since:
+            stopping_since.append(time.monotonic())
+            signal_group(child, signal.SIGTERM)
     def forward(sig, _frame):
         interrupted.append(sig)
-        signal_group(child, sig)
+        if len(interrupted) > 1:
+            signal_group(child, signal.SIGKILL)
+        else:
+            begin_stop()
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, forward)
     def relay(stream, sink, size):
@@ -451,13 +486,13 @@ def run(key, command, calibration_file):
             if cpu > previous_cpu or output_bytes > previous_bytes:
                 scalar('progress', f'{key} elapsed={elapsed:.1f}s output_bytes={output_bytes} tree_cpu={cpu:.2f}s', sys.stderr)
                 previous_cpu, previous_bytes = max(previous_cpu, cpu), output_bytes
-            if interrupted or (ceiling and elapsed >= ceiling and child.poll() is None):
-                expired = not interrupted
-                # Cleanup escalation is immediate; no additional guessed grace.
-                for sig in (signal.SIGTERM, signal.SIGKILL):
-                    signal_group(child, sig)
-                child.wait()
-                break
+            if ceiling and elapsed >= ceiling and not stopping_since and child.poll() is None:
+                expired = True
+                begin_stop()
+            elif stopping_since and ceiling and time.monotonic() - stopping_since[0] >= ceiling:
+                signal_group(child, signal.SIGKILL)  # a second full measured ceiling with the leader alive
+        if stopping_since:
+            signal_group(child, signal.SIGKILL)  # the leader is gone; sweep any remaining group members
         # The leader's exit is the result. Relay the output buffered by then,
         # but do not wait for descendants that outlive the leader and still
         # hold its streams; they are not live work under the ceiling.
@@ -476,7 +511,7 @@ def run(key, command, calibration_file):
         duration_ms = round((time.monotonic() - started) * 1000)
         calibration = not calibration_file.exists() or calibration_file.read_text().strip() == '1'
         try:
-            record(key, duration_ms, code, occurrence_id, calibration, load_start)
+            record(key, duration_ms, code, occurrence_id, calibration, load_start, expired and not interrupted)
         except (OSError, ValueError, RuntimeError) as error:
             scalar('recording_error', str(error), sys.stderr)
             scalar('help', f'python3 bin/fm-duration.py record {shlex.quote(key)} {duration_ms} {code} --sample-id {occurrence_id}{"" if calibration else " --uncalibrated"}{"" if load_start is None else f" --load-start {load_start}"}; command result preserved', sys.stderr)
@@ -627,7 +662,7 @@ def main():
         scalar('bin', str(Path(__file__).resolve()))
         scalar('description', 'Measure host command latency and own repeated timeouts')
         with ledger(write=False) as (_, rows):
-            counts = collections.Counter(r['key'] for r in sample_rows(rows) if r.get('host') == HOST)
+            counts = collections.Counter(r['key'] for r in sample_rows(rows) if mine(r))
         print(f'durations[{len(counts)}]{{key,samples}}:')
         for key, count in sorted(counts.items()):
             print(f'  {json.dumps(key)},{count}')
@@ -642,6 +677,7 @@ def main():
     rec.add_argument('--sample-id')
     rec.add_argument('--uncalibrated', action='store_true')
     rec.add_argument('--load-start', type=float)
+    rec.add_argument('--timed-out', action='store_true')
     commands.add_parser('record-batch')
     lim = commands.add_parser('limit')
     lim.add_argument('key'); lim.add_argument('--percentile', type=int, choices=(95, 99), default=95)
@@ -659,7 +695,7 @@ def main():
     check.add_argument('--base'); check.add_argument('--report', action='store_true')
     args = parser.parse_args()
     if args.action == 'record':
-        record(args.key, args.milliseconds, args.exit, args.sample_id, not args.uncalibrated, args.load_start)
+        record(args.key, args.milliseconds, args.exit, args.sample_id, not args.uncalibrated, args.load_start, args.timed_out)
     elif args.action == 'record-batch':
         record_batch(sys.stdin)
     elif args.action == 'limit':

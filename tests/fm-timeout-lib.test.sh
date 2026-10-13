@@ -707,7 +707,7 @@ with ledger.open('w') as output:
         for _ in range(5):
             output.write(json.dumps(row) + '\n')
 for key in ('lint-root.full.bin/consumer.sh', 'lint.full.whole'):
-    result = subprocess.run([sys.executable, str(helper), 'limit', key, '--percentile', '99'], env=env, capture_output=True, text=True, check=True)
+    result = subprocess.run([sys.executable, str(helper), 'limit', key, '--percentile', '99'], cwd=repo, env=env, capture_output=True, text=True, check=True)
     assert result.stdout.strip() == '0' and '0 of 5 samples' in result.stderr, result
 (repo / 'bin/consumer.sh').write_text('#!/bin/bash\nprintf changed-cold\n')
 handshake, release = fixture / 'handshake', fixture / 'release'

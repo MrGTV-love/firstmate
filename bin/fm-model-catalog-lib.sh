@@ -68,7 +68,7 @@ fm_model_catalog_normalize() {  # <harness>; stdin: raw discovery output
 . "$FM_MODEL_CATALOG_LIB_DIR/fm-duration-lib.sh"
 
 fm_model_catalog() {  # <harness> <scratch-dir>
-  local started finished load_start result=0 h=$1 bound
+  local started finished load_start result=0 h=$1 bound timed_out=0
   if [ -n "${FM_MODEL_CATALOG_DIR:-}" ]; then
     fm_model_catalog_read "$@"
     return
@@ -82,7 +82,10 @@ fm_model_catalog() {  # <harness> <scratch-dir>
   started=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000')
   fm_model_catalog_read "$@" || result=$?
   finished=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000')
-  fm_duration_record "model-catalog.$h" "$((finished - started))" "$result" '' 1 "$load_start"
+  if [ "$bound" -gt 0 ] && [ "$result" -eq 124 ]; then
+    timed_out=1
+  fi
+  fm_duration_record "model-catalog.$h" "$((finished - started))" "$result" '' 1 "$load_start" "$timed_out"
   return "$result"
 }
 
