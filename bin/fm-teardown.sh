@@ -2240,7 +2240,7 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
   done < "$inventory"
   rm -f "$inventory"
   if [ "$refused" = 1 ]; then
-    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, including task $task while its record still names the slot root, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy>. Re-run this teardown afterwards." >&2
+    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy>. Re-run this teardown afterwards." >&2
     return 1
   fi
 }
@@ -4196,6 +4196,9 @@ validate_firstmate_home_children_removal() {
       [ -n "$child_home" ] || child_home=$child_wt
       require_cleanup_copy_clearance "$child_meta" "$child_id" "$sub_state" "$child_home" home || return 1
       validate_firstmate_home_for_removal "$child_home" "child firstmate home" "$child_id" "$home/data/secondmates.md" >/dev/null || return 1
+      if fm_treehouse_pool_slot "$FM_ROOT" "$child_home"; then
+        require_registered_slot_copies "$child_id" "$child_home" || return 1
+      fi
       validate_firstmate_home_children_removal "$child_home" "$removal_root" || return 1
     elif [ "$child_backend" = orca ]; then
       require_orca_worktree_id "$child_meta" >/dev/null || return 1
@@ -4668,6 +4671,9 @@ if [ "$KIND" = secondmate ]; then
   fm_lock_acquire_wait "$LOCAL_HANDOFF_LOCK" || exit 1
   [ -n "$HOME_PATH" ] || HOME_PATH=$WT
   validate_firstmate_home_for_removal "$HOME_PATH" "secondmate home" "$ID" "$SECONDMATE_REG" >/dev/null || exit 1
+  if fm_treehouse_pool_slot "$FM_ROOT" "$HOME_PATH"; then
+    require_registered_slot_copies "$ID" "$HOME_PATH" || exit 1
+  fi
   if [ "$FORCE" = "--force" ]; then
     preflight_descendant_task_locks "$HOME_PATH" || exit 1
     validate_firstmate_home_children_removal "$HOME_PATH" || exit 1
