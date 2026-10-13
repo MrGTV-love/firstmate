@@ -268,10 +268,126 @@ test_no_helpers_rejects_nonworker_launches() {
     fi
     status=$?
     expect_code 1 "$status" "no-helper posture must refuse $kind: $out"
+    assert_contains "$out" "--omp-no-helpers requires a canonical omp ship or scout launch" \
+      "the $kind refusal must name the canonical omp ship or scout requirement"
     assert_absent "$HOME_DIR/state/$id.meta" "unsupported no-helper launch must not publish a task"
     [ ! -s "$LAUNCH_LOG" ] || fail "unsupported no-helper posture launched an agent"
   done
   pass "no-helper posture rejects other runtimes and supervisor sessions before publishing or launching"
+}
+
+# The emitted launch, the generated fallback overlay and the task record are
+# the consumer-visible contract of --omp-no-helpers: a regression in any of them
+# silently returns secondary-model routes to a worker meant to have none.
+assert_no_helper_launch() {  # <label> <launch-log> <fallback-yml> <meta>
+  local label=$1 launch fallback=$3 meta=$4 flag
+  launch=$(cat "$2")
+  assert_contains "$launch" "--config '$ROOT/.omp/fm-no-helpers-overlay.yml'" "$label launch lost the no-helper overlay"
+  for flag in --no-title --no-extensions --no-skills --no-rules; do
+    assert_contains "$launch" " $flag" "$label launch lost $flag"
+  done
+  assert_contains "$launch" " --tools read,bash,edit,write,grep,glob,todo,ask " "$label launch lost the restricted tool list"
+  assert_contains "$launch" "--thinking 'high'" "$label launch must pin non-auto thinking"
+  assert_equals '[]' "$(jq -c .retry.fallbackChains.default "$fallback")" "$label launch must keep no default fallback chain"
+  assert_equals '[]' "$(jq -c '[.retry.fallbackChains | to_entries[] | select(.key != "default") | .value[]]' "$fallback")" \
+    "$label launch must keep no stand-in fallback entry"
+  assert_grep 'omp_no_helpers=on' "$meta" "$label record lost omp_no_helpers=on"
+}
+
+# Run a same-harness relaunch of a published task against the fake tmux stub.
+run_omp_relaunch() {  # <home> <wt> <fakebin> <launch-log> <id>
+  local home=$1 wt=$2 fakebin=$3 launchlog=$4 id=$5
+  local bin
+  : > "$launchlog"
+  # The recorded window is listed and its pane runs an idle shell, which is
+  # the positively agent-free endpoint a relaunch requires.
+  bin="$fakebin/relaunch-shell"
+  mkdir -p "$bin"
+  cat > "$bin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *pane_current_command*) printf 'zsh\\n'; exit 0 ;;
+esac
+exec "$fakebin/tmux" "\$@"
+SH
+  chmod +x "$bin/tmux"
+  FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$home/state/$id.meta")" FM_FAKE_LAUNCH_LOG="$launchlog" \
+    fm_test_run_spawn "$home" "$wt" "$bin:$fakebin" "$id" --relaunch
+}
+
+test_no_helpers_launch_contract() {
+  local rec id out status meta fallback
+  id="omp-no-helpers-contract"
+  rec=$(make_spawn_case no-helpers-contract omp "$id" firstmate)
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/config"
+  cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"low","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
+JSON
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
+    --harness omp --model openai-codex/gpt-6-luna --dispatch-rule rule_1 --omp-no-helpers)
+  expect_code 0 $? "no-helper spawn should succeed: $out"
+  meta="$HOME_DIR/state/$id.meta"
+  fallback="$HOME_DIR/state/$id.omp-fallback.yml"
+  assert_no_helper_launch "first" "$LAUNCH_LOG" "$fallback" "$meta"
+
+  out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+  expect_code 0 $? "same-harness relaunch of a no-helper task should succeed: $out"
+  assert_no_helper_launch "relaunched" "$LAUNCH_LOG" "$fallback" "$meta"
+
+  cp "$meta" "$CASE_DIR/prior.meta"
+  sed -i.bak 's/^omp_no_helpers=on$/omp_no_helpers=maybe/' "$meta"
+  rm -f "$meta.bak"
+  cp "$meta" "$CASE_DIR/invalid.meta"
+  out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+  status=$?
+  expect_code 1 "$status" "an invalid recorded no-helper posture must be refused: $out"
+  assert_contains "$out" "invalid recorded omp_no_helpers posture for $id" "the refusal must name the invalid record"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused relaunch launched an agent"
+  cmp -s "$CASE_DIR/invalid.meta" "$meta" || fail "a refused relaunch changed the task record"
+  pass "no-helper launch, emptied fallback, record, relaunch inheritance and invalid-record refusal hold"
+}
+
+test_no_helpers_refuses_ultra_effort() {
+  local rec id out status
+  id="omp-no-helpers-ultra"
+  rec=$(make_spawn_case no-helpers-ultra omp "$id")
+  read_case_record "$rec"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
+    --harness omp --effort ultra --omp-no-helpers)
+  status=$?
+  expect_code 1 "$status" "omp has no ultra effort, so a no-helper launch must refuse it: $out"
+  assert_contains "$out" "ultra effort requires pi or pi-signed" "the refusal must name the ultra requirement"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused ultra launch must not publish a task"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused ultra launch started an agent"
+  pass "no-helper omp launch refuses ultra effort before publishing or launching"
+}
+
+# Title generation routes to any credentialed OpenRouter model, so every
+# canonical omp ship/scout launch, in any project and on relaunch, turns it off.
+test_omp_workers_disable_title_generation() {
+  local scope kind rec id out launch
+  for scope in firstmate vernant; do
+    for kind in ship scout; do
+      id="omp-title-$scope-$kind"
+      rec=$(make_spawn_case "title-$scope-$kind" omp "$id" "$scope")
+      read_case_record "$rec"
+      if [ "$kind" = ship ]; then
+        out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+          "$id" "$PROJ_DIR" --harness omp --mode no-mistakes --yolo off)
+      else
+        out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+      fi
+      expect_code 0 $? "omp $scope $kind spawn should succeed: $out"
+      launch=$(cat "$LAUNCH_LOG")
+      assert_contains "$launch" " --no-title " "an ordinary omp $scope $kind launch must disable title generation"
+      assert_not_contains "$launch" "--no-extensions" "an ordinary omp $scope $kind launch must keep its extension"
+      out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+      expect_code 0 $? "omp $scope $kind relaunch should succeed: $out"
+      assert_contains "$(cat "$LAUNCH_LOG")" " --no-title " "an omp $scope $kind relaunch must disable title generation"
+    done
+  done
+  pass "every canonical omp ship and scout launch and relaunch disables title generation"
 }
 
 test_worker_replace_mode_environment() {
@@ -3740,6 +3856,9 @@ test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
 test_no_helpers_rejects_nonworker_launches
+test_no_helpers_launch_contract
+test_no_helpers_refuses_ultra_effort
+test_omp_workers_disable_title_generation
 test_worker_replace_mode_environment
 test_worker_guard_project_scope
 test_spawn_retains_pooled_capacity_and_declared_stand_ins

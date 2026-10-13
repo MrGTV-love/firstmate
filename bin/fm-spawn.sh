@@ -291,9 +291,12 @@
 #   changes. Every other project gets find.enabled=off and a failing judge
 #   credential, so native judgments reach neither TypeSafe nor OpenRouter.
 #   No key is stored in config, argv or worker env; global settings stay intact.
+#   Every canonical omp ship/scout launches with --no-title, so title
+#   generation never reaches a credentialed OpenRouter model.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
-#   routes. It layers .omp/fm-no-helpers-overlay.yml, fixes non-auto effort,
-#   disables title/extension/skill/rule discovery and speech (including the
+#   routes. It layers .omp/fm-no-helpers-overlay.yml, defaults an unset effort
+#   to high (ultra is refused for omp before launch), disables
+#   extension/skill/rule discovery and speech (including the
 #   enhanced-speech @tiny route), exposes only deterministic core tools,
 #   withholds native judge credentials and guard judgments, and
 #   empties main-model fallbacks. Deterministic guard path/edit checks remain.
@@ -6113,9 +6116,10 @@ sq_ompext=$(shell_quote "$STATE/$ID.omp-ext.ts")
 sq_ompcfg=$(shell_quote "${OMP_WORKER_CFG:-$FM_ROOT/.omp/fm-worker-overlay.yml}")
 sq_ompsessioncfg=$(shell_quote "${OMP_SESSION_CFG:-$FM_ROOT/.omp/fm-session-overlay.yml}")
 if [ "$HARNESS" = omp ] && [ "$KIND" != secondmate ]; then
-  sq_ompcfg="$sq_ompcfg --config $(shell_quote "$STATE/$ID.omp-fallback.yml")"
+  # Title generation otherwise routes to any credentialed OpenRouter model.
+  sq_ompcfg="$sq_ompcfg --config $(shell_quote "$STATE/$ID.omp-fallback.yml") --no-title"
   if [ "$OMP_NO_HELPERS" = 1 ]; then
-    sq_ompcfg="$sq_ompcfg --config $(shell_quote "$FM_ROOT/.omp/fm-no-helpers-overlay.yml") --no-title --no-extensions --no-skills --no-rules --tools read,bash,edit,write,grep,glob,todo,ask"
+    sq_ompcfg="$sq_ompcfg --config $(shell_quote "$FM_ROOT/.omp/fm-no-helpers-overlay.yml") --no-extensions --no-skills --no-rules --tools read,bash,edit,write,grep,glob,todo,ask"
   fi
 fi
 sq_opinput=$(shell_quote "$FM_ROOT/bin/fm-operational-input.sh")
