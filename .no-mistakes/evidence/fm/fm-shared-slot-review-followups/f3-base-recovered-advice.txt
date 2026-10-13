@@ -1,0 +1,6 @@
+$ FM_HOME=<same lab> <base a9010aab>/bin/fm-teardown.sh finished
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.dYKSVf
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: shared pool slot /Users/charlesabrooker/tmp/fm-lab.dYKSVf/work/pool/.treehouse/proj-accc52/1/proj is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-lab.dYKSVf/work/pool/.treehouse/proj-accc52/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed.
+Inspect its lease with: (cd '/Users/charlesabrooker/tmp/fm-lab.dYKSVf/work/proj' && treehouse status); an unleased slot can be held with treehouse lease <name> --lease-holder 'parked'.
+exit=1

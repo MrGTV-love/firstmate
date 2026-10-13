@@ -1,0 +1,10 @@
+$ FM_HOME=<lab> <base a9010aab>/bin/fm-teardown.sh parked
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.RDVJG6
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+/Users/charlesabrooker/tmp/fm-lab.RDVJG6/work/proj: already current
+teardown parked complete (window fmses:fm-parked, worktree /Users/charlesabrooker/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj)
+Backlog: parked just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.RDVJG6/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.RDVJG6/data/backlog.md - move parked to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0

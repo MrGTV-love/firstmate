@@ -1,0 +1,19 @@
+$ FM_HOME=<lab> bin/fm-teardown.sh finished    # finished + parked records share a slot with a REAL treehouse recovered-state lease
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.dYKSVf
+REFUSED: shared pool slot /Users/charlesabrooker/tmp/fm-lab.dYKSVf/work/pool/.treehouse/proj-accc52/1/proj is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-lab.dYKSVf/work/pool/.treehouse/proj-accc52/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed.
+Treehouse 2.3.1-fm has no supported non-forcing route to replace this recovered-state lease: treehouse lease refuses an already-leased slot. Do not return it to change the lease while copies remain.
+Inspect with (cd '/Users/charlesabrooker/tmp/fm-lab.dYKSVf/work/proj' && treehouse status); report the slot /Users/charlesabrooker/tmp/fm-lab.dYKSVf/work/pool/.treehouse/proj-accc52/1/proj, state file /Users/charlesabrooker/tmp/fm-lab.dYKSVf/work/pool/.treehouse/proj-accc52/treehouse-state.json, recovered lease holder, and treehouse --version to firstmate for operator recovery. Keep all task records and copies in place.
+exit=1
+== finished record unchanged?
+yes
+== claim unchanged?
+yes
+== treehouse status:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.dYKSVf/work/pool/.treehouse/proj-accc52/1/proj  [fm/parked]  (held by recovered: state file was corrupt or truncated; verify before reuse)
+== the old advice (treehouse lease) on this real recovered slot:
+$ (cd <project> && treehouse lease 1 --lease-holder parked)
+
+worktree 1 is already leased (holder: "recovered: state file was corrupt or truncated; verify before reuse")
+== shim calls:
+cat: /Users/charlesabrooker/tmp/fm-lab.dYKSVf/shim.log: No such file or directory

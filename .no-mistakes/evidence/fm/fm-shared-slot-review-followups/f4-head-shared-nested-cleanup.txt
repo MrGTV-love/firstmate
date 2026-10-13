@@ -1,0 +1,30 @@
+### head code: FM_HOME=<lab> bin/fm-teardown.sh finished   (finished names its own landed nested copy; parked names the shared slot root)
+nested-copy leftover pids: 73468 73470 ; parked-root pids: 73473 73475
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.MXNYgE
+notice: task finished shares recorded pool slot /Users/charlesabrooker/tmp/fm-lab.MXNYgE/work/pool/.treehouse/proj-b2fb99/1/proj with task parked; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+teardown: reaping leaked worktree process(es) for finished: 73468 73470
+teardown finished complete (window fmses:fm-finished; shared pool slot /Users/charlesabrooker/tmp/fm-lab.MXNYgE/work/pool/.treehouse/proj-b2fb99/1/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: finished just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.MXNYgE/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.MXNYgE/data/backlog.md - move finished to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+== nested-copy leftover processes alive:
+73468 73470 gone
+== parked-root processes alive:
+73473 73475 gone
+== records:
+parked.meta
+== nested copy still present:
+/Users/charlesabrooker/tmp/fm-lab.MXNYgE/work/pool/.treehouse/proj-b2fb99/1/proj/.claude/worktrees/finished
+== treehouse status:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.MXNYgE/work/pool/.treehouse/proj-b2fb99/1/proj  [fm/parked]  (held by parked)
+                   bash (73473), perl (73475)
+== claim:
+(no claim)
+
+== CORRECTED liveness re-check (the in-run loop above did not word-split under zsh; treat its 'gone' lines as invalid):
+nested-copy leftover:
+73468 gone
+73470 gone
+parked-root:
+73473 ALIVE
+73475 ALIVE

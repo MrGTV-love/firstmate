@@ -1,0 +1,35 @@
+== BEFORE
+== records:
+/Users/charlesabrooker/tmp/fm-lab-aux.fbnvJG/subhome/state/child.meta
+/Users/charlesabrooker/tmp/fm-lab.eN43yu/state/domain.meta
+== child slot lease:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab-aux.fbnvJG/cpool/.treehouse/alpha-e96675/1/alpha  (detached)  (held by child)
+== registered worktrees:
+/Users/charlesabrooker/tmp/fm-lab-aux.fbnvJG/subhome/projects/alpha                                         63b485e [main]
+/Users/charlesabrooker/tmp/fm-lab-aux.fbnvJG/cpool/.treehouse/alpha-e96675/1/alpha                          63b485e (detached HEAD)
+/Users/charlesabrooker/tmp/fm-lab-aux.fbnvJG/cpool/.treehouse/alpha-e96675/1/alpha/.claude/worktrees/parked 63b485e [parked]
+== nested work:
+/Users/charlesabrooker/tmp/fm-lab-aux.fbnvJG/cpool/.treehouse/alpha-e96675/1/alpha/.claude/worktrees/parked/parked.txt
+== tmux endpoints:
+firstmate:fm-domain
+firstmate:fm-child
+$ FM_HOME=<lab> <base a9010aab>/bin/fm-teardown.sh domain --force --drop-file <captain-words>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.eN43yu
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown domain complete (window firstmate:fm-domain, worktree /Users/charlesabrooker/tmp/fm-lab-aux.fbnvJG/subhome)
+exit=0
+== AFTER
+== records:
+snap: no matches found: /Users/charlesabrooker/tmp/fm-lab.eN43yu/state/*.meta
+== child slot lease:
+snap:cd: no such file or directory: /Users/charlesabrooker/tmp/fm-lab-aux.fbnvJG/subhome/projects/alpha
+== registered worktrees:
+fatal: cannot change to '/Users/charlesabrooker/tmp/fm-lab-aux.fbnvJG/subhome/projects/alpha': No such file or directory
+== nested work:
+/Users/charlesabrooker/tmp/fm-lab-aux.fbnvJG/cpool/.treehouse/alpha-e96675/1/alpha/.claude/worktrees/parked/parked.txt
+== tmux endpoints:
+no server running on /Users/charlesabrooker/tmp/fm-lab.eN43yu/tmux/tmux-501/default

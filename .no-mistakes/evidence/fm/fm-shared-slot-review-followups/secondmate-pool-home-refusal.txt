@@ -1,0 +1,33 @@
+== BEFORE
+== domain record:
+window=firstmate:fm-domain
+endpoint_task_id=domain
+== registry:
+- domain - design domain (home: /Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot; scope: design domain; projects: alpha; added 2026-10-12)
+== home lease:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot  (detached)  (held by domain)
+== registered worktrees:
+/Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/fmroot                                                             1fbf02d [main]
+/Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot                           1fbf02d (detached HEAD)
+/Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot/.claude/worktrees/agent-x 1fbf02d [agent-x]
+== nested work:
+?? work.txt
+/Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot/.claude/worktrees/agent-x/work.txt
+== tmux endpoints:
+firstmate:fm-domain
+
+$ FM_HOME=<lab> <lab code root @ target commit>/bin/fm-teardown.sh domain     # home = REAL treehouse slot holding .claude/worktrees/agent-x with uncommitted work
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ltbLJi
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot contains registered copy /Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot/.claude/worktrees/agent-x that is not one of task domain's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+(state identical to BEFORE: endpoint alive, record, registry, lease, copy and work kept)
+
+$ ... bin/fm-teardown.sh domain --force --drop-file <captain-words>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.ltbLJi
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot contains registered copy /Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot/.claude/worktrees/agent-x that is not one of task domain's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab-aux.B0XQy0/smpool/.treehouse/fmroot-c5ad61/1/fmroot worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+(state identical to BEFORE)

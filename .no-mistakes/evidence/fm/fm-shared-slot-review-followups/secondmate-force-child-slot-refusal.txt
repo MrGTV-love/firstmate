@@ -1,0 +1,54 @@
+### shape=treehouse (treehouse on PATH: yes)
+== BEFORE
+== records:
+/Users/charlesabrooker/tmp/fm-lab-aux.4eowM4/subhome/state/child.meta
+/Users/charlesabrooker/tmp/fm-lab.yG56Xq/state/domain.meta
+== child slot lease:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab-aux.4eowM4/cpool/.treehouse/alpha-31d9a4/1/alpha  (detached)  (held by child)
+== child claim:
+task=child
+home=/Users/charlesabrooker/tmp/fm-lab-aux.4eowM4/subhome
+== registered worktrees:
+/Users/charlesabrooker/tmp/fm-lab-aux.4eowM4/subhome/projects/alpha                                         335d7c9 [main]
+/Users/charlesabrooker/tmp/fm-lab-aux.4eowM4/cpool/.treehouse/alpha-31d9a4/1/alpha                          335d7c9 (detached HEAD)
+/Users/charlesabrooker/tmp/fm-lab-aux.4eowM4/cpool/.treehouse/alpha-31d9a4/1/alpha/.claude/worktrees/parked 335d7c9 [parked]
+== nested work:
+/Users/charlesabrooker/tmp/fm-lab-aux.4eowM4/cpool/.treehouse/alpha-31d9a4/1/alpha/.claude/worktrees/parked/parked.txt
+== tmux endpoints:
+firstmate:fm-domain
+firstmate:fm-child
+$ FM_HOME=<lab> bin/fm-teardown.sh domain --force --drop-file <captain-words>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.yG56Xq
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab-aux.4eowM4/cpool/.treehouse/alpha-31d9a4/1/alpha contains registered copy /Users/charlesabrooker/tmp/fm-lab-aux.4eowM4/cpool/.treehouse/alpha-31d9a4/1/alpha/.claude/worktrees/parked that is not one of task child's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab-aux.4eowM4/cpool/.treehouse/alpha-31d9a4/1/alpha worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+(state identical to BEFORE: both endpoints alive; records, claim, lease, registration and nested work kept)
+
+### shape=absent (treehouse on PATH: no)
+== BEFORE
+== records:
+/Users/charlesabrooker/tmp/fm-lab-aux.elSYHH/subhome/state/child.meta
+/Users/charlesabrooker/tmp/fm-lab.df23cw/state/domain.meta
+== child slot lease:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab-aux.elSYHH/cpool/.treehouse/alpha-c73997/1/alpha  (detached)  (held by child)
+== child claim:
+task=child
+home=/Users/charlesabrooker/tmp/fm-lab-aux.elSYHH/subhome
+== registered worktrees:
+/Users/charlesabrooker/tmp/fm-lab-aux.elSYHH/subhome/projects/alpha                                         92cb03a [main]
+/Users/charlesabrooker/tmp/fm-lab-aux.elSYHH/cpool/.treehouse/alpha-c73997/1/alpha                          92cb03a (detached HEAD)
+/Users/charlesabrooker/tmp/fm-lab-aux.elSYHH/cpool/.treehouse/alpha-c73997/1/alpha/.claude/worktrees/parked 92cb03a [parked]
+== nested work:
+/Users/charlesabrooker/tmp/fm-lab-aux.elSYHH/cpool/.treehouse/alpha-c73997/1/alpha/.claude/worktrees/parked/parked.txt
+== tmux endpoints:
+firstmate:fm-domain
+firstmate:fm-child
+$ FM_HOME=<lab> bin/fm-teardown.sh domain --force --drop-file <captain-words>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.df23cw
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab-aux.elSYHH/cpool/.treehouse/alpha-c73997/1/alpha contains registered copy /Users/charlesabrooker/tmp/fm-lab-aux.elSYHH/cpool/.treehouse/alpha-c73997/1/alpha/.claude/worktrees/parked that is not one of task child's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab-aux.elSYHH/cpool/.treehouse/alpha-c73997/1/alpha worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+(state identical to BEFORE: both endpoints alive; records, claim, lease, registration and nested work kept)
+

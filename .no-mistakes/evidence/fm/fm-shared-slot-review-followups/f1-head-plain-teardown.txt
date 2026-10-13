@@ -1,0 +1,12 @@
+$ FM_HOME=<lab> bin/fm-teardown.sh parked
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.PahseO
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab.PahseO/work/pool/.treehouse/proj-26a522/1/proj contains registered copy /Users/charlesabrooker/tmp/fm-lab.PahseO/work/pool/.treehouse/proj-26a522/1/proj/.claude/worktrees/parked-v2 that is not one of task parked's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab.PahseO/work/pool/.treehouse/proj-26a522/1/proj worktree remove <copy>. Re-run this teardown afterwards.
+exit=1

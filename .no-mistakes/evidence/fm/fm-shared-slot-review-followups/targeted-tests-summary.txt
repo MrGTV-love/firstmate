@@ -1,0 +1,4 @@
+fm-control-reassociate rc=0 elapsed=292s
+fm-secondmate-safety rc=0 elapsed=203s
+fm-teardown rc=0 elapsed=1512s
+fm-teardown-endpoint-safety rc=0 elapsed=200s

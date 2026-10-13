@@ -1,0 +1,24 @@
+== record:
+/Users/charlesabrooker/tmp/fm-lab.RDVJG6/state/parked.meta
+== claim:
+task=parked
+home=/Users/charlesabrooker/tmp/fm-lab.RDVJG6
+== treehouse status:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj  [fm/parked]  (held by parked)
+== registered worktrees:
+/Users/charlesabrooker/tmp/fm-lab.RDVJG6/work/proj                                                           37efdf5 [main]
+/Users/charlesabrooker/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj                             37efdf5 [fm/parked]
+/Users/charlesabrooker/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj/.claude/worktrees/parked-v2 4b1c834 [fm/parked-v2]
+== nested unpushed commits:
+4b1c834 nested unlanded commit 3
+5243688 nested unlanded commit 2
+97a582b nested unlanded commit 1
+== nested untracked:
+?? scratch-1.txt
+?? scratch-2.txt
+?? scratch-3.txt
+?? scratch-4.txt
+?? scratch-5.txt
+== tmux windows:
+fmses:fm-parked

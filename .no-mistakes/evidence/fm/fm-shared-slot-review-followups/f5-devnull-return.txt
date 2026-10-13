@@ -1,0 +1,9 @@
+$ (cd <project> && treehouse return <slot> --if-lease-holder next-task </dev/null)   # documented F5 form, slot has untracked dirt
+
+Worktree has uncommitted changes. Clean and return? [Y/n] 🌳 worktree not returned: it has uncommitted changes and the confirmation could not be answered (stdin reached EOF); prune will not reclaim this slot. Use treehouse return --force '/Users/charlesabrooker/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj' to clean and return it
+exit=
+== dirt still present?
+operator dirt that must survive
+== treehouse status:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj  (detached)  (held by next-task)

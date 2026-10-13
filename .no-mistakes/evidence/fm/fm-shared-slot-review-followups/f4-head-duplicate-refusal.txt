@@ -1,0 +1,24 @@
+### head code: FM_HOME=<lab> bin/fm-teardown.sh finished   (record 'other' ALSO names finished's nested copy)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.lHbaNb
+notice: task finished shares recorded pool slot /Users/charlesabrooker/tmp/fm-lab.lHbaNb/work/pool/.treehouse/proj-7ff69a/1/proj with task parked; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+REFUSED: task finished's cleanup target /Users/charlesabrooker/tmp/fm-lab.lHbaNb/work/pool/.treehouse/proj-7ff69a/1/proj/.claude/worktrees/finished is also task other's recorded worktree (/Users/charlesabrooker/tmp/fm-lab.lHbaNb/work/pool/.treehouse/proj-7ff69a/1/proj/.claude/worktrees/finished); preserved worktree custody overlaps it, so nothing was changed - not even with --force.
+exit=1
+== nested-copy leftover:
+59022 ALIVE
+59023 ALIVE
+== parked-root:
+59029 ALIVE
+59033 ALIVE
+finished.meta unchanged
+parked.meta unchanged
+other.meta unchanged
+== claim:
+task=finished
+home=/Users/charlesabrooker/tmp/fm-lab.lHbaNb
+== treehouse status:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.lHbaNb/work/pool/.treehouse/proj-7ff69a/1/proj  [fm/parked]  (held by parked)
+                   bash (59022), perl (59023), bash (59029), perl (59033)
+== tmux windows:
+fmses:fm-parked
+fmses:fm-finished

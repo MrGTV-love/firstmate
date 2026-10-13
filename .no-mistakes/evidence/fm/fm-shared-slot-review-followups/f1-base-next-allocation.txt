@@ -1,0 +1,27 @@
+$ (cd proj && treehouse get --lease --lease-holder next-task)   # next allocation after base teardown
+
+🌳 Setting up worktree...
+🌳 Leased worktree at ~/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj. Run 'treehouse return ~/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj' to release it.
+/Users/charlesabrooker/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj
+exit=0
+== nested copy dir exists?
+total 96
+drwxr-xr-x  14 charlesabrooker  staff  448 Oct 12 23:03 .
+drwxr-xr-x   3 charlesabrooker  staff   96 Oct 12 23:03 ..
+-rw-r--r--   1 charlesabrooker  staff   84 Oct 12 23:03 .git
+-rw-r--r--   1 charlesabrooker  staff    9 Oct 12 23:03 .gitignore
+-rw-r--r--   1 charlesabrooker  staff    5 Oct 12 23:03 README.md
+-rw-r--r--   1 charlesabrooker  staff   11 Oct 12 23:03 commit-1.txt
+-rw-r--r--   1 charlesabrooker  staff   11 Oct 12 23:03 commit-2.txt
+-rw-r--r--   1 charlesabrooker  staff   11 Oct 12 23:03 commit-3.txt
+-rw-r--r--   1 charlesabrooker  staff   17 Oct 12 23:03 root.txt
+-rw-r--r--   1 charlesabrooker  staff   12 Oct 12 23:03 scratch-1.txt
+-rw-r--r--   1 charlesabrooker  staff   12 Oct 12 23:03 scratch-2.txt
+== nested unpushed commits:
+4b1c834 nested unlanded commit 3
+5243688 nested unlanded commit 2
+97a582b nested unlanded commit 1
+== branch fm/parked-v2 still in project?
+4b1c834 nested unlanded commit 3
+5243688 nested unlanded commit 2
+97a582b nested unlanded commit 1

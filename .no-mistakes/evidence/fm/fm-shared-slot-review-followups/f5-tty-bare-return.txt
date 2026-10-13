@@ -1,0 +1,16 @@
+== real TTY pane, bare documented-before-F5 form, before answering:
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+Worktree has uncommitted changes. Clean and return? [Y/n]
+== after pressing Enter (default answer):
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+Worktree has uncommitted changes. Clean and return? [Y/n]
+🌳 Worktree returned to pool.
+exit=0
+bash-3.2$
+== dirt still present?
+cat: /Users/charlesabrooker/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj/dirty-at-root.txt: No such file or directory
+== treehouse status:
+base  main  (repository default)
+1     available    ~/tmp/fm-lab.RDVJG6/work/pool/.treehouse/proj-fc69bd/1/proj  (detached)

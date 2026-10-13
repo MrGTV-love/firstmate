@@ -1,0 +1,44 @@
+## Step 1: a plain git worktree remove refuses while the copy is dirty
+fatal: '/Users/charlesabrooker/tmp/fm-lab.PahseO/work/pool/.treehouse/proj-26a522/1/proj/.claude/worktrees/parked-v2' contains modified or untracked files, use --force to delete it
+exit=128
+## Step 2: operator lands the copy work (commit scratch, push to origin main)
+exit=0
+## Step 3: documented inspection
+$ git -C <copy> status --untracked-files=all
+$ git -C <copy> log --oneline HEAD --not --remotes
+(both empty = nothing unlanded)
+## Step 4: documented manual removal
+$ git -C <slot> worktree remove <copy>
+exit=0
+## Step 5: re-run plain teardown
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.PahseO
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+/Users/charlesabrooker/tmp/fm-lab.PahseO/work/proj: synced 3348ee2..9ee35bb
+teardown parked complete (window fmses:fm-parked, worktree /Users/charlesabrooker/tmp/fm-lab.PahseO/work/pool/.treehouse/proj-26a522/1/proj)
+Backlog: parked just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.PahseO/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.PahseO/data/backlog.md - move parked to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+## After:
+== records:
+(eval):16: no matches found: /Users/charlesabrooker/tmp/fm-lab.PahseO/state/*.meta
+(no records)
+== claim:
+(no claim)
+== treehouse status:
+base  main  (repository default)
+1     available    ~/tmp/fm-lab.PahseO/work/pool/.treehouse/proj-26a522/1/proj  (detached)
+== registered worktrees:
+/Users/charlesabrooker/tmp/fm-lab.PahseO/work/proj                               9ee35bb [main]
+/Users/charlesabrooker/tmp/fm-lab.PahseO/work/pool/.treehouse/proj-26a522/1/proj 9ee35bb (detached HEAD)
+== tmux windows:
+no server running on /Users/charlesabrooker/tmp/fm-lab.PahseO/tmux/tmux-501/default
+== shim calls (forge/no-mistakes/docker only):
+gh-axi pr list --state all --head fm/parked --limit 1
+no-mistakes axi status
+docker ps -a --no-trunc --format {{.ID}}{{.Names}}{{.Label "fm.task"}}{{.Label "com.docker.compose.project"}}{{.Label "com.supabase.cli.project"}}{{.Label "com.docker.compose.project.working_dir"}}
+docker network ls --no-trunc --format {{.ID}}{{.Name}}{{.Label "fm.task"}}{{.Label "com.docker.compose.project"}}{{.Label "com.supabase.cli.project"}}
+docker volume ls --format {{.Name}}{{.Label "fm.task"}}{{.Label "com.docker.compose.project"}}{{.Label "com.supabase.cli.project"}}
+docker ps -a --no-trunc --format {{.ID}}{{.Names}}{{.Label "fm.task"}}{{.Label "com.docker.compose.project"}}{{.Label "com.supabase.cli.project"}}{{.Label "com.docker.compose.project.working_dir"}}

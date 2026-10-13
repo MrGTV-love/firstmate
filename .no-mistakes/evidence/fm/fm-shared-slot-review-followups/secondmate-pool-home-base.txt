@@ -1,0 +1,38 @@
+== BEFORE
+== domain record:
+window=firstmate:fm-domain
+endpoint_task_id=domain
+== home lease:
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab-aux.tfJPsL/smpool/.treehouse/fmroot-eb6136/1/fmroot  (detached)  (held by domain)
+== registered worktrees:
+/Users/charlesabrooker/tmp/fm-lab-aux.tfJPsL/fmroot                                                             6525ed4 [main]
+/Users/charlesabrooker/tmp/fm-lab-aux.tfJPsL/smpool/.treehouse/fmroot-eb6136/1/fmroot                           6525ed4 (detached HEAD)
+/Users/charlesabrooker/tmp/fm-lab-aux.tfJPsL/smpool/.treehouse/fmroot-eb6136/1/fmroot/.claude/worktrees/agent-x 6525ed4 [agent-x]
+== nested work:
+/Users/charlesabrooker/tmp/fm-lab-aux.tfJPsL/smpool/.treehouse/fmroot-eb6136/1/fmroot/.claude/worktrees/agent-x/work.txt
+== tmux endpoints:
+firstmate:fm-domain
+
+$ FM_HOME=<lab> <lab code root @ base a9010aab>/bin/fm-teardown.sh domain
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.5DT0aC
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.2
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown domain complete (window firstmate:fm-domain, worktree /Users/charlesabrooker/tmp/fm-lab-aux.tfJPsL/smpool/.treehouse/fmroot-eb6136/1/fmroot)
+exit=0
+== AFTER
+== domain record:
+(gone)
+== home lease:
+base  main  (repository default)
+1     dirty        ~/tmp/fm-lab-aux.tfJPsL/smpool/.treehouse/fmroot-eb6136/1/fmroot  (detached)
+== registered worktrees:
+/Users/charlesabrooker/tmp/fm-lab-aux.tfJPsL/fmroot                                                             6525ed4 [main]
+/Users/charlesabrooker/tmp/fm-lab-aux.tfJPsL/smpool/.treehouse/fmroot-eb6136/1/fmroot                           6525ed4 (detached HEAD)
+/Users/charlesabrooker/tmp/fm-lab-aux.tfJPsL/smpool/.treehouse/fmroot-eb6136/1/fmroot/.claude/worktrees/agent-x 6525ed4 [agent-x]
+== nested work:
+/Users/charlesabrooker/tmp/fm-lab-aux.tfJPsL/smpool/.treehouse/fmroot-eb6136/1/fmroot/.claude/worktrees/agent-x/work.txt
+== tmux endpoints:
+no server running on /Users/charlesabrooker/tmp/fm-lab.5DT0aC/tmux/tmux-501/default
