@@ -597,7 +597,7 @@ test_batch_reports_a_deferred_pair() {
 # place: it refuses while another holder has it, and defers at capacity before
 # asking Orca for anything but its runtime status.
 test_orca_spawn_is_admitted_under_the_shared_project_lock() {
-  local case_dir home out out2 rc=0 rc2 holder i
+  local case_dir home out rc=0 holder i lock clone waiter
   command -v node >/dev/null 2>&1 || {
     printf 'ok - skipped the Orca capacity case (node, which the Orca status check needs, is not installed)\n'
     return 0
@@ -622,27 +622,39 @@ SH
     . "$1/bin/fm-wake-lib.sh"
     lock=$(fm_treehouse_project_lock_path "$2") || exit 1
     fm_lock_try_acquire "$lock" || exit 1
-    : > "$3.held"
+    printf "%s\n" "$lock" > "$3.held"
     while [ ! -f "$3.release" ]; do sleep 0.05; done
     fm_lock_release "$lock"
   ' _ "$ROOT" "$case_dir/project" "$case_dir/holder" &
   holder=$!
   i=0
-  while [ ! -f "$case_dir/holder.held" ]; do
+  while [ ! -s "$case_dir/holder.held" ]; do
     i=$((i + 1))
     [ "$i" -lt 200 ] || fail "the lock holder never took the project lock"
     sleep 0.05
   done
-  out=$(FM_PROJECT_LOCK_SERVICE_SECS=10 run_spawn "$case_dir" "$home" "$case_dir/unused" task-o "$case_dir/project" \
-    --backend orca --mode no-mistakes --yolo off) || rc=$?
-  rc2=0
-  out2=$(FM_PROJECT_LOCK_SERVICE_SECS=10 run_spawn "$case_dir" "$home" "$case_dir/unused" task-o "$case_dir/project-2" \
-    --backend orca --mode no-mistakes --yolo off) || rc2=$?
+  lock=$(cat "$case_dir/holder.held")
+  # The capped clone and an uncapped same-origin clone both queue on the one
+  # project lock, stay queued behind the live holder, and refuse at its stall.
+  for clone in project project-2; do
+    FM_PROJECT_LOCK_SERVICE_SECS=3 run_spawn "$case_dir" "$home" "$case_dir/unused" task-o "$case_dir/$clone" \
+      --backend orca --mode no-mistakes --yolo off > "$case_dir/$clone.out" 2>&1 &
+    waiter=$!
+    wait_actor_output "$case_dir/$clone.out" 'fm-project-lock: waiting'
+    assert_equals 1 "$(queued_tickets "$lock")" "the Orca spawn from $clone did not register on the shared project queue"
+    assert_absent "$home/state/task-o.meta" "the queued Orca spawn from $clone published a record before admission"
+    rc=0
+    wait "$waiter" || rc=$?
+    out=$(cat "$case_dir/$clone.out")
+    expect_code 1 "$rc" "an Orca spawn from $clone ignored a held project lock: $out"
+    assert_contains "$out" "fm-project-lock: stall limit reached" "the Orca spawn from $clone did not refuse at the project lock's stall limit"
+    assert_contains "$out" "(PID $holder)" "the Orca spawn from $clone did not name the live holder"
+    assert_equals "$holder" "$(cat "$lock/pid" 2>/dev/null)" "the stall refusal removed or replaced the live Orca capacity holder"
+    assert_equals 0 "$(queued_tickets "$lock")" "the refused Orca spawn from $clone left its queue ticket"
+  done
   kill -0 "$holder" || fail "bounded contention removed the live Orca capacity holder"
   : > "$case_dir/holder.release"
   wait "$holder" || true
-  expect_code 1 "$rc" "an Orca spawn ignored a held project lock: $out"
-  expect_code 1 "$rc2" "an Orca spawn from an uncapped same-origin clone ignored the held project lock: $out2"
   assert_absent "$home/state/task-o.meta" "the uncapped clone's Orca spawn published a record while the lock was held"
   assert_no_grep "orca " "$case_dir/calls.log" "the Orca spawn asked Orca for more than its runtime status"
 
@@ -656,22 +668,35 @@ SH
   pass "an Orca spawn takes the shared project lock whenever a same-origin clone is capped and defers before creating anything"
 }
 
-project_queue_actor() {  # <case-dir> <operation> [release-marker]
+project_queue_actor() {  # <case-dir> <operation> [release-marker] [hold-secs] [acquire|try]
   FM_HOME="$1/home" FM_STATE_OVERRIDE='' bash -c '
     . "$1/bin/fm-wake-lib.sh"
     . "$1/bin/fm-project-lock-lib.sh"
-    fm_project_lock_acquire "$2/actor.lock" "$3" || exit 1
+    if [ "$6" = try ]; then
+      fm_project_lock_try "$2/actor.lock" "$3" || exit 1
+    else
+      fm_project_lock_acquire "$2/actor.lock" "$3" || exit 1
+    fi
     printf "%s\n" "$3" >> "$2/order"
     : > "$2/$3.acquired"
     if [ -n "$4" ]; then
       i=0
       while [ ! -e "$4" ]; do
-        i=$((i + 1)); [ "$i" -lt 2000 ] || exit 1
+        i=$((i + 1)); [ "$i" -lt 4000 ] || exit 1
         sleep 0.05
       done
     fi
-    fm_lock_release "$2/actor.lock"
-  ' _ "$ROOT" "$1" "$2" "${3:-}"
+    [ -z "$5" ] || sleep "$5"
+    fm_project_lock_release "$2/actor.lock"
+  ' _ "$ROOT" "$1" "$2" "${3:-}" "${4:-}" "${5:-acquire}"
+}
+
+queued_tickets() {  # <project-lock>
+  local ticket count=0
+  for ticket in "$1.queue"/ticket-*; do
+    [ ! -L "$ticket" ] || count=$((count + 1))
+  done
+  printf '%s\n' "$count"
 }
 
 wait_actor_output() {  # <file> <literal>
@@ -727,6 +752,7 @@ test_project_queue_timeout_preserves_live_holder() {
   waiter=$!
   wait "$waiter" || rc=$?
   expect_code 1 "$rc" "a timed-out waiter was admitted past a live holder"
+  assert_contains "$(cat "$case_dir/waiter.out")" 'fm-project-lock: stall limit reached' "the waiter did not refuse at the holder's stall limit"
   assert_equals "$holder_pid" "$(cat "$case_dir/actor.lock/pid")" "timeout removed or replaced the live holder"
   kill -0 "$holder_pid" || fail "timeout killed the live holder"
   assert_equals holder "$(cat "$case_dir/order")" "the timed-out operation ran"
@@ -738,9 +764,117 @@ test_project_queue_timeout_preserves_live_holder() {
   pass "bounded waiting identifies and preserves the live holder and removes its own expired ticket"
 }
 
+# The reviewed slow-holder sequence at the default measured allowance: the
+# holder keeps the lock for 100 seconds while W1 queues at t=1 and W2 at t=2.
+# A deadline fixed at each waiter's registration refused W1 and admitted W2.
+test_project_queue_slow_holder_keeps_arrival_order() {
+  local case_dir holder w1 w2 start rc1=0 rc2=0
+  case_dir=$(make_case queue-slow-holder)
+  project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  holder=$!
+  wait_actor_output "$case_dir/order" holder
+  start=$SECONDS
+  sleep 1
+  project_queue_actor "$case_dir" w1 > "$case_dir/w1.out" 2>&1 &
+  w1=$!
+  wait_actor_output "$case_dir/w1.out" 'fm-project-lock: waiting'
+  while [ $((SECONDS - start)) -lt 2 ]; do sleep 0.1; done
+  FM_PROJECT_LOCK_POLL_SECS=0.05 project_queue_actor "$case_dir" w2 > "$case_dir/w2.out" 2>&1 &
+  w2=$!
+  wait_actor_output "$case_dir/w2.out" 'fm-project-lock: waiting'
+  while [ $((SECONDS - start)) -lt 100 ]; do sleep 1; done
+  : > "$case_dir/release"
+  wait "$holder" || fail "the slow holder could not release: $(cat "$case_dir/holder.out")"
+  wait "$w1" || rc1=$?
+  wait "$w2" || rc2=$?
+  expect_code 0 "$rc1" "the earliest waiter refused behind a slow holder: $(cat "$case_dir/w1.out")"
+  expect_code 0 "$rc2" "the later waiter refused behind a slow holder: $(cat "$case_dir/w2.out")"
+  assert_equals "$(printf 'holder\nw1\nw2')" "$(cat "$case_dir/order")" "a later waiter was admitted before the earliest one"
+  pass "a 100-second holder keeps waiters in arrival order and refuses nobody at the measured allowance"
+}
+
+# Each 6-second hold is well inside a 20-second allowance, but the last waiter
+# queues behind four of them: earlier tickets' progress never refuses it.
+test_project_queue_progress_never_reaches_the_stall_limit() {
+  local case_dir name rc pid
+  local -a names=(w1 w2 w3 w4 w5) pids=()
+  case_dir=$(make_case queue-progress)
+  FM_PROJECT_LOCK_SERVICE_SECS=20 project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  pids+=("$!")
+  wait_actor_output "$case_dir/order" holder
+  for name in "${names[@]}"; do
+    FM_PROJECT_LOCK_SERVICE_SECS=20 project_queue_actor "$case_dir" "$name" "" 6 > "$case_dir/$name.out" 2>&1 &
+    pids+=("$!")
+    wait_actor_output "$case_dir/$name.out" 'fm-project-lock: waiting'
+  done
+  : > "$case_dir/release"
+  for pid in "${pids[@]}"; do
+    rc=0
+    wait "$pid" || rc=$?
+    expect_code 0 "$rc" "a progressing queue refused a waiter: $(cat "$case_dir"/*.out)"
+  done
+  assert_equals "$(printf 'holder\nw1\nw2\nw3\nw4\nw5')" "$(cat "$case_dir/order")" "a progressing queue lost FIFO order"
+  assert_equals "$(printf 'holder\nw1\nw2\nw3\nw4\nw5')" "$(sed -n 's/.* operation=//p' "$case_dir/actor.lock.holds")" \
+    "the hold record did not log every hold in order"
+  assert_absent "$case_dir/actor.lock" "the progressing queue left the project lock held"
+  pass "a queue that keeps progressing admits every waiter in order and records each hold"
+}
+
+# Callers already holding other locks make one attempt; it refuses while an
+# older waiter is queued even when the lock itself is momentarily free.
+test_nonwaiting_admission_never_jumps_a_queued_waiter() {
+  local case_dir holder queued rc=0
+  case_dir=$(make_case queue-nonwaiting)
+  project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  holder=$!
+  wait_actor_output "$case_dir/order" holder
+  project_queue_actor "$case_dir" busy "" "" try > "$case_dir/busy.out" 2>&1 || rc=$?
+  expect_code 1 "$rc" "nonwaiting admission took a held project lock"
+  FM_PROJECT_LOCK_POLL_SECS=5 project_queue_actor "$case_dir" queued > "$case_dir/queued.out" 2>&1 &
+  queued=$!
+  wait_actor_output "$case_dir/queued.out" 'fm-project-lock: waiting'
+  : > "$case_dir/release"
+  wait "$holder" || fail "the holder could not release"
+  rc=0
+  project_queue_actor "$case_dir" jumper "" "" try > "$case_dir/jumper.out" 2>&1 || rc=$?
+  expect_code 1 "$rc" "nonwaiting admission jumped a queued waiter"
+  wait "$queued" || fail "the queued waiter was not admitted: $(cat "$case_dir/queued.out")"
+  project_queue_actor "$case_dir" after "" "" try > "$case_dir/after.out" 2>&1 \
+    || fail "nonwaiting admission refused an idle project lock: $(cat "$case_dir/after.out")"
+  assert_equals "$(printf 'holder\nqueued\nafter')" "$(cat "$case_dir/order")" "nonwaiting admission changed FIFO order"
+  assert_absent "$case_dir/actor.lock" "nonwaiting admission left the project lock held"
+  pass "nonwaiting admission refuses while the lock is held or an older waiter is queued"
+}
+
+test_project_queue_classifies_refusals_before_queueing() {
+  local case_dir value rc out
+  case_dir=$(make_case queue-input)
+  for value in abc -1 0 0.00 1.2.3; do
+    rc=0
+    out=$(FM_PROJECT_LOCK_POLL_SECS=$value project_queue_actor "$case_dir" "poll-$value" 2>&1) || rc=$?
+    expect_code 1 "$rc" "poll override '$value' was accepted"
+    assert_contains "$out" "fm-project-lock: invalid input" "poll override '$value' was not reported as invalid input"
+    assert_equals 0 "$(queued_tickets "$case_dir/actor.lock")" "poll override '$value' registered a ticket"
+  done
+  rc=0
+  out=$(FM_PROJECT_LOCK_SERVICE_SECS=abc project_queue_actor "$case_dir" service-abc 2>&1) || rc=$?
+  expect_code 1 "$rc" "an invalid service allowance was accepted"
+  assert_contains "$out" "fm-project-lock: invalid input" "an invalid service allowance was not reported as invalid input"
+  mkdir -p "$case_dir/actor.lock.queue"
+  printf 'garbage\n' > "$case_dir/actor.lock.queue/sequence"
+  rc=0
+  out=$(project_queue_actor "$case_dir" bad-sequence 2>&1) || rc=$?
+  expect_code 1 "$rc" "a waiter queued past an unreadable sequence"
+  assert_contains "$out" "fm-project-lock: registration failure" "an unreadable sequence was not reported as a registration failure"
+  assert_equals 0 "$(queued_tickets "$case_dir/actor.lock")" "a failed registration left a ticket"
+  assert_absent "$case_dir/actor.lock" "a refused waiter took the project lock"
+  assert_absent "$case_dir/order" "a refused waiter ran its operation"
+  pass "invalid overrides and registration failures refuse before queueing, each with its own class"
+}
+
 test_recursive_cleanup_orders_projects_across_local_homes() {
-  local case_dir lane sub project other slot lock_a lock_b small large holder_a holder_b
-  local pid_a pid_b i n child child_project child_slot root_home rc=0 ticket queued
+  local case_dir lane sub project other slot lock_a lock_b small large holder
+  local i n child child_project root_home rc=0
   case_dir=$(make_case recursive-order)
   root_home="$case_dir/home"
   project="$case_dir/project"
@@ -773,48 +907,72 @@ test_recursive_cleanup_orders_projects_across_local_homes() {
   lock_b=$(FM_HOME="$root_home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$other")
   local LC_ALL=C
   if [[ "$lock_a" < "$lock_b" ]]; then small=$lock_a; large=$lock_b; else small=$lock_b; large=$lock_a; fi
-  for child_slot in "$small" "$large"; do
-    FM_HOME="$root_home" bash -c '
-      . "$1/bin/fm-wake-lib.sh"
-      fm_lock_try_acquire "$2" || exit 1
-      : > "$2.held"
-      while [ ! -e "$3" ]; do sleep 0.05; done
-      fm_lock_release "$2"
-    ' _ "$ROOT" "$child_slot" "$case_dir/release" &
-    if [ "$child_slot" = "$small" ]; then holder_a=$!; else holder_b=$!; fi
-  done
+  # Only the globally first project is held. Each cleanup already holds its
+  # descendants' lifecycle locks, so it makes one nonwaiting attempt per
+  # project in global order and refuses there, before touching the later one.
+  FM_HOME="$root_home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_lock_try_acquire "$2" || exit 1
+    : > "$2.held"
+    while [ ! -e "$3" ]; do sleep 0.05; done
+    fm_lock_release "$2"
+  ' _ "$ROOT" "$small" "$case_dir/release" &
+  holder=$!
   i=0
-  while [ ! -e "$small.held" ] || [ ! -e "$large.held" ]; do
-    i=$((i + 1)); [ "$i" -lt 400 ] || fail "project blockers never acquired both locks"
+  while [ ! -e "$small.held" ]; do
+    i=$((i + 1)); [ "$i" -lt 400 ] || fail "the project blocker never acquired the first project"
     sleep 0.05
   done
+  run_domain_cleanups "$case_dir"
   for n in 1 2; do
-    FM_HOME="$case_dir/lane-$n" FM_ROOT_OVERRIDE='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
-      FM_FAKE_CALL_LOG="$case_dir/calls.log" PATH="$case_dir/fakebin:$PATH" \
-      "$TEARDOWN" "domain-$n" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/lane-$n.out" 2>&1 &
-    if [ "$n" = 1 ]; then pid_a=$!; else pid_b=$!; fi
+    [ "${CLEANUP_RC[$n]}" -ne 0 ] || fail "cleanup $n ran past a held descendant project lock"
+    assert_contains "$(cat "$case_dir/lane-$n.out")" "(PID $holder)" "cleanup $n did not refuse on the held project lock"
+    assert_present "$case_dir/lane-$n/state/domain-$n.meta" "refused cleanup $n removed its domain record"
+    for i in 1 2; do
+      assert_present "$case_dir/sub-$n/state/child-$n-$i.meta" "refused cleanup $n removed child $n-$i"
+    done
   done
-  wait_actor_output "$case_dir/lane-1.out" 'fm-project-lock: waiting'
-  wait_actor_output "$case_dir/lane-2.out" 'fm-project-lock: waiting'
-  queued=0
-  for ticket in "$small.queue"/ticket-*; do [ ! -L "$ticket" ] || queued=$((queued + 1)); done
-  assert_equals 2 "$queued" "opposite child orders did not both reserve the globally first project"
-  queued=0
-  for ticket in "$large.queue"/ticket-*; do [ ! -L "$ticket" ] || queued=$((queued + 1)); done
-  assert_equals 0 "$queued" "one cleanup reserved the later project before the earlier project"
+  assert_equals "$holder" "$(cat "$small/pid" 2>/dev/null)" "a refused cleanup removed or replaced the live project holder"
+  assert_absent "$large" "a refused cleanup left the later project locked"
+  assert_absent "$large.holds" "a cleanup took the later project before the globally first one"
+  assert_equals 0 "$(queued_tickets "$small")" "a nonwaiting cleanup queued on the first project"
+  assert_equals 0 "$(queued_tickets "$large")" "a nonwaiting cleanup queued on the later project"
   : > "$case_dir/release"
-  wait "$holder_a" || fail "first blocker could not release"
-  wait "$holder_b" || fail "second blocker could not release"
-  wait "$pid_a" || rc=$?
-  expect_code 0 "$rc" "first reverse-order cleanup failed: $(cat "$case_dir/lane-1.out")"
-  rc=0
-  wait "$pid_b" || rc=$?
-  expect_code 0 "$rc" "second reverse-order cleanup failed: $(cat "$case_dir/lane-2.out")"
+  wait "$holder" || fail "the project blocker could not release"
+
+  # Released: run both together. Global order means at least one proceeds; one
+  # that meets the other on the shared project refuses having changed nothing.
+  run_domain_cleanups "$case_dir"
+  for n in 1 2; do
+    if [ "${CLEANUP_RC[$n]}" -ne 0 ]; then
+      assert_present "$case_dir/lane-$n/state/domain-$n.meta" "contended cleanup $n refused after changing its record"
+      rc=0
+      FM_HOME="$case_dir/lane-$n" FM_ROOT_OVERRIDE='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
+        FM_FAKE_CALL_LOG="$case_dir/calls.log" PATH="$case_dir/fakebin:$PATH" \
+        "$TEARDOWN" "domain-$n" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/lane-$n.out" 2>&1 || rc=$?
+      expect_code 0 "$rc" "cleanup $n failed once the other finished: $(cat "$case_dir/lane-$n.out")"
+    fi
+  done
+  [ "${CLEANUP_RC[1]}" -eq 0 ] || [ "${CLEANUP_RC[2]}" -eq 0 ] \
+    || fail "reverse-order cleanups refused each other: $(cat "$case_dir/lane-1.out" "$case_dir/lane-2.out")"
   assert_absent "$case_dir/lane-1/state/domain-1.meta" "first cleanup did not complete"
   assert_absent "$case_dir/lane-2/state/domain-2.meta" "second cleanup did not complete"
   assert_absent "$small" "recursive cleanup left the first project locked"
   assert_absent "$large" "recursive cleanup left the second project locked"
-  pass "concurrent recursive cleanup with reversed child project order acquires globally sorted project locks and completes both homes"
+  pass "concurrent recursive cleanup with reversed child project order tries globally sorted project locks once and completes both homes"
+}
+
+run_domain_cleanups() {  # <case-dir>; sets CLEANUP_RC[1] and CLEANUP_RC[2]
+  local case_dir=$1 n pid_1 pid_2
+  for n in 1 2; do
+    FM_HOME="$case_dir/lane-$n" FM_ROOT_OVERRIDE='' FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
+      FM_FAKE_CALL_LOG="$case_dir/calls.log" PATH="$case_dir/fakebin:$PATH" \
+      "$TEARDOWN" "domain-$n" --force --drop-file "$(fm_test_drop_file)" > "$case_dir/lane-$n.out" 2>&1 &
+    if [ "$n" = 1 ]; then pid_1=$!; else pid_2=$!; fi
+  done
+  CLEANUP_RC=(x 0 0)
+  wait "$pid_1" || CLEANUP_RC[1]=$?
+  wait "$pid_2" || CLEANUP_RC[2]=$?
 }
 
 # The actual spawn and teardown entry points share a queue. Teardown polls
@@ -891,6 +1049,10 @@ test_concurrent_spawns_cannot_both_take_the_last_place
 test_mixed_operations_keep_fifo_even_with_a_slow_waiter
 test_project_queue_recovers_dead_waiter_and_holder
 test_project_queue_timeout_preserves_live_holder
+test_project_queue_slow_holder_keeps_arrival_order
+test_project_queue_progress_never_reaches_the_stall_limit
+test_nonwaiting_admission_never_jumps_a_queued_waiter
+test_project_queue_classifies_refusals_before_queueing
 test_recursive_cleanup_orders_projects_across_local_homes
 test_failed_spawn_after_admission_holds_no_place
 test_unreadable_declaration_refuses_every_spawn

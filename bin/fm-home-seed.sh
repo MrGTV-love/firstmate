@@ -7,9 +7,9 @@
 #       a fresh firstmate worktree via "treehouse get --lease", which durably
 #       leases the worktree under the secondmate <id> so the home survives with
 #       no live process and is never recycled until the lease is released with
-#       "treehouse return". Allocation uses bin/fm-project-lock-lib.sh's FIFO
-#       contention wait, so callers do not need project-lock retry loops.
-#       Projects are cloned
+#       "treehouse return". Allocation runs under the registry lock, so it
+#       makes one nonwaiting bin/fm-project-lock-lib.sh attempt that never
+#       jumps a queued spawn or teardown. Projects are cloned
 #       from the active home into the secondmate home's projects/ directory.
 #       That project list is non-exclusive provisioning data. Pass --no-projects
 #       instead of a project list to seed a project-less home for a domain whose
@@ -534,7 +534,7 @@ seed_treehouse_project_lock_acquire() {
     echo "error: could not resolve the shared Treehouse project lock for $FM_ROOT" >&2
     return 1
   }
-  fm_project_lock_acquire "$SEED_TREEHOUSE_PROJECT_LOCK" "home seed $1" || {
+  fm_project_lock_try "$SEED_TREEHOUSE_PROJECT_LOCK" "home seed $1" || {
     echo "error: another Treehouse slot allocation or return is in progress for $FM_ROOT" >&2
     return 1
   }
@@ -543,7 +543,7 @@ seed_treehouse_project_lock_acquire() {
 
 seed_treehouse_project_lock_release() {
   if [ "$SEED_TREEHOUSE_PROJECT_LOCK_HELD" -eq 1 ]; then
-    fm_lock_release "$SEED_TREEHOUSE_PROJECT_LOCK"
+    fm_project_lock_release "$SEED_TREEHOUSE_PROJECT_LOCK"
     SEED_TREEHOUSE_PROJECT_LOCK_HELD=0
   fi
 }

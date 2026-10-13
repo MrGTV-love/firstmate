@@ -164,11 +164,14 @@
 # through metadata publication, closing the publication
 # gap; forced secondmate teardown takes it and runs the same checks for every
 # descendant Treehouse slot before touching any child.
-# Project-lock contention uses bin/fm-project-lock-lib.sh's measured bounded
-# FIFO wait and holder progress messages; callers no longer need retry loops
-# for allocation/return contention. Recursive cleanup collects and deduplicates
-# every descendant project-lock path, then acquires in global byte order before
-# slot proofs, so opposite child enumeration orders cannot create AB/BA waits.
+# Project-lock contention uses bin/fm-project-lock-lib.sh's FIFO wait, which
+# refuses only when the holder stalls past the measured allowance, with holder
+# progress messages; callers no longer need retry loops for allocation/return
+# contention. Recursive cleanup already holds every descendant home's lifecycle
+# locks, so it makes one nonwaiting attempt per descendant project lock that
+# never jumps a queued waiter; it collects and deduplicates those paths and
+# tries them in global byte order before slot proofs, so opposite child
+# enumeration orders cannot each hold the project the other needs.
 # Other lifecycle lock refusals are unchanged.
 # These refusals are not relaxed by --force: --force authorizes discarding THIS
 # task's unlanded work, never another task's live work. Nothing of this task's
@@ -633,6 +636,10 @@ teardown_release_locks() {
   if declare -F teardown_release_herdr_locks >/dev/null 2>&1; then
     teardown_release_herdr_locks || true
   fi
+  for ((i=${#DESCENDANT_TREEHOUSE_LOCK_PATHS[@]} - 1; i >= 0; i--)); do
+    fm_project_lock_release "${DESCENDANT_TREEHOUSE_LOCK_PATHS[$i]}" || true
+  done
+  DESCENDANT_TREEHOUSE_LOCK_PATHS=()
   for ((i=${#DESCENDANT_LOCK_PATHS[@]} - 1; i >= 0; i--)); do
     fm_lock_release "${DESCENDANT_LOCK_PATHS[$i]}" || true
   done
@@ -662,7 +669,7 @@ teardown_release_locks() {
     CONTROL_LOCK_HELD=0
   fi
   if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
-    fm_lock_release "$TREEHOUSE_PROJECT_LOCK" || true
+    fm_project_lock_release "$TREEHOUSE_PROJECT_LOCK" || true
     TREEHOUSE_PROJECT_LOCK_HELD=0
   fi
   fm_lease_guard_release || true
@@ -4079,8 +4086,8 @@ preflight_descendant_treehouse_slots() {
     done
     if [ "$held" = 0 ]; then
       # Global byte order, not child enumeration order: two unrelated local
-      # homes may enumerate the same projects in opposite orders. Retaining
-      # one while waiting for the other would otherwise create AB/BA waits.
+      # homes may enumerate the same projects in opposite orders. Each holding
+      # the one the other tries next would otherwise refuse both.
       j=${#project_locks[@]}
       while [ "$j" -gt 0 ] && [[ "${project_locks[$((j - 1))]}" > "$lock_path" ]]; do
         project_locks[j]=${project_locks[$((j - 1))]}
@@ -4094,12 +4101,11 @@ preflight_descendant_treehouse_slots() {
   for ((i=0; i < ${#project_locks[@]}; i++)); do
     lock_path=${project_locks[$i]}
     task_id=${project_tasks[$i]}
-    fm_project_lock_acquire "$lock_path" "teardown $ID child $task_id" || {
+    fm_project_lock_try "$lock_path" "teardown $ID child $task_id" || {
       echo "REFUSED: another Treehouse slot allocation or return is in progress for child $task_id; forced teardown changed nothing" >&2
       return 1
     }
     DESCENDANT_TREEHOUSE_LOCK_PATHS+=("$lock_path")
-    DESCENDANT_LOCK_PATHS+=("$lock_path")
   done
   for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
     state=${DESCENDANT_TASK_STATES[$i]}

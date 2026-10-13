@@ -214,9 +214,15 @@
 #   The local root is whatever bin/fm-wake-lib.sh's
 #   fm_firstmate_root_home resolves, so a home seeded from another machine anchors
 #   that lock itself rather than failing to resolve one;
-#   contention uses bin/fm-project-lock-lib.sh's measured, bounded FIFO wait
-#   with holder progress messages; callers no longer need retry loops for this
-#   project lock. Other lifecycle/task-set lock refusals are unchanged.
+#   fresh-spawn contention uses bin/fm-project-lock-lib.sh's FIFO wait, which
+#   refuses only when the holder stalls past the measured allowance, with holder
+#   progress messages; callers no longer need retry loops for this project lock.
+#   A relocating relaunch already holds the task's control lock, so it makes one
+#   nonwaiting attempt that never jumps a queued waiter. The fresh spawn's wait
+#   runs while it holds the home task-set, control and spawn-task locks: the
+#   project, backend and capacity it needs are only resolved after them, so the
+#   wait cannot move ahead of them without reordering that resolution. Other
+#   lifecycle/task-set lock refusals are unchanged.
 #   Project capacity: when this machine declares how many workers a project
 #   admits at once (config/project-capacity; bin/fm-project-capacity-lib.sh owns
 #   the declaration, what holds a place, and the race argument), a fresh ship or
@@ -1750,7 +1756,7 @@ spawn_abort_cleanup() {
   fi
   if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
     SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
-    fm_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK" || true
+    fm_project_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK" || true
   fi
   if [ "$SPAWN_TASK_SET_LOCK_HELD" = 1 ]; then
     SPAWN_TASK_SET_LOCK_HELD=0
@@ -3794,7 +3800,7 @@ if [ "$RELAUNCH_RELOCATING" = 1 ]; then
     echo "error: could not resolve the shared Treehouse project lock for $PROJ_ABS" >&2
     exit 1
   }
-  if ! fm_project_lock_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK" "spawn $ID"; then
+  if ! fm_project_lock_try "$SPAWN_TREEHOUSE_PROJECT_LOCK" "relocating relaunch $ID"; then
     echo "error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race relocation ownership" >&2
     exit 1
   fi
@@ -6044,7 +6050,7 @@ fi
 # follow a committed In-flight transition.
 if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
   SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
-  fm_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK"
+  fm_project_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK"
 fi
 if [ "$SPAWN_TASK_SET_LOCK_HELD" = 1 ]; then
   # The record is published, so this task is now part of the set a teardown
