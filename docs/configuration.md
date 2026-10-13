@@ -1036,7 +1036,7 @@ Its `remove` action excises only the marker-delimited Firstmate region and remov
 For Pi and pi-signed secondmate launches, `fm-spawn.sh` starts the selected executable with `-e` pointed at the secondmate home's own tracked `.pi/extensions/fm-primary-pi-watch.ts` and `.pi/extensions/fm-primary-turnend-guard.ts`, both already present from the secondmate home's git worktree.
 Pi-family secondmates can start unattended in Firstmate-seeded homes without accepting project trust manually; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the capability requirement, session-only approval scope, and older-version fallback, with [regression evidence](verification/runtime-backends.md#pi-seeded-secondmate-project-trust).
 
-For omp session posture, worker-only memory scope, direct-only native Jev credentials, the per-worker `--omp-no-helpers` switch, safe secondmate extension loading, and shared Default-role validation (including remedies and evidence limits), see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
+For omp session posture, worker-only memory scope, disabled worker title generation, direct-only native Jev credentials, the per-worker `--omp-no-helpers` switch, safe secondmate extension loading, and shared Default-role validation (including remedies and evidence limits), see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
 The [portable omp regression suite](../tests/fm-omp-harness.test.sh) covers default-role admission and raw-command model selection without an omp installation; its model-flag expectations preserve literal shell quoting across Bash versions.
 [Native direct-route and no-helper verification](verification/runtime-backends.md#omp-direct-judge-and-primary-model-only-workers) records the real-runtime fake-key probes, unavailable-provider boundary, interactive speech check and evidence limits.
 
@@ -1859,7 +1859,6 @@ omp's native tool-call deadline and both Claude hook timeouts are 30 seconds; om
 A withheld request, missing keys, exhausted budget or any other inference failure lets the tool call proceed, as upstream does, while writes outside the allowed roots, unsupported path spellings and unsupported edit schemas still block without a Jev call.
 The guard supplements, never replaces, existing deterministic protections or required approvals.
 An omp worker launched with `--omp-no-helpers` withholds every guard judgment before credential lookup, using the same no-key behavior while retaining the deterministic path and edit-schema blocks.
-Every canonical omp ship or scout, in any project and on relaunch, launches with `--no-title`, so title generation never reaches a credentialed OpenRouter model.
 [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that opt-in switch's session scope, other helper restrictions and relaunch behavior; it does not change an already running worker.
 The owning home's private `state/jev-guard.jsonl` receives one line per reported `jev`, `hook` or `error` event, selecting answers, usage, model, answering provider, latency and hook outcome without commands, paths, request bodies, reasons, banners or error messages.
 Ledger writes are best-effort and do not gate execution; early adapter rejections for unsupported paths or edit schemas return before upstream reporting.
