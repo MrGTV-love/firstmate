@@ -1,0 +1,44 @@
+## records
+live-task.meta
+live-task.status
+task-x1.meta
+task-x1.status
+## live-task.meta
+window=firstmate:fm-live-task
+endpoint_task_id=live-task
+worktree=/Users/charlesabrooker/tmp/fm-lab.XBmIFO/pool/1/proj
+project=/Users/charlesabrooker/tmp/fm-lab.XBmIFO/projects/proj
+kind=ship
+mode=no-mistakes
+branch=fm/live-task
+spawn_gen=lab-live
+## slot claim
+task=live-task
+home=/Users/charlesabrooker/tmp/fm-lab.XBmIFO
+## pool lease
+{"worktrees":[{"name":"1","path":"/Users/charlesabrooker/tmp/fm-lab.XBmIFO/pool/1/proj","leased":false}]}
+## tmux windows
+fm-task-x1
+fm-live-task
+## slot HEAD
+refs/heads/fm/live-task
+c3a4665962325129df4cc0b38ccfd37c4110edad
+## slot status
+ M live.txt
+?? scratch.txt
+## claimant files
+claimant committed
+claimant tracked edit
+claimant untracked
+claimant hook
+## project refs
+refs/heads/fm/live-task c3a4665962325129df4cc0b38ccfd37c4110edad
+refs/heads/fm/task-x1 470b1fd36de84e2c51577ae8fdd82d606bf946cb
+refs/heads/main e39c73f17fca4656b41179bc1b28ad80d460614a
+refs/remotes/origin/HEAD 470b1fd36de84e2c51577ae8fdd82d606bf946cb
+refs/remotes/origin/main 470b1fd36de84e2c51577ae8fdd82d606bf946cb
+## claimant pid 76866
+alive
+## backlog
+task-x1: in_flight
+live-task: in_flight

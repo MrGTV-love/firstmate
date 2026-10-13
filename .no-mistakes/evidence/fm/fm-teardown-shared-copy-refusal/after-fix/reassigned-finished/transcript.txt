@@ -1,0 +1,70 @@
+== scenario reassigned-finished on 5ecd4a1a
+lab=/Users/charlesabrooker/tmp/fm-lab.JSaTs0
+task-x1 branch landed on origin/main at e53e6dd
+teardown exit code: 0
+--- teardown stdout
+teardown task-x1 complete (window firstmate:fm-task-x1; pool slot /Users/charlesabrooker/tmp/fm-lab.JSaTs0/pool/1/proj left to task live-task (home /Users/charlesabrooker/tmp/fm-lab.JSaTs0), which it was reassigned to)
+Backlog: task-x1 is closed in /Users/charlesabrooker/tmp/fm-lab.JSaTs0/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+--- teardown stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.JSaTs0
+warning: task task-x1's recorded worktree /Users/charlesabrooker/tmp/fm-lab.JSaTs0/pool/1/proj was reassigned to task live-task (home /Users/charlesabrooker/tmp/fm-lab.JSaTs0), which claimed that pool slot after this record was written; that slot is no longer task-x1's, so its processes, copy, and claim are left untouched and only task-x1's own cleanup runs.
+--- external service calls
+gh-axi pr list --state all --head fm/task-x1 --limit 1
+docker ps -a --no-trunc --format {{.ID}}{{.Names}}{{.Label "fm.task"}}{{.Label "com.docker.compose.project"}}{{.Label "com.supabase.cli.project"}}{{.Label "com.docker.compose.project.working_dir"}}
+docker network ls --no-trunc --format {{.ID}}{{.Name}}{{.Label "fm.task"}}{{.Label "com.docker.compose.project"}}{{.Label "com.supabase.cli.project"}}
+docker volume ls --format {{.Name}}{{.Label "fm.task"}}{{.Label "com.docker.compose.project"}}{{.Label "com.supabase.cli.project"}}
+docker ps -a --no-trunc --format {{.ID}}{{.Names}}{{.Label "fm.task"}}{{.Label "com.docker.compose.project"}}{{.Label "com.supabase.cli.project"}}{{.Label "com.docker.compose.project.working_dir"}}
+no-mistakes axi status
+--- before/after diff
+4,5d3
+< task-x1.meta
+< task-x1.status
+21d18
+< fm-task-x1
+43c40
+< task-x1: in_flight
+---
+> task-x1: done
+--- after state
+## records
+live-task.meta
+live-task.status
+## live-task.meta
+window=firstmate:fm-live-task
+endpoint_task_id=live-task
+worktree=/Users/charlesabrooker/tmp/fm-lab.JSaTs0/pool/1/proj
+project=/Users/charlesabrooker/tmp/fm-lab.JSaTs0/projects/proj
+kind=ship
+mode=no-mistakes
+branch=fm/live-task
+spawn_gen=lab-live
+## slot claim
+task=live-task
+home=/Users/charlesabrooker/tmp/fm-lab.JSaTs0
+## pool lease
+{"worktrees":[{"name":"1","path":"/Users/charlesabrooker/tmp/fm-lab.JSaTs0/pool/1/proj","leased":false}]}
+## tmux windows
+fm-live-task
+## slot HEAD
+refs/heads/fm/live-task
+3b7fbc55d1c53d476eea4b9fdbe8830bb22fe0f9
+## slot status
+ M live.txt
+?? scratch.txt
+## claimant files
+claimant committed
+claimant tracked edit
+claimant untracked
+claimant hook
+## project refs
+refs/heads/fm/live-task 3b7fbc55d1c53d476eea4b9fdbe8830bb22fe0f9
+refs/heads/fm/task-x1 e53e6dd627d1e8156f83427b20a534721ae138c4
+refs/heads/main 9885ab6622a7f33c3e478861e4b923b7a21ec23d
+refs/remotes/origin/HEAD e53e6dd627d1e8156f83427b20a534721ae138c4
+refs/remotes/origin/main e53e6dd627d1e8156f83427b20a534721ae138c4
+## claimant pid 8865
+alive
+## backlog
+task-x1: done
+live-task: in_flight
+lab removed: yes

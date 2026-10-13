@@ -1,0 +1,8 @@
+ok - no-mistakes worktree with genuinely unlanded work is refused (safety preserved)
+ok - merged PR does not allow teardown after a later local commit
+ok - dirty worktree is refused even when its committed work has landed (dirty always wins)
+ok - a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes
+ok - a task on a reassigned slot with no merged PR and an unlanded own branch refuses and keeps its records
+ok - teardown of a reassociated record still refuses unlanded work in the current copy
+ok - teardown refuses to return a pool slot another record preserves as a prior copy
+bash tests/fm-teardown.test.sh  test_reassigned_slot_unlanded_task_refuses     4.77s user 11.51s system 48% cpu 33.774 total

@@ -1,0 +1,54 @@
+== scenario shared-unlanded on 5ecd4a1a
+lab=/Users/charlesabrooker/tmp/fm-lab.uV7KiZ
+task-x1 branch left unlanded (no PR, not on origin/main)
+teardown exit code: 1
+--- teardown stdout
+--- teardown stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.uV7KiZ
+notice: task task-x1 shares recorded pool slot /Users/charlesabrooker/tmp/fm-lab.uV7KiZ/pool/1/proj with task live-task; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+REFUSED: task task-x1 shares pool slot /Users/charlesabrooker/tmp/fm-lab.uV7KiZ/pool/1/proj, but its recorded PR is not confirmed merged and its own branch fm/task-x1 is not proved landed; its record and slot claim stay in place.
+Land this task's deliverable before re-running bin/fm-teardown.sh task-x1; the shared slot will not be returned.
+--- external service calls
+gh-axi pr list --state all --head fm/task-x1 --limit 1
+--- before/after diff
+--- after state
+## records
+live-task.meta
+live-task.status
+task-x1.meta
+task-x1.status
+## live-task.meta
+window=firstmate:fm-live-task
+endpoint_task_id=live-task
+worktree=/Users/charlesabrooker/tmp/fm-lab.uV7KiZ/pool/1/proj
+project=/Users/charlesabrooker/tmp/fm-lab.uV7KiZ/projects/proj
+kind=ship
+mode=no-mistakes
+branch=fm/live-task
+spawn_gen=lab-live
+## slot claim
+task=task-x1
+home=/Users/charlesabrooker/tmp/fm-lab.uV7KiZ
+## pool lease
+{"worktrees":[{"name":"1","path":"/Users/charlesabrooker/tmp/fm-lab.uV7KiZ/pool/1/proj","leased":true,"lease_holder":"live-task"}]}
+## tmux windows
+fm-task-x1
+fm-live-task
+## slot HEAD
+refs/heads/fm/task-x1
+da10fd9d691f2df7e89f38a7fa5b21db7c93cb8b
+## slot status
+?? remaining.txt
+## claimant files
+remaining task untracked
+## project refs
+refs/heads/fm/task-x1 da10fd9d691f2df7e89f38a7fa5b21db7c93cb8b
+refs/heads/main ba197cc0f6c319519de14620aa067469e1cf5076
+refs/remotes/origin/HEAD ba197cc0f6c319519de14620aa067469e1cf5076
+refs/remotes/origin/main ba197cc0f6c319519de14620aa067469e1cf5076
+## claimant pid 49557
+alive
+## backlog
+task-x1: in_flight
+live-task: in_flight
+lab removed: yes

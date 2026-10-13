@@ -1,0 +1,59 @@
+== scenario reassigned-unlanded on 5ecd4a1a
+lab=/Users/charlesabrooker/tmp/fm-lab.Kxfexa
+task-x1 branch left unlanded (no PR, not on origin/main)
+teardown exit code: 1
+--- teardown stdout
+--- teardown stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.Kxfexa
+warning: task task-x1's recorded worktree /Users/charlesabrooker/tmp/fm-lab.Kxfexa/pool/1/proj was reassigned to task live-task (home /Users/charlesabrooker/tmp/fm-lab.Kxfexa), which claimed that pool slot after this record was written; that slot is no longer task-x1's, so its processes, copy, and claim are left untouched and only task-x1's own cleanup runs.
+REFUSED: task task-x1's recorded copy /Users/charlesabrooker/tmp/fm-lab.Kxfexa/pool/1/proj was reassigned to task live-task, but its recorded PR is not confirmed merged and its own branch fm/task-x1 is not proved landed; its records stay in place.
+Land this task's deliverable before re-running bin/fm-teardown.sh task-x1; the reassigned slot stays with its claimant.
+--- external service calls
+gh-axi pr list --state all --head fm/task-x1 --limit 1
+--- before/after diff
+--- after state
+## records
+live-task.meta
+live-task.status
+task-x1.meta
+task-x1.status
+## live-task.meta
+window=firstmate:fm-live-task
+endpoint_task_id=live-task
+worktree=/Users/charlesabrooker/tmp/fm-lab.Kxfexa/pool/1/proj
+project=/Users/charlesabrooker/tmp/fm-lab.Kxfexa/projects/proj
+kind=ship
+mode=no-mistakes
+branch=fm/live-task
+spawn_gen=lab-live
+## slot claim
+task=live-task
+home=/Users/charlesabrooker/tmp/fm-lab.Kxfexa
+## pool lease
+{"worktrees":[{"name":"1","path":"/Users/charlesabrooker/tmp/fm-lab.Kxfexa/pool/1/proj","leased":false}]}
+## tmux windows
+fm-task-x1
+fm-live-task
+## slot HEAD
+refs/heads/fm/live-task
+cbc9cbcb0177e775398d5c539b5db5d42fae2b04
+## slot status
+ M live.txt
+?? scratch.txt
+## claimant files
+claimant committed
+claimant tracked edit
+claimant untracked
+claimant hook
+## project refs
+refs/heads/fm/live-task cbc9cbcb0177e775398d5c539b5db5d42fae2b04
+refs/heads/fm/task-x1 b2561273c0afe7248cd6f0d9b2a60658e3a04bcf
+refs/heads/main a6575173c740b4fd26af91bc7dc70170e48ecc02
+refs/remotes/origin/HEAD a6575173c740b4fd26af91bc7dc70170e48ecc02
+refs/remotes/origin/main a6575173c740b4fd26af91bc7dc70170e48ecc02
+## claimant pid 20272
+alive
+## backlog
+task-x1: in_flight
+live-task: in_flight
+lab removed: yes

@@ -1,0 +1,35 @@
+## records
+live-task.meta
+live-task.status
+## live-task.meta
+window=firstmate:fm-live-task
+endpoint_task_id=live-task
+worktree=/Users/charlesabrooker/tmp/fm-lab.AsOEK1/pool/1/proj
+project=/Users/charlesabrooker/tmp/fm-lab.AsOEK1/projects/proj
+kind=ship
+mode=no-mistakes
+branch=fm/live-task
+spawn_gen=lab-live
+## slot claim
+task=live-task
+home=/Users/charlesabrooker/tmp/fm-lab.AsOEK1
+## pool lease
+{"worktrees":[{"name":"1","path":"/Users/charlesabrooker/tmp/fm-lab.AsOEK1/pool/1/proj","leased":false}]}
+## tmux windows
+fm-live-task
+## slot HEAD
+refs/heads/fm/live-task
+a92b1af60840c99ac21acca14136a8ff52941900
+## slot status
+## claimant files
+## project refs
+refs/heads/fm/live-task a92b1af60840c99ac21acca14136a8ff52941900
+refs/heads/fm/task-x1 18ea7be557bd45e9ad4f896221bd7d336048375b
+refs/heads/main a92b1af60840c99ac21acca14136a8ff52941900
+refs/remotes/origin/HEAD a92b1af60840c99ac21acca14136a8ff52941900
+refs/remotes/origin/main a92b1af60840c99ac21acca14136a8ff52941900
+## claimant pid 37490
+alive
+## backlog
+task-x1: done
+live-task: in_flight
