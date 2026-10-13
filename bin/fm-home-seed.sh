@@ -7,7 +7,9 @@
 #       a fresh firstmate worktree via "treehouse get --lease", which durably
 #       leases the worktree under the secondmate <id> so the home survives with
 #       no live process and is never recycled until the lease is released with
-#       "treehouse return". Projects are cloned
+#       "treehouse return". Allocation uses bin/fm-project-lock-lib.sh's FIFO
+#       contention wait, so callers do not need project-lock retry loops.
+#       Projects are cloned
 #       from the active home into the secondmate home's projects/ directory.
 #       That project list is non-exclusive provisioning data. Pass --no-projects
 #       instead of a project list to seed a project-less home for a domain whose
@@ -49,6 +51,8 @@ SUB_HOME_PARENT_MARKER=".fm-secondmate-parent"
 . "$SCRIPT_DIR/fm-secondmate-charter-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-project-lock-lib.sh
+. "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-backend.sh
 . "$SCRIPT_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
@@ -530,7 +534,7 @@ seed_treehouse_project_lock_acquire() {
     echo "error: could not resolve the shared Treehouse project lock for $FM_ROOT" >&2
     return 1
   }
-  fm_lock_try_acquire "$SEED_TREEHOUSE_PROJECT_LOCK" || {
+  fm_project_lock_acquire "$SEED_TREEHOUSE_PROJECT_LOCK" "home seed $1" || {
     echo "error: another Treehouse slot allocation or return is in progress for $FM_ROOT" >&2
     return 1
   }
@@ -901,7 +905,7 @@ seed_home() {
   fi
 
   if [ "$requested_home" = "-" ]; then
-    seed_treehouse_project_lock_acquire || return 1
+    seed_treehouse_project_lock_acquire "$id" || return 1
     SEED_HOME_ACQUIRED=1
     acquire_treehouse_home "$id" || return 1
     home=$SEED_HOME

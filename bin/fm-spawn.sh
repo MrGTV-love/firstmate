@@ -214,7 +214,9 @@
 #   The local root is whatever bin/fm-wake-lib.sh's
 #   fm_firstmate_root_home resolves, so a home seeded from another machine anchors
 #   that lock itself rather than failing to resolve one;
-#   contention refuses rather than waits.
+#   contention uses bin/fm-project-lock-lib.sh's measured, bounded FIFO wait
+#   with holder progress messages; callers no longer need retry loops for this
+#   project lock. Other lifecycle/task-set lock refusals are unchanged.
 #   Project capacity: when this machine declares how many workers a project
 #   admits at once (config/project-capacity; bin/fm-project-capacity-lib.sh owns
 #   the declaration, what holds a place, and the race argument), a fresh ship or
@@ -810,6 +812,8 @@ fi
 . "$SCRIPT_DIR/fm-ff-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-project-lock-lib.sh
+. "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
 fm_backlog_directory_present "$STATE" "state directory" || {
@@ -3765,7 +3769,7 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
     echo "error: could not resolve the shared Treehouse project lock for $PROJ_ABS" >&2
     exit 1
   }
-  if ! fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK"; then
+  if ! fm_project_lock_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK" "spawn $ID"; then
     if [ "$BACKEND" = orca ]; then
       echo "error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race its capacity admission" >&2
     else
@@ -3790,7 +3794,7 @@ if [ "$RELAUNCH_RELOCATING" = 1 ]; then
     echo "error: could not resolve the shared Treehouse project lock for $PROJ_ABS" >&2
     exit 1
   }
-  if ! fm_lock_try_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK"; then
+  if ! fm_project_lock_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK" "spawn $ID"; then
     echo "error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race relocation ownership" >&2
     exit 1
   fi

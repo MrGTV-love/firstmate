@@ -164,6 +164,12 @@
 # through metadata publication, closing the publication
 # gap; forced secondmate teardown takes it and runs the same checks for every
 # descendant Treehouse slot before touching any child.
+# Project-lock contention uses bin/fm-project-lock-lib.sh's measured bounded
+# FIFO wait and holder progress messages; callers no longer need retry loops
+# for allocation/return contention. Recursive cleanup collects and deduplicates
+# every descendant project-lock path, then acquires in global byte order before
+# slot proofs, so opposite child enumeration orders cannot create AB/BA waits.
+# Other lifecycle lock refusals are unchanged.
 # These refusals are not relaxed by --force: --force authorizes discarding THIS
 # task's unlanded work, never another task's live work. Nothing of this task's
 # own is removed by a refusal; reconcile whichever record is wrong and re-run.
@@ -465,6 +471,7 @@ for _teardown_source in \
   fm-cursor-lib.sh \
   fm-nm-run-lib.sh \
   fm-wake-lib.sh \
+  fm-project-lock-lib.sh \
   fm-path-lib.sh \
   fm-lease-lib.sh
 do
@@ -530,6 +537,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 }
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-project-lock-lib.sh
+. "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # Supervision lease guard: post-landing cleanup is overlap territory between
@@ -597,7 +606,7 @@ if [ -f "$META" ] && [ ! -L "$META" ]; then
       echo "REFUSED: cannot resolve the shared Treehouse project lock for ${TEARDOWN_LOCK_PROJECT:-<missing>}; nothing was changed" >&2
       exit 1
     }
-    fm_lock_try_acquire "$TREEHOUSE_PROJECT_LOCK" || {
+    fm_project_lock_acquire "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || {
       echo "REFUSED: another Treehouse slot allocation or return is in progress for $TEARDOWN_LOCK_PROJECT; nothing was changed" >&2
       exit 1
     }
@@ -4038,7 +4047,9 @@ preflight_descendant_task_locks() {
 }
 
 preflight_descendant_treehouse_slots() {
-  local i state task_id meta kind backend target worktree project lock_path held owner_rc
+  local i j state task_id meta kind backend target worktree project lock_path held owner_rc
+  local LC_ALL=C
+  local -a project_locks=() project_tasks=()
   for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
     state=${DESCENDANT_TASK_STATES[$i]}
     task_id=${DESCENDANT_TASK_IDS[$i]}
@@ -4063,14 +4074,32 @@ preflight_descendant_treehouse_slots() {
     for target in "${DESCENDANT_TREEHOUSE_LOCK_PATHS[@]+"${DESCENDANT_TREEHOUSE_LOCK_PATHS[@]}"}"; do
       [ "$target" != "$lock_path" ] || held=1
     done
+    for target in "${project_locks[@]+"${project_locks[@]}"}"; do
+      [ "$target" != "$lock_path" ] || held=1
+    done
     if [ "$held" = 0 ]; then
-      fm_lock_try_acquire "$lock_path" || {
-        echo "REFUSED: another Treehouse slot allocation or return is in progress for child $task_id; forced teardown changed nothing" >&2
-        return 1
-      }
-      DESCENDANT_TREEHOUSE_LOCK_PATHS+=("$lock_path")
-      DESCENDANT_LOCK_PATHS+=("$lock_path")
+      # Global byte order, not child enumeration order: two unrelated local
+      # homes may enumerate the same projects in opposite orders. Retaining
+      # one while waiting for the other would otherwise create AB/BA waits.
+      j=${#project_locks[@]}
+      while [ "$j" -gt 0 ] && [[ "${project_locks[$((j - 1))]}" > "$lock_path" ]]; do
+        project_locks[$j]=${project_locks[$((j - 1))]}
+        project_tasks[$j]=${project_tasks[$((j - 1))]}
+        j=$((j - 1))
+      done
+      project_locks[$j]=$lock_path
+      project_tasks[$j]=$task_id
     fi
+  done
+  for ((i=0; i < ${#project_locks[@]}; i++)); do
+    lock_path=${project_locks[$i]}
+    task_id=${project_tasks[$i]}
+    fm_project_lock_acquire "$lock_path" "teardown $ID child $task_id" || {
+      echo "REFUSED: another Treehouse slot allocation or return is in progress for child $task_id; forced teardown changed nothing" >&2
+      return 1
+    }
+    DESCENDANT_TREEHOUSE_LOCK_PATHS+=("$lock_path")
+    DESCENDANT_LOCK_PATHS+=("$lock_path")
   done
   for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
     state=${DESCENDANT_TASK_STATES[$i]}

@@ -944,7 +944,7 @@ test_remote_layout_homes_serialize_on_one_project_lock() {
   [ -e "$dir/lock-held" ] || fail "the local child never took the shared project lock"
 
   set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
+  FM_PROJECT_LOCK_SERVICE_SECS=10 run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
   rc=$?
   set -e
   kill "$holder" 2>/dev/null || true
@@ -956,8 +956,7 @@ test_remote_layout_homes_serialize_on_one_project_lock() {
   assert_present "$dir/worktree/sentinel" "contended remote-layout teardown reset the slot"
   [ ! -s "$dir/runtime.log" ] \
     || fail "contended remote-layout teardown reached the runtime: $(cat "$dir/runtime.log")"
-  assert_contains "$(cat "$dir/stderr")" "another Treehouse slot allocation or return is in progress" \
-    "the refusal should name the shared project lock, not some unrelated check"
+  assert_present "$lock" "bounded waiting removed a live project holder's lock"
 
   pass "Treehouse project locking still serializes two homes across the remote-seeded boundary"
 }
