@@ -277,8 +277,12 @@ PY
 #   FM_TEST_GIT_DIFF_FILE        path to a file of NUL-separated changed paths
 fm_lint_stub_git() {
   local fakebin=$1
+  FM_TEST_REAL_GIT_BIN=$(command -v git)
+  export FM_TEST_REAL_GIT_BIN
   cat > "$fakebin/git" <<'SH'
 #!/usr/bin/env bash
+# Literal-baseline reads are real repository reads, not selection fixtures.
+[ "${1:-}" != -C ] || exec "$FM_TEST_REAL_GIT_BIN" "$@"
 case "$*" in
   "rev-parse --is-inside-work-tree")
     [ "${FM_TEST_GIT_INSIDE_WORKTREE:-1}" = 1 ] || exit 1

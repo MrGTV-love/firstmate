@@ -639,3 +639,91 @@ test_nm_bounded_perl_bound_reaches_a_child_slow_to_start
 test_perl_bound_forwards_a_term_to_the_command
 test_nested_perl_bound_reaps_a_term_resistant_child
 test_no_status_file_survives_any_exit_of_the_caller
+
+# Cache-hit wall times must never calibrate a subsequent cold miss.
+# This new case exercises the real lint/cache/runner boundary with isolated
+# tools; all completion waits use protocol sentinels, not deadlines.
+export FM_CACHE_DURATION_ROOT="$ROOT" FM_CACHE_DURATION_TMP="$TMP_ROOT"
+"$ROOT/bin/fm-proc-budget.sh" -- python3 - <<'PY'
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+root = Path(os.environ['FM_CACHE_DURATION_ROOT'])
+fixture = Path(os.environ['FM_CACHE_DURATION_TMP']) / 'cold-calibration'
+repo = fixture / 'repo'
+(repo / 'bin').mkdir(parents=True)
+(repo / 'tests').mkdir()
+(repo / 'bin/backends').mkdir()
+for name in ('fm-lint.sh', 'fm-lint-cache.pl', 'fm-timeout-lib.sh', 'fm-duration-lib.sh', 'fm-duration.py'):
+    shutil.copyfile(root / 'bin' / name, repo / 'bin' / name)
+(repo / 'bin/fm-lint-workflows.sh').write_text('#!/bin/bash\nexit 0\n')
+(repo / 'bin/consumer.sh').write_text('#!/bin/bash\nprintf cold\n')
+for path in (repo / 'bin').glob('*.sh'):
+    path.chmod(0o755)
+fakebin = fixture / 'tools'
+fakebin.mkdir()
+(fakebin / 'shellcheck').write_text('''#!/bin/bash
+if [ "${1:-}" = --version ]; then printf 'version: 0.11.0\\n'; exit 0; fi
+printf 'analyzed\\n' >> "$FM_CACHE_ANALYSES"
+if [ "${FM_CACHE_HOLD:-0}" = 1 ]; then
+  printf 'started\\n' > "$FM_CACHE_HANDSHAKE"
+  IFS= read -r release < "$FM_CACHE_RELEASE"
+fi
+exit 0
+''')
+(fakebin / 'shellcheck').chmod(0o755)
+subprocess.run(['git', 'init', '-q', '-b', 'main', str(repo)], check=True)
+subprocess.run(['git', '-C', str(repo), 'add', '.'], check=True)
+subprocess.run(['git', '-C', str(repo), '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-qm', 'cold baseline'], check=True)
+ledger = fixture / 'durations.jsonl'
+analyses = fixture / 'analyses'
+env = dict(os.environ, PATH=str(fakebin) + os.pathsep + os.environ['PATH'],
+           FM_HOME=str(fixture), FM_DATA_OVERRIDE=str(fixture / 'data'),
+           FM_CONFIG_OVERRIDE=str(fixture / 'config'), FM_STATE_OVERRIDE=str(fixture / 'state'),
+           FM_DURATION_FILE=str(ledger), FM_LINT_CACHE_DIR=str(fixture / 'cache'),
+           FM_LINT_SLOT_DIR='off', FM_LINT_TELEMETRY='off', FM_CACHE_ANALYSES=str(analyses),
+           CI='false', GITHUB_ACTIONS='false')
+helper = repo / 'bin/fm-duration.py'
+command = [sys.executable, str(helper), 'run', 'lint.full.whole', '--', 'bash', str(repo / 'bin/fm-lint.sh'), '--jobs', '1']
+for index in range(3):
+    result = subprocess.run(command, cwd=repo, env=env, capture_output=True, text=True)
+    assert result.returncode == 0, (result.stdout, result.stderr)
+    if index == 0:
+        analyzed_count = len(analyses.read_text().splitlines())
+    else:
+        assert len(analyses.read_text().splitlines()) == analyzed_count, 'warm analysis unexpectedly executed ShellCheck'
+rows = [json.loads(line) for line in ledger.read_text().splitlines()]
+warm = [row for row in rows if row.get('exit') == 0 and row.get('calibration') is False]
+assert any(row['key'] == 'lint-root.full.bin/consumer.sh' for row in warm)
+assert any(row['key'] == 'lint.full.whole' for row in warm), 'outer runner lost cache classification'
+# Remove the cold seed and replay ONLY actual warm observations in both
+# independent load-regime fixtures. Neither p99 may infer a cold ceiling.
+with ledger.open('w') as output:
+    for row in warm:
+        for regime in ('idle', 'loaded'):
+            output.write(json.dumps(dict(row, regime=regime)) + '\n')
+for key in ('lint-root.full.bin/consumer.sh', 'lint.full.whole'):
+    result = subprocess.run([sys.executable, str(helper), 'limit', key, '--percentile', '99'], env=env, capture_output=True, text=True, check=True)
+    assert result.stdout.strip() == '0' and 'missing idle, loaded' in result.stderr, result
+(repo / 'bin/consumer.sh').write_text('#!/bin/bash\nprintf changed-cold\n')
+handshake, release = fixture / 'handshake', fixture / 'release'
+os.mkfifo(handshake); os.mkfifo(release)
+cold_env = dict(env, FM_CACHE_HOLD='1', FM_CACHE_HANDSHAKE=str(handshake), FM_CACHE_RELEASE=str(release))
+job = subprocess.Popen(command, cwd=repo, env=cold_env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+with handshake.open() as incoming:
+    assert incoming.readline() == 'started\n'
+assert job.poll() is None, 'the warm cache killed the cold miss'
+with release.open('w') as outgoing:
+    outgoing.write('complete\n')
+out, err = job.communicate()
+assert job.returncode == 0, (out, err)
+new_rows = [json.loads(line) for line in ledger.read_text().splitlines()]
+assert any(row.get('key') == 'lint-root.full.bin/consumer.sh' and row.get('calibration') is True and row.get('exit') == 0 for row in new_rows)
+assert len(analyses.read_text().splitlines()) == analyzed_count + 1
+print('ok - warm hits in both load regimes leave cold root and outer ceilings uncalibrated; changed cold analysis completes')
+PY
+

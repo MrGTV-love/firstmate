@@ -331,7 +331,7 @@ family_for_basename() {
     fm-send-popup-settle.test.sh|fm-send-settle.test.sh|\
     fm-dispatch-capacity.test.sh|\
     fm-supervision-instructions.test.sh|fm-task-delivery.test.sh|\
-    fm-timeout-lib.test.sh|\
+    fm-timeout-lib.test.sh|fm-duration.test.sh|\
     fm-tmux-submit-busy.test.sh|fm-trace-context-lib.test.sh|\
     fm-transition-lib.test.sh|\
     fm-test-run.test.sh|fm-test-isolation-proof.test.sh)
@@ -1798,6 +1798,12 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-procevent-when.test.sh
       printf '%s\n' __script__:fm-remote-reply.test.sh
       ;;
+    bin/fm-duration.py|bin/fm-duration-lib.sh)
+      printf '%s\n' __script__:fm-duration.test.sh
+      printf '%s\n' __script__:fm-timeout-lib.test.sh
+      printf '%s\n' __script__:fm-lint.test.sh
+      printf '%s\n' __script__:fm-test-run.test.sh
+      ;;
     bin/fm-timeout-lib.sh)
       # The shared hard bound: session start's runtime bound, the fleet/bearings
       # snapshots, the vendor auth probe, the stow cascade's per-home step, and
@@ -2734,6 +2740,11 @@ record_script_result() {
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" >>"$RECORDS"
+  if [ "$gate_skip" = false ] && [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
+    # shellcheck source=bin/fm-duration-lib.sh
+    . "$ROOT/bin/fm-duration-lib.sh"
+    fm_duration_record "test.$script" "$duration" "$rc"
+  fi
   family_bump "$family" "$duration" "$fail_delta"
   TOTAL=$((TOTAL + 1))
 }
@@ -2764,7 +2775,12 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   local GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
-  local rc
+  local rc script_seconds=$PER_SCRIPT_TIMEOUT_SECS
+  if [ "$script_seconds" -gt 0 ] && [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
+    # shellcheck source=bin/fm-duration-lib.sh
+    . "$ROOT/bin/fm-duration-lib.sh"
+    script_seconds=$(fm_duration_limit "test.$script" "$script_seconds" 99) || return $?
+  fi
   local -a cmd
   : "$id"
   if [ "$stream" -eq 1 ]; then
@@ -2783,7 +2799,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
     # The bound runs inside the pass holder so the pass wait stays outside it.
     # shellcheck disable=SC2016
     cmd=(bash -c '. "$1" || exit 125; shift; fm_run_timed "$@"' _ \
-      "$ROOT/bin/fm-timeout-lib.sh" "$PER_SCRIPT_TIMEOUT_SECS" "${cmd[@]}")
+      "$ROOT/bin/fm-timeout-lib.sh" "$script_seconds" "${cmd[@]}")
   fi
   if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
@@ -2798,7 +2814,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   rc=$?
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ] && [ "$rc" -eq 124 ]; then
     printf 'not ok - %s exceeded the per-script bound of %ss and was terminated\n' \
-      "$script" "$PER_SCRIPT_TIMEOUT_SECS" >>"$out"
+      "$script" "$script_seconds" >>"$out"
     [ "$stream" -eq 1 ] && tail -1 "$out"
   fi
   reap_script_leftovers "$script"
@@ -2936,14 +2952,12 @@ else
     (
       trap - EXIT HUP INT TERM
       set +e
-      export TMPDIR="$work/tmp"
-      export TMP="$work/tmp"
       unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
         FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
       cd "$ROOT" || exit 1
       begin_ms=$(now_ms)
       set +e
-      run_script_bounded "$script" "$work/output" 0 "w$worker_n"
+      TMPDIR="$work/tmp" TMP="$work/tmp" run_script_bounded "$script" "$work/output" 0 "w$worker_n"
       rc=$?
       set -e
       end_ms=$(now_ms)
@@ -3029,4 +3043,9 @@ if [ -n "$MAX_WALL_MS" ]; then
   fi
 fi
 
+if [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
+  # shellcheck source=bin/fm-duration-lib.sh
+  . "$ROOT/bin/fm-duration-lib.sh"
+  fm_duration_record "test-suite.$SELECTION_DESC" "$RUN_DURATION" "$AGG_RC"
+fi
 exit "$AGG_RC"

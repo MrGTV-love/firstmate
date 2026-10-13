@@ -89,6 +89,8 @@ It has the knowledge-placement rules that keep `AGENTS.md` from regrowing after 
 There is no reliable way for `bin/fm-brief.sh`'s scaffold to detect that a task's repo is firstmate itself, so firstmate adds this skill's load line to firstmate-repo briefs by hand.
 A crewmate picking up such a brief should load the skill even if the brief predates this instruction.
 When supervising live crewmates, keep firstmate's own long validation or build commands in the background so watcher wakes can still be handled.
+Use `python3 bin/fm-duration.py run <stable-command-key> -- <command...>` for progress-based long commands; its header and `--help` own the host-local duration table, empirical percentiles, explicit calibration fallback, and repeated-timeout backlog ownership.
+`bin/fm-lint.sh` also rejects newly introduced time-limit literals in `bin/` without an adjacent `measured:` note; use `python3 bin/fm-duration.py check-literals --report` to inventory existing limits without changing them.
 Crewmate validation follows the installed no-mistakes version's SKILL.md and live `axi` help instead of duplicating gate mechanics in firstmate docs.
 Firstmate's wrapper still matters: crewmates route every `ask-user` finding to firstmate, which applies `ask-user-authority`, and crewmates never pass `--yes` or `-y` because either flag bypasses that check and any required captain escalation.
 [`docs/configuration.md`](docs/configuration.md#gate-defaults-no-mistakesyaml) owns the tracked `.no-mistakes.yaml` gate defaults.

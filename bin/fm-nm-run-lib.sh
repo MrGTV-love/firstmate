@@ -19,7 +19,10 @@
 # Bounded call to an arbitrary command in dir $1, timeout $2 seconds, and its
 # `no-mistakes "$@"` specialization. The bounded
 # form preserves stdout, stderr, and exit status; the checked form discards
-# stderr, while fm_nm_run keeps the fail-open query contract for read-only callers.
+# command stderr, while fm_nm_run keeps the fail-open query contract for read-only callers.
+# Successful explicit --run queries import completed step durations through
+# fm-duration.py, whose header owns idempotence and historical-load handling;
+# import diagnostics do not replace the query's result.
 # The Perl fallback's process-group, signal, and owner-death contract is owned
 # by fm_timeout_perl_bound in fm-timeout-lib.sh's header.
 if ! declare -F fm_timeout_perl_bound >/dev/null 2>&1; then
@@ -48,7 +51,20 @@ fm_nm_run_bounded() {  # <dir> <timeout_secs> <args...>
 }
 
 fm_nm_run_checked() {  # <dir> <timeout_secs> <args...>
-  fm_nm_run_bounded "$@" 2>/dev/null
+  local result=0 arg run_id='' previous='' helper database
+  fm_nm_run_bounded "$@" 2>/dev/null || result=$?
+  if [ "$result" -eq 0 ] && [ "${FM_DURATION_FILE:-}" != off ]; then
+    for arg in "${@:3}"; do
+      [ "$previous" != --run ] || run_id=$arg
+      previous=$arg
+    done
+    helper="$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-duration.py"
+    if [ -n "$run_id" ] && [ -r "$helper" ] && command -v python3 >/dev/null 2>&1; then
+      database=$(fm_nm_state_db "$1")
+      python3 "$helper" import-nm "$database" "$run_id" >&2 || true
+    fi
+  fi
+  return "$result"
 }
 
 fm_nm_run() {  # <dir> <timeout_secs> <args...>

@@ -2406,7 +2406,9 @@ omp_model_validate() { # <omp-bin> <model>
 omp_models_listing() { # <omp-bin>
   local listing
   command -v jq >/dev/null 2>&1 || return 0
-  listing=$(OMP_SKIP_SETUP=1 "$1" models --json 2>/dev/null) || return 0
+  # shellcheck source=bin/fm-duration-lib.sh
+  . "$SCRIPT_DIR/fm-duration-lib.sh"
+  listing=$(OMP_SKIP_SETUP=1 fm_duration_timed model-catalog.omp 0 "$1" models --json) || return 0
   printf '%s\n' "$listing"
 }
 

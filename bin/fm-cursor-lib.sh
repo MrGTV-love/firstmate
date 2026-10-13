@@ -122,7 +122,11 @@ fm_cursor_verify_executable() {  # <path>
 }
 
 fm_cursor_list_models() {  # <path>
-  fm_cursor_bounded_output "$1" --list-models
+  local duration_dir
+  duration_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  # shellcheck source=bin/fm-duration-lib.sh
+  . "$duration_dir/fm-duration-lib.sh"
+  fm_duration_timed model-catalog.cursor "$FM_CURSOR_PROBE_TIMEOUT" "$1" --list-models
 }
 
 fm_cursor_catalog_ids() {  # stdin: --list-models output; stdout: one id per line

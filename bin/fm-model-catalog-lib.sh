@@ -24,8 +24,9 @@
 # omp models --json; Pi --list-models; OpenCode models; Cursor --list-models;
 # agy models. Other harnesses need an export from their own documented surface.
 #
-# TIME LIMIT. Every discovery command runs under one 30 second limit. Per-harness
-# limits are a follow-up: they need idle and heavy-load measurements first.
+# TIME LIMIT. fm-duration.py owns calibration; cold catalogs explicitly retain
+# the existing 30 second fallback (Cursor retains its existing probe fallback).
+# Every live discovery records wall time under the stable model-catalog.<harness> key.
 #
 # shellcheck disable=SC2034 # Sourced library: callers read its output.
 SCRIPT_DIR="${SCRIPT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
@@ -63,7 +64,28 @@ fm_model_catalog_normalize() {  # <harness>; stdin: raw discovery output
   esac
 }
 
+# shellcheck source=bin/fm-duration-lib.sh
+. "$FM_MODEL_CATALOG_LIB_DIR/fm-duration-lib.sh"
+
 fm_model_catalog() {  # <harness> <scratch-dir>
+  local started finished result=0 h=$1 bound
+  if [ -n "${FM_MODEL_CATALOG_DIR:-}" ]; then
+    fm_model_catalog_read "$@"
+    return
+  fi
+  if [ "$h" = cursor ]; then
+    bound=$(fm_duration_limit "model-catalog.$h" "$FM_CURSOR_PROBE_TIMEOUT") || return $?
+  else
+    bound=$(fm_duration_limit "model-catalog.$h" 30) || return $?
+  fi
+  started=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000')
+  fm_model_catalog_read "$@" || result=$?
+  finished=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000')
+  fm_duration_record "model-catalog.$h" "$((finished - started))" "$result"
+  return "$result"
+}
+
+fm_model_catalog_read() {  # <harness> <scratch-dir>; bound supplied by wrapper
   local h=$1 scratch=$2 raw bin
   if [ -n "${FM_MODEL_CATALOG_DIR:-}" ]; then
     cat "$FM_MODEL_CATALOG_DIR/$h.json"
@@ -71,29 +93,29 @@ fm_model_catalog() {  # <harness> <scratch-dir>
   fi
   case "$h" in
     codex)
-      raw=$(cat "${CODEX_HOME:-$HOME/.codex}/models_cache.json") || return 1
+      raw=$(cat "${CODEX_HOME:-$HOME/.codex}/models_cache.json") || return $?
       ;;
     claude)
       printf '%s\n' '{"type":"control_request","request_id":"model-index","request":{"subtype":"initialize"}}' > "$scratch/initialize.json"
       # Timed runners may detach stdin; reopen the protocol input in the child.
       # shellcheck disable=SC2016 # Positional expansion belongs to the child.
-      raw=$(fm_run_timed 30 bash -c 'exec claude -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --setting-sources "" < "$1"' _ "$scratch/initialize.json") || return 1
+      raw=$(fm_run_timed "$bound" bash -c 'exec claude -p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --setting-sources "" < "$1"' _ "$scratch/initialize.json") || return $?
       ;;
     omp)
-      raw=$(OMP_SKIP_SETUP=1 fm_run_timed 30 omp models --json </dev/null) || return 1
+      raw=$(OMP_SKIP_SETUP=1 fm_run_timed "$bound" omp models --json </dev/null) || return $?
       ;;
     pi|pi-signed)
-      raw=$(fm_run_timed 30 "$h" --list-models </dev/null) || return 1
+      raw=$(fm_run_timed "$bound" "$h" --list-models </dev/null) || return $?
       ;;
     opencode)
-      raw=$(fm_run_timed 30 opencode models </dev/null) || return 1
+      raw=$(fm_run_timed "$bound" opencode models </dev/null) || return $?
       ;;
     cursor)
-      bin=$(fm_cursor_resolve_binary) || return 1
-      raw=$(fm_cursor_list_models "$bin") || return 1
+      bin=$(fm_cursor_resolve_binary) || return $?
+      raw=$(fm_run_timed "$bound" "$bin" --list-models </dev/null) || return $?
       ;;
     agy)
-      raw=$(fm_run_timed 30 agy models </dev/null) || return 1
+      raw=$(fm_run_timed "$bound" agy models </dev/null) || return $?
       ;;
     *) return 1 ;;
   esac
