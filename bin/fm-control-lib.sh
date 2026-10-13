@@ -125,17 +125,29 @@ fm_control_omp_launch_check() {
   return 1
 }
 
-# The disabledProviders list an ordinary omp worker's task overlay carries: the
-# operator's own list plus openrouter, because a --config overlay replaces an
-# array setting. Resolves the agent directory the way omp does (OMP_PROFILE wins
-# over PI_PROFILE even when empty; a named profile selects
-# <home>/<PI_CONFIG_DIR or .omp>/profiles/<name>/agent and ignores
-# PI_CODING_AGENT_DIR) and reads that directory's global config.yml without
-# layering project settings. An absent config.yml is omp's empty configuration;
-# an unreadable or malformed one, or a list that is not strings, is refused by
-# name without echoing its content.
-fm_control_omp_worker_disabled_providers() {
-  ruby -ryaml -rjson - <<'RUBY'
+# Resolves, once and the way omp itself does, the agent directory a canonical
+# omp launch must observe, and prints it as JSON: agentDir, profile (empty when
+# none), configDir (the raw PI_CONFIG_DIR value, possibly empty). OMP_PROFILE wins
+# over PI_PROFILE even when empty; empty or "default" means no profile; a named
+# profile selects <home>/<PI_CONFIG_DIR or .omp>/profiles/<name>/agent and ignores
+# PI_CODING_AGENT_DIR; otherwise PI_CODING_AGENT_DIR or <home>/<PI_CONFIG_DIR or
+# .omp>/agent. With --providers it also prints disabledProviders: the operator's
+# list plus a canonical "openrouter" (unless a string entry equals it exactly),
+# because a --config overlay replaces an array setting. Path-scoped mapping
+# entries pass through unchanged for omp to scope against the worker's cwd. The
+# list comes from the first existing global config.yml, then config.yaml, in that
+# directory without layering project settings; only when neither exists is the
+# operator's list empty. A missing parser, an unreadable or malformed file, a
+# value that is not a list, an entry that is neither a string nor a mapping, or
+# an invalid profile name is refused by file or profile name without echoing
+# any file content.
+fm_control_omp_launch_resolve() {
+  local want=${1:-}
+  command -v ruby >/dev/null 2>&1 || {
+    echo "error: ruby is not available, so the omp agent directory and its disabledProviders list cannot be resolved; install ruby or launch omp outside Firstmate's canonical path" >&2
+    return 1
+  }
+  FM_OMP_RESOLVE_PROVIDERS=$([ "$want" = --providers ] && echo 1 || echo 0) ruby -ryaml -rjson - <<'RUBY'
 env = ENV
 raw = env.key?("OMP_PROFILE") ? env["OMP_PROFILE"] : env["PI_PROFILE"]
 profile = raw.to_s.strip
@@ -149,37 +161,44 @@ home = begin
 rescue ArgumentError
   fail_with.call("cannot resolve the home directory, so the omp agent directory is unknown")
 end
-config_dir = env["PI_CONFIG_DIR"].to_s.empty? ? ".omp" : env["PI_CONFIG_DIR"]
+config_dir = env["PI_CONFIG_DIR"].to_s
+config_name = config_dir.empty? ? ".omp" : config_dir
 if profile
   valid = profile.match?(/\A[a-z0-9][a-z0-9._-]{0,63}\z/) && !profile.end_with?(".") &&
     !profile.match?(/\A(?:CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\..*)?\z/i)
   fail_with.call("invalid omp profile name #{profile.inspect}; profile names match [a-z0-9][a-z0-9._-]{0,63}") unless valid
-  agent_dir = File.join(home, config_dir, "profiles", profile, "agent")
+  agent_dir = File.join(home, config_name, "profiles", profile, "agent")
 else
   override = env["PI_CODING_AGENT_DIR"].to_s
-  agent_dir = override.empty? ? File.join(home, config_dir, "agent") : File.expand_path(override)
+  agent_dir = override.empty? ? File.join(home, config_name, "agent") : File.expand_path(override)
 end
-path = File.join(agent_dir, "config.yml")
-listed = []
-begin
-  text = File.read(path)
-  config = YAML.safe_load(text, aliases: true)
-  config = {} if config.nil?
-  fail_with.call("omp config #{path} must contain a YAML mapping") unless config.is_a?(Hash)
-  listed = config["disabledProviders"]
-  listed = [] if listed.nil?
-  unless listed.is_a?(Array) && listed.all? { |entry| entry.is_a?(String) }
-    fail_with.call("omp config #{path} has a disabledProviders setting that is not a list of provider names")
-  end
-rescue Errno::ENOENT
+result = { "agentDir" => agent_dir, "profile" => profile.to_s, "configDir" => config_dir }
+if env["FM_OMP_RESOLVE_PROVIDERS"] == "1"
   listed = []
-rescue SystemCallError, IOError
-  fail_with.call("omp config #{path} cannot be read")
-rescue Psych::Exception, ::SyntaxError, ArgumentError, EncodingError
-  fail_with.call("omp config #{path} is not valid YAML")
+  ["config.yml", "config.yaml"].each do |name|
+    path = File.join(agent_dir, name)
+    begin
+      config = YAML.safe_load(File.read(path), aliases: true)
+      config = {} if config.nil?
+      fail_with.call("omp config #{path} must contain a YAML mapping") unless config.is_a?(Hash)
+      listed = config["disabledProviders"]
+      listed = [] if listed.nil?
+      unless listed.is_a?(Array) && listed.all? { |entry| entry.is_a?(String) || entry.is_a?(Hash) }
+        fail_with.call("omp config #{path} has a disabledProviders setting that is not a list of provider names and path-scoped mappings")
+      end
+      break
+    rescue Errno::ENOENT
+      next
+    rescue SystemCallError, IOError
+      fail_with.call("omp config #{path} cannot be read")
+    rescue Psych::Exception, ::SyntaxError, ArgumentError, EncodingError
+      fail_with.call("omp config #{path} is not valid YAML")
+    end
+  end
+  listed += ["openrouter"] unless listed.include?("openrouter")
+  result["disabledProviders"] = listed
 end
-listed += ["openrouter"] unless listed.any? { |entry| entry.strip.downcase == "openrouter" }
-puts JSON.generate(listed)
+puts JSON.generate(result)
 RUBY
 }
 

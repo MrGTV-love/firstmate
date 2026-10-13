@@ -304,19 +304,27 @@
 #   main provider, not OpenRouter, so an ordinary worker is not zero-spend. The
 #   smol role assignment also reaches any other explicit @smol consumer in that
 #   session, and an explicitly selected OpenRouter model is refused by omp
-#   rather than downgraded. The operator's list comes from the global
-#   config.yml of the agent directory omp itself would use, without layering
-#   project settings: OMP_PROFILE takes precedence over PI_PROFILE even when
-#   empty ("default" or empty means no profile); a named profile reads
-#   <home>/<PI_CONFIG_DIR or .omp>/profiles/<name>/agent and ignores
-#   PI_CODING_AGENT_DIR; otherwise PI_CODING_AGENT_DIR or
-#   <home>/<PI_CONFIG_DIR or .omp>/agent. An absent config.yml is omp's empty
-#   configuration. An unreadable or malformed config.yml, a disabledProviders
-#   setting that is not a list of names, or an invalid profile name refuses the
+#   rather than downgraded. Every canonical omp launch resolves the worker's
+#   agent directory once, the way omp does: OMP_PROFILE takes precedence over
+#   PI_PROFILE even when empty ("default" or empty means no profile); a named
+#   profile selects <home>/<PI_CONFIG_DIR or .omp>/profiles/<name>/agent and
+#   ignores PI_CODING_AGENT_DIR; otherwise PI_CODING_AGENT_DIR or
+#   <home>/<PI_CONFIG_DIR or .omp>/agent. The launch pins that directory by
+#   assigning OMP_PROFILE, PI_PROFILE, PI_CONFIG_DIR and PI_CODING_AGENT_DIR
+#   (profile names and PI_CONFIG_DIR as resolved, empty when none) inside the
+#   launch command, so neither the pane or daemon environment nor a
+#   launch-env-allowlist env -i wrapper can select another directory. The
+#   operator's list is read from that same directory's global config.yml, or
+#   config.yaml when there is no config.yml, without layering project
+#   settings; only when neither file exists is it empty. openrouter is added
+#   unless a string entry equals it exactly, and path-scoped mapping entries
+#   pass through unchanged for omp to scope against the worker's cwd. A missing
+#   ruby, an unreadable or malformed config, a disabledProviders value that is
+#   not a list of names and mappings, or an invalid profile name refuses the
 #   launch before any endpoint or record exists, and fm-control refuses a
-#   relaunch before it stops the running worker; the error names the file
-#   (or the profile) and never prints the file content. The operator's global settings are never
-#   written.
+#   relaunch before it stops the running worker; the error names the file or
+#   profile and never prints file content. The operator's global settings are
+#   never written.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
 #   routes. It layers .omp/fm-no-helpers-overlay.yml, defaults an unset effort
 #   to high (ultra is refused for omp before launch), disables
@@ -359,9 +367,9 @@
 #   read. The refusal remedy is: pass --model <provider>/<id> (or a dispatch
 #   profile) so this launch stops depending on the shared default, or restore
 #   the Default role in omp with /model.
-#   Canonical launches without an omp profile carry the resolved
-#   ${PI_CODING_AGENT_DIR:-$HOME/.omp/agent} directory into the pane, including
-#   through launch-environment filtering. When raw commands are allowed, native
+#   Canonical launches carry the resolved agent directory and its profile
+#   assignments (see above) into the pane, including through
+#   launch-environment filtering. When raw commands are allowed, native
 #   --model <value>, --model=<value>, -m <value>, and expanded __MODELFLAG__
 #   determine whether the command depends on the role; a spawn --model option
 #   not inserted into that command does not bypass the guard.
@@ -3153,18 +3161,18 @@ if [ "$HARNESS" = omp ] && [ "$MODEL_INDEXED" = 0 ]; then
 fi
 if [ "$HARNESS" = omp ]; then
   OMP_AGENT_DIR=
-  if [ "$RAW_LAUNCH" = 0 ] && [ -z "${OMP_PROFILE:-}" ] && [ -z "${PI_PROFILE:-}" ]; then
-    OMP_AGENT_DIR=$(ruby -e 'print File.expand_path(ARGV.fetch(0))' \
-      "${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}" 2>/dev/null) || OMP_AGENT_DIR=
-    if [ -n "$OMP_AGENT_DIR" ]; then
-      LAUNCH="PI_CODING_AGENT_DIR=$(shell_quote "$OMP_AGENT_DIR") $LAUNCH"
+  OMP_WORKER_DISABLED=
+  if [ "$RAW_LAUNCH" = 0 ]; then
+    OMP_RESOLVE_ARGS=
+    if [ "$KIND" != secondmate ] && [ "$OMP_NO_HELPERS" = 0 ]; then OMP_RESOLVE_ARGS=--providers; fi
+    OMP_RESOLVED=$(fm_control_omp_launch_resolve $OMP_RESOLVE_ARGS) || exit 1
+    OMP_AGENT_DIR=$(jq -r .agentDir <<<"$OMP_RESOLVED") || exit 1
+    LAUNCH="OMP_PROFILE=$(shell_quote "$(jq -r .profile <<<"$OMP_RESOLVED")") PI_PROFILE=$(shell_quote "$(jq -r .profile <<<"$OMP_RESOLVED")") PI_CONFIG_DIR=$(shell_quote "$(jq -r .configDir <<<"$OMP_RESOLVED")") PI_CODING_AGENT_DIR=$(shell_quote "$OMP_AGENT_DIR") $LAUNCH"
+    if [ -n "$OMP_RESOLVE_ARGS" ]; then
+      OMP_WORKER_DISABLED=$(jq -c .disabledProviders <<<"$OMP_RESOLVED") || exit 1
     fi
   fi
   omp_default_role_validate "$OMP_BIN" "$MODEL" "$RAW_COMMAND" "$OMP_AGENT_DIR" || exit 1
-  OMP_WORKER_DISABLED=
-  if [ "$RAW_LAUNCH" = 0 ] && [ "$KIND" != secondmate ] && [ "$OMP_NO_HELPERS" = 0 ]; then
-    OMP_WORKER_DISABLED=$(fm_control_omp_worker_disabled_providers) || exit 1
-  fi
 fi
 if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
   agy_model_validate "$AGY_BIN" "$MODEL" || exit 1

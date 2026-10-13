@@ -141,6 +141,22 @@ make_fake_omp() {  # <fakebin>
 #!/usr/bin/env bash
 if [ -n "${FM_FAKE_OMP_ENV_LOG:-}" ]; then
   printf '%s:%s\n' "${1:-launch}" "${PI_CODING_AGENT_DIR:-}" >> "$FM_FAKE_OMP_ENV_LOG"
+  if [ "${1:-}" = --config ]; then
+    if [ "${OMP_PROFILE+set}" = set ]; then fake_profile=$OMP_PROFILE; else fake_profile=${PI_PROFILE:-}; fi
+    case "$fake_profile" in default) fake_profile= ;; esac
+    if [ -n "$fake_profile" ]; then
+      fake_dir="$HOME/${PI_CONFIG_DIR:-.omp}/profiles/$fake_profile/agent"
+    else
+      fake_dir="${PI_CODING_AGENT_DIR:-$HOME/${PI_CONFIG_DIR:-.omp}/agent}"
+    fi
+    fake_overlay=
+    while [ "$#" -gt 1 ]; do
+      case "$2" in *.omp-fallback.yml) fake_overlay=$2 ;; esac
+      shift
+    done
+    printf 'observed:%s|%s\n' "$fake_dir" "$(jq -c .disabledProviders "$fake_overlay" 2>/dev/null)" >> "$FM_FAKE_OMP_ENV_LOG"
+    exit 0
+  fi
 fi
 case "$1" in
   --version)
@@ -422,53 +438,132 @@ test_omp_workers_disable_openrouter_prompt_helpers() {
 }
 
 # The task overlay replaces omp's disabledProviders array, so it must carry the
-# operator's own list from the agent directory omp itself would use, plus
-# openrouter, on launch and relaunch. An absent config is omp's empty
-# configuration; an unreadable or malformed one is refused before anything is
-# published or launched, and a refused relaunch keeps the task record.
-test_omp_worker_disabled_providers_follow_omp_profile_resolution() {
-  local name omp_set omp_profile pi_profile expected rec id out overlay home agent
-  while IFS='|' read -r name omp_set omp_profile pi_profile expected; do
+# operator's own list from the agent directory the launched omp actually uses.
+# The fake omp reports the directory it resolves from the environment the pane
+# really gives it (omp's precedence: OMP_PROFILE over PI_PROFILE even when
+# empty; a named profile ignores PI_CODING_AGENT_DIR), and the test reads that
+# directory's config itself. The pane environment conflicts with the spawner's
+# on purpose, with and without an env -i allowlist that forwards the conflict.
+run_omp_pane() {  # <home> <fakebin> <launch-log> <env-log> <case-dir>
+  : > "$4"
+  HOME="$1/user-home" PATH="$2:$PATH" FM_FAKE_OMP_ENV_LOG="$4" \
+    OMP_PROFILE=pane-profile PI_PROFILE=pane-profile PI_CONFIG_DIR=.pane-omp PI_CODING_AGENT_DIR="$5/pane-agent" \
+    bash "$3" > "$5/pane-output.log" 2>&1
+}
+
+assert_omp_pane_reads_overlay_list() {  # <label> <env-log> <overlay> <marker>
+  local observed dir listed expected
+  observed=$(sed -n 's/^observed://p' "$2" | tail -1)
+  [ -n "$observed" ] || fail "$1: the launched omp reported no resolved agent directory"
+  dir=${observed%%|*}
+  listed=$(ruby -ryaml -rjson -e '
+dir = ARGV[0]
+path = %w[config.yml config.yaml].map { |n| File.join(dir, n) }.find { |f| File.exist?(f) }
+puts JSON.generate(path ? (YAML.safe_load(File.read(path), aliases: true) || {})["disabledProviders"] || [] : [])
+' "$dir")
+  expected=$(jq -cn --argjson listed "$listed" 'if ($listed | index("openrouter")) then $listed else $listed + ["openrouter"] end')
+  assert_equals "$expected" "$(jq -c .disabledProviders "$3")" "$1: the overlay must be the list of the directory the launched omp resolves ($dir) plus openrouter"
+  assert_equals "${observed#*|}" "$(jq -c .disabledProviders "$3")" "$1: the launched omp must receive that overlay"
+  [ "$4" = - ] || assert_contains "$listed" "\"$4\"" "$1: the launched omp must resolve the $4 agent directory, got $dir"
+}
+
+test_omp_worker_disabled_providers_follow_the_launched_agent_directory() {
+  local name omp_set omp_profile pi_profile config_dir override envi marker rec id out overlay home alt agent pass
+  while IFS='|' read -r name omp_set omp_profile pi_profile config_dir override envi marker; do
     id="omp-dp-$name"
     rec=$(make_spawn_case "dp-$name" omp "$id")
     read_case_record "$rec"
     home="$HOME_DIR/user-home/.omp"
-    mkdir -p "$home/agent" "$home/profiles/work/agent" "$home/profiles/other/agent"
-    printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [home-agent-dir]\n' > "$home/agent/config.yml"
-    printf 'disabledProviders:\n  - anthropic\n  - ollama\n  - OpenRouter\n' > "$home/profiles/work/agent/config.yml"
-    printf 'disabledProviders: [other-a, other-b, openrouter]\n' > "$home/profiles/other/agent/config.yml"
+    alt="$HOME_DIR/user-home/.alt-omp"
+    mkdir -p "$home/agent" "$home/profiles/work/agent" "$home/profiles/other/agent" "$alt/agent" "$CASE_DIR/pane-agent"
+    printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [default-agent]\n' > "$home/agent/config.yml"
+    printf 'disabledProviders: [profile-work, anthropic, ollama]\n' > "$home/profiles/work/agent/config.yml"
+    printf 'disabledProviders: [profile-other]\n' > "$home/profiles/other/agent/config.yml"
+    printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [alt-config-dir]\n' > "$alt/agent/config.yml"
+    printf 'disabledProviders: [pane-agent]\n' > "$CASE_DIR/pane-agent/config.yml"
     agent="$CASE_DIR/override-agent"
     mkdir -p "$agent"
-    printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [override-agent-dir]\n' > "$agent/config.yml"
-    out=$(
+    printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [override-agent]\n' > "$agent/config.yml"
+    if [ "$envi" = envi ]; then
+      printf 'FM_FAKE_OMP_ENV_LOG\nOMP_PROFILE\nPI_PROFILE\nPI_CONFIG_DIR\nPI_CODING_AGENT_DIR\n' > "$HOME_DIR/config/launch-env-allowlist"
+    fi
+    spawner_env() {
       if [ "$omp_set" = set ]; then export OMP_PROFILE="$omp_profile"; else unset OMP_PROFILE; fi
-      export PI_PROFILE="$pi_profile" PI_CODING_AGENT_DIR="$agent"
-      run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
-    expect_code 0 $? "omp profile case $name should spawn: $out"
+      export PI_PROFILE="$pi_profile"
+      if [ -n "$config_dir" ]; then export PI_CONFIG_DIR="$config_dir"; else unset PI_CONFIG_DIR; fi
+      if [ "$override" = override ]; then export PI_CODING_AGENT_DIR="$agent"; else unset PI_CODING_AGENT_DIR; fi
+    }
+    out=$(spawner_env; run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+    expect_code 0 $? "omp agent-directory case $name should spawn: $out"
     overlay="$HOME_DIR/state/$id.omp-fallback.yml"
-    assert_equals "$expected" "$(jq -c .disabledProviders "$overlay")" "profile case $name must carry the resolved operator list plus openrouter"
+    run_omp_pane "$HOME_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_DIR/pane-env.log" "$CASE_DIR"
+    assert_omp_pane_reads_overlay_list "$name launch" "$CASE_DIR/pane-env.log" "$overlay" "$marker"
     rm -f "$overlay"
-    out=$(
-      if [ "$omp_set" = set ]; then export OMP_PROFILE="$omp_profile"; else unset OMP_PROFILE; fi
-      export PI_PROFILE="$pi_profile" PI_CODING_AGENT_DIR="$agent"
-      run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
-    expect_code 0 $? "omp profile case $name relaunch should succeed: $out"
-    assert_equals "$expected" "$(jq -c .disabledProviders "$overlay")" "profile case $name relaunch must regenerate the resolved list"
+    out=$(spawner_env; run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+    expect_code 0 $? "omp agent-directory case $name relaunch should succeed: $out"
+    run_omp_pane "$HOME_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$CASE_DIR/pane-env.log" "$CASE_DIR"
+    assert_omp_pane_reads_overlay_list "$name relaunch" "$CASE_DIR/pane-env.log" "$overlay" "$marker"
   done <<'ROWS'
-override-agent-dir|set|||["override-agent-dir","openrouter"]
-omp-profile|set|work||["anthropic","ollama","OpenRouter"]
-pi-profile|unset||work|["anthropic","ollama","OpenRouter"]
-omp-wins|set|other|work|["other-a","other-b","openrouter"]
-empty-omp-wins|set||work|["override-agent-dir","openrouter"]
-default-profile|set|default|work|["override-agent-dir","openrouter"]
-missing-profile-config|set|absent||["openrouter"]
+profile-work-vs-pane|set|work||||plain|profile-work
+profile-work-env-i|set|work||||envi|profile-work
+profile-work-ignores-agent-override|set|work|||override|plain|profile-work
+pi-profile-only|unset||work|||plain|profile-work
+config-dir-without-profile|set|||.alt-omp||plain|alt-config-dir
+config-dir-env-i|set|||.alt-omp||envi|alt-config-dir
+omp-default-beats-pi-profile|set|default|work|||plain|default-agent
+omp-empty-beats-pi-profile|set||work|||envi|default-agent
+omp-empty-beats-pi-profile-override|set||work||override|plain|override-agent
+omp-wins-over-pi-profile|set|other|work|||plain|profile-other
+absent-profile-config|set|absent||||plain|-
 ROWS
-  pass "omp worker overlays merge openrouter into the disabledProviders list of the omp-resolved profile, on launch and relaunch"
+  pass "omp worker launches resolve one agent directory, pin it through the pane and env -i, and read the operator's list from it on launch and relaunch"
+}
+
+test_omp_worker_disabled_providers_list_semantics() {
+  local mode rec id out overlay home dir
+  for mode in exact-spelling yaml-only yml-wins path-scoped duplicate; do
+    id="omp-dp-list-$mode"
+    rec=$(make_spawn_case "dp-list-$mode" omp "$id")
+    read_case_record "$rec"
+    dir="$HOME_DIR/user-home/.omp/agent"
+    mkdir -p "$dir"
+    case "$mode" in
+      exact-spelling) printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [OpenRouter, anthropic]\n' > "$dir/config.yml" ;;
+      yaml-only) printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [from-yaml, ollama]\n' > "$dir/config.yaml" ;;
+      yml-wins)
+        printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [from-yml]\n' > "$dir/config.yml"
+        printf 'disabledProviders: [from-yaml]\n' > "$dir/config.yaml"
+        ;;
+      path-scoped) printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders:\n  - anthropic\n  - pathPrefix: /srv/work\n    providers: [ollama]\n' > "$dir/config.yml" ;;
+      duplicate) printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [openrouter, anthropic]\n' > "$dir/config.yml" ;;
+    esac
+    out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+    expect_code 0 $? "omp list case $mode should spawn: $out"
+    overlay="$HOME_DIR/state/$id.omp-fallback.yml"
+    case "$mode" in
+      exact-spelling) assert_equals '["OpenRouter","anthropic","openrouter"]' "$(jq -c .disabledProviders "$overlay")" "an operator's OpenRouter spelling does not disable the openrouter provider, so the canonical entry is added" ;;
+      yaml-only) assert_equals '["from-yaml","ollama","openrouter"]' "$(jq -c .disabledProviders "$overlay")" "a config.yaml-only agent directory supplies the list" ;;
+      yml-wins) assert_equals '["from-yml","openrouter"]' "$(jq -c .disabledProviders "$overlay")" "config.yml takes precedence over config.yaml" ;;
+      path-scoped) assert_equals '["anthropic",{"pathPrefix":"/srv/work","providers":["ollama"]},"openrouter"]' "$(jq -c .disabledProviders "$overlay")" "path-scoped mapping entries pass through unchanged" ;;
+      duplicate) assert_equals '["openrouter","anthropic"]' "$(jq -c .disabledProviders "$overlay")" "an existing exact openrouter entry is not duplicated" ;;
+    esac
+  done
+  pass "omp worker overlays keep exact spellings, config.yaml-only lists, config.yml precedence, path-scoped entries and a single canonical openrouter"
+}
+
+test_omp_launch_resolution_refuses_a_missing_ruby() {
+  local out status empty
+  empty=$(mktemp -d "$TMP_ROOT/no-ruby.XXXXXX")
+  out=$(PATH="$empty" fm_control_omp_launch_resolve --providers 2>&1)
+  status=$?
+  expect_code 1 "$status" "the shared resolver must refuse without ruby: $out"
+  assert_contains "$out" "ruby is not available" "the missing-parser refusal must say why"
+  pass "omp launch resolution names a missing ruby instead of failing silently"
 }
 
 test_omp_worker_refuses_an_unreadable_disabled_providers_source() {
   local mode rec id out status meta prior config profile
-  for mode in malformed directory non-list non-mapping invalid-profile; do
+  for mode in malformed directory non-list non-mapping bad-entry yaml-only-malformed invalid-profile; do
     id="omp-dp-refuse-$mode"
     rec=$(make_spawn_case "dp-refuse-$mode" omp "$id")
     read_case_record "$rec"
@@ -480,6 +575,11 @@ test_omp_worker_refuses_an_unreadable_disabled_providers_source() {
       directory) mkdir "$config" ;;
       non-list) printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: leaked-secret-value\n' > "$config" ;;
       non-mapping) printf -- '- leaked-secret-value\n' > "$config" ;;
+      bad-entry) printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [anthropic, 42]\n' > "$config" ;;
+      yaml-only-malformed)
+        config="$(dirname "$config")/config.yaml"
+        printf 'disabledProviders: [leaked-secret-value\n' > "$config"
+        ;;
       invalid-profile) profile='Bad Profile' ;;
     esac
     out=$(OMP_PROFILE="$profile" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
@@ -1028,7 +1128,11 @@ test_spawn_omp_profiles_leave_directory_evidence_unreadable() {
         bash "$LAUNCH_LOG" > "$CASE_DIR/pane-output.log" 2>&1
       status=$?
       expect_code 0 "$status" "the profile-selecting launch must execute ($mode)"
-      assert_grep "$first_arg:$launch_dir" "$CASE_DIR/omp-env.log" "profile selection must still launch omp ($mode)"
+      case "$mode" in
+        env-omp) assert_grep "$first_arg:$HOME_DIR/user-home/.omp/profiles/work/agent" "$CASE_DIR/omp-env.log" "a canonical profile launch is pinned to the profile's agent directory ($mode)" ;;
+        env-pi) assert_grep "$first_arg:$launch_dir" "$CASE_DIR/omp-env.log" "an empty OMP_PROFILE beats PI_PROFILE, so the launch is pinned to the agent directory override ($mode)" ;;
+        *) assert_grep "$first_arg:$launch_dir" "$CASE_DIR/omp-env.log" "profile selection must still launch omp ($mode)" ;;
+      esac
     done
   done
   pass "fm-spawn: omp profile flags, assignments, and invoking environment pass through without default-role catalog probes"
@@ -3993,7 +4097,9 @@ test_no_helpers_rejects_nonworker_launches
 test_no_helpers_launch_contract
 test_no_helpers_refuses_ultra_effort
 test_omp_workers_disable_openrouter_prompt_helpers
-test_omp_worker_disabled_providers_follow_omp_profile_resolution
+test_omp_worker_disabled_providers_follow_the_launched_agent_directory
+test_omp_worker_disabled_providers_list_semantics
+test_omp_launch_resolution_refuses_a_missing_ruby
 test_omp_worker_refuses_an_unreadable_disabled_providers_source
 test_worker_replace_mode_environment
 test_worker_guard_project_scope

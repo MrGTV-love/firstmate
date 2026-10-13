@@ -1571,7 +1571,7 @@ SH
 
 test_omp_worker_refuses_an_unreadable_disabled_providers_config_before_stopping() {
   local dir out rc id=rl-omp-dp mode config
-  for mode in malformed directory profile; do
+  for mode in malformed directory profile config-dir yaml-only; do
     dir=$(new_case "omp-dp-$mode" "$id")
     add_ship_task "$dir" "$id" omp
     printf omp > "$dir/fake/command"
@@ -1586,13 +1586,22 @@ test_omp_worker_refuses_an_unreadable_disabled_providers_config_before_stopping(
         mkdir -p "$(dirname "$config")"
         printf 'disabledProviders: leaked-secret-value\n' > "$config"
         ;;
+      config-dir)
+        config="$dir/user-home/.alt-omp/agent/config.yml"
+        mkdir -p "$(dirname "$config")"
+        printf 'disabledProviders: [leaked-secret-value\n' > "$config"
+        ;;
+      yaml-only)
+        config="$dir/user-home/.omp/agent/config.yaml"
+        printf 'disabledProviders: [leaked-secret-value\n' > "$config"
+        ;;
     esac
     cp "$dir/home/state/$id.meta" "$dir/prior.meta"
-    if [ "$mode" = profile ]; then
-      out=$(OMP_PROFILE=work run_control "$dir" "$id" relaunch --note "refuse unreadable config"); rc=$?
-    else
-      out=$(run_control "$dir" "$id" relaunch --note "refuse unreadable config"); rc=$?
-    fi
+    case "$mode" in
+      profile) out=$(OMP_PROFILE=work run_control "$dir" "$id" relaunch --note "refuse unreadable config"); rc=$? ;;
+      config-dir) out=$(PI_CONFIG_DIR=.alt-omp run_control "$dir" "$id" relaunch --note "refuse unreadable config"); rc=$? ;;
+      *) out=$(run_control "$dir" "$id" relaunch --note "refuse unreadable config"); rc=$? ;;
+    esac
     expect_code 1 "$rc" "an unreadable disabledProviders source ($mode) must refuse the relaunch: $out"
     assert_contains "$out" "$config" "the $mode refusal must name the config file"
     assert_not_contains "$out" leaked-secret-value "the $mode refusal must not echo the config content"
