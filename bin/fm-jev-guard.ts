@@ -52,7 +52,9 @@ function admittedDevice(input: { path?: unknown; content?: unknown }, ctx: unkno
         || typeof args.file !== "string") return false;
       const root = realpathSync(worktree);
       if (realpathSync(ctx.cwd) !== root) return false;
-      if (!plainPath(args.file)) return false;
+      // omp's path resolver replaces these Unicode spaces before resolving the file.
+      // Reject rewritten spellings so the realpath check sees the execution target.
+      if (!plainPath(args.file) || /[\u00A0\u2000-\u200A\u202F\u205F\u3000]/.test(args.file)) return false;
       const file = realpathSync(resolve(worktree, args.file));
       return statSync(file).isFile() && insideRepo(file, root);
     }
