@@ -172,6 +172,11 @@
 # never jumps a queued waiter; it collects and deduplicates those paths and
 # tries them in global byte order before slot proofs, so opposite child
 # enumeration orders cannot each hold the project the other needs.
+# The project-lock wait runs after this task's lease-guard lock, so a steer or
+# control action on this same task waits until teardown is admitted or refused;
+# no other task waits on it. Waiting for the project lock first would instead
+# make the project-lock holder wait, without a limit, for a control action on
+# this task, and stall every waiter for the project behind it.
 # Other lifecycle lock refusals are unchanged.
 # These refusals are not relaxed by --force: --force authorizes discarding THIS
 # task's unlanded work, never another task's live work. Nothing of this task's

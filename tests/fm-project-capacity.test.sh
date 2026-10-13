@@ -65,18 +65,6 @@ EOF
   done
 }
 
-# A separate local lane shares the root project's lock without sharing the
-# home task-set lock, which intentionally still refuses during home removal.
-make_local_mate() {  # <case-dir> [task-id...]
-  local case_dir=$1
-  shift
-  make_home "$case_dir/mate" "$@"
-  printf '%s\n' schema=fm-secondmate-parent.v1 route=local "parent_home=$case_dir/home" \
-    > "$case_dir/mate/.fm-secondmate-parent"
-  printf -- '- mate - local lane (home: %s; scope: project work; projects: project; added 2026-10-12)\n' \
-    "$case_dir/mate" > "$case_dir/home/data/secondmates.md"
-}
-
 # A case: one home, a project clone with an origin, and fake tmux/treehouse
 # that record every call so a deferral can be proved to have created nothing.
 make_case() {  # <name> [task-id...]
@@ -496,11 +484,9 @@ test_unreadable_holders_refuse_admission() {
 # Two spawns racing for the last place: the one holding the project lock
 # publishes, the other cannot publish while it waits and is deferred afterwards.
 test_concurrent_spawns_cannot_both_take_the_last_place() {
-  local case_dir home mate out rc=0 hold i wt
-  case_dir=$(make_case concurrent task-a)
+  local case_dir home out rc=0 hold i wt
+  case_dir=$(make_case concurrent task-a task-b)
   home="$case_dir/home"
-  mate="$case_dir/mate"
-  make_local_mate "$case_dir" task-b
   declare_capacity "$home" "project 1"
   hold="$case_dir/hold"
   wt=$(new_worktree "$case_dir" task-a)
@@ -511,7 +497,7 @@ test_concurrent_spawns_cannot_both_take_the_last_place() {
     [ "$i" -lt 400 ] || fail "the first spawn never reached its launch: $(cat "$case_dir/a.out")"
     sleep 0.05
   done
-  run_spawn "$case_dir" "$mate" "$case_dir/unused" task-b "$case_dir/project" --mode no-mistakes --yolo off > "$case_dir/b.out" 2>&1 &
+  spawn_ship "$case_dir" task-b "$case_dir/unused" > "$case_dir/b.out" 2>&1 &
   local waiter=$!
   i=0
   while ! grep -q 'fm-project-lock: waiting' "$case_dir/b.out"; do
@@ -519,14 +505,14 @@ test_concurrent_spawns_cannot_both_take_the_last_place() {
     [ "$i" -lt 400 ] || fail "the second spawn never queued: $(cat "$case_dir/b.out")"
     sleep 0.05
   done
-  assert_absent "$mate/state/task-b.meta" "a concurrent spawn published past the last place"
+  assert_absent "$home/state/task-b.meta" "a concurrent spawn published past the last place"
   : > "$hold.release"
   wait "$waiter" || rc=$?
   wait || true
   assert_contains "$(cat "$case_dir/a.out")" "spawned task-a" "the lock-holding spawn did not finish"
   out=$(cat "$case_dir/b.out")
   expect_code "$DEFER_EXIT" "$rc" "the waiting spawn was not deferred once the place was taken: $out"
-  assert_absent "$mate/state/task-b.meta" "the waiting spawn published past capacity"
+  assert_absent "$home/state/task-b.meta" "the waiting spawn published past capacity"
   pass "concurrent spawns can never both take the last place"
 }
 
@@ -820,6 +806,48 @@ test_project_queue_progress_never_reaches_the_stall_limit() {
   pass "a queue that keeps progressing admits every waiter in order and records each hold"
 }
 
+# A fresh spawn waiting its turn for one project holds only its own task's
+# locks, so a fresh spawn of the same home for another project is admitted and
+# launched meanwhile; the waiting spawn is then admitted once its project frees.
+test_same_home_spawn_for_another_project_is_not_refused_while_one_waits() {
+  local case_dir home holder lock waiter wt other rc=0 out
+  case_dir=$(make_case same-home task-a task-b)
+  home="$case_dir/home"
+  # shellcheck disable=SC2016 # expanded by the holder's own shell
+  FM_HOME="$home" FM_STATE_OVERRIDE='' bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    lock=$(fm_treehouse_project_lock_path "$2") || exit 1
+    fm_lock_try_acquire "$lock" || exit 1
+    printf "%s\n" "$lock" > "$3.held"
+    while [ ! -f "$3.release" ]; do sleep 0.05; done
+    fm_lock_release "$lock"
+  ' _ "$ROOT" "$case_dir/project" "$case_dir/holder" &
+  holder=$!
+  wait_actor_output "$case_dir/holder.held" /
+  lock=$(cat "$case_dir/holder.held")
+  wt=$(new_worktree "$case_dir" task-a)
+  spawn_ship "$case_dir" task-a "$wt" > "$case_dir/a.out" 2>&1 &
+  waiter=$!
+  wait_actor_output "$case_dir/a.out" 'fm-project-lock: waiting'
+  assert_equals 1 "$(queued_tickets "$lock")" "the first spawn did not register on its project queue"
+  git -C "$case_dir/other-project" worktree add --quiet -b wt-task-b "$case_dir/wt-task-b"
+  other="$case_dir/wt-task-b"
+  out=$(run_spawn "$case_dir" "$home" "$other" task-b "$case_dir/other-project" --mode no-mistakes --yolo off) || rc=$?
+  expect_code 0 "$rc" "a same-home spawn for another project was refused while the first waited: $out"
+  assert_present "$home/state/task-b.meta" "the same-home spawn for another project did not publish"
+  assert_absent "$home/state/task-a.meta" "the waiting spawn published before its project was free"
+  kill -0 "$waiter" 2>/dev/null || fail "the waiting spawn did not keep waiting: $(cat "$case_dir/a.out")"
+  assert_equals 1 "$(queued_tickets "$lock")" "the other project's spawn disturbed the waiting ticket"
+  : > "$case_dir/holder.release"
+  wait "$holder" || fail "the project holder could not release"
+  rc=0
+  wait "$waiter" || rc=$?
+  expect_code 0 "$rc" "the waiting spawn was not admitted once its project freed: $(cat "$case_dir/a.out")"
+  assert_present "$home/state/task-a.meta" "the waiting spawn did not publish after admission"
+  assert_absent "$lock" "the admitted spawn left the project lock held"
+  pass "a same-home spawn for another project launches while one spawn waits for its project"
+}
+
 # Callers already holding other locks make one attempt; it refuses while an
 # older waiter is queued even when the lock itself is momentarily free.
 test_nonwaiting_admission_never_jumps_a_queued_waiter() {
@@ -979,11 +1007,9 @@ run_domain_cleanups() {  # <case-dir>; sets CLEANUP_RC[1] and CLEANUP_RC[2]
 # slowly, while the later spawn polls aggressively: the retired record must be
 # gone before the later spawn can reach its first post-admission pane read.
 test_mixed_operations_keep_fifo_even_with_a_slow_waiter() {
-  local case_dir home mate hold first slow fast wt next fm_meta_fixture i rc=0
-  case_dir=$(make_case mixed-fifo task-a)
+  local case_dir home hold first slow fast wt next fm_meta_fixture i rc=0
+  case_dir=$(make_case mixed-fifo task-a task-c)
   home="$case_dir/home"
-  mate="$case_dir/mate"
-  make_local_mate "$case_dir" task-c
   hold="$case_dir/hold"
   mkdir -p "$case_dir/pool/1"
   git -C "$case_dir/project" worktree add --quiet --detach "$case_dir/pool/1/project"
@@ -1014,7 +1040,7 @@ test_mixed_operations_keep_fifo_even_with_a_slow_waiter() {
     sleep 0.05
   done
   FM_PROJECT_LOCK_POLL_SECS=0.05 FM_FAKE_CHECK_REMOVED="$fm_meta_fixture" \
-    run_spawn "$case_dir" "$mate" "$next" task-c "$case_dir/project" --mode no-mistakes --yolo off > "$case_dir/fast.out" 2>&1 &
+    spawn_ship "$case_dir" task-c "$next" > "$case_dir/fast.out" 2>&1 &
   fast=$!
   i=0
   while ! grep -q 'fm-project-lock: waiting' "$case_dir/fast.out"; do
@@ -1022,14 +1048,14 @@ test_mixed_operations_keep_fifo_even_with_a_slow_waiter() {
     sleep 0.05
   done
   assert_present "$fm_meta_fixture" "the queued teardown ran before the initial holder released"
-  assert_absent "$mate/state/task-c.meta" "the later spawn bypassed a queued teardown"
+  assert_absent "$home/state/task-c.meta" "the later spawn bypassed a queued teardown"
   : > "$hold.release"
   wait "$first" || fail "first spawn failed: $(cat "$case_dir/a.out")"
   wait "$slow" || fail "slow teardown failed: $(cat "$case_dir/slow.out")"
   wait "$fast" || rc=$?
   expect_code 0 "$rc" "later spawn ran ahead of the slow teardown or failed: $(cat "$case_dir/fast.out")"
   assert_absent "$fm_meta_fixture" "the slow teardown starved"
-  assert_present "$mate/state/task-c.meta" "the later spawn did not eventually acquire"
+  assert_present "$home/state/task-c.meta" "the later spawn did not eventually acquire"
   assert_contains "$(cat "$case_dir/calls.log")" 'treehouse return' "the slow teardown did not return its slot"
   pass "spawn and teardown remain FIFO and a slow poller cannot starve behind a faster later spawn"
 }
@@ -1047,6 +1073,7 @@ test_capacity_is_shared_by_every_local_home
 test_unreadable_holders_refuse_admission
 test_concurrent_spawns_cannot_both_take_the_last_place
 test_mixed_operations_keep_fifo_even_with_a_slow_waiter
+test_same_home_spawn_for_another_project_is_not_refused_while_one_waits
 test_project_queue_recovers_dead_waiter_and_holder
 test_project_queue_timeout_preserves_live_holder
 test_project_queue_slow_holder_keeps_arrival_order

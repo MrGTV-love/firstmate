@@ -218,11 +218,11 @@
 #   refuses only when the holder stalls past the measured allowance, with holder
 #   progress messages; callers no longer need retry loops for this project lock.
 #   A relocating relaunch already holds the task's control lock, so it makes one
-#   nonwaiting attempt that never jumps a queued waiter. The fresh spawn's wait
-#   runs while it holds the home task-set, control and spawn-task locks: the
-#   project, backend and capacity it needs are only resolved after them, so the
-#   wait cannot move ahead of them without reordering that resolution. Other
-#   lifecycle/task-set lock refusals are unchanged.
+#   nonwaiting attempt that never jumps a queued waiter. A fresh worker spawn
+#   waits holding only this task's own control and spawn-task locks, and takes
+#   the home task-set lock after the project lock, so its wait never refuses
+#   another fresh spawn of the same home. Other lifecycle/task-set lock
+#   refusals are unchanged.
 #   Project capacity: when this machine declares how many workers a project
 #   admits at once (config/project-capacity; bin/fm-project-capacity-lib.sh owns
 #   the declaration, what holds a place, and the race argument), a fresh ship or
@@ -1754,13 +1754,13 @@ spawn_abort_cleanup() {
       echo "warning: leaving task $ID's slot claim on $WT in place; the Treehouse project lock is no longer held, so the next spawn's claim replaces it" >&2
     fi
   fi
-  if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
-    SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
-    fm_project_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK" || true
-  fi
   if [ "$SPAWN_TASK_SET_LOCK_HELD" = 1 ]; then
     SPAWN_TASK_SET_LOCK_HELD=0
     fm_lock_release "$SPAWN_TASK_SET_LOCK" || true
+  fi
+  if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
+    SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
+    fm_project_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK" || true
   fi
   if [ "$SPAWN_CONTROL_LOCK_HELD" = 1 ]; then
     SPAWN_CONTROL_LOCK_HELD=0
@@ -2002,6 +2002,41 @@ spawn_require_relocated_queued_work() {
     exit 1
   fi
 }
+# A FRESH spawn changes which tasks this home has, so it must not interleave
+# with a forced teardown that has already enumerated that set: a record
+# published inside the enumerate-then-remove window is invisible to the
+# teardown's per-task preflight but visible to its cleanup, and gets mutated
+# while never lifecycle-locked (bin/fm-wake-lib.sh's fm_task_set_lock_path
+# owns the evidence; bin/fm-teardown.sh holds the same lock from enumeration
+# through cleanup). Held through publication. The away spend cap and relocated
+# queued-work checks run under it so concurrent spawns cannot both publish.
+#
+# A secondmate spawn takes it before this task's own locks, matching the
+# acquisition order documented there. A worker spawn takes it only after the
+# shared project lock: it is the one lock every task of this home shares, so
+# holding it through a project-queue wait would refuse every other fresh spawn
+# of this home, for any project. Every other lock it holds is a single try,
+# so neither order can wait in a cycle.
+#
+# A relaunch is exempt: it republishes a task that already exists, so it is
+# already covered by that task's control lock, which the teardown preflight
+# tests.
+#
+# Refusing rather than waiting is the fail-closed direction: the home may be
+# moments from removal, so there is nothing worth waiting for.
+spawn_take_task_set_lock() {
+  SPAWN_TASK_SET_LOCK=$(fm_task_set_lock_path "$STATE") || {
+    echo "error: could not resolve the task-set lock for $STATE" >&2
+    exit 1
+  }
+  if ! fm_lock_try_acquire "$SPAWN_TASK_SET_LOCK"; then
+    echo "error: this home's task set is locked by another operation (a forced teardown is enumerating or removing its tasks); refusing to create task $ID rather than racing it" >&2
+    exit 1
+  fi
+  SPAWN_TASK_SET_LOCK_HELD=1
+  spawn_refuse_if_away_spend_cap
+  spawn_require_relocated_queued_work
+}
 if [ "$RELAUNCH" -eq 1 ]; then
   SPAWN_CONTROL_LOCK="$STATE/.control-$ID.lock"
   control_owner=$(cat "$SPAWN_CONTROL_LOCK/pid" 2>/dev/null || true)
@@ -2029,38 +2064,13 @@ if [ "$RELAUNCH" -eq 0 ]; then
     echo "error: spawn refused: $FM_BACKLOG_TRANSITION_ERROR" >&2
     exit 1
   }
-  # A FRESH spawn changes which tasks this home has, so it must not interleave
-  # with a forced teardown that has already enumerated that set: a record
-  # published inside the enumerate-then-remove window is invisible to the
-  # teardown's per-task preflight but visible to its cleanup, and gets mutated
-  # while never lifecycle-locked (bin/fm-wake-lib.sh's fm_task_set_lock_path
-  # owns the evidence; bin/fm-teardown.sh holds the same lock from enumeration
-  # through cleanup). Taken before this task's own locks, matching the
-  # acquisition order documented there, and held through publication.
-  #
-  # A relaunch is exempt: it republishes a task that already exists, so it is
-  # already covered by that task's control lock, which the teardown preflight
-  # tests.
-  #
-  # Refusing rather than waiting is the fail-closed direction: the home may be
-  # moments from removal, so there is nothing worth waiting for.
-  SPAWN_TASK_SET_LOCK=$(fm_task_set_lock_path "$STATE") || {
-    echo "error: could not resolve the task-set lock for $STATE" >&2
-    exit 1
-  }
-  if ! fm_lock_try_acquire "$SPAWN_TASK_SET_LOCK"; then
-    echo "error: this home's task set is locked by another operation (a forced teardown is enumerating or removing its tasks); refusing to create task $ID rather than racing it" >&2
-    exit 1
-  fi
-  SPAWN_TASK_SET_LOCK_HELD=1
+  [ "$KIND" != secondmate ] || spawn_take_task_set_lock
   SPAWN_CONTROL_LOCK="$STATE/.control-$ID.lock"
   if ! fm_lock_try_acquire "$SPAWN_CONTROL_LOCK"; then
     echo "error: another lifecycle action is already running for task $ID" >&2
     exit 1
   fi
   SPAWN_CONTROL_LOCK_HELD=1
-  spawn_refuse_if_away_spend_cap
-  spawn_require_relocated_queued_work
 fi
 if [ "$KIND" = secondmate ]; then
   if spawn_remote_secondmate "$ID"; then
@@ -3784,6 +3794,9 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
     exit 1
   fi
   SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=1
+fi
+if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
+  spawn_take_task_set_lock
 fi
 if [ -n "$SPAWN_PROJECT_CAPACITY" ]; then
   if ! fm_project_capacity_occupants "$SPAWN_TREEHOUSE_PROJECT_LOCK" "$PROJ_ABS" "$STATE" "$ID"; then
@@ -6048,16 +6061,17 @@ fi
 # still being delivered, cannot observe or complete a fresh provisional record
 # between its state check and `tasks-axi start`, and a delivery failure cannot
 # follow a committed In-flight transition.
-if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
-  SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
-  fm_project_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK"
-fi
 if [ "$SPAWN_TASK_SET_LOCK_HELD" = 1 ]; then
   # The record is published, so this task is now part of the set a teardown
   # enumerates and locks per task. The set lock is only needed across that
-  # publication.
+  # publication, and is released before the project lock so the next project
+  # waiter of this home never meets it.
   SPAWN_TASK_SET_LOCK_HELD=0
   fm_lock_release "$SPAWN_TASK_SET_LOCK"
+fi
+if [ "$SPAWN_TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
+  SPAWN_TREEHOUSE_PROJECT_LOCK_HELD=0
+  fm_project_lock_release "$SPAWN_TREEHOUSE_PROJECT_LOCK"
 fi
 "$SCRIPT_DIR/fm-home-summary-refresh.sh" --detach || true
 [ "$BACKEND" = orca ] && ORCA_ABORT_CLEANUP=0

@@ -31,21 +31,39 @@
 # to <project-lock>.holds before releasing, so later allowance derivations can
 # use production hold observations.
 #
-# The default service allowance is 162 seconds, the stall limit for one hold.
-# measured: 2026-10-13T01:02:48Z (2026-10-12 local), load 51-57 on 18 CPUs,
-# Treehouse v2.3.1-fm.e58947de, one run each in a disposable clone with an
-# isolated pool: `treehouse get --lease` 8.924s, `treehouse return --force`
-# 1.628s (evidence: the fm-project-lock-fair-wait task data,
-# real-provider-measurement/). Poll budgets run under the spawn lock in
-# bin/fm-spawn.sh: the treehouse get entry wait, 60 x 1s (lines 5140 and 5155),
-# and the worker path check, 20 x 0.5s (lines 4700 and 4705). Harness readiness
-# and delivery polls run after the lock is released and are not counted.
-# 60 + 10 + 8.924 + 1.628 = 80.552s, rounded up to 81s, doubled for a 100%
-# margin. FM_PROJECT_LOCK_SERVICE_SECS overrides it with a positive integer for
-# a newly measured environment or bounded fixture.
+# The default service allowance is 258 seconds, the stall limit for one hold:
+# the sum of every step spawn or teardown runs while holding the lock, doubled
+# for a 100% margin. Poll budgets and bounds, from bin/fm-spawn.sh: the
+# treehouse get entry wait, 60 x 1s (lines 5153 and 5168), 60s; the worker path
+# check, 20 x 0.5s (lines 4713 and 4718), 10s; the skill pick bound
+# SKILL_SELECTION_BOUND (lines 5210 and 5221), 30s; and from
+# bin/fm-teardown.sh the no-mistakes conclusion bound NM_TEARDOWN_TIMEOUT
+# (line 2452), 10s. Harness readiness and delivery polls run after the spawn
+# releases the lock and are not counted.
+# measured: one run each, in disposable clones (evidence: the
+# fm-project-lock-fair-wait task data, real-provider-measurement/ and
+# real-network-measurement/).
+#   2026-10-13T01:02:48Z, load 51-57 on 18 CPUs, Treehouse v2.3.1-fm.e58947de,
+#   isolated pool: `treehouse get --lease` 8.924s, `treehouse return --force`
+#   1.628s (bin/fm-teardown.sh line 2234).
+#   2026-10-13T02:35:42Z, load 10-11 on 18 CPUs, git 2.54.0, gh 2.101.0:
+#   bin/fm-spawn.sh freshen fetches `git fetch origin` 3.972s (line 4128),
+#   `git remote set-head origin --auto` 0.542s (line 4135), default-branch
+#   fetch 0.511s (line 4145); bin/fm-teardown.sh `gh-axi pr list` 1.092s
+#   (line 1702), `git fetch origin refs/pull/<n>/head` 0.486s (line 1732),
+#   `gh pr view` 0.599s (line 1983) and 0.505s, counted twice (lines 2345
+#   and 2369).
+# 60 + 10 + 30 + 10 + 8.924 + 1.628 + 3.972 + 0.542 + 0.511 + 1.092 + 0.486
+# + 0.599 + 2 x 0.505 = 128.764s, rounded up to 129s, doubled to 258s. The
+# network samples ran at lower load than the 2026-10-12 incident (about 91);
+# the margin covers that. No production hold had been logged to the .holds
+# record below when this was set; once it has, the allowance must also cover
+# the largest logged hold times the same margin.
+# FM_PROJECT_LOCK_SERVICE_SECS overrides it with a positive integer for a newly
+# measured environment or bounded fixture.
 # FM_PROJECT_LOCK_POLL_SECS changes sampling only (default 1 second; a positive
 # decimal number of seconds).
-# Progress is printed immediately and each quarter service allowance (40s
+# Progress is printed immediately and each quarter service allowance (64s
 # by default, minimum 1s for fixture overrides), naming the
 # current holder's operation/PID or the earlier waiter whose turn is reserved.
 # A refusal returns nonzero with an "fm-project-lock:" line naming its class
@@ -131,7 +149,7 @@ fm_project_lock_describe() {  # <lock> <head>
 }
 
 fm_project_lock_acquire() {  # <lock> <operation>
-  local lock=$1 operation=$2 service=${FM_PROJECT_LOCK_SERVICE_SECS:-162}
+  local lock=$1 operation=$2 service=${FM_PROJECT_LOCK_SERVICE_SECS:-258}
   local poll=${FM_PROJECT_LOCK_POLL_SECS:-1} number='^[0-9]+([.][0-9]+)?$' zero='^0*([.]0*)?$'
   local ticket head='' holder='' key last_key='' since=0 stalled=0 mtime now
   local next_message message_interval rc=1
