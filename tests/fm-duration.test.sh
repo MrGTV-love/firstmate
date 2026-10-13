@@ -187,9 +187,9 @@ zero = subprocess.run(['bash', '-c', '. "$1/bin/fm-duration-lib.sh"; fm_duration
 assert zero.returncode == 0 and zero.stdout == '0\nfinished\n', zero
 assert rows()[-1]['key'] == 'zero.key' and rows()[-1]['exit'] == 0 and not any(r.get('event') for r in rows() if r.get('key') == 'zero.key')
 
-# A ceiling expiry sends TERM and waits for the leader: its own TERM cleanup of
-# a child in a separate process group runs and leaves no survivor.
-write_rows([sample('trapped', 400) for _ in range(5)])
+# A stop sends TERM and waits for the leader: its own TERM cleanup of a child in
+# a separate process group runs and leaves no survivor. The leader reports
+# readiness only after installing its handler, so no startup race is possible.
 trap_dir = tmp / 'trap'
 trap_dir.mkdir()
 leader = r'''
@@ -207,7 +207,11 @@ print('started', flush=True)
 while True:
     time.sleep(0.1)
 '''
-cli('run', 'trapped', '--', sys.executable, '-c', leader, trap_dir, expected=124)
+trapped = subprocess.Popen([sys.executable, str(helper), 'run', 'trapped', '--', sys.executable, '-c', leader, str(trap_dir)], env=env, cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+assert trapped.stdout.readline() == 'started\n'
+trapped.send_signal(signal.SIGTERM)
+trapped.communicate(timeout=60)
+assert trapped.returncode == 143, trapped.returncode
 assert (trap_dir / 'trap-ran').read_text() == 'yes'
 try:
     os.kill(int((trap_dir / 'child.pid').read_text()), 0)
