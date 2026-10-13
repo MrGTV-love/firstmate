@@ -4015,8 +4015,11 @@ preflight_descendant_task_locks() {
   # home, during collection above), then per-task locks in that same
   # parent-before-child preorder, sorted by id within each home, each control
   # lock before its matching metadata lock. No child lock holder ever reaches
-  # back for a parent lock. bin/fm-spawn.sh takes the same task-set lock before
-  # its own per-task locks when it publishes a fresh record.
+  # back for a parent lock. A secondmate spawn in bin/fm-spawn.sh takes the same
+  # task-set lock before its own per-task locks when it publishes a fresh
+  # record. A worker spawn takes its own control and spawn-task locks first,
+  # then the shared project lock, then the task-set lock; the task-set and
+  # per-task locks are all single tries, so that order cannot wait in a cycle.
   for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
     state=${DESCENDANT_TASK_STATES[$i]}
     task_id=${DESCENDANT_TASK_IDS[$i]}

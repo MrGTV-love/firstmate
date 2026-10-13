@@ -31,15 +31,20 @@
 # to <project-lock>.holds before releasing, so later allowance derivations can
 # use production hold observations.
 #
-# The default service allowance is 258 seconds, the stall limit for one hold:
+# The default service allowance is 370 seconds, the stall limit for one hold:
 # the sum of every step spawn or teardown runs while holding the lock, doubled
 # for a 100% margin. Poll budgets and bounds, from bin/fm-spawn.sh: the
 # treehouse get entry wait, 60 x 1s (lines 5153 and 5168), 60s; the worker path
 # check, 20 x 0.5s (lines 4713 and 4718), 10s; the skill pick bound
-# SKILL_SELECTION_BOUND (lines 5210 and 5221), 30s; and from
-# bin/fm-teardown.sh the no-mistakes conclusion bound NM_TEARDOWN_TIMEOUT
-# (line 2452), 10s. Harness readiness and delivery polls run after the spawn
-# releases the lock and are not counted.
+# SKILL_SELECTION_BOUND (lines 5210 and 5221), 30s. From bin/fm-teardown.sh:
+# the no-mistakes bound NM_TEARDOWN_TIMEOUT (line 2452), 10s per call, up to
+# five calls (lines 1894, 2493, 2512, 2549 and 2550), 50s; the index.lock
+# return retries, 3 waits of TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS (line 2257),
+# 3s, plus up to four more returns (lines 2259 and 2286) at the measured
+# return time below; the launch-agent bootout poll, 19 x 0.25s (lines 3084 and
+# 3098), 4.75s; and the leaked-process reaping sleep (line 2888), 1s. Harness
+# readiness and delivery polls run after the spawn releases the lock and are
+# not counted.
 # measured: one run each, in disposable clones (evidence: the
 # fm-project-lock-fair-wait task data, real-provider-measurement/ and
 # real-network-measurement/).
@@ -53,17 +58,26 @@
 #   (line 1702), `git fetch origin refs/pull/<n>/head` 0.486s (line 1732),
 #   `gh pr view` 0.599s (line 1983) and 0.505s, counted twice (lines 2345
 #   and 2369).
-# 60 + 10 + 30 + 10 + 8.924 + 1.628 + 3.972 + 0.542 + 0.511 + 1.092 + 0.486
-# + 0.599 + 2 x 0.505 = 128.764s, rounded up to 129s, doubled to 258s. The
-# network samples ran at lower load than the 2026-10-12 incident (about 91);
-# the margin covers that. No production hold had been logged to the .holds
-# record below when this was set; once it has, the allowance must also cover
-# the largest logged hold times the same margin.
+# The previous sum, 128.764s, counted NM_TEARDOWN_TIMEOUT once and left out
+# the return retries, bootout poll and reaping sleep. Adding four more
+# NM_TEARDOWN_TIMEOUT calls (40s), the retry waits (3s), four more returns
+# (4 x 1.628 = 6.512s), the bootout poll (4.75s) and the reaping sleep (1s)
+# gives 128.764 + 40 + 3 + 6.512 + 4.75 + 1 = 184.026s, rounded up to 185s,
+# doubled to 370s. The network samples ran at lower load than the 2026-10-12
+# incident (about 91); the margin covers that. No production hold had been
+# logged to the .holds record below when this was set; once it has, the
+# allowance must also cover the largest logged hold times the same margin.
+# Not covered: home seeding (bin/fm-home-seed.sh) holds the Firstmate
+# project's lock across unbounded, unmeasured clones and no-mistakes setup,
+# and an Orca spawn with declared capacity holds it across unbounded,
+# unmeasured Orca worktree and terminal creation. Seeding is rare, and Orca is
+# not used in this fleet, so neither was measured; a seed or Orca hold that
+# outlasts the allowance makes waiters refuse at the stall limit.
 # FM_PROJECT_LOCK_SERVICE_SECS overrides it with a positive integer for a newly
 # measured environment or bounded fixture.
 # FM_PROJECT_LOCK_POLL_SECS changes sampling only (default 1 second; a positive
 # decimal number of seconds).
-# Progress is printed immediately and each quarter service allowance (64s
+# Progress is printed immediately and each quarter service allowance (92s
 # by default, minimum 1s for fixture overrides), naming the
 # current holder's operation/PID or the earlier waiter whose turn is reserved.
 # A refusal returns nonzero with an "fm-project-lock:" line naming its class
@@ -149,7 +163,7 @@ fm_project_lock_describe() {  # <lock> <head>
 }
 
 fm_project_lock_acquire() {  # <lock> <operation>
-  local lock=$1 operation=$2 service=${FM_PROJECT_LOCK_SERVICE_SECS:-258}
+  local lock=$1 operation=$2 service=${FM_PROJECT_LOCK_SERVICE_SECS:-370}
   local poll=${FM_PROJECT_LOCK_POLL_SECS:-1} number='^[0-9]+([.][0-9]+)?$' zero='^0*([.]0*)?$'
   local ticket head='' holder='' key last_key='' since=0 stalled=0 mtime now
   local next_message message_interval rc=1
