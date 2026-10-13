@@ -1740,7 +1740,7 @@ fm_lint_finish() {
   if declare -F fm_duration_record_batch >/dev/null 2>&1; then
     {
       if [ -s "${ROOTS_LOG:-}" ]; then
-        awk -F '\t' -v OFS='\t' '$1 == "end" { print "lint-root." ($5 == "" ? "full" : $5) "." $3, $8, $9, $13, $14, $15, ($9 == "timeout" ? 1 : 0) }' "$ROOTS_LOG"
+        awk -F '\t' -v OFS='\t' '$1 == "end" { print "lint-root." ($5 == "" ? "full" : $5) "." $3, $8, $9, $13, $14, $15, ($10 == "timeout" ? 1 : 0) }' "$ROOTS_LOG"
       fi
       printf 'lint.%s.%s\t%s\t%s\t%s\t%s\t%s\t0\n' "$ANALYSIS_MODE" "${PARTITION:-whole}" \
         "$(( $(fm_lint_now_ms) - FM_LINT_DURATION_START ))" "$result" "$calibration" \

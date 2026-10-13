@@ -101,6 +101,12 @@ adapter = subprocess.run(['bash', '-c', '. "$1/bin/fm-duration-lib.sh"; fm_durat
                          env=dict(env, FM_DURATION_FILE=str(corrupt)), capture_output=True, text=True)
 assert adapter.returncode == 0 and adapter.stdout == '30\n' and 'existing fallback 30s' in adapter.stderr, adapter
 
+sentinel = tmp / 'corrupt-ran'
+unread = subprocess.run([sys.executable, str(helper), 'run', 'corrupt.run', '--', 'bash', '-c', 'echo ran > "$1"; echo child-out', '_', str(sentinel)],
+                        env=dict(env, FM_DURATION_FILE=str(corrupt)), cwd=workrepo, capture_output=True, text=True)
+assert unread.returncode == 0 and unread.stdout == 'child-out\n' and sentinel.read_text() == 'ran\n', unread
+assert 'calibration_error' in unread.stderr and 'no deadline' in unread.stderr, unread
+
 batch = subprocess.run([sys.executable, str(helper), 'record-batch'], env=env, cwd=workrepo, input='batch.a\t100\t0\t1\t1.5\t2.5\t0\nbatch.b\t200\t3\t0\t\t\t0\n', capture_output=True, text=True)
 assert batch.returncode == 0, batch
 batched = {r['key']: r for r in rows() if r.get('key', '').startswith('batch.')}

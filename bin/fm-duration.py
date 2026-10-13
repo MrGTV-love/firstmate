@@ -432,7 +432,11 @@ def run(key, command, calibration_file):
     if os.name != 'posix':
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
     import termios
-    ceiling = limit(key, 99, 3, 0)
+    try:
+        ceiling = limit(key, 99, 3, 0)
+    except (OSError, ValueError) as error:
+        scalar('calibration_error', f'{error}; running {key} with no deadline', sys.stderr)
+        ceiling = 0
     started = time.monotonic()
     load_start = load_now()
     child_env = dict(os.environ, FM_DURATION_MANAGED_KEY=key,
