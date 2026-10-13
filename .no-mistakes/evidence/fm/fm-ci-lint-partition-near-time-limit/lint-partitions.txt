@@ -1,0 +1,9 @@
+all roots:      565
+1of3:      189 roots
+2of3:      188 roots
+3of3:      188 roots
+union sorted lines:      565; unique:      565
+UNION==ALL, DISJOINT: OK
+invalid 0of3 rc=2
+invalid 4of3 rc=2
+invalid 1of2 rc=2

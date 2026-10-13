@@ -1,0 +1,10 @@
+ok - a stale pane sitting on a terminal status is surfaced (queue + exit)
+ok - a stale terminal-looking status is overridden and absorbed while a run is actively working, then wedge-escalated
+ok - provably-working non-terminal stale is absorbed on first sight, then wedge-escalated past the threshold
+ok - consecutive wedge escalations on the same pane accumulate and demand deep inspection at the threshold
+ok - a pane becoming active again resets the consecutive wedge-escalation counter
+ok - a record whose endpoint is dead or missing reports itself once and is never re-escalated
+wait_for_exit: owned pid 49751 exceeded 100 polls; sending TERM
+49751 78627 SN   bash /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4V6DH9NBFZP73HFX40XERR1/bin/fm-watch.sh
+not ok - an alive endpoint stopped escalating at the wedge threshold: 
+rc=1 elapsed=615s

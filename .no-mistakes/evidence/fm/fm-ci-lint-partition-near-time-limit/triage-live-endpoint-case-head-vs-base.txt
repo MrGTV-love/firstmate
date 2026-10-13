@@ -1,0 +1,9 @@
+-- HEAD waits-entry run 1
+ok - a live wedged agent, an unattributable one, and an unreadable endpoint escalate unchanged
+-- BASE run 1
+ok - a live wedged agent, an unattributable one, and an unreadable endpoint escalate unchanged
+-- HEAD waits-entry run 2
+ok - a live wedged agent, an unattributable one, and an unreadable endpoint escalate unchanged
+-- BASE run 2
+ok - a live wedged agent, an unattributable one, and an unreadable endpoint escalate unchanged
+13:41  up 4 days, 15 mins, 5 users, load averages: 68.93 66.67 58.93

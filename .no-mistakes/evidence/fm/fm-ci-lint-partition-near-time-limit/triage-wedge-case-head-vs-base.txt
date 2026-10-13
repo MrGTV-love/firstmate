@@ -1,0 +1,13 @@
+-- NEW (head) run 1
+ok - pane churn starts a fresh stale-classification interval before a stopped render returns
+-- BASE run 1
+ok - pane churn starts a fresh stale-classification interval before a stopped render returns
+-- NEW (head) run 2
+ok - pane churn starts a fresh stale-classification interval before a stopped render returns
+-- BASE run 2
+ok - pane churn starts a fresh stale-classification interval before a stopped render returns
+-- NEW (head) run 3
+ok - pane churn starts a fresh stale-classification interval before a stopped render returns
+-- BASE run 3
+ok - pane churn starts a fresh stale-classification interval before a stopped render returns
+13:37  up 4 days, 11 mins, 5 users, load averages: 73.55 62.89 54.81

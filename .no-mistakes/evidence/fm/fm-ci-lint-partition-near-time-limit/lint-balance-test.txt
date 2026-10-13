@@ -1,0 +1,8 @@
+ok - changed and deleted libraries recheck transitive callers with the full diagnostic rules
+ok - selection analyzes unchanged imports only through changed or explicit callers
+ok - each runtime backend change selects every direct and transitive dispatcher consumer
+ok - changes and deletions of every runtime backend invalidate dispatcher and caller caches
+ok - shared cache single-flights identical misses and invalidates sources, binaries and failures
+ok - three canonical lint partitions preserve complete source-aware coverage and reject weakened modes
+ok - canonical partitions balance measured analysis cost rather than equal direct bytes
+bash tests/.nm-lint-subset.test.sh  222.41s user 77.60s system 79% cpu 6:17.69 total

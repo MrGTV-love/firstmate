@@ -1,0 +1,21 @@
+== signal group: test_status_span_actionable_classifier
+ok - status_span_has_actionable: benign absorbed, captain events surfaced, classified events not re-fired
+rc=
+== signal group: test_classifier_primitives
+ok - classifier primitives: keyed decisions and activity phases, captain relevance, window-to-task, and overrides
+rc=
+== signal group: test_crew_is_provably_working_classifier
+ok - crew_is_provably_working: only working+run-step/pane is provable; idle/finished/parked/failed/unknown surface
+rc=
+== waits group: test_terminal_stale_surfaced
+ok - a stale pane sitting on a terminal status is surfaced (queue + exit)
+rc=
+== waits group: test_busy_pane_below_turn_age_bound_is_absorbed
+ok - a busy worker below the turn-age bound remains working with no escalation
+rc=
+== waits group: test_own_work_wait_keeps_first_alert_then_long_cadence
+ok - own-work waits keep one first alert, then bounded rechecks without wedges; undeclared idle still alarms
+rc=
+== waits group: test_afk_busy_declared_pause_hands_off_plain_stale
+ok - away mode hands a busy declared pause to the daemon as a plain stale, and lifting the declaration restores the wedge escalation
+rc=
