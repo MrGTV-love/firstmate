@@ -1,0 +1,4 @@
+TMUX socket: /private/tmp/fm-lab.DKt9pt/tmux/tmux-501/fm-lab
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /tmp/fm-lab.DKt9pt
+error: task fm-nohelp records an invalid omp_no_helpers posture; refusing to stop the running agent for a launch that must be refused
+fm-control exit=1

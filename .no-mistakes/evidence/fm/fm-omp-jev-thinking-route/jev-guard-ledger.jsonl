@@ -1,0 +1,24 @@
+{"kind":"error","at":1791925184513,"task":"fm-native-fm","hook":"tool_call"}
+{"kind":"error","at":1791925184595,"task":"fm-native-fm","hook":"tool_result"}
+{"kind":"error","at":1791925189128,"task":"fm-native-fm","hook":"tool_call"}
+{"kind":"error","at":1791925189274,"task":"fm-native-fm","hook":"tool_result"}
+{"kind":"jev","at":1791925224922,"task":"fm-native-fm","source":"tool_call bash","answers":{"effect":{"type":"choice","choice":"read_only","confidence":1,"probabilities":{"read_only":1,"reversible":0,"irreversible":0}},"destructive_intent":{"type":"noul","noul":0.95}},"model":"jev-fake","provider":"typesafe","ms":139,"usage":{"input_tokens":3,"output_tokens":1,"cost":0}}
+{"kind":"hook","at":1791925224923,"task":"fm-native-fm","hook":"tool_call","tool":"bash","block":true}
+{"kind":"error","at":1791925232257,"task":"fm-native-fm","hook":"tool_call"}
+{"kind":"error","at":1791925233936,"task":"fm-native-fm","hook":"tool_result"}
+{"kind":"error","at":1791925327302,"task":"vn-native","hook":"tool_call"}
+{"kind":"error","at":1791925327320,"task":"vn-native","hook":"tool_result"}
+{"kind":"error","at":1791925368183,"task":"fm-nohelp","hook":"tool_call"}
+{"kind":"error","at":1791925368208,"task":"fm-nohelp","hook":"tool_result"}
+{"kind":"error","at":1791925422221,"task":"fm-nohelp","hook":"tool_call"}
+{"kind":"error","at":1791925422235,"task":"fm-nohelp","hook":"tool_result"}
+{"kind":"error","at":1791925464563,"task":"vn-native","hook":"tool_call"}
+{"kind":"error","at":1791925464577,"task":"vn-native","hook":"tool_result"}
+{"kind":"error","at":1791925469078,"task":"vn-native","hook":"tool_call"}
+{"kind":"error","at":1791925469110,"task":"vn-native","hook":"tool_result"}
+{"kind":"error","at":1791925519237,"task":"vn-native","hook":"tool_call"}
+{"kind":"error","at":1791925519269,"task":"vn-native","hook":"tool_result"}
+{"kind":"jev","at":1791925579640,"task":"claude-hook","source":"tool_call bash","answers":{"effect":{"type":"choice","choice":"read_only","confidence":1,"probabilities":{"read_only":1,"reversible":0,"irreversible":0}},"destructive_intent":{"type":"noul","noul":0.95}},"model":"jev-fake","provider":"typesafe","ms":51,"usage":{"input_tokens":3,"output_tokens":1,"cost":0}}
+{"kind":"hook","at":1791925579640,"task":"claude-hook","hook":"tool_call","tool":"bash","block":true}
+{"kind":"error","at":1791925581555,"task":"claude-hook","hook":"tool_call"}
+{"kind":"error","at":1791925581641,"task":"claude-hook","hook":"tool_call"}

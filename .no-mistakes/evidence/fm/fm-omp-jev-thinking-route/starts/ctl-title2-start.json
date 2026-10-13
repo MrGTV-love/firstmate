@@ -1,0 +1,30 @@
+{
+ "typesafeRegistration": [
+  {
+   "productionBaseUrl": "https://api.typesafe.ai",
+   "credential": "!false (always fails)"
+  }
+ ],
+ "activeTools": [
+  "read",
+  "bash",
+  "edit",
+  "ask",
+  "eval",
+  "glob",
+  "grep",
+  "task",
+  "wait",
+  "todo",
+  "web_search",
+  "write",
+  "ast_edit",
+  "debug",
+  "lsp"
+ ],
+ "main": "fixture/main",
+ "smol": "fixture/main",
+ "tiny": "fixture/main",
+ "judge": null,
+ "hasUI": true
+}

@@ -1,0 +1,17 @@
+setupVersion: 2
+modelRoles:
+  default: fixture/main
+  smol: openrouter/anthropic/claude-haiku-5.5
+  tiny: openrouter/anthropic/claude-haiku-5.5
+  judge: openrouter/~typesafe/jev-latest
+defaultThinkingLevel: auto
+skillful: true
+find:
+  enabled: on
+speech:
+  enabled: true
+  enhanced: true
+retry:
+  fallbackChains:
+    judge:
+      - openrouter/~typesafe/jev-latest

@@ -1,0 +1,23 @@
+{
+ "typesafeRegistration": [
+  {
+   "productionBaseUrl": "https://api.typesafe.ai",
+   "credential": "!false (always fails)"
+  }
+ ],
+ "activeTools": [
+  "read",
+  "bash",
+  "edit",
+  "write",
+  "grep",
+  "glob",
+  "todo",
+  "ask"
+ ],
+ "main": "fixture/main",
+ "smol": "openrouter/anthropic/claude-haiku-5.5",
+ "tiny": "openrouter/anthropic/claude-haiku-5.5",
+ "judge": null,
+ "hasUI": true
+}

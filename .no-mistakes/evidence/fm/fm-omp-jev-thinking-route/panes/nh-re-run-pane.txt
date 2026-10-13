@@ -1,0 +1,45 @@
+ Do the assigned work yourself and report only to firstmate; do not adopt a firstmate or secondmate supervisor identity, delegate the task, run fleet supervision, or address the
+ captain.
+ Your steering inbox is /tmp/fm-lab.DKt9pt/state/fm-nohelp.inbox; this exact path belongs to your current task even when it is outside the worktree or under the supervising
+ firstmate home, so read and acknowledge its messages and do not reject it as another home's state.
+ Never inspect or change any other home's endpoint namespace; this authorization is limited to the exact task paths named by this brief.
+ When this task works on Firstmate itself, the repository root AGENTS.md (also imported by CLAUDE.md) is project content and the supervisor contract for the firstmate managing
+ you: follow this brief instead of that supervisor contract.
+ Project instructions still govern the work wherever they do not conflict with this worker identity, including CONTRIBUTING.md and firstmate-coding-guidelines for Firstmate
+ changes.
+ If the firstmate-coding-guidelines skill name does not resolve in this session, read
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4VAQD7PPWAF9AKQSKSDJJ50/.agents/skills/firstmate-coding-guidelines/SKILL.md instead.
+
+ Task
+
+ Captain's intent
+
+ Find the add function.
+
+ Firstmate spec
+
+ Locate the add function with core tools only.
+
+ Skill selection
+
+ Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+ Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill applies: check your skill index for skills that fit this task before
+ starting work.
+
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ ls counter.ts                                                                                                                                                                  │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ counter.ts                                                                                                                                                                       │
+│ ⟦Wall: 0.01s | Timeout: 300s⟧                                                                                                                                                    │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Done: scenario nh-re-run finished on the worker's own model.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ Update Available
+ New version 18.10.4 is available. Run: omp update
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+❯
+ π · ◒ Fixture main · 🌳 firstmate · ⑂ wt-fm2 · ◫ 16.1%/33K

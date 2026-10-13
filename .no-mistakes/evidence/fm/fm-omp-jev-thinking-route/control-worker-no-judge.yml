@@ -1,0 +1,12 @@
+---
+mnemopi:
+  noEmbeddings: true
+retry:
+  enabled: true
+  usageAwareFallback: true
+  usageReservePct: 0
+  usageReservePolicy: auto
+  waitForUsageReset: false
+  modelFallback: false
+  fallbackChains:
+    default: []

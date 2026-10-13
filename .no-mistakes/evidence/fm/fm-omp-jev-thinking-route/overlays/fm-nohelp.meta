@@ -1,0 +1,14 @@
+window=firstmate:fm-fm-nohelp
+endpoint_task_id=fm-nohelp
+worktree=/tmp/fmlive.9rLnPC/wt-fm2
+project=/tmp/fmlive.9rLnPC/proj/firstmate
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-fm-nohelp
+model=default
+effort=high
+omp_no_helpers=on
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791925406.79284.18941
+spawn_gen=s1791925407.76250.23657

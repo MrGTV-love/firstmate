@@ -1,0 +1,16 @@
+{
+  "modelRoles": {
+    "smol": "fixture/main",
+    "tiny": "fixture/main"
+  },
+  "find": {
+    "enabled": "off"
+  },
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "fixture/main": []
+    }
+  }
+}

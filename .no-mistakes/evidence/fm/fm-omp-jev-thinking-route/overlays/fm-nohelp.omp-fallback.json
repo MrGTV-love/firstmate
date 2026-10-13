@@ -1,0 +1,11 @@
+{
+  "find": {
+    "enabled": "off"
+  },
+  "retry": {
+    "modelFallback": false,
+    "fallbackChains": {
+      "default": []
+    }
+  }
+}

@@ -1,0 +1,13 @@
+window=firstmate:fm-vn-native
+endpoint_task_id=vn-native
+worktree=/tmp/fmlive.9rLnPC/wt-vernant
+project=/tmp/fmlive.9rLnPC/proj/vernant
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-vn-native
+model=fixture/main
+effort=default
+skill_selection=unavailable
+skill_selection_reason=no TypeSafe or OpenRouter key
+busy_gen=g1791925302.1939.9817
+spawn_gen=s1791925303.93036.10711
