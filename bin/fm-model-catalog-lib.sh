@@ -24,8 +24,8 @@
 # omp models --json; Pi --list-models; OpenCode models; Cursor --list-models;
 # agy models. Other harnesses need an export from their own documented surface.
 #
-# TIME LIMIT. fm-duration.py owns calibration; cold catalogs explicitly retain
-# the existing 30 second fallback (Cursor retains its existing probe fallback).
+# TIME LIMIT. fm-duration.py owns calibration; the existing 30 second bound
+# (Cursor: its existing probe bound) stays the floor that measurement may raise.
 # Every live discovery records wall time under the stable model-catalog.<harness> key.
 #
 # shellcheck disable=SC2034 # Sourced library: callers read its output.
@@ -68,7 +68,7 @@ fm_model_catalog_normalize() {  # <harness>; stdin: raw discovery output
 . "$FM_MODEL_CATALOG_LIB_DIR/fm-duration-lib.sh"
 
 fm_model_catalog() {  # <harness> <scratch-dir>
-  local started finished result=0 h=$1 bound
+  local started finished load_start result=0 h=$1 bound
   if [ -n "${FM_MODEL_CATALOG_DIR:-}" ]; then
     fm_model_catalog_read "$@"
     return
@@ -78,10 +78,11 @@ fm_model_catalog() {  # <harness> <scratch-dir>
   else
     bound=$(fm_duration_limit "model-catalog.$h" 30) || return $?
   fi
+  load_start=$(fm_duration_load)
   started=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000')
   fm_model_catalog_read "$@" || result=$?
   finished=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000')
-  fm_duration_record "model-catalog.$h" "$((finished - started))" "$result"
+  fm_duration_record "model-catalog.$h" "$((finished - started))" "$result" '' 1 "$load_start"
   return "$result"
 }
 
@@ -112,7 +113,8 @@ fm_model_catalog_read() {  # <harness> <scratch-dir>; bound supplied by wrapper
       ;;
     cursor)
       bin=$(fm_cursor_resolve_binary) || return $?
-      raw=$(fm_run_timed "$bound" "$bin" --list-models </dev/null) || return $?
+      # shellcheck disable=SC2016 # Positional expansion belongs to the child.
+      raw=$(fm_run_timed "$bound" sh -c 'exec "$@" 2>/dev/null' sh "$bin" --list-models </dev/null) || return $?
       ;;
     agy)
       raw=$(fm_run_timed "$bound" agy models </dev/null) || return $?

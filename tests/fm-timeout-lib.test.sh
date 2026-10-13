@@ -700,15 +700,15 @@ rows = [json.loads(line) for line in ledger.read_text().splitlines()]
 warm = [row for row in rows if row.get('exit') == 0 and row.get('calibration') is False]
 assert any(row['key'] == 'lint-root.full.bin/consumer.sh' for row in warm)
 assert any(row['key'] == 'lint.full.whole' for row in warm), 'outer runner lost cache classification'
-# Remove the cold seed and replay ONLY actual warm observations in both
-# independent load-regime fixtures. Neither p99 may infer a cold ceiling.
+# Remove the cold seed and replay ONLY actual warm observations, enough of them
+# to pass the sample-count policy. No p99 may infer a cold ceiling from them.
 with ledger.open('w') as output:
     for row in warm:
-        for regime in ('idle', 'loaded'):
-            output.write(json.dumps(dict(row, regime=regime)) + '\n')
+        for _ in range(5):
+            output.write(json.dumps(row) + '\n')
 for key in ('lint-root.full.bin/consumer.sh', 'lint.full.whole'):
     result = subprocess.run([sys.executable, str(helper), 'limit', key, '--percentile', '99'], env=env, capture_output=True, text=True, check=True)
-    assert result.stdout.strip() == '0' and 'missing idle, loaded' in result.stderr, result
+    assert result.stdout.strip() == '0' and '0 of 5 samples' in result.stderr, result
 (repo / 'bin/consumer.sh').write_text('#!/bin/bash\nprintf changed-cold\n')
 handshake, release = fixture / 'handshake', fixture / 'release'
 os.mkfifo(handshake); os.mkfifo(release)
@@ -724,6 +724,6 @@ assert job.returncode == 0, (out, err)
 new_rows = [json.loads(line) for line in ledger.read_text().splitlines()]
 assert any(row.get('key') == 'lint-root.full.bin/consumer.sh' and row.get('calibration') is True and row.get('exit') == 0 for row in new_rows)
 assert len(analyses.read_text().splitlines()) == analyzed_count + 1
-print('ok - warm hits in both load regimes leave cold root and outer ceilings uncalibrated; changed cold analysis completes')
+print('ok - warm hits leave cold root and outer ceilings uncalibrated; changed cold analysis completes')
 PY
 

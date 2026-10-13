@@ -88,8 +88,8 @@
 #
 # With FM_LINT_REQUIRE_BOUNDS=1, which CI sets, every per-root ShellCheck
 # process runs under an enforced envelope: a wall deadline
-# (measured p99 x 3 via fm-duration.py, explicitly retaining the existing
-# FM_LINT_ROOT_SECONDS default 1200 until calibrated), a terminate-then-kill cleanup grace
+# (FM_LINT_ROOT_SECONDS, default 1200, which fm-duration.py may only raise to
+# a measured p99 x 3 once calibrated), a terminate-then-kill cleanup grace
 # (FM_LINT_ROOT_GRACE, default 5), and a per-process address-space limit
 # (FM_LINT_ROOT_MEMORY_KIB, default 12582912 = 12 GiB of virtual address
 # space per analysis process). The sizing rationale and RSS reduction threshold
@@ -119,8 +119,8 @@
 # the initial attempt and any retry.
 # Per-root evidence is incremental: workers append begin/end records (root,
 # mode, shard, start, end, duration, final exit status, reason, peak RSS when
-# measured, whether the final attempt followed sources, and calibration eligibility)
-# to a roots log
+# measured, whether the final attempt followed sources, calibration eligibility,
+# and the 1-minute load at root start and end) to a roots log
 # as each root completes, so a mid-run kill still leaves the completed record
 # and names the root in flight as begun-but-unfinished. With --telemetry the
 # log is retained at
@@ -133,8 +133,9 @@
 # filename. In partition mode begin/end
 # lines also stream to stderr, and an abnormal root end is always reported
 # there.
-# Duration observations are appended through fm-duration.py; cache-hit, partial
-# selection and memory-fallback successes are not cold calibration evidence.
+# Duration observations are appended through fm-duration.py in one batch from
+# the roots log when lint exits; cache-hit, partial selection and
+# memory-fallback successes are not cold calibration evidence.
 #
 # Optional quiet telemetry writes one bounded TSV snapshot of content and source
 # graph identity, wall/CPU/RSS, shard load, and competing ShellCheck processes.
@@ -340,13 +341,16 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
   local fallback_err="$output_dir/root.$shard_index.$index.fallback.err"
   local fallback_rss="$output_dir/root.$shard_index.$index.fallback.rss"
   local start_ms end_ms duration_ms invocation_rc=0 reason rss_kib initial_rc initial_reason
-  local calibration=0 cache_outcome
+  local calibration=0 cache_outcome load_start='' load_end=''
   local fallback_secs queued_ms=0 root_seconds=$FM_LINT_INTERNAL_ROOT_SECS
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ] && declare -F fm_duration_limit >/dev/null 2>&1; then
     root_seconds=$(fm_duration_limit "lint-root.${FM_LINT_INTERNAL_MODE:-full}.$path" "$root_seconds" 99) || return $?
   fi
   local final_follow_sources=${FM_LINT_INTERNAL_FOLLOW_SOURCES:-1}
   local -a fallback_args
+  if declare -F fm_duration_load >/dev/null 2>&1; then
+    load_start=$(fm_duration_load)
+  fi
   start_ms=$(fm_lint_now_ms)
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
     printf 'begin\t%s\t%s\t%s\t%s\t%s\n' \
@@ -408,19 +412,19 @@ fm_lint_run_root() {  # <index> <path> <output-dir> <shard-index>
     cat "$root_out" "$root_err" >> "$output_dir/shard.$shard_index.out"
   fi
   end_ms=$(fm_lint_now_ms)
+  if declare -F fm_duration_load >/dev/null 2>&1; then
+    load_end=$(fm_duration_load)
+  fi
   duration_ms=$((end_ms - start_ms - queued_ms))
   cache_outcome=$(cat "$rss_file.cache" 2>/dev/null || true)
   if [ "$cache_outcome" = analyzed ] && [ "$reason" != memory-fallback ]; then
     calibration=1
   fi
-  if declare -F fm_duration_record >/dev/null 2>&1; then
-    fm_duration_record "lint-root.${FM_LINT_INTERNAL_MODE:-full}.$path" "$duration_ms" "$invocation_rc" '' "$calibration"
-  fi
   if [ -n "${FM_LINT_INTERNAL_ROOTS_LOG:-}" ]; then
-    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
+    printf 'end\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
       "$index" "$path" "$shard_index" "${FM_LINT_INTERNAL_MODE:-}" \
       "$start_ms" "$end_ms" "$duration_ms" "$invocation_rc" "$reason" "$rss_kib" "$final_follow_sources" "$calibration" \
-      >> "$FM_LINT_INTERNAL_ROOTS_LOG"
+      "$load_start" "$load_end" >> "$FM_LINT_INTERNAL_ROOTS_LOG"
   fi
   if [ "${FM_LINT_INTERNAL_PROGRESS:-0}" = 1 ] || { [ "$reason" != ok ] && [ "$reason" != findings ] && [ "$reason" != memory-fallback ]; }; then
     printf 'fm-lint: end %s reason=%s rc=%s duration_ms=%s rss_kib=%s\n' \
@@ -1713,6 +1717,10 @@ fm_lint_cleanup() {
   done
   rm -rf "$TMP_ROOT"
 }
+FM_LINT_DURATION_LOAD=
+if declare -F fm_duration_load >/dev/null 2>&1; then
+  FM_LINT_DURATION_LOAD=$(fm_duration_load)
+fi
 FM_LINT_DURATION_START=$(fm_lint_now_ms)
 # shellcheck disable=SC2329 # Invoked by EXIT trap.
 fm_lint_finish() {
@@ -1723,8 +1731,15 @@ fm_lint_finish() {
   if [ -n "${FM_DURATION_CALIBRATION_FILE:-}" ] && [ "${FM_DURATION_MANAGED_KEY:-}" = "lint.$ANALYSIS_MODE.${PARTITION:-whole}" ]; then
     printf '%s\n' "$calibration" > "$FM_DURATION_CALIBRATION_FILE"
   fi
-  if declare -F fm_duration_record >/dev/null 2>&1; then
-    fm_duration_record "lint.$ANALYSIS_MODE.${PARTITION:-whole}" "$(( $(fm_lint_now_ms) - FM_LINT_DURATION_START ))" "$result" '' "$calibration"
+  if declare -F fm_duration_record_batch >/dev/null 2>&1; then
+    {
+      if [ -s "${ROOTS_LOG:-}" ]; then
+        awk -F '\t' -v OFS='\t' '$1 == "end" { print "lint-root." ($5 == "" ? "full" : $5) "." $3, $8, $9, $13, $14, $15 }' "$ROOTS_LOG"
+      fi
+      printf 'lint.%s.%s\t%s\t%s\t%s\t%s\t%s\n' "$ANALYSIS_MODE" "${PARTITION:-whole}" \
+        "$(( $(fm_lint_now_ms) - FM_LINT_DURATION_START ))" "$result" "$calibration" \
+        "$FM_LINT_DURATION_LOAD" "$(fm_duration_load)"
+    } | fm_duration_record_batch
   fi
   fm_lint_cleanup
 }

@@ -1,54 +1,77 @@
 #!/usr/bin/env python3
 """Host-local command timing and timeout ownership.
 
-Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibrated]
+Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibrated] [--load-start LOAD]
+       fm-duration.py record-batch < KEY<TAB>MS<TAB>EXIT<TAB>CALIBRATION<TAB>LOAD_START<TAB>LOAD_END lines
        fm-duration.py limit KEY [--percentile 95|99] [--margin N] [--fallback SECONDS]
        fm-duration.py run KEY -- COMMAND [ARGS...]
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
-       fm-duration.py check-literals [--base REF] [--report]
+       fm-duration.py read-wait KEY MILLISECONDS [--event-id ID]
+       fm-duration.py path
+       fm-duration.py check-literals [--base REF | --report]
 
-The append-only, flock-serialized JSONL table is FM_DURATION_FILE, otherwise
+The JSONL table is FM_DURATION_FILE, otherwise FM_DURATION_HOME/data/command-durations.jsonl
+(the owning home fm-spawn exports to ship and scout workers), otherwise
 FM_DATA_OVERRIDE/command-durations.jsonl, otherwise FM_HOME/data/command-durations.jsonl.
-With no home supplied the code root is the home. Recording and process-group
-execution require POSIX Python; pure literal lint works on native Windows Python,
-while limit explicitly preserves the existing fallback when POSIX locks are absent.
-FM_DURATION_FILE=off disables
-recording (fixture copies should use off or their own isolated file).
-Rows carry host, command key, wall milliseconds, exit, timestamp, load and CPU
-count; optional sample ids deduplicate imported no-mistakes steps. Only successful
-completed calibration-eligible samples enter nearest-rank percentiles. Cache hits,
-partial lint selections and memory-fallback successes remain recorded with
-calibration=false and cannot shrink a cold-analysis deadline. --uncalibrated
-records other successful work that is not evidence for that command's ceiling.
-Timeout rows are censored
-lower bounds, not completed latency. A limit uses max(idle percentile, loaded
-percentile) times the stated margin, rounded up to whole seconds; idle means
-load <= CPU count, loaded means load > CPU count. Until BOTH regimes exist,
-limits explicitly report missing calibration and preserve a caller's existing
-fallback, or return zero (no destructive deadline while gathering calibration).
+With no home supplied the code root is the home; a write there reports once that
+the record is checkout-local and not durable. path prints the resolved table.
+FM_DURATION_FILE=off disables recording (fixture copies should use off or their
+own isolated file). Writers hold an exclusive flock on the sibling .lock file
+and readers a shared one. Recording and process-group execution require POSIX
+Python; pure literal lint works on native Windows Python, while limit explicitly
+preserves the existing fallback when POSIX locks are absent.
+
+Rows carry host, command key, wall milliseconds, exit, timestamp, the 1-minute
+load at start and at end (data only, never a selection rule) and CPU count;
+optional sample ids deduplicate imported no-mistakes steps, whose historical
+load is unknown. Only successful completed calibration-eligible samples enter
+nearest-rank percentiles. Cache hits, partial lint selections and memory-fallback
+successes remain recorded with calibration=false and cannot shrink a
+cold-analysis deadline. --uncalibrated records other successful work that is not
+evidence for that command's ceiling. Timeout rows are censored lower bounds, not
+completed latency.
+
+A limit is max(caller's explicit or fallback bound, percentile x the stated
+margin), rounded up to whole seconds, so measurement can raise an operator bound
+but never lower it. Sample-count policy: a host/key needs MIN_SAMPLES eligible
+samples before its measured value applies; below that, limit reports the missing
+calibration and returns the caller's fallback, or zero (no destructive deadline
+while gathering calibration). Retention policy: compaction keeps the newest
+KEEP_SAMPLES samples per host and key once any host/key exceeds COMPACT_AT
+sample rows; timeout, read-wait and filed rows are always kept.
+
 The default margin is 3; run uses p99 x 3 for its outer ceiling. Polling cadence
 is observation, not a failure deadline. Output growth and cumulative process-tree
-CPU time report progress; neither an idle sample nor an elapsed read wait kills
-work. Completion, signal, or the measured outer ceiling ends the run.
+CPU time report progress; neither an idle or failed sample nor an elapsed read
+wait kills work. Completion of the command's leader, signal, or the measured
+outer ceiling ends the run; descendants that outlive the leader and still hold
+its output streams are neither awaited nor counted as live work.
 run exports FM_DURATION_MANAGED_KEY so a self-instrumented command with the same
 key leaves its one complete wall-time sample to the outer runner.
 It also exports a task-local FM_DURATION_CALIBRATION_FILE: self-instrumented
 commands write 0 there to exclude a warm/partial run, or 1 for eligible work.
 The runner propagates the classification to its own sample and removes the file.
 
-The second timeout for a host/key files a deterministic ship item through
-fm-tasks-axi.sh with the observed lower bounds; subsequent events update the
-ledger without duplicating the item. Filing failure remains retryable and is
-reported, never silently marked filed. Manual-backlog homes use compatible
-tasks-axi for this automated addition as well (no separate markdown writer).
+A timeout is a real limit that stopped a command. The second timeout for a
+host/key files a deterministic ship item through the owning home's
+fm-tasks-axi.sh (FM_HOME set to FM_DURATION_HOME when present) with the observed
+lower bounds; later events update the ledger without duplicating an open item.
+When that item is done or gone and a timeout recurs, a new item naming the old
+one is filed. A read-wait event (a self-imposed wait that ended while its command
+continued) is recorded separately and never counts toward filing. Filing failure
+remains retryable and is reported, never silently marked filed. Manual-backlog
+homes use compatible tasks-axi for this automated addition as well.
 
 check-literals compares bin/ against the merge-base with origin/main (main if
 no remote ref exists). Existing literals are grandfathered by path and exact
-statement, not line number. Added/changed bounds need an adjacent measured:
-note with value, ISO date, host and margin. --report lists all current literals
-without enforcing or changing them; --report --base REF inventories that revision. It recognizes shell bound calls, timeout
-flags, timeout/deadline/budget assignments and Python/JS timeout keyword values.
+statement, not line number; existing limits that were only moved are listed in
+bin/fm-duration-existing-limits.tsv (path, value, exact statement). Added or
+changed bounds need an adjacent measured: note with value, ISO date, host and
+margin. --report lists all current literals without enforcing or changing them.
+It recognizes shell bound calls including fm_duration_limit/fm_duration_timed
+fallbacks, timeout flags with optional unit suffixes, timeout/deadline/budget
+assignments and Python/JS timeout keyword values.
 """
 import argparse
 import collections
@@ -69,6 +92,7 @@ import signal
 import shlex
 import selectors
 import sqlite3
+import struct
 import subprocess
 import sys
 import time
@@ -77,6 +101,11 @@ import uuid
 
 ROOT = Path(__file__).resolve().parent.parent
 HOST = platform.node()
+MIN_SAMPLES = 5  # sample-count policy: eligible samples before a measured limit applies
+KEEP_SAMPLES = 100  # sample-count policy: newest samples kept per host and key
+COMPACT_AT = 200  # sample-count policy: host/key sample rows that trigger compaction
+EVENTS = ('timeout', 'read-wait', 'filed')
+LOCAL_NOTED = []
 
 
 def scalar(key, value, stream=sys.stdout):
@@ -89,50 +118,132 @@ def ledger_path():
         return None
     if value:
         return Path(value)
+    owner = os.environ.get('FM_DURATION_HOME')
+    if owner:
+        return Path(owner) / 'data' / 'command-durations.jsonl'
     home = Path(os.environ.get('FM_HOME', ROOT))
     return Path(os.environ.get('FM_DATA_OVERRIDE', home / 'data')) / 'command-durations.jsonl'
 
 
+def checkout_local():
+    return not any(os.environ.get(name) for name in ('FM_DURATION_FILE', 'FM_DURATION_HOME', 'FM_HOME', 'FM_DATA_OVERRIDE'))
+
+
+def note_local(path):
+    if checkout_local() and not LOCAL_NOTED:
+        LOCAL_NOTED.append(path)
+        scalar('ledger', f'{path} is checkout-local and not durable: FM_DURATION_HOME is unset', sys.stderr)
+
+
+def load_now():
+    try:
+        return os.getloadavg()[0]
+    except (AttributeError, OSError):
+        return None
+
+
+def sample_rows(rows):
+    return [r for r in rows if r.get('event') not in EVENTS]
+
+
+def compact(path, rows):
+    counts = collections.Counter((r.get('host'), r.get('key')) for r in sample_rows(rows))
+    if not counts or max(counts.values()) <= COMPACT_AT:
+        return
+    kept, seen = [], collections.Counter()
+    for row in reversed(rows):
+        identity = row.get('host'), row.get('key')
+        if row.get('event') not in EVENTS:
+            seen[identity] += 1
+            if seen[identity] > KEEP_SAMPLES:
+                continue
+        kept.append(row)
+    scratch = path.with_name(path.name + '.compact')
+    fd = os.open(scratch, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
+    with os.fdopen(fd, 'w', encoding='utf-8') as output:
+        output.writelines(json.dumps(row, separators=(',', ':')) + '\n' for row in reversed(kept))
+        output.flush()
+        os.fsync(output.fileno())
+    os.replace(scratch, path)
+
+
 @contextlib.contextmanager
-def ledger(read_rows=True):
+def ledger(write=True):
     path = ledger_path()
-    if path is None:
+    if path is None or (not write and not path.exists()):
         yield None, []
         return
     if fcntl is None:
         raise RuntimeError('duration recording requires POSIX Python file locks; use Python from the Firstmate POSIX shell')
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_APPEND | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(fd, 'r+', encoding='utf-8') as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
-        rows = [json.loads(line) for line in handle if line.strip()] if read_rows else []
-        yield handle, rows
+    if write:
+        path.parent.mkdir(parents=True, exist_ok=True)
+    lock = os.open(str(path) + '.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX if write else fcntl.LOCK_SH)
+        flags = os.O_RDWR | os.O_CREAT | os.O_APPEND if write else os.O_RDONLY
+        fd = os.open(path, flags | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(fd, 'r+' if write else 'r', encoding='utf-8') as handle:
+            rows = [json.loads(line) for line in handle if line.strip()]
+            existing = len(rows)
+            yield (handle if write else None), rows
+        if write and len(rows) > existing:
+            note_local(path)
+            compact(path, rows)
+    finally:
+        os.close(lock)
 
 
-def append(handle, row):
+def append(handle, rows, row):
     if handle is not None:
         handle.write(json.dumps(row, separators=(',', ':')) + '\n')
         handle.flush()
         os.fsync(handle.fileno())
+        rows.append(row)
 
 
-def observation(key, milliseconds, code, sample_id=None, calibration=True):
-    cpus = os.cpu_count() or 1
-    load = os.getloadavg()[0]
-    return dict(host=HOST, key=key, duration_ms=milliseconds, exit=code,
-                recorded_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
-                load=load, cpus=cpus, regime='loaded' if load > cpus else 'idle',
-                sample_id=sample_id, calibration=calibration)
+def now_iso():
+    return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 
-def record(key, milliseconds, code, sample_id=None, calibration=True):
-    if os.environ.get('FM_DURATION_MANAGED_KEY') == key:
-        return  # The outer run owns this command's complete wall time.
-    with ledger(read_rows=bool(sample_id)) as (handle, rows):
-        if not sample_id or not any(r.get('host') == HOST and r.get('sample_id') == sample_id for r in rows):
-            append(handle, observation(key, milliseconds, code, sample_id, calibration))
-    if code in (124, 137):
-        own_timeout(key, milliseconds, sample_id)
+def observation(key, milliseconds, code, sample_id=None, calibration=True, load_start=None, load_end=None):
+    return dict(host=HOST, key=key, duration_ms=milliseconds, exit=code, recorded_at=now_iso(),
+                load_start=load_start, load_end=load_end,
+                cpus=os.cpu_count() or 1, sample_id=sample_id, calibration=calibration)
+
+
+def record_many(entries):
+    entries = [e for e in entries if os.environ.get('FM_DURATION_MANAGED_KEY') != e['key']]
+    with ledger() as (handle, rows):
+        for entry in entries:
+            sample_id = entry.get('sample_id')
+            if not sample_id or not any(r.get('host') == HOST and r.get('sample_id') == sample_id for r in rows):
+                append(handle, rows, observation(**entry))
+    for entry in entries:
+        if entry['code'] in (124, 137):
+            own_timeout(entry['key'], entry['milliseconds'], entry.get('sample_id'))
+
+
+def record(key, milliseconds, code, sample_id=None, calibration=True, load_start=None):
+    record_many([dict(key=key, milliseconds=milliseconds, code=code, sample_id=sample_id,
+                      calibration=calibration, load_start=load_start, load_end=load_now())])
+
+
+def optional_load(value):
+    return float(value) if value else None
+
+
+def record_batch(lines):
+    entries = []
+    for line in lines:
+        if not line.strip():
+            continue
+        key, milliseconds, code, calibration, load_start, load_end = line.rstrip('\n').split('\t')
+        if int(milliseconds) < 0 or int(code) < 0:
+            raise ValueError(f'negative duration or exit for {key}')
+        entries.append(dict(key=key, milliseconds=int(milliseconds), code=int(code),
+                            calibration=calibration == '1', load_start=optional_load(load_start),
+                            load_end=optional_load(load_end)))
+    record_many(entries)
 
 
 def limit(key, percentile, margin, fallback, verbose=True):
@@ -140,85 +251,123 @@ def limit(key, percentile, margin, fallback, verbose=True):
         scalar('calibration', 'POSIX Python file locks unavailable', sys.stderr)
         scalar('fallback', f'{fallback}s existing caller limit' if fallback else 'no destructive deadline; use the Firstmate POSIX shell to collect samples', sys.stderr)
         return fallback
-    with ledger() as (_, rows):
-        samples = [r for r in rows if r.get('host') == HOST and r.get('key') == key
-                   and r.get('exit') == 0 and r.get('calibration', True)]
-    groups = [[r['duration_ms'] for r in samples if r.get('regime') == regime]
-              for regime in ('idle', 'loaded')]
-    if not all(groups):
-        seconds = fallback
-        reason = 'missing ' + ', '.join(regime for regime, values in zip(('idle', 'loaded'), groups) if not values)
+    with ledger(write=False) as (_, rows):
+        samples = sorted(r['duration_ms'] for r in sample_rows(rows) if r.get('host') == HOST and r.get('key') == key
+                         and r.get('exit') == 0 and r.get('calibration', True))
+    if len(samples) < MIN_SAMPLES:
         if verbose:
-            scalar('calibration', reason, sys.stderr)
-            scalar('fallback', f'{seconds}s existing caller limit' if seconds else 'no destructive deadline; collect idle and loaded samples', sys.stderr)
-    else:
-        ranks = [sorted(g)[math.ceil(len(g) * percentile / 100) - 1] for g in groups]
-        seconds = max(1, math.ceil(max(ranks) * margin / 1000))
-        if verbose:
-            scalar('measured', f'{key} host={HOST} p{percentile}={max(ranks)}ms margin={margin} samples={len(samples)}', sys.stderr)
+            scalar('calibration', f'{len(samples)} of {MIN_SAMPLES} samples for {key} on {HOST}', sys.stderr)
+            scalar('fallback', f'{fallback}s existing caller limit' if fallback else 'no destructive deadline; collect samples', sys.stderr)
+        return fallback
+    rank = samples[math.ceil(len(samples) * percentile / 100) - 1]
+    measured = max(1, math.ceil(rank * margin / 1000))
+    seconds = max(fallback, measured)
+    if verbose:
+        scalar('measured', f'{key} host={HOST} p{percentile}={rank}ms margin={margin} samples={len(samples)} measured={measured}s bound={fallback}s', sys.stderr)
     return seconds
 
 
-def own_timeout(key, milliseconds, event_id=None):
+def backlog():
+    owner = os.environ.get('FM_DURATION_HOME')
+    if not owner:
+        return [str(ROOT / 'bin/fm-tasks-axi.sh')], None
+    env = {name: value for name, value in os.environ.items() if name != 'FM_DATA_OVERRIDE'}
+    env['FM_HOME'] = owner
+    return [str(Path(owner) / 'bin/fm-tasks-axi.sh')], env
+
+
+def task_closed(cmd, env, task):
+    shown = subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env)
+    if shown.returncode == 0:
+        return any(line.strip() == 'state: done' for line in shown.stdout.splitlines())
+    if 'NOT_FOUND' in shown.stdout + shown.stderr:
+        return True
+    raise RuntimeError(f'timeout work {task} could not be inspected: ' + shown.stderr.strip() + shown.stdout.strip())
+
+
+def note_event(key, milliseconds, event_id, event):
     with ledger() as (handle, rows):
         if handle is None:
-            return
-        matching = [r for r in rows if r.get('host') == HOST and r.get('key') == key and r.get('event') == 'timeout']
-        if not event_id or not any(r.get('event_id') == event_id for r in matching):
-            event = dict(host=HOST, key=key, event='timeout', duration_ms=milliseconds, event_id=event_id)
-            append(handle, event)
-            matching.append(event)
-        filed = any(r.get('host') == HOST and r.get('key') == key and r.get('event') == 'filed' for r in rows)
-        if len(matching) < 2 or filed:
-            return
-        task = 'fm-timeout-' + hashlib.sha256((HOST + '\0' + key).encode()).hexdigest()[:16]
-        body = f'Repeated timeout for command key {key} on host {HOST}. Observed lower bounds (ms): ' + ', '.join(str(r['duration_ms']) for r in matching)
-        body += '. Measure idle and heavy-load completion latency, then repair the limit with an explicit margin. A read wait ending is not command failure.'
-        cmd = [str(ROOT / 'bin/fm-tasks-axi.sh')]
-        # Inspect before retrying an interrupted publication, using the deterministic id.
-        shown = subprocess.run(cmd + ['show', task], capture_output=True, text=True)
-        if shown.returncode:
-            result = subprocess.run(cmd + ['add', task, f'Measure and repair repeated timeout: {key}', '--kind', 'ship', '--repo', 'firstmate', '--body', body], capture_output=True, text=True)
-            if result.returncode:
-                raise RuntimeError('timeout work could not be filed: ' + result.stderr.strip() + result.stdout.strip())
-        append(handle, dict(host=HOST, key=key, event='filed', task=task))
-        scalar('timeout_work', task, sys.stderr)
+            return None
+        if not event_id or not any(r.get('host') == HOST and r.get('key') == key and r.get('event') == event
+                                   and r.get('event_id') == event_id for r in rows):
+            append(handle, rows, dict(host=HOST, key=key, event=event, duration_ms=milliseconds,
+                                      event_id=event_id, recorded_at=now_iso()))
+        return [r for r in rows if r.get('host') == HOST and r.get('key') == key and r.get('event') in EVENTS]
+
+
+def own_timeout(key, milliseconds, event_id=None):
+    history = note_event(key, milliseconds, event_id, 'timeout')
+    if history is None:
+        return
+    timeouts = [i for i, r in enumerate(history) if r['event'] == 'timeout']
+    filed = [i for i, r in enumerate(history) if r['event'] == 'filed']
+    if len(timeouts) < 2 or (filed and timeouts[-1] < filed[-1]):
+        return
+    cmd, env = backlog()
+    base = 'fm-timeout-' + hashlib.sha256((HOST + '\0' + key).encode()).hexdigest()[:16]
+    previous = history[filed[-1]]['task'] if filed else None
+    if previous and not task_closed(cmd, env, previous):
+        return
+    task = base if not filed else f'{base}-{len(filed) + 1}'
+    body = f'Repeated timeout for command key {key} on host {HOST}. Observed lower bounds (ms): ' + ', '.join(str(history[i]['duration_ms']) for i in timeouts)
+    if previous:
+        body += f'. The timeout recurred after {previous} was closed'
+    body += '. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.'
+    # Inspect before retrying an interrupted publication, using the deterministic id.
+    if subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
+        result = subprocess.run(cmd + ['add', task, f'Measure and repair repeated timeout: {key}', '--kind', 'ship', '--repo', 'firstmate', '--body', body], capture_output=True, text=True, env=env)
+        if result.returncode and subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
+            raise RuntimeError('timeout work could not be filed: ' + result.stderr.strip() + result.stdout.strip())
+    with ledger() as (handle, rows):
+        if not any(r.get('host') == HOST and r.get('key') == key and r.get('event') == 'filed' and r.get('task') == task for r in rows):
+            append(handle, rows, dict(host=HOST, key=key, event='filed', task=task, previous=previous, recorded_at=now_iso()))
+    scalar('timeout_work', task, sys.stderr)
 
 
 def import_nm(database, run_id):
     with contextlib.closing(sqlite3.connect(Path(database).absolute().as_uri() + '?mode=ro', uri=True)) as db:
-        rows = db.execute('SELECT id, step_name, duration_ms, exit_code FROM step_results WHERE run_id = ? AND completed_at IS NOT NULL AND duration_ms > 0 AND exit_code IS NOT NULL', (run_id,)).fetchall()
-    for identity, name, duration, code in rows:
-        # Imported timings have no historical load evidence. Do not mislabel them
-        # with the current host load, or use them for a calibrated ceiling.
-        with ledger() as (handle, existing):
+        steps = db.execute('SELECT id, step_name, duration_ms, exit_code FROM step_results WHERE run_id = ? AND completed_at IS NOT NULL AND duration_ms > 0 AND exit_code IS NOT NULL', (run_id,)).fetchall()
+    timeouts = []
+    with ledger() as (handle, rows):
+        known = {r.get('sample_id') for r in rows}
+        for identity, name, duration, code in steps:
             sample_id = 'nm:' + str(Path(database).absolute()) + ':' + str(identity)
-            if not any(r.get('sample_id') == sample_id for r in existing):
-                append(handle, dict(host=HOST, key='no-mistakes.' + name, duration_ms=duration,
-                                    exit=code, sample_id=sample_id, regime='unknown', load=None,
-                                    cpus=None, recorded_at=datetime.datetime.now(datetime.timezone.utc).isoformat()))
-        if code in (124, 137):
-            own_timeout('no-mistakes.' + name, duration, sample_id)
+            if sample_id not in known:
+                # Imported timings have no historical load evidence.
+                append(handle, rows, dict(host=HOST, key='no-mistakes.' + name, duration_ms=duration,
+                                          exit=code, sample_id=sample_id, load_start=None, load_end=None,
+                                          cpus=None, recorded_at=now_iso()))
+            if code in (124, 137):
+                timeouts.append(('no-mistakes.' + name, duration, sample_id))
+    for key, duration, sample_id in timeouts:
+        own_timeout(key, duration, sample_id)
 
 
 def tree_cpu(pid, observed):
-    result = subprocess.run(['ps', '-axo', 'pid=,ppid=,time=,lstart='], capture_output=True, text=True)
-    children = collections.defaultdict(list)
-    times = {}
-    for line in result.stdout.splitlines():
-        fields = line.split()
-        if len(fields) < 4:
-            continue
-        child, parent = map(int, fields[:2])
-        days, separator, clock = fields[2].rpartition('-')
-        seconds = float(days) * 86400 if separator else 0.0
-        parts = (clock if separator else fields[2]).split(':')
-        clock_seconds = 0.0
-        for part in parts:
-            clock_seconds = clock_seconds * 60 + float(part)
-        seconds += clock_seconds
-        children[parent].append(child)
-        times[child] = (seconds, tuple(fields[3:]))
+    try:
+        result = subprocess.run(['ps', '-axo', 'pid=,ppid=,time=,lstart='], capture_output=True, text=True,
+                                env=dict(os.environ, LC_ALL='C'))
+        if result.returncode:
+            return None
+        children = collections.defaultdict(list)
+        times = {}
+        for line in result.stdout.splitlines():
+            fields = line.split()
+            if len(fields) < 4:
+                continue
+            child, parent = map(int, fields[:2])
+            days, separator, clock = fields[2].rpartition('-')
+            seconds = float(days) * 86400 if separator else 0.0
+            parts = (clock if separator else fields[2]).split(':')
+            clock_seconds = 0.0
+            for part in parts:
+                clock_seconds = clock_seconds * 60 + float(part)
+            seconds += clock_seconds
+            children[parent].append(child)
+            times[child] = (seconds, tuple(fields[3:]))
+    except (OSError, ValueError):
+        return None  # A failed telemetry sample is no progress sample, never a stop reason.
     todo = [pid]
     while todo:
         child = todo.pop()
@@ -255,8 +404,10 @@ def signal_group(child, sig):
 def run(key, command, calibration_file):
     if os.name != 'posix':
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
+    import termios
     ceiling = limit(key, 99, 3, 0)
     started = time.monotonic()
+    load_start = load_now()
     child_env = dict(os.environ, FM_DURATION_MANAGED_KEY=key,
                      FM_DURATION_CALIBRATION_FILE=str(calibration_file))
     child = subprocess.Popen(command, env=child_env, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -270,39 +421,53 @@ def run(key, command, calibration_file):
         signal_group(child, sig)
     for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
         signal.signal(sig, forward)
+    def relay(stream, sink, size):
+        nonlocal output_bytes
+        chunk = os.read(stream.fileno(), size)
+        if chunk:
+            sink.write(chunk)
+            sink.flush()
+            output_bytes += len(chunk)
+        return len(chunk)
     previous_cpu, previous_bytes = -1, -1
     next_cpu_sample = started
     observed_cpu = {}
     occurrence_id = str(uuid.uuid4())
     expired = False
     try:
-        while child.poll() is None or streams.get_map():
-            for ready, _ in streams.select(1):
-                chunk = os.read(ready.fileobj.fileno(), 65536)
-                if not chunk:
+        while child.poll() is None:
+            if not streams.get_map():
+                with contextlib.suppress(subprocess.TimeoutExpired):
+                    child.wait(1)  # observation cadence, not a deadline
+            for ready, _ in streams.select(1) if streams.get_map() else ():
+                if not relay(ready.fileobj, ready.data, 65536):
                     streams.unregister(ready.fileobj)
-                    ready.fileobj.close()
-                else:
-                    ready.data.write(chunk)
-                    ready.data.flush()
-                    output_bytes += len(chunk)
             elapsed = time.monotonic() - started
             cpu = max(0, previous_cpu)
             if child.poll() is None and time.monotonic() >= next_cpu_sample:
-                cpu = tree_cpu(child.pid, observed_cpu)
+                sample = tree_cpu(child.pid, observed_cpu)
+                cpu = cpu if sample is None else sample
                 next_cpu_sample = time.monotonic() + 1  # observation cadence, not a deadline
             if cpu > previous_cpu or output_bytes > previous_bytes:
                 scalar('progress', f'{key} elapsed={elapsed:.1f}s output_bytes={output_bytes} tree_cpu={cpu:.2f}s', sys.stderr)
                 previous_cpu, previous_bytes = max(previous_cpu, cpu), output_bytes
-            if interrupted or (ceiling and elapsed >= ceiling and (child.poll() is None or streams.get_map())):
+            if interrupted or (ceiling and elapsed >= ceiling and child.poll() is None):
                 expired = not interrupted
-                # The command may have exited while descendants still hold its
-                # streams. The ceiling covers those owned group members too.
                 # Cleanup escalation is immediate; no additional guessed grace.
                 for sig in (signal.SIGTERM, signal.SIGKILL):
                     signal_group(child, sig)
                 child.wait()
                 break
+        # The leader's exit is the result. Relay the output buffered by then,
+        # but do not wait for descendants that outlive the leader and still
+        # hold its streams; they are not live work under the ceiling.
+        for stream, sink in ((child.stdout, sys.stdout.buffer), (child.stderr, sys.stderr.buffer)):
+            remaining = struct.unpack('i', fcntl.ioctl(stream.fileno(), termios.FIONREAD, bytes(4)))[0]
+            while remaining > 0:
+                copied = relay(stream, sink, min(remaining, 65536))
+                if not copied:
+                    break
+                remaining -= copied
         code = 124 if expired else child.returncode
         if code < 0:
             code = 128 - code
@@ -311,10 +476,10 @@ def run(key, command, calibration_file):
         duration_ms = round((time.monotonic() - started) * 1000)
         calibration = not calibration_file.exists() or calibration_file.read_text().strip() == '1'
         try:
-            record(key, duration_ms, code, occurrence_id, calibration)
+            record(key, duration_ms, code, occurrence_id, calibration, load_start)
         except (OSError, ValueError, RuntimeError) as error:
             scalar('recording_error', str(error), sys.stderr)
-            scalar('help', f'python3 bin/fm-duration.py record {shlex.quote(key)} {duration_ms} {code} --sample-id {occurrence_id}{"" if calibration else " --uncalibrated"}; command result preserved', sys.stderr)
+            scalar('help', f'python3 bin/fm-duration.py record {shlex.quote(key)} {duration_ms} {code} --sample-id {occurrence_id}{"" if calibration else " --uncalibrated"}{"" if load_start is None else f" --load-start {load_start}"}; command result preserved', sys.stderr)
         return code
     finally:
         streams.close()
@@ -326,9 +491,9 @@ def run(key, command, calibration_file):
 
 
 BOUND = re.compile(r'''(?ix)
-    (?:\bfm_(?:run|exec)_timed\s+|\bfm_nm_(?:bounded|run_bounded|run_checked|run)\s+(?:"(?!\$@)[^"]*"|'[^']*'|[^\s"']+)\s+)["']?(?P<call>\d+(?:\.\d+)?)(?:["']|\b)(?![>\d])
-    |\b(?:g?timeout)\s+(?:-\w+\s+\d+\s+)?(?P<external>\d+(?:\.\d+)?)[smhd]?\b
-    |--(?:[\w-]*timeout[\w-]*|max-time|connect-timeout|wait|deadline)(?:[=\s]+)(?P<flag>\d+(?:\.\d+)?)\b
+    (?:\bfm_(?:run|exec)_timed\s+|\b(?:fm_nm_(?:bounded|run_bounded|run_checked|run)|fm_duration_(?:limit|timed))\s+(?:"(?!\$@)[^"]*"|'[^']*'|[^\s"']+)\s+)["']?(?P<call>\d+(?:\.\d+)?)(?:["']|\b)(?![>\d])
+    |\b(?:g?timeout)\s+(?:-\w+\s+\d+\s+)?(?P<external>\d+(?:\.\d+)?)(?:ms|[smhd])?\b
+    |--(?:[\w-]*timeout[\w-]*|max-time|connect-timeout|wait|deadline)(?:[=\s]+)(?P<flag>\d+(?:\.\d+)?)(?:ms|[smhd])?\b
     |\b[\w]*(?:TIMEOUT|DEADLINE|SECONDS|_SECS|_MS|_GRACE)[\w]*\s*=\s*["']?(?:\$\{[^}\n]*:-)?["']?(?P<assignment>\d+(?:\.\d+)?)\b
     |\b(?:timeout|deadline)["']?\s*[:=]\s*(?P<keyword>\d+(?:\.\d+)?)\b
     |\bread\s+(?:-[A-Za-z]+\s+)*-t\s+["']?(?P<read>\d+(?:\.\d+)?)\b
@@ -355,7 +520,7 @@ def literals(text):
                 continue  # zero disables a deadline, not a time limit
             note = NOTE.search('\n'.join(lines[max(0, index - 1):end + 2]))
             annotated = False
-            if note and note.group(1).rstrip('s') == value:
+            if note and re.sub(r'(?:ms|[smhd])$', '', note.group(1)) == value:
                 fields = dict(re.findall(r'(date|margin)=([^\s,]+)', note.group(0)))
                 try:
                     datetime.date.fromisoformat(fields['date'])
@@ -370,14 +535,13 @@ def git(*args):
     return subprocess.run(['git', '-C', str(ROOT), *args], capture_output=True, text=True, check=True).stdout
 
 
-def sources(base, historical=False):
+def sources(base):
     process = None
     if base:
         process = subprocess.Popen(['git', '-C', str(ROOT), 'cat-file', '--batch'], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
     try:
-        paths = [ROOT / name for name in git('ls-tree', '-r', '--name-only', base, '--', 'bin').splitlines()] if historical else sorted((ROOT / 'bin').rglob('*'))
-        for path in paths:
-            if (not historical and not path.is_file()) or path.suffix not in ('.sh', '.py', '.js', '.ts', '.pl'):
+        for path in sorted((ROOT / 'bin').rglob('*')):
+            if not path.is_file() or path.suffix not in ('.sh', '.py', '.js', '.ts', '.pl'):
                 continue
             relative = str(path.relative_to(ROOT))
             previous = ''
@@ -390,7 +554,7 @@ def sources(base, historical=False):
                     process.stdout.read(1)  # batch frame terminator
                 elif not header or header[-1] != 'missing':
                     raise ValueError('cannot read literal baseline for ' + relative)
-            yield relative, previous if historical else path.read_text(), previous
+            yield relative, path.read_text(), previous
     finally:
         if process:
             process.stdin.close()
@@ -398,27 +562,41 @@ def sources(base, historical=False):
             process.wait()
 
 
+def moved_limits():
+    moved = collections.Counter()
+    listing = ROOT / 'bin/fm-duration-existing-limits.tsv'
+    if listing.exists():
+        for line in listing.read_text().splitlines():
+            if line.strip() and not line.startswith('#'):
+                relative, value, statement = line.split('\t', 2)
+                moved[relative, statement, value] += 1
+    return moved
+
+
 def check_literals(base, report):
-    if not report:
-        if not base:
-            for ref in ('origin/main', 'main'):
-                try:
-                    base = git('merge-base', 'HEAD', ref).strip()
-                    break
-                except subprocess.CalledProcessError:
-                    continue
-        if not base:
-            raise ValueError('no comparison base; pass --base REF')
-    if base:
-        base = git('rev-parse', '--verify', base + '^{commit}').strip()
+    if report:
+        for relative, current, _ in sources(None):
+            for line, statement, value, _ in literals(current):
+                print(f'{relative}:{line}\t{value}\t{statement}')
+        return 0
+    if not base:
+        for ref in ('origin/main', 'main'):
+            try:
+                base = git('merge-base', 'HEAD', ref).strip()
+                break
+            except subprocess.CalledProcessError:
+                continue
+    if not base:
+        raise ValueError('no comparison base; pass --base REF')
+    base = git('rev-parse', '--verify', base + '^{commit}').strip()
+    moved = moved_limits()
     failures = []
-    for relative, current, original in sources(base, historical=bool(report and base)):
+    for relative, current, original in sources(base):
         previous = collections.Counter((statement, value) for _, statement, value, _ in literals(original))
+        previous.update({(statement, value): count for (path, statement, value), count in moved.items() if path == relative})
         for line, statement, value, annotated in literals(current):
             identity = statement, value
-            if report:
-                print(f'{relative}:{line}\t{value}\t{statement}')
-            elif previous[identity]:
+            if previous[identity]:
                 previous[identity] -= 1
             elif not annotated:
                 failures.append(f'{relative}:{line}: new time limit {value}; add adjacent measured: value={value} date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit')
@@ -448,8 +626,8 @@ def main():
     if len(sys.argv) == 1:
         scalar('bin', str(Path(__file__).resolve()))
         scalar('description', 'Measure host command latency and own repeated timeouts')
-        with ledger() as (_, rows):
-            counts = collections.Counter(r['key'] for r in rows if r.get('host') == HOST and 'exit' in r)
+        with ledger(write=False) as (_, rows):
+            counts = collections.Counter(r['key'] for r in sample_rows(rows) if r.get('host') == HOST)
         print(f'durations[{len(counts)}]{{key,samples}}:')
         for key, count in sorted(counts.items()):
             print(f'  {json.dumps(key)},{count}')
@@ -463,6 +641,8 @@ def main():
     rec.add_argument('key'); rec.add_argument('milliseconds', type=nonnegative); rec.add_argument('exit', type=nonnegative)
     rec.add_argument('--sample-id')
     rec.add_argument('--uncalibrated', action='store_true')
+    rec.add_argument('--load-start', type=float)
+    commands.add_parser('record-batch')
     lim = commands.add_parser('limit')
     lim.add_argument('key'); lim.add_argument('--percentile', type=int, choices=(95, 99), default=95)
     lim.add_argument('--margin', type=float, default=3); lim.add_argument('--fallback', type=nonnegative, default=0)
@@ -472,17 +652,29 @@ def main():
     nm.add_argument('database'); nm.add_argument('run_id')
     timeout = commands.add_parser('timeout')
     timeout.add_argument('key'); timeout.add_argument('milliseconds', type=nonnegative); timeout.add_argument('--event-id')
-    check = commands.add_parser('check-literals')
+    wait = commands.add_parser('read-wait')
+    wait.add_argument('key'); wait.add_argument('milliseconds', type=nonnegative); wait.add_argument('--event-id')
+    commands.add_parser('path')
+    check = commands.add_parser('check-literals').add_mutually_exclusive_group()
     check.add_argument('--base'); check.add_argument('--report', action='store_true')
     args = parser.parse_args()
     if args.action == 'record':
-        record(args.key, args.milliseconds, args.exit, args.sample_id, not args.uncalibrated)
+        record(args.key, args.milliseconds, args.exit, args.sample_id, not args.uncalibrated, args.load_start)
+    elif args.action == 'record-batch':
+        record_batch(sys.stdin)
     elif args.action == 'limit':
         if not math.isfinite(args.margin) or args.margin < 1:
             parser.error('--margin must be finite and >= 1')
         print(limit(args.key, args.percentile, args.margin, args.fallback))
     elif args.action == 'timeout':
         own_timeout(args.key, args.milliseconds, args.event_id)
+    elif args.action == 'read-wait':
+        note_event(args.key, args.milliseconds, args.event_id, 'read-wait')
+    elif args.action == 'path':
+        path = ledger_path()
+        if path is not None:
+            note_local(path)
+        print(path or 'off')
     elif args.action == 'import-nm':
         import_nm(args.database, args.run_id)
     elif args.action == 'check-literals':

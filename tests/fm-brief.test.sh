@@ -1036,6 +1036,69 @@ test_scout_and_secondmate_scaffold() {
   pass "fm-brief: scout and secondmate code paths still scaffold well-formed briefs"
 }
 
+# Contract: a waiting worker spends no turns. A decision wait ends the turn, an
+# external wait sleeps in one blocking shell command, a background long command
+# is reattached rather than stopped, and a waiting worker neither polls its inbox
+# nor polls a pipeline between holds.
+test_workers_wait_without_spending_turns() {
+  local home id brief
+  home="$TMP_ROOT/wait-home"
+  mkdir -p "$home/data" "$home/config"
+  : > "$home/config/wait-no-turns"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-wait-ship some-proj --mode no-mistakes >/dev/null 2>&1 \
+    || fail "fm-brief.sh ship scaffold exited non-zero"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-wait-scout some-proj --scout >/dev/null 2>&1 \
+    || fail "fm-brief.sh scout scaffold exited non-zero"
+  for id in brief-wait-ship brief-wait-scout; do
+    brief="$home/data/$id/brief.md"
+    assert_grep "end your turn at once" "$brief" "$id: a decision wait must end the turn"
+    assert_grep "with ONE blocking shell command that returns when the state changes" "$brief" \
+      "$id: an external wait must sleep in one blocking shell command"
+    assert_grep "gh pr checks <pr> --watch" "$brief" "$id: the CI wait primitive is missing"
+    assert_grep "until <condition>; do sleep 30; done" "$brief" "$id: the slot wait primitive is missing"
+    assert_grep "is the sanctioned foreground wait" "$brief" \
+      "$id: the wait a Claude Code worker may use is not named"
+    assert_grep "the still-running job has not failed: reattach to it, never stop because of it" "$brief" \
+      "$id: an elapsed wait bound must not stop a background long command"
+    assert_grep "reattach with \`no-mistakes axi run --wait\` instead, and never send the same \`respond\` again" "$brief" \
+      "$id: a timed-out respond must reattach with axi run, never resend its answer"
+    assert_grep "Do not poll or list the inbox while waiting; a waiting instruction rings." "$brief" \
+      "$id: polling the inbox while waiting is not forbidden"
+    assert_grep "natural checkpoint" "$brief" "$id: the flag dropped the natural-checkpoint inbox check"
+  done
+  brief="$home/data/brief-wait-ship/brief.md"
+  assert_grep "issue the same foreground call again" "$brief" \
+    "the no-mistakes DOD must reattach with the same foreground call"
+  assert_no_grep "background the drive call" "$brief" "the no-mistakes DOD still backgrounds the drive call"
+
+  FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-wait-sm --secondmate --no-projects >/dev/null 2>&1 \
+    || fail "fm-brief.sh secondmate scaffold exited non-zero"
+  brief="$home/data/brief-wait-sm/brief.md"
+  assert_grep "Do not poll or list the inbox while waiting; a waiting instruction rings." "$brief" \
+    "secondmate: polling the inbox while waiting is not forbidden"
+  assert_grep "natural checkpoint" "$brief" "secondmate: the flag dropped the natural-checkpoint inbox check"
+  pass "fm-brief: workers end the turn on a decision, wait in one blocking shell command, and never poll"
+}
+
+# Without config/wait-no-turns the scaffold keeps the pre-flag brief and drive text.
+test_wait_no_turns_absent_keeps_the_previous_brief() {
+  local home brief
+  home="$TMP_ROOT/wait-off"
+  mkdir -p "$home/data"
+  [ ! -e "$home/config/wait-no-turns" ]
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" brief-wait-off some-proj --mode no-mistakes >/dev/null 2>&1 \
+    || fail "fm-brief.sh ship scaffold exited non-zero"
+  brief="$home/data/brief-wait-off/brief.md"
+  assert_no_grep "end your turn at once" "$brief" "an absent flag still added the waiting section"
+  assert_grep "natural checkpoint" "$brief" "an absent flag dropped the unprompted inbox check"
+  assert_no_grep "Do not poll or list the inbox while waiting" "$brief" "an absent flag still added the no-poll inbox line"
+  assert_grep "background the drive call" "$brief" "an absent flag replaced the backgrounded drive text"
+  assert_no_grep "issue the same foreground call again" "$brief" \
+    "an absent flag still asked for the foreground reattach"
+  pass "fm-brief: without config/wait-no-turns the brief and drive text stay as they were"
+}
+
 test_worker_role_scope() {
   local kind home brief
   home="$TMP_ROOT/worker-role"
@@ -1606,6 +1669,8 @@ test_ship_and_scout_teach_validation_round_pause
 test_scout_and_secondmate_load_decision_hold_policy
 test_scout_and_secondmate_scaffold
 test_scout_lavish_line_follows_presentation_floor
+test_workers_wait_without_spending_turns
+test_wait_no_turns_absent_keeps_the_previous_brief
 test_home_brief_include_is_appended_last
 test_base_branch_is_rendered_and_bounded
 test_ship_branch_prefix_defaults_to_legacy_fm

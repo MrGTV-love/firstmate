@@ -194,6 +194,12 @@ RUN_STARTED_MS=$(now_ms)
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
+RUN_STARTED_LOAD=
+if [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
+  # shellcheck source=bin/fm-duration-lib.sh
+  . "$ROOT/bin/fm-duration-lib.sh"
+  RUN_STARTED_LOAD=$(fm_duration_load)
+fi
 
 MODE=
 LIST_ONLY=0
@@ -798,6 +804,7 @@ tests/fm-dispatch-capacity.test.sh 3724
 tests/fm-dispatch-resolve.test.sh 34508
 tests/fm-documentation-audiences.test.sh 3204
 tests/fm-dod-lib.test.sh 4000
+tests/fm-duration.test.sh 7990
 tests/fm-extension-binding.test.sh 12953
 tests/fm-fleet-ledger.test.sh 20284
 tests/fm-fleet-snapshot-contribution-cleanup.test.sh 1299
@@ -1798,7 +1805,7 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-procevent-when.test.sh
       printf '%s\n' __script__:fm-remote-reply.test.sh
       ;;
-    bin/fm-duration.py|bin/fm-duration-lib.sh)
+    bin/fm-duration.py|bin/fm-duration-lib.sh|bin/fm-duration-existing-limits.tsv)
       printf '%s\n' __script__:fm-duration.test.sh
       printf '%s\n' __script__:fm-timeout-lib.test.sh
       printf '%s\n' __script__:fm-lint.test.sh
@@ -2704,7 +2711,7 @@ family_bump() {
 }
 
 record_script_result() {
-  local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5
+  local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5 load_start=${6:-}
   local base family expected gate_skip gate_reason fail_delta token
   base=$(basename "$script")
   family=$(family_for_basename "$base")
@@ -2740,10 +2747,8 @@ record_script_result() {
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" >>"$RECORDS"
-  if [ "$gate_skip" = false ] && [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
-    # shellcheck source=bin/fm-duration-lib.sh
-    . "$ROOT/bin/fm-duration-lib.sh"
-    fm_duration_record "test.$script" "$duration" "$rc"
+  if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1; then
+    fm_duration_record "test.$script" "$duration" "$rc" '' 1 "$load_start"
   fi
   family_bump "$family" "$duration" "$fail_delta"
   TOTAL=$((TOTAL + 1))
@@ -2776,9 +2781,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
   local rc script_seconds=$PER_SCRIPT_TIMEOUT_SECS
-  if [ "$script_seconds" -gt 0 ] && [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
-    # shellcheck source=bin/fm-duration-lib.sh
-    . "$ROOT/bin/fm-duration-lib.sh"
+  if [ "$script_seconds" -gt 0 ] && declare -F fm_duration_limit >/dev/null 2>&1; then
     script_seconds=$(fm_duration_limit "test.$script" "$script_seconds" 99) || return $?
   fi
   local -a cmd
@@ -2823,12 +2826,15 @@ run_script_bounded() {  # <script> <out> <stream> <id>
 
 run_one_serial() {
   local script=$1
-  local base family expected out begin_iso begin_ms end_ms end_iso duration rc
+  local base family expected out begin_iso begin_ms end_ms end_iso duration rc load_start=
   base=$(basename "$script")
   family=$(family_for_basename "$base")
   expected=$(expected_gate_skip_for_family "$family")
   out="$RUN_TMP/out.$TOTAL"
   begin_iso=$(now_iso)
+  if declare -F fm_duration_load >/dev/null 2>&1; then
+    load_start=$(fm_duration_load)
+  fi
   begin_ms=$(now_ms)
 
   printf 'FM_TEST_BEGIN %s %s family=%s expected_gate_skip=%s\n' \
@@ -2847,7 +2853,7 @@ run_one_serial() {
   if [ "$duration" -lt 0 ]; then
     duration=0
   fi
-  record_script_result "$script" "$rc" "$duration" "$out" "$end_iso"
+  record_script_result "$script" "$rc" "$duration" "$out" "$end_iso" "$load_start"
 }
 
 if [ "$JOBS" -eq 1 ]; then
@@ -2862,6 +2868,15 @@ else
   # Retries are never used as a green strategy.
   worker_n=0
   active_workers=0
+  # Workers drop the home overrides below, so pin the one duration table that
+  # both their limit reads and this parent's records use.
+  if [ -z "${FM_DURATION_FILE:-}" ] && [ -r "$ROOT/bin/fm-duration.py" ] && command -v python3 >/dev/null 2>&1; then
+    if FM_DURATION_FILE=$(python3 "$ROOT/bin/fm-duration.py" path); then
+      export FM_DURATION_FILE
+    else
+      unset FM_DURATION_FILE
+    fi
+  fi
 
   worker_root_mode_is_enforceable() {
     case "$(uname -s)" in
@@ -2901,7 +2916,7 @@ else
           ;;
       esac
     fi
-    record_script_result "$script" "$rc" "$duration" "$out" "$end_iso"
+    record_script_result "$script" "$rc" "$duration" "$out" "$end_iso" "$(cat "$work/load_start" 2>/dev/null || true)"
   }
 
   worker_pid_is_running() {
@@ -2955,6 +2970,9 @@ else
       unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
         FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
       cd "$ROOT" || exit 1
+      if declare -F fm_duration_load >/dev/null 2>&1; then
+        fm_duration_load >"$work/load_start"
+      fi
       begin_ms=$(now_ms)
       set +e
       TMPDIR="$work/tmp" TMP="$work/tmp" run_script_bounded "$script" "$work/output" 0 "w$worker_n"
@@ -3043,9 +3061,7 @@ if [ -n "$MAX_WALL_MS" ]; then
   fi
 fi
 
-if [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
-  # shellcheck source=bin/fm-duration-lib.sh
-  . "$ROOT/bin/fm-duration-lib.sh"
-  fm_duration_record "test-suite.$SELECTION_DESC" "$RUN_DURATION" "$AGG_RC"
+if declare -F fm_duration_record >/dev/null 2>&1; then
+  fm_duration_record "test-suite.$SELECTION_DESC" "$RUN_DURATION" "$AGG_RC" '' 1 "$RUN_STARTED_LOAD"
 fi
 exit "$AGG_RC"

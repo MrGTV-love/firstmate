@@ -126,7 +126,9 @@ fm_cursor_list_models() {  # <path>
   duration_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   # shellcheck source=bin/fm-duration-lib.sh
   . "$duration_dir/fm-duration-lib.sh"
-  fm_duration_timed model-catalog.cursor "$FM_CURSOR_PROBE_TIMEOUT" "$1" --list-models
+  # Cursor's own stderr stays quiet; duration diagnostics remain visible.
+  # shellcheck disable=SC2016 # Positional expansion belongs to the child.
+  fm_duration_timed model-catalog.cursor "$FM_CURSOR_PROBE_TIMEOUT" sh -c 'exec "$@" 2>/dev/null' sh "$1" --list-models
 }
 
 fm_cursor_catalog_ids() {  # stdin: --list-models output; stdout: one id per line

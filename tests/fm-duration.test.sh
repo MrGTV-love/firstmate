@@ -37,36 +37,64 @@ def rows():
     return [json.loads(line) for line in ledger.read_text().splitlines()]
 
 
+def write_rows(rows_to_add, path=None):
+    with (path or ledger).open('a') as output:
+        for row in rows_to_add:
+            output.write(json.dumps(row) + '\n')
+
+
+def sample(key, duration, code=0, **extra):
+    return dict(host=platform.node(), key=key, duration_ms=duration, exit=code, **extra)
+
+
 cold = cli('limit', 'lint.full.whole', '--fallback', 30)
-assert cold.stdout.strip() == '30' and 'missing idle, loaded' in cold.stderr
+assert cold.stdout.strip() == '30' and '0 of 5 samples' in cold.stderr
 assert cli('limit', 'uncalibrated').stdout.strip() == '0'
-cli('record', 'sample', 42, 0, '--sample-id', 'once')
+cli('record', 'sample', 42, 0, '--sample-id', 'once', '--load-start', '1.5')
 cli('record', 'sample', 42, 0, '--sample-id', 'once')
 assert len([r for r in rows() if r.get('sample_id') == 'once']) == 1
 assert rows()[0]['host'] == platform.node() and rows()[0]['duration_ms'] == 42
+assert rows()[0]['load_start'] == 1.5 and isinstance(rows()[0]['load_end'], float)
+assert cli('path').stdout.strip() == str(ledger)
 
-# Independent timing-table fixture: two distinct load regimes, exact ranks,
-# failed/censored samples, and another host must not bias this host's limits.
-observations = []
-for regime, multiplier in [('idle', 1), ('loaded', 2)]:
-    for index in range(1, 101):
-        observations.append(dict(host=platform.node(), key='rank', regime=regime, duration_ms=index * multiplier * 1000, exit=0))
-observations.extend([
-    dict(host='another-host', key='rank', regime='loaded', duration_ms=999999999, exit=0),
-    dict(host=platform.node(), key='rank', regime='loaded', duration_ms=999999999, exit=124),
-    dict(host=platform.node(), key='rank', regime='loaded', duration_ms=1, exit=1),
+# Sample-count policy: fewer than five eligible samples keep the caller's bound.
+write_rows([sample('few', 1000 * index) for index in range(1, 5)])
+few = cli('limit', 'few', '--fallback', 30)
+assert few.stdout.strip() == '30' and '4 of 5 samples' in few.stderr
+
+# Independent timing-table fixture: exact ranks over every eligible sample, while
+# failed/censored/uncalibrated samples and another host do not bias this host.
+write_rows([sample('rank', index * 1000) for index in range(1, 101)] + [
+    dict(sample('rank', 999999999), host='another-host'),
+    sample('rank', 999999999, 124),
+    sample('rank', 1, 1),
+    sample('rank', 999999999, calibration=False),
 ])
-with ledger.open('a') as output:
-    for row in observations:
-        output.write(json.dumps(row) + '\n')
-assert cli('limit', 'rank', '--margin', 2).stdout.strip() == '380'
-assert cli('limit', 'rank', '--percentile', 99, '--margin', 2).stdout.strip() == '396'
+assert cli('limit', 'rank', '--margin', 2).stdout.strip() == '190'
+assert cli('limit', 'rank', '--percentile', 99, '--margin', 2).stdout.strip() == '198'
+# A measured value can raise an explicit bound but never lower it.
+assert cli('limit', 'rank', '--margin', 2, '--fallback', 30).stdout.strip() == '190'
+assert cli('limit', 'rank', '--margin', 2, '--fallback', 500).stdout.strip() == '500'
 cli('limit', 'rank', '--margin', 'nan', expected=2)
 cli('limit', 'rank', '--fallback', -1, expected=2)
+
+# The shell adapter keeps the caller's bound when the helper cannot read its table.
+corrupt = tmp / 'corrupt.jsonl'
+corrupt.write_text('{"host":\n')
+adapter = subprocess.run(['bash', '-c', '. "$1/bin/fm-duration-lib.sh"; fm_duration_limit corrupt.key 30', '_', str(root)],
+                         env=dict(env, FM_DURATION_FILE=str(corrupt)), capture_output=True, text=True)
+assert adapter.returncode == 0 and adapter.stdout == '30\n' and 'existing fallback 30s' in adapter.stderr, adapter
+
+batch = subprocess.run([sys.executable, str(helper), 'record-batch'], env=env, input='batch.a\t100\t0\t1\t1.5\t2.5\nbatch.b\t200\t3\t0\t\t\n', capture_output=True, text=True)
+assert batch.returncode == 0, batch
+batched = {r['key']: r for r in rows() if r.get('key', '').startswith('batch.')}
+assert (batched['batch.a']['duration_ms'], batched['batch.a']['load_start'], batched['batch.a']['load_end'], batched['batch.a']['calibration']) == (100, 1.5, 2.5, True)
+assert (batched['batch.b']['exit'], batched['batch.b']['load_end'], batched['batch.b']['calibration']) == (3, None, False)
 
 failed = cli('run', 'consumer.failure', '--', sys.executable, '-c', 'import sys; print("stdout-result"); print("stderr-result", file=sys.stderr); sys.exit(7)', expected=7)
 assert failed.stdout == 'stdout-result\n' and 'stderr-result' in failed.stderr
 assert 'output_bytes=' in failed.stderr and rows()[-1]['exit'] == 7
+assert rows()[-1]['load_start'] is not None and rows()[-1]['load_end'] is not None
 
 # Simulate a read returning while a real background command remains alive.
 # A sentinel controls completion, not a guessed sleep duration.
@@ -77,7 +105,7 @@ assert job.stdout.readline() == 'started\n'
 assert job.poll() is None, 'the initial read must not stop the running job'
 release.touch()
 out, err = job.communicate()
-assert job.returncode == 0 and out == 'completed\n' and 'progress:' in err
+assert job.returncode == 0 and out == 'completed\n' and 'progress:' in err, (job.returncode, out, err)
 assert rows()[-1]['key'] == 'progress.handshake' and rows()[-1]['exit'] == 0
 
 # Cancellation is a real signal result, not a telemetry or dead-group error.
@@ -89,23 +117,64 @@ assert cancel.returncode == 143 and cancel_out == '', (cancel.returncode, cancel
 
 # A calibrated outer ceiling, derived from measured-table fixtures, really
 # terminates an ongoing command rather than just returning from a read wait.
-with ledger.open('a') as output:
-    for regime in ('idle', 'loaded'):
-        output.write(json.dumps(dict(host=platform.node(), key='outer', regime=regime, duration_ms=1, exit=0)) + '\n')
+write_rows([sample('outer', 1) for _ in range(5)])
 cli('run', 'outer', '--', sys.executable, '-c', 'while True: pass', expected=124)
 assert any(r.get('event') == 'timeout' and r['key'] == 'outer' for r in rows())
 
-# Completed no-mistakes step imports are idempotent and historical load is
-# explicitly unknown, never relabeled as today's calibration evidence.
+# The leader's exit is the result even while a descendant still holds its
+# streams: no wait for the descendant and no false ceiling expiry.
+write_rows([sample('orphan', 20000) for _ in range(5)])
+for key in ('orphan', 'orphan.cold'):
+    gate = tmp / (key + '.fifo')
+    os.mkfifo(gate)
+    leader = cli('run', key, '--', 'bash', '-c', '(read -r _ < "$1") & echo leader-done; exit 0', '_', gate)
+    assert leader.stdout == 'leader-done\n'
+    assert rows()[-1]['key'] == key and rows()[-1]['exit'] == 0
+    assert not any(r.get('event') == 'timeout' and r['key'] == key for r in rows())
+    with open(gate, 'w') as opener:
+        opener.write('release\n')
+
+# Completed no-mistakes step imports are idempotent samples whose historical
+# load is unknown; after five samples the step key has a measured limit.
 database = tmp / 'nm.sqlite'
 with sqlite3.connect(database) as db:
     db.execute('CREATE TABLE step_results(id TEXT, run_id TEXT, step_name TEXT, duration_ms INTEGER, exit_code INTEGER, completed_at INTEGER)')
-    db.executemany('INSERT INTO step_results VALUES(?,?,?,?,?,?)', [('s1','r1','review',10000,0,1), ('s2','r2','review',50000,0,1), ('s3','r1','test',10000,0,None)])
+    db.executemany('INSERT INTO step_results VALUES(?,?,?,?,?,?)', [(f's{n}', f'r{n}', 'review', n * 10000, 0, 1) for n in range(1, 6)] + [('s0', 'r1', 'test', 10000, 0, None)])
 cli('import-nm', database, 'r1')
 cli('import-nm', database, 'r1')
 imports = [r for r in rows() if r.get('key') == 'no-mistakes.review']
-assert len(imports) == 1 and imports[0]['duration_ms'] == 10000 and imports[0]['regime'] == 'unknown'
+assert len(imports) == 1 and imports[0]['duration_ms'] == 10000 and imports[0]['load_start'] is None
 assert cli('limit', 'no-mistakes.review', '--fallback', 30).stdout.strip() == '30'
+for n in range(2, 6):
+    cli('import-nm', database, f'r{n}')
+assert cli('limit', 'no-mistakes.review', '--fallback', 30).stdout.strip() == '150'
+
+# Retention: once a host/key exceeds the compaction threshold, only its newest
+# samples survive; timeout, read-wait and filed rows are always kept.
+compact_ledger = tmp / 'compact.jsonl'
+write_rows([sample('busy', n) for n in range(1, 201)] + [sample('quiet', n) for n in range(1, 51)]
+           + [dict(host=platform.node(), key='busy', event=event, duration_ms=1) for event in ('timeout', 'read-wait', 'filed')], compact_ledger)
+subprocess.run([sys.executable, str(helper), 'record', 'busy', '201', '0'], env=dict(env, FM_DURATION_FILE=str(compact_ledger)), check=True, capture_output=True)
+kept = [json.loads(line) for line in compact_ledger.read_text().splitlines()]
+assert [r['duration_ms'] for r in kept if r['key'] == 'busy' and 'exit' in r] == list(range(102, 202))
+assert len([r for r in kept if r['key'] == 'quiet']) == 50
+assert sorted(r['event'] for r in kept if 'event' in r) == ['filed', 'read-wait', 'timeout']
+
+# A self-imposed read wait ending is recorded on its own and never files work.
+for event_id in ('a', 'b', 'c', 'c'):
+    cli('read-wait', 'waited', 600000, '--event-id', event_id)
+assert len([r for r in rows() if r.get('event') == 'read-wait' and r['key'] == 'waited']) == 3
+cli('timeout', 'waited', 600000, '--event-id', 'real')
+assert not any(r.get('event') == 'filed' and r['key'] == 'waited' for r in rows())
+
+# Without an owning home the code root's table is checkout-local; say so once.
+checkout = tmp / 'checkout'
+(checkout / 'bin').mkdir(parents=True)
+shutil.copyfile(helper, checkout / 'bin/fm-duration.py')
+bare = {name: value for name, value in env.items() if name not in ('FM_DURATION_FILE', 'FM_DURATION_HOME', 'FM_HOME', 'FM_DATA_OVERRIDE')}
+local = subprocess.run([sys.executable, str(checkout / 'bin/fm-duration.py'), 'record', 'local', '5', '0'], env=bare, capture_output=True, text=True, check=True)
+assert local.stderr.count('checkout-local and not durable') == 1
+assert (checkout / 'data/command-durations.jsonl').exists()
 
 if shutil.which('tasks-axi'):
     key = 'repeat.consumer'
@@ -124,6 +193,43 @@ if shutil.which('tasks-axi'):
     print('ok - real backlog owns the second timeout exactly once')
 else:
     print('skip: tasks-axi not found (repeated-timeout publication)')
+
+# A worker-shaped call: the helper runs from a disposable checkout while the
+# spawn-exported owning home receives the samples and the owned backlog work.
+# Closing that work and seeing the timeout recur files new work naming it.
+if shutil.which('tasks-axi'):
+    owner = tmp / 'owner-home'
+    (owner / 'data').mkdir(parents=True)
+    (owner / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+    (owner / 'bin').symlink_to(root / 'bin')
+    worktree = tmp / 'worker-worktree'
+    (worktree / 'bin').mkdir(parents=True)
+    shutil.copyfile(helper, worktree / 'bin/fm-duration.py')
+    worker_env = {name: value for name, value in env.items() if name not in ('FM_DURATION_FILE', 'FM_HOME', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_STATE_OVERRIDE')}
+    worker_env['FM_DURATION_HOME'] = str(owner)
+
+    def worker(*args):
+        result = subprocess.run([sys.executable, str(worktree / 'bin/fm-duration.py'), *map(str, args)], env=worker_env, capture_output=True, text=True)
+        assert result.returncode == 0, (args, result.stdout, result.stderr)
+        assert 'not durable' not in result.stderr
+        return result
+
+    key = 'worker.lint'
+    first = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + key).encode()).hexdigest()[:16]
+    for event_id in ('w1', 'w2', 'w3'):
+        worker('timeout', key, 1200000, '--event-id', event_id)
+    owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
+    assert [r['task'] for r in owner_rows if r.get('event') == 'filed'] == [first]
+    assert (owner / 'data/backlog.md').read_text().count('- [ ] fm-timeout-') == 1
+    assert not (worktree / 'data').exists()
+    subprocess.run(['tasks-axi', 'done', first, '--note', 'limit repaired', '--keep', '5'], cwd=owner, env=dict(worker_env, TASKS_AXI_FILE=str(owner / 'data/backlog.md')), check=True, capture_output=True)
+    worker('timeout', key, 1300000, '--event-id', 'w4')
+    worker('timeout', key, 1300000, '--event-id', 'w5')
+    owner_rows = [json.loads(line) for line in (owner / 'data/command-durations.jsonl').read_text().splitlines()]
+    assert [r['task'] for r in owner_rows if r.get('event') == 'filed'] == [first, first + '-2']
+    shown = subprocess.run([str(owner / 'bin/fm-tasks-axi.sh'), 'show', first + '-2', '--full'], env=dict(worker_env, FM_HOME=str(owner)), capture_output=True, text=True, check=True)
+    assert 'state: queued' in shown.stdout and first in shown.stdout
+    print('ok - worker timings and repeated-timeout work reach the owning home, and a recurrence after closure files new work')
 
 # An interrupted publication must remain retryable after samples were imported.
 # Use a real incompatible backlog path, then repair that prerequisite; no
@@ -173,6 +279,15 @@ source.write_text('#!/bin/bash\nEXISTING_TIMEOUT=16\n')
 cli('check-literals','--base','HEAD',expected=1,tool=guard)
 report = cli('check-literals','--report',tool=guard).stdout
 assert 'bin/example.sh:2\t16\t' in report
-print('ok - measured ranks, cold fallback, progress, outer ceiling, pipeline imports and literal guard')
+cli('check-literals','--report','--base','HEAD',expected=2,tool=guard)
+for added in ('fm_duration_timed key.x 5 cmd', 'fm_duration_limit "key.$h" 7', 'cmd --wait 8m', 'curl --timeout 30s'):
+    source.write_text('#!/bin/bash\nEXISTING_TIMEOUT=15\n' + added + '\n')
+    assert 'new time limit' in cli('check-literals','--base','HEAD',expected=1,tool=guard).stdout, added
+    assert added in cli('check-literals','--report',tool=guard).stdout, added
+source.write_text('#!/bin/bash\nEXISTING_TIMEOUT=15\nbound=$(fm_duration_limit "key.$h" 30)\nscript=$(fm_duration_limit "test.$s" "$fallback" 99)\n')
+cli('check-literals','--base','HEAD',expected=1,tool=guard)
+(repo / 'bin/fm-duration-existing-limits.tsv').write_text('# moved\nbin/example.sh\t30\tbound=$(fm_duration_limit "key.$h" 30)\n')
+cli('check-literals','--base','HEAD',tool=guard)
+print('ok - sample-count limits, retention, progress, leader exit, outer ceiling, pipeline imports and literal guard')
 PY
 pass "measured command behavior"

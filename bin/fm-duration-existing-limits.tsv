@@ -1,0 +1,3 @@
+# Existing time limits that this tree only moved (path<TAB>value<TAB>exact statement).
+# bin/fm-duration.py check-literals grandfathers each row once; see its header.
+bin/fm-model-catalog-lib.sh	30	bound=$(fm_duration_limit "model-catalog.$h" 30) || return $?
