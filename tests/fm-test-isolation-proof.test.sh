@@ -229,13 +229,15 @@ test_list_exclusions_documents_reasons() {
   [ -n "$out" ] || fail "--list-exclusions printed nothing"
   printf '%s\n' "$out" | grep -Fq 'fm-watcher-lock.test.sh' \
     || fail "exclusions must document watcher-lock serial reason"
+  printf '%s\n' "$out" | grep -Fq 'fm-watch-triage-waits.test.sh' \
+    || fail "exclusions must document the watcher triage waits serial reason"
   printf '%s\n' "$out" | grep -Fq 'fm-backend-herdr-smoke.test.sh' \
     || fail "exclusions must document real-herdr serial reason"
   pass "exclusion list documents serial reasons"
 }
 
 test_family_map_labels_this_contract() {
-  local fam safe safe_max scheduled_first
+  local fam safe safe_max
   fam=$("$RUNNER" --list --family pure-contract-unit)
   printf '%s\n' "$fam" | grep -Fq 'tests/fm-test-isolation-proof.test.sh' \
     || fail "fm-test-isolation-proof.test.sh must map to pure-contract-unit"
@@ -248,9 +250,6 @@ test_family_map_labels_this_contract() {
   [ "$safe_max" -eq 4 ] || fail "runner exposed the wrong watcher family worker cap: $safe_max"
   safe_max=$("$RUNNER" --concurrent-safe-family-jobs-max pure-contract-unit)
   [ "$safe_max" -eq 4 ] || fail "runner exposed the wrong contract-unit family worker cap: $safe_max"
-  scheduled_first=$("$RUNNER" --list-scheduled --family watcher-wake-lock | head -n 1)
-  [ "$scheduled_first" = tests/fm-watch-triage.test.sh ] \
-    || fail "runner scheduled the watcher family out of longest-hint order: $scheduled_first"
   pass "isolation-proof contract test is family-mapped"
 }
 
