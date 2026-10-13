@@ -451,6 +451,7 @@ run_malformed_wait_record_round() {  # <name> <evidence-body>
         malformed-record-pane
     ' _ "$WATCH" "$body" > "$out" 2>&1 \
     || fail "the wedge timer failed on a malformed wait record ($name): $(cat "$out")"
+  # shellcheck disable=SC2034 # Read by the sourcing wedge cases after this returns.
   MALFORMED_STATE=$state
 }
 
@@ -709,9 +710,11 @@ term_watcher_with_held_marker_lock() {  # <dir> [release-ticks]
   fi
   kill "$pid" 2>/dev/null || true
   wait_for_exit "$pid" 100
+  # shellcheck disable=SC2034 # Read by the sourcing stale cases after this returns.
   HELD_MARKER_LOCK_RC=$?
   : > "$dir/release-marker-lock"
   wait "$holder" 2>/dev/null || true
+  # shellcheck disable=SC2034 # Read by the sourcing stale cases after this returns.
   HELD_MARKER_LOCK_PID=$pid
 }
 
@@ -892,5 +895,6 @@ until_watch() {  # <dir> <cadence> -> pid in UNTIL_PID
     FM_STATE_OVERRIDE="$dir/state" FM_CREW_STATE_BIN="$dir/fakebin/fm-crew-state.sh" \
     FM_PAUSE_RESURFACE_SECS="$2" FM_POLL=1 FM_SIGNAL_GRACE=1 \
     FM_CHECK_INTERVAL=999999 FM_HEARTBEAT=999999 "$WATCH" > "$dir/watch.out" 2>&1 &
+  # shellcheck disable=SC2034 # Read by the sourcing away cases after this returns.
   UNTIL_PID=$!
 }
