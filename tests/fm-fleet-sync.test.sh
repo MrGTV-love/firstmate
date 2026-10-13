@@ -24,7 +24,8 @@
 # syncs (with a "recovered:" summary on stdout so a session-start refresh, which
 # discards stderr, still surfaces it); a live lock is never removed and the sync
 # fails loudly; real Git lock-fd and prepared-ref-transaction owners both block
-# removal, while a real idle non-Git cwd holder does not; incomplete directory
+# removal, including a transaction running in a linked worktree of the clone,
+# while real idle non-Git cwd holders in the clone or a linked worktree do not; incomplete directory
 # evidence and Git helpers still veto removal; a transient lock that self-clears
 # is retried without a force-remove; and any
 # non-packed-refs.lock fetch failure keeps today's behavior with no retry.
@@ -578,19 +579,26 @@ test_live_packed_refs_lock_is_never_removed() {
 }
 
 test_idle_cwd_in_clone_dir_does_not_block_recovery() {
-  local home fakebin clone out err idle
+  local home fakebin clone linked out err idle linked_idle
   home=$(new_home)
   fakebin="$home/fb-lockcwd"; mkdir -p "$fakebin"
   clone=$(build_packed_prunable "$home" lockcwd)
+  linked="$home/lockcwd-slot"
+  git -C "$clone" worktree add -q --detach "$linked"
   plant_packed_refs_lock "$clone"
   touch -t 200001010000 "$clone/.git/packed-refs.lock"
   mkfifo "$home/idle-input"
   exec 9<> "$home/idle-input"
   (cd "$clone" && exec bash -c 'read -r _ <&9') &
   idle=$!
+  # A pool-slot pane shell sits in a linked worktree of the same clone.
+  (cd "$linked" && exec bash -c 'read -r _ <&9') &
+  linked_idle=$!
   # Reuse the measured 200-poll ceiling documented in git-lock-helpers.sh.
   fm_test_wait_until 20 lsof -a -p "$idle" -d cwd -- "$clone" >/dev/null \
     || fail "idle process did not enter clone cwd"
+  fm_test_wait_until 20 lsof -a -p "$linked_idle" -d cwd -- "$linked" >/dev/null \
+    || fail "idle process did not enter linked worktree cwd"
   # The real lock has no open descriptor, but the real directory has a holder.
   if lsof -- "$clone/.git/packed-refs.lock" >/dev/null 2>&1; then
     fail "abandoned lock unexpectedly has an open descriptor"
@@ -601,7 +609,7 @@ test_idle_cwd_in_clone_dir_does_not_block_recovery() {
   FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=30 \
     run_sync_guarded "$home" "$fakebin" "$out" "$err" lockcwd
 
-  kill "$idle"; wait "$idle" 2>/dev/null || true
+  kill "$idle" "$linked_idle"; wait "$idle" "$linked_idle" 2>/dev/null || true
   exec 9>&-
   assert_grep "fetch succeeded after stale packed-refs lock cleanup" "$err" \
     "idle cwd: fetch did not recover"
@@ -609,7 +617,7 @@ test_idle_cwd_in_clone_dir_does_not_block_recovery() {
   assert_absent "$clone/.git/packed-refs.lock" "idle cwd: abandoned lock was kept"
   [ "$(head_sha "$clone")" = "$(git -C "$clone" rev-parse origin/main)" ] \
     || fail "idle cwd: clone was not advanced to origin/main"
-  pass "an idle non-git cwd holder does not prevent abandoned lock recovery"
+  pass "idle non-git cwd holders in the clone and a linked worktree do not prevent abandoned lock recovery"
 }
 
 test_real_git_packed_refs_owners_block_removal() {
@@ -640,6 +648,36 @@ test_real_git_packed_refs_owners_block_removal() {
     fm_test_git_lock_finish
     pass "real Git $kind ownership prevents packed-refs lock removal"
   done
+}
+
+test_linked_worktree_git_owner_blocks_removal() {
+  local home fakebin clone linked out err before
+  home=$(new_home)
+  fakebin="$home/fb-linked-git"; mkdir -p "$fakebin"
+  clone=$(build_packed_prunable "$home" linked-git)
+  linked="$home/linked-git-slot"
+  git -C "$clone" worktree add -q --detach "$linked"
+  fm_test_git_lock_start "$clone" "$home/git-owner-linked" packed "$linked"
+  before=$(head_sha "$clone")
+  # The prepared transaction closed the common lock's descriptor, and its cwd
+  # is the linked worktree, not the clone directory fleet-sync syncs.
+  if lsof -- "$FM_TEST_GIT_LOCK_PATH" >/dev/null 2>&1; then
+    fail "linked prepared Git transaction still has an open lock descriptor"
+  fi
+  if lsof -a -p "$FM_TEST_GIT_LOCK_PID" -d cwd -- "$clone" >/dev/null 2>&1; then
+    fail "linked prepared Git transaction unexpectedly has the clone cwd"
+  fi
+  lsof -a -p "$FM_TEST_GIT_LOCK_PID" -d cwd -- "$linked" >/dev/null \
+    || fail "linked prepared Git transaction did not keep the linked worktree cwd"
+  out="$home/out"; err="$home/err"
+  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=0 \
+  FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=30 \
+    run_sync_guarded "$home" "$fakebin" "$out" "$err" linked-git
+  assert_grep "is not provably stale" "$err" "linked Git owner: guard did not refuse"
+  assert_present "$FM_TEST_GIT_LOCK_PATH" "linked Git owner: lock was removed"
+  [ "$(head_sha "$clone")" = "$before" ] || fail "linked Git owner: clone advanced"
+  fm_test_git_lock_finish
+  pass "a prepared ref transaction in a linked worktree prevents packed-refs lock removal"
 }
 
 test_unclassifiable_directory_holders_block_removal() {
@@ -825,6 +863,7 @@ test_orphaned_stale_packed_refs_lock_recovers
 test_live_packed_refs_lock_is_never_removed
 test_idle_cwd_in_clone_dir_does_not_block_recovery
 test_real_git_packed_refs_owners_block_removal
+test_linked_worktree_git_owner_blocks_removal
 test_unclassifiable_directory_holders_block_removal
 test_transient_packed_refs_lock_self_clears
 test_non_signature_fetch_failure_is_not_retried

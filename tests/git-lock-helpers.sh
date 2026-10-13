@@ -8,8 +8,9 @@
 # 20s of nominal polling gives 11% margin over even the slower WHOLE probe,
 # not just its readiness wait, and stretches further with subprocess cost.
 
-fm_test_git_lock_start() { # <repo> <fixture-dir> <packed|packed-open|index>
-  local repo=$1 fixture=$2 kind=$3
+# The optional owner cwd lets a linked worktree own the repository's common lock.
+fm_test_git_lock_start() { # <repo> <fixture-dir> <packed|packed-open|index> [owner-cwd]
+  local repo=$1 fixture=$2 kind=$3 owner_cwd=${4:-$1}
   mkdir -p "$fixture"
   if [ "$kind" = packed ]; then
     git -C "$repo" branch fm-lock-held
@@ -30,7 +31,7 @@ fm_test_git_lock_start() { # <repo> <fixture-dir> <packed|packed-open|index>
   mkfifo "$fixture/input"
   exec 9<> "$fixture/input"
   (
-    cd "$repo" || exit 1
+    cd "$owner_cwd" || exit 1
     # Close the writer BEFORE exec's other redirections. Combining 9>&- with
     # exec git can leave Bash's saved fd11 writer inherited, preventing EOF.
     exec < "$fixture/input"

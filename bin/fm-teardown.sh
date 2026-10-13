@@ -2192,7 +2192,7 @@ cleanup_stale_lock_for_safety_check() {
     return 0
   fi
 
-  if fm_lock_is_provably_stale "$lock" "$dir" "$STALE_WORKTREE_LOCK_AGE_SECS"; then
+  if fm_lock_is_provably_stale "$lock" "$STALE_WORKTREE_LOCK_AGE_SECS" "$dir"; then
     rm -f "$lock"
     echo "teardown: removed provably-stale git lock $lock (age >= ${STALE_WORKTREE_LOCK_AGE_SECS}s, no live holder) and retrying worktree safety checks" >&2
     return 0
@@ -2253,7 +2253,7 @@ teardown_treehouse_return() {
   lock=$(worktree_git_lock_path "$dir") || lock=""
   if [ -n "$lock" ] && [ -e "$lock" ]; then
     lock_desc=$lock
-    if fm_lock_is_provably_stale "$lock" "$dir" "$STALE_WORKTREE_LOCK_AGE_SECS"; then
+    if fm_lock_is_provably_stale "$lock" "$STALE_WORKTREE_LOCK_AGE_SECS" "$dir"; then
       rm -f "$lock"
       echo "teardown: removed provably-stale git lock $lock (age >= ${STALE_WORKTREE_LOCK_AGE_SECS}s, no live holder) and retrying $label return" >&2
       if [ -n "$post_cleanup_check" ]; then

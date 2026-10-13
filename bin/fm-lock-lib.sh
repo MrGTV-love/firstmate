@@ -6,8 +6,10 @@
 # provably stale iff ALL of the following hold -
 #   1. the lock file still exists;
 #   2. no live process holds the lock file open, and no Git process (kernel
-#      command basename git or git-*) holds the companion directory (the
-#      worktree, or the repo's .git dir) open as cwd or an fd. This covers Git's
+#      command basename git or git-*) holds any companion directory open as cwd
+#      or an fd. The caller passes every worktree that can own the lock: the
+#      worktree for its own index.lock, and ALL worktrees of the repository for
+#      a common-dir lock such as packed-refs.lock. This covers Git's
 #      native executable and dashed helpers, not shells whose argv mentions git.
 #      lsof's c field is the kernel command ("cgit" encodes command "git").
 #      Git's close_lock_file_gently()
@@ -96,11 +98,12 @@ fm_lock_lsof_holder() {
   return 2
 }
 
-# fm_lock_has_live_holder <lock> <dir>: 0 if ANY process holds $lock, a Git
-# process holds companion $dir, or the answer is uncertain (assume live).
-# Returns 1 only when both queries rule out the owners defined in the header.
+# fm_lock_has_live_holder <lock> <dir>...: 0 if ANY process holds $lock, a Git
+# process holds a companion <dir>, or the answer is uncertain (assume live).
+# Returns 1 only when every query rules out the owners defined in the header.
 fm_lock_has_live_holder() {
-  local lock=$1 dir=$2 status
+  local lock=$1 dir status
+  shift
   command -v lsof >/dev/null 2>&1 || return 0
   if [ -n "$lock" ]; then
     if fm_lock_lsof_holder "$lock"; then
@@ -110,14 +113,14 @@ fm_lock_has_live_holder() {
       [ "$status" -eq 1 ] || return 0
     fi
   fi
-  if [ -n "$dir" ]; then
+  for dir in "$@"; do
     if fm_lock_lsof_holder "$dir" git-only; then
       return 0
     else
       status=$?
       [ "$status" -eq 1 ] || return 0
     fi
-  fi
+  done
   return 1
 }
 
@@ -131,14 +134,17 @@ fm_lock_age() {
   printf '%s\n' "$(( now - m ))"
 }
 
-# fm_lock_is_provably_stale <lock> <dir> <min_age_secs>: THE proof. Returns 0 iff
-# the lock exists, has no live holder, and its mtime age is at least
+# fm_lock_is_provably_stale <lock> <min_age_secs> <dir>...: THE proof. Returns 0
+# iff the lock exists, has no live holder, and its mtime age is at least
 # <min_age_secs>. Returns non-zero on any uncertainty - never remove a lock this
 # returns non-zero for.
 fm_lock_is_provably_stale() {
-  local lock=$1 dir=$2 min_age=$3 age
+  local lock=$1 min_age=$2 age
+  shift 2
   [ -n "$lock" ] && [ -e "$lock" ] || return 1
-  fm_lock_has_live_holder "$lock" "$dir" && return 1
+  # Without a companion directory, Git owners cannot be ruled out.
+  [ "$#" -gt 0 ] || return 1
+  fm_lock_has_live_holder "$lock" "$@" && return 1
   if ! age=$(fm_lock_age "$lock"); then
     fm_lock_log "cannot read mtime for git lock $lock; leaving it in place"
     return 1

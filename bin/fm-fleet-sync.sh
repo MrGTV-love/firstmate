@@ -164,14 +164,15 @@ packed_refs_lock_path() {
 # command's combined output and returns its exit status. On the packed-refs.lock
 # signature ONLY: retry up to FLEET_SYNC_PACKED_REFS_LOCK_RETRIES times (a
 # transient lock self-clears as the owning process exits), then - only if the lock
-# is provably stale per fm-lock-lib.sh's shared owner proof, using the clone
-# worktree $PROJ as companion and the configured mtime-age threshold - remove it
-# and retry once more. A live lock, an unprovable one, or any other failure keeps
-# today's behavior. Every wait, retry, and removal prints to stderr, and a
+# is provably stale per fm-lock-lib.sh's shared owner proof, using every existing
+# worktree of the clone as companion and the configured mtime-age threshold -
+# remove it and retry once more. A live lock, an unprovable one, or any other
+# failure keeps today's behavior. Every wait, retry, and removal prints to stderr, and a
 # successful recovery also prints one "$label: recovered: ..." summary to stdout so
 # a session-start refresh (which discards fleet-sync stderr) still surfaces it.
 fetch_with_packed_refs_lock_guard() {
-  local rc attempt=0 lock lock_desc
+  local rc attempt=0 lock lock_desc owner_dir
+  local -a owner_dirs=()
   FETCH_OUTPUT=$(git -C "$PROJ" fetch origin --prune --quiet 2>&1); rc=$?
   [ "$rc" -eq 0 ] && return 0
   is_packed_refs_lock_error "$FETCH_OUTPUT" || return "$rc"
@@ -194,13 +195,18 @@ fetch_with_packed_refs_lock_guard() {
   done
 
   # Retries exhausted and still the lock signature. Clear ONLY if provably stale.
-  # The companion liveness dir is $PROJ (the clone worktree): a live `git -C "$PROJ"`
-  # keeps its cwd there even in the narrow window after it closes packed-refs.lock
-  # and before it exits, so lsof on $PROJ still catches a holder the lock-file check
-  # alone would miss.
+  # packed-refs.lock lives in the common git dir, so a Git process in ANY worktree
+  # of the clone (the clone itself or a linked pool slot) can own it, and keeps its
+  # cwd there even after it closes the lock and before it commits or exits. Every
+  # existing worktree is therefore a companion liveness dir; a missing one cannot
+  # be anyone's cwd by path. No listed worktree leaves the lock unproven.
+  while IFS= read -r owner_dir; do
+    if [ -d "$owner_dir" ]; then owner_dirs+=("$owner_dir"); fi
+  done < <(git -C "$PROJ" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
   lock=$(packed_refs_lock_path) || lock=""
   if [ -n "$lock" ] && [ -e "$lock" ]; then
-    if fm_lock_is_provably_stale "$lock" "$PROJ" "$FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS"; then
+    if fm_lock_is_provably_stale "$lock" "$FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS" \
+      ${owner_dirs[@]+"${owner_dirs[@]}"}; then
       if ! rm -f "$lock"; then
         echo "$label: failed to remove provably-stale packed-refs lock $lock; leaving it in place" >&2
         return "$rc"
