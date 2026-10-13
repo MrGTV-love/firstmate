@@ -117,7 +117,8 @@
 # releases only its own Firstmate claim beside the slot. Before that, while this task still holds the slot's claim or the slot
 # carries none, Treehouse's state must durably hold the slot under
 # fm_task_copy_pool_slot_held's proof, protecting the interval before the
-# remaining record moves; a refusal names the state-only lease remedy. A root
+# remaining record moves; an unleased-slot refusal names the state-only lease
+# remedy, while a recovered-state lease has none (docs/agent-control.md). A root
 # record whose slot claim names another task is not on this route: the slot
 # was reassigned, so it needs no lease proof and keeps the reassigned-slot
 # cleanup below, which leaves that claim intact.
