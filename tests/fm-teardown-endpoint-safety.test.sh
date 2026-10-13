@@ -912,7 +912,7 @@ test_remote_seeded_home_still_refuses_a_slot_its_child_holds() {
 }
 
 test_remote_layout_homes_serialize_on_one_project_lock() {
-  local dir id=remote-serialize child_home child_project lock holder rc waited=0
+  local dir id=remote-serialize child_home child_project lock holder rc waited=0 waiter ticket tickets
   dir=$(make_case remote-lock-exclusion)
   mark_case_as_treehouse_pool "$dir"
   write_remote_parent_record "$dir/home"
@@ -943,21 +943,43 @@ test_remote_layout_homes_serialize_on_one_project_lock() {
   done
   [ -e "$dir/lock-held" ] || fail "the local child never took the shared project lock"
 
+  FM_PROJECT_LOCK_SERVICE_SECS=3 run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr" &
+  waiter=$!
+  waited=0
+  while ! grep -q 'fm-project-lock: waiting' "$dir/stderr" 2>/dev/null; do
+    kill -0 "$waiter" 2>/dev/null || break
+    [ "$waited" -lt 600 ] || fail "the remote-layout teardown never queued: $(cat "$dir/stderr")"
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  tickets=0
+  for ticket in "$lock.queue"/ticket-*; do [ ! -L "$ticket" ] || tickets=$((tickets + 1)); done
+  [ "$tickets" = 1 ] || fail "the remote-layout teardown did not register on the shared project queue: $(cat "$dir/stderr")"
+  assert_present "$dir/home/state/$id.meta" "the queued remote-layout teardown removed the task record before admission"
   set +e
-  run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
+  wait "$waiter"
   rc=$?
   set -e
-  kill "$holder" 2>/dev/null || true
-  wait "$holder" 2>/dev/null || true
 
   [ "$rc" -ne 0 ] \
     || fail "a remote-seeded home returned a pool slot while its local child held the shared lock"
+  assert_contains "$(cat "$dir/stderr")" "fm-project-lock: stall limit reached" \
+    "the refusal did not come from the shared project lock's stall limit"
+  assert_contains "$(cat "$dir/stderr")" "(PID $holder)" "the stall refusal did not name the live holder"
+  kill -0 "$holder" 2>/dev/null || fail "the stall refusal killed the live holder"
+  assert_equals "$holder" "$(cat "$lock/pid" 2>/dev/null)" "the stall refusal removed or replaced the live holder's lock"
+  for ticket in "$lock.queue"/ticket-*; do
+    [ ! -L "$ticket" ] || fail "the refused teardown left its queue ticket behind"
+  done
   assert_present "$dir/home/state/$id.meta" "contended remote-layout teardown removed the task record"
   assert_present "$dir/worktree/sentinel" "contended remote-layout teardown reset the slot"
   [ ! -s "$dir/runtime.log" ] \
     || fail "contended remote-layout teardown reached the runtime: $(cat "$dir/runtime.log")"
-  assert_contains "$(cat "$dir/stderr")" "another Treehouse slot allocation or return is in progress" \
-    "the refusal should name the shared project lock, not some unrelated check"
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  FM_HOME="$dir/home" bash -c '. "$1"; . "$2"; fm_project_lock_try "$3" probe && fm_project_lock_release "$3"' _ \
+    "$ROOT/bin/fm-wake-lib.sh" "$ROOT/bin/fm-project-lock-lib.sh" "$lock" \
+    || fail "the remote-seeded home could not take the project lock after the holder left"
 
   pass "Treehouse project locking still serializes two homes across the remote-seeded boundary"
 }

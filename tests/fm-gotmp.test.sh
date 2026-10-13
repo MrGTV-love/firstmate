@@ -67,6 +67,8 @@ SH
   ln -s "$ROOT/bin/fm-nm-run-lib.sh" "$fake/bin/fm-nm-run-lib.sh"
   # fm-lock-lib.sh: teardown sources it for the shared lock-staleness proof.
   ln -s "$ROOT/bin/fm-lock-lib.sh" "$fake/bin/fm-lock-lib.sh"
+  # fm-project-lock-lib.sh: teardown sources it for fair project-lock admission.
+  ln -s "$ROOT/bin/fm-project-lock-lib.sh" "$fake/bin/fm-project-lock-lib.sh"
   # fm-lease-lib.sh: teardown sources it for the supervision lease guard.
   ln -s "$ROOT/bin/fm-lease-lib.sh" "$fake/bin/fm-lease-lib.sh"
   # The lease guard asks fm-supervision-engine-lib.sh whether this home runs the

@@ -7,6 +7,8 @@
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            (--note <text> | --note-file <path>)
+# Reassociation holds the task control lock, so it makes one nonwaiting
+# bin/fm-project-lock-lib.sh attempt that never jumps a queued waiter.
 #        fm-control.sh <task-id> relaunch [--harness <name>] [--model <name>]
 #                                         [--effort <level>] [--claude-debug]
 #                                         [--reconcile-only] [--worktree <path>]
@@ -231,6 +233,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-project-lock-lib.sh
+. "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # shellcheck source=bin/fm-secondmate-registry-lib.sh
@@ -299,7 +303,7 @@ control_cleanup() {
   fi
   if [ "$CONTROL_PROJECT_LOCK_HELD" = 1 ]; then
     CONTROL_PROJECT_LOCK_HELD=0
-    fm_lock_release "$CONTROL_PROJECT_LOCK" || true
+    fm_project_lock_release "$CONTROL_PROJECT_LOCK" || true
   fi
   if [ "$CONTROL_LOCK_HELD" = 1 ]; then
     CONTROL_LOCK_HELD=0
@@ -644,7 +648,7 @@ do_reassociate() {
     || die "--worktree '$RELOCATE_TO' is not an existing directory"
   CONTROL_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$pre_project") \
     || die "cannot resolve the shared Treehouse project lock for $pre_project; nothing was changed"
-  fm_lock_try_acquire "$CONTROL_PROJECT_LOCK" \
+  fm_project_lock_try "$CONTROL_PROJECT_LOCK" "reassociate $ID" \
     || die "another task copy allocation, return, or reassociation is in progress for $pre_project; refusing to race it, nothing was changed"
   CONTROL_PROJECT_LOCK_HELD=1
   CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || exit 1
