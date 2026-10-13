@@ -1,0 +1,190 @@
+
+######## S1 uncalibrated limit reports missing calibration and keeps the caller fallback
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit lint.full.whole --fallback 1200
+calibration: "0 of 5 samples for lint.full.whole on Mac-Studio.local"
+fallback: "1200s existing caller limit"
+1200
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit lint.full.whole
+calibration: "0 of 5 samples for lint.full.whole on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+0
+[rc=0]
+
+######## S2 calibrated limit = nearest-rank p95 x margin 3, never below the caller bound; failures, uncalibrated and huge warm rows ignored
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit lint.full.whole --fallback 10
+measured: "lint.full.whole host=Mac-Studio.local p95=5000ms margin=3 samples=5 measured=15s bound=10s"
+15
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit lint.full.whole --fallback 30
+measured: "lint.full.whole host=Mac-Studio.local p95=5000ms margin=3 samples=5 measured=15s bound=30s"
+30
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit lint.full.whole --percentile 99 --margin 2
+measured: "lint.full.whole host=Mac-Studio.local p99=5000ms margin=2.0 samples=5 measured=10s bound=0s"
+10
+[rc=0]
+# 20 eligible samples 1..20 s: p95 nearest rank = 19th = 19000 ms; x3 = 57 s; p99 = 20th = 20000 ms; x3 = 60 s
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit lint.full.whole
+measured: "lint.full.whole host=Mac-Studio.local p95=19000ms margin=3 samples=20 measured=57s bound=0s"
+57
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit lint.full.whole --percentile 99
+measured: "lint.full.whole host=Mac-Studio.local p99=20000ms margin=3 samples=20 measured=60s bound=0s"
+60
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit lint.full.whole --margin 0.5
+error: "--margin must be finite and >= 1"
+help: "python3 bin/fm-duration.py --help"
+[rc=2]
+
+######## S10 the same key in another repository does not inherit acme/widgets' samples
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit lint.full.whole --fallback 1200
+calibration: "0 of 5 samples for lint.full.whole on Mac-Studio.local"
+fallback: "1200s existing caller limit"
+1200
+[rc=0]
+
+######## S3 uncalibrated run: background progress by output and CPU, no deadline, relayed output, sample recorded
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run demo.busy -- bash -c for i in 1 2 3 4; do echo tick $i; t=$(( $(date +%s) + 1 )); while [ $(date +%s) -lt $t ]; do :; done; done
+calibration: "0 of 5 samples for demo.busy on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+tick 1
+progress: "demo.busy elapsed=0.0s output_bytes=7 tree_cpu=0.00s"
+tick 2
+progress: "demo.busy elapsed=0.2s output_bytes=14 tree_cpu=0.00s"
+tick 3
+progress: "demo.busy elapsed=1.2s output_bytes=21 tree_cpu=0.06s"
+tick 4
+progress: "demo.busy elapsed=2.2s output_bytes=28 tree_cpu=0.06s"
+[rc=0]
+{'repo': 'acme/widgets', 'key': 'demo.busy', 'duration_ms': 3218, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'task': None, 'event_id': None, 'sample_id': '51da20d3-b642-4c30-8467-61840d532341'}
+
+######## S3b idle work with no output and no CPU is not stopped before its measured ceiling (p99 2 s x3 = 6 s; sleep 4)
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run demo.idle -- sleep 4
+measured: "demo.idle host=Mac-Studio.local p99=2000ms margin=3 samples=5 measured=6s bound=0s"
+progress: "demo.idle elapsed=1.0s output_bytes=0 tree_cpu=0.00s"
+[rc=0]
+wall_s=4
+{'repo': 'acme/widgets', 'key': 'demo.idle', 'duration_ms': 4016, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'task': None, 'event_id': None, 'sample_id': 'e2132cf2-e445-4c4c-9225-21e74d2a6577'}
+
+######## S4 calibrated ceiling (p99 1 s x3 = 3 s) stops a hang: TERM first, leader cleanup trap runs, exit 124, timeout recorded
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run hang.demo -- bash -c trap "echo cleanup > /Users/charlesabrooker/tmp/fm-lab.r3DHjG/trap-ran; exit 7" TERM; while :; do sleep 0.2; done
+measured: "hang.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+progress: "hang.demo elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+Terminated: 15
+progress: "hang.demo elapsed=3.3s output_bytes=15 tree_cpu=0.01s"
+[rc=124]
+wall_s=4 trap_marker=cleanup
+{'repo': 'acme/widgets', 'key': 'hang.demo', 'duration_ms': 3335, 'exit': 124, 'calibration': True, 'timed_out': True, 'event': None, 'task': None, 'event_id': None, 'sample_id': '66a110aa-9a8d-42b9-b3fc-a6398c0e3ada'}
+{'repo': 'acme/widgets', 'key': 'hang.demo', 'duration_ms': 3335, 'exit': None, 'calibration': None, 'timed_out': None, 'event': 'timeout', 'task': None, 'event_id': '66a110aa-9a8d-42b9-b3fc-a6398c0e3ada', 'sample_id': None}
+backlog fm-timeout items after first timeout: 0
+
+######## S5 second timeout of the same key files owned ship work for the registered project (acme/widgets -> widgets)
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run hang.demo -- bash -c while :; do sleep 0.2; done
+measured: "hang.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+progress: "hang.demo elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+timeout_work: "fm-timeout-31f932993b959258"
+[rc=124]
+{'repo': 'acme/widgets', 'key': 'hang.demo', 'duration_ms': 3335, 'exit': None, 'calibration': None, 'timed_out': None, 'event': 'timeout', 'task': None, 'event_id': '66a110aa-9a8d-42b9-b3fc-a6398c0e3ada', 'sample_id': None}
+{'repo': 'acme/widgets', 'key': 'hang.demo', 'duration_ms': 3355, 'exit': None, 'calibration': None, 'timed_out': None, 'event': 'timeout', 'task': None, 'event_id': 'abd85382-c148-4ef8-ba8d-d7595d5362ba', 'sample_id': None}
+{'repo': 'acme/widgets', 'key': 'hang.demo', 'duration_ms': None, 'exit': None, 'calibration': None, 'timed_out': None, 'event': 'filed', 'task': 'fm-timeout-31f932993b959258', 'event_id': None, 'sample_id': None}
+4:- [ ] fm-timeout-31f932993b959258 - Measure and repair repeated timeout: acme/widgets hang.demo (repo: widgets) (kind: ship) (since 2026-10-13)
+$ /Users/charlesabrooker/tmp/fm-lab.r3DHjG/bin/fm-tasks-axi.sh show fm-timeout-31f932993b959258 --full
+task:
+  id: fm-timeout-31f932993b959258
+  title: "Measure and repair repeated timeout: acme/widgets hang.demo"
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: widgets
+  priority: "-"
+  created: 2026-10-13
+  closed: "-"
+  deps: none
+  links: none
+  body: "Repeated timeout for command key hang.demo in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 3335, 3355. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure."
+[rc=0]
+
+######## S5b third timeout updates the ledger without a duplicate item
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run hang.demo -- bash -c while :; do sleep 0.2; done
+measured: "hang.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+progress: "hang.demo elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+[rc=124]
+fm-timeout items in backlog: 1
+
+######## S5c after the item is closed, a recurrence files new work naming the closed one
+$ /Users/charlesabrooker/tmp/fm-lab.r3DHjG/bin/fm-tasks-axi.sh done fm-timeout-31f932993b959258 --note lab: limit repaired
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+[rc=2]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run hang.demo -- bash -c while :; do sleep 0.2; done
+measured: "hang.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+progress: "hang.demo elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+[rc=124]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run hang.demo -- bash -c while :; do sleep 0.2; done
+measured: "hang.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+progress: "hang.demo elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+progress: "hang.demo elapsed=3.2s output_bytes=0 tree_cpu=0.02s"
+[rc=124]
+{'repo': 'acme/widgets', 'key': 'hang.demo', 'duration_ms': None, 'exit': None, 'calibration': None, 'timed_out': None, 'event': 'filed', 'task': 'fm-timeout-31f932993b959258', 'event_id': None, 'sample_id': None}
+$ /Users/charlesabrooker/tmp/fm-lab.r3DHjG/bin/fm-tasks-axi.sh show fm-timeout-31f932993b959258-2 --full
+error: "Task \"fm-timeout-31f932993b959258-2\" not found in this backlog"
+code: NOT_FOUND
+help[1]: Run `tasks-axi list` to see existing tasks
+[rc=1]
+
+######## S6 an unregistered repository (acme/gadgets) routes its repeated-timeout work to firstmate
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py timeout lint.full.whole 1500000 --event-id g1
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py timeout lint.full.whole 1600000 --event-id g2
+timeout_work: "fm-timeout-a9f5e8bdbeffebfa"
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py timeout lint.full.whole 1600000 --event-id g2
+[rc=0]
+$ /Users/charlesabrooker/tmp/fm-lab.r3DHjG/bin/fm-tasks-axi.sh show fm-timeout-a9f5e8bdbeffebfa --full
+task:
+  id: fm-timeout-a9f5e8bdbeffebfa
+  title: "Measure and repair repeated timeout: acme/gadgets lint.full.whole"
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: firstmate
+  priority: "-"
+  created: 2026-10-13
+  closed: "-"
+  deps: none
+  links: none
+  body: "Repeated timeout for command key lint.full.whole in repository acme/gadgets on host Mac-Studio.local. Observed lower bounds (ms): 1500000, 1600000. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure."
+[rc=0]
+
+######## S7 adversarial: a command that merely exits 124 with no ceiling is never a timeout and never files work
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run exit124.demo -- bash -c exit 124
+calibration: "0 of 5 samples for exit124.demo on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "exit124.demo elapsed=0.0s output_bytes=0 tree_cpu=0.00s"
+[rc=124]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run exit124.demo -- bash -c exit 124
+calibration: "0 of 5 samples for exit124.demo on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "exit124.demo elapsed=0.0s output_bytes=0 tree_cpu=0.00s"
+[rc=124]
+{'repo': 'acme/widgets', 'key': 'exit124.demo', 'duration_ms': 61, 'exit': 124, 'calibration': True, 'timed_out': False, 'event': None, 'task': None, 'event_id': None, 'sample_id': '596247f3-dba6-4b66-a064-c872f83c0069'}
+{'repo': 'acme/widgets', 'key': 'exit124.demo', 'duration_ms': 11, 'exit': 124, 'calibration': True, 'timed_out': False, 'event': None, 'task': None, 'event_id': None, 'sample_id': 'bde77808-3c0b-44a5-b2d5-d6d989346105'}
+timeout events for exit124.demo: 0
+
+######## S9 a forwarded SIGTERM lets the leader clean up, returns 143, and is not recorded as a timeout
+runner_rc=143 trap_marker=cleaned
+{'repo': 'acme/widgets', 'key': 'sig.demo', 'duration_ms': 188, 'exit': 143, 'calibration': True, 'timed_out': False, 'event': None, 'task': None, 'event_id': None, 'sample_id': 'bfe06f1d-b320-484d-b5d4-e951dd30612a'}
+timeout events for sig.demo: 0
+
+# NOTE: the S5c block above used fm-tasks-axi.sh done without --pr and was refused (driver error, not product). S5c was re-driven in round3-live-timeout-recurrence.txt.

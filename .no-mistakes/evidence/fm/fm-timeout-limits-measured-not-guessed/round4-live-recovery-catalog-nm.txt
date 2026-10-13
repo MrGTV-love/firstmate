@@ -1,0 +1,121 @@
+######## R13 worker in acme/widgets hits the measured ceiling with an unwritable ledger, then replays the printed recovery command verbatim (round-2 regression)
+[rc=124]
+measured: "recover.hang host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+progress: "recover.hang elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+recording_error: "[Errno 13] Permission denied: '/Users/charlesabrooker/tmp/fm-lab.mCr5mW/rec/table.jsonl'"
+help: "cd /Users/charlesabrooker/tmp/fm-lab.mCr5mW/work/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.hang 3264 124 --sample-id 7a6389e2-aa24-494f-8436-603dd074d843 --load-start 66.615234375 --timed-out; command result preserved"
+printed recovery command: cd /Users/charlesabrooker/tmp/fm-lab.mCr5mW/work/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.hang 3264 124 --sample-id 7a6389e2-aa24-494f-8436-603dd074d843 --load-start 66.615234375 --timed-out
+# replay 1: verbatim from the work repo
+$ bash -c cd /Users/charlesabrooker/tmp/fm-lab.mCr5mW/work/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.hang 3264 124 --sample-id 7a6389e2-aa24-494f-8436-603dd074d843 --load-start 66.615234375 --timed-out
+[rc=0]
+# replay 2: verbatim again from the firstmate worktree (retry must dedupe and keep acme/widgets)
+$ bash -c cd /Users/charlesabrooker/tmp/fm-lab.mCr5mW/work/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.hang 3264 124 --sample-id 7a6389e2-aa24-494f-8436-603dd074d843 --load-start 66.615234375 --timed-out
+[rc=0]
+samples: [('acme/widgets', 0, False, True, None), ('acme/widgets', 0, False, True, None), ('acme/widgets', 0, False, True, None), ('acme/widgets', 0, False, True, None), ('acme/widgets', 0, False, True, None), ('acme/widgets', 124, True, True, '7a6389e2-aa24-494f-8436-603dd074d843')]
+timeout_events: [('acme/widgets', '7a6389e2-aa24-494f-8436-603dd074d843')]
+# adversarial: a leader exiting 124 by itself under an unwritable ledger prints no --timed-out
+[rc=124]
+help: "cd /Users/charlesabrooker/tmp/fm-lab.mCr5mW/work/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.exit124 82 124 --sample-id 6579f197-41b8-4eb0-80fd-3a24c745bb35 --load-start 62.56201171875; command result preserved"
+ok: no --timed-out
+
+######## R14 close the owned item; a recurrence files new work naming the closed one
+$ tasks-axi done fm-timeout-31f932993b959258 --note lab: limit repaired --keep 5
+ok: done fm-timeout-31f932993b959258 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[rc=0]
+$ /Users/charlesabrooker/tmp/fm-lab.mCr5mW/bin/fm-tasks-axi.sh show fm-timeout-31f932993b959258
+task:
+  id: fm-timeout-31f932993b959258
+  title: "Measure and repair repeated timeout: acme/widgets hang.demo"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: widgets
+  priority: "-"
+  created: "-"
+  closed: 2026-10-13
+  deps: none
+  links: none
+  body: "Repeated timeout for command key hang.demo in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 3455, 3535. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.\nlab: limit repaired"
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run hang.demo -- bash -c while :; do sleep 0.2; done
+measured: "hang.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+progress: "hang.demo elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+timeout_work: "fm-timeout-31f932993b959258-2"
+[rc=124]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run hang.demo -- bash -c while :; do sleep 0.2; done
+measured: "hang.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+progress: "hang.demo elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+[rc=124]
+{"host":"Mac-Studio.local","repo":"acme/widgets","key":"hang.demo","event":"filed","task":"fm-timeout-31f932993b959258","previous":null,"recorded_at":"2026-10-13T22:38:46.643457+00:00"}
+{"host":"Mac-Studio.local","repo":"acme/widgets","key":"hang.demo","event":"filed","task":"fm-timeout-31f932993b959258-2","previous":"fm-timeout-31f932993b959258","recorded_at":"2026-10-13T22:46:12.225293+00:00"}
+$ /Users/charlesabrooker/tmp/fm-lab.mCr5mW/bin/fm-tasks-axi.sh show fm-timeout-31f932993b959258-2 --full
+task:
+  id: fm-timeout-31f932993b959258-2
+  title: "Measure and repair repeated timeout: acme/widgets hang.demo"
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: widgets
+  priority: "-"
+  created: 2026-10-13
+  closed: "-"
+  deps: none
+  links: none
+  body: "Repeated timeout for command key hang.demo in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 3455, 3535, 3358, 3227. The timeout recurred after fm-timeout-31f932993b959258 was closed. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure."
+[rc=0]
+
+######## R15 model-catalog discovery with the real omp harness records model-catalog.omp
+$ bash -c . '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-model-catalog-lib.sh'; s=$(mktemp -d); fm_model_catalog omp "$s" | jq -c '{models: (.models|length)}'; r=${PIPESTATUS[0]}; rm -rf "$s"; exit $r
+calibration: "0 of 5 samples for model-catalog.omp on Mac-Studio.local"
+fallback: "30s existing caller limit"
+{"models":675}
+[rc=0]
+{'key': 'model-catalog.omp', 'duration_ms': 1139, 'exit': 0, 'timed_out': False, 'calibration': True}
+
+######## R16 adversarial: a harness (agy shim) that exits 124 by itself under the 30s catalog bound is not a timeout (round-3 sibling)
+$ env PATH=/Users/charlesabrooker/tmp/fm-lab.mCr5mW/shim:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources bash -c . '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-model-catalog-lib.sh'; s=$(mktemp -d); fm_model_catalog agy "$s"; r=$?; rm -rf "$s"; exit $r
+calibration: "0 of 5 samples for model-catalog.agy on Mac-Studio.local"
+fallback: "30s existing caller limit"
+[rc=124]
+samples: [('acme/widgets', 124, False, True, None)]
+timeout_events: []
+
+######## R17 a harness that hangs past the 30s catalog bound is a real timeout
+$ env PATH=/Users/charlesabrooker/tmp/fm-lab.mCr5mW/shim:/Users/charlesabrooker/.claude/bin:/Users/charlesabrooker/.npm-global/bin:/Users/charlesabrooker/.antigravity/antigravity/bin:/Users/charlesabrooker/.cargo/bin:/Users/charlesabrooker/.bun/bin:/Users/charlesabrooker/.pyenv/shims:/Users/charlesabrooker/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/Users/charlesabrooker/go/bin:/Users/charlesabrooker/bin:/usr/local/sbin:/Users/charlesabrooker/.docker/bin:/Applications/Codex.app/Contents/Resources bash -c . '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-model-catalog-lib.sh'; s=$(mktemp -d); fm_model_catalog agy "$s"; r=$?; rm -rf "$s"; exit $r
+calibration: "0 of 5 samples for model-catalog.agy on Mac-Studio.local"
+fallback: "30s existing caller limit"
+[rc=124]
+samples: [('acme/widgets', 124, False, True, None), ('acme/widgets', 124, True, True, None)]
+timeout_events: [('acme/widgets', None)]
+{'key': 'model-catalog.agy', 'duration_ms': 53, 'exit': 124, 'timed_out': False}
+{'key': 'model-catalog.agy', 'duration_ms': 30086, 'exit': 124, 'timed_out': True}
+
+######## R18 import-nm records completed no-mistakes steps once, under no-mistakes-step.<step>, record-only
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py import-nm /Users/charlesabrooker/tmp/fm-lab.mCr5mW/nm.db r1
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py import-nm /Users/charlesabrooker/tmp/fm-lab.mCr5mW/nm.db r1
+[rc=0]
+{'repo': 'acme/widgets', 'key': 'no-mistakes-step.review', 'duration_ms': 600000, 'exit': 0, 'sample_id': 'nm:/Users/charlesabrooker/tmp/fm-lab.mCr5mW/nm.db:1'}
+{'repo': 'acme/widgets', 'key': 'no-mistakes-step.test', 'duration_ms': 900000, 'exit': 0, 'sample_id': 'nm:/Users/charlesabrooker/tmp/fm-lab.mCr5mW/nm.db:2'}
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit no-mistakes.review --fallback 0
+calibration: "0 of 5 samples for no-mistakes.review on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+0
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit no-mistakes-step.review --fallback 0
+calibration: "1 of 5 samples for no-mistakes-step.review on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+0
+[rc=0]

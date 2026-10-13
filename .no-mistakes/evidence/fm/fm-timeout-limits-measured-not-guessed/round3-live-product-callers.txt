@@ -1,0 +1,114 @@
+
+######## S12 fm-lint.sh records per-root and whole-run rows; cold analysis is calibration evidence, a warm cache hit and an explicit selection are not
+# run 1 (cold cache)
+$ bin/fm-lint.sh bin/fm-duration-lib.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+[rc=0]
+# run 2 (warm cache)
+$ bin/fm-lint.sh bin/fm-duration-lib.sh
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-duration-lib.sh
+[rc=0]
+{'repo': 'MrGTV-love/firstmate', 'key': 'lint-root.full.bin/fm-duration-lib.sh', 'duration_ms': 901, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': 48.03, 'load_end': 48.03}
+{'repo': 'MrGTV-love/firstmate', 'key': 'lint.full.whole', 'duration_ms': 2669, 'exit': 0, 'calibration': False, 'timed_out': False, 'event': None, 'load_start': 48.03, 'load_end': 48.03}
+{'repo': 'MrGTV-love/firstmate', 'key': 'lint-root.full.bin/fm-duration-lib.sh', 'duration_ms': 419, 'exit': 0, 'calibration': False, 'timed_out': False, 'event': None, 'load_start': 48.03, 'load_end': 48.03}
+{'repo': 'MrGTV-love/firstmate', 'key': 'lint.full.whole', 'duration_ms': 2038, 'exit': 0, 'calibration': False, 'timed_out': False, 'event': None, 'load_start': 48.03, 'load_end': 48.75}
+
+######## S13 fm-test-run.sh records one row per suite and one per selection into the duration table
+$ bin/fm-test-run.sh tests/fm-duration.test.sh tests/fm-timeout-lib.test.sh
+FM_TEST_BEGIN 2026-10-13T21:31:34Z tests/fm-timeout-lib.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-13T21:31:34Z tests/fm-duration.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - real backlog owns the second timeout exactly once
+ok - worker timings and repeated-timeout work reach the owning home, and a recurrence after closure files new work
+ok - repeated-timeout work routes to the registered project, else to firstmate
+ok - a failed backlog publication is retried without duplicating events, and imports never guess a timeout
+ok - sample-count limits, retention, progress, leader exit, outer ceiling, pipeline imports and literal guard
+ok - measured command behavior
+FM_TEST_END 2026-10-13T21:32:02Z tests/fm-duration.test.sh exit=0 duration_ms=26794 gate_skip=false
+ok - fm_exec_timed passes a command's status and output through unchanged
+ok - system Bash top-level and subshell calls preserve success, failure, and signal status
+_: line 5: 37289 Terminated: 15          "$@" 20>&-
+ok - fm_run_timed reports 124 when the bound TERMs a read whose wrapper recorded 143
+ok - fm_run_timed passes a natural exit through when the bound fired after completion
+ok - fm_exec_timed sends TERM at the bound and a cooperative command ends there
+ok - fm_exec_timed kills a TERM-ignoring command once the grace has passed
+ok - fm_exec_timed replaces the calling shell instead of wrapping it
+ok - fm_exec_timed reaps a descendant that would otherwise hold the output past the bound
+ok - fm_exec_timed forwards a TERM it receives to the bounded command
+ok - fm_exec_timed ends the command when its named owner is already gone
+ok - fm_exec_timed ends the command when its owner dies during watchdog startup
+ok - fm_exec_timed preserves a top-level shell's parent across exec startup
+ok - fm_exec_timed prefers its perl watchdog over timeout
+ok - fm_exec_timed refuses instead of running unbounded when no mechanism exists
+ok - fm_exec_timed rejects a zero, padded, non-numeric, or missing bound and a missing command
+tests/fm-timeout-lib.test.sh: line 28: 50242 Killed: 9               ( . "$ROOT/bin/fm-timeout-lib.sh"; PATH=$path fm_exec_timed "$@" )
+ok - fm_exec_timed's GNU timeout fallback kills a TERM-ignoring command once the grace has passed
+ok - fm_timed_out accepts 124 and 137 and nothing else
+ok - fm_run_timed's perl bound reaches a child that was slow to make its process group
+ok - fm_nm_bounded's perl bound reaches a child that was slow to make its process group
+ok - the perl bound forwards a TERM to its command's group
+ok - an outer Perl bound reaps a TERM-resistant nested command
+ok - no bounded-call status file survives a normal, failing, timed-out, or signalled exit of the caller
+ok - warm hits leave cold root and outer ceilings uncalibrated; changed cold analysis completes
+FM_TEST_END 2026-10-13T21:32:15Z tests/fm-timeout-lib.test.sh exit=0 duration_ms=40538 gate_skip=false
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=41678
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=2 duration_ms=67332 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-timeout-lib.test.sh duration_ms=40538
+FM_TEST_SLOWEST rank=2 script=tests/fm-duration.test.sh duration_ms=26794
+[rc=0]
+{'repo': 'MrGTV-love/firstmate', 'key': 'test.tests/fm-duration.test.sh', 'duration_ms': 26794, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': 48.75, 'load_end': 48.71728515625}
+{'repo': 'MrGTV-love/firstmate', 'key': 'test.tests/fm-timeout-lib.test.sh', 'duration_ms': 40538, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': 48.75, 'load_end': 44.8076171875}
+{'repo': 'MrGTV-love/firstmate', 'key': 'test-suite.scripts;jobs=4', 'duration_ms': 41678, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': 48.75, 'load_end': 44.8076171875}
+
+######## S15 fm_duration_timed: an uncalibrated caller keeps its existing bound; the bound owner records a real timeout; calibration raises (never lowers) the bound
+calibration: "0 of 5 samples for demo.timed on Mac-Studio.local"
+fallback: "2s existing caller limit"
+rc=124 wall_s=3 (existing 2 s bound applied)
+measured: "demo.timed host=Mac-Studio.local p95=4000ms margin=3.0 samples=5 measured=12s bound=2s"
+rc=0 wall_s=6 (measured p95 4 s x3 = 12 s raises the 2 s bound)
+# a zero fallback (caller had no deadline) stays record-only even when calibrated
+rc=0 wall_s=3
+# adversarial: a command that exits 124 by itself under a bound is recorded by the bound owner only if the bound expired
+calibration: "0 of 5 samples for demo.self124 on Mac-Studio.local"
+fallback: "30s existing caller limit"
+rc=124
+{'repo': 'acme/widgets', 'key': 'demo.timed', 'duration_ms': 2032, 'exit': 124, 'calibration': True, 'timed_out': True, 'event': None, 'load_start': 44.81, 'load_end': 45.14306640625}
+{'repo': 'acme/widgets', 'key': 'demo.timed', 'duration_ms': 2032, 'exit': None, 'calibration': None, 'timed_out': None, 'event': 'timeout', 'load_start': None, 'load_end': None}
+{'repo': 'acme/widgets', 'key': 'demo.timed', 'duration_ms': 4000, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 45.14306640625}
+{'repo': 'acme/widgets', 'key': 'demo.timed', 'duration_ms': 4000, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 45.14306640625}
+{'repo': 'acme/widgets', 'key': 'demo.timed', 'duration_ms': 4000, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 45.14306640625}
+{'repo': 'acme/widgets', 'key': 'demo.timed', 'duration_ms': 4000, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 45.14306640625}
+{'repo': 'acme/widgets', 'key': 'demo.timed', 'duration_ms': 4000, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 45.14306640625}
+{'repo': 'acme/widgets', 'key': 'demo.timed', 'duration_ms': 5141, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': 45.14, 'load_end': 46.01220703125}
+{'repo': 'acme/widgets', 'key': 'demo.nodeadline', 'duration_ms': 100, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 46.0107421875}
+{'repo': 'acme/widgets', 'key': 'demo.nodeadline', 'duration_ms': 100, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 46.0107421875}
+{'repo': 'acme/widgets', 'key': 'demo.nodeadline', 'duration_ms': 100, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 46.0107421875}
+{'repo': 'acme/widgets', 'key': 'demo.nodeadline', 'duration_ms': 100, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 46.0107421875}
+{'repo': 'acme/widgets', 'key': 'demo.nodeadline', 'duration_ms': 100, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': None, 'load_end': 46.0107421875}
+{'repo': 'acme/widgets', 'key': 'demo.nodeadline', 'duration_ms': 2027, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': 46.01, 'load_end': 46.0107421875}
+{'repo': 'acme/widgets', 'key': 'demo.self124', 'duration_ms': 37, 'exit': 124, 'calibration': True, 'timed_out': True, 'event': None, 'load_start': 46.01, 'load_end': 47.291015625}
+{'repo': 'acme/widgets', 'key': 'demo.self124', 'duration_ms': 37, 'exit': None, 'calibration': None, 'timed_out': None, 'event': 'timeout', 'load_start': None, 'load_end': None}
+timeout events: 2
+
+######## S15b model-catalog discovery records wall time under model-catalog.<harness>
+calibration: "0 of 5 samples for model-catalog.codex on Mac-Studio.local"
+fallback: "30s existing caller limit"
+catalog rc=0
+catalog rc (missing cache)=1
+{'repo': 'acme/widgets', 'key': 'model-catalog.codex', 'duration_ms': 22, 'exit': 0, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': 47.29, 'load_end': 47.291015625}
+{'repo': 'acme/widgets', 'key': 'model-catalog.codex', 'duration_ms': 11, 'exit': 1, 'calibration': True, 'timed_out': False, 'event': None, 'load_start': 47.29, 'load_end': 47.291015625}
+
+######## S16 import-nm records completed no-mistakes steps once, record-only under no-mistakes-step.<step>
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py import-nm /Users/charlesabrooker/tmp/fm-lab.r3DHjG/nm.db RUN1
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py import-nm /Users/charlesabrooker/tmp/fm-lab.r3DHjG/nm.db RUN1
+[rc=0]
+{'repo': 'acme/widgets', 'key': 'no-mistakes-step.review', 'duration_ms': 600000, 'exit': 0, 'calibration': None, 'timed_out': None, 'event': None, 'load_start': None, 'load_end': None}
+{'repo': 'acme/widgets', 'key': 'no-mistakes-step.test', 'duration_ms': 900000, 'exit': 0, 'calibration': None, 'timed_out': None, 'event': None, 'load_start': None, 'load_end': None}
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py limit no-mistakes.review --fallback 0
+calibration: "0 of 5 samples for no-mistakes.review on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+0
+[rc=0]

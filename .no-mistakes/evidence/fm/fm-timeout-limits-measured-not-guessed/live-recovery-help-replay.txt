@@ -1,0 +1,27 @@
+# Recovery help replay at f2a751a3
+######## driver-d (replay from firstmate root)
+## S11 ledger becomes unwritable while hang.demo runs to its ceiling
+rc=124
+recording_error: "[Errno 21] Is a directory: '/Users/charlesabrooker/tmp/fm-lab.zxjpv0/data/command-durations.jsonl'"
+help: "python3 bin/fm-duration.py record hang.demo 4278 124 --sample-id c31493bf-e609-4ba2-b12e-3cedb6209c49 --load-start 55.10498046875 --timed-out; command result preserved"
+--- replay the printed command twice (repaired ledger)
+timeout events before=7 after=8; sample rows with that id: 2
+
+## S11b non-timeout failure: help has no --timed-out
+rc=2
+help: "python3 bin/fm-duration.py record plain.demo 22 2 --sample-id 6a911f0e-d64a-4655-8e32-e87bb19c3374 --load-start 54.69580078125; command result preserved"
+
+######## driver-e (command ran in acme/widgets)
+## S11c run in acme/widgets hits its ceiling while the ledger is unwritable
+rc=124
+help: "python3 bin/fm-duration.py record hang.demo 4439 124 --sample-id 0d1f3279-bb66-4fa2-a4a1-874e51b4811a --load-start 58.85791015625 --timed-out; command result preserved"
+--- (1) printed command, run in the same directory (acme/widgets):
+/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3: can't open file '/Users/charlesabrooker/tmp/fm-lab.zxjpv0/widgets/bin/fm-duration.py': [Errno 2] No such file or directory
+rc=2
+--- (2) printed command, run from the firstmate code root (only place the relative path resolves):
+timeout_work: "fm-timeout-eeaa6e19e5291749"
+rc=0
+   recorded row: repo=MrGTV-love/firstmate key=hang.demo event=sample
+   recorded row: repo=MrGTV-love/firstmate key=hang.demo event=timeout
+   hang.demo timeout events for acme/widgets: 7
+   hang.demo timeout events for MrGTV-love/firstmate: 2

@@ -1,0 +1,52 @@
+######## R25 rendered lab-timeouts brief ($ FM_HOME=<lab> bin/fm-brief.sh lab-timeouts widgets --mode no-mistakes): measured-command, timeout and blocked lines
+20:If the top-level path is the primary checkout or not the worktree you were launched in, STOP - do not branch or commit here - append `blocked [at=<epoch>]: launched in primary checkout, not an isolated worktree` to the status file and stop.
+22:1. First action: create your branch: `git checkout -b fm/lab-timeouts --`
+27:2. Keep project edits inside this worktree; keep proof and scratch output outside it, under `/Users/charlesabrooker/tmp/fm-lab.mCr5mW/data/lab-timeouts/` or a temporary directory.
+32:   `echo "{state} [at=<epoch>]: {one short line}" >> '/Users/charlesabrooker/tmp/fm-lab.mCr5mW/state/lab-timeouts.status' && { [ ! -e '/Users/charlesabrooker/tmp/fm-lab.mCr5mW/config/fleet-ledger' ] || '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-fleet-ledger.sh' appended '/Users/charlesabrooker/tmp/fm-lab.mCr5mW/config' '/Users/charlesabrooker/tmp/fm-lab.mCr5mW/state/lab-timeouts.status' >/dev/null 2>&1 || true; }`
+33:   States: working, needs-decision, blocked, paused, done, failed.
+37:   needs-decision/blocked/paused/done/failed states. No step-by-step FYI progress lines;
+44:   Use `paused: {why}` - distinct from `blocked:` - when deliberately waiting for work or an external condition expected to clear on its own, including your own validation round.
+51:   Use `blocked:` only for a concrete prerequisite firstmate must supply, never because a command or read wait exceeded your own time budget.
+52:   Run long lint and test commands in the background through `python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run <stable-command-key> -- <command...>`, preserving stdout and stderr in task-local logs.
+56:   Only that helper may append the owning home's duration table and file repeated-timeout work through its backlog wrapper outside your task directory; do not hand-write those records.
+57:   Judge continued work by output growth and cumulative process-tree CPU time, not by how long your read waits.
+58:   A self-imposed read wait ending is never a failure or stop reason: retain the running job and reattach until its actual result arrives.
+59:   An outer ceiling uses measured p99 x 3 once the helper holds five samples for that key on this host, and never drops below an explicit bound; before that, report the missing calibration and collect it under the documented fallback instead of guessing.
+60:   A command run under that helper records its own timeout automatically, so never record it again by hand; use `python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py timeout <stable-command-key> <elapsed-ms> --event-id <unique-occurrence-id>` only for a real limit that stopped a command outside the helper; a read wait of your own that expired while the command continues is not a timeout, so record nothing for it.
+62:   The second timeout for that key automatically files owned backlog work with its measured lower bounds (for the repository's registered project when it has one, else for firstmate), and a recurrence after that work closes files new work; an expired read wait of your own never files work. Report the concrete repair obligation, never a final `blocked: timeout`.
+64:5. If you hit the same non-timeout prerequisite obstacle twice, append `blocked [at=<epoch>]: {why}` and stop; firstmate will help.
+65:   Timeout and elapsed-read events follow the measured-command instructions above, not this stop rule.
+68:   For a no-mistakes ask-user gate specifically, escalate all ask-user findings as one event plus one snapshot file, using that same shape even when the gate holds only a single ask-user finding: write only the ask-user findings, verbatim and unparaphrased (id, severity, file, line, description, authority), to `/Users/charlesabrooker/tmp/fm-lab.mCr5mW/data/lab-timeouts/nm-<run>-findings.txt`, then report the gate with
+69:   `needs-decision [at=<epoch>] [key=nm-<run>-<step>]: ask-user findings=<id1>,<id2>,... file=/Users/charlesabrooker/tmp/fm-lab.mCr5mW/data/lab-timeouts/nm-<run>-findings.txt`
+76:     Before you append `blocked:` about the pipeline, run `no-mistakes daemon status` and
+78:     `blocked [at=<epoch>]: {the daemon error}` and stop even when the local run record still says running or
+82:     going. A drive-call error, timeout, slow read, or generic unreachability is NOT a daemon error:
+94:   `blocked [at=<epoch>]: {what you need}` and stop; firstmate arranges it.
+98:   or a reboot. Before you append a `paused`, `blocked`, `needs-decision`, `done`, or `failed`
+117:Firstmate steers you through durable message files in '/Users/charlesabrooker/tmp/fm-lab.mCr5mW/state/lab-timeouts.inbox'.
+118:When a terminal message says an instruction is waiting there - and at any natural checkpoint when you are unsure - list '/Users/charlesabrooker/tmp/fm-lab.mCr5mW/state/lab-timeouts.inbox'/*.msg, read and act on each message in numeric order, then acknowledge each handled message by moving it: `mv '/Users/charlesabrooker/tmp/fm-lab.mCr5mW/state/lab-timeouts.inbox'/NNN.msg '/Users/charlesabrooker/tmp/fm-lab.mCr5mW/state/lab-timeouts.inbox'/handled/`.
+127:Ship branch: fm/lab-timeouts
+151:A drive call's own wait ending, or your harness's command bound passing, never kills the run, proves failure, or permits a final timeout blocker: the measured-command instructions above own long-command limits and progress checks, so judge continued work by output growth and cumulative process-tree CPU time.
+152:Any outer ceiling is measured p99 x 3 from that helper for the wrapped call's own key, not a guessed tool wait; follow its explicit fallback when calibration is missing.
+155:Reattach and keep going rather than reporting the pipeline blocked; rule 7 owns the checks that decide when a pipeline block is real.
+
+######## R25 rendered lab-scout brief ($ FM_HOME=<lab> bin/fm-brief.sh lab-scout widgets --scout): measured-command, timeout and blocked lines
+27:   States: working, needs-decision, blocked, paused, done, failed.
+30:   would act on and the needs-decision/blocked/paused/done/failed states. No step-by-step
+35:   Use `paused: {why}` - distinct from `blocked:` - when deliberately waiting for work or an external condition expected to clear on its own, including your own validation round.
+42:   Use `blocked:` only for a concrete prerequisite firstmate must supply, never because a command or read wait exceeded your own time budget.
+43:   Run long lint and test commands in the background through `python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run <stable-command-key> -- <command...>`, preserving stdout and stderr in task-local logs.
+47:   Only that helper may append the owning home's duration table and file repeated-timeout work through its backlog wrapper outside your task directory; do not hand-write those records.
+48:   Judge continued work by output growth and cumulative process-tree CPU time, not by how long your read waits.
+49:   A self-imposed read wait ending is never a failure or stop reason: retain the running job and reattach until its actual result arrives.
+50:   An outer ceiling uses measured p99 x 3 once the helper holds five samples for that key on this host, and never drops below an explicit bound; before that, report the missing calibration and collect it under the documented fallback instead of guessing.
+51:   A command run under that helper records its own timeout automatically, so never record it again by hand; use `python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py timeout <stable-command-key> <elapsed-ms> --event-id <unique-occurrence-id>` only for a real limit that stopped a command outside the helper; a read wait of your own that expired while the command continues is not a timeout, so record nothing for it.
+53:   The second timeout for that key automatically files owned backlog work with its measured lower bounds (for the repository's registered project when it has one, else for firstmate), and a recurrence after that work closes files new work; an expired read wait of your own never files work. Report the concrete repair obligation, never a final `blocked: timeout`.
+55:5. If you hit the same non-timeout prerequisite obstacle twice, append `blocked [at=<epoch>]: {why}` and stop; firstmate will help.
+56:   Timeout and elapsed-read events follow the measured-command instructions above, not this stop rule.
+64:     Before you append `blocked:` about the pipeline, run `no-mistakes daemon status` and
+66:     `blocked [at=<epoch>]: {the daemon error}` and stop even when the local run record still says running or
+70:     going. A drive-call error, timeout, slow read, or generic unreachability is NOT a daemon error:
+82:   `blocked [at=<epoch>]: {what you need}` and stop; firstmate arranges it.
+86:   or a reboot. Before you append a `paused`, `blocked`, `needs-decision`, `done`, or `failed`
+

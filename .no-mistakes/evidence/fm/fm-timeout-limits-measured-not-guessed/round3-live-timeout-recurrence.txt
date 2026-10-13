@@ -1,0 +1,56 @@
+
+######## S5c (re-driven) close the owned item, then a recurrence files new work naming it
+$ tasks-axi done fm-timeout-31f932993b959258 --note lab: limit repaired --keep 5
+ok: done fm-timeout-31f932993b959258 -> Done
+help[1]:
+  - Run `tasks-axi ready` to dispatch work unblocked by this
+[rc=0]
+$ /Users/charlesabrooker/tmp/fm-lab.r3DHjG/bin/fm-tasks-axi.sh show fm-timeout-31f932993b959258
+task:
+  id: fm-timeout-31f932993b959258
+  title: "Measure and repair repeated timeout: acme/widgets hang.demo"
+  state: done
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: widgets
+  priority: "-"
+  created: "-"
+  closed: 2026-10-13
+  deps: none
+  links: none
+  body: "Repeated timeout for command key hang.demo in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 3335, 3355. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.\nlab: limit repaired"
+[rc=0]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run hang.demo -- bash -c while :; do sleep 0.2; done
+measured: "hang.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+timeout_work: "fm-timeout-31f932993b959258-2"
+[rc=124]
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run hang.demo -- bash -c while :; do sleep 0.2; done
+measured: "hang.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+[rc=124]
+{"host":"Mac-Studio.local","repo":"acme/widgets","key":"hang.demo","event":"filed","task":"fm-timeout-31f932993b959258","previous":null,"recorded_at":"2026-10-13T21:29:57.613463+00:00"}
+{"host":"Mac-Studio.local","repo":"acme/widgets","key":"hang.demo","event":"filed","task":"fm-timeout-31f932993b959258-2","previous":"fm-timeout-31f932993b959258","recorded_at":"2026-10-13T21:30:31.129701+00:00"}
+$ /Users/charlesabrooker/tmp/fm-lab.r3DHjG/bin/fm-tasks-axi.sh show fm-timeout-31f932993b959258-2 --full
+task:
+  id: fm-timeout-31f932993b959258-2
+  title: "Measure and repair repeated timeout: acme/widgets hang.demo"
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: widgets
+  priority: "-"
+  created: 2026-10-13
+  closed: "-"
+  deps: none
+  links: none
+  body: "Repeated timeout for command key hang.demo in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 3335, 3355, 3287, 3246, 3327, 3443. The timeout recurred after fm-timeout-31f932993b959258 was closed. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure."
+[rc=0]

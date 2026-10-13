@@ -1,0 +1,19 @@
+######## R26 a real fm-spawn scout (lab home, lab tmux socket, raw bash harness) receives FM_DURATION_HOME; the helper run inside the pool worktree records into the owning home
+$ bin/fm-spawn.sh lab-spawn <lab>/projects/widgets --scout --harness "bash --norc"   (from the lab primary pane, FM_HOME=<lab>, TREEHOUSE_ROOT=<lab>/pool)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.mCr5mW
+skill selection for lab-spawn: undelivered - raw launch command has no supported brief transport
+spawned lab-spawn harness=bash kind=scout window=primary:fm-lab-spawn worktree=/Users/charlesabrooker/tmp/fm-lab.mCr5mW/pool/.treehouse/widgets-20b6e5/1/widgets
+SPAWN_RC=0
+# inside the spawned worker pane (primary:fm-lab-spawn):
+/Users/charlesabrooker/tmp/fm-lab.mCr5mW/pool/.treehouse/widgets-20b6e5/1/widgets
+FM_DURATION_HOME=/Users/charlesabrooker/tmp/fm-lab.mCr5mW
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.mCr5mW
+/Users/charlesabrooker/tmp/fm-lab.mCr5mW/data/command-durations.jsonl
+calibration: "0 of 5 samples for lab.spawn.check on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+worker-ran
+progress: "lab.spawn.check elapsed=0.0s output_bytes=11 tree_cpu=0.00s"
+WORKER_RC=0
+# owning home ledger rows for lab.spawn.check (before=0):
+{"host":"Mac-Studio.local","repo":"remote/widgets","key":"lab.spawn.check","duration_ms":12,"exit":0,"recorded_at":"2026-10-13T22:51:01.189575+00:00","load_start":74.2109375,"load_end":74.2109375,"cpus":18,"sample_id":"e1b6f986-e073-49de-bcb3-be3e38abc3b1","calibration":true,"timed_out":false}
+# pool worktree data/command-durations.jsonl exists: no

@@ -1,0 +1,34 @@
+
+######## S8 worker in acme/widgets hits the measured ceiling while the ledger is unwritable; it replays the printed recovery command verbatim
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run recover.hang -- bash -c while :; do sleep 0.2; done
+[rc=124]
+measured: "recover.hang host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+recording_error: "[Errno 13] Permission denied: '/Users/charlesabrooker/tmp/fm-lab.r3DHjG/rec/table.jsonl'"
+help: "cd /Users/charlesabrooker/tmp/fm-lab.r3DHjG/repos/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.hang 3256 124 --sample-id f949aed4-3de4-4fad-ac96-83b187aac717 --load-start 52.1689453125 --timed-out; command result preserved"
+printed recovery command: cd /Users/charlesabrooker/tmp/fm-lab.r3DHjG/repos/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.hang 3256 124 --sample-id f949aed4-3de4-4fad-ac96-83b187aac717 --load-start 52.1689453125 --timed-out
+# replay 1: verbatim from the work repo (acme/widgets)
+$ bash -c cd /Users/charlesabrooker/tmp/fm-lab.r3DHjG/repos/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.hang 3256 124 --sample-id f949aed4-3de4-4fad-ac96-83b187aac717 --load-start 52.1689453125 --timed-out
+[rc=0]
+# replay 2: verbatim from an unrelated directory (/tmp) - must still record under acme/widgets and dedupe
+$ bash -c cd /Users/charlesabrooker/tmp/fm-lab.r3DHjG/repos/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.hang 3256 124 --sample-id f949aed4-3de4-4fad-ac96-83b187aac717 --load-start 52.1689453125 --timed-out
+[rc=0]
+# replay 3: verbatim from the firstmate checkout - must still record under acme/widgets and dedupe
+$ bash -c cd /Users/charlesabrooker/tmp/fm-lab.r3DHjG/repos/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.hang 3256 124 --sample-id f949aed4-3de4-4fad-ac96-83b187aac717 --load-start 52.1689453125 --timed-out
+[rc=0]
+samples_with_id: [('acme/widgets', 124, True, 'f949aed4-3de4-4fad-ac96-83b187aac717')]
+timeout_events: [('acme/widgets', 'f949aed4-3de4-4fad-ac96-83b187aac717')]
+repos_for_key: ['acme/widgets']
+
+######## S8b adversarial: a leader that merely exits 124 under an unwritable ledger prints no --timed-out
+$ python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run recover.exit124 -- bash -c exit 124
+[rc=124]
+calibration: "0 of 5 samples for recover.exit124 on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+recording_error: "[Errno 13] Permission denied: '/Users/charlesabrooker/tmp/fm-lab.r3DHjG/rec/table.jsonl'"
+help: "cd /Users/charlesabrooker/tmp/fm-lab.r3DHjG/repos/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.exit124 6 124 --sample-id 78bfa8b6-3d00-41b0-b31b-732ac45244fc --load-start 52.66796875; command result preserved"
+ok: no --timed-out
+$ bash -c cd /Users/charlesabrooker/tmp/fm-lab.r3DHjG/repos/widgets && python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py record recover.exit124 6 124 --sample-id 78bfa8b6-3d00-41b0-b31b-732ac45244fc --load-start 52.66796875
+[rc=0]
+samples_with_id: [('acme/widgets', 124, False, '78bfa8b6-3d00-41b0-b31b-732ac45244fc')]
+timeout_events: []
+repos_for_key: ['acme/widgets']

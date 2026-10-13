@@ -1,0 +1,87 @@
+
+######## S11 literal guard: the branch as shipped passes; existing limits are reported, not edited
+$ python3 bin/fm-duration.py check-literals --base 0daf001c287af249b3a935622d1a4ee7a5322327
+[rc=0]
+existing literals reported: 176
+bin/backends/herdr-eventwait.py:43	5.0	CONNECT_TIMEOUT = 5.0
+bin/backends/herdr-eventwait.py:44	5.0	ACK_TIMEOUT = 5.0
+bin/backends/herdr-workspace-move.py:30	5.0	CONNECT_TIMEOUT = 5.0
+Exception ignored on flushing sys.stdout:
+BrokenPipeError: [Errno 32] Broken pipe
+
+######## S11b adversarial: a new hard-coded limit without a measured note fails the guard
+$ python3 bin/fm-duration.py check-literals --base 0daf001c287af249b3a935622d1a4ee7a5322327
+error: "bin/fm-lab-probe.sh:2: new time limit 45; add adjacent measured: value=45 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+[rc=1]
+
+######## S11c a malformed note (margin below 1, wrong value) still fails
+$ python3 bin/fm-duration.py check-literals --base 0daf001c287af249b3a935622d1a4ee7a5322327
+error: "bin/fm-lab-probe.sh:3: new time limit 45; add adjacent measured: value=45 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+[rc=1]
+$ python3 bin/fm-duration.py check-literals --base 0daf001c287af249b3a935622d1a4ee7a5322327
+error: "bin/fm-lab-probe.sh:3: new time limit 45; add adjacent measured: value=45 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+[rc=1]
+
+######## S11d an adjacent measured note with value, date, host and margin passes
+$ python3 bin/fm-duration.py check-literals --base 0daf001c287af249b3a935622d1a4ee7a5322327
+[rc=0]
+
+######## S11e the guard also runs inside canonical lint backend purity (fm-lint.sh) and fails it
+558:fm_lint_run_backend_purity() {
+1593:  fm_lint_run_backend_purity || overall_rc=$?
+1968:fm_lint_run_backend_purity || purity_rc=$?
+
+######## S17 adversarial: fm-test-run.sh with a per-script bound, a suite that exits 124 by itself in milliseconds
+$ bin/fm-test-run.sh --per-script-timeout-secs 60 tests/fm-zz-lab-exit124.test.sh
+FM_TEST_BEGIN 2026-10-13T21:33:42Z tests/fm-zz-lab-exit124.test.sh family=unclassified expected_gate_skip=none
+calibration: "0 of 5 samples for test.tests/fm-zz-lab-exit124.test.sh on Mac-Studio.local"
+fallback: "60s existing caller limit"
+not ok - lab suite exits 124 on its own
+not ok - tests/fm-zz-lab-exit124.test.sh exceeded the per-script bound of 60s and was terminated
+FM_TEST_END 2026-10-13T21:33:49Z tests/fm-zz-lab-exit124.test.sh exit=124 duration_ms=6756 gate_skip=false
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=7907
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=6756 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-zz-lab-exit124.test.sh duration_ms=6756
+[rc=1]
+$ bin/fm-test-run.sh --per-script-timeout-secs 60 tests/fm-zz-lab-exit124.test.sh
+FM_TEST_BEGIN 2026-10-13T21:33:51Z tests/fm-zz-lab-exit124.test.sh family=unclassified expected_gate_skip=none
+calibration: "0 of 5 samples for test.tests/fm-zz-lab-exit124.test.sh on Mac-Studio.local"
+fallback: "60s existing caller limit"
+not ok - lab suite exits 124 on its own
+not ok - tests/fm-zz-lab-exit124.test.sh exceeded the per-script bound of 60s and was terminated
+FM_TEST_END 2026-10-13T21:33:56Z tests/fm-zz-lab-exit124.test.sh exit=124 duration_ms=4822 gate_skip=false
+error: "timeout work could not be filed: fm-tasks-axi: data directory cannot be resolved: /Users/charlesabrooker/tmp/fm-lab.r3DHjG/clone/data"
+fm-duration: could not persist duration or file repeated timeout work for test.tests/fm-zz-lab-exit124.test.sh
+FM_TEST_SUMMARY total=1 failed=1 skipped_gate=0 duration_ms=6045
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=4822 failed=1
+FM_TEST_SLOWEST rank=1 script=tests/fm-zz-lab-exit124.test.sh duration_ms=4822
+[rc=1]
+{'key': 'test.tests/fm-zz-lab-exit124.test.sh', 'duration_ms': 6756, 'exit': 124, 'timed_out': True, 'event': None, 'task': None}
+{'key': 'test.tests/fm-zz-lab-exit124.test.sh', 'duration_ms': 6756, 'exit': None, 'timed_out': None, 'event': 'timeout', 'task': None}
+{'key': 'test-suite.scripts;jobs=1', 'duration_ms': 7907, 'exit': 1, 'timed_out': False, 'event': None, 'task': None}
+{'key': 'test.tests/fm-zz-lab-exit124.test.sh', 'duration_ms': 4822, 'exit': 124, 'timed_out': True, 'event': None, 'task': None}
+{'key': 'test.tests/fm-zz-lab-exit124.test.sh', 'duration_ms': 4822, 'exit': None, 'timed_out': None, 'event': 'timeout', 'task': None}
+{'key': 'test-suite.scripts;jobs=1', 'duration_ms': 6045, 'exit': 1, 'timed_out': False, 'event': None, 'task': None}
+
+######## S11e the literal guard runs inside real fm-lint.sh and fails lint on an unannotated new limit
+$ bin/fm-lint.sh bin/fm-lab-probe.sh   (probe: fm_run_timed 77, no note)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+error: "no comparison base; pass --base REF"
+[rc=1]
+$ bin/fm-lint.sh bin/fm-lab-probe.sh   (probe with adjacent measured note)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+error: "no comparison base; pass --base REF"
+[rc=1]
+
+# (the two runs above had no main/origin/main ref in the disposable clone: setup, not product. Local main now points at base 0daf001c.)
+$ bin/fm-lint.sh bin/fm-lab-probe.sh   (probe: fm_run_timed 77, no note)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+error: "bin/fm-lab-probe.sh:2: new time limit 77; add adjacent measured: value=77 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+[rc=1]
+$ bin/fm-lint.sh bin/fm-lab-probe.sh   (probe with adjacent measured note)
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+[rc=0]

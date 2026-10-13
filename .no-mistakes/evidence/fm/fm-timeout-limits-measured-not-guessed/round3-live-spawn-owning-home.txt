@@ -1,0 +1,26 @@
+######## S18 a real fm-spawn scout (lab home, lab tmux socket, raw bash launch) receives FM_DURATION_HOME and its worktree helper records into the owning home
+$ bin/fm-spawn.sh lab-spawn <lab>/projects/widgets --scout --harness "bash --norc"
+skill selection for lab-spawn: undelivered - raw launch command has no supported brief transport
+spawned lab-spawn harness=bash kind=scout window=primary:fm-lab-spawn worktree=/Users/charlesabrooker/tmp/fm-lab.r3DHjG/pool/.treehouse/widgets-93d6a6/1/widgets
+SPAWN_RC=0
+# inside the spawned worker pane:
+/Users/charlesabrooker/tmp/fm-lab.r3DHjG/pool/.treehouse/widgets-93d6a6/1/widgets
+FM_DURATION_HOME=/Users/charlesabrooker/tmp/fm-lab.r3DHjG
+FM_HOME=/Users/charlesabrooker/tmp/fm-lab.r3DHjG
+FM_TASK_INBOX=/Users/charlesabrooker/tmp/fm-lab.r3DHjG/state/lab-spawn.inbox
+/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3: can't open file '/Users/charlesabrooker/tmp/fm-lab.r3DHjG/pool/.treehouse/widgets-93d6a6/1/widgets/bin/fm-duration.py': [Errno 2] No such file or directory
+/Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3: can't open file '/Users/charlesabrooker/tmp/fm-lab.r3DHjG/pool/.treehouse/widgets-93d6a6/1/widgets/bin/fm-duration.py': [Errno 2] No such file or directory
+WORKER_RC=2
+# owning home ledger row:
+# worktree-local data/command-durations.jsonl exists: no
+# (the relative bin/ path above does not exist in a base-commit pool worktree; the brief prints the absolute helper path, used below)
+# inside the spawned worker pane: python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py path / run lab.spawn.check -- echo worker-ran
+/Users/charlesabrooker/tmp/fm-lab.r3DHjG/data/command-durations.jsonl
+calibration: "0 of 5 samples for lab.spawn.check on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+worker-ran
+progress: "lab.spawn.check elapsed=0.0s output_bytes=11 tree_cpu=0.00s"
+WORKER_RC=0
+# owning home ledger row:
+{"host":"Mac-Studio.local","repo":"fm-lab.r3DHjG/clone","key":"lab.spawn.check","duration_ms":124,"exit":0,"recorded_at":"2026-10-13T21:38:17.700717+00:00","load_start":55.72607421875,"load_end":55.72607421875,"cpus":18,"sample_id":"f9a7c8fe-246b-4ee5-b704-832b58a0317b","calibration":true,"timed_out":false}
+# pool worktree data/command-durations.jsonl exists: no

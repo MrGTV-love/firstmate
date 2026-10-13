@@ -1,0 +1,28 @@
+# check-literals in a throwaway clone at f2a751a3
+## S12 unchanged tree vs its own HEAD: guard passes
+rc=0
+
+## S12 this branch vs base 0daf001c: existing limits grandfathered, moved limit listed
+rc=0
+
+## S12a add a guessed limit (timeout 45) to bin/fm-dod-lib.sh: guard fails
+error: "bin/fm-dod-lib.sh:775: new time limit 45; add adjacent measured: value=45 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+rc=1
+
+## S12b same limit with an adjacent measured note: guard passes
+rc=0
+
+## S12c note with wrong value (40) does not cover a 45 limit
+error: "bin/fm-dod-lib.sh:776: new time limit 45; add adjacent measured: value=45 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+rc=1
+
+## S12d new Python timeout= keyword literal is caught
+error: "bin/fm-duration.py:751: new time limit 90; add adjacent measured: value=90 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+rc=1
+## S12e --report lists existing limits without failing
+rc=0 literals=     177
+bin/backends/herdr-eventwait.py:43	5.0	CONNECT_TIMEOUT = 5.0
+bin/backends/herdr-eventwait.py:44	5.0	ACK_TIMEOUT = 5.0
+bin/backends/herdr-workspace-move.py:30	5.0	CONNECT_TIMEOUT = 5.0
+bin/backends/herdr-workspace-move.py:31	5.0	RESPONSE_TIMEOUT = 5.0
+bin/fm-afk-contract.sh:144	120	_FM_AFK_CONTRACT_LOCK_TIMEOUT=120

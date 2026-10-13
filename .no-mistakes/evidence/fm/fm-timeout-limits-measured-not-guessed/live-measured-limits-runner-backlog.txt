@@ -1,0 +1,153 @@
+# Live run at f2a751a3 in disposable lab home (FM_DURATION_HOME=lab), repos acme/widgets (registered) and acme/other (unregistered)
+
+######## driver-a
+## ledger path
+/Users/charlesabrooker/tmp/fm-lab.zxjpv0/data/command-durations.jsonl
+
+## S1 cold key: limit reports missing calibration, keeps caller fallback 120
+calibration: "0 of 5 samples for lint.full.whole on Mac-Studio.local"
+fallback: "120s existing caller limit"
+120
+rc=0
+
+## S1b cold key, fallback 0: no destructive deadline
+calibration: "0 of 5 samples for lint.full.whole on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+0
+rc=0
+
+## S2 collect 5 real samples through run (sleep 1..3s)
+run sleep 1 rc=0
+run sleep 1 rc=0
+run sleep 2 rc=0
+run sleep 2 rc=0
+run sleep 3 rc=0
+
+## S2 calibrated limit: p95 of samples x3, fallback 5 lower than measured
+measured: "lint.full.whole host=Mac-Studio.local p95=3042ms margin=3 samples=5 measured=10s bound=5s"
+10
+## S2 fallback 900 above measured is never lowered
+measured: "lint.full.whole host=Mac-Studio.local p95=3042ms margin=3 samples=5 measured=10s bound=900s"
+900
+
+## S3 warm cache hit (calibration file 0), failure and --uncalibrated rows do not shrink the cold limit
+measured: "lint.full.whole host=Mac-Studio.local p95=3042ms margin=3 samples=5 measured=10s bound=5s"
+10
+rows for lint.full.whole: 13  calibration=false: 7  failed: 1
+
+## S4 repository scoping: same key in acme/other is still cold
+calibration: "0 of 5 samples for lint.full.whole on Mac-Studio.local"
+fallback: "7s existing caller limit"
+7
+
+## S5 quiet CPU-busy command, cold key: no read-wait stop, progress by CPU, real exit 3
+calibration: "0 of 5 samples for busy.quiet on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "busy.quiet elapsed=1.0s output_bytes=0 tree_cpu=0.93s"
+progress: "busy.quiet elapsed=2.1s output_bytes=0 tree_cpu=1.80s"
+progress: "busy.quiet elapsed=3.2s output_bytes=0 tree_cpu=2.82s"
+rc=3 elapsed=5s
+
+######## driver-b
+## S6 calibrate hang.demo with 5 x 1s samples -> p99 ceiling 3s
+measured: "hang.demo host=Mac-Studio.local p99=1247ms margin=3 samples=5 measured=4s bound=0s"
+4
+## S6 hung leader past the ceiling: TERM first, leader TERM trap runs, exit 124, timeout recorded
+measured: "hang.demo host=Mac-Studio.local p99=1247ms margin=3 samples=5 measured=4s bound=0s"
+progress: "hang.demo elapsed=1.0s output_bytes=0 tree_cpu=0.01s"
+progress: "hang.demo elapsed=3.1s output_bytes=0 tree_cpu=0.02s"
+Terminated: 15
+leader-term-cleanup-ran
+progress: "hang.demo elapsed=4.2s output_bytes=39 tree_cpu=0.02s"
+rc=124 elapsed=5s
+  {'duration_ms': 1066, 'exit': 0, 'timed_out': False, 'calibration': True}
+  {'duration_ms': 4244, 'exit': 124, 'timed_out': True, 'calibration': True}
+  {'event': 'timeout', 'duration_ms': 4244}
+
+## S7 operator SIGTERM to runner: group gets TERM, cleanup runs, exit 143, NOT a timeout
+calibration: "0 of 5 samples for sig.demo on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+started
+progress: "sig.demo elapsed=0.0s output_bytes=8 tree_cpu=0.00s"
+progress: "sig.demo elapsed=1.1s output_bytes=8 tree_cpu=0.01s"
+Terminated: 15
+child-cleanup-ran
+progress: "sig.demo elapsed=1.6s output_bytes=41 tree_cpu=0.01s"
+rc=143
+  {'duration_ms': 1560, 'exit': 143, 'timed_out': False, 'calibration': True}
+
+## S8 command that itself exits 124 (no ceiling hit): not counted as a timeout
+calibration: "0 of 5 samples for exit124.demo on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "exit124.demo elapsed=0.0s output_bytes=0 tree_cpu=0.00s"
+rc=124
+calibration: "0 of 5 samples for exit124.demo on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "exit124.demo elapsed=0.0s output_bytes=0 tree_cpu=0.00s"
+rc=124
+  {'duration_ms': 12, 'exit': 124, 'timed_out': False, 'calibration': True}
+  {'duration_ms': 9, 'exit': 124, 'timed_out': False, 'calibration': True}
+  backlog items for exit124: 0
+
+######## driver-c
+## S9 second real ceiling timeout of hang.demo (acme/widgets, registered) files owned backlog work
+measured: "hang.demo host=Mac-Studio.local p99=1247ms margin=3 samples=5 measured=4s bound=0s"
+Terminated: 15
+timeout_work: "fm-timeout-31f932993b959258"
+rc=124
+--- backlog after 2nd timeout:
+- [ ] fm-timeout-31f932993b959258 - Measure and repair repeated timeout: acme/widgets hang.demo (repo: widgets) (kind: ship) (since 2026-10-13)
+--- fm-tasks-axi show fm-timeout-31f932993b959258 --full:
+task:
+  id: fm-timeout-31f932993b959258
+  title: "Measure and repair repeated timeout: acme/widgets hang.demo"
+  state: queued
+  blocked: no
+  blocked_by: none
+  held: no
+  hold_reason: "-"
+  hold_kind: "-"
+  hold_until: "-"
+  kind: ship
+  repo: widgets
+  priority: "-"
+  created: 2026-10-13
+  closed: "-"
+  deps: none
+  links: none
+  body: "Repeated timeout for command key hang.demo in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 4244, 4310. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure."
+
+## S9b third timeout: no duplicate item
+rc=124
+items: 1  filed rows: 1
+
+## S9c close the item, timeout recurs twice: new item naming the old one
+fm-tasks-axi: completion needs proof of the deliverable: --report (scout), a merged --pr (ship), or --drop-file with the captain's words
+rc=124
+rc=124
+
+## S10 unregistered repo acme/other: repeated timeout routes to firstmate
+timeout_work: "fm-timeout-2ab4acfe7324e49b"
+  body: "Repeated timeout for command key other.lint in repository acme/other on host Mac-Studio.local. Observed lower bounds (ms): 2000, 2500. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure."
+
+## S10b replaying the same event id does not double count
+other.lint timeout rows: 2
+
+######## driver-c2
+## S10 (re-show) unregistered acme/other item:
+  id: fm-timeout-2ab4acfe7324e49b
+  title: "Measure and repair repeated timeout: acme/other other.lint"
+  kind: ship
+  repo: firstmate
+
+## S9c close fm-timeout-31f932993b959258 (tasks-axi done in the lab backlog), then the timeout recurs
+closed:   state: done
+timeout_work: "fm-timeout-31f932993b959258-2"
+rc=124
+--- new item:
+  id: fm-timeout-31f932993b959258-2
+  title: "Measure and repair repeated timeout: acme/widgets hang.demo"
+  state: queued
+  repo: widgets
+  body: "Repeated timeout for command key hang.demo in repository acme/widgets on host Mac-Studio.local. Observed lower bounds (ms): 4244, 4310, 4545, 4283, 4395, 4512. The timeout recurred after fm-timeout-31f932993b959258 was closed. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure."
+filed rows: 3

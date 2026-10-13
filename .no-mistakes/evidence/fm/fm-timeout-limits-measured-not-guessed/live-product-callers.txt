@@ -1,0 +1,124 @@
+# Real product callers writing to isolated lab ledgers at f2a751a3
+######## bin/fm-test-run.sh tests/fm-brief.test.sh tests/fm-duration.test.sh tests/fm-timeout-lib.test.sh (rc=0)
+ok - fm-brief: scaffolds leave the worker role scope to the launch boundary and keep the secondmate contract
+ok - fm-brief.sh: bash -n succeeds
+ok - fm-brief.sh: no heredoc is nested inside a command substitution (Bash 3.2 parse-safe)
+ok - fm-brief.sh: --help renders the complete header
+ok - fm-brief.sh: no-mistakes/direct-PR/local-only briefs generate cleanly
+ok - fm-brief.sh: ship --mode is required and closed-set validated
+ok - fm-brief.sh: every crewmate scaffold routes scratch scripts through the process budget
+ok - fm-brief.sh: emitted process-budget commands execute from foreign paths
+ok - fm-brief.sh: the explicit ship mode wins over the registered posture
+ok - fm-brief.sh: --yolo and scout/secondmate --mode are refused, never silently dropped
+ok - fm-brief.sh: faster paths use configured authority without stacked review
+ok - fm-brief.sh: no-mistakes DOD keeps its apostrophe prose and bans --yes outright
+ok - fm-brief.sh: no-mistakes DOD detects a green PR from the drive call, not a status poll
+ok - fm-brief.sh: PR-based done requires a non-draft PR; a deliberate draft declares a wait
+ok - fm-brief.sh: no-mistakes ask-user findings use one event plus a verbatim snapshot
+ok - fm-brief.sh: ship project-memory wording bounds edits to corrections of wrong information
+ok - fm-brief.sh: --herdr-lab emits the complete hard safety contract
+ok - fm-brief.sh: --herdr-lab uses its quoted Firstmate-owned helper path
+ok - fm-brief.sh: ship and scout scaffolds make omitted Herdr intent fail-visible
+ok - fm-brief.sh: the documented {TASK} and {FIRSTMATE_SPEC} fills cannot corrupt the Herdr safety gate
+ok - fm-brief.sh: Herdr lab contract covers scouts and rejects secondmate misuse
+ok - fm-brief.sh: --no-projects scaffolds a project-less charter and guards misuse
+ok - fm-brief.sh: marked requests avoid generic acknowledgements and preserve material reporting
+ok - fm-brief.sh: relative directory inputs ignore CDPATH, render stable absolute charter paths, or fail loudly
+ok - fm-brief.sh: custom pause verb renders in every scaffold
+ok - fm-brief.sh: ship and scout scaffolds declare a validation-round pause once, then hold it
+ok - fm-brief.sh: investigation and visual-review completions load the shared decision policy
+ok - fm-brief: scout and secondmate code paths still scaffold well-formed briefs
+ok - fm-brief.sh: scout Lavish hosting follows the bootstrap lavish-axi floor
+ok - fm-brief: workers end the turn on a decision, wait in one blocking shell command, and never poll
+ok - fm-brief: without config/wait-no-turns the brief and drive text stay as they were
+ok - fm-brief.sh: the home brief include lands last on ship and scout, verbatim, and fails closed
+ok - fm-brief.sh: --base-branch records the base, targets the PR at it, and is refused where no PR carries it
+ok - fm-brief.sh: --branch-prefix omitted defaults every ship mode to fm/<task-id>
+ok - fm-brief.sh: a --branch-prefix override renders identically across every generated section
+ok - fm-brief.sh: an empty --branch-prefix override resolves to a bare <task-id> branch
+ok - fm-brief.sh: --branch-prefix is refused on scout and secondmate scaffolds
+ok - fm-brief.sh: --branch-prefix value is validated against embedded spaces and a leading dash
+ok - fm-brief.sh: ref-format-valid shell metacharacters stay literal in generated branch commands
+ok - fm-brief.sh: every crewmate scaffold forbids administering the shared worktree pool
+ok - fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line
+ok - fm-brief.sh: every crewmate scaffold teaches the Docker task marker and the secondmate charter does not
+FM_TEST_END 2026-10-13T21:12:04Z tests/fm-brief.test.sh exit=0 duration_ms=98288 gate_skip=false
+ok - real backlog owns the second timeout exactly once
+ok - worker timings and repeated-timeout work reach the owning home, and a recurrence after closure files new work
+ok - repeated-timeout work routes to the registered project, else to firstmate
+ok - a failed backlog publication is retried without duplicating events, and imports never guess a timeout
+ok - sample-count limits, retention, progress, leader exit, outer ceiling, pipeline imports and literal guard
+ok - measured command behavior
+FM_TEST_END 2026-10-13T21:12:34Z tests/fm-duration.test.sh exit=0 duration_ms=29677 gate_skip=false
+ok - fm_exec_timed passes a command's status and output through unchanged
+ok - system Bash top-level and subshell calls preserve success, failure, and signal status
+ok - fm_run_timed reports 124 when the bound TERMs a read whose wrapper recorded 143
+ok - fm_run_timed passes a natural exit through when the bound fired after completion
+ok - fm_exec_timed sends TERM at the bound and a cooperative command ends there
+ok - fm_exec_timed kills a TERM-ignoring command once the grace has passed
+ok - fm_exec_timed replaces the calling shell instead of wrapping it
+ok - fm_exec_timed reaps a descendant that would otherwise hold the output past the bound
+ok - fm_exec_timed forwards a TERM it receives to the bounded command
+ok - fm_exec_timed ends the command when its named owner is already gone
+ok - fm_exec_timed ends the command when its owner dies during watchdog startup
+ok - fm_exec_timed preserves a top-level shell's parent across exec startup
+ok - fm_exec_timed prefers its perl watchdog over timeout
+ok - fm_exec_timed refuses instead of running unbounded when no mechanism exists
+ok - fm_exec_timed rejects a zero, padded, non-numeric, or missing bound and a missing command
+ok - fm_exec_timed's GNU timeout fallback kills a TERM-ignoring command once the grace has passed
+ok - fm_timed_out accepts 124 and 137 and nothing else
+ok - fm_run_timed's perl bound reaches a child that was slow to make its process group
+ok - fm_nm_bounded's perl bound reaches a child that was slow to make its process group
+ok - the perl bound forwards a TERM to its command's group
+ok - an outer Perl bound reaps a TERM-resistant nested command
+ok - no bounded-call status file survives a normal, failing, timed-out, or signalled exit of the caller
+ok - warm hits leave cold root and outer ceilings uncalibrated; changed cold analysis completes
+FM_TEST_END 2026-10-13T21:12:50Z tests/fm-timeout-lib.test.sh exit=0 duration_ms=44762 gate_skip=false
+  ledger {'key': 'test.tests/fm-brief.test.sh', 'duration_ms': 98288, 'exit': 0, 'calibration': True, 'timed_out': False}
+  ledger {'key': 'test.tests/fm-duration.test.sh', 'duration_ms': 29677, 'exit': 0, 'calibration': True, 'timed_out': False}
+  ledger {'key': 'test.tests/fm-timeout-lib.test.sh', 'duration_ms': 44762, 'exit': 0, 'calibration': True, 'timed_out': False}
+  ledger {'key': 'test-suite.scripts;jobs=4', 'duration_ms': 145563, 'exit': 0, 'calibration': True, 'timed_out': False}
+
+######## bin/fm-lint.sh bin/fm-duration-lib.sh, cold then warm (rc=0 both)
+{'key': 'lint-root.full.bin/fm-duration-lib.sh', 'duration_ms': 861, 'exit': 0, 'calibration': True, 'timed_out': False}
+{'key': 'lint.full.whole', 'duration_ms': 24484, 'exit': 0, 'calibration': False, 'timed_out': False}
+{'key': 'lint-root.full.bin/fm-duration-lib.sh', 'duration_ms': 561, 'exit': 0, 'calibration': False, 'timed_out': False}
+{'key': 'lint.full.whole', 'duration_ms': 4303, 'exit': 0, 'calibration': False, 'timed_out': False}
+
+######## fm_model_catalog opencode (lab PATH stand-in listing)
+## S14 cold catalog: missing calibration reported, 30s floor kept, sample recorded
+calibration: "0 of 5 samples for model-catalog.opencode on Mac-Studio.local"
+fallback: "30s existing caller limit"
+{"models":[{"id":"acme/model-a"},{"id":"acme/model-b"}]}
+rc=0
+## S14 calibrated: measured p95x3 is below the 30s floor, floor stays
+measured: "model-catalog.opencode host=Mac-Studio.local p95=1093ms margin=3.0 samples=5 measured=4s bound=30s"
+30
+## S14 hung harness listing: stopped at the 30s floor, recorded as a real timeout
+measured: "model-catalog.opencode host=Mac-Studio.local p95=1093ms margin=3.0 samples=5 measured=4s bound=30s"
+rc=124 elapsed=31s
+  {'key': 'model-catalog.opencode', 'duration_ms': 1090, 'exit': 0, 'timed_out': False, 'event': None}
+  {'key': 'model-catalog.opencode', 'duration_ms': 1055, 'exit': 0, 'timed_out': False, 'event': None}
+  {'key': 'model-catalog.opencode', 'duration_ms': 1051, 'exit': 0, 'timed_out': False, 'event': None}
+  {'key': 'model-catalog.opencode', 'duration_ms': 1093, 'exit': 0, 'timed_out': False, 'event': None}
+  {'key': 'model-catalog.opencode', 'duration_ms': 1056, 'exit': 0, 'timed_out': False, 'event': None}
+  {'key': 'model-catalog.opencode', 'duration_ms': 30036, 'exit': 124, 'timed_out': True, 'event': None}
+  {'key': 'model-catalog.opencode', 'duration_ms': 30036, 'exit': None, 'timed_out': None, 'event': 'timeout'}
+
+######## bin/fm-brief.sh lab-timeout-ship widgets --mode no-mistakes: timeout lines
+44:   Use `paused: {why}` - distinct from `blocked:` - when deliberately waiting for work or an external condition expected to clear on its own, including your own validation round.
+51:   Use `blocked:` only for a concrete prerequisite firstmate must supply, never because a command or read wait exceeded your own time budget.
+52:   Run long lint and test commands in the background through `python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py run <stable-command-key> -- <command...>`, preserving stdout and stderr in task-local logs.
+57:   Judge continued work by output growth and cumulative process-tree CPU time, not by how long your read waits.
+58:   A self-imposed read wait ending is never a failure or stop reason: retain the running job and reattach until its actual result arrives.
+60:   A command run under that helper records its own timeout automatically, so never record it again by hand; use `python3 /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4SJN5W45ZKDEHP0SJNSH7CQ/bin/fm-duration.py timeout <stable-command-key> <elapsed-ms> --event-id <unique-occurrence-id>` only for a real limit that stopped a command outside the helper; a read wait of your own that expired while the command continues is not a timeout, so record nothing for it.
+62:   The second timeout for that key automatically files owned backlog work with its measured lower bounds (for the repository's registered project when it has one, else for firstmate), and a recurrence after that work closes files new work; an expired read wait of your own never files work. Report the concrete repair obligation, never a final `blocked: timeout`.
+64:5. If you hit the same non-timeout prerequisite obstacle twice, append `blocked [at=<epoch>]: {why}` and stop; firstmate will help.
+65:   Timeout and elapsed-read events follow the measured-command instructions above, not this stop rule.
+76:     Before you append `blocked:` about the pipeline, run `no-mistakes daemon status` and
+
+######## bin/fm-spawn.sh lab-scout (FM_DURATION_HOME export) attempt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zxjpv0
+no server running on /Users/charlesabrooker/tmp/fm-lab.zxjpv0/tmux/tmux-501/fm-lab
+bin/fm-spawn.sh: line 1597: 73547 Hangup: 1               sleep 1
+error: could not close this attempt's Treehouse acquisition window @2
