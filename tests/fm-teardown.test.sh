@@ -8051,6 +8051,57 @@ SH
   pass 'a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes'
 }
 
+# Reassignment releases the claimant's copy from judgement, not the stale
+# task's own delivery: with no merged PR and an unlanded own branch it refuses.
+test_reassigned_slot_unlanded_task_refuses() {
+  local case_dir slot head rc=0
+  case_dir=$(make_case reassigned-unlanded-task)
+  wt_commit_file "$case_dir" undelivered.txt 'unlanded task work' 'undelivered task'
+  mkdir -p "$case_dir/pool/1" "$case_dir/primary-home/state"
+  slot="$case_dir/pool/1/project"
+  git -C "$case_dir/project" worktree move "$case_dir/wt" "$slot"
+  git -C "$slot" checkout -q -b fm/live-task main
+  printf 'claimant untracked work\n' > "$slot/scratch.txt"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$slot" \
+    > "$case_dir/pool/treehouse-state.json"
+  printf 'task=live-task\nhome=%s\n' "$case_dir/primary-home" > "$case_dir/pool/1/.fm-slot-owner"
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+    "worktree=$slot" "project=$case_dir/project" "kind=ship" \
+    "mode=no-mistakes" "branch=fm/task-x1" "spawn_gen=unfinished"
+  fm_write_meta "$case_dir/state/live-task.meta" \
+    "window=firstmate:fm-live-task" "endpoint_task_id=live-task" \
+    "worktree=$slot" "project=$case_dir/project" "kind=ship" "spawn_gen=live"
+  printf 'unfinished task\n' > "$case_dir/state/task-x1.status"
+  cp "$case_dir/state/task-x1.meta" "$case_dir/task-meta.before"
+  cp "$case_dir/pool/1/.fm-slot-owner" "$case_dir/claim.before"
+  git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' > "$case_dir/refs.before"
+  head=$(git -C "$slot" rev-parse HEAD)
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
+exit 0
+SH
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "an unlanded task must not retire just because its slot was reassigned"$'\n'"$(cat "$case_dir/stderr")"
+  assert_grep "REFUSED: task task-x1's recorded copy $slot was reassigned to task live-task" "$case_dir/stderr" 'refusal did not name the reassigned slot'
+  assert_grep 'its own branch fm/task-x1 is not proved landed' "$case_dir/stderr" 'refusal lost its delivery proof boundary'
+  cmp -s "$case_dir/task-meta.before" "$case_dir/state/task-x1.meta" || fail 'unlanded task metadata changed'
+  [ -f "$case_dir/state/task-x1.status" ] || fail 'unlanded task status was removed'
+  assert_absent "$case_dir/endpoint.log" 'refused teardown touched an endpoint'
+  assert_absent "$case_dir/treehouse.log" 'refused teardown administered the pool'
+  cmp -s "$case_dir/claim.before" "$case_dir/pool/1/.fm-slot-owner" || fail 'claimant slot claim changed'
+  [ "$head" = "$(git -C "$slot" rev-parse HEAD)" ] || fail 'claimant HEAD changed'
+  git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' | cmp -s - "$case_dir/refs.before" || fail 'refs changed'
+  assert_grep 'claimant untracked work' "$slot/scratch.txt" 'claimant untracked work changed'
+  pass 'a task on a reassigned slot with no merged PR and an unlanded own branch refuses and keeps its records'
+}
+
 # A record re-pointed by bin/fm-control.sh reassociate names its earlier copies
 # in prior_worktree=. Teardown still runs the landed-work test on the current
 # copy, but leaves a current copy that is not a pool slot - and every prior
@@ -9571,6 +9622,7 @@ test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_reassigned_dirty_slot_retires_only_finished_task
+test_reassigned_slot_unlanded_task_refuses
 test_reassociated_copies_are_left_in_place
 test_reassociated_unlanded_copy_still_refuses
 test_released_slot_record_keeps_current_copy
