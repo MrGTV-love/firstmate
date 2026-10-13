@@ -1,0 +1,34 @@
+# Used only by fm-spawn --omp-no-helpers, after worker/model overlays.
+# The native judge keeps its direct-only role, but a !false credential override
+# in the worker extension makes even manual stats judgments unavailable.
+find:
+  enabled: off
+advisor:
+  enabled: false
+speech:
+  enabled: false
+features:
+  unexpectedStopDetection: mechanical
+ttsr:
+  judge: off
+tui:
+  autoGraph: off
+memory:
+  backend: off
+autolearn:
+  enabled: false
+eval:
+  py: false
+  js: false
+  tools:
+    enabled: false
+tools:
+  xdev: false
+images:
+  blockImages: true
+  describeForTextModels: false
+spelling:
+  autocomplete: off
+skillful: false
+compaction:
+  enabled: false

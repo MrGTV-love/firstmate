@@ -418,7 +418,7 @@ kill -0 "$PRIMARY_PID" || fail "primary allocation was not still held"
 [ "$(fm_backend_herdr_projection_focus_snapshot "$HERDR_LAB_SESSION")" = "$FOCUS" ] || fail "recovery moved focus"
 # Same-task exclusion must survive releasing the session lock.
 if (spawn primary "$RECOVERY-primary" primary) >"$TEST_DIR/duplicate.out" 2>"$TEST_DIR/duplicate.err"; then fail "duplicate primary recovery launched"; fi
-grep -F 'task set is locked' "$TEST_DIR/duplicate.err" >/dev/null || fail "duplicate did not refuse at the held task-set gate: $(cat "$TEST_DIR/duplicate.err")"
+grep -F 'another lifecycle action is already running' "$TEST_DIR/duplicate.err" >/dev/null || fail "duplicate did not refuse at task custody: $(cat "$TEST_DIR/duplicate.err")"
 [ "$(cat "$TEST_DIR/home-primary/state/.spawn-$RECOVERY-primary.lock/pid")" = "$PRIMARY_PID" ] || fail "primary lost its per-task lock owner"
 touch "$TEST_DIR/release-primary"
 wait "$PRIMARY_PID" || fail "primary recovery failed: $(cat "$TEST_DIR/primary.err")"

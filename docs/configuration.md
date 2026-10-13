@@ -1036,8 +1036,9 @@ Its `remove` action excises only the marker-delimited Firstmate region and remov
 For Pi and pi-signed secondmate launches, `fm-spawn.sh` starts the selected executable with `-e` pointed at the secondmate home's own tracked `.pi/extensions/fm-primary-pi-watch.ts` and `.pi/extensions/fm-primary-turnend-guard.ts`, both already present from the secondmate home's git worktree.
 Pi-family secondmates can start unattended in Firstmate-seeded homes without accepting project trust manually; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the capability requirement, session-only approval scope, and older-version fallback, with [regression evidence](verification/runtime-backends.md#pi-seeded-secondmate-project-trust).
 
-For omp session posture, worker-only memory scope, safe secondmate extension loading, and shared Default-role validation (including remedies and evidence limits), see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
+For omp session posture, worker-only memory scope, disabled worker title generation, ordinary-worker smol and tiny helper roles (skill-description compression among them) on the worker's own model, direct-only native Jev credentials, the per-worker `--omp-no-helpers` switch, safe secondmate extension loading, and shared Default-role validation (including remedies and evidence limits), see the authoritative [`fm-spawn.sh --help`](../bin/fm-spawn.sh) contract.
 The [portable omp regression suite](../tests/fm-omp-harness.test.sh) covers default-role admission and raw-command model selection without an omp installation; its model-flag expectations preserve literal shell quoting across Bash versions.
+[Native direct-route and no-helper verification](verification/runtime-backends.md#omp-direct-judge-and-primary-model-only-workers) records the real-runtime fake-key probes, unavailable-provider boundary, interactive speech check and evidence limits.
 
 ## Claude permission mode (config/claude-permission-mode)
 
@@ -1709,7 +1710,7 @@ On 2026-10-07, the captain authorized worker skill selection to send the same sa
 This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
-Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; for Jev guard, each string in the tool state before provider selection, not the fixed questions or model ID; belay checks every request string.
+Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; for Jev guard, each string in the tool state before credential lookup, not the fixed questions or model ID; belay checks every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -1845,17 +1846,20 @@ On Claude the banner arrives as added context next to the unchanged output, beca
 
 The captain data-egress decision 2026-10-08 authorizes Jev guard requests only for the `firstmate` project.
 `fm-spawn.sh` determines the project once by comparing physical roots: `firstmate` when the project root equals the Firstmate code root, otherwise the project directory's basename.
-Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to TypeSafe or OpenRouter, with no provider fallback.
-This authorization check runs once at the shared `decide` preflight before either provider is selected.
+Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to a model provider.
+This authorization check runs once at the shared `decide` preflight before resolving a credential.
+The same decision governs omp's native model routes: only a `firstmate`-project omp worker receives the native TypeSafe judge credential and `find.enabled=on`, while every other worker keeps the direct-only judge role with no credential and `find.enabled=off`, so its native find, thinking and stop judgments send nothing to TypeSafe or OpenRouter; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that launch contract.
 For `firstmate` only, shell screening sends the command and working directory, write screening sends the path and first 4,000 characters of content, and result screening sends the tool name and first 6,000 characters of output.
-It calls TypeSafe direct first, resolving the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its client is first constructed; no key enters the worker environment.
-Only when an authorized direct call is unavailable or fails does it ask OpenRouter, using `fm_openrouter_key` from [`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh), which owns fallback-key lookup for both this guard and [worker skill selection](#worker-skill-selection); with no key there is no fallback call.
-Each provider client snapshots its credentials: omp reuses it for the session, while Claude constructs clients in each hook process.
-A tool state matching the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key), or an invalid or unreadable policy, is withheld from both providers.
-Each provider has a 10-second total request budget including upstream retries and response bodies, and each complete handler has a shared 25-second cancellation budget.
+It calls only TypeSafe direct, resolving the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its client is first constructed; no key enters the worker environment, configuration, files or command arguments.
+The client snapshots its key: omp reuses it for the session, while Claude constructs it in each hook process; a decision with no key constructs no client, so the next decision looks the key up again.
+An unavailable or failed TypeSafe call never falls back to OpenRouter, even when an OpenRouter key exists.
+A tool state matching the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key), or an invalid or unreadable policy, is withheld from TypeSafe.
+The client has a 10-second total request budget including upstream retries and response bodies, and each complete handler has a shared 25-second cancellation budget.
 omp's native tool-call deadline and both Claude hook timeouts are 30 seconds; omp result screening relies on the shared 25-second handler budget rather than `extensionHandlers.toolCallTimeoutMs`.
 A withheld request, missing keys, exhausted budget or any other inference failure lets the tool call proceed, as upstream does, while writes outside the allowed roots, unsupported path spellings and unsupported edit schemas still block without a Jev call.
 The guard supplements, never replaces, existing deterministic protections or required approvals.
+An omp worker launched with `--omp-no-helpers` withholds every guard judgment before credential lookup, using the same no-key behavior while retaining the deterministic path and edit-schema blocks.
+[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that opt-in switch's session scope, other helper restrictions and relaunch behavior; it does not change an already running worker.
 The owning home's private `state/jev-guard.jsonl` receives one line per reported `jev`, `hook` or `error` event, selecting answers, usage, model, answering provider, latency and hook outcome without commands, paths, request bodies, reasons, banners or error messages.
 Ledger writes are best-effort and do not gate execution; early adapter rejections for unsupported paths or edit schemas return before upstream reporting.
 omp session entries retain the full upstream report payload, including request-derived state; the Claude adapter supplies no session-entry writer.
@@ -1920,7 +1924,7 @@ Privacy-hidden promotion instructions never revive the superseded spec.
 The picker uses the shared [TypeSafe key lookup](#typed-dispatch-resolution-env-typesafe_api_key), including the local primary-home fallback, and asks TypeSafe directly first when that key is available.
 When the TypeSafe key is absent or a direct request fails and `fm_openrouter_key` resolves a key, the same request and the rest of that pick go through OpenRouter.
 Privacy refusals, question-validation failures, and expiry of the picker's overall deadline stop selection without triggering provider fallback.
-[`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) owns the shared OpenRouter fallback-key lookup used by the picker and the [Jev guard](#jev-guard).
+[`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) owns the OpenRouter fallback-key lookup used only by the picker; the [Jev guard](#jev-guard) has no OpenRouter fallback.
 This is the captain's accepted policy: “openrouter is a fallback from directly using the typesafe api.”
 Fallback provenance is retained for picked, no-selection, and unavailable outcomes.
 Missing optional catalog directories are skipped; failures inspecting existing catalogs are unavailable with their actionable reason, not successful no-selection results.
@@ -3182,6 +3186,8 @@ FM_WORKTREE_WRITE_TIMEOUT=10       # wall-clock seconds that one walk may take, 
 FM_WATCH_TRIAGE_LOG_MAX_BYTES=262144   # size cap for the watcher's absorbed-wake debug log
 FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT=     # optional seconds allowed for bootstrap's best-effort clone refresh; unset/blank defaults to max(20, 5 + 3 * origin-backed-project-count)
 FM_FLEET_PRUNE=1        # set to 0 to skip pruning local branches whose upstream is gone
+FM_PROJECT_LOCK_SERVICE_SECS=     # optional measured stall allowance override: seconds one project-lock hold may last before waiters refuse; bin/fm-project-lock-lib.sh owns default sizing and the progress-based stall rule
+FM_PROJECT_LOCK_POLL_SECS=        # optional project-lock sampling cadence override (positive seconds, decimals allowed); bin/fm-project-lock-lib.sh owns the default and holder progress messages
 FM_STALE_WORKTREE_LOCK_AGE_SECS=30       # min mtime age before fm-teardown.sh treats a leftover worktree git index.lock as provably stale
 FM_TREEHOUSE_RETURN_LOCK_RETRIES=3        # retries after a treehouse return fails on the transient git index.lock signature
 FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=1 # seconds fm-teardown.sh waits before each retry after that signature
@@ -3255,7 +3261,9 @@ An invalid nonblank wait falls back to 1 second rather than interrupting teardow
 Teardown never removes a lock during the retry window, and after that window it attempts stale-lock cleanup only for a still-present lock that passes the configured age and live-holder checks.
 
 `fm-fleet-sync.sh` applies the same shape to an orphaned `.git/packed-refs.lock`: it retries only Git's `Unable to create '...packed-refs.lock': File exists` fetch failure up to `FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES` times (nonnegative integer; unset, blank, or invalid uses the default of 3), waiting `FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS` seconds (nonnegative whole or fractional; invalid falls back to 1 second) before each.
-Only after those retries exhaust does it remove the lock, and only when it is provably stale - still present, mtime age at least `FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS` (default 30), and no `lsof` holder of the lock file or of the clone worktree itself (a live `git` keeps that as its cwd even in the window after it closes the lock and before it exits).
+Only after those retries exhaust does it remove the lock, and only when it passes `bin/fm-lock-lib.sh`'s shared owner proof over every existing worktree of the clone (the lock is shared, so a Git process in a linked worktree can own it) and the `FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS` threshold (default 30).
+A `git worktree list` that fails or names no existing worktree leaves the lock unproven and in place.
+That proof distinguishes Git transaction owners from idle non-Git directory holders, so long-lived pane shells do not prevent recovery; the library header owns the exact rule and its closed-descriptor safety rationale.
 
 A live lock, a missing `lsof`, any failed check, or any other fetch failure keeps today's behavior.
 Every wait, retry, and removal is printed to stderr, and a successful recovery also prints one `recovered:` summary line to stdout so a session-start refresh - which discards fleet-sync stderr and relays only stdout - still surfaces it.

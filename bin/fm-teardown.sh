@@ -174,6 +174,23 @@
 # through metadata publication, closing the publication
 # gap; forced secondmate teardown takes it and runs the same checks for every
 # descendant Treehouse slot before touching any child.
+# Project-lock contention uses bin/fm-project-lock-lib.sh's FIFO wait, which
+# refuses only when the holder stalls past the measured allowance, with holder
+# progress messages; callers no longer need retry loops for allocation/return
+# contention. The idle reaper's teardown (FM_IDLE_REAP_ADMISSION=1) instead
+# makes one nonwaiting attempt, so its fixed work bound never includes a queue
+# wait; contention exits FM_PROJECT_LOCK_BUSY_EXIT with nothing changed, and the
+# next sweep retries. Recursive cleanup already holds every descendant home's lifecycle
+# locks, so it makes one nonwaiting attempt per descendant project lock that
+# never jumps a queued waiter; it collects and deduplicates those paths and
+# tries them in global byte order before slot proofs, so opposite child
+# enumeration orders cannot each hold the project the other needs.
+# The project-lock wait runs after this task's lease-guard lock, so a steer or
+# control action on this same task waits until teardown is admitted or refused;
+# no other task waits on it. Waiting for the project lock first would instead
+# make the project-lock holder wait, without a limit, for a control action on
+# this task, and stall every waiter for the project behind it.
+# Other lifecycle lock refusals are unchanged.
 # These refusals are not relaxed by --force: --force authorizes discarding THIS
 # task's unlanded work, never another task's live work. Nothing of this task's
 # own is removed by a refusal; reconcile whichever record is wrong and re-run.
@@ -476,6 +493,7 @@ for _teardown_source in \
   fm-cursor-lib.sh \
   fm-nm-run-lib.sh \
   fm-wake-lib.sh \
+  fm-project-lock-lib.sh \
   fm-path-lib.sh \
   fm-lease-lib.sh
 do
@@ -541,6 +559,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 }
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-project-lock-lib.sh
+. "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
 # Supervision lease guard: post-landing cleanup is overlap territory between
@@ -608,10 +628,20 @@ if [ -f "$META" ] && [ ! -L "$META" ]; then
       echo "REFUSED: cannot resolve the shared Treehouse project lock for ${TEARDOWN_LOCK_PROJECT:-<missing>}; nothing was changed" >&2
       exit 1
     }
-    fm_lock_try_acquire "$TREEHOUSE_PROJECT_LOCK" || {
-      echo "REFUSED: another Treehouse slot allocation or return is in progress for $TEARDOWN_LOCK_PROJECT; nothing was changed" >&2
+    TEARDOWN_PROJECT_LOCK_RC=0
+    if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
+      fm_project_lock_try "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || TEARDOWN_PROJECT_LOCK_RC=$?
+    else
+      fm_project_lock_acquire "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || TEARDOWN_PROJECT_LOCK_RC=$?
+    fi
+    if [ "$TEARDOWN_PROJECT_LOCK_RC" -eq 1 ] && [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
+      echo "REFUSED: cannot acquire the shared Treehouse project lock for $TEARDOWN_LOCK_PROJECT; nothing was changed" >&2
       exit 1
-    }
+    fi
+    if [ "$TEARDOWN_PROJECT_LOCK_RC" -ne 0 ]; then
+      echo "REFUSED: another Treehouse slot allocation or return is in progress for $TEARDOWN_LOCK_PROJECT; nothing was changed" >&2
+      exit "$TEARDOWN_PROJECT_LOCK_RC"
+    fi
     TREEHOUSE_PROJECT_LOCK_HELD=1
   fi
 fi
@@ -635,6 +665,10 @@ teardown_release_locks() {
   if declare -F teardown_release_herdr_locks >/dev/null 2>&1; then
     teardown_release_herdr_locks || true
   fi
+  for ((i=${#DESCENDANT_TREEHOUSE_LOCK_PATHS[@]} - 1; i >= 0; i--)); do
+    fm_project_lock_release "${DESCENDANT_TREEHOUSE_LOCK_PATHS[$i]}" || true
+  done
+  DESCENDANT_TREEHOUSE_LOCK_PATHS=()
   for ((i=${#DESCENDANT_LOCK_PATHS[@]} - 1; i >= 0; i--)); do
     fm_lock_release "${DESCENDANT_LOCK_PATHS[$i]}" || true
   done
@@ -664,7 +698,7 @@ teardown_release_locks() {
     CONTROL_LOCK_HELD=0
   fi
   if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ]; then
-    fm_lock_release "$TREEHOUSE_PROJECT_LOCK" || true
+    fm_project_lock_release "$TREEHOUSE_PROJECT_LOCK" || true
     TREEHOUSE_PROJECT_LOCK_HELD=0
   fi
   fm_lease_guard_release || true
@@ -2203,7 +2237,7 @@ cleanup_stale_lock_for_safety_check() {
     return 0
   fi
 
-  if fm_lock_is_provably_stale "$lock" "$dir" "$STALE_WORKTREE_LOCK_AGE_SECS"; then
+  if fm_lock_is_provably_stale "$lock" "$STALE_WORKTREE_LOCK_AGE_SECS" "$dir"; then
     rm -f "$lock"
     echo "teardown: removed provably-stale git lock $lock (age >= ${STALE_WORKTREE_LOCK_AGE_SECS}s, no live holder) and retrying worktree safety checks" >&2
     return 0
@@ -2303,7 +2337,7 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
   lock=$(worktree_git_lock_path "$dir") || lock=""
   if [ -n "$lock" ] && [ -e "$lock" ]; then
     lock_desc=$lock
-    if fm_lock_is_provably_stale "$lock" "$dir" "$STALE_WORKTREE_LOCK_AGE_SECS"; then
+    if fm_lock_is_provably_stale "$lock" "$STALE_WORKTREE_LOCK_AGE_SECS" "$dir"; then
       rm -f "$lock"
       echo "teardown: removed provably-stale git lock $lock (age >= ${STALE_WORKTREE_LOCK_AGE_SECS}s, no live holder) and retrying $label return" >&2
       if [ -n "$post_cleanup_check" ]; then
@@ -4059,8 +4093,11 @@ preflight_descendant_task_locks() {
   # home, during collection above), then per-task locks in that same
   # parent-before-child preorder, sorted by id within each home, each control
   # lock before its matching metadata lock. No child lock holder ever reaches
-  # back for a parent lock. bin/fm-spawn.sh takes the same task-set lock before
-  # its own per-task locks when it publishes a fresh record.
+  # back for a parent lock. A secondmate spawn in bin/fm-spawn.sh takes the same
+  # task-set lock before its own per-task locks when it publishes a fresh
+  # record. A worker spawn takes its own control and spawn-task locks first,
+  # then the shared project lock, then the task-set lock; the task-set and
+  # per-task locks are all single tries, so that order cannot wait in a cycle.
   for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
     state=${DESCENDANT_TASK_STATES[$i]}
     task_id=${DESCENDANT_TASK_IDS[$i]}
@@ -4103,7 +4140,9 @@ preflight_descendant_task_locks() {
 }
 
 preflight_descendant_treehouse_slots() {
-  local i state task_id meta kind backend target worktree project lock_path held owner_rc
+  local i j state task_id meta kind backend target worktree project lock_path held owner_rc
+  local LC_ALL=C
+  local -a project_locks=() project_tasks=()
   for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
     state=${DESCENDANT_TASK_STATES[$i]}
     task_id=${DESCENDANT_TASK_IDS[$i]}
@@ -4128,14 +4167,31 @@ preflight_descendant_treehouse_slots() {
     for target in "${DESCENDANT_TREEHOUSE_LOCK_PATHS[@]+"${DESCENDANT_TREEHOUSE_LOCK_PATHS[@]}"}"; do
       [ "$target" != "$lock_path" ] || held=1
     done
+    for target in "${project_locks[@]+"${project_locks[@]}"}"; do
+      [ "$target" != "$lock_path" ] || held=1
+    done
     if [ "$held" = 0 ]; then
-      fm_lock_try_acquire "$lock_path" || {
-        echo "REFUSED: another Treehouse slot allocation or return is in progress for child $task_id; forced teardown changed nothing" >&2
-        return 1
-      }
-      DESCENDANT_TREEHOUSE_LOCK_PATHS+=("$lock_path")
-      DESCENDANT_LOCK_PATHS+=("$lock_path")
+      # Global byte order, not child enumeration order: two unrelated local
+      # homes may enumerate the same projects in opposite orders. Each holding
+      # the one the other tries next would otherwise refuse both.
+      j=${#project_locks[@]}
+      while [ "$j" -gt 0 ] && [[ "${project_locks[$((j - 1))]}" > "$lock_path" ]]; do
+        project_locks[j]=${project_locks[$((j - 1))]}
+        project_tasks[j]=${project_tasks[$((j - 1))]}
+        j=$((j - 1))
+      done
+      project_locks[j]=$lock_path
+      project_tasks[j]=$task_id
     fi
+  done
+  for ((i=0; i < ${#project_locks[@]}; i++)); do
+    lock_path=${project_locks[$i]}
+    task_id=${project_tasks[$i]}
+    fm_project_lock_try "$lock_path" "teardown $ID child $task_id" || {
+      echo "REFUSED: another Treehouse slot allocation or return is in progress for child $task_id; forced teardown changed nothing" >&2
+      return 1
+    }
+    DESCENDANT_TREEHOUSE_LOCK_PATHS+=("$lock_path")
   done
   for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
     state=${DESCENDANT_TASK_STATES[$i]}

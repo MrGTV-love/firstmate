@@ -9,7 +9,12 @@ Balance hints come from serial runs of the real lanes on `ubuntu-latest`.
 The concurrent isolation proof in [fm-test-isolation-proof.md](fm-test-isolation-proof.md) establishes concurrency safety, not serial CI duration.
 Local timings are not interchangeable with CI timings: platform and machine load can affect each script differently and change their relative weights.
 
-Both hint tables were refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).
+The serial hints were refreshed on 2026-10-13 from the successful per-suite records in the behavior timing aggregates of three main runs: [38309507694](https://github.com/MrGTV-love/firstmate/actions/runs/38309507694), [38310126183](https://github.com/MrGTV-love/firstmate/actions/runs/38310126183), and [38312847224](https://github.com/MrGTV-love/firstmate/actions/runs/38312847224).
+Retain the slowest successful sample per current serial member, including larger earlier measurements below; exclude failed or unfinished scripts.
+The split supervision-host member uses its independently measured 413717 ms baseline rather than the obsolete combined suite's 877426 ms sample.
+The triage split's initial calibration is described in [Portable serial CI shards](#portable-serial-ci-shards).
+
+The earlier shared hint tables were refreshed on 2026-09-30 from five Ubuntu CI runs: [36583881812](https://github.com/kunchenguid/firstmate/actions/runs/36583881812), [36658498535](https://github.com/kunchenguid/firstmate/actions/runs/36658498535), [36663947738](https://github.com/kunchenguid/firstmate/actions/runs/36663947738), [36664663190](https://github.com/kunchenguid/firstmate/actions/runs/36664663190), and [36669175457](https://github.com/kunchenguid/firstmate/actions/runs/36669175457).
 Use the slowest successful `duration_ms` per script across their uploaded portable timing artifacts and completed `FM_TEST_END` log markers, with the two version/platform exceptions below.
 All artifact records were cross-checked against the corresponding job's markers.
 This covers all 24 parallel and 201 serial members; an existing live-capability skip is a portable-runner measurement, not a timing claim for the unavailable live integration.
@@ -31,10 +36,8 @@ Run 38086081689's serial 11 was cancelled at its 30-minute cap because the stale
 It refreshes the members whose successful measurement grew by more than 30 seconds: contributions, control-relaunch, idle-session-reap, omp-harness, open-loops, pi-watch-extension, proc-budget, procevent, session-start, teardown, wake-queue, watch-idle-reap, and watch-open-loops.
 It adds the twelve unhinted serial members that completed successfully: claude-nested-home-live-e2e, contributions-read-saved, fleet-snapshot-contribution-cleanup, fleet-snapshot-fleet-cost, fleet-snapshot-rolling-window, jev-guard, omp-fallback-chain-live-e2e, omp-reboot-live-e2e, omp-task-session-live-e2e, orphan-safety, pi-watch-loader-live, and spawn-claude-start-confirm.
 The failed wake-queue invocation of run 38082072235 and the cancelled shard's unfinished backend-zellij invocation are excluded; other weights are unchanged.
-The watch-triage suite measured up to 1576043 ms, but it keeps its 1074843 ms hint because one indivisible script above the 1200000 ms target fails the coverage guard at any shard count.
-That suite alone exceeds the packing target; splitting it, as was done for the supervision host suite, is the fix, not a larger target.
-The current weights require thirteen serial shards to fit the unchanged 1200000 ms packing target.
-The runner and workflow matrix both use thirteen; no execution timeout was raised.
+The former combined watch-triage suite exceeded the 1200000 ms packing target; its execution lists are now independently runnable signal/delivery and stale/wait groups, described below.
+The runner and workflow matrix use fourteen serial shards with the unchanged packing target and execution timeouts.
 The capacity suite's 56263 ms hint is the successful Ubuntu `FM_TEST_END` baseline from upstream [run 37739997864, serial shard 9](https://github.com/kunchenguid/firstmate/actions/runs/37739997864/job/113188261544). It is not a measurement of this integration repair: the local repaired run passed the live-worker teardown but later failed the next spawn's existing backlog-read bound, so its duration is excluded.
 In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
 Collect successful per-script measurements for every member before calculating a split.
@@ -100,9 +103,17 @@ Refresh the hints whenever a serial member grows materially or the lane gains sc
 Its header and `--help` own the modeled-budget check and output fields; read the current estimates from `--check-coverage` instead of retaining copied lane sums here.
 [`tests/fm-test-run.test.sh`](../tests/fm-test-run.test.sh), in `test_portable_serial_packing_budget_boundary`, verifies acceptance exactly at the budget and refusal one millisecond above it through the executable runner.
 The boundary, inventory-growth, generation-failure, and duplicate-refusal fixtures share tiny serial timing inputs independent of production hint growth; the boundary case raises only its seeded script to the tested limit. The separate real-repository coverage check continues to validate the actual timing table and packing budget.
-The longest script, `tests/fm-watch-triage.test.sh`, is the indivisible floor for this layout.
+The former combined `tests/fm-watch-triage.test.sh` measured 1355995-1429810 ms in the latest three main runs, so no shard count could fit it within the unchanged 1200000 ms packing target.
+Its 159 existing cases now run exactly once across `tests/fm-watch-triage.test.sh` (93 classifier, signal, delivery, and heartbeat cases) and `tests/fm-watch-triage-waits.test.sh` (66 stale, wait, escalation, and away-mode cases).
+Both source the unchanged definitions and fixture setup in `tests/fm-watch-triage-helpers.sh`; each invocation has its own temporary root and registered watcher cleanup.
+The stock macOS `FM_TEST_ONLY` regression remains selectable through the original script.
+No sleeps, production deadlines, test assertions, or case bodies were shortened or removed.
+Initial group hints are 415321 ms for signal/delivery and 1026519 ms for stale/wait, derived from the timestamped case completions in the same three successful CI invocations.
+Each log contains the identical ordered sequence of 159 `ok -` reports; successive timestamp differences assign every elapsed interval to its case, including suite startup in the first interval.
+Sum the slowest observed interval per retained case and charge the maximum final cleanup interval (1613 ms) to each new group.
+This conservatively replays observed CI work, but is not a measurement of independently launched groups; refresh both hints from their own successful runner artifacts after CI exercises the split.
+On 2026-10-13, `bin/fm-test-run.sh --check-coverage` reported `serial_shards=14 serial_unhinted=0 serial_max_ms=1182165 serial_budget_ms=1200000`; this is a dated packing check, not a measured new-head CI duration.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
-The baseline watch-triage samples range from 944375 to 1074843 ms, while each observed completed portable job adds at most 30 seconds beyond its summed scripts in these runs.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
 `tests/fm-ci-workflow.test.sh` compares the parsed CI matrix to the executable runner lanes, and the runner rejects parallel `--jobs` on a serial lane even when that shard has only one member.
@@ -149,7 +160,13 @@ Portable shards, each portable serial shard, and the Herdr lane upload runner-ge
 
 ## Lint partitions and end-to-end latency
 
-`bin/fm-lint.sh` owns two canonical CI partitions, each attempting full source-aware ShellCheck analysis and running workflow validation and backend-purity checks.
+`bin/fm-lint.sh` owns three canonical CI partitions, each attempting full source-aware ShellCheck analysis and running workflow validation and backend-purity checks.
+Its `fm_lint_partition_weight_hints` table contains the slowest successful per-root duration from the two partitions' `partition-N.roots.tsv` sidecars in the same three main runs used by the latest serial refresh.
+The telemetry records ShellCheck 0.11.0 on Linux x86_64, Ubuntu 24, image `20261004.327.1`.
+Longest-processing-time packing uses those durations, not direct file bytes: equal byte totals previously carried 1240 and 1781 seconds of measured lint work in run 38312847224.
+The script header owns missing-root fallback and partition syntax; local worker balancing and its telemetry weight fields still use direct bytes.
+Refresh the duration table from successful `end` records' `duration_ms`, retaining complete canonical root coverage independently of hints.
+`tests/fm-lint.test.sh` proves the measured-cost selection with equal-byte roots whose independently seeded durations require a different split.
 CI requires its per-root bounds, so an unenforceable deadline or address-space limit refuses lint rather than running uncapped; the script header owns the envelope, per-root execution contract, and memory fallback.
 Its `--list-files` interface exposes partition membership; `tests/fm-lint.test.sh` verifies complete/disjoint executed roots, changed-source selection, shared-cache invalidation, initial analysis flags, fallback reporting, and seeded finding parity.
 The workflow uploads each partition's quiet telemetry plus its per-root lifecycle sidecar to distinguish analysis cost, memory use, and host contention.
@@ -179,9 +196,9 @@ Seeded joint checks retained SC2119 across the pending import seams, watcher UTC
 Cache reuse remains a local optimization, not a Linux CI duration, aggregate RSS, or P95 claim.
 macOS cannot exercise the CI address-space limit; required-bounds coverage must still run on a host that can enforce it.
 
-The longer-term performance objective remains a complete green run under fifteen minutes including start delay, but the current watch-triage floor alone exceeds that objective.
+The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses eighteen long-lived Linux jobs (thirteen serial, two parallel, Herdr, two lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses twenty long-lived Linux jobs (fourteen serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 

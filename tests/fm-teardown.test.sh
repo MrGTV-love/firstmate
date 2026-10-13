@@ -66,6 +66,8 @@ set -u
 
 # shellcheck source=tests/lib.sh disable=SC1091
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/git-lock-helpers.sh
+. "$ROOT/tests/git-lock-helpers.sh"
 fm_git_identity fmtest fmtest@example.invalid
 # Each fixture chooses its own home, never the invoking session's live home.
 unset FM_HOME
@@ -861,6 +863,18 @@ add_lsof_live_holder() {
 exit 0
 SH
   chmod +x "$case_dir/fakebin/lsof"
+}
+
+# Keep real lsof for lock/companion queries, but exclude the independent
+# teardown process-reaping scan: this fixture tests preservation of a live owner,
+# not termination of task processes. No lock-owner evidence is stubbed.
+add_lsof_real_lock_queries() {
+  cat > "$1/fakebin/lsof" <<'SH'
+#!/usr/bin/env bash
+case " $* " in *" -Fpn "*) exit 0 ;; esac
+exec "${REAL_LSOF_FOR_TEST:?}" "$@"
+SH
+  chmod +x "$1/fakebin/lsof"
 }
 
 add_lsof_error() {
@@ -2691,6 +2705,39 @@ test_stale_index_lock_cleared_and_teardown_succeeds() {
   pass "provably-stale worktree index.lock (old, no live holder) is cleared and teardown succeeds"
 }
 
+test_idle_cwd_does_not_block_stale_index_lock_cleanup() {
+  local case_dir rc lock idle
+  case_dir=$(make_case idle-cwd-index-lock)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit "$case_dir" "shippable work"
+  git -C "$case_dir/wt" push -q origin fm/task-x1
+  git -C "$case_dir/project" fetch -q origin
+  add_lock_aware_treehouse "$case_dir"
+  add_lsof_real_lock_queries "$case_dir"
+  lock=$(git_index_lock_path "$case_dir/wt")
+  : > "$lock"
+  touch -t 200001010000 "$lock"
+  mkfifo "$case_dir/idle-input"
+  exec 9<> "$case_dir/idle-input"
+  (cd "$case_dir/wt" && exec bash -c 'read -r _ <&9') &
+  idle=$!
+  # Reuse the measured 200-poll ceiling documented in git-lock-helpers.sh.
+  fm_test_wait_until 20 "$REAL_LSOF_FOR_TEST" -a -p "$idle" -d cwd -- "$case_dir/wt" \
+    || fail "idle-index-lock: process did not enter worktree cwd"
+  set +e
+  FM_TREEHOUSE_RETURN_LOCK_RETRIES=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=30 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
+  rc=$?
+  set -e
+  kill "$idle"; wait "$idle" 2>/dev/null || true
+  exec 9>&-
+  expect_code 0 "$rc" "idle-index-lock: teardown should recover an abandoned lock"
+  assert_grep "removed provably-stale git lock" "$case_dir/stderr" \
+    "idle-index-lock: stale lock was not cleared"
+  assert_absent "$lock" "idle-index-lock: abandoned lock remains"
+  pass "an idle non-Git cwd holder does not block stale index.lock cleanup"
+}
+
 test_live_index_lock_is_never_removed_and_teardown_refuses() {
   local case_dir rc lock
   case_dir=$(make_case live-index-lock)
@@ -2700,13 +2747,12 @@ test_live_index_lock_is_never_removed_and_teardown_refuses() {
   git -C "$case_dir/project" fetch -q origin
 
   add_lock_aware_treehouse "$case_dir"
-  add_lsof_live_holder "$case_dir"
-
-  lock=$(git_index_lock_path "$case_dir/wt")
-  mkdir -p "$(dirname "$lock")"
-  : > "$lock"
-  # Even an old mtime must not be enough on its own: a live holder always wins.
-  touch -t 200001010000 "$lock"
+  add_lsof_real_lock_queries "$case_dir"
+  fm_test_git_lock_start "$case_dir/wt" "$case_dir/git-owner" index
+  lock=$FM_TEST_GIT_LOCK_PATH
+  # The real git update-index process holds a real fd on this old lock.
+  "$REAL_LSOF_FOR_TEST" -a -p "$FM_TEST_GIT_LOCK_PID" -- "$lock" >/dev/null \
+    || fail "live-index-lock: Git did not retain its lock descriptor"
 
   set +e
   FM_STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
@@ -2720,7 +2766,8 @@ test_live_index_lock_is_never_removed_and_teardown_refuses() {
   assert_not_contains "$(cat "$case_dir/stderr")" "removed provably-stale git lock" \
     "live-index-lock: teardown removed a lock with a live holder"
   [ -e "$lock" ] || fail "live-index-lock: live-held lock file was removed"
-  pass "live-held worktree index.lock is never removed and teardown refuses"
+  fm_test_git_lock_finish
+  pass "real Git-held worktree index.lock is never removed and teardown refuses"
 }
 
 test_lsof_error_never_clears_index_lock() {
@@ -9482,6 +9529,7 @@ test_legacy_record_rolls_the_stamp_back_when_the_marker_write_fails
 test_retained_legacy_stamp_still_faces_the_endpoint_gate
 test_legacy_record_never_accepts_a_corrupt_spawn_gen
 test_stale_index_lock_cleared_and_teardown_succeeds
+test_idle_cwd_does_not_block_stale_index_lock_cleanup
 test_live_index_lock_is_never_removed_and_teardown_refuses
 test_lsof_error_never_clears_index_lock
 test_stale_index_lock_cleanup_rechecks_dirty_worktree

@@ -584,10 +584,12 @@ fm_lock_claim() {
     return 1
   fi
   if ! fm_lock_points_to_owner "$lockdir" "$ownerdir"; then
+    FM_LOCK_BUSY=1
     fm_lock_discard_owner "$ownerdir"
     return 1
   fi
   if fm_lock_claim_blocked_by_steal "$lockdir" "$allowed_steal_owner"; then
+    FM_LOCK_BUSY=1
     if fm_lock_points_to_owner "$lockdir" "$ownerdir"; then
       rm -f "$lockdir" 2>/dev/null || true
     fi
@@ -597,11 +599,16 @@ fm_lock_claim() {
   return 0
 }
 
+# A failed create sets FM_LOCK_BUSY=1 when it lost to another actor: the lock
+# path already existed, or the claim found its link replaced or a steal mutex
+# in the way. Every other failure leaves it 0 (a filesystem or owner error).
 fm_lock_try_create() {
   local lockdir=$1 allowed_steal_owner=${2:-} ownerdir
   FM_LOCK_OWNER_DIR=
+  FM_LOCK_BUSY=0
   ownerdir=$(fm_lock_owner_dir "$lockdir") || return 1
   if [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
+    FM_LOCK_BUSY=1
     fm_lock_discard_owner "$ownerdir"
     return 1
   fi
@@ -618,6 +625,9 @@ fm_lock_try_create() {
       rm -f "$lockdir" 2>/dev/null || true
     fi
   else
+    if [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
+      FM_LOCK_BUSY=1
+    fi
     fm_lock_remove_stray_owner_link "$lockdir" "$ownerdir"
   fi
   fm_lock_discard_owner "$ownerdir"
@@ -649,19 +659,25 @@ fm_lock_mid_acquire_is_fresh() {
   return 1
 }
 
+# A refusal sets FM_LOCK_BUSY=1 when the lock changed hands or its owner is live
+# or still publishing (contention); a lock path that is neither a link nor a
+# directory leaves it 0.
 fm_lock_recheck_stale_owner() {
   local lockdir=$1 expected_owner=$2 expected_pid=$3 actual_pid
+  FM_LOCK_BUSY=0
   if [ -n "$expected_owner" ]; then
-    fm_lock_points_to_owner "$lockdir" "$expected_owner" || return 1
+    fm_lock_points_to_owner "$lockdir" "$expected_owner" || { FM_LOCK_BUSY=1; return 1; }
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
     [ -d "$lockdir" ] && [ ! -L "$lockdir" ] || return 1
   fi
   actual_pid=$(cat "$lockdir/pid" 2>/dev/null || true)
-  [ "$actual_pid" = "$expected_pid" ] || return 1
+  [ "$actual_pid" = "$expected_pid" ] || { FM_LOCK_BUSY=1; return 1; }
   if fm_lock_owner_alive "$lockdir" "$actual_pid"; then
+    FM_LOCK_BUSY=1
     return 1
   fi
   if fm_lock_mid_acquire_is_fresh "$lockdir" "$actual_pid"; then
+    FM_LOCK_BUSY=1
     return 1
   fi
   return 0
@@ -1130,6 +1146,7 @@ fm_recovery_marker_handover_restore() {  # <marker> <snapshot-token> <snapshot-s
 # reaper whose own election a trap interrupted resumes it from its tombstone.
 fm_lock_reap_dead_link() {
   local lockdir=$1 owner pid token tomb current identity
+  FM_LOCK_BUSY=0
   [ -L "$lockdir" ] || return 1
   owner=$(fm_lock_link_owner "$lockdir" 2>/dev/null) || return 1
   fm_current_pid current || return 1
@@ -1142,8 +1159,11 @@ fm_lock_reap_dead_link() {
     for tomb in "$owner".reaped.*; do
       [ -d "$tomb" ] || continue
       if [ "${tomb##*.reaped.}" != "$current" ]; then
-        fm_lock_owner_alive "$tomb" "${tomb##*.reaped.}" \
-          "$tomb/reaper-${tomb##*.reaped.}-identity" && return 1
+        if fm_lock_owner_alive "$tomb" "${tomb##*.reaped.}" \
+          "$tomb/reaper-${tomb##*.reaped.}-identity"; then
+          FM_LOCK_BUSY=1
+          return 1
+        fi
       fi
       token=$tomb
     done
@@ -1170,29 +1190,42 @@ fm_lock_reap_dead_link() {
 # hold abandoned by this very process (a trap interrupted its critical section)
 # is reclaimed like fm_lock_try_acquire's self-held branch.
 fm_lock_try_acquire_steal_mutex() {  # <steal-lock>
-  local lockdir=$1 current
+  local lockdir=$1 current initial_busy
   FM_LOCK_OWNER_DIR=
   fm_lock_try_create "$lockdir" && return 0
+  initial_busy=$FM_LOCK_BUSY
   fm_current_pid current || return 1
   fm_lock_reap_dead_link "$lockdir.steal" || true
   if [ "$(cat "$lockdir/pid" 2>/dev/null || true)" = "$current" ]; then
     fm_lock_remove_path "$lockdir" || true
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
-    fm_lock_reap_dead_link "$lockdir" || return 1
+    if ! fm_lock_reap_dead_link "$lockdir"; then
+      # A competing reclaimer can release or rename the observed steal owner
+      # before our reap. Keep the first attempt's contention classification.
+      [ "$initial_busy" != 1 ] || FM_LOCK_BUSY=1
+      return 1
+    fi
   fi
   fm_lock_try_create "$lockdir"
 }
 
+# On failure FM_LOCK_BUSY is 1 when another live or freshly publishing actor
+# was observed at the refusal itself (contention), else 0 (an acquisition
+# error). It is captured where the refusal happens, so a caller needs no later
+# PID recheck, which a fresh publication that has no PID yet would defeat.
 fm_lock_try_acquire() {
   local lockdir=$1 pid steal cur rc steal_owner primary_owner current
   local _fm_lock_identity_bound=${2:-pid}
   FM_LOCK_HELD_PID=
   FM_LOCK_OWNER_DIR=
   FM_LOCK_RECOVERED_PID=
+  # shellcheck disable=SC2034 # Read by callers after fm_lock_try_acquire returns.
+  FM_LOCK_BUSY=0
 
   if fm_lock_try_create "$lockdir"; then
     return 0
   fi
+  FM_LOCK_BUSY=0
 
   fm_current_pid current || return 1
   pid=$(cat "$lockdir/pid" 2>/dev/null || true)
@@ -1214,10 +1247,12 @@ fm_lock_try_acquire() {
   fi
   if fm_lock_owner_alive "$lockdir" "$pid"; then
     FM_LOCK_HELD_PID=$pid
+    FM_LOCK_BUSY=1
     return 1
   fi
   if fm_lock_mid_acquire_is_fresh "$lockdir" "$pid"; then
     FM_LOCK_HELD_PID=$pid
+    FM_LOCK_BUSY=1
     return 1
   fi
 
@@ -1235,18 +1270,22 @@ fm_lock_try_acquire() {
     fm_lock_release "$steal"
     FM_LOCK_HELD_PID=$cur
     FM_LOCK_OWNER_DIR=
+    FM_LOCK_BUSY=1
     return 1
   fi
   if fm_lock_mid_acquire_is_fresh "$lockdir" "$cur"; then
     fm_lock_release "$steal"
     FM_LOCK_HELD_PID=$cur
     FM_LOCK_OWNER_DIR=
+    FM_LOCK_BUSY=1
     return 1
   fi
   if ! fm_lock_points_to_owner "$steal" "$steal_owner"; then
     fm_lock_release "$steal"
     FM_LOCK_HELD_PID=$(cat "$lockdir/pid" 2>/dev/null || true)
     FM_LOCK_OWNER_DIR=
+    # shellcheck disable=SC2034 # Read by callers after fm_lock_try_acquire returns.
+    FM_LOCK_BUSY=1
     return 1
   fi
 

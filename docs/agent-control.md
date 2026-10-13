@@ -239,7 +239,8 @@ The script headers own the command syntax, and `tests/fm-control-reassociate.tes
 
 Before publishing the replacement, it anchors the HEAD of the existing current copy, of each pool slot it leaves, and of each prior copy inside such a slot at `refs/fm/anchor/<task>-<shortsha>` in the project's shared common Git directory (an anchor already holding that HEAD is reused) and verifies each ref resolves to that exact commit. Every copy is checked before any anchor is written. This preserves every ancestor, including all unlanded commits, even if an existing interactive Treehouse owner later detaches and resets the old slot on shell exit. Commit or carry over all uncommitted and untracked-unignored changes first; reassociation does not stash them or change the provider's release lifecycle. Ignored files are not protected by the commit anchor.
 
-Every reassociation holds the shared project lock through both copies' ownership scans and record publication, whether or not either copy is a pool slot. A concurrent allocation, return, or reassociation refuses rather than racing the ownership proof.
+Every reassociation holds the shared project lock through both copies' ownership scans and record publication, whether or not either copy is a pool slot.
+Reassociation already holds the task's control lock, so it makes one nonwaiting attempt through [`bin/fm-project-lock-lib.sh`](../bin/fm-project-lock-lib.sh): a concurrent allocation, return, or reassociation, or any operation queued for the lock, makes it refuse rather than race the ownership proof, which runs only under the acquired lock.
 
 It then publishes, in order, so an earlier failure rolls back to the record that was there:
 

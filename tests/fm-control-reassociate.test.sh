@@ -200,7 +200,9 @@ snapshot_case() {  # <case-dir>
 
 assert_case_unchanged() {  # <case-dir> <message>
   local dir=$1 msg=$2
-  diff -r "$dir/before/state" "$dir/home/state" >/dev/null \
+  # Every project-lock release appends to the lock's .holds observation log
+  # (bin/fm-project-lock-lib.sh), including the release after a refusal.
+  diff -r -x '*.lock.holds' "$dir/before/state" "$dir/home/state" >/dev/null \
     || fail "$msg: the task record or other state changed"
   diff -r "$dir/before/data" "$dir/home/data" >/dev/null \
     || fail "$msg: the instructions changed"
