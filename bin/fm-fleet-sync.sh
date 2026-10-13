@@ -24,8 +24,9 @@
 # worktree, so it cannot discard unlanded work; set FM_FLEET_PRUNE=0 to disable it.
 # When the fetch fails on an orphaned .git/packed-refs.lock (left by a ref rewrite
 # killed mid-write - e.g. a timed-out bootstrap sync or a teardown process kill),
-# it is retried with a bounded wait and removed only when provably stale; see
-# fetch_with_packed_refs_lock_guard and the FM_FLEET_SYNC_PACKED_REFS_LOCK_* knobs.
+# it is retried with a bounded wait and removed only when provably stale under
+# fm-lock-lib.sh's owner rule (idle non-Git directory holders do not block it);
+# see fetch_with_packed_refs_lock_guard and the FM_FLEET_SYNC_PACKED_REFS_LOCK_* knobs.
 # Usage: fm-fleet-sync.sh [<project-dir-or-name>]
 # The single-project form accepts either a path (absolute, or relative to the
 # caller's cwd) or a bare "<name>"/"projects/<name>" form, resolved against
@@ -163,8 +164,8 @@ packed_refs_lock_path() {
 # command's combined output and returns its exit status. On the packed-refs.lock
 # signature ONLY: retry up to FLEET_SYNC_PACKED_REFS_LOCK_RETRIES times (a
 # transient lock self-clears as the owning process exits), then - only if the lock
-# is provably stale per fm-lock-lib.sh (still present, mtime age past the
-# threshold, no lsof holder of the lock or the clone worktree $PROJ) - remove it
+# is provably stale per fm-lock-lib.sh's shared owner proof, using the clone
+# worktree $PROJ as companion and the configured mtime-age threshold - remove it
 # and retry once more. A live lock, an unprovable one, or any other failure keeps
 # today's behavior. Every wait, retry, and removal prints to stderr, and a
 # successful recovery also prints one "$label: recovered: ..." summary to stdout so

@@ -22,15 +22,18 @@
 # (fetch_with_packed_refs_lock_guard, backed by bin/fm-lock-lib.sh's shared
 # staleness proof): a provably-stale lock is retried then removed and the clone
 # syncs (with a "recovered:" summary on stdout so a session-start refresh, which
-# discards stderr, still surfaces it); a live lock (fake lsof holder) is never
-# removed and the sync fails loudly; a live process merely holding the clone
-# worktree dir as its cwd also blocks removal (the clone-dir liveness check); a
-# transient lock that self-clears is retried without a force-remove; and any
+# discards stderr, still surfaces it); a live lock is never removed and the sync
+# fails loudly; real Git lock-fd and prepared-ref-transaction owners both block
+# removal, while a real idle non-Git cwd holder does not; incomplete directory
+# evidence and Git helpers still veto removal; a transient lock that self-clears
+# is retried without a force-remove; and any
 # non-packed-refs.lock fetch failure keeps today's behavior with no retry.
 set -u
 
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
+# shellcheck source=tests/git-lock-helpers.sh
+. "$ROOT/tests/git-lock-helpers.sh"
 
 fm_git_identity fmtest fmtest@example.invalid
 
@@ -177,20 +180,6 @@ lsof_live_holder() {
   cat > "$1/lsof" <<'SH'
 #!/usr/bin/env bash
 exit 0
-SH
-  chmod +x "$1/lsof"
-}
-
-# lsof shim: a holder ONLY for $FLEET_TEST_LIVE_DIR (a live `git -C <clone>` keeping
-# its cwd there), and no holder of the lock file itself - the exact window the
-# clone-dir liveness check must cover.
-lsof_holds_only_live_dir() {
-  cat > "$1/lsof" <<'SH'
-#!/usr/bin/env bash
-target=
-for a in "$@"; do case "$a" in --|-*) ;; *) target=$a ;; esac; done
-[ -n "${FLEET_TEST_LIVE_DIR:-}" ] && [ "$target" = "$FLEET_TEST_LIVE_DIR" ] && exit 0
-exit 1
 SH
   chmod +x "$1/lsof"
 }
@@ -588,32 +577,99 @@ test_live_packed_refs_lock_is_never_removed() {
   pass "a live packed-refs.lock is never removed and the sync fails loudly"
 }
 
-test_live_git_cwd_in_clone_dir_blocks_removal() {
-  local home fakebin clone out err before
+test_idle_cwd_in_clone_dir_does_not_block_recovery() {
+  local home fakebin clone out err idle
   home=$(new_home)
-  fakebin="$home/fb-lockcwd"; rm -rf "$fakebin"; mkdir -p "$fakebin"
+  fakebin="$home/fb-lockcwd"; mkdir -p "$fakebin"
   clone=$(build_packed_prunable "$home" lockcwd)
   plant_packed_refs_lock "$clone"
-  # Nobody holds the lock file, but a live process holds the clone worktree as its
-  # cwd - the narrow race where git closed packed-refs.lock but has not yet exited.
-  lsof_holds_only_live_dir "$fakebin"
-  before=$(head_sha "$clone")
+  touch -t 200001010000 "$clone/.git/packed-refs.lock"
+  mkfifo "$home/idle-input"
+  exec 9<> "$home/idle-input"
+  (cd "$clone" && exec bash -c 'read -r _ <&9') &
+  idle=$!
+  # Reuse the measured 200-poll ceiling documented in git-lock-helpers.sh.
+  fm_test_wait_until 20 lsof -a -p "$idle" -d cwd -- "$clone" >/dev/null \
+    || fail "idle process did not enter clone cwd"
+  # The real lock has no open descriptor, but the real directory has a holder.
+  if lsof -- "$clone/.git/packed-refs.lock" >/dev/null 2>&1; then
+    fail "abandoned lock unexpectedly has an open descriptor"
+  fi
   out="$home/out-lockcwd"; err="$home/err-lockcwd"
 
-  set +e
-  FLEET_TEST_LIVE_DIR="$clone" \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=2 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS=0 \
-  FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=0 \
+  FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=0 \
+  FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=30 \
     run_sync_guarded "$home" "$fakebin" "$out" "$err" lockcwd
-  set -e
 
-  assert_grep "is not provably stale" "$err" "clone-cwd holder: guard did not refuse"
-  assert_no_grep "removed provably-stale packed-refs lock" "$err" \
-    "clone-cwd holder: guard removed a lock while a live process held the clone dir"
-  assert_present "$clone/.git/packed-refs.lock" "clone-cwd holder: lock must not be removed"
-  [ "$(head_sha "$clone")" = "$before" ] || fail "clone-cwd holder: clone was advanced despite the refusal"
-  pass "a live process holding the clone worktree dir blocks lock removal (clone-dir liveness)"
+  kill "$idle"; wait "$idle" 2>/dev/null || true
+  exec 9>&-
+  assert_grep "fetch succeeded after stale packed-refs lock cleanup" "$err" \
+    "idle cwd: fetch did not recover"
+  assert_contains "$(cat "$out")" "lockcwd: synced" "idle cwd: clone did not sync"
+  assert_absent "$clone/.git/packed-refs.lock" "idle cwd: abandoned lock was kept"
+  [ "$(head_sha "$clone")" = "$(git -C "$clone" rev-parse origin/main)" ] \
+    || fail "idle cwd: clone was not advanced to origin/main"
+  pass "an idle non-git cwd holder does not prevent abandoned lock recovery"
+}
+
+test_real_git_packed_refs_owners_block_removal() {
+  local kind home clone fakebin out err before
+  for kind in packed-open packed; do
+    home=$(new_home)
+    fakebin="$home/fb-real-git-$kind"; mkdir -p "$fakebin"
+    clone=$(build_packed_prunable "$home" "git-$kind")
+    fm_test_git_lock_start "$clone" "$home/git-owner-$kind" "$kind"
+    before=$(head_sha "$clone")
+    out="$home/out"; err="$home/err"
+    if [ "$kind" = packed ]; then
+      # A real prepared ref transaction has closed its lock descriptor, yet
+      # still owns the lock until commit/abort. Test that window explicitly.
+      if lsof -- "$FM_TEST_GIT_LOCK_PATH" > "$home/lock-lsof" 2>&1; then
+        fail "prepared Git transaction still has an open lock descriptor"
+      fi
+      [ ! -s "$home/lock-lsof" ] || fail "prepared lock lsof query failed"
+      lsof -a -p "$FM_TEST_GIT_LOCK_PID" -d cwd -- "$clone" >/dev/null \
+        || fail "prepared Git transaction did not keep the clone cwd"
+    fi
+    FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=0 \
+    FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=30 \
+      run_sync_guarded "$home" "$fakebin" "$out" "$err" "git-$kind"
+    assert_grep "is not provably stale" "$err" "real Git $kind: guard did not refuse"
+    assert_present "$FM_TEST_GIT_LOCK_PATH" "real Git $kind: lock was removed"
+    [ "$(head_sha "$clone")" = "$before" ] || fail "real Git $kind: clone advanced"
+    fm_test_git_lock_finish
+    pass "real Git $kind ownership prevents packed-refs lock removal"
+  done
+}
+
+test_unclassifiable_directory_holders_block_removal() {
+  local fields home clone fakebin out err
+  for fields in missing-command warning git-helper; do
+    home=$(new_home)
+    fakebin="$home/fb-fields-$fields"; mkdir -p "$fakebin"
+    clone=$(build_packed_prunable "$home" "fields-$fields")
+    plant_packed_refs_lock "$clone"
+    cat > "$fakebin/lsof" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  *packed-refs.lock*) exit 1 ;;
+esac
+case "$LSOF_TEST_FIELDS" in
+  missing-command) printf 'p123\nfcwd\n' ;;
+  warning) printf 'p123\ncbash\nfcwd\nlsof: simulated incomplete scan\n' ;;
+  git-helper) printf 'p123\ncbash\nfcwd\np456\ncgit-remote-https\nfcwd\n' ;;
+esac
+SH
+    chmod +x "$fakebin/lsof"
+    out="$home/out"; err="$home/err"
+    LSOF_TEST_FIELDS="$fields" \
+    FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=0 \
+    FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=0 \
+      run_sync_guarded "$home" "$fakebin" "$out" "$err" "fields-$fields"
+    assert_grep "is not provably stale" "$err" "$fields: guard did not refuse"
+    assert_present "$clone/.git/packed-refs.lock" "$fields: lock was removed"
+    pass "$fields directory evidence prevents packed-refs lock removal"
+  done
 }
 
 test_transient_packed_refs_lock_self_clears() {
@@ -767,7 +823,9 @@ test_whole_fleet_form
 test_bootstrap_relays_recovered_and_stuck
 test_orphaned_stale_packed_refs_lock_recovers
 test_live_packed_refs_lock_is_never_removed
-test_live_git_cwd_in_clone_dir_blocks_removal
+test_idle_cwd_in_clone_dir_does_not_block_recovery
+test_real_git_packed_refs_owners_block_removal
+test_unclassifiable_directory_holders_block_removal
 test_transient_packed_refs_lock_self_clears
 test_non_signature_fetch_failure_is_not_retried
 test_non_clone_dir_never_syncs_the_enclosing_repo
