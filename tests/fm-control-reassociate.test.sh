@@ -840,7 +840,6 @@ test_shared_slot_cleanup_then_reassociate_preserves_all_copies() {
     finished="shared-finished-$shape"
     scout="shared-scout-$shape"
     dir=$(new_case "shared-$shape" "$id")
-    git -C "$dir/proj" fetch -q origin
     slot=$(add_pool_slot "$dir" 139 "fm/$finished")
     printf '{"worktrees":[{"name":"139","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
     cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
@@ -871,8 +870,7 @@ test_shared_slot_cleanup_then_reassociate_preserves_all_copies() {
       if [ "$shape" = nested-scout ] || [ "$shape" = nested-scout-prior ]; then
         scout_copy="$slot/.claude/worktrees/scout"
         git -C "$dir/proj" worktree add --quiet --detach "$scout_copy"
-        mkdir -p "$scout_copy/.claude"
-        printf 'preserved exempt scout scratch\n' > "$scout_copy/.claude/scout-scratch.txt"
+        printf 'preserved scout scratch\n' > "$scout_copy/scout-scratch.txt"
       fi
       fm_write_meta "$dir/home/state/$scout.meta" "window=fmses:fm-$scout" \
         "endpoint_task_id=$scout" "worktree=$scout_copy" "project=$dir/proj" \
@@ -975,45 +973,6 @@ test_shared_root_without_pr_proves_its_own_branch() {
   copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail 'shared branch proof touched the parked root'
   [ ! -e "$dir/treehouse.log" ] || fail 'shared branch proof returned the slot'
   pass 'a shared-root local-only ship without a PR retires using its own landed branch, not the parked root'
-}
-
-test_nested_scout_unfinished_copy_keeps_its_record() {
-  local id=shared-scout-custody shape dir slot nested out rc
-  for shape in untracked unpushed clean; do
-    dir=$(new_case "scout-custody-$shape" "$id")
-    git -C "$dir/proj" fetch -q origin
-    slot=$(add_pool_slot "$dir" 42 fm/parked-root)
-    nested="$slot/.claude/worktrees/$id"
-    add_copy "$dir" "$nested" "fm/$id-copy"
-    case "$shape" in
-      untracked) printf 'untracked work\n' > "$nested/scratch.txt" ;;
-      unpushed) git -C "$nested" commit -qm 'unpushed scout work' --allow-empty ;;
-    esac
-    printf '{"worktrees":[{"name":"42","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
-    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" \
-      "endpoint_task_id=$id" "worktree=$nested" "project=$dir/proj" \
-      "kind=scout" "spawn_gen=finished"
-    fm_write_meta "$dir/home/state/parked.meta" "worktree=$slot" "kind=ship"
-    printf 'task=%s\nhome=%s\n' "$id" "$dir/home" > "$dir/pool/42/.fm-slot-owner"
-    printf 'Completed findings.\n' > "$dir/home/data/$id/report.md"
-    FM_HOME="$dir/home" "$ROOT/bin/fm-captain-hold.sh" complete "$id" --none >/dev/null || fail 'cannot complete scout inventory'
-    cp "$dir/home/state/$id.meta" "$dir/meta-before"
-    copy_fingerprint "$nested" > "$dir/nested-before"
-    rc=0
-    out=$(run_case_teardown "$dir" "$id") || rc=$?
-    if [ "$shape" = clean ]; then
-      expect_code 0 "$rc" "a clean nested scout must retire records-only"$'\n'"$out"
-      [ ! -e "$dir/home/state/$id.meta" ] || fail 'clean scout record survived'
-    else
-      expect_code 1 "$rc" "$shape scout work must keep its recorded custody"$'\n'"$out"
-      assert_contains "$out" "$nested" 'scout refusal did not name its own copy'
-      cmp -s "$dir/meta-before" "$dir/home/state/$id.meta" || fail 'unfinished scout record retired'
-      assert_line "task=$id" "$dir/pool/42/.fm-slot-owner" 'unfinished scout claim released'
-    fi
-    copy_fingerprint "$nested" | cmp -s - "$dir/nested-before" || fail 'scout cleanup changed copy bytes'
-    [ ! -e "$dir/treehouse.log" ] || fail 'scout cleanup returned the slot'
-  done
-  pass 'nested scout record-only retirement refuses untracked and unpushed work and accepts a clean copy'
 }
 
 test_unfinished_shared_slot_record_cannot_retire() {
@@ -1683,7 +1642,6 @@ EOF
 }
 
 test_shared_root_without_pr_proves_its_own_branch
-test_nested_scout_unfinished_copy_keeps_its_record
 test_non_github_pr_reassociation_refuses
 test_recovered_shared_slot_has_no_nonforcing_lease_remedy
 test_unleased_shared_slot_gates_only_the_claimant

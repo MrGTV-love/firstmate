@@ -80,10 +80,8 @@
 # removed: teardown_nested_slot judges it first by its branch= ref.
 # Scout tasks (kind=scout in meta) carve out of that check: their worktree is
 # declared scratch and the regular, nonsymlink, nonempty report at
-# data/<task-id>/report.md is the work product. A non-forcing retirement still
-# refuses non-exempt dirt or unpushed commits in the scout's own recorded Git
-# copy; a shared slot root is not that scout's own copy. Non-forced teardown also
-# requires the shared unresolved-decision completion gate to verify its captain-held inventory.
+# data/<task-id>/report.md is the work product. Non-forced teardown also requires
+# the shared unresolved-decision completion gate to verify its captain-held inventory.
 # Before destructive cleanup, teardown validates task check artifacts as
 # ordinary single-link files on the state device. It refuses and preserves
 # task state when that proof fails; otherwise it removes the task's check,
@@ -126,7 +124,8 @@
 # Treehouse's lease and every copy, branch and file under the slot stay
 # untouched; slot-wide run/process cleanup and post-cleanup branch pruning
 # are skipped, but a retiring task's own nested copy gets the ordinary
-# identity-proven run, private launch-agent and process cleanup. Retire other
+# identity-proven run, private launch-agent and process cleanup, then its
+# ordinary safety recheck before its claim or record goes. Retire other
 # finished shared records the same way, then use
 # fm-control reassociate for the remaining record's real copy;
 # docs/agent-control.md owns that route.
@@ -214,7 +213,8 @@
 #     --worktree /path/to/remaining-copy --note 'Recover the actual task copy'
 #   Only if that lease was added and the copy is outside the slot: inspect every
 #   copy in the slot, then (cd /path/to/project && treehouse return \
-#     /path/to/slot --if-lease-holder <remaining-task>); docs/agent-control.md.
+#     /path/to/slot --if-lease-holder <remaining-task> </dev/null);
+#   docs/agent-control.md.
 #   --force skips ordinary-task dirty and landed-work checks, skips scout report
 #   checks, and discards secondmate child work for kind=secondmate. Only use it
 #   when the captain has explicitly said to discard the work. Ordinary work
@@ -2363,13 +2363,12 @@ validate_worktree_teardown_safety() {
   local dirty_raw dirty unpushed_raw unpushed branch recorded_pr_state wt_real
   [ "$FORCE" != "--force" ] || return 0
   case "$KIND" in
-    secondmate) return 0 ;;
+    secondmate|scout) return 0 ;;
   esac
   wt_real=$(fm_task_copy_canonical_dir "$WT") || wt_real=$WT
   if [ "$TEARDOWN_SLOT_SHARED" = 1 ] && [ "$wt_real" = "$TEARDOWN_SHARED_SLOT" ]; then
     # The shared root's HEAD and dirt may belong to the remaining task. Use
     # the retiring record's own delivery evidence, never that root's contents.
-    [ "$KIND" != scout ] || return 0
     if [[ "$PR_URL" =~ ^https://github[.]com/([^/]+/[^/]+)/pull/([0-9]+)$ ]] \
         && recorded_pr_state=$(gh pr view "$PR_URL" --json state -q '.state' 2>/dev/null) \
         && [ "$recorded_pr_state" = MERGED ]; then
@@ -2386,7 +2385,6 @@ validate_worktree_teardown_safety() {
     return 1
   fi
   if [ ! -d "$WT" ] || [ "$(git -C "$WT" rev-parse --is-inside-work-tree 2>/dev/null)" != true ]; then
-    [ "$KIND" != scout ] || return 0
     if teardown_nested_slot landed; then
       return 0
     fi
@@ -2435,11 +2433,6 @@ validate_worktree_teardown_safety() {
     echo "REFUSED: worktree $WT has uncommitted changes." >&2
     report_worktree_dirt "$dirty"
     echo "Commit them (or get the captain's explicit OK to discard, then --force)." >&2
-    return 1
-  elif [ "$KIND" = scout ]; then
-    [ -n "$unpushed" ] || return 0
-    echo "REFUSED: recorded scout copy $WT holds commits not on a remote; retain its record until that work is carried over or pushed, or get explicit discard approval and pass --force --drop-file." >&2
-    printf 'unpushed commits:\n%s\n' "$unpushed" >&2
     return 1
   else
     branch=${TEARDOWN_WORKTREE_BRANCH_FOR_SAFETY:-}
@@ -3759,6 +3752,9 @@ safe_rm_rf() {
 safe_rm_rf_child_worktree() {
   local target=$1 project=$2
   validate_child_worktree_for_removal "$target" "$project" >/dev/null || return 1
+  if fm_treehouse_pool_slot "$project" "$target"; then
+    require_registered_slot_copies "$target" || return 1
+  fi
   rm -rf -- "$target"
 }
 
@@ -4157,7 +4153,8 @@ preflight_descendant_treehouse_slots() {
     owner_rc=0
     require_owned_worktree_slot_record "$task_id" "$worktree" || owner_rc=$?
     case "$owner_rc" in
-      0|"$TEARDOWN_SLOT_REASSIGNED_RC") ;;
+      0) require_registered_slot_copies "$worktree" || return 1 ;;
+      "$TEARDOWN_SLOT_REASSIGNED_RC") ;;
       *) return 1 ;;
     esac
   done
@@ -4572,10 +4569,10 @@ cleanup_firstmate_home_children() {
             if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ]; then
               return "$child_return_rc"
             fi
-            safe_rm_rf_child_worktree "$child_wt" "$child_proj"
+            safe_rm_rf_child_worktree "$child_wt" "$child_proj" || return 1
           fi
         else
-          safe_rm_rf_child_worktree "$child_wt" "$child_proj"
+          safe_rm_rf_child_worktree "$child_wt" "$child_proj" || return 1
         fi
       fi
     fi
@@ -4837,6 +4834,7 @@ elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
   conclude_task_no_mistakes_run "$WT" || exit 1
   retire_task_private_nm_launch_agents "$WT" || exit 1
   reap_task_worktree_processes worktree "$WT" "$TASK_TMP" || exit 1
+  require_worktree_teardown_safety
 elif [ "$KIND" != secondmate ]; then
   reap_task_worktree_processes tasktmp "$TASK_TMP"
 fi

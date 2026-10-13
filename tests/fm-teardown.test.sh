@@ -8775,8 +8775,8 @@ test_nested_slot_return_concludes_runs_and_agents_on_the_slot() {
 }
 
 test_shared_nested_copy_concludes_only_its_own_runtime() {
-  local ownership case_dir head rc own_pid worker_pid root_pid label root_label own_survived root_survived daemon_survived
-  for ownership in duplicate own foreign; do
+  local ownership case_dir head rc own_pid worker_pid root_pid label root_label own_survived root_survived daemon_survived late
+  for ownership in duplicate own foreign late; do
     make_nested_slot_case "shared-nested-runtime-$ownership" enclosing .claude/worktrees/x
     case_dir=$NESTED_CASE
     printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$NESTED_SLOT" > "$case_dir/pool/treehouse-state.json"
@@ -8799,11 +8799,16 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
       cp "$case_dir/state/other-nested.meta" "$case_dir/other.before"
       cp "$case_dir/state/task-x1.meta" "$case_dir/own.before"
     fi
+    late=
+    if [ "$ownership" = late ]; then
+      late="$NESTED_COPY/late.txt"
+      cp "$case_dir/state/task-x1.meta" "$case_dir/own.before"
+    fi
     head=$(git -C "$NESTED_COPY" rev-parse HEAD)
     rc=0
     FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
       FM_FAKE_AXI_STATUS="$(parked_axi_status_toon "$([ "$ownership" = foreign ] && printf fm/foreign || printf fm/task-x1-v2)" "$head")" \
-      FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+      FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FAKE_LAUNCHCTL_BOOTOUT_WRITES="$late" \
       run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     own_survived=0
     root_survived=0
@@ -8830,6 +8835,17 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
       assert_absent "$case_dir/treehouse.log" 'duplicate-copy refusal returned the slot'
       continue
     fi
+    if [ "$ownership" = late ]; then
+      expect_code 1 "$rc" "late work in the own nested copy must keep its custody: $(cat "$case_dir/stderr")"
+      assert_grep "worktree $NESTED_COPY has uncommitted changes" "$case_dir/stderr" 'the refusal did not name the late work'
+      assert_present "$NESTED_COPY/late.txt" 'the refusal lost the late work'
+      cmp -s "$case_dir/own.before" "$case_dir/state/task-x1.meta" || fail 'late-work refusal retired or changed its own record'
+      assert_grep 'task=task-x1' "$case_dir/pool/1/.fm-slot-owner" 'late-work refusal released the shared-slot claim'
+      cmp -s "$case_dir/parked.before" "$case_dir/state/parked.meta" || fail 'late-work refusal changed the parked root record'
+      [ "$root_survived" = 1 ] || fail "late-work refusal killed the parked root's daemon"
+      assert_absent "$case_dir/treehouse.log" 'late-work refusal returned the slot'
+      continue
+    fi
     expect_code 0 "$rc" "$ownership: shared nested cleanup must succeed: $(cat "$case_dir/stderr")"
     [ "$own_survived" = 0 ] || fail "$ownership: the retiring task's own process survived"
     [ "$root_survived" = 1 ] || fail "$ownership: the parked root's daemon was killed"
@@ -8847,7 +8863,7 @@ test_shared_nested_copy_concludes_only_its_own_runtime() {
     assert_absent "$case_dir/state/task-x1.meta" 'the finished task record survived'
     cmp -s "$case_dir/parked.before" "$case_dir/state/parked.meta" || fail 'shared cleanup changed the parked record'
   done
-  pass 'shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root and foreign runs'
+  pass 'shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work'
 }
 
 test_other_record_copy_overlap_is_component_aware() {

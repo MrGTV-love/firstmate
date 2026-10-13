@@ -2274,6 +2274,82 @@ SH
   pass "secondmate force teardown preserves child worktree after unproven lock refusal"
 }
 
+# A child slot's registered nested copy is custody no record proves. Forced
+# secondmate discard must refuse before any child is touched, whether the slot
+# would go back through Treehouse or be raw-removed with Treehouse unavailable.
+test_secondmate_force_teardown_preserves_child_slot_registered_copy() {
+  local shape case_dir home subhome childproj childwt nested fakebin log err rc path dir
+  for shape in treehouse absent; do
+    case_dir="$TMP_ROOT/force-child-copy-$shape"
+    home="$case_dir/home"
+    subhome="$case_dir/subhome"
+    childproj="$subhome/projects/alpha"
+    childwt="$case_dir/pool/1/alpha"
+    nested="$childwt/.claude/worktrees/parked"
+    err="$case_dir/err"
+    mkdir -p "$home/state" "$home/data" "$subhome/state" "$(dirname "$childwt")"
+    fm_git_worktree "$childproj" "$childwt" "child-copy-$shape"
+    git -C "$childproj" worktree add --quiet -b "parked-$shape" "$nested"
+    printf 'parked work\n' > "$nested/parked.txt"
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$childwt" \
+      > "$case_dir/pool/treehouse-state.json"
+    cp "$case_dir/pool/treehouse-state.json" "$case_dir/lease-before"
+    printf 'domain\n' > "$subhome/.fm-secondmate-home"
+    cat > "$home/state/domain.meta" <<EOF
+window=firstmate:fm-domain
+worktree=$subhome
+project=$subhome
+harness=echo
+kind=secondmate
+mode=secondmate
+yolo=off
+home=$subhome
+projects=alpha
+EOF
+    printf '%s\n' '- domain - design domain (home: '"$subhome"'; scope: design domain; projects: alpha; added 2026-06-22)' > "$home/data/secondmates.md"
+    cat > "$subhome/state/child.meta" <<EOF
+window=firstmate:fm-child
+worktree=$childwt
+project=$childproj
+harness=echo
+kind=ship
+mode=no-mistakes
+yolo=off
+EOF
+    cp "$subhome/state/child.meta" "$case_dir/child-before"
+    git -C "$childproj" worktree list --porcelain > "$case_dir/registrations-before"
+    fakebin=$(make_fake_tmux "$case_dir/fake")
+    log="$case_dir/fake/tmux.log"
+    path="$fakebin:$PATH"
+    if [ "$shape" = absent ]; then
+      rm -f "$fakebin/treehouse"
+      path=$fakebin
+      while IFS= read -r -d: dir; do
+        [ -x "$dir/treehouse" ] || path="$path:$dir"
+      done <<< "$PATH:"
+    fi
+    set +e
+    PATH="$path" FM_HOME="$home" FM_FAKE_TMUX_LOG="$log" FM_FAKE_TMUX_CAPTURE="$case_dir/fake/pane.txt" \
+      "$ROOT/bin/fm-teardown.sh" domain --force --drop-file "$(fm_test_drop_file)" >/dev/null 2>"$err"
+    rc=$?
+    set -e
+    [ "$rc" -ne 0 ] || fail "$shape: forced secondmate teardown discarded a child slot holding another registered copy"
+    grep -F "registered copy $(cd "$nested" && pwd -P)" "$err" >/dev/null || fail "$shape: the refusal did not name the registered copy: $(cat "$err")"
+    [ -f "$nested/parked.txt" ] || fail "$shape: forced secondmate teardown removed the registered copy's work"
+    [ -d "$childwt" ] || fail "$shape: forced secondmate teardown removed the child slot"
+    git -C "$childproj" worktree list --porcelain | cmp -s - "$case_dir/registrations-before" \
+      || fail "$shape: forced secondmate teardown changed copy registrations"
+    cmp -s "$case_dir/child-before" "$subhome/state/child.meta" || fail "$shape: forced secondmate teardown retired the child record"
+    [ -e "$home/state/domain.meta" ] || fail "$shape: forced secondmate teardown retired the secondmate record"
+    [ -d "$subhome" ] || fail "$shape: forced secondmate teardown removed the secondmate home"
+    cmp -s "$case_dir/lease-before" "$case_dir/pool/treehouse-state.json" || fail "$shape: forced secondmate teardown changed the slot lease"
+    if grep -E 'kill-window|treehouse return' "$log" >/dev/null 2>&1; then
+      fail "$shape: forced secondmate teardown touched a child before refusing: $(cat "$log")"
+    fi
+  done
+  pass "forced secondmate teardown keeps a child slot holding an unproven registered copy, with or without Treehouse"
+}
+
 test_secondmate_force_teardown_allows_non_state_operational_dir_symlinks_inside_home() {
   local opdir home subhome target fakebin err log
   for opdir in data config projects; do
@@ -3213,6 +3289,7 @@ test_secondmate_teardown_removes_plain_clone_home_without_treehouse_return
 test_secondmate_force_teardown_discards_child_work
 test_secondmate_force_teardown_refuses_duplicated_child_slot
 test_secondmate_force_teardown_preserves_child_on_unproven_lock
+test_secondmate_force_teardown_preserves_child_slot_registered_copy
 test_secondmate_force_teardown_allows_non_state_operational_dir_symlinks_inside_home
 test_secondmate_force_teardown_refuses_operational_dir_symlink_outside_home
 test_secondmate_teardown_refuses_registered_nested_home
