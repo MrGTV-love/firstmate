@@ -5,10 +5,19 @@
 # and fm-fleet-sync.sh (a clone's .git/packed-refs.lock) both rely on: a lock is
 # provably stale iff ALL of the following hold -
 #   1. the lock file still exists;
-#   2. no live process holds the lock file open, and none holds a companion
-#      directory (the worktree, or the repo's .git dir) open as cwd or an fd -
-#      a live git process keeps its own lock open for the whole operation, so an
-#      empty lsof result means the file was abandoned, not that no one held it;
+#   2. no live process holds the lock file open, and no Git process (kernel
+#      command basename git or git-*) holds any companion directory open as cwd
+#      or an fd. The caller passes every worktree that can own the lock: the
+#      worktree for its own index.lock, and ALL worktrees of the repository for
+#      a common-dir lock such as packed-refs.lock. This covers Git's
+#      native executable and dashed helpers, not shells whose argv mentions git.
+#      lsof's c field is the kernel command ("cgit" encodes command "git").
+#      Git's close_lock_file_gently()
+#      can close its descriptor BEFORE commit/rollback, so directory-held Git
+#      processes still veto removal. Non-Git cwd/fd holders (idle pane shells,
+#      treehouse, etc.) cannot own that Git transaction and do not veto it;
+#      ANY process holding the lock itself still vetoes removal, regardless
+#      of its command. Unknown/malformed directory-holder output vetoes too;
 #   3. its mtime age is at least a caller-supplied threshold - a freshly created
 #      lock might belong to a process lsof has not yet reflected.
 # ANY uncertainty - lsof missing, an lsof error, an unreadable mtime - returns
@@ -33,12 +42,46 @@ fm_lock_path_mtime() {
   fi
 }
 
-# fm_lock_lsof_holder <target>: 0 a process holds it, 1 provably none, 2 lsof
-# errored (cannot tell). Diagnostics print on the error path only.
+# fm_lock_lsof_holder <target> [git-only]: 0 a relevant process holds it,
+# 1 provably none, 2 lsof errored or returned unclassifiable data (cannot tell).
+# Use command fields, not lsof's truncated human-readable COMMAND column.
+# The lock-file query deliberately has no command filter.
 fm_lock_lsof_holder() {
-  local target=$1 output status
-  if output=$(lsof -- "$target" 2>&1); then
-    return 0
+  local target=$1 mode=${2:-all} output status line command pid='' command_seen=0 valid=0
+  local -a args=()
+  [ "$mode" != git-only ] || args=(+c 0 -F pc)
+  if output=$(lsof ${args[@]+"${args[@]}"} -- "$target" 2>&1); then
+    [ "$mode" = git-only ] || return 0
+    while IFS= read -r line; do
+      valid=0
+      case "$line" in
+        p*)
+          # Every process must have an identifiable command before ignoring it.
+          [ -z "$pid" ] || [ "$command_seen" -eq 1 ] || break
+          pid=${line#p}
+          case "$pid" in ''|*[!0-9]*) break ;; esac
+          command_seen=0
+          ;;
+        c*)
+          [ -n "$pid" ] && [ "$command_seen" -eq 0 ] || break
+          command=${line#c}
+          [ -n "$command" ] || break
+          case "${command##*/}" in git|git-*) return 0 ;; esac
+          command_seen=1
+          ;;
+        f*)
+          # lsof includes descriptor fields even when only p/c were requested.
+          [ "$command_seen" -eq 1 ] || break
+          ;;
+        *) break ;;
+      esac
+      valid=1
+    done <<< "$output"
+    if [ "$valid" -eq 1 ] && [ -n "$pid" ] && [ "$command_seen" -eq 1 ]; then
+      return 1
+    fi
+    fm_lock_log "cannot classify lsof directory holders for $target; leaving the lock in place"
+    return 2
   else
     status=$?
   fi
@@ -55,12 +98,12 @@ fm_lock_lsof_holder() {
   return 2
 }
 
-# fm_lock_has_live_holder <lock> <dir>: 0 if a live process holds $lock or the
-# companion $dir open, OR if the answer is uncertain - a missing lsof or an lsof
-# error is treated as "cannot prove no holder" (fail safe: assume live). Returns
-# 1 only when lsof reports provably no holder on both.
+# fm_lock_has_live_holder <lock> <dir>...: 0 if ANY process holds $lock, a Git
+# process holds a companion <dir>, or the answer is uncertain (assume live).
+# Returns 1 only when every query rules out the owners defined in the header.
 fm_lock_has_live_holder() {
-  local lock=$1 dir=$2 status
+  local lock=$1 dir status
+  shift
   command -v lsof >/dev/null 2>&1 || return 0
   if [ -n "$lock" ]; then
     if fm_lock_lsof_holder "$lock"; then
@@ -70,14 +113,14 @@ fm_lock_has_live_holder() {
       [ "$status" -eq 1 ] || return 0
     fi
   fi
-  if [ -n "$dir" ]; then
-    if fm_lock_lsof_holder "$dir"; then
+  for dir in "$@"; do
+    if fm_lock_lsof_holder "$dir" git-only; then
       return 0
     else
       status=$?
       [ "$status" -eq 1 ] || return 0
     fi
-  fi
+  done
   return 1
 }
 
@@ -91,14 +134,17 @@ fm_lock_age() {
   printf '%s\n' "$(( now - m ))"
 }
 
-# fm_lock_is_provably_stale <lock> <dir> <min_age_secs>: THE proof. Returns 0 iff
-# the lock exists, has no live holder, and its mtime age is at least
+# fm_lock_is_provably_stale <lock> <min_age_secs> <dir>...: THE proof. Returns 0
+# iff the lock exists, has no live holder, and its mtime age is at least
 # <min_age_secs>. Returns non-zero on any uncertainty - never remove a lock this
 # returns non-zero for.
 fm_lock_is_provably_stale() {
-  local lock=$1 dir=$2 min_age=$3 age
+  local lock=$1 min_age=$2 age
+  shift 2
   [ -n "$lock" ] && [ -e "$lock" ] || return 1
-  fm_lock_has_live_holder "$lock" "$dir" && return 1
+  # Without a companion directory, Git owners cannot be ruled out.
+  [ "$#" -gt 0 ] || return 1
+  fm_lock_has_live_holder "$lock" "$@" && return 1
   if ! age=$(fm_lock_age "$lock"); then
     fm_lock_log "cannot read mtime for git lock $lock; leaving it in place"
     return 1
