@@ -7975,6 +7975,82 @@ SH
 }
 
 
+# A stale task's positively reassigned slot belongs to the claimant. Its dirt,
+# unlanded commits and live process cannot block records-only retirement.
+test_reassigned_dirty_slot_retires_only_finished_task() {
+  local case_dir slot delivered head worker rc=0
+  case_dir=$(make_case reassigned-dirty-finished)
+  wt_commit_file "$case_dir" delivered.txt 'merged task work' 'delivered task'
+  delivered=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/wt" push -q origin HEAD:main
+  add_gh_pr_merged_for_head "$case_dir" "$delivered"
+  mkdir -p "$case_dir/pool/1" "$case_dir/primary-home/state"
+  slot="$case_dir/pool/1/project"
+  git -C "$case_dir/project" worktree move "$case_dir/wt" "$slot"
+  git -C "$slot" checkout -q -b fm/live-task
+  printf 'claimant committed work\n' > "$slot/live.txt"
+  git -C "$slot" add live.txt
+  git -C "$slot" commit -qm 'unlanded claimant work'
+  printf 'claimant tracked edit\n' >> "$slot/live.txt"
+  printf 'claimant untracked work\n' > "$slot/scratch.txt"
+  mkdir -p "$slot/.claude"
+  printf 'claimant hook bytes\n' > "$slot/.claude/settings.local.json"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$slot" \
+    > "$case_dir/pool/treehouse-state.json"
+  printf 'task=live-task\nhome=%s\n' "$case_dir/primary-home" > "$case_dir/pool/1/.fm-slot-owner"
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+    "worktree=$slot" "project=$case_dir/project" "kind=ship" \
+    "mode=no-mistakes" "branch=fm/task-x1" "spawn_gen=finished" \
+    "pr=https://github.com/example/repo/pull/7" "pr_head=$delivered"
+  fm_write_meta "$case_dir/state/live-task.meta" \
+    "window=firstmate:fm-live-task" "endpoint_task_id=live-task" \
+    "worktree=$slot" "project=$case_dir/project" "kind=ship" "spawn_gen=live"
+  printf 'finished task\n' > "$case_dir/state/task-x1.status"
+  printf 'live task\n' > "$case_dir/state/live-task.status"
+  cp "$case_dir/state/live-task.meta" "$case_dir/live-meta.before"
+  cp "$case_dir/state/live-task.status" "$case_dir/live-status.before"
+  cp "$case_dir/pool/1/.fm-slot-owner" "$case_dir/claim.before"
+  cp "$case_dir/pool/treehouse-state.json" "$case_dir/lease.before"
+  git -C "$slot" status --porcelain --untracked-files=all > "$case_dir/copy-status.before"
+  git -C "$slot" symbolic-ref HEAD > "$case_dir/branch.before"
+  git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' > "$case_dir/refs.before"
+  head=$(git -C "$slot" rev-parse HEAD)
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
+exit 0
+SH
+  teardown_fixture_start "$slot" KILL sleep 300
+  worker=$TEARDOWN_FIXTURE_PID
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "a finished task must retire without judging the reassigned claimant copy"$'\n'"$(cat "$case_dir/stderr")"
+  kill -0 "$worker" 2>/dev/null || fail 'records-only cleanup killed the claimant process'
+  teardown_fixture_stop "$worker"
+  assert_absent "$case_dir/state/task-x1.meta" 'finished metadata survived'
+  assert_absent "$case_dir/state/task-x1.status" 'finished status survived'
+  assert_grep 'kill-window -t =firstmate:=fm-task-x1' "$case_dir/endpoint.log" 'finished endpoint was not closed'
+  assert_no_grep 'kill-window -t =firstmate:=fm-live-task' "$case_dir/endpoint.log" 'claimant endpoint was closed'
+  assert_absent "$case_dir/treehouse.log" 'records-only cleanup administered the pool'
+  cmp -s "$case_dir/live-meta.before" "$case_dir/state/live-task.meta" || fail 'claimant metadata changed'
+  cmp -s "$case_dir/live-status.before" "$case_dir/state/live-task.status" || fail 'claimant status changed'
+  cmp -s "$case_dir/claim.before" "$case_dir/pool/1/.fm-slot-owner" || fail 'claimant slot claim changed'
+  cmp -s "$case_dir/lease.before" "$case_dir/pool/treehouse-state.json" || fail 'claimant pool lease changed'
+  [ "$head" = "$(git -C "$slot" rev-parse HEAD)" ] || fail 'claimant HEAD changed'
+  git -C "$slot" symbolic-ref HEAD | cmp -s - "$case_dir/branch.before" || fail 'claimant branch changed'
+  git -C "$slot" status --porcelain --untracked-files=all | cmp -s - "$case_dir/copy-status.before" || fail 'claimant copy status changed'
+  git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' | cmp -s - "$case_dir/refs.before" || fail 'claimant refs changed'
+  assert_grep 'claimant tracked edit' "$slot/live.txt" 'claimant tracked work changed'
+  assert_grep 'claimant untracked work' "$slot/scratch.txt" 'claimant untracked work changed'
+  assert_grep 'claimant hook bytes' "$slot/.claude/settings.local.json" 'claimant hook changed'
+  pass 'a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes'
+}
+
 # A record re-pointed by bin/fm-control.sh reassociate names its earlier copies
 # in prior_worktree=. Teardown still runs the landed-work test on the current
 # copy, but leaves a current copy that is not a pool slot - and every prior
@@ -9494,6 +9570,7 @@ test_process_spawned_during_grace_is_reaped_on_later_pass
 test_persistent_scan_refuses_after_bounded_retries
 test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
+test_reassigned_dirty_slot_retires_only_finished_task
 test_reassociated_copies_are_left_in_place
 test_reassociated_unlanded_copy_still_refuses
 test_released_slot_record_keeps_current_copy

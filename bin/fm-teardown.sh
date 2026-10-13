@@ -127,10 +127,11 @@
 # fm-control reassociate for the remaining record's real copy;
 # docs/agent-control.md owns that route.
 # A slot whose owner claim (below) names another task likewise touches nothing
-# under the slot, so its exclusive return scan is skipped rather than
-# stranding the stale record
-# and, with it, the claimant's own teardown. Forced cleanup keeps its existing
-# overlap refusals; this records-only shared-root route never needs --force.
+# under the slot. Its exclusive return scan, dirty/landed-copy admission and
+# post-cleanup clone sync are skipped: that copy and its Git refs belong to the
+# claimant, not the stale task whose endpoint and records are being retired.
+# Forced cleanup keeps its existing overlap refusals; this records-only
+# shared-root route never needs --force.
 # That scan alone cannot prove THIS record is the current owner, because the task
 # that took the slot next may leave no record it can reach - its own worker may
 # have exited and its record been cleaned up, or it may live in a home this
@@ -2350,6 +2351,13 @@ validate_worktree_teardown_safety() {
   case "$KIND" in
     secondmate|scout) return 0 ;;
   esac
+  if [ "$TEARDOWN_SLOT_REASSIGNED" = 1 ] && [ "$TEARDOWN_SLOT_SHARED" != 1 ]; then
+    # A positive claim already proved this copy belongs to another task.
+    # Records-only retirement disposes of none of its work, so its dirt and
+    # HEAD cannot judge the stale record. Shared-root retirement below keeps
+    # its separate proof of this task's delivery.
+    return 0
+  fi
   wt_real=$(fm_task_copy_canonical_dir "$WT") || wt_real=$WT
   if [ "$TEARDOWN_SLOT_SHARED" = 1 ] && [ "$wt_real" = "$TEARDOWN_SHARED_SLOT" ]; then
     # The shared root's HEAD and dirt may belong to the remaining task. Use
@@ -5135,7 +5143,7 @@ fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
-    && [ "$TEARDOWN_SLOT_SHARED" != 1 ]; then
+    && teardown_owns_worktree; then
   "$FM_ROOT/bin/fm-fleet-sync.sh" "$PROJ" || true
 fi
 # A secondmate retirement may remove the home containing an overridden control
