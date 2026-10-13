@@ -1834,7 +1834,7 @@ test_root_deadline_names_the_root_and_reaps_the_tree() {
 import json
 import sys
 rows = [json.loads(line) for line in open(sys.argv[1])]
-roots = {row['key'].rsplit('/', 1)[-1]: row for row in rows if row.get('key', '').startswith('lint-root.')}
+roots = {row['key'].rsplit('/', 1)[-1]: row for row in rows if row.get('key', '').startswith('lint-root.') and 'event' not in row}
 assert roots['blocker.sh']['exit'] == 124 and roots['blocker.sh']['timed_out'] is True, roots
 assert roots['ok.sh']['timed_out'] is False, roots
 assert [row['key'] for row in rows if row.get('event') == 'timeout'] == [roots['blocker.sh']['key']], rows
