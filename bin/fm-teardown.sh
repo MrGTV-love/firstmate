@@ -4083,12 +4083,12 @@ preflight_descendant_treehouse_slots() {
       # one while waiting for the other would otherwise create AB/BA waits.
       j=${#project_locks[@]}
       while [ "$j" -gt 0 ] && [[ "${project_locks[$((j - 1))]}" > "$lock_path" ]]; do
-        project_locks[$j]=${project_locks[$((j - 1))]}
-        project_tasks[$j]=${project_tasks[$((j - 1))]}
+        project_locks[j]=${project_locks[$((j - 1))]}
+        project_tasks[j]=${project_tasks[$((j - 1))]}
         j=$((j - 1))
       done
-      project_locks[$j]=$lock_path
-      project_tasks[$j]=$task_id
+      project_locks[j]=$lock_path
+      project_tasks[j]=$task_id
     fi
   done
   for ((i=0; i < ${#project_locks[@]}; i++)); do
