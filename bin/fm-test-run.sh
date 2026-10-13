@@ -75,8 +75,10 @@
 #                   1 (serial) except for plain --changed and a plain list of
 #                   script paths, which use the bounded automatic scheduler.
 #   --per-script-timeout-secs N
-#                   terminate a script that runs longer than N seconds and
-#                   record it as exit 124 (0 disables, the default). The
+#                   terminate a script that runs longer than N seconds, raised
+#                   to its measured test.<script> p99 x 3 from bin/fm-duration.py
+#                   when that is larger, and record it as exit 124 (0
+#                   disables, the default). The
 #                   --changed applies 1500s automatically, above the current
 #                   slowest CI hint with margin; exceeding it becomes a bounded
 #                   failure, not proof of a hang. --max-wall-ms is checked
