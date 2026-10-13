@@ -1,0 +1,27 @@
+--- primary inventories the scout report: fm-captain-hold.sh complete sc-1 --none
+  | complete: sc-1 captain-call inventory reviewed
+--- sweep 4, lock free
+sweep 4 rc=0 took 1s
+  | refused	sc-1	scout	7264	REFUSED: scout task sc-1 has not passed the captain-call completion gate.
+task record gone: no
+tmux window gone: no
+  pool: 1     in-use       ~/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/1/proj  (detached)
+  pool: 2     in-use       ~/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/2/proj  (detached)
+--- published report rows:
+  | refused	sc-1	scout	7264	REFUSED: scout task sc-1 has not passed the captain-call completion gate.
+--- hold record:
+start=1791871192 end=1791871196 seconds=4 pid=9677 operation=spawn sp-d
+start=1791871198 end=1791871199 seconds=1 pid=24774 operation=spawn sc-1
+start=1791871204 end=1791871208 seconds=4 pid=43460 operation=spawn sc-1
+start=1791871232 end=1791871235 seconds=3 pid=95593 operation=lab spawn holder
+start=1791871236 end=1791871237 seconds=1 pid=4206 operation=teardown sc-1
+--- sweep 5, lock free, new status line
+sweep 5 rc=0 took 13s
+  | reaped	sc-1	-	-	teardown completed
+task record gone: yes
+tmux window gone: yes
+  pool: 1     in-use       ~/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/1/proj  (detached)
+  pool: 2     available    ~/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/2/proj  (detached)
+--- hold record tail:
+start=1791871236 end=1791871237 seconds=1 pid=4206 operation=teardown sc-1
+start=1791871278 end=1791871290 seconds=12 pid=89378 operation=teardown sc-1

@@ -1,0 +1,21 @@
+=== S7 cross-home queue; root home /Users/charlesabrooker/tmp/fm-lab.csSMRM ; child home /Users/charlesabrooker/tmp/fm-lab.dlZSyK ; shared lock /Users/charlesabrooker/tmp/fm-lab.csSMRM/state/.treehouse-project-8510c720e9f88a8ee00fc8cce66031917cad3d13.lock
+--- root-home spawn sp-j (poll 1s) queues first
+--- child-home spawn ch-1 (aggressive poll 0.05s) queues second
+queued tickets on the shared lock:
+  ticket-00000000000000000008 -> role=spawn sp-j pid=35676
+  ticket-00000000000000000009 -> role=spawn ch-1 pid=37738
+--- holder released at 01:02:42
+root spawn sp-j rc=0 ; child spawn ch-1 rc=0
+  root | fm-project-lock: waiting for spawn sp-j; current holder lab holder (PID 34910); 370s left before the stall limit
+  root | spawned sp-j harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-sp-j worktree=/Users/charlesabrooker/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/3/proj
+  child| fm-project-lock: waiting for spawn ch-1; current holder lab holder (PID 34910); 369s left before the stall limit
+  child| spawned ch-1 harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-ch-1 worktree=/Users/charlesabrooker/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/4/proj
+--- hold record entries added (admission order):
+seconds=6 pid=34910 operation=lab holder
+seconds=3 pid=35676 operation=spawn sp-j
+seconds=4 pid=37738 operation=spawn ch-1
+sp-j.meta in root: yes ; ch-1.meta in child: yes
+child home has no project lock of its own: yes
+tickets left:
+(end)
+lock dir present after all? no

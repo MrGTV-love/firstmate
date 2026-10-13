@@ -1,0 +1,45 @@
+=== S0/S1 lab: project lock /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/state/.treehouse-project-161093d1aee01ce2d8461259c088adf156bbb2b2.lock
+--- start holder (stands in for a slow Treehouse return holding the project lock)
+holder pid in lock: 46401  role: lab slow cleanup holder
+
+--- S0: BASE commit a9010aab fm-spawn.sh sp-b against the held lock
+base spawn rc=1 after 0s:
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zZ3EdI
+  | error: another Treehouse slot allocation or return is in progress for /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/projects/proj; refusing to race it
+sp-b.meta present? no
+
+--- S1: NEW fm-spawn.sh sp-b (poll 1s), sp-c (aggressive poll 0.05s), sp-d (poll 1s) queue behind the holder
+queued tickets (oldest first):
+  ticket-00000000000000000005 -> role=spawn sp-b pid=47837
+  ticket-00000000000000000006 -> role=spawn sp-c pid=48735
+  ticket-00000000000000000007 -> role=spawn sp-d pid=49624
+holding 25s more to show waiters keep waiting (old code refused at once)...
+sp-b still waiting (alive)
+sp-c still waiting (alive)
+sp-d still waiting (alive)
+sp-b.meta absent while queued
+sp-c.meta absent while queued
+sp-d.meta absent while queued
+--- release holder at 00:54:44
+holder rc=0
+spawn rc: sp-b=0 sp-c=0 sp-d=0
+--- sp-b output (lock + result lines):
+  | fm-project-lock: waiting for spawn sp-b; current holder lab slow cleanup holder (PID 46401); 369s left before the stall limit
+  | spawned sp-b harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-sp-b worktree=/Users/charlesabrooker/tmp/fm-lab.zZ3EdI/pool/.treehouse/proj-dc22e3/1/proj
+--- sp-c output (lock + result lines):
+  | fm-project-lock: waiting for spawn sp-c; current holder lab slow cleanup holder (PID 46401); 369s left before the stall limit
+  | spawned sp-c harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-sp-c worktree=/Users/charlesabrooker/tmp/fm-lab.zZ3EdI/pool/.treehouse/proj-dc22e3/2/proj
+--- sp-d output (lock + result lines):
+  | fm-project-lock: waiting for spawn sp-d; current holder lab slow cleanup holder (PID 46401); 368s left before the stall limit
+  | spawned sp-d harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-sp-d worktree=/Users/charlesabrooker/tmp/fm-lab.zZ3EdI/pool/.treehouse/proj-dc22e3/3/proj
+--- hold record entries added (admission order):
+seconds=27 pid=46401 operation=lab slow cleanup holder
+seconds=4 pid=47837 operation=spawn sp-b
+seconds=5 pid=48735 operation=spawn sp-c
+seconds=4 pid=49624 operation=spawn sp-d
+--- tickets left:
+(end)
+lock dir present after all? no
+/Users/charlesabrooker/tmp/fm-lab.zZ3EdI/state/sp-b.meta
+/Users/charlesabrooker/tmp/fm-lab.zZ3EdI/state/sp-c.meta
+/Users/charlesabrooker/tmp/fm-lab.zZ3EdI/state/sp-d.meta

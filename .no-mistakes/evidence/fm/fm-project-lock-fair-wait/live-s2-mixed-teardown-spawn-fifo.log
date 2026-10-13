@@ -1,0 +1,25 @@
+=== S2 mixed FIFO; lock /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/state/.treehouse-project-161093d1aee01ce2d8461259c088adf156bbb2b2.lock
+holder in lock: pid 13883 role lab slow cleanup holder
+--- teardown sp-b (slow poll 3s) queues first
+--- spawn sp-e (aggressive poll 0.05s) queues second
+queued tickets:
+  ticket-00000000000000000009 -> role=teardown sp-b pid=15159
+  ticket-00000000000000000010 -> role=spawn sp-e pid=17744
+sp-b.meta still present while queued: yes
+sp-e.meta absent while queued: yes
+--- release holder at 00:55:25
+teardown sp-b rc=0 ; spawn sp-e rc=0
+--- teardown output:
+  | fm-project-lock: waiting for teardown sp-b; current holder lab slow cleanup holder (PID 13883); 369s left before the stall limit
+  | teardown sp-b complete (window firstmate:fm-sp-b, worktree /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/pool/.treehouse/proj-dc22e3/1/proj)
+--- spawn sp-e output:
+  | fm-project-lock: waiting for spawn sp-e; current holder lab slow cleanup holder (PID 13883); 368s left before the stall limit
+  | spawned sp-e harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-sp-e worktree=/Users/charlesabrooker/tmp/fm-lab.zZ3EdI/pool/.treehouse/proj-dc22e3/1/proj
+--- hold record entries added (admission order):
+seconds=7 pid=13883 operation=lab slow cleanup holder
+seconds=15 pid=15159 operation=teardown sp-b
+seconds=3 pid=17744 operation=spawn sp-e
+sp-b.meta gone: yes ; sp-e.meta present: yes
+--- tickets left:
+(end)
+lock dir present after all? no

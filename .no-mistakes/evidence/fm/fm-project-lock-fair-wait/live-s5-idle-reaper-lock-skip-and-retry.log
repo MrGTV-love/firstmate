@@ -1,0 +1,49 @@
+=== S5 idle reaper vs held project lock; lock /Users/charlesabrooker/tmp/fm-lab.csSMRM/state/.treehouse-project-8510c720e9f88a8ee00fc8cce66031917cad3d13.lock
+scout spawn rc=0
+  | spawned sc-1 harness=claude kind=scout window=firstmate:fm-sc-1 worktree=/Users/charlesabrooker/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/2/proj
+--- emulate the finished worker: its Stop hook, its final status line, its report
+busy-event rc=0
+--- scan (no lock held):
+grep: invalid option -- P
+usage: grep [-abcdDEFGHhIiJLlMmnOopqRSsUVvwXxZz] [-A num] [-B num] [-C[num]]
+	[-e pattern] [-f file] [--binary-files=value] [--color=when]
+	[--context[=num]] [--directories=action] [--label] [--line-buffered]
+	[--null] [pattern] [file ...]
+--- sweep 1 with the project lock held by pid 95593
+sweep 1 rc=0 took 1s
+grep: invalid option -- P
+usage: grep [-abcdDEFGHhIiJLlMmnOopqRSsUVvwXxZz] [-A num] [-B num] [-C[num]]
+	[-e pattern] [-f file] [--binary-files=value] [--color=when]
+	[--context[=num]] [--directories=action] [--label] [--line-buffered]
+	[--null] [pattern] [file ...]
+task record kept: yes
+worktree kept: yes ; pool unchanged: yes
+tmux window kept: yes
+refusal recorded: no
+holder unchanged: yes
+tickets:
+(end)
+--- sweep 2, lock still held (retried again, skipped again)
+rc=0
+grep: invalid option -- P
+usage: grep [-abcdDEFGHhIiJLlMmnOopqRSsUVvwXxZz] [-A num] [-B num] [-C[num]]
+	[-e pattern] [-f file] [--binary-files=value] [--color=when]
+	[--context[=num]] [--directories=action] [--label] [--line-buffered]
+	[--null] [pattern] [file ...]
+--- holder released
+--- sweep 3, lock free: the retried teardown runs
+sweep 3 rc=0 took 3s
+grep: invalid option -- P
+usage: grep [-abcdDEFGHhIiJLlMmnOopqRSsUVvwXxZz] [-A num] [-B num] [-C[num]]
+	[-e pattern] [-f file] [--binary-files=value] [--color=when]
+	[--context[=num]] [--directories=action] [--label] [--line-buffered]
+	[--null] [pattern] [file ...]
+task record gone: no
+published report rows:
+  pool: 1     in-use       ~/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/1/proj  (detached)
+  pool: 2     in-use       ~/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/2/proj  (detached)
+start=1791871236 end=1791871237 seconds=1 pid=4206 operation=teardown sc-1
+sweep1: lock-skipped	sc-1	-	-	another operation holds or is queued for the task's project lock
+sweep2: lock-skipped	sc-1	-	-	another operation holds or is queued for the task's project lock
+sweep3: teardown-refused	sc-1	-	-	REFUSED: scout task sc-1 has not passed the captain-call completion gate.
+sweep4: refused	sc-1	scout	7264	REFUSED: scout task sc-1 has not passed the captain-call completion gate.

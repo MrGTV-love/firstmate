@@ -1,0 +1,26 @@
+no server running on /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/tmux/tmux-501/fm-lab
+=== S6 nonwaiting admission never jumps a queued waiter; lock /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/state/.treehouse-project-161093d1aee01ce2d8461259c088adf156bbb2b2.lock
+--- (a) reassociate sp-d while the lock is held
+rc=1
+  | no server running on /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/tmux/tmux-501/fm-lab
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zZ3EdI
+  | fm-project-lock: reassociate sp-d does not wait; current holder lab holder (PID 8809) is ahead of it
+  | error: another task copy allocation, return, or reassociation is in progress for /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/projects/proj; refusing to race it, nothing was changed
+--- queue spawn sp-i with a slow 6s poll
+queued:
+  ticket-00000000000000000019 -> role=spawn sp-i pid=10485
+--- (b) holder released at 00:59:04.437; lock dir present: no; reassociate sp-d now
+rc=1 at 00:59:04
+  | no server running on /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/tmux/tmux-501/fm-lab
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.zZ3EdI
+  | fm-project-lock: reassociate sp-d does not wait; next turn spawn sp-i (PID 10485) is ahead of it
+  | error: another task copy allocation, return, or reassociation is in progress for /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/projects/proj; refusing to race it, nothing was changed
+spawn sp-i rc=1
+  | fm-project-lock: waiting for spawn sp-i; current holder lab holder (PID 8809); 369s left before the stall limit
+--- hold record entries added (admission order):
+seconds=1 pid=8809 operation=lab holder
+seconds=1 pid=10485 operation=spawn sp-i
+sp-d.meta unchanged by refused reassociations: yes
+tickets left:
+(end)
+lock dir present after all? no

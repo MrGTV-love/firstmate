@@ -1,0 +1,24 @@
+=== S6 nonwaiting admission never jumps a queued waiter; lock /Users/charlesabrooker/tmp/fm-lab.csSMRM/state/.treehouse-project-8510c720e9f88a8ee00fc8cce66031917cad3d13.lock
+--- (a) reassociate sp-d while the lock is held
+rc=1
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.csSMRM
+  | fm-project-lock: reassociate sp-d does not wait; current holder lab holder (PID 14150) is ahead of it
+  | error: another task copy allocation, return, or reassociation is in progress for /Users/charlesabrooker/tmp/fm-lab.csSMRM/projects/proj; refusing to race it, nothing was changed
+--- queue spawn sp-i with a slow 6s poll
+queued:
+  ticket-00000000000000000006 -> role=spawn sp-i pid=18384
+--- (b) holder released at 01:01:37.901; lock dir present: no; reassociate sp-d now
+rc=1 at 01:01:38
+  | fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.csSMRM
+  | fm-project-lock: reassociate sp-d does not wait; next turn spawn sp-i (PID 18384) is ahead of it
+  | error: another task copy allocation, return, or reassociation is in progress for /Users/charlesabrooker/tmp/fm-lab.csSMRM/projects/proj; refusing to race it, nothing was changed
+spawn sp-i rc=0
+  | fm-project-lock: waiting for spawn sp-i; current holder lab holder (PID 14150); 369s left before the stall limit
+  | spawned sp-i harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-sp-i worktree=/Users/charlesabrooker/tmp/fm-lab.csSMRM/pool/.treehouse/proj-3be9f1/2/proj
+--- hold record entries added (admission order):
+seconds=1 pid=14150 operation=lab holder
+seconds=4 pid=18384 operation=spawn sp-i
+sp-d.meta unchanged by refused reassociations: yes
+tickets left:
+(end)
+lock dir present after all? no

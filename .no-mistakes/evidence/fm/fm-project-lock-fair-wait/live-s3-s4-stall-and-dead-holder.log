@@ -1,0 +1,29 @@
+=== S3 stall limit; lock /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/state/.treehouse-project-161093d1aee01ce2d8461259c088adf156bbb2b2.lock
+holder pid in lock: 38204
+spawn sp-f (allowance overridden to 8s) rc=1 after 7s
+  | fm-project-lock: waiting for spawn sp-f; current holder lab stalled holder (PID 38204); 6s left before the stall limit
+  | fm-project-lock: waiting for spawn sp-f; current holder lab stalled holder (PID 38204); 4s left before the stall limit
+  | fm-project-lock: waiting for spawn sp-f; current holder lab stalled holder (PID 38204); 2s left before the stall limit
+  | fm-project-lock: stall limit reached for spawn sp-f: current holder lab stalled holder (PID 38204) made no progress for 8s (allowance 8s); no live holder was removed
+  | error: another Treehouse slot allocation or return is in progress for /Users/charlesabrooker/tmp/fm-lab.zZ3EdI/projects/proj; refusing to race it
+holder pid in lock after refusal: 38204 (alive: yes)
+sp-f.meta absent: yes
+sp-f launch brief absent: yes
+sp-f backlog row: - [ ] sp-f - item for sp-f (kind: ship) (since 2026-10-13)
+sp-f tmux window absent: yes
+pool unchanged: yes
+tickets left:
+(end)
+
+=== S4 dead holder recovery (same live holder pid 38204 is now SIGKILLed while sp-f waits)
+queued:
+  ticket-00000000000000000013 -> role=spawn sp-f pid=59284
+killed holder 38204 at 00:56:16
+spawn sp-f rc=0
+  | fm-project-lock: waiting for spawn sp-f; current holder lab stalled holder (PID 38204); 360s left before the stall limit
+  | spawned sp-f harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-sp-f worktree=/Users/charlesabrooker/tmp/fm-lab.zZ3EdI/pool/.treehouse/proj-dc22e3/4/proj
+sp-f.meta present: yes
+start=1791870976 end=1791870980 seconds=4 pid=59284 operation=spawn sp-f
+lock dir present after all? no
+tickets left:
+(end)
