@@ -1190,15 +1190,21 @@ fm_lock_reap_dead_link() {
 # hold abandoned by this very process (a trap interrupted its critical section)
 # is reclaimed like fm_lock_try_acquire's self-held branch.
 fm_lock_try_acquire_steal_mutex() {  # <steal-lock>
-  local lockdir=$1 current
+  local lockdir=$1 current initial_busy
   FM_LOCK_OWNER_DIR=
   fm_lock_try_create "$lockdir" && return 0
+  initial_busy=$FM_LOCK_BUSY
   fm_current_pid current || return 1
   fm_lock_reap_dead_link "$lockdir.steal" || true
   if [ "$(cat "$lockdir/pid" 2>/dev/null || true)" = "$current" ]; then
     fm_lock_remove_path "$lockdir" || true
   elif [ -e "$lockdir" ] || [ -L "$lockdir" ]; then
-    fm_lock_reap_dead_link "$lockdir" || return 1
+    if ! fm_lock_reap_dead_link "$lockdir"; then
+      # A competing reclaimer can release or rename the observed steal owner
+      # before our reap. Keep the first attempt's contention classification.
+      [ "$initial_busy" != 1 ] || FM_LOCK_BUSY=1
+      return 1
+    fi
   fi
   fm_lock_try_create "$lockdir"
 }

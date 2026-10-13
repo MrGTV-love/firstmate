@@ -913,6 +913,70 @@ test_nonwaiting_admission_separates_contention_from_acquisition_errors() {
   pass "nonwaiting admission returns the busy status only for a live holder, and an error for a lock nobody holds"
 }
 
+test_project_queue_retires_a_reused_waiter_pid() {
+  local case_dir unrelated ticket rc=0
+  case_dir=$(make_case queue-pid-reuse)
+  sleep 120 &
+  unrelated=$!
+  ticket=$(FM_HOME="$case_dir/home" FM_STATE_OVERRIDE='' bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-project-lock-lib.sh"
+    fm_project_lock_register "$2" 20 retired-waiter || exit 1
+    printf "%s\n" "$FM_PROJECT_LOCK_TICKET"
+  ' _ "$ROOT" "$case_dir/actor.lock") || fail "could not register the old waiter"
+  # Retain the departed waiter's identity but reuse its numeric PID for an
+  # unrelated real live process, as the kernel can do during a long queue.
+  printf '%s\n' "$unrelated" > "$ticket/pid"
+  project_queue_actor "$case_dir" replacement "" "" try > "$case_dir/probe.out" 2>&1 || rc=$?
+  kill "$unrelated" 2>/dev/null || true
+  wait "$unrelated" 2>/dev/null || true
+  expect_code 0 "$rc" "a reused waiter PID stranded admission: $(cat "$case_dir/probe.out")"
+  assert_equals replacement "$(cat "$case_dir/order")" "the unrelated process was admitted as the departed waiter"
+  assert_absent "$ticket" "the identity-mismatched ticket was not retired"
+  assert_absent "$case_dir/actor.lock" "the replacement did not release its lock"
+  pass "a departed waiter's reused PID does not reserve the queue for an unrelated live process"
+}
+
+test_nonwaiting_admission_preserves_steal_race_contention() {
+  local case_dir race rc out
+  case_dir=$(make_case queue-steal-race)
+  for race in disappeared renamed; do
+    rc=0
+    out=$(FM_HOME="$case_dir/home" FM_STATE_OVERRIDE='' bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      . "$1/bin/fm-project-lock-lib.sh"
+      lock=$2 race=$3
+      owner=$(fm_lock_owner_dir "$lock") || exit 1
+      fixture_steal_owner=$(fm_lock_owner_dir "$lock.steal") || exit 1
+      printf "2147483647\n" > "$owner/pid"
+      printf "2147483647\n" > "$fixture_steal_owner/pid"
+      ln -s "$owner" "$lock" || exit 1
+      ln -s "$fixture_steal_owner" "$lock.steal" || exit 1
+      eval "_real_$(declare -f fm_lock_reap_dead_link)"
+      fm_lock_reap_dead_link() {
+        if [ "$1" = "$lock.steal" ]; then
+          if [ "$race" = disappeared ]; then
+            fm_lock_remove_path "$1" || exit 1
+          else
+            # Elect the competing reaper at the actual tombstone rename.
+            mv() {
+              if [ "${2:-}" = "$fixture_steal_owner" ]; then
+                command mv -- "$fixture_steal_owner" "$fixture_steal_owner.reaped.competitor" || exit 1
+              fi
+              command mv "$@"
+            }
+          fi
+        fi
+        _real_fm_lock_reap_dead_link "$1"
+      }
+      fm_project_lock_try "$lock" race-probe
+    ' _ "$ROOT" "$case_dir/$race.lock" "$race" 2>&1) || rc=$?
+    expect_code 75 "$rc" "the $race steal owner race became a permanent acquisition error: $out"
+    assert_absent "$case_dir/$race.lock/role" "the losing reclaimer was admitted"
+  done
+  pass "an observed steal-mutex contention remains transient when another reclaimer releases or renames its owner"
+}
+
 test_project_queue_classifies_refusals_before_queueing() {
   local case_dir value rc out
   case_dir=$(make_case queue-input)
@@ -1119,6 +1183,8 @@ test_project_queue_slow_holder_never_admits_a_later_waiter_first
 test_project_queue_progress_never_reaches_the_stall_limit
 test_nonwaiting_admission_never_jumps_a_queued_waiter
 test_nonwaiting_admission_separates_contention_from_acquisition_errors
+test_project_queue_retires_a_reused_waiter_pid
+test_nonwaiting_admission_preserves_steal_race_contention
 test_project_queue_classifies_refusals_before_queueing
 test_recursive_cleanup_orders_projects_across_local_homes
 test_failed_spawn_after_admission_holds_no_place

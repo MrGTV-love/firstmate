@@ -492,7 +492,9 @@ test_project_lock_fresh_publication_is_skipped_not_refused() {
   [ -L "$lock" ] || fail "the holder had not published the lock link"
   : > "$STUB_LOG"
   printf 'real\n' > "$STUB_MODE_FILE"
-  out=$(run_reap "$home" reap) || fail "reap failed: $out"
+  # Keep the synchronized publication fresh through the measured loaded-host
+  # teardown startup; this fixture is testing classification, not expiry.
+  out=$(FM_LOCK_STALE_AFTER=120 run_reap "$home" reap) || fail "reap failed: $out"
   expect_class "$out" scout-pool lock-skipped "a lock still being published is contention, not an acquisition error"
   assert_absent "$home/state/.idle-reap/scout-pool.refused" "a fresh publication records no refusal"
   assert_present "$home/state/scout-pool.meta" "a fresh publication preserves the task record"

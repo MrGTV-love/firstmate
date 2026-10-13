@@ -42,16 +42,15 @@
 # the sum of the counted steps below that spawn or teardown run while holding
 # the lock, doubled for a 100% margin. It is not a bound on every hold; the
 # holds and repetitions it does not cover are listed after the sum.
-# Poll budgets and bounds, from bin/fm-spawn.sh: the
-# treehouse get entry wait, 60 x 1s (lines 5153 and 5168), 60s; the worker path
-# check, 20 x 0.5s (lines 4713 and 4718), 10s; the skill pick bound
-# SKILL_SELECTION_BOUND (lines 5210 and 5221), 30s. From bin/fm-teardown.sh:
-# the no-mistakes bound NM_TEARDOWN_TIMEOUT (line 2461), 10s per call, up to
-# five calls (lines 1903, 2502, 2521, 2558 and 2559), 50s; the index.lock
-# return retries, 3 waits of TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS (line 2266),
-# 3s, plus up to four more returns (lines 2268 and 2295) at the measured
-# return time below; the launch-agent bootout poll, 19 x 0.25s (lines 3093 and
-# 3107), 4.75s; and one leaked-process reaping sleep (line 2897), 1s. Harness
+# Poll budgets and bounds, from bin/fm-spawn.sh: the treehouse get entry wait,
+# 60 x 1s, 60s; the worker path check, 20 x 0.5s, 10s; and the skill pick bound
+# SKILL_SELECTION_BOUND, 30s. From bin/fm-teardown.sh: NM_TEARDOWN_TIMEOUT,
+# 10s per call, up to five calls across task conclusion and private launch-agent
+# retirement, 50s; the index.lock return retries, 3 waits of
+# TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS, 3s, plus up to four more returns at
+# the measured return time below; the launch-agent bootout poll in
+# retire_task_private_nm_launch_agents, 19 x 0.25s, 4.75s; and one
+# leaked-process reaping sleep, 1s. Harness
 # readiness and delivery polls run after the spawn releases the lock and are
 # not counted.
 # measured: one run each, in disposable clones (evidence: the
@@ -59,14 +58,13 @@
 # real-network-measurement/).
 #   2026-10-13T01:02:48Z, load 51-57 on 18 CPUs, Treehouse v2.3.1-fm.e58947de,
 #   isolated pool: `treehouse get --lease` 8.924s, `treehouse return --force`
-#   1.628s (bin/fm-teardown.sh line 2243).
+#   1.628s (bin/fm-teardown.sh's Treehouse return).
 #   2026-10-13T02:35:42Z, load 10-11 on 18 CPUs, git 2.54.0, gh 2.101.0:
-#   bin/fm-spawn.sh freshen fetches `git fetch origin` 3.972s (line 4128),
-#   `git remote set-head origin --auto` 0.542s (line 4135), default-branch
-#   fetch 0.511s (line 4145); bin/fm-teardown.sh `gh-axi pr list` 1.092s
-#   (line 1711), `git fetch origin refs/pull/<n>/head` 0.486s (line 1741),
-#   `gh pr view` 0.599s (line 1992) and 0.505s, counted twice (lines 2354
-#   and 2378).
+#   bin/fm-spawn.sh freshen_spawn_worktree_base fetches `git fetch origin`
+#   3.972s, `git remote set-head origin --auto` 0.542s, default-branch fetch
+#   0.511s; bin/fm-teardown.sh `gh-axi pr list` 1.092s,
+#   `git fetch origin refs/pull/<n>/head` 0.486s, `gh pr view` 0.599s
+#   and 0.505s, counted twice.
 # The previous sum, 128.764s, counted NM_TEARDOWN_TIMEOUT once and left out
 # the return retries, bootout poll and reaping sleep. Adding four more
 # NM_TEARDOWN_TIMEOUT calls (40s), the retry waits (3s), four more returns
@@ -83,15 +81,16 @@
 #     worktree and terminal creation; Orca is not used in this fleet;
 #   - teardown runs conclude_task_no_mistakes_run and
 #     retire_task_private_nm_launch_agents once per swept root
-#     (bin/fm-teardown.sh lines 3542-3547), so a copy nested in a pool slot
-#     repeats four NM_TEARDOWN_TIMEOUT calls and the bootout poll per extra
-#     root, which the sum counts once;
-#   - the reaping sleep runs in up to three passes (bin/fm-teardown.sh lines
-#     2841 and 2897), 3s, which the sum counts as 1s;
-#   - Docker cleanup (bin/fm-teardown.sh line 4824) runs unbounded;
+#     in bin/fm-teardown.sh, so a copy nested in a pool slot repeats four
+#     NM_TEARDOWN_TIMEOUT calls and the bootout poll per extra root, which the
+#     sum counts once;
+#   - the leaked-process reaping sleep runs in up to max_passes=3 passes in
+#     bin/fm-teardown.sh, 3s, which the sum counts as 1s;
+#   - fm_task_docker_cleanup in bin/fm-teardown.sh runs unbounded;
 #   - forced recursive secondmate teardown holds every descendant project lock
-#     (bin/fm-teardown.sh line 4121) while it returns each child slot in turn
-#     (line 4555), so its hold grows with the child count.
+#     acquired by preflight_descendant_treehouse_slots while
+#     cleanup_firstmate_home_children returns each child slot in turn, so its
+#     hold grows with the child count.
 # A hold that outlasts the allowance makes waiters refuse at the stall limit.
 # FM_PROJECT_LOCK_SERVICE_SECS overrides it with a positive integer for a newly
 # measured environment or bounded fixture.
@@ -110,6 +109,7 @@ FM_PROJECT_LOCK_BUSY_EXIT=75
 
 fm_project_lock_register() {  # <lock> <service-secs> <operation>
   local lock=$1 service=$2 operation=$3 queue mutex sequence=0 owner ticket
+  local _fm_lock_identity_bound=identity
   queue="$lock.queue"
   mutex="$lock.queue-lock"
   FM_PROJECT_LOCK_TICKET=
@@ -153,6 +153,7 @@ fm_project_lock_register() {  # <lock> <service-secs> <operation>
 
 fm_project_lock_head() {  # <queue>
   local path pid owner
+  local _fm_lock_identity_bound=identity
   FM_PROJECT_LOCK_HEAD=
   for path in "$1"/ticket-*; do
     [ -e "$path" ] || [ -L "$path" ] || continue
