@@ -224,7 +224,10 @@ A finished record whose copy is nested in the slot also uses record-only retirem
 Then reassociate the remaining task to its real nested or external copy with `bin/fm-control.sh <remaining-task> reassociate --worktree <copy> --note <why>`.
 The existing component-aware exclusivity proof still requires finished nested scout records to retire first when they overlap the old root, even if their copy is disjoint from the replacement.
 Do not retire an unfinished task to clear custody: it keeps its record and claim until its own delivery proof passes.
-Before returning any pool slot, teardown also checks that slot's Git worktree registrations and refuses a nested copy that is not one of the retiring task's proven copies, naming the copy and the reassociation step; `--force` does not waive that custody proof.
+Before returning any pool slot, teardown also checks that slot's Git worktree registrations and refuses a nested copy that is not one of the retiring task's proven copies, naming each such copy; `--force` does not waive that custody proof.
+When an active task record owns that copy's work, including the retiring task itself while its record still names the slot root, reassociate that task to the copy first.
+When no active record owns it, such as a finished record's nested copy left after records-only retirement or a worker's own `.claude/worktrees/` copy, inspect it by hand with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it by hand with a plain `git -C <slot> worktree remove <copy>` and rerun teardown.
+Teardown never disposes of such a copy itself.
 A surviving recorded PR follows only under the head-containment proof above.
 A durable lease added for this recovery stays on the slot after the remaining task moves to a copy outside it, so no record names the slot and teardown never returns it.
 Release it by hand only after inspecting every copy left in the slot with `git -C <slot> status --untracked-files=all` and `git -C <project> worktree list --porcelain`, and only when no record names the slot or a copy inside it and nothing there is unlanded: `(cd <project> && treehouse return <slot-path> --if-lease-holder <remaining-task> </dev/null)`, where the holder is the one passed to `treehouse lease`.

@@ -923,8 +923,12 @@ test_shared_slot_cleanup_then_reassociate_preserves_all_copies() {
       rc=0
       out=$(run_case_teardown "$dir" "$id") || rc=$?
       expect_code 1 "$rc" "before reassociation, the parked record must not return a slot containing an unrecorded copy"$'\n'"$out"
-      assert_contains "$out" "$nested" 'the refusal must name the protected registered copy'
-      assert_contains "$out" 'reassociate' 'the refusal must name the recovery step'
+      assert_contains "$out" "registered copy $nested that is not one of task $id's proven copies" 'the refusal must name the protected registered copy and its retiring task'
+      assert_contains "$out" "registered copy $slot/.claude/worktrees/$finished " 'the refusal must name the retired record'"'"'s leftover copy'
+      assert_contains "$out" "bin/fm-control.sh <owning-task> reassociate --worktree <copy>" 'the refusal must name reassociation for an owned copy'
+      assert_contains "$out" 'git -C <copy> status --untracked-files=all' 'the refusal must name the manual inspection for an unowned copy'
+      assert_contains "$out" "git -C $slot worktree remove <copy>" 'the refusal must name the manual removal for an unowned copy'
+      assert_not_contains "$out" 'worktree remove --force' 'the refusal must not suggest forced copy removal'
       cmp -s "$dir/parked-before" "$dir/home/state/$id.meta" || fail 'mistaken cleanup retired the parked record'
       [ ! -e "$dir/treehouse.log" ] || fail 'mistaken cleanup returned the durably leased slot'
       rc=0

@@ -2334,7 +2334,8 @@ EOF
     rc=$?
     set -e
     [ "$rc" -ne 0 ] || fail "$shape: forced secondmate teardown discarded a child slot holding another registered copy"
-    grep -F "registered copy $(cd "$nested" && pwd -P)" "$err" >/dev/null || fail "$shape: the refusal did not name the registered copy: $(cat "$err")"
+    grep -F "registered copy $(cd "$nested" && pwd -P) that is not one of task child's proven copies" "$err" >/dev/null \
+      || fail "$shape: the refusal did not name the registered copy and its child task: $(cat "$err")"
     [ -f "$nested/parked.txt" ] || fail "$shape: forced secondmate teardown removed the registered copy's work"
     [ -d "$childwt" ] || fail "$shape: forced secondmate teardown removed the child slot"
     git -C "$childproj" worktree list --porcelain | cmp -s - "$case_dir/registrations-before" \

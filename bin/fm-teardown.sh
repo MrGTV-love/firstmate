@@ -152,7 +152,10 @@
 # flight across that change on no evidence at all. Independently, before any
 # pool return, the slot's Git worktree registrations must contain no nested
 # copy outside this task's individually proven copies; otherwise teardown
-# refuses, even with --force, and names the copy and reassociation step.
+# refuses, even with --force, and names each such copy. If an active record
+# owns that copy's work, reassociate that task to it first. If none does,
+# inspect the copy by hand, confirm it holds no unlanded work, and remove it by
+# hand with a plain git worktree remove; docs/agent-control.md owns that route.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -2213,9 +2216,9 @@ cleanup_stale_lock_for_safety_check() {
 # root. Registered nested copies must be this task's individually proven copies
 # before cleanup, and must all be removed before any provider return, even on
 # --force. Read the slot's own ref store, including paths containing newlines.
-require_registered_slot_copies() {  # <slot> [<proven-copy>...]
-  local slot=$1 inventory field copy known allowed refused=0
-  shift
+require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
+  local task=$1 slot=$2 inventory field copy known allowed refused=0
+  shift 2
   slot=$(fm_task_copy_canonical_dir "$slot") || return 1
   inventory=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-worktrees.XXXXXX") || return 1
   if ! git -C "$slot" worktree list --porcelain -z > "$inventory" 2>/dev/null; then
@@ -2233,25 +2236,25 @@ require_registered_slot_copies() {  # <slot> [<proven-copy>...]
     done
     [ "$known" = 0 ] || continue
     refused=1
-    echo "REFUSED: pool slot $slot contains registered copy $copy that is not one of task $ID's proven copies; its record and lease must stay in place, even with --force." >&2
+    echo "REFUSED: pool slot $slot contains registered copy $copy that is not one of task $task's proven copies; its record and lease must stay in place, even with --force." >&2
   done < "$inventory"
   rm -f "$inventory"
   if [ "$refused" = 1 ]; then
-    echo "Inspect the listed copies' ownership and reassociate the remaining task to its real copy first with bin/fm-control.sh <remaining-task> reassociate --worktree <copy> --note <why>, then prove every copy before returning the slot." >&2
+    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, including task $task while its record still names the slot root, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy>. Re-run this teardown afterwards." >&2
     return 1
   fi
 }
 
 # Return a worktree/home via `treehouse return --force`, tolerating a transient or
 # stale git index.lock left by a killed crew process. See the script header.
-teardown_treehouse_return() {
-  local dir=$1 cd_dir=$2 label=$3 post_cleanup_check=${4:-}
+teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-cleanup-check>]
+  local dir=$1 cd_dir=$2 label=$3 owner=$4 post_cleanup_check=${5:-}
   local out lock attempt=0 max_retries lock_desc
 
   # Capture stdout+stderr so non-lock failures stay visible and lock failures can
   # be matched by signature even when the lock file is already gone mid-check.
   if fm_treehouse_pool_slot "$cd_dir" "$dir"; then
-    require_registered_slot_copies "$dir" || return 1
+    require_registered_slot_copies "$owner" "$dir" || return 1
   fi
   if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
     [ -n "$out" ] && printf '%s\n' "$out"
@@ -2279,7 +2282,7 @@ teardown_treehouse_return() {
     sleep "$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS"
 
     if fm_treehouse_pool_slot "$cd_dir" "$dir"; then
-      require_registered_slot_copies "$dir" || return 1
+      require_registered_slot_copies "$owner" "$dir" || return 1
     fi
     if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
       [ -n "$out" ] && printf '%s\n' "$out"
@@ -2309,7 +2312,7 @@ teardown_treehouse_return() {
         fi
       fi
       if fm_treehouse_pool_slot "$cd_dir" "$dir"; then
-        require_registered_slot_copies "$dir" || return 1
+        require_registered_slot_copies "$owner" "$dir" || return 1
       fi
       if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
         [ -n "$out" ] && printf '%s\n' "$out"
@@ -3553,7 +3556,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       teardown_landed "$PROJ" "refs/heads/$branch" "$branch"
       ;;
     reprove)
-      [ -z "$TEARDOWN_RETURN_SLOT" ] || require_registered_slot_copies "$TEARDOWN_RETURN_SLOT" \
+      [ -z "$TEARDOWN_RETURN_SLOT" ] || require_registered_slot_copies "$ID" "$TEARDOWN_RETURN_SLOT" \
         ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} || return 1
       for copy in ${TEARDOWN_PROOF_COPIES[@]+"${TEARDOWN_PROOF_COPIES[@]}"}; do
         [ -d "$copy" ] || [ "$copy" = "$TEARDOWN_RETURN_SLOT" ] || continue
@@ -3607,7 +3610,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       elif [ "$FORCE" != "--force" ] && [ "$KIND" != scout ] && [ "$KIND" != secondmate ]; then
         post_lock_check=validate_worktree_teardown_safety
       fi
-      teardown_treehouse_return "$teardown_slot" "$PROJ" "worktree" "$post_lock_check" || {
+      teardown_treehouse_return "$teardown_slot" "$PROJ" "worktree" "$ID" "$post_lock_check" || {
         echo "error: treehouse return failed for worktree $teardown_slot; teardown aborted" >&2
         exit 1
       }
@@ -3749,11 +3752,11 @@ safe_rm_rf() {
   rm -rf -- "$target"
 }
 
-safe_rm_rf_child_worktree() {
-  local target=$1 project=$2
+safe_rm_rf_child_worktree() {  # <target> <project> <owner-task>
+  local target=$1 project=$2 owner=$3
   validate_child_worktree_for_removal "$target" "$project" >/dev/null || return 1
   if fm_treehouse_pool_slot "$project" "$target"; then
-    require_registered_slot_copies "$target" || return 1
+    require_registered_slot_copies "$owner" "$target" || return 1
   fi
   rm -rf -- "$target"
 }
@@ -3831,7 +3834,7 @@ remove_firstmate_home() {
       restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
       return 1
     }
-    teardown_treehouse_return "$abs_home_path" "$FM_ROOT" "$label" || {
+    teardown_treehouse_return "$abs_home_path" "$FM_ROOT" "$label" "$expected_id" || {
       echo "error: treehouse return failed for $label $abs_home_path; lease may still be held" >&2
       restore_firstmate_home_process_events "$abs_home_path" "$label" "$process_event_backup" || return $?
       return 1
@@ -4153,7 +4156,7 @@ preflight_descendant_treehouse_slots() {
     owner_rc=0
     require_owned_worktree_slot_record "$task_id" "$worktree" || owner_rc=$?
     case "$owner_rc" in
-      0) require_registered_slot_copies "$worktree" || return 1 ;;
+      0) require_registered_slot_copies "$task_id" "$worktree" || return 1 ;;
       "$TEARDOWN_SLOT_REASSIGNED_RC") ;;
       *) return 1 ;;
     esac
@@ -4562,17 +4565,17 @@ cleanup_firstmate_home_children() {
           "$child_wt/.opencode/plugins/fm-busy-state.js" \
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
         if [ -n "$child_proj" ] && [ -d "$child_proj" ] && command -v treehouse >/dev/null 2>&1; then
-          if teardown_treehouse_return "$child_wt" "$child_proj" "child worktree"; then
+          if teardown_treehouse_return "$child_wt" "$child_proj" "child worktree" "$child_id"; then
             fm_treehouse_slot_owner_release "$child_wt" "$child_id"
           else
             child_return_rc=$?
             if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ]; then
               return "$child_return_rc"
             fi
-            safe_rm_rf_child_worktree "$child_wt" "$child_proj" || return 1
+            safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
           fi
         else
-          safe_rm_rf_child_worktree "$child_wt" "$child_proj" || return 1
+          safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
         fi
       fi
     fi
