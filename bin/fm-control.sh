@@ -1701,13 +1701,6 @@ resolve_relaunch_profile() {
       ;;
     *) die "task $ID records an invalid omp_no_helpers posture; refusing to stop the running agent for a launch that must be refused" ;;
   esac
-  if [ "$TARGET_HARNESS" = omp ]; then
-    if [ "$KIND" != secondmate ] && [ -z "$(fm_meta_get "$META" omp_no_helpers)" ]; then
-      fm_control_omp_launch_resolve --providers >/dev/null || return 1
-    else
-      fm_control_omp_launch_resolve >/dev/null || return 1
-    fi
-  fi
   if [ "$TARGET_EFFORT" = ultra ]; then
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" || return 1
   fi

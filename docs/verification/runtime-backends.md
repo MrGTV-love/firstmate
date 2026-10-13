@@ -1052,71 +1052,27 @@ The task-owned driver remains outside the commit; `bash bin/fm-test-run.sh tests
 
 ### Ordinary worker prompt helpers
 
-Verified 2026-10-13 on macOS arm64 with omp 18.9.2, fresh isolated homes and skill-description caches, a previously uncached fixture skill, and credentialed loopback primary and OpenRouter helper providers.
-The fake operator settings kept `skillful=true`, `disabledProviders: ["anthropic"]`, and `smol` and `tiny` roles pointing at the credentialed fake OpenRouter model.
-Every session disabled titles, kept extensions and automatic skill listing available, and pinned the thinking level.
-The task overlay assigned the session-only `smol` role to the worker's own model and set `disabledProviders` to the operator's entries plus `openrouter`.
-This supersedes the earlier `skillful=false` probe, which stopped OpenRouter skill-description requests by also removing automatic skill listing from every ordinary worker.
+Verified 2026-10-13 on macOS arm64 with omp 18.9.2, through the real `fm-spawn.sh` scout path.
+For each session `fm-spawn.sh` emitted the task overlay into a fresh fake Firstmate home; real omp then ran a print-mode turn with the session, worker and emitted task overlays and `--no-title`, from a fresh worktree with a new project skill and fresh skill-description caches.
+The fake operator settings had `skillful=true`, `disabledProviders: ["anthropic"]`, and `smol` and `tiny` roles pointing at a credentialed loopback OpenRouter model, which stayed available in every session; the worktree's project settings had `disabledProviders: ["ollama"]`.
 
-| Session | Task `smol` role | Compression on the primary model | Project skill in the primary prompt | OpenRouter requests |
-| --- | --- | ---: | --- | ---: |
-| Launch with no `--model` | `pi/default` | 1 | Yes | 0 |
-| Launch with `--model fixture/main` | `fixture/main` | 1 | Yes | 0 |
-| `smol` role names an unavailable model, OpenRouter disabled | `fixture/missing` | 0 | Yes | 0 |
-| Same unavailable role, task `disabledProviders` omitted | `fixture/missing` | 0 | Yes | 1 |
+| Launch | Emitted `smol` and `tiny` roles | Main-model turns | Compression on the main model | Project skill in the main prompt | OpenRouter requests |
+| --- | --- | ---: | ---: | --- | ---: |
+| No `--model` (default role `fixture/main`) | `pi/default` | 1 | 1 | Yes | 0 |
+| `--model fixture/main` | `fixture/main` | 1 | 1 | Yes | 0 |
 
-The last row is the counterfactual: omp falls back from an unresolvable `smol` role to its built-in `smol` and `tiny` choices, and the credentialed OpenRouter model took that fallback until `openrouter` was disabled for the task.
-Every session completed on the primary fixture model, and the operator's `skillful`, `disabledProviders` and `modelRoles` settings read back unchanged.
-The task overlay's `disabledProviders` is the operator's list plus `openrouter`, because a `--config` overlay replaces an array.
-`fm_control_omp_launch_resolve` in `bin/fm-control-lib.sh` resolves, once per launch, the agent directory omp itself would use, and `bin/fm-spawn.sh` and `fm-control.sh`'s pre-stop relaunch check share it.
-`OMP_PROFILE` takes precedence over `PI_PROFILE` even when empty, `default` or empty means no profile, a named profile selects `<home>/<PI_CONFIG_DIR or .omp>/profiles/<name>/agent` and ignores `PI_CODING_AGENT_DIR`, and otherwise `PI_CODING_AGENT_DIR` or `<home>/<PI_CONFIG_DIR or .omp>/agent` is used.
-The operator's list comes from that directory's `config.yml`, or `config.yaml` when there is no `config.yml`, without layering project settings; only when neither exists is it empty.
-`openrouter` is added unless a string entry equals it exactly, so an operator's `OpenRouter` entry does not stand in for it, and path-scoped mapping entries pass through unchanged for omp to scope against the worker's cwd.
-The launch command assigns `OMP_PROFILE`, `PI_PROFILE`, `PI_CONFIG_DIR` and `PI_CODING_AGENT_DIR` from the same resolution, inside the command that an `env -i` launch-environment wrapper runs, so neither the pane or daemon environment nor a forwarded allowlist value selects another directory.
-A missing `ruby`, an unreadable or malformed file, a `disabledProviders` value that is not a list of names and mappings, or an invalid profile name refuses a fresh launch before any record or endpoint exists, and refuses a relaunch before `fm-control.sh` stops the worker.
-The refusal names the file or profile and never prints the file content.
-The executable launch regressions check the emitted role and disabled-provider policy for ship and scout launches and relaunches in Firstmate and another project, an explicit and an implicit model, the operator's disabled providers kept, and no `skillful=false` outside the no-helper overlay.
-They run the emitted launch command in a pane whose `OMP_PROFILE`, `PI_PROFILE`, `PI_CONFIG_DIR` and `PI_CODING_AGENT_DIR` conflict with the spawner's, with and without an `env -i` allowlist that forwards the conflict.
-A fake `omp` there reports the agent directory it resolves from the environment it receives, using omp's documented precedence, and the test reads that directory's config itself, so the check is against the directory the launched executable observes rather than the spawner's values.
-The cases cover a named profile, `PI_PROFILE` alone, `PI_CONFIG_DIR` without a profile, `OMP_PROFILE=default` and empty `OMP_PROFILE` with `PI_PROFILE` set, an agent-directory override under and without a profile, and relaunch.
-Further cases cover exact provider spelling, `config.yaml`-only and `config.yml`-first directories, path-scoped entries, a missing parser, and refusals for malformed, non-list, bad-entry and unreadable configuration (a directory in place of `config.yml` stands in for an unreadable file, so the case holds for root), with the task record unchanged and the running agent kept alive by `fm-control.sh`.
+In both sessions `@smol` and `@tiny` resolved to the fixture provider, every assistant message came from it, and the emitted overlay held no `skillful` and no `disabledProviders` entry.
+`omp config get` afterwards still read `skillful=true`, the operator's `smol`/`tiny`/`default` role values, and the project's `["ollama"]` list, so the scalar role values left the operator's arrays and other settings as omp loads them.
+The executable launch regression checks the emitted `smol` and `tiny` values, the absence of `skillful` and `disabledProviders`, and `--no-title` for ship and scout launches and relaunches in Firstmate and another project, with an explicit and an implicit model; it also proves its own check rejects an overlay that plants either key.
+An ordinary worker is not zero-spend: skill-description compression, and any other explicit `@smol` or `@tiny` consumer in the session, bills the selected main provider instead of OpenRouter.
+omp falls back to its built-in `smol` and `tiny` choices only when the worker's own model cannot be resolved, and that branch is not exercised here.
+`--omp-no-helpers` remains the opt-in route that suppresses those helper requests rather than rerouting them: it keeps `skillful=false` and sets no helper roles.
+If an operator's own omp config routes some other role to OpenRouter, that is their config and this PR does not override it.
+All endpoints were local fakes, so these sessions' model calls cost USD 0.00; that says nothing about the supervising guard or the whole task.
+The endpoint and scratch homes were stopped and removed; the emitted overlays and request records are retained in the run's evidence directory.
 
-#### Agent-directory pin runtime check
-
-Verified 2026-10-13 with omp 18.9.2 in a scratch home, with fake configuration only and no network request.
-For each case the real resolver produced the launch assignments, and a real `omp config get disabledProviders` ran with a conflicting pane environment (`OMP_PROFILE=pane`, `PI_PROFILE=pane`, `PI_CONFIG_DIR=.pane-omp`, a decoy `PI_CODING_AGENT_DIR`) under those assignments.
-Each result is the marker list of the directory the resolver chose; the same command without the assignments read the conflicting directory instead.
-
-| Spawner environment | Resolved agent directory | `omp config get disabledProviders` under the pin |
-| --- | --- | --- |
-| `OMP_PROFILE=work` | `<home>/.omp/profiles/work/agent` | `["profile-work"]` |
-| `PI_PROFILE=work` only | `<home>/.omp/profiles/work/agent` | `["profile-work"]` |
-| `PI_CONFIG_DIR=.alt-omp`, no profile | `<home>/.alt-omp/agent` | `["alt-config-dir"]` |
-| `OMP_PROFILE=default`, `PI_PROFILE=work` | `<home>/.omp/agent` | `["default-agent"]` |
-| `OMP_PROFILE=` (empty), `PI_PROFILE=work` | `<home>/.omp/agent` | `["default-agent"]` |
-
-This checks the pin against real omp's resolution.
-It does not run a full Firstmate worker pane, a launch under `env -i` with real omp, or `config.yaml` handling in real omp; those rest on the fake-consumer regressions above and on the omp 18.9.2 source.
-Model API calls in these checks cost USD 0.00; this says nothing about the cost of the supervising guard or the whole task.
-
-#### Named-profile runtime check
-
-Verified 2026-10-13 with omp 18.9.2 under the same isolation as the sessions above, before the pin existed, so it shows the list lookup only.
-Each session ran with `HOME` set to a fresh scratch home and a decoy `PI_CODING_AGENT_DIR`; `omp config set` wrote the operator's `disabledProviders: ["anthropic","ollama"]` into `<home>/.omp/profiles/work/agent/config.yml` and left the decoy directory empty, so the lookup read the file omp itself uses.
-The lookup returned `["anthropic","ollama","openrouter"]` for every session, and the credentialed fake OpenRouter model was available in each.
-
-| Session | Profile selected by | Task `smol` role | Compression on the primary model | Project skill in the primary prompt | OpenRouter requests |
-| --- | --- | --- | ---: | --- | ---: |
-| Explicit model | `OMP_PROFILE=work` | `fixture/main` | 1 | Yes | 0 |
-| Implicit model | `PI_PROFILE=work` | `pi/default` | 1 | Yes | 0 |
-| Unavailable `smol` role | `OMP_PROFILE=work` | `fixture/missing` | 0 | Yes | 0 |
-
-The operator's profile `skillful` and `disabledProviders` settings read back unchanged, all endpoints were local fakes (USD 0.00), and the private endpoint and scratch homes were stopped and removed.
-An ordinary worker is not zero-spend: its skill-description compression now bills the selected main provider instead of OpenRouter, and the session-only `smol` assignment also reaches any other explicit `@smol` consumer in that session.
-`--omp-no-helpers` remains the opt-in route with no secondary-model request: it keeps `skillful=false` and sets neither role nor disabled providers.
-All endpoints were local fakes, so these smokes spent USD 0.00.
-The endpoint and private scratch homes were stopped and removed after the proof; the raw request metadata is retained in the run's evidence directory.
-This probe covers skill-description cache misses and the worker setting, not every possible explicit helper command, persistent secondmates or live fleet activation.
+Superseded probes, kept as history only: an earlier round set `skillful=false` for every ordinary worker (1 main request and 0 OpenRouter requests, but no automatic skill listing), and later rounds replaced the `disabledProviders` array with the operator's list plus `openrouter` and pinned the agent directory and profile.
+Neither is current behavior.
 
 ## Codex hook trust
 
