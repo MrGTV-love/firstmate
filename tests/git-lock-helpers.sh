@@ -52,7 +52,9 @@ fm_test_git_lock_start() { # <repo> <fixture-dir> <packed|packed-open|index> [ow
     fm_test_wait_until 20 grep -q 'prepare: ok' "$fixture/output" \
       || fail "Git ref transaction did not prepare"
   else
-    fm_test_wait_until 20 lsof -a -p "$FM_TEST_GIT_LOCK_PID" -- "$FM_TEST_GIT_LOCK_PATH" \
+    # Subshell: Bash hashes lsof's path, and a parent-shell hash survives later
+    # PATH= prefixes (Bash 3.2), so missing-lsof cases would still find it.
+    (fm_test_wait_until 20 lsof -a -p "$FM_TEST_GIT_LOCK_PID" -- "$FM_TEST_GIT_LOCK_PATH") \
       || fail "Git did not open the fixture lock"
   fi
   touch -t 200001010000 "$FM_TEST_GIT_LOCK_PATH"
