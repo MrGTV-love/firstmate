@@ -1,0 +1,2 @@
+ok - fm-control relaunch: a no-helper task refuses explicit and stand-in harness switches before the agent stops
+bash tests/zz-filtered-ctl.test.sh  1.62s user 6.92s system 54% cpu 15.710 total

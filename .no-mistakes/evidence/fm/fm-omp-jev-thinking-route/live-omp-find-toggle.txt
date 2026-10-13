@@ -1,0 +1,10 @@
+Working...
+hello there
+== find.enabled=off
+POST /v1/chat/completions find in tools: False ntools 11
+openrouter-stub log lines:       10
+Working...
+hello there
+== find.enabled=on
+POST /v1/chat/completions find in tools: True ntools 12
+openrouter-stub log lines:        4

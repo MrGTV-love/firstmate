@@ -1,0 +1,12 @@
+== with-title: main POSTs:
+  main /v1/chat/completions tools 12 {}
+  main /v1/chat/completions tools 12 {}
+  main /v1/chat/completions tools 0 {}
+  main POST count: 3  openrouter-stub POST count: 0
+tuirun.sh: line 3: 55463 Terminated: 15          python3 -I server.py main.log main.port
+tuirun.sh: line 3: 55469 Terminated: 15          python3 -I server.py or.log or.port
+== no-title: main POSTs:
+  main /v1/chat/completions tools 12 {}
+  main POST count: 1  openrouter-stub POST count: 0
+tuirun.sh: line 3: 95842 Terminated: 15          python3 -I server.py main.log main.port
+tuirun.sh: line 3: 95846 Terminated: 15          python3 -I server.py or.log or.port

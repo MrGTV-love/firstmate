@@ -1,0 +1,7 @@
+Working...
+hello there
+== find.enabled=off
+POST /v1/chat/completions find in tools: False ntools 7
+openrouter-stub:
+main:
+{"method": "POST", "path": "/v1/chat/completions", "tools": ["read", "bash", "edit", "write", "grep", "glob", "todo"], "model": "m1", "body": "{\"model\":\"m1\",\"messages\":[{\"role\":\"system\",\"co
