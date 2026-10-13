@@ -26,13 +26,13 @@ fm_duration_record() {
   [ "${FM_DURATION_FILE:-}" != off ] || return 0
   [ "${FM_DURATION_MANAGED_KEY:-}" != "$1" ] || return 0
   [ -r "$FM_DURATION_HELPER" ] || return 0
-  local -a args
-  args=(record "$1" "$2" "$3")
-  [ -z "${4:-}" ] || args+=(--sample-id "$4")
-  [ "${5:-1}" != 0 ] || args+=(--uncalibrated)
-  [ -z "${6:-}" ] || args+=(--load-start "$6")
-  [ "${7:-0}" != 1 ] || args+=(--timed-out)
-  python3 "$FM_DURATION_HELPER" "${args[@]}" >&2 || {
+  local -a record_argv
+  record_argv=(record "$1" "$2" "$3")
+  [ -z "${4:-}" ] || record_argv+=(--sample-id "$4")
+  [ "${5:-1}" != 0 ] || record_argv+=(--uncalibrated)
+  [ -z "${6:-}" ] || record_argv+=(--load-start "$6")
+  [ "${7:-0}" != 1 ] || record_argv+=(--timed-out)
+  python3 "$FM_DURATION_HELPER" "${record_argv[@]}" >&2 || {
     printf 'fm-duration: could not persist duration or file repeated timeout work for %s\n' "$1" >&2
     return 0
   }
