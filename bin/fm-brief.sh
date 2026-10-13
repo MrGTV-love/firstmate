@@ -180,7 +180,7 @@ IFS= read -r -d '' CREWMATE_PAUSE_INSTRUCTIONS <<EOF || true
    An outer ceiling uses measured p99 x 3 once the helper holds five samples for that key on this host, and never drops below an explicit bound; before that, report the missing calibration and collect it under the documented fallback instead of guessing.
    A command run under that helper records its own timeout automatically, so never record it again by hand; use \`python3 $SCRIPT_DIR/fm-duration.py timeout <stable-command-key> <elapsed-ms> --event-id <unique-occurrence-id>\` only for a real limit that stopped a command outside the helper; a read wait of your own that expired while the command continues is not a timeout, so record nothing for it.
    Reuse the occurrence id when retrying a recording and never change the running command's result to a failure.
-   The second timeout for that key automatically files owned backlog work with its measured lower bounds, and a recurrence after that work closes files new work; an expired read wait of your own never files work. Report the concrete repair obligation, never a final \`blocked: timeout\`.
+   The second timeout for that key automatically files owned backlog work with its measured lower bounds (for the repository's registered project when it has one, else for firstmate), and a recurrence after that work closes files new work; an expired read wait of your own never files work. Report the concrete repair obligation, never a final \`blocked: timeout\`.
 EOF
 
 resolve_directory_input() {

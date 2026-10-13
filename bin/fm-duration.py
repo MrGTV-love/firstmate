@@ -70,7 +70,8 @@ limit (run's ceiling, fm_run_timed, the lint root bound, the per-script bound,
 or record --timed-out); an exit code of 124 or 137 alone never counts. The second timeout for a
 host/key files a deterministic ship item through the owning home's
 fm-tasks-axi.sh (FM_HOME set to FM_DURATION_HOME when present) with the observed
-lower bounds; later events update the ledger without duplicating an open item.
+lower bounds, for the project registered in that home's data/projects.md under the
+repository's name, else for firstmate; later events update the ledger without duplicating an open item.
 When that item is done or gone and a timeout recurs, a new item naming the old
 one is filed. A self-imposed read wait that ended while its command continued is
 not a timeout and is never recorded as one. Filing failure
@@ -309,6 +310,19 @@ def backlog():
     return [str(Path(owner) / 'bin/fm-tasks-axi.sh')], env
 
 
+def filing_project():
+    owner = os.environ.get('FM_DURATION_HOME')
+    home = owner or os.environ.get('FM_HOME') or str(ROOT)
+    data = Path(owner) / 'data' if owner else Path(os.environ.get('FM_DATA_OVERRIDE', Path(home) / 'data'))
+    try:
+        lines = (data / 'projects.md').read_text().splitlines()
+    except OSError:
+        return 'firstmate'
+    registered = {re.split(r' \[| - ', line[2:], maxsplit=1)[0].strip() for line in lines if line.startswith('- ')}
+    name = repo().rsplit('/', 1)[-1]
+    return name if name in registered else 'firstmate'
+
+
 def task_closed(cmd, env, task):
     shown = subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env)
     if shown.returncode == 0:
@@ -349,7 +363,7 @@ def own_timeout(key, milliseconds, event_id=None):
     body += '. Measure completion latency across host load, then repair the limit with an explicit margin. A read wait ending is not command failure.'
     # Inspect before retrying an interrupted publication, using the deterministic id.
     if subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
-        result = subprocess.run(cmd + ['add', task, f'Measure and repair repeated timeout: {repo()} {key}', '--kind', 'ship', '--repo', 'firstmate', '--body', body], capture_output=True, text=True, env=env)
+        result = subprocess.run(cmd + ['add', task, f'Measure and repair repeated timeout: {repo()} {key}', '--kind', 'ship', '--repo', filing_project(), '--body', body], capture_output=True, text=True, env=env)
         if result.returncode and subprocess.run(cmd + ['show', task], capture_output=True, text=True, env=env).returncode:
             raise RuntimeError('timeout work could not be filed: ' + result.stderr.strip() + result.stdout.strip())
     with ledger() as (handle, rows):
@@ -515,11 +529,12 @@ def run(key, command, calibration_file):
             code = 128 + interrupted[-1]
         duration_ms = round((time.monotonic() - started) * 1000)
         calibration = not calibration_file.exists() or calibration_file.read_text().strip() == '1'
+        timed_out = expired and not interrupted
         try:
-            record(key, duration_ms, code, occurrence_id, calibration, load_start, expired and not interrupted)
+            record(key, duration_ms, code, occurrence_id, calibration, load_start, timed_out)
         except (OSError, ValueError, RuntimeError) as error:
             scalar('recording_error', str(error), sys.stderr)
-            scalar('help', f'python3 bin/fm-duration.py record {shlex.quote(key)} {duration_ms} {code} --sample-id {occurrence_id}{"" if calibration else " --uncalibrated"}{"" if load_start is None else f" --load-start {load_start}"}; command result preserved', sys.stderr)
+            scalar('help', f'python3 bin/fm-duration.py record {shlex.quote(key)} {duration_ms} {code} --sample-id {occurrence_id}{"" if calibration else " --uncalibrated"}{"" if load_start is None else f" --load-start {load_start}"}{" --timed-out" if timed_out else ""}; command result preserved', sys.stderr)
         return code
     finally:
         streams.close()

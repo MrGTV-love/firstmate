@@ -14,6 +14,7 @@ import os
 import signal
 from pathlib import Path
 import platform
+import shlex
 import shutil
 import sqlite3
 import subprocess
@@ -351,6 +352,57 @@ if shutil.which('tasks-axi'):
     shown = subprocess.run([str(owner / 'bin/fm-tasks-axi.sh'), 'show', first + '-2', '--full'], env=dict(worker_env, FM_HOME=str(owner)), capture_output=True, text=True, check=True)
     assert 'state: queued' in shown.stdout and first in shown.stdout
     print('ok - worker timings and repeated-timeout work reach the owning home, and a recurrence after closure files new work')
+
+# Repeated-timeout work goes to the project registered under the repository's name in
+# the owning home's data/projects.md, and to firstmate when there is no such project.
+if shutil.which('tasks-axi'):
+    registry = '# Projects\n\n- widgets [no-mistakes] - fixture project (added 2026-10-13)\n- other thing - second project (added 2026-10-13)\n'
+    unregistered = make_repo('work-z', 'git@github.com:acme/unregistered.git')
+
+    def filed_item(name, cwd_repo, identity, key):
+        home = tmp / name
+        (home / 'data').mkdir(parents=True)
+        (home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+        (home / 'data/projects.md').write_text(registry)
+        (home / 'bin').symlink_to(root / 'bin')
+        route_env = {n: v for n, v in env.items() if n not in ('FM_DURATION_FILE', 'FM_HOME', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_STATE_OVERRIDE')}
+        route_env['FM_DURATION_HOME'] = str(home)
+        for event_id in ('a', 'b'):
+            subprocess.run([sys.executable, str(helper), 'timeout', key, '1000', '--event-id', event_id], env=route_env, cwd=cwd_repo, check=True, capture_output=True)
+        task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + identity + '\0' + key).encode()).hexdigest()[:16]
+        return subprocess.run([str(home / 'bin/fm-tasks-axi.sh'), 'show', task, '--full'], env=dict(route_env, FM_HOME=str(home)), capture_output=True, text=True, check=True).stdout
+
+    registered_item = filed_item('route-registered', workrepo, REPO, 'route.key')
+    assert 'repo: widgets' in registered_item and 'acme/widgets route.key' in registered_item, registered_item
+    fallback_item = filed_item('route-unregistered', unregistered, 'acme/unregistered', 'route.key')
+    assert 'repo: firstmate' in fallback_item and 'acme/unregistered route.key' in fallback_item, fallback_item
+    print('ok - repeated-timeout work routes to the registered project, else to firstmate')
+
+# The recovery command printed when run() cannot record keeps timeout provenance only
+# when the runner's own ceiling expired, and replaying it records exactly one occurrence.
+def recovery(key, leader_tail, samples):
+    table = tmp / (key + '.jsonl')
+    table.write_text('')
+    write_rows([sample(key, 1000) for _ in range(samples)], table)
+    swap = 'mv "$L" "$L.bak"; mkdir "$L"; ' + leader_tail
+    failed = subprocess.run([sys.executable, str(helper), 'run', key, '--', 'bash', '-c', swap, '_'], env=dict(env, FM_DURATION_FILE=str(table), L=str(table)), cwd=workrepo, capture_output=True, text=True)
+    assert 'recording_error' in failed.stderr, failed
+    line = next(l for l in failed.stderr.splitlines() if l.startswith('help: '))
+    command = shlex.split(json.loads(line[len('help: '):]).split('; command result preserved')[0])
+    table.rmdir()
+    (tmp / (key + '.jsonl.bak')).rename(table)
+    replay_env = dict(env, FM_DURATION_FILE=str(table))
+    for _ in range(2):
+        subprocess.run([sys.executable, str(helper), *command[2:]], env=replay_env, cwd=workrepo, check=True, capture_output=True)
+    recorded = [json.loads(l) for l in table.read_text().splitlines()]
+    return failed, command, [r for r in recorded if r['key'] == key and r.get('sample_id')], [r for r in recorded if r.get('event') == 'timeout']
+
+failed, command, sample_rows, timeouts = recovery('recover.ceiling', 'while :; do sleep 1; done', 5)
+assert failed.returncode == 124 and '--timed-out' in command, command
+assert len(sample_rows) == 1 and sample_rows[0]['exit'] == 124 and len(timeouts) == 1, (sample_rows, timeouts)
+failed, command, sample_rows, timeouts = recovery('recover.exit124', 'exit 124', 0)
+assert failed.returncode == 124 and '--timed-out' not in command, command
+assert len(sample_rows) == 1 and sample_rows[0]['exit'] == 124 and timeouts == [], (sample_rows, timeouts)
 
 # An interrupted publication must remain retryable after samples were imported.
 # Use a real incompatible backlog path, then repair that prerequisite; no
