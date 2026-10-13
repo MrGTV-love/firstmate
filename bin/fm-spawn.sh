@@ -295,17 +295,28 @@
 #   reach a credentialed OpenRouter model. An ordinary (not no-helper) worker
 #   also keeps automatic skill listing, but its task overlay assigns the
 #   session-only smol role to the worker's own model (the launch model, or
-#   pi/default when it has none) and adds openrouter to disabledProviders,
-#   keeping the operator's own entries. omp compresses each skill description
-#   through the smol role, and falls back to built-in smol and tiny choices
-#   when that role cannot be resolved among available models; the disabled
-#   provider removes OpenRouter from that fallback too. Skill-description
-#   compression therefore bills the worker's main provider, not OpenRouter, so
-#   an ordinary worker is not zero-spend. The smol role assignment also reaches
-#   any other explicit @smol consumer in that session, and an explicitly
-#   selected OpenRouter model is refused by omp rather than downgraded. A launch
-#   under an omp profile cannot read its agent directory, so its list is only
-#   openrouter. The operator's global settings are never written.
+#   pi/default when it has none) and merges openrouter into the operator's
+#   own disabledProviders list, because a --config overlay replaces an array.
+#   omp compresses each skill description through the smol role, and falls
+#   back to built-in smol and tiny choices when that role cannot be resolved
+#   among available models; the disabled provider removes OpenRouter from that
+#   fallback too. Skill-description compression therefore bills the worker's
+#   main provider, not OpenRouter, so an ordinary worker is not zero-spend. The
+#   smol role assignment also reaches any other explicit @smol consumer in that
+#   session, and an explicitly selected OpenRouter model is refused by omp
+#   rather than downgraded. The operator's list comes from the global
+#   config.yml of the agent directory omp itself would use, without layering
+#   project settings: OMP_PROFILE takes precedence over PI_PROFILE even when
+#   empty ("default" or empty means no profile); a named profile reads
+#   <home>/<PI_CONFIG_DIR or .omp>/profiles/<name>/agent and ignores
+#   PI_CODING_AGENT_DIR; otherwise PI_CODING_AGENT_DIR or
+#   <home>/<PI_CONFIG_DIR or .omp>/agent. An absent config.yml is omp's empty
+#   configuration. An unreadable or malformed config.yml, a disabledProviders
+#   setting that is not a list of names, or an invalid profile name refuses the
+#   launch before any endpoint or record exists, and fm-control refuses a
+#   relaunch before it stops the running worker; the error names the file
+#   (or the profile) and never prints the file content. The operator's global settings are never
+#   written.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
 #   routes. It layers .omp/fm-no-helpers-overlay.yml, defaults an unset effort
 #   to high (ultra is refused for omp before launch), disables
@@ -2553,20 +2564,6 @@ print role.to_s
   return 0
 }
 
-# The omp --config overlay replaces an array setting, so the worker's
-# disabledProviders list is the operator's own entries plus openrouter. An
-# unknown or unreadable agent directory contributes no entries.
-omp_worker_disabled_providers() { # <agent-dir>
-  local agent_dir=${1:-} listed
-  listed=$(ruby -ryaml -rjson -e '
-config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
-listed = config.is_a?(Hash) ? config["disabledProviders"] : nil
-listed = [] unless listed.is_a?(Array)
-puts JSON.generate((listed.select { |entry| entry.is_a?(String) } + ["openrouter"]).uniq)
-' "$agent_dir/config.yml" 2>/dev/null) || listed=
-  printf '%s\n' "${listed:-[\"openrouter\"]}"
-}
-
 # agy pre-launch validation for non-index-entry literals. `agy models`
 # (agy 1.2.0) prints one model per
 # line as "<id>\t<label>" for the account's catalog only; model ids are bare
@@ -3164,6 +3161,10 @@ if [ "$HARNESS" = omp ]; then
     fi
   fi
   omp_default_role_validate "$OMP_BIN" "$MODEL" "$RAW_COMMAND" "$OMP_AGENT_DIR" || exit 1
+  OMP_WORKER_DISABLED=
+  if [ "$RAW_LAUNCH" = 0 ] && [ "$KIND" != secondmate ] && [ "$OMP_NO_HELPERS" = 0 ]; then
+    OMP_WORKER_DISABLED=$(fm_control_omp_worker_disabled_providers) || exit 1
+  fi
 fi
 if [ "$HARNESS" = agy ] && [ "$MODEL_INDEXED" = 0 ]; then
   agy_model_validate "$AGY_BIN" "$MODEL" || exit 1
@@ -5687,10 +5688,10 @@ EOF
     native_find=off
     [ "$guard_project" != firstmate ] || [ "$OMP_NO_HELPERS" = 1 ] || native_find=on
     native_helpers='{}'
-    if [ "$OMP_NO_HELPERS" = 0 ]; then
+    if [ -n "$OMP_WORKER_DISABLED" ]; then
       native_smol=$MODEL
       case "$native_smol" in '' | default) native_smol=pi/default ;; esac
-      native_helpers=$(jq -cn --arg smol "$native_smol" --argjson disabled "$(omp_worker_disabled_providers "$OMP_AGENT_DIR")" \
+      native_helpers=$(jq -cn --arg smol "$native_smol" --argjson disabled "$OMP_WORKER_DISABLED" \
         '{modelRoles: {smol: $smol}, disabledProviders: $disabled}') || exit 1
     fi
     jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" --arg find "$native_find" --argjson helpers "$native_helpers" '

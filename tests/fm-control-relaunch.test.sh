@@ -1569,6 +1569,41 @@ SH
   pass "fm-control relaunch: a no-helper task refuses explicit and stand-in harness switches before the agent stops"
 }
 
+test_omp_worker_refuses_an_unreadable_disabled_providers_config_before_stopping() {
+  local dir out rc id=rl-omp-dp mode config
+  for mode in malformed directory profile; do
+    dir=$(new_case "omp-dp-$mode" "$id")
+    add_ship_task "$dir" "$id" omp
+    printf omp > "$dir/fake/command"
+    printf omp > "$dir/fake/becomes"
+    config="$dir/user-home/.omp/agent/config.yml"
+    mkdir -p "$(dirname "$config")"
+    case "$mode" in
+      malformed) printf 'disabledProviders: [leaked-secret-value\n' > "$config" ;;
+      directory) mkdir "$config" ;;
+      profile)
+        config="$dir/user-home/.omp/profiles/work/agent/config.yml"
+        mkdir -p "$(dirname "$config")"
+        printf 'disabledProviders: leaked-secret-value\n' > "$config"
+        ;;
+    esac
+    cp "$dir/home/state/$id.meta" "$dir/prior.meta"
+    if [ "$mode" = profile ]; then
+      out=$(OMP_PROFILE=work run_control "$dir" "$id" relaunch --note "refuse unreadable config"); rc=$?
+    else
+      out=$(run_control "$dir" "$id" relaunch --note "refuse unreadable config"); rc=$?
+    fi
+    expect_code 1 "$rc" "an unreadable disabledProviders source ($mode) must refuse the relaunch: $out"
+    assert_contains "$out" "$config" "the $mode refusal must name the config file"
+    assert_not_contains "$out" leaked-secret-value "the $mode refusal must not echo the config content"
+    assert_equals omp "$(cat "$dir/fake/command")" "the $mode refusal must keep the running omp agent alive"
+    [ ! -s "$dir/fake/keys" ] && [ ! -s "$dir/fake/literal" ] || fail "the $mode refusal sent lifecycle or launch input"
+    cmp -s "$dir/prior.meta" "$dir/home/state/$id.meta" || fail "the $mode refusal changed task metadata"
+    assert_absent "$dir/home/state/$id.control-relaunch" "the $mode refusal must precede the relaunch transaction"
+  done
+  pass "fm-control relaunch: an ordinary omp worker refuses an unreadable disabledProviders source before the agent stops"
+}
+
 test_prior_harness_turnend_registry_entry_is_cleared() {
   local dir auth
   dir=$(new_case grokauth rl9)
@@ -6331,6 +6366,7 @@ test_exclude_tools_refusals_happen_before_the_agent_stops
 test_explicit_model_wins_over_the_recorded_one
 test_relaunch_onto_an_unverified_harness_is_refused
 test_no_helper_task_refuses_a_harness_switch_before_stopping
+test_omp_worker_refuses_an_unreadable_disabled_providers_config_before_stopping
 test_prior_harness_turnend_registry_entry_is_cleared
 test_wiring_removal_failure_refuses_before_replacement_arm
 test_turnend_auth_paths_are_owned_by_the_control_adapter

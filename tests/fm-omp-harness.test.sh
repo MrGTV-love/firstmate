@@ -421,6 +421,103 @@ test_omp_workers_disable_openrouter_prompt_helpers() {
   pass "every canonical omp ship and scout launch and relaunch disables titles and sends skill compression to the worker's own model with OpenRouter disabled"
 }
 
+# The task overlay replaces omp's disabledProviders array, so it must carry the
+# operator's own list from the agent directory omp itself would use, plus
+# openrouter, on launch and relaunch. An absent config is omp's empty
+# configuration; an unreadable or malformed one is refused before anything is
+# published or launched, and a refused relaunch keeps the task record.
+test_omp_worker_disabled_providers_follow_omp_profile_resolution() {
+  local name omp_set omp_profile pi_profile expected rec id out overlay home agent
+  while IFS='|' read -r name omp_set omp_profile pi_profile expected; do
+    id="omp-dp-$name"
+    rec=$(make_spawn_case "dp-$name" omp "$id")
+    read_case_record "$rec"
+    home="$HOME_DIR/user-home/.omp"
+    mkdir -p "$home/agent" "$home/profiles/work/agent" "$home/profiles/other/agent"
+    printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [home-agent-dir]\n' > "$home/agent/config.yml"
+    printf 'disabledProviders:\n  - anthropic\n  - ollama\n  - OpenRouter\n' > "$home/profiles/work/agent/config.yml"
+    printf 'disabledProviders: [other-a, other-b, openrouter]\n' > "$home/profiles/other/agent/config.yml"
+    agent="$CASE_DIR/override-agent"
+    mkdir -p "$agent"
+    printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [override-agent-dir]\n' > "$agent/config.yml"
+    out=$(
+      if [ "$omp_set" = set ]; then export OMP_PROFILE="$omp_profile"; else unset OMP_PROFILE; fi
+      export PI_PROFILE="$pi_profile" PI_CODING_AGENT_DIR="$agent"
+      run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+    expect_code 0 $? "omp profile case $name should spawn: $out"
+    overlay="$HOME_DIR/state/$id.omp-fallback.yml"
+    assert_equals "$expected" "$(jq -c .disabledProviders "$overlay")" "profile case $name must carry the resolved operator list plus openrouter"
+    rm -f "$overlay"
+    out=$(
+      if [ "$omp_set" = set ]; then export OMP_PROFILE="$omp_profile"; else unset OMP_PROFILE; fi
+      export PI_PROFILE="$pi_profile" PI_CODING_AGENT_DIR="$agent"
+      run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+    expect_code 0 $? "omp profile case $name relaunch should succeed: $out"
+    assert_equals "$expected" "$(jq -c .disabledProviders "$overlay")" "profile case $name relaunch must regenerate the resolved list"
+  done <<'ROWS'
+override-agent-dir|set|||["override-agent-dir","openrouter"]
+omp-profile|set|work||["anthropic","ollama","OpenRouter"]
+pi-profile|unset||work|["anthropic","ollama","OpenRouter"]
+omp-wins|set|other|work|["other-a","other-b","openrouter"]
+empty-omp-wins|set||work|["override-agent-dir","openrouter"]
+default-profile|set|default|work|["override-agent-dir","openrouter"]
+missing-profile-config|set|absent||["openrouter"]
+ROWS
+  pass "omp worker overlays merge openrouter into the disabledProviders list of the omp-resolved profile, on launch and relaunch"
+}
+
+test_omp_worker_refuses_an_unreadable_disabled_providers_source() {
+  local mode rec id out status meta prior config profile
+  for mode in malformed directory non-list non-mapping invalid-profile; do
+    id="omp-dp-refuse-$mode"
+    rec=$(make_spawn_case "dp-refuse-$mode" omp "$id")
+    read_case_record "$rec"
+    config="$HOME_DIR/user-home/.omp/agent/config.yml"
+    profile=
+    mkdir -p "$(dirname "$config")"
+    case "$mode" in
+      malformed) printf 'modelRoles: {default: x}\ndisabledProviders: [leaked-secret-value\n' > "$config" ;;
+      directory) mkdir "$config" ;;
+      non-list) printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: leaked-secret-value\n' > "$config" ;;
+      non-mapping) printf -- '- leaked-secret-value\n' > "$config" ;;
+      invalid-profile) profile='Bad Profile' ;;
+    esac
+    out=$(OMP_PROFILE="$profile" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+    status=$?
+    expect_code 1 "$status" "an unusable disabledProviders source ($mode) must refuse a fresh launch: $out"
+    if [ "$mode" = invalid-profile ]; then
+      assert_contains "$out" "invalid omp profile name" "the $mode refusal must name the profile problem"
+    else
+      assert_contains "$out" "$config" "the $mode refusal must name the config file"
+    fi
+    assert_not_contains "$out" leaked-secret-value "the $mode refusal must not echo the config content"
+    assert_absent "$HOME_DIR/state/$id.meta" "a refused $mode launch must publish no task record"
+    [ ! -s "$LAUNCH_LOG" ] || fail "a refused $mode launch started an agent"
+  done
+
+  id=omp-dp-refuse-relaunch
+  rec=$(make_spawn_case dp-refuse-relaunch omp "$id")
+  read_case_record "$rec"
+  mkdir -p "$(dirname "$GLOBAL_CONFIG")"
+  printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\ndisabledProviders: [anthropic]\n' > "$GLOBAL_CONFIG"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+  expect_code 0 $? "the readable list must spawn: $out"
+  meta="$HOME_DIR/state/$id.meta"
+  prior="$CASE_DIR/prior.meta"
+  cp "$meta" "$prior"
+  printf 'disabledProviders: [leaked-secret-value\n' > "$GLOBAL_CONFIG"
+  out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+  status=$?
+  expect_code 1 "$status" "a relaunch must refuse a config that became unreadable: $out"
+  assert_contains "$out" "$GLOBAL_CONFIG" "the relaunch refusal must name the config file"
+  assert_not_contains "$out" leaked-secret-value "the relaunch refusal must not echo the config content"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused relaunch started an agent"
+  cmp -s "$prior" "$meta" || fail "a refused relaunch changed the task record"
+  assert_equals '["anthropic","openrouter"]' "$(jq -c .disabledProviders "$HOME_DIR/state/$id.omp-fallback.yml")" \
+    "a refused relaunch must keep the previous overlay"
+  pass "omp worker launches refuse an unusable disabledProviders source without publishing, launching or touching the record"
+}
+
 test_worker_replace_mode_environment() {
   local kind rec id out status launch seen
   for kind in ship scout; do
@@ -763,7 +860,13 @@ test_spawn_global_config_is_read_only_and_unlayered() {
   cp "$GLOBAL_CONFIG" "$CASE_DIR/original-config.yml"
   out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
   status=$?
-  expect_code 0 "$status" "a malformed global config establishes nothing and must pass through: $out"
+  expect_code 1 "$status" "an ordinary worker must refuse a malformed global config it cannot merge its disabled providers from: $out"
+  assert_contains "$out" "$GLOBAL_CONFIG" "the refusal must name the malformed config"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused malformed-config spawn must publish no record"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused malformed-config spawn must record no launch"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp --omp-no-helpers)
+  status=$?
+  expect_code 0 "$status" "a malformed global config establishes nothing for the default-role check and must pass through: $out"
   cmp -s "$CASE_DIR/original-config.yml" "$GLOBAL_CONFIG" || fail "the malformed global config must remain byte-identical"
   for out in "$GLOBAL_CONFIG".broken-*; do
     assert_absent "$out" "the global config must not be quarantined"
@@ -3890,6 +3993,8 @@ test_no_helpers_rejects_nonworker_launches
 test_no_helpers_launch_contract
 test_no_helpers_refuses_ultra_effort
 test_omp_workers_disable_openrouter_prompt_helpers
+test_omp_worker_disabled_providers_follow_omp_profile_resolution
+test_omp_worker_refuses_an_unreadable_disabled_providers_source
 test_worker_replace_mode_environment
 test_worker_guard_project_scope
 test_spawn_retains_pooled_capacity_and_declared_stand_ins

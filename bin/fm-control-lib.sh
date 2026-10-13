@@ -125,6 +125,64 @@ fm_control_omp_launch_check() {
   return 1
 }
 
+# The disabledProviders list an ordinary omp worker's task overlay carries: the
+# operator's own list plus openrouter, because a --config overlay replaces an
+# array setting. Resolves the agent directory the way omp does (OMP_PROFILE wins
+# over PI_PROFILE even when empty; a named profile selects
+# <home>/<PI_CONFIG_DIR or .omp>/profiles/<name>/agent and ignores
+# PI_CODING_AGENT_DIR) and reads that directory's global config.yml without
+# layering project settings. An absent config.yml is omp's empty configuration;
+# an unreadable or malformed one, or a list that is not strings, is refused by
+# name without echoing its content.
+fm_control_omp_worker_disabled_providers() {
+  ruby -ryaml -rjson - <<'RUBY'
+env = ENV
+raw = env.key?("OMP_PROFILE") ? env["OMP_PROFILE"] : env["PI_PROFILE"]
+profile = raw.to_s.strip
+profile = nil if profile.empty? || profile == "default"
+fail_with = lambda do |message|
+  warn "error: #{message}"
+  exit 1
+end
+home = begin
+  Dir.home
+rescue ArgumentError
+  fail_with.call("cannot resolve the home directory, so the omp agent directory is unknown")
+end
+config_dir = env["PI_CONFIG_DIR"].to_s.empty? ? ".omp" : env["PI_CONFIG_DIR"]
+if profile
+  valid = profile.match?(/\A[a-z0-9][a-z0-9._-]{0,63}\z/) && !profile.end_with?(".") &&
+    !profile.match?(/\A(?:CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(?:\..*)?\z/i)
+  fail_with.call("invalid omp profile name #{profile.inspect}; profile names match [a-z0-9][a-z0-9._-]{0,63}") unless valid
+  agent_dir = File.join(home, config_dir, "profiles", profile, "agent")
+else
+  override = env["PI_CODING_AGENT_DIR"].to_s
+  agent_dir = override.empty? ? File.join(home, config_dir, "agent") : File.expand_path(override)
+end
+path = File.join(agent_dir, "config.yml")
+listed = []
+begin
+  text = File.read(path)
+  config = YAML.safe_load(text, aliases: true)
+  config = {} if config.nil?
+  fail_with.call("omp config #{path} must contain a YAML mapping") unless config.is_a?(Hash)
+  listed = config["disabledProviders"]
+  listed = [] if listed.nil?
+  unless listed.is_a?(Array) && listed.all? { |entry| entry.is_a?(String) }
+    fail_with.call("omp config #{path} has a disabledProviders setting that is not a list of provider names")
+  end
+rescue Errno::ENOENT
+  listed = []
+rescue SystemCallError, IOError
+  fail_with.call("omp config #{path} cannot be read")
+rescue Psych::Exception, ::SyntaxError, ArgumentError, EncodingError
+  fail_with.call("omp config #{path} is not valid YAML")
+end
+listed += ["openrouter"] unless listed.any? { |entry| entry.strip.downcase == "openrouter" }
+puts JSON.generate(listed)
+RUBY
+}
+
 # Which task kinds an adapter is verified to run. muse, gemini, rovo, agy, and devin
 # are crewmate/scout adapters only: none has a primary supervision protocol,
 # and bin/fm-spawn.sh refuses a --secondmate launch on any of them. The control
