@@ -1064,15 +1064,10 @@ The fake operator settings had `skillful=true`, `disabledProviders: ["anthropic"
 In both sessions `@smol` and `@tiny` resolved to the fixture provider, every assistant message came from it, and the emitted overlay held no `skillful` and no `disabledProviders` entry.
 `omp config get` afterwards still read `skillful=true`, the operator's `smol`/`tiny`/`default` role values, and the project's `["ollama"]` list, so the scalar role values left the operator's arrays and other settings as omp loads them.
 The executable launch regression checks the emitted `smol` and `tiny` values, the absence of `skillful` and `disabledProviders`, and `--no-title` for ship and scout launches and relaunches in Firstmate and another project, with an explicit and an implicit model; it also proves its own check rejects an overlay that plants either key.
-An ordinary worker is not zero-spend: skill-description compression, and any other explicit `@smol` or `@tiny` consumer in the session, bills the selected main provider instead of OpenRouter.
-omp falls back to its built-in `smol` and `tiny` choices only when the worker's own model cannot be resolved, and that branch is not exercised here.
-`--omp-no-helpers` remains the opt-in route that suppresses those helper requests rather than rerouting them: it keeps `skillful=false` and sets no helper roles.
-If an operator's own omp config routes some other role to OpenRouter, that is their config and this PR does not override it.
+These sessions do not exercise omp's fallback to its built-in `smol` and `tiny` choices when the worker's own model cannot be resolved.
 All endpoints were local fakes, so these sessions' model calls cost USD 0.00; that says nothing about the supervising guard or the whole task.
 The endpoint and scratch homes were stopped and removed; the emitted overlays and request records are retained in the run's evidence directory.
-
-Superseded probes, kept as history only: an earlier round set `skillful=false` for every ordinary worker (1 main request and 0 OpenRouter requests, but no automatic skill listing), and later rounds replaced the `disabledProviders` array with the operator's list plus `openrouter` and pinned the agent directory and profile.
-Neither is current behavior.
+[`fm-spawn.sh --help`](../../bin/fm-spawn.sh) owns the ordinary-worker helper-role contract, its spend boundary and its operator-config residual.
 
 ## Codex hook trust
 
