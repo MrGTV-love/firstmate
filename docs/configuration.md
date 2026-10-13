@@ -1443,7 +1443,7 @@ An unreachable, empty, missing, or malformed catalog (including concatenated JSO
 
 `bin/fm-model-freshness.sh` reports a worker or reviewer model that a newer model of the same family has passed in its own harness's catalog, so a stale model is noticed instead of launched by habit.
 It is advisory: it exits 0 whatever it finds, refuses nothing, and edits no configuration file, so the supervisor decides what to change.
-Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each harness's discovery command and its 30 second limit.
+Its header owns the comparison rule, and `bin/fm-model-catalog-lib.sh` owns each harness's discovery command and its time-limit floor, which measured durations from `bin/fm-duration.py` may raise.
 
 - **Inputs.** Every model named in the effective home's `config/crew-dispatch.json` (role references resolve through the [model index](#fleet-model-index-configmodel-indexjson)), and the model requested at each `bin/fm-spawn.sh`.
 - **Catalog.** Each harness's own catalog, read with its own command; a name is never used to infer one.
