@@ -2002,6 +2002,9 @@ spawn_require_relocated_queued_work() {
     exit 1
   fi
 }
+# Like the spend cap: checked before any argument resolution, endpoint, or
+# project-queue wait, and rechecked after the task-set lock.
+spawn_require_relocated_queued_work
 # A FRESH spawn changes which tasks this home has, so it must not interleave
 # with a forced teardown that has already enumerated that set: a record
 # published inside the enumerate-then-remove window is invisible to the
