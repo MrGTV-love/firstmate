@@ -7,6 +7,7 @@ set -eu
 TMP_ROOT=$(fm_test_tmproot fm-duration)
 export FM_DURATION_TEST_ROOT="$ROOT" FM_DURATION_TEST_TMP="$TMP_ROOT"
 "$ROOT/bin/fm-proc-budget.sh" -- python3 - <<'PY'
+import contextlib
 import hashlib
 import json
 import os
@@ -190,11 +191,20 @@ assert rows()[-1]['key'] == 'zero.key' and rows()[-1]['exit'] == 0 and not any(r
 # A stop sends TERM and waits for the leader: its own TERM cleanup of a child in
 # a separate process group runs and leaves no survivor. The leader reports
 # readiness only after installing its handler, so no startup race is possible.
+def reap_owned(runner, *pid_files):
+    runner.kill()
+    for pid_file in pid_files:
+        with contextlib.suppress(FileNotFoundError, ValueError, ProcessLookupError, PermissionError):
+            os.killpg(int(pid_file.read_text()), signal.SIGKILL)
+    runner.communicate()
+
+
 trap_dir = tmp / 'trap'
 trap_dir.mkdir()
 leader = r'''
 import os, pathlib, signal, subprocess, sys, time
 home = pathlib.Path(sys.argv[1])
+(home / 'leader.pid').write_text(str(os.getpid()))
 child = subprocess.Popen([sys.executable, '-c', 'import time\nwhile True: time.sleep(1)'], start_new_session=True)
 (home / 'child.pid').write_text(str(child.pid))
 def on_term(sig, frame):
@@ -208,31 +218,39 @@ while True:
     time.sleep(0.1)
 '''
 trapped = subprocess.Popen([sys.executable, str(helper), 'run', 'trapped', '--', sys.executable, '-c', leader, str(trap_dir)], env=env, cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-assert trapped.stdout.readline() == 'started\n'
-trapped.send_signal(signal.SIGTERM)
-trapped.communicate(timeout=60)
-assert trapped.returncode == 143, trapped.returncode
-assert (trap_dir / 'trap-ran').read_text() == 'yes'
 try:
-    os.kill(int((trap_dir / 'child.pid').read_text()), 0)
-    raise AssertionError('the leader\'s child group survived the runner kill')
-except ProcessLookupError:
-    pass
+    assert trapped.stdout.readline() == 'started\n'
+    trapped.send_signal(signal.SIGTERM)
+    trapped.communicate()
+    assert trapped.returncode == 143, trapped.returncode
+    assert (trap_dir / 'trap-ran').read_text() == 'yes'
+    try:
+        os.kill(int((trap_dir / 'child.pid').read_text()), 0)
+        raise AssertionError('the leader\'s child group survived the runner kill')
+    except ProcessLookupError:
+        pass
+except BaseException:
+    reap_owned(trapped, trap_dir / 'leader.pid', trap_dir / 'child.pid')
+    raise
 
 # A leader that ignores TERM is killed only by a second forwarded signal.
 stubborn = tmp / 'stubborn.pid'
 code = 'import os, pathlib, signal, sys, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\npathlib.Path(sys.argv[1]).write_text(str(os.getpid()))\nprint("started", flush=True)\nwhile True: time.sleep(0.1)'
 job = subprocess.Popen([sys.executable, str(helper), 'run', 'stubborn', '--', sys.executable, '-c', code, str(stubborn)], env=env, cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-assert job.stdout.readline() == 'started\n'
-job.send_signal(signal.SIGTERM)
-job.send_signal(signal.SIGINT)
-job.communicate(timeout=60)
-assert job.returncode in (130, 143), job.returncode
 try:
-    os.kill(int(stubborn.read_text()), 0)
-    raise AssertionError('the second signal did not kill the TERM-ignoring leader')
-except ProcessLookupError:
-    pass
+    assert job.stdout.readline() == 'started\n'
+    job.send_signal(signal.SIGTERM)
+    job.send_signal(signal.SIGINT)
+    job.communicate()
+    assert job.returncode in (130, 143), job.returncode
+    try:
+        os.kill(int(stubborn.read_text()), 0)
+        raise AssertionError('the second signal did not kill the TERM-ignoring leader')
+    except ProcessLookupError:
+        pass
+except BaseException:
+    reap_owned(job, stubborn)
+    raise
 
 # Completed no-mistakes step imports are idempotent samples whose historical
 # load is unknown; after five samples the step key has a measured limit.

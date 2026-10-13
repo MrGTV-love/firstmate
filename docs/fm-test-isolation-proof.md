@@ -30,7 +30,6 @@ This record owns concurrent isolation evidence for the portable parallel candida
 - `tests/fm-composer-ghost.test.sh`
 - `tests/fm-composer-lib.test.sh`
 - `tests/fm-crew-state.test.sh`
-- `tests/fm-duration.test.sh`
 - `tests/fm-ensure-agents-md.test.sh`
 - `tests/fm-grok-harness.test.sh`
 - `tests/fm-herdr-lab.test.sh`
@@ -47,16 +46,6 @@ This record owns concurrent isolation evidence for the portable parallel candida
 - `tests/fm-tmux-submit-busy.test.sh`
 - `tests/fm-transition-lib.test.sh`
 - `tests/fm-x-mode.test.sh`
-
-## tests/fm-duration.test.sh admission
-
-- Date: 2026-10-13
-- Command: `bin/fm-test-isolation-proof.sh --jobs 4 --json /tmp/fm-isolation-proof-duration.json` on macOS arm64 with the 25-script candidate set.
-- Result for the added script: `FM_ISOLATION_CANDIDATE_END 2026-10-13T15:49:36Z tests/fm-duration.test.sh exit=0 duration_ms=22429 worker=9`, alongside three other concurrent workers.
-
-The suite owns a private temporary root, an explicit `FM_DURATION_FILE`, its own throwaway Git repositories and FIFOs, and signals only the runner processes it started.
-That whole run is not an archived green summary: this host lacks the `tsc` prerequisite, so `tests/fm-pi-primary-types.test.sh` took its gate skip (exit 1), and `tests/fm-test-run.test.sh` failed on a load-sensitive case in `tests/fm-supervision-events.test.sh`.
-The run was stopped while `tests/fm-captain-hold-lifecycle.test.sh` was still running, after the load-dependent hang above, so the archived JSON and the table below are the 2026-08-20 24-script result and have not been regenerated.
 
 ## Durations
 
