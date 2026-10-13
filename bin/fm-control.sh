@@ -1697,6 +1697,14 @@ resolve_relaunch_profile() {
     fm_control_harness_supports_kind "$TARGET_HARNESS" "$KIND" \
       || die "'$TARGET_HARNESS' is not verified to run a $KIND task"
   fi
+  case "$(fm_meta_get "$META" omp_no_helpers)" in
+    '') ;;
+    on)
+      [ "$TARGET_HARNESS" = omp ] \
+        || die "task $ID records omp_no_helpers=on, which only omp can honor; relaunching it onto '$TARGET_HARNESS' would stop the running agent for a launch that must be refused"
+      ;;
+    *) die "task $ID records an invalid omp_no_helpers posture; refusing to stop the running agent for a launch that must be refused" ;;
+  esac
   if [ "$TARGET_EFFORT" = ultra ]; then
     "$SCRIPT_DIR/fm-harness.sh" validate-native-effort "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT" || return 1
   fi

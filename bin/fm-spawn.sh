@@ -290,6 +290,46 @@
 #   resets and receive a task-owned --config overlay permitting only declared
 #   OMP model fallbacks, with an empty default chain so ambient role chains
 #   cannot weaken the assigned model.
+#   Workers pin the native judge to typesafe/jev-latest with judge: [] fallbacks.
+#   Under the captain data-egress decision 2026-10-08, only a firstmate-project
+#   worker (the Jev guard's physical-root test) gets the task-overlay
+#   find.enabled=on, which admits that tool before credential extensions load,
+#   and a private !command credential lookup through fm_typesafe_key. omp
+#   memoizes successful lookups for that process; relaunch picks up primary-key
+#   changes. Every other project gets find.enabled=off and a failing judge
+#   credential, so native judgments reach neither TypeSafe nor OpenRouter.
+#   No key is stored in config, argv or worker env; global settings stay intact.
+#   Every canonical omp ship/scout launches with --no-title, so titles never
+#   reach a credentialed OpenRouter model. An ordinary (not no-helper) worker
+#   keeps automatic skill listing, but its task overlay assigns the
+#   session-only smol and tiny roles to the worker's own model (the launch
+#   model, or pi/default when it has none). These are scalar role values, so
+#   the operator's arrays (disabledProviders and the like) and other role
+#   entries are left as omp loads them, and the worker keeps whatever agent
+#   directory and profile omp selects. omp compresses each skill description
+#   through the smol role (then tiny), so that compression, and any other
+#   explicit @smol or @tiny consumer in the session, bills the worker's main
+#   provider instead of OpenRouter: an ordinary worker is not zero-spend.
+#   omp falls back to its built-in smol and tiny choices only when the
+#   worker's own model cannot be resolved. If an operator's own omp config
+#   routes some other role to OpenRouter, that is their config and Firstmate
+#   does not override it.
+#   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
+#   routes. It layers .omp/fm-no-helpers-overlay.yml, defaults an unset effort
+#   to high (ultra is refused for omp before launch), disables
+#   extension/skill/rule discovery, automatic skill listing (skillful=false,
+#   unlike an ordinary worker) and speech (including the
+#   enhanced-speech @tiny route), exposes only deterministic core tools,
+#   withholds native judge credentials and guard judgments, and
+#   empties main-model fallbacks. Deterministic guard path/edit checks remain.
+#   omp compaction can fall back from the primary model to role-assigned or
+#   other credentialed models, so the overlay sets compaction.enabled=false: a
+#   long no-helper task stops at the context limit instead of compacting. It
+#   also sets memory.backend=off, so the session has no memory recall.
+#   The choice is recorded as omp_no_helpers=on and inherited on relaunch;
+#   fm-control refuses to switch such a task to another harness before it stops
+#   the running worker.
+#   It does not sandbox Bash or prevent explicit external API commands.
 #   Secondmate lanes keep their memory settings; the captain's own
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written or
 #   renamed by Firstmate.
@@ -891,6 +931,7 @@ TRACEPARENT_SET=0
 RELAUNCH=0
 RECONCILE_ONLY=0
 CLAUDE_DEBUG=0
+OMP_NO_HELPERS=0
 RELOCATE_TO=
 RELOCATE_SET=0
 ALLOW_API_KEY=0
@@ -968,6 +1009,7 @@ for a in "$@"; do
     ;;
   --relaunch) RELAUNCH=1 ;;
   --reconcile-only) RECONCILE_ONLY=1 ;;
+  --omp-no-helpers) OMP_NO_HELPERS=1 ;;
   --allow-api-key) ALLOW_API_KEY=1 ;;
   --herdr-resume-lock-wait) HERDR_RESUME_LOCK_WAIT=1 ;;
   --worktree) want_value=worktree ;;
@@ -1889,6 +1931,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ "$YOLO_SET" -eq 0 ] || shared_args+=(--yolo "$YOLO")
   [ "$BRANCH_PREFIX_SET" -eq 0 ] || shared_args+=(--branch-prefix "$BRANCH_PREFIX")
   [ "$ALLOW_API_KEY" -eq 0 ] || shared_args+=(--allow-api-key)
+  [ "$OMP_NO_HELPERS" -eq 0 ] || shared_args+=(--omp-no-helpers)
   [ "$BASE_BRANCH_SET" -eq 0 ] || shared_args+=(--base-branch "$BASE_BRANCH")
   [ "$HERDR_RESUME_LOCK_WAIT" -eq 0 ] || shared_args+=(--herdr-resume-lock-wait)
   for pair in "${POS[@]}"; do
@@ -2193,6 +2236,11 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_PRIOR_HARNESS=$(fm_meta_get "$RELAUNCH_META" harness)
   KIND=$(fm_meta_get "$RELAUNCH_META" kind)
   [ -n "$KIND" ] || KIND=ship
+  case "$(fm_meta_get "$RELAUNCH_META" omp_no_helpers)" in
+    '') ;;
+    on) OMP_NO_HELPERS=1 ;;
+    *) echo "error: invalid recorded omp_no_helpers posture for $ID" >&2; exit 1 ;;
+  esac
   # Keep the instruction owner's recovery scope through direct and automatic
   # replacements; dependency completion alone cannot restore execution rights.
   if [ "$(fm_meta_get "$RELAUNCH_META" recovery)" = reconcile-only ]; then
@@ -2965,6 +3013,19 @@ if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
   fi
 fi
 fm_session_launch_policy_check "$CONFIG" "$HARNESS" "$RAW_LAUNCH" || exit 1
+
+if [ "$OMP_NO_HELPERS" = 1 ]; then
+  if [ "$HARNESS" != omp ] || [ "$RAW_LAUNCH" != 0 ] || [ "$KIND" = secondmate ]; then
+    echo "error: --omp-no-helpers requires a canonical omp ship or scout launch" >&2
+    exit 1
+  fi
+  # Pin effort so an ambient auto-thinking setting cannot invoke the judge.
+  [ -n "$EFFORT" ] || EFFORT=high
+  [ -f "$FM_ROOT/.omp/fm-no-helpers-overlay.yml" ] || {
+    echo "error: omp no-helper overlay missing" >&2
+    exit 1
+  }
+fi
 
 if [ "$CLAUDE_DEBUG" = 1 ] && { [ "$RAW_LAUNCH" = 1 ] || [ "$HARNESS" != claude ]; }; then
   echo "error: --claude-debug applies only to a claude launch; $ID resolved harness '$HARNESS'" >&2
@@ -5618,7 +5679,8 @@ EOF
     # omp 18.1.11). Lives in state/, cleaned by teardown.
     guard_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guard_config" --arg state "$STATE_REAL" \
       --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" --arg project "$guard_project" \
-      '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project}') || exit 1
+      --argjson noHelpers "$OMP_NO_HELPERS" \
+      '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project, noHelpers: ($noHelpers == 1)}') || exit 1
     rm -f "$STATE/$ID.live-model"
     # Exact model and effort keys override ambient default or provider chains.
     # This per-task overlay travels to all local backends through --config.
@@ -5633,10 +5695,19 @@ EOF
       [ "$candidate_model" != "$MODEL" ] || continue
       native_fallback=$(jq -cn --argjson prefix "$native_fallback" --argjson profile "$candidate" '$prefix + [$profile]') || exit 1
     done < <(jq -c '.[]' <<<"$DISPATCH_FALLBACK")
-    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" '
+    [ "$OMP_NO_HELPERS" = 0 ] || native_fallback='[]'
+    native_find=off
+    [ "$guard_project" != firstmate ] || [ "$OMP_NO_HELPERS" = 1 ] || native_find=on
+    native_helpers='{}'
+    if [ "$OMP_NO_HELPERS" = 0 ]; then
+      native_helper_role=$MODEL
+      case "$native_helper_role" in '' | default) native_helper_role=pi/default ;; esac
+      native_helpers=$(jq -cn --arg role "$native_helper_role" '{modelRoles: {smol: $role, tiny: $role}}') || exit 1
+    fi
+    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" --arg find "$native_find" --argjson helpers "$native_helpers" '
       def effort_key($m; $e): if $e == "" then $m else $m + ":" + $e end;
       ([$fallback[] | effort_key(.model; .effort)]) as $chain |
-      {retry: {modelFallback: ($model | contains("/")), fallbackChains:
+      $helpers + {find: {enabled: $find}, retry: {modelFallback: ($model | contains("/")), fallbackChains:
         (reduce ([{model:$model, effort:$effort}] + $fallback)[] as $p
           ({default: []}; if ($p.model | contains("/")) then
             .[$p.model] = [] | .[effort_key($p.model; $p.effort)] = [] else . end)
@@ -5658,6 +5729,7 @@ EOF
 // would leave every completed turn recorded busy.
 import { execFile } from "node:child_process";
 import { installJevGuard } from "$FM_ROOT/bin/fm-jev-guard.ts";
+import { installTypesafeJudge } from "$FM_ROOT/bin/fm-omp-jev.ts";
 import { installTaskSessionProof } from "$FM_ROOT/.omp/extensions/lib/fm-task-session.ts";
 import { installLiveModelPublisher } from "$FM_ROOT/bin/fm-omp-live-model.ts";
 import { appendFileSync, readFileSync } from "node:fs";
@@ -5669,7 +5741,9 @@ const busyEvent = (state: string, event: string) =>
     ], () => resolve());
   });
 export default function (pi: any) {
-  installJevGuard(pi, $guard_context);
+  const guardContext = $guard_context;
+  installTypesafeJudge(pi, guardContext);
+  installJevGuard(pi, guardContext);
   installTaskSessionProof(pi, "$STATE_REAL", "$ID");
   // The model serving this task now, for bin/fm-crew-state.sh's drift note.
   installLiveModelPublisher(pi, "$STATE_REAL/$ID.live-model");
@@ -5905,7 +5979,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model model_stale effort dispatch_rule account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch model model_stale effort omp_no_helpers dispatch_rule account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -5927,6 +6001,7 @@ preserve_relaunch_meta() {
   echo "model=${MODEL:-default}"
   [ -z "${MODEL_STALE:-}" ] || echo "model_stale=$MODEL_STALE"
   echo "effort=${EFFORT:-default}"
+  [ "$OMP_NO_HELPERS" = 0 ] || echo "omp_no_helpers=on"
   [ -z "$SKILL_SELECTION_STATUS" ] || echo "skill_selection=$SKILL_SELECTION_STATUS"
   [ -z "$SKILL_SELECTION_REASON" ] || echo "skill_selection_reason=$SKILL_SELECTION_REASON"
   [ -z "$SKILL_SELECTION_PICKED" ] || echo "skill_selection_picked=$SKILL_SELECTION_PICKED"
@@ -6088,7 +6163,11 @@ sq_ompext=$(shell_quote "$STATE/$ID.omp-ext.ts")
 sq_ompcfg=$(shell_quote "${OMP_WORKER_CFG:-$FM_ROOT/.omp/fm-worker-overlay.yml}")
 sq_ompsessioncfg=$(shell_quote "${OMP_SESSION_CFG:-$FM_ROOT/.omp/fm-session-overlay.yml}")
 if [ "$HARNESS" = omp ] && [ "$KIND" != secondmate ]; then
-  sq_ompcfg="$sq_ompcfg --config $(shell_quote "$STATE/$ID.omp-fallback.yml")"
+  # Title generation otherwise routes to any credentialed OpenRouter model.
+  sq_ompcfg="$sq_ompcfg --config $(shell_quote "$STATE/$ID.omp-fallback.yml") --no-title"
+  if [ "$OMP_NO_HELPERS" = 1 ]; then
+    sq_ompcfg="$sq_ompcfg --config $(shell_quote "$FM_ROOT/.omp/fm-no-helpers-overlay.yml") --no-extensions --no-skills --no-rules --tools read,bash,edit,write,grep,glob,todo,ask"
+  fi
 fi
 sq_opinput=$(shell_quote "$FM_ROOT/bin/fm-operational-input.sh")
 sq_worktree=$(shell_quote "$WT")

@@ -68,6 +68,34 @@ rm -f "$LANE/.env"
 printf 'TYPESAFE_API_KEY=primary-key\n' > "$PRIMARY/.env"
 pass "the OpenRouter fallback key resolves from own, then primary .env, never the environment"
 
+# Native omp credentials use its supported private !command interface, not
+# saved keys or the worker environment. Exercise the command with fake homes.
+NATIVE_OUT=$(env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE LANE="$LANE" ROOT="$ROOT" \
+  NODE_NO_WARNINGS=1 node --experimental-strip-types --input-type=module 2>&1 <<'JS'
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
+const { installTypesafeJudge } = await import(pathToFileURL(`${process.env.ROOT}/bin/fm-omp-jev.ts`));
+let provider, config;
+const api = { registerProvider(name, value) { provider = name; config = value; } };
+installTypesafeJudge(api, { home: process.env.LANE, project: "firstmate" });
+assert.equal(provider, "typesafe");
+assert.equal(config.baseUrl, "https://api.typesafe.ai");
+assert.ok(!config.apiKey.includes("primary-key"), "configuration must store only the lookup command");
+assert.equal(execFileSync("/bin/sh", ["-c", config.apiKey.slice(1)], { encoding: "utf8" }), "primary-key");
+assert.equal(process.env.TYPESAFE_API_KEY, undefined);
+assert.equal(process.env.TYPESAFE_API_KEY_PRIVATE, undefined);
+for (const context of [{ project: "firstmate", noHelpers: true }, { project: "vernant" }, { project: "" }, {}]) {
+  installTypesafeJudge(api, { home: process.env.LANE, ...context });
+  assert.throws(() => execFileSync("/bin/sh", ["-c", config.apiKey.slice(1)], { encoding: "utf8", stdio: "pipe" }),
+    `${JSON.stringify(context)} must supply no credential even when the primary has one`);
+}
+console.log("native-key-ok");
+JS
+) || fail "native command-key boundary failed: $NATIVE_OUT"
+[ "$NATIVE_OUT" = native-key-ok ] || fail "unexpected native key probe: $NATIVE_OUT"
+pass "native omp command credentials reach the primary privately for firstmate only and stay unavailable with no helpers"
+
 # The jev-guard hook is a separate process; it must reach the primary key too.
 cat > "$TMP_ROOT/fake-jev.mjs" <<'JS'
 import { createServer } from 'node:http';

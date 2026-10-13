@@ -253,6 +253,176 @@ test_spawn_launch_line_and_worker_wiring() {
   pass "fm-spawn: the omp launch line clears markers, pins posture, and wires the state-resident extension"
 }
 
+test_no_helpers_rejects_nonworker_launches() {
+  local rec id out status kind
+  for kind in claude secondmate; do
+    id="no-helper-invalid-$kind"
+    rec=$(make_spawn_case "$id" "$kind" "$id")
+    read_case_record "$rec"
+    if [ "$kind" = secondmate ]; then
+      out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+        "$id" "$HOME_DIR" --secondmate --harness omp --omp-no-helpers)
+    else
+      out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+        "$id" "$PROJ_DIR" --harness claude --omp-no-helpers)
+    fi
+    status=$?
+    expect_code 1 "$status" "no-helper posture must refuse $kind: $out"
+    assert_contains "$out" "--omp-no-helpers requires a canonical omp ship or scout launch" \
+      "the $kind refusal must name the canonical omp ship or scout requirement"
+    assert_absent "$HOME_DIR/state/$id.meta" "unsupported no-helper launch must not publish a task"
+    [ ! -s "$LAUNCH_LOG" ] || fail "unsupported no-helper posture launched an agent"
+  done
+  pass "no-helper posture rejects other runtimes and supervisor sessions before publishing or launching"
+}
+
+# The emitted launch, the generated fallback overlay and the task record are
+# the consumer-visible contract of --omp-no-helpers: a regression in any of them
+# silently returns secondary-model routes to a worker meant to have none.
+assert_no_helper_launch() {  # <label> <launch-log> <fallback-yml> <meta>
+  local label=$1 launch fallback=$3 meta=$4 flag
+  launch=$(cat "$2")
+  assert_contains "$launch" "--config '$ROOT/.omp/fm-no-helpers-overlay.yml'" "$label launch lost the no-helper overlay"
+  for flag in --no-title --no-extensions --no-skills --no-rules; do
+    assert_contains "$launch" " $flag" "$label launch lost $flag"
+  done
+  assert_contains "$launch" " --tools read,bash,edit,write,grep,glob,todo,ask " "$label launch lost the restricted tool list"
+  assert_contains "$launch" "--thinking 'high'" "$label launch must pin non-auto thinking"
+  assert_equals '[]' "$(jq -c .retry.fallbackChains.default "$fallback")" "$label launch must keep no default fallback chain"
+  assert_equals '[]' "$(jq -c '[.retry.fallbackChains | to_entries[] | select(.key != "default") | .value[]]' "$fallback")" \
+    "$label launch must keep no stand-in fallback entry"
+  assert_grep 'omp_no_helpers=on' "$meta" "$label record lost omp_no_helpers=on"
+  assert_equals '[false,false,false]' "$(jq -c '[has("modelRoles"), has("disabledProviders"), has("skillful")]' "$fallback")" \
+    "$label task overlay must leave helper policy to the no-helper overlay"
+  assert_equals false "$(ruby -ryaml -rjson -e 'print JSON.generate(YAML.safe_load(File.read(ARGV[0]))["skillful"])' "$ROOT/.omp/fm-no-helpers-overlay.yml")" \
+    "the no-helper overlay must keep automatic skill listing off"
+}
+
+# Run a same-harness relaunch of a published task against the fake tmux stub.
+run_omp_relaunch() {  # <home> <wt> <fakebin> <launch-log> <id> [spawn-args...]
+  local home=$1 wt=$2 fakebin=$3 launchlog=$4 id=$5
+  local bin
+  shift 5
+  : > "$launchlog"
+  # The recorded window is listed and its pane runs an idle shell, which is
+  # the positively agent-free endpoint a relaunch requires.
+  bin="$fakebin/relaunch-shell"
+  mkdir -p "$bin"
+  cat > "$bin/tmux" <<SH
+#!/usr/bin/env bash
+case "\$*" in
+  *pane_current_command*) printf 'zsh\\n'; exit 0 ;;
+esac
+exec "$fakebin/tmux" "\$@"
+SH
+  chmod +x "$bin/tmux"
+  FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$home/state/$id.meta")" FM_FAKE_LAUNCH_LOG="$launchlog" \
+    fm_test_run_spawn "$home" "$wt" "$bin:$fakebin" "$id" --relaunch "$@"
+}
+
+test_no_helpers_launch_contract() {
+  local rec id out status meta fallback
+  id="omp-no-helpers-contract"
+  rec=$(make_spawn_case no-helpers-contract omp "$id" firstmate)
+  read_case_record "$rec"
+  mkdir -p "$HOME_DIR/config"
+  cat > "$HOME_DIR/config/crew-dispatch.json" <<'JSON'
+{"rules":[{"when":"easy work","use":{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"low","provider":"codex"},"fallback":[{"harness":"omp","model":"deepseek/deepseek-v4-flash","effort":"high"}]}]}
+JSON
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
+    --harness omp --model openai-codex/gpt-6-luna --dispatch-rule rule_1 --omp-no-helpers)
+  expect_code 0 $? "no-helper spawn should succeed: $out"
+  meta="$HOME_DIR/state/$id.meta"
+  fallback="$HOME_DIR/state/$id.omp-fallback.yml"
+  assert_no_helper_launch "first" "$LAUNCH_LOG" "$fallback" "$meta"
+
+  out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+  expect_code 0 $? "same-harness relaunch of a no-helper task should succeed: $out"
+  assert_no_helper_launch "relaunched" "$LAUNCH_LOG" "$fallback" "$meta"
+
+  cp "$meta" "$CASE_DIR/prior.meta"
+  sed -i.bak 's/^omp_no_helpers=on$/omp_no_helpers=maybe/' "$meta"
+  rm -f "$meta.bak"
+  cp "$meta" "$CASE_DIR/invalid.meta"
+  out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+  status=$?
+  expect_code 1 "$status" "an invalid recorded no-helper posture must be refused: $out"
+  assert_contains "$out" "invalid recorded omp_no_helpers posture for $id" "the refusal must name the invalid record"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused relaunch launched an agent"
+  cmp -s "$CASE_DIR/invalid.meta" "$meta" || fail "a refused relaunch changed the task record"
+  pass "no-helper launch, emptied fallback, record, relaunch inheritance and invalid-record refusal hold"
+}
+
+test_no_helpers_refuses_ultra_effort() {
+  local rec id out status
+  id="omp-no-helpers-ultra"
+  rec=$(make_spawn_case no-helpers-ultra omp "$id")
+  read_case_record "$rec"
+  out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
+    --harness omp --effort ultra --omp-no-helpers)
+  status=$?
+  expect_code 1 "$status" "omp has no ultra effort, so a no-helper launch must refuse it: $out"
+  assert_contains "$out" "ultra effort requires pi or pi-signed" "the refusal must name the ultra requirement"
+  assert_absent "$HOME_DIR/state/$id.meta" "a refused ultra launch must not publish a task"
+  [ ! -s "$LAUNCH_LOG" ] || fail "a refused ultra launch started an agent"
+  pass "no-helper omp launch refuses ultra effort before publishing or launching"
+}
+
+# Titles and the smol and tiny helper roles (skill-description compression
+# among them) can select a credentialed OpenRouter model. An ordinary worker
+# keeps automatic skill listing, so its task overlay must point those roles at
+# its own model with scalar values only, never an array that would replace the
+# operator's disabledProviders, on launch and relaunch, in Firstmate and in
+# other projects.
+assert_worker_helper_policy() {  # <label> <overlay> <role>
+  assert_equals "[\"$3\",\"$3\"]" "$(jq -c '[.modelRoles.smol, .modelRoles.tiny]' "$2")" "$1 must assign smol and tiny to the worker's own model"
+  assert_equals '[false,false]' "$(jq -c '[has("skillful"), has("disabledProviders")]' "$2")" \
+    "$1 must keep automatic skill listing and leave the operator's disabledProviders alone"
+}
+
+test_omp_workers_disable_openrouter_prompt_helpers() {
+  local scope kind rec id out launch overlay role
+  local -a model_args
+  for scope in firstmate vernant; do
+    for kind in ship scout; do
+      id="omp-title-$scope-$kind"
+      rec=$(make_spawn_case "title-$scope-$kind" omp "$id" "$scope")
+      read_case_record "$rec"
+      printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\n' > "$GLOBAL_CONFIG"
+      model_args=()
+      role=pi/default
+      if [ "$kind" = scout ]; then
+        model_args=(--model openai-codex/gpt-6-luna)
+        role=openai-codex/gpt-6-luna
+      fi
+      if [ "$kind" = ship ]; then
+        out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+          "$id" "$PROJ_DIR" --harness omp --mode no-mistakes --yolo off ${model_args[@]+"${model_args[@]}"})
+      else
+        out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp ${model_args[@]+"${model_args[@]}"})
+      fi
+      expect_code 0 $? "omp $scope $kind spawn should succeed: $out"
+      overlay="$HOME_DIR/state/$id.omp-fallback.yml"
+      launch=$(cat "$LAUNCH_LOG")
+      assert_contains "$launch" " --no-title " "an ordinary omp $scope $kind launch must disable title generation"
+      assert_worker_helper_policy "an ordinary omp $scope $kind launch" "$overlay" "$role"
+      assert_not_contains "$launch" "--no-extensions" "an ordinary omp $scope $kind launch must keep its extension"
+      assert_not_contains "$launch" "--no-skills" "an ordinary omp $scope $kind launch must keep skill discovery"
+      out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" ${model_args[@]+"${model_args[@]}"})
+      expect_code 0 $? "omp $scope $kind relaunch should succeed: $out"
+      assert_contains "$(cat "$LAUNCH_LOG")" " --no-title " "an omp $scope $kind relaunch must disable title generation"
+      assert_worker_helper_policy "an omp $scope $kind relaunch" "$overlay" "$role"
+    done
+  done
+  jq '. + {skillful: false}' "$overlay" > "$CASE_DIR/skillful-false.json"
+  ! (assert_worker_helper_policy "a planted skillful=false" "$CASE_DIR/skillful-false.json" "$role") 2>/dev/null \
+    || fail "the helper-policy check must reject an overlay that turns skill listing off"
+  jq '. + {disabledProviders: ["openrouter"]}' "$overlay" > "$CASE_DIR/disabled-array.json"
+  ! (assert_worker_helper_policy "a planted disabledProviders" "$CASE_DIR/disabled-array.json" "$role") 2>/dev/null \
+    || fail "the helper-policy check must reject an overlay that replaces disabledProviders"
+  pass "every canonical omp ship and scout launch and relaunch disables titles and routes smol and tiny to the worker's own model with scalar roles only"
+}
+
 test_worker_replace_mode_environment() {
   local kind rec id out status launch seen
   for kind in ship scout; do
@@ -284,17 +454,26 @@ printf '%s\n' \"\$PI_EDIT_VARIANT\"") \
 }
 
 test_worker_guard_project_scope() {
-  local project rec id out
-  for project in firstmate vernant; do
-    id="omp-scope-$project"
-    rec=$(make_spawn_case "scope-$project" omp "$id" "$project")
+  local scope project rec id out expected
+  local -a extra
+  for scope in firstmate vernant no-helpers; do
+    project=$scope
+    extra=()
+    [ "$scope" != no-helpers ] || { project=firstmate; extra=(--omp-no-helpers); }
+    id="omp-scope-$scope"
+    rec=$(make_spawn_case "scope-$scope" omp "$id" "$project")
     read_case_record "$rec"
-    out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
-    expect_code 0 $? "omp $project spawn should succeed: $out"
+    out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp ${extra[@]+"${extra[@]}"})
+    expect_code 0 $? "omp $scope spawn should succeed: $out"
+    expected=off
+    [ "$scope" != firstmate ] || expected=on
+    assert_equals "$expected" "$(jq -r .find.enabled "$HOME_DIR/state/$id.omp-fallback.yml")" \
+      "the task overlay must admit native find only for a firstmate-project worker"
     printf 'TYPESAFE_API_KEY=omp-scope-key\nOPENROUTER_API_KEY=omp-fallback-key\n' > "$HOME_DIR/.env"
-    out=$(EXT_PATH="$HOME_DIR/state/$id.omp-ext.ts" PROJECT="$project" WT="$WT_DIR" FM_TEST_SEAM=1 \
+    out=$(EXT_PATH="$HOME_DIR/state/$id.omp-ext.ts" PROJECT="$scope" WT="$WT_DIR" FM_TEST_SEAM=1 \
       node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { createServer } from "node:http";
 import { pathToFileURL } from "node:url";
 const requests = [];
@@ -303,7 +482,6 @@ const server = createServer((req, res) => {
   req.on("data", chunk => { body += chunk; });
   req.on("end", () => {
     requests.push({ path: req.url, state: JSON.parse(body).state });
-    if (req.url === "/direct") { res.writeHead(500).end("{}"); return; }
     const answers = {};
     for (const [id, q] of Object.entries(JSON.parse(body).questions)) {
       const keys = Object.keys(q.criteria ?? {});
@@ -319,15 +497,19 @@ await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
 try {
   const base = `http://127.0.0.1:${server.address().port}`;
   process.env.FM_JEV_GUARD_BASE_URL = `${base}/direct`;
-  process.env.FM_JEV_GUARD_OPENROUTER_URL = `${base}/fallback`;
   const handlers = {};
-  (await import(pathToFileURL(process.env.EXT_PATH))).default({ on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
+  const providers = [];
+  (await import(pathToFileURL(process.env.EXT_PATH))).default({ registerProvider: (name, config) => providers.push({ name, ...config }), on: (name, fn) => { handlers[name] = fn; }, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } } });
+  assert.deepEqual(providers.map(row => [row.name, row.baseUrl]), [["typesafe", "https://api.typesafe.ai"]]);
+  const credential = () => execFileSync("/bin/sh", ["-c", providers[0].apiKey.slice(1)], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
   const result = await handlers.tool_call({ toolName: "bash", input: { command: "rm -rf customer-record" } }, { cwd: process.env.WT });
   if (process.env.PROJECT === "firstmate") {
+    assert.equal(credential(), "omp-scope-key");
     assert.equal(result?.block, true);
-    assert.deepEqual(requests.map(row => row.path), ["/direct", "/fallback"]);
+    assert.deepEqual(requests.map(row => row.path), ["/direct"]);
     assert.ok(requests.every(row => row.state.command === "rm -rf customer-record"));
   } else {
+    assert.throws(credential, "a non-firstmate worker must have no native judge credential");
     assert.equal(result, undefined);
     assert.deepEqual(requests, []);
   }
@@ -337,9 +519,9 @@ try {
 console.log("scope-ok");
 JS
 )
-    [ "$out" = scope-ok ] || fail "generated omp extension lost $project egress scope: $out"
+    [ "$out" = scope-ok ] || fail "generated omp extension lost $scope egress scope: $out"
   done
-  pass "real omp spawns authorize firstmate only and carry project scope through the generated extension"
+  pass "real omp spawns give firstmate alone, without no-helpers, native find, a judge credential and guard egress"
 }
 
 test_spawn_retains_pooled_capacity_and_declared_stand_ins() {
@@ -1008,7 +1190,7 @@ const registered = {};
 const handlers = {};
 // The extension API exposes the host SDK; the session proof only reads the
 // live registry from it inside its own handlers, which these modes never fire.
-mod.default({ on: (name, fn) => {
+mod.default({ registerProvider() {}, on: (name, fn) => {
   (registered[name] ||= []).push(fn);
   handlers[name] = async (...args) => { for (const h of registered[name]) await h(...args); };
 }, pi: { AgentRegistry: { global: () => ({}) } } });
@@ -2509,7 +2691,7 @@ globalThis.setTimeout = (callback, delay, ...args) => {
 };
 globalThis.clearTimeout = (timer) => { if (!flushChecks.delete(timer)) realClearTimeout(timer); };
 globalThis.setInterval = (callback, delay, ...args) => {
-  if (manual && delay === 3000) { pollCheck = () => callback(...args); return { unref() {} }; }
+  if ((manual || scenario === "stranded-two") && delay === 3000) { pollCheck = () => callback(...args); return { unref() {} }; }
   return realSetInterval(callback, delay === 3000 && scenario.startsWith("stranded-") ? 100 : delay, ...args);
 };
 writeFileSync(`${state}/.lock`, `${process.pid}\n`);
@@ -3016,13 +3198,18 @@ if (scenario === "external") {
         }
         case "stranded-two": {
           await settle();
+          // One stable poll removes one block. Do not let a later poll race
+          // the assertion while the first asynchronous queue read is in flight.
+          writeFileSync(`${state}/query-slow`, "");
           const first = stale("check: old headline one"), second = stale("check: old headline two");
           editor = `${first}\n\n${second}`;
+          pollCheck(); pollCheck();
           await until(() => wakes().length === 2, "the first stranded wake was never handled");
           fresh(1);
           if (editor !== second) throw new Error(`the first stranded wake was not removed alone: ${JSON.stringify(editor)}`);
           await accept(wakes()[1]);
           await end();
+          pollCheck(); pollCheck();
           await until(() => wakes().length === 3, "the second stranded wake was never handled");
           fresh(2);
           if (editor !== "") throw new Error("the second stranded wake was not removed");
@@ -3701,6 +3888,10 @@ test_watch_lifecycle_deadline_diagnostics
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
 test_spawn_launch_line_and_worker_wiring
+test_no_helpers_rejects_nonworker_launches
+test_no_helpers_launch_contract
+test_no_helpers_refuses_ultra_effort
+test_omp_workers_disable_openrouter_prompt_helpers
 test_worker_replace_mode_environment
 test_worker_guard_project_scope
 test_spawn_retains_pooled_capacity_and_declared_stand_ins

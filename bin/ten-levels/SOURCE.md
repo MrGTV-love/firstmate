@@ -28,22 +28,24 @@ Firstmate supplies shorter client budgets through the upstream constructor optio
 Upstream's `report.ts` is the lab's side channel, so it is the one upstream file Firstmate changes.
 Each change and its reason:
 
-- `extensions/report.ts:85-103`: the client calls TypeSafe direct first and asks OpenRouter only when the direct call is unavailable or fails, preserving Firstmate's provider order rather than upstream's single-provider snapshot.
-  `:87` and `:89` shorten each provider's total request budget; [the operator contract](../../docs/configuration.md#jev-guard) owns current budgets and host limits.
-  `:85` reads test endpoint overrides only when `FM_TEST_SEAM=1`.
-- `extensions/report.ts:28-46`: `withDecisionBudget` gives each complete handler a shared 25-second cancellation deadline.
-  `:62`, `:71` and `:81` bound synchronous key and policy preflight to the remaining handler budget.
-  `:94-98` pass the shared cancellation signal through both upstream clients so a fallback cannot outlive its handler.
+- `extensions/report.ts`'s `jev` keeps upstream's single-provider TypeSafe client snapshot, memoized for the session; Firstmate's former OpenRouter fallback client is removed under the 2026-10-09 prohibition on OpenRouter fleet calls.
+  Unavailable TypeSafe follows upstream's existing no-key error behavior; it never tries another provider.
+  The constructor shortens the total request budget; [the operator contract](../../docs/configuration.md#jev-guard) owns current budgets and host limits.
+  `seam` reads test endpoint overrides only when `FM_TEST_SEAM=1`.
+- `extensions/report.ts`'s `withDecisionBudget` gives each complete handler a shared 25-second cancellation deadline.
+  `preflightTimeout` bounds synchronous key and policy preflight to the remaining handler budget.
+  `decide` passes the shared cancellation signal to the upstream client so a request cannot outlive its handler.
   omp 18.8.1's supported `extensionHandlers.toolCallTimeoutMs` setting covers only tool calls, not result screening, so Firstmate bounds both paths without extending the host deadline.
-- `extensions/report.ts:58-73`: both keys are read through `bin/fm-typesafe-lib.sh` (`fm_typesafe_key`, `fm_openrouter_key`) because Firstmate keeps the worker environment free of keys.
-- `extensions/report.ts:26`, `:49-55`, `:77` and `:137`: the captain data-egress decision 2026-10-08 authorizes only the `firstmate` project, so every hook's shared `decide` preflight withholds all other, missing or empty project scopes before either provider is selected.
+- `extensions/report.ts`'s `typesafeKey` reads the key through `bin/fm-typesafe-lib.sh` (`fm_typesafe_key`) when the client is first constructed because Firstmate keeps the worker environment free of keys.
+- `extensions/report.ts`'s `permitted` preflight enforces the captain data-egress decision 2026-10-08, withholding all other, missing or empty project scopes before resolving a credential.
   A withheld request throws, so upstream's own error path allows the tool call while the outside-root write block remains deterministic.
-- `extensions/report.ts:78-83` and `:137`: authorized requests must also pass `config/dispatch-never-send` through the existing `fm_typesafe_permitted` policy.
-- `extensions/report.ts:49-55`: `configure` names the owning home, its config and state, the task and project because one shared code root serves many workers.
-- `extensions/report.ts:115-121`: events go to the owning home's private `state/jev-guard.jsonl` instead of the lab's stderr stream, which has no reader in Firstmate.
+- `extensions/report.ts`'s `permitted` also checks authorized requests against `config/dispatch-never-send` through the existing `fm_typesafe_permitted` policy.
+  A worker's explicit no-helper posture withholds judgments before credential lookup while leaving the upstream deterministic safety checks unchanged; [the operator contract](../../docs/configuration.md#jev-guard) owns that behavior.
+- `extensions/report.ts`'s `configure` names the owning home, its config and state, the task and project because one shared code root serves many workers.
+- `extensions/report.ts`'s `report` sends events to the owning home's private `state/jev-guard.jsonl` instead of the lab's stderr stream, which has no reader in Firstmate.
   The ledger deliberately selects decision metadata, answers and numeric usage, excluding commands, paths, request bodies, questions, reasons, banners, error messages and unknown request-derived fields.
   [The operator contract](../../docs/configuration.md#jev-guard) owns ledger availability and the difference between omp session entries and Claude reporting.
-- `extensions/report.ts:141`: the `jev` event names the answering provider so fallback use is measurable.
+- `extensions/report.ts`'s `decide` records the answering provider in the `jev` event so direct-only routing remains observable.
 
 ## Firstmate glue outside this directory
 

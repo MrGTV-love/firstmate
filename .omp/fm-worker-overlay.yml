@@ -5,6 +5,10 @@
 # Verified against omp 18.6.3 (`omp config list --json`).
 mnemopi:
   noEmbeddings: true
+# Worker-only judge routing; global operator settings remain untouched.
+# The per-task overlay and credential extension decide whether it is usable.
+modelRoles:
+  judge: typesafe/jev-latest
 retry:
   # Native credential rotation is available in omp 18.6.1; inspect pooled
   # headroom rather than quota-axi's single Codex account before routing away.
@@ -18,3 +22,4 @@ retry:
   # supplied by fm-spawn as a later per-task overlay, never an ambient chain.
   fallbackChains:
     default: []
+    judge: []
