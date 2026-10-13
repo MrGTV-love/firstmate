@@ -292,12 +292,17 @@ assert_no_helper_launch() {  # <label> <launch-log> <fallback-yml> <meta>
   assert_equals '[]' "$(jq -c '[.retry.fallbackChains | to_entries[] | select(.key != "default") | .value[]]' "$fallback")" \
     "$label launch must keep no stand-in fallback entry"
   assert_grep 'omp_no_helpers=on' "$meta" "$label record lost omp_no_helpers=on"
+  assert_equals '[false,false]' "$(jq -c '[has("modelRoles"), has("disabledProviders")]' "$fallback")" \
+    "$label launch must leave helper-role policy to the no-helper overlay"
+  assert_equals false "$(ruby -ryaml -rjson -e 'print JSON.generate(YAML.safe_load(File.read(ARGV[0]))["skillful"])' "$ROOT/.omp/fm-no-helpers-overlay.yml")" \
+    "the no-helper overlay must keep automatic skill listing off"
 }
 
 # Run a same-harness relaunch of a published task against the fake tmux stub.
-run_omp_relaunch() {  # <home> <wt> <fakebin> <launch-log> <id>
+run_omp_relaunch() {  # <home> <wt> <fakebin> <launch-log> <id> [spawn-args...]
   local home=$1 wt=$2 fakebin=$3 launchlog=$4 id=$5
   local bin
+  shift 5
   : > "$launchlog"
   # The recorded window is listed and its pane runs an idle shell, which is
   # the positively agent-free endpoint a relaunch requires.
@@ -312,7 +317,7 @@ exec "$fakebin/tmux" "\$@"
 SH
   chmod +x "$bin/tmux"
   FM_FAKE_DUPLICATE_WINDOW="$(sed -n 's/^window=[^:]*://p' "$home/state/$id.meta")" FM_FAKE_LAUNCH_LOG="$launchlog" \
-    fm_test_run_spawn "$home" "$wt" "$bin:$fakebin" "$id" --relaunch
+    fm_test_run_spawn "$home" "$wt" "$bin:$fakebin" "$id" --relaunch "$@"
 }
 
 test_no_helpers_launch_contract() {
@@ -363,36 +368,57 @@ test_no_helpers_refuses_ultra_effort() {
   pass "no-helper omp launch refuses ultra effort before publishing or launching"
 }
 
-# Titles and skill-description cache misses can select credentialed OpenRouter
-# helpers. Both must remain disabled for ordinary workers as well as no-helper
-# workers, including relaunches and projects outside Firstmate.
+# Titles and skill-description compression can select credentialed OpenRouter
+# helpers. An ordinary worker keeps automatic skill listing, so its task overlay
+# must send compression to its own model and leave OpenRouter disabled, with
+# the operator's own disabled providers kept, on launch and on relaunch, in
+# Firstmate and in other projects.
+assert_worker_helper_policy() {  # <label> <overlay> <smol> <disabled-json>
+  assert_equals "$3" "$(jq -r '.modelRoles.smol' "$2")" "$1 must assign smol to the worker's own model"
+  assert_equals "$4" "$(jq -c '.disabledProviders' "$2")" "$1 must disable OpenRouter and keep the operator's entries"
+  assert_equals unset "$(jq -r '.skillful // "unset"' "$2")" "$1 must not turn automatic skill listing off"
+}
+
 test_omp_workers_disable_openrouter_prompt_helpers() {
-  local scope kind rec id out launch
+  local scope kind rec id out launch overlay smol disabled
+  local -a model_args
   for scope in firstmate vernant; do
     for kind in ship scout; do
       id="omp-title-$scope-$kind"
       rec=$(make_spawn_case "title-$scope-$kind" omp "$id" "$scope")
       read_case_record "$rec"
+      model_args=()
+      smol=pi/default
+      if [ "$kind" = scout ]; then
+        model_args=(--model openai-codex/gpt-6-luna)
+        smol=openai-codex/gpt-6-luna
+      fi
+      printf 'modelRoles:\n  default: openai-codex/gpt-6-astra\n' > "$GLOBAL_CONFIG"
+      disabled='["openrouter"]'
+      if [ "$scope" = firstmate ]; then
+        printf 'disabledProviders:\n  - anthropic\n  - openrouter\n  - ollama\n' >> "$GLOBAL_CONFIG"
+        disabled='["anthropic","openrouter","ollama"]'
+      fi
       if [ "$kind" = ship ]; then
         out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
-          "$id" "$PROJ_DIR" --harness omp --mode no-mistakes --yolo off)
+          "$id" "$PROJ_DIR" --harness omp --mode no-mistakes --yolo off ${model_args[@]+"${model_args[@]}"})
       else
-        out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp)
+        out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" --harness omp ${model_args[@]+"${model_args[@]}"})
       fi
       expect_code 0 $? "omp $scope $kind spawn should succeed: $out"
+      overlay="$HOME_DIR/state/$id.omp-fallback.yml"
       launch=$(cat "$LAUNCH_LOG")
       assert_contains "$launch" " --no-title " "an ordinary omp $scope $kind launch must disable title generation"
-      assert_equals false "$(jq -r .skillful "$HOME_DIR/state/$id.omp-fallback.yml")" \
-        "an ordinary omp $scope $kind launch must disable background skill compression"
+      assert_worker_helper_policy "an ordinary omp $scope $kind launch" "$overlay" "$smol" "$disabled"
       assert_not_contains "$launch" "--no-extensions" "an ordinary omp $scope $kind launch must keep its extension"
-      out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
+      assert_not_contains "$launch" "--no-skills" "an ordinary omp $scope $kind launch must keep skill discovery"
+      out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" ${model_args[@]+"${model_args[@]}"})
       expect_code 0 $? "omp $scope $kind relaunch should succeed: $out"
       assert_contains "$(cat "$LAUNCH_LOG")" " --no-title " "an omp $scope $kind relaunch must disable title generation"
-      assert_equals false "$(jq -r .skillful "$HOME_DIR/state/$id.omp-fallback.yml")" \
-        "an omp $scope $kind relaunch must disable background skill compression"
+      assert_worker_helper_policy "an omp $scope $kind relaunch" "$overlay" "$smol" "$disabled"
     done
   done
-  pass "every canonical omp ship and scout launch and relaunch disables titles and background skill compression"
+  pass "every canonical omp ship and scout launch and relaunch disables titles and sends skill compression to the worker's own model with OpenRouter disabled"
 }
 
 test_worker_replace_mode_environment() {

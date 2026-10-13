@@ -1053,19 +1053,25 @@ The task-owned driver remains outside the commit; `bash bin/fm-test-run.sh tests
 ### Ordinary worker prompt helpers
 
 Verified 2026-10-13 on macOS arm64 with omp 18.9.2, fresh isolated homes and skill-description caches, a previously uncached fixture skill, and credentialed loopback primary and OpenRouter helper providers.
-Both sessions disabled titles, kept ordinary skill discovery and extensions available, pinned the primary model and thinking level, and left the fake operator's `skillful=true` setting unchanged.
-The available `@smol` model remained the fake OpenRouter model in both sessions, so the result was not caused by removing helper credentials or priming a cache.
+The fake operator settings kept `skillful=true`, `disabledProviders: ["anthropic"]`, and `smol` and `tiny` roles pointing at the credentialed fake OpenRouter model.
+Every session disabled titles, kept extensions and automatic skill listing available, and pinned the thinking level.
+The task overlay assigned the session-only `smol` role to the worker's own model and set `disabledProviders` to the operator's entries plus `openrouter`.
+This supersedes the earlier `skillful=false` probe, which stopped OpenRouter skill-description requests by also removing automatic skill listing from every ordinary worker.
 
-| Session | Primary-model requests | OpenRouter skill-description requests | Observed assistant provider |
-| --- | ---: | ---: | --- |
-| Ordinary worker without the `skillful=false` task overlay | 1 | 30 | `fixture` |
-| Ordinary worker with `skillful=false` in its task overlay | 1 | 0 | `fixture` |
+| Session | Task `smol` role | Compression on the primary model | Project skill in the primary prompt | OpenRouter requests |
+| --- | --- | ---: | --- | ---: |
+| Launch with no `--model` | `pi/default` | 1 | Yes | 0 |
+| Launch with `--model fixture/main` | `fixture/main` | 1 | Yes | 0 |
+| `smol` role names an unavailable model, OpenRouter disabled | `fixture/missing` | 0 | Yes | 0 |
+| Same unavailable role, task `disabledProviders` omitted | `fixture/missing` | 0 | Yes | 1 |
 
-The baseline requests contained omp's `Compress into one routing hint` prompt; title suppression alone did not prevent them.
-The worker-only setting suppresses automatic skill listing and background description compression, not explicit skill reads or the Firstmate-selected skill in the launch brief.
-The executable launch regression checks the emitted setting for both ship and scout launches and relaunches in Firstmate and another project, alongside `--no-title` and the preserved ordinary extension.
+The last row is the counterfactual: omp falls back from an unresolvable `smol` role to its built-in `smol` and `tiny` choices, and the credentialed OpenRouter model took that fallback until `openrouter` was disabled for the task.
+Every session completed on the primary fixture model, and the operator's `skillful`, `disabledProviders` and `modelRoles` settings read back unchanged.
+The executable launch regression checks the emitted role and disabled-provider policy for ship and scout launches and relaunches in Firstmate and another project, an explicit and an implicit model, the operator's disabled providers kept, and no `skillful=false` outside the no-helper overlay.
+An ordinary worker is not zero-spend: its skill-description compression now bills the selected main provider instead of OpenRouter, and the session-only `smol` assignment also reaches any other explicit `@smol` consumer in that session.
+`--omp-no-helpers` remains the opt-in route with no secondary-model request: it keeps `skillful=false` and sets neither role nor disabled providers.
 All endpoints were local fakes, so these smokes spent USD 0.00.
-The endpoint and private scratch homes were stopped and removed after the proof.
+The endpoint and private scratch homes were stopped and removed after the proof; the raw request metadata is retained in the run's evidence directory.
 This probe covers skill-description cache misses and the worker setting, not every possible explicit helper command, persistent secondmates or live fleet activation.
 
 ## Codex hook trust

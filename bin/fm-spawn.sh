@@ -291,15 +291,26 @@
 #   changes. Every other project gets find.enabled=off and a failing judge
 #   credential, so native judgments reach neither TypeSafe nor OpenRouter.
 #   No key is stored in config, argv or worker env; global settings stay intact.
-#   Every canonical omp ship/scout launches with --no-title and task-overlay
-#   skillful=false, so titles and background skill-description compression
-#   never reach a credentialed OpenRouter model. Automatic skill listing in
-#   the system prompt is disabled; explicit skill reads and the Firstmate-
-#   selected skill in the launch brief remain available.
+#   Every canonical omp ship/scout launches with --no-title, so titles never
+#   reach a credentialed OpenRouter model. An ordinary (not no-helper) worker
+#   also keeps automatic skill listing, but its task overlay assigns the
+#   session-only smol role to the worker's own model (the launch model, or
+#   pi/default when it has none) and adds openrouter to disabledProviders,
+#   keeping the operator's own entries. omp compresses each skill description
+#   through the smol role, and falls back to built-in smol and tiny choices
+#   when that role cannot be resolved among available models; the disabled
+#   provider removes OpenRouter from that fallback too. Skill-description
+#   compression therefore bills the worker's main provider, not OpenRouter, so
+#   an ordinary worker is not zero-spend. The smol role assignment also reaches
+#   any other explicit @smol consumer in that session, and an explicitly
+#   selected OpenRouter model is refused by omp rather than downgraded. A launch
+#   under an omp profile cannot read its agent directory, so its list is only
+#   openrouter. The operator's global settings are never written.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
 #   routes. It layers .omp/fm-no-helpers-overlay.yml, defaults an unset effort
 #   to high (ultra is refused for omp before launch), disables
-#   extension/skill/rule discovery and speech (including the
+#   extension/skill/rule discovery, automatic skill listing (skillful=false,
+#   unlike an ordinary worker) and speech (including the
 #   enhanced-speech @tiny route), exposes only deterministic core tools,
 #   withholds native judge credentials and guard judgments, and
 #   empties main-model fallbacks. Deterministic guard path/edit checks remain.
@@ -2540,6 +2551,20 @@ print role.to_s
     ;;
   esac
   return 0
+}
+
+# The omp --config overlay replaces an array setting, so the worker's
+# disabledProviders list is the operator's own entries plus openrouter. An
+# unknown or unreadable agent directory contributes no entries.
+omp_worker_disabled_providers() { # <agent-dir>
+  local agent_dir=${1:-} listed
+  listed=$(ruby -ryaml -rjson -e '
+config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
+listed = config.is_a?(Hash) ? config["disabledProviders"] : nil
+listed = [] unless listed.is_a?(Array)
+puts JSON.generate((listed.select { |entry| entry.is_a?(String) } + ["openrouter"]).uniq)
+' "$agent_dir/config.yml" 2>/dev/null) || listed=
+  printf '%s\n' "${listed:-[\"openrouter\"]}"
 }
 
 # agy pre-launch validation for non-index-entry literals. `agy models`
@@ -5661,10 +5686,17 @@ EOF
     [ "$OMP_NO_HELPERS" = 0 ] || native_fallback='[]'
     native_find=off
     [ "$guard_project" != firstmate ] || [ "$OMP_NO_HELPERS" = 1 ] || native_find=on
-    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" --arg find "$native_find" '
+    native_helpers='{}'
+    if [ "$OMP_NO_HELPERS" = 0 ]; then
+      native_smol=$MODEL
+      case "$native_smol" in '' | default) native_smol=pi/default ;; esac
+      native_helpers=$(jq -cn --arg smol "$native_smol" --argjson disabled "$(omp_worker_disabled_providers "$OMP_AGENT_DIR")" \
+        '{modelRoles: {smol: $smol}, disabledProviders: $disabled}') || exit 1
+    fi
+    jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" --arg find "$native_find" --argjson helpers "$native_helpers" '
       def effort_key($m; $e): if $e == "" then $m else $m + ":" + $e end;
       ([$fallback[] | effort_key(.model; .effort)]) as $chain |
-      {skillful: false, find: {enabled: $find}, retry: {modelFallback: ($model | contains("/")), fallbackChains:
+      $helpers + {find: {enabled: $find}, retry: {modelFallback: ($model | contains("/")), fallbackChains:
         (reduce ([{model:$model, effort:$effort}] + $fallback)[] as $p
           ({default: []}; if ($p.model | contains("/")) then
             .[$p.model] = [] | .[effort_key($p.model; $p.effort)] = [] else . end)
