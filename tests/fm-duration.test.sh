@@ -238,30 +238,33 @@ with sqlite3.connect(database) as db:
     db.executemany('INSERT INTO step_results VALUES(?,?,?,?,?,?)', [(f's{n}', f'r{n}', 'review', n * 10000, 0, 1) for n in range(1, 6)] + [('s0', 'r1', 'test', 10000, 0, None)])
 cli('import-nm', database, 'r1')
 cli('import-nm', database, 'r1')
-imports = [r for r in rows() if r.get('key') == 'no-mistakes.review']
+imports = [r for r in rows() if r.get('key') == 'no-mistakes-step.review']
 assert len(imports) == 1 and imports[0]['duration_ms'] == 10000 and imports[0]['load_start'] is None
-assert cli('limit', 'no-mistakes.review', '--fallback', 30).stdout.strip() == '30'
+assert not any(r.get('key') == 'no-mistakes.review' for r in rows())
 for n in range(2, 6):
     cli('import-nm', database, f'r{n}')
-assert cli('limit', 'no-mistakes.review', '--fallback', 30).stdout.strip() == '150'
+assert len([r for r in rows() if r.get('key') == 'no-mistakes-step.review']) == 5
+# Imported step samples are record-only: a wrapped drive call under its own key never inherits them.
+drive = cli('limit', 'no-mistakes.review', '--fallback', 30)
+assert drive.stdout.strip() == '30' and '0 of 5 samples' in drive.stderr, drive
+cli('run', 'no-mistakes.review', '--', 'bash', '-c', 'sleep 2')
+assert rows()[-1]['key'] == 'no-mistakes.review' and rows()[-1]['exit'] == 0 and not any(r.get('event') for r in rows() if r.get('key') == 'no-mistakes.review')
 
 # Retention: once a host/key exceeds the compaction threshold, only its newest
-# samples survive; timeout, read-wait and filed rows are always kept.
+# samples survive; timeout and filed rows are always kept.
 compact_ledger = tmp / 'compact.jsonl'
 write_rows([sample('busy', n) for n in range(1, 201)] + [sample('quiet', n) for n in range(1, 51)]
-           + [dict(host=platform.node(), key='busy', event=event, duration_ms=1) for event in ('timeout', 'read-wait', 'filed')], compact_ledger)
+           + [dict(host=platform.node(), key='busy', event=event, duration_ms=1) for event in ('timeout', 'filed')], compact_ledger)
 subprocess.run([sys.executable, str(helper), 'record', 'busy', '201', '0'], env=dict(env, FM_DURATION_FILE=str(compact_ledger)), cwd=workrepo, check=True, capture_output=True)
 kept = [json.loads(line) for line in compact_ledger.read_text().splitlines()]
 assert [r['duration_ms'] for r in kept if r['key'] == 'busy' and 'exit' in r] == list(range(102, 202))
 assert len([r for r in kept if r['key'] == 'quiet']) == 50
-assert sorted(r['event'] for r in kept if 'event' in r) == ['filed', 'read-wait', 'timeout']
+assert sorted(r['event'] for r in kept if 'event' in r) == ['filed', 'timeout']
 
-# A self-imposed read wait ending is recorded on its own and never files work.
-for event_id in ('a', 'b', 'c', 'c'):
-    cli('read-wait', 'waited', 600000, '--event-id', event_id)
-assert len([r for r in rows() if r.get('event') == 'read-wait' and r['key'] == 'waited']) == 3
+# The helper has no read-wait record: only a real limit is a timeout, and one alone files nothing.
+cli('read-wait', 'waited', 600000, expected=2)
 cli('timeout', 'waited', 600000, '--event-id', 'real')
-assert not any(r.get('event') == 'filed' and r['key'] == 'waited' for r in rows())
+assert [r['event'] for r in rows() if r['key'] == 'waited' and 'event' in r] == ['timeout']
 
 # Without an owning home the code root's table is checkout-local; say so once.
 checkout = tmp / 'checkout'
@@ -341,8 +344,8 @@ if shutil.which('tasks-axi'):
     with sqlite3.connect(database) as db:
         db.executemany('INSERT INTO step_results VALUES(?,?,?,?,?,?)', [('retry1','retry-run','retry',10000,124,1), ('retry2','retry-run','retry',20000,137,1)])
     cli('import-nm', database, 'retry-run')
-    assert len([r for r in rows() if r.get('key') == 'no-mistakes.retry' and 'exit' in r]) == 2
-    assert not any(r.get('key') == 'no-mistakes.retry' and 'event' in r for r in rows()), 'an imported exit code was guessed to be a timeout'
+    assert len([r for r in rows() if r.get('key') == 'no-mistakes-step.retry' and 'exit' in r]) == 2
+    assert not any(r.get('key') == 'no-mistakes-step.retry' and 'event' in r for r in rows()), 'an imported exit code was guessed to be a timeout'
     cli('timeout', 'retry.key', 10000, '--event-id', 'retry1')
     cli('timeout', 'retry.key', 20000, '--event-id', 'retry2', expected=1)
     assert len([r for r in rows() if r.get('key') == 'retry.key' and r.get('event') == 'timeout']) == 2

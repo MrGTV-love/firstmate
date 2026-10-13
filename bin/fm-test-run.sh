@@ -546,6 +546,7 @@ tests/fm-cd-pretool-check.test.sh
 tests/fm-composer-ghost.test.sh
 tests/fm-composer-lib.test.sh
 tests/fm-crew-state.test.sh
+tests/fm-duration.test.sh
 tests/fm-ensure-agents-md.test.sh
 tests/fm-grok-harness.test.sh
 tests/fm-herdr-lab.test.sh
@@ -578,6 +579,7 @@ tests/fm-cd-pretool-check.test.sh 16801
 tests/fm-composer-ghost.test.sh 2292
 tests/fm-composer-lib.test.sh 9521
 tests/fm-crew-state.test.sh 82058
+tests/fm-duration.test.sh 7990
 tests/fm-ensure-agents-md.test.sh 895
 tests/fm-grok-harness.test.sh 7666
 tests/fm-herdr-lab.test.sh 18325
@@ -641,6 +643,7 @@ tests/fm-crew-state.test.sh
 tests/fm-arm-pretool-check.test.sh
 tests/fm-herdr-lab.test.sh
 tests/fm-brief.test.sh
+tests/fm-duration.test.sh
 tests/fm-grok-harness.test.sh
 tests/fm-send-strict.test.sh
 tests/fm-spawn-batch.test.sh
@@ -804,7 +807,6 @@ tests/fm-dispatch-capacity.test.sh 3724
 tests/fm-dispatch-resolve.test.sh 34508
 tests/fm-documentation-audiences.test.sh 3204
 tests/fm-dod-lib.test.sh 4000
-tests/fm-duration.test.sh 7990
 tests/fm-extension-binding.test.sh 12953
 tests/fm-fleet-ledger.test.sh 20284
 tests/fm-fleet-snapshot-contribution-cleanup.test.sh 1299

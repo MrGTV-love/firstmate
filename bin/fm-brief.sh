@@ -171,16 +171,16 @@ IFS= read -r -d '' CREWMATE_PAUSE_INSTRUCTIONS <<EOF || true
    Follow the resolution rule below when the wait clears, then resume the task.
    Use \`blocked:\` only for a concrete prerequisite firstmate must supply, never because a command or read wait exceeded your own time budget.
    Run long lint and test commands in the background through \`python3 $SCRIPT_DIR/fm-duration.py run <stable-command-key> -- <command...>\`, preserving stdout and stderr in task-local logs.
-   Use stable keys: \`lint.full.whole\` for canonical lint, \`test.<script-path>\` for an individual suite, and \`no-mistakes.<step>\` for a pipeline step; do not combine unrelated commands or scopes into one key.
+   Use stable keys: \`lint.full.whole\` for canonical lint, \`test.<script-path>\` for an individual suite, and \`no-mistakes.<step>\` for a wrapped pipeline drive call (the helper records imported per-step durations apart from it, under its own \`no-mistakes-step.<step>\` namespace, and they never set a limit); do not combine unrelated commands or scopes into one key.
    The helper scopes every key to the repository you run it in, so keep the short keys and never add a repository name yourself.
    The helper owns measured limits and explicit cold-start fallbacks; consult its \`--help\` rather than inventing a ceiling.
    Only that helper may append the owning home's duration table and file repeated-timeout work through its backlog wrapper outside your task directory; do not hand-write those records.
    Judge continued work by output growth and cumulative process-tree CPU time, not by how long your read waits.
    A self-imposed read wait ending is never a failure or stop reason: retain the running job and reattach until its actual result arrives.
    An outer ceiling uses measured p99 x 3 once the helper holds five samples for that key on this host, and never drops below an explicit bound; before that, report the missing calibration and collect it under the documented fallback instead of guessing.
-   A command run under that helper records its own timeout automatically, so never record it again by hand; use \`python3 $SCRIPT_DIR/fm-duration.py timeout <stable-command-key> <elapsed-ms> --event-id <unique-occurrence-id>\` only for a real limit that stopped a command outside the helper; when only your own read wait expired while the command continues, record \`python3 $SCRIPT_DIR/fm-duration.py read-wait <stable-command-key> <elapsed-ms> --event-id <unique-occurrence-id>\` instead.
+   A command run under that helper records its own timeout automatically, so never record it again by hand; use \`python3 $SCRIPT_DIR/fm-duration.py timeout <stable-command-key> <elapsed-ms> --event-id <unique-occurrence-id>\` only for a real limit that stopped a command outside the helper; a read wait of your own that expired while the command continues is not a timeout, so record nothing for it.
    Reuse the occurrence id when retrying a recording and never change the running command's result to a failure.
-   The second timeout for that key automatically files owned backlog work with its measured lower bounds, and a recurrence after that work closes files new work; read-wait events never file work. Report the concrete repair obligation, never a final \`blocked: timeout\`.
+   The second timeout for that key automatically files owned backlog work with its measured lower bounds, and a recurrence after that work closes files new work; an expired read wait of your own never files work. Report the concrete repair obligation, never a final \`blocked: timeout\`.
 EOF
 
 resolve_directory_input() {

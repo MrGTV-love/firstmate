@@ -7,7 +7,6 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py run KEY -- COMMAND [ARGS...]
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
-       fm-duration.py read-wait KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
        fm-duration.py check-literals [--base REF | --report]
 
@@ -29,7 +28,9 @@ ceiling; rows without a repository are not used for limits. Keys stay short.
 Rows carry host, repository, command key, wall milliseconds, exit, timestamp, the 1-minute
 load at start and at end (data only, never a selection rule) and CPU count;
 optional sample ids deduplicate imported no-mistakes steps, whose historical
-load is unknown. Only successful completed calibration-eligible samples enter
+load is unknown; import-nm records them under no-mistakes-step.<step>, apart from
+the no-mistakes.<step> key of a wrapped drive call, and they are record-only: no
+run or limit for another key ever reads them. Only successful completed calibration-eligible samples enter
 nearest-rank percentiles. Cache hits, partial lint selections and memory-fallback
 successes remain recorded with calibration=false and cannot shrink a
 cold-analysis deadline. --uncalibrated records other successful work that is not
@@ -45,7 +46,7 @@ while gathering calibration). A shell caller whose fallback is 0 had no deadline
 before this table existed, so fm_duration_limit keeps it record-only and never
 applies a measured kill. Retention policy: compaction keeps the newest
 KEEP_SAMPLES samples per host, repository and key once any of them exceeds
-COMPACT_AT sample rows; timeout, read-wait and filed rows are always kept.
+COMPACT_AT sample rows; timeout and filed rows are always kept.
 
 The default margin is 3; run uses p99 x 3 for its outer ceiling. Polling cadence
 is observation, not a failure deadline. Output growth and cumulative process-tree
@@ -71,8 +72,8 @@ host/key files a deterministic ship item through the owning home's
 fm-tasks-axi.sh (FM_HOME set to FM_DURATION_HOME when present) with the observed
 lower bounds; later events update the ledger without duplicating an open item.
 When that item is done or gone and a timeout recurs, a new item naming the old
-one is filed. A read-wait event (a self-imposed wait that ended while its command
-continued) is recorded separately and never counts toward filing. Filing failure
+one is filed. A self-imposed read wait that ended while its command continued is
+not a timeout and is never recorded as one. Filing failure
 remains retryable and is reported, never silently marked filed. Manual-backlog
 homes use compatible tasks-axi for this automated addition as well.
 
@@ -118,7 +119,7 @@ HOST = platform.node()
 MIN_SAMPLES = 5  # sample-count policy: eligible samples before a measured limit applies
 KEEP_SAMPLES = 100  # sample-count policy: newest samples kept per host and key
 COMPACT_AT = 200  # sample-count policy: host/key sample rows that trigger compaction
-EVENTS = ('timeout', 'read-wait', 'filed')
+EVENTS = ('timeout', 'filed')
 LOCAL_NOTED = []
 
 
@@ -317,19 +318,19 @@ def task_closed(cmd, env, task):
     raise RuntimeError(f'timeout work {task} could not be inspected: ' + shown.stderr.strip() + shown.stdout.strip())
 
 
-def note_event(key, milliseconds, event_id, event):
+def note_timeout(key, milliseconds, event_id):
     with ledger() as (handle, rows):
         if handle is None:
             return None
-        if not event_id or not any(mine(r, key) and r.get('event') == event
+        if not event_id or not any(mine(r, key) and r.get('event') == 'timeout'
                                    and r.get('event_id') == event_id for r in rows):
-            append(handle, rows, dict(host=HOST, repo=repo(), key=key, event=event, duration_ms=milliseconds,
+            append(handle, rows, dict(host=HOST, repo=repo(), key=key, event='timeout', duration_ms=milliseconds,
                                       event_id=event_id, recorded_at=now_iso()))
         return [r for r in rows if mine(r, key) and r.get('event') in EVENTS]
 
 
 def own_timeout(key, milliseconds, event_id=None):
-    history = note_event(key, milliseconds, event_id, 'timeout')
+    history = note_timeout(key, milliseconds, event_id)
     if history is None:
         return
     timeouts = [i for i, r in enumerate(history) if r['event'] == 'timeout']
@@ -366,7 +367,7 @@ def import_nm(database, run_id):
             sample_id = 'nm:' + str(Path(database).absolute()) + ':' + str(identity)
             if sample_id not in known:
                 # Imported timings have no historical load evidence.
-                append(handle, rows, dict(host=HOST, repo=repo(), key='no-mistakes.' + name, duration_ms=duration,
+                append(handle, rows, dict(host=HOST, repo=repo(), key='no-mistakes-step.' + name, duration_ms=duration,
                                           exit=code, sample_id=sample_id, load_start=None, load_end=None,
                                           cpus=None, recorded_at=now_iso()))
 
@@ -692,8 +693,6 @@ def main():
     nm.add_argument('database'); nm.add_argument('run_id')
     timeout = commands.add_parser('timeout')
     timeout.add_argument('key'); timeout.add_argument('milliseconds', type=nonnegative); timeout.add_argument('--event-id')
-    wait = commands.add_parser('read-wait')
-    wait.add_argument('key'); wait.add_argument('milliseconds', type=nonnegative); wait.add_argument('--event-id')
     commands.add_parser('path')
     check = commands.add_parser('check-literals').add_mutually_exclusive_group()
     check.add_argument('--base'); check.add_argument('--report', action='store_true')
@@ -708,8 +707,6 @@ def main():
         print(limit(args.key, args.percentile, args.margin, args.fallback))
     elif args.action == 'timeout':
         own_timeout(args.key, args.milliseconds, args.event_id)
-    elif args.action == 'read-wait':
-        note_event(args.key, args.milliseconds, args.event_id, 'read-wait')
     elif args.action == 'path':
         path = ledger_path()
         if path is not None:
