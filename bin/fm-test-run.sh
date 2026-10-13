@@ -2751,7 +2751,7 @@ record_script_result() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" >>"$RECORDS"
   if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1; then
-    if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ] && [ "$rc" -eq 124 ]; then
+    if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
       timed_out=1
     fi
     fm_duration_record "test.$script" "$duration" "$rc" '' 1 "$load_start" "$timed_out"
@@ -2806,9 +2806,14 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   fi
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
     # The bound runs inside the pass holder so the pass wait stays outside it.
+    # A script's own exit 124 is not a timeout: <out>.expired marks only a 124
+    # after the bound's full span, which record_script_result reports.
     # shellcheck disable=SC2016
-    cmd=(bash -c '. "$1" || exit 125; shift; fm_run_timed "$@"' _ \
-      "$ROOT/bin/fm-timeout-lib.sh" "$script_seconds" "${cmd[@]}")
+    cmd=(bash -c '. "$1" || exit 125; expired=$2; shift 2
+      ms() { perl -MTime::HiRes=time -e "printf q(%.0f), time * 1000"; }
+      started=$(ms); fm_run_timed "$@"; rc=$?
+      [ "$rc" -ne 124 ] || [ $(($(ms) - started)) -lt $(($1 * 1000)) ] || : >"$expired"
+      exit "$rc"' _ "$ROOT/bin/fm-timeout-lib.sh" "$out.expired" "$script_seconds" "${cmd[@]}")
   fi
   if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \

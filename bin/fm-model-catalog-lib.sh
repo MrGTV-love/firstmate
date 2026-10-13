@@ -82,7 +82,8 @@ fm_model_catalog() {  # <harness> <scratch-dir>
   started=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000')
   fm_model_catalog_read "$@" || result=$?
   finished=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000')
-  if [ "$bound" -gt 0 ] && [ "$result" -eq 124 ]; then
+  # A harness's own 124 is not a timeout: only an expired bound is one.
+  if [ "$bound" -gt 0 ] && [ "$result" -eq 124 ] && [ $((finished - started)) -ge $((bound * 1000)) ]; then
     timed_out=1
   fi
   fm_duration_record "model-catalog.$h" "$((finished - started))" "$result" '' 1 "$load_start" "$timed_out"

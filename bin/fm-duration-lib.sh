@@ -84,7 +84,8 @@ fm_duration_timed() {
     fm_run_timed "$bound" "$@" || result=$?
   fi
   finished=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000') || return $?
-  if [ "$bound" -gt 0 ] && [ "$result" -eq 124 ]; then
+  # A command's own 124 is not a timeout: only an expired bound is one.
+  if [ "$bound" -gt 0 ] && [ "$result" -eq 124 ] && [ $((finished - started)) -ge $((bound * 1000)) ]; then
     timed_out=1
   fi
   fm_duration_record "$key" "$((finished - started))" "$result" '' 1 "$load_start" "$timed_out"

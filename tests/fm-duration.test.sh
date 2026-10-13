@@ -189,6 +189,28 @@ zero = subprocess.run(['bash', '-c', '. "$1/bin/fm-duration-lib.sh"; fm_duration
 assert zero.returncode == 0 and zero.stdout == '0\nfinished\n', zero
 assert rows()[-1]['key'] == 'zero.key' and rows()[-1]['exit'] == 0 and not any(r.get('event') for r in rows() if r.get('key') == 'zero.key')
 
+# A command's own exit 124 well inside its bound is a failed sample, never a
+# timeout, in each shell caller; only a bound that actually expired is one.
+self124 = subprocess.run(['bash', '-c', '. "$1/bin/fm-duration-lib.sh"; fm_duration_timed self.124 30 bash -c "exit 124"', '_', str(root)],
+                         env=env, cwd=workrepo, capture_output=True, text=True)
+assert self124.returncode == 124, self124
+assert [(r.get('event'), r.get('timed_out')) for r in rows() if r.get('key') == 'self.124'] == [(None, False)]
+runrepo = make_repo('run-x', 'git@github.com:acme/widgets.git')
+(runrepo / 'bin').mkdir()
+(runrepo / 'tests').mkdir()
+for name in ('bin/fm-test-run.sh', 'bin/fm-duration-lib.sh', 'bin/fm-duration.py', 'bin/fm-timeout-lib.sh', 'tests/git-config-helpers.sh'):
+    shutil.copy2(root / name, runrepo / name)
+(runrepo / 'tests/fm-self124.test.sh').write_text('exit 124\n')
+(runrepo / 'tests/fm-hang.test.sh').write_text('sleep 30\n')
+for _ in range(2):
+    run = subprocess.run([str(runrepo / 'bin/fm-test-run.sh'), '--per-script-timeout-secs', '1', 'tests/fm-self124.test.sh', 'tests/fm-hang.test.sh'],
+                         env=env, cwd=runrepo, capture_output=True, text=True)
+    assert run.returncode != 0 and 'FM_TEST_SUMMARY total=2 failed=2' in run.stdout, run
+suite_rows = [(r['key'], r['exit'], r['timed_out']) for r in rows() if r.get('key', '').startswith('test.tests/fm-') and 'event' not in r]
+assert suite_rows == [('test.tests/fm-self124.test.sh', 124, False), ('test.tests/fm-hang.test.sh', 124, True)] * 2, suite_rows
+events = [r['key'] for r in rows() if r.get('event') == 'timeout' and r.get('key', '').startswith('test.tests/fm-')]
+assert events == ['test.tests/fm-hang.test.sh'] * 2, events
+
 # A stop sends TERM and waits for the leader: its own TERM cleanup of a child in
 # a separate process group runs and leaves no survivor. The leader reports
 # readiness only after installing its handler, so no startup race is possible.
