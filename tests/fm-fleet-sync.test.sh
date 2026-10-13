@@ -25,7 +25,8 @@
 # discards stderr, still surfaces it); a live lock is never removed and the sync
 # fails loudly; real Git lock-fd and prepared-ref-transaction owners both block
 # removal, including a transaction running in a linked worktree of the clone,
-# while real idle non-Git cwd holders in the clone or a linked worktree do not; incomplete directory
+# while real idle non-Git cwd holders in the clone or a linked worktree do not; a failed,
+# partial, or empty worktree inventory keeps the lock; incomplete directory
 # evidence and Git helpers still veto removal; a transient lock that self-clears
 # is retried without a force-remove; and any
 # non-packed-refs.lock fetch failure keeps today's behavior with no retry.
@@ -680,6 +681,48 @@ test_linked_worktree_git_owner_blocks_removal() {
   pass "a prepared ref transaction in a linked worktree prevents packed-refs lock removal"
 }
 
+test_unusable_worktree_inventory_blocks_removal() {
+  local kind home clone fakebin out err before
+  # partial: the listing names only the clone, then fails. failed: it fails with
+  # no output. empty: it succeeds but names no worktree. None is a complete owner
+  # inventory, so an otherwise abandoned, unheld lock must stay.
+  for kind in partial failed empty; do
+    home=$(new_home)
+    fakebin="$home/fb-inventory-$kind"; mkdir -p "$fakebin"
+    clone=$(build_packed_prunable "$home" "inventory-$kind")
+    plant_packed_refs_lock "$clone"
+    lsof_no_holder "$fakebin"
+    cat > "$fakebin/git" <<'SH'
+#!/usr/bin/env bash
+real=${REAL_GIT_FOR_TEST:?}
+case " $* " in
+  *" worktree list "*)
+    case "$INVENTORY_TEST_KIND" in
+      partial) printf 'worktree %s\n' "${INVENTORY_TEST_CLONE:?}"; exit 1 ;;
+      failed) exit 1 ;;
+      empty) exit 0 ;;
+    esac
+    ;;
+esac
+exec "$real" "$@"
+SH
+    chmod +x "$fakebin/git"
+    before=$(head_sha "$clone")
+    out="$home/out"; err="$home/err"
+    INVENTORY_TEST_KIND="$kind" INVENTORY_TEST_CLONE="$clone" \
+    FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES=0 \
+    FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS=0 \
+      run_sync_guarded "$home" "$fakebin" "$out" "$err" "inventory-$kind"
+    assert_grep "is not provably stale (worktree inventory failed or listed no existing worktree" "$err" \
+      "$kind inventory: guard did not refuse with the inventory reason"
+    assert_no_grep "removed provably-stale packed-refs lock" "$err" \
+      "$kind inventory: guard removed a lock without a complete owner inventory"
+    assert_present "$clone/.git/packed-refs.lock" "$kind inventory: lock was removed"
+    [ "$(head_sha "$clone")" = "$before" ] || fail "$kind inventory: clone advanced"
+    pass "$kind worktree inventory prevents packed-refs lock removal"
+  done
+}
+
 test_unclassifiable_directory_holders_block_removal() {
   local fields home clone fakebin out err
   for fields in missing-command warning git-helper; do
@@ -864,6 +907,7 @@ test_live_packed_refs_lock_is_never_removed
 test_idle_cwd_in_clone_dir_does_not_block_recovery
 test_real_git_packed_refs_owners_block_removal
 test_linked_worktree_git_owner_blocks_removal
+test_unusable_worktree_inventory_blocks_removal
 test_unclassifiable_directory_holders_block_removal
 test_transient_packed_refs_lock_self_clears
 test_non_signature_fetch_failure_is_not_retried

@@ -171,7 +171,8 @@ packed_refs_lock_path() {
 # successful recovery also prints one "$label: recovered: ..." summary to stdout so
 # a session-start refresh (which discards fleet-sync stderr) still surfaces it.
 fetch_with_packed_refs_lock_guard() {
-  local rc attempt=0 lock lock_desc owner_dir
+  local rc attempt=0 lock lock_desc owner_dir inventory inventory_rc
+  local unproven_reason="may belong to a live process"
   local -a owner_dirs=()
   FETCH_OUTPUT=$(git -C "$PROJ" fetch origin --prune --quiet 2>&1); rc=$?
   [ "$rc" -eq 0 ] && return 0
@@ -199,10 +200,21 @@ fetch_with_packed_refs_lock_guard() {
   # of the clone (the clone itself or a linked pool slot) can own it, and keeps its
   # cwd there even after it closes the lock and before it commits or exits. Every
   # existing worktree is therefore a companion liveness dir; a missing one cannot
-  # be anyone's cwd by path. No listed worktree leaves the lock unproven.
-  while IFS= read -r owner_dir; do
-    if [ -d "$owner_dir" ]; then owner_dirs+=("$owner_dir"); fi
-  done < <(git -C "$PROJ" worktree list --porcelain 2>/dev/null | sed -n 's/^worktree //p')
+  # be anyone's cwd by path. A failed listing may omit a live owner's worktree,
+  # so its output is discarded; no listed worktree leaves the lock unproven.
+  inventory=$(git -C "$PROJ" worktree list --porcelain 2>/dev/null); inventory_rc=$?
+  if [ "$inventory_rc" -eq 0 ]; then
+    while IFS= read -r owner_dir; do
+      case "$owner_dir" in
+        "worktree "*) owner_dir=${owner_dir#worktree } ;;
+        *) continue ;;
+      esac
+      if [ -d "$owner_dir" ]; then owner_dirs+=("$owner_dir"); fi
+    done <<< "$inventory"
+  fi
+  if [ "${#owner_dirs[@]}" -eq 0 ]; then
+    unproven_reason="worktree inventory failed or listed no existing worktree, so live Git owners cannot be ruled out"
+  fi
   lock=$(packed_refs_lock_path) || lock=""
   if [ -n "$lock" ] && [ -e "$lock" ]; then
     if fm_lock_is_provably_stale "$lock" "$FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS" \
@@ -220,7 +232,7 @@ fetch_with_packed_refs_lock_guard() {
       fi
       return "$rc"
     fi
-    echo "$label: fetch blocked by packed-refs lock $lock that persisted across ${FLEET_SYNC_PACKED_REFS_LOCK_RETRIES} retries and is not provably stale (may belong to a live process); leaving it in place" >&2
+    echo "$label: fetch blocked by packed-refs lock $lock that persisted across ${FLEET_SYNC_PACKED_REFS_LOCK_RETRIES} retries and is not provably stale ($unproven_reason); leaving it in place" >&2
     return "$rc"
   fi
   echo "$label: fetch packed-refs lock signature persisted across ${FLEET_SYNC_PACKED_REFS_LOCK_RETRIES} retries even after the lock file disappeared" >&2

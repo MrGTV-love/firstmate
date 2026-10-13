@@ -3255,6 +3255,7 @@ Teardown never removes a lock during the retry window, and after that window it 
 
 `fm-fleet-sync.sh` applies the same shape to an orphaned `.git/packed-refs.lock`: it retries only Git's `Unable to create '...packed-refs.lock': File exists` fetch failure up to `FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRIES` times (nonnegative integer; unset, blank, or invalid uses the default of 3), waiting `FM_FLEET_SYNC_PACKED_REFS_LOCK_RETRY_WAIT_SECS` seconds (nonnegative whole or fractional; invalid falls back to 1 second) before each.
 Only after those retries exhaust does it remove the lock, and only when it passes `bin/fm-lock-lib.sh`'s shared owner proof over every existing worktree of the clone (the lock is shared, so a Git process in a linked worktree can own it) and the `FM_FLEET_SYNC_PACKED_REFS_LOCK_AGE_SECS` threshold (default 30).
+A `git worktree list` that fails or names no existing worktree leaves the lock unproven and in place.
 That proof distinguishes Git transaction owners from idle non-Git directory holders, so long-lived pane shells do not prevent recovery; the library header owns the exact rule and its closed-descriptor safety rationale.
 
 A live lock, a missing `lsof`, any failed check, or any other fetch failure keeps today's behavior.
