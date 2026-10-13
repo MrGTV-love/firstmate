@@ -1,0 +1,45 @@
+# Live lab: secondmate home is a real treehouse pool slot holding an unproven registered copy (round-3 preflight)
+## HEAD aad9a03f
+# secondmate home = real treehouse pool slot of a lab firstmate root; registered copy .claude/worktrees/agent-x holds uncommitted work
+$ fm-teardown.sh sm-domain   # plain
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+REFUSED: pool slot $LABROOT/pool/.treehouse/fmroot-73013f/1/fmroot contains registered copy $LABROOT/pool/.treehouse/fmroot-73013f/1/fmroot/.claude/worktrees/agent-x that is not one of task sm-domain's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $LABROOT/pool/.treehouse/fmroot-73013f/1/fmroot worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+--- after ---
+endpoint window firstmate:fm-sm-domain: ALIVE
+secondmate record: UNCHANGED
+secondmate registry: UNCHANGED
+home lease state: UNCHANGED
+worktree registrations: UNCHANGED
+agent-x work.txt: PRESENT
+secondmate home: PRESENT
+
+$ fm-teardown.sh sm-domain --force --drop-file captain-words.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+REFUSED: pool slot $LABROOT/pool/.treehouse/fmroot-73013f/1/fmroot contains registered copy $LABROOT/pool/.treehouse/fmroot-73013f/1/fmroot/.claude/worktrees/agent-x that is not one of task sm-domain's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $LABROOT/pool/.treehouse/fmroot-73013f/1/fmroot worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+--- after ---
+endpoint window firstmate:fm-sm-domain: ALIVE
+secondmate record: UNCHANGED
+secondmate registry: UNCHANGED
+home lease state: UNCHANGED
+worktree registrations: UNCHANGED
+agent-x work.txt: PRESENT
+secondmate home: PRESENT
+
+## BASE 365b2a0f (failing-before)
+# BASE 365b2a0f: secondmate home = real pool slot; registered copy agent-x holds uncommitted work
+$ base fm-teardown.sh sm-dombase   # plain
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+
+🌳 Worktree returned to pool.
+teardown sm-dombase complete (window firstmate:fm-sm-dombase, worktree $LABROOT/poolbase/.treehouse/fmbase-7387ed/1/fmbase)
+exit=0
+--- after (base) ---
+endpoint window fm-sm-dombase: KILLED
+secondmate record: RETIRED
+agent-x work.txt: PRESENT
+base  main  (repository default)
+1     dirty        ~/tmp/fm-lab-root.ODe91v/poolbase/.treehouse/fmbase-7387ed/1/fmbase  (detached)

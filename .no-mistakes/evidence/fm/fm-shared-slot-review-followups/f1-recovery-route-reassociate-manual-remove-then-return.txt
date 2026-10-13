@@ -1,0 +1,75 @@
+# Live lab continued: documented recovery route after the F1 refusal (real fm-control.sh reassociate, real fm-teardown.sh, real treehouse)
+$ fm-control.sh sm-parked reassociate --worktree $SLOT/.claude/worktrees/sm-parked --note ...
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+reassociated sm-parked worktree=$LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-parked branch=fm/sm-parked-v2 prior=$LAB/pool/.treehouse/proj-200c0c/1/proj slot=claimed
+exit=0
+worktree=$LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-parked
+slot claim:
+task=sm-parked
+home=$LAB
+
+$ fm-teardown.sh sm-parked   # after reassociation; its own copy still holds unlanded work
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+REFUSED: pool slot $LAB/pool/.treehouse/proj-200c0c/1/proj contains registered copy $LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-finished that is not one of task sm-parked's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $LAB/pool/.treehouse/proj-200c0c/1/proj worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+--- after-state checks ---
+parked record: UNCHANGED
+treehouse lease state: UNCHANGED
+"lease_holder": "sm-parked"
+git worktree registrations: UNCHANGED
+nested copy (3 unpushed commits + 5 untracked files): UNCHANGED
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/1/proj  (detached)  (held by sm-parked)
+
+worktree=$LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-parked
+# Follow the printed manual route for the unowned leftover copy
+$ git -C <copy> status --untracked-files=all
+On branch fm/sm-finished-v2
+nothing to commit, working tree clean
+$ git -C <copy> log --oneline HEAD --not --remotes   (empty = nothing unlanded)
+$ git -C $SLOT worktree remove <copy>
+exit=0
+
+$ fm-teardown.sh sm-parked   # leftover gone; own copy still has 3 unpushed commits + 5 untracked files
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+REFUSED: worktree $LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-parked has uncommitted changes.
+uncommitted changes present (untracked-only leftovers)
+untracked paths (up to 10):
+  scratch-1.txt
+  scratch-2.txt
+  scratch-3.txt
+  scratch-4.txt
+  scratch-5.txt
+Commit them (or get the captain's explicit OK to discard, then --force).
+exit=1
+--- after-state checks ---
+parked record: UNCHANGED
+treehouse lease state: UNCHANGED
+"lease_holder": "sm-parked"
+git worktree registrations: UNCHANGED
+nested copy (3 unpushed commits + 5 untracked files): UNCHANGED
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/1/proj  (detached)  (held by sm-parked)
+
+# Land the parked work: commit scratch, merge fm/sm-parked-v2 into main, push
+landed
+$ fm-teardown.sh sm-parked   # all work landed, no unknown copies in the slot
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.3
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown sm-parked complete (window fmses:fm-sm-parked; nested reassociated worktree $LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-parked removed and its pool slot $LAB/pool/.treehouse/proj-200c0c/1/proj returned)
+Backlog: sm-parked just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move sm-parked to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+--- after ---
+home-summary.json
+terminal-outcomes
+.
+..
+proj
+$LAB/projects/proj                      cd97347 [main]
+$LAB/pool/.treehouse/proj-200c0c/1/proj cd97347 (detached HEAD)
+base  main  (repository default)
+1     available    ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/1/proj  (detached)

@@ -1,0 +1,40 @@
+# Live lab: real bin/fm-teardown.sh + real treehouse v2.3.1-fm pool (TREEHOUSE_ROOT in a disposable lab), disposable FM_HOME
+# Setup: slot leased by sm-parked; records sm-finished (landed local-only) and sm-parked both name the slot root;
+# nested copies .claude/worktrees/sm-parked (3 unpushed commits + 5 untracked files) and .claude/worktrees/sm-finished.
+
+$ fm-teardown.sh sm-finished   # finished record, shared pool slot root
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+notice: task sm-finished shares recorded pool slot $LAB/pool/.treehouse/proj-200c0c/1/proj with task sm-parked; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+teardown sm-finished complete (window fmses:fm-sm-finished; shared pool slot $LAB/pool/.treehouse/proj-200c0c/1/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: sm-finished just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move sm-finished to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+
+$ fm-teardown.sh sm-parked   # MISTAKEN plain teardown before reassociation (F1)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+REFUSED: pool slot $LAB/pool/.treehouse/proj-200c0c/1/proj contains registered copy $LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-finished that is not one of task sm-parked's proven copies; its record and lease must stay in place, even with --force.
+REFUSED: pool slot $LAB/pool/.treehouse/proj-200c0c/1/proj contains registered copy $LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-parked that is not one of task sm-parked's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $LAB/pool/.treehouse/proj-200c0c/1/proj worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+--- after-state checks ---
+parked record: UNCHANGED
+treehouse lease state: UNCHANGED
+"lease_holder": "sm-parked"
+git worktree registrations: UNCHANGED
+nested copy (3 unpushed commits + 5 untracked files): UNCHANGED
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/1/proj  (detached)  (held by sm-parked)
+
+$ fm-teardown.sh sm-parked --force --drop-file captain-words.txt   # ADVERSARIAL: captain-authorized force
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+REFUSED: pool slot $LAB/pool/.treehouse/proj-200c0c/1/proj contains registered copy $LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-finished that is not one of task sm-parked's proven copies; its record and lease must stay in place, even with --force.
+REFUSED: pool slot $LAB/pool/.treehouse/proj-200c0c/1/proj contains registered copy $LAB/pool/.treehouse/proj-200c0c/1/proj/.claude/worktrees/sm-parked that is not one of task sm-parked's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $LAB/pool/.treehouse/proj-200c0c/1/proj worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+--- after-state checks ---
+parked record: UNCHANGED
+treehouse lease state: UNCHANGED
+"lease_holder": "sm-parked"
+git worktree registrations: UNCHANGED
+nested copy (3 unpushed commits + 5 untracked files): UNCHANGED
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/1/proj  (detached)  (held by sm-parked)

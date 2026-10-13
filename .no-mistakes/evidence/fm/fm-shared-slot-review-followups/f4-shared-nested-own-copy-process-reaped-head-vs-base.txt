@@ -1,0 +1,29 @@
+# Live lab: F4 - finished record whose copy is its own nested copy in a shared slot; a leftover process runs in that copy
+## HEAD aad9a03f
+# leftover process in finished task sm-fin3 own nested copy:
+cwd: $LAB/pool/.treehouse/proj-200c0c/2/proj/.claude/worktrees/sm-fin3
+$ fm-teardown.sh sm-fin3   # finished record, own nested copy inside a slot that parked sm-park3 also names (F4)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+notice: task sm-fin3 shares recorded pool slot $LAB/pool/.treehouse/proj-200c0c/2/proj with task sm-park3; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+teardown: reaping leaked worktree process(es) for sm-fin3: 27771 27774
+teardown sm-fin3 complete (window fmses:fm-sm-fin3; shared pool slot $LAB/pool/.treehouse/proj-200c0c/2/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: sm-fin3 just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move sm-fin3 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+--- after ---
+leftover process 27771: REAPED
+finished record: retired
+parked record: UNCHANGED
+"lease_holder": "sm-park3"
+nested copy dir: kept in place
+
+## BASE 365b2a0f (same fixture, failing-before)
+# BASE 365b2a0f: same F4 fixture
+leftover: 82971 sleep  cwd=$LAB/pool/.treehouse/proj-200c0c/2/proj/.claude/worktrees/sm-fin3
+$ base fm-teardown.sh sm-fin3
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+notice: task sm-fin3 shares recorded pool slot $LAB/pool/.treehouse/proj-200c0c/2/proj with task sm-park3; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+teardown sm-fin3 complete (window fmses:fm-sm-fin3; shared pool slot $LAB/pool/.treehouse/proj-200c0c/2/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: sm-fin3 just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move sm-fin3 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+leftover process 82971: STILL RUNNING (leak at base)
+(test cleanup: killed 82971)

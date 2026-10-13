@@ -1,0 +1,29 @@
+# Live lab: F1 at BASE 365b2a0f (failing-before). Same shape as f1-shared-slot-mistaken-teardown-refused.txt.
+# Base exits 0, retires the parked record and returns the durably leased slot (lease dropped; slot now unleased 'dirty').
+# BASE 365b2a0f: same F1 shape in fresh slot $LAB/pool/.treehouse/proj-200c0c/4/proj
+nested copy before: 3 unpushed commits, 5 untracked files
+$ base fm-teardown.sh bq-finished
+exit=0
+$ base fm-teardown.sh bq-parked   # MISTAKEN plain teardown before reassociation
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+
+🌳 Worktree returned to pool.
+teardown bq-parked complete (window fmses:fm-bq-parked, worktree $LAB/pool/.treehouse/proj-200c0c/4/proj)
+Backlog: bq-parked just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move bq-parked to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+--- after (base) ---
+parked record: RETIRED
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/1/proj  (detached)  (held by recovered: state file was corrupt or truncated; verify before reuse)
+2     leased       ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/2/proj  (detached)  (held by sm-park3)
+3     dirty        ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/3/proj  (detached)
+4     dirty        ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/4/proj  (detached)
+nested copy: dir present; untracked files now: 5
+$LAB/projects/proj                                                  cd97347 [main]
+$LAB/pool/.treehouse/proj-200c0c/1/proj                             cd97347 (detached HEAD)
+$LAB/pool/.treehouse/proj-200c0c/2/proj                             cd97347 (detached HEAD)
+$LAB/pool/.treehouse/proj-200c0c/2/proj/.claude/worktrees/sm-fin3   cd97347 [fm/sm-fin3]
+$LAB/pool/.treehouse/proj-200c0c/3/proj                             cd97347 (detached HEAD)
+$LAB/pool/.treehouse/proj-200c0c/3/proj/.claude/worktrees/bp-parked cd97347 [fm/bp-parked-v2]
+$LAB/pool/.treehouse/proj-200c0c/4/proj                             cd97347 (detached HEAD)
+$LAB/pool/.treehouse/proj-200c0c/4/proj/.claude/worktrees/bq-parked 437ad99 [fm/bq-parked-v2]

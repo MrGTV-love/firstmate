@@ -1,0 +1,14 @@
+# Live lab: F5 documented manual release form against real treehouse v2.3.1-fm
+$ treehouse lease 1 --lease-holder remaining-task
+
+🌳 Leased worktree 1 at ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/1/proj. Run 'treehouse return ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/1/proj' to release it.
+$LAB/pool/.treehouse/proj-200c0c/1/proj
+$ (cd $P && treehouse return $SLOT --if-lease-holder remaining-task </dev/null)   # documented F5 form, dirty slot
+
+Worktree has uncommitted changes. Clean and return? [Y/n] 🌳 worktree not returned: it has uncommitted changes and the confirmation could not be answered (stdin reached EOF); prune will not reclaim this slot. Use treehouse return --force '$LAB/pool/.treehouse/proj-200c0c/1/proj' to clean and return it
+exit=3
+--- after ---
+$LAB/pool/.treehouse/proj-200c0c/1/proj/dirt.txt
+uncommitted operator bytes
+base  main  (repository default)
+1     leased       ~/tmp/fm-lab.HySf7Q/pool/.treehouse/proj-200c0c/1/proj  (detached)  (held by remaining-task)

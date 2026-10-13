@@ -1,0 +1,6 @@
+# Live lab: F2 - reassociate refuses a non-GitHub recorded PR even when its head is contained
+$ fm-control.sh sm-gl reassociate --worktree gl-new --note moved   # recorded PR is a GitLab MR whose head IS contained
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: recorded PR https://gitlab.example.com/group/repo/-/merge_requests/7 is not a GitHub PR; its PR head cannot be verified by reassociate; nothing was changed
+exit=1
+record: UNCHANGED

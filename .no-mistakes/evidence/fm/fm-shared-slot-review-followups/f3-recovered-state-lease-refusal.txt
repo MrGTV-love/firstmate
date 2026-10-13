@@ -1,0 +1,18 @@
+# Live lab: F3 recovered-state lease (real treehouse recovered a truncated lab state file)
+$ fm-teardown.sh sm-fin2   # finished record on a shared slot whose Treehouse lease is recovered-state (F3)
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+REFUSED: shared pool slot $LAB/pool/.treehouse/proj-200c0c/1/proj is not a Firstmate home and carries Treehouse's recovered-state lease in $LAB/pool/.treehouse/proj-200c0c/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed.
+Treehouse 2.3.1-fm has no supported non-forcing route to replace this recovered-state lease: treehouse lease refuses an already-leased slot. Do not return it to change the lease while copies remain.
+Inspect with (cd '$LAB/projects/proj' && treehouse status); report the slot $LAB/pool/.treehouse/proj-200c0c/1/proj, state file $LAB/pool/.treehouse/proj-200c0c/treehouse-state.json, recovered lease holder, and treehouse --version to firstmate for operator recovery. Keep all task records and copies in place.
+exit=1
+--- after ---
+finished record: KEPT
+slot claim: KEPT
+treehouse state: UNCHANGED
+
+# Confirm the removed advice really is unusable on this Treehouse:
+$ treehouse lease 1 --lease-holder sm-park2
+
+worktree 1 is already leased (holder: "recovered: state file was corrupt or truncated; verify before reuse")
+exit=1
+v2.3.1-fm.e58947de
