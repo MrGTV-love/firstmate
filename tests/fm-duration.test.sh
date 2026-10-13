@@ -388,14 +388,17 @@ def recovery(key, leader_tail, samples):
     failed = subprocess.run([sys.executable, str(helper), 'run', key, '--', 'bash', '-c', swap, '_'], env=dict(env, FM_DURATION_FILE=str(table), L=str(table)), cwd=workrepo, capture_output=True, text=True)
     assert 'recording_error' in failed.stderr, failed
     line = next(l for l in failed.stderr.splitlines() if l.startswith('help: '))
-    command = shlex.split(json.loads(line[len('help: '):]).split('; command result preserved')[0])
+    printed = json.loads(line[len('help: '):]).split('; command result preserved')[0]
     table.rmdir()
     (tmp / (key + '.jsonl.bak')).rename(table)
     replay_env = dict(env, FM_DURATION_FILE=str(table))
-    for _ in range(2):
-        subprocess.run([sys.executable, str(helper), *command[2:]], env=replay_env, cwd=workrepo, check=True, capture_output=True)
+    # Replay verbatim from the work repo and from the firstmate checkout; both
+    # must record under the repository where the command ran.
+    for cwd in (workrepo, root):
+        subprocess.run(['bash', '-c', printed], env=replay_env, cwd=cwd, check=True, capture_output=True)
     recorded = [json.loads(l) for l in table.read_text().splitlines()]
-    return failed, command, [r for r in recorded if r['key'] == key and r.get('sample_id')], [r for r in recorded if r.get('event') == 'timeout']
+    assert {r.get('repo') for r in recorded if r['key'] == key} == {REPO}, recorded
+    return failed, shlex.split(printed), [r for r in recorded if r['key'] == key and r.get('sample_id')], [r for r in recorded if r.get('event') == 'timeout']
 
 failed, command, sample_rows, timeouts = recovery('recover.ceiling', 'while :; do sleep 1; done', 5)
 assert failed.returncode == 124 and '--timed-out' in command, command

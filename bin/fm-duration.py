@@ -534,7 +534,8 @@ def run(key, command, calibration_file):
             record(key, duration_ms, code, occurrence_id, calibration, load_start, timed_out)
         except (OSError, ValueError, RuntimeError) as error:
             scalar('recording_error', str(error), sys.stderr)
-            scalar('help', f'python3 bin/fm-duration.py record {shlex.quote(key)} {duration_ms} {code} --sample-id {occurrence_id}{"" if calibration else " --uncalibrated"}{"" if load_start is None else f" --load-start {load_start}"}{" --timed-out" if timed_out else ""}; command result preserved', sys.stderr)
+            # Absolute paths: the replay must derive this command's repo() from any directory.
+            scalar('help', f'cd {shlex.quote(os.getcwd())} && python3 {shlex.quote(str(Path(__file__).resolve()))} record {shlex.quote(key)} {duration_ms} {code} --sample-id {occurrence_id}{"" if calibration else " --uncalibrated"}{"" if load_start is None else f" --load-start {load_start}"}{" --timed-out" if timed_out else ""}; command result preserved', sys.stderr)
         return code
     finally:
         streams.close()
