@@ -1050,6 +1050,24 @@ All endpoints were local fakes, so these smokes spent USD 0.00.
 They do not exercise unexpected-stop judgments, which need a model stop that the fixture did not produce.
 The task-owned driver remains outside the commit; `bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh` checks the generated overlay and credential for both directions without omp.
 
+### Ordinary worker prompt helpers
+
+Verified 2026-10-13 on macOS arm64 with omp 18.9.2, fresh isolated homes and skill-description caches, a previously uncached fixture skill, and credentialed loopback primary and OpenRouter helper providers.
+Both sessions disabled titles, kept ordinary skill discovery and extensions available, pinned the primary model and thinking level, and left the fake operator's `skillful=true` setting unchanged.
+The available `@smol` model remained the fake OpenRouter model in both sessions, so the result was not caused by removing helper credentials or priming a cache.
+
+| Session | Primary-model requests | OpenRouter skill-description requests | Observed assistant provider |
+| --- | ---: | ---: | --- |
+| Ordinary worker without the `skillful=false` task overlay | 1 | 30 | `fixture` |
+| Ordinary worker with `skillful=false` in its task overlay | 1 | 0 | `fixture` |
+
+The baseline requests contained omp's `Compress into one routing hint` prompt; title suppression alone did not prevent them.
+The worker-only setting suppresses automatic skill listing and background description compression, not explicit skill reads or the Firstmate-selected skill in the launch brief.
+The executable launch regression checks the emitted setting for both ship and scout launches and relaunches in Firstmate and another project, alongside `--no-title` and the preserved ordinary extension.
+All endpoints were local fakes, so these smokes spent USD 0.00.
+The endpoint and private scratch homes were stopped and removed after the proof.
+This probe covers skill-description cache misses and the worker setting, not every possible explicit helper command, persistent secondmates or live fleet activation.
+
 ## Codex hook trust
 
 Verified 2026-09-16 on codex-cli 0.151.0, macOS arm64, in a fresh linked worktree of this repository.

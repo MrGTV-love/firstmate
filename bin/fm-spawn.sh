@@ -291,8 +291,11 @@
 #   changes. Every other project gets find.enabled=off and a failing judge
 #   credential, so native judgments reach neither TypeSafe nor OpenRouter.
 #   No key is stored in config, argv or worker env; global settings stay intact.
-#   Every canonical omp ship/scout launches with --no-title, so title
-#   generation never reaches a credentialed OpenRouter model.
+#   Every canonical omp ship/scout launches with --no-title and task-overlay
+#   skillful=false, so titles and background skill-description compression
+#   never reach a credentialed OpenRouter model. Automatic skill listing in
+#   the system prompt is disabled; explicit skill reads and the Firstmate-
+#   selected skill in the launch brief remain available.
 #   --omp-no-helpers opts one canonical omp ship/scout into no secondary-model
 #   routes. It layers .omp/fm-no-helpers-overlay.yml, defaults an unset effort
 #   to high (ultra is refused for omp before launch), disables
@@ -5661,7 +5664,7 @@ EOF
     jq -n --arg model "$MODEL" --arg effort "$EFFORT" --argjson fallback "$native_fallback" --arg find "$native_find" '
       def effort_key($m; $e): if $e == "" then $m else $m + ":" + $e end;
       ([$fallback[] | effort_key(.model; .effort)]) as $chain |
-      {find: {enabled: $find}, retry: {modelFallback: ($model | contains("/")), fallbackChains:
+      {skillful: false, find: {enabled: $find}, retry: {modelFallback: ($model | contains("/")), fallbackChains:
         (reduce ([{model:$model, effort:$effort}] + $fallback)[] as $p
           ({default: []}; if ($p.model | contains("/")) then
             .[$p.model] = [] | .[effort_key($p.model; $p.effort)] = [] else . end)

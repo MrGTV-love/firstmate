@@ -363,9 +363,10 @@ test_no_helpers_refuses_ultra_effort() {
   pass "no-helper omp launch refuses ultra effort before publishing or launching"
 }
 
-# Title generation routes to any credentialed OpenRouter model, so every
-# canonical omp ship/scout launch, in any project and on relaunch, turns it off.
-test_omp_workers_disable_title_generation() {
+# Titles and skill-description cache misses can select credentialed OpenRouter
+# helpers. Both must remain disabled for ordinary workers as well as no-helper
+# workers, including relaunches and projects outside Firstmate.
+test_omp_workers_disable_openrouter_prompt_helpers() {
   local scope kind rec id out launch
   for scope in firstmate vernant; do
     for kind in ship scout; do
@@ -381,13 +382,17 @@ test_omp_workers_disable_title_generation() {
       expect_code 0 $? "omp $scope $kind spawn should succeed: $out"
       launch=$(cat "$LAUNCH_LOG")
       assert_contains "$launch" " --no-title " "an ordinary omp $scope $kind launch must disable title generation"
+      assert_equals false "$(jq -r .skillful "$HOME_DIR/state/$id.omp-fallback.yml")" \
+        "an ordinary omp $scope $kind launch must disable background skill compression"
       assert_not_contains "$launch" "--no-extensions" "an ordinary omp $scope $kind launch must keep its extension"
       out=$(run_omp_relaunch "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id")
       expect_code 0 $? "omp $scope $kind relaunch should succeed: $out"
       assert_contains "$(cat "$LAUNCH_LOG")" " --no-title " "an omp $scope $kind relaunch must disable title generation"
+      assert_equals false "$(jq -r .skillful "$HOME_DIR/state/$id.omp-fallback.yml")" \
+        "an omp $scope $kind relaunch must disable background skill compression"
     done
   done
-  pass "every canonical omp ship and scout launch and relaunch disables title generation"
+  pass "every canonical omp ship and scout launch and relaunch disables titles and background skill compression"
 }
 
 test_worker_replace_mode_environment() {
@@ -3858,7 +3863,7 @@ test_spawn_launch_line_and_worker_wiring
 test_no_helpers_rejects_nonworker_launches
 test_no_helpers_launch_contract
 test_no_helpers_refuses_ultra_effort
-test_omp_workers_disable_title_generation
+test_omp_workers_disable_openrouter_prompt_helpers
 test_worker_replace_mode_environment
 test_worker_guard_project_scope
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
