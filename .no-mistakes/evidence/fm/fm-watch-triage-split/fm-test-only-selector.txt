@@ -1,0 +1,24 @@
+== tests/fm-watch-triage-away.test.sh  (cases in file: 19)
+$ FM_TEST_ONLY=test_open_captain_call_bounds_stale_churn bash tests/fm-watch-triage-away.test.sh
+ok - work under an open captain call surfaces once, absorbs pane churn, then re-surfaces when the window elapses
+exit=0 ok-lines=1 elapsed_s=86
+== tests/fm-watch-triage-procevent.test.sh  (cases in file: 9)
+$ FM_TEST_ONLY=test_procevent_captured_result_surfaces_proactively bash tests/fm-watch-triage-procevent.test.sh
+ok - a captured process-event result wakes a healthy watcher proactively, with no manual drain
+exit=0 ok-lines=1 elapsed_s=10
+== tests/fm-watch-triage-stale.test.sh  (cases in file: 33)
+$ FM_TEST_ONLY=test_terminal_stale_surfaced bash tests/fm-watch-triage-stale.test.sh
+ok - a stale pane sitting on a terminal status is surfaced (queue + exit)
+exit=0 ok-lines=1 elapsed_s=10
+== tests/fm-watch-triage-wait.test.sh  (cases in file: 9)
+$ FM_TEST_ONLY=test_nonterminal_stale_paused_absorbed_then_resurfaced bash tests/fm-watch-triage-wait.test.sh
+ok - a declared pause is absorbed on first sight, then re-surfaced as a recheck past the threshold, never wedge-escalated
+exit=0 ok-lines=1 elapsed_s=16
+== tests/fm-watch-triage-wedge.test.sh  (cases in file: 12)
+$ FM_TEST_ONLY=test_gone_endpoint_reports_once_instead_of_escalating_forever bash tests/fm-watch-triage-wedge.test.sh
+ok - a record whose endpoint is dead or missing reports itself once and is never re-escalated
+exit=0 ok-lines=1 elapsed_s=90
+== tests/fm-watch-triage.test.sh  (cases in file: 34)
+$ FM_TEST_ONLY=test_working_note_not_working_surfaced bash tests/fm-watch-triage.test.sh
+ok - a no-verb working: note whose crew is idle with no running pipeline is surfaced
+exit=0 ok-lines=1 elapsed_s=13

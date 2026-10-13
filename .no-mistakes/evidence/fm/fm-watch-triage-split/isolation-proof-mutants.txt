@@ -1,0 +1,15 @@
+===== control: line 2468 = done | LC_ALL=C sort -t"$(printf '	')" -k1,1nr -k2,2 | cut -f2-
+first --list-scheduled watcher member: tests/fm-watch-triage-wait.test.sh
+ok - isolation-proof contract test is family-mapped
+test exit=
+===== ascending: line 2468 = done | LC_ALL=C sort -t"$(printf '	')" -k1,1n -k2,2 | cut -f2-
+first --list-scheduled watcher member: tests/fm-supervision-events.test.sh
+not ok - runner scheduled the watcher family out of longest-hint order: tests/fm-supervision-events.test.sh before tests/fm-watch-triage-wait.test.sh
+test exit=
+===== nosort: line 2468 = done | cut -f2-
+first --list-scheduled watcher member: tests/fm-cursor-primary.test.sh
+not ok - runner scheduled the watcher family out of longest-hint order: tests/fm-cursor-primary.test.sh before tests/fm-watch-triage-wait.test.sh
+test exit=
+control isolation-proof test exit=0
+ascending isolation-proof test exit=1
+nosort isolation-proof test exit=1

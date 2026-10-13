@@ -1,0 +1,58 @@
+$ bin/fm-test-run.sh --list --family watcher-wake-lock | grep watch-triage
+tests/fm-watch-triage-away.test.sh
+tests/fm-watch-triage-procevent.test.sh
+tests/fm-watch-triage-stale.test.sh
+tests/fm-watch-triage-turnend.test.sh
+tests/fm-watch-triage-wait.test.sh
+tests/fm-watch-triage-wedge.test.sh
+tests/fm-watch-triage.test.sh
+
+$ bin/fm-test-run.sh --list-scheduled --family watcher-wake-lock | head -3
+tests/fm-watch-triage-wait.test.sh
+tests/fm-watch-triage-wedge.test.sh
+tests/fm-watch-triage.test.sh
+
+$ bin/fm-test-isolation-proof.sh --list-exclusions | grep watch-triage
+
+$ bin/fm-test-isolation-proof.sh --list | grep -c watch-triage (must be 0)
+0
+
+$ bin/fm-test-run.sh --list-lanes
+portable-parallel-1
+portable-parallel-2
+portable-serial
+portable-serial-1of14
+portable-serial-2of14
+portable-serial-3of14
+portable-serial-4of14
+portable-serial-5of14
+portable-serial-6of14
+portable-serial-7of14
+portable-serial-8of14
+portable-serial-9of14
+portable-serial-10of14
+portable-serial-11of14
+portable-serial-12of14
+portable-serial-13of14
+portable-serial-14of14
+real-herdr-gated
+
+$ bin/fm-test-run.sh --check-coverage
+FM_TEST_COVERAGE ok total=316 parallel=24 parallel_max_ms=665545 parallel_imbalance_ms=2 parallel_unhinted=0 serial=274 serial_shards=14 serial_unhinted=8 serial_max_ms=1151923 serial_budget_ms=1200000 herdr=18
+exit=0
+$ bin/fm-test-isolation-proof.sh --pool watcher-wake-lock --list | grep watch-triage
+tests/fm-watch-triage-away.test.sh
+tests/fm-watch-triage-procevent.test.sh
+tests/fm-watch-triage-stale.test.sh
+tests/fm-watch-triage-turnend.test.sh
+tests/fm-watch-triage-wait.test.sh
+tests/fm-watch-triage-wedge.test.sh
+tests/fm-watch-triage.test.sh
+
+$ bin/fm-test-run.sh --list-concurrent-safe-families
+watcher-wake-lock
+pure-contract-unit
+pr-forge
+secondmate
+session-bootstrap
+standalone

@@ -1,0 +1,32 @@
+serial lane members:      274
+sum of shard members:      274
+duplicate across shards:        0
+shard union == serial lane: yes
+parallel+serial+herdr overlap:        0
+all scripts not in any lane:        0
+watch-triage in parallel lanes: 0
+
+watch-triage shard placement:
+4 tests/fm-watch-triage-turnend.test.sh
+8 tests/fm-watch-triage-wait.test.sh
+9 tests/fm-watch-triage-away.test.sh
+10 tests/fm-watch-triage-stale.test.sh
+11 tests/fm-watch-triage-wedge.test.sh
+13 tests/fm-watch-triage.test.sh
+14 tests/fm-watch-triage-procevent.test.sh
+
+Shard modeled sums (hint table + 45000 default for unhinted; budget 1200000):
+shard  1   1151917 ms
+shard  2   1151894 ms
+shard  3   1151914 ms
+shard  4   1151917 ms
+shard  5   1151903 ms
+shard  6   1151898 ms
+shard  7   1151923 ms
+shard  8   1151913 ms
+shard  9   1151916 ms
+shard 10   1151905 ms
+shard 11   1151923 ms
+shard 12   1151916 ms
+shard 13   1151922 ms
+shard 14   1151921 ms

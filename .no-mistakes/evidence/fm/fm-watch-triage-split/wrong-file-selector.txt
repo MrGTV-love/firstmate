@@ -1,0 +1,9 @@
+# split head: churn case sent to the OLD combined file path (where it no longer lives)
+$ FM_TEST_ONLY=test_turn_ended_churn_existing_marker_absorbed /bin/bash tests/fm-watch-triage.test.sh
+tests/fm-watch-triage.test.sh: line 1381: test_turn_ended_churn_existing_marker_absorbed: command not found
+exit=0
+
+# base commit a9010aab (pre-existing behaviour): unknown name with the original selector
+$ FM_TEST_ONLY=test_no_such_case /bin/bash tests/fm-watch-triage.test.sh
+tests/fm-watch-triage.test.sh: line 7786: test_no_such_case: command not found
+exit=0

@@ -1,0 +1,25 @@
+{
+ "base_test_functions": 159,
+ "base_invocations": 159,
+ "base_invocations_unique": 159,
+ "new_invocations_total": 159,
+ "new_invocations_per_file": {
+  "tests/fm-watch-triage-helpers.sh": 0,
+  "tests/fm-watch-triage-away.test.sh": 19,
+  "tests/fm-watch-triage-procevent.test.sh": 9,
+  "tests/fm-watch-triage-stale.test.sh": 33,
+  "tests/fm-watch-triage-turnend.test.sh": 43,
+  "tests/fm-watch-triage-wait.test.sh": 9,
+  "tests/fm-watch-triage-wedge.test.sh": 12,
+  "tests/fm-watch-triage.test.sh": 34
+ },
+ "invoked_more_than_once": [],
+ "base_invoked_not_in_new": [],
+ "new_invoked_not_in_base": [],
+ "base_functions_total": 203,
+ "functions_missing_in_split": [],
+ "functions_with_changed_body": [],
+ "functions_added_in_split": [],
+ "conflicting_duplicate_definitions": [],
+ "invocation_order_preserved_within_files": true
+}

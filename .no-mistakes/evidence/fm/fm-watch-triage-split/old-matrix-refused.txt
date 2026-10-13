@@ -1,0 +1,3 @@
+$ bin/fm-test-run.sh --list --lane portable-serial-1of13   (old 13-shard matrix must be refused)
+fm-test-run: lane 'portable-serial-1of13' asks for 13 portable serial shards but this runner is configured for 14 (see --list-lanes)
+exit=2
