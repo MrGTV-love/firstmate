@@ -27,9 +27,11 @@
 # queue wait: waiting there would stretch the refusal windows of the locks they
 # hold. It refuses while any older live ticket is queued, so it never jumps a
 # waiter. Contention (a live queued ticket, or a live process other than the
-# caller holding or reclaiming the lock) returns FM_PROJECT_LOCK_BUSY_EXIT (75,
-# try later); every other refusal, including a lock that cannot be taken with
-# no live holder, returns 1 with a filesystem error line.
+# caller holding, reclaiming, or still publishing the lock, as recorded by
+# fm_lock_try_acquire at its refusal in FM_LOCK_BUSY) returns
+# FM_PROJECT_LOCK_BUSY_EXIT (75, try later); every other refusal, including a
+# lock that cannot be taken with no live holder, returns 1 with a filesystem
+# error line.
 #
 # fm_project_lock_release <project-lock>
 # Appends "start=<epoch> end=<epoch> seconds=<n> pid=<pid> operation=<label>"
@@ -263,18 +265,15 @@ fm_project_lock_try() {  # <lock> <operation>
     return 1
   fi
   if [ -z "$FM_PROJECT_LOCK_HEAD" ] && ! fm_lock_try_acquire "$lock"; then
-    # Contention is a live process other than this one holding the lock or
-    # reclaiming it through its steal mutex. Any other failure (owner
-    # directory, publication, or self-reclamation) is an acquisition error.
+    # fm_lock_try_acquire records at its refusal whether it lost to another
+    # live or still-publishing actor (FM_LOCK_BUSY). A refusal that names this
+    # very process, or none, is an acquisition error, not contention.
     fm_current_pid current || current=
-    holder=$FM_LOCK_HELD_PID
-    if ! fm_pid_alive "$holder" || [ "$holder" = "$current" ]; then
-      holder=$(cat "$lock.steal/pid" 2>/dev/null || true)
-    fi
-    if ! fm_pid_alive "$holder" || [ "$holder" = "$current" ]; then
+    if [ "$FM_LOCK_BUSY" != 1 ] || { [ -n "$current" ] && [ "$FM_LOCK_HELD_PID" = "$current" ]; }; then
       echo "fm-project-lock: filesystem error: cannot acquire $lock with no live holder or queued waiter ahead; $operation was not admitted" >&2
       return 1
     fi
+    holder=busy
   fi
   if [ -n "$FM_PROJECT_LOCK_HEAD" ] || [ -n "$holder" ]; then
     fm_project_lock_describe "$lock" "$FM_PROJECT_LOCK_HEAD"
