@@ -1,0 +1,12 @@
+{
+  "find": {
+    "enabled": "on"
+  },
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "fixture/main": []
+    }
+  }
+}

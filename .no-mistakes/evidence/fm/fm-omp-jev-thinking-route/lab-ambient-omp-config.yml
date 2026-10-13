@@ -1,0 +1,12 @@
+modelRoles:
+  default: fixture/main
+  advisor: fixture/main
+  tiny: secondary/tiny
+retry:
+  fallbackChains:
+    judge:
+      - openrouter/~typesafe/jev-latest
+speech:
+  enabled: true
+  enhanced: true
+defaultThinkingLevel: auto

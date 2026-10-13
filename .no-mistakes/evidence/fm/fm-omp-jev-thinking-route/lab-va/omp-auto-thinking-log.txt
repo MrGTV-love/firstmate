@@ -1,0 +1,1 @@
+{"timestamp":"2026-10-12T17:45:23.558-05:00","level":"debug","pid":18835,"message":"auto-thinking: classification failed; using fallback level","error":"judgment: every judge candidate failed: no API key for typesafe/jev-latest"}

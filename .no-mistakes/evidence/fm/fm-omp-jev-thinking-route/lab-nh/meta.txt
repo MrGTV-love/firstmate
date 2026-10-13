@@ -1,0 +1,15 @@
+window=primary:fm-lab-nh
+endpoint_task_id=lab-nh
+worktree=/Users/charlesabrooker/tmp/fm-lab.k62xWq/treehouse/.treehouse/firstmate-f1fef2/1/firstmate
+project=/Users/charlesabrooker/tmp/fm-lab.k62xWq/home/projects/firstmate
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-lab-nh
+model=fixture/main
+effort=high
+omp_no_helpers=on
+skill_selection=none
+skill_selection_reason=this project has no skills to judge
+busy_gen=g1791845687.82897.13742
+spawn_gen=s1791845687.75471.31349
+control_relaunch_tx=67882.20261012T225442Z.9464

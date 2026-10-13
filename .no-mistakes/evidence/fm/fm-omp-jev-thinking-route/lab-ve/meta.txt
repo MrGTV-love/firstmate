@@ -1,0 +1,13 @@
+window=primary:fm-lab-ve
+endpoint_task_id=lab-ve
+worktree=/Users/charlesabrooker/tmp/fm-lab.k62xWq/treehouse/.treehouse/vernant-a481f7/1/vernant
+project=/Users/charlesabrooker/tmp/fm-lab.k62xWq/home/projects/vernant
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-lab-ve
+model=fixture/main
+effort=high
+skill_selection=none
+skill_selection_reason=this project has no skills to judge
+busy_gen=g1791844976.40191.31843
+spawn_gen=s1791844977.28570.19720

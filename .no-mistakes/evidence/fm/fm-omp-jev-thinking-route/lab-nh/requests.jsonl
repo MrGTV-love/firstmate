@@ -1,0 +1,13 @@
+{"at":"2026-10-12T22:52:37.743Z","phase":"spawn-lab-nh","service":"proxy-refused","method":"CONNECT","path":"hyper.charm.land:443"}
+{"at":"2026-10-12T22:52:39.305Z","phase":"spawn-lab-nh","service":"proxy-refused","method":"CONNECT","path":"api.github.com:443"}
+{"at":"2026-10-12T22:52:44.946Z","phase":"spawn-lab-nh","service":"proxy-refused","method":"CONNECT","path":"build.stencil.so:443"}
+{"at":"2026-10-12T22:52:44.973Z","phase":"spawn-lab-nh","service":"proxy-refused","method":"CONNECT","path":"hyper.charm.land:443"}
+{"at":"2026-10-12T22:52:45.122Z","phase":"spawn-lab-nh","service":"fixture","method":"POST","path":"/v1/chat/completions","model":"main","credential":"lab-main-key","toolsOffered":["read","bash","edit","write","grep","glob","todo","ask"],"toolResultsSoFar":0,"reply":"tool:bash"}
+{"at":"2026-10-12T22:52:45.279Z","phase":"worker-lab-nh","service":"fixture","method":"POST","path":"/v1/chat/completions","model":"main","credential":"lab-main-key","toolsOffered":["read","bash","edit","write","grep","glob","todo","ask"],"toolResultsSoFar":1,"reply":"tool:read"}
+{"at":"2026-10-12T22:52:45.288Z","phase":"worker-lab-nh","service":"fixture","method":"POST","path":"/v1/chat/completions","model":"main","credential":"lab-main-key","toolsOffered":["read","bash","edit","write","grep","glob","todo","ask"],"toolResultsSoFar":2,"reply":"text"}
+{"at":"2026-10-12T22:54:45.046Z","phase":"relaunch-same","service":"proxy-refused","method":"CONNECT","path":"hyper.charm.land:443"}
+{"at":"2026-10-12T22:54:49.641Z","phase":"relaunch-same","service":"proxy-refused","method":"CONNECT","path":"build.stencil.so:443"}
+{"at":"2026-10-12T22:54:49.678Z","phase":"relaunch-same","service":"proxy-refused","method":"CONNECT","path":"hyper.charm.land:443"}
+{"at":"2026-10-12T22:54:49.843Z","phase":"relaunch-same","service":"fixture","method":"POST","path":"/v1/chat/completions","model":"main","credential":"lab-main-key","toolsOffered":["read","bash","edit","write","grep","glob","todo","ask"],"toolResultsSoFar":0,"reply":"tool:bash"}
+{"at":"2026-10-12T22:54:49.973Z","phase":"relaunch-same","service":"fixture","method":"POST","path":"/v1/chat/completions","model":"main","credential":"lab-main-key","toolsOffered":["read","bash","edit","write","grep","glob","todo","ask"],"toolResultsSoFar":1,"reply":"tool:read"}
+{"at":"2026-10-12T22:54:49.986Z","phase":"relaunch-same","service":"fixture","method":"POST","path":"/v1/chat/completions","model":"main","credential":"lab-main-key","toolsOffered":["read","bash","edit","write","grep","glob","todo","ask"],"toolResultsSoFar":2,"reply":"text"}

@@ -1,0 +1,2 @@
+error: task lab-nh records omp_no_helpers=on, which only omp can honor; relaunching it onto 'claude' would stop the running agent for a launch that must be refused
+RC=1

@@ -1,0 +1,13 @@
+window=primary:fm-lab-fa
+endpoint_task_id=lab-fa
+worktree=/Users/charlesabrooker/tmp/fm-lab.k62xWq/treehouse/.treehouse/firstmate-f1fef2/1/firstmate
+project=/Users/charlesabrooker/tmp/fm-lab.k62xWq/home/projects/firstmate
+harness=omp
+kind=scout
+tasktmp=/tmp/fm-lab-fa
+model=fixture/main
+effort=default
+skill_selection=none
+skill_selection_reason=this project has no skills to judge
+busy_gen=g1791845370.55688.25881
+spawn_gen=s1791845370.49308.10657

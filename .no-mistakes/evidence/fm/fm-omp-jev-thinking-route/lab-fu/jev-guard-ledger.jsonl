@@ -1,0 +1,3 @@
+{"kind":"error","at":1791845448274,"task":"lab-fu","hook":"tool_call"}
+{"kind":"error","at":1791845450210,"task":"lab-fu","hook":"tool_result"}
+{"kind":"error","at":1791845451890,"task":"lab-fu","hook":"tool_result"}

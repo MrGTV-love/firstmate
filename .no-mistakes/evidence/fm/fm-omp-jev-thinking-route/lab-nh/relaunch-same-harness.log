@@ -1,0 +1,4 @@
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for lab-nh: none - this project has no skills to judge
+relaunched lab-nh harness=omp from=omp model=fixture/main effort=high backend=tmux endpoint=primary:fm-lab-nh worktree=/Users/charlesabrooker/tmp/fm-lab.k62xWq/treehouse/.treehouse/firstmate-f1fef2/1/firstmate
+RC=0

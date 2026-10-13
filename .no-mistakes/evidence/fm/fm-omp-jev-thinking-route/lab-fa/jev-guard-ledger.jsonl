@@ -1,0 +1,6 @@
+{"kind":"jev","at":1791845373147,"task":"lab-fa","source":"tool_call bash","answers":{"effect":{"type":"choice","choice":"read_only","confidence":1,"probabilities":{"read_only":1,"reversible":0,"irreversible":0}},"destructive_intent":{"type":"noul","noul":0.05}},"model":"jev-lab-fake","provider":"typesafe","ms":39,"usage":{"input_tokens":3,"output_tokens":1,"cost":0}}
+{"kind":"hook","at":1791845373147,"task":"lab-fa","hook":"tool_call","tool":"bash","block":false}
+{"kind":"jev","at":1791845373273,"task":"lab-fa","source":"tool_result bash","answers":{"injection":{"type":"noul","noul":0.05}},"model":"jev-lab-fake","provider":"typesafe","ms":2,"usage":{"input_tokens":3,"output_tokens":1,"cost":0}}
+{"kind":"hook","at":1791845373274,"task":"lab-fa","hook":"tool_result","tool":"bash","flag":false,"noul":0.05}
+{"kind":"jev","at":1791845373341,"task":"lab-fa","source":"tool_result read","answers":{"injection":{"type":"noul","noul":0.05}},"model":"jev-lab-fake","provider":"typesafe","ms":3,"usage":{"input_tokens":3,"output_tokens":1,"cost":0}}
+{"kind":"hook","at":1791845373342,"task":"lab-fa","hook":"tool_result","tool":"read","flag":false,"noul":0.05}

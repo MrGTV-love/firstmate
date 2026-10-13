@@ -1,0 +1,25 @@
+providers:
+  fixture:
+    baseUrl: http://127.0.0.1:58912/v1
+    apiKey: <fake-lab-value>
+    api: openai-completions
+    models:
+      - id: main
+        name: Lab fixture main
+        reasoning: true
+        input: [text]
+        contextWindow: 32768
+        maxTokens: 8192
+        cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
+  secondary:
+    baseUrl: http://127.0.0.1:58912/secondary/v1
+    apiKey: <fake-lab-value>
+    api: openai-completions
+    models:
+      - id: tiny
+        name: Lab secondary tiny trap
+        reasoning: false
+        input: [text]
+        contextWindow: 32768
+        maxTokens: 8192
+        cost: {input: 0, output: 0, cacheRead: 0, cacheWrite: 0}
