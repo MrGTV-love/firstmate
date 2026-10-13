@@ -174,7 +174,7 @@ test_canonical_partitions_preserve_full_lint() {
   mkdir -p "$fakebin"
   all=$(CI=true "$LINT" --list-files | LC_ALL=C sort)
   : > "$tmp/union"
-  for part in 1of2 2of2; do
+  for part in 1of3 2of3 3of3; do
     selected=$(CI=false GITHUB_ACTIONS=false "$LINT" --partition "$part" --list-files) \
       || fail "partition $part must select full canonical roots even on a local branch"
     [ -n "$selected" ] || fail "empty lint partition $part"
@@ -203,18 +203,65 @@ test_canonical_partitions_preserve_full_lint() {
       || fail "partition $part did not stream an end record per root"
   done
   [ "$(LC_ALL=C sort "$tmp/union")" = "$all" ] || fail "lint partitions lose or duplicate canonical roots"
-  for option in 0of2 3of2 1of3; do
+  for option in 0of3 4of3 1of2; do
     rc=0
     "$LINT" --partition "$option" --list-files > "$tmp/refused" 2>&1 || rc=$?
     [ "$rc" = 2 ] || fail "invalid partition $option was not refused"
   done
   rc=0
-  "$LINT" --partition 1of2 --fast > "$tmp/refused" 2>&1 || rc=$?
+  "$LINT" --partition 1of3 --fast > "$tmp/refused" 2>&1 || rc=$?
   [ "$rc" = 2 ] || fail "partition accepted --fast"
   rc=0
-  "$LINT" --partition 1of2 bin/fm-lint.sh > "$tmp/refused" 2>&1 || rc=$?
+  "$LINT" --partition 1of3 bin/fm-lint.sh > "$tmp/refused" 2>&1 || rc=$?
   [ "$rc" = 2 ] || fail "partition accepted an explicit subset"
-  pass "two canonical lint partitions preserve complete source-aware coverage and reject weakened modes"
+  pass "three canonical lint partitions preserve complete source-aware coverage and reject weakened modes"
+}
+
+test_canonical_partitions_balance_measured_cost() {
+  local tmp part selected cost all
+  tmp=$(fm_test_tmproot fm-lint-measured-balance)
+  mkdir -p "$tmp/repo/bin/backends" "$tmp/repo/tests"
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/repo/bin/backends/noop.sh"
+  cp "$LINT" "$tmp/repo/bin/fm-lint.sh"
+  cp "$ROOT/bin/fm-lint-cache.pl" "$tmp/repo/bin/"
+  # Equal-sized roots deliberately make direct bytes a misleading cost proxy.
+  # Seed independent duration evidence; assert only the executable selection.
+  python3 - "$tmp/repo" <<'PY'
+import pathlib
+import sys
+
+root = pathlib.Path(sys.argv[1])
+hints = []
+for name, weight in zip("abcdef", [600, 500, 400, 300, 200, 100]):
+    path = f"tests/{name}.test.sh"
+    (root / path).write_text("#!/usr/bin/env bash\nexit 0\n")
+    hints.append(f"{path}\t{weight}")
+runner = root / "bin/fm-lint.sh"
+text = runner.read_text()
+start = text.index("  cat <<'EOF'\n", text.index("fm_lint_partition_weight_hints() {")) + len("  cat <<'EOF'\n")
+end = text.index("\nEOF", start)
+# Include the runner and backend roots in the fixture's cost model.
+runner.write_text(text[:start] + "\n".join(hints + ["bin/fm-lint.sh\t1", "bin/backends/noop.sh\t1"]) + text[end:])
+PY
+  : > "$tmp/union"
+  for part in 1of3 2of3 3of3; do
+    selected=$(cd "$tmp/repo" && bin/fm-lint.sh --partition "$part" --list-files) \
+      || fail "measured-cost partition $part refused the fixture"
+    printf '%s\n' "$selected" >> "$tmp/union"
+    cost=$(printf '%s\n' "$selected" | awk '
+      /tests\/a.test.sh$/ { cost+=600 }
+      /tests\/b.test.sh$/ { cost+=500 }
+      /tests\/c.test.sh$/ { cost+=400 }
+      /tests\/d.test.sh$/ { cost+=300 }
+      /tests\/e.test.sh$/ { cost+=200 }
+      /tests\/f.test.sh$/ { cost+=100 }
+      END { print cost+0 }
+    ')
+    [ "$cost" -eq 700 ] || fail "partition $part packs $cost ms instead of 700 ms of measured test work"
+  done
+  all=$(cd "$tmp/repo" && CI=true bin/fm-lint.sh --list-files | LC_ALL=C sort)
+  [ "$(LC_ALL=C sort "$tmp/union")" = "$all" ] || fail "cost-balanced partitions lose or duplicate roots"
+  pass "canonical partitions balance measured analysis cost rather than equal direct bytes"
 }
 
 # fm_lint_stub_git <fakebin-dir>: install a git stub for the changed-file mode
@@ -3351,6 +3398,7 @@ test_runtime_backend_inputs_invalidate_dispatcher_cache
 test_shared_cache_reuses_only_identical_successful_inputs
 test_list_files_reports_the_shell_inventory
 test_canonical_partitions_preserve_full_lint
+test_canonical_partitions_balance_measured_cost
 test_ci_rejects_explicit_fast_mode
 test_fast_mode_catches_a_real_lint_defect
 test_pins_an_explicit_version

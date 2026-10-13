@@ -421,6 +421,30 @@ test_supervision_groups_share_coverage_and_changed_selection() {
     listed=$(cd "$repo" && bin/fm-test-run.sh --list --family afk)
   done
   pass "both supervision groups retain family coverage and direct/transitive changed selection"
+
+  for script in fm-watch-triage.test.sh fm-watch-triage-waits.test.sh; do
+    printf '#!/usr/bin/env bash\n# fm-watch-triage-helpers.sh\n' >"$repo/tests/$script"
+    chmod +x "$repo/tests/$script"
+  done
+  printf '# wake-helpers.sh\n' >"$repo/tests/fm-watch-triage-helpers.sh"
+  git -C "$repo" add tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm triage-selection-fixture
+  for owner in tests/fm-watch-triage-helpers.sh tests/wake-helpers.sh; do
+    printf '\n' >>"$repo/$owner"
+    listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+      || fail "$owner failed triage selection"
+    for script in fm-watch-triage.test.sh fm-watch-triage-waits.test.sh; do
+      assert_contains "$listed" "tests/$script" "$owner retains $script coverage"
+    done
+    assert_not_contains "$listed" "tests/fm-pr-merge.test.sh" "$owner must not widen to unrelated suites"
+    git -C "$repo" add "$owner"
+    git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm triage-owner-change
+  done
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --family watcher-wake-lock)
+  for script in fm-watch-triage.test.sh fm-watch-triage-waits.test.sh; do
+    assert_contains "$listed" "tests/$script" "watcher family retains $script"
+  done
+  pass "both triage groups retain watcher coverage and direct/transitive changed selection"
 }
 
 test_changed_task_copy_lib_selects_retained_and_secondmate() {
