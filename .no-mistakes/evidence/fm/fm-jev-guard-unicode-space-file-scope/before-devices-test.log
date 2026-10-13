@@ -1,0 +1,22 @@
+not ok - omp session device verification failed: node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: {"path":"xd://lsp","content":"{\"action\":\"references\",\"file\":\"x .ts\",\"line\":1,\"symbol\":\"value\"}"} must block
++ actual - expected
+
++ undefined
+- true
+
+    at deny (file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4V3K623DY87XYM32E9J0ZPC/[eval1]:54:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4V3K623DY87XYM32E9J0ZPC/[eval1]:62:5 {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: undefined,
+  expected: true,
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.4.0

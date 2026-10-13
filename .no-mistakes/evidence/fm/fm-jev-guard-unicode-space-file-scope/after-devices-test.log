@@ -1,0 +1,2 @@
+ok - omp: file-scoped LSP navigation and running own-job cancellation pass without file-write judgment
+bash tests/.tmp-devices.test.sh  1.24s user 3.44s system 58% cpu 8.021 total
