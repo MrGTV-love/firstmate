@@ -1672,6 +1672,12 @@ ${context.command}
   pi.on?.("before_agent_start", async (event, ctx) => {
     rememberMainModel(ctx);
     currentMainSession = ctx?.sessionManager ?? null;
+    // Pi 1.2.0 fires this event for a run that pi.sendMessage(..., { triggerTurn })
+    // opens too, and only a user-prompt run carries `prompt`. A custom-message run
+    // holds no captain text to stage, and message_start already tracks the
+    // processing request it carries. Pi before 1.2.0 never fires the event for
+    // that run and sets no messageType, so the prompt itself is the discriminator.
+    if (!("prompt" in event) || typeof event.prompt !== "string") return;
     const promptGeneration = generation;
     if (!(await enqueueDelivery(() => actingAsOwner(promptGeneration)))) return;
     if (promptGeneration !== generation || !currentMainSession || !collectCurrentMainDialog()) return;

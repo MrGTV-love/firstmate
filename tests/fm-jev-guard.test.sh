@@ -414,7 +414,7 @@ test_omp_session_devices() {
   out=$(HOME_DIR="$HOME_DIR" WT="$WT" TASK_DATA="$TASK_DATA" REQUESTS="$REQUESTS" GUARD="$ROOT/bin/fm-jev-guard.ts" \
     "${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from "node:assert/strict";
-import { readFileSync, writeFileSync, symlinkSync } from "node:fs";
+import { readFileSync, writeFileSync, symlinkSync, realpathSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.HOME_DIR;
@@ -422,6 +422,18 @@ const requests = () => readFileSync(process.env.REQUESTS, "utf8");
 writeFileSync(`${process.env.WT}/source.ts`, "export const value = 1;\n");
 writeFileSync(`${process.env.TASK_DATA}/outside.ts`, "export const outside = 1;\n");
 symlinkSync(`${process.env.TASK_DATA}/outside.ts`, `${process.env.WT}/escape.ts`);
+// omp changes these Unicode spaces to ASCII before resolving the LSP file.
+// The raw spelling is inside; the rewritten spelling is an outside symlink.
+const unicodeSpaces = [0x00a0, ...Array.from({ length: 11 }, (_, i) => 0x2000 + i), 0x202f, 0x205f, 0x3000];
+const rewrittenFiles = unicodeSpaces.map(code => `x${String.fromCodePoint(code)}.ts`);
+for (const file of rewrittenFiles) writeFileSync(`${process.env.WT}/${file}`, "export const inside = 1;\n");
+symlinkSync(`${process.env.TASK_DATA}/outside.ts`, `${process.env.WT}/x .ts`);
+assert.equal(realpathSync(`${process.env.WT}/x .ts`), realpathSync(`${process.env.TASK_DATA}/outside.ts`));
+for (const file of rewrittenFiles) {
+  assert.equal(realpathSync(`${process.env.WT}/${file}`), `${realpathSync(process.env.WT)}/${file}`);
+}
+writeFileSync(`${process.env.WT}/plain space.ts`, "export const value = 1;\n");
+writeFileSync(`${process.env.WT}/unicode-λ.ts`, "export const value = 1;\n");
 for (const project of ["firstmate", "vernant", "", undefined]) {
   const handlers = {};
   process.env.PI_DISABLE_LSPMUX = "0";
@@ -438,6 +450,7 @@ for (const project of ["firstmate", "vernant", "", undefined]) {
   for (const input of [
     ...["references", "definition", "implementation", "type_definition", "hover", "symbols"].map(action => lsp({ action, file: "source.ts", line: 1, symbol: "value" })),
     lsp({ action: "references", file: `${process.env.WT}/source.ts`, line: 1, symbol: "value" }),
+    ...["plain space.ts", "unicode-λ.ts"].map(file => lsp({ action: "references", file, line: 1, symbol: "value" })),
     { path: "proc://bg_1/kill" },
   ]) {
     const event = { toolName: "write", input };
@@ -460,7 +473,7 @@ for (const project of ["firstmate", "vernant", "", undefined]) {
   for (const action of ["diagnostics", "request", "rename", "rename_file", "code_actions", "format", "reload", "status", "capabilities", "unknown", "References", ""]) {
     await deny(lsp({ action, file: "source.ts", query: "workspace/executeCommand", apply: true }));
   }
-  for (const file of ["/etc/hosts", `${process.env.TASK_DATA}/outside.ts`, "escape.ts", "../outside.ts", "missing.ts", ".", process.env.WT, "/", "file:///etc/hosts", "~/.env", "@source.ts", ":./source.ts", "[source.ts]", "src/**/*.ts", ""]) {
+  for (const file of [...rewrittenFiles, ...rewrittenFiles.map(file => `${process.env.WT}/${file}`), "/etc/hosts", `${process.env.TASK_DATA}/outside.ts`, "escape.ts", "../outside.ts", "missing.ts", ".", process.env.WT, "/", "file:///etc/hosts", "~/.env", "@source.ts", ":./source.ts", "[source.ts]", "src/**/*.ts", ""]) {
     await deny(lsp({ action: "references", file, line: 1, symbol: "value" }));
   }
   for (const action of ["references", "symbols", "diagnostics"]) await deny(lsp({ action, file: "*", line: 1, symbol: "value", query: "value" }));
@@ -469,7 +482,9 @@ for (const project of ["firstmate", "vernant", "", undefined]) {
   for (const content of ["", "not json", "null", "[]", "1", '{"action":"references","file":1}']) await deny({ path: "xd://lsp", content });
   await deny(lsp({ action: "references", file: "source.ts" }), { ...ctx, cwd: process.env.TASK_DATA });
   await deny(lsp({ action: "references", file: "source.ts" }), { cwd: process.env.WT });
-  await deny({ path: "xd://lsp", old_string: "a", new_string: "b" }, ctx, "edit");
+  for (const path of ["XD://lsp", "xd://Lsp"]) await deny({ ...lsp({ action: "references", file: "source.ts" }), path });
+  await deny({ ...lsp({ action: "references", file: "source.ts" }), old_string: "a", new_string: "b" }, ctx, "edit");
+  await deny({ path: "proc://bg_1/kill", old_string: "a", new_string: "b" }, ctx, "edit");
   for (const path of ["proc://bg_2/kill", "proc://lookalike-service/kill", "proc:///kill", "proc://bg_1/kill/", "proc://bg_1/kill#x", "PROC://bg_1/kill"]) await deny({ path });
   for (const getAsyncJobSnapshot of [undefined, () => null, () => ({ running: [], recent: [] }), () => ({ running: [null, { id: "bg_2" }], recent: [] }), () => ({ running: [], recent: [{ id: "bg_1", status: "completed" }] }), () => { throw new Error("snapshot unavailable"); }]) {
     await deny({ path: "proc://bg_1/kill" }, { cwd: process.env.WT, getAsyncJobSnapshot });

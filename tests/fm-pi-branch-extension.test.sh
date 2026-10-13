@@ -1006,6 +1006,14 @@ const operational = spawnSync(
   { encoding: "utf8", input: "operational watcher injection" },
 );
 if (operational.status !== 0) throw new Error(`could not create operational input: ${operational.stderr}`);
+// Pi 1.2.0 also raises this event for an idle pi.sendMessage(..., { triggerTurn })
+// run, with the custom message in place of a prompt. It holds no captain text.
+const customRunText = "custom message run is not captain dialog";
+await fire(
+  "before_agent_start",
+  { type: "before_agent_start", messageType: "custom", message: { role: "custom", customType: "fm-branch-process", content: customRunText } },
+  mainCtx,
+);
 await fire("before_agent_start", { prompt: operational.stdout }, mainCtx);
 entries.push({ type: "message", message: { role: "user", content: operational.stdout } });
 const unsolicitedPrompt = "Please keep responses concise while monitoring the fleet.";
@@ -1066,6 +1074,9 @@ const mirroredCaptainText = globalThis.__fmSessions[0].ops
 for (const content of [unsolicitedPrompt, ...requestedPrompts]) {
   const copies = mirroredCaptainText.filter((text) => text === `[captain] ${content}`).length;
   if (copies !== 1) throw new Error(`current captain prompt was mirrored ${copies} times instead of once`);
+}
+if (mirroredCaptainText.some((text) => text.includes(customRunText) || text.startsWith("[captain] undefined"))) {
+  throw new Error(`a custom-message run entered captain mirror context: ${JSON.stringify(mirroredCaptainText)}`);
 }
 if (mirroredCaptainText.some((text) =>
   text.includes("operational watcher injection") || text.includes("FIRSTMATE_OP: give me a fresh system-resource report")
