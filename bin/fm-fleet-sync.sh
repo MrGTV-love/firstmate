@@ -199,9 +199,12 @@ fetch_with_packed_refs_lock_guard() {
   # packed-refs.lock lives in the common git dir, so a Git process in ANY worktree
   # of the clone (the clone itself or a linked pool slot) can own it, and keeps its
   # cwd there even after it closes the lock and before it commits or exits. Every
-  # existing worktree is therefore a companion liveness dir; a missing one cannot
-  # be anyone's cwd by path. A failed listing may omit a live owner's worktree,
-  # so its output is discarded; no listed worktree leaves the lock unproven.
+  # existing worktree is therefore a companion liveness dir. Listed roots that are
+  # absent are skipped, so a normal prunable entry cannot block recovery. A process
+  # that kept its cwd in an unlinked root is a known limit: only the age threshold
+  # and the open-file holder check cover it. A failed listing may omit a live
+  # owner's worktree, so its output is discarded; no listed worktree leaves the
+  # lock unproven.
   inventory=$(git -C "$PROJ" worktree list --porcelain 2>/dev/null); inventory_rc=$?
   if [ "$inventory_rc" -eq 0 ]; then
     while IFS= read -r owner_dir; do
