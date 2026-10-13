@@ -623,6 +623,10 @@ if [ -f "$META" ] && [ ! -L "$META" ]; then
     else
       fm_project_lock_acquire "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || TEARDOWN_PROJECT_LOCK_RC=$?
     fi
+    if [ "$TEARDOWN_PROJECT_LOCK_RC" -eq 1 ] && [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
+      echo "REFUSED: cannot acquire the shared Treehouse project lock for $TEARDOWN_LOCK_PROJECT; nothing was changed" >&2
+      exit 1
+    fi
     if [ "$TEARDOWN_PROJECT_LOCK_RC" -ne 0 ]; then
       echo "REFUSED: another Treehouse slot allocation or return is in progress for $TEARDOWN_LOCK_PROJECT; nothing was changed" >&2
       exit "$TEARDOWN_PROJECT_LOCK_RC"

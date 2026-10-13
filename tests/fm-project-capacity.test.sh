@@ -881,6 +881,38 @@ test_nonwaiting_admission_never_jumps_a_queued_waiter() {
   pass "nonwaiting admission refuses while the lock is held or an older waiter is queued"
 }
 
+# One attempt reports contention (FM_PROJECT_LOCK_BUSY_EXIT) only for a live
+# holder. A lock it cannot create with nobody holding it, here because its
+# parent directory is missing, is an acquisition error, not contention.
+test_nonwaiting_admission_separates_contention_from_acquisition_errors() {
+  local case_dir holder rc out
+  case_dir=$(make_case queue-try-classes)
+  rc=0
+  out=$(FM_HOME="$case_dir/home" FM_STATE_OVERRIDE='' bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-project-lock-lib.sh"
+    fm_project_lock_try "$2" probe
+  ' _ "$ROOT" "$case_dir/absent/actor.lock" 2>&1) || rc=$?
+  expect_code 1 "$rc" "a lock with no holder that cannot be created was reported as contention: $out"
+  assert_contains "$out" "fm-project-lock: filesystem error" "the acquisition error was not named as a filesystem error"
+  assert_absent "$case_dir/absent" "the failed attempt created the missing parent"
+  project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  holder=$!
+  wait_actor_output "$case_dir/order" holder
+  rc=0
+  out=$(FM_HOME="$case_dir/home" FM_STATE_OVERRIDE='' bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-project-lock-lib.sh"
+    fm_project_lock_try "$2" probe
+  ' _ "$ROOT" "$case_dir/actor.lock" 2>&1) || rc=$?
+  expect_code 75 "$rc" "a live holder was not reported as contention: $out"
+  assert_contains "$out" "current holder holder (PID" "the contention did not name the live holder"
+  : > "$case_dir/release"
+  wait "$holder" || fail "the holder could not release"
+  assert_equals holder "$(cat "$case_dir/order")" "the nonwaiting attempt ran its operation"
+  pass "nonwaiting admission returns the busy status only for a live holder, and an error for a lock nobody holds"
+}
+
 test_project_queue_classifies_refusals_before_queueing() {
   local case_dir value rc out
   case_dir=$(make_case queue-input)
@@ -1086,6 +1118,7 @@ test_project_queue_timeout_preserves_live_holder
 test_project_queue_slow_holder_never_admits_a_later_waiter_first
 test_project_queue_progress_never_reaches_the_stall_limit
 test_nonwaiting_admission_never_jumps_a_queued_waiter
+test_nonwaiting_admission_separates_contention_from_acquisition_errors
 test_project_queue_classifies_refusals_before_queueing
 test_recursive_cleanup_orders_projects_across_local_homes
 test_failed_spawn_after_admission_holds_no_place

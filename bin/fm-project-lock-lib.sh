@@ -26,8 +26,10 @@
 # and for the idle reaper's teardown, whose fixed work bound must not include a
 # queue wait: waiting there would stretch the refusal windows of the locks they
 # hold. It refuses while any older live ticket is queued, so it never jumps a
-# waiter. Contention returns FM_PROJECT_LOCK_BUSY_EXIT (75, try later); every
-# other refusal returns 1.
+# waiter. Contention (a live queued ticket, or a live process other than the
+# caller holding or reclaiming the lock) returns FM_PROJECT_LOCK_BUSY_EXIT (75,
+# try later); every other refusal, including a lock that cannot be taken with
+# no live holder, returns 1 with a filesystem error line.
 #
 # fm_project_lock_release <project-lock>
 # Appends "start=<epoch> end=<epoch> seconds=<n> pid=<pid> operation=<label>"
@@ -254,13 +256,27 @@ fm_project_lock_acquire() {  # <lock> <operation>
 }
 
 fm_project_lock_try() {  # <lock> <operation>
-  local lock=$1 operation=$2
+  local lock=$1 operation=$2 current='' holder=''
   FM_PROJECT_LOCK_ERROR=
   if ! fm_project_lock_head "$lock.queue"; then
     echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR; $operation was not admitted" >&2
     return 1
   fi
-  if [ -n "$FM_PROJECT_LOCK_HEAD" ] || ! fm_lock_try_acquire "$lock"; then
+  if [ -z "$FM_PROJECT_LOCK_HEAD" ] && ! fm_lock_try_acquire "$lock"; then
+    # Contention is a live process other than this one holding the lock or
+    # reclaiming it through its steal mutex. Any other failure (owner
+    # directory, publication, or self-reclamation) is an acquisition error.
+    fm_current_pid current || current=
+    holder=$FM_LOCK_HELD_PID
+    if ! fm_pid_alive "$holder" || [ "$holder" = "$current" ]; then
+      holder=$(cat "$lock.steal/pid" 2>/dev/null || true)
+    fi
+    if ! fm_pid_alive "$holder" || [ "$holder" = "$current" ]; then
+      echo "fm-project-lock: filesystem error: cannot acquire $lock with no live holder or queued waiter ahead; $operation was not admitted" >&2
+      return 1
+    fi
+  fi
+  if [ -n "$FM_PROJECT_LOCK_HEAD" ] || [ -n "$holder" ]; then
     fm_project_lock_describe "$lock" "$FM_PROJECT_LOCK_HEAD"
     echo "fm-project-lock: $operation does not wait; $FM_PROJECT_LOCK_DESC is ahead of it" >&2
     return "$FM_PROJECT_LOCK_BUSY_EXIT"

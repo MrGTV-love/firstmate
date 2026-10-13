@@ -448,6 +448,45 @@ test_project_lock_contention_is_skipped_and_retried() {
   pass "a sweep teardown meeting project-lock contention returns at once, changes nothing, and is retried next sweep"
 }
 
+# Only a live holder or queued waiter is contention. A project lock path the
+# teardown cannot take with nobody holding it (here an old regular file in its
+# place) is an acquisition error: the sweep records it as a refusal with its
+# reason, not as a silent lock-skipped, and the task and slot stay intact.
+test_project_lock_acquisition_error_is_not_skipped() {
+  local home project slot lock out i
+  home=$(make_home projectlockerror)
+  project="$home/project"
+  slot="$home/pool/1/project"
+  fm_git_init_commit "$project"
+  mkdir -p "${slot%/*}"
+  git -C "$project" worktree add --quiet --detach "$slot"
+  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot" > "$home/pool/treehouse-state.json"
+  mk_task "$home" scout-pool scout idle "done [at=$OLD]: report written" \
+    -- "worktree=$slot" "project=$project"
+  scout_report "$home" scout-pool
+  lock=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$project") \
+    || fail "could not resolve the project lock"
+  printf 'not a lock\n' > "$lock"
+  fm_touch_epoch "$OLD" "$lock"
+  : > "$STUB_LOG"
+  printf 'real\n' > "$STUB_MODE_FILE"
+  out=$(run_reap "$home" reap) || fail "reap failed: $out"
+  expect_class "$out" scout-pool teardown-refused "a project-lock acquisition error is a refusal, not contention"
+  case "$(row_detail "$out" scout-pool)" in
+    "REFUSED: cannot acquire the shared Treehouse project lock"*) ;;
+    *) fail "the refusal reason does not name the acquisition error: $(row_detail "$out" scout-pool)" ;;
+  esac
+  assert_present "$home/state/.idle-reap/scout-pool.refused" "the acquisition error is remembered as a refusal"
+  assert_present "$home/state/scout-pool.meta" "an acquisition error preserves the task record"
+  assert_present "$home/state/scout-pool.status" "an acquisition error preserves the status log"
+  assert_present "$slot" "an acquisition error preserves the pool slot"
+  [ -f "$lock" ] && [ ! -L "$lock" ] || fail "the teardown replaced the unexplained project lock path"
+  for i in "$lock.queue"/ticket-*; do
+    [ ! -L "$i" ] || fail "the sweep's teardown registered in the project-lock queue"
+  done
+  pass "a project lock nobody holds but the teardown cannot take is recorded as a refusal, not a lock skip"
+}
+
 test_single_flight_lock() {
   local home out pid hung
   home=$(make_home lock)
@@ -702,6 +741,7 @@ test_refusal_is_remembered_and_retried_on_change
 test_real_teardown_refusal_preserves_the_task
 test_lease_refusal_is_transient
 test_project_lock_contention_is_skipped_and_retried
+test_project_lock_acquisition_error_is_not_skipped
 test_unknown_times_and_fixed_grace
 test_canonical_forge_markers
 test_semantic_idle_sources
