@@ -1,0 +1,46 @@
+## A1: cold table, fallback 120
+calibration: "0 of 5 samples for lint.demo on Mac-Studio.local"
+fallback: "120s existing caller limit"
+120
+rc=0
+## record 5 samples 10..50s
+## A2: p95 of 5 = 50s x3 = 150
+measured: "lint.demo host=Mac-Studio.local p95=50000ms margin=3 samples=5 measured=150s bound=120s"
+150
+## higher fallback not lowered
+measured: "lint.demo host=Mac-Studio.local p95=50000ms margin=3 samples=5 measured=150s bound=900s"
+900
+## failed / uncalibrated samples do not count
+measured: "lint.demo host=Mac-Studio.local p95=50000ms margin=3 samples=5 measured=150s bound=120s"
+150
+## fallback 0 cold
+calibration: "0 of 5 samples for other.key on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+0
+rc=0
+## B: p99 limit
+measured: "run.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+3
+## B1: run, 2s command (longer than a 1s sample) completes with output
+measured: "run.demo host=Mac-Studio.local p99=1000ms margin=3 samples=5 measured=3s bound=0s"
+tick 1
+progress: "run.demo elapsed=0.0s output_bytes=7 tree_cpu=0.00s"
+tick 2
+progress: "run.demo elapsed=0.5s output_bytes=14 tree_cpu=0.00s"
+tick 3
+progress: "run.demo elapsed=1.0s output_bytes=21 tree_cpu=0.00s"
+tick 4
+progress: "run.demo elapsed=1.6s output_bytes=28 tree_cpu=0.01s"
+done
+progress: "run.demo elapsed=2.1s output_bytes=33 tree_cpu=0.01s"
+rc=0 elapsed=2s
+## B2: ceiling (p99 1s x3 = 3s) ends hung command, TERM first
+measured: "run.demo host=Mac-Studio.local p99=2064ms margin=3 samples=6 measured=7s bound=0s"
+progress: "run.demo elapsed=1.0s output_bytes=0 tree_cpu=0.00s"
+got-term-cleanup
+progress: "run.demo elapsed=7.4s output_bytes=17 tree_cpu=0.00s"
+rc=124 elapsed=8s
+## ledger tail
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"run.demo","duration_ms":2064,"exit":0,"recorded_at":"2026-10-13T17:53:56.898841+00:00","load_start":40.24365234375,"load_end":42.06591796875,"cpus":18,"sample_id":"0675166a-2e80-41b0-9b4c-3132ce17bb71","calibration":true,"timed_out":false}
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"run.demo","duration_ms":7416,"exit":124,"recorded_at":"2026-10-13T17:54:04.787705+00:00","load_start":42.06591796875,"load_end":42.060546875,"cpus":18,"sample_id":"3651810c-3e01-45ee-89e6-4d32526cf92b","calibration":true,"timed_out":true}
+{"host":"Mac-Studio.local","repo":"MrGTV-love/firstmate","key":"run.demo","event":"timeout","duration_ms":7416,"event_id":"3651810c-3e01-45ee-89e6-4d32526cf92b","recorded_at":"2026-10-13T17:54:04.789208+00:00"}

@@ -1,0 +1,6 @@
+ok - real backlog owns the second timeout exactly once
+ok - worker timings and repeated-timeout work reach the owning home, and a recurrence after closure files new work
+ok - a failed backlog publication is retried without duplicating events, and imports never guess a timeout
+ok - sample-count limits, retention, progress, leader exit, outer ceiling, pipeline imports and literal guard
+ok - measured command behavior
+bash tests/fm-duration.test.sh  7.16s user 9.00s system 57% cpu 28.034 total

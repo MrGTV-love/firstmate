@@ -1,0 +1,19 @@
+## D1: guard on the real branch
+rc=0
+## D2: report
+bin/fm-x-lib.sh:1005	10	lock_timeout=${FMX_LINK_CLEAR_LOCK_TIMEOUT:-10}
+bin/fm-x-lib.sh:1006	10	case "$lock_timeout" in ''|*[!0-9]*|0) lock_timeout=10 ;; esac
+bin/fm_open_loops.py:191	1	child.communicate(timeout=1)
+bin/fm_open_loops.py:360	2	with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True, timeout=2) as db:
+bin/fm_voice_records.py:550	30	env=env, capture_output=True, text=True, timeout=30, check=False)
+## D3: adversarial: scratch repo, add unmeasured literal then measured one
+error: "bin/old.sh:3: new time limit 45; add adjacent measured: value=45 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+unmeasured rc=1
+error: "bin/old.sh:4: new time limit 45; add adjacent measured: value=45 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+measured-note rc=1
+## D3 (corrected note format)
+error: "bin/old.sh:3: new time limit 45; add adjacent measured: value=45 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+unmeasured rc=1
+measured-note rc=0
+error: "bin/old.sh:4: new time limit 99; add adjacent measured: value=99 date=YYYY-MM-DD host=<host> margin=<factor> with empirical evidence, or use fm-duration.py limit"
+note-value-mismatch rc=1
