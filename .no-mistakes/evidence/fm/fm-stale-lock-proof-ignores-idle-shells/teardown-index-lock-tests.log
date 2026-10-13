@@ -1,0 +1,7 @@
+ok - provably-stale worktree index.lock (old, no live holder) is cleared and teardown succeeds
+ok - an idle non-Git cwd holder does not block stale index.lock cleanup
+ok - real Git-held worktree index.lock is never removed and teardown refuses
+ok - lsof errors leave worktree index.lock in place and refuse teardown
+ok - stale lock cleanup rechecks and refuses dirty worktree before return
+ok - normal repo index.lock is resolved from the worktree and cleared when stale
+exit=0

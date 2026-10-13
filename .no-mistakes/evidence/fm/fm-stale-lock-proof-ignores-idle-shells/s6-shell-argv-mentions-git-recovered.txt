@@ -1,0 +1,27 @@
+== scenario argv-mentions-git  (bin root: $WORKTREE)
+clone: $LAB/projects/demo-argv-mentions-git
+clone HEAD before: 0a1b691   origin main: ab02310
+--- lock file: 0 bytes, mtime Oct 12 18:45
+--- lsof on lock file (empty = nobody has it open):
+--- processes with cwd/fd in clone dir:
+    COMMAND PID FD
+    zsh 14414 cwd
+    treehouse 14445 cwd
+    zsh 14456 cwd
+    bash 14490 cwd
+    bash 14494 cwd
+    sleep 14496 cwd
+    treehouse 14513 cwd
+--- run: FM_HOME=$LAB $WORKTREE/bin/fm-fleet-sync.sh demo-argv-mentions-git
+exit=0  elapsed=13s
+--- stdout:
+    demo-argv-mentions-git: recovered: removed a stale packed-refs lock (no live holder)
+    demo-argv-mentions-git: pruned feature
+    demo-argv-mentions-git: synced 0a1b691..ab02310
+--- stderr (lock lines):
+    demo-argv-mentions-git: fetch blocked by packed-refs lock ($LAB/projects/demo-argv-mentions-git/.git/packed-refs.lock); waiting 1s and retrying (1/3) (owning process may be exiting)
+    demo-argv-mentions-git: fetch blocked by packed-refs lock ($LAB/projects/demo-argv-mentions-git/.git/packed-refs.lock); waiting 1s and retrying (2/3) (owning process may be exiting)
+    demo-argv-mentions-git: fetch blocked by packed-refs lock ($LAB/projects/demo-argv-mentions-git/.git/packed-refs.lock); waiting 1s and retrying (3/3) (owning process may be exiting)
+    demo-argv-mentions-git: removed provably-stale packed-refs lock $LAB/projects/demo-argv-mentions-git/.git/packed-refs.lock (age >= 30s, no live holder) and retrying fetch
+    demo-argv-mentions-git: fetch succeeded after stale packed-refs lock cleanup
+--- after: lock present? no   clone HEAD: ab02310   origin main: ab02310
