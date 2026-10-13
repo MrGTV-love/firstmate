@@ -750,33 +750,40 @@ test_project_queue_timeout_preserves_live_holder() {
   pass "bounded waiting identifies and preserves the live holder and removes its own expired ticket"
 }
 
-# The reviewed slow-holder sequence at the default measured allowance: the
-# holder keeps the lock for 100 seconds while W1 queues at t=1 and W2 at t=2.
-# A deadline fixed at each waiter's registration refused W1 and admitted W2.
-test_project_queue_slow_holder_keeps_arrival_order() {
-  local case_dir holder w1 w2 start rc1=0 rc2=0
+# The reviewed slow-holder sequence: one holder outlasts the allowance while W1
+# and then W2 queue behind it. A deadline counted from each waiter's arrival
+# and widened by its queue position refused W1 at its own limit and then
+# admitted the later W2 once the holder left. The stall clock follows the
+# holder instead, so both refuse together and W2 never goes ahead of W1.
+test_project_queue_slow_holder_never_admits_a_later_waiter_first() {
+  local case_dir holder w1 w2 i rc1=0 rc2=0
   case_dir=$(make_case queue-slow-holder)
   project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
   holder=$!
   wait_actor_output "$case_dir/order" holder
-  start=$SECONDS
-  sleep 1
-  project_queue_actor "$case_dir" w1 > "$case_dir/w1.out" 2>&1 &
+  FM_PROJECT_LOCK_SERVICE_SECS=8 FM_PROJECT_LOCK_POLL_SECS=0.1 \
+    project_queue_actor "$case_dir" w1 > "$case_dir/w1.out" 2>&1 &
   w1=$!
   wait_actor_output "$case_dir/w1.out" 'fm-project-lock: waiting'
-  while [ $((SECONDS - start)) -lt 2 ]; do sleep 0.1; done
-  FM_PROJECT_LOCK_POLL_SECS=0.05 project_queue_actor "$case_dir" w2 > "$case_dir/w2.out" 2>&1 &
+  FM_PROJECT_LOCK_SERVICE_SECS=8 FM_PROJECT_LOCK_POLL_SECS=0.1 \
+    project_queue_actor "$case_dir" w2 > "$case_dir/w2.out" 2>&1 &
   w2=$!
   wait_actor_output "$case_dir/w2.out" 'fm-project-lock: waiting'
-  while [ $((SECONDS - start)) -lt 100 ]; do sleep 1; done
+  wait "$w1" || rc1=$?
+  i=0
+  while kill -0 "$w2" 2>/dev/null && [ "$i" -lt 60 ]; do
+    i=$((i + 1))
+    sleep 0.1
+  done
   : > "$case_dir/release"
   wait "$holder" || fail "the slow holder could not release: $(cat "$case_dir/holder.out")"
-  wait "$w1" || rc1=$?
   wait "$w2" || rc2=$?
-  expect_code 0 "$rc1" "the earliest waiter refused behind a slow holder: $(cat "$case_dir/w1.out")"
-  expect_code 0 "$rc2" "the later waiter refused behind a slow holder: $(cat "$case_dir/w2.out")"
-  assert_equals "$(printf 'holder\nw1\nw2')" "$(cat "$case_dir/order")" "a later waiter was admitted before the earliest one"
-  pass "a 100-second holder keeps waiters in arrival order and refuses nobody at the measured allowance"
+  expect_code 1 "$rc1" "the earliest waiter was admitted past a stalled holder: $(cat "$case_dir/w1.out")"
+  expect_code 1 "$rc2" "a later waiter was admitted after the earliest one refused: $(cat "$case_dir/w2.out")"
+  assert_contains "$(cat "$case_dir/w1.out")" 'fm-project-lock: stall limit reached' "the earliest waiter did not refuse at the holder's stall"
+  assert_contains "$(cat "$case_dir/w2.out")" 'fm-project-lock: stall limit reached' "the later waiter did not refuse at the same holder's stall"
+  assert_equals holder "$(cat "$case_dir/order")" "a later waiter went ahead of a refused earlier one"
+  pass "a stalled holder refuses its waiters together, so a later waiter never goes ahead of an earlier one"
 }
 
 # Each 6-second hold is well inside a 20-second allowance, but the last waiter
@@ -1076,7 +1083,7 @@ test_mixed_operations_keep_fifo_even_with_a_slow_waiter
 test_same_home_spawn_for_another_project_is_not_refused_while_one_waits
 test_project_queue_recovers_dead_waiter_and_holder
 test_project_queue_timeout_preserves_live_holder
-test_project_queue_slow_holder_keeps_arrival_order
+test_project_queue_slow_holder_never_admits_a_later_waiter_first
 test_project_queue_progress_never_reaches_the_stall_limit
 test_nonwaiting_admission_never_jumps_a_queued_waiter
 test_project_queue_classifies_refusals_before_queueing

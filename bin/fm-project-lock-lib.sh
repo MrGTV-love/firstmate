@@ -22,9 +22,12 @@
 #
 # fm_project_lock_try <project-lock> <operation>
 # One nonwaiting attempt for callers that already hold other locks (recursive
-# teardown preflight, home seeding, copy reassociation, relocating relaunch):
-# waiting there would stretch the refusal windows of the locks they hold. It
-# refuses while any older live ticket is queued, so it never jumps a waiter.
+# teardown preflight, home seeding, copy reassociation, relocating relaunch),
+# and for the idle reaper's teardown, whose fixed work bound must not include a
+# queue wait: waiting there would stretch the refusal windows of the locks they
+# hold. It refuses while any older live ticket is queued, so it never jumps a
+# waiter. Contention returns FM_PROJECT_LOCK_BUSY_EXIT (75, try later); every
+# other refusal returns 1.
 #
 # fm_project_lock_release <project-lock>
 # Appends "start=<epoch> end=<epoch> seconds=<n> pid=<pid> operation=<label>"
@@ -32,17 +35,19 @@
 # use production hold observations.
 #
 # The default service allowance is 370 seconds, the stall limit for one hold:
-# the sum of every step spawn or teardown runs while holding the lock, doubled
-# for a 100% margin. Poll budgets and bounds, from bin/fm-spawn.sh: the
+# the sum of the counted steps below that spawn or teardown run while holding
+# the lock, doubled for a 100% margin. It is not a bound on every hold; the
+# holds and repetitions it does not cover are listed after the sum.
+# Poll budgets and bounds, from bin/fm-spawn.sh: the
 # treehouse get entry wait, 60 x 1s (lines 5153 and 5168), 60s; the worker path
 # check, 20 x 0.5s (lines 4713 and 4718), 10s; the skill pick bound
 # SKILL_SELECTION_BOUND (lines 5210 and 5221), 30s. From bin/fm-teardown.sh:
-# the no-mistakes bound NM_TEARDOWN_TIMEOUT (line 2452), 10s per call, up to
-# five calls (lines 1894, 2493, 2512, 2549 and 2550), 50s; the index.lock
-# return retries, 3 waits of TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS (line 2257),
-# 3s, plus up to four more returns (lines 2259 and 2286) at the measured
-# return time below; the launch-agent bootout poll, 19 x 0.25s (lines 3084 and
-# 3098), 4.75s; and the leaked-process reaping sleep (line 2888), 1s. Harness
+# the no-mistakes bound NM_TEARDOWN_TIMEOUT (line 2461), 10s per call, up to
+# five calls (lines 1903, 2502, 2521, 2558 and 2559), 50s; the index.lock
+# return retries, 3 waits of TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS (line 2266),
+# 3s, plus up to four more returns (lines 2268 and 2295) at the measured
+# return time below; the launch-agent bootout poll, 19 x 0.25s (lines 3093 and
+# 3107), 4.75s; and one leaked-process reaping sleep (line 2897), 1s. Harness
 # readiness and delivery polls run after the spawn releases the lock and are
 # not counted.
 # measured: one run each, in disposable clones (evidence: the
@@ -50,14 +55,14 @@
 # real-network-measurement/).
 #   2026-10-13T01:02:48Z, load 51-57 on 18 CPUs, Treehouse v2.3.1-fm.e58947de,
 #   isolated pool: `treehouse get --lease` 8.924s, `treehouse return --force`
-#   1.628s (bin/fm-teardown.sh line 2234).
+#   1.628s (bin/fm-teardown.sh line 2243).
 #   2026-10-13T02:35:42Z, load 10-11 on 18 CPUs, git 2.54.0, gh 2.101.0:
 #   bin/fm-spawn.sh freshen fetches `git fetch origin` 3.972s (line 4128),
 #   `git remote set-head origin --auto` 0.542s (line 4135), default-branch
 #   fetch 0.511s (line 4145); bin/fm-teardown.sh `gh-axi pr list` 1.092s
-#   (line 1702), `git fetch origin refs/pull/<n>/head` 0.486s (line 1732),
-#   `gh pr view` 0.599s (line 1983) and 0.505s, counted twice (lines 2345
-#   and 2369).
+#   (line 1711), `git fetch origin refs/pull/<n>/head` 0.486s (line 1741),
+#   `gh pr view` 0.599s (line 1992) and 0.505s, counted twice (lines 2354
+#   and 2378).
 # The previous sum, 128.764s, counted NM_TEARDOWN_TIMEOUT once and left out
 # the return retries, bootout poll and reaping sleep. Adding four more
 # NM_TEARDOWN_TIMEOUT calls (40s), the retry waits (3s), four more returns
@@ -67,12 +72,23 @@
 # incident (about 91); the margin covers that. No production hold had been
 # logged to the .holds record below when this was set; once it has, the
 # allowance must also cover the largest logged hold times the same margin.
-# Not covered: home seeding (bin/fm-home-seed.sh) holds the Firstmate
-# project's lock across unbounded, unmeasured clones and no-mistakes setup,
-# and an Orca spawn with declared capacity holds it across unbounded,
-# unmeasured Orca worktree and terminal creation. Seeding is rare, and Orca is
-# not used in this fleet, so neither was measured; a seed or Orca hold that
-# outlasts the allowance makes waiters refuse at the stall limit.
+# Not covered or undercounted (none measured):
+#   - home seeding (bin/fm-home-seed.sh) holds the Firstmate project's lock
+#     across unbounded clones and no-mistakes setup; seeding is rare;
+#   - an Orca spawn with declared capacity holds it across unbounded Orca
+#     worktree and terminal creation; Orca is not used in this fleet;
+#   - teardown runs conclude_task_no_mistakes_run and
+#     retire_task_private_nm_launch_agents once per swept root
+#     (bin/fm-teardown.sh lines 3542-3547), so a copy nested in a pool slot
+#     repeats four NM_TEARDOWN_TIMEOUT calls and the bootout poll per extra
+#     root, which the sum counts once;
+#   - the reaping sleep runs in up to three passes (bin/fm-teardown.sh lines
+#     2841 and 2897), 3s, which the sum counts as 1s;
+#   - Docker cleanup (bin/fm-teardown.sh line 4824) runs unbounded;
+#   - forced recursive secondmate teardown holds every descendant project lock
+#     (bin/fm-teardown.sh line 4121) while it returns each child slot in turn
+#     (line 4555), so its hold grows with the child count.
+# A hold that outlasts the allowance makes waiters refuse at the stall limit.
 # FM_PROJECT_LOCK_SERVICE_SECS overrides it with a positive integer for a newly
 # measured environment or bounded fixture.
 # FM_PROJECT_LOCK_POLL_SECS changes sampling only (default 1 second; a positive
@@ -84,6 +100,8 @@
 # (invalid input, registration failure, filesystem error, stall limit), so
 # callers retain their existing refusal and safety checks; capacity admission
 # remains inside the acquired project lock.
+
+FM_PROJECT_LOCK_BUSY_EXIT=75
 
 fm_project_lock_register() {  # <lock> <service-secs> <operation>
   local lock=$1 service=$2 operation=$3 queue mutex sequence=0 owner ticket
@@ -243,8 +261,8 @@ fm_project_lock_try() {  # <lock> <operation>
   fi
   if [ -n "$FM_PROJECT_LOCK_HEAD" ] || ! fm_lock_try_acquire "$lock"; then
     fm_project_lock_describe "$lock" "$FM_PROJECT_LOCK_HEAD"
-    echo "fm-project-lock: $operation holds other locks, so it does not wait; $FM_PROJECT_LOCK_DESC is ahead of it" >&2
-    return 1
+    echo "fm-project-lock: $operation does not wait; $FM_PROJECT_LOCK_DESC is ahead of it" >&2
+    return "$FM_PROJECT_LOCK_BUSY_EXIT"
   fi
   if ! printf '%s\n' "$operation" > "$lock/role"; then
     fm_lock_release "$lock"

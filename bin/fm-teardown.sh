@@ -167,7 +167,10 @@
 # Project-lock contention uses bin/fm-project-lock-lib.sh's FIFO wait, which
 # refuses only when the holder stalls past the measured allowance, with holder
 # progress messages; callers no longer need retry loops for allocation/return
-# contention. Recursive cleanup already holds every descendant home's lifecycle
+# contention. The idle reaper's teardown (FM_IDLE_REAP_ADMISSION=1) instead
+# makes one nonwaiting attempt, so its fixed work bound never includes a queue
+# wait; contention exits FM_PROJECT_LOCK_BUSY_EXIT with nothing changed, and the
+# next sweep retries. Recursive cleanup already holds every descendant home's lifecycle
 # locks, so it makes one nonwaiting attempt per descendant project lock that
 # never jumps a queued waiter; it collects and deduplicates those paths and
 # tries them in global byte order before slot proofs, so opposite child
@@ -614,10 +617,16 @@ if [ -f "$META" ] && [ ! -L "$META" ]; then
       echo "REFUSED: cannot resolve the shared Treehouse project lock for ${TEARDOWN_LOCK_PROJECT:-<missing>}; nothing was changed" >&2
       exit 1
     }
-    fm_project_lock_acquire "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || {
+    TEARDOWN_PROJECT_LOCK_RC=0
+    if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
+      fm_project_lock_try "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || TEARDOWN_PROJECT_LOCK_RC=$?
+    else
+      fm_project_lock_acquire "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || TEARDOWN_PROJECT_LOCK_RC=$?
+    fi
+    if [ "$TEARDOWN_PROJECT_LOCK_RC" -ne 0 ]; then
       echo "REFUSED: another Treehouse slot allocation or return is in progress for $TEARDOWN_LOCK_PROJECT; nothing was changed" >&2
-      exit 1
-    }
+      exit "$TEARDOWN_PROJECT_LOCK_RC"
+    fi
     TREEHOUSE_PROJECT_LOCK_HELD=1
   fi
 fi

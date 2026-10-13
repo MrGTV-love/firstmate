@@ -45,13 +45,16 @@
 # the status line it was made against, and the task is not offered to teardown
 # again until its newest status line changes or six hours pass.
 # A refusal because the other supervision actor holds the task's lease
-# (FM_LEASE_REFUSE_EXIT) is transient and records nothing.
+# (FM_LEASE_REFUSE_EXIT) is transient and records nothing. So is the
+# teardown's project-lock contention (FM_PROJECT_LOCK_BUSY_EXIT): the reaper's
+# teardown never waits in the project-lock queue, changes nothing, and the next
+# sweep retries it.
 #
 # `scan` rows are tab-separated: <class> <task-id> <kind> <age-secs> <detail>.
 # Classes: reap, wait-grace, refused, parked, awaiting-pipeline, awaiting-merge,
 # scout-noreport, idle-unreported, steer-pending, active, secondmate, remote.
-# `reap` adds the result rows reaped, teardown-refused, teardown-timeout, and
-# lease-skipped, and publishes the complete row set atomically to
+# `reap` adds the result rows reaped, teardown-refused, teardown-timeout,
+# lease-skipped, and lock-skipped, and publishes the complete row set atomically to
 # state/idle-sessions.report so the parked sessions and their pause reasons
 # can be read without rerunning the scan.
 #
@@ -80,6 +83,8 @@ LOCK="$STATE/.idle-reap.lock"
 . "$SCRIPT_DIR/fm-timeout-lib.sh"
 # shellcheck source=bin/fm-lease-lib.sh
 . "$SCRIPT_DIR/fm-lease-lib.sh"
+# shellcheck source=bin/fm-project-lock-lib.sh
+. "$SCRIPT_DIR/fm-project-lock-lib.sh"
 
 TEARDOWN_BIN="${FM_IDLE_REAP_TEARDOWN_BIN:-$SCRIPT_DIR/fm-teardown.sh}"
 
@@ -220,6 +225,10 @@ reap_one() {  # <task-id> <status-line>
   fi
   if [ "$rc" -eq "$FM_LEASE_REFUSE_EXIT" ]; then
     add_row lease-skipped "$id" - - "another supervision actor holds the task lease"
+    return 0
+  fi
+  if [ "$rc" -eq "$FM_PROJECT_LOCK_BUSY_EXIT" ]; then
+    add_row lock-skipped "$id" - - "another operation holds or is queued for the task's project lock"
     return 0
   fi
   # The first line that names a refusal is the reason; fall back to the last

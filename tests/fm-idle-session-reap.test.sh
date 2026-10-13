@@ -34,6 +34,7 @@ case "$mode" in
   refuse) echo "REFUSED: task $1 has work that has not landed" >&2; exit 1 ;;
   lease) echo "error: lease held" >&2; exit 6 ;;
   hang) exec sleep 30 ;;
+  real) exec "$ROOT/bin/fm-teardown.sh" "$@" ;;
   steer-race)
     if [ "$1" = a-first ]; then
       mkdir -p "$FM_STATE_OVERRIDE/b-next.inbox"
@@ -400,6 +401,53 @@ test_lease_refusal_is_transient() {
 }
 
 
+# The project lock is shared with spawns and other teardowns. The sweep's
+# teardown must not wait in its queue, because its fixed work bound would then
+# include the wait: with the lock held, the real teardown returns at once,
+# changes nothing, records no refusal, and the next sweep offers it again.
+test_project_lock_contention_is_skipped_and_retried() {
+  local home project slot lock holder out started i
+  home=$(make_home projectlock)
+  project="$home/project"
+  slot="$home/pool/1/project"
+  fm_git_init_commit "$project"
+  mkdir -p "${slot%/*}"
+  git -C "$project" worktree add --quiet --detach "$slot"
+  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot" > "$home/pool/treehouse-state.json"
+  mk_task "$home" scout-pool scout idle "done [at=$OLD]: report written" \
+    -- "worktree=$slot" "project=$project"
+  scout_report "$home" scout-pool
+  lock=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$project") \
+    || fail "could not resolve the project lock"
+  FM_HOME="$home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_lock_try_acquire "$2" || exit 1; : > "$3"; exec sleep 60' _ \
+    "$ROOT" "$lock" "$home/lock-held" &
+  holder=$!
+  i=0
+  while [ ! -e "$home/lock-held" ]; do
+    i=$((i + 1)); [ "$i" -lt 200 ] || fail "the project lock holder never acquired"
+    sleep 0.05
+  done
+  : > "$STUB_LOG"
+  printf 'real\n' > "$STUB_MODE_FILE"
+  started=$SECONDS
+  out=$(run_reap "$home" reap) || fail "reap failed: $out"
+  [ $((SECONDS - started)) -lt 60 ] || fail "the sweep's teardown waited in the project-lock queue"
+  expect_class "$out" scout-pool lock-skipped "project-lock contention skips the task"
+  assert_absent "$home/state/.idle-reap/scout-pool.refused" "a project-lock skip records no refusal"
+  assert_present "$home/state/scout-pool.meta" "a project-lock skip preserves the task record"
+  assert_present "$slot" "a project-lock skip preserves the pool slot"
+  assert_equals "$holder" "$(cat "$lock/pid" 2>/dev/null)" "the sweep's teardown disturbed the live project holder"
+  for i in "$lock.queue"/ticket-*; do
+    [ ! -L "$i" ] || fail "the sweep's teardown registered in the project-lock queue"
+  done
+  out=$(run_reap "$home" reap) || fail "second reap failed: $out"
+  [ "$(calls)" = 2 ] || fail "a lock-skipped task is offered again on the next sweep (calls=$(calls))"
+  expect_class "$out" scout-pool lock-skipped "the retried teardown is skipped again while the lock is held"
+  kill "$holder" 2>/dev/null || true
+  wait "$holder" 2>/dev/null || true
+  pass "a sweep teardown meeting project-lock contention returns at once, changes nothing, and is retried next sweep"
+}
+
 test_single_flight_lock() {
   local home out pid hung
   home=$(make_home lock)
@@ -653,6 +701,7 @@ test_budget_bounds_teardowns_per_pass
 test_refusal_is_remembered_and_retried_on_change
 test_real_teardown_refusal_preserves_the_task
 test_lease_refusal_is_transient
+test_project_lock_contention_is_skipped_and_retried
 test_unknown_times_and_fixed_grace
 test_canonical_forge_markers
 test_semantic_idle_sources
