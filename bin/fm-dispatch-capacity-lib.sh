@@ -23,6 +23,7 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-quota-axi-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-session-launch-policy-lib.sh"
+. "$FM_DISPATCH_CAPACITY_DIR/fm-api-key-guard-lib.sh"
 
 fm_omp_codex_capacity() {
   local model=$1 usage=${2:-} now
@@ -146,6 +147,7 @@ fm_dispatch_fallback_supported() {
   FM_CONFIG_OVERRIDE="$routing_config" "$FM_DISPATCH_CAPACITY_DIR/fm-model-index.sh" model "$harness" "$model" >/dev/null || return 1
   case "$harness" in
     omp)
+      fm_omp_api_billing_route_check "$model" || return 1
       catalog=$(fm_run_timed 20 omp models --json 2>/dev/null </dev/null) || return 1
       jq -e --arg m "$model" 'any(.models[]?; .selector == $m)' <<<"$catalog" >/dev/null
       ;;

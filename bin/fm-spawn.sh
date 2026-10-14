@@ -2486,8 +2486,7 @@ omp_catalog_verdict() { # <listing> <provider/id>
 # writable Settings, so it is not a read-only global-file probe. The header
 # owns the default-role admission contract and points to its regression suite.
 omp_default_role_validate() {
-  local bin=$1 model=$2 raw=${3:-} agent_dir=${4:-} role selector verdict remedy model_flag dependency
-  [ -z "${OMP_PROFILE:-}" ] && [ -z "${PI_PROFILE:-}" ] || return 0
+  local bin=$1 model=$2 raw=${3:-} agent_dir=${4:-} role selector verdict remedy model_flag dependency raw_model
   if [ -n "$raw" ]; then
     model_flag=$(model_flag_for_harness omp "$model")
     raw=${raw//__MODELFLAG__/$model_flag}
@@ -2506,7 +2505,8 @@ const { tokens, error } = new LaunchLexer(process.argv[3]).tokenize();
 const readableToken = token => token.type === "word"
   ? /^(?:[A-Za-z0-9_./:=,@%+-]|\x27[^\x27]*\x27|\x22[^\x22\x24\x60\\]*\x22)+$/.test(token.source)
   : token.type === "redir" && [">", ">>", "<", "<>", ">&", "<&"].includes(token.value);
-if (error || !tokens.every(readableToken)) process.exit(1);
+if (error) process.exit(1);
+const readable = tokens.every(readableToken);
 const words = [];
 for (let i = 0; i < tokens.length; i++) {
   const token = tokens[i];
@@ -2529,24 +2529,32 @@ while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]?.value || "")) {
 }
 if (!/(^|\/)omp$/.test(words[i]?.value || "")) certain = false;
 let pinned = false;
+const models = [];
 for (i++; i < words.length; i++) {
-  if (words[i].value === "--") break;
+  if (words[i].type !== "word" || words[i].value === "--") break;
   if (words[i].value === "--profile" || words[i].value.startsWith("--profile=")) certain = false;
-  if (/^--model=.+/.test(words[i].value) ||
-      ((words[i].value === "--model" || words[i].value === "-m") && words[i + 1]?.value)) {
+  if (/^--model=.+/.test(words[i].value)) {
     pinned = true;
-    break;
+    if (readableToken(words[i])) models.push(words[i].value.slice("--model=".length));
+  } else if ((words[i].value === "--model" || words[i].value === "-m") && words[i + 1]?.type === "word") {
+    pinned = true;
+    if (readableToken(words[i]) && readableToken(words[i + 1])) models.push(words[i + 1].value);
+    i++;
   }
 }
-if (!certain || !agentDir.startsWith("/") || /[\n\r]/.test(agentDir)) agentDir = "";
-process.stdout.write(JSON.stringify({ pinned, agentDir }));
+if (!readable || !certain || !agentDir.startsWith("/") || /[\n\r]/.test(agentDir)) agentDir = "";
+process.stdout.write(JSON.stringify({ pinned, agentDir, models }));
 JS
     ) || return 0
+    while IFS= read -r raw_model; do
+      fm_omp_api_billing_route_check "$raw_model" || return 1
+    done < <(printf '%s' "$dependency" | jq -r '.models[]' 2>/dev/null)
     agent_dir=$(printf '%s' "$dependency" | jq -r '.agentDir' 2>/dev/null) || return 0
     [ "$(printf '%s' "$dependency" | jq -r '.pinned' 2>/dev/null)" = false ] || return 0
   else
     { [ -z "$model" ] || [ "$model" = default ]; } || return 0
   fi
+  [ -z "${OMP_PROFILE:-}" ] && [ -z "${PI_PROFILE:-}" ] || return 0
   [ -n "$agent_dir" ] || return 0
   role=$(ruby -ryaml -e '
 config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
