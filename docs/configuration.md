@@ -635,7 +635,7 @@ The `silent_report` clock is the newest nonfuture time among the last logical st
 The handled-directory mtime records the latest move when it contains handled messages, because a rename preserves the message's send mtime.
 Pane activity, commits, pipeline progress, request creation, and transport delivery do not reset this clock.
 Each row's evidence names all three sources and any exclusion or pending request.
-An ordinary task that reported done or ready is informational here because its PR or landing evidence owns the next action.
+An ordinary task whose latest status event or current state is `done` is informational here because its PR or landing evidence owns the next action.
 A report with no status line, acknowledgement, or resolved reply yet starts its clock at its task record's mtime (dispatch), so a new worker is not overdue before its first line.
 A report whose status log holds an open `needs-decision` or `blocked` key it raised about its own work, or whose parked no-mistakes gate carries the `ask-user: authority decision` verdict component, is informational here because firstmate owes the next move and `unanswered_question` or the gate owns it.
 Reserved `pending-reply-`, `remote-reply-continuity-` and `captain-hold-` keys are not the report's own decisions, and a parked gate with only auto-fix findings (`fix_review` or `awaiting_agent`) is owed by the worker, so a silent report in either case stays eligible for a check-in.
