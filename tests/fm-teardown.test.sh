@@ -8807,7 +8807,8 @@ test_slot_named_as_another_prior_copy_refuses() {
   case_dir=$(make_case prior-copy-collision)
   mkdir -p "$case_dir/home/state" "$case_dir/pool/1"
   git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
-  printf '{"worktrees":[]}\n' > "$case_dir/pool/treehouse-state.json"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"task-x1"}]}\n' \
+    "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
   slot=$(cd "$case_dir/pool/1/project" && pwd -P)
   wt_commit_at() { git -C "$slot" -c user.email=t@t -c user.name=t commit -q --allow-empty -m "$1"; }
   wt_commit_at "shippable work"
@@ -8856,7 +8857,8 @@ SH
         if [ "$pool" = pool ]; then
           mkdir -p "$case_dir/pool/1"
           git -C "$case_dir/project" worktree move "$slot" "$case_dir/pool/1/project"
-          printf '{"worktrees":[]}\n' > "$case_dir/pool/treehouse-state.json"
+          printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"task-x1"}]}\n' \
+    "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
           slot=$case_dir/pool/1/project
         fi
         ln -s "$slot" "$case_dir/copy-A"
@@ -8938,7 +8940,8 @@ make_nested_slot_case() {  # <name> <shape> <nested-relative-path> [mode]
   NESTED_CASE=$case_dir
   mkdir -p "$case_dir/home/state" "$case_dir/pool/1"
   git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
-  printf '{"worktrees":[]}\n' > "$case_dir/pool/treehouse-state.json"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"task-x1"}]}\n' \
+    "$case_dir/pool/1/project" > "$case_dir/pool/treehouse-state.json"
   NESTED_SLOT=$(cd "$case_dir/pool/1/project" && pwd -P)
   NESTED_COPY="$NESTED_SLOT/$3"
   mkdir -p "${NESTED_COPY%/*}"
@@ -9318,16 +9321,13 @@ SH
   chmod +x "$case_dir/fakebin/tmux"
 }
 
-# A step after the slot return fails, so the record stays while the slot is
-# already back in the pool and no longer claimed. The re-run can no longer reach
-# the slot through its claim, yet the removed nested copy still has to be judged
-# landed from its own branch ref: with a plain re-run, no --force and no captain
-# words, the ship is recorded as landed, never as dropped. The notices name
-# neither a copy left in place nor a slot to return again.
-test_nested_rerun_after_slot_return_records_landed() {
+# Endpoint closure refuses before the reserved slot or nested copy is removed.
+# A plain retry finishes once the endpoint closes, returns the slot exactly
+# once and records the landed ship as landed rather than an authorized drop.
+test_nested_rerun_after_endpoint_refusal_records_landed() {
   local case_dir rc mode label returns
   for mode in local-only no-mistakes; do
-    label="nested-after-return-$mode"
+    label="nested-after-endpoint-refusal-$mode"
     make_nested_slot_case "$label" enclosing .claude/worktrees/x "$mode"
     case_dir=$NESTED_CASE
     seed_backlog_in_flight "$case_dir"
@@ -9344,26 +9344,25 @@ test_nested_rerun_after_slot_return_records_landed() {
     rc=0
     FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
     expect_code 1 "$rc" "$label: the first teardown must stop at the endpoint close: $(cat "$case_dir/stderr")"
-    assert_grep "return --force $NESTED_SLOT" "$case_dir/treehouse.log" "$label: the slot was not returned before the failure"
-    assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the returned slot is still claimed"
-    assert_absent "$NESTED_COPY" "$label: the nested copy was not removed"
+    assert_absent "$case_dir/treehouse.log" "$label: the slot was returned while its endpoint could still hold it"
+    assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the reserved slot lost its claim"
+    assert_present "$NESTED_COPY" "$label: the nested copy was removed before its endpoint closed"
+    jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+      || fail "$label: the refused endpoint close left its slot allocatable"
     assert_present "$case_dir/state/task-x1.meta" "$label: the failed teardown deleted the record"
 
     rm -f "$case_dir/endpoint-stuck"
     rc=0
     FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
     expect_code 0 "$rc" "$label: a plain re-run must finish: $(cat "$case_dir/stderr2")"
-    assert_no_grep "get the captain's own words" "$case_dir/stderr2" "$label: the re-run asked for captain words for landed work"
     assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
     assert_absent "$case_dir/data/task-x1/captain-drop.md" "$label: landed work was recorded as a captain drop"
     grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null || fail "$label: the backlog row was not closed"
     assert_no_grep "dropped" "$case_dir/data/backlog.md" "$label: landed work was recorded as dropped"
-    assert_no_grep "left in place" "$case_dir/stdout2" "$label: the re-run said the removed copy was left in place"
-    assert_no_grep "prior copy" "$case_dir/stdout2" "$label: the re-run asked to return an already-returned slot"
     returns=$(grep -c "^return --force $NESTED_SLOT\$" "$case_dir/treehouse.log" || true)
-    assert_equals 1 "$returns" "$label: the re-run returned the slot again"
+    assert_equals 1 "$returns" "$label: the retry must return the reserved slot exactly once"
   done
-  pass "a re-run after the slot was already returned still judges the removed nested copy by its branch and records it landed"
+  pass "an endpoint-refused retry keeps the reservation until closure and records the nested ship landed"
 }
 
 # The stale-lock proof covers the enclosing slot only. Nested copies teardown
@@ -9497,7 +9496,6 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
       retire) assert_grep "still loaded" "$case_dir/stderr" "$label: the refusal did not name the unloaded agent" ;;
       pre-remove)
         assert_grep "claimed pool slot $NESTED_SLOT" "$case_dir/stderr" "$label: the refusal did not name the slot"
-        assert_grep "nothing was removed" "$case_dir/stderr" "$label: the refusal did not say nothing was removed"
         git -C "$NESTED_SLOT" add late.txt
         git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm "late slot work"
         git -C "$NESTED_SLOT" push -q origin HEAD:main
@@ -9774,7 +9772,8 @@ test_forced_nested_secondmate_admits_only_locked_current_copies() {
       "kind=secondmate" "mode=local-only"
     mkdir -p "${wt%/*}"
     git -C "$case_dir/project" worktree add -q -b fm/grandchild "$wt" main
-    printf '{"worktrees":[]}\n' > "${wt%/*/*}/treehouse-state.json"
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"grandchild"}]}\n' \
+      "$wt" > "${wt%/*/*}/treehouse-state.json"
     printf 'task=grandchild\nhome=%s\n' "$child_home" > "${wt%/*}/.fm-slot-owner"
     fm_write_meta "$child_home/state/grandchild.meta" \
       "window=firstmate:fm-grandchild" "endpoint_task_id=grandchild" \
@@ -10134,7 +10133,8 @@ test_subordinate_slot_cleanup_preserves_ancestor_custody() {
     fi
     mkdir -p "${slot%/*}"
     git -C "$case_dir/project" worktree move "$case_dir/wt" "$slot"
-    printf '{"worktrees":[]}\n' > "${slot%/*/*}/treehouse-state.json"
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"task-x1"}]}\n' \
+      "$slot" > "${slot%/*/*}/treehouse-state.json"
     fm_write_meta "$case_dir/state/task-x1.meta" \
       "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
       "worktree=$slot" "project=$case_dir/project" "kind=ship" "mode=no-mistakes" \
@@ -10292,7 +10292,125 @@ SH
   pass 'a custody refusal at a non-pool child return keeps the child worktree and its parked copy'
 }
 
+test_unverified_pool_reservation_preserves_processes() {
+  local case_dir pid rc=0
+  make_nested_slot_case unverified-pool-reservation enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$NESTED_SLOT" \
+    > "$case_dir/pool/treehouse-state.json"
+  # The existing fixture provider acknowledges lease but never changes state.
+  # A successful command is not evidence that this slot became nonallocatable.
+  teardown_fixture_start "$NESTED_COPY" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
+  FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  if ! kill -0 "$pid" 2>/dev/null; then
+    fail 'an unverified reservation killed the worker before protecting its slot'
+  fi
+  teardown_fixture_stop "$pid"
+  expect_code 1 "$rc" "unverified reservation must stop cleanup: $(cat "$case_dir/stderr")"
+  assert_present "$case_dir/state/task-x1.meta" 'unverified reservation removed task identity'
+  assert_present "$case_dir/pool/1/.fm-slot-owner" 'unverified reservation dropped slot ownership'
+  assert_present "$NESTED_COPY" 'unverified reservation removed its nested copy'
+  assert_no_grep '^return ' "$case_dir/treehouse.log" 'unverified reservation returned the pool slot'
+  pass 'a lease command without durable state proof cannot reap processes or return the slot, even with authorized discard'
+}
+
+test_pool_return_rechecks_work_after_waiting_for_project_custody() {
+  local shape case_dir slot lock actor holder ticket queued i rc head
+  for shape in dirty committed; do
+    case_dir=$(make_case "pool-late-work-$shape")
+    slot="$case_dir/pool/1/project"
+    mkdir -p "${slot%/*}" "$case_dir/primary-home/state"
+    git -C "$case_dir/project" worktree add -q -b fm/late-root "$slot" main
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"task-x1"}]}\n' \
+      "$slot" > "$case_dir/pool/treehouse-state.json"
+    printf 'task=task-x1\nhome=%s\n' "$case_dir/primary-home" > "${slot%/*}/.fm-slot-owner"
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      'window=firstmate:fm-task-x1' 'endpoint_task_id=task-x1' \
+      "worktree=$slot" "project=$case_dir/project" 'kind=ship' 'mode=local-only' \
+      'spawn_gen=teardown-test-task-x1' 'branch=fm/late-root'
+    printf 'manual\n' > "$case_dir/config/backlog-backend"
+    cat > "$case_dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-windows)
+    [ -f "$FM_LATE_CASE/closed" ] || printf '%s\n' fm-task-x1
+    exit 0
+    ;;
+  kill-window)
+    : > "$FM_LATE_CASE/closing"
+    i=0
+    while [ ! -f "$FM_LATE_CASE/project-held" ]; do
+      i=$((i + 1)); [ "$i" -lt 2000 ] || exit 1
+      sleep 0.05
+    done
+    : > "$FM_LATE_CASE/closed"
+    ;;
+esac
+SH
+    cat > "$case_dir/fakebin/treehouse" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_LATE_CASE/treehouse.log"
+SH
+    chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
+    lock=$(FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
+      bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
+      _ "$ROOT" "$case_dir/project")
+    FM_HOME="$case_dir/primary-home" FM_LATE_CASE="$case_dir" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" &
+    actor=$!
+    i=0
+    while [ ! -f "$case_dir/closing" ]; do
+      i=$((i + 1)); [ "$i" -lt 1000 ] || fail "$shape: teardown did not reach endpoint closure: $(cat "$case_dir/stderr" "$case_dir/stdout")"
+      sleep 0.05
+    done
+    FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
+      bash -c '
+        . "$1/bin/fm-wake-lib.sh"
+        fm_lock_try_acquire "$2" || exit 1
+        trap '\''fm_lock_release "$2"'\'' EXIT
+        : > "$3/project-held"
+        while [ ! -f "$3/release" ]; do sleep 0.05; done
+      ' _ "$ROOT" "$lock" "$case_dir" &
+    holder=$!
+    i=0
+    while :; do
+      queued=0
+      for ticket in "$lock.queue"/ticket-*; do
+        [ ! -L "$ticket" ] || queued=1
+      done
+      [ "$queued" = 0 ] || break
+      i=$((i + 1)); [ "$i" -lt 1000 ] || {
+        : > "$case_dir/release"; wait "$holder" || true; wait "$actor" || true
+        fail "$shape: teardown never queued for final project custody: $(cat "$case_dir/stderr")"
+      }
+      sleep 0.05
+    done
+    printf 'work produced while return waits\n' > "$slot/late.txt"
+    if [ "$shape" = committed ]; then
+      git -C "$slot" add late.txt
+      git -C "$slot" -c user.email=t@t -c user.name=t commit -qm 'late unlanded work'
+    fi
+    head=$(git -C "$slot" rev-parse HEAD)
+    : > "$case_dir/release"
+    wait "$holder" || fail "$shape: project holder could not release"
+    rc=0; wait "$actor" || rc=$?
+    [ "$rc" -ne 0 ] || fail "$shape: teardown returned a slot whose work changed while project custody was queued"
+    assert_present "$case_dir/state/task-x1.meta" "$shape: refused return erased its record"
+    assert_present "${slot%/*}/.fm-slot-owner" "$shape: refused return dropped its claim"
+    assert_absent "$case_dir/treehouse.log" "$shape: late work reached a destructive provider call"
+    assert_equals "$head" "$(git -C "$slot" rev-parse HEAD)" "$shape: late HEAD was changed"
+    assert_grep 'work produced while return waits' "$slot/late.txt" "$shape: late bytes were changed"
+    jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+      || fail "$shape: refused return released its durable reservation"
+  done
+  pass 'ordinary pool return preserves dirt and new commits produced while final project custody is queued'
+}
+
 teardown_test_cases=(
+test_pool_return_rechecks_work_after_waiting_for_project_custody
+test_unverified_pool_reservation_preserves_processes
 test_non_pool_returns_recheck_registered_copies
 test_return_missing_slot_reports_canonicalization_refusal
 test_child_return_custody_refusal_keeps_non_pool_worktree
@@ -10482,7 +10600,7 @@ test_nested_rerun_gone_copy_needs_its_branch_landed
 test_nested_rerun_gone_copy_and_branch_uses_recorded_merged_pr
 test_nested_slot_is_not_proven_by_the_current_copys_pipeline_input
 test_nested_rerun_gone_copy_is_proven_by_its_pipeline_input
-test_nested_rerun_after_slot_return_records_landed
+test_nested_rerun_after_endpoint_refusal_records_landed
 test_nested_post_lock_reprove_skips_removed_nested_priors
 test_other_record_copy_overlap_is_component_aware
 test_forced_descendant_preserved_copy_refuses_before_cleanup

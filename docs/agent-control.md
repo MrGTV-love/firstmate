@@ -282,7 +282,11 @@ A task's own prior copies are not competing custody against the cleanup of its o
 
 1. **Proof, with no side effects.** The nested copy passes the ordinary landed-work test. When an earlier teardown already removed it, that test runs on its `branch=` ref read from the project: local-main ancestry for a local-only ship, then a merged PR, then the merge-tree content check, so neither the copy nor a recorded `pr=` URL is needed. When that branch ref is gone too, for example pruned after its PR merged, the forge's word on the recorded `pr=` settles it as for any missing worktree: a merged PR finishes with a plain re-run and is recorded as landed, while no recorded PR, or one the forge does not report merged, refuses. The slot and every own copy nested in it are clean worktree roots whose HEAD is landed by that same rule or held by the task's `refs/fm/anchor/<task>-<sha>` anchor, and the slot's claim is this task's. Otherwise teardown stops before changing anything and names the copy and the reason.
 2. **Retire, on every swept root.** Before any destructive step, teardown concludes a parked no-mistakes run, retires a task-private launch agent, and reaps leaked processes on the current copy, the slot and each nested copy, each as its own root.
-3. **Execute.** Teardown proves the slot and the nested copies again with the lock held and refuses before removing anything. Then it removes the nested copy (its branch stays), detaches the slot, returns it, and drops the claim. If the return removes a stale `index.lock`, the slot is proved once more before the reset.
+3. **Execute.** Teardown checks dirt and HEAD again with the project lock held, reusing only landing proofs tied to those same immutable commits; it refuses before removing anything if a new landing proof would be needed.
+   Then it removes the nested copy (its branch stays), detaches the slot, returns it, drops the claim and removes the task record before releasing the project lock.
+   If the return removes a stale `index.lock`, the slot is checked once more before the reset.
+
+The teardown header owns the state-only slot reservation and lock boundaries; process cleanup, endpoint closure, backlog completion and clone synchronization are outside those ordinary pool critical sections.
 
 `--force` skips the landed-work test on the current copy as always and does not waive the slot proof.
 The same function covers the reverse shape, where the current copy is the pool slot and a prior copy is nested inside it: that copy is proved and removed before the ordinary return.
