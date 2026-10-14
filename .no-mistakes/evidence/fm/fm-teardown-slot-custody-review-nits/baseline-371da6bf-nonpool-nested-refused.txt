@@ -1,0 +1,46 @@
+fixture: plain linked worktree (no Treehouse pool inventory) with a registered nested copy at $LAB/worktrees/demo-x1/.claude/worktrees/parked
+=== scenario: nonpool-nested-refused
+LAB=/Users/charlesabrooker/tmp/fm-lab.YIeCpJ (marked lab home)
+--- fm-teardown.sh exit code: 1
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: pool slot $LAB/worktrees/demo-x1 contains registered copy $LAB/worktrees/demo-x1/.claude/worktrees/parked that is not one of task fmlab-x1's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $LAB/worktrees/demo-x1 worktree remove <copy>. Re-run this teardown afterwards.
+error: treehouse return failed for worktree $LAB/worktrees/demo-x1; teardown aborted
+--- stdout
+--- after-state
+task meta present:      yes
+task worktree present:  yes
+nested copy present:    yes
+treehouse calls:        0
+registered worktrees:
+  $LAB/projects/demo                              4ac8fc2 [main]
+  $LAB/worktrees/demo-x1                          4ac8fc2 (detached HEAD)
+  $LAB/worktrees/demo-x1/.claude/worktrees/parked 4ac8fc2 (detached HEAD)
+
+=== follow the printed recovery: remove the nested copy by hand, then re-run teardown
+=== scenario: nonpool-nested-refused
+LAB=/Users/charlesabrooker/tmp/fm-lab.YIeCpJ (marked lab home)
+--- fm-teardown.sh exit code: 0
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+--- stdout
+teardown fmlab-x1 complete (window firstmate:fm-fmlab-x1, worktree $LAB/worktrees/demo-x1)
+Backlog: fmlab-x1 just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move fmlab-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- after-state
+task meta present:      NO
+task worktree present:  yes
+nested copy present:    NO
+treehouse calls:        1
+  treehouse return --force /Users/charlesabrooker/tmp/fm-lab.YIeCpJ/worktrees/demo-x1
+registered worktrees:
+  $LAB/projects/demo     4ac8fc2 [main]
+  $LAB/worktrees/demo-x1 4ac8fc2 (detached HEAD)

@@ -1,0 +1,44 @@
+fixture: plain linked worktree (no Treehouse pool inventory) with a registered nested copy at $LAB/worktrees/demo-x1/.claude/worktrees/parked
+=== scenario: nonpool-nested-refused
+LAB=/Users/charlesabrooker/tmp/fm-lab.7UEjAx (marked lab home)
+--- fm-teardown.sh exit code: 0
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- stdout
+teardown fmlab-x1 complete (window firstmate:fm-fmlab-x1, worktree $LAB/worktrees/demo-x1)
+Backlog: fmlab-x1 just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move fmlab-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- after-state
+task meta present:      NO
+task worktree present:  yes
+nested copy present:    yes
+treehouse calls:        1
+  treehouse return --force /Users/charlesabrooker/tmp/fm-lab.7UEjAx/worktrees/demo-x1
+registered worktrees:
+  $LAB/projects/demo                              a91bcd2 [main]
+  $LAB/worktrees/demo-x1                          a91bcd2 (detached HEAD)
+  $LAB/worktrees/demo-x1/.claude/worktrees/parked a91bcd2 (detached HEAD)
+
+=== follow the printed recovery: remove the nested copy by hand, then re-run teardown
+=== scenario: nonpool-nested-refused
+LAB=/Users/charlesabrooker/tmp/fm-lab.7UEjAx (marked lab home)
+--- fm-teardown.sh exit code: 1
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+error: teardown refused: task record is not a regular file at $LAB/state/fmlab-x1.meta
+--- stdout
+--- after-state
+task meta present:      NO
+task worktree present:  yes
+nested copy present:    NO
+treehouse calls:        1
+  treehouse return --force /Users/charlesabrooker/tmp/fm-lab.7UEjAx/worktrees/demo-x1
+registered worktrees:
+  $LAB/projects/demo     a91bcd2 [main]
+  $LAB/worktrees/demo-x1 a91bcd2 (detached HEAD)

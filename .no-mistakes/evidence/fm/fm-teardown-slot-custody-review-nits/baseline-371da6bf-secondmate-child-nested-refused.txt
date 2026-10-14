@@ -1,0 +1,29 @@
+fixture: secondmate task whose child-a owns a plain linked worktree (no pool) holding a registered nested copy
+=== scenario: secondmate-child-nested-refused
+LAB=/Users/charlesabrooker/tmp/fm-lab.L3HkR4 (marked lab home)
+--- fm-teardown.sh exit code: 0
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab-sm.dDGRBe/worktrees/child-a contains registered copy /Users/charlesabrooker/tmp/fm-lab-sm.dDGRBe/worktrees/child-a/.claude/worktrees/parked that is not one of task child-a's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab-sm.dDGRBe/worktrees/child-a worktree remove <copy>. Re-run this teardown afterwards.
+--- stdout
+teardown fmlab-x1 complete (window firstmate:fm-fmlab-x1, worktree $LAB/worktrees/demo-x1)
+--- after-state
+task meta present:      NO
+task worktree present:  yes
+nested copy present:    NO
+treehouse calls:        0
+registered worktrees:
+  $LAB/projects/demo                                 f1ec258 [main]
+  /Users/charlesabrooker/tmp/fm-lab-sm.dDGRBe/worktrees/child-a                          f1ec258 [fm/child-a] prunable
+  /Users/charlesabrooker/tmp/fm-lab-sm.dDGRBe/worktrees/child-a/.claude/worktrees/parked f1ec258 (detached HEAD) prunable
+  $LAB/worktrees/demo-x1                             f1ec258 [fm/fmlab-x1]
+child worktree present: NO
+child record present:   NO

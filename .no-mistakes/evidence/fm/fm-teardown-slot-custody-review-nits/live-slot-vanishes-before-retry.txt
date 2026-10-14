@@ -1,0 +1,27 @@
+fixture: first provider return moves the target away and fails with a transient index.lock
+=== scenario: slot-vanishes-before-retry
+LAB=/Users/charlesabrooker/tmp/fm-lab.WLNOeU (marked lab home)
+--- fm-teardown.sh exit code: 1
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fatal: Unable to create 'index.lock': File exists.
+teardown: worktree return failed with transient git lock (index.lock); waiting 0s and retrying (1/1)
+REFUSED: cannot canonicalize pool slot $LAB/worktrees/demo-x1; retain its records and lease and inspect the slot path before retrying.
+error: treehouse return failed for worktree $LAB/worktrees/demo-x1; teardown aborted
+--- stdout
+--- after-state
+task meta present:      yes
+task worktree present:  NO
+treehouse calls:        1
+  treehouse return --force /Users/charlesabrooker/tmp/fm-lab.WLNOeU/worktrees/demo-x1
+registered worktrees:
+  $LAB/projects/demo     7016c7a [main]
+  $LAB/worktrees/demo-x1 7016c7a (detached HEAD) prunable
+retained copy present:  yes

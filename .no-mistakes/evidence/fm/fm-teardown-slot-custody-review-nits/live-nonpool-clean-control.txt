@@ -1,0 +1,24 @@
+fixture: plain linked worktree, no nested copy (positive control)
+=== scenario: nonpool-clean-control
+LAB=/Users/charlesabrooker/tmp/fm-lab.0xN9Zc (marked lab home)
+--- fm-teardown.sh exit code: 0
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- stdout
+teardown fmlab-x1 complete (window firstmate:fm-fmlab-x1, worktree $LAB/worktrees/demo-x1)
+Backlog: fmlab-x1 just finished (this home keeps no markdown backlog at $LAB/data/backlog.md). Update $LAB/data/backlog.md - move fmlab-x1 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+--- after-state
+task meta present:      NO
+task worktree present:  yes
+treehouse calls:        1
+  treehouse return --force /Users/charlesabrooker/tmp/fm-lab.0xN9Zc/worktrees/demo-x1
+registered worktrees:
+  $LAB/projects/demo     4e8036f [main]
+  $LAB/worktrees/demo-x1 4e8036f (detached HEAD)

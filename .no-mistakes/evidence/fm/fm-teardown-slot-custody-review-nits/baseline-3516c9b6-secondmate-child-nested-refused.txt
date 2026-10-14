@@ -1,0 +1,28 @@
+fixture: secondmate task whose child-a owns a plain linked worktree (no pool) holding a registered nested copy
+=== scenario: secondmate-child-nested-refused
+LAB=/Users/charlesabrooker/tmp/fm-lab.rKunBy (marked lab home)
+--- fm-teardown.sh exit code: 0
+--- stderr
+fm-gate-refuse: gate agent lifecycle permitted only against lab home $LAB
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+--- stdout
+teardown fmlab-x1 complete (window firstmate:fm-fmlab-x1, worktree $LAB/worktrees/demo-x1)
+--- after-state
+task meta present:      NO
+task worktree present:  yes
+nested copy present:    yes
+treehouse calls:        1
+  treehouse return --force /Users/charlesabrooker/tmp/fm-lab-sm.RXrvg5/worktrees/child-a
+registered worktrees:
+  $LAB/projects/demo                                 96b6d6f [main]
+  /Users/charlesabrooker/tmp/fm-lab-sm.RXrvg5/worktrees/child-a                          96b6d6f [fm/child-a]
+  /Users/charlesabrooker/tmp/fm-lab-sm.RXrvg5/worktrees/child-a/.claude/worktrees/parked 96b6d6f (detached HEAD)
+  $LAB/worktrees/demo-x1                             96b6d6f [fm/fmlab-x1]
+child worktree present: yes
+child record present:   NO
