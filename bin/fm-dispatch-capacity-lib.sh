@@ -53,6 +53,8 @@ fm_omp_codex_capacity() {
          (if any($limits[]; (.amount | percent) <= 0) then "exhausted" else "usable" end)
        else "unknown" end) as $state |
       {status: $state,
+       headroomKnown: (($limits | length) > 0 and all($limits[];
+         (.amount | percent) as $p | ($p | type) == "number" and $p >= 0 and $p <= 100)),
        remaining: ([$limits[].amount | percent | select(. != null)] | if length > 0 then min else null end),
        savedResets: (.resetCredits.availableCount // 0)};
     (if length == 1 and (.[0] | type) == "object" then .[0] else {} end) |
@@ -63,7 +65,10 @@ fm_omp_codex_capacity() {
       {status: (if any($accounts[]; .status == "usable") then "usable"
                 elif ($accounts | length) == 0 or any($accounts[]; .status == "unknown") or
                   any((.accountsWithoutUsage // [])[]; .provider == "openai-codex")
-                then "unknown" else "exhausted" end), accounts: $accounts}
+                then "unknown" else "exhausted" end), accounts: $accounts,
+       bestAccountHeadroom: ([$accounts[] | select(.status == "usable" and .headroomKnown and
+         (.remaining | type) == "number" and .remaining > 0 and .remaining <= 100) | .remaining]
+         | if length > 0 then max else null end)}
     end
   ' 2>/dev/null || printf '%s\n' '{"status":"unknown","accounts":[],"reason":"invalid omp usage JSON"}'
 }

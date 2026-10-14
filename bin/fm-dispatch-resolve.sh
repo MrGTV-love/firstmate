@@ -10,31 +10,25 @@
 #   With no key from any source: one "dispatch-resolve: off" line on stderr,
 #   nothing on stdout, exit 0, no network call, so firstmate dispatches exactly
 #   as today.
-#   The key lives in one shell variable and reaches curl as a header read from
-#   a file descriptor, never on argv; nothing logs or writes it.
+#   The key lives in one shell variable and reaches the JevClient helper through
+#   file descriptor 3, never on argv or in its environment; nothing logs it.
 #   Every HTTP code it receives goes to bin/fm-typesafe-health.sh record, which
 #   alerts the captain once on 402, 401, or 403 (docs/configuration.md
 #   "TypeSafe account health" owns that contract).
 #
-# What it does when on with at least one rule: one POST to
-#   https://api.typesafe.ai/v1/systemone with the project name and the brief's
-#   `## Captain's intent` and `## Firstmate spec` sections, tagged when it is a
-#   scout brief (the whole brief when it has neither section), as state and
-#   ONE Choice question whose options are every rule's `when` from
-#   config/crew-dispatch.json plus one fixed generic none option. Jev returns
-#   the matched rule, a probability per option, and a confidence. Everything
-#   after that uses local policy: the confidence floor (0.6 on the answer confidence, or a
-#   rule's declared `min_confidence` on that rule's probability, falling to the
-#   most probable other option that clears its own floor), the rule's declared
-#   `approval` and `floor`, each profile's declared `provider` and `floor`, the
-#   quota rows from ONE compatible quota-axi --json snapshot, and ranking under
-#   the operator contract below. The model never sees quota, catalogs, approvals,
-#   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
-#   result so firstmate keeps using the existing intake.
-#   The chosen profile also passes the selected-entry preflight owned by
-#   docs/configuration.md "Fleet model index" before publication.
-#   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
-#   "Typed dispatch resolution" owns this tool's operator contract.
+# Pre-checks prune explicit Vernant/non-Vernant rule boundaries and prohibited
+#   session launch targets without inference. An explicit Claude-only requirement
+#   resolves locally, including refusal when its harness is prohibited.
+#   Otherwise one JevClient.systemOne call combines the vendored Level 5 agent
+#   and model questions with the rule Choice over the remaining `when` texts.
+#   bin/fm-dispatch-level5.ts owns this adaptation and reasoning-effort floors.
+#   The shared client selects TypeSafe explicitly, retains the raw exchange,
+#   validates every answer, and bounds retries within five seconds.
+#   Quota and rule gates remain local; model output never authorizes a launch.
+#   One quota-axi JSON snapshot and one OMP pool report feed the deterministic
+#   normalized quota composite; no quota or candidate profile is sent to Jev.
+#   docs/configuration.md "Typed dispatch resolution" owns weights, comparisons,
+#   gates, and the chosen model-index preflight.
 #
 # Never-send: docs/configuration.md owns the opt-in list and section markers
 #   in $FM_HOME/config/dispatch-never-send. Enabled marked regions are removed
@@ -52,9 +46,10 @@
 #     usage: input_tokens/output_tokens/jev_cost_usd/jev_input_usd_per_million/returned_model
 #   These diagnostics accompany normal resolution and structured errors, but
 #   no-rules results contain only status/reason; off paths have no stdout.
-#   api_ms and its latency_ms alias are curl's own time_total in whole
-#   milliseconds, so they carry no local helper overhead. Unknown api_ms prints
-#   null; unknown latency_ms prints -. Unattempted quota_ms prints null.
+#   api_ms and its latency_ms alias are JevClient's elapsedMs in whole
+#   milliseconds, excluding helper startup but including retries and validation.
+#   Deterministic routes report zero API time. Unknown api_ms prints null;
+#   unknown latency_ms prints -. Unattempted quota_ms prints null.
 #   quota_ms and total_ms include helper overhead; total is measured from
 #   opted-in setup through rendering, before printing diagnostics.
 #   local_ms is the nonnegative residual after subtracting known API and quota
@@ -67,7 +62,6 @@
 #   echoing arbitrary API text.
 #   Only numeric usage and the returned model id are observed, never request text
 #   or raw API error bodies, which may echo sensitive input.
-#     fallback: <runner-up rule taken when the picked rule missed its own floor>
 #     reason: <why the status is not clear>
 #     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. -> eligible [warning: ..] | eligible, unranked: <reason> | not eligible: <reason>
 #     profile: --harness <h> [--model <m>] [--effort <e>]     (status clear only)
@@ -116,7 +110,6 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 . "$SCRIPT_DIR/fm-worker-account-lib.sh"
 
 CONFIDENCE_FLOOR=0.6
-TS_MODEL=jev-latest
 TS_INPUT_USD_PER_MILLION=0.042
 DEFAULT_WHEN="No listed rule applies to this task."
 
@@ -358,44 +351,43 @@ never_send_check() {
 never_send_load
 fm_typesafe_brief_task "$BRIEF" "$NEVER_SEND_PATH" "$TASK_TEXT" \
   || never_send_off "$FM_TYPESAFE_WITHHELD_REASON"
-command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
-  REQUEST=$(jq -n --rawfile brief "$TASK_TEXT" --arg project "$PROJECT" --arg model "$TS_MODEL" \
-    --arg none_criterion "$DEFAULT_WHEN" --slurpfile rules "$RULES" '
-    ($rules[0]) as $cfg |
-    ($cfg.rules | to_entries | map({key: ("rule_" + ((.key + 1) | tostring)), value: .value.when}) | from_entries) as $criteria |
-    {
-      model: $model,
-      state: {task: {project: $project, brief: $brief}},
-      questions: {
-        rule: {
-          type: "choice",
-          instructions: "Which ONE dispatch rule best fits `task` (read `task.brief` and `task.project`)? Each option is the rule'"'"'s own matching condition; pick `default` when no rule'"'"'s condition is met, including when a rule'"'"'s own exemption text excludes this task.",
-          criteria: ($criteria + {default: $none_criterion})
-        }
-      }
-    }')
+command -v bun >/dev/null 2>&1 || emit_error "bun not installed"
+allowed_harnesses='[]'
+while IFS= read -r harness; do
+  if fm_session_launch_policy_check "$CONFIG" "$harness" 2>/dev/null; then
+    allowed_harnesses=$(jq -cn --argjson a "$allowed_harnesses" --arg h "$harness" '$a + [$h]')
+  fi
+done < <(jq -r '[(.rules[].use | if type == "array" then .[] else . end),
+  (.default // [] | if type == "array" then .[] else . end)] | map(.harness) | unique[]' "$RULES")
+PREPARED=$(bun "$SCRIPT_DIR/fm-dispatch-level5.ts" prepare "$RULES" "$TASK_TEXT" "$PROJECT" "$allowed_harnesses") \
+  || emit_error "Level 5 pre-check failed"
+printf '%s' "$PREPARED" > "$MODEL_CONFIG/level5.json"
+REQUEST=$(jq -c .request <<<"$PREPARED")
+if [ "$(jq -r '.direct // ""' <<<"$PREPARED")" = '' ]; then
   never_send_check
-  HTTP=$(fm_typesafe_post "$REQUEST" "$RESP_FILE" "$SEND_TEXT")
-  LAT_MS=$(fm_timing_seconds_ms "$(cat "$SEND_TEXT")") || LAT_MS=null
+  # The complete upstream exchange is preserved until policy derives its view.
+  api_rc=0
+  API_RESPONSE=$(printf '%s' "$REQUEST" | bun "$SCRIPT_DIR/fm-dispatch-level5.ts" call \
+    3< <(printf '%s' "$TYPESAFE_API_KEY_PRIVATE") 2>"$MODEL_CONFIG/call.err") || api_rc=$?
+  cat "$MODEL_CONFIG/call.err" >&2
   # Report the code at once so a credit or key failure does not wait for the next
   # watcher probe; the health tool ignores every other code and never blocks this.
-  FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-typesafe-health.sh" record "$HTTP" dispatch-resolve </dev/null >/dev/null 2>&1 || true
-  [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms"
-jq -e --slurpfile rules "$RULES" '
-    (($rules[0].rules | to_entries | map("rule_" + ((.key + 1) | tostring))) + ["default"] | sort) as $choices |
-    (.answers.rule.choice | type) == "string" and
-    (.answers.rule.confidence | type) == "number" and
-    .answers.rule.confidence >= 0 and .answers.rule.confidence <= 1 and
-    (.answers.rule.probabilities | type) == "object" and
-    ((.answers.rule.probabilities | keys | sort) == $choices) and
-    all(.answers.rule.probabilities[]; type == "number" and . >= 0 and . <= 1) and
-    ((.answers.rule.probabilities | [.[]] | add) as $total | $total >= 0.99 and $total <= 1.01) and
-    ((has("usage") | not) or
-      ((.usage | type) == "object" and
-       (.usage.input_tokens | type) == "number" and
-       (.usage.output_tokens | type) == "number"))' \
-  "$RESP_FILE" >/dev/null 2>&1 || emit_error "response is not a rule Choice answer"
-RESPONSE_VALID=1
+  if [ "$api_rc" -eq 0 ]; then HTTP=200
+  else HTTP=$(sed -n 's/^dispatch-level5: TypeSafe HTTP \([0-9][0-9][0-9]\)$/\1/p' "$MODEL_CONFIG/call.err" | head -n 1); fi
+  [ -z "${HTTP:-}" ] || FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-typesafe-health.sh" record "$HTTP" dispatch-resolve </dev/null >/dev/null 2>&1 || true
+  [ "$api_rc" -eq 0 ] || emit_error "Level 5 API request failed"
+  printf '%s' "$API_RESPONSE" > "$RESP_FILE"
+  LAT_MS=$(jq -r '.meta.elapsedMs | floor' "$RESP_FILE")
+  RESPONSE_VALID=1
+else
+  LAT_MS=0
+fi
+# apply consumes the same frozen rule set and validated questions as prepare.
+# This is a private derived snapshot, not a rewrite of the captain's policy.
+chmod 600 "$RULES"
+NORMALIZED=$(bun "$SCRIPT_DIR/fm-dispatch-level5.ts" apply "$RULES" "$RESP_FILE" "$MODEL_CONFIG/level5.json") \
+  || emit_error "Level 5 response or mapping failed"
+printf '%s' "$NORMALIZED" > "$RESP_FILE"
 
 # ---- quota evidence: one quota-axi --json snapshot -----------------------------
 command -v quota-axi >/dev/null 2>&1 || emit_error "quota-axi not installed"
@@ -521,10 +513,12 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     ($c.harness == "omp" and $p == "codex") as $pooled |
     ([$rows[] | select(runway_class(.) != "ok") | runway_note(.)]) as $risks |
     any($rows[]; runway_class(.) == "short") as $short |
-    if $pooled then $base
+    (if $pooled then $base + {pct: ($base.capacity.bestAccountHeadroom // null)}
+    elif $short then $base + {eligible: false, short: true, reason: "established runway shorter than task horizon", warning: ($risks | join("; "))}
     elif $ranked and ($risks | length) > 0 then
-      $base + {warning: ($risks | join("; ")), short: $short}
-    else $base end;
+      $base + {warning: ($risks | join("; ")), short: false}
+    else $base end) + {feasibleRunway: (if $pooled or ($rows | length) == 0 then null
+      else all($rows[]; runway_class(.) == "ok") end)};
   def rule_at($c):
     if ($c | test("^rule_[1-9][0-9]*$")) then
       ($c | ltrimstr("rule_") | tonumber) as $n |
@@ -534,37 +528,25 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   def confidence_floor($c): if declared_confidence($c) then rule_at($c).min_confidence else ($floor | tonumber) end;
   ($a.choice) as $picked |
   (confidence_floor($picked)) as $picked_floor |
-  # A declared floor is checked against the probability of that option whether
-  # it is the pick or a runner-up, so a runner-up never needs weaker support
-  # than it would as the pick. Only a rule that declares its own floor falls
-  # through to a runner-up, so a file with no declared floors keeps the single
-  # global floor on the answer confidence exactly.
-  (if declared_confidence($picked) | not then
-     (if $a.confidence >= $picked_floor then {below: false} else {below: true, global: true} end)
-   elif $a.probabilities[$picked] >= $picked_floor then {below: false}
-   else
-     ([$a.probabilities | to_entries[] | select(.key != $picked and .value >= confidence_floor(.key))]
-       | sort_by(-.value)) as $ok |
-     if ($ok | length) == 0 then {below: true, why: "no other option clears its own floor"}
-     elif ($ok | length) > 1 and $ok[1].value == $ok[0].value then {below: true, why: "runner-up tie"}
-     else {below: true, to: $ok[0].key, p: $ok[0].value, to_floor: confidence_floor($ok[0].key)} end
-   end) as $fb |
-  (if $fb.to then $fb.to else $picked end) as $choice |
-  (rule_at($choice)) as $rule |
+  # A failed confidence floor returns to firstmate, never another rule whose
+  # cheaper model or lower effort would silently replace the selected class.
+  (if declared_confidence($picked) then $a.probabilities[$picked] < $picked_floor
+   else $a.confidence < $picked_floor end) as $below_confidence |
+  (rule_at($picked)) as $rule |
   (if $rule == null then "none"
    elif $rule.floor.provider == "codex" and any(profiles($rule.use)[]; .harness == "omp" and (.model // "" | startswith("openai-codex/")))
    then "unknown" else floor_state($rule.floor; $rule.floor.provider; "") end) as $rule_floor_state |
-  (if $choice != "default" and $rule == null then []
+  (if $picked != "default" and $rule == null then []
    elif $rule == null then profiles($cfg.default // null)
    else profiles($rule.use)
    end) as $answer_use |
-  (if $choice != "default" and $rule == null then {invalid: "rule \($choice) is not in the rules file"}
+  (if $picked != "default" and $rule == null then {invalid: "rule \($picked) is not in the rules file"}
    elif $rule == null then {source: "default", use: profiles($cfg.default // null), note: "no rule matched"}
-   elif ($rule.approval // "") == "captain" then {source: $choice, escalate: "rule requires the captain'"'"'s explicit approval before dispatch"}
-   elif $rule_floor_state == "unknown" then {source: $choice, escalate: "rule \($choice) floor \($rule.floor.provider)/\($rule.floor.scope) is unverifiable"}
+   elif ($rule.approval // "") == "captain" then {source: $picked, escalate: "rule requires the captain'"'"'s explicit approval before dispatch"}
+   elif $rule_floor_state == "unknown" then {source: $picked, escalate: "rule \($picked) floor \($rule.floor.provider)/\($rule.floor.scope) is unverifiable"}
    elif $rule_floor_state == "below"
-     then {source: "default", use: profiles($cfg.default // null), note: "rule \($choice) floor \($rule.floor.scope) below \($rule.floor.min_percent)%: fall through to default"}
-   else {source: $choice, use: profiles($rule.use), note: "rule matched"} end) as $sel |
+     then {source: $picked, escalate: "rule \($picked) floor \($rule.floor.scope) below \($rule.floor.min_percent)%: required class cannot be replaced by default"}
+   else {source: $picked, use: profiles($rule.use), note: "rule matched"} end) as $sel |
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
   {
     model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
@@ -573,57 +555,55 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       elif $sel.source == "default" then (if (($cfg.default_fallback // []) | length) > 0 then "default" else null end)
       elif ((rule_at($sel.source).fallback // []) | length) > 0 then $sel.source else null end),
     rule_when: when_of($picked),
-    confidence: $a.confidence, probabilities: $a.probabilities
+    confidence: $a.confidence, probabilities: $a.probabilities, routing: $r.route
   }
-  + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) probability \($fb.p) clears its floor \($fb.to_floor); \($picked) probability \($a.probabilities[$picked]) is below its floor \($picked_floor)"} else {} end)
   as $ev |
-  if $sel.invalid then $ev + {status: "error", reason: $sel.invalid}
-  elif $fb.below and $fb.global then
-    $ev + {status: "ambiguous", reason: "confidence \($a.confidence) below floor \($floor)", candidates: ($answer_use | map(evaluate(.)))}
-  elif $fb.below and ($fb.to | not) then
-    $ev + {status: "ambiguous", reason: "\($picked) probability \($a.probabilities[$picked]) below its floor \($picked_floor); \($fb.why)", candidates: ($answer_use | map(evaluate(.)))}
+  if $r.route.escalate then $ev + {status: "escalate", reason: $r.route.escalate, candidates: ($answer_use | map(evaluate(.)))}
+  elif $sel.invalid then $ev + {status: "error", reason: $sel.invalid}
+  elif $below_confidence then
+    $ev + {status: "ambiguous", reason: (if declared_confidence($picked) then
+      "\($picked) probability \($a.probabilities[$picked]) below its floor \($picked_floor); no other rule substituted"
+      else "confidence \($a.confidence) below floor \($floor)" end), candidates: ($answer_use | map(evaluate(.)))}
   elif $sel.escalate then
     $ev + {status: "escalate", reason: $sel.escalate, candidates: ($answer_use | map(evaluate(.)))}
   elif ($sel.use | length) == 0 then $ev + {status: "escalate", reason: "no profiles configured for \($sel.source)", note: $sel.note, candidates: []}
   else
-    ($sel.use | map(evaluate(.))) as $cands |
-    ([$cands[] | select(.eligible and ((.unranked // false) | not))]) as $elig |
-    ([$cands[] | select(.eligible and .unranked)]) as $unranked |
-    if ([$cands[] | select(.eligible)] | length) == 1 and
-       any($cands[]; .eligible and .capacity.status == "usable" and (.unknown // false | not))
-    then $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: ($cands[] | select(.eligible))}
-    elif ($elig | length) == 0 then $ev + {status: "escalate", reason: "no rankable eligible candidate", note: $sel.note, candidates: $cands}
+    ($sel.use | map(evaluate(.))) as $raw |
+    def parts:
+      (if .capacity then .pct else ([.bounds[]?.pct | select(type == "number")] | min) end) as $headroom |
+      {headroom: (if ($headroom | type) == "number" and $headroom > 0 and $headroom <= 100 then $headroom / 100 else null end),
+       spend: (if (.spendPriority | type) == "number" then 0.5 + .spendPriority / (2 * (1 + (.spendPriority | fabs))) else null end),
+       runway: (if .feasibleRunway == true then 1 else null end)};
+    ($raw | map(. + {quota_parts: parts})) as $parts |
+    ([$parts[] | select(.eligible and ((.unknown // false) | not) and
+      ((.unranked // false | not) or .capacity.status == "usable"))]) as $viable |
+    {headroom: 0.6, spend: 0.3, runway: 0.1} as $weights |
+    ([$weights | keys[] | . as $key | select(($viable | length) > 0 and all($viable[]; (.quota_parts[$key] | type) == "number"))]) as $common |
+    ($common | map($weights[.]) | add // 0) as $denominator |
+    ($parts | map(. as $c | . + {quota_weights: $weights, quota_common: $common,
+      quota_score: (if .eligible and ($viable | index($c)) != null and $denominator > 0 then
+        ([$common[] | . as $key | $c.quota_parts[$key] * $weights[$key]] | add) / $denominator
+        else null end)})) as $cands |
+    ([$cands[] | select((.quota_score | type) == "number")]) as $elig |
+    if ($elig | length) == 0 then
+      $ev + {status: "escalate", reason: "no rankable eligible candidate", note: $sel.note, candidates: $cands}
     else
-      ($elig | max_by(.spendPriority)) as $best |
-      ([$elig[] | select(.spendPriority == $best.spendPriority)] | length) as $ties |
-      if $ties > 1 then $ev + {status: "escalate", reason: "genuine spendPriority tie", note: $sel.note, candidates: $cands}
-      elif $best.short then
-        $ev + {status: "escalate", reason: "highest-ranked candidate \($best.profile.harness):\($best.profile.model // "-") has established runway shorter than the \(horizon_seconds / 60)-minute task horizon; completion is not proven", note: $sel.note, candidates: $cands}
-      else $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: $best}
-        + (if ($unranked | length) > 0 then
-             {unranked_note: "\($unranked | length) eligible candidate(s) unranked (\([$unranked[].provider] | unique | join(", ")))"}
-           else {} end)
-      end
+      ($elig | max_by(.quota_score)) as $top |
+      ([$elig[] | select(.quota_score == $top.quota_score)]) as $ties |
+      # spendPriority remains the final ranker only when the tied scalars exist
+      # for every candidate; absent pool economics are never treated as zero.
+      (if ($ties | length) > 1 and all($ties[]; (.spendPriority | type) == "number") then
+        ($ties | max_by(.spendPriority)) as $best | [$ties[] | select(.spendPriority == $best.spendPriority)]
+        else $ties end) as $final |
+      if ($final | length) > 1 then
+        $ev + {status: "escalate", reason: "genuine quota evidence tie", note: $sel.note, candidates: $cands}
+      else $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: $final[0]} end
     end
   end') || emit_error "resolution failed"
 
-# Only proven exhaustion activates a declared stand-in. Confidence, approval,
-# malformed configuration, unknown headroom, and floors retain their decisions.
-if jq -e '.status == "escalate" and .reason == "no rankable eligible candidate" and
-  (.candidates | length) > 0 and all(.candidates[]; .exhausted == true)' <<<"$RESULT" >/dev/null; then
-  dispatch_rule=$(jq -r '.dispatch_rule // ""' <<<"$RESULT")
-  primary=$(jq -c '.candidates[0].profile' <<<"$RESULT")
-  fallbacks=$(fm_dispatch_fallbacks "$MODEL_CONFIG" "$dispatch_rule" "$(jq -r .harness <<<"$primary")" \
-    "$(jq -r '.model // ""' <<<"$primary")" "$(jq -r '.effort // ""' <<<"$primary")" "$RULES") || emit_error "invalid fallback configuration"
-  if selected=$(fm_dispatch_select "$CONFIG" "$dispatch_rule" "$primary" "$(jq -c .fallback <<<"$fallbacks")" '{"status":"exhausted","reason":"captured primary capacity"}' "$MODEL_CONFIG" 2>/dev/null); then
-    if [ "$(jq -r .switched <<<"$selected")" = true ]; then
-      RESULT=$(jq -c --argjson selected "$selected" '.status = "clear" | del(.reason) |
-        .fallback = "primary capacity exhausted; declared model-matrix fallback" |
-        .chosen = {profile: $selected.profile, capacity: $selected.capacity, eligible: true} |
-        .candidates += [.chosen]' <<<"$RESULT")
-    fi
-  fi
-fi
+# The composite is the only typed selection path. A launch-time stand-in cannot
+# turn exhausted approved candidates into an unscored or weaker clear result;
+# non-clear results return to firstmate's existing intake instead.
 CHOSEN=$(jq -r '.chosen.profile | select(.model) | [.harness, .model] | @tsv' <<<"$RESULT") || emit_error "resolution failed"
 if [ -n "$CHOSEN" ] && [ -e "$MODEL_CONFIG/model-index.json" ]; then
   IFS=$'\t' read -r chosen_harness chosen_model <<<"$CHOSEN"
@@ -647,16 +627,18 @@ TEXT=$(jq -r '
   "  model: \(show(.model))   latency_ms: \(show(.latency_ms))   tokens: \(show(.tokens.input_tokens))/\(show(.tokens.output_tokens))",
   "  rule: \(.rule | flat) (\(.rule_when | flat))   confidence: \(.confidence | flat)",
   "  probabilities: \([.probabilities | to_entries[] | "\(.key | flat)=\(.value | flat)"] | join(" "))",
-  (if .fallback then "  fallback: \(.fallback | flat)" else empty end),
+  "  routing: \(.routing | tojson | flat)",
   (if .reason then "  reason: \(.reason | flat)" else empty end),
   (if .note then "  note: \(.note | flat)" else empty end),
-  (if .unranked_note then "  note: \(.unranked_note | flat)" else empty end),
   (.candidates[]? | "  candidate: \(.profile.harness | flat):\(show(.profile.model))"
       + (if .provider then "  provider=\(.provider | flat)" else "" end)
       + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))" else "" end)
       + (if .capacity then "  pool=" + (.capacity | tojson | flat) else "" end)
+      + (if .quota_parts then "  quota_score=\(show(.quota_score))  parts=" + (.quota_parts | tojson | flat)
+          + "  weights=" + (.quota_weights | tojson | flat) + "  common=" + (.quota_common | tojson | flat) else "" end)
       + (if (.bounds // [] | length) > 1 then "  bounds=" + ([.bounds[] | "\(.scope | flat):\(show(.pct))%/\((.runway // .status) | flat)"] | join(",")) else "" end)
-      + "  -> " + (if .unranked and .eligible then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)
+      + "  -> " + (if .unranked and .eligible and (.quota_score | type) == "number" then "eligible, quota-scored; economic rank unknown: \(.reason | flat)"
+          elif .unranked and .eligible then "eligible, unranked: \(.reason | flat): disclosed uncertainty" elif .eligible then "eligible" else "not eligible: \(.reason | flat)" end)
       + (if .warning then " [warning: \(.warning | flat)]" else "" end)),
   (if .chosen then "  profile: --harness \(.chosen.profile.harness | shell_arg)"
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)

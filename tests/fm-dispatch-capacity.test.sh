@@ -53,6 +53,19 @@ assert_equals unknown "$(jq -r .status <<<"$out")" "invalid vendor JSON does not
 jq '.reports[1].metadata={meterStates:{chat:{allowed:true,limitReached:false}}}' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/serving.json"
 out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/serving.json")")
 assert_equals usable "$(jq -r .status <<<"$out")" "a serving verdict remains authoritative even with zero percentage"
+assert_equals null "$(jq -r '.bestAccountHeadroom' <<<"$out")" "zero serving percentages do not fabricate a quota score"
+write_pool 98
+out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol)
+assert_equals 98 "$(jq -r '.bestAccountHeadroom' <<<"$out")" "the usable sibling provides headroom without counting saved resets"
+jq '.reports[0].metadata={meterStates:{chat:{allowed:true,limitReached:false}}} |
+  .reports[0].limits[0].amount.remaining=40' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/two-usable.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/two-usable.json")")
+assert_equals 98 "$(jq -r '.bestAccountHeadroom' <<<"$out")" "pool percentages use the best account, never a sum"
+jq '.reports[1].metadata={meterStates:{chat:{allowed:true,limitReached:false}}} |
+  .reports[1].limits += [{scope:{shared:true},amount:{}}]' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/partial-headroom.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/partial-headroom.json")")
+assert_equals usable "$(jq -r .status <<<"$out")" "native serviceability survives an unmeasured bound"
+assert_equals null "$(jq -r '.bestAccountHeadroom' <<<"$out")" "unknown applicable bounds cannot produce a comparable headroom score"
 pass "pool capacity preserves serving, missing-account, freshness, and saved-reset semantics"
 
 primary='{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}'
