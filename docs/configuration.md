@@ -1541,7 +1541,7 @@ This section is the single owner of the canonical schema and its per-field seman
 OMP's own `usage --provider openai-codex --json` is authoritative for that surface, not quota-axi's single-account Codex row.
 A fresh usable sibling keeps the model available; an unmeasured sibling prevents a whole-pool exhaustion verdict.
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
-The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
+The pool has no synthesized `spendPriority` or completion runway: typed resolution ranks it only on its best usable account's measured headroom, as "Typed dispatch resolution" defines, never by summing percentages.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
 Native Claude's default-account quota is not a TeamClaude proxy ledger, so a TeamClaude fallback candidate's capacity is unknown and native Claude exhaustion cannot veto that stand-in, including on recovery of a task already running on it while `config/claude-launcher` selects `teamclaude`.
 Claude-primary routes keep their existing quota-axi ranking, floors, and `fm-quota-choose.sh` treatment.
@@ -1800,7 +1800,7 @@ When every candidate of the resolved rule is proven exhausted, the rule's declar
 **Candidate eligibility and evidence**
 
 - A known profile-floor shortfall makes a candidate ineligible, and outside the omp Codex pool any applicable `exhausted_now` row or known zero bound does the same, before unrelated quota uncertainty is considered.
-- Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
+- Missing or nonnumeric `spendPriority` evidence is never synthesized into a score component, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
 - Runway is judged against the task horizon, not the quota reset clock: the question is whether the candidate runs out before this task finishes.
   The horizon is the top-level `task_horizon_minutes` field defined under [Crew dispatch profiles](#crew-dispatch-profiles-configcrew-dispatchjson).
   `through_reset` passes, and so does a `projected_exhaustion` bound whose `projectionConfidence` is `established` and whose `usableRunwaySeconds` covers the horizon.
