@@ -1,0 +1,50 @@
+ When this task works on Firstmate itself, the repository root AGENTS.md (also imported by CLAUDE.md) is project content and the supervisor contract for the firstmate managing you: follow this brief
+ instead of that supervisor contract.
+ Project instructions still govern the work wherever they do not conflict with this worker identity, including CONTRIBUTING.md and firstmate-coding-guidelines for Firstmate changes.
+ If the firstmate-coding-guidelines skill name does not resolve in this session, read
+ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFDTH9SSHXJZH42XC61SJ9/.agents/skills/firstmate-coding-guidelines/SKILL.md instead.
+
+ Task
+
+ Captain's intent
+
+ Read README.md and report its first line. Change nothing.
+
+ Firstmate spec
+
+ Report only.
+
+ Progress note (2026-10-14T18:46:50Z)
+
+ This task was relaunched. Continue from here; the local copy and every
+ uncommitted change are exactly as the previous worker left them.
+
+ First, check your instruction inbox: list /Users/charlesabrooker/tmp/fm-lab.xIQBF4/state/route-recover.inbox/*.msg, act on
+ each message in numeric order, then mv each handled file into
+ /Users/charlesabrooker/tmp/fm-lab.xIQBF4/state/route-recover.inbox/handled/. A steer sent before the relaunch survives there.
+
+ lab quota-recovery check: continue the same report-only task
+
+ Skill selection
+
+ Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.
+ Skill selection was unavailable for this task (no TypeSafe or OpenRouter key). This does not mean no skill applies: check your skill index for skills that fit this task before starting work.
+
+
+ Listing inbox files
+
+╭──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+│ $ printf '%s\n' /Users/charlesabrooker/tmp/fm-lab.xIQBF4/state/route-recover.inbox/*.msg                                                                                                             │
+├─── Output ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┤
+│ /Users/charlesabrooker/tmp/fm-lab.xIQBF4/state/route-recover.inbox/*.msg                                                                                                                             │
+│ ⟦Wall: 0.01s | Timeout: 300s⟧                                                                                                                                                                        │
+╰──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+
+ Reading README line 1
+
+ ● Read README.md:1
+
+ hello
+
+❯
+ π · ◒ GPT-6-Luna 🙈 · 🌳 demo/demo · ⑂ detached · ◫ 3.2%/272K ⟲ · S0.00 + 👁 0.02                                                                                                           🆔 01a13bbd

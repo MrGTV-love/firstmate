@@ -1,0 +1,39 @@
+# Live recovery transcript: real bin/fm-spawn.sh + bin/fm-control.sh relaunch in a marked fm-lab home on tmux -L fm-lab, real omp 18.10.4 workers.
+# Rule: rule_1 use omp gpt-6.1-sol high; declared fallback omp gpt-6-luna low.
+
+## 1. Spawn with --dispatch-route powerful:high while Sol has headroom (lab pool fixture 80%)
+$ TMUX=<lab fm-lab socket> FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xIQBF4 bin/fm-spawn.sh route-recover /Users/charlesabrooker/tmp/fm-lab.xIQBF4/projects/demo --scout --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1 --dispatch-route powerful:high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.xIQBF4
+skill selection for route-recover: unavailable - no TypeSafe or OpenRouter key
+spawned route-recover harness=omp kind=scout window=primary:fm-route-recover worktree=/Users/charlesabrooker/.treehouse/demo-caa450/1/demo
+(exit 0)
+meta file: present
+harness=omp
+model=openai-codex/gpt-6.1-sol
+effort=high
+dispatch_rule=rule_1
+dispatch_route=powerful:high
+
+## 2. Sol limit now exhausted in the lab pool fixture; relaunch reloads dispatch_route=powerful:high from meta
+$ meta before: model=openai-codex/gpt-6.1-sol effort=high dispatch_rule=rule_1 dispatch_route=powerful:high 
+$ FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xIQBF4 bin/fm-control.sh route-recover relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.xIQBF4
+error: dispatch rule_1 has exhausted capacity and no supported permitted fallback
+(exit 1)
+$ meta after: model=openai-codex/gpt-6.1-sol effort=high dispatch_rule=rule_1 dispatch_route=powerful:high 
+worker pane footer after refused relaunch (old agent kept):
+  π · ◒ GPT-6.1-Sol 👁 · 🌳 demo/demo · ⑂ detached · ◫ 1.7%/500K ⟲ · S0.02 🆔 01a13bbc
+
+## 3. Control: same task, meta edited to dispatch_route=fast:high, relaunch takes the declared stand-in clamped to high
+$ meta before: model=openai-codex/gpt-6.1-sol effort=high dispatch_rule=rule_1 dispatch_route=fast:high 
+$ FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xIQBF4 bin/fm-control.sh route-recover relaunch --note <lab note>
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.xIQBF4
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.xIQBF4
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+warning: model is stale - openai-codex/gpt-6-luna on omp is older than openai-codex/gpt-6.1-sol in the omp catalog (other tier: sol)
+skill selection for route-recover: unavailable - no TypeSafe or OpenRouter key
+relaunched route-recover harness=omp from=omp model=openai-codex/gpt-6-luna effort=high backend=tmux endpoint=primary:fm-route-recover worktree=/Users/charlesabrooker/.treehouse/demo-caa450/1/demo
+(exit 0)
+$ meta after: model=openai-codex/gpt-6-luna effort=high dispatch_rule=rule_1 dispatch_route=fast:high 
+worker pane footer after relaunch:
+ π · ◒ GPT-6-Luna 🙈 · 🌳 demo/demo · ⑂ detached · ◫ 3.2%/272K ⟲ · S0.00 + 👁 0.02 🆔 01a13bbd

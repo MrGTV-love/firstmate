@@ -1,0 +1,70 @@
+{
+  "path": "/",
+  "auth": "Bearer <redacted>",
+  "model": "jev-latest",
+  "state": {
+    "task": "## Captain's intent\nRename a misspelled variable in one file.\n\n## Firstmate spec\nUse the existing implementation.\n",
+    "repository": "firstmate"
+  },
+  "question_ids": [
+    "ambiguity",
+    "effort",
+    "model",
+    "needs_desktop",
+    "profile",
+    "rule"
+  ],
+  "questions": {
+    "rule": {
+      "type": "choice",
+      "instructions": "Which ONE dispatch rule best fits `task` in `repository`? Pick default when no listed condition is met, including exemptions.",
+      "criteria": {
+        "rule_1": "Only when the captain expressly requires Claude for this task, or executing inside Claude Code is intrinsic.",
+        "rule_2": "Non-Vernant ship task that is well understood.",
+        "rule_3": "Trivial mechanical edit.",
+        "default": "No listed rule applies to this task."
+      }
+    },
+    "profile": {
+      "type": "choice",
+      "instructions": "Which workflow should handle `task` in `repository`?",
+      "criteria": {
+        "deterministic_script": "A script or existing tool answers it with no model at all",
+        "fast_agent": "A quick coding agent on a cheap model for localized changes like adding a feature or fixing a test",
+        "reasoning_agent": "A deep reasoning model for architecture or hard debugging",
+        "browser_agent": "Needs a browser or logged-in web applications",
+        "human": "Ambiguous, sensitive, or needs judgment the tools cannot make"
+      }
+    },
+    "ambiguity": {
+      "type": "score",
+      "instructions": "How ambiguous is `task`?",
+      "criteria": [
+        "Fully specified, unambiguous request",
+        "Some interpretation needed but the goal is clear",
+        "Open-ended; success depends on choices not stated in the request"
+      ]
+    },
+    "needs_desktop": {
+      "type": "noul",
+      "instructions": "Does `task` require access to logged-in applications or the desktop?"
+    },
+    "model": {
+      "type": "choice",
+      "instructions": "Choose the least costly model that can complete `task`.",
+      "criteria": {
+        "fast": "Direct lookups, extraction, localized changes",
+        "powerful": "Architecture, cross-file reasoning, high-stakes decisions"
+      }
+    },
+    "effort": {
+      "type": "score",
+      "instructions": "How much reasoning effort does `task` need?",
+      "criteria": [
+        "Immediate answer, single fact or mechanical change",
+        "Some investigation across a few files",
+        "Deep multi-step reasoning with trade-offs"
+      ]
+    }
+  }
+}

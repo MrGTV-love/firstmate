@@ -1,0 +1,31 @@
+# Live spawn transcript: real bin/fm-spawn.sh run inside a marked fm-lab home on a private tmux socket (tmux -L fm-lab).
+# Rule: rule_1 use omp openai-codex/gpt-6.1-sol high; declared fallback omp openai-codex/gpt-6-luna low.
+# Lab omp usage fixture: GPT-6.1-Sol limit exhausted (account still usable). Every other omp call is the real omp 18.10.4.
+
+$ TMUX=<lab fm-lab socket> FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xIQBF4 bin/fm-spawn.sh route-powerful2 /Users/charlesabrooker/tmp/fm-lab.xIQBF4/projects/demo --scout --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1 --dispatch-route powerful:high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.xIQBF4
+error: dispatch rule_1 has exhausted capacity and no supported permitted fallback
+(exit 1)
+meta file: absent
+
+$ TMUX=<lab fm-lab socket> FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xIQBF4 bin/fm-spawn.sh route-malformed2 /Users/charlesabrooker/tmp/fm-lab.xIQBF4/projects/demo --scout --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1 --dispatch-route fast:medium
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.xIQBF4
+error: --dispatch-route must be <fast|powerful>:<low|high>
+(exit 1)
+meta file: absent
+
+$ TMUX=<lab fm-lab socket> FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xIQBF4 bin/fm-spawn.sh route-fast /Users/charlesabrooker/tmp/fm-lab.xIQBF4/projects/demo --scout --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1 --dispatch-route fast:high
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.xIQBF4
+warning: model is stale - openai-codex/gpt-6-luna on omp is older than openai-codex/gpt-6.1-sol in the omp catalog (other tier: sol)
+skill selection for route-fast: unavailable - no TypeSafe or OpenRouter key
+spawned route-fast harness=omp kind=scout window=primary:fm-route-fast worktree=/Users/charlesabrooker/.treehouse/demo-caa450/1/demo
+(exit 0)
+meta file: present
+harness=omp
+model=openai-codex/gpt-6-luna
+effort=high
+dispatch_rule=rule_1
+dispatch_route=fast:high
+
+# Worker pane (real omp) footer line from capture-pane:
+ π · ◒ GPT-6-Luna 👁 · 🌳 demo/demo · ⑂ detached · ◫ 3.3%/272K ⟲ · S0.00 + 👁 0.01 🆔 01a13bbb

@@ -1,0 +1,229 @@
+# Live resolver transcript: real bin/fm-dispatch-resolve.sh in a marked fm-lab home
+# Jev answers come from a disposable local TypeSafe-compatible endpoint (FM_TEST_SEAM); quota-axi/omp usage are lab fixtures.
+# Rules: rule_1 Claude-only Sonnet; rule_2 [Sonnet, omp GPT-6.1-Sol pool]; rule_3 [Haiku medium, omp Luna pool low, Sonnet high] + fallback omp Haiku low.
+
+=== S2 fast verdict, low effort, trivial rule: cheapest approved candidate (Haiku, effort forced to max)
+$ Jev answers: {"rule":"rule_3","model":"fast","effort":0}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 17   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"fast_agent","effort":0,"needsDesktopAccess":false,"rationale":"fast_agent @ confidence 0.95"},"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0}
+  note: rule matched
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"unknown","accounts":[],"bestAccountHeadroom":null}  quota_score=-  parts={"headroom":null,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'claude-haiku-5-5' --effort 'max' --dispatch-rule 'rule_3' --dispatch-route 'fast:low'
+  timings: api_ms=17 quota_ms=31 local_ms=651 total_ms=699
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S3 powerful verdict on the same rule: Haiku and Luna are filtered out
+$ Jev answers: {"rule":"rule_3","model":"powerful","effort":2}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 7   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"fast_agent","effort":0,"needsDesktopAccess":false,"rationale":"fast_agent @ confidence 0.95"},"model":{"model":"powerful","effort":"high","rationale":"powerful @ confidence 0.95, effort score 2"},"effort_score":2}
+  note: rule matched
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high' --dispatch-rule 'rule_3' --dispatch-route 'powerful:high'
+  timings: api_ms=7 quota_ms=24 local_ms=606 total_ms=637
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S4 fast verdict, high effort; Haiku exhausted, Luna pool usable: Luna effort raised low->high
+$ Jev answers: {"rule":"rule_3","model":"fast","effort":2}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 7   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"fast_agent","effort":0,"needsDesktopAccess":false,"rationale":"fast_agent @ confidence 0.95"},"model":{"model":"fast","effort":"high","rationale":"fast @ confidence 0.95, effort score 2"},"effort_score":2}
+  note: rule matched
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=model:claude-haiku-5-5  remaining=0%  spendPriority=-  runway=exhausted_now  quota_score=-  parts={"headroom":null,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=["headroom"]  bounds=all_models:80%/through_reset,model:claude-haiku-5-5:0%/exhausted_now  -> not eligible: runway exhausted_now at model:claude-haiku-5-5
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"usable","accounts":[{"status":"usable","headroomKnown":true,"remaining":70,"savedResets":0}],"bestAccountHeadroom":70}  quota_score=0.7  parts={"headroom":0.7,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=["headroom"]  -> eligible, quota-scored; economic rank unknown: OMP pooled Codex capacity usable; no pool spendPriority
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.8  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom"]  -> eligible
+  profile: --harness 'omp' --model 'openai-codex/gpt-6-luna' --effort 'high' --dispatch-rule 'rule_3' --dispatch-route 'fast:high'
+  timings: api_ms=7 quota_ms=22 local_ms=557 total_ms=586
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S5a high ambiguity escalates
+$ Jev answers: {"rule":"rule_3","ambiguity":2}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 7   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"fast_agent","effort":2,"needsDesktopAccess":false,"rationale":"fast_agent @ confidence 0.95"},"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"escalate":"high task ambiguity requires firstmate judgment"}
+  reason: high task ambiguity requires firstmate judgment
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"unknown","accounts":[],"bestAccountHeadroom":null}  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  timings: api_ms=7 quota_ms=26 local_ms=577 total_ms=610
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S5b browser agent escalates
+$ Jev answers: {"rule":"rule_3","profile":"browser_agent"}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 7   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"browser_agent","effort":0,"needsDesktopAccess":false,"rationale":"browser_agent @ confidence 0.95"},"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"escalate":"browser_agent requires an explicit handler or capability decision"}
+  reason: browser_agent requires an explicit handler or capability decision
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"unknown","accounts":[],"bestAccountHeadroom":null}  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  timings: api_ms=7 quota_ms=41 local_ms=752 total_ms=800
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S5c human escalates
+$ Jev answers: {"rule":"rule_3","profile":"human"}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 9   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"human","effort":0,"needsDesktopAccess":false,"rationale":"human @ confidence 0.95"},"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"escalate":"human requires an explicit handler or capability decision"}
+  reason: human requires an explicit handler or capability decision
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"unknown","accounts":[],"bestAccountHeadroom":null}  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  timings: api_ms=9 quota_ms=57 local_ms=1213 total_ms=1279
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S5d deterministic script escalates
+$ Jev answers: {"rule":"rule_3","profile":"deterministic_script"}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"deterministic_script","effort":0,"needsDesktopAccess":false,"rationale":"deterministic_script @ confidence 0.95"},"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"escalate":"deterministic_script requires an explicit handler or capability decision"}
+  reason: deterministic_script requires an explicit handler or capability decision
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"unknown","accounts":[],"bestAccountHeadroom":null}  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  timings: api_ms=6 quota_ms=30 local_ms=772 total_ms=808
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S5e desktop access escalates
+$ Jev answers: {"rule":"rule_3","needs_desktop":1}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"fast_agent","effort":0,"needsDesktopAccess":true,"rationale":"fast_agent @ confidence 0.95"},"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"escalate":"fast_agent requires an explicit handler or capability decision"}
+  reason: fast_agent requires an explicit handler or capability decision
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"unknown","accounts":[],"bestAccountHeadroom":null}  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  timings: api_ms=6 quota_ms=25 local_ms=553 total_ms=584
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S5f low-confidence agent choice becomes human (upstream rule) and escalates
+$ Jev answers: {"rule":"rule_3","profile":"reasoning_agent","profile_confidence":0.4}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"human","effort":0,"needsDesktopAccess":false,"rationale":"human @ confidence 0.40"},"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0,"escalate":"human requires an explicit handler or capability decision"}
+  reason: human requires an explicit handler or capability decision
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"unknown","accounts":[],"bestAccountHeadroom":null}  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  -> eligible
+  timings: api_ms=6 quota_ms=34 local_ms=548 total_ms=588
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S5g boundary: ambiguity exactly 1 does NOT escalate
+$ Jev answers: {"rule":"rule_3","ambiguity":1}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 5   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"fast_agent","effort":1,"needsDesktopAccess":false,"rationale":"fast_agent @ confidence 0.95"},"model":{"model":"fast","effort":"low","rationale":"fast @ confidence 0.95, effort score 0"},"effort_score":0}
+  note: rule matched
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"unknown","accounts":[],"bestAccountHeadroom":null}  quota_score=-  parts={"headroom":null,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible, unranked: OMP pooled Codex capacity unknown; no pool spendPriority: disclosed uncertainty
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.7740740740740741  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom","spend"]  -> eligible
+  profile: --harness 'claude' --model 'claude-haiku-5-5' --effort 'max' --dispatch-rule 'rule_3' --dispatch-route 'fast:low'
+  timings: api_ms=5 quota_ms=31 local_ms=556 total_ms=592
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S6a ADVERSARIAL powerful + every candidate exhausted + cheap Haiku stand-in declared: must escalate, no profile
+$ Jev answers: {"rule":"rule_3","model":"powerful","effort":2}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: escalate
+  model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"fast_agent","effort":0,"needsDesktopAccess":false,"rationale":"fast_agent @ confidence 0.95"},"model":{"model":"powerful","effort":"high","rationale":"powerful @ confidence 0.95, effort score 2"},"effort_score":2}
+  reason: no rankable eligible candidate
+  note: rule matched
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  quota_score=-  parts={"headroom":null,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=[]  -> not eligible: runway exhausted_now at all_models
+  timings: api_ms=6 quota_ms=21 local_ms=894 total_ms=921
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S6b control: fast + same exhaustion takes the declared stand-in at route effort (Haiku max)
+$ Jev answers: {"rule":"rule_3","model":"fast","effort":2}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=1 default=0
+  routing: {"agent":{"profile":"fast_agent","effort":0,"needsDesktopAccess":false,"rationale":"fast_agent @ confidence 0.95"},"model":{"model":"fast","effort":"high","rationale":"fast @ confidence 0.95, effort score 2"},"effort_score":2}
+  fallback: primary capacity exhausted; declared model-matrix fallback
+  note: rule matched
+  candidate: claude:claude-haiku-5-5  provider=claude  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  quota_score=-  parts={"headroom":null,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=[]  -> not eligible: runway exhausted_now at all_models
+  candidate: omp:openai-codex/gpt-6-luna  provider=codex  pool={"status":"exhausted","accounts":[{"status":"exhausted","headroomKnown":false,"remaining":null,"savedResets":0}],"bestAccountHeadroom":null}  quota_score=-  parts={"headroom":null,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=[]  -> not eligible: OMP pooled Codex capacity exhausted; no pool spendPriority
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  quota_score=-  parts={"headroom":null,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=[]  -> not eligible: runway exhausted_now at all_models
+  candidate: omp:anthropic/claude-haiku-5-5  pool={"status":"unknown","reason":"no measured quota for this route"}  -> eligible
+  profile: --harness 'omp' --model 'anthropic/claude-haiku-5-5' --effort 'max' --dispatch-rule 'rule_3' --dispatch-route 'fast:high'
+  timings: api_ms=6 quota_ms=18 local_ms=1157 total_ms=1181
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+
+=== S7 Codex pool is quota-scored: GPT-6.1-Sol pool at 90% beats Claude Sonnet at 80%
+$ Jev answers: {"rule":"rule_2","profile":"reasoning_agent","model":"powerful","effort":2}
+$ bin/fm-dispatch-resolve.sh brief.md --project firstmate
+dispatch-resolve:
+  status: clear
+  model: jev-1.13.0   latency_ms: 6   tokens: 100/20
+  rule: rule_2 (Non-Vernant ship task that is well understood.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=1 rule_3=0 default=0
+  routing: {"agent":{"profile":"reasoning_agent","effort":0,"needsDesktopAccess":false,"rationale":"reasoning_agent @ confidence 0.95"},"model":{"model":"powerful","effort":"high","rationale":"powerful @ confidence 0.95, effort score 2"},"effort_score":2}
+  note: rule matched
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  scope=all_models  remaining=80%  spendPriority=0.8  runway=through_reset  quota_score=0.8  parts={"headroom":0.8,"spend":0.7222222222222222}  weights={"headroom":0.6,"spend":0.3}  common=["headroom"]  -> eligible
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  pool={"status":"usable","accounts":[{"status":"usable","headroomKnown":true,"remaining":90,"savedResets":0}],"bestAccountHeadroom":90}  quota_score=0.9000000000000001  parts={"headroom":0.9,"spend":null}  weights={"headroom":0.6,"spend":0.3}  common=["headroom"]  -> eligible, quota-scored; economic rank unknown: OMP pooled Codex capacity usable; no pool spendPriority
+  profile: --harness 'omp' --model 'openai-codex/gpt-6.1-sol' --effort 'high'
+  timings: api_ms=6 quota_ms=43 local_ms=570 total_ms=619
+  usage: input_tokens=100 output_tokens=20 jev_cost_usd=4.2000000000000004e-06 jev_input_usd_per_million=0.042 returned_model=jev-1.13.0
+(exit 0)
+

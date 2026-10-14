@@ -1,0 +1,16 @@
+node:1: command not found: _nvm_lazy_load
+✔ L5 B: an order-status question routes to lookup, no LLM involved (1.547208ms)
+✔ L5 B: unclear intent below 0.5 confidence goes to a human (0.105417ms)
+✔ L5 B: a hard complaint routes to a human, an easy one to the LLM (0.068875ms)
+✔ L5 C: routeModel picks fast vs powerful with an effort read (0.288167ms)
+✔ L5 A: a localized test fix routes to the fast agent (0.246875ms)
+✔ L5 A: low-confidence profile decisions escalate to human (0.06725ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 108.083166
+exit 0
