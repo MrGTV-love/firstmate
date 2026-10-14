@@ -122,15 +122,20 @@ case "${1:-} ${2:-}" in
       *state,headRefOid,url*)
         printf 'MERGED\t%s\t%s\n' "${FM_TEST_MERGED_HEAD:-}" "${FM_TEST_MERGED_PR:-}"
         ;;
-      *statusCheckRollup*)
-        printf '%s\n' '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"1111111111111111111111111111111111111111","baseRefName":"main","statusCheckRollup":[{"__typename":"CheckRun","name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}]}'
+      *mergeStateStatus*)
+        printf '%s\n' '{"state":"OPEN","isDraft":false,"mergeable":"MERGEABLE","mergeStateStatus":"CLEAN","headRefOid":"1111111111111111111111111111111111111111","baseRefName":"main"}'
         ;;
       *headRefOid*) printf '%s\n' 1111111111111111111111111111111111111111 ;;
     esac
     ;;
   "pr merge") printf 'merged:\n  number: %s\n  status: ok\n' "${3:-}" ;;
   "api graphql")
-    printf '%s\n' 'state=MERGED' 'merged=true' 'queued=false' 'base=main'
+    case "$*" in
+      *'contexts(first:'*)
+        printf '%s\n' '{"data":{"repository":{"object":{"oid":"1111111111111111111111111111111111111111","statusCheckRollup":{"contexts":{"totalCount":1,"pageInfo":{"hasNextPage":false,"endCursor":null},"nodes":[{"__typename":"CheckRun","id":"ci-1","name":"ci","status":"COMPLETED","conclusion":"SUCCESS"}]}}}}}}'
+        ;;
+      *) printf '%s\n' 'state=MERGED' 'merged=true' 'queued=false' 'base=main' ;;
+    esac
     ;;
   "api --paginate")
     case " $* " in
