@@ -1,0 +1,15 @@
+=== case: v3322-branch-503-once
+url: https://github.com/MrGTV-love/vernant/pull/3322  fault: branch-503-once  extra: 
+exit code: 97   elapsed: 16s
+--- rollup GraphQL reads: 2   pr view reads: 2   branch reads: 5
+--- stdout:
+armed: state/labv3322branch503once.check.sh
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+verified: https://github.com/MrGTV-love/vernant/pull/3322 is open and mergeable, with every unwaived required check reported and every unwaived check green at head 5d6e7f8e4cf9b154b0b01cbdd3bb806b9fc01cb8
+shim: blocked non-read gh call
+error: GitHub merge outcome was not successful: state=OPEN, merged=false, isInMergeQueue=false
+--- blocked by shim:
+SHIM BLOCKED: pr merge 3322 --repo MrGTV-love/vernant --match-head-commit 5d6e7f8e4cf9b154b0b01cbdd3bb806b9fc01cb8 --squash
+--- real rollup read rollup-real-1.json: {"pages":1,"totalCount":43,"nodes":43,"lastHasNextPage":false}
+--- real rollup read rollup-real-2.json: {"pages":1,"totalCount":43,"nodes":43,"lastHasNextPage":false}

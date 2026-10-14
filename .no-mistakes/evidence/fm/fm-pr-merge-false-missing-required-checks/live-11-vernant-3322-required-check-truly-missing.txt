@@ -1,0 +1,13 @@
+=== case: v3322-required-truly-missing
+url: https://github.com/MrGTV-love/vernant/pull/3322  fault: rollup-drop-required-always  extra: 
+exit code: 1   elapsed: 37s
+--- rollup GraphQL reads: 5   pr view reads: 5   branch reads: 10
+--- stdout:
+armed: state/labv3322requiredtrulymi.check.sh
+--- stderr:
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+error: refusing to merge https://github.com/MrGTV-love/vernant/pull/3322
+  - required check 'unit-tests' has not reported at head 5d6e7f8e4cf9b154b0b01cbdd3bb806b9fc01cb8
+error: these required checks have not reported: unit-tests
+--- blocked by shim:
+(none)
