@@ -239,12 +239,17 @@ answers = [captured_answer(answer_inbox, 'lavish-overdue.1', 301, 'gone'),
            captured_answer(answer_inbox, 'lavish-parked.1', 301, 'parked-board'),
            captured_answer(answer_inbox, 'lavish-missing.1', 301, 'missing-board'),
            captured_answer(answer_inbox, 'lavish-unowned.1', 301),
+           captured_answer(answer_inbox, 'lavish-parked-live.1', 301, 'parked-live'),
+           captured_answer(answer_inbox, 'lavish-blocked-live.1', 301, 'blocked-live'),
            captured_answer(answer_inbox, 'lavish-live.1', 9000, 'fresh'),
            captured_answer(answer_inbox, 'lavish-handled.1', 601, 'gone', handled=True)]
 foreign = [captured_answer(answer_inbox, name + '-foreign.1', 9000, 'gone', adapter=name)
            for name in ('proc', 'quota', 'when', 'remote-reply')]
 parked_board = task('parked-board', world / 'absent-board', state='parked', exists=False, alive='dead')
-(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[*tasks, parked_board],
+parked_live = task('parked-live', world / 'absent-board', state='parked', exists=True, alive='alive')
+blocked_live = task('blocked-live', world / 'absent-board', state='blocked', exists=True, alive='alive')
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1',
+                                                    tasks=[*tasks, parked_board, parked_live, blocked_live],
                                                     backlog=dict(present=True, records=backlog))))
 answer_report = ledger('--heartbeat')
 answer_rows = rows(answer_report, 'unhandled_board_answer')
@@ -252,6 +257,11 @@ assert set(answer_rows) == {p.name for p in answers[:-1]}, answer_report
 assert not any(p.name in answer_rows for p in foreign), 'only lavish board answers are listed'
 live_row = answer_rows['lavish-live.1.result']
 assert live_row.get('informational') and not live_row['overdue'], live_row
+assert live_row['owner'] == 'worker:fresh' and live_row['next_action'].startswith('informational:'), live_row
+assert 'read and route' not in live_row['next_action'], live_row
+for live_owner in ('parked-live', 'blocked-live'):
+    row = answer_rows[f'lavish-{live_owner}.1.result']
+    assert row['overdue'] and not row.get('informational') and row['owner'] == 'firstmate', row
 for result in answers[:-2]:
     row = answer_rows[result.name]
     assert row['owner'] == 'firstmate' and row['limit_seconds'] == 300, row

@@ -686,10 +686,15 @@ class Collector:
             if owner_file.is_file() and not owner_file.is_symlink():
                 task = self.source("board answer owner " + result.name, owner_file.read_text)
             owner_task = task.strip() if task and task.strip() else ""
+            if self.owner_working(owner_task):
+                self.add("unhandled_board_answer", result.name,
+                         f"informational: live working owner task {owner_task} holds this board round",
+                         mtime(result), owner="worker:" + owner_task, evidence=result, informational=True)
+                continue
             self.add("unhandled_board_answer", result.name,
                      f"read and route the captured board answer {result}; owner task: "
                      + (owner_task or "unknown (no owner task recorded)"),
-                     mtime(result), evidence=result, informational=self.owner_working(owner_task))
+                     mtime(result), evidence=result)
 
     def owner_working(self, owner_task):
         """A board round held by a live, working owner task is the worker's to finish, not an overdue answer."""
