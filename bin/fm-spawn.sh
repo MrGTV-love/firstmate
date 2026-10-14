@@ -2530,15 +2530,31 @@ while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]?.value || "")) {
 if (!/(^|\/)omp$/.test(words[i]?.value || "")) certain = false;
 let pinned = false;
 const models = [];
+const literalToken = token => token?.type === "word" && token.literal && !token.unquotedExpansion;
+const operandOptions = new Set([
+  "--smol", "--slow", "--plan", "--goal", "--prewalk-into", "--plan-yolo-into",
+  "--provider", "--api-key", "--system-prompt", "--system-prompt-template",
+  "--append-system-prompt", "--profile", "--alias", "--cwd", "--mode", "--config",
+  "--add-dir", "--session-dir", "--models", "--tools", "--thinking", "--service-tier",
+  "--hook", "--extension", "-e", "--skills", "--export", "--max-time",
+  "--approval-mode", "--plugin-dir", "--prompt",
+]);
 for (i++; i < words.length; i++) {
   if (words[i].type !== "word" || words[i].value === "--") break;
-  if (words[i].value === "--profile" || words[i].value.startsWith("--profile=")) certain = false;
-  if (/^--model=.+/.test(words[i].value)) {
+  if (!literalToken(words[i])) continue;
+  const option = words[i].value;
+  if (option === "--profile" || option.startsWith("--profile=")) certain = false;
+  if (/^--model=.+/.test(option)) {
     pinned = true;
-    if (readableToken(words[i])) models.push(words[i].value.slice("--model=".length));
-  } else if ((words[i].value === "--model" || words[i].value === "-m") && words[i + 1]?.type === "word") {
+    models.push(option.slice("--model=".length));
+  } else if ((option === "--model" || option === "-m") && words[i + 1]?.type === "word") {
     pinned = true;
-    if (readableToken(words[i]) && readableToken(words[i + 1])) models.push(words[i + 1].value);
+    if (literalToken(words[i + 1])) models.push(words[i + 1].value);
+    i++;
+  } else if (operandOptions.has(option) && words[i + 1]?.type === "word") {
+    i++;
+  } else if (["--resume", "--restore", "-r"].includes(option)
+      && words[i + 1]?.type === "word" && !words[i + 1].value.startsWith("-")) {
     i++;
   }
 }

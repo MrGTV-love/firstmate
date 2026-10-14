@@ -767,6 +767,74 @@ SH
   pass "fm-control relaunch: unsupported omp preserves the running agent and task"
 }
 
+test_relaunch_omp_billing_admission_preserves_running_agents() {
+  local provider path dir id model meta out rc expected
+  local -a args
+  for provider in openai openrouter openai-codex; do
+    for path in explicit recorded role secondmate; do
+      id="rl-billing-$provider-$path"
+      model="$provider/gpt-6.1-sol"
+      dir=$(new_case "$id" "$id")
+      add_ship_task "$dir" "$id" omp
+      printf omp > "$dir/fake/command"
+      printf omp > "$dir/fake/becomes"
+      mkdir -p "$dir/home/config"
+      meta=$(cat "$dir/home/state/$id.meta")
+      meta=${meta/model=default/model=openai-codex\/gpt-6.1-sol}
+      args=(--note "preserve subscription routing")
+      case "$path" in
+        explicit) args+=(--model "$model") ;;
+        recorded) meta=${meta/model=openai-codex\/gpt-6.1-sol/model=$model} ;;
+        role)
+          printf '{"version":1,"roles":{"chosen":{"omp":{"model":"%s"}}},"retired":[]}\n' "$model" \
+            > "$dir/home/config/model-index.json"
+          args+=(--model role:chosen)
+          ;;
+        secondmate)
+          meta=${meta/kind=ship/kind=secondmate}
+          meta=${meta/mode=no-mistakes/mode=secondmate}
+          meta="$meta"$'\n'"home=$dir/wt"
+          mkdir -p "$dir/wt/state" "$dir/wt/data" "$dir/wt/bin"
+          printf '# fixture charter\n' > "$dir/wt/AGENTS.md"
+          printf '%s\n' "$id" > "$dir/wt/.fm-secondmate-home"
+          printf 'omp %s high\n' "$model" > "$dir/home/config/secondmate-harness"
+          args=()
+          ;;
+      esac
+      printf '%s\n' "$meta" > "$dir/home/state/$id.meta"
+      cat > "$dir/fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  --version) printf 'omp/18.1.20\n' ;;
+  models) printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"}]}' ;;
+  usage) printf '{"reports":[]}\n' ;;
+  *) exit 0 ;;
+esac
+SH
+      chmod +x "$dir/fakebin/omp"
+      cp "$dir/home/state/$id.meta" "$dir/prior.meta"
+      cp "$dir/home/data/$id/brief.md" "$dir/prior-brief.md"
+      out=$(run_control "$dir" "$id" relaunch ${args[@]+"${args[@]}"}); rc=$?
+      expected=1
+      [ "$provider" != openai-codex ] || expected=0
+      expect_code "$expected" "$rc" "$path relaunch billing admission for $provider: $out"
+      assert_equals omp "$(cat "$dir/fake/command")" "billing admission must leave a running agent"
+      if [ "$expected" = 1 ]; then
+        assert_contains "$out" 'routes use API billing' "relaunch must reject the resolved API route"
+        [ ! -s "$dir/fake/keys" ] && [ ! -s "$dir/fake/literal" ] || fail "billing refusal sent lifecycle input"
+        cmp -s "$dir/prior.meta" "$dir/home/state/$id.meta" || fail "billing refusal changed task metadata"
+        cmp -s "$dir/prior-brief.md" "$dir/home/data/$id/brief.md" || fail "billing refusal changed instructions"
+        assert_absent "$dir/home/state/$id.control-relaunch" "billing refusal must precede checkpointing"
+      else
+        assert_equals complete "$(journal_field "$dir" "$id" phase)" "subscription relaunch must complete"
+        assert_equals "$model" "$(meta_field "$dir" "$id" model)" "subscription selection must reach the replacement"
+        assert_contains "$(cat "$dir/fake/launch")" "--model '$model'" "subscription model must reach executable launch"
+      fi
+    done
+  done
+  pass "omp relaunch billing admission preserves agents before refusal and accepts subscription routes"
+}
+
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text() {
   local dir out rc
   dir=$(new_case pending-exit rl43)
@@ -6301,6 +6369,7 @@ test_quota_exhaustion_relaunches_only_a_permitted_route
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_unsupported_omp_before_stopping
+test_relaunch_omp_billing_admission_preserves_running_agents
 test_relaunch_refuses_before_exit_when_the_composer_holds_pending_text
 test_relaunch_refuses_before_exit_when_the_composer_state_is_unproven
 test_relaunch_from_linked_home_preserves_recorded_worktree

@@ -688,31 +688,44 @@ test_spawn_refuses_api_billed_routes() {
 }
 
 test_spawn_raw_api_billing_admission() {
-  local provider form rec id out status command expected index=0 profile
+  local provider form spelling flag value rec id out status command expected index=0 profile
   for provider in openai openrouter openai-codex; do
     for form in long equals short; do
-      index=$((index + 1))
-      id="omp-raw-billing-$index"
-      rec=$(make_spawn_case "$id" omp "$id")
-      read_case_record "$rec"
-      case "$form" in
-        long) command="omp --model '$provider/gpt-6.1-sol'" ;;
-        equals) command="omp --model=\"$provider/gpt-6.1-sol\"" ;;
-        short) command="omp -m $provider/gpt-6.1-sol" ;;
-      esac
-      out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
-      status=$?
-      expected=1
-      [ "$provider" != openai-codex ] || expected=0
-      expect_code "$expected" "$status" "raw $form billing admission for $provider: $out"
-      if [ "$expected" = 0 ]; then
-        assert_present "$HOME_DIR/state/$id.meta" "subscription raw launch must publish metadata"
-        assert_contains "$(cat "$LAUNCH_LOG")" "$command" "subscription argv must reach the launch unchanged"
-      else
-        assert_contains "$out" 'routes use API billing' "raw rejection must come from the billing guard"
-        assert_absent "$HOME_DIR/state/$id.meta" "raw refusal must precede publication"
-        [ ! -s "$LAUNCH_LOG" ] || fail "forbidden raw model reached launch"
-      fi
+      for spelling in plain escaped ansi; do
+        index=$((index + 1))
+        id="omp-raw-billing-$index"
+        rec=$(make_spawn_case "$id" omp "$id")
+        read_case_record "$rec"
+        flag=--model
+        [ "$form" != short ] || flag=-m
+        case "$spelling" in
+          plain) value="'$provider/gpt-6.1-sol'" ;;
+          escaped)
+            flag='--mo\del'
+            [ "$form" != short ] || flag='-\m'
+            value="$provider/gpt\\-6.1-sol"
+            ;;
+          ansi)
+            flag="\$'--mo\\x64el'"
+            [ "$form" != short ] || flag="\$'-\\x6d'"
+            value="\$'$provider/gpt\\x2d6.1-sol'"
+            ;;
+        esac
+        if [ "$form" = equals ]; then command="omp $flag=$value"; else command="omp $flag $value"; fi
+        out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
+        status=$?
+        expected=1
+        [ "$provider" != openai-codex ] || expected=0
+        expect_code "$expected" "$status" "raw $form $spelling billing admission for $provider: $out"
+        if [ "$expected" = 0 ]; then
+          assert_present "$HOME_DIR/state/$id.meta" "subscription raw launch must publish metadata"
+          assert_contains "$(cat "$LAUNCH_LOG")" "$command" "subscription argv must reach the launch unchanged"
+        else
+          assert_contains "$out" 'routes use API billing' "raw rejection must come from the billing guard"
+          assert_absent "$HOME_DIR/state/$id.meta" "raw refusal must precede publication"
+          [ ! -s "$LAUNCH_LOG" ] || fail "forbidden raw model reached launch"
+        fi
+      done
     done
   done
   while IFS='|' read -r command profile expected; do
@@ -741,6 +754,17 @@ omp --model openai-codex/gpt-6.1-sol --model=openai/gpt-6.1-sol||1
 omp __MODELFLAG__ -m openrouter/gpt-6.1-sol||1
 omp --model openai/gpt-6.1-sol --prompt "$PROMPT"||1
 omp -m openrouter/gpt-6.1-sol --prompt "$(touch __EVALUATED__)"||1
+omp --model "$MODEL"||0
+omp --model "$(touch __EVALUATED__; printf openai/gpt-6.1-sol)"||0
+omp --model=openai/$MODEL||0
+omp --model openai-codex/gpt-6.1-sol --append-system-prompt '--model=openai/gpt-6.1-sol'||0
+omp --model openai-codex/gpt-6.1-sol --append-system-prompt --model openai/gpt-6.1-sol||0
+omp --model openai-codex/gpt-6.1-sol --system-prompt -m openrouter/gpt-6.1-sol||0
+omp --append-system-prompt --model --model openai/gpt-6.1-sol||1
+omp --system-prompt -m --model=openrouter/gpt-6.1-sol||1
+omp --append-system-prompt='--model=openai/gpt-6.1-sol' --model openai-codex/gpt-6.1-sol||0
+omp --resume --model openai/gpt-6.1-sol||1
+omp -r saved-session --model=openrouter/gpt-6.1-sol||1
 omp -- --model openai/gpt-6.1-sol||0
 omp '--model openrouter/gpt-6.1-sol'||0
 CASES
@@ -4026,6 +4050,11 @@ test_watch_lifecycle_deadline_diagnostics() {
   expect_code 0 "$status" "omp lifecycle deadline diagnostics: $out"
   pass "omp shutdown, arm and host readiness, and unready retirement each log one expiry"
 }
+
+if [ -n "${FM_TEST_ONLY:-}" ]; then
+  "$FM_TEST_ONLY"
+  exit "$?"
+fi
 
 test_watch_lifecycle_deadline_diagnostics
 test_detection_anchored_name_and_marker_precedence
