@@ -1,0 +1,61 @@
+session:
+  file: /review.html
+  status: feedback
+prompts[9]:
+  - uid: "38"
+    prompt: Build the estimate from the individual tasks. How will an alternative proposed by the customer be evaluated?
+    selector: "body > main > div:nth-of-type(3) > ul > li:nth-of-type(3)"
+    tag: li
+    text: Estimate for a four-task case.
+  - uid: ""
+    prompt: there will
+    selector: ""
+    tag: message
+    text: Freeform message
+  - uid: "333"
+    prompt: "Option A is not what we do, B is the one that makes sense to me."
+    selector: "div > table > tbody > tr:nth-of-type(2) > td:nth-of-type(3)"
+    tag: td
+    text: "Our margin moves when vendors move."
+    target:
+      type: table-cell
+      selector: "div > table > tbody > tr:nth-of-type(2) > td:nth-of-type(3)"
+      rowLabel: B. A unit is a fixed amount of customer value
+      columnLabel: What it does to us
+      text: "Nested target text must not replace the captured item text."
+  - uid: "334"
+    prompt: Two different things -- the value of units vs how to price with them.
+    selector: "div > table > tbody > tr:nth-of-type(2) > td:nth-of-type(1)"
+    tag: td
+    text: B. Record a new schedule version when costs move
+    target:
+      type: table-cell
+      selector: "div > table > tbody > tr:nth-of-type(2) > td:nth-of-type(1)"
+      rowLabel: B. Record a new schedule version when costs move
+      columnLabel: Option
+      text: B. Record a new schedule version when costs move
+  - uid: ""
+    prompt: "The estimate is not a firm fixed price. Let the customer set a threshold (e.g, % over budget)."
+    selector: ""
+    tag: message
+    text: Freeform message
+  - uid: ""
+    prompt: "Capture and explain why the estimate was exceeded."
+    selector: ""
+    tag: message
+    text: Freeform message
+  - uid: ""
+    prompt: "Review the margin target."
+    selector: ""
+    tag: message
+    text: Freeform message
+  - uid: ""
+    prompt: "Compare the smaller example with the full case."
+    selector: ""
+    tag: message
+    text: Freeform message
+  - uid: ""
+    prompt: I think the full case will be higher with messy data
+    selector: ""
+    tag: message
+    text: Freeform message
