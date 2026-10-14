@@ -222,30 +222,37 @@ print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 # Captured answers stay firstmate's obligation independently of the board owner's lifecycle.
 answer_inbox = home / 'state/procevent-inbox'
 answer_inbox.mkdir()
-def captured_answer(inbox, name, age, owner=None, handled=False):
+def captured_answer(inbox, name, age, owner=None, handled=False, adapter='lavish'):
     result = inbox / (name + '.result')
     result.write_text('captured board answer\n')
+    result.with_suffix('.adapter').write_text(adapter + '\n')
     os.utime(result, (now - age, now - age))
     if owner is not None:
         result.with_suffix('.owner-task').write_text(owner + '\n')
     if handled:
         result.with_suffix('.handled').touch()
     return result
-answers = [captured_answer(answer_inbox, 'lavish-overdue.1', 301, 'fresh'),
-           captured_answer(answer_inbox, 'lavish-boundary.1', 300, 'fresh'),
-           captured_answer(answer_inbox, 'lavish-fresh.1', 299, 'fresh'),
+answers = [captured_answer(answer_inbox, 'lavish-overdue.1', 301, 'gone'),
+           captured_answer(answer_inbox, 'lavish-boundary.1', 300, 'gone'),
+           captured_answer(answer_inbox, 'lavish-fresh.1', 299, 'gone'),
            captured_answer(answer_inbox, 'lavish-dead.1', 601, 'gone'),
            captured_answer(answer_inbox, 'lavish-parked.1', 301, 'parked-board'),
            captured_answer(answer_inbox, 'lavish-missing.1', 301, 'missing-board'),
            captured_answer(answer_inbox, 'lavish-unowned.1', 301),
+           captured_answer(answer_inbox, 'lavish-live.1', 9000, 'fresh'),
            captured_answer(answer_inbox, 'lavish-handled.1', 601, 'gone', handled=True)]
+foreign = [captured_answer(answer_inbox, name + '-foreign.1', 9000, 'gone', adapter=name)
+           for name in ('proc', 'quota', 'when', 'remote-reply')]
 parked_board = task('parked-board', world / 'absent-board', state='parked', exists=False, alive='dead')
 (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[*tasks, parked_board],
                                                     backlog=dict(present=True, records=backlog))))
 answer_report = ledger('--heartbeat')
 answer_rows = rows(answer_report, 'unhandled_board_answer')
 assert set(answer_rows) == {p.name for p in answers[:-1]}, answer_report
-for result in answers[:-1]:
+assert not any(p.name in answer_rows for p in foreign), 'only lavish board answers are listed'
+live_row = answer_rows['lavish-live.1.result']
+assert live_row.get('informational') and not live_row['overdue'], live_row
+for result in answers[:-2]:
     row = answer_rows[result.name]
     assert row['owner'] == 'firstmate' and row['limit_seconds'] == 300, row
     assert str(result) in row['next_action'], row
@@ -258,6 +265,7 @@ assert json.loads((home / 'state/open-loops.json').read_text()) == answer_report
 tuned_answers = rows(ledger(), 'unhandled_board_answer')
 assert not tuned_answers['lavish-overdue.1.result']['overdue'], tuned_answers
 assert tuned_answers['lavish-dead.1.result']['overdue'], tuned_answers
+assert not tuned_answers['lavish-live.1.result']['overdue'], tuned_answers
 assert tuned_answers['lavish-overdue.1.result']['limit_seconds'] == 600, tuned_answers
 (home / 'config/open-loops.json').unlink()
 answers[0].with_suffix('.handled').touch()
@@ -283,7 +291,7 @@ assert lane_answer.name not in rows(ledger(), 'unhandled_board_answer'), 'primar
 shutil.rmtree(answer_inbox)
 (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
                                                     backlog=dict(present=True, records=backlog))))
-print('PASS: board answer ages, handling, dead parked missing owners, and home-local secondmate publication', flush=True)
+print('PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication', flush=True)
 
 # A PR for A cannot hide a local correction B, whether the PR is open or merged.
 def correction(path):

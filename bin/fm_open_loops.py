@@ -675,14 +675,31 @@ class Collector:
             handled = result.with_suffix(".handled")
             if handled.exists() or handled.is_symlink():
                 continue
+            adapter_file = result.with_suffix(".adapter")
+            if not adapter_file.is_file() or adapter_file.is_symlink():
+                continue
+            adapter = self.source("board answer adapter " + result.name, adapter_file.read_text)
+            if adapter is None or adapter.strip() != "lavish":
+                continue
             owner_file = result.with_suffix(".owner-task")
             task = None
             if owner_file.is_file() and not owner_file.is_symlink():
                 task = self.source("board answer owner " + result.name, owner_file.read_text)
-            owner_task = task.strip() if task and task.strip() else "unknown (no owner task recorded)"
+            owner_task = task.strip() if task and task.strip() else ""
             self.add("unhandled_board_answer", result.name,
-                     f"read and route the captured board answer {result}; owner task: {owner_task}",
-                     mtime(result), evidence=result)
+                     f"read and route the captured board answer {result}; owner task: "
+                     + (owner_task or "unknown (no owner task recorded)"),
+                     mtime(result), evidence=result, informational=self.owner_working(owner_task))
+
+    def owner_working(self, owner_task):
+        """A board round held by a live, working owner task is the worker's to finish, not an overdue answer."""
+        task = next((t for t in self.tasks if t["id"] == owner_task), None)
+        if task is None or task["current_state"].get("state") != "working":
+            return False
+        try:
+            return self.liveness(task) == "alive"
+        except SOURCE_ERRORS:
+            return False
 
     # -- run -------------------------------------------------------------------------------------
 
