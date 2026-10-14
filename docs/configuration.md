@@ -621,6 +621,7 @@ For a non-informational row, an unknown age stays `null` and counts as overdue, 
 | `missing_worker` | an In flight item requiring child metadata lacks a task record, or its worker or an ordinary task's worker has a confirmed missing endpoint or dead agent without a recorded stop | 600 s |
 | `ready_not_started` | a Queued item has no hold kind or unresolved blocker, and its optional hold date is absent or due; unselected items are informational | 1800 s |
 | `unanswered_question` | a `needs-decision` or `blocked` status key is still open, or a current captain-held backlog row is in the `live` or `aged` hold bucket | 1800 s |
+| `unhandled_board_answer` | this home's `state/procevent-inbox/*.result` has a `lavish` `.adapter` sibling and no `.handled` sibling; captures from other adapters never appear; firstmate owns routing, the next action names the captured board-answer file and its `.owner-task` value (or an unknown owner), and age comes from the result's mtime regardless of a parked, dead, or missing owner task; a result whose owner task is a current, live `working` task is an informational row owned by `worker:<id>` whose action says that worker holds the round | 300 s |
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
 | `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
@@ -657,7 +658,7 @@ Unknown current task state adds degraded coverage independently of liveness, exc
 Only nonfuture progress timestamps count as work evidence.
 Pipeline progress uses each task's worktree to resolve a relative `NM_HOME`; unset or empty values select `$HOME/.no-mistakes`.
 Progress remains scoped to that resolved store and the task's project and branch.
-The ledger covers this home's current backlog, ordinary task records, status questions, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
+The ledger covers this home's current backlog, ordinary task records, status questions, unhandled captured board answers, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
 A recorded PR head that is not a local object in the task's copy cannot be compared, so PR coverage is skipped for that task alone: its unlanded-commit row names the absent head and counts every commit not on the default branch, and the ledger stays complete.
 Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
 The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.

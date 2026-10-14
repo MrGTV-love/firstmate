@@ -22,6 +22,7 @@ BIN = Path(__file__).resolve().parent
 GH_REST = BIN / "fm-gh-rest.sh"  # conditional REST reads and the shared quota floor
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
+    "unhandled_board_answer": 300,
     "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
     "open_pr": 3600, "red_check": 0, "coverage": 0,
 }
@@ -662,6 +663,49 @@ class Collector:
                          "answer or close this question, or record why it no longer applies",
                          int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}")
 
+    def board_answer_rows(self):
+        inbox = self.state / "procevent-inbox"
+        try:
+            results = sorted(inbox.iterdir())
+        except FileNotFoundError:
+            return
+        for result in results:
+            if result.suffix != ".result" or result.is_symlink() or not result.is_file():
+                continue
+            handled = result.with_suffix(".handled")
+            if handled.exists() or handled.is_symlink():
+                continue
+            adapter_file = result.with_suffix(".adapter")
+            if not adapter_file.is_file() or adapter_file.is_symlink():
+                continue
+            adapter = self.source("board answer adapter " + result.name, adapter_file.read_text)
+            if adapter is None or adapter.strip() != "lavish":
+                continue
+            owner_file = result.with_suffix(".owner-task")
+            task = None
+            if owner_file.is_file() and not owner_file.is_symlink():
+                task = self.source("board answer owner " + result.name, owner_file.read_text)
+            owner_task = task.strip() if task and task.strip() else ""
+            if self.owner_working(owner_task):
+                self.add("unhandled_board_answer", result.name,
+                         f"informational: live working owner task {owner_task} holds this board round",
+                         mtime(result), owner="worker:" + owner_task, evidence=result, informational=True)
+                continue
+            self.add("unhandled_board_answer", result.name,
+                     f"read and route the captured board answer {result}; owner task: "
+                     + (owner_task or "unknown (no owner task recorded)"),
+                     mtime(result), evidence=result)
+
+    def owner_working(self, owner_task):
+        """A board round held by a live, working owner task is the worker's to finish, not an overdue answer."""
+        task = next((t for t in self.tasks if t["id"] == owner_task), None)
+        if task is None or task["current_state"].get("state") != "working":
+            return False
+        try:
+            return self.liveness(task) == "alive"
+        except SOURCE_ERRORS:
+            return False
+
     # -- run -------------------------------------------------------------------------------------
 
     def collect(self):
@@ -674,6 +718,7 @@ class Collector:
             self.source("open PRs " + slug, self.pr_rows, slug)
         self.source("workers", self.worker_rows)
         self.source("questions", self.question_rows)
+        self.source("board answers", self.board_answer_rows)
         if self.degraded:
             self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                      None, evidence="; ".join(self.degraded))
