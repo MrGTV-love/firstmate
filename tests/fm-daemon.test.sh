@@ -359,12 +359,17 @@ EOF
 }
 
 test_overdue_rows_escalate_before_away_acknowledgement() {
-  local dir state fakebin buffer now kind
+  local dir state fakebin buffer kind wake
   dir=$(make_supercase overdue-away-ack); state="$dir/state"; fakebin="$dir/daemon-bin"
   buffer="$state/.subsuper-escalations"
-  now=$(date +%s)
-  printf '{"schema":"fm-open-loops.v1","generated_epoch":%s,"complete":true,"rows":[{"id":"away-row","category":"stalled_worker","subject":"slow-worker","owner":"worker:slow-worker","next_action":"follow up on the recorded wait","age_seconds":7200,"limit_seconds":3600,"overdue":true,"evidence":"waiting for lint.full.whole"}]}\n' \
-    "$now" > "$state/open-loops.json"
+  python3 - "$state/open-loops.json" "$(date +%s)" <<'PYROWS'
+import json, sys
+rows = [dict(id=f'away-row-{i}', category='stalled_worker', subject=f'slow-worker-{i}', owner=f'worker:slow-worker-{i}',
+             next_action='follow up on the recorded wait', age_seconds=7200, limit_seconds=3600, overdue=True,
+             evidence='waiting for lint.full.whole') for i in range(10)]
+json.dump(dict(schema='fm-open-loops.v1', generated_epoch=int(sys.argv[2]), complete=True, rows=rows),
+          open(sys.argv[1], 'w'))
+PYROWS
   mkdir -p "$fakebin"
   printf '#!/usr/bin/env bash\nexec "%s/bin/fm-open-loops.sh" "$@"\n' "$ROOT" > "$fakebin/fm-open-loops.sh"
   chmod +x "$fakebin/fm-open-loops.sh"
@@ -382,18 +387,20 @@ EOF
   FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
     handle_durable_wakes fallback "$state" || fail "an overdue row wedged the away acknowledgement"
   [ "$(cat "$dir/acked" 2>/dev/null)" = ack ] || fail "the away daemon did not acknowledge after escalating"
-  assert_contains "$(cat "$buffer" 2>/dev/null)" 'overdue open work: "away-row","worker:slow-worker","slow-worker"' \
+  assert_contains "$(cat "$buffer" 2>/dev/null)" 'overdue open work: "away-row-3","worker:slow-worker-3","slow-worker-3"' \
     "the overdue row did not join the escalation digest"
   assert_contains "$(cat "$buffer")" 'waiting for lint.full.whole' "the digest lost the overdue row's evidence"
-  kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"]["away-row"]["kind"])' \
+  kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"]["away-row-3"]["kind"])' \
     "$state/open-loops.json")
   [ "$kind" = escalated ] || fail "the away escalation was not recorded as the row's receipt: $kind"
-  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
-    handle_durable_wakes fallback "$state" || fail "a later wake with the same overdue row was not acknowledged"
-  [ "$(wc -l < "$dir/acked" | tr -d ' ')" = 2 ] || fail "the later wake was not acknowledged once"
-  [ "$(grep -cF 'overdue open work: "away-row",' "$buffer")" = 1 ] \
-    || fail "an unflushed digest buffered the same overdue row twice"
-  pass "away mode escalates overdue rows once per digest, records the receipt, and acknowledges"
+  for wake in 2 3 4; do
+    FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+      handle_durable_wakes fallback "$state" || fail "wake $wake with the same overdue rows was not acknowledged"
+  done
+  [ "$(wc -l < "$dir/acked" | tr -d ' ')" = 4 ] || fail "a repeated wake was not acknowledged once"
+  [ "$(grep -c '^overdue open work: ' "$buffer")" = 10 ] \
+    || fail "repeated wakes buffered an overdue row more than once before the digest flushed"
+  pass "away mode escalates each overdue row once per digest, records the receipt, and acknowledges"
 }
 
 test_busy_inbox_escalation_reaches_supervision() {

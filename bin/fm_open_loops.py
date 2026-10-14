@@ -32,7 +32,7 @@ CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream depe
                  "Handle this at your next safe checkpoint; do not interrupt a running step.")
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
-DAY_SECONDS = 86400  # longest deferral, and how far back completions reach
+DAY_SECONDS = 86400  # longest deferral
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
@@ -98,7 +98,6 @@ class Collector:
         self.projects_dir = Path(os.environ.get("FM_PROJECTS_OVERRIDE") or self.home / "projects")
         self.load_config()
         self.required = {}
-        self.completions = []
         self.pipeline_waits = {}
         self.env = dict(os.environ, FM_HOME=str(self.home), FM_STATE_OVERRIDE=str(self.state),
                         FM_DATA_OVERRIDE=str(self.data), FM_CONFIG_OVERRIDE=str(self.config),
@@ -952,18 +951,6 @@ class Collector:
         except SOURCE_ERRORS:
             return False
 
-    def completion_rows(self):
-        """Backlog items closed within the last day, each with the merge of its own PR link."""
-        for record in self.backlog:
-            closed = epoch((record.get("completion") or {}).get("date"))
-            if record.get("state") != "done" or closed is None or not 0 <= self.now - closed <= DAY_SECONDS:
-                continue
-            evidence = record.get("title") or "backlog item completed"
-            pr = self.pr_state(record["pr_url"]) if record.get("pr_url") else None
-            if pr and pr.get("merged_at"):
-                evidence += f"; merged {record['pr_url']} at {pr['merged_at']}"
-            self.completions.append(dict(subject=record["id"], evidence=evidence))
-
     # -- run -------------------------------------------------------------------------------------
 
     def collect(self):
@@ -978,7 +965,6 @@ class Collector:
         self.source("report silence", self.silent_reports)
         self.source("questions", self.question_rows)
         self.source("board answers", self.board_answer_rows)
-        self.source("completions", self.completion_rows)
         if self.degraded:
             self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                      None, evidence="; ".join(self.degraded))
@@ -1004,7 +990,6 @@ class Collector:
                      None, evidence=reason)
             return
         self.stale_generated = previous["generated_epoch"]
-        self.completions = previous.get("completions", [])
         for row in previous["rows"]:
             if isinstance(row, dict) and isinstance(row.get("id"), str) and row.get("subject") != "ledger stale":
                 self.rows[row["id"]] = dict(row, stale=True)
@@ -1015,7 +1000,7 @@ class Collector:
         rows = sorted(self.rows.values(), key=lambda r: (r["category"], r["subject"]))
         report = dict(schema="fm-open-loops.v1", generated_epoch=self.stale_generated or self.now,
                       home=str(self.home), complete=not self.degraded and not self.stale_reason,
-                      rows=rows, completions=self.completions)
+                      rows=rows)
         if self.stale_reason:
             report.update(stale=True, stale_reason=self.stale_reason,
                           stale_until_epoch=self.quota_reset())
@@ -1057,8 +1042,8 @@ class Collector:
             handling["presentations"] = {actor: {ident: sequence for ident, sequence in pending.items()
                                                  if ident in published}
                                          for actor, pending in handling["presentations"].items()}
-            handling["presented_at"] = {ident: stamp for ident, stamp in handling.get("presented_at", {}).items()
-                                        if ident in published}
+            handling["presented_at"] = {actor: {ident: stamp for ident, stamp in stamps.items() if ident in published}
+                                        for actor, stamps in handling.get("presented_at", {}).items()}
             for row in report["rows"]:
                 if handling["actions"].get(row["id"], {}).get("captain_visible"):
                     row["captain_visible"] = True
@@ -1099,6 +1084,7 @@ def read_ledger(state):
                 type(handling.get("sequence")) is not int
                 or not isinstance(handling.get("actions"), dict) or not isinstance(handling.get("presentations"), dict)
                 or not isinstance(handling.get("presented_at", {}), dict)
+                or any(not isinstance(v, dict) for v in handling.get("presented_at", {}).values())
                 or any(not isinstance(v, dict) for v in [*handling["actions"].values(),
                                                          *handling["presentations"].values()])):
         raise ValueError("unsupported open-loop ledger")
@@ -1149,8 +1135,8 @@ def receipt_stands(action, row, now):
     kind = action.get("kind")
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
-    if kind == "escalated" and row.get("owner") == "captain":  # stands until the captain's row changes
-        return action.get("digest") == row_digest(row)
+    if kind == "escalated" and (row.get("owner") == "captain" or row.get("category") == "review_pass_not_merged"):
+        return action.get("digest") == row_digest(row)  # only the captain can move it; stands until the row changes
     return False
 
 
@@ -1198,7 +1184,8 @@ def ledger_action(args, state, now):
         return 0
     if args.present_overdue and not overdue_rows(report, now):
         return 0
-    controls = report.setdefault("handling", dict(sequence=0, presentations={}, actions={}))
+    controls = report.setdefault("handling", dict(sequence=0, presentations={}, presented_at={}, actions={}))
+    stamps = controls.setdefault("presented_at", {})
     actor = os.environ.get("FM_SUPERVISION_ACTOR") or "main"
     if actor not in ("main", "branch"):
         raise ValueError("unknown supervision actor")
@@ -1215,7 +1202,7 @@ def ledger_action(args, state, now):
             if not receipt_stands(action, row, now) and (ident not in pending
                                                          or action.get("sequence", 0) > pending[ident]):
                 pending[ident] = controls["sequence"]
-                controls.setdefault("presented_at", {})[ident] = now
+                stamps.setdefault(actor, {})[ident] = now
         write_ledger(state, report, receipt=True)
         if rows:
             print(render_overdue(rows))
@@ -1235,11 +1222,6 @@ def ledger_action(args, state, now):
     if args.report:
         print(f"generated_epoch: {report['generated_epoch']}")
         print("complete: " + str(report.get("complete", False)).lower())
-        completed = report.get("completions", [])
-        print(f"COMPLETIONS[{len(completed)}]{{subject,evidence}}:")
-        for completion in completed:
-            print("  " + ",".join(json.dumps(completion.get(f), ensure_ascii=False)
-                                  for f in ("subject", "evidence")))
         print(render_overdue(rows) if rows else "OVERDUE: none")
         return 0
     if args.row_id not in by_id:
@@ -1255,7 +1237,10 @@ def ledger_action(args, state, now):
         sent = steer_record_epoch(state, by_id[ident], args.evidence)
         if sent is None:
             raise ValueError("steered evidence must be a delivery record name (NNN.msg) in this row's task inbox")
-        if sent < controls.get("presented_at", {}).get(ident, now) or args.evidence in cited:
+        boundary = stamps.get(actor, {}).get(ident)
+        if boundary is None:
+            boundary = min((marked[ident] for marked in stamps.values() if ident in marked), default=now)
+        if sent < boundary or args.evidence in cited:
             raise ValueError("steered evidence must be a new delivery sent after this row's presentation")
         cited = cited + [args.evidence]
     if args.kind == "merged" and not merge_recorded(state, by_id[ident], args.evidence):
@@ -1272,13 +1257,19 @@ def ledger_action(args, state, now):
             for presented in controls["presentations"].values():
                 if ident in presented:
                     presented[ident] = controls["sequence"]
-            controls.setdefault("presented_at", {})[ident] = now
+            for marked in stamps.values():
+                if ident in marked:
+                    marked[ident] = now
             write_ledger(state, report, receipt=True)
             raise ValueError("second deferral refused; row is captain-visible; steer, merge or escalate it")
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
     elif args.recheck:
         raise ValueError("--recheck is only valid for deferred actions")
+    if args.kind == "deferred":
+        for marked in stamps.values():
+            if ident in marked:
+                marked[ident] = now
     controls["sequence"] += 1
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
                          sequence=controls["sequence"], deferrals=old.get("deferrals", 0)
@@ -1305,7 +1296,7 @@ def main():
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--present-overdue", action="store_true", help="present and require actions before wake acknowledgement")
     modes.add_argument("--check-actions", action="store_true", help="refuse acknowledgement with unactioned presented rows")
-    modes.add_argument("--report", action="store_true", help="report published completions and all overdue ages without collecting")
+    modes.add_argument("--report", action="store_true", help="report all overdue rows with current ages without collecting")
     commands = parser.add_subparsers(dest="command")
     action = commands.add_parser("action", help="record an action on a presented overdue row")
     action.add_argument("row_id")

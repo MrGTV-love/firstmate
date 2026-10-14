@@ -150,8 +150,7 @@ backlog = [
     dict(id='held', structured=True, state='queued', since=iso(hours(9)), hold_kind='captain'),
     dict(id='deferred', structured=True, state='queued', since=iso(hours(9)), hold_until='2999-01-01'),
     dict(id='review-8', structured=True, state='done', links=[PR_URL + '8'], pr_url=PR_URL + '8'),
-    dict(id='route-9', structured=True, state='done', links=[PR_URL + '9'], pr_url=PR_URL + '9',
-         completion=dict(verb='merged', date=iso(hours(1)))),
+    dict(id='route-9', structured=True, state='done', links=[PR_URL + '9'], pr_url=PR_URL + '9'),
 ]
 (home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
                                                     backlog=dict(present=True, records=backlog))))
@@ -269,8 +268,7 @@ double['single']['9'] = dict(merged_at=iso(now), head=dict(sha=review_head))
 (world / 'gh.json').write_text(json.dumps(double))
 merged_report = ledger('--heartbeat')
 assert not rows(merged_report, 'review_pass_not_merged'), 'merge resolves the obligation'
-assert [c['subject'] for c in merged_report['completions']] == ['route-9'], 'only items closed within a day'
-assert 'merged ' + review_url in merged_report['completions'][0]['evidence'], merged_report['completions']
+assert 'completions' not in merged_report, 'no completions projection is published'
 double['pulls'].append(review_pr)
 double['single'].pop('9')
 (world / 'gh.json').write_text(json.dumps(double))
@@ -1871,6 +1869,13 @@ def inbox(home, record, handled=False, offset=0):
     path.write_text(f'schema=fm-task-inbox.v1\nat={sent}\n--\nfollow up\n')
     return path
 
+def loops_as(home, actor, *args):
+    actor_env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home),
+                     FM_OPEN_LOOPS_NOW=str(clock['now']), FM_SUPERVISION_ACTOR=actor)
+    for key in ('FM_STATE_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+        actor_env.pop(key, None)
+    return subprocess.run([str(code / 'bin/fm-open-loops.sh'), *args], env=actor_env, text=True, capture_output=True)
+
 def case(name, actor='main', empty=False, **fields):
     home = world / ('action-' + name)
     for directory in ('state', 'config', 'data'):
@@ -1886,8 +1891,7 @@ def case(name, actor='main', empty=False, **fields):
     row.update(fields)
     ledger = home / 'state/open-loops.json'
     ledger.write_text(json.dumps(dict(schema='fm-open-loops.v1', generated_epoch=now, complete=True,
-                                     rows=[] if empty else [row],
-                                     completions=[dict(subject='shipped', evidence='completed fix')])) )
+                                     rows=[] if empty else [row])))
     def call(*args):
         return subprocess.run([str(a) for a in args], env=dict(env, FM_OPEN_LOOPS_NOW=str(clock['now'])),
                               text=True, capture_output=True)
@@ -1963,7 +1967,7 @@ for name, actor in (('host', 'branch'), ('secondmate', 'main')):
     ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '002.msg')
     assert ack(boundary).returncode == 0
     report = ok(code / 'bin/fm-open-loops.sh', '--report').stdout
-    assert 'shipped' in report and row['id'] in report and '7200' in report, report
+    assert row['id'] in report and '7200' in report and 'COMPLETIONS' not in report, report
 
 # Re-presentation is idempotent while an action is still missing. A later turn requires a new action.
 home, ledger, row, call, ok, drain, ack = case('repeat')
@@ -1995,6 +1999,43 @@ assert reused.returncode == 1 and 'new delivery' in reused.stdout, reused
 inbox(home, '005.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '005.msg')
 assert ack(boundary).returncode == 0
+
+# Steering evidence is judged against the acting actor's own presentation, not another actor's later one.
+home, ledger, row, call, ok, drain, ack = case('actors')
+assert loops_as(home, 'main', '--present-overdue').returncode == 0
+clock['now'] = now + 10
+inbox(home, '010.msg')
+clock['now'] = now + 20
+assert loops_as(home, 'branch', '--present-overdue').returncode == 0
+accepted = loops_as(home, 'main', 'action', row['id'], 'steered', '--evidence', '010.msg')
+assert accepted.returncode == 0, ('a later presentation by another actor refused main steer', accepted.stdout)
+clock['now'] = now
+
+# A message sent before a deferral cannot answer the row when that deferral lapses.
+home, ledger, row, call, ok, drain, ack = case('deferral-boundary')
+assert loops_as(home, 'main', '--present-overdue').returncode == 0
+inbox(home, '020.msg')
+clock['now'] = now + 100
+recheck = dt.datetime.fromtimestamp(now + 700, dt.timezone.utc).isoformat()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', recheck)
+clock['now'] = now + 800
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1
+old_message = call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '020.msg')
+assert old_message.returncode == 1 and 'new delivery' in old_message.stdout, old_message
+inbox(home, '021.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '021.msg')
+clock['now'] = now
+
+# An escalated review-PASS row awaiting the captain's merge approval stands until its evidence changes.
+home, ledger, row, call, ok, drain, ack = case('approval', category='review_pass_not_merged', subject=PR,
+                                               next_action='merge with existing authority or escalate for approval',
+                                               evidence='independent review PASS at live head', limit_seconds=600)
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain to approve')
+assert ack(boundary).returncode == 0
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: approval pending"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+assert ack(boundary).returncode == 0, 'an unchanged approval row needs no new escalation'
 
 # One escalation of a captain-owned row stands until the row changes.
 home, ledger, row, call, ok, drain, ack = case('captain', category='unanswered_question', subject='hold:captain-hold',
