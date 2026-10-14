@@ -1,0 +1,15 @@
+247 |   throw new Error("No Jev credentials: set TYPESAFE_API_KEY or OPENROUTER_API_KEY, or explicitly select provider: mock / JEV_BACKEND=mock for offline use.");
+                  ^
+error: No Jev credentials: set TYPESAFE_API_KEY or OPENROUTER_API_KEY, or explicitly select provider: mock / JEV_BACKEND=mock for offline use.
+      at selectProvider (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFDTH9SSHXJZH42XC61SJ9/bin/ten-levels/src/core/client.ts:247:13)
+      at new JevClient (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFDTH9SSHXJZH42XC61SJ9/bin/ten-levels/src/core/client.ts:116:21)
+      at sharedJev (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFDTH9SSHXJZH42XC61SJ9/bin/ten-levels/src/core/client.ts:368:27)
+      at get (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFDTH9SSHXJZH42XC61SJ9/bin/ten-levels/src/core/client.ts:375:20)
+      at routeAgent (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFDTH9SSHXJZH42XC61SJ9/bin/ten-levels/src/levels/level05/agent-router.ts:41:29)
+      at <anonymous> (/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFDTH9SSHXJZH42XC61SJ9/bin/ten-levels/tests/level05.test.ts:47:22)
+      at fn (node:test:215:18)
+(fail) L5 A: a localized test fix routes to the fast agent [0.08ms]
+
+ 3 pass
+ 3 fail
+Ran 6 tests across 1 file. [95.00ms]

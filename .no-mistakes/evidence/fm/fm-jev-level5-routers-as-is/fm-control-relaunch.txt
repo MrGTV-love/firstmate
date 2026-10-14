@@ -1,0 +1,55 @@
+ok - bounded ticks inspect one recorded unmanaged launch, rotate past drafts, and wrap without mutation
+ok - bounded recovery wakes once per unmanaged restored-agent identity and again only when it changes
+ok - bounded recovery persists inspection cursor before interruption and only inspects the next unmanaged launch
+ok - fm-control removes the dialog file after exit and after relaunch
+ok - fm-control exit removes the dialog file before it releases the control lock
+ok - held replacement admission refuses before touching the live owner
+ok - exited-owner recovery preserves commits, files, instructions, and real holds/dependencies without continuation authority
+ok - automatic, direct, and ordinary replacement inherit recovery until explicit clearance, then remain ordinary
+ok - reconciliation-only admission refuses live owners, queued work, fresh dispatch, and absent backlog authority
+ok - all supported worker harnesses share pre-stop blocked replacement admission
+ok - Herdr shares pre-stop held admission and recovery-only exited-owner preservation
+ok - continuation authorization refuses missing, foreign, dead, worker, and attended/away branch authority without side effects
+ok - continuation clearance accepts no relaunch options, arbitrary text, or non-allowlisted verbs
+ok - held and dependency-blocked continuation authorization refuses ordinary admission and preserves every byte
+ok - continuation authorization requires current automatic backlog, local unambiguous recovery records, and no pending close
+ok - unblocked ship/scout clearance changes only recovery, sends no endpoint input, and permits later live/exited ordinary relaunch
+ok - continuation-first lifecycle/meta locking excludes both control and direct replacement through admission and publication
+ok - control/direct replacement-first lifecycle/meta locking excludes clearance and inherits recovery until explicit later authorization
+ok - away branch replacement applies ordinary/recovery replacement admission without fresh queued-only dispatch
+ok - OMP replacement retires generated policy without removing user configuration
+ok - relaunch without a usable recorded rule treats an ambiguous match as no fallback
+ok - supervised OMP quota recovery uses the declared stand-in or preserves the strongest route and work
+ok - supervised OMP recovery enforces the typed route class and effort on stand-ins
+ok - fm-control relaunch: a same-harness relaunch replaces the agent in the same endpoint and worktree
+ok - fm-control relaunch: unsupported omp preserves the running agent and task
+ok - fm-control relaunch: pending composer text refuses before the exit command is typed
+ok - fm-control relaunch: an unreadable composer fails safe before the exit command is typed
+ok - fm-control relaunch: a linked spawning home preserves committed and unfinished work in the recorded copy
+ok - fm-control relaunch: durable task metadata survives replacement launch publication
+ok - fm-control relaunch: a recorded PR stays parseable for PR monitoring with tracing off
+ok - fm-control relaunch: a recorded PR stays parseable for PR monitoring with tracing on
+ok - fm-control relaunch: delivery and concurrent task metadata publication serialize
+ok - fm-control relaunch: disabling tracing clears metadata and pane context
+ok - fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement
+ok - fm-control relaunch: a ship task refuses without the progress note its replacement needs
+ok - fm-control relaunch: switching harness is one ordinary relaunch, and the old wiring goes with the old agent
+ok - fm-control relaunch: a harness switch resets model and effort unless they are named too
+ok - fm-control relaunch: a prefixed recorded harness can switch adapters transactionally
+ok - fm-control relaunch: a prefixed command requires an explicit replacement harness
+ok - fm-control relaunch: a same-harness relaunch keeps the profile axes it was running with
+ok - native Ultra relaunch preserves its profile and rejects an unsupported model before stopping
+ok - fm-control relaunch: roles resolve, and retired or catalog-absent ids refuse through the model index before the stop
+ok - relaunch freezes role, stand-in, and literal membership across authentication and replacement
+ok - unpinned indexed relaunch discloses unknown context before stopping without supervisor catalog evidence
+ok - fm-control relaunch: a signed-out worker account pin refuses before the old agent stops
+ok - fm-control relaunch: the replacement follows the home's current worker account pin
+ok - fm-control relaunch: a recorded api_key=allow opt-in is carried to the replacement launch
+ok - fm-control relaunch refuses a credential before stopping the original worker
+ok - fm-control checks the replacement harness rather than the previous harness
+ok - fm-control honors the replacement account pin's credential shed
+ok - fm-control honors the replacement launch allowlist
+ok - fm-control checks tmux environment before stopping the original worker
+ok - fm-spawn --relaunch: a replacement that does not opt in drops the recorded api_key line
+ok - fm-control relaunch: a Pi replacement keeps the home's tool exclusions
+ok - fm-control relaunch: exclusion-list refusals happen before the running agent stops

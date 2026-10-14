@@ -1,0 +1,6 @@
+ok - pool capacity preserves serving, missing-account, freshness, and saved-reset semantics
+ok - matrix fallback retains per-rule permission and strongest-model boundaries
+ok - fallback lookup resolves primary and stand-in roles and normalizes omitted axes
+ok - retirement and fallback schema apply to matched lists and direct fallback selection, not unrelated rules
+ok - capacity does not conflate native Claude quota with a TeamClaude stand-in
+# all fm-dispatch-capacity tests passed
