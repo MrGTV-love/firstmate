@@ -38,7 +38,8 @@
 #            is printed as its own field even when a selector is also present
 #            and even when that comment matches the element text, so typed
 #            words are never dropped. Choice Context data is not a comment.
-#            Captain-supplied body lines are visibly prefixed so they cannot
+#            Each image the captain attached prints as an `attachment_path:`
+#            line under its message or annotation. Captain-supplied body lines are visibly prefixed so they cannot
 #            forge structural labels. Empty message and annotation sections
 #            are reported explicitly.
 # orphans    List leftover Lavish poll processes that no listener owns, one
