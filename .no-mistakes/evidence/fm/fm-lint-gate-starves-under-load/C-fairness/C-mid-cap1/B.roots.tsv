@@ -1,0 +1,25 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	1
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	3	bin/fm-contributions.sh	0	full	1791997613885
+end	3	bin/fm-contributions.sh	0	full	1791997613885	1791997633256	10429	0	ok	1406192	1	1	91.88	87.74
+begin	1	bin/fm-host-mirror.sh	1	full	1791997634411
+end	1	bin/fm-host-mirror.sh	1	full	1791997634411	1791997659830	11463	0	ok	977264	1	1	87.74	85.53
+begin	2	bin/fm-herdr-session-cleanup.sh	1	full	1791997660552
+end	2	bin/fm-herdr-session-cleanup.sh	1	full	1791997660552	1791997682053	11252	0	ok	1398080	1	1	85.53	81.86
+begin	4	bin/fm-lab-home.sh	1	full	1791997682973
+end	4	bin/fm-lab-home.sh	1	full	1791997682973	1791997703653	7884	0	ok	961824	1	1	81.86	82.01
+meta	roots_begun	4
+meta	roots_completed	4
+meta	roots_unfinished	0
+meta	result_exit	0

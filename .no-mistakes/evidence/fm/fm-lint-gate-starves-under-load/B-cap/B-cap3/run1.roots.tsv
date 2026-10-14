@@ -1,0 +1,41 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	tests/fm-send-inbox-doorbell-live-e2e.test.sh	1	full	1791997240179
+begin	2	tests/fm-remote-job-orphan-reap.test.sh	0	full	1791997240343
+end	1	tests/fm-send-inbox-doorbell-live-e2e.test.sh	1	full	1791997240179	1791997241915	1736	0	ok	132336	1	1	80.80	80.80
+begin	4	tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh	1	full	1791997242159
+end	2	tests/fm-remote-job-orphan-reap.test.sh	0	full	1791997240343	1791997242895	1627	0	ok	133344	1	1	80.80	80.80
+begin	3	tests/fm-backend-herdr-prune-safety-e2e.test.sh	0	full	1791997243083
+end	4	tests/fm-sessionstart-instruction-refresh-live-e2e.test.sh	1	full	1791997242159	1791997244321	1959	0	ok	131328	1	1	80.80	82.98
+end	3	tests/fm-backend-herdr-prune-safety-e2e.test.sh	0	full	1791997243083	1791997244604	882	0	ok	50352	1	1	80.80	82.98
+begin	6	tests/fm-host-mirror-live-e2e.test.sh	1	full	1791997244845
+begin	5	tests/fm-procevent-proc.test.sh	0	full	1791997244878
+end	5	tests/fm-procevent-proc.test.sh	0	full	1791997244878	1791997246958	2080	0	ok	155936	1	1	82.98	82.98
+begin	7	tests/fm-watch-recovery-loop.test.sh	0	full	1791997247663
+end	6	tests/fm-host-mirror-live-e2e.test.sh	1	full	1791997244845	1791997251271	6425	0	ok	891136	1	1	82.98	87.38
+end	7	tests/fm-watch-recovery-loop.test.sh	0	full	1791997247663	1791997251387	1973	0	ok	150752	1	1	82.98	87.38
+begin	8	tests/fm-backend-herdr-respawn-idem-e2e.test.sh	1	full	1791997251595
+begin	9	tests/fm-cursor-primary-live-e2e.test.sh	0	full	1791997251666
+end	8	tests/fm-backend-herdr-respawn-idem-e2e.test.sh	1	full	1791997251595	1791997252381	781	0	ok	40992	1	1	87.38	87.38
+begin	10	tests/fm-pi-branch-responsiveness-live-e2e.test.sh	1	full	1791997252654
+end	9	tests/fm-cursor-primary-live-e2e.test.sh	0	full	1791997251666	1791997253145	1266	0	ok	131328	1	1	87.38	91.28
+begin	12	tests/fm-claude-nested-home-live-e2e.test.sh	0	full	1791997253370
+end	10	tests/fm-pi-branch-responsiveness-live-e2e.test.sh	1	full	1791997252654	1791997254855	1991	0	ok	126192	1	1	87.38	91.28
+begin	11	tests/fm-spawn-herdr-launch-shell.test.sh	1	full	1791997255303
+end	12	tests/fm-claude-nested-home-live-e2e.test.sh	0	full	1791997253370	1791997256383	2279	0	ok	247008	1	1	91.28	91.28
+end	11	tests/fm-spawn-herdr-launch-shell.test.sh	1	full	1791997255303	1791997258421	2598	0	ok	174320	1	1	91.28	94.54
+meta	roots_begun	12
+meta	roots_completed	12
+meta	roots_unfinished	0
+meta	result_exit	0

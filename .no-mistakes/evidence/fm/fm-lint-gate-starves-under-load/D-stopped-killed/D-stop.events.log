@@ -1,0 +1,11 @@
+1791998109.963	H started pid=53391
+1791998112.536	H admitted
+1791998112.596	X started pid=57522
+1791998113.833	X gate pid=58856 queued: queue.00000000000000000002.58856.57522
+1791998114.030	X gate stopped: state=T   
+1791998114.137	Y started pid=59602
+1791998129.381	Y finished rc=0; X gate state now: T   
+1791998129.401	X gate continued
+1791998151.797	X finished rc=0
+1791998171.067	H finished rc=0
+1791998171.088	summary mode=stop Y_rc=0 X_rc=0 H_rc=0

@@ -1,0 +1,177 @@
+Product: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFRRHNM6DGKRMTRZQB0YPJ/bin/fm-lint-cache.pl
+Host load snapshot: 13:15  up 4 days, 23:49, 5 users, load averages: 71.79 83.11 92.91
+
+SCENARIO CPU-derived capacity fills under current load and never oversubscribes
+ncpu=18 override=None started=9 expected=9 queued=2
+cold command started p0
+cold command completed p0
+cold command started p1
+cold command completed p1
+cold command started p2
+cold command completed p2
+cold command started p3
+cold command completed p3
+cold command started p4
+cold command completed p4
+cold command started p5
+cold command completed p5
+cold command started p6
+cold command completed p6
+cold command started p7
+cold command completed p7
+cold command started p8
+cold command completed p8
+cold command started p9
+cold command completed p9
+cold command started p10
+cold command completed p10
+ncpu=4 override=None started=2 expected=2 queued=2
+cold command started p0
+cold command completed p0
+cold command started p1
+cold command completed p1
+cold command started p2
+cold command completed p2
+cold command started p3
+cold command completed p3
+ncpu=1 override=None started=2 expected=2 queued=2
+cold command started p0
+cold command completed p0
+cold command started p1
+cold command completed p1
+cold command started p2
+cold command completed p2
+cold command started p3
+cold command completed p3
+ncpu=18 override=1 started=1 expected=1 queued=2
+cold command started p0
+cold command completed p0
+cold command started p1
+cold command completed p1
+cold command started p2
+cold command completed p2
+ncpu=18 override=2 started=2 expected=2 queued=2
+cold command started p0
+cold command completed p0
+cold command started p1
+cold command completed p1
+cold command started p2
+cold command completed p2
+cold command started p3
+cold command completed p3
+{"name": "CPU-derived capacity fills under current load and never oversubscribes", "result": "pass", "live": true, "detail": [{"ncpu": 18, "override": null, "active": 9}, {"ncpu": 4, "override": null, "active": 2}, {"ncpu": 1, "override": null, "active": 2}, {"ncpu": 18, "override": 1, "active": 1}, {"ncpu": 18, "override": 2, "active": 2}], "wall_seconds": 3.219}
+
+SCENARIO Nine-worker and one-worker runs get fair service on one slot
+admitted A0 pending-one-worker=True
+cold command started A0
+cold command completed A0
+admitted B0 pending-one-worker=True
+cold command started B0
+cold command completed B0
+admitted A1 pending-one-worker=True
+cold command started A1
+cold command completed A1
+admitted B1 pending-one-worker=True
+cold command started B1
+cold command completed B1
+admitted A2 pending-one-worker=True
+cold command started A2
+cold command completed A2
+admitted B2 pending-one-worker=True
+cold command started B2
+cold command completed B2
+admitted A3 pending-one-worker=False
+cold command started A3
+cold command completed A3
+admitted A4 pending-one-worker=False
+cold command started A4
+cold command completed A4
+admitted A5 pending-one-worker=False
+cold command started A5
+cold command completed A5
+admitted A6 pending-one-worker=False
+cold command started A6
+cold command completed A6
+admitted A7 pending-one-worker=False
+cold command started A7
+cold command completed A7
+admitted A8 pending-one-worker=False
+cold command started A8
+cold command completed A8
+service order=A0,B0,A1,B1,A2,B2,A3,A4,A5,A6,A7,A8 max nine-worker starts while later one-worker demand waits=1
+{"name": "Nine-worker and one-worker runs get fair service on one slot", "result": "pass", "live": true, "detail": {"capacity": 1, "service_order": ["A0", "B0", "A1", "B1", "A2", "B2", "A3", "A4", "A5", "A6", "A7", "A8"], "max_competing_turns": 1}, "wall_seconds": 1.595}
+
+SCENARIO Nine-worker and one-worker runs get fair service on two slots
+cold command started B0
+cold command completed B0
+cold command started A1
+cold command completed A1
+cold command started B1
+cold command completed B1
+cold command started A2
+cold command completed A2
+cold command started B2
+cold command completed B2
+cold command started A0
+cold command completed A0
+cold command started A3
+cold command completed A3
+cold command started A4
+cold command completed A4
+cold command started A5
+cold command completed A5
+cold command started A6
+cold command completed A6
+cold command started A7
+cold command completed A7
+cold command started A8
+cold command completed A8
+two-slot fair service=A0,B0,A1,B1,A2,B2; each release served queued one-worker demand before older backlog, while spare capacity was used between demands
+{"name": "Nine-worker and one-worker runs get fair service on two slots", "result": "pass", "live": true, "detail": {"capacity": 2, "controlled_service_order": ["A0", "B0", "A1", "B1", "A2", "B2"], "all_nine_worker_requests_finished": true}, "wall_seconds": 1.472}
+
+SCENARIO live head waiter preserves progress and queue correctness
+cold command started older
+cold command completed older
+cold command started younger
+cold command completed younger
+owner=live admission order=older -> younger queue_ms={'older.wait': 108, 'younger.wait': 209}
+{"name": "live head waiter preserves progress and queue correctness", "result": "pass", "live": true, "detail": {"owner_state": "live", "first": "older", "wait_milliseconds": {"older.wait": 108, "younger.wait": 209}}, "wall_seconds": 0.31}
+
+SCENARIO dead head waiter preserves progress and queue correctness
+cold command started younger
+cold command completed younger
+owner=dead admission order=younger queue_ms={'younger.wait': 107}
+{"name": "dead head waiter preserves progress and queue correctness", "result": "pass", "live": true, "detail": {"owner_state": "dead", "first": "younger", "wait_milliseconds": {"younger.wait": 107}}, "wall_seconds": 0.217}
+
+SCENARIO stopped head waiter preserves progress and queue correctness
+cold command started younger
+cold command completed younger
+cold command started older
+cold command completed older
+owner=stopped admission order=younger -> older queue_ms={'older.wait': 1349, 'younger.wait': 1268}
+{"name": "stopped head waiter preserves progress and queue correctness", "result": "pass", "live": true, "detail": {"owner_state": "stopped", "first": "younger", "wait_milliseconds": {"older.wait": 1349, "younger.wait": 1268}}, "wall_seconds": 1.422}
+
+SCENARIO Stopping the admission coordinator cannot freeze a free pool
+Stopped real queued gate while it owns admission.lock: 26778 T synchronization_attempts=1
+after 3 seconds with a free slot: younger_started=False younger_has_ticket=False
+cold command started older
+cold command completed older
+cold command started younger
+cold command completed younger
+{"name": "Stopping the admission coordinator cannot freeze a free pool", "result": "fail", "live": true, "detail": "stopped admission.lock owner blocks all later waiters even with the analyzer slot free; resuming owner restored progress", "wall_seconds": 3.259}
+
+SCENARIO Cache wrappers bypass occupied slots and serialize identical misses across roots
+cold payload initial
+fm-lint: cache hit bin/consumer.sh
+cold payload single-flight-first
+fm-lint: cache hit bin/consumer.sh
+cold payload failure-first
+cold payload failure-second
+Real cache/gate wrapper: cross-root hit bypassed occupied slot; changed source ran cold; identical concurrent miss reused one execution; cache key wait_ms=1479; exit 7 replayed by fresh execution.
+{"name": "Cache wrappers bypass occupied slots and serialize identical misses across roots", "result": "pass", "live": true, "detail": {"cold_commands": ["initial", "single-flight-first", "failure-first", "failure-second"], "key_queue_ms": 1479, "failure_exit_codes": [7, 7], "payload": "/usr/bin/true identity with real Python --execute command; no ShellCheck invoked"}, "wall_seconds": 1.966}
+
+SCENARIO Killing gate does not release a protected descendant slot
+cold command started later
+cold command completed later
+gate killed; descendant retained slot; queued command started only after descendant exit
+{"name": "Killing gate does not release a protected descendant slot", "result": "pass", "live": true, "detail": "Inherited flock survived SIGKILL of gate and was released by the real descendant exit.", "wall_seconds": 0.682}

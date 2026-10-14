@@ -1,0 +1,8 @@
+queued: queue.00000000000000000001.18344.13873
+queue.00000000000000000002.18343.13873
+lint rc=143 after SIGINT, exit took 315 s
+tickets left: 2
+gate processes left: 1
+follow-up lint rc=0
+
+[exited with code 0]

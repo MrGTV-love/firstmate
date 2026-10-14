@@ -1,0 +1,27 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	1
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c11.sh	0	full	1792003126275
+end	1	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c11.sh	0	full	1792003126275	1792003128607	1706	0	ok	299952	1	1	32.83	32.83
+begin	3	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c13.sh	0	full	1792003128633
+end	3	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c13.sh	0	full	1792003128633	1792003130421	1788	0	ok	299952	1	1	32.83	31.80
+begin	5	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c15.sh	0	full	1792003130449
+end	5	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c15.sh	0	full	1792003130449	1792003133604	1702	0	ok	299952	1	1	31.80	31.80
+begin	2	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c12.sh	1	full	1792003133678
+end	2	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c12.sh	1	full	1792003133678	1792003135508	1727	0	ok	299952	1	1	31.80	31.02
+begin	4	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c14.sh	1	full	1792003135538
+end	4	/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/fx/c14.sh	1	full	1792003135538	1792003139036	2055	0	ok	299952	1	1	31.02	33.34
+meta	roots_begun	5
+meta	roots_completed	5
+meta	roots_unfinished	0
+meta	result_exit	0

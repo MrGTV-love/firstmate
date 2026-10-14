@@ -1,0 +1,21 @@
+
+SCENARIO Host-slot waiting longer than watchdog budget still permits cold completion
+exit=0 stdout=watchdog payload completed stderr=
+Host queue_ms=2100 total_seconds=2.443 watchdog_seconds=1 payload_seconds=0.2
+{"name": "Host-slot waiting longer than watchdog budget still permits cold completion", "result": "pass", "live": true, "detail": {"host_wait_ms": 2100, "total_seconds": 2.443, "watchdog_seconds": 1}}
+
+SCENARIO Cache-key waiting longer than watchdog budget still permits cold completion
+exit=7 stdout=uncached exit 7 stderr=
+exit=0 stdout=cold watchdog completed after cache-key wait stderr=
+Key queue_ms=1965 total_seconds=2.373 watchdog_seconds=1 payload_seconds=0.2
+{"name": "Cache-key waiting longer than watchdog budget still permits cold completion", "result": "pass", "live": true, "detail": {"cache_key_wait_ms": 1965, "total_seconds": 2.373, "watchdog_seconds": 1, "cache_outcome": "analyzed"}}
+
+SCENARIO Literal --execute operand stays a root instead of becoming command metadata
+literal operand stdout='-- --execute\n' exit=0
+{"name": "Literal --execute operand stays a root instead of becoming command metadata", "result": "pass", "live": true, "detail": {"stdout": "-- --execute\n", "exit": 0, "real_command": "/bin/echo"}}
+
+SCENARIO Cancelling cache owner reaps cold command and releases admission
+exit=143 stdout= stderr=
+exit=0 stdout=later request admitted after cancellation stderr=
+Cancelled cache owner exit=143; protected child absent; next request admitted
+{"name": "Cancelling cache owner reaps cold command and releases admission", "result": "pass", "live": true, "detail": {"cancel_exit": 143, "cold_child_alive": false, "later_exit": 0}}

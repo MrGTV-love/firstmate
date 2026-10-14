@@ -1,0 +1,41 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	tests/fm-muse-signals-live-e2e.test.sh	0	full	1791997240515
+begin	2	tests/fm-send-agy-confirm.test.sh	1	full	1791997240777
+end	2	tests/fm-send-agy-confirm.test.sh	1	full	1791997240777	1791997245228	1325	0	ok	118000	1	1	80.80	82.98
+begin	4	tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh	1	full	1791997245586
+end	1	tests/fm-muse-signals-live-e2e.test.sh	0	full	1791997240515	1791997249480	8233	0	ok	967904	1	1	80.80	87.38
+begin	3	tests/fm-agy-signals-live-e2e.test.sh	0	full	1791997249789
+end	4	tests/fm-backend-herdr-agent-exit-shell-e2e.test.sh	1	full	1791997245586	1791997250206	1582	0	ok	135408	1	1	82.98	87.38
+begin	5	tests/fm-herdr-pi-stale-registration-live-e2e.test.sh	1	full	1791997250609
+end	3	tests/fm-agy-signals-live-e2e.test.sh	0	full	1791997249789	1791997251956	1321	0	ok	133376	1	1	87.38	87.38
+begin	6	tests/fm-test-fixture-cleanup.test.sh	0	full	1791997252299
+end	5	tests/fm-herdr-pi-stale-registration-live-e2e.test.sh	1	full	1791997250609	1791997252676	1338	0	ok	128272	1	1	87.38	87.38
+begin	7	tests/fm-home-summary-refresh-ownership.test.sh	1	full	1791997252949
+end	6	tests/fm-test-fixture-cleanup.test.sh	0	full	1791997252299	1791997253415	1116	0	ok	111856	1	1	87.38	91.28
+begin	8	tests/fm-devin-harness.test.sh	0	full	1791997253854
+end	7	tests/fm-home-summary-refresh-ownership.test.sh	1	full	1791997252949	1791997255387	1608	0	ok	101600	1	1	87.38	91.28
+begin	10	tests/fm-backend-cmux-smoke.test.sh	1	full	1791997255671
+end	10	tests/fm-backend-cmux-smoke.test.sh	1	full	1791997255671	1791997259367	988	0	ok	40032	1	1	91.28	94.54
+begin	11	tests/fm-proc-budget.test.sh	1	full	1791997259783
+end	8	tests/fm-devin-harness.test.sh	0	full	1791997253854	1791997261491	6705	0	ok	1041648	1	1	91.28	94.54
+begin	9	tests/fm-backend-autodetect-smoke.test.sh	0	full	1791997262000
+end	11	tests/fm-proc-budget.test.sh	1	full	1791997259783	1791997262304	2108	0	ok	151760	1	1	94.54	94.54
+end	9	tests/fm-backend-autodetect-smoke.test.sh	0	full	1791997262000	1791997263152	1152	0	ok	47184	1	1	94.54	95.61
+begin	12	tests/fm-wake-daemon-lifecycle-e2e.test.sh	0	full	1791997263746
+end	12	tests/fm-wake-daemon-lifecycle-e2e.test.sh	0	full	1791997263746	1791997266878	3132	0	ok	147744	1	1	95.61	95.61
+meta	roots_begun	12
+meta	roots_completed	12
+meta	roots_unfinished	0
+meta	result_exit	0

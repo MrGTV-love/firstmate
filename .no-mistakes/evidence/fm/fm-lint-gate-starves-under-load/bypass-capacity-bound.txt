@@ -1,0 +1,6 @@
+== Scenario (bypass bound): cap=2; A's gate stopped inside admission.lock; 4 more lints (8 workers) contend
+[t+ 13.72s] catcher: caught after 756 tries
+[t+ 13.74s] A gate pid=30627 stopped while owning admission.lock (stat=T   )
+[t+ 16.81s] both holders released; 4 lints contend while A stays stopped
+[t+ 75.81s] 4 contending lints finished with exits: 0 0 0 0; peak concurrent ShellChecks=2 over 413 samples (cap=2)
+[t+ 79.22s] A resumed and finished exit=0

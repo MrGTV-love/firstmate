@@ -1,0 +1,16 @@
+1791997610689	A	bin/fm-classify-lib.sh
+1791997615961	B	bin/fm-contributions.sh
+1791997625200	A	bin/fm-branch-report.sh
+1791997632292	B	bin/fm-host-mirror.sh
+1791997640841	A	bin/fm-backlog-receive.sh
+1791997648735	B	bin/fm-herdr-session-cleanup.sh
+1791997659434	A	bin/fm-home-summary-refresh.sh
+1791997667468	B	bin/fm-lab-home.sh
+1791997673808	A	bin/backends/tmux.sh
+1791997680877	A	bin/fm-remote-home-seed.sh
+1791997688190	A	bin/fm-afk-start.sh
+1791997695388	A	bin/fm-live-lab.sh
+1791997702657	A	bin/fm-guard.sh
+1791997709403	A	bin/fm-lock.sh
+1791997717113	A	bin/fm-gh-rest.sh
+1791997723699	A	bin/fm-claude-stop-autoarm.sh

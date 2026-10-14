@@ -1,0 +1,5 @@
+warm rc=0 wall=48.9
+external holder owns the only host slot
+cached rerun with slot held: rc=124 wall=60.1
+cold root still queued after 15 s with slot held (bound enforced)
+cold root after release: rc=0 total wall=21.1

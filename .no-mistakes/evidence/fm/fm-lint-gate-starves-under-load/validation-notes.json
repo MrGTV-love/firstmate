@@ -1,0 +1,20 @@
+{
+  "target_commit": "e2f337f5e870713f07e26a2bd89c80d636af22c5",
+  "scope": "Real fm-lint-cache.pl gate/check executables and fm-lint.sh watchdog, with disposable non-analyzer payloads. No linter, formatter, static analyzer, or complete test suite run in this validation.",
+  "failure": {
+    "observed": "SIGSTOP of a real queued gate while holding admission.lock left a later gate unable to obtain a ticket or start for 3 seconds after analyzer capacity freed. ps confirmed T; SIGCONT restored progress. Reproduced in intermediate and final driver runs.",
+    "expected": "Stopped head owners must not block later live demand on free capacity.",
+    "existing_gap": "The permanent stopped-head check explicitly resumes owners stopped while holding admission.lock, so it does not exercise this failure."
+  },
+  "fixture_corrections": [
+    "Initial/intermediate two-slot accounting imposed overly strict turn limits instead of isolating queued demand. Final controlled tests verify lower-occupancy demand takes each freed slot before older backlog, and permit spare-capacity use when demand is absent.",
+    "Intermediate cache-driver newline was escaped twice; corrected fixture and re-drove successfully. Earlier logs are retained, not final product verdicts for those scenarios."
+  ],
+  "preexisting_evidence_reviewed": {
+    "targeted_tests": "targeted-gate-tests.log already existed; read, not rerun.",
+    "single_canonical": "F-full/single/summary.txt reports exit 0, wall 1939.104 seconds; run0.tsv binds it to target e2f337f5 and full/all with root_count 569. This is pre-existing evidence, not a live scenario driven in this validation.",
+    "three_concurrent": "No three-concurrent final benchmark artifacts were present in the explicitly authorized evidence directory."
+  },
+  "limits": "Actual CLI --jobs propagation, ShellCheck finding/retry integration, RSS under concurrent canonical analysis and all four required benchmark times were not driven here. ShellCheck is on PATH, but this test phase explicitly prohibits linters and reserves lint/PR/CI phases to the outer executor. Disposable real-gate/cache/watchdog routes were exercised instead; fake ShellCheck would not prove those missing contracts. The 13,504.494-second attached historical result is not final AFTER evidence. No original baseline restarted.",
+  "cleanup": "Drivers reap disposable processes and remove worktree-local pools/cache/fixtures; replayable drivers and logs remain only in authorized evidence. Product source and permanent tests are unchanged."
+}

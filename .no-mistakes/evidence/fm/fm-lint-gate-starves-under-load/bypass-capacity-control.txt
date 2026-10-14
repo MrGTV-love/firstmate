@@ -1,0 +1,6 @@
+== CONTROL (no stopped owner): cap=2; A's gate stopped inside admission.lock; 4 more lints (8 workers) contend
+[t+  0.38s] control run: A is NOT stopped
+[t+  3.44s] both holders released; 4 lints contend while A stays stopped
+[t+ 17.77s] 4 contending lints finished with exits: 0 0 0 0; peak concurrent ShellChecks=2 over 104 samples (cap=2)
+/Users/charlesabrooker/tmp/fm-lint-lab.xiz6Z3/s-bypass-control.sh: line 28: kill: (28323) - No such process
+[t+ 17.78s] A resumed and finished exit=0

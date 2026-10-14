@@ -1,0 +1,12 @@
+ok - host caps are CPU-derived, ignore load, and admission respects total occupancy
+ok - waiting roots precede newer roots and a killed waiter cannot strand admission
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+ok - a stopped head waiter is skipped while a slot is free and is admitted once resumed
+ok - a gate stopped while owning admission does not freeze free capacity
+analysis ran
+analysis ran
+ok - the queue scan handles slot paths with spaces and tickets cancelled mid-scan
+ok - a content-identical cached success finishes while all host slots remain occupied
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+ok - a cache-key wait longer than the root deadline preserves its memory retry budget
+ok - an explicit leading-dash root retains real ShellCheck findings

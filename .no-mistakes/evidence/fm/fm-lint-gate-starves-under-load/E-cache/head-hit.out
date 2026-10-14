@@ -1,0 +1,5 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint: cache hit bin/fm-dod-lib.sh
+fm-lint: cache hit tests/fm-backend-herdr-eventwait-smoke.test.sh
+fm-lint: cache hit bin/fm-lease.sh

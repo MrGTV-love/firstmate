@@ -1,0 +1,99 @@
+== before-base-realload: 5 concurrent lints x --jobs 2 x 8 roots, cap=default(ncpu/2=9), ncpu=18
+run1	rc=0	wall=22.1s
+run2	rc=0	wall=12.0s
+run3	rc=0	wall=18.0s
+run4	rc=0	wall=16.2s
+run5	rc=0	wall=18.2s
+total_wall=22.1s
+  samples_with_0_running=15
+  samples_with_1_running=20
+  samples_with_2_running=5
+  samples_with_3_running=21
+  samples_with_4_running=24
+  samples_with_5_running=1
+  samples_with_6_running=16
+  samples_with_8_running=9
+load_1min min=30.9 mean=31.5 max=32.5 (2*ncpu=36)
+peak_concurrent_shellcheck=8
+== after-head-realload: 5 concurrent lints x --jobs 2 x 8 roots, cap=default(ncpu/2=9), ncpu=18
+run1	rc=0	wall=11.7s
+run2	rc=0	wall=11.8s
+run3	rc=0	wall=11.7s
+run4	rc=0	wall=11.8s
+run5	rc=0	wall=10.2s
+total_wall=11.9s
+  samples_with_0_running=10
+  samples_with_1_running=1
+  samples_with_2_running=1
+  samples_with_3_running=1
+  samples_with_4_running=8
+  samples_with_5_running=1
+  samples_with_6_running=1
+  samples_with_7_running=2
+  samples_with_8_running=5
+  samples_with_9_running=30
+load_1min min=32.5 mean=33.1 max=36.7 (2*ncpu=36)
+peak_concurrent_shellcheck=9
+== before-base-realload: 5 concurrent lints x --jobs 2 x 8 roots, cap=default(ncpu/2=9), ncpu=18
+run1	rc=0	wall=13.2s
+run2	rc=0	wall=24.2s
+run3	rc=0	wall=17.1s
+run4	rc=0	wall=20.9s
+run5	rc=0	wall=22.7s
+total_wall=24.3s
+  samples_with_0_running=13
+  samples_with_1_running=18
+  samples_with_2_running=23
+  samples_with_3_running=14
+  samples_with_4_running=15
+  samples_with_5_running=14
+  samples_with_6_running=8
+  samples_with_7_running=6
+load_1min min=36.7 mean=39.8 max=43.1 (2*ncpu=36)
+peak_concurrent_shellcheck=7
+== after-head-realload: 5 concurrent lints x --jobs 2 x 8 roots, cap=default(ncpu/2=9), ncpu=18
+run1	rc=0	wall=12.3s
+run2	rc=0	wall=12.4s
+run3	rc=0	wall=12.2s
+run4	rc=0	wall=10.8s
+run5	rc=0	wall=12.3s
+total_wall=12.4s
+  samples_with_0_running=11
+  samples_with_2_running=2
+  samples_with_3_running=2
+  samples_with_4_running=7
+  samples_with_7_running=3
+  samples_with_8_running=5
+  samples_with_9_running=29
+load_1min min=40.3 mean=40.9 max=41.3 (2*ncpu=36)
+peak_concurrent_shellcheck=9
+## Old gate test seam FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=100 (overnight-like load); the new gate does not read load
+== before-base-load100: 5 concurrent lints x --jobs 2 x 8 roots, cap=default(ncpu/2=9), ncpu=18
+run1	rc=0	wall=33.7s
+run2	rc=0	wall=32.0s
+run3	rc=0	wall=39.7s
+run4	rc=0	wall=43.6s
+run5	rc=0	wall=37.9s
+total_wall=43.6s
+  samples_with_0_running=31
+  samples_with_1_running=29
+  samples_with_2_running=160
+load_1min min=38.1 mean=40.1 max=41.5 (2*ncpu=36)
+peak_concurrent_shellcheck=2
+== after-head-load100: 5 concurrent lints x --jobs 2 x 8 roots, cap=default(ncpu/2=9), ncpu=18
+run1	rc=0	wall=12.3s
+run2	rc=0	wall=11.9s
+run3	rc=0	wall=12.2s
+run4	rc=0	wall=12.3s
+run5	rc=0	wall=11.1s
+total_wall=12.3s
+  samples_with_0_running=10
+  samples_with_2_running=1
+  samples_with_3_running=3
+  samples_with_4_running=9
+  samples_with_6_running=1
+  samples_with_7_running=2
+  samples_with_8_running=5
+  samples_with_9_running=28
+load_1min min=38.1 mean=43.2 max=45.8 (2*ncpu=36)
+peak_concurrent_shellcheck=9

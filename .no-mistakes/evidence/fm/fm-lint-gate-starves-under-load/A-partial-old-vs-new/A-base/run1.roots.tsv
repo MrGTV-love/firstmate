@@ -1,0 +1,145 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	bin/fm-afk-contract.sh	1	full	1791996326748
+begin	5	bin/fm-agent-process-lib.sh	0	full	1791996326786
+end	1	bin/fm-afk-contract.sh	1	full	1791996326748	1791996338310	1033	0	ok	83040	1	1	57.37	59.78
+begin	2	bin/fm-afk-launch.sh	1	full	1791996338640
+end	2	bin/fm-afk-launch.sh	1	full	1791996338640	1791996349543	10832	0	ok	1441040	1	1	59.78	63.59
+begin	3	bin/fm-afk-return.sh	1	full	1791996350145
+end	5	bin/fm-agent-process-lib.sh	0	full	1791996326786	1791996357967	1205	0	ok	138432	1	1	57.37	63.42
+begin	8	bin/fm-arm-pretool-check.sh	0	full	1791996358349
+end	8	bin/fm-arm-pretool-check.sh	0	full	1791996358349	1791996359206	771	0	ok	31792	1	1	63.42	63.42
+begin	10	bin/fm-backend.sh	0	full	1791996359542
+end	10	bin/fm-backend.sh	0	full	1791996359542	1791996360957	1329	0	ok	104608	1	1	63.42	63.42
+begin	20	bin/fm-brief-heading-lib.sh	0	full	1791996361385
+end	20	bin/fm-brief-heading-lib.sh	0	full	1791996361385	1791996380143	982	0	ok	23552	1	1	63.42	66.32
+begin	23	bin/fm-busy-lib.sh	0	full	1791996380696
+end	3	bin/fm-afk-return.sh	1	full	1791996350145	1791996404807	22381	0	ok	2909456	1	1	63.59	68.46
+begin	4	bin/fm-afk-start.sh	1	full	1791996405177
+end	23	bin/fm-busy-lib.sh	0	full	1791996380696	1791996416156	1200	0	ok	92368	1	1	66.32	71.68
+begin	27	bin/fm-check-register.sh	0	full	1791996416765
+end	4	bin/fm-afk-start.sh	1	full	1791996405177	1791996416574	6915	0	ok	944352	1	1	68.46	71.68
+begin	6	bin/fm-agy-trust.sh	1	full	1791996417406
+end	27	bin/fm-check-register.sh	0	full	1791996416765	1791996420870	4052	0	ok	335104	1	1	71.68	71.70
+begin	32	bin/fm-claude-stop-autoarm.sh	0	full	1791996421700
+end	6	bin/fm-agy-trust.sh	1	full	1791996417406	1791996421499	1604	0	ok	36848	1	1	71.68	71.70
+begin	7	bin/fm-api-key-guard-lib.sh	1	full	1791996422361
+end	32	bin/fm-claude-stop-autoarm.sh	0	full	1791996421700	1791996441422	10271	0	ok	1087840	1	1	71.70	77.75
+begin	35	bin/fm-composer-lib.sh	0	full	1791996442073
+end	7	bin/fm-api-key-guard-lib.sh	1	full	1791996422361	1791996442190	2158	0	ok	29552	1	1	71.70	77.75
+begin	9	bin/fm-backend-hometag-lib.sh	1	full	1791996445271
+end	35	bin/fm-composer-lib.sh	0	full	1791996442073	1791996452055	9721	0	ok	496288	1	1	77.75	84.05
+begin	43	bin/fm-crew-state.sh	0	full	1791996452986
+end	9	bin/fm-backend-hometag-lib.sh	1	full	1791996445271	1791996455893	2469	0	ok	24416	1	1	78.57	88.13
+begin	11	bin/fm-backlog-handoff.sh	1	full	1791996456470
+end	43	bin/fm-crew-state.sh	0	full	1791996452986	1791996481896	26533	0	ok	3991824	1	1	84.05	96.38
+begin	45	bin/fm-decision-hold.sh	0	full	1791996482613
+end	45	bin/fm-decision-hold.sh	0	full	1791996482613	1791996484378	1590	0	ok	48208	1	1	96.38	98.59
+begin	46	bin/fm-devin-config.sh	0	full	1791996485294
+end	11	bin/fm-backlog-handoff.sh	1	full	1791996456470	1791996537820	62203	0	ok	6183712	1	1	88.13	91.80
+begin	12	bin/fm-backlog-receive.sh	1	full	1791996538039
+end	12	bin/fm-backlog-receive.sh	1	full	1791996538039	1791996570313	10172	0	ok	966912	1	1	89.58	90.19
+begin	13	bin/fm-backlog-transition-lib.sh	1	full	1791996572103
+end	46	bin/fm-devin-config.sh	0	full	1791996485294	1791996582363	1679	0	ok	23552	1	1	98.59	88.70
+begin	48	bin/fm-dispatch-capacity.sh	0	full	1791996582793
+end	13	bin/fm-backlog-transition-lib.sh	1	full	1791996572103	1791996582554	4597	0	ok	518384	1	1	90.19	88.70
+begin	14	bin/fm-bearings-board.sh	1	full	1791996583164
+end	48	bin/fm-dispatch-capacity.sh	0	full	1791996582793	1791996586542	3684	0	ok	434352	1	1	88.70	88.88
+begin	49	bin/fm-dispatch-resolve.sh	0	full	1791996587108
+end	14	bin/fm-bearings-board.sh	1	full	1791996583164	1791996587334	1368	0	ok	54336	1	1	88.88	88.88
+begin	15	bin/fm-bearings-snapshot.sh	1	full	1791996587669
+end	49	bin/fm-dispatch-resolve.sh	0	full	1791996587108	1791996594817	7586	0	ok	642720	1	1	88.88	96.93
+begin	53	bin/fm-ensure-agents-md.sh	0	full	1791996595424
+end	53	bin/fm-ensure-agents-md.sh	0	full	1791996595424	1791996603238	3093	0	ok	35888	1	1	96.93	96.92
+begin	54	bin/fm-env-lib.sh	0	full	1791996604881
+end	54	bin/fm-env-lib.sh	0	full	1791996604881	1791996618971	2717	0	ok	22416	1	1	96.92	98.33
+begin	55	bin/fm-exclude-tools-lib.sh	0	full	1791996619707
+end	15	bin/fm-bearings-snapshot.sh	1	full	1791996587669	1791996642950	1328	0	ok	118960	1	1	88.88	103.44
+begin	16	bin/fm-bootstrap.sh	1	full	1791996643715
+end	55	bin/fm-exclude-tools-lib.sh	0	full	1791996619707	1791996666768	2961	0	ok	25584	1	1	98.33	95.07
+begin	57	bin/fm-ff-lib.sh	0	full	1791996666972
+end	57	bin/fm-ff-lib.sh	0	full	1791996666972	1791996668942	1860	0	ok	130192	1	1	95.07	94.18
+begin	59	bin/fm-fleet-snapshot.sh	0	full	1791996669197
+end	59	bin/fm-fleet-snapshot.sh	0	full	1791996669197	1791996685173	15927	0	ok	2320656	1	1	94.18	86.77
+begin	62	bin/fm-forge-detect.sh	0	full	1791996685646
+end	16	bin/fm-bootstrap.sh	1	full	1791996643715	1791996686302	36034	0	ok	4374816	1	1	103.44	86.77
+begin	17	bin/fm-branch-outcome.sh	1	full	1791996686577
+end	17	bin/fm-branch-outcome.sh	1	full	1791996686577	1791996702547	15928	0	ok	2019600	1	1	86.77	86.63
+begin	18	bin/fm-branch-prompt.sh	1	full	1791996702756
+end	18	bin/fm-branch-prompt.sh	1	full	1791996702756	1791996704328	1379	0	ok	21216	1	1	86.63	91.62
+end	62	bin/fm-forge-detect.sh	0	full	1791996685646	1791996704434	1030	0	ok	23376	1	1	86.77	91.62
+begin	19	bin/fm-branch-report.sh	1	full	1791996704454
+begin	63	bin/fm-gate-refuse-lib.sh	0	full	1791996704630
+end	19	bin/fm-branch-report.sh	1	full	1791996704454	1791996713962	9325	0	ok	1001744	1	1	91.62	89.60
+begin	21	bin/fm-brief.sh	1	full	1791996714324
+end	63	bin/fm-gate-refuse-lib.sh	0	full	1791996704630	1791996715894	1398	0	ok	26624	1	1	91.62	89.60
+begin	64	bin/fm-gemini-lib.sh	0	full	1791996716790
+end	64	bin/fm-gemini-lib.sh	0	full	1791996716790	1791996728916	898	0	ok	25632	1	1	89.60	86.48
+begin	65	bin/fm-gh-rest.sh	0	full	1791996729211
+end	65	bin/fm-gh-rest.sh	0	full	1791996729211	1791996759309	8296	0	ok	885008	1	1	86.48	85.90
+begin	68	bin/fm-harness.sh	0	full	1791996759486
+end	21	bin/fm-brief.sh	1	full	1791996714324	1791996760148	21716	0	ok	2721040	1	1	89.60	85.90
+begin	22	bin/fm-busy-event.sh	1	full	1791996760379
+end	68	bin/fm-harness.sh	0	full	1791996759486	1791996761047	1491	0	ok	145664	1	1	85.90	85.90
+begin	72	bin/fm-hold-reason-lib.sh	0	full	1791996761696
+end	72	bin/fm-hold-reason-lib.sh	0	full	1791996761696	1791996764716	797	0	ok	20144	1	1	85.90	82.63
+begin	75	bin/fm-hook-host-lib.sh	0	full	1791996765256
+end	75	bin/fm-hook-host-lib.sh	0	full	1791996765256	1791996774573	646	0	ok	20240	1	1	82.63	83.12
+begin	76	bin/fm-host-mirror.sh	0	full	1791996774840
+end	22	bin/fm-busy-event.sh	1	full	1791996760379	1791996774952	1752	0	ok	124096	1	1	85.90	83.12
+begin	24	bin/fm-captain-hold.sh	1	full	1791996775238
+end	76	bin/fm-host-mirror.sh	0	full	1791996774840	1791996784533	9583	0	ok	988400	1	1	83.12	85.67
+begin	77	bin/fm-idle-reap-lib.sh	0	full	1791996785112
+end	24	bin/fm-captain-hold.sh	1	full	1791996775238	1791996802382	27059	0	ok	3250480	1	1	83.12	92.52
+begin	25	bin/fm-cd-pretool-check.sh	1	full	1791996802763
+end	77	bin/fm-idle-reap-lib.sh	0	full	1791996785112	1791996816470	24267	0	ok	2519440	1	1	85.67	95.06
+begin	79	bin/fm-inactive-reconcile.sh	0	full	1791996817663
+end	79	bin/fm-inactive-reconcile.sh	0	full	1791996817663	1791996847224	29457	0	ok	3671312	1	1	95.06	101.09
+begin	81	bin/fm-install-actionlint.sh	0	full	1791996847831
+end	81	bin/fm-install-actionlint.sh	0	full	1791996847831	1791996850081	2053	0	ok	24672	1	1	101.09	101.40
+begin	82	bin/fm-install-herdr.sh	0	full	1791996850966
+end	82	bin/fm-install-herdr.sh	0	full	1791996850966	1791996857461	1744	0	ok	24560	1	1	101.40	99.61
+begin	86	bin/fm-jev-guard-hook.sh	0	full	1791996858122
+end	25	bin/fm-cd-pretool-check.sh	1	full	1791996802763	1791996858840	1104	0	ok	31824	1	1	92.52	97.16
+begin	26	bin/fm-check-lib.sh	1	full	1791996859383
+end	86	bin/fm-jev-guard-hook.sh	0	full	1791996858122	1791996859064	916	0	ok	20272	1	1	99.61	97.16
+begin	87	bin/fm-kimi-turnend-hook.sh	0	full	1791996859633
+end	26	bin/fm-check-lib.sh	1	full	1791996859383	1791996860941	1312	0	ok	29632	1	1	97.16	97.16
+begin	28	bin/fm-check-unregister.sh	1	full	1791996861554
+end	87	bin/fm-kimi-turnend-hook.sh	0	full	1791996859633	1791996862748	1011	0	ok	22352	1	1	97.16	97.16
+begin	90	bin/fm-launch-proof-lib.sh	0	full	1791996863540
+end	90	bin/fm-launch-proof-lib.sh	0	full	1791996863540	1791996866190	2428	0	ok	180416	1	1	93.70	93.70
+begin	91	bin/fm-lease-lib.sh	0	full	1791996866611
+end	28	bin/fm-check-unregister.sh	1	full	1791996861554	1791996869187	3294	0	ok	316656	1	1	97.16	93.81
+begin	29	bin/fm-classify-lib.sh	1	full	1791996869766
+end	91	bin/fm-lease-lib.sh	0	full	1791996866611	1791996876668	1247	0	ok	76992	1	1	93.70	90.22
+begin	92	bin/fm-lease.sh	0	full	1791996877187
+end	29	bin/fm-classify-lib.sh	1	full	1791996869766	1791996883408	7082	0	ok	855248	1	1	93.81	87.79
+begin	30	bin/fm-claude-launcher-lib.sh	1	full	1791996883762
+end	92	bin/fm-lease.sh	0	full	1791996877187	1791996886053	8654	0	ok	1018128	1	1	90.22	87.79
+begin	95	bin/fm-lint.sh	0	full	1791996886227
+end	95	bin/fm-lint.sh	0	full	1791996886227	1791996905528	2504	0	ok	401648	1	1	87.79	96.70
+begin	97	bin/fm-load-report.sh	0	full	1791996905928
+end	30	bin/fm-claude-launcher-lib.sh	1	full	1791996883762	1791996906303	1142	0	ok	23456	1	1	87.79	96.70
+begin	31	bin/fm-claude-memory-lib.sh	1	full	1791996906859
+end	31	bin/fm-claude-memory-lib.sh	1	full	1791996906859	1791996916572	881	0	ok	27552	1	1	96.70	98.11
+begin	33	bin/fm-claude-trust.sh	1	full	1791996916903
+end	33	bin/fm-claude-trust.sh	1	full	1791996916903	1791996919157	2025	0	ok	89200	1	1	98.11	99.78
+begin	34	bin/fm-compact-adviser-lib.sh	1	full	1791996920096
+end	97	bin/fm-load-report.sh	0	full	1791996905928	1791996921271	2215	0	ok	20144	1	1	96.70	99.78
+begin	98	bin/fm-lock-lib.sh	0	full	1791996922285
+end	98	bin/fm-lock-lib.sh	0	full	1791996922285	1791996923500	1204	0	ok	32880	1	1	99.78	102.04
+begin	99	bin/fm-lock.sh	0	full	1791996923834
+end	99	bin/fm-lock.sh	0	full	1791996923834	1791996945084	10215	0	ok	1098064	1	1	102.04	106.45
+begin	103	bin/fm-mem-guard.sh	0	full	1791996945425

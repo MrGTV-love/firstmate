@@ -1,0 +1,114 @@
+[
+  {
+    "name": "CPU-derived capacity fills under current load and never oversubscribes",
+    "result": "pass",
+    "live": true,
+    "detail": [
+      {
+        "ncpu": 18,
+        "override": null,
+        "active": 9
+      },
+      {
+        "ncpu": 4,
+        "override": null,
+        "active": 2
+      },
+      {
+        "ncpu": 1,
+        "override": null,
+        "active": 2
+      },
+      {
+        "ncpu": 18,
+        "override": 1,
+        "active": 1
+      },
+      {
+        "ncpu": 18,
+        "override": 2,
+        "active": 2
+      }
+    ],
+    "wall_seconds": 3.252
+  },
+  {
+    "name": "Nine-worker and one-worker runs get fair service on one slot",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "capacity": 1,
+      "service_order": [
+        "A0",
+        "B0",
+        "A1",
+        "B1",
+        "A2",
+        "B2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8"
+      ],
+      "max_competing_turns": 1
+    },
+    "wall_seconds": 1.683
+  },
+  {
+    "name": "Nine-worker and one-worker runs get fair service on two slots",
+    "result": "fail",
+    "live": true,
+    "detail": "per-run fairness violated: 2 nine-worker turns while one-worker demand waited; order=A0,B0,A1,A2,B1,A3,A4,B2,A5,A6,A7,A8",
+    "wall_seconds": 1.226
+  },
+  {
+    "name": "live head waiter preserves progress and queue correctness",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "owner_state": "live",
+      "first": "older",
+      "wait_milliseconds": {
+        "older.wait": 108,
+        "younger.wait": 209
+      }
+    },
+    "wall_seconds": 0.317
+  },
+  {
+    "name": "dead head waiter preserves progress and queue correctness",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "owner_state": "dead",
+      "first": "younger",
+      "wait_milliseconds": {
+        "younger.wait": 103
+      }
+    },
+    "wall_seconds": 0.218
+  },
+  {
+    "name": "stopped head waiter preserves progress and queue correctness",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "owner_state": "stopped",
+      "first": "younger",
+      "wait_milliseconds": {
+        "older.wait": 1358,
+        "younger.wait": 1275
+      }
+    },
+    "wall_seconds": 1.444
+  },
+  {
+    "name": "Killing gate does not release a protected descendant slot",
+    "result": "pass",
+    "live": true,
+    "detail": "Inherited flock survived SIGKILL of gate and was released by the real descendant exit.",
+    "wall_seconds": 0.777
+  }
+]

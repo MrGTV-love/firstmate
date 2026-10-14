@@ -1,0 +1,3 @@
+A_rc=0 B_rc=0 B_started_ms=1791997612123
+sequence_after_B_arrives=ABAABAABAAB A_turns=7 B_turns=4 max_A_turns_between_B=2
+B_sum_wait_s=45.9 B_max_wait_s=14.0

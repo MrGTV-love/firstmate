@@ -1,0 +1,38 @@
+== fair-head: cap=1; run A --jobs 2 roots c1-c10 (started first); run B --jobs 1 roots c11-c15
+A rc=0  B rc=0
+0.65 c3   A
+2.40 c11  B
+4.42 c1   A
+6.19 c13  B
+7.92 c5   A
+9.74 c15  B
+11.59 c2   A
+13.62 c12  B
+15.39 c7   A
+17.07 c14  B
+18.88 c4   A
+20.69 c9   A
+22.46 c6   A
+24.36 c10  A
+26.06 c8   A
+peak_concurrent_shellcheck=1
+start_sequence=ABABABABABAAAAA
+== (OLD gate, for contrast) fair-base: cap=1; run A --jobs 2 roots c1-c10 (started first); run B --jobs 1 roots c11-c15
+A rc=0  B rc=0
+0.52 c1   A
+2.37 c2   A
+4.28 c4   A
+6.09 c6   A
+7.89 c8   A
+10.60 c3   A
+12.50 c5   A
+14.44 c7   A
+16.28 c9   A
+18.38 c10  A
+21.69 c11  B
+23.55 c13  B
+25.36 c15  B
+27.19 c12  B
+28.93 c14  B
+peak_concurrent_shellcheck=1
+start_sequence=AAAAAAAAAABBBBB

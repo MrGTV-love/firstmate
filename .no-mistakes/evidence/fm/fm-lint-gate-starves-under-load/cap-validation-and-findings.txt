@@ -1,0 +1,14 @@
+$ FM_LINT_HOST_SLOTS=09 lint.sh --jobs 1 fx/c30.sh
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got 09.
+exit=2
+$ FM_LINT_HOST_SLOTS=0 lint.sh --jobs 1 fx/c30.sh
+fm-lint.sh: full ShellCheck extended analysis enabled
+fm-lint.sh: FM_LINT_HOST_SLOTS must be a positive integer, got 0.
+exit=2
+$ LAB_SLOTS=off lint.sh --jobs 1 fx/bad.sh   (pool disabled; real finding must still fail lint)
+       ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+exit=1
+$ lint.sh --jobs 1 fx/bad.sh   (private pool on)
+       ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+exit=1

@@ -1,0 +1,41 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	3	bin/fm-branch-report.sh	1	full	1791997610686
+begin	1	bin/fm-classify-lib.sh	0	full	1791997610689
+end	1	bin/fm-classify-lib.sh	0	full	1791997610689	1791997616282	5593	0	ok	856272	1	1	94.39	91.88
+begin	2	bin/fm-backlog-receive.sh	0	full	1791997616630
+end	3	bin/fm-branch-report.sh	1	full	1791997610686	1791997633167	7967	0	ok	1001696	1	1	94.39	87.74
+begin	8	bin/fm-home-summary-refresh.sh	1	full	1791997633794
+end	2	bin/fm-backlog-receive.sh	0	full	1791997616630	1791997651936	11095	0	ok	956640	1	1	91.88	87.89
+begin	4	bin/backends/tmux.sh	0	full	1791997653156
+end	8	bin/fm-home-summary-refresh.sh	1	full	1791997633794	1791997668296	8862	0	ok	985360	1	1	87.74	84.77
+begin	9	bin/fm-remote-home-seed.sh	1	full	1791997668518
+end	4	bin/backends/tmux.sh	0	full	1791997653156	1791997681869	8061	0	ok	910656	1	1	87.89	81.86
+begin	5	bin/fm-afk-start.sh	0	full	1791997682794
+end	9	bin/fm-remote-home-seed.sh	1	full	1791997668518	1791997689262	8385	0	ok	1121552	1	1	84.77	80.62
+begin	10	bin/fm-live-lab.sh	1	full	1791997689780
+end	5	bin/fm-afk-start.sh	0	full	1791997682794	1791997696403	8213	0	ok	943392	1	1	81.86	82.73
+begin	6	bin/fm-guard.sh	0	full	1791997697692
+end	10	bin/fm-live-lab.sh	1	full	1791997689780	1791997704222	8834	0	ok	1113376	1	1	80.62	82.01
+begin	11	bin/fm-lock.sh	1	full	1791997704712
+end	6	bin/fm-guard.sh	0	full	1791997697692	1791997710447	7790	0	ok	926944	1	1	82.73	83.05
+begin	7	bin/fm-gh-rest.sh	0	full	1791997711098
+end	11	bin/fm-lock.sh	1	full	1791997704712	1791997718759	9356	0	ok	1102064	1	1	82.01	91.12
+begin	12	bin/fm-claude-stop-autoarm.sh	1	full	1791997719976
+end	7	bin/fm-gh-rest.sh	0	full	1791997711098	1791997725051	7938	0	ok	885008	1	1	83.05	90.71
+end	12	bin/fm-claude-stop-autoarm.sh	1	full	1791997719976	1791997732448	8749	0	ok	1088784	1	1	91.12	89.21
+meta	roots_begun	12
+meta	roots_completed	12
+meta	roots_unfinished	0
+meta	result_exit	0

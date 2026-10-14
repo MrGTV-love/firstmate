@@ -1,0 +1,11 @@
+== Scenario (head): cap=1; run A queues first and its gate is SIGSTOPped; run B queues behind it
+[t+  0.08s] test holder owns the only slot
+[t+  0.37s] run A gate pid=22384 (/usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/...) queued: queue.00000000000000000001.22384.21816 
+[t+  0.39s] A gate stopped OUTSIDE admission.lock: ps stat=T   
+[t+  4.59s] pool still full after 4 s: shellcheck running for B=0 A=0 (bound: must be 0 while holder owns the only slot)
+[t+  4.62s] holder released the slot
+[t+  9.04s] run B exit=0, finished 4.42 s after release; A still T   
+[t+  9.05s] A resumed (SIGCONT)
+[t+ 12.27s] run A exit=0
+[t+ 12.28s] peak concurrent ShellChecks after release (cap=1): 1
+[t+ 12.29s] leftover tickets: 0

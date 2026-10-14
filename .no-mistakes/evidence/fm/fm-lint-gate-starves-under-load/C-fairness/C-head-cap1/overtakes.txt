@@ -1,0 +1,5 @@
+B root bin/fm-contributions.sh                            waited    2.2 s; A admissions during that wait: 0
+B root bin/fm-host-mirror.sh                              waited    4.1 s; A admissions during that wait: 0
+B root bin/fm-herdr-session-cleanup.sh                    waited    5.1 s; A admissions during that wait: 0
+B root bin/fm-lab-home.sh                                 waited    6.1 s; A admissions during that wait: 0
+worst_A_admissions_during_one_B_wait=0

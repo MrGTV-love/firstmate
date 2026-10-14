@@ -1,0 +1,33 @@
+### test_host_slots_bound_concurrent_runs
+ok - six concurrent runs peak at 12 ShellCheck processes ungated and 3 with a three-slot pool
+### test_oversubscribed_runs_share_the_cap_and_all_finish
+ok - oversubscribed runs share the CPU-derived cap and every run finishes
+### test_host_cap_is_cpu_derived_and_occupancy_bounded
+ok - host caps are CPU-derived, ignore load, and admission respects total occupancy
+### test_host_waiters_make_progress_without_barging
+ok - waiting roots precede newer roots and a killed waiter cannot strand admission
+### test_unequal_runs_share_scarce_slots_per_run
+ok - a two-worker run and a one-worker run alternate turns on a scarce pool
+### test_stopped_head_waiter_does_not_block_the_queue
+ok - a stopped head waiter is skipped while a slot is free and is admitted once resumed
+### test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
+analysis ran
+analysis ran
+ok - the queue scan handles slot paths with spaces and tickets cancelled mid-scan
+### test_cached_success_does_not_wait_for_host_slots
+ok - a content-identical cached success finishes while all host slots remain occupied
+### test_slot_pool_can_be_disabled_or_misconfigured
+ok - the slot pool can be disabled, rejects bad settings, and never fails lint when unusable
+### test_slot_file_failures_run_ungated
+analysis ran
+analysis ran
+analysis ran
+ok - slot open and non-contention coordinator/scan lock failures warn and run ungated
+### test_slot_survives_gate_death
+ok - inherited slots prevent overlap after gate death and allow admission after watchdog cleanup
+### test_queued_roots_use_high_resolution_timings
+ok - queued roots and memory retries record precise analysis durations without EPOCHREALTIME
+### test_cache_key_wait_preserves_root_retry_budget
+ok - a cache-key wait longer than the root deadline preserves its memory retry budget
+### test_explicit_root_can_equal_the_private_execution_marker
+ok - an explicit leading-dash root retains real ShellCheck findings

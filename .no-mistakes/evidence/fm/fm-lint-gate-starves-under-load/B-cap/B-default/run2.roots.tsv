@@ -1,0 +1,41 @@
+format	fm-lint-roots-v1
+meta	shellcheck_version	0.11.0
+meta	platform	Darwin arm64
+meta	image_os	unknown
+meta	image_version	unknown
+meta	mode	full
+meta	partition	all
+meta	jobs	2
+meta	bounds_enforced	0
+meta	root_deadline_seconds	unbounded
+meta	root_kill_grace_seconds	unbounded
+meta	root_memory_limit_kib	unbounded
+meta	timing_mechanism	none
+begin	1	tests/fm-spawn-worktree-settle.test.sh	1	full	1791997240293
+begin	2	tests/fm-session-launch-policy-inherit.test.sh	0	full	1791997240359
+end	1	tests/fm-spawn-worktree-settle.test.sh	1	full	1791997240293	1791997241908	1615	0	ok	144640	1	1	80.80	80.80
+begin	4	tests/fm-backend-zellij-smoke.test.sh	1	full	1791997242142
+end	4	tests/fm-backend-zellij-smoke.test.sh	1	full	1791997242142	1791997242912	769	0	ok	47200	1	1	80.80	80.80
+begin	5	tests/fm-launch-prompt-signals-live-e2e.test.sh	1	full	1791997243085
+end	2	tests/fm-session-launch-policy-inherit.test.sh	0	full	1791997240359	1791997244413	4053	0	ok	422112	1	1	80.80	82.98
+begin	3	tests/fm-fork-free-helpers.test.sh	0	full	1791997244826
+end	3	tests/fm-fork-free-helpers.test.sh	0	full	1791997244826	1791997246631	1804	0	ok	114928	1	1	82.98	82.98
+begin	6	tests/fm-grok-stop-live-e2e.test.sh	0	full	1791997247614
+end	6	tests/fm-grok-stop-live-e2e.test.sh	0	full	1791997247614	1791997249397	1783	0	ok	134400	1	1	82.98	87.38
+begin	8	tests/fm-agy-composer-live-e2e.test.sh	0	full	1791997249757
+end	8	tests/fm-agy-composer-live-e2e.test.sh	0	full	1791997249757	1791997251253	1495	0	ok	164096	1	1	87.38	87.38
+begin	9	tests/fm-review-diff.test.sh	0	full	1791997251501
+end	9	tests/fm-review-diff.test.sh	0	full	1791997251501	1791997253102	1586	0	ok	121088	1	1	87.38	91.28
+begin	12	tests/fm-devin-signals-live-e2e.test.sh	0	full	1791997253405
+end	12	tests/fm-devin-signals-live-e2e.test.sh	0	full	1791997253405	1791997261021	7615	0	ok	1080544	1	1	91.28	94.54
+end	5	tests/fm-launch-prompt-signals-live-e2e.test.sh	1	full	1791997243085	1791997426645	183559	0	ok	9478096	1	1	82.98	133.47
+begin	7	tests/fm-gotmp.test.sh	1	full	1791997427419
+end	7	tests/fm-gotmp.test.sh	1	full	1791997427419	1791997430461	3031	0	ok	36832	1	1	133.47	129.75
+begin	10	tests/fm-wake-drain-open-decisions.test.sh	1	full	1791997431050
+end	10	tests/fm-wake-drain-open-decisions.test.sh	1	full	1791997431050	1791997432828	1777	0	ok	145664	1	1	129.75	129.75
+begin	11	tests/fm-task-docker-live-e2e.test.sh	1	full	1791997433304
+end	11	tests/fm-task-docker-live-e2e.test.sh	1	full	1791997433304	1791997435284	1979	0	ok	232688	1	1	125.53	125.53
+meta	roots_begun	12
+meta	roots_completed	12
+meta	roots_unfinished	0
+meta	result_exit	0

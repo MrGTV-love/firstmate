@@ -1,0 +1,7 @@
+one request at +1.3 s admitted after 6.6 s; nine admissions while it waited: 7
+one request at +10.0 s admitted after 8.3 s; nine admissions while it waited: 8
+one request at +20.3 s admitted after 7.9 s; nine admissions while it waited: 8
+one request at +30.9 s admitted after 0.1 s; nine admissions while it waited: 0
+one request at +32.9 s admitted after 0.9 s; nine admissions while it waited: 0
+one request at +35.5 s admitted after 1.3 s; nine admissions while it waited: 0
+worst=8 total_nine_overtakes=23

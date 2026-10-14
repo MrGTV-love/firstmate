@@ -1,0 +1,42 @@
+== after-head-single: 1 concurrent real lint(s), 13 canonical roots each, --jobs 2, cache off, cap 9
+run1 rc=0 wall=23.8s
+total_wall=23.8s  load(1/5/15) start={ 28.32 27.29 34.11 } end={ 28.28 27.33 33.96 }
+peak_concurrent_shellcheck=2
+  run1 summed_queue=0.1s summed_analysis=27.8s
+== after-head-triple: 3 concurrent real lint(s), 13 canonical roots each, --jobs 2, cache off, cap 9
+run1 rc=0 wall=26.3s
+run2 rc=0 wall=26.2s
+run3 rc=0 wall=26.2s
+total_wall=26.4s  load(1/5/15) start={ 28.28 27.33 33.96 } end={ 30.88 28.17 34.04 }
+peak_concurrent_shellcheck=6
+  run1 summed_queue=0.1s summed_analysis=32.1s
+  run2 summed_queue=0.1s summed_analysis=32.1s
+  run3 summed_queue=0.0s summed_analysis=32.2s
+== before-base-triple: 3 concurrent real lint(s), 13 canonical roots each, --jobs 2, cache off, cap 9
+run1 rc=0 wall=28.1s
+run2 rc=0 wall=29.9s
+run3 rc=0 wall=26.3s
+total_wall=29.9s  load(1/5/15) start={ 30.88 28.17 34.04 } end={ 26.88 27.45 33.58 }
+peak_concurrent_shellcheck=6
+  run1 summed_queue=4.1s summed_analysis=28.9s
+  run2 summed_queue=8.1s summed_analysis=29.0s
+  run3 summed_queue=8.1s summed_analysis=29.8s
+## next: OLD gate with its test seam FM_TEST_SEAM=1 FM_LINT_SLOT_LOAD=100 (overnight-like load); NEW gate under the same env (it reads no load)
+== before-base-triple-load100: 3 concurrent real lint(s), 13 canonical roots each, --jobs 2, cache off, cap 9
+run1 rc=0 wall=37.9s
+run2 rc=0 wall=52.9s
+run3 rc=0 wall=38.5s
+total_wall=52.9s  load(1/5/15) start={ 26.88 27.45 33.58 } end={ 21.19 25.80 32.61 }
+peak_concurrent_shellcheck=2
+  run1 summed_queue=36.1s summed_analysis=28.5s
+  run2 summed_queue=50.1s summed_analysis=28.2s
+  run3 summed_queue=16.0s summed_analysis=26.9s
+== after-head-triple-load100: 3 concurrent real lint(s), 13 canonical roots each, --jobs 2, cache off, cap 9
+run1 rc=0 wall=24.3s
+run2 rc=0 wall=24.3s
+run3 rc=0 wall=24.4s
+total_wall=24.4s  load(1/5/15) start={ 21.19 25.80 32.61 } end={ 21.14 25.42 32.27 }
+peak_concurrent_shellcheck=6
+  run1 summed_queue=0.1s summed_analysis=29.4s
+  run2 summed_queue=0.1s summed_analysis=29.5s
+  run3 summed_queue=0.4s summed_analysis=29.5s

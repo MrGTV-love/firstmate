@@ -1,0 +1,152 @@
+[
+  {
+    "name": "CPU-derived capacity fills under current load and never oversubscribes",
+    "result": "pass",
+    "live": true,
+    "detail": [
+      {
+        "ncpu": 18,
+        "override": null,
+        "active": 9
+      },
+      {
+        "ncpu": 4,
+        "override": null,
+        "active": 2
+      },
+      {
+        "ncpu": 1,
+        "override": null,
+        "active": 2
+      },
+      {
+        "ncpu": 18,
+        "override": 1,
+        "active": 1
+      },
+      {
+        "ncpu": 18,
+        "override": 2,
+        "active": 2
+      }
+    ],
+    "wall_seconds": 3.219
+  },
+  {
+    "name": "Nine-worker and one-worker runs get fair service on one slot",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "capacity": 1,
+      "service_order": [
+        "A0",
+        "B0",
+        "A1",
+        "B1",
+        "A2",
+        "B2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8"
+      ],
+      "max_competing_turns": 1
+    },
+    "wall_seconds": 1.595
+  },
+  {
+    "name": "Nine-worker and one-worker runs get fair service on two slots",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "capacity": 2,
+      "controlled_service_order": [
+        "A0",
+        "B0",
+        "A1",
+        "B1",
+        "A2",
+        "B2"
+      ],
+      "all_nine_worker_requests_finished": true
+    },
+    "wall_seconds": 1.472
+  },
+  {
+    "name": "live head waiter preserves progress and queue correctness",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "owner_state": "live",
+      "first": "older",
+      "wait_milliseconds": {
+        "older.wait": 108,
+        "younger.wait": 209
+      }
+    },
+    "wall_seconds": 0.31
+  },
+  {
+    "name": "dead head waiter preserves progress and queue correctness",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "owner_state": "dead",
+      "first": "younger",
+      "wait_milliseconds": {
+        "younger.wait": 107
+      }
+    },
+    "wall_seconds": 0.217
+  },
+  {
+    "name": "stopped head waiter preserves progress and queue correctness",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "owner_state": "stopped",
+      "first": "younger",
+      "wait_milliseconds": {
+        "older.wait": 1349,
+        "younger.wait": 1268
+      }
+    },
+    "wall_seconds": 1.422
+  },
+  {
+    "name": "Stopping the admission coordinator cannot freeze a free pool",
+    "result": "fail",
+    "live": true,
+    "detail": "stopped admission.lock owner blocks all later waiters even with the analyzer slot free; resuming owner restored progress",
+    "wall_seconds": 3.259
+  },
+  {
+    "name": "Cache wrappers bypass occupied slots and serialize identical misses across roots",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "cold_commands": [
+        "initial",
+        "single-flight-first",
+        "failure-first",
+        "failure-second"
+      ],
+      "key_queue_ms": 1479,
+      "failure_exit_codes": [
+        7,
+        7
+      ],
+      "payload": "/usr/bin/true identity with real Python --execute command; no ShellCheck invoked"
+    },
+    "wall_seconds": 1.966
+  },
+  {
+    "name": "Killing gate does not release a protected descendant slot",
+    "result": "pass",
+    "live": true,
+    "detail": "Inherited flock survived SIGKILL of gate and was released by the real descendant exit.",
+    "wall_seconds": 0.682
+  }
+]

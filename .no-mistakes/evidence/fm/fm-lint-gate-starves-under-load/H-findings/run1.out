@@ -1,0 +1,20 @@
+fm-lint.sh: ShellCheck 0.11.0 (pinned 0.11.0)
+fm-lint.sh: full ShellCheck extended analysis enabled
+
+In /Users/charlesabrooker/tmp/fm-lint-live.s72zyD/H-findings/defect.sh line 3:
+ls $x
+   ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+ls "$x"
+
+
+In /Users/charlesabrooker/tmp/fm-lint-live.s72zyD/H-findings/defect.sh line 4:
+[ $x = y ] && echo yes || echo no
+  ^-- SC2086 (info): Double quote to prevent globbing and word splitting.
+
+Did you mean:
+[ "$x" = y ] && echo yes || echo no
+
+For more information:
+  https://www.shellcheck.net/wiki/SC2086 -- Double quote to prevent globbing ...

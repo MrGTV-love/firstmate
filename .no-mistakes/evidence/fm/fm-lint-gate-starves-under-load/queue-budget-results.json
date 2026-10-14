@@ -1,0 +1,43 @@
+[
+  {
+    "name": "Host-slot waiting longer than watchdog budget still permits cold completion",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "host_wait_ms": 2100,
+      "total_seconds": 2.443,
+      "watchdog_seconds": 1
+    }
+  },
+  {
+    "name": "Cache-key waiting longer than watchdog budget still permits cold completion",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "cache_key_wait_ms": 1965,
+      "total_seconds": 2.373,
+      "watchdog_seconds": 1,
+      "cache_outcome": "analyzed"
+    }
+  },
+  {
+    "name": "Literal --execute operand stays a root instead of becoming command metadata",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "stdout": "-- --execute\n",
+      "exit": 0,
+      "real_command": "/bin/echo"
+    }
+  },
+  {
+    "name": "Cancelling cache owner reaps cold command and releases admission",
+    "result": "pass",
+    "live": true,
+    "detail": {
+      "cancel_exit": 143,
+      "cold_child_alive": false,
+      "later_exit": 0
+    }
+  }
+]

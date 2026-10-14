@@ -1,0 +1,7 @@
+== (PREVIOUS commit e2f337f5, for contrast) coordinator stop; cap=1
+[t+  9.94s] catcher: caught after 540 tries
+[t+ 11.97s] holder released the slot
+[t+ 33.25s] run B still blocked 20 s after release (shellcheck running: 0)
+[t+ 33.26s] A resumed
+[t+ 38.05s] B exit=0
+[t+ 38.05s] A exit=0

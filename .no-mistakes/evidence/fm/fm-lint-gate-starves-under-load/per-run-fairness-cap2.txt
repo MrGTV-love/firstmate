@@ -1,0 +1,39 @@
+== fair-head-cap2: cap=2; run A --jobs 2 roots c1-c10 (started first); run B --jobs 1 roots c11-c15
+A rc=0  B rc=0
+0.54 c3   A
+0.54 c1   A
+2.35 c11  B
+2.35 c5   A
+4.22 c2   A
+4.22 c13  B
+5.90 c7   A
+6.10 c4   A
+8.11 c15  B
+8.34 c9   A
+9.96 c6   A
+10.10 c12  B
+11.92 c10  A
+12.06 c8   A
+13.76 c14  B
+peak_concurrent_shellcheck=2
+start_sequence=AABAABAABAABAAB
+== cap=2 rerun with telemetry: per-root queue wait = (end - start) - analysis duration
+A c1.sh  queued=    0ms analysis= 1658ms
+A c3.sh  queued=    0ms analysis= 1681ms
+A c2.sh  queued=    0ms analysis= 1684ms
+A c5.sh  queued= 1543ms analysis= 1751ms
+A c4.sh  queued= 1536ms analysis= 1736ms
+A c7.sh  queued=  103ms analysis= 1737ms
+A c6.sh  queued=  101ms analysis= 1723ms
+A c9.sh  queued= 1433ms analysis= 1713ms
+A c8.sh  queued= 1452ms analysis= 1769ms
+A c10.sh queued=  102ms analysis= 1780ms
+A total_queue=6270ms max_queue=1543ms
+B c11.sh queued=  626ms analysis= 1706ms
+B c13.sh queued=    0ms analysis= 1788ms
+B c15.sh queued= 1453ms analysis= 1702ms
+B c12.sh queued=  103ms analysis= 1727ms
+B c14.sh queued= 1443ms analysis= 2055ms
+B total_queue=3625ms max_queue=1453ms
+peak_concurrent_shellcheck=2
+start_sequence=AABAABAABAABAAB

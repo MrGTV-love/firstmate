@@ -1,0 +1,7 @@
+one request at +1.3 s admitted after 2.4 s; nine admissions while it waited: 2
+one request at +5.3 s admitted after 1.5 s; nine admissions while it waited: 1
+one request at +8.5 s admitted after 1.4 s; nine admissions while it waited: 1
+one request at +11.5 s admitted after 1.4 s; nine admissions while it waited: 1
+one request at +15.2 s admitted after 1.8 s; nine admissions while it waited: 2
+one request at +18.7 s admitted after 1.8 s; nine admissions while it waited: 2
+worst=2 total_nine_overtakes=9

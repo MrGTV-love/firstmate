@@ -1,0 +1,10 @@
+== Scenario (kill): cap=1; run A queues first and its gate is SIGKILLed; run B queues behind it
+[t+  0.09s] test holder owns the only slot
+[t+  0.45s] run A gate pid=89185 (/usr/bin/perl /Users/charlesabrooker/.no-mistakes/worktrees/...) queued: queue.00000000000000000001.89185.88391 
+[t+  0.46s] A gate SIGKILLed
+[t+  4.64s] pool still full after 4 s: shellcheck running for B=0 A=0 (bound: must be 0 while holder owns the only slot)
+[t+  4.67s] holder released the slot
+[t+  7.90s] run B exit=0, finished 3.23 s after release; A still dead
+[t+  7.91s] run A exit=137
+[t+  7.91s] peak concurrent ShellChecks after release (cap=1): 1
+[t+  7.92s] leftover tickets: 0

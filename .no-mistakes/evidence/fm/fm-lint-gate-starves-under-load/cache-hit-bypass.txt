@@ -1,0 +1,7 @@
+== Scenario: cached success bypasses a full host pool; a cold check still waits (cap=1, private cache)
+[t+  4.22s] warm-up cold lint of c20 exit=0
+[t+  4.30s] test holder now owns the only slot (slot.0)
+[t+  6.34s] re-lint of unchanged c20 with the pool full: exit=0 wall=2.02s
+[t+ 11.46s] cold lint of c21 still waiting after 5 s (running shellcheck for c21: 0)
+[t+ 11.49s] holder released the slot
+[t+ 15.05s] cold lint of c21 exit=0

@@ -1,0 +1,5 @@
+start	1791997237.011	load	{ 78.43 79.88 74.04 }
+run1	rc=0	wall=38.424
+run0	rc=0	wall=50.802
+run2	rc=0	wall=202.703
+total_wall	202.921	load_end	{ 123.32 102.17 84.78 }	#peak_admitted	3	peak_waiting	3

@@ -1,0 +1,10 @@
+1791998176.390	H started pid=55883
+1791998178.307	H admitted
+1791998178.322	X started pid=59701
+1791998180.104	X gate pid=61251 queued: queue.00000000000000000002.61251.59701
+1791998180.119	X gate killed
+1791998180.170	Y started pid=62165
+1791998203.647	Y finished rc=0; X gate state now: gone
+1791998203.661	X finished rc=137
+1791998232.047	H finished rc=0
+1791998232.075	summary mode=kill Y_rc=0 X_rc=137 H_rc=0

@@ -1,0 +1,8 @@
+warm rc=0 wall=38.3
+external holder owns the only host slot
+cached rerun with slot held: rc=0 wall=7.1
+fm-lint: cache hit bin/fm-dod-lib.sh
+fm-lint: cache hit tests/fm-backend-herdr-eventwait-smoke.test.sh
+fm-lint: cache hit bin/fm-lease.sh
+cold root still queued after 15 s with slot held (bound enforced)
+cold root after release: rc=0 total wall=25.0
