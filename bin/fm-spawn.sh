@@ -2142,7 +2142,22 @@ spawn_take_task_set_lock() {
     exit 1
   }
   if ! fm_lock_try_acquire "$SPAWN_TASK_SET_LOCK"; then
-    echo "error: this home's task set is locked by another operation (a forced teardown is enumerating or removing its tasks); refusing to create task $ID rather than racing it" >&2
+    case "$(fm_lock_role "$SPAWN_TASK_SET_LOCK" 2>/dev/null || true)" in
+      task-spawn)
+        echo "error: this home's task set is locked by another spawn; refusing to create task $ID rather than racing it" >&2
+        ;;
+      forced-teardown)
+        echo "error: this home's task set is locked by a forced teardown; refusing to create task $ID rather than racing it" >&2
+        ;;
+      *)
+        echo "error: this home's task set is locked by another operation; refusing to create task $ID rather than racing it" >&2
+        ;;
+    esac
+    exit 1
+  fi
+  if ! fm_lock_set_role "$SPAWN_TASK_SET_LOCK" task-spawn; then
+    fm_lock_release "$SPAWN_TASK_SET_LOCK" || true
+    echo "error: could not record task-set lock holder for spawn of $ID" >&2
     exit 1
   fi
   SPAWN_TASK_SET_LOCK_HELD=1
@@ -5695,10 +5710,13 @@ BUSY_GEN=
     fi
     hooks_json="\"hooks\":{${guard_entries}\"UserPromptSubmit\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_submit\"}]}],${stop_entry}\"StopFailure\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stopfail\"}]}],\"SessionEnd\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_sessionend\"}]}]}"
     if [ "$KIND" = secondmate ]; then
-      session_keys='"feedbackDrafts":"off",'
+      session_keys='"feedbackDrafts":"off"'
       if [ "$KEEP_AI_TRAILERS" != 1 ]; then
-        session_keys='"feedbackDrafts":"off","attribution":{"commit":"","pr":"","sessionUrl":false},'
+        session_keys='"feedbackDrafts":"off","attribution":{"commit":"","pr":"","sessionUrl":false}'
       fi
+      secondmate_md_excludes=$(fm_claude_md_excludes_json "$WT")
+      secondmate_md_excludes=${secondmate_md_excludes//"'\\''"/"'"}
+      session_keys="$session_keys$secondmate_md_excludes,"
       printf '{%s%s}\n' "$session_keys" "$hooks_json" >"$STATE_REAL/$ID.claude-settings.json"
     else
       mkdir -p "$WT/.claude"

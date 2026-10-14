@@ -2556,10 +2556,11 @@ teardown_refuse_removed_nested_copy() {
 # Scratch and --force copies are scrubbed before Treehouse return. See the
 # script header for why `git clean -fd` is not enough and why a dirty return
 # is not reported as clean.
-teardown_scrub_scratch_copy() {
-  local wt=$1
+teardown_scrub_scratch_copy() {  # <wt> <owner-task>
+  local wt=$1 owner=$2
   # A non-git path has no nested repository this clean can remove.
   git -C "$wt" rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
+  require_registered_slot_copies "$owner" "$wt" || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
   git -C "$wt" clean -ffdq || {
     echo "error: could not clean scratch in worktree $wt before returning it; teardown aborted" >&2
     return 1
@@ -3840,7 +3841,7 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
         post_lock_check=validate_worktree_teardown_safety
       fi
       if [ "$KIND" = scout ] || [ "$FORCE" = "--force" ]; then
-        teardown_scrub_scratch_copy "$teardown_slot" || exit 1
+        teardown_scrub_scratch_copy "$teardown_slot" "$ID" || exit 1
       fi
       local returned_pool_slot=0
       fm_treehouse_pool_slot "$PROJ" "$teardown_slot" && returned_pool_slot=1
@@ -4830,7 +4831,7 @@ cleanup_firstmate_home_children() {
           "$child_wt/.opencode/plugins/fm-busy-state.js" \
           "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
         if [ -n "$child_proj" ] && [ -d "$child_proj" ] && command -v treehouse >/dev/null 2>&1; then
-          teardown_scrub_scratch_copy "$child_wt" || return 1
+          teardown_scrub_scratch_copy "$child_wt" "$child_id" || return $?
           child_pool_slot=0
           fm_treehouse_pool_slot "$child_proj" "$child_wt" && child_pool_slot=1
           if teardown_treehouse_return "$child_wt" "$child_proj" "child worktree" "$child_id"; then

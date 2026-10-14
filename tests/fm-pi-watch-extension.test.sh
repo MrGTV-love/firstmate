@@ -3898,7 +3898,7 @@ const pi = {
     prompts.push(message);
     if (streaming) return;
     beforeAgentStarts += 1;
-    handlers.get("before_agent_start")?.({ messageType: "user", prompt: message }, {});
+    handlers.get("before_agent_start")?.({ prompt: message }, {});
   },
   events: { on() {}, emit() {} },
 };

@@ -1678,7 +1678,7 @@ ${context.command}
       isProcessingCustomMessage(event.message) &&
       queuedProcessingContent !== null &&
       event.message.content === queuedProcessingContent;
-    if (event.messageType !== "user") return;
+    if (!("prompt" in event) || typeof event.prompt !== "string") return;
     const promptGeneration = generation;
     if (!(await enqueueDelivery(() => actingAsOwner(promptGeneration)))) return;
     if (promptGeneration !== generation || !currentMainSession || !collectCurrentMainDialog()) return;
