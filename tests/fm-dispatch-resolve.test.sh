@@ -1360,6 +1360,25 @@ expect_code 0 "$code" "http 429 exits 0"
 assert_contains "$out" '  status: error' "http 429 is an error outcome"
 assert_contains "$out" '  reason: http 429 after' "http status is reported"
 assert_contains "$err" 'dispatch-resolve: error (http 429' "error also goes to stderr"
+assert_absent "$HOME_DIR/state/.typesafe-health" "an http 429 is not a credit or key failure and records no account-health state"
+# A credit or key failure reaches the account-health alert at once, not at the next
+# watcher probe; a 200 afterwards raises its one recovered note.
+reset_log
+rm -rf "$HOME_DIR/state"
+TYPESAFE_API_KEY=$KEY FAKE_CURL_HTTP=402 run code out err "$BRIEF"
+expect_code 0 "$code" "http 402 exits 0"
+assert_contains "$out" '  reason: http 402 after' "http 402 stays a structured error outcome"
+assert_equals 1 "$(grep -cF $'\ttypesafe-health-credits\t' "$HOME_DIR/state/.wake-queue")" "a 402 raises one account-health wake at once"
+TYPESAFE_API_KEY=$KEY FAKE_CURL_HTTP=402 run code out err "$BRIEF"
+assert_equals 1 "$(grep -cF $'\ttypesafe-health-credits\t' "$HOME_DIR/state/.wake-queue")" "a repeated 402 raises no second wake"
+TYPESAFE_API_KEY=$KEY FAKE_CURL_HTTP=401 run code out err "$BRIEF"
+assert_equals 1 "$(grep -cF $'\ttypesafe-health-auth\t' "$HOME_DIR/state/.wake-queue")" "a 401 raises one account-health wake of its own class"
+write_response "$RESPONSE" rule_4 0.9
+TYPESAFE_API_KEY=$KEY run code out err "$BRIEF"
+assert_contains "$out" '  status: clear' "the answer after a failure resolves as usual"
+assert_equals 1 "$(grep -cF $'\ttypesafe-health-recovered\t' "$HOME_DIR/state/.wake-queue")" "a 200 raises one recovered note"
+assert_not_contains "$(cat "$HOME_DIR/state/.wake-queue" "$HOME_DIR/state/.typesafe-health")" "$KEY" "the key is in no account-health record"
+rm -rf "$HOME_DIR/state"
 reset_log
 TYPESAFE_API_KEY=$KEY FAKE_CURL_FAIL=1 run code out err "$BRIEF"
 expect_code 0 "$code" "curl failure exits 0"

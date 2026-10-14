@@ -11,6 +11,8 @@
 # Output: the "# Skill selection" launch-instructions section. --record also
 # writes status= (picked, none or unavailable), reason= and picked= lines.
 # Any failure yields status unavailable with its reason; exit 2 is a usage error.
+# A TypeSafe HTTP 402, 401, or 403 in the reason goes to bin/fm-typesafe-health.sh
+# record, so a credit or key failure reaches the captain once.
 set -u
 SCRIPT_DIR=${BASH_SOURCE[0]%/*}
 [ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ] || SCRIPT_DIR=.
@@ -47,7 +49,18 @@ trap 'rm -rf "$WORK"' EXIT
 umask 077
 : > "$WORK/not-judged"
 
+# Pass a TypeSafe HTTP failure the picker saw (its reason names the code, even
+# when OpenRouter then answered) to the account-health alert at once, and a
+# TypeSafe answer as proof of recovery. The health tool ignores other codes.
+record_health() {
+  local code
+  code=$(printf '%s' "$REASON" | sed -n 's/.*typesafe HTTP \(40[123]\)\..*/\1/p' | head -n 1)
+  [ -n "$code" ] || { [ "$PROVIDER" = typesafe ] && code=200; }
+  [ -z "$code" ] || FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-typesafe-health.sh" record "$code" skill-pick </dev/null >/dev/null 2>&1 || true
+}
+
 finish() {
+  record_health
   printf '\n# Skill selection\n\n'
   printf '%s\n' 'Existing mandatory skill triggers in these instructions and your skill index still apply first and unchanged.'
   case "$STATUS" in

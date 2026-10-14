@@ -94,6 +94,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
+- The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
@@ -1809,6 +1810,61 @@ Firstmate passes its profile line unless it states a reason to override, such as
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
 
+## TypeSafe account health
+
+`bin/fm-typesafe-health.sh` tells the captain once when the TypeSafe (Jev) account stops answering for a reason only the captain can fix, and once when it answers again.
+Without it, a credit or key failure makes every Jev consumer fail silently and carry on without Jev, and nobody is told.
+It is off in any home with no key, because [the typed-dispatch opt-in](#typed-dispatch-resolution-env-typesafe_api_key) is also off there.
+This section is the single owner of the alert contract; the script header owns its subcommands and output lines.
+
+**What is checked and when**
+
+- The watcher starts `fm-typesafe-health.sh probe` as a detached, single-flight helper every `FM_TYPESAFE_HEALTH_INTERVAL` seconds (default 600; 0 turns it off).
+  A fresh watcher waits one full interval for its first probe, and watcher handoffs keep that deadline.
+  There is no daemon.
+- A probe is one POST through `fm_typesafe_post` in [`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) with a constant two-option Choice question and no brief text, so it is a few hundred bytes of fixed text and the never-send list has nothing to check.
+  The key comes from `fm_typesafe_key` and follows the [key-handling contract](#typed-dispatch-resolution-env-typesafe_api_key): never exported, never on argv, never written to output, state, or a wake.
+- `bin/fm-dispatch-resolve.sh` and `bin/fm-skill-pick.sh` also pass the code they saw to `fm-typesafe-health.sh record` the moment it arrives, so an alert does not wait for the next probe.
+  Only 402, 401, 403, and a 200 act; every other code is left to the probe.
+  The picker reports a TypeSafe failure even when its OpenRouter fallback then answered.
+
+**Classes and alerts**
+
+| Observation | Class | Effect |
+| --- | --- | --- |
+| HTTP 200 | ok | Clears an alert and raises one recovered note |
+| HTTP 402 | credits | One wake at once |
+| HTTP 401 or 403 | auth | One wake at once |
+| Timeout, no connection, or any other HTTP code | unreachable | Internal until the threshold below |
+
+- Each alert is one `check: typesafe-health:` wake.
+  Its payload names what failed, the UTC time it was first seen and by which caller, the last time Jev answered normally, and the affected consumers: worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), the Level 6 jev-guard, and the belay Stop hook.
+  Firstmate sends the captain one plain message from it; no other action follows.
+- `state/.typesafe-health` records the alerted class, so the same failure raises no second wake, whether a probe or a consumer sees it again, until a 200 arrives.
+  A different class the captain has not heard of, such as auth after credits, alerts once more.
+  An unreachable run never replaces a credits or auth alert.
+- Recovery raises one `check: typesafe-health: recovered` wake, and only when an alert had gone out.
+- The wake is appended before the state is written, so an interruption can repeat an alert but never lose one.
+
+**Unreachable threshold**
+
+Unreachable raises its own wake after `FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES` consecutive failed probes (default 3, about 20 minutes between the first and the third at the default cadence).
+The measurement behind it comes from the primary home's `state/jev-guard.jsonl` for 2026-10-09 through 2026-10-14:
+
+- 15,640 answered Jev calls had a median latency of 181 ms, 95th percentile 322 ms, 99th percentile 535 ms, and a maximum of 6,946 ms, so one call in 15,640 outlasted the probe's five-second deadline.
+- No 10-minute window held errors and no success outside the 2026-10-13 credits outage, whose error-only windows ran from 13:40 to 23:10 CDT.
+
+A single missed probe is therefore noise, and three consecutive misses is stricter than anything in the sample.
+The sample holds no non-credit outage, so the default is a conservative floor to recalibrate when one is observed, not a fitted rate.
+
+**Primary home only**
+
+A home with a `.fm-secondmate-parent` record or a `.fm-secondmate-home` marker resolves the primary home's key, so it exits silently, keeps no state, and sends no request.
+The primary home's wake already reaches the captain, so a secondmate never duplicates it.
+
+[`tests/fm-typesafe-health.test.sh`](../tests/fm-typesafe-health.test.sh) covers the classes, deduplication, recovery, the threshold, consumer reports, secondmate silence, and key secrecy with a stubbed endpoint.
+[`tests/fm-watch-typesafe-health.test.sh`](../tests/fm-watch-typesafe-health.test.sh) covers the watcher's cadence.
+
 ## Jev guard
 
 Claude and omp ship and scout workers run the unchanged level 6 jev-guard from disler's ten-levels-of-jev under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md), with Firstmate-specific reporting and adapters.
@@ -3091,6 +3147,9 @@ FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-se
 # Fixed reap policy and safety gates are owned by bin/fm-idle-session-reap.sh's header, not configurable overrides.
 FM_IDLE_REAP_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-idle-session-reap.sh
 FM_IDLE_REAP_TEARDOWN_BIN=   # test seam: the teardown the sweep runs instead of bin/fm-teardown.sh
+FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeSafe account-health probes (bin/fm-typesafe-health.sh); 0 turns the probe off; a fresh watcher waits one full interval; invalid values use 600
+FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
+FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding home-summary state initialization, refresh-lock acquisition, validation, and atomic publication; independent post-attempt deadlines are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2

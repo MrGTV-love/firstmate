@@ -1176,6 +1176,7 @@ bin/fm-transition-lib.sh	165
 bin/fm-turnend-guard-cursor.sh	9138
 bin/fm-turnend-guard-grok.sh	465
 bin/fm-turnend-guard.sh	8136
+bin/fm-typesafe-health.sh	1500
 bin/fm-typesafe-lib.sh	417
 bin/fm-update.sh	2520
 bin/fm-utc-lib.sh	116
@@ -1487,6 +1488,7 @@ tests/fm-trace-context-spawn.test.sh	1270
 tests/fm-transition-lib.test.sh	716
 tests/fm-turnend-foreign-owner-arm-fix.test.sh	116
 tests/fm-turnend-guard.test.sh	3224
+tests/fm-typesafe-health.test.sh	1500
 tests/fm-typesafe-key-source.test.sh	1068
 tests/fm-update.test.sh	1119
 tests/fm-vendor-auth-probe.test.sh	967
@@ -1503,6 +1505,7 @@ tests/fm-watch-idle-reap.test.sh	1269
 tests/fm-watch-open-loops.test.sh	1969
 tests/fm-watch-recovery-loop.test.sh	1067
 tests/fm-watch-triage.test.sh	11895
+tests/fm-watch-typesafe-health.test.sh	1200
 tests/fm-watchdog-check.test.sh	1217
 tests/fm-watcher-lock.test.sh	2773
 tests/fm-worker-account-live-e2e.test.sh	1220

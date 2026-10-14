@@ -12,6 +12,9 @@
 #   as today.
 #   The key lives in one shell variable and reaches curl as a header read from
 #   a file descriptor, never on argv; nothing logs or writes it.
+#   Every HTTP code it receives goes to bin/fm-typesafe-health.sh record, which
+#   alerts the captain once on 402, 401, or 403 (docs/configuration.md
+#   "TypeSafe account health" owns that contract).
 #
 # What it does when on with at least one rule: one POST to
 #   https://api.typesafe.ai/v1/systemone with the project name and the brief's
@@ -374,6 +377,9 @@ command -v curl >/dev/null 2>&1 || emit_error "curl not installed"
   never_send_check
   HTTP=$(fm_typesafe_post "$REQUEST" "$RESP_FILE" "$SEND_TEXT")
   LAT_MS=$(fm_timing_seconds_ms "$(cat "$SEND_TEXT")") || LAT_MS=null
+  # Report the code at once so a credit or key failure does not wait for the next
+  # watcher probe; the health tool ignores every other code and never blocks this.
+  FM_HOME="$FM_HOME" "$SCRIPT_DIR/fm-typesafe-health.sh" record "$HTTP" dispatch-resolve </dev/null >/dev/null 2>&1 || true
   [ "$HTTP" = 200 ] || emit_error "http $HTTP after ${LAT_MS} ms"
 jq -e --slurpfile rules "$RULES" '
     (($rules[0].rules | to_entries | map("rule_" + ((.key + 1) | tostring))) + ["default"] | sort) as $choices |
