@@ -1504,6 +1504,7 @@ test_fresh_same_id_spawn_cannot_cycle_with_slow_teardown() {
   cat > "$case_dir/fakebin/tmux" <<'SH'
 #!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FM_FAKE_CALL_LOG"
+case "$*" in *'#{pane_current_path}'*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}"; exit 0 ;; esac
 case "${1:-}" in
   list-windows)
     [ -f "$FM_SLOW_CASE/closed" ] || printf '%s\n' fm-retire
@@ -1521,7 +1522,6 @@ case "${1:-}" in
     ;;
   display-message) printf 'firstmate\n'; exit 0 ;;
 esac
-case "$*" in *'#{pane_current_path}'*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}" ;; esac
 exit 0
 SH
   chmod +x "$case_dir/fakebin/tmux"
@@ -1560,7 +1560,7 @@ SH
   done
   cp "$home/state/retire.meta" "$case_dir/retire.meta.before"
   next=$(new_worktree "$case_dir" retire-again)
-  spawn_ship "$case_dir" retire "$next" > "$case_dir/spawn.out" 2>&1 &
+  FM_SLOW_CASE="$case_dir" spawn_ship "$case_dir" retire "$next" > "$case_dir/spawn.out" 2>&1 &
   spawner=$!
   i=0
   while kill -0 "$spawner" 2>/dev/null; do
@@ -1587,6 +1587,14 @@ SH
   assert_absent "$home/state/retire.meta" 'the queued teardown kept the retiring record'
   jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
     || fail 'the queued teardown left its slot leased'
+  # The same fresh spawn is admitted once teardown releases the task, so the
+  # refusal above came from that lifecycle custody, not from this fixture.
+  rc=0
+  FM_SLOW_CASE="$case_dir" spawn_ship "$case_dir" retire "$next" > "$case_dir/spawn-after.out" 2>&1 || rc=$?
+  expect_code 0 "$rc" "the fresh same-ID spawn must succeed after teardown: $(cat "$case_dir/spawn-after.out")"
+  assert_present "$home/state/retire.meta" 'the admitted spawn did not publish its task record'
+  ! grep -qx 'spawn_gen=s-retire' "$home/state/retire.meta" \
+    || fail 'the admitted spawn republished the retired incarnation'
   pass 'a fresh same-ID spawn refuses at task admission during a slow teardown, so pool return still progresses'
 }
 
