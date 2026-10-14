@@ -1713,6 +1713,85 @@ PL
   pass "a stopped head waiter is skipped while a slot is free and is admitted once resumed"
 }
 
+test_stopped_admission_coordinator_does_not_freeze_free_capacity() {
+  local tmp
+  tmp=$(fm_test_tmproot fm-lint-slot-stopped-coordinator)
+  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "stopped coordinator regression failed"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use Fcntl qw(:flock);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+make_path("$tmp/slots");
+open(my $holder, '>>', "$tmp/slots/slot.0") or die "$!";
+flock($holder, LOCK_EX) or die "$!";
+local $ENV{FM_LINT_HOST_SLOTS} = 1;
+sub spawn {
+    my ($run) = @_;
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+        close $holder;
+        exec $^X, $gate, 'gate', "$tmp/slots", 18, $run, "$tmp/$run.wait", '--', $^X, '-e',
+            'open(my $fh, ">>", $ARGV[0]) or die "$!"; print {$fh} "$ARGV[1]\n"', "$tmp/order", $run;
+        die "exec: $!";
+    }
+    return $pid;
+}
+sub finish {
+    my ($pid, $what) = @_;
+    my $deadline = time() + 15;
+    while (waitpid($pid, WNOHANG) == 0) {
+        die "$what\n" if time() > $deadline;
+        sleep 0.01;
+    }
+    die "$what: status $?\n" if $?;
+}
+sub order {
+    open(my $fh, '<', "$tmp/order") or return '';
+    local $/;
+    return <$fh>;
+}
+my ($stopped, $live);
+my $error;
+eval {
+    $stopped = spawn('stopped');
+    my $deadline = time() + 60;
+    until (grep { /\.$stopped\.stopped\z/ } glob "$tmp/slots/queue.*") {
+        die "the older waiter never queued\n" if time() > $deadline;
+        sleep 0.01;
+    }
+    # Stop the queued gate until the signal lands while it owns admission.lock.
+    open(my $coordinator, '>>', "$tmp/slots/admission.lock") or die "$!";
+    while (1) {
+        kill 'STOP', $stopped;
+        if (!flock($coordinator, LOCK_EX | LOCK_NB)) { last; }
+        flock($coordinator, LOCK_UN);
+        kill 'CONT', $stopped;
+        die "could not stop the older waiter inside admission\n" if time() > $deadline;
+        sleep 0.013;
+    }
+    $live = spawn('live');
+    sleep 0.25;
+    close $holder;
+    finish($live, 'a stopped coordinator owner froze a free slot');
+    undef $live;
+    die "admission order was @{[order()]}\n" unless order() eq "live\n";
+    kill 'CONT', $stopped;
+    finish($stopped, 'the resumed waiter was never admitted');
+    undef $stopped;
+    die "admission order was @{[order()]}\n" unless order() eq "live\nstopped\n";
+};
+$error = $@;
+close $holder;
+for my $pid (grep { defined } $stopped, $live) { kill 'CONT', $pid; kill 'KILL', $pid; waitpid($pid, 0); }
+die $error if $error;
+PL
+  pass "a gate stopped while owning admission does not freeze free capacity"
+}
+
 test_slot_pool_can_be_disabled_or_misconfigured() {
   local tmp rc out
   tmp=$(fm_lint_slot_fixture fm-lint-slots-off)
@@ -3935,6 +4014,7 @@ test_host_cap_is_cpu_derived_and_occupancy_bounded
 test_host_waiters_make_progress_without_barging
 test_unequal_runs_share_scarce_slots_per_run
 test_stopped_head_waiter_does_not_block_the_queue
+test_stopped_admission_coordinator_does_not_freeze_free_capacity
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
 test_slot_pool_can_be_disabled_or_misconfigured

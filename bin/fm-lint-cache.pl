@@ -30,7 +30,10 @@ use File::Basename qw(dirname basename);
 # then the oldest ticket. Within a run, tickets stay FIFO, so every waiting run
 # and request makes progress. A head ticket whose owner has been stopped for a
 # second is skipped; one ps call checks every waiting owner, and only after a
-# free slot has stayed unclaimed for that second.
+# free slot has stayed unclaimed for that second. A waiter that has been unable
+# to take admission.lock for a second looks, at most once a second, for a stopped
+# gate on this slot directory; if one exists, its owner may hold the lock, so
+# the waiter scans without the lock. Slot flocks alone enforce the capacity bound.
 # Admission retains the slot.* protocol so in-flight older gates remain bounded.
 # The high-resolution wait is written in milliseconds to <wait-file> before
 # launch so the caller can account for queue time separately.
@@ -56,16 +59,38 @@ if (($ARGV[0] // '') eq 'gate') {
         return %stopped;
     };
     my ($slot, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
+    my ($blocked_at, $checked_at, $bypass);
+    my $stopped_gate = sub {
+        open(my $ps, '-|', 'ps', '-axww', '-o', 'pid=,stat=,command=') or return 0;
+        my $found = 0;
+        while (my $line = <$ps>) {
+            next unless $line =~ /\A\s*([0-9]+)\s+T\S*\s+(.*)\z/s && $1 != $$;
+            $found = 1 if index($2, " gate $slot_dir ") >= 0;
+        }
+        close $ps;
+        return $found;
+    };
     my ($passed, $passed_at, %stopped);
     my $available = eval { make_path($slot_dir, {mode => 0700}); -d $slot_dir && -w _ };
     $available = 0 if $available && !open($coordinator, '>>', "$slot_dir/admission.lock");
     if ($available) {
         $waited_from = Time::HiRes::time();
         ACQUIRE: while (!$slot && !$caught) {
-            unless (flock($coordinator, LOCK_EX | LOCK_NB)) {
+            if (flock($coordinator, LOCK_EX | LOCK_NB)) {
+                undef $blocked_at;
+                undef $bypass;
+            } else {
                 unless ($!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR}) { $available = 0; last; }
-                Time::HiRes::sleep(0.1);
-                next;
+                my $now = Time::HiRes::time();
+                $blocked_at //= $now;
+                if ($now - $blocked_at >= 1 && $now - ($checked_at // 0) >= 1) {
+                    $checked_at = $now;
+                    $bypass = $stopped_gate->();
+                }
+                unless ($bypass) {
+                    Time::HiRes::sleep(0.1);
+                    next;
+                }
             }
             unless ($ticket) {
                 open(my $sequence, '+>>', "$slot_dir/queue.next")
@@ -75,9 +100,9 @@ if (($ARGV[0] // '') eq 'gate') {
                 unless ($number =~ /\A[0-9]+\n\z/) { $available = 0; last; }
                 close $sequence;
                 my $next;
-                open($next, '>', "$slot_dir/queue.next.tmp")
+                open($next, '>', "$slot_dir/queue.next.tmp.$$")
                     && print({$next} $number + 1, "\n") && close($next)
-                    && rename("$slot_dir/queue.next.tmp", "$slot_dir/queue.next")
+                    && rename("$slot_dir/queue.next.tmp.$$", "$slot_dir/queue.next")
                     or do { $available = 0; last; };
                 $ticket_number = $number + 1;
                 $ticket_path = sprintf '%s/queue.%020d.%d.%s', $slot_dir, $ticket_number, $$, $run;
