@@ -1380,8 +1380,188 @@ print('PASS: unchanged forge reads are 304s and a run below the quota floor publ
 print('PASS: owned-work categories, owners, ages, degraded row, and atomic publication')
 PY
 
-# The real snapshot's home-input contract: large inventories travel by file, secondmates are
-# excluded, and a captain drop is read back from the stored completion note.
+# Report silence through the real snapshot, ledger, inbox send and pending-reply store.
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+import datetime as dt, json, os, shutil, subprocess, sys, time
+from pathlib import Path
+root, world = map(Path, sys.argv[1:])
+code, home, fake = (world / name for name in ('silence-code', 'silence-home', 'silence-fake'))
+shutil.copytree(root / 'bin', code / 'bin')
+for name in ('state', 'data', 'config', 'projects'):
+    (home / name).mkdir(parents=True)
+fake.mkdir()
+now = int(time.time())
+def script(path, text):
+    path.write_text(text); path.chmod(0o755)
+script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\nprintf "state: %s · source: %s · %s\\n" "${FM_SILENCE_TEST_CREW_STATE:-working}" "${FM_SILENCE_TEST_CREW_SOURCE:-pane}" "${FM_SILENCE_TEST_CREW_DETAIL:-building}"\n')
+# This fixture supplies endpoint observations, not a rendered vendor-process classifier.
+backend = code / 'bin/fm-backend.sh'
+backend.write_text(backend.read_text() + '\nfm_backend_agent_state() { printf "%s" "${FM_SILENCE_TEST_LIVENESS:-alive}"; }\n'
+                   'fm_backend_agent_alive() { printf "%s" "${FM_SILENCE_TEST_LIVENESS:-alive}"; }\n')
+script(fake / 'tmux', '''#!/usr/bin/env bash
+case "$1" in
+  capture-pane) printf '╭────╮\\n│    │\\n╰────╯\\n' ;;
+  list-windows) printf 'fm-worker\\nfm-scout\\nfm-mate\\n' ;;
+  display-message) printf 'fakepane\\n' ;;
+  send-keys) printf '%s\\n' "$*" >> "$FM_SEND_LOG" ;;
+esac
+''')
+(home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+env = dict(os.environ, FM_HOME=str(home), FM_OPEN_LOOPS_NOW=str(now), FM_PENDING_REPLY_NOW=str(now),
+           FM_PAUSE_RESURFACE_SECS='14400', NM_HOME=str(world / 'silence-nm'), FM_SEND_LOG=str(world / 'silence-send.log'),
+           PATH=f'{fake}:{os.environ["PATH"]}')
+for key in ('FM_ROOT_OVERRIDE', 'FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE',
+            'FM_PENDING_REPLY_DIR_OVERRIDE', 'FM_PENDING_REPLY_EXISTING_CORR'):
+    env.pop(key, None)
+def call(*args, extra=None):
+    done = subprocess.run([str(code / 'bin/fm-open-loops.sh'), *args], env=dict(env, **(extra or {})),
+                          text=True, capture_output=True, timeout=120)
+    assert done.returncode == 0, (args, done.stdout, done.stderr)
+    return done.stdout
+
+def rows(extra=None):
+    report = json.loads(call('--json', extra=extra))
+    assert report['complete'], report
+    return {r['subject']: r for r in report['rows'] if r['category'] == 'silent_report'}
+def status(name, text, at):
+    path = home / f'state/{name}.status'
+    path.write_text(text)
+    os.utime(path, (at, at))
+for name, kind in (('worker', 'ship'), ('scout', 'scout')):
+    (home / f'state/{name}.meta').write_text(f'kind={kind}\nbackend=tmux\nwindow=sess:fm-{name}\nharness=claude\n')
+    status(name, f'working [at={now - 901}]: building\n', now - 901)
+silent = rows()
+assert silent['worker']['overdue'] and silent['worker']['age_seconds'] == 901, silent
+assert silent['worker']['limit_seconds'] == 900 and silent['scout']['overdue'], silent
+assert not rows(extra={'FM_SILENCE_TEST_LIVENESS': 'dead'}), 'confirmed dead endpoints are recovery, not silent live reports'
+# Canonical status stamp wins over an old mtime; an unstamped legacy event falls back to mtime.
+status('worker', f'working [at={now - 7}]: building\n', now - 2000)
+assert rows()['worker']['age_seconds'] == 7
+status('worker', 'working: building\n', now - 8)
+assert rows()['worker']['age_seconds'] == 8
+# Handled move resets the clock, not message creation or terminal/transport activity.
+status('worker', f'working [at={now - 901}]: building\n', now - 901)
+inbox = home / 'state/worker.inbox'; handled = inbox / 'handled'; handled.mkdir(parents=True)
+message = inbox / '001.msg'; message.write_text('schema=fm-task-inbox.v1\n\nold steer\n')
+os.utime(message, (now - 2000, now - 2000)); message.rename(handled / message.name)
+os.utime(handled, (now - 9, now - 9))
+assert rows()['worker']['age_seconds'] == 9
+shutil.rmtree(inbox)
+# Only a resolved reply counts; delivered_epoch and an unresolved request do not reset age.
+pending = home / 'state/pending-replies'; pending.mkdir()
+record = pending / 'abcdef0123456789'
+record.write_text(f'task_id=worker\nphase=resolved\nresolved_epoch={now - 10}\n')
+assert rows()['worker']['age_seconds'] == 10
+future_reply = pending / 'fedcba9876543210'
+future_reply.write_text(f'task_id=worker\nphase=resolved\nresolved_epoch={now + 10}\n')
+assert rows()['worker']['age_seconds'] == 10, 'a future reply cannot hide an older valid report'
+future_reply.unlink()
+record.write_text(f'task_id=worker\nphase=awaiting_report\ndelivered_epoch={now}\n')
+r = rows()['worker']; assert r['age_seconds'] == 901 and not r['overdue'] and r['informational'], r
+record.unlink()
+# Named pauses are excluded from the short cadence, not forgotten forever; elapsed deadlines restore it.
+status('worker', f'paused [at={now - 901}]: awaiting CI to finish\n', now - 901)
+r = rows()['worker']; assert not r['overdue'] and r['limit_seconds'] == 14400 and 'declared wait' in r['evidence'], r
+status('worker', f'paused [at={now - 14400}]: awaiting CI to finish\n', now - 14400)
+assert rows()['worker']['overdue']
+clearing = dt.datetime.fromtimestamp(now - 1, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+status('worker', f'paused [at={now - 901}]: awaiting CI until {clearing}\n', now - 901)
+r = rows()['worker']; assert r['overdue'] and r['limit_seconds'] == 900, r
+# A verified captain-held wait gets the same long cadence as a named pause.
+status('worker', f'captain-held [at={now - 901}]: awaiting captain approval\n', now - 901)
+r = rows()['worker']; assert not r['overdue'] and r['limit_seconds'] == 14400 and 'declared wait' in r['evidence'], r
+status('worker', f'captain-held [at={now - 14400}]: awaiting captain approval\n', now - 14400)
+assert rows()['worker']['overdue']
+# Firstmate owes the next move on its own open decision or blocker, so the silence check-in stays out.
+for line in (f'needs-decision [at={now - 901}] [key=k]: pick A or B', f'blocked [at={now - 901}] [key=k]: waiting on answer'):
+    status('worker', line + '\n', now - 901)
+    r = rows()['worker']
+    assert not r['overdue'] and r['informational'] and 'waiting on firstmate' in r['evidence'], r
+# Keys a supervisor raised about other work are not this report's own wait: a quiet report stays eligible.
+for key in ('captain-hold-child-1', 'remote-reply-continuity-abc', 'pending-reply-abc'):
+    status('worker', f'needs-decision [at={now - 901}] [key={key}]: relayed decision\n', now - 901)
+    r = rows()['worker']
+    assert r['overdue'] and not r.get('informational') and 'waiting on firstmate' not in r['evidence'], (key, r)
+status('worker', f'working [at={now - 901}]: building\n', now - 901)
+# A parked gate is firstmate-owed only when its verdict says a human owes the answer; otherwise the worker owes it.
+human = {'FM_SILENCE_TEST_CREW_STATE': 'parked', 'FM_SILENCE_TEST_CREW_SOURCE': 'run-step',
+         'FM_SILENCE_TEST_CREW_DETAIL': 'parked at fix_review: 1 finding(s) · ask-user: authority decision · run: r1'}
+r = rows(extra=human)['worker']
+assert not r['overdue'] and r['informational'] and 'waiting on firstmate' in r['evidence'], r
+for gate in ('awaiting_agent', 'fix_review'):
+    own = dict(human, FM_SILENCE_TEST_CREW_DETAIL=f'parked at {gate}: 1 finding(s) · run: r1')
+    r = rows(extra=own)['worker']
+    assert r['overdue'] and not r.get('informational'), (gate, r)
+assert rows()['worker']['overdue']
+# A worker with no status line yet starts its clock at dispatch (task record mtime).
+status_file = home / 'state/worker.status'; meta_file = home / 'state/worker.meta'
+status_file.rename(home / 'state/worker.status.hold')
+os.utime(meta_file, (now - 5, now - 5))
+r = rows()['worker']; assert r['age_seconds'] == 5 and not r['overdue'] and 'clock starts at dispatch' in r['evidence'], r
+os.utime(meta_file, (now - 901, now - 901))
+r = rows()['worker']; assert r['age_seconds'] == 901 and r['overdue'], r
+os.utime(meta_file, (now, now))
+(home / 'state/worker.status.hold').rename(status_file)
+status('worker', f'done [at={now - 2000}]: ready in branch\n', now - 2000)
+r = rows()['worker']; assert not r['overdue'] and r['informational'] and 'done/ready' in r['evidence'], r
+# Ordinary check-in uses the real inbox, requests a report before ack, never types payload or interrupts.
+status('worker', f'working [at={now - 901}]: building\n', now - 901)
+call('--check-in', 'worker')
+messages = list(inbox.glob('*.msg')); assert len(messages) == 1, messages
+body = messages[0].read_text(); assert 'report progress, blockers, and cross-workstream dependencies' in body
+call('--check-in', 'worker'); assert len(list(inbox.glob('*.msg'))) == 1
+sent = Path(env['FM_SEND_LOG']).read_text()
+assert 'report progress' not in sent and 'C-c' not in sent and 'instruction waiting' in sent, sent
+# A real secondmate-shaped home uses the same tracker for its direct workers.
+(home / '.fm-secondmate-home').write_text('domain-mate\n')
+assert rows()['scout']['overdue']
+(home / '.fm-secondmate-home').unlink()
+# Persistent secondmate idle/active distinction uses its own canonical backlog, not pane activity.
+mate_home = world / 'silence-mate'
+for name in ('state', 'data', 'config', 'projects'):
+    (mate_home / name).mkdir(parents=True)
+(mate_home / 'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+(home / 'state/mate.meta').write_text(f'kind=secondmate\nbackend=tmux\nwindow=sess:fm-mate\nharness=claude\nhome={mate_home}\n')
+status('mate', f'working [at={now - 2000}]: idle\n', now - 2000)
+r = rows()['mate']; assert not r['overdue'] and 'idle secondmate' in r['evidence'], r
+# Idle remains healthy even after an old named wait reaches the pause recheck cadence.
+status('mate', f'paused [at={now - 14401}]: waiting for routed work\n', now - 14401)
+r = rows()['mate']
+assert r['age_seconds'] == 14401 and r.get('informational') and not r['overdue'] and 'idle secondmate' in r['evidence'], r
+call('--check-in', 'mate')
+assert not list((home / 'state/mate.inbox').glob('*.msg')), 'idle secondmate must not receive a silence check-in'
+status('mate', f'working [at={now - 2000}]: idle\n', now - 2000)
+(mate_home / 'data/backlog.md').write_text('## In flight\n- [ ] routed - Routed work (repo: firstmate) (kind: ship)\n\n## Queued\n\n## Done\n')
+assert rows()['mate']['overdue']
+call('--check-in', 'mate')
+records = [p for p in pending.iterdir() if not p.name.startswith('.')]
+assert len(records) == 1, records
+fields = dict(line.split('=', 1) for line in records[0].read_text().splitlines() if '=' in line)
+assert fields['task_id'] == 'mate' and fields['phase'] == 'awaiting_report' and fields['delivered_epoch'], fields
+mate_messages = list((home / 'state/mate.inbox').glob('*.msg'))
+assert len(mate_messages) == 1 and f'corr={fields["corr_id"]}' in mate_messages[0].read_text()
+call('--check-in', 'mate'); assert len(list((home / 'state/mate.inbox').glob('*.msg'))) == 1
+r = rows()['mate']; assert r['age_seconds'] == 2000 and not r['overdue'] and 'pending' in r['evidence'], r
+# A correlated report resolves through the same library the watcher runs and restarts the silence clock.
+status('mate', f'working [at={now - 11}] corr={fields["corr_id"]}: progress reported\n', now - 11)
+resolved = subprocess.run(['bash', '-c', '. "$1"; fm_pending_reply_try_resolve "$2" "$3"', '_',
+                           str(code / 'bin/fm-pending-reply-lib.sh'), str(home / 'state'), fields['corr_id']],
+                          env=env, text=True, capture_output=True, timeout=120)
+assert resolved.returncode == 0, (resolved.stdout, resolved.stderr)
+assert rows()['mate']['age_seconds'] == 0
+# Per-category override and inclusive boundary.
+(home / 'config/open-loops.json').write_text('{"age_limits_seconds":{"silent_report":902}}')
+r = rows()['scout']; assert not r['overdue'] and r['limit_seconds'] == 902, r
+(home / 'config/open-loops.json').write_text('{"age_limits_seconds":{"silent_report":901}}')
+assert rows()['scout']['overdue']
+refused = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--check-in', 'worker'],
+                         env=dict(env, FM_HOME=''), text=True, capture_output=True, timeout=120)
+assert refused.returncode == 1 and 'FM_HOME is required' in refused.stdout
+print('PASS: silence clock resets, exclusions, check-in inbox/correlation deduplication, and secondmate-home run', flush=True)
+PY
+
+# The real snapshot's home-input contract: large inventories travel by file, direct secondmates
+# are retained, and a captain drop is read back from the stored completion note.
 SNAP_HOME=$TMP_ROOT/snapshot-home
 mkdir -p "$SNAP_HOME/state" "$SNAP_HOME/data" "$SNAP_HOME/config" "$SNAP_HOME/projects"
 {
@@ -1398,12 +1578,12 @@ fm_write_meta "$SNAP_HOME/state/worker.meta" "kind=ship" "window=firstmate:fm-wo
 printf 'needs-decision [at=1783814400] [key=retained]: decide the remaining policy question\n' > "$SNAP_HOME/state/held-drop.status"
 INPUT=$(FM_HOME="$SNAP_HOME" bash "$ROOT/bin/fm-fleet-snapshot.sh" --home-input)
 printf '%s' "$INPUT" | jq -e '.schema == "fm-fleet-home-input.v1" and (.backlog.records | length) > 2500
-  and (.tasks | map(.id) == ["worker"])
+  and (.tasks | map(.id) == ["mate-lane", "worker"])
   and (.backlog.records[] | select(.id == "dropped-one") | .captain_drop == true)
   and (.backlog.records[] | select(.id == "held-drop") | .state == "queued" and .captain_drop == true)
   and (.backlog.records[] | select(.id == "landed-one") | .captain_drop == false)' >/dev/null \
   || { echo "FAIL: home-input contract" >&2; exit 1; }
-echo "PASS: home-input carries a large inventory, skips secondmates, and marks a captain drop"
+echo "PASS: home-input carries a large inventory, retains direct secondmates, and marks a captain drop"
 LEDGER=$(FM_HOME="$SNAP_HOME" bash "$ROOT/bin/fm-open-loops.sh" --json)
 printf '%s' "$LEDGER" | jq -e '
   any(.rows[]; .category == "unanswered_question" and .subject == "held-drop:retained")
@@ -1448,9 +1628,9 @@ exit 2
 SH
 chmod +x "$TMP_ROOT/unreadable-bin/tmux"
 INPUT=$(PATH="$TMP_ROOT/unreadable-bin:$PATH" FM_HOME="$SNAP_HOME" bash "$ROOT/bin/fm-fleet-snapshot.sh" --home-input)
-printf '%s' "$INPUT" | jq -e '.tasks[0].endpoint.exists == null
-  and .tasks[0].endpoint.agent_alive == "unreadable"
-  and .tasks[0].current_state.state == "unknown"' >/dev/null \
+printf '%s' "$INPUT" | jq -e '.tasks[] | select(.id == "worker")
+  | .endpoint.exists == null and .endpoint.agent_alive == "unreadable"
+  and .current_state.state == "unknown"' >/dev/null \
   || { echo "FAIL: unreadable tmux is not authoritative absence" >&2; exit 1; }
 LEDGER=$(PATH="$TMP_ROOT/unreadable-bin:$PATH" FM_HOME="$SNAP_HOME" bash "$ROOT/bin/fm-open-loops.sh" --json)
 printf '%s' "$LEDGER" | jq -e '.complete == false
@@ -1466,8 +1646,9 @@ SH
 chmod +x "$TMP_ROOT/timeout-bin/fm-crew-state.sh"
 INPUT=$(PATH="$TMP_ROOT/unreadable-bin:$PATH" FM_HOME="$SNAP_HOME" FM_SNAPSHOT_CREW_STATE_TIMEOUT=1 \
   bash "$TMP_ROOT/timeout-bin/fm-fleet-snapshot.sh" --home-input)
-printf '%s' "$INPUT" | jq -e '.tasks[0].current_state.state == "unknown"
-  and (.tasks[0].current_state.detail | startswith("current-state command failed (exit "))' >/dev/null \
+printf '%s' "$INPUT" | jq -e '.tasks[] | select(.id == "worker")
+  | .current_state.state == "unknown"
+  and (.current_state.detail | startswith("current-state command failed (exit "))' >/dev/null \
   || { echo "FAIL: current-state timeout must retain failure evidence" >&2; exit 1; }
 echo "PASS: current-state timeout retains independent observation failure"
 python3 - "$ROOT" "$TMP_ROOT" <<'PY'
