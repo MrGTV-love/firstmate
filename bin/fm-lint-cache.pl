@@ -26,8 +26,9 @@ use File::Basename qw(dirname basename);
 # scans occupancy, then releases its ticket before executing. New roots cannot
 # repeatedly take a released slot ahead of an already waiting run.
 # Admission retains the slot.* protocol so in-flight older gates remain bounded.
-# The coordinator shares a two-second load sample across all waiting requests;
-# progress checks never spawn additional load readers during that interval.
+# Capacity is the CPU-derived cap alone; host load never shrinks it, so unrelated
+# machine load cannot starve lint. A run holds at most JOBS requests, so FIFO
+# order shares the cap across runs and every waiting request reaches the head.
 # The high-resolution wait is written in milliseconds to <wait-file> before
 # launch so the caller can account for queue time separately.
 if (($ARGV[0] // '') eq 'gate') {
@@ -41,24 +42,8 @@ if (($ARGV[0] // '') eq 'gate') {
     for my $name (keys %signal_number) {
         $SIG{$name} = sub { $caught = $name; kill 'TERM', $child if $child; };
     }
-    my $floor = 2;
     my $cap = ($ENV{FM_LINT_HOST_SLOTS} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_HOST_SLOTS} + 0
-        : ($ncpu >> 1) > $floor ? ($ncpu >> 1) : $floor;
-    $floor = $cap if $cap < $floor;
-    my $slot_load = sub {
-        return $ENV{FM_LINT_SLOT_LOAD} + 0
-            if ($ENV{FM_TEST_SEAM} // '') eq '1' && ($ENV{FM_LINT_SLOT_LOAD} // '') =~ /\A[0-9]+(?:\.[0-9]+)?\z/;
-        if (open(my $fh, '<', '/proc/loadavg')) {
-            my $line = <$fh>;
-            return $1 + 0 if defined $line && $line =~ /\A([0-9]+(?:\.[0-9]+)?)/;
-        }
-        if (open(my $pipe, '-|', 'sysctl', '-n', 'vm.loadavg')) {
-            my $line = <$pipe>;
-            close $pipe;
-            return $1 + 0 if defined $line && $line =~ /([0-9]+(?:\.[0-9]+)?)/;
-        }
-        return 0;
-    };
+        : ($ncpu >> 1) > 2 ? ($ncpu >> 1) : 2;
     my ($slot, $waited_from, $ticket, $ticket_path, $coordinator);
     my $available = eval { make_path($slot_dir, {mode => 0700}); -d $slot_dir && -w _ };
     $available = 0 if $available && !open($coordinator, '>>', "$slot_dir/admission.lock");
@@ -87,11 +72,15 @@ if (($ARGV[0] // '') eq 'gate') {
                     or do { $available = 0; last; };
             }
             my $head;
-            for my $path (sort glob "$slot_dir/queue.[0-9]*") {
+            opendir(my $queue, $slot_dir) or do { $available = 0; last ACQUIRE; };
+            my @requests = sort grep { /\Aqueue\.[0-9]{20}\z/ } readdir $queue;
+            closedir $queue;
+            for my $name (@requests) {
+                my $path = "$slot_dir/$name";
                 if ($path eq $ticket_path) { $head = $path; last; }
                 open(my $request, '>>', $path) or do { $available = 0; last ACQUIRE; };
                 if (flock($request, LOCK_EX | LOCK_NB)) {
-                    unlink($path) or do { $available = 0; last ACQUIRE; };
+                    unlink($path) or $!{ENOENT} or do { $available = 0; last ACQUIRE; };
                     next;
                 }
                 unless ($!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR}) { $available = 0; last ACQUIRE; }
@@ -99,22 +88,7 @@ if (($ARGV[0] // '') eq 'gate') {
                 last;
             }
             if (defined $head && $head eq $ticket_path) {
-                my ($sampled_at, $load);
-                if (open(my $sample, '<', "$slot_dir/load.sample")) {
-                    my $line = <$sample> // '';
-                    ($sampled_at, $load) = ($1, $2)
-                        if $line =~ /\A([0-9.]+)\t([0-9.]+)\n\z/;
-                }
-                my $now = Time::HiRes::time();
-                unless (defined $load && $now >= $sampled_at && $now - $sampled_at < 2) {
-                    $load = $slot_load->();
-                    my $sample;
-                    open($sample, '>', "$slot_dir/load.sample")
-                        && print({$sample} Time::HiRes::time(), "\t", $load, "\n") && close($sample)
-                        or do { $available = 0; last; };
-                }
-                my (@free, $occupied);
-                $occupied = 0;
+                my @free;
                 for my $index (0 .. $cap - 1) {
                     open(my $fh, '>>', "$slot_dir/slot.$index")
                         or do { $available = 0; last ACQUIRE; };
@@ -122,12 +96,8 @@ if (($ARGV[0] // '') eq 'gate') {
                     my $busy = $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
                     close $fh;
                     unless ($busy) { $available = 0; last ACQUIRE; }
-                    $occupied++;
                 }
-                my $allowed = int($cap + 2 * $ncpu - $load + 0.5);
-                $allowed = $floor if $allowed < $floor;
-                $allowed = $cap if $allowed > $cap;
-                $slot = shift @free if @free && $occupied < $allowed;
+                $slot = shift @free if @free;
                 close $_ for @free;
             }
             if ($slot) {

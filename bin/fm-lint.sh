@@ -65,19 +65,20 @@
 # lookup and identical-miss serialization, so hits and duplicate waiters consume
 # no host slots. Live cold roots queue FIFO: a run has at most JOBS requests in
 # flight, and newly arriving roots cannot bypass an older request. Killed waiters
-# are skipped automatically. Admission still requires total slot occupancy below
-# the current load allowance; fairness does not increase host concurrency.
+# are skipped automatically. Admission needs only a free slot among the cap;
+# fairness does not increase host concurrency.
 # FM_LINT_SLOT_DIR defaults to ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots;
-# "off" disables the pool. Load samples are shared and refreshed at most once
-# every two seconds; admission checks do not spawn a load reader per waiter.
+# "off" disables the pool. Host load average never changes admission, so
+# unrelated machine load cannot starve lint.
 # Runs share a pool only when they use the same slot directory, so different
 # homes or overrides must select the same directory to share the host bound.
 # FM_LINT_HOST_SLOTS sets the cap; unset or empty uses max(2, floor(ncpu/2)).
 # A nonempty value must be a positive decimal integer without leading zeros,
-# or lint exits 2, even with the pool off. The load allowance is the cap minus
-# any 1-minute load above two times ncpu, rounded to the nearest integer and
-# clamped between min(2, cap) and cap. Thus a lone default two-worker run keeps
-# both workers unless an explicit cap of one is selected.
+# or lint exits 2, even with the pool off. The cap is the only host-wide bound:
+# a lone default two-worker run keeps both workers unless an explicit cap of one
+# is selected. The CPU-derived default keeps the memory protection of the
+# original pool (some ShellChecks reach several GB); the per-root memory limit
+# is enforced only where ulimit -v works, and native macOS cannot enforce it.
 # Waiting roots queue rather than fail; both cache-key and host-slot queue time
 # consume neither the root deadline nor its retry budget.
 # Slot directory, file, or locking failures warn and run ungated rather than failing lint.
