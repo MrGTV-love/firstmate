@@ -24,8 +24,12 @@ DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
     "unhandled_board_answer": 300,
     "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
-    "open_pr": 3600, "red_check": 0, "coverage": 0,
+    "open_pr": 3600, "red_check": 0, "coverage": 0, "silent_report": 900,
 }
+CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream dependencies that need resolution. "
+                 "Reply through your supervised status/report channel before acknowledging this inbox message; "
+                 "secondmates must preserve the request correlation in their parent-channel reply. "
+                 "Handle this at your next safe checkpoint; do not interrupt a running step.")
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
@@ -102,6 +106,8 @@ class Collector:
         self.stale_generated = None
         self.degraded = []
         self.tasks = []
+        self.direct_reports = []
+        self.reply_by_task = None
         self.backlog = []
         self.prs = {}
         self.missing_heads = {}
@@ -263,13 +269,123 @@ class Collector:
         snap = json.loads(self.run([BIN / "fm-fleet-snapshot.sh", "--home-input"]))
         if snap.get("schema") != "fm-fleet-home-input.v1":
             raise ValueError("unsupported fleet snapshot")
-        self.tasks = [t for t in snap["tasks"] if t["kind"] != "secondmate"]
+        self.direct_reports = snap["tasks"]
+        self.tasks = [t for t in self.direct_reports if t["kind"] != "secondmate"]
         self.backlog = [r for r in snap["backlog"]["records"] if r.get("structured")]
         if snap["backlog"].get("present") is False:
             raise ValueError("backlog is unavailable")
         for record in snap["backlog"]["records"]:
             if not record.get("structured") and record.get("state") != "done":
                 self.degraded.append("unstructured backlog row: " + str(record.get("raw", ""))[:100])
+
+    def reply_records(self, task_id):
+        if self.reply_by_task is None:
+            directory = self.state / "pending-replies"
+            grouped = {}
+            for path in directory.iterdir() if directory.exists() else ():
+                if re.fullmatch(r"[a-fA-F0-9]{16}", path.name) and path.is_file():
+                    record = self.read_fields(path)
+                    grouped.setdefault(record.get("task_id"), []).append(record)
+            self.reply_by_task = grouped
+        return self.reply_by_task.get(task_id, [])
+
+    @staticmethod
+    def read_fields(path):
+        return dict(line.split("=", 1) for line in path.read_text().splitlines() if "=" in line)
+
+    def report_status(self, task_id):
+        # The shared parser owns stamps, logical events and standing pause declarations.
+        path = self.state / (task_id + ".status")
+        out = self.bash('. "$1/fm-classify-lib.sh"; last=$(last_status_line "$2"); '
+                        'printf "%s\\n" "$(status_line_at_epoch "$last" || :)" '
+                        '"$(status_line_verb "$last")"; '
+                        'wait=$(status_declared_wait_line "$2"); '
+                        'if status_is_paused "$wait" && [ -n "$(status_line_note "$wait")" ]; then '
+                        'printf "%s\\n%s\\n%s\\n" "${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}" '
+                        '"$(status_paused_until "$wait" || :)" "$(status_line_note "$wait")"; fi', BIN, path)
+        fields = out.splitlines()
+        fields += [""] * (5 - len(fields))
+        stamp, verb, cadence, until, note = fields[:5]
+        return (int(stamp) if stamp.isdigit() else mtime(path), verb,
+                int(cadence) if cadence.isdigit() and int(cadence) > 0 else None,
+                int(until) if until.isdigit() else None, note)
+
+    def secondmate_has_work(self, task):
+        if task.get("remote"):
+            output = self.run([BIN / "fm-on.sh", task["id"], "fm-fleet-snapshot.sh", "--contribution-input"])
+        else:
+            home = task.get("paths", {}).get("home", {}).get("path")
+            if not home:
+                raise ValueError("secondmate home is unavailable")
+            env = dict(self.env, FM_HOME=home)
+            for key in ("FM_STATE_OVERRIDE", "FM_DATA_OVERRIDE", "FM_CONFIG_OVERRIDE", "FM_PROJECTS_OVERRIDE"):
+                env.pop(key, None)
+            output = self.run([BIN / "fm-fleet-snapshot.sh", "--contribution-input"], env=env)
+        snapshot = json.loads(output)
+        if not isinstance(snapshot.get("backlog"), dict) or not snapshot["backlog"].get("present"):
+            raise ValueError("secondmate backlog is unavailable")
+        return any(row.get("state") == "in_flight" for row in snapshot["backlog"]["records"])
+
+    def silent_report(self, task):
+        ident = task["id"]
+        if task["current_state"].get("detail") == "task generation changed during snapshot":
+            raise ValueError("task generation changed during snapshot")
+        if task["endpoint"].get("exists") is False or task["endpoint"].get("agent_alive") in ("dead", "missing"):
+            return
+        status_at, verb, pause_limit, until, pause_note = self.report_status(ident)
+        records = self.reply_records(ident)
+        open_replies = [r for r in records if r.get("phase") != "resolved"]
+        inbox = self.state / (ident + ".inbox")
+        handled = inbox / "handled"
+        # rename preserves the message's send mtime; directory mtime records the acknowledgement move.
+        ack_at = mtime(handled) if any(handled.glob("[0-9]*.msg")) else None
+        reply_at = max((int(r["resolved_epoch"]) for r in records
+                        if r.get("phase") == "resolved" and r.get("resolved_epoch", "").isdigit()
+                        and int(r["resolved_epoch"]) <= self.now), default=None)
+        stamps = [s for s in (status_at, ack_at, reply_at) if s is not None and s <= self.now]
+        since = max(stamps, default=None)
+        evidence = f"last heard: status={status_at}; inbox acknowledgement={ack_at}; resolved reply={reply_at}"
+        excluded = None
+        if task["kind"] != "secondmate" and (verb == "done" or task["current_state"].get("state") in ("done", "ready")):
+            excluded = "excluded: done/ready task is covered by PR or landing evidence"
+        elif pause_limit and (until is None or until > self.now):
+            # Keep the named wait visible on the watcher's long cadence, not the ordinary check-in cadence.
+            excluded = "declared pause uses long cadence: " + pause_note
+        elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
+            excluded = "excluded: idle secondmate has no routed work in flight"
+        pending = bool(open_replies) or any(CHECK_IN_TEXT in path.read_text()
+                                           for path in inbox.glob("[0-9]*.msg"))
+        informational = bool(excluded and not excluded.startswith("declared pause")) or pending
+        if pending:
+            evidence += "; pending reply/check-in: do not repeat; existing reply or inbox escalation owns recovery"
+        if excluded:
+            evidence += "; " + excluded
+        self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
+                 since, evidence=evidence, informational=informational)
+        if excluded and excluded.startswith("declared pause"):
+            row = next(r for r in self.rows.values() if r["category"] == "silent_report" and r["subject"] == ident)
+            row["limit_seconds"] = pause_limit
+            row["overdue"] = not informational and (row["age_seconds"] is None or row["age_seconds"] >= pause_limit
+                                                        or (until is not None and self.now >= until))
+
+    def silent_reports(self):
+        for task in self.direct_reports:
+            self.source("report silence " + task["id"], self.silent_report, task)
+
+    def check_in(self, task_id):
+        row = next((r for r in self.rows.values() if r["category"] == "silent_report"
+                    and r["subject"] == task_id), None)
+        if not row:
+            raise ValueError("no live direct report eligible for a check-in: " + task_id)
+        if not row["overdue"]:
+            return dict(check_in="not_sent", subject=task_id,
+                        reason="report is fresh, excluded, or already has a pending request")
+        task = next(t for t in self.direct_reports if t["id"] == task_id)
+        env = dict(self.env)
+        if task.get("spawn_gen"):
+            env["FM_SEND_EXPECTED_SPAWN_GEN"] = task["spawn_gen"]
+        self.run([BIN / "fm-send.sh", task_id, CHECK_IN_TEXT], env=env)
+        return dict(check_in="sent", subject=task_id)
 
     def recorded_stop(self, task):
         """True when the worker's own durable record says it stopped on purpose, so its endpoint
@@ -331,6 +447,8 @@ class Collector:
                     alive = None
             else:
                 alive = self.source("worker liveness " + task["id"], self.liveness, task)
+            # Silence tracking shares this observation rather than probing again or counting a dead worker as live.
+            task["endpoint"]["agent_alive"] = alive
             if (task["current_state"].get("state") == "unknown" and not stopped
                     and not (alive in ("dead", "missing")
                              and task["current_state"].get("detail", "").startswith("backend target gone:"))):
@@ -717,6 +835,7 @@ class Collector:
         for slug in slugs:
             self.source("open PRs " + slug, self.pr_rows, slug)
         self.source("workers", self.worker_rows)
+        self.source("report silence", self.silent_reports)
         self.source("questions", self.question_rows)
         self.source("board answers", self.board_answer_rows)
         if self.degraded:
@@ -805,7 +924,11 @@ def main():
     parser = CliParser(description="Reconcile assigned work against live reality")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--heartbeat", action="store_true", help="publish state/open-loops.json")
+    parser.add_argument("--check-in", metavar="TASK_ID", help="send one inbox check-in for an overdue silent report")
     args = parser.parse_args()
+    if args.check_in and not os.environ.get("FM_HOME"):
+        print('error: "FM_HOME is required for a check-in"')
+        return 1
     home = Path(os.environ.get("FM_HOME") or os.environ.get("FM_ROOT_OVERRIDE") or BIN.parent).resolve()
     try:
         lock_dir = Path(os.environ.get("FM_STATE_OVERRIDE") or home / "state").resolve()
@@ -837,8 +960,15 @@ def main():
     finally:
         signal.alarm(0)
     try:
+        if args.check_in:
+            if collector.stale_reason:
+                raise ValueError("cannot send a check-in from retained stale ledger evidence")
+            outcome = collector.check_in(args.check_in)
+            print(json.dumps(outcome) if args.json else "\n".join(
+                key + ": " + json.dumps(value) for key, value in outcome.items()))
+            return 0
         report = collector.publish() if args.heartbeat else collector.result()
-    except (OSError, ValueError, subprocess.SubprocessError) as error:
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         print("error: " + json.dumps(str(error)))
         return 1
     print(json.dumps(report) if args.json else render(report))

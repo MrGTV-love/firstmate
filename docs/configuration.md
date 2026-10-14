@@ -611,7 +611,7 @@ An existing ledger is left untouched while recording is disabled.
 
 `bin/fm-open-loops.sh` reconciles this home's recorded obligations against live worker and delivery evidence.
 `bin/fm-open-loops.sh --json` normally collects current evidence for this home; [quota refusal](#github-rest-reads-and-the-quota-floor) can instead retain the last published ledger.
-It never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
+Ordinary reconciliation never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
 Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
 Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
 For a non-informational row, an unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
@@ -624,12 +624,26 @@ For a non-informational row, an unknown age stays `null` and counts as overdue, 
 | `unhandled_board_answer` | this home's `state/procevent-inbox/*.result` has a `lavish` `.adapter` sibling and no `.handled` sibling; captures from other adapters never appear; firstmate owns routing, the next action names the captured board-answer file and its `.owner-task` value (or an unknown owner), and age comes from the result's mtime regardless of a parked, dead, or missing owner task; a result whose owner task is a current, live `working` task is an informational row owned by `worker:<id>` whose action says that worker holds the round | 300 s |
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
 | `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
+| `silent_report` | a live direct ship, scout, or secondmate has not reported to this home; excluded reports remain informational with their reason in evidence, and declared waits use the existing long cadence | 900 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
 | `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing | 3600 s |
 | `red_check` | the latest run of a check on an open PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
 Each home reports only what it owns.
+The `silent_report` clock is the newest nonfuture time among the last logical status event's canonical `[at=...]` stamp (or status-file mtime when unstamped), the latest acknowledgement move into the report's steering inbox `handled/`, and a pending-reply record's `resolved_epoch` for that report.
+The handled-directory mtime records the latest move when it contains handled messages, because a rename preserves the message's send mtime.
+Pane activity, commits, pipeline progress, request creation, and transport delivery do not reset this clock.
+Each row's evidence names all three sources and any exclusion or pending request.
+An ordinary task that reported done or ready is informational here because its PR or landing evidence owns the next action.
+A named declared pause uses `FM_PAUSE_RESURFACE_SECS` and its existing default instead of 900 seconds; an elapsed declared clearing time restores the short cadence.
+An idle secondmate with no routed work in its own backlog's In flight section and no outstanding reply request is informational and healthy, not a silent report.
+The secondmate backlog is read through the canonical lightweight fleet snapshot in that home, across its registered transport when remote; unreadable evidence degrades coverage rather than inventing idleness.
+Each secondmate home runs exactly the same tracker for its own direct workers, without surveying another home's children.
+A pending secondmate reply or unacknowledged check-in makes the row informational until the existing reply or inbox recovery path settles it, preventing repeated requests.
+The check-in action is opt-in, separate from read-only reconciliation: `bin/fm-open-loops.sh`'s header and help own its exact command, standard request, explicit-home requirement, and serialized repeat suppression.
+Secondmate check-ins retain the existing pending-reply correlation so acknowledgement or delivery alone cannot resolve the requested answer; ordinary workers are instructed to report before acknowledging their check-in inbox record.
+The existing pending-reply and steering-inbox escalation paths own unanswered requests; no new scheduler, interrupt, or persistence store is added.
 A PR is owned when one of this home's task records or backlog items names its exact URL, or when its head repository (`head.repo.full_name`) and head branch match the origin repository and branch of one of this home's tasks.
 Repository identities are matched case-insensitively; branch names remain case-sensitive, and recorded URLs must match exactly.
 Matching only the base repository does not establish ownership of a fork's branch.
@@ -658,7 +672,7 @@ Unknown current task state adds degraded coverage independently of liveness, exc
 Only nonfuture progress timestamps count as work evidence.
 Pipeline progress uses each task's worktree to resolve a relative `NM_HOME`; unset or empty values select `$HOME/.no-mistakes`.
 Progress remains scoped to that resolved store and the task's project and branch.
-The ledger covers this home's current backlog, ordinary task records, status questions, unhandled captured board answers, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
+The ledger covers this home's current backlog, direct-report task records, status questions, unhandled captured board answers, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
 A recorded PR head that is not a local object in the task's copy cannot be compared, so PR coverage is skipped for that task alone: its unlanded-commit row names the absent head and counts every commit not on the default branch, and the ledger stays complete.
 Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
 The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
@@ -702,7 +716,7 @@ Create the optional local `config/open-loops.json` to override the limits:
 
 ```json
 {
-  "age_limits_seconds": { "stalled_worker": 3600, "unlanded_commit": 86400 },
+  "age_limits_seconds": { "silent_report": 900, "stalled_worker": 3600, "unlanded_commit": 86400 },
   "command_timeout_seconds": 60
 }
 ```
