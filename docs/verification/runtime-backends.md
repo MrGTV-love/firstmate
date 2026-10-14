@@ -3494,6 +3494,8 @@ Refresh the schema and directory observations with the same model-free commands 
 `bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh tests/fm-control-relaunch.test.sh tests/fm-bootstrap.test.sh tests/fm-remote-doctor.test.sh` exercises the public spawn, fallback, relaunch, and diagnostic paths with isolated configuration and no paid model launch.
 A public `fm-bootstrap.sh` detect-only local smoke reported all three forbidden roles and forbidden fallback keys/targets, left the fixture config byte-identical, and omitted its credential sentinel.
 
+Portable compatibility coverage: `bash bin/fm-test-run.sh --jobs 1 tests/fm-on.test.sh tests/fm-worker-account.test.sh` passed both complete scripts. The worker-account native catalog cases use `openai-codex/*` for omp, covering unsupported/supported non-index literals and indexed role, stand-in, primary-literal, and stand-in-literal selections. The transport fixture includes the doctor's shared billing guard; its executable bootstrap checks accept the current trusted doctor without Git and reject an altered copy. Changes to `fm-remote-doctor.sh` must also refresh the trusted checksum in `fm-remote-entrypoint.sh`.
+
 Billing-route regression map for the approved bounded scope:
 
 | Route | Named executable regression | Observable contract |
