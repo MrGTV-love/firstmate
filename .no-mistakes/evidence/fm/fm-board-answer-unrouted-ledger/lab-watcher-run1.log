@@ -1,0 +1,11 @@
+### 07:50:48 ledger overdue ids: ["lavish-29aa0dee3dd2e001.1.result","lavish-board-gone.1.result","lavish-board-missing.1.result","lavish-board-unowned.1.result"]
+signal: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/owner-parked.status
+watch-exit=0 at 07:51:19
+== wake queue
+1791981826	1	check	procevent:lavish-board-unowned:1	check: procevent lavish lavish-board-unowned 1
+1791981829	2	check	procevent:when-foreign:1	check: procevent when when-foreign 1
+1791981831	3	check	procevent:proc-foreign:1	check: procevent proc proc-foreign 1
+1791981833	4	check	procevent:quota-foreign:1	check: procevent quota quota-foreign 1
+1791981835	5	check	procevent:remote-reply-foreign:1	check: procevent remote-reply remote-reply-foreign 1
+1791982279	6	signal	owner-parked.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/owner-parked.status
+1791982279	7	signal	owner-parked.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/owner-parked.status

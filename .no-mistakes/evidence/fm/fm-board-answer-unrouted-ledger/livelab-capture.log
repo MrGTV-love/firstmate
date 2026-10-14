@@ -1,0 +1,14 @@
+### 07:49:38 crew-state lab66f50f4ed892-worker: state: paused · source: status-log · waiting for gate file /Users/charlesabrooker/tmp/fmlab.k72yf4/home/data/lab66f50f4ed892-worker/gate and a resume message
+== register-task lavish lavish-livelab-board owner=lab66f50f4ed892-worker
+registered: lavish-livelab-board (lavish, task=lab66f50f4ed892-worker)
+rc=0
+== start lavish-livelab-board
+not-autohandled: lavish-livelab-board (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fmlab.k72yf4/home/state/procevent-inbox/lavish-livelab-board.1.result
+rc=0
+total 24
+drwx------   5 charlesabrooker  staff   160 Oct 14 07:49 .
+drwxr-xr-x  74 charlesabrooker  staff  2368 Oct 14 07:49 ..
+-rw-------   1 charlesabrooker  staff     7 Oct 14 07:49 lavish-livelab-board.1.adapter
+-rw-------   1 charlesabrooker  staff    23 Oct 14 07:49 lavish-livelab-board.1.owner-task
+-rw-------   1 charlesabrooker  staff   142 Oct 14 07:49 lavish-livelab-board.1.result

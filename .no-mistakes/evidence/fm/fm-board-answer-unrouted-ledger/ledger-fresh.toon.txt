@@ -1,0 +1,16 @@
+### 2026-10-14 07:44:18 CDT  FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xM0BHP
+$ bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4X4CVKJ1B4K90GASNVEQDZM/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1791981858
+rows[7]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"fleet snapshot: backlog is unavailable"
+  "missing_worker","owner-gone","firstmate","recover the assigned worker without discarding work",47,false,""
+  "unanswered_question","owner-parked:board","firstmate","answer or close this question, or record why it no longer applies",47,false,"needs-decision: captain board 29aa-lab is open; waiting on the answer"
+  "unhandled_board_answer","lavish-29aa0dee3dd2e001.1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-29aa0dee3dd2e001.1.result; owner task: owner-parked",42,false,"/Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-29aa0dee3dd2e001.1.result"
+  "unhandled_board_answer","lavish-board-gone.1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-gone.1.result; owner task: owner-gone",39,false,"/Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-gone.1.result"
+  "unhandled_board_answer","lavish-board-missing.1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-missing.1.result; owner task: owner-missing",37,false,"/Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-missing.1.result"
+  "unhandled_board_answer","lavish-board-unowned.1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-unowned.1.result; owner task: unknown (no owner task recorded)",32,false,"/Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-unowned.1.result"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+exit=0

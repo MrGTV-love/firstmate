@@ -1,0 +1,15 @@
+### 2026-10-14 07:49:03 CDT  FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xM0BHP
+$ bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4X4CVKJ1B4K90GASNVEQDZM/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1791982143
+rows[6]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","owner-gone","firstmate","recover the assigned worker without discarding work",332,false,""
+  "unanswered_question","owner-parked:board","firstmate","answer or close this question, or record why it no longer applies",332,false,"needs-decision: captain board 29aa-lab is open; waiting on the answer"
+  "unhandled_board_answer","lavish-29aa0dee3dd2e001.1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-29aa0dee3dd2e001.1.result; owner task: owner-parked",327,true,"/Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-29aa0dee3dd2e001.1.result"
+  "unhandled_board_answer","lavish-board-gone.1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-gone.1.result; owner task: owner-gone",324,true,"/Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-gone.1.result"
+  "unhandled_board_answer","lavish-board-missing.1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-missing.1.result; owner task: owner-missing",322,true,"/Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-missing.1.result"
+  "unhandled_board_answer","lavish-board-unowned.1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-unowned.1.result; owner task: unknown (no owner task recorded)",317,true,"/Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-unowned.1.result"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+exit=0

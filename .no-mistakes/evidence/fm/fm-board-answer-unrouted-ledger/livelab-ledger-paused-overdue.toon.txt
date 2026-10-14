@@ -1,0 +1,14 @@
+### 2026-10-14 07:54:50 CDT  live lab FM_HOME=/Users/charlesabrooker/tmp/fmlab.k72yf4/home
+crew-state lab66f50f4ed892-worker: state: paused · source: status-log · gate file /Users/charlesabrooker/tmp/fmlab.k72yf4/home/data/lab66f50f4ed892-worker/gate still absent; 001.msg was a lavish-board note, not a resume, so not acted on
+busy-state: v1 gen=g1791981899.85121.24304 seq=5 state=idle source=claude-hook event=stop ts=1791982194
+$ bin/fm-open-loops.sh
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4X4CVKJ1B4K90GASNVEQDZM/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1791982491
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","no forge coverage: notes","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fmlab.k72yf4/home/projects/notes: local origin /Users/charlesabrooker/tmp/fmlab.k72yf4/origins/notes.git"
+  "unhandled_board_answer","lavish-livelab-board.1.result","firstmate","read and route the captured board answer /Users/charlesabrooker/tmp/fmlab.k72yf4/home/state/procevent-inbox/lavish-livelab-board.1.result; owner task: lab66f50f4ed892-worker",310,true,"/Users/charlesabrooker/tmp/fmlab.k72yf4/home/state/procevent-inbox/lavish-livelab-board.1.result"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+exit=0
+crew-state after: state: paused · source: status-log · gate file /Users/charlesabrooker/tmp/fmlab.k72yf4/home/data/lab66f50f4ed892-worker/gate still absent; 001.msg was a lavish-board note, not a resume, so not acted on

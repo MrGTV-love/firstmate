@@ -1,0 +1,11 @@
+### BASE COMMIT 7897a7cd collector, 2026-10-14 07:49:04 CDT  FM_HOME=/Users/charlesabrooker/tmp/fm-lab.xM0BHP
+$ base/bin/fm-open-loops.sh
+bin: /private/tmp/fm-board-scratch/base/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1791982145
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","owner-gone","firstmate","recover the assigned worker without discarding work",334,false,""
+  "unanswered_question","owner-parked:board","firstmate","answer or close this question, or record why it no longer applies",334,false,"needs-decision: captain board 29aa-lab is open; waiting on the answer"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+exit=0

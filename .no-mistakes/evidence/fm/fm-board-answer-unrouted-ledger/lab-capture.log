@@ -1,0 +1,98 @@
+crew-state owner-parked: state: parked · source: status-log · captain board 29aa-lab is open; waiting on the answer
+crew-state owner-gone: state: unknown · source: none · backend target gone: firstmate:fm-owner-gone
+crew-state owner-missing: state: unknown · source: none · backend target gone: firstmate:fm-owner-missing
+== register-task lavish-29aa0dee3dd2e001 owner=owner-parked
+registered: lavish-29aa0dee3dd2e001 (lavish, task=owner-parked)
+rc=0
+== register-task lavish-board-gone owner=owner-gone
+registered: lavish-board-gone (lavish, task=owner-gone)
+rc=0
+== register-task lavish-board-missing owner=owner-missing
+registered: lavish-board-missing (lavish, task=owner-missing)
+rc=0
+== register-task lavish-board-handled owner=owner-gone
+registered: lavish-board-handled (lavish, task=owner-gone)
+rc=0
+== register lavish-board-unowned (no owner)
+registered: lavish-board-unowned (lavish)
+rc=0
+== register when-foreign (adapter when)
+registered: when-foreign (when)
+rc=0
+== register proc-foreign (adapter proc)
+registered: proc-foreign (proc)
+rc=0
+== register quota-foreign (adapter quota)
+registered: quota-foreign (quota)
+rc=0
+== register remote-reply-foreign (adapter remote-reply)
+registered: remote-reply-foreign (remote-reply)
+rc=0
+== owner-missing task record removed (torn down) after its board was armed
+== start lavish-29aa0dee3dd2e001
+not-autohandled: lavish-29aa0dee3dd2e001 (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-29aa0dee3dd2e001.1.result
+rc=0
+== start lavish-board-gone
+not-autohandled: lavish-board-gone (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-gone.1.result
+rc=0
+== start lavish-board-missing
+not-autohandled: lavish-board-missing (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-missing.1.result
+rc=0
+== start lavish-board-handled
+not-autohandled: lavish-board-handled (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-handled.1.result
+rc=0
+== start lavish-board-unowned
+not-autohandled: lavish-board-unowned (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/lavish-board-unowned.1.result
+rc=0
+== start when-foreign
+not-autohandled: when-foreign (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/when-foreign.1.result
+rc=0
+== start proc-foreign
+not-autohandled: proc-foreign (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/proc-foreign.1.result
+rc=0
+== start quota-foreign
+not-autohandled: quota-foreign (left for the handler; still unacknowledged)
+captured: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/quota-foreign.1.result
+rc=0
+== start remote-reply-foreign
+not-autohandled: remote-reply-foreign (left for the handler; still unacknowledged)
+retired: remote-reply-foreign (adapter classified the captured result terminal)
+captured: /Users/charlesabrooker/tmp/fm-lab.xM0BHP/state/procevent-inbox/remote-reply-foreign.1.result
+rc=0
+== mark lavish-board-handled round 1 handled
+handled: lavish-board-handled 1
+rc=0
+crew-state owner-parked: state: parked · source: status-log · captain board 29aa-lab is open; waiting on the answer
+crew-state owner-gone: state: unknown · source: none · backend target gone: firstmate:fm-owner-gone
+crew-state owner-missing: state: unknown · source: none · no metadata for owner-missing
+== inbox
+lavish-29aa0dee3dd2e001.1.adapter: lavish 
+lavish-29aa0dee3dd2e001.1.owner-task: owner-parked 
+lavish-29aa0dee3dd2e001.1.result: session:   status: feedback prompts[1]{uid,prompt,selector,tag,text}:   "","capt
+lavish-board-gone.1.adapter: lavish 
+lavish-board-gone.1.owner-task: owner-gone 
+lavish-board-gone.1.result: session:   status: feedback prompts[1]{uid,prompt,selector,tag,text}:   "","capt
+lavish-board-handled.1.adapter: lavish 
+lavish-board-handled.1.handled: 
+lavish-board-handled.1.owner-task: owner-gone 
+lavish-board-handled.1.result: session:   status: feedback prompts[1]{uid,prompt,selector,tag,text}:   "","capt
+lavish-board-missing.1.adapter: lavish 
+lavish-board-missing.1.owner-task: owner-missing 
+lavish-board-missing.1.result: session:   status: feedback prompts[1]{uid,prompt,selector,tag,text}:   "","capt
+lavish-board-unowned.1.adapter: lavish 
+lavish-board-unowned.1.result: session:   status: feedback prompts[1]{uid,prompt,selector,tag,text}:   "","capt
+proc-foreign.1.adapter: proc 
+proc-foreign.1.result: foreign capture from proc\n
+quota-foreign.1.adapter: quota 
+quota-foreign.1.result: foreign capture from quota\n
+remote-reply-foreign.1.adapter: remote-reply 
+remote-reply-foreign.1.result: foreign capture from remote-reply\n
+when-foreign.1.adapter: when 
+when-foreign.1.result: foreign capture from when\n
