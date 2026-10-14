@@ -27,9 +27,10 @@ table sits under the home's data directory and that work tree is a firstmate
 checkout (it holds bin/fm-duration.py): a firstmate tool must not
 change a project copy. A refused location prints one stderr line, records
 nothing and exits 0 (path prints off, limit keeps the caller's fallback);
-gitignore is never relied on to hide a misplaced write. Recording and process-group execution require POSIX
-Python; pure literal lint works on native Windows Python, while limit explicitly
-preserves the existing fallback when POSIX locks are absent.
+gitignore is never relied on to hide a misplaced write. Recording and
+process-group execution require POSIX Python; pure literal lint works on native
+Windows Python, while limit explicitly preserves the existing fallback when
+POSIX locks are absent.
 
 Every row, limit and filing is scoped to host and repository: the helper derives
 the repository from the origin remote of the working directory (owner/name), else
