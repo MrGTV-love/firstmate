@@ -2,141 +2,163 @@
 
 Audience: maintainer verification.
 
-This record supports the opt-in `bin/fm-dispatch-resolve.sh` contract owned by [`../configuration.md`](../configuration.md) ("Typed dispatch resolution") and the declared rule and profile fields owned there under "Crew dispatch profiles".
-It records only facts that must be re-established when the typesafe.ai model, its API, or firstmate's dispatch rules change.
-Task chronology, the captain's rules, and the briefs themselves stay in the private scout report.
+The [operator contract](../configuration.md#typed-dispatch-resolution-env-typesafe_api_key) owns policy, privacy, quota weights, and uncertainty paths.
+The [vendor provenance](../../bin/ten-levels/SOURCE.md) owns the upstream commit and adaptations.
+This record describes exercised current behavior, not calibrated task-completion accuracy.
 
-## The API the tool depends on
+## Runtime and upstream contract
 
-Verified 2026-09-16 against `https://api.typesafe.ai`.
-`GET /v1/models` listed `jev-latest` and `jev-preview`, both released 2026-09-10; a `jev-latest` request answered as `jev-1.13.0`.
-`POST /v1/systemone` takes `{model, state, questions}`; a `choice` question returns `{choice, probabilities, confidence}` with the probabilities summing to 1.
-Observed error shapes: 401 `authentication_error` for a bad key, 403 when the header is missing, 422 with a `detail[].loc` naming the offending field, 400 `api_usage_error` for an unknown model, 405 on GET.
-No rate-limit headers were present on any response; every response carried `x-typesafe-request-id`.
-Observed end-to-end latency from a Mac was 123 to 348 ms per request, with the server's own upstream time at 4 to 60 ms.
-
-## Live rule match against real briefs
-
-Run 2026-09-16 with the key injected for the one command through the vault (`av inject +TYPESAFE_API_KEY -- ...`), model `jev-latest`, confidence floor 0.6, timeout 5 s, one `quota-axi --json` snapshot for the whole run.
-Rules: the captain's five-rule file with a captain-authored none option, one `approval: captain` rule, two rule floors on `model:fable`, and declared `provider` on the Pi profiles.
-Briefs: 15 real briefs from this home's recent work plus 10 synthetic ones written to hit each rule.
-
-| Measure | Result |
-| --- | --- |
-| Rule matched the hand label | 20 of 25 |
-| Resolved to the hand-labeled profile | 20 of 25 |
-| Outcomes: clear / ambiguous / escalate / error | 18 / 1 / 6 / 0 |
-| Clear results with a wrong profile | 0 |
-| API latency (min / median / max) | 152 / 214 / 348 ms |
-| Wall time per call including jq (min / median / max) | 198 / 261 / 396 ms |
-| Input tokens per brief (min / median / max) | 1,279 / 3,114 / 4,538 |
-| Output tokens | 150 to 152 |
-| API errors | 0 |
-
-Of the five disagreements, one was a wrong hand label (the brief quoted the bug-fix rule's wording verbatim), three were real briefs the model read as the approval-gated design rule at 0.66 to 0.86 confidence and escalated by design, each of which the captain had in fact dispatched at the strongest-reasoning class, and one was a synthetic tweak that came back ambiguous at 0.41 confidence and was handed back to firstmate.
-A lean request that asks only the rule Choice matched the full request (rule, profile, and status) on all 25 briefs, which is why the shipped tool asks one question and keeps every gate in code.
-That table records the 2026-09-16 run with the captain-authored none option.
-A second live run on 2026-09-17 used the same 25 briefs, held one quota snapshot constant through a fake `quota-axi`, and exercised a copy of this branch with the shipped neutral `No listed rule applies to this task.` option and option-free interface.
-
-| Measure | Result |
-| --- | --- |
-| Rule matched the hand label | 20 of 25 |
-| Resolved to the hand-labeled profile | 18 of 25 |
-| Outcomes: clear / ambiguous / escalate / error | 17 / 2 / 6 / 0 |
-| Clear results with a profile other than the hand label | 1 |
-| API latency (min / median / max) | 137 / 220 / 1,795 ms |
-| Input tokens per brief (min / median / max) | 754 / 2,589 / 4,013 |
-| Output tokens | 60 to 62 |
-| API errors | 0 |
-
-The maximum latency was one outlier; the next slowest request was 309 ms.
-The differing clear result was a synthetic small tweak that matched the simple-bug-fix rule at 0.90 and selected `cursor-grok-4.6-medium` instead of the hand-labeled `cursor-grok-4.6-high`: the tweak exemption removed from the none-option text belongs in that rule's own `when` text.
-Two default-labeled briefs became ambiguous.
-
-## Task sections and per-rule confidence floors
-
-Run 2026-09-23 against `jev-latest` (answering as `jev-1.13.0`), comparing the resolver before this change (whole brief as state) with the resolver after it (only `## Captain's intent` and `## Firstmate spec`).
-Each fixture brief was scaffolded with `bin/fm-brief.sh` (ship `--mode no-mistakes` or `--scout`), its two placeholders filled, and both resolvers run on the same file against the same rules.
-
-Generic rules: a hardest-tier rule that requires the brief itself to call the work unusually difficult or high-risk and excludes routine builds, ports, and installers; routine feature, port, or installer builds; bug fixes with a stated root cause; trivial mechanical edits; and read-only investigations or audits.
-Sixteen fixtures: ten clear-cut briefs (two per rule) and six borderline ones (a large port with signed installers, an installer after a broken upgrade, a large file split, a table migration, an unexplained slowdown, and a retry policy).
-
-| Measure | Whole brief | Task sections |
-| --- | --- | --- |
-| Top rule matched the label | 16 of 16 | 16 of 16 |
-| Input tokens per ship brief | 4,327 to 4,379 | 583 to 624 |
-| Input tokens per scout brief | 2,861 to 2,874 | 584 to 597 |
-| Borderline top-rule confidence below 0.99 | 0.77 split, 0.72 slowdown | 0.59 split, 0.70 slowdown |
-
-The top rule matched the label on 16 of 16 fixtures under both shapes, so on these generic briefs the change did not improve routing accuracy.
-Every clear-cut fixture answered at probability 0.99 or 1.0 under both shapes, so the scaffold boilerplate neither caused nor prevented a wrong pick.
-The one routing difference is a regression: the large-file-split fixture went from clear (confidence 0.77, probability 0.82 on its labeled routine-build rule) to `ambiguous` (confidence 0.59, probability 0.66, the rest going to the neutral option), just under the 0.6 floor.
-The gain that holds across the set is size: about 4,350 input tokens down to about 600 per ship brief.
-
-### A routine port the hardest tier over-claims
-
-Run 2026-09-23 against `jev-latest` (answering as `jev-1.13.0`).
-The brief was a generic scaffolded ship brief for a routine port of a macOS-only capture helper to Windows plus a Windows installer, described as a straightforward port, with a long never-do-X safety list in its spec.
-The rules were the same generic five-rule set with two changes: a loosely worded top-tier rule ("Large or hard engineering work that needs the strongest model, such as a multi-platform build or anything where a mistake is costly.") and the routine rule broadened to "Implementation where the worker must design parts of the solution itself within an existing codebase."
-The task-sections row is the shape this change sends: the two task sections, with no kind line because it is a ship brief.
-
-| Shape | Runs | Input tokens | Top-tier rule probability | Confidence | Implementation rule probability |
-| --- | --- | --- | --- | --- | --- |
-| Whole brief | 3 | 4,436 | 0.90 to 0.93 | 0.87 to 0.92 | 0.07 to 0.10 |
-| Task sections | 5 | 670 | 0.88 to 0.91 | 0.84 to 0.89 | 0.09 to 0.12 |
-
-Extraction does not prevent the top-tier pick; a loosely worded rule is matched from the task text alone.
-With `min_confidence: 0.95` declared on the top-tier rule, the task-sections shape returned `ambiguous` in 3 of 3 runs, because the pick's probability was below its floor and no other option cleared its own floor.
-Additionally declaring `min_confidence: 0.05` on the implementation rule returned a `fallback:` line to that rule in 3 of 3 runs.
-
-Two scaffolded scout briefs (592 and 605 input tokens, sent with the `Brief kind: scout (report only)` line) matched the investigation rule at probability 1.0 in 4 of 4 runs.
-A free-form brief with neither task section (561 input tokens, sent whole with no kind line) matched the trivial-edit rule at probability 1.0.
-
-Negative finding: an intermediate variant that also sent `Brief kind: ship, mode=no-mistakes` moved the same routine port brief to the top-tier rule at probability 0.96 to 0.97 in 7 of 7 runs, above a 0.95 floor.
-The delivery mode is the same on most ship briefs and says nothing about difficulty, so it is deliberately not sent.
-
-These live runs cover the scout line, the free-form whole-brief fallback, the ship-brief package, the top-tier floor turning the pick `ambiguous`, and the fallback to a runner-up.
-The remaining behavior is covered only by the offline tests below: a fenced heading inside a section, the boundaries of the global 0.6 confidence check with no declared floors, the probability-based floor examples, the tie case, and rejection of an out-of-range `min_confidence`.
-
-## Offline behavior
-
-`tests/fm-dispatch-resolve.test.sh` drives the public interface with a fake `curl` that records argv, the request body, the header read from file descriptor 3, and whether the secret reached its environment, plus a fake `quota-axi` that performs the same environment check.
-It proves firstmate can invoke the resolve path without a separate caller preflight and dynamic output fields are flattened to one line.
-The [fleet model-index contract](../configuration.md#fleet-model-index-configmodel-indexjson) owns the frozen rules/index and chosen-entry validation exercised by this regression.
-It proves the absent key (environment and `.env`) prints one stderr line, nothing on stdout, exits 0, and never invokes `curl` or `quota-axi`.
-It proves absent, default-only, and empty-rules files return `no rules to match` without a model or quota request, while a broken rules-file symlink exits 2 as unreadable.
-It proves the documented starter configuration pair resolves its Pi default through the declared Claude provider, a `.env` key turns the tool on, and the environment wins over it.
-It proves the key is absent from child environments, never appears on `curl` argv, and arrives only as the bearer header on the descriptor.
-It proves the request uses the fixed endpoint and model, carries only the project, the privacy-filtered brief's task sections read by the shared brief-heading parser with a scout line only for a scout brief and never a ship brief's delivery mode (or the whole privacy-filtered brief when it has neither section), and rule Choice with one option per rule plus the fixed neutral none option, and never carries `why`, `use`, or quota.
-Synthetic fixtures cover the [never-send contract](../configuration.md) ("Never-send list") through outgoing-body capture and checks that withheld requests invoke neither `curl` nor `quota-axi`.
-It proves a declared `min_confidence` is checked against the rule's own probability both as the pick and as a runner-up, a picked rule below it falls to the most probable runner-up that clears its floor, is `ambiguous` when none does or two tie, and that a file without declared floors keeps the global 0.6 floor on confidence unchanged.
-It proves the clear, fixed-floor ambiguous with candidate evidence, escalate (approval with candidate evidence, unverifiable rule floor, tie, nothing rankable), known rule-floor fall-through, known and unverifiable profile-floor evidence, explicit-provider and provider-ID enforcement, authoritative Agy and explicit-provider Gemini routing, partial providers, eligible unranked candidates and their clear-result note, concrete quota vetoes and profile-floor shortfalls taking precedence over uncertainty, account-wide quota veto, limiting-bound ranking, schema-6 account-row binding with schema-5 compatibility, missing-curl and quota-axi failures, HTTP 429 and 500, transport failure, malformed usage, zero-mass or malformed probabilities or confidence, malformed or duplicate profile, invalid selector, removed-option rejection, and out-of-range rule ID paths behave as the contract states, with configuration errors exiting 2 before any network call.
-It proves runway is judged against the task horizon: an `established` projection shorter than the default 240-minute or a declared `task_horizon_minutes` horizon on any applicable bound of the highest-ranked candidate (including a non-limiting exact-model bound) escalates with no profile, while `through_reset`, an established projection covering the horizon (including exactly at it), an `early` or absent-confidence projection, and `unknown` runway clear with any non-passing bound named in a candidate warning; `exhausted_now` vetoes every candidate outside the `omp` Codex pool; a short winner is never replaced by a lower-ranked candidate in its rule, another rule, or the default array; and the horizon is never sent to the model.
-It proves an `omp` Codex pool ranks on its visible account through the same task-horizon classification (through-reset, established covering, early, and unknown readings clear, and an established short reading escalates rather than falling back to a lower-ranked candidate), an exhausted visible reading leaves the pool eligible but unranked with its warning and no veto, and a declared profile-floor shortfall still makes the pool not eligible.
-It proves an absent OpenRouter row and a credit-only OpenRouter row stay eligible but unranked, and that an older, unparseable, or failed `quota-axi --version` read is an `error` naming the required minimum before any snapshot is taken.
-It checks stage accounting in a successful call with known API and quota durations, API time from curl's own transfer time, and unknown API timing when curl reports none.
-It checks millisecond epoch stamps without `EPOCHREALTIME`; when Bash on PATH exposes that builtin, it also checks that the fast path starts no Perl.
-It checks that missing usage stays unknown rather than zero and a quota failure keeps the paid call's cost and returned Jev version.
-It checks that telemetry on clear and quota-error results, the `model:` line on clear results, and HTTP errors never echo the key, brief text, or arbitrary response model text.
-`tests/fm-bootstrap.test.sh` proves bootstrap ignores resolver-only fields without the typed key, accepts a positive `task_horizon_minutes` and rejects a nonpositive one, validates each malformed shape when the environment or home `.env` activates typed resolution, and prevents an environment-provided key from reaching child processes.
+Verified 2026-10-14 (UTC) with Node `v26.4.0`, Bun `1.3.14`, and live TypeSafe responses identifying `jev-1.13.0`.
+Level 5's independent workflow, ambiguity, desktop, model-tier, and effort questions run in one vendored `JevClient.systemOne` call alongside the existing rule Choice.
+The client validates the response before Firstmate applies policy.
+No worker was launched during the live evaluation.
 
 ```console
-$ bash tests/fm-dispatch-resolve.test.sh | tail -1
+$ JEV_BACKEND=mock node --test bin/ten-levels/tests/level05.test.ts
+ℹ tests 6
+ℹ pass 6
+ℹ fail 0
+```
+
+These unchanged upstream tests exercise intent lookup and complaint paths, model tiers, localized agent work, and the upstream low-confidence agent fallback.
+Mock results are contract coverage, not live model-quality evidence.
+
+## Public resolver behavior
+
+Commands exercised:
+
+```sh
+bash tests/fm-dispatch-resolve.test.sh
+bash tests/fm-dispatch-capacity.test.sh
+bash tests/fm-quota-choose.test.sh
+```
+
+All three exited 0 through the measured-command wrapper.
+After the regression groups deleted by the JevClient transport rewrite were ported to the local provider harness, the resolver suite was rerun on its own on 2026-10-14 with Node `v26.4.0`, Bun `1.3.14`, and macOS `/bin/bash` 3.2, and exited 0.
+The resolver suite serves typed answers through a local HTTP endpoint to the real vendored client, with synthetic task text and no paid requests.
+Its output, in order:
+
+```console
+ok - pool bias is removed by normalized nonadditive evidence, with explicit ties
+ok - common headroom and economic urgency are normalized before weighting
+ok - quota veto preserves required reasoning class
+ok - an unmeasured usable pool remains disclosed uncertainty without blocking ranking
+ok - the resolver runs its adapter with node when bun is absent
+ok - vendored upstream Level 5 tests pass unchanged
+ok - the rule Choice decides project-scoped and Claude-only rules without local text pre-checks
+ok - session launch policy filters the selected rule after judgment and names an emptied rule
+ok - Level 5 tier and effort map to the approved model matrix
+ok - ambiguity and unsupported handler/capability decisions escalate
+ok - privacy boundaries and provider errors preserve safe fallback
+ok - captain approval and declared floors veto before weighted selection
+ok - fixed questions, task extraction, and protected regions retain their privacy boundary
+ok - rule floor: a known shortfall falls through to default
+ok - per-rule confidence floors fall to the most probable runner-up that clears its own floor
+ok - proven exhaustion activates only the declared model-matrix stand-in
+ok - a powerful verdict filters declared stand-ins and every stand-in takes the route effort
+ok - task-horizon feasibility still vetoes the quota winner
+ok - absent key is off: one stderr line, exit 0, no network call or quota read
+ok - help and bare-filename startup isolate environment credentials
+ok - TYPESAFE_API_KEY= in .env activates the tool; environment and config overrides work
+ok - key handling: bearer header only, never argv or child environments; the request carries task, project, and criteria only
+ok - never-send list withholds the request on a match or a bad list, and never prints the value
+ok - opt-in marked sections protect outgoing bodies and markers never send without the exact opt-in
+ok - error diagnostics omit sensitive API bodies without blocking intake
+ok - stock Bash resolver separates API, quota, local and total timing at millisecond precision, with input-only Jev cost
+skip: no bash with EPOCHREALTIME is installed
+ok - unavailable usage is unknown and a failed quota snapshot retains API cost
+ok - quota-error model evidence accepts only safe Jev version ids
+ok - successful resolution model evidence accepts only safe Jev version ids
+ok - rules snapshots and shell quoting preserve the profile protocol
+ok - no-rule fallback, Agy, Gemini, and documented configurations resolve
+ok - ambiguous: confidence below the fixed floor hands the decision back
+ok - per-rule confidence floor boundaries check each runner-up on its own probability; no declared floors keeps the global floor
+ok - only the brief's task sections and scout tag reach the model, with a whole-brief fallback
+ok - rule floor: unavailable evidence, including the OMP pool, escalates rather than falling through
+ok - declared provider and profile floor evidence are applied in code
+ok - nonnumeric spendPriority evidence is never ranked
+ok - partial and missing quota evidence remain eligible but unranked
+ok - provider-wide and exact quota rows combine into one limiting candidate
+ok - default: no rule matched resolves among the default profiles
+ok - tie: equal quota evidence never breaks by array order
+ok - no rankable candidate: the tool escalates instead of guessing
+ok - schema 6: native Codex and Pi lanes bind to their own account rows; schema 5 is unchanged
+ok - task-horizon runway, OpenRouter coverage, and minimum-version guards
+ok - quota evidence comes from one quota-axi --json read, and its failure is an error outcome
+ok - API, transport, and response failures are error outcomes with exit 0
+ok - typed OMP dispatch preserves pooled headroom, explicit stand-ins, and uncertainty
+ok - configuration errors exit 2 before any network call
+ok - typed intake resolves roles before quota ranking and detects concrete duplicates
+ok - typed intake checks the chosen id against the pinned worker account's catalog
+ok - chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks
 # all fm-dispatch-resolve tests passed
 ```
 
-## Runway calibration replay
+No Bash with `EPOCHREALTIME` was installed on that host, so the fast-path check printed its skip line instead of running.
 
-Replayed 2026-09-30 offline, with no new model or quota call, from frozen inputs rather than fresh live quota: the recorded Jev answers for four real firstmate ship briefs, a `quota-axi --json` snapshot generated 2026-09-30T17:30:58.104Z, and a read-only copy of the live rules file.
-All four answers matched a rule whose only profile is an `omp` Codex-pool profile, at confidences 0.79, 0.92, 0.78, and 0.93.
-The snapshot's one Codex row read 60% remaining, `projected_exhaustion`, `usableRunwaySeconds` 80796 (about 22 hours), and `projectionConfidence` `early`.
+The public-interface assertions cover one-request batching, the rule Choice deciding project-scoped and Claude-only rules with every rule offered, the session launch policy filtering the selected rule after judgment and escalating when it empties that rule, the Node fallback when Bun is absent, Haiku max and powerful-class effort floors, unrounded ambiguity boundaries, desktop thresholds, approval and quota-floor vetoes, a `fast` answer preferring quota-passing Haiku/Luna candidates (including a usable cheap pool with unmeasured limits) and ranking the whole rule when every cheap one is vetoed or has established short runway, a `powerful` verdict never taking a cheap declared stand-in, a fast verdict's stand-in taking the route effort with Haiku at max, a known rule-floor shortfall falling through to the default array, runner-up fallback below a declared `min_confidence`, and the declared model-matrix stand-in only on proven exhaustion.
+When all components are known, they exercise both directions of the headroom/economic-urgency tradeoff and verify that extreme economic scalars are normalized before weighting.
+The recorded `--dispatch-route` class and effort constrain stand-ins after the resolver returns: `test_spawn_route_class_constrains_stand_ins` in `tests/fm-omp-harness.test.sh` covers launch, including a manual launch without a route staying unchanged, and `test_quota_recovery_keeps_the_typed_route_class` in `tests/fm-control-relaunch.test.sh` covers recovery for a `powerful` and a `fast` route.
+Privacy coverage checks outgoing requests rather than implementation source text.
 
-| Snapshot | clear | escalate |
+The suite drives only argv, environment, stdout, stderr, and exit status.
+It observes request bodies and headers captured at the local provider, call records from fake `quota-axi` and `omp`, and pass-through spies on the Bun or Node helper, `quota-axi`, `omp`, and `dirname` that record argv and whether the key reached their environment.
+It proves the absent key prints one stderr line, nothing on stdout, exits 0, launches no helper, makes no request, and never reads quota, and that help and bare-filename startup scrub an environment key before their first child.
+It proves a `.env` key turns the tool on, the environment wins over it, and `FM_CONFIG_OVERRIDE` selects the rules directory.
+Under both Bun and Node, it proves the key arrives only as the provider's bearer header and never appears on any child argv, in any child environment, in the request body, or in output.
+It proves the request names `jev-latest`, carries the project as `repository` and the task text as `task`, batches the Level 5 questions with one rule Choice offering every rule's `when` plus the fixed neutral option, and never carries `why`, `use` profiles, quota, approvals, or confidence floors.
+It proves the task text is only the privacy-filtered brief's task sections read by the shared brief-heading parser, with a scout line only for a scout brief and never a ship brief's delivery mode, or the whole privacy-filtered brief when it has neither section.
+Synthetic fixtures cover the [never-send contract](../configuration.md) ("Never-send list") through outgoing-request capture.
+Case-insensitive, whitespace-collapsed literal matches in the task text, project name, or rule criteria withhold the request, as do an inherited list in a secondmate home, a directory, broken symlink, or inaccessible link target at the list path, markers without the exact directive, malformed markers, and invalid directives.
+Each withheld request prints one `dispatch-resolve: off (...; nothing sent)` line, makes no request and no quota read, and never prints the listed value or the key.
+Enabled marked regions are removed before extraction, including inside code fences and for the whole-brief fallback, and a literal outside a removed region still withholds.
+It proves an HTTP error never echoes the key, response body, or request text, and leaves API time, quota time, and cost unknown with no quota read.
+It checks stage accounting under `/bin/bash` with a fake whole-second `date`: API time (the client's elapsed time, at least the provider's delay), quota time, and local time are integer milliseconds that sum to the total, with input-only Jev cost.
+It checks that a response missing usage is an `error` whose usage, cost, API time, and returned model stay unknown rather than zero, that a quota failure keeps the paid call's cost and returned Jev version, and that only numeric Jev version ids are reported on clear and quota-error results.
+It proves resolution uses the rules snapshot Jev received even when the file is replaced mid-request, and that dynamic fields are flattened so one shell-quoted `profile:` line keeps its argument boundaries.
+It proves absent, default-only, and empty-rules files return `no rules to match` without a model or quota request, a broken rules-file symlink exits 2 as unreadable, and Agy, explicit-provider Gemini, and the documented example configuration resolve.
+It proves the fixed 0.6 floor is inclusive and returns `ambiguous` with candidate evidence below it.
+It proves a declared `min_confidence` is checked against the rule's own probability as the pick and as a runner-up, including a runner-up exactly at its floor, and that a file without declared floors keeps the global floor on confidence unchanged.
+It proves an unverifiable rule floor (a missing scope, a provider absent from the snapshot, or the OMP Codex pool) escalates rather than falling through to the default array.
+It proves declared providers, known and unverifiable profile floors, nonnumeric `spendPriority`, partial providers, unknown exact-model rows, missing applicable rows, and limiting provider-wide bounds produce the candidate evidence and eligibility the contract states.
+It proves a default choice resolves among the default profiles, equal quota evidence escalates as a genuine tie in either array order, and nothing rankable escalates.
+It proves schema-6 account-row binding for Pi lanes, native Codex, and Pi native adapters (codex-home before default, independent of row order), schema-5 compatibility, and that a keyless schema-6 row is an invalid-snapshot `error`.
+It proves runway is judged against the default 240-minute or a declared `task_horizon_minutes` horizon, which is never sent to the model.
+An `established` projection shorter than the horizon on any applicable bound of the highest-ranked candidate escalates with no profile; it is never replaced by a lower-ranked candidate in its rule, another rule, or the default array, while a short lower-ranked candidate does not displace a feasible winner.
+Through-reset, covering (including exactly at the horizon), early, absent-confidence, and unknown runway clear with any non-passing bound named in a warning, and `exhausted_now` vetoes.
+It proves absent and credit-only OpenRouter rows stay eligible but unranked, an older, unparseable, or failed `quota-axi --version` read is an `error` naming the required minimum before any snapshot, and otherwise `quota-axi --json` is read exactly once and its failure is an `error`.
+It proves a missing runtime, HTTP 429 (three attempts within the deadline) and 500 (not retried), a closed port, a dropped connection, a response slower than five seconds, a non-JSON body, and each invalid answer the client validates (distributions, choices, confidence, score range and legend, Noul bounds, missing answers, usage, and model) are `error` outcomes with exit 0, no profile, and no quota read.
+It proves OMP routing uses the native pool report rather than quota-axi's Codex row, whole-pool exhaustion takes only the declared stand-in, and an unverifiable OMP or Codex floor or unknown pool capacity escalates without one.
+It proves configuration errors, including duplicate profiles, provider-ID validation, and removed or unknown options, exit 2 before any network call.
+The [fleet model-index contract](../configuration.md#fleet-model-index-configmodel-indexjson) owns the frozen rules/index and chosen-entry validation exercised here.
+Roles resolve before quota ranking, a withheld indexed intake stops before any request, an index edit mid-request cannot change the resolved id, and role/literal duplicates refuse.
+The chosen id is checked against the pinned worker account's catalog, and chosen Codex and Pi entries never use supervisor catalogs while export retirement checks still refuse.
+The pooled-capacity suite verifies that saved resets and stale or unknown siblings are not counted as current headroom, percentages are not summed, and an incompletely measured account can remain serviceable without receiving a comparable headroom score.
+The quota-helper suite continues exercising its separate eligibility and account-binding contract.
+
+## Live twenty-brief evaluation
+
+The original and Level 5 resolvers were exercised on the twenty most recently modified real Firstmate briefs, with identical captured quota and native OMP pool evidence and no spawns.
+The final new routes were refreshed at the frozen quota observation time; production uses the current clock.
+That evaluation ran a version with local Claude and project pre-checks, which have since been removed so the rule Choice decides; it has not been repeated for the current resolver.
+The cohort used neither below-floor rule substitution nor the exhausted-capacity stand-in transition.
+The full per-brief table, exact commands, preserved old resolver, captured stdout/stderr, and supporting inputs belong in private task evidence rather than this shared record.
+
+| Measure | Original resolver | Level 5 resolver |
 | --- | --- | --- |
-| Frozen snapshot as generated (early projection, 80796 seconds) | 4 | 0 |
-| Same snapshot with an `established` projection of 3600 seconds | 0 | 4 |
+| Clear | 14 | 12 |
+| Ambiguous | 6 | 2 |
+| Escalate | 0 | 6 |
+| Error | 0 | 0 |
 
-Each clear chose the rule's `omp` profile with a `[warning: ...]` naming the early projection, because early confidence is warning-only regardless of projected duration.
-Each escalation named the `omp` profile as the highest-ranked candidate with established runway shorter than the 240-minute task horizon and emitted no profile.
+Every emitted new profile was an approved model from its selected rule and met the configured effort floor: zero weaker-class or below-floor selections were observed.
+All twelve clear new profiles selected GPT-6.1 Sol at high through OMP.
+The shared measured quota component was native OMP best-account headroom 0.72 versus Claude headroom 0.67; absent pool spendPriority and completion runway were disclosed, not fabricated or scored as zero.
+This cohort offered no demonstrated safe effort reduction, and downstream worker-cost savings were not measured.
+The extra uncertainty paths can increase escalation; this evaluation does not establish that the new clear rate or weights are optimal.
 
-A live run needs a key and is not part of the suite; rerun the live rule-match tables above by pointing the tool at a brief with the key injected for that one command.
+## Verification boundary
+
+The resolver publishes the same clear/non-clear and shell-quoted profile interface to every supported worker adapter; this change does not alter adapter launch mechanics.
+The live replay exercised Claude and OMP candidate evidence, not new sessions on every worker runtime.
+Candidate catalog, authentication, launch authorization, and worker-side validation remain owned by their existing interfaces and are not proved by a routing dry run.

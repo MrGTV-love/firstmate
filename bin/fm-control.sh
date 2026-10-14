@@ -1458,6 +1458,7 @@ TARGET_HARNESS=$HARNESS
 TARGET_MODEL=
 TARGET_EFFORT=
 TARGET_DISPATCH_RULE=
+TARGET_DISPATCH_ROUTE=
 TARGET_DISPATCH_SWITCHED=false
 
 journal_write() {  # <phase> [extra-line]...
@@ -1672,8 +1673,10 @@ resolve_relaunch_profile() {
     local dispatch_set dispatch_profile dispatch_result config_dir
     config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
     TARGET_DISPATCH_RULE=$(fm_meta_get "$META" dispatch_rule)
+    TARGET_DISPATCH_ROUTE=$(fm_meta_get "$META" dispatch_route)
     if [ "$HARNESS_SET" = 1 ] || [ "$MODEL_SET" = 1 ] || [ "$EFFORT_SET" = 1 ]; then
       TARGET_DISPATCH_RULE=
+      TARGET_DISPATCH_ROUTE=
     fi
     dispatch_set=$(fm_dispatch_fallbacks "$RELAUNCH_PAIR_DIR" "$TARGET_DISPATCH_RULE" \
       "$TARGET_HARNESS" "$TARGET_MODEL" "$TARGET_EFFORT") || return 1
@@ -1683,7 +1686,7 @@ resolve_relaunch_profile() {
       dispatch_profile=$(jq -cn --arg h "$TARGET_HARNESS" --arg m "$TARGET_MODEL" \
         --arg e "$TARGET_EFFORT" '{harness:$h,model:$m,effort:$e}')
       dispatch_result=$(fm_dispatch_select "$config_dir" "$TARGET_DISPATCH_RULE" \
-        "$dispatch_profile" "$(jq -c .fallback <<<"$dispatch_set")" "" "$RELAUNCH_PAIR_DIR") || return 1
+        "$dispatch_profile" "$(jq -c .fallback <<<"$dispatch_set")" "" "$RELAUNCH_PAIR_DIR" "$TARGET_DISPATCH_ROUTE") || return 1
       TARGET_DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
       TARGET_HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
       TARGET_MODEL=$(jq -r .profile.model <<<"$dispatch_result")
@@ -1984,6 +1987,7 @@ do_relaunch() {
   [ "$TARGET_MODEL" = default ] || spawn_args+=(--model "$TARGET_MODEL")
   [ "$TARGET_EFFORT" = default ] || spawn_args+=(--effort "$TARGET_EFFORT")
   [ -z "$TARGET_DISPATCH_RULE" ] || spawn_args+=(--dispatch-rule "$TARGET_DISPATCH_RULE")
+  [ -z "$TARGET_DISPATCH_ROUTE" ] || spawn_args+=(--dispatch-route "$TARGET_DISPATCH_ROUTE")
   if [ "$TARGET_API_KEY_ALLOW" = 1 ]; then
     spawn_args+=(--allow-api-key)
   fi

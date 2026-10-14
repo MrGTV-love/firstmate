@@ -60,7 +60,8 @@ Read `quota-axi auth --json` only when a candidate's credential surface is in qu
 For an OMP `openai-codex/` candidate, also inspect `bin/fm-dispatch-capacity.sh --harness omp --model <selector>` before deciding that Codex is exhausted.
 It reads OMP's native account pool; quota-axi's single Codex account, account keys, and `exhausted_now` row cannot veto a usable OMP sibling.
 Unknown pooled accounts prevent a whole-pool exhaustion conclusion, and saved resets are not current headroom.
-OMP reports no pool `spendPriority` or completion runway, so disclose those unknowns and never synthesize a scalar, sum account percentages, or reuse the exhausted sibling's economics.
+OMP reports no pool `spendPriority` or completion runway, so disclose those unknowns and never synthesize an economic scalar, sum account percentages, or reuse the exhausted sibling's economics.
+The [typed resolver's operator contract](../../../docs/configuration.md#typed-dispatch-resolution-env-typesafe_api_key) owns its deterministic normalized quota component, including the nonadditive best-usable-account fraction and comparison only on common measured components; that quota score is not pool spendPriority.
 The selected rule's machine-readable stand-ins and automatic recovery are owned by the crew-dispatch schema in `docs/configuration.md`; strongest-class work still cannot use an undeclared weaker stand-in.
 Provider-level quota notifications from `fm-procevent-quota.sh` are not proof that an OMP account pool is exhausted; reconcile the concrete OMP route before parking it.
 

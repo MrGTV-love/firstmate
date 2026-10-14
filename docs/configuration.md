@@ -1558,7 +1558,7 @@ This section is the single owner of the canonical schema and its per-field seman
 OMP's own `usage --provider openai-codex --json` is authoritative for that surface, not quota-axi's single-account Codex row.
 A fresh usable sibling keeps the model available; an unmeasured sibling prevents a whole-pool exhaustion verdict.
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
-The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
+The pool has no synthesized `spendPriority` or completion runway: typed resolution ranks it only on its best usable account's measured headroom, as "Typed dispatch resolution" defines, never by summing percentages.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
 Native Claude's default-account quota is not a TeamClaude proxy ledger, so a TeamClaude fallback candidate's capacity is unknown and native Claude exhaustion cannot veto that stand-in, including on recovery of a task already running on it while `config/claude-launcher` selects `teamclaude`.
 Claude-primary routes keep their existing quota-axi ranking, floors, and `fm-quota-choose.sh` treatment.
@@ -1573,9 +1573,13 @@ Natural-language `why` text does not authorize an executable fallback.
 
 `fm-dispatch-resolve.sh`, `fm-spawn.sh`, and `fm-control.sh relaunch` share the same fallback list.
 Only proven primary exhaustion activates it; approval, confidence, unknown capacity, and floor decisions are not bypassed.
+Typed resolution also passes `--dispatch-route <fast|powerful>:<low|high>`, its Level 5 class and effort verdict, which `fm-spawn.sh` records as `dispatch_route` and `fm-control.sh relaunch` reloads, so the shared stand-in selection applies it at launch and recovery alike.
+A `powerful` route never selects a Haiku/Luna stand-in from `fallback` or `default_fallback`, and every selected stand-in's effort is raised to the route level, Haiku to `max`; if none remains, launch or recovery refuses instead of launching.
+A launch without `--dispatch-route`, such as a manual route, keeps each stand-in exactly as declared.
 Spawn and recovery resolve each rule against their frozen model-index and dispatch pair, even when typed resolution is off.
 Only rules that contain the launched profile must resolve, so a retired model or unconfigured role in an unrelated rule does not block a launch or recovery.
 When the matched rule has a fallback policy, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
+A recorded rule still contains the task's profile when typed resolution raised its effort above the configured one for the same harness and model.
 A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
 A task that switched to a stand-in stays on it until it is launched again from the matrix.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
@@ -1676,7 +1680,12 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 
 **What the model receives**
 
-When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state and asks one Choice question whose options are every rule's `when` plus the fixed neutral option for no matching rule; the model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
+When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state in one `JevClient.systemOne` call.
+That call combines the vendored Level 5 agent-router questions (workflow, ambiguity, desktop access), model-router questions (least costly capable tier and reasoning effort), and one rule Choice whose options are every rule's `when` plus the fixed neutral option for no matching rule.
+The rule Choice alone decides which rule applies, including project-scoped and Claude-only rules; no local text pre-check selects or removes a rule.
+The upstream question wording, rubrics, thresholds, and pure decisions are retained; [the vendor provenance](../bin/ten-levels/SOURCE.md) records the minimal question-object exports needed to batch them.
+The model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
+The Level 5 intent router is vendored unchanged but unused, because dispatch has no script, browser, or human handler, so those agent-router routes escalate to firstmate instead.
 The task-specific text is the brief's `## Captain's intent` and `## Firstmate spec` sections under `# Task` that `bin/fm-brief.sh` scaffolds, read by the same parser that feeds `fm-spawn.sh` validation and the no-mistakes `--intent` contract; a brief with neither section is sent whole.
 Section extraction and the whole-brief fallback both read the brief after any enabled never-send marked regions are removed (see the never-send list below).
 Extraction rewrites the caller's task-text file in place without relaxing its existing permissions.
@@ -1743,24 +1752,51 @@ An absent rules file, a default-only file, or `rules: []` returns the non-clear 
 
 **Checks performed after the answer**
 
-After the answer, code applies all remaining checks and ranking:
+The upstream agent decision escalates human, script, browser, desktop-dependent, and ambiguity scores above 1 to firstmate, because a worker profile cannot provision an unapproved handler or capability.
+The upstream model decision `fast` prefers the matched rule's configured Haiku/Luna candidates that pass the quota gates: eligible, with known positive headroom or a usable pool whose measurement is a disclosed unknown, and without established runway shorter than the task horizon.
+Among them, a sole usable pool clears and otherwise the composite ranks them.
+When no cheap candidate passes, the whole rule ranks as usual: an exhausted or floor-vetoed cheap set leaves the rule's remaining approved candidates to be ranked before any stand-in is considered, and an established-short cheap candidate only leaves the preferred set, so an overall short winner still escalates under its own identity.
+This is not a guarantee of `clear`: a genuine tie, no comparable quota evidence, or an overall short winner still escalates.
+`powerful` excludes Haiku/Luna candidates and declared stand-ins, from `fallback` and `default_fallback` alike, and a selected stand-in takes the same route effort clamp as `use` candidates, Haiku at `max`.
+When only such stand-ins remain, the result is `escalate`.
+The resolver's profile line carries `--dispatch-route` beside `--dispatch-rule`, so launch and recovery apply the same class and effort.
+The adapter never imports a cheaper candidate from another rule.
+The upstream effort threshold maps scores above 1 to high, otherwise low, then code clamps each profile to its configured effort floor; Haiku uses max.
+These rules can lower proposed cost only within the captain's approved matrix; quota never lowers the reasoning class or minimum effort.
+The session launch policy removes prohibited candidates from the selected rule after the answer, so a prohibited rule is still recognized rather than replaced by another rule.
+When the session policy or the model-router class filter removes every candidate of the selected rule or default array, the result is `escalate`, naming the filter and listing each removed candidate.
 
-- The confidence floor and the matched rule's `approval` and `floor`.
-- Each candidate's `provider` and `floor`.
-- Every applicable account-wide and model/product row from one `quota-axi --json` snapshot.
-- The numeric `spendPriority` argmax over the matched rule's candidates, using each candidate's limiting row, then the task-horizon runway check on that winner.
+Before weighting, code applies the confidence floor, rule approval and floor, each candidate's provider and floor, and all applicable quota scopes.
+A known rule-floor shortfall falls through to the default array, as "Rule quota floors" above defines.
+It captures one compatible `quota-axi --json` snapshot and one native OMP usage report.
+A highest-ranked candidate with established runway shorter than the task horizon escalates rather than receiving a small penalty that other components could mask.
+Because a short cheap candidate leaves the `fast` preferred set, this check names the true highest-ranked candidate of the set actually ranked.
+
+The deterministic quota composite follows Level 3's normalize-and-weight pattern; quota is not a Jev question.
+Its base weights are headroom 0.6 and spendPriority 0.3: current usable allowance dominates and reset-clock economics remain material; runway is only the independent winner check above.
+Headroom is normalized to `[0,1]` from the minimum applicable bound for a measured account.
+For OMP, it is the maximum of the per-account minimum applicable percentages among fresh usable accounts: the best currently usable account's fractional headroom, never a sum of percentages or a purported total pool capacity.
+Accounts with stale or unknown serviceability and saved reset credits contribute nothing to that measurement.
+This fraction compares relative remaining allowance, not equivalent token budgets across subscription tiers or a completion guarantee.
+`spendPriority` is normalized by `0.5 + p / (2 * (1 + abs(p)))`, preserving its order without clipping extreme values.
+Only components known for every viable candidate are compared, and their weights are renormalized to sum to 1 for that comparison.
+A usable OMP pool is viable only when its best usable account has measured headroom.
+Thus a usable OMP pool and Claude can compete on shared headroom even when only Claude publishes spendPriority; the missing pool economics and completion runway remain visible uncertainties.
+A usable pool without measured headroom stays eligible but unranked, and it clears only when it is the sole eligible candidate.
+No common measurable component escalates, and equal composite scores use spendPriority as the final ranker only when every tied candidate has a comparable numeric scalar; a remaining tie escalates.
+The output exposes the unrounded quota score, normalized parts, base weights, comparison components, and every assessed candidate.
+These weights are inspectable routing policy, not calibrated forecasts of task success; live task replay belongs in private evaluation evidence.
 
 The [shared quota library](../bin/fm-quota-axi-lib.sh) owns the minimum compatible quota-axi version in `FM_QUOTA_AXI_MIN`, accepts schema 5 and schema 6, and implements the [account-matching contract](../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
 The resolver checks `quota-axi --version` before taking its one JSON snapshot; an older, unreadable, or unparseable version produces a named `error` requiring that minimum, never a ranking based on incompatible output.
 
 - An expanded provider with no matching account row leaves the candidate eligible but unranked.
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
-- omp's Codex provider pools accounts, while quota-axi reports individual accounts rather than that runtime's combined availability.
-  The account an `omp` profile declaring `provider: "codex"` binds to is therefore only a lower bound on the pool.
-  The pool is ranked on that account through the task-horizon runway classification in "Candidate eligibility and evidence" below.
-  An `exhausted_now` row or a known zero bound on that account leaves the pool eligible but unranked, never vetoed, because another pooled account may still have headroom; any non-passing runway bound is disclosed as a warning.
-  A declared profile `floor` is a captain limit rather than runway evidence, so a known shortfall makes the pool not eligible like any other candidate.
-  The resolver never sums account rows, discovers credentials, or reads another runtime's credential store to fill that gap.
+- omp's Codex provider pools accounts, so its native usage report, not quota-axi's individual Codex row, owns current serviceability and the headroom component described above.
+  An exhausted sibling cannot veto a usable pool; unknown siblings prevent concluding that the whole pool is exhausted.
+  The pool has no economic spendPriority or modeled completion runway, and those unknowns are disclosed rather than synthesized.
+  A declared OMP profile or rule floor is unverifiable on this pooled surface and cannot authorize dispatch.
+  The resolver never sums account percentages, redeems saved resets, discovers credentials, or reads another runtime's credential store.
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
   An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
 
@@ -1776,10 +1812,12 @@ When the picked rule declares its own floor but its probability falls below it, 
 
 No qualifying option, or two equally probable qualifying options, produces `ambiguous`.
 
+When every candidate of the resolved rule is proven exhausted, the rule's declared model-matrix stand-in is selected through the shared fallback list above, with a `fallback:` line naming it.
+
 **Candidate eligibility and evidence**
 
 - A known profile-floor shortfall makes a candidate ineligible, and outside the omp Codex pool any applicable `exhausted_now` row or known zero bound does the same, before unrelated quota uncertainty is considered.
-- Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
+- Missing or nonnumeric `spendPriority` evidence is never synthesized into a score component, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
 - Runway is judged against the task horizon, not the quota reset clock: the question is whether the candidate runs out before this task finishes.
   The horizon is the top-level `task_horizon_minutes` field defined under [Crew dispatch profiles](#crew-dispatch-profiles-configcrew-dispatchjson).
   `through_reset` passes, and so does a `projected_exhaustion` bound whose `projectionConfidence` is `established` and whose `usableRunwaySeconds` covers the horizon.
@@ -1789,8 +1827,8 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
   Each non-passing bound on a rankable candidate is named in a `[warning: ...]` suffix on its candidate line.
   Projected-exhaustion warnings include `usableRunwaySeconds` and `projectionConfidence`; other runway warnings name the status and scope.
   A low positive percentage alone is not a veto unless it falls below a declared floor; the resolver invents no generic percentage floor.
-- Ranking stays inside the matched rule's own `use` array (or `default` when that was selected) and keeps its highest `spendPriority` choice: a short winner escalates rather than being replaced by a lower-ranked candidate in that array, another rule, or the default array, so the rule's reasoning class is never silently downgraded to conserve quota.
-- Unranked alternatives do not prevent a measured winner from clearing; the clear result's unranked note names their providers.
+- Ranking stays inside the matched rule's class-filtered `use` array (or `default` when selected): a short winner escalates rather than being replaced by a lower-ranked candidate in that array, another rule, or the default array, so the rule's reasoning class is never silently downgraded to conserve quota.
+- Unmeasured alternatives remain disclosed uncertainties, while candidates with native measurable pooled headroom compete on the common components described above rather than losing by default to candidates with a spendPriority scalar.
 - On the opted-in path, duplicate concrete profiles with the same harness, model, and effort inside one rule or the default array are configuration errors rather than ties.
 
 **Outcomes and exit status**
@@ -1799,14 +1837,14 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, a genuine tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, unsupported handler/capability request, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
 | `error` | API, network, malformed response metadata, rendering, quota-axi failure, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
 
 Every result above exits 0.
 
-- Response probabilities must contain exactly every offered choice, use numeric values from 0 through 1, and sum to approximately 1 within 0.01.
+- The unchanged vendored client validates choice distributions, score ranges and legends, Noul bounds, and nonnegative integer token usage before policy mapping.
 - Only a usage or configuration error exits 2: an unreadable brief, an existing but unreadable or malformed canonical rules file, a [model-index resolution failure](#fleet-model-index-configmodel-indexjson), or missing `jq`, each reported and never selected around.
-- Missing `curl` is a normal structured `error` outcome with exit 0 so firstmate uses today's routing.
+- The resolver runs its TypeScript adapter with `bun` when installed, otherwise `node` with type stripping; missing both is a normal structured `error` outcome with exit 0 so firstmate uses its existing routing.
 - Resolver diagnostics report stage timing and usage/cost evidence; the [script header](../bin/fm-dispatch-resolve.sh) owns their fields, measurement boundaries, cost estimate, and response-metadata privacy safeguards.
 
 **Firstmate retains the dispatch decision**
@@ -1815,12 +1853,12 @@ The tool never replaces firstmate's judgment, `quota-array-dispatch`, the captai
 A `clear` result still leaves authentication and reasoning-class checks to firstmate; its conservative quota-runway guarantee is limited to "Candidate eligibility and evidence" above.
 The [fleet model-index contract](#fleet-model-index-configmodel-indexjson) owns the checks required before a chosen profile is published.
 
-Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.
+Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked candidate line; every non-clear result returns to the full existing intake.
 
 **Key handling and fixed settings**
 
 - The resolver, skill picker, and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
-- The resolver sends its key to `curl` only as a header read from a file descriptor, never on argv.
+- The resolver sends its key to its Bun or Node helper through file descriptor 3; the vendored JevClient supplies the fetch Authorization header, never an argv argument or exported key.
   The skill picker pipes its resolved keys on stdin to Node, which supplies them to the vendored JevClient's fetch transport; the picker does not export the resolved key variables or put their values on argv.
   Neither tool prints, logs, or writes keys to files.
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.

@@ -53,6 +53,19 @@ assert_equals unknown "$(jq -r .status <<<"$out")" "invalid vendor JSON does not
 jq '.reports[1].metadata={meterStates:{chat:{allowed:true,limitReached:false}}}' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/serving.json"
 out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/serving.json")")
 assert_equals usable "$(jq -r .status <<<"$out")" "a serving verdict remains authoritative even with zero percentage"
+assert_equals null "$(jq -r '.bestAccountHeadroom' <<<"$out")" "zero serving percentages do not fabricate a quota score"
+write_pool 98
+out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol)
+assert_equals 98 "$(jq -r '.bestAccountHeadroom' <<<"$out")" "the usable sibling provides headroom without counting saved resets"
+jq '.reports[0].metadata={meterStates:{chat:{allowed:true,limitReached:false}}} |
+  .reports[0].limits[0].amount.remaining=40' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/two-usable.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/two-usable.json")")
+assert_equals 98 "$(jq -r '.bestAccountHeadroom' <<<"$out")" "pool percentages use the best account, never a sum"
+jq '.reports[1].metadata={meterStates:{chat:{allowed:true,limitReached:false}}} |
+  .reports[1].limits += [{scope:{shared:true},amount:{}}]' "$OMP_USAGE_FIXTURE" > "$TMP_ROOT/partial-headroom.json"
+out=$(fm_omp_codex_capacity openai-codex/gpt-6.1-sol "$(cat "$TMP_ROOT/partial-headroom.json")")
+assert_equals usable "$(jq -r .status <<<"$out")" "native serviceability survives an unmeasured bound"
+assert_equals null "$(jq -r '.bestAccountHeadroom' <<<"$out")" "unknown applicable bounds cannot produce a comparable headroom score"
 pass "pool capacity preserves serving, missing-account, freshness, and saved-reset semantics"
 
 primary='{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"high"}'
@@ -99,6 +112,14 @@ mv "$TMP_ROOT/bad.json" "$TMP_ROOT/config/crew-dispatch.json"
 if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
   fail "Claude fallback without a supported TeamClaude requirement must refuse"
 fi
+# Typed resolution raises a profile's effort above its configured floor; the
+# recorded rule must still carry its fallback policy into spawn and recovery.
+jq '.rules[0].use.effort="low"' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
+set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high) || fail "a raised effort must not refuse"
+assert_equals "$(jq -cn --argjson f "$allowed" '{rule:"rule_1",fallback:$f}')" "$set" "a recorded rule contains its profile at a raised effort"
+jq '.rules[0].use.effort="max" | .default.effort="max"' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
+set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high) || fail "a lowered effort must not refuse"
+assert_equals '{"rule":"","fallback":[]}' "$set" "a recorded rule never contains its profile at a lowered effort"
 pass "matrix fallback retains per-rule permission and strongest-model boundaries"
 
 cat > "$TMP_ROOT/config/model-index.json" <<'JSON'

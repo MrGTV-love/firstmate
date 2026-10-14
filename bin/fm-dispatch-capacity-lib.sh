@@ -7,14 +7,26 @@
 # fm_dispatch_capacity <harness> <model> prints usable/exhausted/unknown evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
 # prints {rule, fallback}; only rules containing the profile must resolve and
-# satisfy the fallback schema. A recorded rule that no longer contains it counts
-# as none, and differing unlabeled lists permit no fallback. rule is set only
-# for a fallback policy.
+# satisfy the fallback schema. A recorded rule also contains its configured
+# harness and model at a raised effort, as typed resolution emits them; one that
+# no longer contains the profile counts as none, and differing unlabeled lists
+# permit no fallback. rule is set only for a fallback policy.
 # fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
-# prints the original profile unless it is proven exhausted, then the first
-# permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
+# [evidence] [routing-config] [route] prints the original profile unless it is
+# proven exhausted, then the first permitted, supported, non-exhausted fallback.
+# Unknown is disclosed, not zero. A typed route (<fast|powerful>:<low|high>,
+# the Level 5 verdict typed resolution records as --dispatch-route) filters
+# stand-ins below a powerful class and clamps each selected stand-in's effort to
+# the route level, Haiku to max; an empty route leaves manual routes unchanged.
+# FM_DISPATCH_CHEAP_CLASS_RE and FM_DISPATCH_MAX_EFFORT_RE are the one
+# definition of those classes, handed to the typed-resolution adapter as well.
 # A TeamClaude fallback's proxy quota is unknown, never native Claude's row,
 # both as a candidate and once a task already runs on that stand-in.
+
+FM_DISPATCH_CHEAP_CLASS_RE='haiku|luna'
+FM_DISPATCH_MAX_EFFORT_RE='haiku'
+# shellcheck disable=SC2034 # Read by the sourcing resolver and spawn scripts.
+FM_DISPATCH_ROUTE_RE='^(fast|powerful):(low|high)$'
 
 FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 # shellcheck source=bin/fm-timeout-lib.sh
@@ -53,6 +65,8 @@ fm_omp_codex_capacity() {
          (if any($limits[]; (.amount | percent) <= 0) then "exhausted" else "usable" end)
        else "unknown" end) as $state |
       {status: $state,
+       headroomKnown: (($limits | length) > 0 and all($limits[];
+         (.amount | percent) as $p | ($p | type) == "number" and $p >= 0 and $p <= 100)),
        remaining: ([$limits[].amount | percent | select(. != null)] | if length > 0 then min else null end),
        savedResets: (.resetCredits.availableCount // 0)};
     (if length == 1 and (.[0] | type) == "object" then .[0] else {} end) |
@@ -63,7 +77,10 @@ fm_omp_codex_capacity() {
       {status: (if any($accounts[]; .status == "usable") then "usable"
                 elif ($accounts | length) == 0 or any($accounts[]; .status == "unknown") or
                   any((.accountsWithoutUsage // [])[]; .provider == "openai-codex")
-                then "unknown" else "exhausted" end), accounts: $accounts}
+                then "unknown" else "exhausted" end), accounts: $accounts,
+       bestAccountHeadroom: ([$accounts[] | select(.status == "usable" and .headroomKnown and
+         (.remaining | type) == "number" and .remaining > 0 and .remaining <= 100) | .remaining]
+         | if length > 0 then max else null end)}
     end
   ' 2>/dev/null || printf '%s\n' '{"status":"unknown","accounts":[],"reason":"invalid omp usage JSON"}'
 }
@@ -122,12 +139,15 @@ fm_dispatch_fallbacks() {
     def profiles: if type == "array" then . else [.] end;
     def axis: if . == null or . == "default" then "" else . end;
     def same: type == "object" and .harness == $h and (.model | axis) == ($m | axis) and (.effort | axis) == ($e | axis);
-    def contains_profile: .resolved as $resolved |
-      any((.use | profiles)[]; same and ($resolved or (has("role") | not))) or
-      any(.fallback | if type == "array" then .[] else empty end; same);
+    def level($x): ["low", "medium", "high", "xhigh", "max"] | index($x);
+    def raised: type == "object" and .harness == $h and (.model | axis) == ($m | axis) and
+      level(.effort) != null and level($e) != null and level($e) >= level(.effort);
+    def holds(match): .resolved as $resolved |
+      any((.use | profiles)[]; match and ($resolved or (has("role") | not))) or
+      any(.fallback | if type == "array" then .[] else empty end; match);
     . as $rules |
-    [$rules[] | select($rule != "" and .rule == $rule and contains_profile)] as $recorded |
-    (if ($recorded | length) > 0 then $recorded else [$rules[] | select(contains_profile)] end) as $matches |
+    [$rules[] | select($rule != "" and .rule == $rule and holds(same or raised))] as $recorded |
+    (if ($recorded | length) > 0 then $recorded else [$rules[] | select(holds(same))] end) as $matches |
     if any($matches[]; .fallback != null and (.fallback | valid_fallback | not)) then error(fallback_error)
     elif any($matches[]; .resolved | not) then
       error("dispatch " + ([$matches[] | select(.resolved | not) | .rule] | join(", ")) + " names a retired model or unconfigured role")
@@ -174,7 +194,7 @@ fm_dispatch_fallback_capacity() {
 }
 
 fm_dispatch_select() {
-  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} routing_config=${6:-$1} candidate state
+  local config=$1 rule=$2 profile=$3 fallback=$4 evidence=${5:-} routing_config=${6:-$1} route=${7:-} candidate state
   if [ -z "$evidence" ]; then
     if [ -r "$config/claude-launcher" ] && [ "$(tr -d '[:space:]' < "$config/claude-launcher")" = teamclaude ] &&
        jq -e --argjson p "$profile" 'any(.[]; .requires == "teamclaude" and
@@ -192,6 +212,15 @@ fm_dispatch_select() {
   fi
   while IFS= read -r candidate; do
     [ "$candidate" != "$profile" ] || continue
+    if [ -n "$route" ]; then
+      candidate=$(jq -c --arg route "$route" --arg cheap "$FM_DISPATCH_CHEAP_CLASS_RE" --arg max "$FM_DISPATCH_MAX_EFFORT_RE" '
+        ($route | split(":")) as [$class, $level] |
+        if $class == "powerful" and ((.model // "") | test($cheap; "i")) then empty
+        elif (.effort == null or .effort == "ultra") then .
+        elif ((.model // "") | test($max; "i")) then .effort = "max"
+        else ["low", "medium", "high", "xhigh", "max"] as $l | .effort as $e | .effort = $l[[($l | index($e)), ($l | index($level))] | max] end' <<<"$candidate")
+      [ -n "$candidate" ] || continue
+    fi
     fm_dispatch_fallback_supported "$config" "$candidate" "$routing_config" || continue
     evidence=$(fm_dispatch_fallback_capacity "$candidate")
     [ "$(jq -r .status <<<"$evidence")" != exhausted ] || continue
