@@ -1,0 +1,11 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches
+teardown: reaping leaked worktree process(es) for lab36357-rn-restored-source: 98435
+notice: keeping archive/lab36357-rn-restored-source-pipeline-667fa373 (merged PR head and matching merge content could not be proven)
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 104s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XSA40PXMFF1K4MDWKBC5FJ/bin/fm-home-summary-refresh.sh: child setpgid (19411 to 19411): Operation not permitted

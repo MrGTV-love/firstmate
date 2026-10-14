@@ -1,0 +1,16 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-sq-offline-b7a928/1/p-sq-offline",
+      "created_at": "2026-10-14T15:49:47.992023-05:00",
+      "leased": true,
+      "lease_id": "1d4a288289bdd1dde38e6d32ee17244c",
+      "lease_holder": "lab90152-sq-offline",
+      "leased_at": "2026-10-14T15:49:48.01185-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "c2d7bffca1a6d78af4fd8a64d5157f8004960496e13587167698509d272541a2"
+    }
+  ]
+}

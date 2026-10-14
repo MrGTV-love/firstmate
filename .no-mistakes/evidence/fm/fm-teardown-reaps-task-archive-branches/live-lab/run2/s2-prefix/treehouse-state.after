@@ -1,0 +1,23 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-prefix-6513f3/1/p-prefix",
+      "created_at": "2026-10-14T15:48:39.847319-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "dc2c4fed17a4accddd3fcaafe763982f5fee477443f5dfdf92db96b1428c9d5e"
+    },
+    {
+      "name": "2",
+      "path": "/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-prefix-6513f3/2/p-prefix",
+      "created_at": "2026-10-14T15:48:40.275987-05:00",
+      "leased": true,
+      "lease_id": "1f334a1d587e6e9950aae3212bcc1012",
+      "lease_holder": "lab90152-x1-2",
+      "leased_at": "2026-10-14T15:48:40.289753-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "3ba57d6dc6672c6773053493502de4d32c753d98d44d6afe81a0336e066fdbcf"
+    }
+  ]
+}

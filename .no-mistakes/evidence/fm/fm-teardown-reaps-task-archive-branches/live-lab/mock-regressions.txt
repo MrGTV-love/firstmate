@@ -1,0 +1,9 @@
+ok - teardown reaps only this task's ancestor and patch-equivalent archives carried by the squash
+ok - teardown judges only the task's exact custody archive names, never another task's
+ok - unlanded edits, cherry-invisible merge edits, and checked-out archives stay named and intact
+ok - even ancestor archives stay when squash content differs or the merge object is unproven
+ok - archive merge proof includes deleted paths and treats pathspec-like filenames literally
+ok - landing refusal and forced discard never reap recovery archives
+ok - content-only landing with an unreachable forge keeps and names recovery archives
+ok - a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes
+rc=0

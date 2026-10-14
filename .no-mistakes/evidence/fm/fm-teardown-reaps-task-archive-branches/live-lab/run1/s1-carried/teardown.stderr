@@ -1,0 +1,5 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches
+teardown: reaping leaked worktree process(es) for lab36357-carry: 38374
+teardown: reaped archive/lab36357-carry-pipeline-0fe65af9 (carried by the merged PR lineage)
+teardown: reaped archive/lab36357-carry-submitted-09e99449 (carried by the merged PR lineage)
+teardown: reaped archive/lab36357-carry-submitted-0c790b6a (carried by the merged PR lineage)

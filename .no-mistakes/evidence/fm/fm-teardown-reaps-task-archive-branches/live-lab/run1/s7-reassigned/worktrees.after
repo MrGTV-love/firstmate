@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-reassigned
+HEAD e51d203ba9397c1f8702b0cc26ed43687181aef6
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-reassigned-350b9b/1/p-reassigned
+HEAD b4898f4b321345f339520eb37e5ff5a5102e069c
+branch refs/heads/fm/lab36357-claimant
+

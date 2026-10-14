@@ -1,0 +1,2 @@
+:(literal)renamed file.txt
+old.txt

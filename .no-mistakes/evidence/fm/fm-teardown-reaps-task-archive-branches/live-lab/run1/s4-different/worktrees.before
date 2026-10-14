@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-sq-different
+HEAD 45b5bda4ec750d9087b2b91a4836b7d523b368f9
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-sq-different-7032e5/1/p-sq-different
+HEAD 390e2daab29641aa654efd593fa7fa4360e526f4
+branch refs/heads/fm/lab36357-sq-different
+

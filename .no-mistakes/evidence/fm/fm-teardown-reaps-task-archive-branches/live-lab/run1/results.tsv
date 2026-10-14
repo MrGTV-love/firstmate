@@ -1,0 +1,103 @@
+PASS	s1-carried	teardown exits 0
+PASS	s1-carried	replayed archive is not an ancestor of PR head (patch-equivalent case is real)
+PASS	s1-carried	archive/lab36357-carry-submitted-09e99449 deleted
+PASS	s1-carried	archive/lab36357-carry-submitted-09e99449 named as reaped
+PASS	s1-carried	archive/lab36357-carry-submitted-0c790b6a deleted
+PASS	s1-carried	archive/lab36357-carry-submitted-0c790b6a named as reaped
+PASS	s1-carried	archive/lab36357-carry-pipeline-0fe65af9 deleted
+PASS	s1-carried	archive/lab36357-carry-pipeline-0fe65af9 named as reaped
+PASS	s1-carried	archive/lab36357-carry (non-custody) kept
+PASS	s1-carried	archive/lab36357-carry-pipeline-final (non-custody) kept
+PASS	s1-carried	archive/other-pipeline-* (other task) kept
+PASS	s1-carried	unrelated branch kept
+PASS	s1-carried	task endpoint window closed
+PASS	s1-carried	task record removed
+PASS	s1-carried	pool slot returned (no longer leased)
+PASS	s1-carried	backlog row closed
+PASS	s2-prefix	teardown lab36357-x1 exits 0
+PASS	s2-prefix	own archive archive/lab36357-x1-pipeline-9c64691c reaped
+PASS	s2-prefix	own archive named as reaped
+PASS	s2-prefix	archive/lab36357-x1-2-pipeline-9c64691c kept at its head
+PASS	s2-prefix	archive/lab36357-x1-2-pipeline-9c64691c never printed
+PASS	s2-prefix	archive/lab36357-x1-2-submitted-9c64691c kept at its head
+PASS	s2-prefix	archive/lab36357-x1-2-submitted-9c64691c never printed
+PASS	s2-prefix	archive/lab36357-x1-pipeline-final kept at its head
+PASS	s2-prefix	archive/lab36357-x1-pipeline-final never printed
+FAIL	s2-prefix	archive/lab36357-x1-pipeline-9C64691C kept at its head
+PASS	s2-prefix	archive/lab36357-x1-pipeline-9C64691C never printed
+PASS	s2-prefix	archive/lab36357-x1-pipeline-9c64691c4 kept at its head
+PASS	s2-prefix	archive/lab36357-x1-pipeline-9c64691c4 never printed
+PASS	s2-prefix	archive/lab36357-x1-submitted-9c64691c-extra kept at its head
+PASS	s2-prefix	archive/lab36357-x1-submitted-9c64691c-extra never printed
+PASS	s2-prefix	lab36357-x1-2 record unchanged
+PASS	s2-prefix	lab36357-x1-2 status unchanged
+PASS	s2-prefix	lab36357-x1-2 slot claim unchanged
+PASS	s2-prefix	lab36357-x1-2 window alive
+PASS	s2-prefix	lab36357-x1-2 branch unchanged
+PASS	s2-prefix	lab36357-x1-2 copy still on its branch
+PASS	s2-prefix	lab36357-x1-2 backlog row still in flight
+PASS	s2-prefix	lab36357-x1 window closed
+PASS	s3-unproven	teardown exits 0 (unproven archives do not block landed cleanup)
+PASS	s3-unproven	unlanded-edit archive kept
+PASS	s3-unproven	unlanded-edit archive named
+PASS	s3-unproven	edited-merge archive kept
+PASS	s3-unproven	edited-merge archive named
+PASS	s3-unproven	checked-out archive kept
+PASS	s3-unproven	checked-out archive named
+PASS	s3-unproven	other copy still attached to its archive branch
+PASS	s3-unproven	carried sibling archive reaped
+PASS	s3-unproven	carried sibling archive named
+PASS	s4-different	teardown exits 0 (ordinary landing proof still passes)
+PASS	s4-different	ancestor archive kept at its head
+PASS	s4-different	archive named with unproven-merge reason
+PASS	s4-different	task endpoint window closed
+PASS	s4-missing	teardown exits 0 (ordinary landing proof still passes)
+PASS	s4-missing	ancestor archive kept at its head
+PASS	s4-missing	archive named with unproven-merge reason
+PASS	s4-missing	task endpoint window closed
+PASS	s4-offline	teardown exits 0 (ordinary landing proof still passes)
+PASS	s4-offline	ancestor archive kept at its head
+PASS	s4-offline	archive named with unproven-merge reason
+PASS	s4-offline	task endpoint window closed
+PASS	s4-offline	real gh could not reach the forge
+PASS	s5-matching	teardown exits 0
+PASS	s5-matching	complete rename archive reaped
+PASS	s5-matching	complete rename archive named
+PASS	s5-restored-source	teardown exits 0
+PASS	s5-restored-source	merge restored the deleted source (fixture is real)
+PASS	s5-restored-source	incomplete rename archive kept
+PASS	s5-restored-source	incomplete rename archive named
+PASS	s6-refused	unlanded teardown refuses (exit 1)
+PASS	s6-refused	refusal names REFUSED
+PASS	s6-refused	archive kept after refusal
+PASS	s6-refused	refusal keeps the task copy
+PASS	s6-refused	refusal keeps the task branch on the unlanded commit
+PASS	s6-refused	refusal keeps the task record
+PASS	s6-refused	refusal keeps the task window
+PASS	s6-refused	refusal never mentions archive reaping
+PASS	s6-refused	authorized forced discard exits 0
+PASS	s6-refused	archive kept after forced discard
+PASS	s6-refused	forced discard names the archive as not landed
+PASS	s6-refused	forced discard closed the window
+PASS	s6-refused	forced discard removed the task record
+PASS	s7-reassigned	teardown lab36357-finished exits 0
+PASS	s7-reassigned	claimant process survived
+PASS	s7-reassigned	finished record removed
+PASS	s7-reassigned	finished status removed
+PASS	s7-reassigned	finished window closed
+PASS	s7-reassigned	claimant window alive
+PASS	s7-reassigned	claimant record unchanged
+PASS	s7-reassigned	claimant status unchanged
+PASS	s7-reassigned	claimant slot claim unchanged
+FAIL	s7-reassigned	pool lease unchanged (treehouse status)
+PASS	s7-reassigned	every project ref unchanged (archive included)
+PASS	s7-reassigned	finished task's archive kept and not reaped
+PASS	s7-reassigned	archive never named as reaped
+PASS	s7-reassigned	claimant HEAD unchanged
+PASS	s7-reassigned	claimant branch unchanged
+PASS	s7-reassigned	claimant copy status unchanged
+PASS	s7-reassigned	claimant tracked edit intact
+PASS	s7-reassigned	claimant untracked file intact
+PASS	s7-reassigned	claimant hook bytes intact
+FAIL	isolation	no file under ~/.treehouse changed during the lab
+PASS	isolation	lab marker carries the gate token

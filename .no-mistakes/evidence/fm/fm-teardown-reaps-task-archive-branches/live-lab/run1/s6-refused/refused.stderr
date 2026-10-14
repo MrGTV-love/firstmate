@@ -1,0 +1,5 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+c680cd9 unlanded feature
+Land its PR, or get the captain's own words to drop it and pass --force --drop-file.

@@ -1,0 +1,8 @@
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.3
+Run "treehouse update" to update
+
+base  main  (repository default)
+1     leased       ~/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-prefix-6513f3/1/p-prefix  [fm/lab36357-x1]  (held by lab36357-x1)
+                   sleep (55481)
+2     leased       ~/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-prefix-6513f3/2/p-prefix  [fm/lab36357-x1-2]  (held by lab36357-x1-2)
+                   sleep (55505)

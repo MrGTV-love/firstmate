@@ -1,0 +1,12 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-rn-matching-9a17b6/1/p-rn-matching",
+      "created_at": "2026-10-14T15:50:06.386681-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "30ea010b1cb4a1c7fd1a8417651347338f89a3a93db7cd0f8c7ed08ffd73dcb4"
+    }
+  ]
+}

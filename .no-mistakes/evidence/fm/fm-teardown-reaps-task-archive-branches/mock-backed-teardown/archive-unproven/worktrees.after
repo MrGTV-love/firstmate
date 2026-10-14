@@ -1,0 +1,12 @@
+worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XSA40PXMFF1K4MDWKBC5FJ/.teardown-validation/fm-teardown-tests.F3GiZy/archive-unproven/project
+HEAD f520b0bf888fb979c06d63629677c3a585fb39b6
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XSA40PXMFF1K4MDWKBC5FJ/.teardown-validation/fm-teardown-tests.F3GiZy/archive-unproven/archive-held
+HEAD 0720e84092136b3445f78a5e8e1f841435e44094
+branch refs/heads/archive/task-x1-pipeline-0b0b0b03
+
+worktree /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XSA40PXMFF1K4MDWKBC5FJ/.teardown-validation/fm-teardown-tests.F3GiZy/archive-unproven/wt
+HEAD 0720e84092136b3445f78a5e8e1f841435e44094
+detached
+

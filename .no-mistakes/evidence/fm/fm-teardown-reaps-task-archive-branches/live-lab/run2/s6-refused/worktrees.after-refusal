@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-refused
+HEAD 998e9c0d330d19a2f23cb09f92d808acf4461fa6
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-refused-ec8896/1/p-refused
+HEAD a0d422fd365fd1d8fd8de62af1bfe2f486bea0c5
+branch refs/heads/fm/lab90152-refused
+

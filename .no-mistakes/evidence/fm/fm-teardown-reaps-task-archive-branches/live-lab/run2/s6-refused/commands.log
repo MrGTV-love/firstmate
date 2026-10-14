@@ -1,0 +1,3 @@
+slot=/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-refused-ec8896/1/p-refused
+fm-teardown.sh lab90152-refused -> exit 1
+fm-teardown.sh lab90152-refused --force --drop-file /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/captain-words.txt -> exit 0

@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-carry
+HEAD fc5c3a4a8f2bce6eca3f546d3c80076e98e349ab
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-carry-f781cf/1/p-carry
+HEAD 0fe65af9a8b0661d307cac9ce7510b318426d20f
+branch refs/heads/fm/lab36357-carry
+

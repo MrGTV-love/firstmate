@@ -1,0 +1,12 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-sq-different-7032e5/1/p-sq-different",
+      "created_at": "2026-10-14T15:49:17.986155-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "f9a5c79bd70c13e89894f552715b0f284d1f12e0a4caf96b9cdfd6897b320ea7"
+    }
+  ]
+}

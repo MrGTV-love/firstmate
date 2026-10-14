@@ -1,0 +1,12 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-carry-f781cf/1/p-carry",
+      "created_at": "2026-10-14T15:48:26.396411-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "75bd1fe43572d1f15800c33c7008975e08ab4c2c0cf43831bfd1e99bb83596b9"
+    }
+  ]
+}

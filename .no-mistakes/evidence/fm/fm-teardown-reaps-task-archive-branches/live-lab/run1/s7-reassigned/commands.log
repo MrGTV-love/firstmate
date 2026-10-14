@@ -1,0 +1,3 @@
+slot=/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-reassigned-350b9b/1/p-reassigned
+claimant_pid=55350
+fm-teardown.sh lab36357-finished -> exit 0

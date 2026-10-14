@@ -1,0 +1,16 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-refused-ec8896/1/p-refused",
+      "created_at": "2026-10-14T15:50:56.879344-05:00",
+      "leased": true,
+      "lease_id": "d1d50583e8584c0081cfc1c2d6183393",
+      "lease_holder": "lab90152-refused",
+      "leased_at": "2026-10-14T15:50:56.906536-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "1538565671d69c3e9946a5156292971e465763201a866b99606cfa663d1691a6"
+    }
+  ]
+}

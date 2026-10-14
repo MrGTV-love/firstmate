@@ -1,0 +1,18 @@
+/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/offlinebin:
+total 0
+lrwxr-xr-x  1 charlesabrooker  staff  20 Oct 14 15:48 gh -> /opt/homebrew/bin/gh
+lrwxr-xr-x  1 charlesabrooker  staff  24 Oct 14 15:48 gh-axi -> /opt/homebrew/bin/gh-axi
+
+/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/toolbin:
+total 0
+lrwxr-xr-x  1 charlesabrooker  staff  12 Oct 14 15:48 git -> /usr/bin/git
+lrwxr-xr-x  1 charlesabrooker  staff  26 Oct 14 15:48 gtimeout -> /opt/homebrew/bin/gtimeout
+lrwxr-xr-x  1 charlesabrooker  staff  11 Oct 14 15:48 jq -> /usr/bin/jq
+lrwxr-xr-x  1 charlesabrooker  staff  14 Oct 14 15:48 lsof -> /usr/sbin/lsof
+lrwxr-xr-x  1 charlesabrooker  staff  22 Oct 14 15:48 node -> /opt/homebrew/bin/node
+lrwxr-xr-x  1 charlesabrooker  staff  13 Oct 14 15:48 perl -> /usr/bin/perl
+lrwxr-xr-x  1 charlesabrooker  staff  57 Oct 14 15:48 python3 -> /Users/charlesabrooker/.pyenv/versions/3.13.6/bin/python3
+lrwxr-xr-x  1 charlesabrooker  staff  27 Oct 14 15:48 tasks-axi -> /opt/homebrew/bin/tasks-axi
+lrwxr-xr-x  1 charlesabrooker  staff  25 Oct 14 15:48 timeout -> /opt/homebrew/bin/timeout
+lrwxr-xr-x  1 charlesabrooker  staff  22 Oct 14 15:48 tmux -> /opt/homebrew/bin/tmux
+lrwxr-xr-x  1 charlesabrooker  staff  43 Oct 14 15:48 treehouse -> /Users/charlesabrooker/.local/bin/treehouse

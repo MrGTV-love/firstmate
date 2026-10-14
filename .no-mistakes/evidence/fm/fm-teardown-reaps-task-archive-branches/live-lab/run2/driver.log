@@ -1,0 +1,13 @@
+== create lab home /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches
+== s1-carried (lab90152-carry)
+== s2-prefix (lab90152-x1, lab90152-x1-2)
+== s3-unproven (lab90152-unproven)
+== s4-different (lab90152-sq-different)
+== s4-missing (lab90152-sq-missing)
+== s4-offline (lab90152-sq-offline)
+== s5-matching (lab90152-rn-matching)
+== s5-restored-source (lab90152-rn-restored-source)
+== s6-refused (lab90152-refused)
+== s7-reassigned (lab90152-finished, lab90152-claimant)
+== cleanup
+checks: 107 pass, 0 fail

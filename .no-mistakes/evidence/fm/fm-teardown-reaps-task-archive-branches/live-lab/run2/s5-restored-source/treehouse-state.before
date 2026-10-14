@@ -1,0 +1,16 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-rn-restored-source-f4aed2/1/p-rn-restored-source",
+      "created_at": "2026-10-14T15:50:37.377316-05:00",
+      "leased": true,
+      "lease_id": "0c111bb83faca1aa97036a487951dc73",
+      "lease_holder": "lab90152-rn-restored-source",
+      "leased_at": "2026-10-14T15:50:37.419884-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "ebe91d0ce5be2cdc42328e5925a3602ebbe963155fe6adb34cff11a3e13ad6b2"
+    }
+  ]
+}

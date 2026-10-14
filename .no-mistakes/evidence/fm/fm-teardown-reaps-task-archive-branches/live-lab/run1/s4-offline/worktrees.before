@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-sq-offline
+HEAD 4651b6522fd23d34f97dcafb6bf7cf1302512667
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-sq-offline-b7a928/1/p-sq-offline
+HEAD 8d8d38d3ac8610622938814cf2cab2e5086a968d
+branch refs/heads/fm/lab36357-sq-offline
+

@@ -1,0 +1,12 @@
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-unproven
+HEAD 5cb79e85607532a5f254548793d113af0c743b12
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/held/lab90152-unproven
+HEAD eab1ebabe68ffe5bcc78b65b6389c63db09c7ed0
+branch refs/heads/archive/lab90152-unproven-pipeline-eab1ebab
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-unproven-7558da/1/p-unproven
+HEAD eab1ebabe68ffe5bcc78b65b6389c63db09c7ed0
+branch refs/heads/fm/lab90152-unproven
+

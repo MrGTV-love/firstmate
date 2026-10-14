@@ -1,0 +1,16 @@
+{
+  "version": 4,
+  "worktrees": [
+    {
+      "name": "1",
+      "path": "/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-unproven-7558da/1/p-unproven",
+      "created_at": "2026-10-14T15:49:01.313869-05:00",
+      "leased": true,
+      "lease_id": "f9deda35c556cd83018cc89f51992677",
+      "lease_holder": "lab90152-unproven",
+      "leased_at": "2026-10-14T15:49:01.337727-05:00",
+      "seed_inventory_known": true,
+      "seed_inventory_digest": "8a2f8e1dc45d1f02f6861adb902f9c344ce8da11b1a62a9970ff6dfd8fb9b5d5"
+    }
+  ]
+}

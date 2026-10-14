@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-rn-restored-source
+HEAD 52aa348f72d31ff8ac1929612798d3785019e320
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-rn-restored-source-f4aed2/1/p-rn-restored-source
+HEAD 667fa3731a79fbc84382783c9e3acabb03fd9230
+branch refs/heads/fm/lab36357-rn-restored-source
+

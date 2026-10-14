@@ -1,0 +1,120 @@
+=== S1 squash-merged task: reap ancestor and patch-equivalent custody archives
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s1/stderr) ---
+  | teardown: reaped archive/task-x1-pipeline-0b0b0b01 (carried by the merged PR lineage)
+  | teardown: reaped archive/task-x1-submitted-0a0a0a01 (carried by the merged PR lineage)
+  | teardown: reaped archive/task-x1-submitted-0a0a0a02 (carried by the merged PR lineage)
+  refs before/after diff:
+  3,6d2
+  < refs/heads/archive/task-x1-pipeline-0b0b0b01 812362621f73bf0b5f73e6612bb9e667fd1ef0c8
+  < refs/heads/archive/task-x1-submitted-0a0a0a01 470e4cda9db8b10f5b1a93586864084efedeec6c
+  < refs/heads/archive/task-x1-submitted-0a0a0a02 85b00eb64887cbdaa026dbaeebae9dc84fd98d00
+  < refs/heads/fm/task-x1 812362621f73bf0b5f73e6612bb9e667fd1ef0c8
+  PASS: teardown exit 0
+  PASS: archive/task-x1-submitted-0a0a0a01 deleted
+  PASS: reaped message names submitted-0a0a0a01
+  PASS: archive/task-x1-submitted-0a0a0a02 deleted
+  PASS: reaped message names submitted-0a0a0a02
+  PASS: archive/task-x1-pipeline-0b0b0b01 deleted
+  PASS: reaped message names pipeline-0b0b0b01
+  PASS: archive/other-pipeline-final kept
+  PASS: archive/task-x1 (non-custody) kept
+  PASS: unrelated kept
+  PASS: task meta retired
+=== S2 teardown task-x1 never judges task-x1-2 or non-custody names
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s2/stderr) ---
+  | teardown: reaped archive/task-x1-pipeline-0b0b0b01 (carried by the merged PR lineage)
+  PASS: teardown exit 0
+  PASS: own archive reaped
+  PASS: archive/task-x1-2-pipeline-0b0b0b02 untouched
+  PASS: archive/task-x1-2-pipeline-0b0b0b02 never printed
+  PASS: archive/task-x1-2-submitted-0a0a0a02 untouched
+  PASS: archive/task-x1-2-submitted-0a0a0a02 never printed
+  PASS: archive/task-x1-pipeline-final untouched
+  PASS: archive/task-x1-pipeline-final never printed
+  PASS: archive/task-x1-pipeline-0B0B0B03 untouched
+  PASS: archive/task-x1-pipeline-0B0B0B03 never printed
+  PASS: archive/task-x1-pipeline-0b0b0b044 untouched
+  PASS: archive/task-x1-pipeline-0b0b0b044 never printed
+  PASS: archive/task-x1-submitted-0a0a0a05-extra untouched
+  PASS: archive/task-x1-submitted-0a0a0a05-extra never printed
+=== S3 landed teardown keeps+names unlanded edits, edited merge, checked-out archive
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s3/stderr) ---
+  | notice: keeping archive/task-x1-pipeline-0b0b0b02 (archive history is not proven carried by the merged PR head)
+  | notice: keeping archive/task-x1-pipeline-0b0b0b03 (checked out in a local copy)
+  | teardown: reaped archive/task-x1-pipeline-0b0b0b04 (carried by the merged PR lineage)
+  | notice: keeping archive/task-x1-submitted-0a0a0a03 (archive patches are not all carried by the merged PR head)
+  PASS: teardown exit 0
+  PASS: unlanded-edit archive kept
+  PASS: edited-merge archive kept
+  PASS: checked-out archive kept
+  PASS: plain carried archive 04 reaped
+  PASS: keeping notice names submitted-0a0a0a03
+  PASS: keeping notice names pipeline-0b0b0b02
+  PASS: keeping notice names pipeline-0b0b0b03
+  PASS: other copy's HEAD still on archive branch
+=== S4 retain archives when merge content differs, merge proof missing, forge down
+ [different]
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s4-different/stderr) ---
+  | notice: keeping archive/task-x1-pipeline-0b0b0b01 (merged PR head and matching merge content could not be proven)
+  PASS: different: teardown exit 0 (ordinary landing proof)
+  PASS: different: archive kept
+  PASS: different: archive named in keeping notice
+ [missing]
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s4-missing/stderr) ---
+  | notice: keeping archive/task-x1-pipeline-0b0b0b01 (merged PR head and matching merge content could not be proven)
+  PASS: missing: teardown exit 0 (ordinary landing proof)
+  PASS: missing: archive kept
+  PASS: missing: archive named in keeping notice
+ [offline]
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s4-offline/stderr) ---
+  | notice: keeping archive/task-x1-pipeline-0b0b0b01 (merged PR head and matching merge content could not be proven)
+  PASS: offline: teardown exit 0 (ordinary landing proof)
+  PASS: offline: archive kept
+  PASS: offline: archive named in keeping notice
+=== S5 deleted path and pathspec-like filename compared literally
+ [matching]
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s5-matching/stderr) ---
+  | teardown: reaped archive/task-x1-pipeline-0b0b0b05 (carried by the merged PR lineage)
+  | /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XSA40PXMFF1K4MDWKBC5FJ/bin/fm-home-summary-refresh.sh: child setpgid (15865 to 15865): Operation not permitted
+  PASS: matching: teardown exit 0
+  PASS: matching rename reaped
+ [restored-source]
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s5-restored-source/stderr) ---
+  | notice: keeping archive/task-x1-pipeline-0b0b0b05 (merged PR head and matching merge content could not be proven)
+  PASS: restored-source: teardown exit 0
+  PASS: incomplete rename (deletion not carried) kept
+  PASS: incomplete rename named
+=== S6 unlanded refusal and authorized forced discard preserve archives
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s6/stderr) ---
+  | REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+  | unpushed commits:
+  | 06887d8 unlanded feature
+  | Land its PR, or get the captain's own words to drop it and pass --force --drop-file.
+  PASS: unlanded teardown refuses (non-zero)
+  PASS: archive intact after refusal
+  PASS: task meta retained after refusal
+  PASS: worktree retained after refusal
+ [forced]
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s6/stderr) ---
+  | notice: keeping archive/task-x1-submitted-0a0a0a04 (forced discard is not landing proof)
+  PASS: authorized forced discard succeeds
+  PASS: archive preserved through forced discard
+  PASS: forced notice names the kept archive
+=== S7 finished task on reassigned slot retires; claimant work/process/refs unchanged
+  --- teardown stderr (/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s7/stderr) ---
+  | warning: task task-x1's recorded worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/cases/s7/pool/1/project was reassigned to task live-task (home /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches), which claimed that pool slot after this record was written; that slot is no longer task-x1's, so its processes, copy, and claim are left untouched and only task-x1's own cleanup runs.
+  PASS: finished task teardown exit 0
+  PASS: claimant process still alive
+  PASS: finished meta/status removed
+  PASS: finished endpoint closed
+  PASS: claimant endpoint NOT closed
+  PASS: pool not administered (no treehouse call)
+  PASS: claimant meta/status unchanged
+  PASS: slot claim + lease unchanged
+  PASS: claimant HEAD/branch unchanged
+  PASS: claimant copy status unchanged
+  PASS: claimant files intact
+  PASS: no other branch ref changed
+  archive/task-x1-pipeline-0b0b0b06 after records-only retirement: 43d72eb735ed2d7fcd96240619f62069ec88fe58 (records-only shared slot: header says refs stay untouched)
+  PASS: archive on records-only reassigned slot untouched (intent: shared/reassigned slots stay untouched)
+=== DONE failures=0

@@ -1,0 +1,12 @@
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-prefix
+HEAD e2ec6c96b6c7f2aca2ff72a6063eff1116f662cc
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-prefix-6513f3/1/p-prefix
+HEAD e2ec6c96b6c7f2aca2ff72a6063eff1116f662cc
+detached
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-prefix-6513f3/2/p-prefix
+HEAD 70f3616c5b345535433adfaa3d1285f8ffcefac0
+branch refs/heads/fm/lab36357-x1-2
+

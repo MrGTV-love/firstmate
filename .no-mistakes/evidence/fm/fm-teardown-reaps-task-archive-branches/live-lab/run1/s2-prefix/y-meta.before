@@ -1,0 +1,8 @@
+window=firstmate:fm-lab36357-x1-2
+endpoint_task_id=lab36357-x1-2
+worktree=/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-prefix-6513f3/2/p-prefix
+project=/Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-prefix
+kind=ship
+mode=no-mistakes
+branch=fm/lab36357-x1-2
+spawn_gen=lab-lab36357-x1-2

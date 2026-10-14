@@ -1,0 +1,8 @@
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/projects/p-sq-missing
+HEAD de881f7c89ba9621cd6b4b066aa4700bd7bfcd13
+branch refs/heads/main
+
+worktree /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches/fixture/pool/.treehouse/p-sq-missing-3aa339/1/p-sq-missing
+HEAD cbdf2cc5d073ef17975b03a07ab6f53238289478
+branch refs/heads/fm/lab36357-sq-missing
+

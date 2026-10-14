@@ -1,0 +1,13 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/fm-lab/fm-teardown-reaps-task-archive-branches
+teardown: reaping leaked worktree process(es) for lab36357-unproven: 82238
+notice: keeping archive/lab36357-unproven-pipeline-3cc0b258 (checked out in a local copy)
+notice: keeping archive/lab36357-unproven-pipeline-5f84832f (archive history is not proven carried by the merged PR head)
+teardown: reaped archive/lab36357-unproven-submitted-3cc0b258 (carried by the merged PR lineage)
+notice: keeping archive/lab36357-unproven-submitted-fe5fb026 (archive patches are not all carried by the merged PR head)
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no live watcher process holds this home lock (last beat: 38s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
