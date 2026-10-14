@@ -348,11 +348,11 @@ class Collector:
         excluded = None
         if task["kind"] != "secondmate" and (verb == "done" or task["current_state"].get("state") in ("done", "ready")):
             excluded = "excluded: done/ready task is covered by PR or landing evidence"
+        elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
+            excluded = "excluded: idle secondmate has no routed work in flight"
         elif pause_limit and (until is None or until > self.now):
             # Keep the named wait visible on the watcher's long cadence, not the ordinary check-in cadence.
             excluded = "declared pause uses long cadence: " + pause_note
-        elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
-            excluded = "excluded: idle secondmate has no routed work in flight"
         pending = bool(open_replies) or any(CHECK_IN_TEXT in path.read_text()
                                            for path in inbox.glob("[0-9]*.msg"))
         informational = bool(excluded and not excluded.startswith("declared pause")) or pending

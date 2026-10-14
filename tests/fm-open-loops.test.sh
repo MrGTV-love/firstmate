@@ -1489,6 +1489,13 @@ for name in ('state', 'data', 'config', 'projects'):
 (home / 'state/mate.meta').write_text(f'kind=secondmate\nbackend=tmux\nwindow=sess:fm-mate\nharness=claude\nhome={mate_home}\n')
 status('mate', f'working [at={now - 2000}]: idle\n', now - 2000)
 r = rows()['mate']; assert not r['overdue'] and 'idle secondmate' in r['evidence'], r
+# Idle remains healthy even after an old named wait reaches the pause recheck cadence.
+status('mate', f'paused [at={now - 14401}]: waiting for routed work\n', now - 14401)
+r = rows()['mate']
+assert r['age_seconds'] == 14401 and r.get('informational') and not r['overdue'] and 'idle secondmate' in r['evidence'], r
+call('--check-in', 'mate')
+assert not list((home / 'state/mate.inbox').glob('*.msg')), 'idle secondmate must not receive a silence check-in'
+status('mate', f'working [at={now - 2000}]: idle\n', now - 2000)
 (mate_home / 'data/backlog.md').write_text('## In flight\n- [ ] routed - Routed work (repo: firstmate) (kind: ship)\n\n## Queued\n\n## Done\n')
 assert rows()['mate']['overdue']
 call('--check-in', 'mate')

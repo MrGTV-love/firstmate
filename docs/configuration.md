@@ -637,7 +637,7 @@ Pane activity, commits, pipeline progress, request creation, and transport deliv
 Each row's evidence names all three sources and any exclusion or pending request.
 An ordinary task that reported done or ready is informational here because its PR or landing evidence owns the next action.
 A named declared pause uses `FM_PAUSE_RESURFACE_SECS` and its existing default instead of 900 seconds; an elapsed declared clearing time restores the short cadence.
-An idle secondmate with no routed work in its own backlog's In flight section and no outstanding reply request is informational and healthy, not a silent report.
+An idle secondmate with no routed work in its own backlog's In flight section and no outstanding reply request remains informational and healthy regardless of a standing pause declaration.
 The secondmate backlog is read through the canonical lightweight fleet snapshot in that home, across its registered transport when remote; unreadable evidence degrades coverage rather than inventing idleness.
 Each secondmate home runs exactly the same tracker for its own direct workers, without surveying another home's children.
 A pending secondmate reply or unacknowledged check-in makes the row informational until the existing reply or inbox recovery path settles it, preventing repeated requests.
