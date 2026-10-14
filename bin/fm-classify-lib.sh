@@ -38,16 +38,15 @@
 # of its worktree instead of a status file, so callers run it only at the moment
 # they would otherwise escalate.
 
-# shellcheck source=bin/fm-status-io-lib.sh
-. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-io-lib.sh"
+# Import the status APIs through their wake -> event -> decision -> I/O owners.
+# Repeating those imports multiplies ShellCheck's source expansion per caller.
+# shellcheck source=bin/fm-status-wake-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-wake-lib.sh"
 # The crew current-state reader used for the "provably working" decision.
 # Overridable so tests can stub the run-step/pane verdict without a real worktree
 # or no-mistakes install; absent, it points at the real sibling script.
 FM_CREW_STATE_BIN="${FM_CREW_STATE_BIN:-$_FM_CLASSIFY_LIB_DIR/fm-crew-state.sh}"
-# shellcheck source=bin/fm-status-decision-lib.sh
-. "$_FM_CLASSIFY_LIB_DIR/fm-status-decision-lib.sh"
-# shellcheck source=bin/fm-status-wake-lib.sh
-. "$_FM_CLASSIFY_LIB_DIR/fm-status-wake-lib.sh"
+
 # shellcheck source=bin/fm-utc-lib.sh
 . "$_FM_CLASSIFY_LIB_DIR/fm-utc-lib.sh"
 

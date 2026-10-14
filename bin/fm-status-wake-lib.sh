@@ -14,13 +14,9 @@
 # A missing, malformed, identity-mismatched, or past-end classified position reads
 # from byte 0, preferring a bounded duplicate over a lost event.
 
-if ! command -v _fm_status_file_size >/dev/null 2>&1; then
-  # shellcheck source=bin/fm-status-io-lib.sh
-  . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-io-lib.sh"
-fi
-
+# The event owner supplies decision folding and status I/O transitively.
 # shellcheck source=bin/fm-status-event-lib.sh
-. "$_FM_CLASSIFY_LIB_DIR/fm-status-event-lib.sh"
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-event-lib.sh"
 
 # FM_OPEN_DECISIONS_FOLD_VERSION and its bump history live with the fold rule
 # they version, in bin/fm-status-decision-lib.sh.
