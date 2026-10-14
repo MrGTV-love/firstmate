@@ -112,6 +112,14 @@ mv "$TMP_ROOT/bad.json" "$TMP_ROOT/config/crew-dispatch.json"
 if fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high > "$TMP_ROOT/result" 2> "$TMP_ROOT/error"; then
   fail "Claude fallback without a supported TeamClaude requirement must refuse"
 fi
+# Typed resolution raises a profile's effort above its configured floor; the
+# recorded rule must still carry its fallback policy into spawn and recovery.
+jq '.rules[0].use.effort="low"' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
+set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high) || fail "a raised effort must not refuse"
+assert_equals "$(jq -cn --argjson f "$allowed" '{rule:"rule_1",fallback:$f}')" "$set" "a recorded rule contains its profile at a raised effort"
+jq '.rules[0].use.effort="max" | .default.effort="max"' "$TMP_ROOT/identical.json" > "$TMP_ROOT/config/crew-dispatch.json"
+set=$(fm_dispatch_fallbacks "$TMP_ROOT/config" rule_1 omp openai-codex/gpt-6-luna high) || fail "a lowered effort must not refuse"
+assert_equals '{"rule":"","fallback":[]}' "$set" "a recorded rule never contains its profile at a lowered effort"
 pass "matrix fallback retains per-rule permission and strongest-model boundaries"
 
 cat > "$TMP_ROOT/config/model-index.json" <<'JSON'

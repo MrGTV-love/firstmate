@@ -600,6 +600,14 @@ test_changed_dependency_selection_and_unmapped_failure() {
   [ -z "$listed" ] || fail "an unreferenced retired test asset must select no suite: $listed"
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm retired-asset-change
 
+  mkdir -p "$repo/bin/ten-levels/src/levels/level05"
+  : >"$repo/bin/ten-levels/src/levels/level05/model-router.ts"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD)
+  assert_contains "$listed" "tests/fm-dispatch-resolve.test.sh" "vendored Level 5 routers select the typed dispatch resolver suite"
+  assert_contains "$listed" "tests/fm-jev-guard.test.sh" "vendored Level 5 routers keep the jev-guard suite"
+  git -C "$repo" add bin/ten-levels
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm vendored-level5-change
+
   mkdir -p "$repo/tests/assets"
   : >"$repo/tests/assets/board-render-harness.mjs"
   printf '#!/usr/bin/env bash\nnode tests/assets/board-render-harness.mjs\n' >"$repo/tests/fm-bearings-board-render.test.sh"

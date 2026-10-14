@@ -7,9 +7,10 @@
 # fm_dispatch_capacity <harness> <model> prints usable/exhausted/unknown evidence.
 # fm_dispatch_fallbacks <config-dir> <rule|empty> <harness> <model> <effort>
 # prints {rule, fallback}; only rules containing the profile must resolve and
-# satisfy the fallback schema. A recorded rule that no longer contains it counts
-# as none, and differing unlabeled lists permit no fallback. rule is set only
-# for a fallback policy.
+# satisfy the fallback schema. A recorded rule also contains its configured
+# harness and model at a raised effort, as typed resolution emits them; one that
+# no longer contains the profile counts as none, and differing unlabeled lists
+# permit no fallback. rule is set only for a fallback policy.
 # fm_dispatch_select <config-dir> <rule> <profile-json> <fallback-array>
 # prints the original profile unless it is proven exhausted, then the first
 # permitted, supported, non-exhausted fallback. Unknown is disclosed, not zero.
@@ -127,12 +128,15 @@ fm_dispatch_fallbacks() {
     def profiles: if type == "array" then . else [.] end;
     def axis: if . == null or . == "default" then "" else . end;
     def same: type == "object" and .harness == $h and (.model | axis) == ($m | axis) and (.effort | axis) == ($e | axis);
-    def contains_profile: .resolved as $resolved |
-      any((.use | profiles)[]; same and ($resolved or (has("role") | not))) or
+    def level($x): ["low", "medium", "high", "xhigh", "max"] | index($x);
+    def raised: type == "object" and .harness == $h and (.model | axis) == ($m | axis) and
+      level(.effort) != null and level($e) != null and level($e) >= level(.effort);
+    def holds(match): .resolved as $resolved |
+      any((.use | profiles)[]; match and ($resolved or (has("role") | not))) or
       any(.fallback | if type == "array" then .[] else empty end; same);
     . as $rules |
-    [$rules[] | select($rule != "" and .rule == $rule and contains_profile)] as $recorded |
-    (if ($recorded | length) > 0 then $recorded else [$rules[] | select(contains_profile)] end) as $matches |
+    [$rules[] | select($rule != "" and .rule == $rule and holds(same or raised))] as $recorded |
+    (if ($recorded | length) > 0 then $recorded else [$rules[] | select(holds(same))] end) as $matches |
     if any($matches[]; .fallback != null and (.fallback | valid_fallback | not)) then error(fallback_error)
     elif any($matches[]; .resolved | not) then
       error("dispatch " + ([$matches[] | select(.resolved | not) | .rule] | join(", ")) + " names a retired model or unconfigured role")

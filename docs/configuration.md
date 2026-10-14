@@ -1554,13 +1554,12 @@ For example, a rule may declare `"fallback": [{"harness": "omp", "model": "deeps
 The operator must preserve the task's required reasoning class in each list; an exhausted strongest route without a supported equal-class stand-in stops and reports the unavailable route.
 Natural-language `why` text does not authorize an executable fallback.
 
-`fm-spawn.sh` and `fm-control.sh relaunch` share the same declared launch fallback list.
+`fm-dispatch-resolve.sh`, `fm-spawn.sh`, and `fm-control.sh relaunch` share the same fallback list.
 Only proven primary exhaustion activates it; approval, confidence, unknown capacity, and floor decisions are not bypassed.
-Typed resolution validates that configuration and carries the selected rule identifier, but never converts an exhausted or unrankable result into an unscored stand-in selection.
-It returns the non-clear result to firstmate's existing intake, preserving the selected rule's reasoning class and quota decisions.
 Spawn and recovery resolve each rule against their frozen model-index and dispatch pair, even when typed resolution is off.
 Only rules that contain the launched profile must resolve, so a retired model or unconfigured role in an unrelated rule does not block a launch or recovery.
 When the matched rule has a fallback policy, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
+A recorded rule still contains the task's profile when typed resolution raised its effort above the configured one for the same harness and model.
 A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
 A task that switched to a stand-in stays on it until it is launched again from the matrix.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
@@ -1583,7 +1582,7 @@ The resolver supplies the fixed neutral Choice option `No listed rule applies to
 
 `min_confidence` is a number from 0 through 1.
 The rule's own probability in the answer must reach it, replacing the resolver's global 0.6 floor on the answer's confidence.
-Set it high when a wrong pick is costly and low when an explicitly selected rule is safe under weaker evidence.
+Set it high when a wrong pick is costly and low when the rule is a safe runner-up.
 
 `task_horizon_minutes` is a positive number of minutes, 240 when absent: the runway a resolved candidate needs for one task, as described under "Candidate eligibility and evidence" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key).
 The 240-minute default matches the 240-minute single-agent limit no-mistakes applies to one task's agent.
@@ -1661,15 +1660,12 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 
 **What the model receives**
 
-Before inference, deterministic pre-checks remove the captain's explicitly scoped Vernant rules from non-Vernant requests, non-Vernant rules from Vernant requests, and candidates prohibited by the session launch policy.
-An explicit imperative to use Claude, or an imperative to perform engineering or investigation work on a Claude-only or Claude-specific subject, selects the configured Claude-only rule locally; a prohibited required harness escalates rather than substituting another harness or calling Jev.
-Merely mentioning or comparing Claude models does not select that rule.
-The pre-checks recognize those existing captain-rule boundaries, not task difficulty; arbitrary custom `when` text remains a bounded judgment.
-When judgment is needed, one `JevClient.systemOne` call combines the vendored Level 5 agent-router questions (workflow, ambiguity, desktop access), model-router questions (least costly capable tier and reasoning effort), and the rule Choice over the remaining `when` texts plus the neutral no-match option.
+When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state in one `JevClient.systemOne` call.
+That call combines the vendored Level 5 agent-router questions (workflow, ambiguity, desktop access), model-router questions (least costly capable tier and reasoning effort), and one rule Choice whose options are every rule's `when` plus the fixed neutral option for no matching rule.
+The rule Choice alone decides which rule applies, including project-scoped and Claude-only rules; no local text pre-check selects or removes a rule.
 The upstream question wording, rubrics, thresholds, and pure decisions are retained; [the vendor provenance](../bin/ten-levels/SOURCE.md) records the minimal question-object exports needed to batch them.
 The model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
-The Level 5 intent router is also vendored unchanged as the reference handler pattern; its retail intent labels are not asked about engineering tasks.
-The intent sample itself calls Jev: Firstmate's zero-inference pre-checks are an explicit adaptation, not a claim that the upstream retail example avoids inference.
+The Level 5 intent router is vendored unchanged but unused, because dispatch has no script, browser, or human handler, so those agent-router routes escalate to firstmate instead.
 The task-specific text is the brief's `## Captain's intent` and `## Firstmate spec` sections under `# Task` that `bin/fm-brief.sh` scaffolds, read by the same parser that feeds `fm-spawn.sh` validation and the no-mistakes `--intent` contract; a brief with neither section is sent whole.
 Section extraction and the whole-brief fallback both read the brief after any enabled never-send marked regions are removed (see the never-send list below).
 Extraction rewrites the caller's task-text file in place without relaxing its existing permissions.
@@ -1741,22 +1737,25 @@ The upstream model decision maps `fast` to the matched rule's configured Haiku/L
 The adapter never imports a cheaper candidate from another rule.
 The upstream effort threshold maps scores above 1 to high, otherwise low, then code clamps each profile to its configured effort floor; Haiku uses max.
 These rules can lower proposed cost only within the captain's approved matrix; quota never lowers the reasoning class or minimum effort.
+The session launch policy removes prohibited candidates from the selected rule after the answer, so a prohibited rule is still recognized rather than replaced by another rule.
+When the session policy or the model-router class filter removes every candidate of the selected rule or default array, the result is `escalate`, naming the filter and listing each removed candidate.
 
 Before weighting, code applies the confidence floor, rule approval and floor, each candidate's provider and floor, all applicable quota scopes, and established task-horizon runway vetoes.
-A rule-floor failure escalates instead of falling through to the default array, because quota cannot replace that rule's required reasoning class.
+A known rule-floor shortfall falls through to the default array, as "Rule quota floors" above defines.
 It captures one compatible `quota-axi --json` snapshot and one native OMP usage report.
 A candidate with established runway shorter than the task horizon is ineligible before scoring, rather than receiving a small penalty that other components could mask.
 
 The deterministic quota composite follows Level 3's normalize-and-weight pattern; quota is not a Jev question.
-Its base weights are headroom 0.6, spendPriority 0.3, and proven feasible runway 0.1: current usable allowance dominates, reset-clock economics remain material, and runway cannot bypass its independent hard veto.
+Its base weights are headroom 0.6 and spendPriority 0.3: current usable allowance dominates and reset-clock economics remain material; runway is only the independent hard veto above.
 Headroom is normalized to `[0,1]` from the minimum applicable bound for a measured account.
 For OMP, it is the maximum of the per-account minimum applicable percentages among fresh usable accounts: the best currently usable account's fractional headroom, never a sum of percentages or a purported total pool capacity.
 Accounts with stale or unknown serviceability and saved reset credits contribute nothing to that measurement.
 This fraction compares relative remaining allowance, not equivalent token budgets across subscription tiers or a completion guarantee.
 `spendPriority` is normalized by `0.5 + p / (2 * (1 + abs(p)))`, preserving its order without clipping extreme values.
-Known feasible runway (`through_reset`, or an established projection covering the task horizon on every applicable bound) contributes 1; unknown or unmodeled runway contributes no invented value.
 Only components known for every viable candidate are compared, and their weights are renormalized to sum to 1 for that comparison.
+A usable OMP pool is viable only when its best usable account has measured headroom.
 Thus a usable OMP pool and Claude can compete on shared headroom even when only Claude publishes spendPriority; the missing pool economics and completion runway remain visible uncertainties.
+A usable pool without measured headroom stays eligible but unranked, and it clears only when it is the sole eligible candidate.
 No common measurable component escalates, and equal composite scores use spendPriority as the final ranker only when every tied candidate has a comparable numeric scalar; a remaining tie escalates.
 The output exposes the unrounded quota score, normalized parts, base weights, comparison components, and every assessed candidate.
 These weights are inspectable routing policy, not calibrated forecasts of task success; live task replay belongs in private evaluation evidence.
@@ -1774,14 +1773,19 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
   An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
 
-**Confidence and selected reasoning class**
+**Confidence and fallback rules**
 
-- A rule that declares `min_confidence` is checked against that selected rule's own probability.
-- A selected rule without `min_confidence`, and the neutral option, keep the global 0.6 floor on the answer's confidence.
+- A rule that declares `min_confidence` is checked against that rule's own probability, whether it is the picked option or a runner-up, so a runner-up never needs weaker support than it would as the pick.
+- A picked rule without `min_confidence`, and the neutral option, keep the global 0.6 floor on the answer's confidence exactly as before, so a file with no declared floors behaves as it did.
 
-A selected rule below its applicable floor produces `ambiguous` with no profile.
-The tool never substitutes a lower-confidence rule with a lower floor: that could silently change the required model class even when the alternate meets its own threshold.
-All configured thresholds are retained; uncertain classification returns to firstmate's existing intake rather than weakening the selected rule.
+When the picked rule declares its own floor but its probability falls below it, the tool checks the other options:
+
+1. Find the most probable other option that clears its own floor: the rule's `min_confidence`, or 0.6 otherwise.
+2. Print a `fallback:` line naming both floors and resolve that rule as though it had been picked.
+
+No qualifying option, or two equally probable qualifying options, produces `ambiguous`.
+
+When every candidate of the resolved rule is proven exhausted, the rule's declared model-matrix stand-in is selected through the shared fallback list above, with a `fallback:` line naming it.
 
 **Candidate eligibility and evidence**
 
@@ -1806,14 +1810,14 @@ All configured thresholds are retained; uncertain classification returns to firs
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, unsupported handler/capability request, nothing rankable after feasibility gates, or a genuine evidence tie. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, unsupported handler/capability request, every selected candidate removed by the session policy or class filter, nothing rankable after feasibility gates, or a genuine evidence tie. |
 | `error` | API, network, malformed response metadata, rendering, quota-axi failure, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
 
 Every result above exits 0.
 
 - The unchanged vendored client validates choice distributions, score ranges and legends, Noul bounds, and nonnegative integer token usage before policy mapping.
 - Only a usage or configuration error exits 2: an unreadable brief, an existing but unreadable or malformed canonical rules file, a [model-index resolution failure](#fleet-model-index-configmodel-indexjson), or missing `jq`, each reported and never selected around.
-- Missing `bun` is a normal structured `error` outcome with exit 0 so firstmate uses its existing routing.
+- The resolver runs its TypeScript adapter with `bun` when installed, otherwise `node` with type stripping; missing both is a normal structured `error` outcome with exit 0 so firstmate uses its existing routing.
 - Resolver diagnostics report stage timing and usage/cost evidence; the [script header](../bin/fm-dispatch-resolve.sh) owns their fields, measurement boundaries, cost estimate, and response-metadata privacy safeguards.
 
 **Firstmate retains the dispatch decision**
@@ -1822,12 +1826,12 @@ The tool never replaces firstmate's judgment, `quota-array-dispatch`, the captai
 A `clear` result still leaves authentication and reasoning-class checks to firstmate; its conservative quota-runway guarantee is limited to "Candidate eligibility and evidence" above.
 The [fleet model-index contract](#fleet-model-index-configmodel-indexjson) owns the checks required before a chosen profile is published.
 
-Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.
+Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked candidate line; every non-clear result returns to the full existing intake.
 
 **Key handling and fixed settings**
 
 - The resolver, skill picker, and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
-- The resolver sends its key to Bun through file descriptor 3; the vendored JevClient supplies the fetch Authorization header, never an argv argument or exported key.
+- The resolver sends its key to its Bun or Node helper through file descriptor 3; the vendored JevClient supplies the fetch Authorization header, never an argv argument or exported key.
   The skill picker pipes its resolved keys on stdin to Node, which supplies them to the vendored JevClient's fetch transport; the picker does not export the resolved key variables or put their values on argv.
   Neither tool prints, logs, or writes keys to files.
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
