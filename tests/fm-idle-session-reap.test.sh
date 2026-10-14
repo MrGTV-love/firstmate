@@ -401,6 +401,15 @@ test_lease_refusal_is_transient() {
 }
 
 
+# A finished, idle pool-slot scout whose tmux endpoint record validates, so the
+# real teardown reaches its project-lock admission.
+mk_pool_scout() {  # <home> <slot> <project>
+  mk_task "$1" scout-pool scout idle "done [at=$OLD]: report written"
+  fm_write_meta "$1/state/scout-pool.meta" "window=firstmate:fm-scout-pool" \
+    "endpoint_task_id=scout-pool" "kind=scout" "harness=claude" "worktree=$2" "project=$3"
+  scout_report "$1" scout-pool
+}
+
 # The project lock is shared with spawns and other teardowns. The sweep's
 # teardown must not wait in its queue, because its fixed work bound would then
 # include the wait: with the lock held, the real teardown returns at once,
@@ -414,9 +423,7 @@ test_project_lock_contention_is_skipped_and_retried() {
   mkdir -p "${slot%/*}"
   git -C "$project" worktree add --quiet --detach "$slot"
   printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot" > "$home/pool/treehouse-state.json"
-  mk_task "$home" scout-pool scout idle "done [at=$OLD]: report written" \
-    -- "worktree=$slot" "project=$project"
-  scout_report "$home" scout-pool
+  mk_pool_scout "$home" "$slot" "$project"
   lock=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$project") \
     || fail "could not resolve the project lock"
   FM_HOME="$home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_lock_try_acquire "$2" || exit 1; : > "$3"; exec sleep 60' _ \
@@ -462,9 +469,7 @@ test_project_lock_fresh_publication_is_skipped_not_refused() {
   mkdir -p "${slot%/*}"
   git -C "$project" worktree add --quiet --detach "$slot"
   printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot" > "$home/pool/treehouse-state.json"
-  mk_task "$home" scout-pool scout idle "done [at=$OLD]: report written" \
-    -- "worktree=$slot" "project=$project"
-  scout_report "$home" scout-pool
+  mk_pool_scout "$home" "$slot" "$project"
   lock=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$project") \
     || fail "could not resolve the project lock"
   FM_HOME="$home" bash -c '
@@ -522,9 +527,7 @@ test_project_lock_acquisition_error_is_not_skipped() {
   mkdir -p "${slot%/*}"
   git -C "$project" worktree add --quiet --detach "$slot"
   printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot" > "$home/pool/treehouse-state.json"
-  mk_task "$home" scout-pool scout idle "done [at=$OLD]: report written" \
-    -- "worktree=$slot" "project=$project"
-  scout_report "$home" scout-pool
+  mk_pool_scout "$home" "$slot" "$project"
   lock=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$project") \
     || fail "could not resolve the project lock"
   printf 'not a lock\n' > "$lock"

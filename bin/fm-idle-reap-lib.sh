@@ -67,6 +67,18 @@ fm_idle_reap_classify() {
   esac
   status="$state/$id.status"
   IDLE_REAP_LAST=$(last_status_line "$status")
+  # A teardown admitted this task and already retired its busy state and
+  # status; only its pool slot return remains for the next sweep to finish.
+  if fm_teardown_return_pending "$state" "$id"; then
+    fm_epoch_seconds_to now
+    if fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+      IDLE_REAP_CLASS=refused
+      return 0
+    fi
+    IDLE_REAP_CLASS=reap
+    IDLE_REAP_DETAIL="closed by teardown; its pool slot return is pending"
+    return 0
+  fi
   declared=$(status_declared_wait_line "$status")
   if status_is_paused_or_captain_held "$declared"; then
     status_line_verb "$declared" verb

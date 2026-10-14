@@ -206,9 +206,10 @@
 # and remove the record that names it. A refusal before that reservation
 # leaves no new lease; a failed cleanup after it retains the lease.
 # A slot whose state is neither held nor unleased (recovered, conflicting,
-# unreadable, or needing jq) cannot be reserved; teardown logs that state and
-# keeps project custody from the reservation point through the return, as
-# before the narrowing.
+# unreadable, or needing jq), or an unleased slot with no treehouse installed
+# to lease it, cannot be reserved; teardown logs that state and keeps project
+# custody from the reservation point through the return with treehouse return
+# --force, as before the narrowing.
 # Pipeline conclusion, process reaping, endpoint closure, status retirement,
 # backlog completion and clone sync otherwise run outside project custody.
 # Successful landing proofs bind to immutable commits; final dirty/HEAD checks
@@ -227,11 +228,18 @@
 # (FM_IDLE_REAP_ADMISSION=1) instead makes nonwaiting ownership and reservation
 # attempts, so contention exits FM_PROJECT_LOCK_BUSY_EXIT with nothing closed
 # and the next sweep retries. Once processes or endpoints may be gone, the
-# task no longer classifies as reap-ready, so the reaper's return stage and
-# every forced child return wait in that FIFO queue instead: a closed task is
-# never left leased for a sweep that cannot select it again. The wait is
-# bounded per holder by the stall allowance (370s, measured in
-# bin/fm-project-lock-lib.sh), inside the reaper's 600s teardown limit. On
+# reaper's return stage and every forced child return wait in that FIFO queue
+# instead, bounded per holder by the same stall allowance as every other
+# waiter (370s, measured in bin/fm-project-lock-lib.sh), inside the reaper's
+# 600s teardown limit. Before that wait, teardown records
+# state/<id>.teardown-return-pending (bin/fm-wake-lib.sh's
+# fm_teardown_return_pending owns the contract; a forced secondmate teardown
+# records it for itself, naming the child). Any later refusal keeps that
+# durable record: the open-work ledger reports it, session-start backlog
+# replay leaves the record for the retry, and the idle reaper selects the
+# closed task by that record instead of its retired busy state and status.
+# A wait that still cannot obtain the lock exits FM_PROJECT_LOCK_BUSY_EXIT, so
+# the next sweep retries it rather than standing on a refusal memo. On
 # 2026-10-14 (macOS arm64, 18 CPUs, load 136-177, modeled Treehouse) the
 # return stage itself held the lock 1s for an ordinary teardown and 1-4s per
 # recursive child. Project holders never wait for task custody (fresh spawn
@@ -734,6 +742,11 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
     TEARDOWN_SLOT_CUSTODY=project
     return 0
   fi
+  if ! command -v treehouse >/dev/null 2>&1; then
+    echo "warning: pool slot $slot is unleased and treehouse is not installed to reserve it; keeping project custody through its return instead" >&2
+    TEARDOWN_SLOT_CUSTODY=project
+    return 0
+  fi
   name=$FM_TASK_COPY_SLOT_NAME
   (cd "$project" && treehouse lease "$name" --lease-holder "$task_id") || return 1
   FM_TASK_COPY_POOL_STATE_FILE=
@@ -743,6 +756,21 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
     return 1
   }
   TEARDOWN_SLOT_CUSTODY=lease
+}
+
+# Record, before a closed task's final pool return, that its slot is still
+# held for it (bin/fm-wake-lib.sh's fm_teardown_return_pending owns the
+# contract). A refusal from here on leaves the record for the retry.
+teardown_mark_return_pending() {  # <slot> [child-id]
+  local marker="$STATE/$ID.teardown-return-pending" tmp gen
+  tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
+  gen=$(fm_teardown_return_pending_gen "$META") || gen=
+  if { printf 'spawn_gen=%s\n' "$gen"; printf 'slot=%s\n' "$1"; [ -z "${2:-}" ] || printf 'child=%s\n' "$2"; } > "$tmp" \
+      && mv -f "$tmp" "$marker"; then
+    return 0
+  fi
+  rm -f "$tmp"
+  echo "warning: could not record that task $ID's pool slot $1 awaits its return at $marker" >&2
 }
 
 CONTROL_LOCK="$STATE/.control-$ID.lock"
@@ -4986,12 +5014,14 @@ cleanup_firstmate_home_children() {
     status_retire_presentation_task "$sub_state" "$child_id" || return 1
     fm_wake_queue_prune_task "$sub_state" "$child_id" "$child_t" 2>/dev/null || true
     if [ "$child_pool_return" = 1 ]; then
+      teardown_mark_return_pending "$child_wt" "$child_id"
       if [ "$DESCENDANT_LEGACY_CUSTODY" != 1 ]; then
         child_project_lock=$(fm_treehouse_project_lock_path "$child_proj") || return 1
         # This child's endpoint is already closed, so wait in the FIFO queue
         # rather than strand its reserved slot. Project holders refuse rather
         # than wait for the task-set locks this cleanup holds.
-        fm_project_lock_acquire "$child_project_lock" "teardown $ID return child $child_id" || return 1
+        fm_project_lock_acquire "$child_project_lock" "teardown $ID return child $child_id" \
+          || return "$FM_PROJECT_LOCK_BUSY_EXIT"
         DESCENDANT_TREEHOUSE_LOCK_PATHS+=("$child_project_lock")
       fi
       require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
@@ -5005,8 +5035,17 @@ cleanup_firstmate_home_children() {
           return 1
         }
       fi
-      teardown_treehouse_return "$child_wt" "$child_proj" "child worktree" "$child_id" || return $?
-      fm_treehouse_slot_owner_release "$child_wt" "$child_id" || return 1
+      if command -v treehouse >/dev/null 2>&1; then
+        if teardown_treehouse_return "$child_wt" "$child_proj" "child worktree" "$child_id"; then
+          fm_treehouse_slot_owner_release "$child_wt" "$child_id" || return 1
+        else
+          child_return_rc=$?
+          [ "$child_return_rc" -ne "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ] || return "$child_return_rc"
+          safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
+        fi
+      else
+        safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
+      fi
     fi
     fm_backlog_atomic_transition remove "$sub_state/$child_id.meta" "task record" "$sub_state" || return 1
     [ "$DESCENDANT_LEGACY_CUSTODY" = 1 ] || teardown_release_descendant_project_locks || return 1
@@ -5578,12 +5617,13 @@ fi
 # see a false shared-slot collision. Backlog completion and clone sync need
 # only task custody and run after project custody is released.
 if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
+  teardown_mark_return_pending "${TEARDOWN_RETURN_SLOT:-$TEARDOWN_SHARED_SLOT}"
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = return ]; then
     TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
     teardown_nested_slot reprove || exit 1
     [ ! -d "$WT" ] || require_worktree_teardown_safety
   fi
-  [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] || teardown_acquire_project_lock wait || exit $?
+  [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] || teardown_acquire_project_lock wait || exit "$FM_PROJECT_LOCK_BUSY_EXIT"
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = shared ]; then
     # Drop only this task's claim, never the remaining task's durable lease.
     fm_treehouse_slot_owner_release "$TEARDOWN_SHARED_SLOT" "$ID"
@@ -5647,6 +5687,7 @@ else
 fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
+rm -f "$STATE/$ID.teardown-return-pending"
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
     && teardown_owns_worktree; then
   "$FM_ROOT/bin/fm-fleet-sync.sh" "$PROJ" || true

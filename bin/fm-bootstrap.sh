@@ -1272,6 +1272,10 @@ backlog_record_reconcile() {
       return 2
     fi
     label=$(basename "$marker" .backlog-close)
+    if fm_teardown_return_pending "$STATE" "$label"; then
+      echo "BACKLOG_RECONCILE: $label: its teardown still owes a pool slot return; leaving the recorded close for the teardown retry"
+      continue
+    fi
     control_lock="$STATE/.control-$label.lock"
     meta_lock=$(fm_meta_lock_path "$STATE/$label.meta") || continue
     fm_lock_try_acquire "$control_lock" || continue

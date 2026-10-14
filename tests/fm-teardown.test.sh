@@ -10551,15 +10551,12 @@ SH
   pass 'recovered, conflicting and unreadable slot states fall back to whole-cleanup project custody and return the slot'
 }
 
-# The idle reaper's teardown never waits before it has closed anything, but
-# once the endpoint is gone the task no longer classifies as reap-ready. Its
-# return stage therefore waits in the project queue and completes, instead of
-# exiting busy and leaving a closed task holding its slot with no retry.
-test_idle_reap_return_waits_for_project_custody_after_closure() {
-  local case_dir slot holder actor i queued ticket rc old returns
-  make_lease_modeling_pool_case pool-idle-reap-return '' scout
+# A finished, idle scout in a pool slot that the idle reaper selects, with an
+# endpoint whose close waits until the test holds the project lock.
+make_idle_reap_pool_case() {  # <name>
+  local case_dir old
+  make_lease_modeling_pool_case "$1" '' scout
   case_dir=$POOL_CASE
-  slot=$POOL_SLOT
   old=$(( $(date +%s) - 7200 ))
   printf 'harness=claude\n' >> "$case_dir/state/task-x1.meta"
   printf 'done [at=%s]: report written\n' "$old" > "$case_dir/state/task-x1.status"
@@ -10591,6 +10588,29 @@ esac
 exit 0
 SH
   chmod +x "$case_dir/fakebin/tmux"
+}
+
+# Holds <lock> from another process until <case>/release exists.
+hold_project_lock_until_release() {  # <case-dir> <lock>
+  FM_HOME="$1/primary-home" FM_STATE_OVERRIDE="$1/state" \
+    bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      fm_lock_try_acquire "$2" || exit 1
+      trap '\''fm_lock_release "$2"'\'' EXIT
+      : > "$3/project-held"
+      while [ ! -f "$3/release" ]; do sleep 0.05; done
+    ' _ "$ROOT" "$2" "$1"
+}
+
+# The idle reaper's teardown never waits before it has closed anything, but
+# once the endpoint is gone the task no longer classifies as reap-ready. Its
+# return stage therefore waits in the project queue and completes, instead of
+# exiting busy and leaving a closed task holding its slot with no retry.
+test_idle_reap_return_waits_for_project_custody_after_closure() {
+  local case_dir slot holder actor i queued ticket rc returns
+  make_idle_reap_pool_case pool-idle-reap-return
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
   FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_IDLE_REAP_ADMISSION=1 \
     FM_PROJECT_LOCK_POLL_SECS=0.05 \
     run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" &
@@ -10600,14 +10620,7 @@ SH
     i=$((i + 1)); [ "$i" -lt 1000 ] || { kill "$actor" 2>/dev/null || true; fail "automatic teardown did not reach endpoint closure: $(cat "$case_dir/stderr")"; }
     sleep 0.05
   done
-  FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
-    bash -c '
-      . "$1/bin/fm-wake-lib.sh"
-      fm_lock_try_acquire "$2" || exit 1
-      trap '\''fm_lock_release "$2"'\'' EXIT
-      : > "$3/project-held"
-      while [ ! -f "$3/release" ]; do sleep 0.05; done
-    ' _ "$ROOT" "$POOL_LOCK" "$case_dir" &
+  hold_project_lock_until_release "$case_dir" "$POOL_LOCK" &
   holder=$!
   i=0
   while :; do
@@ -10641,7 +10654,76 @@ SH
   pass 'an automatic teardown that has closed its endpoint waits for project custody and returns its slot'
 }
 
+# A closed task whose return still cannot obtain project custody within the
+# stall bound is neither stranded nor parked behind a refusal memo: its
+# durable return-pending record lets the very next sweep select it again
+# without a live busy state, and that sweep finishes the return.
+test_idle_reap_retries_a_closed_task_whose_return_stalled() {
+  local case_dir slot holder actor i rc out returns
+  make_idle_reap_pool_case pool-idle-reap-stalled-return
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
+  rm -f "$case_dir/config/backlog-backend"
+  seed_backlog_in_flight "$case_dir" scout
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_IDLE_REAP_ADMISSION=1 \
+    FM_PROJECT_LOCK_POLL_SECS=0.05 FM_PROJECT_LOCK_SERVICE_SECS=2 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" &
+  actor=$!
+  i=0
+  while [ ! -f "$case_dir/closing" ]; do
+    i=$((i + 1)); [ "$i" -lt 1000 ] || { kill "$actor" 2>/dev/null || true; fail "automatic teardown did not reach endpoint closure: $(cat "$case_dir/stderr")"; }
+    sleep 0.05
+  done
+  hold_project_lock_until_release "$case_dir" "$POOL_LOCK" &
+  holder=$!
+  rc=0; wait "$actor" || rc=$?
+  if [ "$rc" != 75 ]; then
+    : > "$case_dir/release"; wait "$holder" || true
+    fail "a stalled return must exit busy for the next sweep, got $rc: $(cat "$case_dir/stderr")"
+  fi
+  assert_present "$case_dir/closed" 'the fixture did not close the endpoint before the return stalled'
+  assert_present "$case_dir/state/task-x1.meta" 'the stalled return erased the task record'
+  assert_present "${slot%/*}/.fm-slot-owner" 'the stalled return dropped the slot claim'
+  [ "$(grep -c '^return ' "$case_dir/treehouse.log" || true)" = 0 ] || fail 'the stalled return still returned the slot'
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the stalled return left the closed slot allocatable'
+  assert_present "$case_dir/state/task-x1.backlog-close" 'the stalled return lost its pending backlog close'
+  out=$(PATH="$case_dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/primary-home" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" FM_BOOTSTRAP_NETWORK=skip \
+    "$ROOT/bin/fm-bootstrap.sh" 2>&1) || fail "session start failed beside a pending return: $out"
+  assert_present "$case_dir/state/task-x1.meta" 'session start retired the record whose slot return is pending'
+  assert_present "$case_dir/state/task-x1.backlog-close" 'session start consumed the close the teardown retry owes'
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "session start closed the backlog row before the slot return: $(backlog_row_state "$case_dir")"
+  out=$(FM_HOME="$case_dir/primary-home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
+    NM_HOME="$case_dir/nm" FM_POOL_CASE="$case_dir" PATH="$case_dir/fakebin:$PATH" \
+    "$ROOT/bin/fm-idle-session-reap.sh" scan) || fail "the reaper could not scan the closed task: $out"
+  [ "$(printf '%s\n' "$out" | awk -F'\t' '$2 == "task-x1" { print $1 }')" = reap ] \
+    || fail "the next sweep could not select the closed task again: $out"
+
+  : > "$case_dir/release"
+  wait "$holder" || fail 'the project holder could not release'
+  out=$(FM_HOME="$case_dir/primary-home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
+    NM_HOME="$case_dir/nm" FM_POOL_CASE="$case_dir" PATH="$case_dir/fakebin:$PATH" \
+    "$ROOT/bin/fm-idle-session-reap.sh" reap) || fail "the retry sweep failed: $out"
+  [ "$(printf '%s\n' "$out" | awk -F'\t' '$2 == "task-x1" { print $1 }')" = reaped ] \
+    || fail "the retry sweep did not finish the closed task: $out"
+  assert_absent "$case_dir/state/task-x1.meta" 'the retry kept the closed task record'
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" 'the retry kept the return-pending record'
+  returns=$(grep -c "^return --force $slot\$" "$case_dir/treehouse.log" || true)
+  assert_equals 1 "$returns" 'the retry must return the slot exactly once'
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the retry left the returned slot leased'
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "the retry did not close the backlog row: $(backlog_row_state "$case_dir")"
+  pass 'a closed task whose return stalled survives session start and is finished by the next sweep'
+}
+
 teardown_test_cases=(
+test_idle_reap_retries_a_closed_task_whose_return_stalled
 test_refusal_before_cleanup_takes_no_pool_reservation
 test_unprovable_pool_state_keeps_project_custody_through_return
 test_idle_reap_return_waits_for_project_custody_after_closure

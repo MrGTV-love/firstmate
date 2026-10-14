@@ -124,6 +124,7 @@ case "${1:-}" in
       "$state" > "$state.next" && mv "$state.next" "$state" || exit 1
     ;;
   return)
+    [ -z "${FM_FAKE_RETURN_FAILS:-}" ] || { echo "error: provider refused the return" >&2; exit 1; }
     slot=${@: -1}
     state="${slot%/*/*}/treehouse-state.json"
     if [ -f "$state" ]; then
@@ -1347,12 +1348,12 @@ SH
   pass 'spawn proceeds during slow process cleanup, clone sync and backlog completion while the retiring slot stays reserved until return'
 }
 
-# A forced child return runs after that child's endpoint and Docker objects
-# are already gone, so it waits in the FIFO queue rather than exiting busy and
-# stranding the closed child's reserved slot.
-test_forced_child_return_waits_for_project_custody() {
-  local case_dir home child_home slot lock actor holder i queued ticket rc
-  case_dir=$(make_case child-return-wait)
+# A forced secondmate teardown fixture: domain "retire" whose home holds one
+# child scout in a pool slot, and a Docker stand-in that waits at the child's
+# cleanup until <case>/project-held exists. Sets CHILD_CASE.
+make_child_return_case() {  # <name>
+  local case_dir home slot child_home
+  case_dir=$(make_case "$1")
   home="$case_dir/home"
   slot="$case_dir/pool/1/project"
   mkdir -p "${slot%/*}"
@@ -1387,6 +1388,19 @@ fi
 exec docker-fixture "$@"
 SH
   chmod +x "$case_dir/fakebin/docker"
+  CHILD_CASE=$case_dir
+}
+
+# A forced child return runs after that child's endpoint and Docker objects
+# are already gone, so it waits in the FIFO queue rather than exiting busy and
+# stranding the closed child's reserved slot.
+test_forced_child_return_waits_for_project_custody() {
+  local case_dir home child_home slot lock actor holder i queued ticket rc
+  make_child_return_case child-return-wait
+  case_dir=$CHILD_CASE
+  home="$case_dir/home"
+  slot="$case_dir/pool/1/project"
+  child_home="$case_dir/retired-home"
   lock=$(FM_HOME="$home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
     _ "$ROOT" "$case_dir/project")
   FM_SLOW_CASE="$case_dir" FM_PROJECT_LOCK_POLL_SECS=0.05 \
@@ -1442,6 +1456,140 @@ SH
   pass 'a forced child return queues for project custody after closure and returns the reserved slot'
 }
 
+# A child return the provider refuses for a reason other than a held git
+# lock still finishes forced cleanup as before: the closed child's copy is
+# removed by the guarded raw removal and its record is retired.
+test_forced_child_return_failure_falls_back_to_removal() {
+  local case_dir home slot child_home rc=0
+  make_child_return_case child-return-fails
+  case_dir=$CHILD_CASE
+  home="$case_dir/home"
+  slot="$case_dir/pool/1/project"
+  child_home="$case_dir/retired-home"
+  : > "$case_dir/project-held"
+  FM_SLOW_CASE="$case_dir" FM_FAKE_RETURN_FAILS=1 \
+    FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
+    FM_FAKE_CALL_LOG="$case_dir/calls.log" PATH="$case_dir/fakebin:$PATH" \
+    "$TEARDOWN" retire --force --drop-file "$(fm_test_drop_file)" > "$case_dir/retire.out" 2>&1 || rc=$?
+  expect_code 0 "$rc" "a refused child return must fall back to removal: $(cat "$case_dir/retire.out")"
+  assert_contains "$(cat "$case_dir/calls.log")" 'treehouse return' 'the child return was never attempted'
+  assert_absent "$slot" 'the refused child return left the closed child copy behind'
+  assert_absent "$child_home" 'forced teardown kept the child home'
+  assert_absent "$home/state/retire.meta" 'forced teardown kept the parent record'
+  assert_absent "$home/state/retire.teardown-return-pending" 'completed cleanup kept its return-pending record'
+  pass 'a refused forced child return falls back to guarded removal and finishes cleanup'
+}
+
+# Fresh same-ID spawn during a slow teardown that holds the task metadata lock
+# and waits for final project custody: spawn admission refuses at the task's
+# control lock before queueing for the project lock, so no admission cycle can
+# form, the retiring record is untouched, and the queued return still finishes.
+test_fresh_same_id_spawn_cannot_cycle_with_slow_teardown() {
+  local case_dir home slot lock actor holder spawner i queued ticket rc next
+  case_dir=$(make_case same-id-spawn-cycle)
+  home="$case_dir/home"
+  slot="$case_dir/pool/1/project"
+  mkdir -p "${slot%/*}"
+  git -C "$case_dir/project" worktree add --quiet --detach "$slot"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$slot" \
+    > "$case_dir/pool/treehouse-state.json"
+  printf 'manual\n' > "$home/config/backlog-backend"
+  write_brief "$home" retire
+  fm_write_meta "$home/state/retire.meta" \
+    "window=firstmate:fm-retire" "endpoint_task_id=retire" \
+    "worktree=$slot" "project=$case_dir/project" \
+    "harness=codex" "kind=ship" "mode=no-mistakes" "yolo=off" "spawn_gen=s-retire"
+  printf 'task=retire\nhome=%s\n' "$home" > "${slot%/*}/.fm-slot-owner"
+  fm_fake_docker "$case_dir/fakebin"
+  cat > "$case_dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_FAKE_CALL_LOG"
+case "${1:-}" in
+  list-windows)
+    [ -f "$FM_SLOW_CASE/closed" ] || printf '%s\n' fm-retire
+    exit 0
+    ;;
+  kill-window)
+    : > "$FM_SLOW_CASE/closing"
+    i=0
+    while [ ! -f "$FM_SLOW_CASE/project-held" ]; do
+      i=$((i + 1)); [ "$i" -lt 4000 ] || exit 1
+      sleep 0.05
+    done
+    : > "$FM_SLOW_CASE/closed"
+    exit 0
+    ;;
+  display-message) printf 'firstmate\n'; exit 0 ;;
+esac
+case "$*" in *'#{pane_current_path}'*) printf '%s\n' "${FM_FAKE_PANE_PATH:-}" ;; esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+  lock=$(FM_HOME="$home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
+    _ "$ROOT" "$case_dir/project")
+  FM_SLOW_CASE="$case_dir" FM_PROJECT_LOCK_POLL_SECS=0.05 \
+    FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
+    FM_FAKE_CALL_LOG="$case_dir/calls.log" PATH="$case_dir/fakebin:$PATH" \
+    "$TEARDOWN" retire --force --drop-file "$(fm_test_drop_file)" > "$case_dir/retire.out" 2>&1 &
+  actor=$!
+  i=0
+  while [ ! -f "$case_dir/closing" ]; do
+    i=$((i + 1)); [ "$i" -lt 1000 ] || { kill "$actor" 2>/dev/null || true; fail "teardown never reached endpoint closure: $(cat "$case_dir/retire.out")"; }
+    sleep 0.05
+  done
+  FM_HOME="$home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_lock_try_acquire "$2" || exit 1
+    trap '\''fm_lock_release "$2"'\'' EXIT
+    : > "$3/project-held"
+    while [ ! -f "$3/release" ]; do sleep 0.05; done
+  ' _ "$ROOT" "$lock" "$case_dir" &
+  holder=$!
+  i=0
+  while :; do
+    queued=0
+    for ticket in "$lock.queue"/ticket-*; do
+      [ ! -L "$ticket" ] || queued=1
+    done
+    [ "$queued" = 0 ] || break
+    i=$((i + 1)); [ "$i" -lt 1000 ] || {
+      : > "$case_dir/release"; wait "$holder" || true; wait "$actor" || true
+      fail "teardown never queued for its final return: $(cat "$case_dir/retire.out")"
+    }
+    sleep 0.05
+  done
+  cp "$home/state/retire.meta" "$case_dir/retire.meta.before"
+  next=$(new_worktree "$case_dir" retire-again)
+  spawn_ship "$case_dir" retire "$next" > "$case_dir/spawn.out" 2>&1 &
+  spawner=$!
+  i=0
+  while kill -0 "$spawner" 2>/dev/null; do
+    i=$((i + 1)); [ "$i" -lt 400 ] || {
+      kill "$spawner" 2>/dev/null || true
+      : > "$case_dir/release"; wait "$holder" || true; wait "$actor" || true
+      fail "a fresh same-ID spawn waited behind the slow teardown: $(cat "$case_dir/spawn.out")"
+    }
+    sleep 0.05
+  done
+  rc=0; wait "$spawner" || rc=$?
+  [ "$rc" -ne 0 ] || fail "a fresh same-ID spawn was admitted during teardown: $(cat "$case_dir/spawn.out")"
+  cmp -s "$case_dir/retire.meta.before" "$home/state/retire.meta" \
+    || fail 'the refused spawn changed the retiring task record'
+  ! grep -q 'operation=spawn retire$' "$lock.holds" 2>/dev/null \
+    || fail 'the refused spawn held the project lock'
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the refused spawn released the retiring slot reservation'
+  assert_not_contains "$(cat "$case_dir/calls.log")" 'treehouse return' 'the slot was returned before final custody'
+  : > "$case_dir/release"
+  wait "$holder" || fail 'the project holder could not release'
+  rc=0; wait "$actor" || rc=$?
+  expect_code 0 "$rc" "the queued teardown must finish after the refused spawn: $(cat "$case_dir/retire.out")"
+  assert_absent "$home/state/retire.meta" 'the queued teardown kept the retiring record'
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the queued teardown left its slot leased'
+  pass 'a fresh same-ID spawn refuses at task admission during a slow teardown, so pool return still progresses'
+}
+
 test_undeclared_capacity_keeps_dispatch_uncapped
 test_available_capacity_admits_the_worker
 test_exhausted_capacity_defers_without_leaving_anything_behind
@@ -1456,6 +1604,8 @@ test_unreadable_holders_refuse_admission
 test_concurrent_spawns_cannot_both_take_the_last_place
 test_spawn_progresses_during_non_pool_teardown_phases
 test_forced_child_return_waits_for_project_custody
+test_forced_child_return_failure_falls_back_to_removal
+test_fresh_same_id_spawn_cannot_cycle_with_slow_teardown
 test_mixed_operations_keep_fifo_even_with_a_slow_waiter
 test_same_home_spawn_for_another_project_is_not_refused_while_one_waits
 test_project_queue_recovers_dead_waiter_and_holder

@@ -30,6 +30,11 @@
 #   - no refusal from a recent teardown attempt still stands (see below).
 # A ship that is done but has no merge marker is awaiting its pipeline or its
 # merge and is reported, not reaped.
+# An ordinary ship or scout whose earlier admitted teardown already closed it
+# but still owes its pool slot return (state/<id>.teardown-return-pending, as
+# bin/fm-wake-lib.sh's fm_teardown_return_pending reads it) is reap-ready on
+# that record alone unless a refusal still stands: that teardown already
+# retired the busy state and status the gates above read.
 # Standing declared waits are PARKED with their reason before busy-state and
 # steering-inbox classification, including busy, unknown, and idle workers.
 # bin/fm-status-event-lib.sh owns configured wait verbs and wait retraction.
@@ -49,7 +54,11 @@
 # teardown's project-lock contention (FM_PROJECT_LOCK_BUSY_EXIT): before it
 # closes anything, the reaper's teardown never waits in the project-lock queue,
 # so that exit has closed nothing and the next sweep retries it. After closure
-# its short return stage waits in that queue (bin/fm-teardown.sh's header).
+# its short return stage waits in that queue with the same measured stall
+# bound as every other waiter. If it still cannot obtain the lock, the task
+# keeps its durable state/<id>.teardown-return-pending record, reported by
+# the open-work ledger, and the next sweep selects the closed task by that
+# record and retries it (bin/fm-teardown.sh's header owns the mechanics).
 #
 # `scan` rows are tab-separated: <class> <task-id> <kind> <age-secs> <detail>.
 # Classes: reap, wait-grace, refused, parked, awaiting-pipeline, awaiting-merge,
