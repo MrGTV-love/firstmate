@@ -475,6 +475,18 @@ sub fingerprint {
     }
     return sha256_hex(join "\0", @parts);
 }
+# A per-invocation sidecar distinguishes reused successes from cold analysis
+# without interpreting diagnostic text emitted by ShellCheck.
+sub duration_outcome {
+    my ($outcome) = @_;
+    return unless defined $ENV{FM_LINT_CACHE_RESULT_FILE};
+    if (open(my $fh, '>', $ENV{FM_LINT_CACHE_RESULT_FILE})) {
+        print {$fh} "$outcome\n";
+        close $fh;
+    } else {
+        warn "fm-lint: cannot record cache outcome: $!\n";
+    }
+}
 my $key = $cache eq 'off' ? undef : fingerprint();
 my ($lock, $passed);
 if (defined $key) {
@@ -491,6 +503,7 @@ if (defined $key) {
             my $record = <$fh>;
             close $fh;
             if (defined $record && $record eq "$key\n") {
+                duration_outcome('cache-hit');
                 print STDERR "fm-lint: cache hit $path\n";
                 exit 0;
             }
@@ -500,6 +513,7 @@ if (defined $key) {
         undef $key;
     }
 }
+duration_outcome('analyzed');
 my $status = system {$tool} $tool, @args;
 my $rc = $status == -1 ? 127 : ($status & 127) ? 128 + ($status & 127) : $status >> 8;
 if ($rc == 0 && defined $key) {

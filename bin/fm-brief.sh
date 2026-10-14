@@ -169,7 +169,18 @@ IFS= read -r -d '' CREWMATE_PAUSE_INSTRUCTIONS <<EOF || true
    Firstmate may still raise one first-sight alert; the declared wait then uses the existing long recheck cadence instead of repeated possible-wedge alarms.
    When you know when the wait clears, include \`until <YYYY-MM-DDTHH:MMZ>\` (UTC) for a recheck at that time.
    Follow the resolution rule below when the wait clears, then resume the task.
-   Use \`blocked:\` when you are stuck and need help.
+   Use \`blocked:\` only for a concrete prerequisite firstmate must supply, never because a command or read wait exceeded your own time budget.
+   Run long lint and test commands in the background through \`python3 $SCRIPT_DIR/fm-duration.py run <stable-command-key> -- <command...>\`, preserving stdout and stderr in task-local logs.
+   Use stable keys: \`lint.full.whole\` for canonical lint, \`test.<script-path>\` for an individual suite, and \`no-mistakes.<step>\` for a wrapped pipeline drive call (the helper records imported per-step durations apart from it, under its own \`no-mistakes-step.<step>\` namespace, and they never set a limit); do not combine unrelated commands or scopes into one key.
+   The helper scopes every key to the repository you run it in, so keep the short keys and never add a repository name yourself.
+   The helper owns measured limits and explicit cold-start fallbacks; consult its \`--help\` rather than inventing a ceiling.
+   Only that helper may append the owning home's duration table and file repeated-timeout work through its backlog wrapper outside your task directory; do not hand-write those records.
+   Judge continued work by output growth and cumulative process-tree CPU time, not by how long your read waits.
+   A self-imposed read wait ending is never a failure or stop reason: retain the running job and reattach until its actual result arrives.
+   An outer ceiling uses measured p99 x 3 once the helper holds five samples for that key on this host, and never drops below an explicit bound; before that, report the missing calibration and collect it under the documented fallback instead of guessing.
+   A command run under that helper records its own timeout automatically, so never record it again by hand; use \`python3 $SCRIPT_DIR/fm-duration.py timeout <stable-command-key> <elapsed-ms> --event-id <unique-occurrence-id>\` only for a real limit that stopped a command outside the helper; a read wait of your own that expired while the command continues is not a timeout, so record nothing for it.
+   Reuse the occurrence id when retrying a recording and never change the running command's result to a failure.
+   The second timeout for that key automatically files owned backlog work with its measured lower bounds (for the repository's registered project when it has one, else for firstmate), and a recurrence after that work closes files new work; an expired read wait of your own never files work. Report the concrete repair obligation, never a final \`blocked: timeout\`.
 EOF
 
 resolve_directory_input() {
@@ -411,6 +422,8 @@ In Claude Code that `until` loop in a single Bash call is the sanctioned foregro
 Bound that command by what your harness lets one command run: in Pi pass the bash tool a `timeout` of at most 2700 seconds, because Pi sets none by default; in Claude Code pass the Bash tool its maximum `timeout` of 600000 ms, because its default is 2 minutes; in Codex keep waiting on a still-running command with empty `write_stdin` polls of up to 300000 ms; elsewhere pass your shell tool its largest timeout and assume at most 10 minutes.
 Give any `--wait` a duration a little under that bound.
 When the bound passes with nothing changed, run the same blocking command again, with no status check in between.
+Long lint and test commands still run in the background under the measured-command instructions above; reattaching to such a job with one blocking read is waiting, not polling, and this waiting mode does not override their progress-based lifetime.
+When that bound or a tool's own read wait passes, the still-running job has not failed: reattach to it, never stop because of it, and never arm a guessed deadline as a substitute for observing completion.
 The one exception is `respond`: it sent its answer before it began waiting, so reattach with `no-mistakes axi run --wait` instead, and never send the same `respond` again, because it would answer whichever gate parks next without you reading it.
 A wait your shell can watch this way needs no `paused:` line, except your own pipeline run, a long foreground command, or your own validation round, which you declare once just before its blocking hold: append `paused:` once just before its first blocking command, then stay in the command, and never append it again as you reissue that command.
 EOF
@@ -679,7 +692,8 @@ The report is the only thing that survives, so anything worth keeping must be in
    https:// URL exactly as the forge printed it, never a bare number such as "PR 108"; firstmate
    copies that URL from your line rather than assembling one.
 $CREWMATE_PAUSE_INSTRUCTIONS
-5. If you hit the same obstacle twice, append \`blocked [at=<epoch>]: {why}\` and stop; firstmate will help.
+5. If you hit the same non-timeout prerequisite obstacle twice, append \`blocked [at=<epoch>]: {why}\` and stop; firstmate will help.
+   Timeout and elapsed-read events follow the measured-command instructions above, not this stop rule.
 6. If a decision belongs to a human (product choices, destructive actions),
    append \`needs-decision [at=<epoch>]: {summary of options}\` and stop. Firstmate will reply with the decision.
    A decision or blocker you opened stays open until a \`resolved\` line carrying its exact key lands; a later \`done:\` or \`working:\` line never closes it, even when the answer is what started that work.
@@ -761,7 +775,8 @@ $RULE1
    A mid-task \`working:\` line (including setup complete) is nonterminal: do not end the
    turn after it; continue the same stage until a defined \`done:\` gate under Definition of done.
 $CREWMATE_PAUSE_INSTRUCTIONS
-5. If you hit the same obstacle twice, append \`blocked [at=<epoch>]: {why}\` and stop; firstmate will help.
+5. If you hit the same non-timeout prerequisite obstacle twice, append \`blocked [at=<epoch>]: {why}\` and stop; firstmate will help.
+   Timeout and elapsed-read events follow the measured-command instructions above, not this stop rule.
 6. If a decision belongs above the implementation worker (product choices, destructive actions),
    append \`needs-decision [at=<epoch>]: {summary of options}\` and stop. Firstmate will reply with the decision.
 $ASK_USER_BLOCK

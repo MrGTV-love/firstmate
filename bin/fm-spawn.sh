@@ -2454,7 +2454,10 @@ omp_model_validate() { # <omp-bin> <model>
 omp_models_listing() { # <omp-bin>
   local listing
   command -v jq >/dev/null 2>&1 || return 0
-  listing=$(OMP_SKIP_SETUP=1 "$1" models --json 2>/dev/null) || return 0
+  # shellcheck source=bin/fm-duration-lib.sh
+  . "$SCRIPT_DIR/fm-duration-lib.sh"
+  # shellcheck disable=SC2016 # Positional expansion belongs to the child.
+  listing=$(OMP_SKIP_SETUP=1 fm_duration_timed model-catalog.omp 0 sh -c 'exec "$@" 2>/dev/null' sh "$1" models --json) || return 0
   printf '%s\n' "$listing"
 }
 
@@ -6393,6 +6396,12 @@ fi
 # kill switch below it is an export statement, so it survives a compound raw
 # launch and the launch-env-allowlist `env -i` wrapper.
 LAUNCH="export FM_TASK_INBOX=$(shell_quote "$STATE_REAL/$ID.inbox"); $LAUNCH"
+# Ship and scout workers run their worktree's own bin/, so name the owning home
+# for command durations and repeated-timeout work (bin/fm-duration.py header);
+# a secondmate's FM_HOME above already is its owning home.
+if [ "$KIND" != secondmate ]; then
+  LAUNCH="export FM_DURATION_HOME=$(shell_quote "$FM_HOME"); $LAUNCH"
+fi
 LAUNCH="export COMPACT_ADVISER_DISABLE=$COMPACT_ADVISER_SWITCH; $COMPACT_ADVISER_HOOKS$LAUNCH"
 if [ "$BACKEND" = herdr ]; then
   LAUNCH="(export FM_SPAWN_GEN=$(shell_quote "$SPAWN_GEN"); $LAUNCH

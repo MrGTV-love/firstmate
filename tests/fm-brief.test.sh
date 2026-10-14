@@ -1037,8 +1037,9 @@ test_scout_and_secondmate_scaffold() {
 }
 
 # Contract: a waiting worker spends no turns. A decision wait ends the turn, an
-# external wait sleeps in one bounded blocking shell command sized per harness,
-# and a waiting worker neither polls its inbox nor polls a pipeline between holds.
+# external wait sleeps in one blocking shell command, a background long command
+# is reattached rather than stopped, and a waiting worker neither polls its inbox
+# nor polls a pipeline between holds.
 test_workers_wait_without_spending_turns() {
   local home id brief
   home="$TMP_ROOT/wait-home"
@@ -1054,11 +1055,16 @@ test_workers_wait_without_spending_turns() {
     assert_grep "with ONE blocking shell command that returns when the state changes" "$brief" \
       "$id: an external wait must sleep in one blocking shell command"
     assert_grep "gh pr checks <pr> --watch" "$brief" "$id: the CI wait primitive is missing"
+    assert_grep "until <condition>; do sleep 30; done" "$brief" "$id: the slot wait primitive is missing"
     assert_grep "a \`timeout\` of at most 2700 seconds" "$brief" "$id: the Pi ceiling is missing"
     assert_grep "its maximum \`timeout\` of 600000 ms" "$brief" "$id: the Claude Code ceiling is missing"
     assert_grep "empty \`write_stdin\` polls of up to 300000 ms" "$brief" "$id: the Codex ceiling is missing"
+    assert_grep "records its own timeout automatically, so never record it again by hand" "$brief" \
+      "$id: a helper-run timeout must not be recorded a second time by hand"
     assert_grep "is the sanctioned foreground wait" "$brief" \
       "$id: the wait a Claude Code worker may use is not named"
+    assert_grep "the still-running job has not failed: reattach to it, never stop because of it" "$brief" \
+      "$id: an elapsed wait bound must not stop a background long command"
     assert_grep "reattach with \`no-mistakes axi run --wait\` instead, and never send the same \`respond\` again" "$brief" \
       "$id: a timed-out respond must reattach with axi run, never resend its answer"
     assert_grep "Do not poll or list the inbox while waiting; a waiting instruction rings." "$brief" \
@@ -1077,10 +1083,10 @@ test_workers_wait_without_spending_turns() {
   assert_grep "Do not poll or list the inbox while waiting; a waiting instruction rings." "$brief" \
     "secondmate: polling the inbox while waiting is not forbidden"
   assert_grep "natural checkpoint" "$brief" "secondmate: the flag dropped the natural-checkpoint inbox check"
-  pass "fm-brief: workers end the turn on a decision, wait in one bounded shell command, and never poll"
+  pass "fm-brief: workers end the turn on a decision, wait in one blocking shell command, and never poll"
 }
 
-# Without config/wait-no-turns the scaffold matches the pre-flag brief and drive text.
+# Without config/wait-no-turns the scaffold keeps the pre-flag brief and drive text.
 test_wait_no_turns_absent_keeps_the_previous_brief() {
   local home brief
   home="$TMP_ROOT/wait-off"

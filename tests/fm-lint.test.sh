@@ -277,8 +277,12 @@ PY
 #   FM_TEST_GIT_DIFF_FILE        path to a file of NUL-separated changed paths
 fm_lint_stub_git() {
   local fakebin=$1
+  FM_TEST_REAL_GIT_BIN=$(command -v git)
+  export FM_TEST_REAL_GIT_BIN
   cat > "$fakebin/git" <<'SH'
 #!/usr/bin/env bash
+# Literal-baseline reads are real repository reads, not selection fixtures.
+[ "${1:-}" != -C ] || exec "$FM_TEST_REAL_GIT_BIN" "$@"
 case "$*" in
   "rev-parse --is-inside-work-tree")
     [ "${FM_TEST_GIT_INSIDE_WORKTREE:-1}" = 1 ] || exit 1
@@ -1818,7 +1822,7 @@ test_root_deadline_names_the_root_and_reaps_the_tree() {
   sentinel_pid=$!
   rc=0
   out=$(PATH="$fakebin:$PATH" FM_LINT_JOBS=1 \
-    FM_LINT_REQUIRE_BOUNDS=1 \
+    FM_LINT_REQUIRE_BOUNDS=1 FM_DURATION_FILE="$tmp/durations.jsonl" \
     FM_LINT_ROOT_SECONDS=1 FM_LINT_ROOT_GRACE=1 \
     FM_TEST_STUB_LOG="$stub_log" FM_TEST_CHILD_PID="$child_pid_file" \
     FM_TEST_STUB_PID="$stub_pid_file" FM_TEST_BLOCK_SECS=300 \
@@ -1826,6 +1830,15 @@ test_root_deadline_names_the_root_and_reaps_the_tree() {
   [ "$rc" -ne 0 ] || fail "a root pinned at the wall deadline unexpectedly passed"
   assert_contains "$out" "blocker.sh" "the timed-out root was not named"
   assert_contains "$out" "reason=timeout" "the timed-out root was not reported as a timeout"
+  python3 - "$tmp/durations.jsonl" <<'PY' || fail "the timed-out root was not recorded as a timeout in the duration table"
+import json
+import sys
+rows = [json.loads(line) for line in open(sys.argv[1])]
+roots = {row['key'].rsplit('/', 1)[-1]: row for row in rows if row.get('key', '').startswith('lint-root.') and 'event' not in row}
+assert roots['blocker.sh']['exit'] == 124 and roots['blocker.sh']['timed_out'] is True, roots
+assert roots['ok.sh']['timed_out'] is False, roots
+assert [row['key'] for row in rows if row.get('event') == 'timeout'] == [roots['blocker.sh']['key']], rows
+PY
   kill -0 "$sentinel_pid" 2>/dev/null \
     || fail "the lint deadline killed an unrelated sentinel process"
   kill -KILL "$sentinel_pid" 2>/dev/null || true

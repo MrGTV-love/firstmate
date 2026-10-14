@@ -75,14 +75,16 @@
 #                   1 (serial) except for plain --changed and a plain list of
 #                   script paths, which use the bounded automatic scheduler.
 #   --per-script-timeout-secs N
-#                   terminate a script that runs longer than N seconds and
-#                   record it as exit 124 (0 disables, the default). The
+#                   terminate a script that runs longer than N seconds, raised
+#                   to its measured test.<script> p99 x 3 from bin/fm-duration.py
+#                   when that is larger, and record it as exit 124 (0
+#                   disables, the default). The
 #                   --changed applies 1500s automatically, above the current
 #                   slowest CI hint with margin; exceeding it becomes a bounded
 #                   failure, not proof of a hang. --max-wall-ms is checked
 #                   after the run and so cannot catch a hang on its own.
-#                   External interruption cleanup is outside this runner's
-#                   guarantee; configured per-script bounds remain authoritative.
+#                   HUP, INT and TERM remove this runner's scratch directory
+#                   before it exits; configured per-script bounds remain authoritative.
 #   --max-wall-ms N fail the run when its measured invocation wall clock exceeds
 #                   N milliseconds, including an empty selection. It is
 #                   evaluated after selection and suite execution and cannot
@@ -194,6 +196,12 @@ RUN_STARTED_MS=$(now_ms)
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT" || exit 1
+RUN_STARTED_LOAD=
+if [ -r "$ROOT/bin/fm-duration-lib.sh" ]; then
+  # shellcheck source=bin/fm-duration-lib.sh
+  . "$ROOT/bin/fm-duration-lib.sh"
+  RUN_STARTED_LOAD=$(fm_duration_load)
+fi
 
 MODE=
 LIST_ONLY=0
@@ -331,7 +339,7 @@ family_for_basename() {
     fm-send-popup-settle.test.sh|fm-send-settle.test.sh|\
     fm-dispatch-capacity.test.sh|\
     fm-supervision-instructions.test.sh|fm-task-delivery.test.sh|\
-    fm-timeout-lib.test.sh|\
+    fm-timeout-lib.test.sh|fm-duration.test.sh|\
     fm-tmux-submit-busy.test.sh|fm-trace-context-lib.test.sh|\
     fm-transition-lib.test.sh|\
     fm-test-run.test.sh|fm-test-isolation-proof.test.sh)
@@ -798,6 +806,7 @@ tests/fm-dispatch-capacity.test.sh 3724
 tests/fm-dispatch-resolve.test.sh 34508
 tests/fm-documentation-audiences.test.sh 3204
 tests/fm-dod-lib.test.sh 4000
+tests/fm-duration.test.sh 7990
 tests/fm-extension-binding.test.sh 12953
 tests/fm-fleet-ledger.test.sh 20284
 tests/fm-fleet-snapshot-contribution-cleanup.test.sh 1299
@@ -1798,6 +1807,12 @@ families_for_changed_path() {
       printf '%s\n' __script__:fm-procevent-when.test.sh
       printf '%s\n' __script__:fm-remote-reply.test.sh
       ;;
+    bin/fm-duration.py|bin/fm-duration-lib.sh|bin/fm-duration-existing-limits.tsv)
+      printf '%s\n' __script__:fm-duration.test.sh
+      printf '%s\n' __script__:fm-timeout-lib.test.sh
+      printf '%s\n' __script__:fm-lint.test.sh
+      printf '%s\n' __script__:fm-test-run.test.sh
+      ;;
     bin/fm-timeout-lib.sh)
       # The shared hard bound: session start's runtime bound, the fleet/bearings
       # snapshots, the vendor auth probe, the stow cascade's per-home step, and
@@ -2659,6 +2674,9 @@ cleanup_run() {
 }
 
 trap cleanup_run EXIT
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 RUN_ID="fm-test-run-${RUN_STARTED_MS}-$$"
 TOTAL=0
@@ -2698,8 +2716,8 @@ family_bump() {
 }
 
 record_script_result() {
-  local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5
-  local base family expected gate_skip gate_reason fail_delta token
+  local script=$1 rc=$2 duration=$3 out=$4 end_iso=$5 load_start=${6:-}
+  local base family expected gate_skip gate_reason fail_delta token timed_out=0
   base=$(basename "$script")
   family=$(family_for_basename "$base")
   expected=$(expected_gate_skip_for_family "$family")
@@ -2734,6 +2752,12 @@ record_script_result() {
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" >>"$RECORDS"
+  if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1; then
+    if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
+      timed_out=1
+    fi
+    fm_duration_record "test.$script" "$duration" "$rc" '' 1 "$load_start" "$timed_out"
+  fi
   family_bump "$family" "$duration" "$fail_delta"
   TOTAL=$((TOTAL + 1))
 }
@@ -2764,7 +2788,10 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   local GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM
   # shellcheck source=tests/git-config-helpers.sh
   . "$ROOT/tests/git-config-helpers.sh" || return
-  local rc
+  local rc script_seconds=$PER_SCRIPT_TIMEOUT_SECS
+  if [ "$script_seconds" -gt 0 ] && declare -F fm_duration_limit >/dev/null 2>&1; then
+    script_seconds=$(fm_duration_limit "test.$script" "$script_seconds" 99) || return $?
+  fi
   local -a cmd
   : "$id"
   if [ "$stream" -eq 1 ]; then
@@ -2781,9 +2808,14 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   fi
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
     # The bound runs inside the pass holder so the pass wait stays outside it.
+    # A script's own exit 124 is not a timeout: <out>.expired marks only a 124
+    # after the bound's full span, which record_script_result reports.
     # shellcheck disable=SC2016
-    cmd=(bash -c '. "$1" || exit 125; shift; fm_run_timed "$@"' _ \
-      "$ROOT/bin/fm-timeout-lib.sh" "$PER_SCRIPT_TIMEOUT_SECS" "${cmd[@]}")
+    cmd=(bash -c '. "$1" || exit 125; expired=$2; shift 2
+      ms() { perl -MTime::HiRes=time -e "printf q(%.0f), time * 1000"; }
+      started=$(ms); fm_run_timed "$@"; rc=$?
+      [ "$rc" -ne 124 ] || [ $(($(ms) - started)) -lt $(($1 * 1000)) ] || : >"$expired"
+      exit "$rc"' _ "$ROOT/bin/fm-timeout-lib.sh" "$out.expired" "$script_seconds" "${cmd[@]}")
   fi
   if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
@@ -2798,7 +2830,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   rc=$?
   if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ] && [ "$rc" -eq 124 ]; then
     printf 'not ok - %s exceeded the per-script bound of %ss and was terminated\n' \
-      "$script" "$PER_SCRIPT_TIMEOUT_SECS" >>"$out"
+      "$script" "$script_seconds" >>"$out"
     [ "$stream" -eq 1 ] && tail -1 "$out"
   fi
   reap_script_leftovers "$script"
@@ -2807,12 +2839,15 @@ run_script_bounded() {  # <script> <out> <stream> <id>
 
 run_one_serial() {
   local script=$1
-  local base family expected out begin_iso begin_ms end_ms end_iso duration rc
+  local base family expected out begin_iso begin_ms end_ms end_iso duration rc load_start=
   base=$(basename "$script")
   family=$(family_for_basename "$base")
   expected=$(expected_gate_skip_for_family "$family")
   out="$RUN_TMP/out.$TOTAL"
   begin_iso=$(now_iso)
+  if declare -F fm_duration_load >/dev/null 2>&1; then
+    load_start=$(fm_duration_load)
+  fi
   begin_ms=$(now_ms)
 
   printf 'FM_TEST_BEGIN %s %s family=%s expected_gate_skip=%s\n' \
@@ -2831,7 +2866,7 @@ run_one_serial() {
   if [ "$duration" -lt 0 ]; then
     duration=0
   fi
-  record_script_result "$script" "$rc" "$duration" "$out" "$end_iso"
+  record_script_result "$script" "$rc" "$duration" "$out" "$end_iso" "$load_start"
 }
 
 if [ "$JOBS" -eq 1 ]; then
@@ -2846,6 +2881,15 @@ else
   # Retries are never used as a green strategy.
   worker_n=0
   active_workers=0
+  # Workers drop the home overrides below, so pin the one duration table that
+  # both their limit reads and this parent's records use.
+  if [ -z "${FM_DURATION_FILE:-}" ] && [ -r "$ROOT/bin/fm-duration.py" ] && command -v python3 >/dev/null 2>&1; then
+    if FM_DURATION_FILE=$(python3 "$ROOT/bin/fm-duration.py" path); then
+      export FM_DURATION_FILE
+    else
+      unset FM_DURATION_FILE
+    fi
+  fi
 
   worker_root_mode_is_enforceable() {
     case "$(uname -s)" in
@@ -2885,7 +2929,7 @@ else
           ;;
       esac
     fi
-    record_script_result "$script" "$rc" "$duration" "$out" "$end_iso"
+    record_script_result "$script" "$rc" "$duration" "$out" "$end_iso" "$(cat "$work/load_start" 2>/dev/null || true)"
   }
 
   worker_pid_is_running() {
@@ -2936,14 +2980,15 @@ else
     (
       trap - EXIT HUP INT TERM
       set +e
-      export TMPDIR="$work/tmp"
-      export TMP="$work/tmp"
       unset FM_HOME FM_STATE_OVERRIDE FM_DATA_OVERRIDE FM_ROOT_OVERRIDE \
         FM_PROJECTS_OVERRIDE FM_CONFIG_OVERRIDE FM_BACKEND 2>/dev/null || true
       cd "$ROOT" || exit 1
+      if declare -F fm_duration_load >/dev/null 2>&1; then
+        fm_duration_load >"$work/load_start"
+      fi
       begin_ms=$(now_ms)
       set +e
-      run_script_bounded "$script" "$work/output" 0 "w$worker_n"
+      TMPDIR="$work/tmp" TMP="$work/tmp" run_script_bounded "$script" "$work/output" 0 "w$worker_n"
       rc=$?
       set -e
       end_ms=$(now_ms)
@@ -3029,4 +3074,7 @@ if [ -n "$MAX_WALL_MS" ]; then
   fi
 fi
 
+if declare -F fm_duration_record >/dev/null 2>&1; then
+  fm_duration_record "test-suite.$SELECTION_DESC" "$RUN_DURATION" "$AGG_RC" '' 1 "$RUN_STARTED_LOAD" 0
+fi
 exit "$AGG_RC"

@@ -390,6 +390,45 @@ SH
   pass "shared helpers and runner keep fixture Git off an inherited repository location"
 )
 
+test_duration_fixture_isolation() (
+  local dir="$TMP_ROOT/duration-isolation" out
+  mkdir -p "$dir/ambient/data" "$dir/isolated"
+  printf 'existing production ledger\n' > "$dir/ambient/data/command-durations.jsonl"
+  cp "$dir/ambient/data/command-durations.jsonl" "$dir/expected"
+  out=$(FM_DURATION_FILE="$dir/ambient/data/command-durations.jsonl" \
+    FM_DURATION_HOME="$dir/ambient" \
+    FM_HOME="$dir/ambient" FM_DATA_OVERRIDE="$dir/ambient/data" \
+    bash -eu -s -- "$ROOT" "$dir/isolated/durations.jsonl" <<'SH'
+# shellcheck source=tests/lib.sh
+. "$1/tests/lib.sh"
+# shellcheck source=bin/fm-duration-lib.sh
+. "$1/bin/fm-duration-lib.sh"
+fm_duration_record fixture.ambient 42 0
+[ "$FM_DURATION_FILE" = off ]
+[ -z "${FM_DURATION_HOME:-}" ]
+export FM_DURATION_FILE="$2"
+fm_duration_record fixture.isolated 42 0
+# Re-sourcing must retain an explicit fixture override, not reset test state.
+# shellcheck source=tests/lib.sh
+. "$1/tests/lib.sh"
+fm_duration_record fixture.isolated 43 0
+python3 - "$2" <<'PY'
+import json
+from pathlib import Path
+import sys
+rows = [json.loads(line) for line in Path(sys.argv[1]).read_text().splitlines()]
+assert [(row['key'], row['duration_ms'], row['exit']) for row in rows] == [('fixture.isolated', 42, 0), ('fixture.isolated', 43, 0)]
+print('isolated samples: 42,43')
+PY
+SH
+  ) || fail "fixture duration isolation failed: $out"
+  cmp -s "$dir/ambient/data/command-durations.jsonl" "$dir/expected" \
+    || fail "stubbed fixture command changed ambient production timing evidence"
+  [ "$out" = 'isolated samples: 42,43' ] || fail "explicit fixture ledger did not retain measured samples: $out"
+  pass "fixture timing defaults off, preserves production evidence, and explicitly isolated samples survive re-sourcing"
+)
+
+test_duration_fixture_isolation || fail "Fixture duration isolation"
 test_git_config_isolation || fail "Git fixture config isolation"
 test_inherited_git_location_isolation || fail "Git fixture location isolation"
 test_agent_standin_survives_a_multicall_sleep || fail "agent stand-in multicall case"

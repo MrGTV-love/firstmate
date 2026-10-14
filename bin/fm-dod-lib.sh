@@ -337,6 +337,10 @@ Declare that wait using the brief's status-reporting rule before waiting on the 
 Where a harness's own command limit is not established, assume it bounds commands and use that same backgrounded shape.
 ${pr_return_line}Whenever a drive call returns without a gate or an outcome - its own wait elapsed, or it was killed or timed out - reattach at once by re-running \`no-mistakes axi run\` without flags, backgrounded the same way${pr_reattach_clause} if it refuses because no run is active, read the finished outcome from \`no-mistakes axi status\`."
   fi
+  drive_block="$drive_block
+A drive call's own wait ending, or your harness's command bound passing, never kills the run, proves failure, or permits a final timeout blocker: the measured-command instructions above own long-command limits and progress checks, so judge continued work by output growth and cumulative process-tree CPU time.
+Any outer ceiling is measured p99 x 3 from that helper for the wrapped call's own key, not a guessed tool wait; follow its explicit fallback when calibration is missing.
+The per-step durations the helper imports from completed pipeline runs are record-only under \`no-mistakes-step.<step>\` and never set a drive call's ceiling."
   cat <<EOF
 You drive no-mistakes by responding to its gates, not by implementing fixes.
 Follow the guidance no-mistakes itself provides for the mechanics: it loads when you invoke /no-mistakes, and \`no-mistakes axi run --help\` plus the \`help\` lines in each \`axi\` response are authoritative and version-matched to the installed binary.

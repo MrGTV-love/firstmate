@@ -38,6 +38,9 @@ jobs:
         partition: [1, 2, 3]
     steps:
       - uses: actions/checkout@v6
+        with:
+          # New time-limit literals compare against the default-branch merge-base.
+          fetch-depth: 0
       - name: Install pinned ShellCheck
         run: |
           set -eu

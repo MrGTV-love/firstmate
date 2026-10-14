@@ -58,6 +58,12 @@ export FM_TEST_SEAM=1
 # it back on against fixture catalogs.
 export FM_MODEL_FRESHNESS=0
 
+# Stubbed commands are not production timing evidence. Never inherit an
+# operational home's ledger into fixtures; timing-specific cases explicitly
+# select an isolated file after sourcing this helper.
+export FM_DURATION_FILE=off
+unset FM_DURATION_HOME
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
