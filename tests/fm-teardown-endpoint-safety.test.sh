@@ -1046,6 +1046,9 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   fm_write_meta "$dir/home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=ship"
+  # A ship retires from a reassigned slot only on its own delivery proof, never
+  # the claimant's copy: its own branch is landed on the default branch.
+  git -C "$dir/project" branch "fm/$id"
   claim_pool_slot "$dir" "$other" "$dir/other-home"
   ( cd "$dir/worktree" && exec sleep 30 ) &
   worker=$!
@@ -1121,15 +1124,27 @@ test_stale_record_on_claimed_slot_retires_then_claimant_tears_down() {
   grep -Fq "treehouse <return>" "$dir/runtime.log" \
     || fail "claimant teardown did not return its pool slot: $(cat "$dir/runtime.log")"
 
-  # Ordinary non-forcing cleanup of a stale ship record with no recorded PR
-  # and a pruned branch, while the claimant holds only a process lease, keeps
-  # the records-only route: no durable lease or new delivery proof is needed.
+  # Ordinary non-forcing cleanup of a stale ship record with a merged recorded
+  # PR and a pruned branch, while the claimant holds only a process lease, keeps
+  # the records-only route: its own PR proves delivery, and no durable lease is
+  # needed.
   dir=$(make_case slot-reassigned-both-records-unforced)
   mark_case_as_treehouse_pool "$dir"
   rm -f "$dir/worktree/sentinel"
+  cat > "$dir/fakebin/gh" <<'SH'
+#!/usr/bin/env bash
+case "$*" in
+  "pr view https://github.com/example/repo/pull/7 --json state -q .state")
+    printf '%s\n' MERGED
+    ;;
+  *) exit 1 ;;
+esac
+SH
+  chmod +x "$dir/fakebin/gh"
   fm_write_meta "$dir/home/state/$id.meta" \
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
-    "worktree=$dir/worktree" "project=$dir/project" "kind=ship" "branch=fm/$id"
+    "worktree=$dir/worktree" "project=$dir/project" "kind=ship" "branch=fm/$id" \
+    "pr=https://github.com/example/repo/pull/7"
   fm_write_meta "$dir/home/state/$other.meta" \
     "window=firstmate:fm-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"

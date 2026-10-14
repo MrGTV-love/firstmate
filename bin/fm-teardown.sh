@@ -127,10 +127,13 @@
 # fm-control reassociate for the remaining record's real copy;
 # docs/agent-control.md owns that route.
 # A slot whose owner claim (below) names another task likewise touches nothing
-# under the slot, so its exclusive return scan is skipped rather than
-# stranding the stale record
-# and, with it, the claimant's own teardown. Forced cleanup keeps its existing
-# overlap refusals; this records-only shared-root route never needs --force.
+# under the slot. Its exclusive return scan, dirty/landed-copy admission and
+# post-cleanup clone sync are skipped: that copy and its Git refs belong to the
+# claimant, not the stale task whose endpoint and records are being retired.
+# Like the shared root, it still proves delivery from its recorded PR or own
+# branch, and refuses with its records in place otherwise.
+# Forced cleanup keeps its existing overlap refusals; this records-only
+# shared-root route never needs --force.
 # That scan alone cannot prove THIS record is the current owner, because the task
 # that took the slot next may leave no record it can reach - its own worker may
 # have exited and its record been cleaned up, or it may live in a home this
@@ -2351,9 +2354,11 @@ validate_worktree_teardown_safety() {
     secondmate|scout) return 0 ;;
   esac
   wt_real=$(fm_task_copy_canonical_dir "$WT") || wt_real=$WT
-  if [ "$TEARDOWN_SLOT_SHARED" = 1 ] && [ "$wt_real" = "$TEARDOWN_SHARED_SLOT" ]; then
-    # The shared root's HEAD and dirt may belong to the remaining task. Use
-    # the retiring record's own delivery evidence, never that root's contents.
+  if [ "$TEARDOWN_SLOT_REASSIGNED" = 1 ] \
+      && { [ "$TEARDOWN_SLOT_SHARED" != 1 ] || [ "$wt_real" = "$TEARDOWN_SHARED_SLOT" ]; }; then
+    # A reassigned slot's or shared root's HEAD and dirt may belong to its
+    # claimant or remaining task. Use the retiring record's own delivery
+    # evidence, never that copy's contents.
     if [[ "$PR_URL" =~ ^https://github[.]com/([^/]+/[^/]+)/pull/([0-9]+)$ ]] \
         && recorded_pr_state=$(gh pr view "$PR_URL" --json state -q '.state' 2>/dev/null) \
         && [ "$recorded_pr_state" = MERGED ]; then
@@ -2365,8 +2370,13 @@ validate_worktree_teardown_safety() {
         && teardown_landed "$PROJ" "refs/heads/$branch" "$branch"; then
       return 0
     fi
-    echo "REFUSED: task $ID shares pool slot $TEARDOWN_SHARED_SLOT, but its recorded PR is not confirmed merged and its own branch $branch is not proved landed; its record and slot claim stay in place." >&2
-    echo "Land this task's deliverable before re-running bin/fm-teardown.sh $ID; the shared slot will not be returned." >&2
+    if [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
+      echo "REFUSED: task $ID shares pool slot $TEARDOWN_SHARED_SLOT, but its recorded PR is not confirmed merged and its own branch $branch is not proved landed; its record and slot claim stay in place." >&2
+      echo "Land this task's deliverable before re-running bin/fm-teardown.sh $ID; the shared slot will not be returned." >&2
+    else
+      echo "REFUSED: task $ID's recorded copy $WT was reassigned to task $TEARDOWN_SLOT_REASSIGNED_TO, but its recorded PR is not confirmed merged and its own branch $branch is not proved landed; its records stay in place." >&2
+      echo "Land this task's deliverable before re-running bin/fm-teardown.sh $ID; the reassigned slot stays with its claimant." >&2
+    fi
     return 1
   fi
   if [ ! -d "$WT" ] || [ "$(git -C "$WT" rev-parse --is-inside-work-tree 2>/dev/null)" != true ]; then
@@ -5135,7 +5145,7 @@ fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
-    && [ "$TEARDOWN_SLOT_SHARED" != 1 ]; then
+    && teardown_owns_worktree; then
   "$FM_ROOT/bin/fm-fleet-sync.sh" "$PROJ" || true
 fi
 # A secondmate retirement may remove the home containing an overridden control

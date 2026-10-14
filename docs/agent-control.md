@@ -211,7 +211,8 @@ An absent claim counts as ownership for this protection, as it does for teardown
 Otherwise cleanup refuses with the command to lease that exact slot in place without changing its contents.
 When exactly one other root record names the slot, the command names it as the lease holder; when several do, it names none, lists every candidate with its last recorded status line, and the operator selects the live one.
 This prevents another allocation from resetting the parked copies between cleanup and reassociation, while the remaining record still names only the root.
-A finished root record whose slot claim already names another task, such as a slot an ordinary spawn handed on under a process-only lease, no longer owns the slot: it keeps teardown's existing reassigned-slot cleanup, retiring records-only with no lease proof and no shared-route delivery proof, and leaves the claimant's record, claim, branches, and copy untouched.
+A finished root record whose slot claim already names another task, such as a slot an ordinary spawn handed on under a process-only lease, no longer owns the slot: it keeps teardown's existing reassigned-slot cleanup, retiring records-only with no lease proof, and leaves the claimant's record, claim, branches, and copy untouched.
+Like a shared root record, a ship on that route must have its own recorded PR confirmed merged or its recorded branch proved landed; the claimant's copy, HEAD, and dirt are never judged, and an unproved ship refuses with its records in place.
 Then run ordinary `bin/fm-teardown.sh <finished-task>` in that record's owning `FM_HOME` first.
 The shared-root route reuses record-only retirement: it closes the finished task's endpoint and records, releases only that task's Firstmate claim beside the slot, and never returns the slot or touches its contents, nested copies, or branches.
 Slot-wide run/process cleanup is skipped; task-owned temporary resources retain the existing record-only cleanup behavior.
