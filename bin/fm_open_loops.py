@@ -299,7 +299,7 @@ class Collector:
         out = self.bash('. "$1/fm-classify-lib.sh"; last=$(last_status_line "$2"); '
                         'printf "%s\\n" "$(status_line_at_epoch "$last" || :)" '
                         '"$(status_line_verb "$last")"; '
-                        'status_open_decisions_dated "$2" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
+                        'status_own_open_decisions "$2" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
                         '{ n = 1 } END { print n + 0 }\'; '
                         'wait=$(status_declared_wait_line "$2"); '
                         'if status_is_paused_or_captain_held "$wait" && [ -n "$(status_line_note "$wait")" ]; then '
@@ -328,6 +328,13 @@ class Collector:
             raise ValueError("secondmate backlog is unavailable")
         return any(row.get("state") == "in_flight" for row in snapshot["backlog"]["records"])
 
+    def gate_awaits_human(self, task):
+        state = task["current_state"]
+        if state.get("state") != "parked" or state.get("source") != "run-step":
+            return False
+        return bool(self.bash('. "$1/fm-classify-lib.sh"; crew_gate_awaits_human_decision "$2" || :',
+                              BIN, task["id"]).strip())
+
     def silent_report(self, task):
         ident = task["id"]
         if task["current_state"].get("detail") == "task generation changed during snapshot":
@@ -354,8 +361,8 @@ class Collector:
             excluded = "excluded: done/ready task is covered by PR or landing evidence"
         elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
             excluded = "excluded: idle secondmate has no routed work in flight"
-        elif open_decision or task["current_state"].get("state") in ("parked", "blocked"):
-            excluded = "excluded: waiting on firstmate; its unanswered question or gate owns the next move"
+        elif open_decision or self.gate_awaits_human(task):
+            excluded = "excluded: waiting on firstmate; its unanswered question or human-owned gate owns the next move"
         elif pause_limit and (until is None or until > self.now):
             # Keep the declared wait visible on the watcher's long cadence, not the ordinary check-in cadence.
             excluded = "declared wait uses long cadence: " + pause_note

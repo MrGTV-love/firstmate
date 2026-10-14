@@ -1393,7 +1393,7 @@ fake.mkdir()
 now = int(time.time())
 def script(path, text):
     path.write_text(text); path.chmod(0o755)
-script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\nprintf "state: %s · source: pane · building\\n" "${FM_SILENCE_TEST_CREW_STATE:-working}"\n')
+script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\nprintf "state: %s · source: %s · %s\\n" "${FM_SILENCE_TEST_CREW_STATE:-working}" "${FM_SILENCE_TEST_CREW_SOURCE:-pane}" "${FM_SILENCE_TEST_CREW_DETAIL:-building}"\n')
 # This fixture supplies endpoint observations, not a rendered vendor-process classifier.
 backend = code / 'bin/fm-backend.sh'
 backend.write_text(backend.read_text() + '\nfm_backend_agent_state() { printf "%s" "${FM_SILENCE_TEST_LIVENESS:-alive}"; }\n'
@@ -1472,15 +1472,26 @@ status('worker', f'captain-held [at={now - 901}]: awaiting captain approval\n', 
 r = rows()['worker']; assert not r['overdue'] and r['limit_seconds'] == 14400 and 'declared wait' in r['evidence'], r
 status('worker', f'captain-held [at={now - 14400}]: awaiting captain approval\n', now - 14400)
 assert rows()['worker']['overdue']
-# Firstmate owes the next move on an open decision, blocker, or parked gate, so the silence check-in stays out.
+# Firstmate owes the next move on its own open decision or blocker, so the silence check-in stays out.
 for line in (f'needs-decision [at={now - 901}] [key=k]: pick A or B', f'blocked [at={now - 901}] [key=k]: waiting on answer'):
     status('worker', line + '\n', now - 901)
     r = rows()['worker']
     assert not r['overdue'] and r['informational'] and 'waiting on firstmate' in r['evidence'], r
+# Keys a supervisor raised about other work are not this report's own wait: a quiet report stays eligible.
+for key in ('captain-hold-child-1', 'remote-reply-continuity-abc', 'pending-reply-abc'):
+    status('worker', f'needs-decision [at={now - 901}] [key={key}]: relayed decision\n', now - 901)
+    r = rows()['worker']
+    assert r['overdue'] and not r.get('informational') and 'waiting on firstmate' not in r['evidence'], (key, r)
 status('worker', f'working [at={now - 901}]: building\n', now - 901)
-for state in ('parked', 'blocked'):
-    r = rows(extra={'FM_SILENCE_TEST_CREW_STATE': state})['worker']
-    assert not r['overdue'] and r['informational'] and 'waiting on firstmate' in r['evidence'], r
+# A parked gate is firstmate-owed only when its verdict says a human owes the answer; otherwise the worker owes it.
+human = {'FM_SILENCE_TEST_CREW_STATE': 'parked', 'FM_SILENCE_TEST_CREW_SOURCE': 'run-step',
+         'FM_SILENCE_TEST_CREW_DETAIL': 'parked at fix_review: 1 finding(s) · ask-user: authority decision · run: r1'}
+r = rows(extra=human)['worker']
+assert not r['overdue'] and r['informational'] and 'waiting on firstmate' in r['evidence'], r
+for gate in ('awaiting_agent', 'fix_review'):
+    own = dict(human, FM_SILENCE_TEST_CREW_DETAIL=f'parked at {gate}: 1 finding(s) · run: r1')
+    r = rows(extra=own)['worker']
+    assert r['overdue'] and not r.get('informational'), (gate, r)
 assert rows()['worker']['overdue']
 # A worker with no status line yet starts its clock at dispatch (task record mtime).
 status_file = home / 'state/worker.status'; meta_file = home / 'state/worker.meta'
