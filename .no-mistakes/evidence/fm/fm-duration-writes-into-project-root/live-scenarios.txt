@@ -1,0 +1,38 @@
+== unset everything, cwd=project (original report)
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4WM50FG5WCTRM6GFVNND8K5/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+rc=0
+-- tree: []
+== FM_DATA_OVERRIDE=project abs
+ledger: "refused, nothing recorded: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3cCwc8FJZd/proj/command-durations.jsonl is inside a git work tree that is not a firstmate checkout data directory"
+rc=0
+-- tree: []
+== FM_HOME=project
+ledger: "refused, nothing recorded: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3cCwc8FJZd/proj/data/command-durations.jsonl is inside a git work tree that is not a firstmate checkout data directory"
+rc=0
+-- tree: []
+== FM_DURATION_HOME=project
+ledger: "refused, nothing recorded: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3cCwc8FJZd/proj/data/command-durations.jsonl is inside a git work tree that is not a firstmate checkout data directory"
+rc=0
+-- tree: []
+== FM_DATA_OVERRIDE=project/data
+ledger: "refused, nothing recorded: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3cCwc8FJZd/proj/data/command-durations.jsonl is inside a git work tree that is not a firstmate checkout data directory"
+rc=0
+-- tree: []
+== FM_DURATION_FILE=project/x.jsonl
+ledger: "refused, nothing recorded: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3cCwc8FJZd/proj/x.jsonl is inside a git work tree that is not a firstmate checkout data directory"
+rc=0
+-- tree: []
+== FM_DATA_OVERRIDE via symlink to project
+ledger: "refused, nothing recorded: /private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3cCwc8FJZd/proj/command-durations.jsonl is inside a git work tree that is not a firstmate checkout data directory"
+rc=0
+-- tree: []
+== firstmate-like checkout declared home (should write)
+rc=0
+command-durations.jsonl
+command-durations.jsonl.lock
+== outside any work tree (should write)
+rc=0
+command-durations.jsonl
+command-durations.jsonl.lock
+== path outputs
+/private/var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.3cCwc8FJZd/outside/data/command-durations.jsonl
