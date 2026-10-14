@@ -617,12 +617,14 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       quota_score: (if .eligible and ($viable | index($c)) != null and $denominator > 0 then
         ([$common[] | . as $key | $c.quota_parts[$key] * $weights[$key]] | add) / $denominator
         else null end)})) as $cands |
-    ([$cands[] | select((.quota_score | type) == "number")]) as $scored |
-    ([$scored[] | select(.profile.model // "" | test("haiku|luna"; "i"))]) as $cheap |
-    (if $r.route.model.model == "fast" and ($cheap | length) > 0 then $cheap else $scored end) as $elig |
-    if ([$cands[] | select(.eligible)] | length) == 1 and
-       any($cands[]; .eligible and .capacity.status == "usable" and (.unknown // false | not))
-    then $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: ($cands[] | select(.eligible))}
+    ([$cands[] | select(.profile.cheap and .eligible and ((.short // false) | not) and
+      (((.quota_score | type) == "number" and (.quota_parts.headroom | type) == "number") or
+       (.capacity.status == "usable" and (.unknown // false | not))))]) as $cheap |
+    (if $r.route.model.model == "fast" and ($cheap | length) > 0 then $cheap else $cands end) as $set |
+    ([$set[] | select((.quota_score | type) == "number")]) as $elig |
+    if ([$set[] | select(.eligible)] | length) == 1 and
+       any($set[]; .eligible and .capacity.status == "usable" and (.unknown // false | not))
+    then $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: ($set[] | select(.eligible))}
     elif ($elig | length) == 0 then
       $ev + {status: "escalate", reason: "no rankable eligible candidate", note: $sel.note, candidates: $cands}
     else

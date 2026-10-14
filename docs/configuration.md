@@ -1733,7 +1733,8 @@ An absent rules file, a default-only file, or `rules: []` returns the non-clear 
 **Checks performed after the answer**
 
 The upstream agent decision escalates human, script, browser, desktop-dependent, and ambiguity scores above 1 to firstmate, because a worker profile cannot provision an unapproved handler or capability.
-The upstream model decision `fast` prefers the matched rule's configured Haiku/Luna candidates among those that pass the quota gates and are ranked; when none does, the same rule's other approved candidates are ranked as usual, so a vetoed cheap set never escalates or takes a stand-in while an approved candidate in that rule has headroom.
+The upstream model decision `fast` prefers the matched rule's configured Haiku/Luna candidates that pass the quota gates: eligible, with known positive headroom or a usable pool whose measurement is a disclosed unknown, and without established runway shorter than the task horizon.
+Among them, a sole usable pool clears and otherwise the composite ranks them; when none passes, the whole rule ranks as usual, so a vetoed or short cheap set never escalates or takes a stand-in while an approved candidate in that rule has headroom.
 `powerful` excludes Haiku/Luna candidates.
 The adapter never imports a cheaper candidate from another rule.
 The upstream effort threshold maps scores above 1 to high, otherwise low, then code clamps each profile to its configured effort floor; Haiku uses max.
@@ -1745,6 +1746,7 @@ Before weighting, code applies the confidence floor, rule approval and floor, ea
 A known rule-floor shortfall falls through to the default array, as "Rule quota floors" above defines.
 It captures one compatible `quota-axi --json` snapshot and one native OMP usage report.
 A highest-ranked candidate with established runway shorter than the task horizon escalates rather than receiving a small penalty that other components could mask.
+Because a short cheap candidate leaves the `fast` preferred set, this check names the true highest-ranked candidate of the set actually ranked.
 
 The deterministic quota composite follows Level 3's normalize-and-weight pattern; quota is not a Jev question.
 Its base weights are headroom 0.6 and spendPriority 0.3: current usable allowance dominates and reset-clock economics remain material; runway is only the independent winner check above.

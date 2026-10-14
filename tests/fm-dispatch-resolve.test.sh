@@ -259,6 +259,22 @@ assert_contains "$OUT" 'status: clear' 'a vetoed cheap set does not escalate whi
 assert_contains "$OUT" "--harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'" 'the same rule ranks its other approved candidate'
 assert_not_contains "$OUT" 'fallback:' 'no stand-in replaces an approved candidate with headroom'
 assert_contains "$(grep 'candidate: claude:claude-haiku-5-5' <<<"$OUT")" 'not eligible: runway exhausted_now at model:claude-haiku-5-5' 'the vetoed cheap candidate stays visible'
+# A usable cheap pool with unmeasured limits still passes the gates: it is the
+# preferred sole usable candidate, not displaced by measured Sonnet.
+cp "$POOL" "$TMP_ROOT/fast-exhausted-pool.json"
+node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({reports:[{provider:"openai-codex",fetchedAt:Date.now(),metadata:{meterStates:{chat:{allowed:true,limitReached:false}}},limits:[]}]}))' "$POOL"
+run
+assert_contains "$OUT" 'status: clear' 'an unmeasured usable cheap pool clears a fast task'
+assert_contains "$OUT" "--harness 'omp' --model 'openai-codex/gpt-6-luna' --effort 'low'" 'the usable cheap pool is preferred over measured Sonnet'
+cp "$TMP_ROOT/fast-exhausted-pool.json" "$POOL"
+# An established-short cheap candidate leaves the preferred set; the whole rule
+# ranks, so the higher-ranked feasible Sonnet clears instead of an escalation.
+jq '.providers[0].quotaSemantics.effectiveAvailability += [{scope:"model:claude-haiku-5-5",status:"known",effectivePercentRemaining:50,runway:{status:"projected_exhaustion",projectionConfidence:"established",usableRunwaySeconds:3600},selection:{spendPriority:0.8}}]' \
+  "$TMP_ROOT/pre-haiku-quota.json" > "$QUOTA"
+run
+assert_contains "$OUT" 'status: clear' 'a short cheap candidate does not escalate a fast task while Sonnet has headroom'
+assert_contains "$OUT" "--harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'" 'the whole rule ranks the feasible Sonnet'
+assert_contains "$(grep 'candidate: claude:claude-haiku-5-5' <<<"$OUT")" 'projectionConfidence=established' 'the short cheap candidate stays visible with its runway warning'
 cp "$TMP_ROOT/pre-haiku-quota.json" "$QUOTA"
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 printf '%s\n' '{"rule":"rule_4","model":"powerful","effort":2,"profile":"reasoning_agent"}' > "$SETTINGS"

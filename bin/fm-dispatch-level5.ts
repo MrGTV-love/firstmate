@@ -86,9 +86,9 @@ try {
       let ps = keep(use, p => allowed.includes(p.harness), "session launch policy prohibits this harness");
       if (route.model.model === "powerful") ps = keep(ps, p => !cheap(p), "Level 5 model router chose powerful, which excludes Haiku/Luna");
       return { use: ps.map(p => {
-        if (!p.effort || p.effort === "ultra") return p;
+        if (!p.effort || p.effort === "ultra") return { ...p, cheap: cheap(p) };
         const effort = /haiku/i.test(p.model ?? "") ? "max" : levels[Math.max(levels.indexOf(p.effort), levels.indexOf(route.model.effort))];
-        return { ...p, effort };
+        return { ...p, cheap: cheap(p), effort };
       }), filtered };
     };
     cfg.rules = cfg.rules.map(r => ({ ...r, ...mapProfiles(r.use) }));
