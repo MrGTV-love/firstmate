@@ -1119,7 +1119,9 @@ cmd_terminal() {
 
 # Decode the two published TOON collection forms once for read and choice rows.
 # List items have scalar fields at four spaces; nested target metadata is deeper
-# and must not overwrite the item text or selector. Only column-zero headers
+# and must not overwrite the item text or selector. A nested array is not an
+# item scalar either, but each `attachments` entry's `path` is kept with its
+# item, in table or list form. Only column-zero headers
 # frame a collection, never captain-supplied indented text.
 result_items() {  # <result-file>
   perl -MJSON::PP -e '
@@ -1156,19 +1158,29 @@ result_items() {  # <result-file>
       die "invalid quoted field" if $@ || !defined($decoded) || ref($decoded);
       return $decoded;
     }
+    sub split_cells {
+      my ($row) = @_;
+      my @vals;
+      while (length $row) {
+        if ($row =~ s/^"((?:[^"\\]|\\.)*)"//) {
+          push @vals, $1;
+        } else {
+          $row =~ s/^([^,]*)//;
+          push @vals, $1;
+        }
+        last unless $row =~ s/^,//;
+      }
+      return (\@vals, $row);
+    }
+    sub unescape_cells {
+      s/\\(.)/$1 eq "n" ? "\n" : $1 eq "t" ? "\t" : $1 eq "r" ? "\r" : $1/ge for @_;
+    }
     if ($header eq "table") {
       for my $row (@rows) {
         $row =~ s/^\s+//;
-        my @vals;
-        while (length $row) {
-          if ($row =~ s/^"((?:[^"\\]|\\.)*)"//) {
-            push @vals, $1;
-          } else {
-            $row =~ s/^([^,]*)//;
-            push @vals, $1;
-          }
-          last unless $row =~ s/^,//;
-        }
+        my ($cells, $rest) = split_cells($row);
+        my @vals = @$cells;
+        $row = $rest;
         # Older captures emit unquoted freeform text containing commas.
         if (@vals > @fields) {
           my ($preserve) = grep { $fields[$_] eq "prompt" } 0 .. $#fields;
@@ -1179,13 +1191,20 @@ result_items() {  # <result-file>
           }
         }
         if (@vals != @fields || length $row) { $malformed++; next }
-        s/\\(.)/$1 eq "n" ? "\n" : $1 eq "t" ? "\t" : $1 eq "r" ? "\r" : $1/ge for @vals;
+        unescape_cells(@vals);
         my %item;
         @item{@fields} = @vals;
         push @parsed, \%item;
       }
     } elsif ($header eq "list") {
-      my ($item, $invalid);
+      my ($item, $invalid, $nested);
+      my $close_nested = sub {
+        return unless defined $nested;
+        my $paths = $nested->{paths};
+        $invalid = 1 if @$paths != $nested->{want} || grep { !defined($_) || $_ eq "" } @$paths;
+        $item->{attachments} = $paths;
+        undef $nested;
+      };
       my $finish = sub {
         return unless defined $item;
         my @required = $kind eq "prompts" ? qw(uid prompt selector tag text) : qw(text);
@@ -1194,12 +1213,21 @@ result_items() {  # <result-file>
       };
       for my $line (@rows) {
         if ($line =~ /^  - (.*)$/) {
+          $close_nested->();
           $finish->();
           $item = {}; $invalid = 0;
           $line = "    $1";
         }
         if (!defined $item) { $malformed++; next }
-        if ($line =~ /^    ([A-Za-z][A-Za-z0-9_]*):(?: (.*))?$/) {
+        $close_nested->() if $line =~ /^    \S/;
+        if ($line =~ /^    ([A-Za-z][A-Za-z0-9_]*)\[(\d+)\](?:\{([^}]+)\})?:(?: (.*))?$/) {
+          my ($key, $count, $columns, $inline) = ($1, 0 + $2, $3, $4);
+          # A nested array is not an item scalar; only attachment paths are kept.
+          next unless $key eq "attachments";
+          if (exists $item->{$key} || defined $inline) { $invalid = 1; next }
+          $nested = { want => $count, paths => [],
+            fields => defined $columns ? [split /,/, $columns, -1] : undef };
+        } elsif ($line =~ /^    ([A-Za-z][A-Za-z0-9_]*):(?: (.*))?$/) {
           my ($key, $value) = ($1, $2);
           # A nested object (notably target:) is not an item scalar.
           next unless defined $value;
@@ -1209,8 +1237,28 @@ result_items() {  # <result-file>
           $item->{$key} = $decoded;
         } elsif ($line !~ /^      /) {
           $invalid = 1;
+        } elsif (defined $nested && defined $nested->{fields}) {
+          if ($line !~ /^      (\S.*)$/) { $invalid = 1; next }
+          my ($cells, $rest) = split_cells($1);
+          my @vals = @$cells;
+          if (@vals != @{$nested->{fields}} || length $rest) { $invalid = 1; next }
+          unescape_cells(@vals);
+          my %attachment;
+          @attachment{@{$nested->{fields}}} = @vals;
+          push @{$nested->{paths}}, $attachment{path};
+        } elsif (defined $nested) {
+          if ($line =~ /^      - (.*)$/) {
+            push @{$nested->{paths}}, undef;
+            $line = "        $1";
+          }
+          next unless $line =~ /^        path: (.*)$/;
+          if (!@{$nested->{paths}} || defined $nested->{paths}[-1]) { $invalid = 1; next }
+          my $path = eval { scalar_value($1) };
+          if ($@) { $invalid = 1; next }
+          $nested->{paths}[-1] = $path;
         }
       }
+      $close_nested->();
       $finish->();
     }
     print encode_json({ header => $header, want => $want, kind => $kind,
@@ -1378,7 +1426,8 @@ cmd_reconciles() { cmd_choice_rows reconciles "$@"; }
 # A non-choice annotation that carries a freeform `prompt` prints that comment
 # as its own field; a selector must not hide the typed words, even when the
 # comment matches the captured element text. Choice rows keep Context data
-# out of that field. A pure annotation has no prompt.
+# out of that field. A pure annotation has no prompt. Each image the captain
+# attached prints as an `attachment_path:` line with its message or annotation.
 cmd_read() {
   local file=${1-} lifecycle session_ended
   [ -n "$file" ] || usage
@@ -1417,6 +1466,13 @@ cmd_read() {
       return if !@lines || (@lines == 1 && $lines[0] eq "");
       print "| $_\n" for @lines;
     }
+    sub emit_attachments {
+      my ($item) = @_;
+      for my $path (@{$item->{attachments} || []}) {
+        (my $shown = $path) =~ s/[\x00-\x1f\x7f]/ /g;
+        print "attachment_path: $shown\n";
+      }
+    }
     my $ended = $session_ended =~ /^(?:true|True|TRUE)$/;
     if (@messages) {
       my $message_label = $ended ? "SESSION-ENDING MESSAGE" : "CAPTAIN MESSAGE";
@@ -1427,6 +1483,7 @@ cmd_read() {
           ? $messages[$i]{prompt}
           : (defined $messages[$i]{text} ? $messages[$i]{text} : "");
         emit_body($body);
+        emit_attachments($messages[$i]);
       }
       print "END $message_label\n";
     } else {
@@ -1465,6 +1522,7 @@ cmd_read() {
           print "prompt:\n";
           emit_body($comment);
         }
+        emit_attachments($f);
       }
       print "END ANNOTATIONS\n";
     } else {

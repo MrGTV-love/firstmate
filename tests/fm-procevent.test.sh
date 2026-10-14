@@ -1087,6 +1087,55 @@ out=$("$ROOT/bin/fm-procevent-lavish.sh" reconciles "$READ") || fail "list recon
 [ "$out" = $'sample-call\tCheck again' ] || fail "list Reconcile lost its note: $out"
 pass "list choices preserve keyed answers, close mode, and latest-selection precedence"
 
+# Encoded by Lavish's bundled TOON encoder from prompts carrying image
+# attachments in table and list form, after scalars and as the first key.
+cp "$ROOT/tests/fixtures/lavish-attachments-result.toon" "$READ"
+out=$(read_out) || fail "read failed on a list with image attachments"
+assert_contains "$out" "presented_items: 5" "an item with image attachments was dropped"
+assert_contains "$out" "malformed_items: 0" "an item with image attachments was counted malformed"
+assert_contains "$out" "complete: yes" "a list with image attachments was not read completely"
+assert_contains "$out" $'| see image\nattachment_path: /state/attachments/k/a1b2.png' \
+  "a table-form attachment lost its path or its item's typed words"
+assert_contains "$out" $'| two screenshots, one renamed\nattachment_path: /state/attachments/k/c3d4.png\nattachment_path: /state/attachments/k/e5f6, "copy".jpg' \
+  "a list-form attachment lost its path or its item's typed words"
+assert_contains "$out" $'| compare with this\nattachment_path: /state/attachments/k/a7b8.webp\nEND CAPTAIN MESSAGE' \
+  "a message attachment lost its path"
+assert_contains "$out" $'| Approve\nattachment_path: /state/attachments/k/c9d0.png' \
+  "a first-key table-form attachment lost its path"
+assert_contains "$out" $'| Reconcile\nattachment_path: /state/attachments/k/e1f2.png\nattachment_path: /state/attachments/k/a3b4.png' \
+  "a first-key list-form attachment lost its path"
+assert_not_contains "$out" 'Nested target text' "nested target metadata overwrote item text"
+out=$("$ROOT/bin/fm-procevent-lavish.sh" answers "$READ") || fail "choice extraction failed with attachments"
+[ "$out" = $'sample-call\tapprove\tApprove' ] || fail "a choice with attachments lost its answer: $out"
+out=$("$ROOT/bin/fm-procevent-lavish.sh" reconciles "$READ") || fail "reconcile extraction failed with attachments"
+[ "$out" = $'other-call\tCheck this' ] || fail "a Reconcile with attachments lost its request: $out"
+pass "list items with image attachments keep their words, choices, and attachment paths"
+
+cat > "$READ" <<'EOF'
+session:
+  status: feedback
+prompts[2]:
+  - uid: "a"
+    prompt: Keep this comment
+    selector: "#a"
+    tag: text
+    text: Valid element
+    labels[2]: x,y
+  - uid: "b"
+    prompt: Lost attachment
+    selector: "#b"
+    tag: text
+    text: Short element
+    attachments[2]{id,path}:
+      a.png,/state/attachments/k/a.png
+EOF
+out=$(read_out) || fail "read failed on a list with a short attachment table"
+assert_contains "$out" 'presented_items: 1' "an item with a missing attachment was certified presented"
+assert_contains "$out" 'malformed_items: 1' "an item with a missing attachment was not reported"
+assert_contains "$out" 'complete: no' "a missing attachment was certified complete"
+assert_contains "$out" '| Keep this comment' "another nested array hid its item's typed words"
+pass "read never certifies an item whose attachments cannot all be decoded"
+
 for block in prompts feedback; do
   printf 'session:\n  status: ended\n%s[0]:\n' "$block" > "$READ"
   out=$(read_out) || fail "an empty $block list was unreadable"
