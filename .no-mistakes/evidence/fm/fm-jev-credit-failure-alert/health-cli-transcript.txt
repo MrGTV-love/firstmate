@@ -1,0 +1,29 @@
+== 1. HTTP 402 probe
+typesafe-health: credits (http 402)
+exit=0
+-- repeat probe (must add no second wake)
+typesafe-health: credits (http 402)
+-- wake files:
+/Users/charlesabrooker/tmp/fm-lab.tR2npq/state/.wake-queue
+-- status:
+typesafe-health:
+  status: credits
+  since: 2026-10-14T15:41Z
+  alerted: credits
+  unreachable_count: 0 (alert at 3)
+  last_ok: unknown
+  last_probe: 2026-10-14T15:41Z
+  last_source: probe
+  last_detail: http 402
+
+== 2. recovery 200
+typesafe-health: ok (http 200)
+== 3. 401 key rejected
+typesafe-health: auth (http 401)
+== 4. consumer record 402 after 200 (no probe)
+typesafe-health: ok (http 200)
+typesafe-health:
+  status: credits
+  since: 2026-10-14T15:41Z
+  alerted: credits
+  unreachable_count: 0 (alert at 3)

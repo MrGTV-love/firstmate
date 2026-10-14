@@ -1,0 +1,23 @@
+ok - quota evidence comes from one quota-axi --json read, and its failure is an error outcome
+ok - API, transport, and response failures are error outcomes with exit 0
+ok - typed OMP dispatch preserves pooled headroom, explicit stand-ins, and uncertainty
+ok - configuration errors exit 2 before any network call
+ok - typed intake resolves roles before quota ranking and detects concrete duplicates
+ok - typed intake checks the chosen id against the pinned worker account's catalog
+ok - chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks
+# all fm-dispatch-resolve tests passed
+ok - promotion and marked regions preserve effective task privacy
+ok - raw launch records match delivery capability
+ok - raw doorbell and pointer transports deliver picked, none and unavailable outcomes
+ok - failed Kimi, Rovo and doorbell relaunch delivery records undelivered selection for ships and scouts
+ok - pre-publication relaunch abort leaves prior selection metadata unchanged
+ok - successful picks are not claimed when overlay publication fails
+ok - explicit kind and entirely hidden promotion preserve task semantics
+# all fm-skill-pick tests passed
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+ok - invalid and unreadable policy refuse before transport
+ok - belay's own exit status reaches Claude
+ok - pin mismatch, missing clone and missing key exit 0 without running belay
+
+[exited with code 0]

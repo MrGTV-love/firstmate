@@ -1,0 +1,16 @@
+== unreachable x3 + other code
+typesafe-health: unreachable (no connection (curl exit 7))
+wakes after probe 1: 0
+typesafe-health: unreachable (no connection (curl exit 7))
+wakes after probe 2: 0
+typesafe-health: unreachable (no connection (curl exit 7))
+wakes after probe 3: 1
+typesafe-health: unreachable (no connection (curl exit 7))
+wakes after probe 4: 1
+record 500 -> wakes: 1
+== 429 record must be ignored
+wakes: 1
+== secondmate home silent
+exit=0 files:        0
+== no key silent
+exit=0 curl calls:        0 state files:        0
