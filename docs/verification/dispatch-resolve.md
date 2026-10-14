@@ -40,7 +40,7 @@ Its output, in order:
 
 ```console
 ok - pool bias is removed by normalized nonadditive evidence, with explicit ties
-ok - common headroom, economic urgency, and feasible runway are normalized before weighting
+ok - common headroom and economic urgency are normalized before weighting
 ok - quota veto preserves required reasoning class
 ok - an unmeasured usable pool remains disclosed uncertainty without blocking ranking
 ok - the resolver runs its adapter with node when bun is absent
@@ -82,7 +82,7 @@ ok - default: no rule matched resolves among the default profiles
 ok - tie: equal quota evidence never breaks by array order
 ok - no rankable candidate: the tool escalates instead of guessing
 ok - schema 6: native Codex and Pi lanes bind to their own account rows; schema 5 is unchanged
-ok - task-horizon runway vetoes, OpenRouter coverage, and minimum-version guards
+ok - task-horizon runway, OpenRouter coverage, and minimum-version guards
 ok - quota evidence comes from one quota-axi --json read, and its failure is an error outcome
 ok - API, transport, and response failures are error outcomes with exit 0
 ok - typed OMP dispatch preserves pooled headroom, explicit stand-ins, and uncertainty
@@ -95,7 +95,7 @@ ok - chosen Codex and Pi entries never use supervisor catalogs and retain author
 
 No Bash with `EPOCHREALTIME` was installed on that host, so the fast-path check printed its skip line instead of running.
 
-The public-interface assertions cover one-request batching, the rule Choice deciding project-scoped and Claude-only rules with every rule offered, the session launch policy filtering the selected rule after judgment and escalating when it empties that rule, the Node fallback when Bun is absent, Haiku max and powerful-class effort floors, unrounded ambiguity boundaries, desktop thresholds, approval and quota-floor vetoes, a known rule-floor shortfall falling through to the default array, runner-up fallback below a declared `min_confidence`, and the declared model-matrix stand-in only on proven exhaustion.
+The public-interface assertions cover one-request batching, the rule Choice deciding project-scoped and Claude-only rules with every rule offered, the session launch policy filtering the selected rule after judgment and escalating when it empties that rule, the Node fallback when Bun is absent, Haiku max and powerful-class effort floors, unrounded ambiguity boundaries, desktop thresholds, approval and quota-floor vetoes, a `fast` answer preferring quota-passing Haiku/Luna candidates and ranking the rule's other approved candidates when every cheap one is vetoed, a known rule-floor shortfall falling through to the default array, runner-up fallback below a declared `min_confidence`, and the declared model-matrix stand-in only on proven exhaustion.
 When all components are known, they exercise both directions of the headroom/economic-urgency tradeoff and verify that extreme economic scalars are normalized before weighting.
 Privacy coverage checks outgoing requests rather than implementation source text.
 
@@ -122,7 +122,7 @@ It proves declared providers, known and unverifiable profile floors, nonnumeric 
 It proves a default choice resolves among the default profiles, equal quota evidence escalates as a genuine tie in either array order, and nothing rankable escalates.
 It proves schema-6 account-row binding for Pi lanes, native Codex, and Pi native adapters (codex-home before default, independent of row order), schema-5 compatibility, and that a keyless schema-6 row is an invalid-snapshot `error`.
 It proves runway is judged against the default 240-minute or a declared `task_horizon_minutes` horizon, which is never sent to the model.
-An `established` projection shorter than the horizon on any applicable bound makes that candidate not eligible before scoring, so a feasible sibling in the same rule clears, while a rule with no feasible candidate escalates without consulting another rule or the default array.
+An `established` projection shorter than the horizon on any applicable bound of the highest-ranked candidate escalates with no profile; it is never replaced by a lower-ranked candidate in its rule, another rule, or the default array, while a short lower-ranked candidate does not displace a feasible winner.
 Through-reset, covering (including exactly at the horizon), early, absent-confidence, and unknown runway clear with any non-passing bound named in a warning, and `exhausted_now` vetoes.
 It proves absent and credit-only OpenRouter rows stay eligible but unranked, an older, unparseable, or failed `quota-axi --version` read is an `error` naming the required minimum before any snapshot, and otherwise `quota-axi --json` is read exactly once and its failure is an `error`.
 It proves a missing runtime, HTTP 429 (three attempts within the deadline) and 500 (not retried), a closed port, a dropped connection, a response slower than five seconds, a non-JSON body, and each invalid answer the client validates (distributions, choices, confidence, score range and legend, Noul bounds, missing answers, usage, and model) are `error` outcomes with exit 0, no profile, and no quota read.

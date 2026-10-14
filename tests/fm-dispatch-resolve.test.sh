@@ -143,7 +143,7 @@ run
 assert_contains "$OUT" "--model 'opus' --effort 'high'" 'known economic urgency can outweigh a smaller headroom advantage without weakening the class'
 cp "$TMP_ROOT/base-quota.json" "$QUOTA"
 cp "$TMP_ROOT/base-rules.json" "$RULES"
-pass 'common headroom, economic urgency, and feasible runway are normalized before weighting'
+pass 'common headroom and economic urgency are normalized before weighting'
 
 # Proven exhaustion excludes the pool; the powerful rule remains high even
 # when Jev suggests fast and low effort.
@@ -247,6 +247,20 @@ printf '%s\n' '{"rule":"rule_4","model":"fast"}' > "$SETTINGS"
 before=$(count); run
 assert_equals "$((before + 1))" "$(count)" 'independent questions share one request'
 assert_contains "$OUT" "--model 'claude-haiku-5-5' --effort 'max'" 'fast task uses approved cheap candidate and Haiku max'
+# A fast answer prefers cheap candidates only among those passing the quota
+# gates: with Haiku exhausted and the Luna pool exhausted, the same rule's
+# approved Sonnet with headroom is ranked, never an escalation or stand-in.
+cp "$QUOTA" "$TMP_ROOT/pre-haiku-quota.json"
+jq '.providers[0].quotaSemantics.effectiveAvailability += [{scope:"model:claude-haiku-5-5",status:"known",effectivePercentRemaining:0,runway:{status:"exhausted_now"},selection:{spendPriority:0.8}}]' \
+  "$TMP_ROOT/pre-haiku-quota.json" > "$QUOTA"
+jq '.rules[3].fallback=[{harness:"omp",model:"anthropic/claude-haiku-5-5",effort:"low"}]' "$TMP_ROOT/base-rules.json" > "$RULES"
+run
+assert_contains "$OUT" 'status: clear' 'a vetoed cheap set does not escalate while an approved candidate has headroom'
+assert_contains "$OUT" "--harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'" 'the same rule ranks its other approved candidate'
+assert_not_contains "$OUT" 'fallback:' 'no stand-in replaces an approved candidate with headroom'
+assert_contains "$(grep 'candidate: claude:claude-haiku-5-5' <<<"$OUT")" 'not eligible: runway exhausted_now at model:claude-haiku-5-5' 'the vetoed cheap candidate stays visible'
+cp "$TMP_ROOT/pre-haiku-quota.json" "$QUOTA"
+cp "$TMP_ROOT/base-rules.json" "$RULES"
 printf '%s\n' '{"rule":"rule_4","model":"powerful","effort":2,"profile":"reasoning_agent"}' > "$SETTINGS"
 run
 assert_contains "$OUT" "--model 'claude-sonnet-5-5[1m]' --effort 'high'" 'powerful response excludes cheap class and maps effort'
@@ -441,7 +455,11 @@ for dir in "$SPYBIN" "$SPYNODE"; do
   spy "$dir" omp "$FAKEBIN/omp"
   spy "$dir" dirname "$(command -v dirname)"
 done
-spy "$SPYBIN" bun "$(command -v bun)"
+RUNTIMES=(node)
+if command -v bun >/dev/null 2>&1; then
+  spy "$SPYBIN" bun "$(command -v bun)"
+  RUNTIMES=(bun node)
+fi
 spy "$SPYNODE" node "$(command -v node)"
 
 # Absent key: off, silent on stdout, no helper, no network, no quota read.
@@ -494,7 +512,8 @@ pass 'TYPESAFE_API_KEY= in .env activates the tool; environment and config overr
 # text and every rule criterion, never why, use, quota, approvals, or floors.
 jq '.rules[2].why = "SECRET-WHY-TEXT strongest model" | .rules[1].approval = "captain" | .rules[3].min_confidence = 0.1' \
   "$TMP_ROOT/base-rules.json" > "$RULES"
-for runtime in bun node; do
+[ "${#RUNTIMES[@]}" -eq 2 ] || echo 'skip: bun is not installed; node alone covers key handling'
+for runtime in "${RUNTIMES[@]}"; do
   reset_spies
   if [ "$runtime" = bun ]; then
     keyed PATH="$SPYBIN:$FAKEBIN:$BASE_PATH" -- "$BRIEF" --project pager
@@ -1323,7 +1342,8 @@ guard_runway exhausted_now '{"status":"exhausted_now"}'
 guard() { keyed QUOTA_AXI_FIXTURE="$TMP_ROOT/guard-$1.json" -- "$BRIEF"; }
 guard short
 assert_contains "$OUT" '  status: escalate' 'established runway shorter than the default 240-minute horizon does not authorize dispatch'
-assert_contains "$(cand codex:gpt-6.1-sol)" '-> not eligible: established runway shorter than task horizon [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]' 'the candidate names its short runway'
+assert_contains "$OUT" '  reason: highest-ranked candidate codex:gpt-6.1-sol has established runway shorter than the 240-minute task horizon; completion is not proven' 'the escalation names the short winner'
+assert_contains "$(cand codex:gpt-6.1-sol)" '-> eligible [warning: projected_exhaustion at all_models (usableRunwaySeconds=3600 projectionConfidence=established)]' 'the candidate names its short runway'
 assert_not_contains "$OUT" '  profile:' 'short runway emits no dispatch profile'
 for name in long boundary safe; do
   guard "$name"
@@ -1360,14 +1380,19 @@ assert_contains "$OUT" '  status: clear' 'one hour of runway covers a declared 3
 jq '.task_horizon_minutes = 120' "$GUARD_RULES" > "$RULES"
 guard short
 assert_contains "$OUT" '  status: escalate' 'a declared 120-minute horizon replaces the default'
-assert_contains "$(cand codex:gpt-6.1-sol)" '-> not eligible: established runway shorter than task horizon' 'the declared horizon vetoes the short candidate'
+assert_contains "$OUT" 'shorter than the 120-minute task horizon' 'the declared horizon names the short winner'
 assert_not_contains "$(last_request)" 'task_horizon_minutes' 'the model never sees the task horizon'
-# A short candidate is vetoed before scoring, so a feasible sibling in the same rule clears.
+# A short winner is not replaced by a lower-ranked candidate in the same rule.
 jq '.rules[0].use += [{harness:"cursor",model:"cursor-grok-4.6-medium"}]' "$GUARD_RULES" > "$RULES"
+jq '(.providers[] | select(.provider == "codex") | .quotaSemantics.effectiveAvailability[].effectivePercentRemaining) = 95' \
+  "$TMP_ROOT/guard-short.json" > "$TMP_ROOT/guard-short-top.json"
+guard short-top
+assert_contains "$OUT" '  status: escalate' 'a short highest-ranked candidate escalates'
+assert_contains "$OUT" 'reason: highest-ranked candidate codex:gpt-6.1-sol has established runway' 'the short winner is named'
+assert_contains "$(cand cursor:cursor-grok-4.6-medium)" '-> eligible' 'the lower-ranked candidate stays visible'
+assert_not_contains "$OUT" '  profile:' 'no same-rule fallback profile is emitted'
 guard short
-assert_contains "$OUT" '  status: clear' 'a feasible same-rule sibling clears after the short veto'
-assert_contains "$(cand codex:gpt-6.1-sol)" '-> not eligible: established runway shorter than task horizon' 'the short candidate stays visible as vetoed'
-assert_contains "$OUT" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" 'the feasible sibling is chosen'
+assert_contains "$OUT" "  profile: --harness 'cursor' --model 'cursor-grok-4.6-medium'" 'a higher-ranked feasible candidate is not displaced by a short lower-ranked one'
 # A short matched rule never falls back to another rule or the default array.
 jq '.rules += [{when:"Cheap chores.",use:{harness:"cursor",model:"cursor-grok-4.6-medium"}}]
   | .default = [{harness:"cursor",model:"cursor-grok-4.6-high"}]' "$GUARD_RULES" > "$RULES"
@@ -1409,7 +1434,7 @@ assert_contains "$OUT" '  status: error' 'a failed version read never clears'
 assert_contains "$OUT" 'quota-axi requires >= 0.1.51' 'the failed version read names the minimum'
 assert_equals '--version' "$(cat "$QUOTA_AXI_CALLS")" 'a failed version read never takes a quota snapshot'
 cp "$WIDE_RULES" "$RULES"
-pass 'task-horizon runway vetoes, OpenRouter coverage, and minimum-version guards'
+pass 'task-horizon runway, OpenRouter coverage, and minimum-version guards'
 
 # ---- quota-axi is read exactly once ------------------------------------------
 cp "$TMP_ROOT/base-rules.json" "$RULES"

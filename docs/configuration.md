@@ -1733,20 +1733,21 @@ An absent rules file, a default-only file, or `rules: []` returns the non-clear 
 **Checks performed after the answer**
 
 The upstream agent decision escalates human, script, browser, desktop-dependent, and ambiguity scores above 1 to firstmate, because a worker profile cannot provision an unapproved handler or capability.
-The upstream model decision maps `fast` to the matched rule's configured Haiku/Luna candidates when available, otherwise keeps that rule's equal-class candidates; `powerful` excludes Haiku/Luna candidates.
+The upstream model decision `fast` prefers the matched rule's configured Haiku/Luna candidates among those that pass the quota gates and are ranked; when none does, the same rule's other approved candidates are ranked as usual, so a vetoed cheap set never escalates or takes a stand-in while an approved candidate in that rule has headroom.
+`powerful` excludes Haiku/Luna candidates.
 The adapter never imports a cheaper candidate from another rule.
 The upstream effort threshold maps scores above 1 to high, otherwise low, then code clamps each profile to its configured effort floor; Haiku uses max.
 These rules can lower proposed cost only within the captain's approved matrix; quota never lowers the reasoning class or minimum effort.
 The session launch policy removes prohibited candidates from the selected rule after the answer, so a prohibited rule is still recognized rather than replaced by another rule.
 When the session policy or the model-router class filter removes every candidate of the selected rule or default array, the result is `escalate`, naming the filter and listing each removed candidate.
 
-Before weighting, code applies the confidence floor, rule approval and floor, each candidate's provider and floor, all applicable quota scopes, and established task-horizon runway vetoes.
+Before weighting, code applies the confidence floor, rule approval and floor, each candidate's provider and floor, and all applicable quota scopes.
 A known rule-floor shortfall falls through to the default array, as "Rule quota floors" above defines.
 It captures one compatible `quota-axi --json` snapshot and one native OMP usage report.
-A candidate with established runway shorter than the task horizon is ineligible before scoring, rather than receiving a small penalty that other components could mask.
+A highest-ranked candidate with established runway shorter than the task horizon escalates rather than receiving a small penalty that other components could mask.
 
 The deterministic quota composite follows Level 3's normalize-and-weight pattern; quota is not a Jev question.
-Its base weights are headroom 0.6 and spendPriority 0.3: current usable allowance dominates and reset-clock economics remain material; runway is only the independent hard veto above.
+Its base weights are headroom 0.6 and spendPriority 0.3: current usable allowance dominates and reset-clock economics remain material; runway is only the independent winner check above.
 Headroom is normalized to `[0,1]` from the minimum applicable bound for a measured account.
 For OMP, it is the maximum of the per-account minimum applicable percentages among fresh usable accounts: the best currently usable account's fractional headroom, never a sum of percentages or a purported total pool capacity.
 Accounts with stale or unknown serviceability and saved reset credits contribute nothing to that measurement.
@@ -1794,13 +1795,13 @@ When every candidate of the resolved rule is proven exhausted, the rule's declar
 - Runway is judged against the task horizon, not the quota reset clock: the question is whether the candidate runs out before this task finishes.
   The horizon is the top-level `task_horizon_minutes` field defined under [Crew dispatch profiles](#crew-dispatch-profiles-configcrew-dispatchjson).
   `through_reset` passes, and so does a `projected_exhaustion` bound whose `projectionConfidence` is `established` and whose `usableRunwaySeconds` covers the horizon.
-  An `established` projection shorter than the horizon on any applicable bound vetoes that candidate before the quota composite is evaluated.
+  An `established` projection shorter than the horizon on any applicable bound of the highest-ranked candidate produces `escalate` with no `profile:`.
   For an otherwise rankable candidate, a `projected_exhaustion` bound with `early`, unknown, or absent `projectionConfidence`, or absent or nonnumeric `usableRunwaySeconds`, is warning-only; `unknown` runway is also warning-only.
   A young or unmeasured projection is not evidence of mid-task exhaustion.
   Each non-passing bound on a rankable candidate is named in a `[warning: ...]` suffix on its candidate line.
   Projected-exhaustion warnings include `usableRunwaySeconds` and `projectionConfidence`; other runway warnings name the status and scope.
   A low positive percentage alone is not a veto unless it falls below a declared floor; the resolver invents no generic percentage floor.
-- Ranking stays inside the matched rule's class-filtered `use` array (or `default` when selected); neither the composite nor a runway veto imports a weaker candidate from another rule.
+- Ranking stays inside the matched rule's class-filtered `use` array (or `default` when selected): a short winner escalates rather than being replaced by a lower-ranked candidate in that array, another rule, or the default array, so the rule's reasoning class is never silently downgraded to conserve quota.
 - Unmeasured alternatives remain disclosed uncertainties, while candidates with native measurable pooled headroom compete on the common components described above rather than losing by default to candidates with a spendPriority scalar.
 - On the opted-in path, duplicate concrete profiles with the same harness, model, and effort inside one rule or the default array are configuration errors rather than ties.
 
@@ -1810,7 +1811,7 @@ When every candidate of the resolved rule is proven exhausted, the rule's declar
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, unsupported handler/capability request, every selected candidate removed by the session policy or class filter, nothing rankable after feasibility gates, or a genuine evidence tie. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, unsupported handler/capability request, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
 | `error` | API, network, malformed response metadata, rendering, quota-axi failure, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
 
 Every result above exits 0.

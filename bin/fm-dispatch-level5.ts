@@ -84,7 +84,6 @@ try {
       const keep = (ps: Profile[], ok: (p: Profile) => boolean, reason: string) =>
         ps.filter(p => ok(p) || (filtered.push({ profile: p, reason }), false));
       let ps = keep(use, p => allowed.includes(p.harness), "session launch policy prohibits this harness");
-      if (route.model.model === "fast" && ps.some(cheap)) ps = keep(ps, cheap, "Level 5 model router chose fast and a Haiku/Luna candidate remains");
       if (route.model.model === "powerful") ps = keep(ps, p => !cheap(p), "Level 5 model router chose powerful, which excludes Haiku/Luna");
       return { use: ps.map(p => {
         if (!p.effort || p.effort === "ultra") return p;

@@ -83,7 +83,8 @@
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> approval required, unverifiable rule floor, high ambiguity, an
 #                unsupported handler or capability, every selected profile
-#                filtered out, no candidate rankable, or a genuine tie
+#                filtered out, no candidate rankable, a genuine tie, or a
+#                winner whose established runway is shorter than the task horizon
 #   error     -> API, network, response, quota-axi, or chosen-profile model-index
 #                preflight failure; decide as today
 #   Every outcome exits 0 so an intake is never blocked by this tool.
@@ -532,9 +533,8 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     ([$rows[] | select(runway_class(.) != "ok") | runway_note(.)]) as $risks |
     any($rows[]; runway_class(.) == "short") as $short |
     if $pooled then $base + {pct: ($base.capacity.bestAccountHeadroom // null)}
-    elif $short then $base + {eligible: false, short: true, reason: "established runway shorter than task horizon", warning: ($risks | join("; "))}
     elif $ranked and ($risks | length) > 0 then
-      $base + {warning: ($risks | join("; ")), short: false}
+      $base + {warning: ($risks | join("; ")), short: $short}
     else $base end;
   def rule_at($c):
     if ($c | test("^rule_[1-9][0-9]*$")) then
@@ -617,7 +617,9 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       quota_score: (if .eligible and ($viable | index($c)) != null and $denominator > 0 then
         ([$common[] | . as $key | $c.quota_parts[$key] * $weights[$key]] | add) / $denominator
         else null end)})) as $cands |
-    ([$cands[] | select((.quota_score | type) == "number")]) as $elig |
+    ([$cands[] | select((.quota_score | type) == "number")]) as $scored |
+    ([$scored[] | select(.profile.model // "" | test("haiku|luna"; "i"))]) as $cheap |
+    (if $r.route.model.model == "fast" and ($cheap | length) > 0 then $cheap else $scored end) as $elig |
     if ([$cands[] | select(.eligible)] | length) == 1 and
        any($cands[]; .eligible and .capacity.status == "usable" and (.unknown // false | not))
     then $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: ($cands[] | select(.eligible))}
@@ -633,6 +635,8 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
         else $ties end) as $final |
       if ($final | length) > 1 then
         $ev + {status: "escalate", reason: "genuine quota evidence tie", note: $sel.note, candidates: $cands}
+      elif $final[0].short then
+        $ev + {status: "escalate", reason: "highest-ranked candidate \($final[0].profile.harness):\($final[0].profile.model // "-") has established runway shorter than the \(horizon_seconds / 60)-minute task horizon; completion is not proven", note: $sel.note, candidates: $cands}
       else $ev + {status: "clear", note: $sel.note, candidates: $cands, chosen: $final[0]} end
     end
   end') || emit_error "resolution failed"
