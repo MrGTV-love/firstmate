@@ -1413,6 +1413,109 @@ PL
   pass "host caps follow the load threshold and both acquisition paths respect total occupancy"
 }
 
+test_host_waiters_make_progress_without_barging() {
+  local tmp
+  tmp=$(fm_test_tmproot fm-lint-slot-fairness)
+  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "FIFO admission regression failed"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use Fcntl qw(:flock);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+open(my $module, '>', "$tmp/WaitLock.pm") or die "$!";
+print {$module} <<'MODULE';
+package WaitLock;
+use Errno qw(EWOULDBLOCK EAGAIN);
+use Fcntl qw(LOCK_NB);
+use Time::HiRes qw(time sleep);
+my $notified;
+BEGIN {
+    *CORE::GLOBAL::flock = sub {
+        my $got = CORE::flock($_[0], $_[1]);
+        my $error = 0 + $!;
+        if (!$notified && ($_[1] & LOCK_NB)
+            && ($ENV{QUEUE_ROLE} eq 'younger' || (!$got && ($error == EWOULDBLOCK || $error == EAGAIN)))) {
+            $notified = 1;
+            open(my $fh, '>', "$ENV{CASE_DIR}/$ENV{QUEUE_ROLE}.attempt") or die "$!";
+            close $fh;
+            if ($ENV{QUEUE_ROLE} eq 'older') {
+                my $deadline = time() + 15;
+                until (-e "$ENV{CASE_DIR}/retry") { die "retry not released\n" if time() > $deadline; sleep 0.01; }
+            }
+        }
+        $! = $error;
+        return $got;
+    };
+}
+1;
+MODULE
+close $module;
+sub await_file {
+    my ($path) = @_;
+    my $deadline = time() + 10;
+    until (-e $path) { die "missing $path\n" if time() > $deadline; sleep 0.01; }
+}
+for my $case (qw(live killed)) {
+    my $dir = "$tmp/$case";
+    make_path("$dir/slots");
+    open(my $holder, '>>', "$dir/slots/slot.0") or die "$!";
+    flock($holder, LOCK_EX) or die "$!";
+    local %ENV = (%ENV, FM_LINT_HOST_SLOTS => 1, FM_TEST_SEAM => 1,
+        FM_LINT_SLOT_LOAD => 100000, CASE_DIR => $dir);
+    my @pids;
+    my $error;
+    eval {
+        for my $role (qw(older younger)) {
+            local $ENV{QUEUE_ROLE} = $role;
+            my $pid = fork();
+            die "fork: $!" unless defined $pid;
+            if (!$pid) {
+                close $holder;
+                exec $^X, "-I$tmp", '-MWaitLock', $gate, 'gate', "$dir/slots", 18,
+                    "$dir/$role.wait", '--', $^X, '-e',
+                    'open(my $fh, ">>", $ARGV[0]) or die "$!"; print {$fh} "$ARGV[1]\n"',
+                    "$dir/order", $role;
+                die "exec: $!";
+            }
+            push @pids, $pid;
+            await_file("$dir/$role.attempt");
+            close $holder if $role eq 'older' && $case eq 'live';
+        }
+        if ($case eq 'killed') {
+            kill 'KILL', $pids[0];
+            waitpid($pids[0], 0);
+            shift @pids;
+            close $holder;
+        } else {
+            open(my $retry, '>', "$dir/retry") or die "$!";
+            close $retry;
+        }
+        for my $pid (@pids) {
+            my $deadline = time() + 10;
+            while (waitpid($pid, WNOHANG) == 0) {
+                die "waiter did not finish\n" if time() > $deadline;
+                sleep 0.01;
+            }
+            die "waiter failed: $?\n" if $?;
+        }
+        @pids = ();
+        open(my $order, '<', "$dir/order") or die "$!";
+        local $/;
+        my $actual = <$order>;
+        my $expected = $case eq 'live' ? "older\nyounger\n" : "younger\n";
+        die "admission order was $actual, expected $expected" unless $actual eq $expected;
+    };
+    $error = $@;
+    close $holder;
+    for my $pid (@pids) { kill 'KILL', $pid; waitpid($pid, 0); }
+    die "$case: $error" if $error;
+}
+PL
+  pass "waiting roots precede newer roots and a killed waiter cannot strand admission"
+}
+
 test_slot_pool_can_be_disabled_or_misconfigured() {
   local tmp rc out
   tmp=$(fm_lint_slot_fixture fm-lint-slots-off)
@@ -1444,18 +1547,24 @@ my ($gate, $tmp) = @ARGV;
 open(my $module, '>', "$tmp/FailLock.pm") or die "$!";
 print {$module} <<'MODULE';
 package FailLock;
-use Errno qw(EIO EWOULDBLOCK);
+use Errno qw(EIO);
 use Fcntl qw(LOCK_NB);
+my $locks;
 BEGIN {
     *CORE::GLOBAL::flock = sub {
-        $! = $ENV{FAIL_LOCK} eq 'wait' && ($_[1] & LOCK_NB) ? EWOULDBLOCK : EIO;
-        return 0;
+        # Coordinator, ticket, then slot scan; inject a real I/O failure at
+        # each admission boundary without changing ordinary contention.
+        if (($_[1] & LOCK_NB) && ++$locks == ($ENV{FAIL_LOCK} eq 'scan' ? 3 : 1)) {
+            $! = EIO;
+            return 0;
+        }
+        return CORE::flock($_[0], $_[1]);
     };
 }
 1;
 MODULE
 close $module;
-for my $failure (qw(open scan wait)) {
+for my $failure (qw(open scan coordinator)) {
     my $dir = "$tmp/$failure";
     make_path("$dir/slots");
     make_path("$dir/slots/slot.0") if $failure eq 'open';
@@ -1489,7 +1598,7 @@ for my $failure (qw(open scan wait)) {
         unless $warning =~ /running without the host-wide ShellCheck bound/;
 }
 PL
-  pass "slot open and non-contention scan/wait lock failures warn and run ungated"
+  pass "slot open and non-contention coordinator/scan lock failures warn and run ungated"
 }
 
 test_slot_survives_gate_death() {
@@ -2994,6 +3103,60 @@ SH
   pass "shared cache single-flights identical misses and invalidates sources, binaries and failures"
 }
 
+test_cached_success_does_not_wait_for_host_slots() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): cached slot bypass"; return; }
+  local tmp repo out
+  tmp=$(fm_test_tmproot fm-lint-cache-slots)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  out=$(CI='' GITHUB_ACTIONS='' FM_LINT_CACHE_DIR="$tmp/cache" \
+    "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) || fail "cache warm-up failed: $out"
+  perl - "$repo/bin/fm-lint.sh" "$tmp" <<'PL' || fail "warm cache queued behind an occupied host slot"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use Fcntl qw(:flock);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($lint, $tmp) = @ARGV;
+make_path("$tmp/slots");
+open(my $holder, '>>', "$tmp/slots/slot.0") or die "$!";
+flock($holder, LOCK_EX) or die "$!";
+local %ENV = (%ENV, CI => '', GITHUB_ACTIONS => '', FM_LINT_CACHE_DIR => "$tmp/cache",
+    FM_LINT_SLOT_DIR => "$tmp/slots", FM_LINT_HOST_SLOTS => 1,
+    FM_TEST_SEAM => 1, FM_LINT_SLOT_LOAD => 100000);
+my $pid = fork();
+die "fork: $!" unless defined $pid;
+if (!$pid) {
+    close $holder;
+    open STDOUT, '>', "$tmp/hit.out" or die "$!";
+    open STDERR, '>&', \*STDOUT or die "$!";
+    exec '/bin/bash', $lint, 'bin/consumer.sh';
+    die "exec: $!";
+}
+my $error;
+my $deadline = time() + 10;
+while (waitpid($pid, WNOHANG) == 0) {
+    if (time() > $deadline) {
+        $error = "cache hit required an analysis slot\n";
+        kill 'TERM', $pid;
+        close $holder;
+        waitpid($pid, 0);
+        last;
+    }
+    sleep 0.01;
+}
+$error ||= "cache hit failed: $?\n" if $?;
+close $holder;
+open(my $output, '<', "$tmp/hit.out") or die "$!";
+local $/;
+my $text = <$output>;
+die $error, $text if $error;
+die "did not reuse the successful analysis: $text\n" unless $text =~ /cache hit bin\/consumer[.]sh/;
+PL
+  pass "a content-identical cached success finishes while all host slots remain occupied"
+}
+
 test_source_spellings_keep_changed_and_cached_dataflow_findings() {
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): source spelling regression"; return; }
   local tmp repo fakebin diff_file command_line index=0 out attempt listed
@@ -3432,6 +3595,8 @@ test_jobs_are_deterministic_and_complete
 test_host_slots_bound_concurrent_runs
 test_host_load_shrinks_slots_to_the_floor
 test_host_load_preserves_the_cap_until_the_threshold
+test_host_waiters_make_progress_without_barging
+test_cached_success_does_not_wait_for_host_slots
 test_slot_pool_can_be_disabled_or_misconfigured
 test_slot_file_failures_run_ungated
 test_slot_survives_gate_death

@@ -61,9 +61,15 @@
 # run holds at most JOBS concurrent ShellCheck processes. Diagnostics replay
 # in stable shard/root order. FM_LINT_JOBS=1 changes concurrency, not diagnostics
 # or exit selection.
-# That bound is per run; the host-wide pool admits each root only while total
-# slot occupancy is below the current load allowance. FM_LINT_SLOT_DIR defaults
-# to ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots; "off" disables the pool.
+# That bound is per run; only cold checks enter the host-wide pool, after cache
+# lookup and identical-miss serialization, so hits and duplicate waiters consume
+# no host slots. Live cold roots queue FIFO: a run has at most JOBS requests in
+# flight, and newly arriving roots cannot bypass an older request. Killed waiters
+# are skipped automatically. Admission still requires total slot occupancy below
+# the current load allowance; fairness does not increase host concurrency.
+# FM_LINT_SLOT_DIR defaults to ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots;
+# "off" disables the pool. Load samples are shared and refreshed at most once
+# every two seconds; admission checks do not spawn a load reader per waiter.
 # Runs share a pool only when they use the same slot directory, so different
 # homes or overrides must select the same directory to share the host bound.
 # FM_LINT_HOST_SLOTS sets the cap; unset or empty uses max(2, floor(ncpu/2)).
@@ -279,11 +285,9 @@ fm_lint_classify_root() {  # <rc> <root-stderr-file>
 # address-space limit, returning its exit status in FM_LINT_LAST_RC.
 fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds> <args...>
   local path=$1 root_out=$2 root_err=$3 rss_file=$4 seconds=$5 invocation_rc=0 wait_file waited
-  local -a analysis_command gate_command
+  local -a analysis_command gate_command cold_command check_command
   shift 5
-  analysis_command=(env "FM_LINT_CACHE_RESULT_FILE=$rss_file.cache" "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" check \
-    "${FM_LINT_INTERNAL_CACHE:-off}" "$ROOT" "$FM_LINT_SHELLCHECK" \
-    "$@" -- "$path")
+  analysis_command=("$FM_LINT_SHELLCHECK" "$@" -- "$path")
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" = none ] && [ -x /usr/bin/time ]; then
     if [ "$(uname)" = Darwin ]; then
       analysis_command=(/usr/bin/time -lp -o "$rss_file" "${analysis_command[@]}")
@@ -308,20 +312,24 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
     # check still starts the same terminate-then-kill escalation; the worker
     # names itself as that owner before the launch, so a worker that dies while
     # the watchdog is still starting is detected too.
-    ( FM_EXEC_TIMED_OWNER_PID=$$ exec ${gate_command[@]+"${gate_command[@]}"} "${FM_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
+    cold_command=(${gate_command[@]+"${gate_command[@]}"} "${FM_LINT_PERL_BIN:-perl}" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
         "${BASH:-bash}" "$SELF" --internal-timed \
         "$seconds" "$FM_LINT_INTERNAL_GRACE" \
         "${BASH:-bash}" "$SELF" --internal-root "$rss_file" "$FM_LINT_INTERNAL_MEMORY_KIB" \
-        "${analysis_command[@]}" ) > "$root_out" 2> "$root_err" &
-    FM_LINT_WORKER_RUN_PID=$!
-    wait "$FM_LINT_WORKER_RUN_PID" || invocation_rc=$?
-    FM_LINT_WORKER_RUN_PID=
+        "${analysis_command[@]}")
   else
-    ${gate_command[@]+"${gate_command[@]}"} "${analysis_command[@]}" > "$root_out" 2> "$root_err" &
-    FM_LINT_WORKER_RUN_PID=$!
-    wait "$FM_LINT_WORKER_RUN_PID" || invocation_rc=$?
-    FM_LINT_WORKER_RUN_PID=
+    cold_command=(${gate_command[@]+"${gate_command[@]}"} "${analysis_command[@]}")
   fi
+  # Hits and identical concurrent misses need no host slot. Only the cache's
+  # cold execution enters the gate, with the watchdog still inside admission.
+  check_command=(env "FM_LINT_CACHE_RESULT_FILE=$rss_file.cache" \
+    "${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" check \
+    "${FM_LINT_INTERNAL_CACHE:-off}" "$ROOT" "$FM_LINT_SHELLCHECK" \
+    "$@" -- "$path" --execute "${cold_command[@]}")
+  ( FM_EXEC_TIMED_OWNER_PID=$$ exec "${check_command[@]}" ) > "$root_out" 2> "$root_err" &
+  FM_LINT_WORKER_RUN_PID=$!
+  wait "$FM_LINT_WORKER_RUN_PID" || invocation_rc=$?
+  FM_LINT_WORKER_RUN_PID=
   FM_LINT_LAST_RC=$invocation_rc
   FM_LINT_LAST_WAIT_MS=0
   if [ -r "$wait_file" ]; then
