@@ -44,6 +44,12 @@
 # Concurrency: fm_secondmate_liveness_lock serializes probe+kill+relaunch per
 # task across the bootstrap sweep and the watcher tick, so a concurrent
 # relaunch can never be observed mid-flight as a dead endpoint and killed.
+# A separate per-home lock serializes relaunches of different mates, since each
+# fresh spawn owns the same task-set lock. Its wait ceiling comes from the
+# host/repository-scoped secondmate.relaunch durations (p99 x 3), never below
+# an explicit caller timeout. Without calibration or a caller bound, the
+# standard fallback waits without a destructive deadline while collecting
+# successful lock-wait-plus-spawn durations.
 # The attempt ledger (.secondmate-relaunch-<id>, one line per attempt plus one
 # per outcome) is both the durable relaunch record and the input to the
 # watcher's relaunch bound; teardown removes it.
@@ -58,6 +64,8 @@ FM_SM_LIVE_LIB_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$FM_SM_LIVE_LIB_DIR/fm-remote-readiness-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
 . "$FM_SM_LIVE_LIB_DIR/fm-timeout-lib.sh"
+# shellcheck source=bin/fm-duration-lib.sh
+. "$FM_SM_LIVE_LIB_DIR/fm-duration-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$FM_SM_LIVE_LIB_DIR/fm-session-launch-policy-lib.sh"
 # shellcheck source=bin/fm-secondmate-registry-lib.sh
@@ -266,17 +274,20 @@ fm_secondmate_liveness_probe() {  # <meta> <id> <full|poll>
 
 # fm_secondmate_liveness_relaunch <meta> <id> [timeout-secs]
 #
-# Acts on a `relaunchable` probe verdict for <id>, subject to the launch policy
-# owned by docs/configuration.md: records the attempt before killing a confirmed-dead
-# local endpoint (FM_SM_LIVE_KILL), then runs the guarded secondmate spawn and records its outcome. A positive timeout
+# Acts on a `relaunchable` probe verdict for <id>: takes the per-home relaunch
+# lock subject to the session launch policy (docs/configuration.md), records the attempt, kills a confirmed-dead local endpoint if required
+# (FM_SM_LIVE_KILL), runs the guarded spawn, then records its outcome.
+# The header owns the lock-wait bounds. A positive timeout separately
 # wraps the spawn in fm_run_timed so a watcher poll stays bounded; 124/137 mean
 # the bound fired. Returns the spawn exit status; combined spawn output is in
-# FM_SM_LIVE_OUT and the status in FM_SM_LIVE_RC. When the ledger cannot be
-# read or the attempt row cannot be appended, nothing is killed or spawned: the verdict becomes
+# FM_SM_LIVE_OUT and the status in FM_SM_LIVE_RC. When the lock wait expires,
+# the ledger cannot be read, or the attempt row cannot be appended, nothing is
+# killed or spawned and no attempt is recorded: the verdict becomes
 # FM_SM_LIVE_STATUS=skipped with FM_SM_LIVE_REASON set and this returns 1.
 # Caller holds the liveness lock and owns reporting.
 fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
-  local meta=$1 id=$2 timeout=${3:-}
+  local meta=$1 id=$2 timeout=${3:-} relaunch_lock wait_seconds rc=0
+  local started finished load_start lock_rc=0 timed_out=0
   FM_SM_LIVE_OUT='' FM_SM_LIVE_RC=0 FM_SM_LIVE_POLICY_REFUSED=0 FM_SM_LIVE_WAKE=
   local policy_error config home generation reason harness
   home=$(fm_meta_get "$meta" home)
@@ -319,7 +330,37 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
     FM_SM_LIVE_RC=1
     return 1
   fi
+  fm_sm_live_require_locks || return 1
+  relaunch_lock="$STATE/.secondmate-relaunch.lock"
+  started=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000') || return 1
+  load_start=$(fm_duration_load)
+  # Use the CLI lookup: unlike a formerly unbounded shell caller, this wait
+  # gains a measured ceiling once enough successful relaunch samples exist.
+  if ! wait_seconds=$(python3 "$FM_DURATION_HELPER" limit secondmate.relaunch \
+    --percentile 99 --fallback "${timeout:-0}"); then
+    printf 'fm-duration: calibration unavailable for secondmate.relaunch; preserving the caller bound or collecting without a deadline\n' >&2
+    wait_seconds=$timeout
+  fi
+  case "$wait_seconds" in
+    ''|0) fm_lock_acquire_wait "$relaunch_lock" || lock_rc=$? ;;
+    *) fm_lock_acquire_wait_bounded "$relaunch_lock" "$wait_seconds" || lock_rc=$? ;;
+  esac
+  if [ "$lock_rc" -ne 0 ]; then
+    [ "$lock_rc" -ne 124 ] || timed_out=1
+    if finished=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000'); then
+      fm_duration_record secondmate.relaunch "$((finished - started))" "$lock_rc" \
+        '' 1 "$load_start" "$timed_out"
+    fi
+    FM_SM_LIVE_STATUS=skipped
+    FM_SM_LIVE_REASON="could not acquire the per-home relaunch lock; endpoint left $FM_SM_LIVE_STATE"
+    if [ -n "$wait_seconds" ] && [ "$wait_seconds" != 0 ]; then
+      FM_SM_LIVE_REASON="another secondmate relaunch still owns the per-home relaunch lock after ${wait_seconds}s; endpoint left $FM_SM_LIVE_STATE"
+    fi
+    FM_SM_LIVE_RC=1
+    return 1
+  fi
   if ! fm_secondmate_liveness_ledger_add "$id" attempt; then
+    fm_lock_release "$relaunch_lock" || true
     FM_SM_LIVE_STATUS=skipped
     FM_SM_LIVE_REASON="relaunch ledger $STATE/.secondmate-relaunch-$id is unwritable; endpoint left $FM_SM_LIVE_STATE"
     FM_SM_LIVE_RC=1
@@ -335,7 +376,6 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
     fi
     [ -z "$target" ] || fm_backend_kill "$backend" "$target" 2>/dev/null || true
   fi
-  local rc=0
   if [ -n "$timeout" ]; then
     FM_SM_LIVE_OUT=$(FM_SPAWN_NO_GUARD=1 fm_run_timed "$timeout" "$FM_ROOT/bin/fm-spawn.sh" "$id" --secondmate 2>&1) || rc=$?
   else
@@ -346,6 +386,10 @@ fm_secondmate_liveness_relaunch() {  # <meta> <id> [timeout-secs]
     fm_secondmate_liveness_ledger_add "$id" relaunched || true
   else
     fm_secondmate_liveness_ledger_add "$id" failed || true
+  fi
+  fm_lock_release "$relaunch_lock" || true
+  if finished=$(perl -MTime::HiRes=time -e 'printf "%.0f", time * 1000'); then
+    fm_duration_record secondmate.relaunch "$((finished - started))" "$rc" '' 1 "$load_start"
   fi
   return "$rc"
 }
