@@ -79,8 +79,9 @@
 # The one exception is a task's own nested copy that an earlier teardown
 # removed: teardown_nested_slot judges it first by its branch= ref.
 # After landing and runtime cleanup pass, ship teardown also reaps only local
-# archive/<task>-* branches whose exact head is an ancestor of the merged PR
-# head, or whose non-merge commits all have equivalent patches in that head.
+# archive/<task>-{submitted,pipeline}-<8 lowercase hex> branches whose exact head
+# is an ancestor of the merged PR head, or whose non-merge commits all have
+# equivalent patches in that head.
 # The PR head must match its forge-reported merge commit on every changed path.
 # Forced discard, unavailable proof, non-ancestor merge commits, checked-out
 # archives, or a concurrently moved ref keep the archive and name it; another
@@ -2102,9 +2103,10 @@ task_archive_pr_matches_merge() {
 
 reap_task_archive_branches() {
   local refs ref sha branch target head cherry merges checked_out reason
+  local hex8='[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]'
   [ "$KIND" = ship ] && teardown_owns_worktree || return 0
   refs=$(git -C "$PROJ" for-each-ref --format='%(refname) %(objectname)' \
-    "refs/heads/archive/$ID-*") || {
+    "refs/heads/archive/$ID-submitted-$hex8" "refs/heads/archive/$ID-pipeline-$hex8") || {
     echo "warning: could not enumerate task $ID's archive branches; keeping them" >&2
     return 0
   }
