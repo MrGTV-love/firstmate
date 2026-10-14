@@ -3494,7 +3494,7 @@ Refresh the schema and directory observations with the same model-free commands 
 `bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh tests/fm-control-relaunch.test.sh tests/fm-bootstrap.test.sh tests/fm-remote-doctor.test.sh` exercises the public spawn, fallback, relaunch, and diagnostic paths with isolated configuration and no paid model launch.
 A public `fm-bootstrap.sh` detect-only local smoke reported all three forbidden roles and forbidden fallback keys/targets, left the fixture config byte-identical, and omitted its credential sentinel.
 
-Billing-route regression map:
+Billing-route regression map for the approved bounded scope:
 
 | Route | Named executable regression | Observable contract |
 | --- | --- | --- |
@@ -3504,6 +3504,10 @@ Billing-route regression map:
 | Explicit, recorded, role-resolved, and secondmate-pinned relaunches | `tests/fm-control-relaunch.test.sh`: `test_relaunch_omp_billing_admission_preserves_running_agents` | Mixed-case API routes refused before lifecycle input, checkpointing, or metadata/instruction mutation; subscription replacement completes |
 | Default/vision/tiny roles and fallback keys/targets, with default, directory-override, and named-profile configurations | `tests/fm-bootstrap.test.sh`: `test_omp_api_billing_config_diagnostics` | Lowercase, mixed-case, and uppercase API providers reported locally without model calls, secrets, or config writes; subscription routes remain unflagged |
 | Doctor role and fallback inspection | `tests/fm-remote-doctor.test.sh`: billing diagnostic scenario | Mixed-case API providers produce an actionable gap without exposing secrets or modifying configuration |
+
+This map covers the refused routes and diagnostics exercised by the named regressions, not every API-billed selector representation.
+R7 padded-selector normalization and R8 comma-separated role diagnostics are excluded from this change and deferred to `fm-omp-billing-selector-followup`.
+The pipeline PR body must carry this bounded scope, both exclusions, and the route-to-named-regression mapping above.
 
 ### Process identity and markers
 

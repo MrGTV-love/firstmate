@@ -23,6 +23,7 @@ FM_DISPATCH_CAPACITY_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 . "$FM_DISPATCH_CAPACITY_DIR/fm-quota-axi-lib.sh"
 # shellcheck source=bin/fm-session-launch-policy-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-session-launch-policy-lib.sh"
+# shellcheck source=bin/fm-api-key-guard-lib.sh
 . "$FM_DISPATCH_CAPACITY_DIR/fm-api-key-guard-lib.sh"
 
 fm_omp_codex_capacity() {
