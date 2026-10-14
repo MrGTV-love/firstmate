@@ -1,0 +1,77 @@
+{
+  "main": {
+    "run": 38582520880,
+    "attempt": 1,
+    "head": "3516c9b609f0254c942db56fbf8331787f02a036",
+    "failure_excerpt": [
+      "2026-10-14T14:50:46.8259237Z ok - watch-arm: markerless legacy queues are adopted and recovered",
+      "2026-10-14T14:50:52.6992036Z ok - watch-arm: an idle Lavish source stays quiet and its real result wakes promptly",
+      "2026-10-14T14:50:55.2595872Z ok - watch-arm: appending work reopens an announced empty recovery",
+      "2026-10-14T14:50:58.6628208Z not ok - repeated publications during handling replaced the outstanding recovery generation",
+      "2026-10-14T14:50:58.8433518Z FM_TEST_END 2026-10-14T14:50:58Z tests/fm-watch-arm.test.sh exit=1 duration_ms=106451 gate_skip=false"
+    ],
+    "rerun": {
+      "conclusion": "success",
+      "head_sha": "3516c9b609f0254c942db56fbf8331787f02a036",
+      "run_attempt": 2
+    }
+  },
+  "historical_local_observations": {
+    "3516c9b6": {
+      "original_unforced_case_exit": 0,
+      "forced_announced_original_case_exit": 1
+    },
+    "c71df56d": {
+      "original_unforced_case_exit": 0,
+      "forced_announced_original_case_exit": 1
+    },
+    "controlled_failure": "repeated publications during handling replaced the outstanding recovery generation",
+    "interpretation": "The old fixture mixes a generation-preserving handling-successor assertion with an ordinary restart. Forcing announced handling makes the assertion fail at both historical revisions; the issue predates PR 125. The corrected fixture forces announced recovery and names its predecessor."
+  },
+  "target": {
+    "focused_regression_exit": 0,
+    "real_tmux_lifecycle_exit": 0,
+    "real_tmux_repeat_exit": 0,
+    "repeats": 3
+  },
+  "herdr": {
+    "run": 38596911609,
+    "job": 115965884049,
+    "annotations": [
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/MrGTV-love/firstmate/blob/f3ec4304672944f434c68c646996f38aa2470ad2/.github",
+        "start_line": 1,
+        "start_column": null,
+        "end_line": 1,
+        "end_column": null,
+        "annotation_level": "failure",
+        "title": "",
+        "message": "The hosted runner lost communication with the server. Anything in your workflow that terminates the runner process, starves it for CPU/Memory, or blocks its network access can cause this error.",
+        "raw_details": ""
+      },
+      {
+        "path": ".github",
+        "blob_href": "https://github.com/MrGTV-love/firstmate/blob/f3ec4304672944f434c68c646996f38aa2470ad2/.github",
+        "start_line": 1,
+        "start_column": null,
+        "end_line": 1,
+        "end_column": null,
+        "annotation_level": "notice",
+        "title": "",
+        "message": "\"The ubuntu-latest label will migrate to Ubuntu 26 beginning October 19, 2026. For more information, see https://github.com/actions/runner-images/issues/14748\"",
+        "raw_details": ""
+      }
+    ],
+    "job_log_endpoint": "HTTP 404",
+    "run_log_archive": "No Herdr job log included",
+    "herdr_diagnostic_artifact": "No Herdr artifact uploaded",
+    "interpretation": "GitHub reports hosted-runner communication loss, not a watcher assertion. Missing job diagnostics prevent determining why communication was lost; no evidence supports the same watch-arm root."
+  },
+  "isolation": {
+    "product": "real fm-watch-arm.sh, fm-watch.sh and fm-wake-drain.sh",
+    "terminal": "real tmux, private socket, session fm-lab-watch-validation; no fake terminal or crew-state executable in live scenarios",
+    "fixtures": "disposable paths inside the gate worktree; test harness sandbox bypass",
+    "setup_correction": "Historical-copy TMUX relative path was corrected to ../../.gate-watch-validation/watch.sock and verified by real tmux session query."
+  }
+}

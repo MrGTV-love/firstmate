@@ -1,0 +1,14 @@
+{
+  "name": "Behavior tests (Herdr)",
+  "conclusion": "failure",
+  "started_at": "2026-10-14T16:18:13Z",
+  "completed_at": "2026-10-14T17:06:14Z",
+  "details_url": "https://github.com/MrGTV-love/firstmate/actions/runs/38596911609/job/115965884049",
+  "output": {
+    "title": null,
+    "summary": null,
+    "text": null,
+    "annotations_count": 2,
+    "annotations_url": "https://api.github.com/repos/MrGTV-love/firstmate/check-runs/115965884049/annotations"
+  }
+}

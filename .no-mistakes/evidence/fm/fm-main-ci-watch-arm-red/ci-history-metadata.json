@@ -1,0 +1,144 @@
+{
+  "main-original": {
+    "conclusion": "failure",
+    "headSha": "3516c9b609f0254c942db56fbf8331787f02a036",
+    "url": "https://github.com/MrGTV-love/firstmate/actions/runs/38582520880/attempts/1"
+  },
+  "main-rerun": {
+    "conclusion": "success",
+    "head_sha": "3516c9b609f0254c942db56fbf8331787f02a036",
+    "run_attempt": 2
+  },
+  "herdr-job": {
+    "id": 115965884049,
+    "run_id": 38596911609,
+    "workflow_name": "CI",
+    "head_branch": "fm/fm-procevent-lavish-list-form-parse",
+    "run_url": "https://api.github.com/repos/MrGTV-love/firstmate/actions/runs/38596911609",
+    "run_attempt": 1,
+    "node_id": "CR_kwDOUk48vM8AAAAbABr2kQ",
+    "head_sha": "f3ec4304672944f434c68c646996f38aa2470ad2",
+    "url": "https://api.github.com/repos/MrGTV-love/firstmate/actions/jobs/115965884049",
+    "html_url": "https://github.com/MrGTV-love/firstmate/actions/runs/38596911609/job/115965884049",
+    "status": "completed",
+    "conclusion": "failure",
+    "created_at": "2026-10-14T16:18:11Z",
+    "started_at": "2026-10-14T16:18:13Z",
+    "completed_at": "2026-10-14T17:06:14Z",
+    "name": "Behavior tests (Herdr)",
+    "steps": [
+      {
+        "name": "Set up job",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 1,
+        "started_at": "2026-10-14T16:18:14Z",
+        "completed_at": "2026-10-14T16:18:14Z"
+      },
+      {
+        "name": "Run actions/checkout@v6",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 2,
+        "started_at": "2026-10-14T16:18:14Z",
+        "completed_at": "2026-10-14T16:18:19Z"
+      },
+      {
+        "name": "Require tools for real Herdr",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 3,
+        "started_at": "2026-10-14T16:18:19Z",
+        "completed_at": "2026-10-14T16:18:19Z"
+      },
+      {
+        "name": "Install pinned Herdr",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 4,
+        "started_at": "2026-10-14T16:18:19Z",
+        "completed_at": "2026-10-14T16:18:20Z"
+      },
+      {
+        "name": "Install pinned Treehouse",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 5,
+        "started_at": "2026-10-14T16:18:20Z",
+        "completed_at": "2026-10-14T16:18:20Z"
+      },
+      {
+        "name": "Install tasks-axi for recovery regression",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 6,
+        "started_at": "2026-10-14T16:18:20Z",
+        "completed_at": "2026-10-14T16:18:27Z"
+      },
+      {
+        "name": "Assert Herdr pin and protocol floor",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 7,
+        "started_at": "2026-10-14T16:18:27Z",
+        "completed_at": "2026-10-14T16:18:27Z"
+      },
+      {
+        "name": "Start default Herdr session for fleet-state tripwire",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 8,
+        "started_at": "2026-10-14T16:18:27Z",
+        "completed_at": "2026-10-14T16:18:27Z"
+      },
+      {
+        "name": "Snapshot pre-suite Herdr sessions",
+        "status": "completed",
+        "conclusion": "success",
+        "number": 9,
+        "started_at": "2026-10-14T16:18:27Z",
+        "completed_at": "2026-10-14T16:18:27Z"
+      },
+      {
+        "name": "Run real-Herdr family (serial, required)",
+        "status": "in_progress",
+        "conclusion": null,
+        "number": 10,
+        "started_at": "2026-10-14T16:18:27Z",
+        "completed_at": null
+      },
+      {
+        "name": "Cleanup job-owned Herdr lab sessions",
+        "status": "pending",
+        "conclusion": null,
+        "number": 11,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "name": "Upload Herdr timing and diagnostics",
+        "status": "pending",
+        "conclusion": null,
+        "number": 12,
+        "started_at": null,
+        "completed_at": null
+      },
+      {
+        "name": "Post Run actions/checkout@v6",
+        "status": "pending",
+        "conclusion": null,
+        "number": 24,
+        "started_at": null,
+        "completed_at": null
+      }
+    ],
+    "check_run_url": "https://api.github.com/repos/MrGTV-love/firstmate/check-runs/115965884049",
+    "labels": [
+      "ubuntu-latest"
+    ],
+    "runner_id": 1000174258,
+    "runner_name": "GitHub Actions 1000174258",
+    "runner_group_id": 0,
+    "runner_group_name": "GitHub Actions"
+  }
+}

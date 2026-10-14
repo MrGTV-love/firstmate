@@ -1,0 +1,79 @@
+
+=== TARGET REPEAT 1 ===
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.wGy5vU/handling-window-close-acknowledgement/first-arm.out predecessor=none
+watcher: started pid=83001 (beacon fresh)
+RECOVERY STATE: DURABLE QUEUE:
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.wGy5vU/handling-window-close-acknowledgement/recovery-arm.out predecessor=none
+watcher: started pid=87160 (beacon fresh)
+RECOVERY STATE: announced:downtime:83001.1792000512.VJCtoX
+DURABLE QUEUE:
+1792000512	1	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.wGy5vU/handling-window-close-acknowledgement/state/handled.status
+1792000513	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.wGy5vU/handling-window-close-acknowledgement/state/handled.status
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.wGy5vU/handling-window-close-acknowledgement/handling-window-arm.out predecessor=87100
+watcher: started pid=90537 (beacon fresh) recovery-generation=83001.1792000512.VJCtoX
+RECOVERY STATE: announced:handling:83001.1792000512.VJCtoX
+DURABLE QUEUE:
+1792000512	1	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.wGy5vU/handling-window-close-acknowledgement/state/handled.status
+1792000513	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.wGy5vU/handling-window-close-acknowledgement/state/handled.status
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.wGy5vU/handling-window-close-acknowledgement/next-arm.out predecessor=none
+watcher: started pid=95408 (beacon fresh)
+RECOVERY STATE: acked:handling:83001.1792000512.VJCtoX
+DURABLE QUEUE:
+ok - watch-arm: a watcher close during handling keeps the printed acknowledgement valid
+
+=== TARGET REPEAT 2 ===
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.2OYB0R/handling-window-close-acknowledgement/first-arm.out predecessor=none
+watcher: started pid=669 (beacon fresh)
+RECOVERY STATE: DURABLE QUEUE:
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.2OYB0R/handling-window-close-acknowledgement/recovery-arm.out predecessor=none
+watcher: started pid=6484 (beacon fresh)
+check: rearm-resurface
+RECOVERY STATE: announced:downtime:669.1792000523.IBGhqh
+DURABLE QUEUE:
+1792000523	1	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.2OYB0R/handling-window-close-acknowledgement/state/handled.status
+1792000523	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.2OYB0R/handling-window-close-acknowledgement/state/handled.status
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.2OYB0R/handling-window-close-acknowledgement/handling-window-arm.out predecessor=6323
+watcher: started pid=10919 (beacon fresh) recovery-generation=669.1792000523.IBGhqh
+RECOVERY STATE: announced:handling:669.1792000523.IBGhqh
+DURABLE QUEUE:
+1792000523	1	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.2OYB0R/handling-window-close-acknowledgement/state/handled.status
+1792000523	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.2OYB0R/handling-window-close-acknowledgement/state/handled.status
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.2OYB0R/handling-window-close-acknowledgement/next-arm.out predecessor=none
+watcher: started pid=16829 (beacon fresh)
+RECOVERY STATE: acked:handling:669.1792000523.IBGhqh
+DURABLE QUEUE:
+ok - watch-arm: a watcher close during handling keeps the printed acknowledgement valid
+
+=== TARGET REPEAT 3 ===
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.3Virim/handling-window-close-acknowledgement/first-arm.out predecessor=none
+watcher: started pid=20395 (beacon fresh)
+RECOVERY STATE: DURABLE QUEUE:
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.3Virim/handling-window-close-acknowledgement/recovery-arm.out predecessor=none
+check: rearm-resurface
+RECOVERY STATE: announced:downtime:20395.1792000533.2DQzCw
+DURABLE QUEUE:
+1792000533	1	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.3Virim/handling-window-close-acknowledgement/state/handled.status
+1792000533	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.3Virim/handling-window-close-acknowledgement/state/handled.status
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.3Virim/handling-window-close-acknowledgement/handling-window-arm.out predecessor=25191
+watcher: started pid=28944 (beacon fresh) recovery-generation=20395.1792000533.2DQzCw
+RECOVERY STATE: announced:handling:20395.1792000533.2DQzCw
+DURABLE QUEUE:
+1792000533	1	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.3Virim/handling-window-close-acknowledgement/state/handled.status
+1792000533	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.3Virim/handling-window-close-acknowledgement/state/handled.status
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-repeat.3Virim/handling-window-close-acknowledgement/next-arm.out predecessor=none
+watcher: started pid=32970 (beacon fresh)
+RECOVERY STATE: acked:handling:20395.1792000533.2DQzCw
+DURABLE QUEUE:
+ok - watch-arm: a watcher close during handling keeps the printed acknowledgement valid

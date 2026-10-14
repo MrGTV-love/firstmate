@@ -1,0 +1,13 @@
+{
+  "private_tmux_kill_server_exit": 0,
+  "private_tmux_list_sessions_after_exit": 1,
+  "private_tmux_after_stderr": "no server running on .gate-watch-validation/watch.sock",
+  "remaining_owned_watcher_processes": [],
+  "removed_disposable_paths": [
+    ".gate-watch-validation",
+    "tests/.gate-watch-arm-focused.test.sh",
+    "tests/.gate-live-watch-arm.test.sh",
+    "tests/.gate-live-watch-arm-repeat.test.sh"
+  ],
+  "temporary_registry_directory_was_empty": true
+}

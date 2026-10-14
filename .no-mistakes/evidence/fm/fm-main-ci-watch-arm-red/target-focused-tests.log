@@ -1,0 +1,3 @@
+ok - watch-arm: a watcher close during handling keeps the printed acknowledgement valid
+ok - watch-arm: interrupted handling leaves its wake durable for successor re-drain
+ok - watch-arm: a moved recovery generation consumes handled rows and names its remedy

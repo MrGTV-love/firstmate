@@ -1,0 +1,65 @@
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/first-arm.out predecessor=none
+watcher: started pid=79112 (beacon fresh)
+RECOVERY STATE: DURABLE QUEUE:
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/forced-announcement.out predecessor=none
+watcher: started pid=85676 (beacon fresh)
+RECOVERY STATE: announced:downtime:79112.1792000512.SgGXTW
+DURABLE QUEUE:
+1792000512	1	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/handled.status
+1792000512	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/handled.status
+FORCED ANNOUNCED SCHEDULE: announced:downtime:79112.1792000512.SgGXTW
+
+PRODUCT ARM /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/handling-window-arm.out predecessor=none
+watcher: started pid=89694 (beacon fresh)
+RECOVERY STATE: announced:downtime:89694.1792000515.4khZLM
+DURABLE QUEUE:
+1792000512	1	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/handled.status
+1792000512	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/handled.status
+not ok - repeated publications during handling replaced the outstanding recovery generation
+
+===== PRODUCT ARTIFACTS: handling-window-close-acknowledgement =====
+
+--- drain.out ---
+1792000512	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/handled.status
+wake annotation: latest wake-EVENT observed at drain, not current state: handled.status: done: wake handled while a watcher cycle closes
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+handled done: wake handled while a watcher cycle closes
+
+--- first-arm.out ---
+watcher: started pid=79112 (beacon fresh)
+signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/handled.status
+
+--- forced-announcement.out ---
+watcher: started pid=85676 (beacon fresh)
+check: rearm-resurface
+
+--- handling-window-arm.out ---
+watcher: started pid=89694 (beacon fresh)
+signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/during-handling.status
+
+--- drain.err ---
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 79112.1792000512.SgGXTW
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  Unread wake(s) queued, but no live watcher process holds this home lock (last beat: 1s ago).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair missing watcher supervision according to the session-start block for this harness; do not use shell &.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+--- state/.watch-cycle-exits.log ---
+arm_pid=79070	watcher_pid=79112	origin=started	started_at=1792000510	ended_at=1792000512	exit_code=0	signal=none	reason=actionable-signal	beacon_age=0	lock_before=pid:79112|identity:Wed Oct 14 12:55:10 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/c71df56d/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=none
+arm_pid=85601	watcher_pid=85676	origin=started	started_at=1792000513	ended_at=1792000513	exit_code=0	signal=none	reason=actionable-check	beacon_age=0	lock_before=pid:85676|identity:Wed Oct 14 12:55:13 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/c71df56d/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=none
+arm_pid=89663	watcher_pid=89694	origin=started	started_at=1792000515	ended_at=1792000517	exit_code=0	signal=none	reason=actionable-signal	beacon_age=1	lock_before=pid:89694|identity:Wed Oct 14 12:55:15 2026     bash /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/c71df56d/bin/fm-watch.sh	lock_after=pid:none|identity:none	successor=none
+
+--- state/.watcher-down ---
+pending:downtime:89694.1792000517.6fzj3J
+
+--- state/.wake-queue ---
+1792000512	1	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/handled.status
+1792000512	2	signal	handled.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/handled.status
+1792000517	3	signal	during-handling.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/during-handling.status
+1792000517	4	signal	during-handling.status	signal: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XRDWVK4ZRGEXK6YXENKJNN/.gate-watch-validation/tmp/fm-watch-arm-tests.4oYePm/handling-window-close-acknowledgement/state/during-handling.status
