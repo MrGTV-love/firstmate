@@ -366,8 +366,24 @@ for name, value in (('FM_DATA_OVERRIDE', 'data'), ('FM_HOME', '.'), ('FM_DURATIO
             assert done.stdout.strip() == 'off'
 print('ok - a ledger or lock location inside a project work tree is refused without writing')
 
-# Normal recording is unchanged: a home that is itself a git checkout keeps its table under its own data/.
+# A declared home that is a plain git work tree or a project copy is refused, whichever variable names it.
+for name, value in (('FM_DURATION_HOME', str(project)), ('FM_HOME', str(project)), ('FM_DATA_OVERRIDE', str(project)),
+                    ('FM_DATA_OVERRIDE', str(project / 'data')), ('FM_DURATION_HOME', str(project / 'nested/home'))):
+    for args in (('record', 'plain', 5, 0), ('limit', 'plain', '--fallback', 9), ('timeout', 'plain', 5), ('path',)):
+        done = from_project(*args, extra={name: value})
+        assert done.returncode == 0, (name, value, args, done.stdout, done.stderr)
+        assert done.stderr.count('refused, nothing recorded') == 1, (name, value, args, done.stderr)
+        assert project_dirty() == '' and not (project / 'data').exists(), (name, value, args, 'a plain work tree home was written', project_dirty())
+        if args[0] == 'limit':
+            assert done.stdout.strip() == '9'
+        if args[0] == 'path':
+            assert done.stdout.strip() == 'off'
+print('ok - a declared home that is a project work tree is refused without writing')
+
+# Normal recording is unchanged: a home that is itself a firstmate git checkout keeps its table under its own data/.
 git_home = make_repo('git-home')
+(git_home / 'bin').mkdir()
+(git_home / 'bin/fm-duration.py').write_text('')
 (git_home / 'data').mkdir()
 for extra in ({'FM_DURATION_HOME': str(git_home)}, {'FM_HOME': str(git_home)}, {'FM_HOME': str(git_home), 'FM_DATA_OVERRIDE': str(git_home / 'data')}):
     (git_home / 'data/command-durations.jsonl').unlink(missing_ok=True)

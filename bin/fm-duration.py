@@ -23,7 +23,8 @@ A variable that is set but empty names nothing and counts as unset. A location
 variable must be an absolute path, so the table never resolves against the
 caller's directory. The table, its .lock and .compact siblings, and the
 calibration scratch file are never written inside a git work tree unless the
-table sits under a firstmate home's data directory: a firstmate tool must not
+table sits under the home's data directory and that work tree is a firstmate
+checkout (it holds bin/fm-duration.py): a firstmate tool must not
 change a project copy. A refused location prints one stderr line, records
 nothing and exits 0 (path prints off, limit keeps the caller's fallback);
 gitignore is never relied on to hide a misplaced write. Recording and process-group execution require POSIX
@@ -169,12 +170,11 @@ def contained(path, directory):
 
 
 def may_write(path, home):
-    """A table may sit outside every work tree, under the declared home's data
-    directory, or under the data directory of a firstmate checkout; any other
+    """A table may sit outside every work tree, or under the home's data
+    directory when the work tree holding it is a firstmate checkout; any other
     work tree is a project copy."""
     root = work_tree_root(path.parent)
-    return (root is None or contained(path, home)
-            or ((root / 'bin' / 'fm-duration.py').exists() and contained(path, root / 'data')))
+    return root is None or (contained(path, home) and (root / 'bin' / 'fm-duration.py').exists())
 
 
 def refuse(reason):
@@ -198,7 +198,7 @@ def ledger_path():
     except ValueError as error:
         return refuse(str(error))
     if not may_write(path, home):
-        return refuse(f'{path} is inside a git work tree that is not a firstmate home data directory')
+        return refuse(f'{path} is inside a git work tree that is not a firstmate checkout data directory')
     return path
 
 
