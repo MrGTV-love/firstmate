@@ -126,8 +126,11 @@ Firstmate PR #3644 demonstrated the cost: pinning a 75-162-script walk took 32.7
 - Never add an agent name as a commit co-author.
 - `bin/*.sh` and `bin/backends/*.sh` must pass `shellcheck`.
 - Run Firstmate production-library tests and commands that source `bin/` scripts under `bash` explicitly, never through the tool shell's default interpreter.
-- Run `bin/fm-lint.sh` before treating a script change as done; it is the single owner of the lint definition that CI and the no-mistakes pre-push gate both invoke, its own header owns what that definition covers, and it refuses to run under any other version of either linter.
-  Use this entry point for repository lint rather than ad hoc full-tree ShellCheck commands so its dependency selection and cross-worktree reuse apply.
+- When no-mistakes will run its lint step, do not run full or context-selected `bin/fm-lint.sh` again before committing or handing off the change.
+  An optional quick worker check uses explicit changed script paths only: `bin/fm-lint.sh bin/<changed-script>.sh`.
+  Otherwise run the context-selected entry point before treating a script change as done.
+  `bin/fm-lint.sh` owns lint selection, analysis, and pinned versions; the pipeline owns the local lint verdict and CI remains the full canonical authority.
+  Use this entry point rather than ad hoc full-tree ShellCheck commands.
 - When a task names a specific tool, implement the work with that tool, or explicitly flag the substitution and its new dependency footprint for review before shipping.
 - Colocate tests with the existing pattern in `tests/`, name them `<subject>.test.sh`, and extend an existing script rather than inventing a new runner.
 - Tests must exercise behavior through an executable or public interface and must never assert implementation-source bytes, including through parsers, regexes, snapshots, or indirect wrappers.

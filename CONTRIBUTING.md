@@ -98,11 +98,13 @@ The `firstmate-coding-guidelines` skill owns the rule that local no-mistakes Tes
 Verify the same way the gate does: reach for `bin/fm-test-run.sh` with the subjects you care about rather than chaining `bash tests/a.test.sh && bash tests/b.test.sh`, because a list of script paths gets the same bounded concurrency as `--changed`.
 The pipeline publishes that evidence itself, so never hand-commit `.no-mistakes/` paths onto a feature branch; CI rejects them as tracked personal fleet paths.
 
-Check and test the toolbelt before pushing:
+Exercise the changed behavior before committing; the `firstmate-coding-guidelines` skill owns whether a separate local lint is needed before the pipeline.
+The pipeline runs the local lint verdict, and CI checks the full canonical partitions.
+Optional quick lint checks name explicit changed script paths rather than repeating the full or dependency-selected lint:
 
 ```sh
-while IFS= read -r script; do /bin/bash -n "$script" || exit; done < <(bin/fm-lint.sh --list-files)   # syntax-check fm-lint.sh's context-selected shell surface
-bin/fm-lint.sh   # lint that shell surface plus GitHub workflows via pinned actionlint; the single owner CI and the no-mistakes gate both run
+/bin/bash -n bin/<changed-script>.sh
+bin/fm-lint.sh bin/<changed-script>.sh   # optional quick changed-root check; the pipeline runs its own lint step
 bin/fm-test-run.sh tests/<subject>.test.sh   # one script (primary local focus path, timed)
 bin/fm-test-run.sh tests/<a>.test.sh tests/<b>.test.sh   # several subjects at once: bounded automatic concurrency
 bin/fm-test-run.sh --family pure-contract-unit   # ordinary family-scoped local path (serial, timed)
