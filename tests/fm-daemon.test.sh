@@ -388,7 +388,12 @@ EOF
   kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"]["away-row"]["kind"])' \
     "$state/open-loops.json")
   [ "$kind" = escalated ] || fail "the away escalation was not recorded as the row's receipt: $kind"
-  pass "away mode escalates overdue rows, records the receipt, and acknowledges"
+  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+    handle_durable_wakes fallback "$state" || fail "a later wake with the same overdue row was not acknowledged"
+  [ "$(wc -l < "$dir/acked" | tr -d ' ')" = 2 ] || fail "the later wake was not acknowledged once"
+  [ "$(grep -cF 'overdue open work: "away-row",' "$buffer")" = 1 ] \
+    || fail "an unflushed digest buffered the same overdue row twice"
+  pass "away mode escalates overdue rows once per digest, records the receipt, and acknowledges"
 }
 
 test_busy_inbox_escalation_reaches_supervision() {

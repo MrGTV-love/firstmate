@@ -1705,7 +1705,10 @@ escalate_overdue_rows() {  # <state>
     case "$line" in '  "'*) ;; *) continue ;; esac
     id=${line#  \"}
     id=${id%%\"*}
-    escalate_add "$state" "overdue open work: ${line#  }" || return 1
+    # One buffered digest item per row until the digest flushes.
+    if ! grep -qF "overdue open work: \"$id\"," "$state/.subsuper-escalations" 2>/dev/null; then
+      escalate_add "$state" "overdue open work: ${line#  }" || return 1
+    fi
     "$FM_DAEMON_DIR/fm-open-loops.sh" action "$id" escalated \
       --evidence "away supervisor escalation digest" > /dev/null || return 1
   done <<EOF

@@ -659,14 +659,21 @@ with open(sys.argv[1], 'w') as stream:
                    completions=[dict(subject='finished-fix', evidence='merged and complete')]), stream)
 PY
 : > "$TMP_ROOT/board-trigger"
-when "$H" arm board-0900 --stable 1 --condition "$COND" "$TMP_ROOT/board-trigger" "$TMP_ROOT/board-count" \
+when "$H" arm report-0900 --stable 1 --condition "$COND" "$TMP_ROOT/board-trigger" "$TMP_ROOT/board-count" \
   --action "$ACT" "$TMP_ROOT/board-action" >/dev/null || fail "could not arm the board report"
-out=$(FM_OPEN_LOOPS_NOW="$now" when "$H" run when-board-0900) || fail "board report source failed"
+out=$(FM_OPEN_LOOPS_NOW="$now" when "$H" run when-report-0900) || fail "board report source failed"
 assert_contains "$out" 'status: fired' 'scheduled board condition did not fire'
 assert_contains "$out" 'finished-fix' 'board wake lost the completion evidence'
 assert_contains "$out" 'row-0' 'board wake lost its first overdue row'
 assert_contains "$out" 'row-24' 'board wake truncated its overdue rows'
 assert_contains "$out" '7200' 'board wake omitted overdue ages'
 pass 'scheduled board outcomes list completions and every overdue row with its age'
+: > "$TMP_ROOT/other-trigger"
+when "$H" arm deploy-check --stable 1 --condition "$COND" "$TMP_ROOT/other-trigger" "$TMP_ROOT/other-count" \
+  --action "$ACT" "$TMP_ROOT/other-action" >/dev/null || fail "could not arm the ordinary watch"
+out=$(FM_OPEN_LOOPS_NOW="$now" when "$H" run when-deploy-check) || fail "ordinary watch source failed"
+assert_contains "$out" 'status: fired' 'ordinary watch condition did not fire'
+case "$out" in *'OPEN WORK REPORT'*) fail 'an ordinary watch outcome carried the open-work report' ;; esac
+pass 'only the scheduled report watches carry the open-work report'
 
 printf 'all fm-procevent-when tests passed\n'
