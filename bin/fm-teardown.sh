@@ -2191,6 +2191,7 @@ STALE_WORKTREE_LOCK_RETRY_WAIT_SECS=$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS
 TEARDOWN_TREEHOUSE_LOCK_REFUSED=2
 TEARDOWN_WORKTREE_SAFETY_LOCK_BLOCKED=3
 TEARDOWN_PROCEVENT_RESTORE_FAILED=4
+TEARDOWN_TREEHOUSE_CUSTODY_REFUSED=5
 
 # True when treehouse/git stderr shows the transient index.lock "File exists" race.
 # Other return failures must not enter the retry path.
@@ -2296,7 +2297,7 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
 
   # Capture stdout+stderr so non-lock failures stay visible and lock failures can
   # be matched by signature even when the lock file is already gone mid-check.
-  require_registered_slot_copies "$owner" "$dir" || return 1
+  require_registered_slot_copies "$owner" "$dir" || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
   if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
     [ -n "$out" ] && printf '%s\n' "$out"
     return 0
@@ -2322,7 +2323,7 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
     echo "teardown: $label return failed with transient git lock ($lock_desc); waiting ${TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS}s and retrying ($attempt/${max_retries})" >&2
     sleep "$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS"
 
-    require_registered_slot_copies "$owner" "$dir" || return 1
+    require_registered_slot_copies "$owner" "$dir" || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
     if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
       [ -n "$out" ] && printf '%s\n' "$out"
       echo "teardown: $label return succeeded on retry; lock cleared on its own" >&2
@@ -2350,7 +2351,7 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
           return 1
         fi
       fi
-      require_registered_slot_copies "$owner" "$dir" || return 1
+      require_registered_slot_copies "$owner" "$dir" || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
       if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
         [ -n "$out" ] && printf '%s\n' "$out"
         echo "teardown: $label return succeeded after stale-lock cleanup" >&2
@@ -4638,7 +4639,8 @@ cleanup_firstmate_home_children() {
             fm_treehouse_slot_owner_release "$child_wt" "$child_id"
           else
             child_return_rc=$?
-            if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ]; then
+            if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ] \
+               || [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED" ]; then
               return "$child_return_rc"
             fi
             safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1

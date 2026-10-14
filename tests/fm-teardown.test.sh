@@ -9647,9 +9647,41 @@ SH
   pass 'an uncanonicalizable return target reports an explicit refusal and preserves its record'
 }
 
+# A custody refusal at a child's return is final; no fallback may delete the copy.
+test_child_return_custody_refusal_keeps_non_pool_worktree() {
+  local case_dir home nested rc=0
+  case_dir=$(make_case child-return-custody)
+  write_meta "$case_dir" local-only secondmate
+  configure_secondmate_with_tmux_children "$case_dir"
+  home="$case_dir/secondmate-home"
+  nested="$case_dir/child-a-wt/.claude/worktrees/parked"
+  git -C "$case_dir/project" worktree add -q --detach "$nested" main
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+exit 0
+SH
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 5 "$rc" "child custody refusal must stop teardown: $(cat "$case_dir/stderr")"
+  assert_grep "contains registered copy $nested" "$case_dir/stderr" 'child custody refusal was not reported'
+  assert_present "$nested/.git" 'child custody refusal lost the parked copy'
+  assert_present "$case_dir/child-a-wt/.git" 'child custody refusal removed the child worktree'
+  assert_present "$home/state/child-a.meta" 'child custody refusal retired the child record'
+  assert_present "$case_dir/state/task-x1.meta" 'child custody refusal retired the parent record'
+  assert_absent "$case_dir/treehouse.log" 'provider was called despite the parked copy'
+  pass 'a custody refusal at a non-pool child return keeps the child worktree and its parked copy'
+}
+
 teardown_test_cases=(
 test_non_pool_returns_recheck_registered_copies
 test_return_missing_slot_reports_canonicalization_refusal
+test_child_return_custody_refusal_keeps_non_pool_worktree
 test_teardown_never_holds_up_a_steer_to_another_task
 test_lane_registry_scan_reads_each_distinct_registry_once
 test_task_teardown_preserves_another_homes_abandoned_worker
