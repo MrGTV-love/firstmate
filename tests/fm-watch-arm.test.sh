@@ -537,8 +537,11 @@ test_slow_rearm_recovery_is_still_surfaced() {
 
   # Removing the dead watcher's beacon makes the delay start exactly when the
   # re-armed watcher publishes its own, so its startup and the arm's confirmation
-  # stay at full speed and only the work after confirmation is slowed.
-  rm -f "$state/.last-watcher-beat"
+  # stay at full speed and only the work after confirmation is slowed. Removing
+  # its prelude progress marker makes the re-armed watcher run the whole prelude
+  # rather than resume wherever the kill happened to land, so the delayed cycle
+  # is the same length on every run.
+  rm -f "$state/.last-watcher-beat" "$state/.prelude-progress"
   for tool in mktemp readlink; do
     real=$(command -v "$tool") || fail "no $tool to delay"
     cat > "$fakebin/$tool" <<SH
