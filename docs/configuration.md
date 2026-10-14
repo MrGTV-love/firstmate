@@ -706,7 +706,7 @@ Both durable payloads are identical to their printed wake reasons, including the
 Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults.
 Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
-Drain presents `OVERDUE` before other sections, with every overdue row's id, owner, next action, evidence, and current age.
+Drain presents `OVERDUE` before other sections, with the id, owner, next action, evidence, and current age of every overdue row that still needs an action; rows under a standing receipt follow in a `STANDING` block, and a drain whose only overdue rows stand prints neither block and opens no handling episode.
 `bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no action recorded after its presentation; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
 The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest, at most one buffered item per row id until the digest flushes, and records an `escalated` receipt for it before acknowledging, so away mode neither wedges nor consumes overdue work silently.
@@ -720,11 +720,13 @@ A deferral's recheck time must be in the future and at most 24 hours ahead.
 Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible`, and requires steering, merging, or escalation before acknowledgement.
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
 A first deferral stands until its recheck time.
-An escalation of a captain-owned row, or of a `review_pass_not_merged` row awaiting merge approval, stands until the row's category, subject, owner, next action, or evidence changes.
+An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
+A `review_pass_not_merged` row has no standing receipt: firstmate holds merge authority for a reviewed, green PR, so each presentation needs a merge or a routed action.
 The existing ledger lock file separates collection exclusion from the short publication/receipt critical section, so a slow source scan cannot delay overdue presentation or action recording, and atomic publication preserves action requirements and receipts rather than overwriting them.
 Receipt writes preserve the ledger's heartbeat modification time, so action recording cannot mask a reconciler that stopped publishing.
 An incomplete collection keeps a presented row it no longer sees as a stale informational row: it is shown, never overdue, and needs no receipt; a complete collection drops it.
 Every publication drops `handling` entries for rows it no longer publishes, so a later recurrence of the same obligation starts with no receipts or deferrals, and an unreadable previous ledger is replaced rather than blocking publication.
+An unreadable ledger (corrupt JSON, wrong schema, or a symbolic link) never blocks a drain, acknowledgement, session start, or away return: the drain prints one stderr line naming the exact repair command, `rm state/open-loops.json`, and the next heartbeat rebuilds the file; `action` and `--report` still refuse it.
 An action receipt permits acknowledgement, never resolves the obligation: a row disappears only when fresh delivery evidence resolves it.
 The scheduled report watches, process-event `when` watches named `board-*` or `report-*`, append every still-overdue row with its current age after the bounded action output; other `when` outcomes do not.
 The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors.

@@ -2026,7 +2026,7 @@ inbox(home, '021.msg')
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '021.msg')
 clock['now'] = now
 
-# An escalated review-PASS row awaiting the captain's merge approval stands until its evidence changes.
+# A reviewed green PR is firstmate's to merge: an escalation never stands on it, so each presentation needs an action.
 home, ledger, row, call, ok, drain, ack = case('approval', category='review_pass_not_merged', subject=PR,
                                                next_action='merge with existing authority or escalate for approval',
                                                evidence='independent review PASS at live head', limit_seconds=600)
@@ -2035,7 +2035,9 @@ ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence'
 assert ack(boundary).returncode == 0
 ok('bash', '-c', '. "$1"; fm_wake_append check report "check: approval pending"', '_', code / 'bin/fm-wake-lib.sh')
 _, boundary = drain()
-assert ack(boundary).returncode == 0, 'an unchanged approval row needs no new escalation'
+assert ack(boundary).returncode == 1, 'an escalation cannot silence a mergeable reviewed PR'
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain again')
+assert ack(boundary).returncode == 0
 
 # One escalation of a captain-owned row stands until the row changes.
 home, ledger, row, call, ok, drain, ack = case('captain', category='unanswered_question', subject='hold:captain-hold',
@@ -2055,6 +2057,46 @@ ledger.write_text(json.dumps(record))
 ok('bash', '-c', '. "$1"; fm_wake_append check report "check: changed"', '_', code / 'bin/fm-wake-lib.sh')
 _, boundary = drain()
 assert ack(boundary).returncode == 1, 'a changed captain row needs a new escalation'
+
+# An idle drain whose only overdue rows stand opens no handling episode and demands no acknowledgement.
+home, ledger, row, call, ok, drain, ack = case('idle-standing', category='unanswered_question', subject='hold:captain-hold',
+                                               owner='captain', next_action='resolve the captain hold',
+                                               evidence='awaiting budget approval', limit_seconds=1800)
+(home / 'state/.wake-queue').write_text('')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain')
+assert ack(boundary).returncode == 0
+idle = ok(code / 'bin/fm-wake-drain.sh')
+assert 'OVERDUE' not in idle.stdout and 'STANDING' not in idle.stdout and 'WAKE_ACK_REQUIRED' not in idle.stderr, idle
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: standing beside new work"', '_', code / 'bin/fm-wake-lib.sh')
+record = json.loads(ledger.read_text())
+record['rows'].append(dict(row, id='row-fresh', subject='other-worker', category='stalled_worker', owner='worker:other-worker'))
+ledger.write_text(json.dumps(record))
+mixed = ok(code / 'bin/fm-wake-drain.sh')
+assert 'row-fresh' in mixed.stdout and 'STANDING' in mixed.stdout and mixed.stdout.index('row-fresh') < mixed.stdout.index('STANDING'), mixed
+
+# An unreadable ledger never blocks a drain or an acknowledgement; it names the exact repair command.
+for label in ('corrupt', 'symlink'):
+    home, ledger, row, call, ok, drain, ack = case('unreadable-' + label)
+    if label == 'corrupt':
+        ledger.write_text('{"schema": "fm-open-loops.v1", "rows": [')
+    else:
+        target = home / 'elsewhere.json'
+        target.write_text(ledger.read_text())
+        ledger.unlink()
+        ledger.symlink_to(target)
+    result, boundary = drain()
+    assert 'ledger unreadable' in result.stderr and f'rm {ledger.parent.resolve() / ledger.name}' in result.stderr, result
+    assert 'OVERDUE' not in result.stdout, result
+    assert ack(boundary).returncode == 0, 'an unreadable ledger must not refuse an acknowledgement'
+    assert not (home / 'state/.wake-queue').read_text(), 'the acknowledged wake was consumed'
+    assert call(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'x').returncode == 1
+    if label == 'corrupt':
+        rebuilt = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
+        assert rebuilt['schema'] == 'fm-open-loops.v1' and json.loads(ledger.read_text()) == rebuilt
+    else:
+        ledger.unlink()
+        assert ok(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 0
 
 # A collector's long-lived exclusion must not hold up the short publication/receipt boundary.
 import fcntl

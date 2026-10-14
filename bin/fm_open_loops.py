@@ -1135,7 +1135,7 @@ def receipt_stands(action, row, now):
     kind = action.get("kind")
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
-    if kind == "escalated" and (row.get("owner") == "captain" or row.get("category") == "review_pass_not_merged"):
+    if kind == "escalated" and row.get("owner") == "captain":
         return action.get("digest") == row_digest(row)  # only the captain can move it; stands until the row changes
     return False
 
@@ -1177,7 +1177,14 @@ def render_overdue(rows):
 
 def ledger_action(args, state, now):
     """Receipts and per-actor presentations share the ledger's short publication lock range."""
-    report = read_ledger(state)
+    try:
+        report = read_ledger(state)
+    except (OSError, ValueError) as error:
+        if args.command == "action" or args.report:
+            raise
+        print(f"error: open-loops ledger unreadable ({str(error)[:120]}); this drain is not gated on overdue rows."
+              f" Repair: rm {state / 'open-loops.json'} (the next heartbeat rebuilds it)", file=sys.stderr)
+        return 0
     if report is None:
         if args.command == "action":
             raise ValueError("no published ledger; run bin/fm-open-loops.sh --heartbeat first")
@@ -1196,16 +1203,22 @@ def ledger_action(args, state, now):
         row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
     pending = controls["presentations"].setdefault(actor, {})
     if args.present_overdue:
+        needing, standing = [], []
         for row in rows:
             ident = row["id"]
             action = actions.get(ident, {})
-            if not receipt_stands(action, row, now) and (ident not in pending
-                                                         or action.get("sequence", 0) > pending[ident]):
+            if receipt_stands(action, row, now):
+                standing.append(row)
+                continue
+            needing.append(row)
+            if ident not in pending or action.get("sequence", 0) > pending[ident]:
                 pending[ident] = controls["sequence"]
                 stamps.setdefault(actor, {})[ident] = now
         write_ledger(state, report, receipt=True)
-        if rows:
-            print(render_overdue(rows))
+        if needing:
+            print(render_overdue(needing))
+            if standing:
+                print(render_overdue(standing).replace("OVERDUE:", "STANDING (a receipt stands; no action needed):", 1))
             print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred>"
                   " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]")
         return 0

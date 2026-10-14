@@ -12,7 +12,9 @@
 # Requires explicit FM_HOME for sends; unresolved targets are refused by fm-send.
 # Default: reconcile this home, TOON output. --json prints fm-open-loops.v1 for
 # reconciliation or the check-in result object for --check-in.
-# --present-overdue presents every overdue row first and records this actor's action requirements.
+# --present-overdue presents every overdue row that still needs an action first and records this actor's action
+# requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
+# An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
 # --check-actions exits 1 while a presented overdue row has no subsequent action receipt.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence, verified against local records: a new steered inbox record (NNN.msg) sent
