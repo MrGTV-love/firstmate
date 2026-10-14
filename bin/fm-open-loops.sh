@@ -15,8 +15,9 @@
 # --present-overdue presents every overdue row first and records this actor's action requirements.
 # --check-actions exits 1 while a presented overdue row has no subsequent action receipt.
 # --report reads published completions and all overdue rows with current ages, without a forge scan.
-# action records follow-up evidence: fm-send delivery id, full PR URL, captain escalation, or deferral reason.
-# deferred requires a future ISO UTC --recheck time; a second deferral refuses and marks the row captain-visible.
+# action records follow-up evidence, verified against local records: the steered task's inbox record (NNN.msg),
+# the row's own PR URL with its merge recorded by fm-pr-merge.sh, a captain escalation, or a deferral reason.
+# deferred requires an ISO UTC --recheck time within 24 hours; a second deferral refuses and marks the row captain-visible.
 # Receipts remain in state/open-loops.json across collection; they permit acknowledgement, never resolve work.
 # Examples: fm-open-loops.sh action ROW_ID steered --evidence 001.msg
 #           fm-open-loops.sh action ROW_ID deferred --evidence 'lint still producing output' --recheck '<future-UTC-time>'

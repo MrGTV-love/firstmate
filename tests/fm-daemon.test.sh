@@ -358,6 +358,39 @@ EOF
   pass "failed escalation writes retain durable wakes and classification positions"
 }
 
+test_overdue_rows_escalate_before_away_acknowledgement() {
+  local dir state fakebin buffer now kind
+  dir=$(make_supercase overdue-away-ack); state="$dir/state"; fakebin="$dir/daemon-bin"
+  buffer="$state/.subsuper-escalations"
+  now=$(date +%s)
+  printf '{"schema":"fm-open-loops.v1","generated_epoch":%s,"complete":true,"rows":[{"id":"away-row","category":"stalled_worker","subject":"slow-worker","owner":"worker:slow-worker","next_action":"follow up on the recorded wait","age_seconds":7200,"limit_seconds":3600,"overdue":true,"evidence":"waiting for lint.full.whole"}]}\n' \
+    "$now" > "$state/open-loops.json"
+  mkdir -p "$fakebin"
+  printf '#!/usr/bin/env bash\nexec "%s/bin/fm-open-loops.sh" "$@"\n' "$ROOT" > "$fakebin/fm-open-loops.sh"
+  chmod +x "$fakebin/fm-open-loops.sh"
+  cat > "$fakebin/fm-wake-drain.sh" <<EOF
+#!/usr/bin/env bash
+if [ "\${1:-}" = --ack-through ]; then
+  "$ROOT/bin/fm-open-loops.sh" --check-actions || exit 1
+  printf '%s\n' ack >> "$dir/acked"; exit 0
+fi
+"$ROOT/bin/fm-open-loops.sh" --present-overdue || exit 1
+printf '1\t1\tcheck\treport\tcheck: board report\n'
+printf 'WAKE_ACK_REQUIRED: run --ack-through 1 --recovery-generation gen\n' >&2
+EOF
+  chmod +x "$fakebin/fm-wake-drain.sh"
+  FM_STATE_OVERRIDE="$state" FM_DAEMON_DIR="$fakebin" FM_ESCALATE_BATCH_SECS=999999 \
+    handle_durable_wakes fallback "$state" || fail "an overdue row wedged the away acknowledgement"
+  [ "$(cat "$dir/acked" 2>/dev/null)" = ack ] || fail "the away daemon did not acknowledge after escalating"
+  assert_contains "$(cat "$buffer" 2>/dev/null)" 'overdue open work: "away-row","worker:slow-worker","slow-worker"' \
+    "the overdue row did not join the escalation digest"
+  assert_contains "$(cat "$buffer")" 'waiting for lint.full.whole' "the digest lost the overdue row's evidence"
+  kind=$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["handling"]["actions"]["away-row"]["kind"])' \
+    "$state/open-loops.json")
+  [ "$kind" = escalated ] || fail "the away escalation was not recorded as the row's receipt: $kind"
+  pass "away mode escalates overdue rows, records the receipt, and acknowledges"
+}
+
 test_busy_inbox_escalation_reaches_supervision() {
   local variant=$1 mode=$2 dir state task=busy-inbox win gen pane reason detail buffer sent drain
   dir=$(make_supercase "busy-inbox-$variant-$mode"); state="$dir/state"
@@ -3387,6 +3420,7 @@ test_unverifiable_identity_surfaces_without_marker
 test_status_read_failure_surfaces_without_advancing_seen
 test_catchall_advances_routine_then_surfaces_append
 test_escalation_buffer_failure_retains_wake_and_position
+test_overdue_rows_escalate_before_away_acknowledgement
 test_busy_inbox_escalation_reaches_supervision stuck away
 test_busy_inbox_escalation_reaches_supervision stuck quiet
 test_busy_inbox_escalation_reaches_supervision write away

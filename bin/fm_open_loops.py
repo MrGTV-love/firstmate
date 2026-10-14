@@ -4,6 +4,7 @@
 The CLI owner's configuration reference describes collection sources, quota refusal, and degraded coverage.
 """
 import argparse
+import contextlib
 import fcntl
 import datetime as dt
 import hashlib
@@ -32,6 +33,7 @@ CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream depe
                  "Handle this at your next safe checkpoint; do not interrupt a running step.")
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
+RECEIPT_STANDING_SECONDS = 86400  # longest deferral, and how long a captain-owned row's escalation stands
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
@@ -117,6 +119,8 @@ class Collector:
         self.state_files = []
         self.owned_urls = set()
         self.owned_branches = set()
+        self.scopes = []
+        self.failed = []
         self.lane = self.is_secondmate_home()
 
     def is_secondmate_home(self):
@@ -145,9 +149,6 @@ class Collector:
             raise ValueError("review_lanes must map owner/repository to nonempty lists of local review task ids")
         self.review_lanes = {slug.casefold(): lanes for slug, lanes in self.review_lanes.items()}
         self.ages = dict(DEFAULT_AGES)
-        interval = os.environ.get("FM_OPEN_LOOPS_INTERVAL", "")
-        if re.fullmatch(r"[0-9]+", interval) and int(interval) > 0:
-            self.ages["review_pass_not_merged"] = int(interval)
         supplied = config.get("age_limits_seconds", {})
         if not isinstance(supplied, dict) or set(supplied) - set(self.ages):
             raise ValueError("unknown open-loop age category")
@@ -260,18 +261,38 @@ class Collector:
         limit = self.ages[category]
         row = dict(id=identity, category=category, subject=str(subject), owner=owner,
                    next_action=action, age_seconds=age, limit_seconds=limit,
-                   overdue=not informational and (age is None or age >= limit), evidence=str(evidence)[:400])
+                   overdue=not informational and (age is None or age >= limit), evidence=str(evidence)[:400],
+                   sources=list(self.scopes))
         if informational:
             row["informational"] = True
         self.rows[identity] = row
 
-    def source(self, name, reader, *args):
-        """Run one reader; its failure marks the ledger partly blind and never aborts the others."""
+    @contextlib.contextmanager
+    def scope(self, name):
+        """Rows record the scopes they were read under, so a failed read keeps only its own rows."""
+        self.scopes.append(name)
         try:
-            return reader(*args)
-        except SOURCE_ERRORS as error:
-            self.degraded.append(f"{name}: {str(error)[:160]}")
-            return None
+            yield
+        finally:
+            self.scopes.pop()
+
+    def degrade(self, text):
+        """An unreadable item hides the rows of the scope it was read in."""
+        self.degraded.append(text)
+        self.failed.append(tuple(self.scopes))
+
+    def source(self, name, reader, *args):
+        """Run one reader; its failure marks the ledger partly blind and never aborts the others.
+
+        A nested reader's failure hides its enclosing scope's rows; a top-level reader's hides its own.
+        """
+        with self.scope(name):
+            try:
+                return reader(*args)
+            except SOURCE_ERRORS as error:
+                self.degraded.append(f"{name}: {str(error)[:160]}")
+                self.failed.append(tuple(self.scopes[:-1]) or (name,))
+                return None
 
     # -- sources ---------------------------------------------------------------------------------
 
@@ -398,7 +419,8 @@ class Collector:
 
     def silent_reports(self):
         for task in self.direct_reports:
-            self.source("report silence " + task["id"], self.silent_report, task)
+            with self.scope("task " + task["id"]):
+                self.source("report silence " + task["id"], self.silent_report, task)
 
     def check_in(self, task_id):
         row = next((r for r in self.rows.values() if r["category"] == "silent_report"
@@ -467,31 +489,32 @@ class Collector:
 
     def worker_rows(self):
         for task in self.tasks:
-            stopped = self.source("worker stop " + task["id"], self.recorded_stop, task)
-            if stopped:  # a recorded stop explains an unreadable endpoint; it never degrades coverage
-                try:
-                    alive = self.liveness(task)
-                except SOURCE_ERRORS:
-                    alive = None
-            else:
-                alive = self.source("worker liveness " + task["id"], self.liveness, task)
-            # Silence tracking shares this observation rather than probing again or counting a dead worker as live.
-            task["endpoint"]["agent_alive"] = alive
-            if (task["current_state"].get("state") == "unknown" and not stopped
-                    and not (alive in ("dead", "missing")
-                             and task["current_state"].get("detail", "").startswith("backend target gone:"))):
-                self.degraded.append("worker current state " + task["id"] + ": "
-                                     + (task["current_state"].get("detail") or "observation unavailable"))
-            if not stopped and (task["endpoint"].get("exists") is False or alive in ("dead", "missing")):
-                self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
-                         mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
-            if task["current_state"].get("state") == "failed":
-                if not self.source("failed deliverable " + task["id"], self.deliverable_landed, task):
-                    self.add("failed_task", task["id"], "recover the failed work or record why it ends",
-                             mtime(self.state / (task["id"] + ".status")))
-            elif task["current_state"].get("state") == "working" and alive == "alive":
-                self.source("progress " + task["id"], self.stalled, task)
-            self.source("unlanded work " + task["id"], self.unlanded, task)
+            with self.scope("task " + task["id"]):
+                stopped = self.source("worker stop " + task["id"], self.recorded_stop, task)
+                if stopped:  # a recorded stop explains an unreadable endpoint; it never degrades coverage
+                    try:
+                        alive = self.liveness(task)
+                    except SOURCE_ERRORS:
+                        alive = None
+                else:
+                    alive = self.source("worker liveness " + task["id"], self.liveness, task)
+                # Silence tracking shares this observation rather than probing again or counting a dead worker as live.
+                task["endpoint"]["agent_alive"] = alive
+                if (task["current_state"].get("state") == "unknown" and not stopped
+                        and not (alive in ("dead", "missing")
+                                 and task["current_state"].get("detail", "").startswith("backend target gone:"))):
+                    self.degrade("worker current state " + task["id"] + ": "
+                                 + (task["current_state"].get("detail") or "observation unavailable"))
+                if not stopped and (task["endpoint"].get("exists") is False or alive in ("dead", "missing")):
+                    self.add("missing_worker", task["id"], "recover the assigned worker without discarding work",
+                             mtime(self.state / (task["id"] + ".status")) or mtime(self.state / (task["id"] + ".meta")))
+                if task["current_state"].get("state") == "failed":
+                    if not self.source("failed deliverable " + task["id"], self.deliverable_landed, task):
+                        self.add("failed_task", task["id"], "recover the failed work or record why it ends",
+                                 mtime(self.state / (task["id"] + ".status")))
+                elif task["current_state"].get("state") == "working" and alive == "alive":
+                    self.source("progress " + task["id"], self.stalled, task)
+                self.source("unlanded work " + task["id"], self.unlanded, task)
 
     def pipeline_progress(self, worktree):
         """Latest recorded pipeline step time per (project, branch); no store is not a failure."""
@@ -554,21 +577,21 @@ class Collector:
                                 self.state / (task["id"] + ".status")).strip()
         waits = [line.strip() for line in pane.splitlines()
                  if re.search(r"\b(waiting|awaiting|lint|background job|step)\b", line, re.I)]
-        wait = waits[-1] if waits else declaration
+        wait = (waits[-1] if waits else declaration)[:150]
         if re.fullmatch(r"(?:harness |agent )?busy[.!]?", declaration.split(":", 1)[-1].strip(), re.I) and not waits:
             wait = ""
         pipeline_key = (str(Path(task["project"]).resolve()), task["branch"]) \
             if task.get("project") and task.get("branch") else None
         active_step = self.pipeline_waits.get(pipeline_key)
         if active_step:
-            wait = f"pipeline step {active_step[0]}; step age {self.now - active_step[1]}s"
+            wait = f"pipeline step {str(active_step[0])[:100]}; step age {self.now - active_step[1]}s"
         age = "unknown age" if since is None else f"{self.now - since}s without progress"
         evidence = f"{wait or 'worker has not recorded its concrete wait'}; {age}"
         declared_at = re.search(r"\[at=([0-9]+)\]", declaration.split(":", 1)[0])
         if declaration and declared_at and int(declared_at[1]) <= self.now:
             evidence += f"; declaration age {self.now - int(declared_at[1])}s"
         if signatures:
-            evidence += "; " + signatures[-1]
+            evidence += "; " + signatures[-1][:150]
         self.add("stalled_worker", task["id"], "follow up on the recorded wait and recover the worker", since,
                  owner="worker:" + task["id"], evidence=evidence)
 
@@ -827,10 +850,11 @@ class Collector:
                                      for r in rule["parameters"]["required_status_checks"]]
             self.required[key] = [(name, None if app == -1 else app) for name, app in requirements]
         # Match app-bound requirements to the actual producer; missing checks never count as green.
+        # A commit status names no producing app, so only a matching check run satisfies an app binding.
         for name, app in self.required[key]:
             runs = [c for c in checks if c.get("name") == name and
                     (app is None or c.get("app", {}).get("id") == app)]
-            contexts = [s for s in statuses if s.get("context") == name]
+            contexts = [s for s in statuses if s.get("context") == name] if app is None else []
             if not runs and not contexts:
                 return False
             if any(c.get("status") != "completed" or c.get("conclusion") not in
@@ -898,17 +922,18 @@ class Collector:
         for status in (p for p in self.state_files if p.name.endswith(".status")):
             if status.is_symlink():
                 continue
-            try:
-                out = self.bash('cat "$2" >/dev/null || exit 1; '
-                                '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
-            except SOURCE_ERRORS as error:
-                self.degraded.append(f"questions {status.name}: {str(error)[:120]}")
-                continue
-            for line in out.splitlines():
-                key, verb, opened, summary = (line.split("\t", 3) + ["", "", "", ""])[:4]
-                self.add("unanswered_question", f"{status.stem}:{key}",
-                         "answer or close this question, or record why it no longer applies",
-                         int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}")
+            with self.scope("questions " + status.name):
+                try:
+                    out = self.bash('cat "$2" >/dev/null || exit 1; '
+                                    '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
+                except SOURCE_ERRORS as error:
+                    self.degrade(f"questions {status.name}: {str(error)[:120]}")
+                    continue
+                for line in out.splitlines():
+                    key, verb, opened, summary = (line.split("\t", 3) + ["", "", "", ""])[:4]
+                    self.add("unanswered_question", f"{status.stem}:{key}",
+                             "answer or close this question, or record why it no longer applies",
+                             int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}")
 
     def board_answer_rows(self):
         inbox = self.state / "procevent-inbox"
@@ -967,11 +992,15 @@ class Collector:
     def collect(self):
         self.source("state inventory", self.read_state_inventory)
         self.source("fleet snapshot", self.read_snapshot)
+        if self.failed:  # every other source reads through the inventory and snapshot
+            self.failed.append(())
         self.source("backlog", self.backlog_rows)
-        self.source("ownership", self.load_ownership)
-        slugs = self.source("project origins", self.repo_slugs) or []
-        for slug in slugs:
-            self.source("open PRs " + slug, self.pr_rows, slug)
+        with self.scope("pull requests"):
+            self.source("ownership", self.load_ownership)
+            slugs = self.source("project origins", self.repo_slugs) or []
+            for slug in slugs:
+                with self.scope(slug):
+                    self.source("open PRs " + slug, self.pr_rows, slug)
         self.source("workers", self.worker_rows)
         self.source("report silence", self.silent_reports)
         self.source("questions", self.question_rows)
@@ -1033,20 +1062,32 @@ class Collector:
         if target.is_symlink():
             raise ValueError("open-loop ledger must not be a symbolic link")
         report = self.result()
-        previous = read_ledger(self.state)
+        try:
+            previous = read_ledger(self.state)
+        except (OSError, ValueError):  # an unreadable ledger has no handling to keep; this publication replaces it
+            previous = None
         if previous and "handling" in previous:
-            report["handling"] = previous["handling"]
+            handling = report["handling"] = previous["handling"]
             if not report["complete"]:
                 current = {row["id"] for row in report["rows"]}
-                presented = {ident for actor in report["handling"]["presentations"].values() for ident in actor}
+                presented = {ident for actor in handling["presentations"].values() for ident in actor}
                 for row in previous["rows"]:
-                    if row["id"] in presented and row["id"] not in current:
+                    sources = row.get("sources")
+                    # A presented row is kept only while a read it depends on failed; absent after a read, it resolved.
+                    if row["id"] in presented and row["id"] not in current and (
+                            sources is None or any(tuple(sources[:len(scope)]) == scope for scope in self.failed)):
                         retained = dict(row, stale=True)
                         if retained.get("age_seconds") is not None:
                             retained["age_seconds"] += max(0, self.now - previous["generated_epoch"])
                         report["rows"].append(retained)
+            published = {row["id"] for row in report["rows"]}
+            handling["actions"] = {ident: action for ident, action in handling["actions"].items()
+                                   if ident in published}
+            handling["presentations"] = {actor: {ident: sequence for ident, sequence in pending.items()
+                                                 if ident in published}
+                                         for actor, pending in handling["presentations"].items()}
             for row in report["rows"]:
-                if report["handling"]["actions"].get(row["id"], {}).get("captain_visible"):
+                if handling["actions"].get(row["id"], {}).get("captain_visible"):
                     row["captain_visible"] = True
         write_ledger(self.state, report)
         try:
@@ -1077,8 +1118,15 @@ def read_ledger(state):
     if not path.exists():
         return None
     report = json.loads(path.read_text())
+    handling = report.get("handling", {}) if isinstance(report, dict) else None
     if not isinstance(report, dict) or report.get("schema") != "fm-open-loops.v1" \
-            or not isinstance(report.get("rows"), list):
+            or type(report.get("generated_epoch")) is not int or not isinstance(report.get("rows"), list) \
+            or any(not isinstance(row, dict) or not isinstance(row.get("id"), str) for row in report["rows"]) \
+            or not isinstance(handling, dict) or handling and (
+                type(handling.get("sequence")) is not int
+                or not isinstance(handling.get("actions"), dict) or not isinstance(handling.get("presentations"), dict)
+                or any(not isinstance(v, dict) for v in [*handling["actions"].values(),
+                                                         *handling["presentations"].values()])):
         raise ValueError("unsupported open-loop ledger")
     return report
 
@@ -1117,6 +1165,49 @@ def overdue_rows(report, now):
     return rows
 
 
+def row_digest(row):
+    return hashlib.sha256(json.dumps([row.get(f) for f in ("category", "subject", "owner", "next_action",
+                                                           "evidence")]).encode()).hexdigest()[:24]
+
+
+def receipt_stands(action, row, now):
+    """A standing receipt also answers later turns; any other receipt answers only the turn it followed."""
+    kind = action.get("kind")
+    if kind == "deferred":
+        return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
+    if kind == "steered":  # the worker gets the row's own limit to act on the routed message
+        return now < action.get("at_epoch", 0) + row["limit_seconds"]
+    if kind == "escalated" and row.get("owner") == "captain":
+        return action.get("digest") == row_digest(row) and now < action.get("at_epoch", 0) + RECEIPT_STANDING_SECONDS
+    return False
+
+
+def steered_task(state, row, record):
+    """The row's task whose steering inbox (bin/fm-task-inbox-lib.sh) holds this delivery record."""
+    if not re.fullmatch(r"[0-9]+[.]msg", record):
+        return None
+    owner = str(row.get("owner", ""))
+    tasks = [owner[len("worker:"):]] if owner.startswith("worker:") else []
+    tasks.append(str(row.get("subject", "")).split(":", 1)[0])
+    for task in tasks:
+        if not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", task):
+            continue
+        inbox = state / (task + ".inbox")
+        if any(path.is_file() and not path.is_symlink() for path in (inbox / record, inbox / "handled" / record)):
+            return task
+    return None
+
+
+def merge_recorded(state, row, url):
+    """The row's own PR has a merge recorded by bin/fm-merge-outcome-lib.sh (fm-pr-poll-merge-notified-v1)."""
+    match = GITHUB_PR.fullmatch(url)
+    if not match or url != row.get("subject"):
+        return False
+    expected = ["fm-pr-poll-merge-notified-v1", "github", "github.com", match[1], match[2]]
+    return any(marker.is_file() and not marker.is_symlink() and marker.read_text().splitlines() == expected
+               for marker in state.glob("*.pr-poll-merge-notified"))
+
+
 def render_overdue(rows):
     fields = ["id", "owner", "subject", "next_action", "age_seconds", "evidence", "captain_visible"]
     lines = ["OVERDUE:", f"rows[{len(rows)}]{{{','.join(fields)}}}:"]
@@ -1147,9 +1238,12 @@ def ledger_action(args, state, now):
         for row in rows:
             ident = row["id"]
             action = actions.get(ident, {})
-            deferred = action.get("kind") == "deferred" and action.get("recheck_epoch", 0) > now \
-                and not action.get("captain_visible")
-            if not deferred and (ident not in pending or action.get("sequence", 0) > pending[ident]):
+            if action.get("kind") == "steered" and not (
+                    state / (action["task"] + ".inbox") / "handled" / action["evidence"]).is_file():
+                row["evidence"] = (f"steer {action['evidence']} not yet handled by {action['task']}; "
+                                   + str(row.get("evidence")))
+            if not receipt_stands(action, row, now) and (ident not in pending
+                                                         or action.get("sequence", 0) > pending[ident]):
                 pending[ident] = controls["sequence"]
         write_ledger(state, report, receipt=True)
         if rows:
@@ -1185,8 +1279,11 @@ def ledger_action(args, state, now):
     old = actions.get(ident, {})
     if not args.evidence or not args.evidence.strip():
         raise ValueError("--evidence is required for every action")
-    if args.kind == "merged" and not GITHUB_PR.fullmatch(args.evidence):
-        raise ValueError("merged evidence must be the full GitHub PR URL")
+    task = steered_task(state, by_id[ident], args.evidence) if args.kind == "steered" else None
+    if args.kind == "steered" and task is None:
+        raise ValueError("steered evidence must be a delivery record name (NNN.msg) in this row's task inbox")
+    if args.kind == "merged" and not merge_recorded(state, by_id[ident], args.evidence):
+        raise ValueError("merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh")
     recheck = epoch(args.recheck)
     if args.kind == "deferred":
         if old.get("deferrals", 0):
@@ -1201,16 +1298,19 @@ def ledger_action(args, state, now):
                     presented[ident] = controls["sequence"]
             write_ledger(state, report, receipt=True)
             raise ValueError("second deferral refused; row is captain-visible; steer, merge or escalate it")
-        if recheck is None or recheck <= now:
-            raise ValueError("deferral requires --recheck at a future UTC time")
+        if recheck is None or recheck <= now or recheck > now + RECEIPT_STANDING_SECONDS:
+            raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
     elif args.recheck:
         raise ValueError("--recheck is only valid for deferred actions")
     controls["sequence"] += 1
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
                          sequence=controls["sequence"], deferrals=old.get("deferrals", 0)
-                         + int(args.kind == "deferred"), captain_visible=old.get("captain_visible", False))
+                         + int(args.kind == "deferred"), captain_visible=old.get("captain_visible", False),
+                         digest=row_digest(by_id[ident]))
     if recheck is not None:
         actions[ident]["recheck_epoch"] = recheck
+    if task is not None:
+        actions[ident]["task"] = task
     write_ledger(state, report, receipt=True)
     print("action: " + json.dumps(ident) + "\nkind: " + args.kind)
     return 0
@@ -1277,6 +1377,7 @@ def main():
         collector.hold_last(str(low))
     except (CollectionDeadline, *SOURCE_ERRORS) as error:
         collector.degraded.insert(0, "reconciler: " + str(error)[:160])
+        collector.failed.append(())
         collector.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                       None, evidence="; ".join(collector.degraded))
     finally:

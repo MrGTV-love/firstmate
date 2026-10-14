@@ -1068,12 +1068,6 @@ if [ "$ACTOR" = main ]; then
     # drain that prints nothing while the queue is visibly non-empty reads as a
     # lost wake, and leaves the caller with no idea who owns what is queued.
     print_branch_held_notice
-    if [ -n "$OVERDUE_SECTION" ]; then
-      fm_recovery_marker_begin_handling "$RECOVERY_MARKER" || exit 1
-      RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
-      printf 'WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation %s\n' \
-        "${RECOVERY_MARKER_TOKEN##*:}" >&2
-    fi
     fm_lock_release "$FM_WAKE_QUEUE_LOCK"
     DRAIN_LOCK_HELD=false
     (print_status_presentation) || true

@@ -614,7 +614,7 @@ An existing ledger is left untouched while recording is disabled.
 `bin/fm-open-loops.sh --json` normally collects current evidence for this home; [quota refusal](#github-rest-reads-and-the-quota-floor) can instead retain the last published ledger.
 Ordinary reconciliation never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
 Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
-Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
+Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, overdue verdict, and `sources`: the source scopes it was read under.
 For a non-informational row, an unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
 
 | Category | A row exists when | Default limit |
@@ -628,7 +628,7 @@ For a non-informational row, an unknown age stays `null` and counts as overdue, 
 | `silent_report` | a live direct ship, scout, or secondmate has not reported to this home; excluded reports remain informational with their reason in evidence, and declared waits use the existing long cadence | 900 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
 | `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing | 3600 s |
-| `review_pass_not_merged` | a configured independent review lane recorded PASS for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | one `FM_OPEN_LOOPS_INTERVAL` (600 s by default) |
+| `review_pass_not_merged` | a configured independent review lane recorded PASS for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | 600 s |
 | `red_check` | the latest run of a check on an open PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
@@ -708,13 +708,22 @@ Stale-wake cooldown covers one continuous publication outage: a successful atomi
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
 Drain presents `OVERDUE` before other sections, with every overdue row's id, owner, next action, evidence, and current age.
 `bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no action recorded after its presentation; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
-The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, and optional recheck time and captain-visible mark.
-The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer with its delivery id, a merge with its full PR URL, a captain escalation, or a reasoned deferral with a future recheck time.
+When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
+The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest and records an `escalated` receipt for it before acknowledging, so away mode neither wedges nor consumes overdue work silently.
+The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, and optional recheck time, steered task, and captain-visible mark.
+The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer, a merge, a captain escalation, or a reasoned deferral; it verifies evidence against local records only, without a forge call.
+A steer's evidence is a delivery record name (`NNN.msg`) present in the steering inbox, or its `handled/` directory, of the row's task: its `worker:` owner or the task id leading its subject.
+A merge's evidence is the row's own PR URL, and a merge of that PR must be recorded locally by `bin/fm-pr-merge.sh` or the merge poll (the `fm-pr-poll-merge-notified-v1` marker).
+A deferral's recheck time must be in the future and at most 24 hours ahead.
 Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible`, and requires steering, merging, or escalation before acknowledgement.
-Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while the first deferral's recheck time is still in the future.
+Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
+A first deferral stands until its recheck time.
+A steer stands for the row's own age limit after it was recorded; presentation states when its delivery record is not yet in the worker's `handled/` directory, and the row re-presents once the limit passes.
+An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes, or for 24 hours.
 The existing ledger lock file separates collection exclusion from the short publication/receipt critical section, so a slow source scan cannot delay overdue presentation or action recording, and atomic publication preserves action requirements and receipts rather than overwriting them.
 Receipt writes preserve the ledger's heartbeat modification time, so action recording cannot mask a reconciler that stopped publishing.
-An incomplete collection retains any missing presented rows as stale rather than treating unreadable evidence as completed work.
+An incomplete collection retains a missing presented row as stale only when a read it depends on failed: its own source or item, or the state inventory or fleet snapshot that every source reads through; a row absent after its source was read has resolved.
+Every publication drops `handling` entries for rows it no longer publishes, so a later recurrence of the same obligation starts with no receipts or deferrals, and an unreadable previous ledger is replaced rather than blocking publication.
 An action receipt permits acknowledgement, never resolves the obligation: a row disappears only when fresh delivery evidence resolves it.
 The ledger's `completions` projection lists retained Done backlog items and owned PRs whose merge the forge confirmed.
 Process-event `when` outcomes append this projection and every still-overdue row with its current age after the bounded action output, so scheduled board reports use the same evidence without another list or daemon.

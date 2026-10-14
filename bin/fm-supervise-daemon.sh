@@ -1689,6 +1689,30 @@ handle_wake() {  # <reason> <state>
   [ "$classification_failed" -eq 0 ]
 }
 
+# Away mode owns no follow-up of its own: every overdue open-loops row the drain
+# presented without a recorded action joins the escalation digest, and that
+# escalation is recorded as the row's receipt, so the acknowledgement gate
+# neither wedges these wakes nor lets them be consumed silently.
+escalate_overdue_rows() {  # <state>
+  local state=$1 report line id
+  [ -e "$state/open-loops.json" ] || [ -L "$state/open-loops.json" ] || return 0
+  report=$("$FM_DAEMON_DIR/fm-open-loops.sh" --check-actions) && return 0
+  case "$report" in
+    *'acknowledgement refused'*) ;;
+    *) printf '%s\n' "$report" >&2; return 1 ;;
+  esac
+  while IFS= read -r line; do
+    case "$line" in '  "'*) ;; *) continue ;; esac
+    id=${line#  \"}
+    id=${id%%\"*}
+    escalate_add "$state" "overdue open work: ${line#  }" || return 1
+    "$FM_DAEMON_DIR/fm-open-loops.sh" action "$id" escalated \
+      --evidence "away supervisor escalation digest" > /dev/null || return 1
+  done <<EOF
+$report
+EOF
+}
+
 handle_durable_wakes() {  # <watcher-reason> <state>
   local fallback_reason=$1 state=$2 out err tab epoch sequence kind key payload rest
   local handled=0 failed=0 ack_through ack_generation
@@ -1709,6 +1733,7 @@ handle_durable_wakes() {  # <watcher-reason> <state>
     handled=$((handled + 1))
   done < "$out"
   if [ "$handled" -eq 0 ]; then handle_wake "$fallback_reason" "$state" || failed=1; fi
+  escalate_overdue_rows "$state" || failed=1
 
   ack_through=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err" | tail -1)
   ack_generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err" | tail -1)
