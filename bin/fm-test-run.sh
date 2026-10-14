@@ -180,7 +180,8 @@
 # those also name individual tests/ files explicitly.
 # Deleted test assets still select remaining suites that reference them; an
 # unreferenced retired asset selects nothing. Vendored bin/ten-levels/ files
-# select the jev-guard behavior suite.
+# select the jev-guard behavior suite; its core client and Level 5 routers also
+# select the typed dispatch resolver suite, their only dispatch consumer.
 set -eu
 
 now_ms() {
@@ -354,7 +355,7 @@ family_for_basename() {
     fm-mail.test.sh|fm-mail-check.test.sh|\
     fm-turnend-foreign-owner-arm-fix.test.sh|\
     fm-wake-queue.test.sh|fm-watch-arm.test.sh|fm-watch-checkpoint.test.sh|fm-watch-recovery-loop.test.sh|\
-    fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-task-inbox.test.sh|\
+    fm-watch-triage.test.sh|fm-watch-triage-waits.test.sh|fm-watch-open-loops.test.sh|fm-watch-idle-reap.test.sh|fm-watch-typesafe-health.test.sh|fm-task-inbox.test.sh|\
     fm-watcher-lock.test.sh|fm-inactive-reconcile.test.sh|fm-watchdog-check.test.sh)
       printf '%s\n' watcher-wake-lock
       ;;
@@ -473,7 +474,7 @@ family_for_basename() {
     fm-branch-supervision.test.sh|fm-busy-adapter-wiring.test.sh|\
     fm-busy-state.test.sh|fm-classify-corr-token.test.sh|\
     fm-claude-stop-autoarm.test.sh|fm-cursor-harness.test.sh|\
-    fm-dispatch-resolve.test.sh|fm-model-index.test.sh|fm-skill-pick.test.sh|fm-typesafe-key-source.test.sh|\
+    fm-dispatch-resolve.test.sh|fm-model-index.test.sh|fm-skill-pick.test.sh|fm-typesafe-key-source.test.sh|fm-typesafe-health.test.sh|\
     fm-extension-binding.test.sh|fm-gitignore-config.test.sh|\
     fm-no-mistakes-required.test.sh|fm-peek-remote.test.sh|\
     fm-pending-reply.test.sh|fm-pi-branch-extension.test.sh|\
@@ -804,7 +805,7 @@ tests/fm-daemon.test.sh 43841
 tests/fm-devin-harness.test.sh 3790
 tests/fm-devin-signals-live-e2e.test.sh 461
 tests/fm-dispatch-capacity.test.sh 3724
-tests/fm-dispatch-resolve.test.sh 34508
+tests/fm-dispatch-resolve.test.sh 196000
 tests/fm-documentation-audiences.test.sh 3204
 tests/fm-dod-lib.test.sh 4000
 tests/fm-duration.test.sh 7990
@@ -992,6 +993,7 @@ tests/fm-trace-context-lib.test.sh 478
 tests/fm-trace-context-spawn.test.sh 123562
 tests/fm-turnend-foreign-owner-arm-fix.test.sh 5644
 tests/fm-turnend-guard.test.sh 38640
+tests/fm-typesafe-health.test.sh 13000
 tests/fm-typesafe-key-source.test.sh 11324
 tests/fm-update.test.sh 11894
 tests/fm-vendor-auth-probe.test.sh 45255
@@ -1006,6 +1008,7 @@ tests/fm-watch-arm.test.sh 139882
 tests/fm-watch-checkpoint.test.sh 21156
 tests/fm-watch-idle-reap.test.sh 80937
 tests/fm-watch-open-loops.test.sh 267071
+tests/fm-watch-typesafe-health.test.sh 30000
 tests/fm-watch-recovery-loop.test.sh 59427
 tests/fm-watch-triage.test.sh 415321
 tests/fm-watch-triage-waits.test.sh 1026519
@@ -1543,6 +1546,12 @@ families_for_changed_path() {
       # resolution in the caller; emit a marker family of __script__
       printf '%s\n' "__script__:$(basename "$path")"
       ;;
+    bin/ten-levels/src/core/*|bin/ten-levels/src/levels/level05/*|bin/ten-levels/tests/level05.test.ts)
+      # The vendored core client and Level 5 routers (see SOURCE.md there) back
+      # both the jev-guard and the typed dispatch resolver.
+      printf '%s\n' "__script__:fm-jev-guard.test.sh"
+      printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
+      ;;
     bin/ten-levels/*)
       # Vendored upstream jev-guard (see SOURCE.md there) and its Firstmate
       # report.ts are exercised only through the jev-guard behavior suite.
@@ -1706,13 +1715,18 @@ families_for_changed_path() {
     bin/fm-quota-choose.sh)
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       ;;
-    bin/fm-dispatch-resolve.sh)
+    bin/fm-dispatch-resolve.sh|bin/fm-dispatch-level5.ts)
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       ;;
     bin/fm-typesafe-lib.sh)
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       printf '%s\n' "__script__:fm-skill-pick.test.sh"
       printf '%s\n' "__script__:fm-typesafe-key-source.test.sh"
+      printf '%s\n' "__script__:fm-typesafe-health.test.sh"
+      ;;
+    bin/fm-typesafe-health.sh)
+      printf '%s\n' "__script__:fm-typesafe-health.test.sh"
+      printf '%s\n' "__script__:fm-watch-typesafe-health.test.sh"
       ;;
     bin/fm-jev-belay-hook.sh|bin/fm-jev-belay-policy.mjs)
       printf '%s\n' "__script__:fm-typesafe-key-source.test.sh"

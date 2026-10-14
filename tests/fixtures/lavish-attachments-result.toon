@@ -1,0 +1,71 @@
+session:
+  file: /review.html
+  status: feedback
+prompts[5]:
+  - uid: "12"
+    prompt: see image
+    selector: main > p
+    tag: p
+    text: Pricing paragraph
+    target:
+      type: element
+      selector: main > p
+      text: Nested target text must not replace the captured item text.
+    attachments[1]{id,type,path,mime,bytes,width,height}:
+      a1b2.png,image,/state/attachments/k/a1b2.png,image/png,2048,640,480
+  - uid: "13"
+    prompt: "two screenshots, one renamed"
+    selector: main > ul
+    tag: ul
+    text: Option list
+    attachments[2]:
+      - id: c3d4.png
+        type: image
+        path: /state/attachments/k/c3d4.png
+        mime: image/png
+        bytes: 2048
+        width: 640
+        height: 480
+      - id: e5f6.jpg
+        type: image
+        path: "/state/attachments/k/e5f6, \"copy\".jpg"
+        mime: image/jpeg
+        bytes: 2048
+        width: 640
+        height: 480
+        name: shot.jpg
+  - uid: ""
+    prompt: compare with this
+    selector: ""
+    tag: message
+    text: Freeform message
+    attachments[1]{id,type,path,mime,bytes,width,height}:
+      a7b8.webp,image,/state/attachments/k/a7b8.webp,image/webp,2048,640,480
+  - attachments[1]{id,type,path,mime,bytes,width,height}:
+      c9d0.png,image,/state/attachments/k/c9d0.png,image/png,2048,640,480
+    uid: "20"
+    prompt: "Pick one. Context data: {\"schema\":\"fm-bearings-answer.v1\",\"question\":\"sample-call\",\"selection\":\"approve\",\"note\":\"\"}"
+    selector: #approve
+    tag: choice
+    text: Approve
+  - attachments[2]:
+      - id: e1f2.png
+        type: image
+        path: /state/attachments/k/e1f2.png
+        mime: image/png
+        bytes: 2048
+        width: 640
+        height: 480
+      - id: a3b4.png
+        type: image
+        path: /state/attachments/k/a3b4.png
+        mime: image/png
+        bytes: 2048
+        width: 640
+        height: 480
+        name: why.png
+    uid: "21"
+    prompt: "Pick one. Context data: {\"schema\":\"fm-bearings-answer.v1\",\"question\":\"other-call\",\"selection\":\"reconcile\",\"note\":\"Check this\"}"
+    selector: #reconcile
+    tag: choice
+    text: Reconcile

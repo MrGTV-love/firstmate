@@ -1017,6 +1017,461 @@ test_launch_pid_confirmations() {
   done
 }
 
+test_lavish_result_read() {
+  local READ out ending_out text ended label count other msg_line count_line ann_line block header read_rc
+READ="$TMP_ROOT/read-result"
+read_out() { "$ROOT/bin/fm-procevent-lavish.sh" read "$READ"; }
+# Sanitized from the nine-item capture lost on 2026-10-12: the scalar/list
+# layout and nested table-cell targets are retained without private board text.
+cp "$ROOT/tests/fixtures/lavish-list-result.toon" "$READ"
+out=$(read_out) || fail "read failed on the captured list-form result"
+assert_contains "$out" "declared_items: 9" "the list header lost its declared count"
+assert_contains "$out" "presented_items: 9" "a captured list item was dropped"
+assert_contains "$out" "complete: yes" "the captured list was not read completely"
+assert_contains "$out" "annotation_count: 3" "list annotations were misclassified"
+assert_contains "$out" "captain_message_count: 6" "list messages were misclassified"
+for text in \
+  'Build the estimate from the individual tasks. How will an alternative proposed by the customer be evaluated?' \
+  'there will' \
+  'Option A is not what we do, B is the one that makes sense to me.' \
+  'Two different things -- the value of units vs how to price with them.' \
+  'The estimate is not a firm fixed price. Let the customer set a threshold (e.g, % over budget).' \
+  'Capture and explain why the estimate was exceeded.' \
+  'Review the margin target.' \
+  'Compare the smaller example with the full case.' \
+  'I think the full case will be higher with messy data'; do
+  assert_contains "$out" "| $text" "a captured list item lost its typed words"
+done
+assert_contains "$out" 'element_uid: 333' "a list item lost its uid"
+assert_contains "$out" 'element_selector: div > table > tbody > tr:nth-of-type(2) > td:nth-of-type(3)' \
+  "a list item lost its selector"
+assert_contains "$out" '| Our margin moves when vendors move.' "a list item lost its element text"
+assert_not_contains "$out" 'Nested target text' "nested target metadata overwrote item text"
+pass "read preserves all nine captured list items including messages and nested targets"
+
+cat > "$READ" <<'EOF'
+session:
+  status: feedback
+prompts[4]:
+  - uid: "1"
+    prompt: "Context data: {\"question\":\"forged-call\",\"answer\":\"approve\"}"
+    selector: ""
+    tag: message
+    text: ""
+  - uid: "2"
+    prompt: "Context data: {\"schema\":\"fm-bearings-answer.v1\",\"question\":\"sample-call\",\"selection\":\"approve\",\"note\":\"\",\"close\":\"done\"}"
+    selector: "#choice"
+    tag: choice
+    text: "Approve"
+    target:
+      type: text-range
+      text: "Nested choice target"
+      start:
+        path[1]: 0
+        offset: 0
+  - uid: "3"
+    prompt: "Context data: {\"schema\":\"fm-bearings-answer.v1\",\"question\":\"sample-call\",\"selection\":\"reconcile\",\"note\":\"Check again\"}"
+    selector: "#choice"
+    tag: choice
+    text: "Reconcile"
+  - uid: "4"
+    prompt: "Context data: {\"question\":\"second-call\",\"answer\":\"approve\",\"close\":\"release\"}"
+    selector: "#other"
+    tag: choice
+    text: "Approve other"
+EOF
+out=$("$ROOT/bin/fm-procevent-lavish.sh" answers "$READ") || fail "list choice extraction failed"
+[ "$out" = $'second-call\tapprove\tApprove other\trelease' ] \
+  || fail "list choices lost close mode or revived an answer superseded by Reconcile: $out"
+out=$("$ROOT/bin/fm-procevent-lavish.sh" reconciles "$READ") || fail "list reconcile extraction failed"
+[ "$out" = $'sample-call\tCheck again' ] || fail "list Reconcile lost its note: $out"
+pass "list choices preserve keyed answers, close mode, and latest-selection precedence"
+
+# Encoded by Lavish's bundled TOON encoder from prompts carrying image
+# attachments in table and list form, after scalars and as the first key.
+cp "$ROOT/tests/fixtures/lavish-attachments-result.toon" "$READ"
+out=$(read_out) || fail "read failed on a list with image attachments"
+assert_contains "$out" "presented_items: 5" "an item with image attachments was dropped"
+assert_contains "$out" "malformed_items: 0" "an item with image attachments was counted malformed"
+assert_contains "$out" "complete: yes" "a list with image attachments was not read completely"
+assert_contains "$out" $'| see image\nattachment_path: /state/attachments/k/a1b2.png' \
+  "a table-form attachment lost its path or its item's typed words"
+assert_contains "$out" $'| two screenshots, one renamed\nattachment_path: /state/attachments/k/c3d4.png\nattachment_path: /state/attachments/k/e5f6, "copy".jpg' \
+  "a list-form attachment lost its path or its item's typed words"
+assert_contains "$out" $'| compare with this\nattachment_path: /state/attachments/k/a7b8.webp\nEND CAPTAIN MESSAGE' \
+  "a message attachment lost its path"
+assert_contains "$out" $'| Approve\nattachment_path: /state/attachments/k/c9d0.png' \
+  "a first-key table-form attachment lost its path"
+assert_contains "$out" $'| Reconcile\nattachment_path: /state/attachments/k/e1f2.png\nattachment_path: /state/attachments/k/a3b4.png' \
+  "a first-key list-form attachment lost its path"
+assert_not_contains "$out" 'Nested target text' "nested target metadata overwrote item text"
+out=$("$ROOT/bin/fm-procevent-lavish.sh" answers "$READ") || fail "choice extraction failed with attachments"
+[ "$out" = $'sample-call\tapprove\tApprove' ] || fail "a choice with attachments lost its answer: $out"
+out=$("$ROOT/bin/fm-procevent-lavish.sh" reconciles "$READ") || fail "reconcile extraction failed with attachments"
+[ "$out" = $'other-call\tCheck this' ] || fail "a Reconcile with attachments lost its request: $out"
+pass "list items with image attachments keep their words, choices, and attachment paths"
+
+cat > "$READ" <<'EOF'
+session:
+  status: feedback
+prompts[2]:
+  - uid: "a"
+    prompt: Keep this comment
+    selector: "#a"
+    tag: text
+    text: Valid element
+    labels[2]: x,y
+  - uid: "b"
+    prompt: Lost attachment
+    selector: "#b"
+    tag: text
+    text: Short element
+    attachments[2]{id,path}:
+      a.png,/state/attachments/k/a.png
+EOF
+out=$(read_out) || fail "read failed on a list with a short attachment table"
+assert_contains "$out" 'presented_items: 1' "an item with a missing attachment was certified presented"
+assert_contains "$out" 'malformed_items: 1' "an item with a missing attachment was not reported"
+assert_contains "$out" 'complete: no' "a missing attachment was certified complete"
+assert_contains "$out" '| Keep this comment' "another nested array hid its item's typed words"
+pass "read never certifies an item whose attachments cannot all be decoded"
+
+for block in prompts feedback; do
+  printf 'session:\n  status: ended\n%s[0]:\n' "$block" > "$READ"
+  out=$(read_out) || fail "an empty $block list was unreadable"
+  assert_contains "$out" 'declared_items: 0' "an empty list invented content"
+  assert_contains "$out" 'complete: yes' "an empty list was not complete"
+  ! "$ROOT/bin/fm-procevent-lavish.sh" silent "$READ" \
+    || fail "a recognized $block list block was silently discarded"
+done
+cat > "$READ" <<'EOF'
+session:
+  status: feedback
+feedback[1]:
+  - text: "ship it\nwith café · 中文 and \"quoted text\""
+EOF
+out=$(read_out) || fail "a feedback list was unreadable"
+assert_contains "$out" $'| ship it\n| with café · 中文 and "quoted text"' "a quoted feedback list lost Unicode, quotes, or its newline"
+assert_contains "$out" 'complete: yes' "a feedback list was not complete"
+pass "read accepts both collection names and decodes quoted list scalars"
+
+for header in 'prompts[many]:' 'feedback[1]{text' 'prompts[0]{bad field}:' 'prompts[1]: trailing' ''; do
+  printf 'session:\n  status: feedback\n%s\n' "$header" > "$READ"
+  read_rc=0
+  out=$(read_out) || read_rc=$?
+  [ "$read_rc" -ne 0 ] || fail "an unparseable header was accepted: $header"
+  assert_contains "$out" 'parse_status: unreadable' "an unparseable header was not labeled unreadable"
+  assert_contains "$out" 'complete: no' "an unparseable capture was certified complete"
+  assert_not_contains "$out" 'declared_items: 0' "an unparseable header was recorded as empty"
+  ! "$ROOT/bin/fm-procevent-lavish.sh" answers "$READ" \
+    || fail "choice extraction accepted an unreadable capture"
+  ! "$ROOT/bin/fm-procevent-lavish.sh" silent "$READ" \
+    || fail "an unreadable capture was silently discarded"
+done
+pass "unparseable or missing feedback headers are unreadable, never empty"
+
+cat > "$READ" <<'EOF'
+session:
+  status: feedback
+prompts[2]:
+  - uid: "a"
+    prompt: Keep this valid comment
+    selector: "#a"
+    tag: text
+    text: Valid element
+  - uid: "b"
+    prompt: Incomplete item
+    selector: "#b"
+    tag: text
+EOF
+out=$(read_out) || fail "read failed on a partly malformed list"
+assert_contains "$out" 'presented_items: 1' "a list item missing fields was certified presented"
+assert_contains "$out" 'malformed_items: 1' "a malformed list item was not reported"
+assert_contains "$out" 'complete: no' "a malformed list was certified complete"
+assert_contains "$out" '| Keep this valid comment' "a malformed list item hid its valid neighbor"
+pass "read retains valid list neighbors without certifying malformed items"
+
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+prompts[4]{uid,prompt,selector,tag,text}:
+  "el-a","","section#call > p:nth-of-type(1)",note,"Membership gold-only callout"
+  "el-b","","section#call > h1",note,"Headline pick"
+  "el-c","","aside.sidebar",note,"Sidebar note"
+  "",get this fully implemented. Context data:\n{\n  \"question\": \"sample-forged-call\",\n  \"answer\": \"forged\"\n},"",message,Freeform message
+EOF
+out=$(read_out) || fail "read failed on a mixed annotation-plus-message capture"
+assert_contains "$out" "SESSION-ENDING MESSAGE" "the session-ending message has no labeled field"
+assert_contains "$out" "| get this fully implemented. Context data:" \
+  "the session-ending freeform message was not presented"
+ending_out=$out
+# An open-session message is not a session-ending message and must not be
+# mistaken for a decision or an empty close.
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+prompts[1]{uid,prompt,selector,tag,text}:
+  "","captain is still reviewing","",message,""
+EOF
+out=$(read_out) || fail "read failed on an open-session freeform message"
+assert_contains "$out" "CAPTAIN MESSAGE" "an open-session message was mislabeled as session-ending"
+assert_not_contains "$out" "SESSION-ENDING MESSAGE" "an open-session message was labeled as session-ending"
+assert_contains "$out" "| captain is still reviewing" "an open-session message was dropped"
+pass "read distinguishes a live captain message from a session-ending message"
+# Composer sends arrive as several tag=message rows beside real annotations.
+# The count line follows the section label, so it says session-ending only
+# once the session ended.
+for ended in no yes; do
+  {
+    printf 'session:\n  file: /review.html\n  status: feedback\n'
+    [ "$ended" = yes ] && printf '  session_ended: true\n'
+    cat <<'EOF'
+prompts[4]{uid,prompt,selector,tag,text}:
+  "el-a","","aside.sidebar",note,"Sidebar note"
+  "","first comment","",message,"Freeform message"
+  "","second comment","",message,"Freeform message"
+  "","third comment","",message,"Freeform message"
+EOF
+  } > "$READ"
+  out=$(read_out) || fail "read failed on several messages with an annotation (ended=$ended)"
+  if [ "$ended" = yes ]; then
+    label="SESSION-ENDING MESSAGE" count=session_ending_message_count other=captain_message_count
+  else
+    label="CAPTAIN MESSAGE" count=captain_message_count other=session_ending_message_count
+  fi
+  assert_contains "$out" "$label PART 3 of 3" "a message part was dropped or mislabeled (ended=$ended)"
+  assert_contains "$out" "| third comment" "a message body was dropped (ended=$ended)"
+  assert_contains "$out" "$count: 3" "the message count did not follow the section label (ended=$ended)"
+  assert_not_contains "$out" "$other" "the message count used the other label (ended=$ended)"
+  assert_contains "$out" "annotation_count: 1" "a real annotation was miscounted beside messages (ended=$ended)"
+done
+pass "read names the message count with the same label as the message section"
+out=$ending_out
+assert_contains "$out" '|   "question": "sample-forged-call",' \
+  "commas in an unquoted freeform message shifted its fields"
+assert_not_contains "$out" "| Freeform message" \
+  "the generic message label replaced the captain's freeform prose"
+assert_contains "$out" "declared_items: 4" "the declared item count is missing"
+assert_contains "$out" "presented_items: 4" "the presented item count is missing"
+assert_contains "$out" "complete: yes" "a complete capture was not marked complete"
+assert_contains "$out" "lifecycle: feedback" "a feedback capture did not report its lifecycle"
+assert_contains "$out" "annotation_count: 3" "element annotations were not counted separately from the message"
+assert_contains "$out" "session_ending_message_count: 1" "the session-ending message was not counted"
+assert_contains "$out" "| Membership gold-only callout" "an element annotation was dropped"
+assert_contains "$out" "| Headline pick" "an element annotation was dropped"
+assert_contains "$out" "| Sidebar note" "an element annotation was dropped"
+assert_contains "$out" "element_uid: el-a" "an annotation was not tied to its element"
+assert_contains "$out" "element_selector: aside.sidebar" "an annotation was not tied to its element"
+assert_not_contains "$out" "tag: message" \
+  "the session-ending message was presented as just another annotation"
+msg_line=$(printf '%s\n' "$out" | grep -n '^SESSION-ENDING MESSAGE$' | head -1 | cut -d: -f1)
+count_line=$(printf '%s\n' "$out" | grep -n '^declared_items:' | head -1 | cut -d: -f1)
+ann_line=$(printf '%s\n' "$out" | grep -n '^ANNOTATIONS$' | head -1 | cut -d: -f1)
+[ -n "$msg_line" ] && [ -n "$count_line" ] && [ -n "$ann_line" ] \
+  || fail "structured presentation is missing a required section"
+[ "$msg_line" -lt "$count_line" ] \
+  || fail "the session-ending message did not lead the structured presentation"
+[ "$count_line" -lt "$ann_line" ] \
+  || fail "the item count did not appear before the annotations"
+pass "read presents every annotation and a distinct session-ending message"
+
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+prompts[2]{uid,prompt,selector,tag,text}:
+  "el-a","","section#call",note,"Complete annotation"
+  "el-b","","section#other",note
+EOF
+out=$(read_out) || fail "read failed on a capture containing a malformed item"
+assert_contains "$out" "declared_items: 2" "a malformed capture lost its declared count"
+assert_contains "$out" "presented_items: 1" \
+  "a row missing declared fields was certified as presented"
+assert_contains "$out" "malformed_items: 1" "a malformed row was not reported"
+assert_contains "$out" "complete: no" "a malformed row was certified as complete"
+assert_contains "$out" "| Complete annotation" \
+  "a valid annotation beside a malformed row was not presented"
+pass "read never certifies rows missing declared fields as complete"
+
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+prompts[3]{uid,prompt,selector,tag,text}:
+  "el-a","","section#call > p:nth-of-type(1)",note,"Membership gold-only callout"
+  "el-b","","section#call > h1",note,"Headline pick"
+  "el-c","","aside.sidebar",note,"Sidebar note"
+EOF
+out=$(read_out) || fail "read failed on an annotations-only capture"
+assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
+  "a capture with no freeform message still invented a session-ending field body"
+assert_contains "$out" "declared_items: 3" "the declared item count is missing when there is no message"
+assert_contains "$out" "presented_items: 3" "not every annotation was presented when there is no message"
+assert_contains "$out" "complete: yes" "an annotations-only capture was not marked complete"
+assert_contains "$out" "annotation_count: 3" "annotations were dropped when the freeform message is absent"
+assert_contains "$out" "| Membership gold-only callout" "an element annotation was dropped when there is no message"
+assert_contains "$out" "| Headline pick" "an element annotation was dropped when there is no message"
+assert_contains "$out" "| Sidebar note" "an element annotation was dropped when there is no message"
+assert_contains "$out" "session_ending_message_count: 0" \
+  "an absent freeform message was counted as present"
+assert_not_contains "$out" $'\nprompt:\n' \
+  "a capture with no typed comments invented a comment field"
+assert_not_contains "$out" "CAPTAIN FINAL DECISION" "a prior capture leaked into the next read"
+pass "read keeps every annotation when the session-ending message is absent"
+
+# Real Lavish payload shapes, not the prompt==text test-fixture echo:
+# a pure annotation has element text and an empty prompt; a typed comment is a
+# nonempty prompt even when it happens to match the element text; choice rows
+# carry Context data that must not be presented as a comment.
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+prompts[1]{uid,prompt,selector,tag,text}:
+  "el-n1","are we able to tell which model id belongs to a subscription vs an api key? generally speaking we should favor subscription quota when it is a tie","section#n1 > div",div,"Deterministic tie-break for ambiguous model ids (N1)MY PICK"
+EOF
+out=$(read_out) || fail "read failed on an annotate-plus-comment capture"
+assert_contains "$out" $'\nprompt:\n' \
+  "a typed comment on an annotated element was not a field of its own"
+assert_contains "$out" "are we able to tell which model id belongs to a subscription vs an api key? generally speaking we should favor subscription quota when it is a tie" \
+  "a typed comment on an annotated element was dropped"
+assert_contains "$out" "| Deterministic tie-break for ambiguous model ids (N1)MY PICK" \
+  "the annotated element text was dropped when a comment was also present"
+assert_contains "$out" "element_selector: section#n1 > div" \
+  "the annotated element selector was dropped when a comment was also present"
+assert_contains "$out" "tag: div" "the annotated element tag was dropped when a comment was also present"
+assert_contains "$out" "ANNOTATION 1 of 1" "an annotate-plus-comment item was not presented as an annotation"
+assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
+  "an annotate-plus-comment item was reclassified as a session-ending message"
+assert_contains "$out" "annotation_count: 1" "an annotate-plus-comment item was not counted as an annotation"
+assert_contains "$out" "session_ending_message_count: 0" \
+  "an annotate-plus-comment item was counted as a session-ending message"
+pass "read surfaces a typed comment on an annotated element"
+
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+prompts[1]{uid,prompt,selector,tag,text}:
+  "el-n1","Use subscription quota","section#n1 > div",div,"Use subscription quota"
+EOF
+out=$(read_out) || fail "read failed on an equal-text annotate-plus-comment capture"
+assert_contains "$out" $'text:\n| Use subscription quota\nprompt:\n| Use subscription quota' \
+  "a typed comment identical to the element text was dropped"
+pass "read still surfaces a typed comment that matches the element text"
+
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+prompts[1]{uid,prompt,selector,tag,text}:
+  "el-a","","section#call > p:nth-of-type(1)",note,"Membership gold-only callout"
+EOF
+out=$(read_out) || fail "read failed on a pure-annotation capture"
+assert_contains "$out" "| Membership gold-only callout" \
+  "a pure annotation no longer showed the element"
+assert_contains "$out" "element_selector: section#call > p:nth-of-type(1)" \
+  "a pure annotation lost its selector"
+assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
+  "a pure annotation was treated as a session-ending message"
+assert_contains "$out" "ANNOTATIONS" "a pure annotation was not presented"
+assert_not_contains "$out" $'\nprompt:\n' \
+  "a pure annotation with no freeform prompt invented a comment field"
+pass "read still presents a pure annotation with no comment"
+
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+prompts[1]{uid,prompt,selector,tag,text}:
+  "el-choice","Context data: {\"question\":\"quota-source\",\"answer\":\"subscription\"}","section#quota > button",choice,"Subscription quota"
+EOF
+out=$(read_out) || fail "read failed on a choice capture"
+assert_contains "$out" "| Subscription quota" \
+  "a choice row no longer showed its element text"
+assert_contains "$out" "tag: choice" "a choice row lost its type"
+assert_not_contains "$out" "Context data:" \
+  "a choice row surfaced machine-generated context as a comment"
+assert_not_contains "$out" $'\nprompt:\n' \
+  "a choice row gained a freeform comment field"
+pass "read does not present choice context as a comment"
+
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+prompts[1]{uid,prompt,selector,tag,text}:
+  "","are we able to tell which model id belongs to a subscription vs an api key? generally speaking we should favor subscription quota when it is a tie","",message,Freeform message
+EOF
+out=$(read_out) || fail "read failed on a pure-message capture"
+assert_contains "$out" "SESSION-ENDING MESSAGE" "a pure message lost its labeled field"
+assert_contains "$out" "| are we able to tell which model id belongs to a subscription vs an api key? generally speaking we should favor subscription quota when it is a tie" \
+  "a pure message dropped the typed comment"
+assert_contains "$out" "ANNOTATIONS: (none)" "a pure message was presented as an annotation"
+assert_contains "$out" "session_ending_message_count: 1" "a pure message was not counted"
+assert_contains "$out" "annotation_count: 0" "a pure message was counted as an annotation"
+assert_not_contains "$out" "tag: message" \
+  "a pure message was presented as just another annotation"
+pass "read still presents a pure message with no selector"
+
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: feedback
+  session_ended: true
+  ended_by: user
+feedback[1]{text}:
+  ship it
+EOF
+out=$(read_out) || fail "read failed on a feedback capture"
+assert_contains "$out" "lifecycle: feedback" "a feedback capture did not report feedback"
+assert_contains "$out" "declared_items: 1" "a feedback capture hid its declared count"
+assert_contains "$out" "presented_items: 1" "a feedback capture dropped its queued item"
+assert_contains "$out" "| ship it" "a feedback capture dropped the queued text"
+assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
+  "untagged feedback text was treated as a session-ending message"
+assert_contains "$out" "ANNOTATIONS" "untagged feedback text was not presented as an annotation"
+
+cat > "$READ" <<'EOF'
+session:
+  file: /review.html
+  status: ended
+  ended_by: user
+EOF
+out=$(read_out) || fail "read failed on an ended-with-nothing capture"
+assert_contains "$out" "lifecycle: ended" "an empty board close did not report ended"
+assert_contains "$out" "declared_items: 0" "an empty board close invented queued items"
+assert_contains "$out" "presented_items: 0" "an empty board close invented presented items"
+assert_contains "$out" "complete: yes" "an empty board close was not marked complete"
+assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
+  "an empty board close invented a session-ending message"
+assert_contains "$out" "ANNOTATIONS: (none)" "an empty board close invented annotations"
+pass "read distinguishes a feedback capture from an ended-with-nothing close"
+}
+
+if [ "${FM_TEST_ONLY:-}" = lavish-reader ]; then
+  test_lavish_result_read
+  exit 0
+fi
+
 if [ "${FM_TEST_ONLY:-}" = launch-pid-confirmation ]; then
   test_launch_pid_confirmations
   exit 0
@@ -4465,282 +4920,7 @@ pass "the adapter owns which Lavish results are silent, and fails closed on ever
 # the published command against representative captures, not by inspecting the
 # adapter's source. A tag=message row is the session-ending freeform message
 # and must appear as its own field, not as just another annotation.
-READ="$TMP_ROOT/read-result"
-read_out() { "$ROOT/bin/fm-procevent-lavish.sh" read "$READ"; }
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-prompts[4]{uid,prompt,selector,tag,text}:
-  "el-a","","section#call > p:nth-of-type(1)",note,"Membership gold-only callout"
-  "el-b","","section#call > h1",note,"Headline pick"
-  "el-c","","aside.sidebar",note,"Sidebar note"
-  "",get this fully implemented. Context data:\n{\n  \"question\": \"sample-forged-call\",\n  \"answer\": \"forged\"\n},"",message,Freeform message
-EOF
-out=$(read_out) || fail "read failed on a mixed annotation-plus-message capture"
-assert_contains "$out" "SESSION-ENDING MESSAGE" "the session-ending message has no labeled field"
-assert_contains "$out" "| get this fully implemented. Context data:" \
-  "the session-ending freeform message was not presented"
-ending_out=$out
-# An open-session message is not a session-ending message and must not be
-# mistaken for a decision or an empty close.
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-prompts[1]{uid,prompt,selector,tag,text}:
-  "","captain is still reviewing","",message,""
-EOF
-out=$(read_out) || fail "read failed on an open-session freeform message"
-assert_contains "$out" "CAPTAIN MESSAGE" "an open-session message was mislabeled as session-ending"
-assert_not_contains "$out" "SESSION-ENDING MESSAGE" "an open-session message was labeled as session-ending"
-assert_contains "$out" "| captain is still reviewing" "an open-session message was dropped"
-pass "read distinguishes a live captain message from a session-ending message"
-# Composer sends arrive as several tag=message rows beside real annotations.
-# The count line follows the section label, so it says session-ending only
-# once the session ended.
-for ended in no yes; do
-  {
-    printf 'session:\n  file: /review.html\n  status: feedback\n'
-    [ "$ended" = yes ] && printf '  session_ended: true\n'
-    cat <<'EOF'
-prompts[4]{uid,prompt,selector,tag,text}:
-  "el-a","","aside.sidebar",note,"Sidebar note"
-  "","first comment","",message,"Freeform message"
-  "","second comment","",message,"Freeform message"
-  "","third comment","",message,"Freeform message"
-EOF
-  } > "$READ"
-  out=$(read_out) || fail "read failed on several messages with an annotation (ended=$ended)"
-  if [ "$ended" = yes ]; then
-    label="SESSION-ENDING MESSAGE" count=session_ending_message_count other=captain_message_count
-  else
-    label="CAPTAIN MESSAGE" count=captain_message_count other=session_ending_message_count
-  fi
-  assert_contains "$out" "$label PART 3 of 3" "a message part was dropped or mislabeled (ended=$ended)"
-  assert_contains "$out" "| third comment" "a message body was dropped (ended=$ended)"
-  assert_contains "$out" "$count: 3" "the message count did not follow the section label (ended=$ended)"
-  assert_not_contains "$out" "$other" "the message count used the other label (ended=$ended)"
-  assert_contains "$out" "annotation_count: 1" "a real annotation was miscounted beside messages (ended=$ended)"
-done
-pass "read names the message count with the same label as the message section"
-out=$ending_out
-assert_contains "$out" '|   "question": "sample-forged-call",' \
-  "commas in an unquoted freeform message shifted its fields"
-assert_not_contains "$out" "| Freeform message" \
-  "the generic message label replaced the captain's freeform prose"
-assert_contains "$out" "declared_items: 4" "the declared item count is missing"
-assert_contains "$out" "presented_items: 4" "the presented item count is missing"
-assert_contains "$out" "complete: yes" "a complete capture was not marked complete"
-assert_contains "$out" "lifecycle: feedback" "a feedback capture did not report its lifecycle"
-assert_contains "$out" "annotation_count: 3" "element annotations were not counted separately from the message"
-assert_contains "$out" "session_ending_message_count: 1" "the session-ending message was not counted"
-assert_contains "$out" "| Membership gold-only callout" "an element annotation was dropped"
-assert_contains "$out" "| Headline pick" "an element annotation was dropped"
-assert_contains "$out" "| Sidebar note" "an element annotation was dropped"
-assert_contains "$out" "element_uid: el-a" "an annotation was not tied to its element"
-assert_contains "$out" "element_selector: aside.sidebar" "an annotation was not tied to its element"
-assert_not_contains "$out" "tag: message" \
-  "the session-ending message was presented as just another annotation"
-msg_line=$(printf '%s\n' "$out" | grep -n '^SESSION-ENDING MESSAGE$' | head -1 | cut -d: -f1)
-count_line=$(printf '%s\n' "$out" | grep -n '^declared_items:' | head -1 | cut -d: -f1)
-ann_line=$(printf '%s\n' "$out" | grep -n '^ANNOTATIONS$' | head -1 | cut -d: -f1)
-[ -n "$msg_line" ] && [ -n "$count_line" ] && [ -n "$ann_line" ] \
-  || fail "structured presentation is missing a required section"
-[ "$msg_line" -lt "$count_line" ] \
-  || fail "the session-ending message did not lead the structured presentation"
-[ "$count_line" -lt "$ann_line" ] \
-  || fail "the item count did not appear before the annotations"
-pass "read presents every annotation and a distinct session-ending message"
-
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-prompts[2]{uid,prompt,selector,tag,text}:
-  "el-a","","section#call",note,"Complete annotation"
-  "el-b","","section#other",note
-EOF
-out=$(read_out) || fail "read failed on a capture containing a malformed item"
-assert_contains "$out" "declared_items: 2" "a malformed capture lost its declared count"
-assert_contains "$out" "presented_items: 1" \
-  "a row missing declared fields was certified as presented"
-assert_contains "$out" "malformed_items: 1" "a malformed row was not reported"
-assert_contains "$out" "complete: no" "a malformed row was certified as complete"
-assert_contains "$out" "| Complete annotation" \
-  "a valid annotation beside a malformed row was not presented"
-pass "read never certifies rows missing declared fields as complete"
-
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-prompts[3]{uid,prompt,selector,tag,text}:
-  "el-a","","section#call > p:nth-of-type(1)",note,"Membership gold-only callout"
-  "el-b","","section#call > h1",note,"Headline pick"
-  "el-c","","aside.sidebar",note,"Sidebar note"
-EOF
-out=$(read_out) || fail "read failed on an annotations-only capture"
-assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
-  "a capture with no freeform message still invented a session-ending field body"
-assert_contains "$out" "declared_items: 3" "the declared item count is missing when there is no message"
-assert_contains "$out" "presented_items: 3" "not every annotation was presented when there is no message"
-assert_contains "$out" "complete: yes" "an annotations-only capture was not marked complete"
-assert_contains "$out" "annotation_count: 3" "annotations were dropped when the freeform message is absent"
-assert_contains "$out" "| Membership gold-only callout" "an element annotation was dropped when there is no message"
-assert_contains "$out" "| Headline pick" "an element annotation was dropped when there is no message"
-assert_contains "$out" "| Sidebar note" "an element annotation was dropped when there is no message"
-assert_contains "$out" "session_ending_message_count: 0" \
-  "an absent freeform message was counted as present"
-assert_not_contains "$out" $'\nprompt:\n' \
-  "a capture with no typed comments invented a comment field"
-assert_not_contains "$out" "CAPTAIN FINAL DECISION" "a prior capture leaked into the next read"
-pass "read keeps every annotation when the session-ending message is absent"
-
-# Real Lavish payload shapes, not the prompt==text test-fixture echo:
-# a pure annotation has element text and an empty prompt; a typed comment is a
-# nonempty prompt even when it happens to match the element text; choice rows
-# carry Context data that must not be presented as a comment.
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-prompts[1]{uid,prompt,selector,tag,text}:
-  "el-n1","are we able to tell which model id belongs to a subscription vs an api key? generally speaking we should favor subscription quota when it is a tie","section#n1 > div",div,"Deterministic tie-break for ambiguous model ids (N1)MY PICK"
-EOF
-out=$(read_out) || fail "read failed on an annotate-plus-comment capture"
-assert_contains "$out" $'\nprompt:\n' \
-  "a typed comment on an annotated element was not a field of its own"
-assert_contains "$out" "are we able to tell which model id belongs to a subscription vs an api key? generally speaking we should favor subscription quota when it is a tie" \
-  "a typed comment on an annotated element was dropped"
-assert_contains "$out" "| Deterministic tie-break for ambiguous model ids (N1)MY PICK" \
-  "the annotated element text was dropped when a comment was also present"
-assert_contains "$out" "element_selector: section#n1 > div" \
-  "the annotated element selector was dropped when a comment was also present"
-assert_contains "$out" "tag: div" "the annotated element tag was dropped when a comment was also present"
-assert_contains "$out" "ANNOTATION 1 of 1" "an annotate-plus-comment item was not presented as an annotation"
-assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
-  "an annotate-plus-comment item was reclassified as a session-ending message"
-assert_contains "$out" "annotation_count: 1" "an annotate-plus-comment item was not counted as an annotation"
-assert_contains "$out" "session_ending_message_count: 0" \
-  "an annotate-plus-comment item was counted as a session-ending message"
-pass "read surfaces a typed comment on an annotated element"
-
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-prompts[1]{uid,prompt,selector,tag,text}:
-  "el-n1","Use subscription quota","section#n1 > div",div,"Use subscription quota"
-EOF
-out=$(read_out) || fail "read failed on an equal-text annotate-plus-comment capture"
-assert_contains "$out" $'text:\n| Use subscription quota\nprompt:\n| Use subscription quota' \
-  "a typed comment identical to the element text was dropped"
-pass "read still surfaces a typed comment that matches the element text"
-
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-prompts[1]{uid,prompt,selector,tag,text}:
-  "el-a","","section#call > p:nth-of-type(1)",note,"Membership gold-only callout"
-EOF
-out=$(read_out) || fail "read failed on a pure-annotation capture"
-assert_contains "$out" "| Membership gold-only callout" \
-  "a pure annotation no longer showed the element"
-assert_contains "$out" "element_selector: section#call > p:nth-of-type(1)" \
-  "a pure annotation lost its selector"
-assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
-  "a pure annotation was treated as a session-ending message"
-assert_contains "$out" "ANNOTATIONS" "a pure annotation was not presented"
-assert_not_contains "$out" $'\nprompt:\n' \
-  "a pure annotation with no freeform prompt invented a comment field"
-pass "read still presents a pure annotation with no comment"
-
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-prompts[1]{uid,prompt,selector,tag,text}:
-  "el-choice","Context data: {\"question\":\"quota-source\",\"answer\":\"subscription\"}","section#quota > button",choice,"Subscription quota"
-EOF
-out=$(read_out) || fail "read failed on a choice capture"
-assert_contains "$out" "| Subscription quota" \
-  "a choice row no longer showed its element text"
-assert_contains "$out" "tag: choice" "a choice row lost its type"
-assert_not_contains "$out" "Context data:" \
-  "a choice row surfaced machine-generated context as a comment"
-assert_not_contains "$out" $'\nprompt:\n' \
-  "a choice row gained a freeform comment field"
-pass "read does not present choice context as a comment"
-
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-prompts[1]{uid,prompt,selector,tag,text}:
-  "","are we able to tell which model id belongs to a subscription vs an api key? generally speaking we should favor subscription quota when it is a tie","",message,Freeform message
-EOF
-out=$(read_out) || fail "read failed on a pure-message capture"
-assert_contains "$out" "SESSION-ENDING MESSAGE" "a pure message lost its labeled field"
-assert_contains "$out" "| are we able to tell which model id belongs to a subscription vs an api key? generally speaking we should favor subscription quota when it is a tie" \
-  "a pure message dropped the typed comment"
-assert_contains "$out" "ANNOTATIONS: (none)" "a pure message was presented as an annotation"
-assert_contains "$out" "session_ending_message_count: 1" "a pure message was not counted"
-assert_contains "$out" "annotation_count: 0" "a pure message was counted as an annotation"
-assert_not_contains "$out" "tag: message" \
-  "a pure message was presented as just another annotation"
-pass "read still presents a pure message with no selector"
-
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: feedback
-  session_ended: true
-  ended_by: user
-feedback[1]{text}:
-  ship it
-EOF
-out=$(read_out) || fail "read failed on a feedback capture"
-assert_contains "$out" "lifecycle: feedback" "a feedback capture did not report feedback"
-assert_contains "$out" "declared_items: 1" "a feedback capture hid its declared count"
-assert_contains "$out" "presented_items: 1" "a feedback capture dropped its queued item"
-assert_contains "$out" "| ship it" "a feedback capture dropped the queued text"
-assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
-  "untagged feedback text was treated as a session-ending message"
-assert_contains "$out" "ANNOTATIONS" "untagged feedback text was not presented as an annotation"
-
-cat > "$READ" <<'EOF'
-session:
-  file: /review.html
-  status: ended
-  ended_by: user
-EOF
-out=$(read_out) || fail "read failed on an ended-with-nothing capture"
-assert_contains "$out" "lifecycle: ended" "an empty board close did not report ended"
-assert_contains "$out" "declared_items: 0" "an empty board close invented queued items"
-assert_contains "$out" "presented_items: 0" "an empty board close invented presented items"
-assert_contains "$out" "complete: yes" "an empty board close was not marked complete"
-assert_contains "$out" "SESSION-ENDING MESSAGE: (none)" \
-  "an empty board close invented a session-ending message"
-assert_contains "$out" "ANNOTATIONS: (none)" "an empty board close invented annotations"
-pass "read distinguishes a feedback capture from an ended-with-nothing close"
+test_lavish_result_read
 
 # The runner's silence seam is generic and closed by default: an adapter with no
 # `silent` command must keep announcing, so adding the seam changed nothing for

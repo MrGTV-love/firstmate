@@ -1,5 +1,7 @@
 Mode: Unknown harness fallback.
 
+For open-loop-ledger wakes and heartbeat row handling, follow [Event-driven supervision](../architecture.md#event-driven-supervision).
+
 This primary harness does not have a verified watcher wake adapter.
 Follow the generic supervision contract in `AGENTS.md`.
 First cycle: drain queued wakes, then choose a supervision wait that the harness can actually wake from.

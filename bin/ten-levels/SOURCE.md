@@ -1,6 +1,6 @@
 # Source
 
-This directory holds the level 6 jev-guard from disler's ten-levels-of-jev, vendored from upstream.
+This directory holds the Level 5 routers and level 6 jev-guard from disler's ten-levels-of-jev, vendored from upstream.
 
 - Repository: https://github.com/disler/ten-levels-of-jev
 - Path: `apps/ten-levels` (the `LICENSE` file comes from the repository root)
@@ -18,10 +18,21 @@ These files are byte-for-byte copies of the upstream files at the same paths:
 - `src/levels/level06/index.ts`, `bash-gate.ts`, `write-gate.ts` and `result-screen.ts`
 - `src/core/client.ts`, `helpers.ts`, `mock.ts` and `types.ts`
 - `tests/level06.test.ts`
+- `src/levels/level05/intent-router.ts` and `index.ts`
+- `tests/level05.test.ts`
 - `LICENSE`
 
 The questions, thresholds, block and banner wording, content trimming, the client's provider snapshot and retries, and the allow-on-error behavior all run as upstream wrote them.
 Firstmate supplies shorter client budgets through the upstream constructor options.
+
+## Changed copies: Level 5 agent and model routers
+
+Level 5 was copied from the same pinned commit on 2026-10-14 (UTC).
+`src/levels/level05/agent-router.ts` exports its existing question object as `agentQuestions`, and `model-router.ts` exports its existing question object as `modelQuestions`.
+Their original route functions consume those objects unchanged.
+This is the only change in those copies: combining independent agent and model questions in one paid dispatch request requires access to the objects without invoking two separate route calls.
+Question wording, criteria, pure decisions, and thresholds remain upstream's.
+`bin/fm-dispatch-level5.ts` combines the objects with the existing rule question, uses the unchanged core client, and maps the pure decisions into the captain's approved candidates.
 
 ## Changed copy: `extensions/report.ts`
 

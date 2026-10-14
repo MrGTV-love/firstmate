@@ -184,7 +184,7 @@ printf '%s\n' "$*" >> "$FM_TEST_GH_LOG"
 case "${1:-} ${2:-}" in
   "pr view")
     case " $* " in
-      *statusCheckRollup*)
+      *mergeStateStatus*)
         if [ -n "${FM_TEST_GH_MERGEABLE_SEQUENCE:-}" ]; then
           call_n=$(( $(cat "$FM_TEST_GH_MERGEABLE_CALLS" 2>/dev/null || echo 0) + 1 ))
           printf '%s\n' "$call_n" > "$FM_TEST_GH_MERGEABLE_CALLS"
@@ -194,9 +194,9 @@ case "${1:-} ${2:-}" in
           read -r call_m call_c <<< "$call_m"
           jq -c --arg m "$call_m" --arg c "${call_c:-}" \
             '.mergeable = $m | if $c != "" then .statusCheckRollup[0].conclusion = $c else . end' \
-            "$FM_TEST_GH_VIEW_JSON"
+            "$FM_TEST_GH_VIEW_JSON" | tee "$FM_TEST_GH_VIEW_CURRENT"
         else
-          cat "$FM_TEST_GH_VIEW_JSON"
+          cat "$FM_TEST_GH_VIEW_JSON" | tee "$FM_TEST_GH_VIEW_CURRENT"
         fi
         if [ -f "${FM_TEST_AWAY_RECORD_AFTER_VIEW:-}" ]; then
           if [ -s "${FM_TEST_AWAY_RECORD_AFTER_VIEW}" ]; then
@@ -244,6 +244,29 @@ case "${1:-} ${2:-}" in
     exit "$merge_rc"
     ;;
   "api graphql")
+    case "$*" in
+      *'contexts(first:'*)
+        calls=$(( $(cat "$FM_TEST_GH_ROLLUP_CALLS" 2>/dev/null || echo 0) + 1 ))
+        printf '%s\n' "$calls" > "$FM_TEST_GH_ROLLUP_CALLS"
+        if [ -d "$FM_TEST_GH_ROLLUP_RESPONSES" ]; then
+          reply="$FM_TEST_GH_ROLLUP_RESPONSES/$calls"
+          [ -f "$reply" ] || [ -f "$reply.fail" ] || reply="$FM_TEST_GH_ROLLUP_RESPONSES/final"
+          if [ -f "$reply.fail" ]; then
+            cat "$reply.fail" >&2
+            exit 1
+          fi
+          cat "$reply"
+          exit $?
+        fi
+        jq -c '{data:{repository:{object:{oid:.headRefOid,statusCheckRollup:
+          (if .statusCheckRollup == null then null else {contexts:{
+            totalCount:(.statusCheckRollup | length),
+            pageInfo:{hasNextPage:false,endCursor:null},
+            nodes:(.statusCheckRollup | to_entries | map(.value + {id:("fixture-" + (.key | tostring))}))
+          }} end)}}}}' "$FM_TEST_GH_VIEW_CURRENT"
+        exit $?
+        ;;
+    esac
     if [ -f "${FM_TEST_GH_GRAPHQL_FAIL:-}" ]; then
       echo 'error: could not reach the GitHub API' >&2
       exit 1
@@ -260,6 +283,14 @@ case "${1:-} ${2:-}" in
           *"/commits/$(cat "$FM_TEST_GH_HEAD")/check-runs"*) ;;
           *) exit 1 ;;
         esac
+        if [ -f "$FM_TEST_GH_RUNS_FIRST" ]; then
+          calls=$(( $(cat "$FM_TEST_GH_RUNS_CALLS" 2>/dev/null || echo 0) + 1 ))
+          printf '%s\n' "$calls" > "$FM_TEST_GH_RUNS_CALLS"
+          if [ "$calls" -eq 1 ]; then
+            cat "$FM_TEST_GH_RUNS_FIRST"
+            exit 0
+          fi
+        fi
         cat "$FM_TEST_GH_RUNS"
         exit $?
         ;;
@@ -267,6 +298,7 @@ case "${1:-} ${2:-}" in
       *" repos/"*"/rules/branches/"*)
         if [ -f "${FM_TEST_GH_REQUIRED_RULES_FAIL:-}" ]; then
           cat "$FM_TEST_GH_REQUIRED_RULES_FAIL" >&2
+          [ ! -f "$FM_TEST_GH_REQUIRED_RULES_FAIL.once" ] || rm "$FM_TEST_GH_REQUIRED_RULES_FAIL"
           exit 1
         fi
         cat "$FM_TEST_GH_REQUIRED_RULES"
@@ -275,6 +307,7 @@ case "${1:-} ${2:-}" in
       *" repos/"*"/branches/"*)
         if [ -f "${FM_TEST_GH_BRANCH_FAIL:-}" ]; then
           cat "$FM_TEST_GH_BRANCH_FAIL" >&2
+          [ ! -f "$FM_TEST_GH_BRANCH_FAIL.once" ] || rm "$FM_TEST_GH_BRANCH_FAIL"
           exit 1
         fi
         cat "$FM_TEST_GH_BRANCH"
@@ -667,10 +700,16 @@ run_pr_merge() {
   FM_TEST_GH_OUTCOME="$case_dir/github-outcome" \
   FM_TEST_GH_RULES="$case_dir/github-rules" \
   FM_TEST_GH_VIEW_JSON="$case_dir/github-view.json" \
+  FM_TEST_GH_VIEW_CURRENT="$case_dir/github-view-current.json" \
+  FM_TEST_GH_ROLLUP_RESPONSES="$case_dir/rollup-responses" \
+  FM_TEST_GH_ROLLUP_CALLS="$case_dir/rollup-calls" \
   FM_TEST_GH_MERGEABLE_SEQUENCE="${FM_TEST_GH_MERGEABLE_SEQUENCE:-}" \
   FM_TEST_GH_MERGEABLE_CALLS="$case_dir/mergeable-calls" \
+  FM_PR_GITHUB_MERGEABLE_RETRY_DELAY="${FM_PR_GITHUB_MERGEABLE_RETRY_DELAY:-0}" \
   FM_TEST_GH_HEAD="$case_dir/github-head" \
   FM_TEST_GH_RUNS="$case_dir/github-runs.json" \
+  FM_TEST_GH_RUNS_FIRST="$case_dir/github-runs-first.json" \
+  FM_TEST_GH_RUNS_CALLS="$case_dir/github-runs-calls" \
   FM_TEST_GH_MERGE_RC_FILE="$case_dir/github-merge-rc" \
   FM_TEST_GH_MERGE_OUTPUT="$(cat "$case_dir/github-merge-output" 2>/dev/null || true)" \
   FM_TEST_GH_GRAPHQL_FAIL="$case_dir/github-graphql-fail" \
@@ -877,8 +916,8 @@ test_github_mergeable_unknown_retries_then_succeeds() {
   set -e
 
   expect_code 0 "$rc" "github-mergeable-unknown-then-mergeable: a merge should succeed once mergeable resolves"
-  [ "$(grep -c '^pr view .*statusCheckRollup' "$case_dir/gh.log")" -eq 2 ] \
-    || fail "github-mergeable-unknown-then-mergeable: expected exactly 2 mergeable reads, got $(grep -c '^pr view .*statusCheckRollup' "$case_dir/gh.log")"
+  [ "$(grep -c '^pr view .*mergeStateStatus' "$case_dir/gh.log")" -eq 2 ] \
+    || fail "github-mergeable-unknown-then-mergeable: expected exactly 2 mergeable reads, got $(grep -c '^pr view .*mergeStateStatus' "$case_dir/gh.log")"
   assert_logged_gh_merge "$case_dir" 83 example/repo --squash
   [ "$(grep -c '^pr merge ' "$case_dir/gh.log")" -eq 1 ] \
     || fail "github-mergeable-unknown-then-mergeable: the wrapper attempted more than one merge"
@@ -909,8 +948,8 @@ test_github_mergeable_unknown_exhausts_bound_and_reports_pending() {
   set -e
 
   expect_code 1 "$rc" "github-mergeable-unknown-exhausted: a mergeable read that never resolves must still fail"
-  [ "$(grep -c '^pr view .*statusCheckRollup' "$case_dir/gh.log")" -eq 5 ] \
-    || fail "github-mergeable-unknown-exhausted: expected exactly 5 bounded mergeable reads, got $(grep -c '^pr view .*statusCheckRollup' "$case_dir/gh.log")"
+  [ "$(grep -c '^pr view .*mergeStateStatus' "$case_dir/gh.log")" -eq 5 ] \
+    || fail "github-mergeable-unknown-exhausted: expected exactly 5 bounded mergeable reads, got $(grep -c '^pr view .*mergeStateStatus' "$case_dir/gh.log")"
   assert_no_grep 'pr merge' "$case_dir/gh.log" \
     "github-mergeable-unknown-exhausted: a merge was attempted while mergeable never resolved"
   assert_grep "mergeability for https://github.com/example/repo/pull/84 is still being computed by GitHub; retry shortly" \
@@ -940,8 +979,8 @@ test_github_mergeable_unknown_retry_rechecks_checks() {
   set -e
 
   expect_code 1 "$rc" "github-mergeable-unknown-check-turns-red: a check that turned red must refuse"
-  [ "$(grep -c '^pr view .*statusCheckRollup' "$case_dir/gh.log")" -eq 2 ] \
-    || fail "github-mergeable-unknown-check-turns-red: expected exactly 2 reads, got $(grep -c '^pr view .*statusCheckRollup' "$case_dir/gh.log")"
+  [ "$(grep -c '^pr view .*mergeStateStatus' "$case_dir/gh.log")" -eq 2 ] \
+    || fail "github-mergeable-unknown-check-turns-red: expected exactly 2 reads, got $(grep -c '^pr view .*mergeStateStatus' "$case_dir/gh.log")"
   assert_grep "check 'ci' is not green" "$case_dir/stderr" \
     "github-mergeable-unknown-check-turns-red: the re-check did not refuse the red check"
   assert_no_grep 'still being computed' "$case_dir/stderr" \
@@ -972,7 +1011,7 @@ test_github_mergeable_conflicting_is_not_retried() {
   set -e
 
   expect_code 1 "$rc" "github-mergeable-conflicting: a genuine conflict must refuse"
-  [ "$(grep -c '^pr view .*statusCheckRollup' "$case_dir/gh.log")" -eq 1 ] \
+  [ "$(grep -c '^pr view .*mergeStateStatus' "$case_dir/gh.log")" -eq 1 ] \
     || fail "github-mergeable-conflicting: a genuine conflict was retried instead of refused immediately"
   assert_grep 'mergeable is "CONFLICTING", not MERGEABLE' "$case_dir/stderr" \
     "github-mergeable-conflicting: the conflict was not named"
@@ -4175,6 +4214,189 @@ run_required_case() {
   set -e
 }
 
+write_rollup_response() {  # <case-dir> <output>
+  jq -c '{data:{repository:{object:{oid:.headRefOid,statusCheckRollup:{contexts:{
+    totalCount:(.statusCheckRollup | length),pageInfo:{hasNextPage:false,endCursor:null},
+    nodes:(.statusCheckRollup | to_entries | map(.value + {id:("fixture-" + (.key | tostring))}))
+  }}}}}}' "$1/github-view.json" > "$2"
+}
+
+test_rollup_read_retries_and_rechecks_complete_verdict() {
+  local case_dir head variant expected
+  head=b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2
+  for variant in partial pending-page empty missing-context http-503 rate-limit graphql-error turns-red; do
+    case_dir=$(make_case "rollup-retry-$variant")
+    add_gh_mocks "$case_dir" "$head"
+    write_github_rollup_json "$case_dir" "$head" \
+      "$(check_run ci COMPLETED SUCCESS)" "$(check_run validate COMPLETED SUCCESS)"
+    write_github_required "$case_dir" classic:ci ruleset:validate
+    mkdir "$case_dir/rollup-responses"
+    write_rollup_response "$case_dir" "$case_dir/rollup-responses/final"
+    case "$variant" in
+      partial|turns-red)
+        jq '.data.repository.object.statusCheckRollup.contexts.nodes |= .[0:1]' \
+          "$case_dir/rollup-responses/final" > "$case_dir/rollup-responses/1" ;;
+      pending-page)
+        jq '.data.repository.object.statusCheckRollup.contexts.pageInfo = {hasNextPage:true,endCursor:"next"}' \
+          "$case_dir/rollup-responses/final" > "$case_dir/rollup-responses/1" ;;
+      empty)
+        jq '.data.repository.object.statusCheckRollup.contexts |= (.totalCount = 0 | .nodes = [])' \
+          "$case_dir/rollup-responses/final" > "$case_dir/rollup-responses/1" ;;
+      missing-context)
+        jq '.data.repository.object.statusCheckRollup.contexts |= (.totalCount = 1 | .nodes |= .[0:1])' \
+          "$case_dir/rollup-responses/final" > "$case_dir/rollup-responses/1" ;;
+      http-503) printf 'gh: Service Unavailable (HTTP 503)\n' > "$case_dir/rollup-responses/1.fail" ;;
+      rate-limit) printf 'gh: secondary rate limit (HTTP 403)\n' > "$case_dir/rollup-responses/1.fail" ;;
+      graphql-error)
+        jq '.errors = [{message:"temporarily unavailable"}]' \
+          "$case_dir/rollup-responses/final" > "$case_dir/rollup-responses/1" ;;
+    esac
+    expected=0
+    if [ "$variant" = turns-red ]; then
+      jq '.data.repository.object.statusCheckRollup.contexts.nodes[1].conclusion = "FAILURE"' \
+        "$case_dir/rollup-responses/final" > "$case_dir/updated.json"
+      mv "$case_dir/updated.json" "$case_dir/rollup-responses/final"
+      expected=1
+    fi
+    run_required_case "$case_dir" 113
+    expect_code "$expected" "$RC" "rollup-$variant: $(cat "$case_dir/stderr")"
+    [ "$(cat "$case_dir/rollup-calls")" -eq 2 ] || fail "rollup-$variant did not retry once"
+    assert_no_grep 'these required checks have not reported' "$case_dir/stderr" \
+      "rollup-$variant presented transient visibility as missing checks"
+    if [ "$expected" = 0 ]; then
+      assert_logged_gh_merge "$case_dir" 113 example/repo --squash
+    else
+      assert_grep "check 'validate' is not green" "$case_dir/stderr" "retry hid a newly red check"
+      assert_no_grep 'pr merge' "$case_dir/gh.log" "retry merged a newly red check"
+    fi
+  done
+  pass "fm-pr-merge retries incomplete and transient rollups, then judges every check anew"
+}
+
+test_unreadable_rollup_never_becomes_missing_or_waivable() {
+  local case_dir head variant
+  head=b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3
+  for variant in partial duplicate stale error no-source changing-count; do
+    case_dir=$(make_case "rollup-unreadable-$variant")
+    add_gh_mocks "$case_dir" "$head"
+    write_github_required "$case_dir" classic:ci ruleset:validate
+    mkdir "$case_dir/rollup-responses"
+    write_rollup_response "$case_dir" "$case_dir/seed.json"
+    case "$variant" in
+      partial) jq '.data.repository.object.statusCheckRollup.contexts.totalCount = 2' "$case_dir/seed.json" ;;
+      duplicate) jq '.data.repository.object.statusCheckRollup.contexts |= (.totalCount = 2 | .nodes += .nodes)' "$case_dir/seed.json" ;;
+      stale) jq '.data.repository.object.oid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' "$case_dir/seed.json" ;;
+      error) jq '.errors = [{message:"unavailable"}]' "$case_dir/seed.json" ;;
+      no-source) jq 'del(.data.repository.object.statusCheckRollup)' "$case_dir/seed.json" ;;
+      changing-count)
+        jq '.data.repository.object.statusCheckRollup.contexts |= (.pageInfo = {hasNextPage:true,endCursor:"next"})' "$case_dir/seed.json"
+        jq '.data.repository.object.statusCheckRollup.contexts |= (.totalCount = 2 | .nodes = [])' "$case_dir/seed.json" ;;
+    esac > "$case_dir/rollup-responses/final"
+    run_required_case "$case_dir" 114 --allow-missing validate
+    expect_code 1 "$RC" "rollup-unreadable-$variant must refuse"
+    [ "$(cat "$case_dir/rollup-calls")" -eq 5 ] || fail "rollup-$variant exceeded or skipped the read retry bound"
+    assert_grep 'check rollup at head' "$case_dir/stderr" "unreadable rollup source was not named"
+    assert_grep 'could not be read completely' "$case_dir/stderr" "incomplete rollup was not reported unreadable"
+    assert_no_grep 'has not reported' "$case_dir/stderr" "unreadable rollup was classified as missing"
+    assert_no_grep 'pr merge' "$case_dir/gh.log" "waiver bypassed an unreadable rollup"
+  done
+  pass "fm-pr-merge refuses incomplete rollups as unreadable sources even with a missing-check waiver"
+}
+
+test_rollup_later_pages_enforce_missing_and_red_checks() {
+  local case_dir head variant expected
+  head=b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4
+  for variant in green red; do
+    case_dir=$(make_case "rollup-pages-$variant")
+    add_gh_mocks "$case_dir" "$head"
+    write_github_rollup_json "$case_dir" "$head" \
+      "$(check_run ci COMPLETED SUCCESS)" "$(check_run validate COMPLETED SUCCESS)"
+    write_github_required "$case_dir" ruleset:validate
+    mkdir "$case_dir/rollup-responses"
+    write_rollup_response "$case_dir" "$case_dir/seed.json"
+    jq '.data.repository.object.statusCheckRollup.contexts |=
+      (.nodes |= .[0:1] | .pageInfo = {hasNextPage:true,endCursor:"next"})' \
+      "$case_dir/seed.json" > "$case_dir/rollup-responses/final"
+    jq --arg variant "$variant" '.data.repository.object.statusCheckRollup.contexts |=
+      (.nodes |= .[1:] | if $variant == "red" then .nodes[0].conclusion = "FAILURE" else . end)' \
+      "$case_dir/seed.json" >> "$case_dir/rollup-responses/final"
+    run_required_case "$case_dir" 115
+    expected=0
+    [ "$variant" != red ] || expected=1
+    expect_code "$expected" "$RC" "later-page-$variant: $(cat "$case_dir/stderr")"
+    if [ "$expected" = 0 ]; then
+      assert_logged_gh_merge "$case_dir" 115 example/repo --squash
+    else
+      assert_grep "check 'validate' is not green" "$case_dir/stderr" "later-page failure was omitted"
+      assert_no_grep 'pr merge' "$case_dir/gh.log" "later-page failure reached merge"
+    fi
+    assert_no_grep 'has not reported' "$case_dir/stderr" "later-page requirement was called missing"
+  done
+  pass "fm-pr-merge judges required and red checks on later rollup pages"
+}
+
+test_partial_producer_read_retries_before_merging() {
+  local case_dir head
+  head=b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1
+  case_dir=$(make_case partial-producers-then-complete)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_required "$case_dir" classic:ci
+  jq '.protection.required_status_checks.checks[0].app_id = 15368' \
+    "$case_dir/github-branch.json" > "$case_dir/updated.json"
+  mv "$case_dir/updated.json" "$case_dir/github-branch.json"
+  printf '{"total_count":2,"check_runs":[{"name":"other","app":{"id":15368},"head_sha":"%s"}]}\n' \
+    "$head" > "$case_dir/github-runs-first.json"
+  printf '{"total_count":2,"check_runs":[{"name":"other","app":{"id":15368},"head_sha":"%s"},{"name":"ci","app":{"id":15368},"head_sha":"%s"}]}\n' \
+    "$head" "$head" > "$case_dir/github-runs.json"
+
+  FM_PR_GITHUB_MERGEABLE_RETRY_DELAY=0 run_required_case "$case_dir" 112
+  expect_code 0 "$RC" "partial producer read must recover inside the bounded wait: $(cat "$case_dir/stderr")"
+  assert_logged_gh_merge "$case_dir" 112 example/repo --squash
+  assert_no_grep 'these required checks have not reported' "$case_dir/stderr" \
+    "a partial producer read was presented as a missing check"
+  [ "$(cat "$case_dir/github-runs-calls")" -eq 2 ] \
+    || fail "partial producer read was not retried exactly once"
+  pass "fm-pr-merge retries an incomplete producer list before merging the verified head"
+}
+
+test_required_sources_retry_transient_failures() {
+  local case_dir head source failure
+  head=b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5b5
+  for source in branch required-rules; do
+    case_dir=$(make_case "required-transient-$source")
+    add_gh_mocks "$case_dir" "$head"
+    write_github_required "$case_dir" classic:ci ruleset:ci
+    failure="$case_dir/github-$source-fail"
+    printf 'gh: Service Unavailable (HTTP 503)\n' > "$failure"
+    : > "$failure.once"
+    run_required_case "$case_dir" 116
+    expect_code 0 "$RC" "required-$source read did not recover: $(cat "$case_dir/stderr")"
+    assert_logged_gh_merge "$case_dir" 116 example/repo --squash
+    assert_no_grep 'could not be read' "$case_dir/stderr" "recovered source retained an obsolete error"
+    [ "$(cat "$case_dir/rollup-calls")" -eq 2 ] || fail "required-$source did not recheck live head checks"
+  done
+  pass "fm-pr-merge retries transient classic and ruleset required-source failures"
+}
+
+test_incomplete_producer_source_cannot_be_waived() {
+  local case_dir head
+  head=b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6
+  case_dir=$(make_case incomplete-producers-waived)
+  add_gh_mocks "$case_dir" "$head"
+  write_github_required "$case_dir" classic:ci
+  jq '.protection.required_status_checks.checks[0].app_id = 15368' \
+    "$case_dir/github-branch.json" > "$case_dir/updated.json"
+  mv "$case_dir/updated.json" "$case_dir/github-branch.json"
+  printf '{"total_count":1,"check_runs":[]}\n' > "$case_dir/github-runs.json"
+  run_required_case "$case_dir" 117 --allow-missing ci
+  expect_code 1 "$RC" "partial producer evidence must remain unreadable even with a missing-check waiver"
+  assert_grep 'required check producers at head' "$case_dir/stderr" "partial producer source not identified"
+  assert_no_grep 'has not reported' "$case_dir/stderr" "partial producer source was presented as absent"
+  assert_no_grep 'pr merge' "$case_dir/gh.log" "missing-check waiver bypassed incomplete producer evidence"
+  [ "$(cat "$case_dir/rollup-calls")" -eq 5 ] || fail "incomplete producer read did not use the bounded retry"
+  pass "fm-pr-merge never waives incomplete producer evidence"
+}
+
 test_required_producer_identity() {
   local case_dir head kind variant expected app
   head=a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1
@@ -4194,12 +4416,12 @@ test_required_producer_identity() {
       fi
       app=42
       [ "$variant" != correct ] || app=15368
-      printf '{"check_runs":[{"name":"ci","app":{"id":%s},"head_sha":"%s"}]}\n' \
+      printf '{"total_count":1,"check_runs":[{"name":"ci","app":{"id":%s},"head_sha":"%s"}]}\n' \
         "$app" "$head" > "$case_dir/github-runs.json"
       case "$variant" in
         unreadable) rm "$case_dir/github-runs.json" ;;
         malformed) printf '{}' > "$case_dir/github-runs.json" ;;
-        stale) printf '{"check_runs":[{"name":"ci","app":{"id":15368},"head_sha":"bbbb"}]}' > "$case_dir/github-runs.json" ;;
+        stale) printf '{"total_count":1,"check_runs":[{"name":"ci","app":{"id":15368},"head_sha":"bbbb"}]}' > "$case_dir/github-runs.json" ;;
       esac
       expected=1
       if [ "$variant" = waived ]; then
@@ -4211,7 +4433,12 @@ test_required_producer_identity() {
       fi
       expect_code "$expected" "$RC" "producer-$kind-$variant: $(cat "$case_dir/stderr")"
       if [ "$expected" = 1 ]; then
-        assert_grep "required check 'ci' has not reported" "$case_dir/stderr" "producer absence not reported"
+        case "$variant" in
+          unreadable|malformed|stale)
+            assert_no_grep "required check 'ci' has not reported" "$case_dir/stderr" \
+              "unreadable producer source was classified as a missing check" ;;
+          *) assert_grep "required check 'ci' has not reported" "$case_dir/stderr" "producer absence not reported" ;;
+        esac
         assert_no_grep 'pr merge' "$case_dir/gh.log" "wrong producer reached merge"
       else
         assert_grep 'pr merge' "$case_dir/gh.log" "accepted producer did not merge"
@@ -4250,7 +4477,7 @@ test_app_bound_required_status_context_matches_by_name() {
           "$case_dir/github-required-rules.json" > "$case_dir/updated.json"
         mv "$case_dir/updated.json" "$case_dir/github-required-rules.json"
       fi
-      printf '{"check_runs":[{"name":"ci","app":{"id":42},"head_sha":"%s"}]}\n' \
+      printf '{"total_count":1,"check_runs":[{"name":"ci","app":{"id":42},"head_sha":"%s"}]}\n' \
         "$head" > "$case_dir/github-runs.json"
       run_required_case "$case_dir" 111
       if [ "$variant" = reported ]; then
@@ -4636,6 +4863,12 @@ test_unreadable_required_set_refuses
 test_allow_missing_waives_only_the_named_unreported_check
 test_allow_missing_follows_the_allow_red_rules
 
+test_rollup_read_retries_and_rechecks_complete_verdict
+test_unreadable_rollup_never_becomes_missing_or_waivable
+test_rollup_later_pages_enforce_missing_and_red_checks
+test_partial_producer_read_retries_before_merging
+test_required_sources_retry_transient_failures
+test_incomplete_producer_source_cannot_be_waived
 test_required_producer_identity
 test_app_bound_required_status_context_matches_by_name
 test_required_partial_reads_report_all_failures

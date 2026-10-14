@@ -408,9 +408,10 @@ land_on_origin_main() {
   rm -rf "$tmp"
 }
 
-# Override GitHub lookups to report PR 7 as merged with the supplied head.
+# Override GitHub lookups to report PR 7 as merged with the supplied head and,
+# optionally, the actual merge commit used by archive cleanup.
 add_gh_pr_merged_for_head() {
-  local case_dir=$1 head=$2
+  local case_dir=$1 head=$2 merge=${3:-}
   cat > "$case_dir/fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 case "${1:-} ${2:-}" in
@@ -426,6 +427,7 @@ SH
 case "\${1:-} \${2:-}" in
   "pr view")
     case " \$* " in
+      *"state,headRefOid,mergeCommit"*) printf '%s\t%s\t%s\n' 'MERGED' '$head' '$merge' ; exit 0 ;;
       *"state,headRefOid,url"*) printf '%s\t%s\t%s\n' 'MERGED' '$head' 'https://github.com/example/repo/pull/7' ; exit 0 ;;
       *"--json state "*) printf '%s\n' MERGED ; exit 0 ;;
       *"headRefOid"*) printf '%s\n' '$head' ; exit 0 ;;
@@ -1346,6 +1348,222 @@ test_squash_merged_branch_deleted_allows() {
   expect_code 0 "$rc" "squash-merged: teardown should succeed when the PR is merged"
   ! grep -q REFUSED "$case_dir/stderr" || fail "squash-merged: teardown printed a REFUSED line"
   pass "squash-merged + deleted-branch worktree (PR merged) is torn down (the fix)"
+}
+
+# Land the fixture's task branch as a real squash commit and supply independent
+# forge head/merge evidence. The local task copy remains on the PR head.
+land_archive_fixture_pr() {
+  local case_dir=$1 head merge
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" merge -q --squash fm/task-x1 >/dev/null
+  git -C "$case_dir/project" -c user.email=t@t -c user.name=t commit -qm "squash task"
+  merge=$(git -C "$case_dir/project" rev-parse HEAD)
+  git -C "$case_dir/project" push -q origin main
+  append_pr_meta_url "$case_dir"
+  add_gh_pr_merged_for_head "$case_dir" "$head" "$merge"
+}
+
+assert_archive_ref() {  # <case-dir> <branch> <expected-sha>
+  local case_dir=$1 branch=$2 expected=$3 actual
+  actual=$(git -C "$case_dir/project" rev-parse --verify "refs/heads/$branch" 2>/dev/null) || actual=
+  [ "$actual" = "$expected" ] || fail "$branch: expected ref $expected, got $actual"
+}
+
+test_task_archives_reap_only_carried_refs() {
+  local case_dir base submitted replayed pipeline rc=0 name
+  case_dir=$(make_case archive-carried)
+  write_meta "$case_dir" no-mistakes ship
+  base=$(git -C "$case_dir/wt" rev-parse HEAD)
+  wt_commit_file "$case_dir" 'feature file.txt' alpha "add feature"
+  submitted=$(git -C "$case_dir/wt" rev-parse HEAD)
+  replayed=$(printf 'replayed feature\n' | git -C "$case_dir/project" commit-tree \
+    "$(git -C "$case_dir/wt" rev-parse "HEAD^{tree}")" -p "$base")
+  wt_commit_file "$case_dir" later.txt beta "pipeline follow-up"
+  pipeline=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a01 "$submitted"
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a02 "$replayed"
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$pipeline"
+  git -C "$case_dir/project" branch archive/other-pipeline-final "$pipeline"
+  git -C "$case_dir/project" branch archive/task-x1 "$submitted"
+  git -C "$case_dir/project" branch unrelated "$pipeline"
+  land_archive_fixture_pr "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "carried archives: teardown failed: $(cat "$case_dir/stderr")"
+  for name in submitted-0a0a0a01 submitted-0a0a0a02 pipeline-0b0b0b01; do
+    assert_archive_ref "$case_dir" "archive/task-x1-$name" ""
+    assert_grep "reaped archive/task-x1-$name" "$case_dir/stderr" "carried archive was not named"
+  done
+  assert_archive_ref "$case_dir" archive/other-pipeline-final "$pipeline"
+  assert_archive_ref "$case_dir" archive/task-x1 "$submitted"
+  assert_archive_ref "$case_dir" unrelated "$pipeline"
+  pass "teardown reaps only this task's ancestor and patch-equivalent archives carried by the squash"
+}
+
+test_task_archives_ignore_other_tasks_and_non_custody_names() {
+  local case_dir head rc=0 name
+  case_dir=$(make_case archive-prefix)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt alpha "feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$head"
+  for name in task-x1-2-pipeline-0b0b0b02 task-x1-2-submitted-0a0a0a02 \
+    task-x1-pipeline-final task-x1-pipeline-0B0B0B03 task-x1-pipeline-0b0b0b044 \
+    task-x1-submitted-0a0a0a05-extra; do
+    git -C "$case_dir/project" branch "archive/$name" "$head"
+  done
+  land_archive_fixture_pr "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "prefix archives: teardown failed: $(cat "$case_dir/stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b01 ""
+  assert_grep 'reaped archive/task-x1-pipeline-0b0b0b01' "$case_dir/stderr" "own archive was not named"
+  for name in task-x1-2-pipeline-0b0b0b02 task-x1-2-submitted-0a0a0a02 \
+    task-x1-pipeline-final task-x1-pipeline-0B0B0B03 task-x1-pipeline-0b0b0b044 \
+    task-x1-submitted-0a0a0a05-extra; do
+    assert_archive_ref "$case_dir" "archive/$name" "$head"
+    if grep -qF "archive/$name" "$case_dir/stderr"; then
+      fail "archive/$name belongs to another task or is not a custody name but was named"
+    fi
+  done
+  pass "teardown judges only the task's exact custody archive names, never another task's"
+}
+
+test_task_archives_keep_unproven_and_checked_out_refs() {
+  local case_dir landed extra merge edited rc=0 name
+  case_dir=$(make_case archive-unproven)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt alpha "landed feature"
+  landed=$(git -C "$case_dir/wt" rev-parse HEAD)
+  wt_commit_file "$case_dir" extra.txt unlanded "unlanded archive edit"
+  extra=$(git -C "$case_dir/wt" rev-parse HEAD)
+  # git cherry ignores merges: this archive has only a merge above the PR head,
+  # but that merge's tree contains an edit absent from both its parents.
+  merge=$(commit_tree_from_wt_head "$case_dir" "$landed" "empty second parent")
+  edited=$(printf 'edited merge\n' | git -C "$case_dir/project" commit-tree \
+    "$(git -C "$case_dir/wt" rev-parse "HEAD^{tree}")" -p "$landed" -p "$merge")
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a03 "$extra"
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b02 "$edited"
+  git -C "$case_dir/wt" reset -q --hard "$landed"
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b03 "$landed"
+  git -C "$case_dir/project" worktree add -q "$case_dir/archive-held" archive/task-x1-pipeline-0b0b0b03
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b04 "$landed"
+  land_archive_fixture_pr "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "unproven archives must not prevent landed task cleanup: $(cat "$case_dir/stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-submitted-0a0a0a03 "$extra"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b02 "$edited"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b03 "$landed"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b04 ""
+  for name in submitted-0a0a0a03 pipeline-0b0b0b02 pipeline-0b0b0b03; do
+    assert_grep "keeping archive/task-x1-$name" "$case_dir/stderr" "retained archive was not named"
+  done
+  [ "$(git -C "$case_dir/archive-held" symbolic-ref HEAD)" = refs/heads/archive/task-x1-pipeline-0b0b0b03 ] \
+    || fail "archive cleanup detached another copy"
+  pass "unlanded edits, cherry-invisible merge edits, and checked-out archives stay named and intact"
+}
+
+test_task_archives_require_matching_squash_content() {
+  local shape case_dir head merge rc
+  for shape in different missing; do
+    case_dir=$(make_case "archive-squash-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    wt_commit_file "$case_dir" feature.txt alpha "feature"
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$head"
+    append_pr_meta_url "$case_dir"
+    if [ "$shape" = different ]; then
+      land_on_origin_main "$case_dir" feature.txt different
+      git -C "$case_dir/project" fetch -q origin
+      merge=$(git -C "$case_dir/project" rev-parse origin/main)
+    else
+      merge=
+    fi
+    add_gh_pr_merged_for_head "$case_dir" "$head" "$merge"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$shape squash: ordinary landing proof should still pass: $(cat "$case_dir/stderr")"
+    assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b01 "$head"
+    assert_grep 'keeping archive/task-x1-pipeline-0b0b0b01' "$case_dir/stderr" "$shape squash: archive not named"
+  done
+  pass "even ancestor archives stay when squash content differs or the merge object is unproven"
+}
+
+test_task_archives_include_deleted_and_literal_paths_in_merge_proof() {
+  local shape case_dir base head merge rc archive file=':(literal)renamed file.txt'
+  for shape in matching restored-source; do
+    case_dir=$(make_case "archive-deleted-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    printf 'rename me\n' > "$case_dir/project/old.txt"
+    git -C "$case_dir/project" add old.txt
+    git -C "$case_dir/project" commit -qm "baseline file"
+    git -C "$case_dir/project" push -q origin main
+    base=$(git -C "$case_dir/project" rev-parse HEAD)
+    git -C "$case_dir/wt" reset -q --hard "$base"
+    git -C "$case_dir/wt" --literal-pathspecs mv -- old.txt "$file"
+    git -C "$case_dir/wt" commit -qm rename
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    archive=archive/task-x1-pipeline-0b0b0b05
+    git -C "$case_dir/project" branch "$archive" "$head"
+    if [ "$shape" = matching ]; then
+      land_archive_fixture_pr "$case_dir"
+    else
+      # The destination matches, but the squash did not carry the deletion.
+      # Treat both PR and squash path sets as literal filenames, not pathspecs.
+      printf 'rename me\n' > "$case_dir/project/$file"
+      git -C "$case_dir/project" --literal-pathspecs add -- "$file"
+      git -C "$case_dir/project" commit -qm "incomplete rename squash"
+      merge=$(git -C "$case_dir/project" rev-parse HEAD)
+      git -C "$case_dir/project" push -q origin main
+      append_pr_meta_url "$case_dir"
+      add_gh_pr_merged_for_head "$case_dir" "$head" "$merge"
+    fi
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$shape rename: task landing proof should pass: $(cat "$case_dir/stderr")"
+    if [ "$shape" = matching ]; then
+      assert_archive_ref "$case_dir" "$archive" ""
+      assert_grep "reaped $archive" "$case_dir/stderr" "matching rename was not reaped"
+    else
+      assert_archive_ref "$case_dir" "$archive" "$head"
+      assert_grep "keeping $archive" "$case_dir/stderr" "incomplete rename was not named"
+    fi
+  done
+  pass "archive merge proof includes deleted paths and treats pathspec-like filenames literally"
+}
+
+test_task_archives_survive_refusal_and_forced_discard() {
+  local case_dir head rc=0
+  case_dir=$(make_case archive-refused)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt unlanded "unlanded feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a04 "$head"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "archive cleanup must not precede landing proof"
+  assert_archive_ref "$case_dir" archive/task-x1-submitted-0a0a0a04 "$head"
+  assert_refusal_retained_task_state "$case_dir" archive-refused "$head"
+  rc=0
+  run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+    > "$case_dir/forced.stdout" 2> "$case_dir/forced.stderr" || rc=$?
+  expect_code 0 "$rc" "authorized discard failed: $(cat "$case_dir/forced.stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-submitted-0a0a0a04 "$head"
+  pass "landing refusal and forced discard never reap recovery archives"
+}
+
+test_task_archives_keep_refs_when_forge_is_unreachable() {
+  local case_dir head rc=0
+  case_dir=$(make_case archive-offline)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt alpha "feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$head"
+  land_on_origin_main "$case_dir" feature.txt alpha
+  append_pr_meta_url "$case_dir"
+  add_gh_axi_error "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "content landing fallback failed: $(cat "$case_dir/stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b01 "$head"
+  assert_grep 'keeping archive/task-x1-pipeline-0b0b0b01' "$case_dir/stderr" "offline archive not named"
+  pass "content-only landing with an unreachable forge keeps and names recovery archives"
 }
 
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head() {
@@ -7370,7 +7588,10 @@ test_docker_workdirs_canonicalize_and_exclude_foreign_lanes_and_tasktmp() {
   rc=0
   FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  expect_code 0 "$rc" "canonical-paths: teardown failed: $(cat "$case_dir/stderr")"
+  # The nested lanes are registered copies this task has not proven, so the
+  # forced return refuses them after the Docker sweep and keeps them.
+  expect_code 1 "$rc" "canonical-paths: unproven nested copies must stop the return: $(cat "$case_dir/stderr")"
+  assert_grep "contains registered copy $case_dir/wt/git-lane" "$case_dir/stderr" "canonical-paths: custody refusal omitted the nested Git worktree"
   assert_equals "nested-git-path nested-record-path symlink-foreign temporary-path " "$(docker_store_names "$store" container)" \
     "canonical-paths: canonical custody or worktree-only boundary was ignored"
   assert_present "$case_dir/state/foreign-lane.meta" "canonical-paths: foreign task record was removed"
@@ -8375,7 +8596,8 @@ test_reassigned_dirty_slot_retires_only_finished_task() {
   wt_commit_file "$case_dir" delivered.txt 'merged task work' 'delivered task'
   delivered=$(git -C "$case_dir/wt" rev-parse HEAD)
   git -C "$case_dir/wt" push -q origin HEAD:main
-  add_gh_pr_merged_for_head "$case_dir" "$delivered"
+  add_gh_pr_merged_for_head "$case_dir" "$delivered" "$delivered"
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b06 "$delivered"
   mkdir -p "$case_dir/pool/1" "$case_dir/primary-home/state"
   slot="$case_dir/pool/1/project"
   git -C "$case_dir/project" worktree move "$case_dir/wt" "$slot"
@@ -9340,6 +9562,98 @@ test_nested_slot_return_concludes_runs_and_agents_on_the_slot() {
   pass "returning the enclosing slot aborts its parked run and retires its launch agent before the return"
 }
 
+test_shared_nested_copy_concludes_only_its_own_runtime() {
+  local ownership case_dir head rc own_pid worker_pid root_pid label root_label own_survived root_survived daemon_survived late
+  for ownership in duplicate own foreign late; do
+    make_nested_slot_case "shared-nested-runtime-$ownership" enclosing .claude/worktrees/x
+    case_dir=$NESTED_CASE
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$NESTED_SLOT" > "$case_dir/pool/treehouse-state.json"
+    fm_write_meta "$case_dir/state/parked.meta" "worktree=$NESTED_SLOT" "kind=ship"
+    cp "$case_dir/state/parked.meta" "$case_dir/parked.before"
+    add_fake_launchctl "$case_dir"
+    mkdir -p "$NESTED_COPY/.claude/nm/h" "$NESTED_SLOT/.claude/nm/h"
+    teardown_fixture_start "$NESTED_COPY/.claude/nm/h" KILL perl -e 'sleep'
+    own_pid=$TEARDOWN_FIXTURE_PID
+    teardown_fixture_start "$NESTED_COPY" KILL perl -e 'sleep'
+    worker_pid=$TEARDOWN_FIXTURE_PID
+    teardown_fixture_start "$NESTED_SLOT/.claude/nm/h" KILL perl -e 'sleep'
+    root_pid=$TEARDOWN_FIXTURE_PID
+    label="$NM_AGENT_PREFIX.5a11c001"
+    root_label="$NM_AGENT_PREFIX.5a11c002"
+    add_nm_launch_agent "$case_dir" 5a11c001 "$NESTED_COPY/.claude/nm/h" "$own_pid"
+    add_nm_launch_agent "$case_dir" 5a11c002 "$NESTED_SLOT/.claude/nm/h" "$root_pid"
+    if [ "$ownership" = duplicate ]; then
+      fm_write_meta "$case_dir/state/other-nested.meta" "worktree=$NESTED_COPY" "kind=ship"
+      cp "$case_dir/state/other-nested.meta" "$case_dir/other.before"
+      cp "$case_dir/state/task-x1.meta" "$case_dir/own.before"
+    fi
+    late=
+    if [ "$ownership" = late ]; then
+      late="$NESTED_COPY/late.txt"
+      cp "$case_dir/state/task-x1.meta" "$case_dir/own.before"
+    fi
+    head=$(git -C "$NESTED_COPY" rev-parse HEAD)
+    rc=0
+    FM_HOME="$case_dir/home" FM_LAUNCH_AGENTS_DIR="$case_dir/launchagents" \
+      FM_FAKE_AXI_STATUS="$(parked_axi_status_toon "$([ "$ownership" = foreign ] && printf fm/foreign || printf fm/task-x1-v2)" "$head")" \
+      FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" FAKE_LAUNCHCTL_BOOTOUT_WRITES="$late" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    own_survived=0
+    root_survived=0
+    daemon_survived=0
+    kill -0 "$worker_pid" 2>/dev/null && own_survived=1
+    kill -0 "$root_pid" 2>/dev/null && root_survived=1
+    kill -0 "$own_pid" 2>/dev/null && daemon_survived=1
+    teardown_fixture_stop "$worker_pid"
+    teardown_fixture_stop "$own_pid"
+    teardown_fixture_stop "$root_pid"
+    if [ "$ownership" = duplicate ]; then
+      expect_code 1 "$rc" "duplicate nested custody must refuse before any runtime cleanup: $(cat "$case_dir/stderr")"
+      assert_grep 'other-nested' "$case_dir/stderr" 'the refusal must name the other nested owner'
+      [ "$own_survived$root_survived$daemon_survived" = 111 ] || fail 'duplicate-copy refusal signalled a live process'
+      assert_absent "$case_dir/nm-abort.log" 'duplicate-copy refusal aborted the parked run'
+      assert_absent "$case_dir/state/task-x1.teardown-processes" 'duplicate-copy refusal recorded signal targets'
+      assert_present "$case_dir/launchagents/$label.plist" 'duplicate-copy refusal removed the own launch agent'
+      assert_present "$case_dir/launchagents/$root_label.plist" 'duplicate-copy refusal removed the root launch agent'
+      assert_no_grep 'bootout' "$case_dir/launchctl-calls" 'duplicate-copy refusal unloaded a launch agent'
+      cmp -s "$case_dir/own.before" "$case_dir/state/task-x1.meta" || fail 'duplicate-copy refusal changed its own record'
+      cmp -s "$case_dir/other.before" "$case_dir/state/other-nested.meta" || fail 'duplicate-copy refusal changed the other nested record'
+      cmp -s "$case_dir/parked.before" "$case_dir/state/parked.meta" || fail 'duplicate-copy refusal changed the parked root record'
+      assert_present "$NESTED_COPY" 'duplicate-copy refusal removed the nested copy'
+      assert_absent "$case_dir/treehouse.log" 'duplicate-copy refusal returned the slot'
+      continue
+    fi
+    if [ "$ownership" = late ]; then
+      expect_code 1 "$rc" "late work in the own nested copy must keep its custody: $(cat "$case_dir/stderr")"
+      assert_grep "worktree $NESTED_COPY has uncommitted changes" "$case_dir/stderr" 'the refusal did not name the late work'
+      assert_present "$NESTED_COPY/late.txt" 'the refusal lost the late work'
+      cmp -s "$case_dir/own.before" "$case_dir/state/task-x1.meta" || fail 'late-work refusal retired or changed its own record'
+      assert_grep 'task=task-x1' "$case_dir/pool/1/.fm-slot-owner" 'late-work refusal released the shared-slot claim'
+      cmp -s "$case_dir/parked.before" "$case_dir/state/parked.meta" || fail 'late-work refusal changed the parked root record'
+      [ "$root_survived" = 1 ] || fail "late-work refusal killed the parked root's daemon"
+      assert_absent "$case_dir/treehouse.log" 'late-work refusal returned the slot'
+      continue
+    fi
+    expect_code 0 "$rc" "$ownership: shared nested cleanup must succeed: $(cat "$case_dir/stderr")"
+    [ "$own_survived" = 0 ] || fail "$ownership: the retiring task's own process survived"
+    [ "$root_survived" = 1 ] || fail "$ownership: the parked root's daemon was killed"
+    if [ "$ownership" = own ]; then
+      assert_grep 'abort --run 01RUN' "$case_dir/nm-abort.log" 'the task-owned parked run was not concluded'
+    else
+      assert_absent "$case_dir/nm-abort.log" 'a foreign parked run was aborted'
+    fi
+    assert_grep "bootout gui/$(id -u)/$label" "$case_dir/launchctl-calls" 'the own nested launch agent was not retired'
+    assert_present "$case_dir/data/task-x1/launchagent-backup/$label.plist" 'the own launch agent was not archived'
+    assert_present "$case_dir/launchagents/$root_label.plist" 'the parked root launch agent was removed'
+    assert_no_grep "bootout gui/$(id -u)/$root_label" "$case_dir/launchctl-calls" 'the parked root launch agent was unloaded'
+    assert_present "$NESTED_COPY" 'shared cleanup removed the own nested copy'
+    assert_absent "$case_dir/treehouse.log" 'shared cleanup returned the slot'
+    assert_absent "$case_dir/state/task-x1.meta" 'the finished task record survived'
+    cmp -s "$case_dir/parked.before" "$case_dir/state/parked.meta" || fail 'shared cleanup changed the parked record'
+  done
+  pass 'shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work'
+}
+
 test_other_record_copy_overlap_is_component_aware() {
   local case_dir field direction rc recorded proceeds
   for field in worktree home prior_worktree; do
@@ -9860,7 +10174,128 @@ SH
   pass "ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage"
 }
 
+# A provider return still sweeps nested copies when its pool inventory is absent.
+# Introduce a copy at each return boundary, not during earlier custody scans.
+test_non_pool_returns_recheck_registered_copies() {
+  local phase case_dir nested lock rc
+  for phase in initial retry stale; do
+    case_dir=$(make_case "non-pool-registered-$phase")
+    write_meta "$case_dir" no-mistakes ship
+    nested="$case_dir/wt/.claude/worktrees/parked"
+    lock=$(git_index_lock_path "$case_dir/wt")
+    if [ "$phase" = initial ]; then
+      git -C "$case_dir/project" worktree add -q --detach "$nested" main
+    fi
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+if [ ! -e "$case_dir/attempted" ]; then
+  touch "$case_dir/attempted"
+  if [ "$phase" = retry ]; then
+    git -C "$case_dir/project" worktree add -q --detach "$nested" main || exit 2
+  elif [ "$phase" = stale ]; then
+    touch "$lock"
+    touch -t 200001010000 "$lock"
+  fi
+  echo "fatal: Unable to create '$lock': File exists." >&2
+  exit 128
+fi
+exit 0
+SH
+    if [ "$phase" = stale ]; then
+      cat > "$case_dir/fakebin/rm" <<SH
+#!/usr/bin/env bash
+/bin/rm "\$@" || exit
+for arg in "\$@"; do
+  if [ "\$arg" = "$lock" ]; then
+    git -C "$case_dir/project" worktree add -q --detach "$nested" main || exit 2
+  fi
+done
+SH
+      chmod +x "$case_dir/fakebin/rm"
+      add_lsof_no_holder "$case_dir"
+    fi
+    rc=0
+    FM_TREEHOUSE_RETURN_LOCK_RETRIES=$([ "$phase" = stale ] && printf 0 || printf 1) \
+    FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+      run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "$phase: an unproven registered copy must stop the return: $(cat "$case_dir/stderr")"
+    assert_grep "contains registered copy $nested" "$case_dir/stderr" "$phase: missing custody refusal"
+    assert_present "$nested/.git" "$phase: parked copy was lost"
+    assert_present "$case_dir/state/task-x1.meta" "$phase: task record was retired"
+    if [ "$phase" = initial ]; then
+      assert_absent "$case_dir/treehouse.log" 'initial: provider was called despite the parked copy'
+      assert_grep 'FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate' \
+        "$case_dir/stderr" 'recovery command omitted the owning home'
+    else
+      assert_equals 1 "$(wc -l < "$case_dir/treehouse.log" | tr -d ' ')" "$phase: provider retried despite the parked copy"
+    fi
+    if [ "$phase" = stale ]; then
+      assert_grep 'removed provably-stale git lock' "$case_dir/stderr" 'stale cleanup boundary was not reached'
+    fi
+  done
+  pass 'every forced return checks registered copies without pool inventory, and recovery names the owning home'
+}
+
+# A provider may lose its target between attempts; refusal must explain why.
+test_return_missing_slot_reports_canonicalization_refusal() {
+  local case_dir rc=0
+  case_dir=$(make_case return-missing-slot)
+  write_meta "$case_dir" no-mistakes ship
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+mv "$case_dir/wt" "$case_dir/retained-copy" || exit 2
+echo "fatal: Unable to create 'index.lock': File exists." >&2
+exit 128
+SH
+  FM_TREEHOUSE_RETURN_LOCK_RETRIES=1 FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
+    run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "missing slot must stop the retry: $(cat "$case_dir/stderr")"
+  assert_grep "REFUSED: cannot canonicalize pool slot $case_dir/wt" "$case_dir/stderr" 'missing slot refusal did not identify the path'
+  assert_equals 1 "$(wc -l < "$case_dir/treehouse.log" | tr -d ' ')" 'provider retried an unresolvable slot'
+  assert_present "$case_dir/state/task-x1.meta" 'missing-slot refusal retired the task record'
+  assert_present "$case_dir/retained-copy/.git" 'missing-slot refusal lost the retained copy'
+  pass 'an uncanonicalizable return target reports an explicit refusal and preserves its record'
+}
+
+# A custody refusal at a child's return is final; no fallback may delete the copy.
+test_child_return_custody_refusal_keeps_non_pool_worktree() {
+  local case_dir home nested rc=0
+  case_dir=$(make_case child-return-custody)
+  write_meta "$case_dir" local-only secondmate
+  configure_secondmate_with_tmux_children "$case_dir"
+  home="$case_dir/secondmate-home"
+  nested="$case_dir/child-a-wt/.claude/worktrees/parked"
+  git -C "$case_dir/project" worktree add -q --detach "$nested" main
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+exit 0
+SH
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
+  run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 5 "$rc" "child custody refusal must stop teardown: $(cat "$case_dir/stderr")"
+  assert_grep "contains registered copy $nested" "$case_dir/stderr" 'child custody refusal was not reported'
+  assert_present "$nested/.git" 'child custody refusal lost the parked copy'
+  assert_present "$case_dir/child-a-wt/.git" 'child custody refusal removed the child worktree'
+  assert_present "$home/state/child-a.meta" 'child custody refusal retired the child record'
+  assert_present "$case_dir/state/task-x1.meta" 'child custody refusal retired the parent record'
+  assert_absent "$case_dir/treehouse.log" 'provider was called despite the parked copy'
+  pass 'a custody refusal at a non-pool child return keeps the child worktree and its parked copy'
+}
+
 teardown_test_cases=(
+test_non_pool_returns_recheck_registered_copies
+test_return_missing_slot_reports_canonicalization_refusal
+test_child_return_custody_refusal_keeps_non_pool_worktree
 test_teardown_never_holds_up_a_steer_to_another_task
 test_lane_registry_scan_reads_each_distinct_registry_once
 test_task_teardown_preserves_another_homes_abandoned_worker
@@ -9906,6 +10341,13 @@ test_teardown_retires_v1_journal_when_projected_workspace_gone
 test_teardown_retains_v1_journal_when_projected_workspace_present
 test_teardown_retains_v1_journal_when_workspace_query_ambiguous
 test_squash_merged_branch_deleted_allows
+test_task_archives_reap_only_carried_refs
+test_task_archives_ignore_other_tasks_and_non_custody_names
+test_task_archives_keep_unproven_and_checked_out_refs
+test_task_archives_require_matching_squash_content
+test_task_archives_include_deleted_and_literal_paths_in_merge_proof
+test_task_archives_survive_refusal_and_forced_discard
+test_task_archives_keep_refs_when_forge_is_unreachable
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head
 test_no_pr_recorded_discovers_merged_pr_by_branch_allows
 test_squash_merged_pr_allows_replayed_unpushed_patch
@@ -10031,6 +10473,7 @@ test_slot_named_as_another_prior_copy_refuses
 test_own_prior_copies_block_only_an_unproven_pool_return
 test_reverse_nested_prior_outside_claude_tears_down
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot
+test_shared_nested_copy_concludes_only_its_own_runtime
 test_nested_slot_stale_lock_cleanup_reproves_the_slot
 test_nested_slot_reproof_refusal_is_rerunnable
 test_nested_rerun_local_only_ship_is_recorded_landed

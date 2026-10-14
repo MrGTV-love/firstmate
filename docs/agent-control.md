@@ -208,14 +208,15 @@ It refuses without changing the record, instructions, or copies when:
 When finished and parked ordinary tasks both record the same pool slot root, reassociation cannot go first: the other root record overlaps the replacement copy and may still claim the slot.
 Before retiring a record that still holds the slot's Firstmate claim, or any record when the slot carries no claim, Treehouse's state must durably lease the slot under the existing [`fm_task_copy_pool_slot_held`](../bin/fm-task-copy-lib.sh) proof.
 An absent claim counts as ownership for this protection, as it does for teardown's slot-owner check.
-Otherwise cleanup refuses with the command to lease that exact slot in place without changing its contents.
+An unleased slot refuses with the command to lease that exact slot in place without changing its contents.
+A recovered-state lease has no supported non-forcing replacement on Treehouse 2.3.1-fm; retain the records and copies and report the slot, state file, lease holder, and installed version for operator recovery rather than returning the slot to change its lease.
 When exactly one other root record names the slot, the command names it as the lease holder; when several do, it names none, lists every candidate with its last recorded status line, and the operator selects the live one.
 This prevents another allocation from resetting the parked copies between cleanup and reassociation, while the remaining record still names only the root.
 A finished root record whose slot claim already names another task, such as a slot an ordinary spawn handed on under a process-only lease, no longer owns the slot: it keeps teardown's existing reassigned-slot cleanup, retiring records-only with no lease proof, and leaves the claimant's record, claim, branches, and copy untouched.
 Like a shared root record, a ship on that route must have its own recorded PR confirmed merged or its recorded branch proved landed; the claimant's copy, HEAD, and dirt are never judged, and an unproved ship refuses with its records in place.
 Then run ordinary `bin/fm-teardown.sh <finished-task>` in that record's owning `FM_HOME` first.
 The shared-root route reuses record-only retirement: it closes the finished task's endpoint and records, releases only that task's Firstmate claim beside the slot, and never returns the slot or touches its contents, nested copies, or branches.
-Slot-wide run/process cleanup is skipped; task-owned temporary resources retain the existing record-only cleanup behavior.
+Slot-wide run/process cleanup is skipped; when the retiring record names its own nested copy, only that copy's identity-proven parked pipeline run, private launch agents, and leftover processes are concluded after the ordinary per-copy record clearance proves no other record names it, and that copy's ordinary non-forced safety check runs again before the claim or record is released; task-owned temporary resources retain their existing cleanup behavior.
 It leaves Treehouse's durable lease intact and skips post-cleanup branch pruning.
 A ship whose record names the shared root must have its own recorded PR confirmed merged or its recorded branch proved landed independently of that root's HEAD and dirt.
 A scout still needs its regular nonempty report and the ordinary completed decision inventory; it needs no branch.
@@ -224,9 +225,17 @@ A finished record whose copy is nested in the slot also uses record-only retirem
 Then reassociate the remaining task to its real nested or external copy with `bin/fm-control.sh <remaining-task> reassociate --worktree <copy> --note <why>`.
 The existing component-aware exclusivity proof still requires finished nested scout records to retire first when they overlap the old root, even if their copy is disjoint from the replacement.
 Do not retire an unfinished task to clear custody: it keeps its record and claim until its own delivery proof passes.
+Before any forced Treehouse return of a Git directory, whether or not it is a pool slot, teardown also checks that directory's Git worktree registrations and refuses a nested copy that is not one of the retiring task's proven copies, naming each such copy; `--force` does not waive that custody proof.
+A child-worktree removal that hits this refusal stops there, with no `rm -rf` fallback, and a path that cannot be canonicalized is refused the same way.
+The refusal prints the reassociate command with `FM_HOME=/path/to/owning-home`, because the owning task's record may live in a different home than the one running teardown.
+A secondmate home that is a pool slot, and each descendant secondmate home, gets the same check before any endpoint, child, or record is touched.
+When an active task record owns that copy's work, including the retiring task itself while its record still names the slot root, reassociate that task to the copy first.
+When no active record owns it, such as a finished record's nested copy left after records-only retirement or a worker's own `.claude/worktrees/` copy, inspect it by hand with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it by hand with a plain `git -C <slot> worktree remove <copy>` and rerun teardown.
+Teardown never disposes of such a copy itself.
 A surviving recorded PR follows only under the head-containment proof above.
 A durable lease added for this recovery stays on the slot after the remaining task moves to a copy outside it, so no record names the slot and teardown never returns it.
-Release it by hand only after inspecting every copy left in the slot with `git -C <slot> status --untracked-files=all` and `git -C <project> worktree list --porcelain`, and only when no record names the slot or a copy inside it and nothing there is unlanded: `(cd <project> && treehouse return <slot-path> --if-lease-holder <remaining-task>)`, where the holder is the one passed to `treehouse lease`.
+Release it by hand only after inspecting every copy left in the slot with `git -C <slot> status --untracked-files=all` and `git -C <project> worktree list --porcelain`, and only when no record names the slot or a copy inside it and nothing there is unlanded: `(cd <project> && treehouse return <slot-path> --if-lease-holder <remaining-task> </dev/null)`, where the holder is the one passed to `treehouse lease`.
+The input redirection prevents the TTY prompt's default-yes answer from cleaning dirt; the noninteractive command refuses instead.
 That return is not state-only: it terminates lingering processes in the slot and may clean and reset it, so carry over or land any remaining work first.
 `--force` retains its existing collision refusals and is neither needed nor used for this route.
 The script headers own the command syntax, and `tests/fm-control-reassociate.test.sh` exercises the complete sequence with unpushed commits, untracked files, and an external locked copy.

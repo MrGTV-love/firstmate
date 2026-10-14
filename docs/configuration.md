@@ -94,6 +94,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
+- The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
@@ -641,7 +642,7 @@ An existing ledger is left untouched while recording is disabled.
 
 `bin/fm-open-loops.sh` reconciles this home's recorded obligations against live worker and delivery evidence.
 `bin/fm-open-loops.sh --json` normally collects current evidence for this home; [quota refusal](#github-rest-reads-and-the-quota-floor) can instead retain the last published ledger.
-It never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
+Ordinary reconciliation never changes a worker, a PR, or the backlog, suppresses optional Git locks, and isolates temporary merge-tree objects from the inspected repository; forge reads update only local cache and quota records.
 Home selection and the state, data, config, and projects overrides follow shell defaults: unset or empty values use `FM_HOME`, then `FM_ROOT_OVERRIDE`, then the code root for the home, and the selected home's corresponding directory for each source.
 Every JSON row carries its category, subject, owner, next action, age in seconds, age limit, and overdue verdict.
 For a non-informational row, an unknown age stays `null` and counts as overdue, and an age equal to its limit is overdue.
@@ -651,14 +652,32 @@ For a non-informational row, an unknown age stays `null` and counts as overdue, 
 | `missing_worker` | an In flight item requiring child metadata lacks a task record, or its worker or an ordinary task's worker has a confirmed missing endpoint or dead agent without a recorded stop | 600 s |
 | `ready_not_started` | a Queued item has no hold kind or unresolved blocker, and its optional hold date is absent or due; unselected items are informational | 1800 s |
 | `unanswered_question` | a `needs-decision` or `blocked` status key is still open, or a current captain-held backlog row is in the `live` or `aged` hold bucket | 1800 s |
+| `unhandled_board_answer` | this home's `state/procevent-inbox/*.result` has a `lavish` `.adapter` sibling and no `.handled` sibling; captures from other adapters never appear; firstmate owns routing, the next action names the captured board-answer file and its `.owner-task` value (or an unknown owner), and age comes from the result's mtime regardless of a parked, dead, or missing owner task; a result whose owner task is a current, live `working` task is an informational row owned by `worker:<id>` whose action says that worker holds the round | 300 s |
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
 | `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
+| `silent_report` | a live direct ship, scout, or secondmate has not reported to this home; excluded reports remain informational with their reason in evidence, and declared waits use the existing long cadence | 900 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
 | `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing | 3600 s |
 | `red_check` | the latest run of a check on an open PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
 Each home reports only what it owns.
+The `silent_report` clock is the newest nonfuture time among the last logical status event's canonical `[at=...]` stamp (or status-file mtime when unstamped), the latest acknowledgement move into the report's steering inbox `handled/`, and a pending-reply record's `resolved_epoch` for that report.
+The handled-directory mtime records the latest move when it contains handled messages, because a rename preserves the message's send mtime.
+Pane activity, commits, pipeline progress, request creation, and transport delivery do not reset this clock.
+Each row's evidence names all three sources and any exclusion or pending request.
+An ordinary task whose latest status event or current state is `done` is informational here because its PR or landing evidence owns the next action.
+A report with no status line, acknowledgement, or resolved reply yet starts its clock at its task record's mtime (dispatch), so a new worker is not overdue before its first line.
+A report whose status log holds an open `needs-decision` or `blocked` key it raised about its own work, or whose parked no-mistakes gate carries the `ask-user: authority decision` verdict component, is informational here because firstmate owes the next move and `unanswered_question` or the gate owns it.
+Reserved `pending-reply-`, `remote-reply-continuity-` and `captain-hold-` keys are not the report's own decisions, and a parked gate with only auto-fix findings (`fix_review` or `awaiting_agent`) is owed by the worker, so a silent report in either case stays eligible for a check-in.
+A declared `paused` or verified `captain-held` wait uses `FM_PAUSE_RESURFACE_SECS` and its existing default instead of 900 seconds; an elapsed declared clearing time restores the short cadence.
+An idle secondmate with no routed work in its own backlog's In flight section and no outstanding reply request remains informational and healthy regardless of a standing pause declaration.
+The secondmate backlog is read through the canonical lightweight fleet snapshot in that home, across its registered transport when remote; unreadable evidence degrades coverage rather than inventing idleness.
+Each secondmate home runs exactly the same tracker for its own direct workers, without surveying another home's children.
+A pending secondmate reply or unacknowledged check-in makes the row informational until the existing reply or inbox recovery path settles it, preventing repeated requests.
+The check-in action is opt-in, separate from read-only reconciliation: `bin/fm-open-loops.sh`'s header and help own its exact command, standard request, explicit-home requirement, and serialized repeat suppression.
+Secondmate check-ins retain the existing pending-reply correlation so acknowledgement or delivery alone cannot resolve the requested answer; ordinary workers are instructed to report before acknowledging their check-in inbox record.
+The existing pending-reply and steering-inbox escalation paths own unanswered requests; no new scheduler, interrupt, or persistence store is added.
 A PR is owned when one of this home's task records or backlog items names its exact URL, or when its head repository (`head.repo.full_name`) and head branch match the origin repository and branch of one of this home's tasks.
 Repository identities are matched case-insensitively; branch names remain case-sensitive, and recorded URLs must match exactly.
 Matching only the base repository does not establish ownership of a fork's branch.
@@ -687,7 +706,7 @@ Unknown current task state adds degraded coverage independently of liveness, exc
 Only nonfuture progress timestamps count as work evidence.
 Pipeline progress uses each task's worktree to resolve a relative `NM_HOME`; unset or empty values select `$HOME/.no-mistakes`.
 Progress remains scoped to that resolved store and the task's project and branch.
-The ledger covers this home's current backlog, ordinary task records, status questions, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
+The ledger covers this home's current backlog, direct-report task records, status questions, unhandled captured board answers, and discovered GitHub PRs; each secondmate home runs its own watcher and reports through its own parent channel.
 A recorded PR head that is not a local object in the task's copy cannot be compared, so PR coverage is skipped for that task alone: its unlanded-commit row names the absent head and counts every commit not on the default branch, and the ledger stays complete.
 Commit inspection is limited to recorded ship copies; archive bundles, stashes, recovery refs, canonical-PR landing in another repository, captured-answer routing proofs, and cross-home aggregation are not covered.
 The collector does not establish slot ownership or merge-commit delivery; its nonmerge patch comparison cannot prove merge-only content.
@@ -731,7 +750,7 @@ Create the optional local `config/open-loops.json` to override the limits:
 
 ```json
 {
-  "age_limits_seconds": { "stalled_worker": 3600, "unlanded_commit": 86400 },
+  "age_limits_seconds": { "silent_report": 900, "stalled_worker": 3600, "unlanded_commit": 86400 },
   "command_timeout_seconds": 60
 }
 ```
@@ -1578,7 +1597,7 @@ This section is the single owner of the canonical schema and its per-field seman
 OMP's own `usage --provider openai-codex --json` is authoritative for that surface, not quota-axi's single-account Codex row.
 A fresh usable sibling keeps the model available; an unmeasured sibling prevents a whole-pool exhaustion verdict.
 Native serving verdicts and successful-response rate-limit warnings remain usable even at 0%; saved resets are disclosed but never redeemed or counted as present capacity.
-The pool has no synthesized `spendPriority` or completion runway: typed resolution can select its sole eligible usable route, but cannot economically rank it against another unranked route by summing percentages.
+The pool has no synthesized `spendPriority` or completion runway: typed resolution ranks it only on its best usable account's measured headroom, as "Typed dispatch resolution" defines, never by summing percentages.
 Quota-axi profile or rule floors on an OMP Codex pool are unverifiable rather than silently applied to the unrelated single account.
 Native Claude's default-account quota is not a TeamClaude proxy ledger, so a TeamClaude fallback candidate's capacity is unknown and native Claude exhaustion cannot veto that stand-in, including on recovery of a task already running on it while `config/claude-launcher` selects `teamclaude`.
 Claude-primary routes keep their existing quota-axi ranking, floors, and `fm-quota-choose.sh` treatment.
@@ -1593,9 +1612,13 @@ Natural-language `why` text does not authorize an executable fallback.
 
 `fm-dispatch-resolve.sh`, `fm-spawn.sh`, and `fm-control.sh relaunch` share the same fallback list.
 Only proven primary exhaustion activates it; approval, confidence, unknown capacity, and floor decisions are not bypassed.
+Typed resolution also passes `--dispatch-route <fast|powerful>:<low|high>`, its Level 5 class and effort verdict, which `fm-spawn.sh` records as `dispatch_route` and `fm-control.sh relaunch` reloads, so the shared stand-in selection applies it at launch and recovery alike.
+A `powerful` route never selects a Haiku/Luna stand-in from `fallback` or `default_fallback`, and every selected stand-in's effort is raised to the route level, Haiku to `max`; if none remains, launch or recovery refuses instead of launching.
+A launch without `--dispatch-route`, such as a manual route, keeps each stand-in exactly as declared.
 Spawn and recovery resolve each rule against their frozen model-index and dispatch pair, even when typed resolution is off.
 Only rules that contain the launched profile must resolve, so a retired model or unconfigured role in an unrelated rule does not block a launch or recovery.
 When the matched rule has a fallback policy, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
+A recorded rule still contains the task's profile when typed resolution raised its effort above the configured one for the same harness and model.
 A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
 A task that switched to a stand-in stays on it until it is launched again from the matrix.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
@@ -1696,7 +1719,12 @@ Firstmate invokes the resolve path directly after writing the brief, without a p
 
 **What the model receives**
 
-When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state and asks one Choice question whose options are every rule's `when` plus the fixed neutral option for no matching rule; the model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
+When on and at least one rule exists, the tool sends the project name and the brief's task-specific text as state in one `JevClient.systemOne` call.
+That call combines the vendored Level 5 agent-router questions (workflow, ambiguity, desktop access), model-router questions (least costly capable tier and reasoning effort), and one rule Choice whose options are every rule's `when` plus the fixed neutral option for no matching rule.
+The rule Choice alone decides which rule applies, including project-scoped and Claude-only rules; no local text pre-check selects or removes a rule.
+The upstream question wording, rubrics, thresholds, and pure decisions are retained; [the vendor provenance](../bin/ten-levels/SOURCE.md) records the minimal question-object exports needed to batch them.
+The model never sees quota, catalogs, `why`, `use`, approvals, or confidence floors.
+The Level 5 intent router is vendored unchanged but unused, because dispatch has no script, browser, or human handler, so those agent-router routes escalate to firstmate instead.
 The task-specific text is the brief's `## Captain's intent` and `## Firstmate spec` sections under `# Task` that `bin/fm-brief.sh` scaffolds, read by the same parser that feeds `fm-spawn.sh` validation and the no-mistakes `--intent` contract; a brief with neither section is sent whole.
 Section extraction and the whole-brief fallback both read the brief after any enabled never-send marked regions are removed (see the never-send list below).
 Extraction rewrites the caller's task-text file in place without relaxing its existing permissions.
@@ -1763,24 +1791,51 @@ An absent rules file, a default-only file, or `rules: []` returns the non-clear 
 
 **Checks performed after the answer**
 
-After the answer, code applies all remaining checks and ranking:
+The upstream agent decision escalates human, script, browser, desktop-dependent, and ambiguity scores above 1 to firstmate, because a worker profile cannot provision an unapproved handler or capability.
+The upstream model decision `fast` prefers the matched rule's configured Haiku/Luna candidates that pass the quota gates: eligible, with known positive headroom or a usable pool whose measurement is a disclosed unknown, and without established runway shorter than the task horizon.
+Among them, a sole usable pool clears and otherwise the composite ranks them.
+When no cheap candidate passes, the whole rule ranks as usual: an exhausted or floor-vetoed cheap set leaves the rule's remaining approved candidates to be ranked before any stand-in is considered, and an established-short cheap candidate only leaves the preferred set, so an overall short winner still escalates under its own identity.
+This is not a guarantee of `clear`: a genuine tie, no comparable quota evidence, or an overall short winner still escalates.
+`powerful` excludes Haiku/Luna candidates and declared stand-ins, from `fallback` and `default_fallback` alike, and a selected stand-in takes the same route effort clamp as `use` candidates, Haiku at `max`.
+When only such stand-ins remain, the result is `escalate`.
+The resolver's profile line carries `--dispatch-route` beside `--dispatch-rule`, so launch and recovery apply the same class and effort.
+The adapter never imports a cheaper candidate from another rule.
+The upstream effort threshold maps scores above 1 to high, otherwise low, then code clamps each profile to its configured effort floor; Haiku uses max.
+These rules can lower proposed cost only within the captain's approved matrix; quota never lowers the reasoning class or minimum effort.
+The session launch policy removes prohibited candidates from the selected rule after the answer, so a prohibited rule is still recognized rather than replaced by another rule.
+When the session policy or the model-router class filter removes every candidate of the selected rule or default array, the result is `escalate`, naming the filter and listing each removed candidate.
 
-- The confidence floor and the matched rule's `approval` and `floor`.
-- Each candidate's `provider` and `floor`.
-- Every applicable account-wide and model/product row from one `quota-axi --json` snapshot.
-- The numeric `spendPriority` argmax over the matched rule's candidates, using each candidate's limiting row, then the task-horizon runway check on that winner.
+Before weighting, code applies the confidence floor, rule approval and floor, each candidate's provider and floor, and all applicable quota scopes.
+A known rule-floor shortfall falls through to the default array, as "Rule quota floors" above defines.
+It captures one compatible `quota-axi --json` snapshot and one native OMP usage report.
+A highest-ranked candidate with established runway shorter than the task horizon escalates rather than receiving a small penalty that other components could mask.
+Because a short cheap candidate leaves the `fast` preferred set, this check names the true highest-ranked candidate of the set actually ranked.
+
+The deterministic quota composite follows Level 3's normalize-and-weight pattern; quota is not a Jev question.
+Its base weights are headroom 0.6 and spendPriority 0.3: current usable allowance dominates and reset-clock economics remain material; runway is only the independent winner check above.
+Headroom is normalized to `[0,1]` from the minimum applicable bound for a measured account.
+For OMP, it is the maximum of the per-account minimum applicable percentages among fresh usable accounts: the best currently usable account's fractional headroom, never a sum of percentages or a purported total pool capacity.
+Accounts with stale or unknown serviceability and saved reset credits contribute nothing to that measurement.
+This fraction compares relative remaining allowance, not equivalent token budgets across subscription tiers or a completion guarantee.
+`spendPriority` is normalized by `0.5 + p / (2 * (1 + abs(p)))`, preserving its order without clipping extreme values.
+Only components known for every viable candidate are compared, and their weights are renormalized to sum to 1 for that comparison.
+A usable OMP pool is viable only when its best usable account has measured headroom.
+Thus a usable OMP pool and Claude can compete on shared headroom even when only Claude publishes spendPriority; the missing pool economics and completion runway remain visible uncertainties.
+A usable pool without measured headroom stays eligible but unranked, and it clears only when it is the sole eligible candidate.
+No common measurable component escalates, and equal composite scores use spendPriority as the final ranker only when every tied candidate has a comparable numeric scalar; a remaining tie escalates.
+The output exposes the unrounded quota score, normalized parts, base weights, comparison components, and every assessed candidate.
+These weights are inspectable routing policy, not calibrated forecasts of task success; live task replay belongs in private evaluation evidence.
 
 The [shared quota library](../bin/fm-quota-axi-lib.sh) owns the minimum compatible quota-axi version in `FM_QUOTA_AXI_MIN`, accepts schema 5 and schema 6, and implements the [account-matching contract](../.agents/skills/quota-array-dispatch/SKILL.md#1-eligibility).
 The resolver checks `quota-axi --version` before taking its one JSON snapshot; an older, unreadable, or unparseable version produces a named `error` requiring that minimum, never a ranking based on incompatible output.
 
 - An expanded provider with no matching account row leaves the candidate eligible but unranked.
 - Known applicable rows from a provider with partial quota semantics remain rankable; rows whose own status is not known remain unrankable.
-- omp's Codex provider pools accounts, while quota-axi reports individual accounts rather than that runtime's combined availability.
-  The account an `omp` profile declaring `provider: "codex"` binds to is therefore only a lower bound on the pool.
-  The pool is ranked on that account through the task-horizon runway classification in "Candidate eligibility and evidence" below.
-  An `exhausted_now` row or a known zero bound on that account leaves the pool eligible but unranked, never vetoed, because another pooled account may still have headroom; any non-passing runway bound is disclosed as a warning.
-  A declared profile `floor` is a captain limit rather than runway evidence, so a known shortfall makes the pool not eligible like any other candidate.
-  The resolver never sums account rows, discovers credentials, or reads another runtime's credential store to fill that gap.
+- omp's Codex provider pools accounts, so its native usage report, not quota-axi's individual Codex row, owns current serviceability and the headroom component described above.
+  An exhausted sibling cannot veto a usable pool; unknown siblings prevent concluding that the whole pool is exhausted.
+  The pool has no economic spendPriority or modeled completion runway, and those unknowns are disclosed rather than synthesized.
+  A declared OMP profile or rule floor is unverifiable on this pooled surface and cannot authorize dispatch.
+  The resolver never sums account percentages, redeems saved resets, discovers credentials, or reads another runtime's credential store.
 - quota-axi supports OpenRouter, but reports its credit balance rather than an effective usage-window percentage or completion runway.
   An absent OpenRouter row or credit-only unknown semantics remains eligible but unranked, not an authentication failure or a zero balance.
 
@@ -1796,10 +1851,12 @@ When the picked rule declares its own floor but its probability falls below it, 
 
 No qualifying option, or two equally probable qualifying options, produces `ambiguous`.
 
+When every candidate of the resolved rule is proven exhausted, the rule's declared model-matrix stand-in is selected through the shared fallback list above, with a `fallback:` line naming it.
+
 **Candidate eligibility and evidence**
 
 - A known profile-floor shortfall makes a candidate ineligible, and outside the omp Codex pool any applicable `exhausted_now` row or known zero bound does the same, before unrelated quota uncertainty is considered.
-- Missing or nonnumeric `spendPriority` evidence is never ranked, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
+- Missing or nonnumeric `spendPriority` evidence is never synthesized into a score component, and every candidate is printed beside its evidence or the reason it was not rankable, including on ambiguous and approval-gated outcomes that emit no profile.
 - Runway is judged against the task horizon, not the quota reset clock: the question is whether the candidate runs out before this task finishes.
   The horizon is the top-level `task_horizon_minutes` field defined under [Crew dispatch profiles](#crew-dispatch-profiles-configcrew-dispatchjson).
   `through_reset` passes, and so does a `projected_exhaustion` bound whose `projectionConfidence` is `established` and whose `usableRunwaySeconds` covers the horizon.
@@ -1809,8 +1866,8 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
   Each non-passing bound on a rankable candidate is named in a `[warning: ...]` suffix on its candidate line.
   Projected-exhaustion warnings include `usableRunwaySeconds` and `projectionConfidence`; other runway warnings name the status and scope.
   A low positive percentage alone is not a veto unless it falls below a declared floor; the resolver invents no generic percentage floor.
-- Ranking stays inside the matched rule's own `use` array (or `default` when that was selected) and keeps its highest `spendPriority` choice: a short winner escalates rather than being replaced by a lower-ranked candidate in that array, another rule, or the default array, so the rule's reasoning class is never silently downgraded to conserve quota.
-- Unranked alternatives do not prevent a measured winner from clearing; the clear result's unranked note names their providers.
+- Ranking stays inside the matched rule's class-filtered `use` array (or `default` when selected): a short winner escalates rather than being replaced by a lower-ranked candidate in that array, another rule, or the default array, so the rule's reasoning class is never silently downgraded to conserve quota.
+- Unmeasured alternatives remain disclosed uncertainties, while candidates with native measurable pooled headroom compete on the common components described above rather than losing by default to candidates with a spendPriority scalar.
 - On the opted-in path, duplicate concrete profiles with the same harness, model, and effort inside one rule or the default array are configuration errors rather than ties.
 
 **Outcomes and exit status**
@@ -1819,14 +1876,14 @@ No qualifying option, or two equally probable qualifying options, produces `ambi
 | --- | --- |
 | `clear` | A `profile:` line ready for `fm-spawn.sh`. |
 | `ambiguous` | Confidence below the floor with no runner-up taken. |
-| `escalate` | An approval-gated rule, unverifiable rule floor, nothing rankable, a genuine tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
+| `escalate` | An approval-gated rule, unverifiable rule floor, high ambiguity, unsupported handler/capability request, every selected candidate removed by the session policy or class filter, nothing rankable, a genuine evidence tie, or a highest-ranked candidate whose established runway is shorter than the task horizon. |
 | `error` | API, network, malformed response metadata, rendering, quota-axi failure, or failed chosen-profile [model-index preflight](#fleet-model-index-configmodel-indexjson). |
 
 Every result above exits 0.
 
-- Response probabilities must contain exactly every offered choice, use numeric values from 0 through 1, and sum to approximately 1 within 0.01.
+- The unchanged vendored client validates choice distributions, score ranges and legends, Noul bounds, and nonnegative integer token usage before policy mapping.
 - Only a usage or configuration error exits 2: an unreadable brief, an existing but unreadable or malformed canonical rules file, a [model-index resolution failure](#fleet-model-index-configmodel-indexjson), or missing `jq`, each reported and never selected around.
-- Missing `curl` is a normal structured `error` outcome with exit 0 so firstmate uses today's routing.
+- The resolver runs its TypeScript adapter with `bun` when installed, otherwise `node` with type stripping; missing both is a normal structured `error` outcome with exit 0 so firstmate uses its existing routing.
 - Resolver diagnostics report stage timing and usage/cost evidence; the [script header](../bin/fm-dispatch-resolve.sh) owns their fields, measurement boundaries, cost estimate, and response-metadata privacy safeguards.
 
 **Firstmate retains the dispatch decision**
@@ -1835,17 +1892,72 @@ The tool never replaces firstmate's judgment, `quota-array-dispatch`, the captai
 A `clear` result still leaves authentication and reasoning-class checks to firstmate; its conservative quota-runway guarantee is limited to "Candidate eligibility and evidence" above.
 The [fleet model-index contract](#fleet-model-index-configmodel-indexjson) owns the checks required before a chosen profile is published.
 
-Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked-candidate note; every non-clear result returns to the full existing intake.
+Firstmate passes its profile line unless it states a reason to override, such as the brief's reasoning class or an eligible-unranked candidate line; every non-clear result returns to the full existing intake.
 
 **Key handling and fixed settings**
 
 - The resolver, skill picker, and bootstrap copy an environment-provided key into a non-exported private variable and unset `TYPESAFE_API_KEY` before launching child processes, so the secret is absent from child environments.
-- The resolver sends its key to `curl` only as a header read from a file descriptor, never on argv.
+- The resolver sends its key to its Bun or Node helper through file descriptor 3; the vendored JevClient supplies the fetch Authorization header, never an argv argument or exported key.
   The skill picker pipes its resolved keys on stdin to Node, which supplies them to the vendored JevClient's fetch transport; the picker does not export the resolved key variables or put their values on argv.
   Neither tool prints, logs, or writes keys to files.
 - The resolver fixes the endpoint at `https://api.typesafe.ai`, model at `jev-latest`, default confidence floor at 0.6, and request timeout at 5 seconds; `TYPESAFE_API_KEY` is its only resolver-specific environment setting.
 
 The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`](verification/dispatch-resolve.md).
+
+## TypeSafe account health
+
+`bin/fm-typesafe-health.sh` tells the captain once when the TypeSafe (Jev) account stops answering for a reason only the captain can fix, and once when it answers again.
+Without it, a credit or key failure makes every Jev consumer fail silently and carry on without Jev, and nobody is told.
+It is off in any home with no key, because [the typed-dispatch opt-in](#typed-dispatch-resolution-env-typesafe_api_key) is also off there.
+This section is the single owner of the alert contract; the script header owns its subcommands and output lines.
+
+**What is checked and when**
+
+- The watcher starts `fm-typesafe-health.sh probe` as a detached, single-flight helper every `FM_TYPESAFE_HEALTH_INTERVAL` seconds (default 600; 0 turns it off).
+  A fresh watcher waits one full interval for its first probe, and watcher handoffs keep that deadline.
+  There is no daemon.
+- A probe is one POST through `fm_typesafe_post` in [`bin/fm-typesafe-lib.sh`](../bin/fm-typesafe-lib.sh) with a constant two-option Choice question and no brief text, so it is a few hundred bytes of fixed text and the never-send list has nothing to check.
+  The key comes from `fm_typesafe_key` and follows the [key-handling contract](#typed-dispatch-resolution-env-typesafe_api_key): never exported, never on argv, never written to output, state, or a wake.
+- `bin/fm-dispatch-resolve.sh` and `bin/fm-skill-pick.sh` also pass the code they saw to `fm-typesafe-health.sh record` the moment it arrives, so an alert does not wait for the next probe.
+  Only 402, 401, 403, and a 200 act; every other code is left to the probe.
+  The picker reports a TypeSafe failure even when its OpenRouter fallback then answered.
+
+**Classes and alerts**
+
+| Observation | Class | Effect |
+| --- | --- | --- |
+| HTTP 200 | ok | Clears an alert and raises one recovered note |
+| HTTP 402 | credits | One wake at once |
+| HTTP 401 or 403 | auth | One wake at once |
+| Timeout, no connection, or any other HTTP code | unreachable | Internal until the threshold below |
+
+- Each alert is one `check: typesafe-health:` wake.
+  Its payload names what failed, the UTC time it was first seen and by which caller, the last time Jev answered normally, and the affected consumers: worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), the Level 6 jev-guard, and the belay Stop hook.
+  Firstmate sends the captain one plain message from it; no other action follows.
+- `state/.typesafe-health` records the alerted class, so the same failure raises no second wake, whether a probe or a consumer sees it again, until a 200 arrives.
+  A different class the captain has not heard of, such as auth after credits, alerts once more.
+  An unreachable run never replaces a credits or auth alert.
+- Recovery raises one `check: typesafe-health: recovered` wake, and only when an alert had gone out.
+- The wake is appended before the state is written, so an interruption can repeat an alert but never lose one.
+
+**Unreachable threshold**
+
+Unreachable raises its own wake after `FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES` consecutive failed probes (default 3, about 20 minutes between the first and the third at the default cadence).
+The measurement behind it comes from the primary home's `state/jev-guard.jsonl` for 2026-10-09 through 2026-10-14:
+
+- 15,640 answered Jev calls had a median latency of 181 ms, 95th percentile 322 ms, 99th percentile 535 ms, and a maximum of 6,946 ms, so one call in 15,640 outlasted the probe's five-second deadline.
+- No 10-minute window held errors and no success outside the 2026-10-13 credits outage, whose error-only windows ran from 13:40 to 23:10 CDT.
+
+A single missed probe is therefore noise, and three consecutive misses is stricter than anything in the sample.
+The sample holds no non-credit outage, so the default is a conservative floor to recalibrate when one is observed, not a fitted rate.
+
+**Primary home only**
+
+A home with a `.fm-secondmate-parent` record or a `.fm-secondmate-home` marker resolves the primary home's key, so it exits silently, keeps no state, and sends no request.
+The primary home's wake already reaches the captain, so a secondmate never duplicates it.
+
+[`tests/fm-typesafe-health.test.sh`](../tests/fm-typesafe-health.test.sh) covers the classes, deduplication, recovery, the threshold, consumer reports, secondmate silence, and key secrecy with a stubbed endpoint.
+[`tests/fm-watch-typesafe-health.test.sh`](../tests/fm-watch-typesafe-health.test.sh) covers the watcher's cadence.
 
 ## Jev guard
 
@@ -3140,6 +3252,9 @@ FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-se
 # Fixed reap policy and safety gates are owned by bin/fm-idle-session-reap.sh's header, not configurable overrides.
 FM_IDLE_REAP_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-idle-session-reap.sh
 FM_IDLE_REAP_TEARDOWN_BIN=   # test seam: the teardown the sweep runs instead of bin/fm-teardown.sh
+FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeSafe account-health probes (bin/fm-typesafe-health.sh); 0 turns the probe off; a fresh watcher waits one full interval; invalid values use 600
+FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
+FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
 FM_HOME_SUMMARY_TIMEOUT=60     # seconds bounding home-summary state initialization, refresh-lock acquisition, validation, and atomic publication; independent post-attempt deadlines are owned by bin/fm-home-summary-refresh.sh's header; invalid or zero values use 60
 FM_HOME_SUMMARY_ERROR_LOG_MAX_BYTES=65536   # approximate size cap for state/.home-summary-refresh.log before it is trimmed to the newest 200 lines; invalid or zero values use 65536
 FM_HOME_SUMMARY_FAILURE_REPORT=2   # recorded publication failures since the ledger's own last publication before session start reports a HOME_SUMMARY line; invalid or zero values use 2

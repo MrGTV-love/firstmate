@@ -619,6 +619,48 @@ test_spawn_rejects_retired_fallbacks_before_publication() {
   pass "retired fallback refusal covers launch-time selection and runtime chains"
 }
 
+test_spawn_route_class_constrains_stand_ins() {
+  local rec id out status case_name
+  for case_name in powerful fast manual malformed; do
+    id="omp-route-$case_name"
+    rec=$(make_spawn_case "route-$case_name" omp "$id")
+    read_case_record "$rec"
+    mkdir -p "$HOME_DIR/config"
+    printf '%s\n' '{"rules":[{"when":"strong work","use":{"harness":"omp","model":"openai-codex/gpt-6.1-sol","effort":"high","provider":"codex"},"fallback":[{"harness":"omp","model":"openai-codex/gpt-6-luna","effort":"low"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:true,limitReached:false}}},
+      limits:[{scope:{modelId:"gpt-6.1-sol"},status:"exhausted",amount:{remainingFraction:0}}]}]}' > "$CASE_DIR/usage.json"
+    case "$case_name" in
+      powerful) route=powerful:high ;;
+      fast) route=fast:high ;;
+      manual) route= ;;
+      malformed) route=cheap:medium ;;
+    esac
+    out=$(OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" \
+      --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1 ${route:+--dispatch-route "$route"})
+    status=$?
+    case "$case_name" in
+      powerful|malformed)
+        expect_code 1 "$status" "a $case_name route must not launch the cheap stand-in: $out"
+        assert_absent "$HOME_DIR/state/$id.meta" "a refused $case_name stand-in must precede task publication"
+        ;;
+      fast)
+        expect_code 0 "$status" "a fast route may take the declared cheap stand-in: $out"
+        assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "the fast route serves the stand-in"
+        assert_grep 'effort=high' "$HOME_DIR/state/$id.meta" "the stand-in effort is clamped to the route level"
+        assert_grep 'dispatch_route=fast:high' "$HOME_DIR/state/$id.meta" "the typed route follows recovery"
+        ;;
+      manual)
+        expect_code 0 "$status" "an unrestricted route keeps the declared stand-in: $out"
+        assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "the manual route serves the stand-in"
+        assert_grep 'effort=low' "$HOME_DIR/state/$id.meta" "the manual stand-in keeps its declared effort"
+        assert_no_grep 'dispatch_route=' "$HOME_DIR/state/$id.meta" "a manual route records no typed route"
+        ;;
+    esac
+  done
+  pass "typed route class and effort constrain launch stand-ins while manual routes are unchanged"
+}
+
 test_spawn_ignores_stale_unrelated_rules() {
   local rec id=omp-unrelated-stale out status
   rec=$(make_spawn_case "$id" omp "$id")
@@ -3901,6 +3943,7 @@ test_worker_guard_project_scope
 test_spawn_retains_pooled_capacity_and_declared_stand_ins
 test_spawn_native_fallback_preserves_destination_order
 test_spawn_rejects_retired_fallbacks_before_publication
+test_spawn_route_class_constrains_stand_ins
 test_spawn_ignores_stale_unrelated_rules
 test_spawn_exhausted_strongest_route_preserves_unlanded_work
 test_spawn_model_validation_scoped_to_listed_providers

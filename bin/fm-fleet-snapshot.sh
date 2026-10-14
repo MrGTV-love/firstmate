@@ -114,7 +114,7 @@
 #
 # --contribution-input prints only the canonical backlog/tasks ownership pair,
 # without worker observations or cross-home collection, for the home-local poll.
-# --home-input emits the same uncapped local backlog and ordinary task records,
+# --home-input emits the same uncapped local backlog and direct-report task records,
 # including worker observations, without contribution or cross-home projections.
 # Its schema is fm-fleet-home-input.v1; the open-work reconciler consumes it.
 # Compatibility: JSON is the primary machine-readable surface.
@@ -246,7 +246,7 @@ refreshes only its parent-side remote-summary cache as an observational side eff
 
 --contribution-input emits the canonical local backlog/tasks ownership pair only,
 without worker observations or cross-home collection.
---home-input emits uncapped local backlog and ordinary tasks with worker observations,
+--home-input emits uncapped local backlog and direct reports with worker observations,
 without contribution polling or cross-home summaries (fm-fleet-home-input.v1).
 
 --secondmate-home-summary emits the bounded structured summary used after a
@@ -779,7 +779,7 @@ prefetch_task_observations() {  # <meta> <id>
 # window rather than five in series, while every command bound remains owned by
 # fm-timeout-lib.sh.
 prefetch_task_current_states() {
-  local meta captured_meta id index=0 rc=0 read_slot=0 pid kind
+  local meta captured_meta id index=0 rc=0 read_slot=0 pid
   local -a pids=()
   snapshot_task_cleanup
   SNAPSHOT_TASK_DIR=$(umask 077; mktemp -d "${TMPDIR:-/tmp}/fm-fleet-tasks.$SNAPSHOT_OWNER_TOKEN.XXXXXX") || return 1
@@ -788,11 +788,6 @@ prefetch_task_current_states() {
   # composition one coherent task manifest even if publication or teardown races it.
   for meta in "$STATE"/*.meta; do
     [ -e "$meta" ] || continue
-    # A persistent secondmate has its own home and ledger, not an ordinary task.
-    if [ "$OUTPUT_MODE" = home-input ]; then
-      meta_value_to "$meta" kind kind
-      [ "$kind" != secondmate ] || continue
-    fi
     id=${meta##*/}
     id=${id%.meta}
     captured_meta="$SNAPSHOT_TASK_DIR/$id.meta"

@@ -115,6 +115,9 @@
 #   --dispatch-rule <rule_N|default> names the crew-dispatch rule whose declared
 #   fallback list this task may use; docs/configuration.md "Crew dispatch
 #   profiles" owns that policy and the stand-in switch on proven exhaustion.
+#   --dispatch-route <fast|powerful>:<low|high> is the typed Level 5 verdict that
+#   resolution records beside it; fm_dispatch_select refuses stand-ins below a
+#   powerful class and clamps stand-in effort to it. Absent means unrestricted.
 #   --backend <name> is the explicit runtime session-provider backend for this
 #   exact task only (docs/configuration.md "Runtime backend" owns when that flag
 #   is authorized). Without it, the script resolves FM_BACKEND, then
@@ -934,6 +937,7 @@ HARNESS_ARG=
 MODEL=
 EFFORT=
 DISPATCH_RULE=
+DISPATCH_ROUTE=
 DISPATCH_FALLBACK='[]'
 DISPATCH_SWITCHED=false
 BACKEND_ARG=
@@ -1019,6 +1023,7 @@ for a in "$@"; do
       TRACEPARENT_SET=1
       ;;
     dispatch-rule) DISPATCH_RULE=$a ;;
+    dispatch-route) DISPATCH_ROUTE=$a ;;
     *)
       echo "error: internal parser state for --$want_value" >&2
       exit 1
@@ -1099,6 +1104,8 @@ for a in "$@"; do
   --claude-debug) CLAUDE_DEBUG=1 ;;
   --dispatch-rule) want_value="dispatch-rule" ;;
   --dispatch-rule=*) DISPATCH_RULE=${a#--dispatch-rule=} ;;
+  --dispatch-route) want_value="dispatch-route" ;;
+  --dispatch-route=*) DISPATCH_ROUTE=${a#--dispatch-route=} ;;
   *) POS+=("$a") ;;
   esac
 done
@@ -1981,6 +1988,7 @@ if [ "${#POS[@]}" -gt 0 ] && [ "${POS[0]}" != "$idpart" ] && case "$idpart" in *
   [ -z "$MODEL" ] || shared_args+=(--model "$MODEL")
   [ -z "$EFFORT" ] || shared_args+=(--effort "$EFFORT")
   [ -z "$DISPATCH_RULE" ] || shared_args+=(--dispatch-rule "$DISPATCH_RULE")
+  [ -z "$DISPATCH_ROUTE" ] || shared_args+=(--dispatch-route "$DISPATCH_ROUTE")
   [ -z "$BACKEND_ARG" ] || shared_args+=(--backend "$BACKEND_ARG")
   # One delivery contract applies to every pair in a batch, exactly like the shared
   # harness. Each pair still re-validates it against its own brief, so a batch
@@ -3063,13 +3071,17 @@ fi
 # Preserve the chosen rule through launch and recovery. Only declared stand-ins
 # may replace a proven exhausted route; unknown OMP quota is never single-account
 # quota-axi exhaustion. Secondmate and raw launch identities remain unchanged.
+if [ -n "$DISPATCH_ROUTE" ] && ! [[ "$DISPATCH_ROUTE" =~ $FM_DISPATCH_ROUTE_RE ]]; then
+  echo "error: --dispatch-route must be <fast|powerful>:<low|high>" >&2
+  exit 1
+fi
 if [ "$KIND" != secondmate ] && [ "$RAW_LAUNCH" = 0 ]; then
   dispatch_set=$(fm_dispatch_fallbacks "$SPAWN_ROUTING_PAIR" "$DISPATCH_RULE" "$HARNESS" "$MODEL" "$EFFORT") || exit 1
   DISPATCH_RULE=$(jq -r .rule <<<"$dispatch_set")
   DISPATCH_FALLBACK=$(jq -c .fallback <<<"$dispatch_set")
   if [ "$HARNESS" = omp ] && [[ "$MODEL" == openai-codex/* ]] || [ "$DISPATCH_FALLBACK" != '[]' ]; then
     dispatch_profile=$(jq -cn --arg h "$HARNESS" --arg m "$MODEL" --arg e "$EFFORT" '{harness:$h, model:$m, effort:$e}')
-    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$SPAWN_ROUTING_PAIR") || exit 1
+    dispatch_result=$(fm_dispatch_select "$CONFIG" "$DISPATCH_RULE" "$dispatch_profile" "$DISPATCH_FALLBACK" "" "$SPAWN_ROUTING_PAIR" "$DISPATCH_ROUTE") || exit 1
     DISPATCH_SWITCHED=$(jq -r .switched <<<"$dispatch_result")
     if [ "$DISPATCH_SWITCHED" = true ]; then
       HARNESS=$(jq -r .profile.harness <<<"$dispatch_result")
@@ -6172,7 +6184,7 @@ SPAWN_META_PATH=$SPAWN_META_TMP
 preserve_relaunch_meta() {
   awk -F= '
     BEGIN {
-      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch upstream_consent model model_stale effort omp_no_helpers dispatch_rule account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
+      split("window endpoint_task_id worktree project harness kind mode yolo branch tasktmp base_branch upstream_consent model model_stale effort omp_no_helpers dispatch_rule dispatch_route account account_provider api_key skill_selection skill_selection_reason skill_selection_picked busy_gen spawn_gen launch_proof traceparent backend herdr_session herdr_workspace_id herdr_tab_id herdr_pane_id zellij_session zellij_tab_id zellij_pane_id orca_worktree_id terminal cmux_workspace_id cmux_surface_id home projects control_relaunch_tx recovery", keys, " ")
       for (i in keys) owned[keys[i]] = 1
     }
     !($1 in owned)
@@ -6213,6 +6225,7 @@ preserve_relaunch_meta() {
   # data/fm-backend-design-d7's P1 compatibility contract).
   [ "$BACKEND" = tmux ] || echo "backend=$BACKEND"
   [ -z "$DISPATCH_RULE" ] || echo "dispatch_rule=$DISPATCH_RULE"
+  [ -z "$DISPATCH_ROUTE" ] || echo "dispatch_route=$DISPATCH_ROUTE"
   if [ "$BACKEND" = herdr ]; then
     echo "herdr_session=$HERDR_SES"
     echo "herdr_workspace_id=$HERDR_WORKSPACE_ID"

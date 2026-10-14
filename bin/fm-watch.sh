@@ -370,6 +370,15 @@ case "$IDLE_REAP_INTERVAL" in
 esac
 IDLE_REAP_BIN=${FM_IDLE_REAP_BIN:-$SCRIPT_DIR/fm-idle-session-reap.sh}
 IDLE_REAP_NEXT=
+# The TypeSafe account-health probe is one tiny request at this cadence;
+# docs/configuration.md "TypeSafe account health" owns the contract.
+TYPESAFE_HEALTH_INTERVAL=${FM_TYPESAFE_HEALTH_INTERVAL:-600}
+case "$TYPESAFE_HEALTH_INTERVAL" in
+  ''|*[!0-9]*) TYPESAFE_HEALTH_INTERVAL=600 ;;
+  *) TYPESAFE_HEALTH_INTERVAL=$((10#$TYPESAFE_HEALTH_INTERVAL)) ;;
+esac
+TYPESAFE_HEALTH_BIN=${FM_TYPESAFE_HEALTH_BIN:-$SCRIPT_DIR/fm-typesafe-health.sh}
+TYPESAFE_HEALTH_NEXT=
 SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's
                                       # turn-end hook) coalesce into one wake
@@ -2712,6 +2721,43 @@ idle_reap_tick() {
   IDLE_REAP_PID=$!
 }
 
+# The account-health probe is detached and single-flight like the sweeps above: it
+# can wait on the network for its five-second deadline, and a missed tick loses
+# nothing because the helper's state file, not this timer, dedupes the captain's
+# alert. The helper owns every wake; a failed or hung probe never stops the poll.
+TYPESAFE_HEALTH_PID=
+typesafe_health_tick() {
+  local now
+  [ "$TYPESAFE_HEALTH_INTERVAL" -gt 0 ] || return 0
+  fm_epoch_seconds_to now
+  if [ -z "$TYPESAFE_HEALTH_NEXT" ]; then
+    if [ -r "$STATE/.typesafe-health-next" ]; then
+      IFS= read -r TYPESAFE_HEALTH_NEXT < "$STATE/.typesafe-health-next" || true
+    fi
+    case "$TYPESAFE_HEALTH_NEXT" in
+      ''|*[!0-9]*) TYPESAFE_HEALTH_NEXT= ;;
+      *) TYPESAFE_HEALTH_NEXT=$((10#$TYPESAFE_HEALTH_NEXT)) ;;
+    esac
+  fi
+  if [ -z "$TYPESAFE_HEALTH_NEXT" ]; then
+    TYPESAFE_HEALTH_NEXT=$((now + TYPESAFE_HEALTH_INTERVAL))
+    printf '%s\n' "$TYPESAFE_HEALTH_NEXT" > "$STATE/.typesafe-health-next"
+    return 0
+  fi
+  [ "$now" -ge "$TYPESAFE_HEALTH_NEXT" ] || return 0
+  TYPESAFE_HEALTH_NEXT=$((now + TYPESAFE_HEALTH_INTERVAL))
+  printf '%s\n' "$TYPESAFE_HEALTH_NEXT" > "$STATE/.typesafe-health-next"
+  if [ -n "$TYPESAFE_HEALTH_PID" ]; then
+    if kill -0 "$TYPESAFE_HEALTH_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$TYPESAFE_HEALTH_PID" 2>/dev/null || true
+    TYPESAFE_HEALTH_PID=
+  fi
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$TYPESAFE_HEALTH_BIN" probe </dev/null >/dev/null 2>&1 &
+  TYPESAFE_HEALTH_PID=$!
+}
+
 # Surface the ledger so overdue work cannot be dropped silently. A newly overdue row
 # wakes firstmate at once; an unchanged overdue set repeats only every
 # OPEN_LOOPS_RESURFACE seconds; a ledger the helper stopped publishing is its own wake.
@@ -3036,6 +3082,7 @@ prelude_phase() {
   fi
   watcher_beat
   idle_reap_tick
+  typesafe_health_tick
 
   # Bearings publishes reconcile asks as local one-shot request files and
   # returns before any mate delivery. Supervision owns their later delivery;

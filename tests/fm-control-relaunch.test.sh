@@ -6201,6 +6201,68 @@ SH
   pass "fm-control exit removes the dialog file before it releases the control lock"
 }
 
+test_quota_recovery_keeps_the_typed_route_class() {
+  local dir id=rl-route route meta out rc
+  for route in powerful:high fast:high; do
+    dir=$(new_case "route-${route%%:*}" "$id")
+    add_ship_task "$dir" "$id" omp
+    printf omp > "$dir/fake/command"
+    printf omp > "$dir/fake/becomes"
+    printf 'unfinished change\n' > "$dir/wt/unfinished.txt"
+    meta=$(cat "$dir/home/state/$id.meta")
+    meta=${meta/model=default/model=openai-codex/gpt-6.1-sol}
+    meta=${meta/effort=default/effort=high}
+    printf '%s\ndispatch_rule=rule_1\ndispatch_route=%s\n' "$meta" "$route" > "$dir/home/state/$id.meta"
+    mkdir -p "$dir/home/config"
+    jq -n '{rules:[{when:"assigned work",
+      use:{harness:"omp",model:"openai-codex/gpt-6.1-sol",effort:"high",provider:"codex"},
+      fallback:[{harness:"omp",model:"openai-codex/gpt-6-luna",effort:"low"}]}]}' > "$dir/home/config/crew-dispatch.json"
+    jq -n --argjson now "$(date +%s)" '{reports:[{provider:"openai-codex",fetchedAt:($now*1000),
+      metadata:{meterStates:{chat:{allowed:true,limitReached:false}}},
+      limits:[{scope:{modelId:"gpt-6.1-sol"},status:"exhausted",amount:{remainingFraction:0}}]}]}' > "$dir/usage.json"
+    cat > "$dir/fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+case "$1" in
+  --version) printf 'omp/18.1.20\n' ;;
+  usage) cat "$FM_FAKE_DIR/../usage.json" ;;
+  models) printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6-luna","selector":"openai-codex/gpt-6-luna"},{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"}]}' ;;
+  *) exit 0 ;;
+esac
+SH
+    chmod +x "$dir/fakebin/omp"
+    "$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" "$id" --state idle --source omp-ext --event quota-exhausted >/dev/null
+    mkdir -p "$dir/user-home"
+    # shellcheck disable=SC2031 # The helper subshell's PATH change does not reach here.
+    out=$(env -u HERDR_ENV -u HERDR_PANE_ID -u HERDR_SESSION -u HERDR_SOCKET_PATH \
+      -u HERDR_TAB_ID -u HERDR_WORKSPACE_ID \
+      PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+      FM_WAKE_QUEUE="$dir/home/state/.wake-queue" \
+      HOME="$dir/user-home" FM_SPAWN_NO_GUARD=1 \
+      FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+      bash -s -- "$ROOT" <<'SH'
+. "$1/bin/fm-session-end-relaunch-lib.sh"
+fm_session_end_relaunch_scan "$FM_HOME/state" 180 || exit
+printf "%s\n" "$FM_SESSION_END_WAKE"
+SH
+    )
+    rc=$?
+    expect_code 0 "$rc" "supervised quota recovery must evaluate the typed route: $out"
+    assert_equals 'unfinished change' "$(cat "$dir/wt/unfinished.txt")" "recovery must preserve uncommitted work"
+    if [ "$route" = powerful:high ]; then
+      assert_contains "$out" 'auto-relaunch failed' "a powerful route must refuse the cheap stand-in"
+      assert_equals omp "$(cat "$dir/fake/command")" "the refused stand-in must leave the old agent running"
+      assert_equals openai-codex/gpt-6.1-sol "$(meta_field "$dir" "$id" model)" "the powerful model identity must remain unchanged"
+      assert_no_grep '/quit' "$dir/fake/literal" "no exit may be sent when no powerful replacement exists"
+    else
+      assert_contains "$out" 'auto-relaunched after quota exhaustion' "a fast route may recover on the declared stand-in"
+      assert_equals openai-codex/gpt-6-luna "$(meta_field "$dir" "$id" model)" "the fast route serves the stand-in"
+      assert_equals high "$(meta_field "$dir" "$id" effort)" "recovery clamps the stand-in effort to the route level"
+      assert_equals fast:high "$(meta_field "$dir" "$id" dispatch_route)" "the typed route is carried through the replacement"
+    fi
+  done
+  pass "supervised OMP recovery enforces the typed route class and effort on stand-ins"
+}
+
 if [ -n "${FM_TEST_ONLY:-}" ]; then
   "$FM_TEST_ONLY"
   exit "$?"
@@ -6341,6 +6403,7 @@ test_retiring_omp_removes_only_its_generated_configuration
 test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior
 
 test_quota_exhaustion_relaunches_only_a_permitted_route
+test_quota_recovery_keeps_the_typed_route_class
 
 test_same_harness_relaunch_keeps_identity_and_reuses_the_endpoint
 test_relaunch_refuses_unsupported_omp_before_stopping
