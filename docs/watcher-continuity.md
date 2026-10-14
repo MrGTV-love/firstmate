@@ -583,7 +583,7 @@ They also prove that a legacy or handoff-phase watcher marker from an absent rep
 - A persistent live successor after recovery.
 - An idle live Lavish source that stays quiet until its real result is durably queued and closes the arm successfully, without requiring one reason to win the process-event/recovery observation race.
 - An append that reopens an announced empty recovery.
-- A watcher close inside the handling window that must leave the printed acknowledgement valid.
+- A handling successor's watcher close after a deterministically announced recovery that must leave the printed acknowledgement valid.
 - A re-arm whose recovery cycle is slowed after confirmation and must still surface rather than read as a watcher that stayed live.
 - The self-healing moved-generation acknowledgement that consumes its handled rows and names its remedy.
 - The already-acknowledged confirmation no-op for a matching generation, with its mismatched-generation, dead-pid, and lock-mismatch rejections preserved.

@@ -951,7 +951,7 @@ test_append_wakes_live_announced_watcher() {
 # Exercise the handling-window recovery invariant owned by
 # docs/watcher-continuity.md through real watcher processes.
 test_handling_window_close_keeps_the_acknowledgement_valid() {
-  local dir home state fakebin pair sequence generation
+  local dir home state fakebin pair sequence generation recovery_arm
   dir=$(make_case handling-window-close-acknowledgement)
   home="$dir/home"
   state="$dir/state"
@@ -965,6 +965,18 @@ test_handling_window_close_keeps_the_acknowledgement_valid() {
   grep "$(printf '\tsignal\thandled.status\t')" "$state/.wake-queue" >/dev/null \
     || fail "delivered wake was not durable before handling"
 
+  # Force the announced path with a real recovery cycle rather than letting
+  # signal/prelude scheduling choose pending versus announced handling.
+  start_rearm_arm "$home" "$state" "$fakebin" "$dir/recovery-arm.out"
+  wait_for_exit "$ARM_PID" "$REARM_EXIT_POLLS" || fail "fixture recovery did not announce the durable wake"
+  recovery_arm=$ARM_PID
+  grep -F 'check: rearm-resurface' "$dir/recovery-arm.out" >/dev/null \
+    || fail "fixture recovery did not surface its recovery reason"
+  case "$(cat "$state/.watcher-down" 2>/dev/null || true)" in
+    announced:downtime:*) ;;
+    *) fail "fixture recovery did not establish an announced episode" ;;
+  esac
+
   FM_HOME="$home" FM_STATE_OVERRIDE="$state" "$DRAIN" > "$dir/drain.out" 2> "$dir/drain.err" \
     || fail "handling drain did not present the durable wake"
   pair=$(drain_ack_pair "$dir/drain.err") \
@@ -972,9 +984,15 @@ test_handling_window_close_keeps_the_acknowledgement_valid() {
   sequence=${pair%%$'\t'*}
   generation=${pair##*$'\t'}
 
-  # One full watcher cycle appends a wake and then closes inside the handling window.
-  start_rearm_arm "$home" "$state" "$fakebin" "$dir/handling-window-arm.out"
+  [ "$(cat "$state/.watcher-down" 2>/dev/null || true)" = "announced:handling:$generation" ] \
+    || fail "handling drain did not preserve the announced episode"
+
+  # An ordinary restart treats announced handling as interrupted and opens a
+  # new generation. This cycle is its handling successor, as in the adapters.
+  start_rearm_arm "$home" "$state" "$fakebin" "$dir/handling-window-arm.out" "$recovery_arm"
   is_live_non_zombie "$ARM_PID" || fail "handling-window watcher did not stay live"
+  [ "$(cat "$state/.watcher-down" 2>/dev/null || true)" = "announced:handling:$generation" ] \
+    || fail "handling successor replaced the episode before publication"
   printf 'done: wake published during handling\n' > "$state/during-handling.status"
   wait_for_exit "$ARM_PID" "$REARM_EXIT_POLLS" || fail "handling-window watcher did not deliver its wake"
   grep "$(printf '\tsignal\tduring-handling.status\t')" "$state/.wake-queue" >/dev/null \
