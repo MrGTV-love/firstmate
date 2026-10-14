@@ -17,7 +17,16 @@ With no home supplied the code root is the home; a write there reports once that
 the record is checkout-local and not durable. path prints the resolved table.
 FM_DURATION_FILE=off disables recording (fixture copies should use off or their
 own isolated file). Writers hold an exclusive flock on the sibling .lock file
-and readers a shared one. Recording and process-group execution require POSIX
+and readers a shared one.
+
+A variable that is set but empty names nothing and counts as unset. A location
+variable must be an absolute path, so the table never resolves against the
+caller's directory. The table, its .lock and .compact siblings, and the
+calibration scratch file are never written inside a git work tree unless the
+table sits under a firstmate home's data directory: a firstmate tool must not
+change a project copy. A refused location prints one stderr line, records
+nothing and exits 0 (path prints off, limit keeps the caller's fallback);
+gitignore is never relied on to hide a misplaced write. Recording and process-group execution require POSIX
 Python; pure literal lint works on native Windows Python, while limit explicitly
 preserves the existing fallback when POSIX locks are absent.
 
@@ -122,23 +131,75 @@ KEEP_SAMPLES = 100  # sample-count policy: newest samples kept per host and key
 COMPACT_AT = 200  # sample-count policy: host/key sample rows that trigger compaction
 EVENTS = ('timeout', 'filed')
 LOCAL_NOTED = []
+REFUSED = []
 
 
 def scalar(key, value, stream=sys.stdout):
     print(f'{key}: {json.dumps(value, ensure_ascii=False)}', file=stream)
 
 
+def absolute(name, value):
+    if not os.path.isabs(value):
+        raise ValueError(f'{name}={value!r} is not an absolute path')
+    return Path(os.path.realpath(value))
+
+
+def data_dir():
+    """The owning home's data directory; an empty variable is unset."""
+    for name in ('FM_DURATION_HOME', 'FM_DATA_OVERRIDE'):
+        value = os.environ.get(name)
+        if value:
+            path = absolute(name, value)
+            return path / 'data' if name == 'FM_DURATION_HOME' else path
+    value = os.environ.get('FM_HOME')
+    return (absolute('FM_HOME', value) if value else ROOT) / 'data'
+
+
+def work_tree_root(directory):
+    """The nearest enclosing git work tree top level, or None outside any."""
+    return next((parent for parent in (directory, *directory.parents) if (parent / '.git').exists()), None)
+
+
+def contained(path, directory):
+    try:
+        path.relative_to(directory)
+    except ValueError:
+        return False
+    return True
+
+
+def may_write(path, home):
+    """A table may sit outside every work tree, under the declared home's data
+    directory, or under the data directory of a firstmate checkout; any other
+    work tree is a project copy."""
+    root = work_tree_root(path.parent)
+    return (root is None or contained(path, home)
+            or ((root / 'bin' / 'fm-duration.py').exists() and contained(path, root / 'data')))
+
+
+def refuse(reason):
+    if not REFUSED:
+        REFUSED.append(reason)
+        scalar('ledger', f'refused, nothing recorded: {reason}', sys.stderr)
+    return None
+
+
 def ledger_path():
     value = os.environ.get('FM_DURATION_FILE')
     if value == 'off':
         return None
-    if value:
-        return Path(value)
-    owner = os.environ.get('FM_DURATION_HOME')
-    if owner:
-        return Path(owner) / 'data' / 'command-durations.jsonl'
-    home = Path(os.environ.get('FM_HOME', ROOT))
-    return Path(os.environ.get('FM_DATA_OVERRIDE', home / 'data')) / 'command-durations.jsonl'
+    try:
+        home = data_dir()
+        if value:
+            # Resolve the directory only: the table itself is opened with O_NOFOLLOW.
+            path = absolute('FM_DURATION_FILE', str(Path(value).parent)) / Path(value).name
+        else:
+            path = home / 'command-durations.jsonl'
+    except ValueError as error:
+        return refuse(str(error))
+    if not may_write(path, home):
+        return refuse(f'{path} is inside a git work tree that is not a firstmate home data directory')
+    return path
 
 
 def checkout_local():
@@ -311,12 +372,9 @@ def backlog():
 
 
 def filing_project():
-    owner = os.environ.get('FM_DURATION_HOME')
-    home = owner or os.environ.get('FM_HOME') or str(ROOT)
-    data = Path(owner) / 'data' if owner else Path(os.environ.get('FM_DATA_OVERRIDE', Path(home) / 'data'))
     try:
-        lines = (data / 'projects.md').read_text().splitlines()
-    except OSError:
+        lines = (data_dir() / 'projects.md').read_text().splitlines()
+    except (OSError, ValueError):
         return 'firstmate'
     registered = {re.split(r' \[| - ', line[2:], maxsplit=1)[0].strip() for line in lines if line.startswith('- ')}
     name = repo().rsplit('/', 1)[-1]
@@ -443,6 +501,18 @@ def signal_group(child, sig):
                 raise
 
 
+@contextlib.contextmanager
+def calibration_scratch():
+    """A task-local calibration file path, never inside a git work tree."""
+    for base in dict.fromkeys((tempfile.gettempdir(), '/tmp', '/var/tmp')):
+        if os.path.isdir(base) and work_tree_root(Path(os.path.realpath(base))) is None:
+            with tempfile.TemporaryDirectory(prefix='fm-duration-', dir=base) as scratch:
+                yield Path(scratch) / 'calibration'
+            return
+    scalar('calibration', 'no scratch directory outside a git work tree; running without a calibration file', sys.stderr)
+    yield None
+
+
 def run(key, command, calibration_file):
     if os.name != 'posix':
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
@@ -454,8 +524,9 @@ def run(key, command, calibration_file):
         ceiling = 0
     started = time.monotonic()
     load_start = load_now()
-    child_env = dict(os.environ, FM_DURATION_MANAGED_KEY=key,
-                     FM_DURATION_CALIBRATION_FILE=str(calibration_file))
+    child_env = dict(os.environ, FM_DURATION_MANAGED_KEY=key)
+    if calibration_file is not None:
+        child_env['FM_DURATION_CALIBRATION_FILE'] = str(calibration_file)
     child = subprocess.Popen(command, env=child_env, start_new_session=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     streams = selectors.DefaultSelector()
     streams.register(child.stdout, selectors.EVENT_READ, sys.stdout.buffer)
@@ -528,7 +599,7 @@ def run(key, command, calibration_file):
         if interrupted:
             code = 128 + interrupted[-1]
         duration_ms = round((time.monotonic() - started) * 1000)
-        calibration = not calibration_file.exists() or calibration_file.read_text().strip() == '1'
+        calibration = calibration_file is None or not calibration_file.exists() or calibration_file.read_text().strip() == '1'
         timed_out = expired and not interrupted
         try:
             record(key, duration_ms, code, occurrence_id, calibration, load_start, timed_out)
@@ -736,8 +807,8 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('run requires -- COMMAND')
-        with tempfile.TemporaryDirectory(prefix='fm-duration-') as scratch:
-            return run(args.key, command, Path(scratch) / 'calibration')
+        with calibration_scratch() as calibration_file:
+            return run(args.key, command, calibration_file)
     return 0
 
 

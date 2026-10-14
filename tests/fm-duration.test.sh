@@ -320,6 +320,74 @@ local = subprocess.run([sys.executable, str(checkout / 'bin/fm-duration.py'), 'r
 assert local.stderr.count('checkout-local and not durable') == 1
 assert (checkout / 'data/command-durations.jsonl').exists()
 
+# A firstmate tool never writes into a project copy. The caller's directory is a
+# project-like git repository whose .gitignore hides *.jsonl but not the .lock,
+# exactly as the reported tree was; any file the helper leaves there is a failure.
+project = make_repo('project-like', 'git@github.com:acme/project.git')
+(project / '.gitignore').write_text('*.jsonl\n')
+subprocess.run(['git', '-C', str(project), 'add', '.gitignore'], check=True)
+subprocess.run(['git', '-C', str(project), '-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'init'], check=True)
+
+
+def project_dirty():
+    return subprocess.run(['git', '-C', str(project), 'status', '--porcelain', '--ignored', '-uall'],
+                          capture_output=True, text=True, check=True).stdout
+
+
+def from_project(*args, extra=None, **kwargs):
+    environment = dict(bare, **(extra or {}))
+    return subprocess.run([sys.executable, str(checkout / 'bin/fm-duration.py'), *map(str, args)],
+                          env=environment, cwd=project, capture_output=True, text=True, **kwargs)
+
+
+assert project_dirty() == ''
+for empty in ('FM_DATA_OVERRIDE', 'FM_HOME', 'FM_DURATION_FILE', 'FM_DURATION_HOME'):
+    shutil.rmtree(checkout / 'data')
+    done = from_project('record', 'empty.' + empty, 7, 0, extra={empty: ''})
+    assert done.returncode == 0 and 'refused' not in done.stderr, (empty, done.stdout, done.stderr)
+    assert project_dirty() == '', (empty, 'an empty variable wrote into the project', project_dirty())
+    assert (checkout / 'data/command-durations.jsonl').exists(), (empty, 'an empty variable is unset, so the code root records')
+everything_empty = from_project('record', 'empty.all', 7, 0, extra={name: '' for name in ('FM_DATA_OVERRIDE', 'FM_HOME', 'FM_DURATION_FILE', 'FM_DURATION_HOME')})
+assert everything_empty.returncode == 0 and project_dirty() == '', (everything_empty.stderr, project_dirty())
+print('ok - empty home variables are unset and never resolve against the caller directory')
+
+# A relative or in-project location refuses once, records nothing, and leaves the tree clean.
+for name, value in (('FM_DATA_OVERRIDE', 'data'), ('FM_HOME', '.'), ('FM_DURATION_HOME', 'owner'), ('FM_DURATION_FILE', 'command-durations.jsonl'),
+                    ('FM_DURATION_FILE', str(project / 'command-durations.jsonl')),
+                    ('FM_DURATION_FILE', str(project / 'nested/dir/command-durations.jsonl'))):
+    for args in (('record', 'refused', 5, 0), ('limit', 'refused', '--fallback', 9), ('timeout', 'refused', 5), ('path',)):
+        done = from_project(*args, extra={name: value})
+        assert done.returncode == 0, (name, value, args, done.stdout, done.stderr)
+        assert done.stderr.count('refused, nothing recorded') == 1, (name, value, args, done.stderr)
+        assert project_dirty() == '', (name, value, args, 'a refused location still wrote into the project', project_dirty())
+        if args[0] == 'limit':
+            assert done.stdout.strip() == '9'
+        if args[0] == 'path':
+            assert done.stdout.strip() == 'off'
+print('ok - a ledger or lock location inside a project work tree is refused without writing')
+
+# Normal recording is unchanged: a home that is itself a git checkout keeps its table under its own data/.
+git_home = make_repo('git-home')
+(git_home / 'data').mkdir()
+for extra in ({'FM_DURATION_HOME': str(git_home)}, {'FM_HOME': str(git_home)}, {'FM_HOME': str(git_home), 'FM_DATA_OVERRIDE': str(git_home / 'data')}):
+    (git_home / 'data/command-durations.jsonl').unlink(missing_ok=True)
+    done = from_project('record', 'home.key', 11, 0, extra=extra)
+    assert done.returncode == 0 and 'refused' not in done.stderr, (extra, done.stderr)
+    assert json.loads((git_home / 'data/command-durations.jsonl').read_text().splitlines()[0])['key'] == 'home.key'
+    assert project_dirty() == ''
+spread = from_project('record', 'file.key', 11, 0, extra={'FM_DURATION_FILE': str(tmp / 'explicit-outside.jsonl')})
+assert spread.returncode == 0 and 'refused' not in spread.stderr and (tmp / 'explicit-outside.jsonl').exists()
+
+# The calibration scratch file follows the same rule: a TMPDIR inside a project work tree is skipped.
+inside = project / 'scratch-inside'
+inside.mkdir()
+calibration = from_project('run', 'calibration.key', '--', sys.executable, '-c', 'import os; print(os.environ.get("FM_DURATION_CALIBRATION_FILE", "none"))',
+                           extra={'FM_DURATION_FILE': str(tmp / 'explicit-outside.jsonl'), 'TMPDIR': str(inside)})
+assert calibration.returncode == 0, calibration.stderr
+assert not calibration.stdout.strip().startswith(str(project)) and not calibration.stdout.strip().startswith(str(project.resolve())), calibration.stdout
+assert project_dirty() == '' and not any(inside.iterdir()), (project_dirty(), list(inside.iterdir()))
+print('ok - the calibration scratch file never lands in a project work tree')
+
 if shutil.which('tasks-axi'):
     key = 'repeat.consumer'
     task = 'fm-timeout-' + hashlib.sha256((platform.node() + '\0' + REPO + '\0' + key).encode()).hexdigest()[:16]
