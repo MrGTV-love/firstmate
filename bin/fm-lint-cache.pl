@@ -17,26 +17,30 @@ use File::Path qw(make_path);
 use File::Basename qw(dirname basename);
 
 # Private gate protocol; bin/fm-lint.sh's header owns the public pool controls.
-# Usage: perl fm-lint-cache.pl gate <slot-dir> <ncpu> <wait-file> -- <command...>
+# Usage: perl fm-lint-cache.pl gate <slot-dir> <ncpu> <run-id> <wait-file> -- <command...>
 # Commands inherit the flock descriptor across exec, so killing the gate cannot
 # release capacity while a protected descendant still holds it; the kernel
 # releases the slot when the last inherited descriptor closes.
-# Live requests enter a FIFO under admission.lock; a request's flock is its
-# liveness proof, so a killed waiter cannot strand the queue. Only the head
-# scans occupancy, then releases its ticket before executing. New roots cannot
-# repeatedly take a released slot ahead of an already waiting run.
+# Live requests take a ticket under admission.lock; a request's flock is its
+# liveness proof, so a killed waiter cannot strand the queue. Capacity is the
+# CPU-derived cap alone; host load never shrinks it, so unrelated machine load
+# cannot starve lint. Service is shared per run, not per worker: an admitted
+# request records its run and ticket in its slot file, and a free slot goes to
+# the waiting run holding the fewest slots, then the run served least recently,
+# then the oldest ticket. Within a run, tickets stay FIFO, so every waiting run
+# and request makes progress. A head ticket whose owner has been stopped for a
+# second is skipped; one ps call checks every waiting owner, and only after a
+# free slot has stayed unclaimed for that second.
 # Admission retains the slot.* protocol so in-flight older gates remain bounded.
-# Capacity is the CPU-derived cap alone; host load never shrinks it, so unrelated
-# machine load cannot starve lint. A run holds at most JOBS requests, so FIFO
-# order shares the cap across runs and every waiting request reaches the head.
 # The high-resolution wait is written in milliseconds to <wait-file> before
 # launch so the caller can account for queue time separately.
 if (($ARGV[0] // '') eq 'gate') {
     require POSIX;
     require Time::HiRes;
-    my (undef, $slot_dir, $ncpu, $wait_file, $dashes, @command) = @ARGV;
+    my (undef, $slot_dir, $ncpu, $run, $wait_file, $dashes, @command) = @ARGV;
     die "fm-lint-gate: invalid private invocation\n"
-        unless defined $dashes && $dashes eq '--' && @command && ($ncpu // '') =~ /\A[1-9][0-9]*\z/;
+        unless defined $dashes && $dashes eq '--' && @command && ($ncpu // '') =~ /\A[1-9][0-9]*\z/
+            && ($run // '') =~ /\A[A-Za-z0-9_-]{1,64}\z/;
     my ($child, $caught);
     my %signal_number = (HUP => 1, INT => 2, TERM => 15);
     for my $name (keys %signal_number) {
@@ -44,7 +48,15 @@ if (($ARGV[0] // '') eq 'gate') {
     }
     my $cap = ($ENV{FM_LINT_HOST_SLOTS} // '') =~ /\A[1-9][0-9]*\z/ ? $ENV{FM_LINT_HOST_SLOTS} + 0
         : ($ncpu >> 1) > 2 ? ($ncpu >> 1) : 2;
-    my ($slot, $waited_from, $ticket, $ticket_path, $coordinator);
+    my $stopped_owners = sub {
+        my %stopped;
+        open(my $ps, '-|', 'ps', '-o', 'pid=,stat=', '-p', join(',', @_)) or return %stopped;
+        while (my $line = <$ps>) { $stopped{$1} = 1 if $line =~ /\A\s*([0-9]+)\s+T/; }
+        close $ps;
+        return %stopped;
+    };
+    my ($slot, $waited_from, $ticket, $ticket_path, $ticket_number, $coordinator);
+    my ($passed, $passed_at, %stopped);
     my $available = eval { make_path($slot_dir, {mode => 0700}); -d $slot_dir && -w _ };
     $available = 0 if $available && !open($coordinator, '>>', "$slot_dir/admission.lock");
     if ($available) {
@@ -67,39 +79,68 @@ if (($ARGV[0] // '') eq 'gate') {
                     && print({$next} $number + 1, "\n") && close($next)
                     && rename("$slot_dir/queue.next.tmp", "$slot_dir/queue.next")
                     or do { $available = 0; last; };
-                $ticket_path = sprintf '%s/queue.%020d', $slot_dir, $number + 1;
+                $ticket_number = $number + 1;
+                $ticket_path = sprintf '%s/queue.%020d.%d.%s', $slot_dir, $ticket_number, $$, $run;
                 open($ticket, '>>', $ticket_path) && flock($ticket, LOCK_EX | LOCK_NB)
                     or do { $available = 0; last; };
             }
-            my $head;
-            opendir(my $queue, $slot_dir) or do { $available = 0; last ACQUIRE; };
-            my @requests = sort grep { /\Aqueue\.[0-9]{20}\z/ } readdir $queue;
-            closedir $queue;
-            for my $name (@requests) {
-                my $path = "$slot_dir/$name";
-                if ($path eq $ticket_path) { $head = $path; last; }
-                open(my $request, '>>', $path) or do { $available = 0; last ACQUIRE; };
-                if (flock($request, LOCK_EX | LOCK_NB)) {
-                    unlink($path) or $!{ENOENT} or do { $available = 0; last ACQUIRE; };
-                    next;
-                }
-                unless ($!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR}) { $available = 0; last ACQUIRE; }
-                $head = $path;
-                last;
+            my (@free, @slots);
+            for my $index (0 .. $cap - 1) {
+                my $path = "$slot_dir/slot.$index";
+                open(my $fh, '>>', $path) or do { $available = 0; last ACQUIRE; };
+                if (flock($fh, LOCK_EX | LOCK_NB)) { push @free, $fh; push @slots, [$path, 0]; next; }
+                my $busy = $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
+                close $fh;
+                unless ($busy) { $available = 0; last ACQUIRE; }
+                push @slots, [$path, 1];
             }
-            if (defined $head && $head eq $ticket_path) {
-                my @free;
-                for my $index (0 .. $cap - 1) {
-                    open(my $fh, '>>', "$slot_dir/slot.$index")
-                        or do { $available = 0; last ACQUIRE; };
-                    if (flock($fh, LOCK_EX | LOCK_NB)) { push @free, $fh; next; }
-                    my $busy = $!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR};
-                    close $fh;
-                    unless ($busy) { $available = 0; last ACQUIRE; }
+            undef $passed unless @free;
+            if (@free) {
+                my (%held, %served, %oldest, %owners);
+                for my $entry (@slots) {
+                    open(my $record, '<', $entry->[0]) or next;
+                    my $line = <$record> // '';
+                    next unless $line =~ /\A([A-Za-z0-9_-]+)\t([0-9]+)\n\z/;
+                    $held{$1}++ if $entry->[1];
+                    $served{$1} = $2 if ($served{$1} // 0) < $2;
                 }
-                $slot = shift @free if @free;
-                close $_ for @free;
+                opendir(my $queue, $slot_dir) or do { $available = 0; last ACQUIRE; };
+                my @requests = sort grep { /\Aqueue\.[0-9]{20}\.[0-9]+\.[A-Za-z0-9_-]+\z/ } readdir $queue;
+                closedir $queue;
+                for my $name (@requests) {
+                    my $path = "$slot_dir/$name";
+                    my ($owner, $owner_run) = $name =~ /\Aqueue\.[0-9]{20}\.([0-9]+)\.(.+)\z/;
+                    if ($path ne $ticket_path) {
+                        open(my $request, '>>', $path) or do { $available = 0; last ACQUIRE; };
+                        if (flock($request, LOCK_EX | LOCK_NB)) {
+                            unlink($path) or $!{ENOENT} or do { $available = 0; last ACQUIRE; };
+                            next;
+                        }
+                        unless ($!{EWOULDBLOCK} || $!{EAGAIN} || $!{EINTR}) { $available = 0; last ACQUIRE; }
+                        $owners{$owner} = 1;
+                        next if $stopped{$owner};
+                    }
+                    $oldest{$owner_run} //= $path;
+                }
+                my ($next) = sort {
+                    ($held{$a} // 0) <=> ($held{$b} // 0)
+                        || ($served{$a} // 0) <=> ($served{$b} // 0)
+                        || $oldest{$a} cmp $oldest{$b}
+                } keys %oldest;
+                if (defined $next && $oldest{$next} eq $ticket_path) {
+                    $slot = shift @free;
+                    truncate($slot, 0) && syswrite($slot, "$run\t$ticket_number\n");
+                } elsif (defined $next) {
+                    my $now = Time::HiRes::time();
+                    if (($passed // '') ne $oldest{$next}) {
+                        ($passed, $passed_at) = ($oldest{$next}, $now);
+                    } elsif ($now - $passed_at >= 1) {
+                        %stopped = $stopped_owners->(sort keys %owners);
+                        $passed_at = $now;
+                    }
+                }
             }
+            close $_ for @free;
             if ($slot) {
                 unlink($ticket_path);
                 close $ticket;

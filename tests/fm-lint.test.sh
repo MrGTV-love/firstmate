@@ -1339,7 +1339,7 @@ for my $case (['', 18, 9], ['', 4, 2], ['', 1, 2], [6, 18, 6]) {
         my $pid = fork();
         die "fork: $!" unless defined $pid;
         if (!$pid) {
-            exec $^X, $gate, 'gate', "$dir/slots", $ncpu, "$dir/wait.$index",
+            exec $^X, $gate, 'gate', "$dir/slots", $ncpu, 'cap', "$dir/wait.$index",
                 '--', $^X, '-e', $command, "$dir/started.$index", "$dir/release";
             die "exec: $!";
         }
@@ -1379,7 +1379,7 @@ my $pid = fork();
 die "fork: $!" unless defined $pid;
 if (!$pid) {
     close $_ for @holders;
-    exec $^X, $gate, 'gate', "$dir/slots", 18, "$dir/wait",
+    exec $^X, $gate, 'gate', "$dir/slots", 18, 'occupancy', "$dir/wait",
         '--', $^X, '-e', 'open(my $fh, ">", $ARGV[0]) or die "$!"', "$dir/started";
     die "exec: $!";
 }
@@ -1421,10 +1421,10 @@ use Fcntl qw(LOCK_NB);
 my $locks;
 BEGIN {
     *CORE::GLOBAL::flock = sub {
-        # Coordinator, own ticket, then the stale request ahead of it: its
-        # owner cancels (unlinks) between this scan's open and its lock.
-        unlink "$ENV{CASE_DIR}/slots/queue.00000000000000000000"
-            if ($_[1] & LOCK_NB) && ++$locks == 3;
+        # Coordinator, own ticket, free slot, then the stale request ahead of
+        # it: its owner cancels (unlinks) between this scan's open and its lock.
+        unlink "$ENV{CASE_DIR}/slots/queue.00000000000000000000.1.stale"
+            if ($_[1] & LOCK_NB) && ++$locks == 4;
         return CORE::flock($_[0], $_[1]);
     };
 }
@@ -1436,7 +1436,7 @@ for my $case (qw(spaces vanishing)) {
     my $slots = $case eq 'spaces' ? "$dir/my slots" : "$dir/slots";
     make_path($slots);
     if ($case eq 'vanishing') {
-        open(my $stale, '>', "$slots/queue.00000000000000000000") or die "$!";
+        open(my $stale, '>', "$slots/queue.00000000000000000000.1.stale") or die "$!";
         close $stale;
     }
     local $ENV{FM_LINT_HOST_SLOTS} = 1;
@@ -1446,7 +1446,7 @@ for my $case (qw(spaces vanishing)) {
     die "fork: $!" unless defined $pid;
     if (!$pid) {
         open STDERR, '>', "$dir/err" or die "$!";
-        exec $^X, @inject, $gate, 'gate', $slots, 18, "$dir/wait",
+        exec $^X, @inject, $gate, 'gate', $slots, 18, 'scan', "$dir/wait",
             '--', $^X, '-e', 'print "analysis ran\n"; exit 23';
         die "exec: $!";
     }
@@ -1529,7 +1529,7 @@ for my $case (qw(live killed)) {
             die "fork: $!" unless defined $pid;
             if (!$pid) {
                 close $holder;
-                exec $^X, "-I$tmp", '-MWaitLock', $gate, 'gate', "$dir/slots", 18,
+                exec $^X, "-I$tmp", '-MWaitLock', $gate, 'gate', "$dir/slots", 18, $role,
                     "$dir/$role.wait", '--', $^X, '-e',
                     'open(my $fh, ">>", $ARGV[0]) or die "$!"; print {$fh} "$ARGV[1]\n"',
                     "$dir/order", $role;
@@ -1570,6 +1570,147 @@ for my $case (qw(live killed)) {
 }
 PL
   pass "waiting roots precede newer roots and a killed waiter cannot strand admission"
+}
+
+test_unequal_runs_share_scarce_slots_per_run() {
+  local tmp root pid_two pid_one rc=0
+  tmp=$(fm_test_tmproot fm-lint-slots-per-run)
+  mkdir -p "$tmp/bin" "$tmp/two" "$tmp/one"
+  for root in 1 2 3 4 5 6; do
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/two/r$root.sh"
+  done
+  for root in 1 2 3; do
+    printf '#!/usr/bin/env bash\nexit 0\n' > "$tmp/one/r$root.sh"
+  done
+  cat > "$tmp/bin/shellcheck" <<PL
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Fcntl qw(:flock);
+if ((\$ARGV[0] // '') eq '--version') {
+    print "ShellCheck - shell script analysis tool\nversion: 0.11.0\n";
+    exit 0;
+}
+my \$run = \$ARGV[-1] =~ m{/two/} ? 'two' : 'one';
+open(my \$log, '>>', "$tmp/starts") or die "\$!";
+flock(\$log, LOCK_EX) or die "\$!";
+print {\$log} "\$run\n";
+close \$log;
+select(undef, undef, undef, 2);
+exit 0;
+PL
+  chmod +x "$tmp/bin/shellcheck"
+  : > "$tmp/starts"
+  # One slot, a two-worker run with backlog, then a one-worker run: per-run
+  # service alternates instead of giving the two-worker run two turns per turn.
+  FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=1 PATH="$tmp/bin:$PATH" \
+    "$LINT" --jobs 2 "$tmp"/two/*.sh > "$tmp/two.out" 2>&1 &
+  pid_two=$!
+  perl -e 'my $deadline = time() + 30; until (-s $ARGV[0]) { exit 1 if time() > $deadline; select(undef, undef, undef, 0.01); }' \
+    "$tmp/starts" || fail "the two-worker run never started a ShellCheck"
+  FM_LINT_SLOT_DIR="$tmp/slots" FM_LINT_HOST_SLOTS=1 PATH="$tmp/bin:$PATH" \
+    "$LINT" --jobs 1 "$tmp"/one/*.sh > "$tmp/one.out" 2>&1 &
+  pid_one=$!
+  wait "$pid_two" || rc=$?
+  wait "$pid_one" || rc=$?
+  [ "$rc" -eq 0 ] || fail "a per-run fairness lint failed (rc=$rc)"$'\n'"$(cat "$tmp/two.out" "$tmp/one.out")"
+  perl - "$tmp/starts" <<'PL' || fail "per-run fair share regression failed"$'\n'"$(tr '\n' ' ' < "$tmp/starts")"
+use strict;
+use warnings;
+open(my $fh, '<', $ARGV[0]) or die "$!";
+chomp(my @starts = <$fh>);
+my $one = grep { $_ eq 'one' } @starts;
+my $two = grep { $_ eq 'two' } @starts;
+die "expected 6 two-worker and 3 one-worker starts, got $two and $one\n" unless $two == 6 && $one == 3;
+my ($gap, $seen) = (0, 0);
+for my $run (@starts) {
+    if ($run eq 'one') {
+        die "the two-worker run took $gap turns between one-worker turns\n" if $seen && $gap > 1;
+        ($gap, $seen) = (0, $seen + 1);
+        last if $seen == 3;
+        next;
+    }
+    $gap++;
+}
+PL
+  pass "a two-worker run and a one-worker run alternate turns on a scarce pool"
+}
+
+test_stopped_head_waiter_does_not_block_the_queue() {
+  local tmp
+  tmp=$(fm_test_tmproot fm-lint-slot-stopped-head)
+  perl - "$ROOT/bin/fm-lint-cache.pl" "$tmp" <<'PL' || fail "stopped head regression failed"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use Fcntl qw(:flock);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($gate, $tmp) = @ARGV;
+make_path("$tmp/slots");
+open(my $holder, '>>', "$tmp/slots/slot.0") or die "$!";
+flock($holder, LOCK_EX) or die "$!";
+local $ENV{FM_LINT_HOST_SLOTS} = 1;
+sub spawn {
+    my ($run) = @_;
+    my $pid = fork();
+    die "fork: $!" unless defined $pid;
+    if (!$pid) {
+        close $holder;
+        exec $^X, $gate, 'gate', "$tmp/slots", 18, $run, "$tmp/$run.wait", '--', $^X, '-e',
+            'open(my $fh, ">>", $ARGV[0]) or die "$!"; print {$fh} "$ARGV[1]\n"', "$tmp/order", $run;
+        die "exec: $!";
+    }
+    return $pid;
+}
+sub finish {
+    my ($pid, $what) = @_;
+    my $deadline = time() + 10;
+    while (waitpid($pid, WNOHANG) == 0) {
+        die "$what\n" if time() > $deadline;
+        sleep 0.01;
+    }
+    die "$what: status $?\n" if $?;
+}
+sub order {
+    open(my $fh, '<', "$tmp/order") or return '';
+    local $/;
+    return <$fh>;
+}
+my ($stopped, $live);
+my $error;
+eval {
+    $stopped = spawn('stopped');
+    my $deadline = time() + 10;
+    until (grep { /\.$stopped\.stopped\z/ } glob "$tmp/slots/queue.*") {
+        die "the older waiter never queued\n" if time() > $deadline;
+        sleep 0.01;
+    }
+    open(my $coordinator, '>>', "$tmp/slots/admission.lock") or die "$!";
+    while (1) {
+        kill 'STOP', $stopped;
+        if (flock($coordinator, LOCK_EX | LOCK_NB)) { flock($coordinator, LOCK_UN); last; }
+        kill 'CONT', $stopped;
+        die "could not stop the older waiter outside admission\n" if time() > $deadline;
+        sleep 0.05;
+    }
+    $live = spawn('live');
+    sleep 0.25;
+    close $holder;
+    finish($live, 'a stopped head waiter blocked a live waiter');
+    undef $live;
+    die "admission order was @{[order()]}\n" unless order() eq "live\n";
+    kill 'CONT', $stopped;
+    finish($stopped, 'the resumed waiter was never admitted');
+    undef $stopped;
+    die "admission order was @{[order()]}\n" unless order() eq "live\nstopped\n";
+};
+$error = $@;
+close $holder;
+for my $pid (grep { defined } $stopped, $live) { kill 'CONT', $pid; kill 'KILL', $pid; waitpid($pid, 0); }
+die $error if $error;
+PL
+  pass "a stopped head waiter is skipped while a slot is free and is admitted once resumed"
 }
 
 test_slot_pool_can_be_disabled_or_misconfigured() {
@@ -1631,7 +1772,7 @@ for my $failure (qw(open scan coordinator)) {
     die "fork: $!" unless defined $pid;
     if (!$pid) {
         open STDERR, '>', "$dir/err" or die "$!";
-        exec $^X, @inject, $gate, 'gate', "$dir/slots", 18, "$dir/wait",
+        exec $^X, @inject, $gate, 'gate', "$dir/slots", 18, 'fail', "$dir/wait",
             '--', $^X, '-e', 'print "analysis ran\n"; exit 23';
         die "exec: $!";
     }
@@ -1695,6 +1836,7 @@ for my $bounded ('none', $bound_mechanism eq 'perl' ? ('perl') : ()) {
     close $manifest;
     local %ENV = (%ENV, FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => 'off',
         FM_LINT_INTERNAL_SLOT_DIR => "$dir/slots", FM_LINT_INTERNAL_NCPU => 18,
+        FM_LINT_INTERNAL_RUN_ID => 'worker',
         FM_LINT_HOST_SLOTS => 1,
         FM_LINT_INTERNAL_BOUNDED => $bounded, FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
         FM_LINT_INTERNAL_ROOT_SECS => 10, FM_LINT_INTERNAL_GRACE => 1,
@@ -1729,7 +1871,7 @@ for my $bounded ('none', $bound_mechanism eq 'perl' ? ('perl') : ()) {
         $queued = fork();
         die "fork: $!" unless defined $queued;
         if (!$queued) {
-            exec $^X, $gate_script, 'gate', "$dir/slots", 18, "$dir/queued.wait",
+            exec $^X, $gate_script, 'gate', "$dir/slots", 18, 'queued', "$dir/queued.wait",
                 '--', $^X, '-e', q{
                     my ($admitted, $bounded, @protected) = @ARGV;
                     if ($bounded ne 'none') {
@@ -1826,6 +1968,7 @@ for my $retry (0, 1) {
     local %ENV = (%ENV, BASH_ENV => "$tmp/bash-env", RETRY => $retry,
         FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => 'off',
         FM_LINT_INTERNAL_SLOT_DIR => "$dir/slots", FM_LINT_INTERNAL_NCPU => 18,
+        FM_LINT_INTERNAL_RUN_ID => 'worker',
         FM_LINT_HOST_SLOTS => 1,
         FM_LINT_INTERNAL_BOUNDED => $bounded, FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
         FM_LINT_INTERNAL_ROOT_SECS => 3, FM_LINT_INTERNAL_GRACE => 1,
@@ -3790,6 +3933,8 @@ test_host_slots_bound_concurrent_runs
 test_oversubscribed_runs_share_the_cap_and_all_finish
 test_host_cap_is_cpu_derived_and_occupancy_bounded
 test_host_waiters_make_progress_without_barging
+test_unequal_runs_share_scarce_slots_per_run
+test_stopped_head_waiter_does_not_block_the_queue
 test_queue_scan_survives_odd_slot_paths_and_vanishing_tickets
 test_cached_success_does_not_wait_for_host_slots
 test_slot_pool_can_be_disabled_or_misconfigured

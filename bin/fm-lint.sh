@@ -63,10 +63,14 @@
 # or exit selection.
 # That bound is per run; only cold checks enter the host-wide pool, after cache
 # lookup and identical-miss serialization, so hits and duplicate waiters consume
-# no host slots. Live cold roots queue FIFO: a run has at most JOBS requests in
-# flight, and newly arriving roots cannot bypass an older request. Killed waiters
-# are skipped automatically. Admission needs only a free slot among the cap;
-# fairness does not increase host concurrency.
+# no host slots. Cold roots share the pool per lint run, not per worker: a free
+# slot goes to the waiting run holding the fewest slots, then the run served
+# least recently, so a two-worker run cannot take two turns for each turn of a
+# one-worker run. Within a run, roots stay FIFO and newer roots cannot bypass an
+# older one. Killed waiters, and waiters stopped for a second while a slot sits
+# free, are skipped automatically. Admission needs only a free slot among the
+# cap; fairness does not increase host concurrency. After an update to this
+# gate merges, restart in-flight lints that still run the older code.
 # FM_LINT_SLOT_DIR defaults to ${XDG_CACHE_HOME:-$HOME/.cache}/firstmate/lint-slots;
 # "off" disables the pool. Host load average never changes admission, so
 # unrelated machine load cannot starve lint.
@@ -303,7 +307,7 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   rm -f "$wait_file" "$rss_file.cache" "$rss_file.cache.wait"
   if [ "${FM_LINT_INTERNAL_SLOT_DIR:-off}" != off ]; then
     gate_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
-      "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$wait_file" --)
+      "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$FM_LINT_INTERNAL_RUN_ID" "$wait_file" --)
   fi
   if [ "${FM_LINT_INTERNAL_BOUNDED:-none}" != none ]; then
     # The watchdog runs in a process group of its own (the same setpgrp hop the
@@ -1889,6 +1893,7 @@ fm_lint_run_worker() {  # <worker-index>
     FM_LINT_PERL_BIN="$PERL_BIN"
   )
   worker_env+=(FM_LINT_INTERNAL_CACHE="$CACHE_DIR" FM_LINT_INTERNAL_SLOT_DIR="$SLOT_DIR" FM_LINT_INTERNAL_NCPU="$NCPU")
+  worker_env+=(FM_LINT_INTERNAL_RUN_ID="$$")
   if [ -n "$TELEMETRY" ] && [ -x /usr/bin/time ]; then
     if [ "$(uname)" = Darwin ]; then
       exec "$PERL_BIN" -e 'setpgrp(0, 0) or die "setpgrp: $!"; exec @ARGV or die "exec: $!"' \
