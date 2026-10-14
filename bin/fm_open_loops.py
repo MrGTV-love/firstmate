@@ -22,6 +22,7 @@ BIN = Path(__file__).resolve().parent
 GH_REST = BIN / "fm-gh-rest.sh"  # conditional REST reads and the shared quota floor
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
+    "unhandled_board_answer": 300,
     "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
     "open_pr": 3600, "red_check": 0, "coverage": 0,
 }
@@ -662,6 +663,27 @@ class Collector:
                          "answer or close this question, or record why it no longer applies",
                          int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}")
 
+    def board_answer_rows(self):
+        inbox = self.state / "procevent-inbox"
+        try:
+            results = sorted(inbox.iterdir())
+        except FileNotFoundError:
+            return
+        for result in results:
+            if result.suffix != ".result" or result.is_symlink() or not result.is_file():
+                continue
+            handled = result.with_suffix(".handled")
+            if handled.exists() or handled.is_symlink():
+                continue
+            owner_file = result.with_suffix(".owner-task")
+            task = None
+            if owner_file.is_file() and not owner_file.is_symlink():
+                task = self.source("board answer owner " + result.name, owner_file.read_text)
+            owner_task = task.strip() if task and task.strip() else "unknown (no owner task recorded)"
+            self.add("unhandled_board_answer", result.name,
+                     f"read and route the captured board answer {result}; owner task: {owner_task}",
+                     mtime(result), evidence=result)
+
     # -- run -------------------------------------------------------------------------------------
 
     def collect(self):
@@ -674,6 +696,7 @@ class Collector:
             self.source("open PRs " + slug, self.pr_rows, slug)
         self.source("workers", self.worker_rows)
         self.source("questions", self.question_rows)
+        self.source("board answers", self.board_answer_rows)
         if self.degraded:
             self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                      None, evidence="; ".join(self.degraded))

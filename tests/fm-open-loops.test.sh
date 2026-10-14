@@ -219,6 +219,72 @@ assert bad.returncode == 1 and 'unknown open-loop age category' in bad.stdout, b
 (home / 'config/open-loops.json').unlink()
 print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
 
+# Captured answers stay firstmate's obligation independently of the board owner's lifecycle.
+answer_inbox = home / 'state/procevent-inbox'
+answer_inbox.mkdir()
+def captured_answer(inbox, name, age, owner=None, handled=False):
+    result = inbox / (name + '.result')
+    result.write_text('captured board answer\n')
+    os.utime(result, (now - age, now - age))
+    if owner is not None:
+        result.with_suffix('.owner-task').write_text(owner + '\n')
+    if handled:
+        result.with_suffix('.handled').touch()
+    return result
+answers = [captured_answer(answer_inbox, 'lavish-overdue.1', 301, 'fresh'),
+           captured_answer(answer_inbox, 'lavish-boundary.1', 300, 'fresh'),
+           captured_answer(answer_inbox, 'lavish-fresh.1', 299, 'fresh'),
+           captured_answer(answer_inbox, 'lavish-dead.1', 601, 'gone'),
+           captured_answer(answer_inbox, 'lavish-parked.1', 301, 'parked-board'),
+           captured_answer(answer_inbox, 'lavish-missing.1', 301, 'missing-board'),
+           captured_answer(answer_inbox, 'lavish-unowned.1', 301),
+           captured_answer(answer_inbox, 'lavish-handled.1', 601, 'gone', handled=True)]
+parked_board = task('parked-board', world / 'absent-board', state='parked', exists=False, alive='dead')
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[*tasks, parked_board],
+                                                    backlog=dict(present=True, records=backlog))))
+answer_report = ledger('--heartbeat')
+answer_rows = rows(answer_report, 'unhandled_board_answer')
+assert set(answer_rows) == {p.name for p in answers[:-1]}, answer_report
+for result in answers[:-1]:
+    row = answer_rows[result.name]
+    assert row['owner'] == 'firstmate' and row['limit_seconds'] == 300, row
+    assert str(result) in row['next_action'], row
+    assert row['age_seconds'] == now - int(result.stat().st_mtime), row
+    assert row['overdue'] == (row['age_seconds'] >= 300), row
+    owner_file = result.with_suffix('.owner-task')
+    assert (owner_file.read_text().strip() if owner_file.exists() else 'unknown') in row['next_action'], row
+assert json.loads((home / 'state/open-loops.json').read_text()) == answer_report
+(home / 'config/open-loops.json').write_text(json.dumps(dict(age_limits_seconds=dict(unhandled_board_answer=600))))
+tuned_answers = rows(ledger(), 'unhandled_board_answer')
+assert not tuned_answers['lavish-overdue.1.result']['overdue'], tuned_answers
+assert tuned_answers['lavish-dead.1.result']['overdue'], tuned_answers
+assert tuned_answers['lavish-overdue.1.result']['limit_seconds'] == 600, tuned_answers
+(home / 'config/open-loops.json').unlink()
+answers[0].with_suffix('.handled').touch()
+assert answers[0].name not in rows(ledger(), 'unhandled_board_answer'), 'handling removes the obligation'
+
+# A secondmate collects and publishes only its own captured answers, without consulting the owner task.
+answer_lane = world / 'answer-secondmate'
+for name in ('state/procevent-inbox', 'data', 'config', 'projects'):
+    (answer_lane / name).mkdir(parents=True)
+(answer_lane / '.fm-secondmate-home').write_text('answer-lane\n')
+(answer_lane / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=[],
+                                                        backlog=dict(present=True, records=[]))))
+lane_answer = captured_answer(answer_lane / 'state/procevent-inbox', 'lavish-lane.6', 301, 'parked-owner')
+lane_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json', '--heartbeat'],
+                             env=dict(env, FM_HOME=str(answer_lane))))
+lane_rows = rows(lane_report, 'unhandled_board_answer')
+assert lane_report['complete'] and set(lane_rows) == {lane_answer.name}, lane_report
+assert lane_rows[lane_answer.name]['overdue'] and lane_rows[lane_answer.name]['owner'] == 'firstmate', lane_report
+assert str(lane_answer) in lane_rows[lane_answer.name]['next_action'], lane_report
+assert 'parked-owner' in lane_rows[lane_answer.name]['next_action'], lane_report
+assert json.loads((answer_lane / 'state/open-loops.json').read_text()) == lane_report
+assert lane_answer.name not in rows(ledger(), 'unhandled_board_answer'), 'primary must not sweep secondmate answers'
+shutil.rmtree(answer_inbox)
+(home / 'snapshot.json').write_text(json.dumps(dict(schema='fm-fleet-home-input.v1', tasks=tasks,
+                                                    backlog=dict(present=True, records=backlog))))
+print('PASS: board answer ages, handling, dead parked missing owners, and home-local secondmate publication', flush=True)
+
 # A PR for A cannot hide a local correction B, whether the PR is open or merged.
 def correction(path):
     (path / 'correction').write_text('B\n')
