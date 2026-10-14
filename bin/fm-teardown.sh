@@ -154,7 +154,7 @@
 # absent claim - a slot taken before claims existed, or already returned - keeps
 # the record-scan protection, because refusing it would strand every task in
 # flight across that change on no evidence at all. Independently, before any
-# forced Treehouse return (even without pool inventory), the slot's Git
+# forced Treehouse return of a Git directory (pool slot or not), its Git
 # worktree registrations must contain no nested
 # copy outside this task's individually proven copies; otherwise teardown
 # refuses, even with --force, and names each such copy. If an active record
@@ -2293,11 +2293,16 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
 # stale git index.lock left by a killed crew process. See the script header.
 teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-cleanup-check>]
   local dir=$1 cd_dir=$2 label=$3 owner=$4 post_cleanup_check=${5:-}
-  local out lock attempt=0 max_retries lock_desc
+  local out lock attempt=0 max_retries lock_desc check_custody=0
 
+  # A directory Git cannot open has no worktree registrations to prove; every
+  # Git directory, pool slot or not, must pass the custody check before each
+  # forced return. Decide once, so a target lost mid-retry is still refused.
+  ! git -C "$dir" rev-parse --git-dir >/dev/null 2>&1 || check_custody=1
   # Capture stdout+stderr so non-lock failures stay visible and lock failures can
   # be matched by signature even when the lock file is already gone mid-check.
-  require_registered_slot_copies "$owner" "$dir" || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+  [ "$check_custody" = 0 ] || require_registered_slot_copies "$owner" "$dir" \
+    || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
   if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
     [ -n "$out" ] && printf '%s\n' "$out"
     return 0
@@ -2323,7 +2328,8 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
     echo "teardown: $label return failed with transient git lock ($lock_desc); waiting ${TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS}s and retrying ($attempt/${max_retries})" >&2
     sleep "$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS"
 
-    require_registered_slot_copies "$owner" "$dir" || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+    [ "$check_custody" = 0 ] || require_registered_slot_copies "$owner" "$dir" \
+      || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
     if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
       [ -n "$out" ] && printf '%s\n' "$out"
       echo "teardown: $label return succeeded on retry; lock cleared on its own" >&2
@@ -2351,7 +2357,8 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
           return 1
         fi
       fi
-      require_registered_slot_copies "$owner" "$dir" || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
+      [ "$check_custody" = 0 ] || require_registered_slot_copies "$owner" "$dir" \
+        || return "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED"
       if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
         [ -n "$out" ] && printf '%s\n' "$out"
         echo "teardown: $label return succeeded after stale-lock cleanup" >&2

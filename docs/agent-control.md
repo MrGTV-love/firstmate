@@ -225,7 +225,7 @@ A finished record whose copy is nested in the slot also uses record-only retirem
 Then reassociate the remaining task to its real nested or external copy with `bin/fm-control.sh <remaining-task> reassociate --worktree <copy> --note <why>`.
 The existing component-aware exclusivity proof still requires finished nested scout records to retire first when they overlap the old root, even if their copy is disjoint from the replacement.
 Do not retire an unfinished task to clear custody: it keeps its record and claim until its own delivery proof passes.
-Before any forced Treehouse return, whether or not the directory is a pool slot, teardown also checks that directory's Git worktree registrations and refuses a nested copy that is not one of the retiring task's proven copies, naming each such copy; `--force` does not waive that custody proof.
+Before any forced Treehouse return of a Git directory, whether or not it is a pool slot, teardown also checks that directory's Git worktree registrations and refuses a nested copy that is not one of the retiring task's proven copies, naming each such copy; `--force` does not waive that custody proof.
 A child-worktree removal that hits this refusal stops there, with no `rm -rf` fallback, and a path that cannot be canonicalized is refused the same way.
 The refusal prints the reassociate command with `FM_HOME=/path/to/owning-home`, because the owning task's record may live in a different home than the one running teardown.
 A secondmate home that is a pool slot, and each descendant secondmate home, gets the same check before any endpoint, child, or record is touched.

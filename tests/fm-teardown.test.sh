@@ -6978,7 +6978,10 @@ test_docker_workdirs_canonicalize_and_exclude_foreign_lanes_and_tasktmp() {
   rc=0
   FM_FAKE_DOCKER_STORE="$store" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
     > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
-  expect_code 0 "$rc" "canonical-paths: teardown failed: $(cat "$case_dir/stderr")"
+  # The nested lanes are registered copies this task has not proven, so the
+  # forced return refuses them after the Docker sweep and keeps them.
+  expect_code 1 "$rc" "canonical-paths: unproven nested copies must stop the return: $(cat "$case_dir/stderr")"
+  assert_grep "contains registered copy $case_dir/wt/git-lane" "$case_dir/stderr" "canonical-paths: custody refusal omitted the nested Git worktree"
   assert_equals "nested-git-path nested-record-path symlink-foreign temporary-path " "$(docker_store_names "$store" container)" \
     "canonical-paths: canonical custody or worktree-only boundary was ignored"
   assert_present "$case_dir/state/foreign-lane.meta" "canonical-paths: foreign task record was removed"
