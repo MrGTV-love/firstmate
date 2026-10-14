@@ -1734,7 +1734,9 @@ An absent rules file, a default-only file, or `rules: []` returns the non-clear 
 
 The upstream agent decision escalates human, script, browser, desktop-dependent, and ambiguity scores above 1 to firstmate, because a worker profile cannot provision an unapproved handler or capability.
 The upstream model decision `fast` prefers the matched rule's configured Haiku/Luna candidates that pass the quota gates: eligible, with known positive headroom or a usable pool whose measurement is a disclosed unknown, and without established runway shorter than the task horizon.
-Among them, a sole usable pool clears and otherwise the composite ranks them; when none passes, the whole rule ranks as usual, so a vetoed or short cheap set never escalates or takes a stand-in while an approved candidate in that rule has headroom.
+Among them, a sole usable pool clears and otherwise the composite ranks them.
+When no cheap candidate passes, the whole rule ranks as usual: an exhausted or floor-vetoed cheap set leaves the rule's remaining approved candidates to be ranked before any stand-in is considered, and an established-short cheap candidate only leaves the preferred set, so an overall short winner still escalates under its own identity.
+This is not a guarantee of `clear`: a genuine tie, no comparable quota evidence, or an overall short winner still escalates.
 `powerful` excludes Haiku/Luna candidates.
 The adapter never imports a cheaper candidate from another rule.
 The upstream effort threshold maps scores above 1 to high, otherwise low, then code clamps each profile to its configured effort floor; Haiku uses max.
