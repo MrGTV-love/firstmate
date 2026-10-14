@@ -649,6 +649,44 @@ test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
   pass "strongest-model exhaustion neither spends saved resets nor weakens or discards the task"
 }
 
+test_spawn_refuses_api_billed_routes() {
+  local provider kind rec id out status
+  local -a args
+  for provider in openai openrouter; do
+    for kind in ship scout secondmate; do
+      id="omp-api-$provider-$kind"
+      rec=$(make_spawn_case "$id" omp "$id")
+      read_case_record "$rec"
+      case "$kind" in
+        ship) args=(--mode local-only --yolo off) ;;
+        scout) args=(--scout) ;;
+        secondmate) args=(--secondmate) ;;
+      esac
+      out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+        "$id" "$PROJ_DIR" --harness omp --model "$provider/gpt-6.1-sol" "${args[@]}" 2>&1)
+      status=$?
+      expect_code 1 "$status" "API-billed omp route must refuse $kind: $out"
+      assert_contains "$out" "openai-codex/" "refusal must name the subscription route"
+      [ ! -s "$LAUNCH_LOG" ] || fail "API-billed route reached $kind launch"
+      assert_absent "$HOME_DIR/state/$id.meta" "refusal must not publish task metadata"
+    done
+  done
+  for provider in openai openrouter; do
+    id="omp-api-indexed-$provider"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    printf '{"version":1,"roles":{"strong":{"omp":{"model":"%s/gpt-6.1-sol"}}},"retired":[]}\n' "$provider" \
+      > "$HOME_DIR/config/model-index.json"
+    out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+      "$id" "$PROJ_DIR" --harness omp --model role:strong 2>&1)
+    expect_code 1 $? "indexed API-billed route must refuse: $out"
+    assert_contains "$out" 'openai-codex/' "indexed model must not bypass the billing guard"
+    [ ! -s "$LAUNCH_LOG" ] || fail "indexed API-billed route launched"
+    assert_absent "$HOME_DIR/state/$id.meta" "indexed refusal must publish no metadata"
+  done
+  pass "fm-spawn refuses omp openai and openrouter routes before any worker launches"
+}
+
 test_spawn_model_validation_scoped_to_listed_providers() {
   local rec id out status
   rec=$(make_spawn_case model-refused omp omp-model-refused-q2)
@@ -3887,6 +3925,7 @@ test_watch_lifecycle_deadline_diagnostics() {
 test_watch_lifecycle_deadline_diagnostics
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
+test_spawn_refuses_api_billed_routes
 test_spawn_launch_line_and_worker_wiring
 test_no_helpers_rejects_nonworker_launches
 test_no_helpers_launch_contract

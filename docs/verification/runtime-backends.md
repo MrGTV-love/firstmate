@@ -3474,6 +3474,26 @@ Its native App Server peer and watcher-close process are deterministic fixtures;
 omp runs crewmate, scout, secondmate, and primary work; [`supervision.md`](supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.
 The evidence below was produced on 2026-09-05 against omp 18.1.11 (`~/.local/bin/omp`, a Bun-compiled single binary) on macOS 26 arm64 through the Herdr backend with the `openai-codex/gpt-6-astra` model, building on the 2026-09-02 adapter investigation against 18.1.2.
 
+### Billing-route configuration inspection
+
+Verified 2026-10-14 on macOS arm64 with `omp --version` reporting `omp/18.10.4`, without a model request.
+`omp config get modelRoles --json` exposed string entries for `default`, `vision`, and `tiny`; `omp config get retry.fallbackChains --json` exposed a mapping from role/model/provider selectors to ordered selector arrays.
+The production diagnostic reads that YAML directly rather than invoking Settings or printing provider credentials; [`fm-api-key-guard-lib.sh`](../../bin/fm-api-key-guard-lib.sh) owns its read-only boundary.
+
+With a fresh temporary `HOME`, the installed binary's `omp config path` returned these paths for the following environment selections:
+
+| Environment selection | Reported agent directory relative to the temporary home |
+| --- | --- |
+| No directory or profile override | `.omp/agent` |
+| `PI_CODING_AGENT_DIR=<temporary-home>/agent-override` | `agent-override` |
+| `OMP_PROFILE=billing-probe` | `.omp/profiles/billing-probe/agent` |
+| Both overrides above | `.omp/profiles/billing-probe/agent` |
+| `PI_PROFILE=billing-probe` only | `.omp/agent` |
+
+Refresh the schema and directory observations with the same model-free commands after an omp upgrade.
+`bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh tests/fm-bootstrap.test.sh tests/fm-remote-doctor.test.sh` exercises the public rejection and diagnostic paths with isolated configuration and no paid model launch.
+A public `fm-bootstrap.sh` detect-only local smoke reported all three forbidden roles and forbidden fallback keys/targets, left the fixture config byte-identical, and omitted its credential sentinel.
+
 ### Process identity and markers
 
 `ps -o comm=` reports the bare name `omp` for the agent process, from both its `!` bash path and the model's bash tool, so identity is the anchored name; `ompd` and `comp` never match.

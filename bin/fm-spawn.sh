@@ -267,9 +267,12 @@
 #   config/claude-permission-mode is not mapped: Devin auto approves read-only
 #   tools, unlike Claude auto. Effort is part of Devin model ids, so the
 #   independent --effort axis is recorded but omitted from argv.
-#   For omp (Oh My Pi), fm-spawn resolves the `omp` executable from PATH once and
-#   refuses when it is absent. Every omp launch clears the foreign harness
-#   markers (omp publishes none of its own), sets the Firstmate-owned
+#   For omp (Oh My Pi), explicit openai/* and openrouter/* model selections
+#   are refused before launch because they bill APIs; use openai-codex/<gpt-model>
+#   for the GPT subscription route. This applies to resolved model-index and
+#   dispatch-profile selections too, regardless of catalog availability.
+#   fm-spawn resolves the `omp` executable from PATH once and refuses when absent.
+#   Every omp launch clears the foreign harness markers (omp publishes none of its own), sets the Firstmate-owned
 #   FM_OMP_HARNESS=omp detection marker, suppresses the first-run provider
 #   wizard with OMP_SKIP_SETUP=1, forces --auto-approve, pins the working
 #   directory with --cwd, and passes the tracked session posture overlay
@@ -2993,6 +2996,12 @@ else
   MODEL_INDEXED=0
 fi
 
+# Do not let dispatch fallback selection turn a forbidden explicit route into
+# an apparently accepted spawn. The final launch check also covers a stand-in.
+if [ "$HARNESS" = omp ]; then
+  fm_omp_api_billing_route_check "$MODEL" || exit 1
+fi
+
 # Preserve the chosen rule through launch and recovery. Only declared stand-ins
 # may replace a proven exhausted route; unknown OMP quota is never single-account
 # quota-axi exhaustion. Secondmate and raw launch identities remain unchanged.
@@ -3128,6 +3137,7 @@ cursor)
   fi
   ;;
 omp)
+  fm_omp_api_billing_route_check "$MODEL" || exit 1
   OMP_BIN=$(resolve_pi_executable omp) || {
     echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
     exit 1

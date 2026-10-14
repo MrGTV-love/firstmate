@@ -29,6 +29,7 @@ set -u
 BASE_PATH=${FM_TEST_BASE_PATH:-/usr/bin:/bin:/usr/sbin:/sbin}
 TMP_ROOT=$(fm_test_tmproot fm-bootstrap-tests)
 export FM_BACKEND_CMUX_BUNDLE_BIN="$TMP_ROOT/no-bundled-cmux"
+export PI_CODING_AGENT_DIR="$TMP_ROOT/no-ambient-omp-config" OMP_PROFILE='' PI_PROFILE=''
 
 # Hermetic runtime-backend detection. These cases pin the backend per-home via
 # config/backend; the dev shell's ambient runtime markers ($TMUX inside tmux,
@@ -251,6 +252,73 @@ assert_timeout_report() {
 #   mode=empty -> output must be empty (expect/notcontains ignored)
 #   mode=exact -> output must equal <expect>
 #   mode=grep  -> output must contain <expect> (fixed string); <notcontains> must not appear
+test_omp_api_billing_config_diagnostics() {
+  local case_dir fakebin out phase profile agent config override selected_profile field
+  case_dir="$TMP_ROOT/omp-billing"
+  fakebin=$(make_fake_toolchain "$case_dir")
+  mkdir -p "$case_dir/home/config" "$case_dir/user/.omp/agent"
+  printf 'manual\n' > "$case_dir/home/config/backlog-backend"
+  cat > "$fakebin/omp" <<'SH'
+#!/usr/bin/env bash
+printf 'called\n' >> "$FM_TEST_OMP_CALLS"
+exit 1
+SH
+  chmod +x "$fakebin/omp"
+  for profile in default override named; do
+    agent="$case_dir/user/.omp/agent"
+    override='' selected_profile=''
+    case "$profile" in
+      override) agent="$case_dir/custom-agent"; override=$agent ;;
+      named) agent="$case_dir/user/.omp/profiles/billing-test/agent"; override="$case_dir/unused-agent"; selected_profile=billing-test ;;
+    esac
+    mkdir -p "$agent"
+    config="$agent/config.yml"
+    cat > "$config" <<'YAML'
+modelRoles:
+  default: openai/gpt-6.1-sol:high
+  vision: openrouter/openai/gpt-6.1-sol
+  tiny: openai/gpt-6-mini
+retry:
+  fallbackChains:
+    default: ['openrouter/openai/gpt-6.1-sol:high', openai-codex/gpt-6.1-sol]
+    openai/*: [deepseek/deepseek-v4-flash]
+providers:
+  secret: do-not-print-this-credential
+YAML
+    cp "$config" "$case_dir/before.yml"
+    for phase in skip only; do
+      out=$(PATH="$fakebin:$BASE_PATH" HOME="$case_dir/user" FM_HOME="$case_dir/home" \
+        FM_ROOT_OVERRIDE="$case_dir/home" FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK="$phase" \
+        FM_FAKE_TREEHOUSE_LEASE_HELP=1 FM_TEST_OMP_CALLS="$case_dir/omp-calls" \
+        PI_CODING_AGENT_DIR="$override" OMP_PROFILE="$selected_profile" \
+        "$ROOT/bin/fm-bootstrap.sh" 2>&1)
+      if [ "$phase" = skip ]; then
+        for field in modelRoles.default modelRoles.vision modelRoles.tiny 'retry.fallbackChains target[0][0]' 'retry.fallbackChains key[1]'; do
+          assert_contains "$out" "OMP_API_BILLING: $field" "$profile must report $field"
+        done
+        assert_contains "$out" 'openai-codex/<gpt-model>' "diagnostic must name the subscription remedy"
+      else
+        assert_not_contains "$out" 'OMP_API_BILLING:' "network phase must not duplicate local diagnostic"
+      fi
+      assert_not_contains "$out" 'do-not-print-this-credential' "configuration diagnostics exposed credentials"
+      cmp -s "$config" "$case_dir/before.yml" || fail "diagnostics changed omp config"
+      assert_absent "$case_dir/omp-calls" "diagnostic invoked omp instead of reading YAML"
+    done
+  done
+  printf 'modelRoles:\n  default: openai-codex/gpt-6.1-sol:high\n  vision: deepseek/deepseek-v4-flash\n  tiny: ollama/qwen3:8b\nretry:\n  fallbackChains:\n    default: [openai-codex/gpt-6.1-sol, deepseek/deepseek-v4-flash]\n' > "$config"
+  out=$(PATH="$fakebin:$BASE_PATH" HOME="$case_dir/user" FM_HOME="$case_dir/home" \
+    FM_ROOT_OVERRIDE="$case_dir/home" FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 PI_CODING_AGENT_DIR='' OMP_PROFILE=billing-test "$ROOT/bin/fm-bootstrap.sh" 2>&1)
+  assert_not_contains "$out" 'OMP_API_BILLING:' "subscription and unrelated providers must stay unflagged"
+  printf 'modelRoles: [do-not-print-this-credential\n' > "$config"
+  out=$(PATH="$fakebin:$BASE_PATH" HOME="$case_dir/user" FM_HOME="$case_dir/home" \
+    FM_ROOT_OVERRIDE="$case_dir/home" FM_BOOTSTRAP_DETECT_ONLY=1 FM_BOOTSTRAP_NETWORK=skip \
+    FM_FAKE_TREEHOUSE_LEASE_HELP=1 PI_CODING_AGENT_DIR='' OMP_PROFILE=billing-test "$ROOT/bin/fm-bootstrap.sh" 2>&1)
+  assert_contains "$out" 'OMP_API_BILLING: cannot inspect omp configuration' "invalid YAML must not claim a clean configuration"
+  assert_not_contains "$out" 'do-not-print-this-credential' "parser exception exposed configuration content"
+  pass "bootstrap reports API-billed omp roles and fallback keys/targets locally without model calls, secrets or config writes"
+}
+
 test_bootstrap_reporting() {
   local label lease tasks quota backend mode expect notcontains case_dir fakebin out n archive_body multi_id
   n=0
@@ -1679,6 +1747,7 @@ test_opted_in_suite_starts_one_detector_runner_and_reaps_it() {
   pass "an opted-in suite starts exactly one detector runner and reaps it at exit"
 }
 
+test_omp_api_billing_config_diagnostics
 test_remote_guarded_pair_notifications
 test_model_roles_preserve_offline_bootstrap
 test_bootstrap_arms_the_process_pileup_detector_in_the_primary_home_only

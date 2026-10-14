@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Shared Claude API key guard check for firstmate spawns and relaunches.
+# Shared API billing guards for Firstmate launches and configuration diagnostics.
 # Usage: source after bin/fm-config-inherit-lib.sh is available.
 #
 # This is the shared preflight for refusing a Claude worker when an Anthropic
@@ -12,6 +12,67 @@
 # both credential variables when billing has not been opted into.
 #
 # See docs/configuration.md "Claude API key guard" for semantics.
+
+# fm_omp_api_billing_route_check <model>
+# Explicit openai/* and openrouter/* routes bill APIs, regardless of catalog
+# availability or model-index membership. Never resolve or call those models.
+fm_omp_api_billing_route_check() {
+  case "$1" in
+    openai/* | openrouter/*)
+      echo "error: omp ${1%%/*}/* routes use API billing; select --model openai-codex/<gpt-model> instead" >&2
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+# fm_omp_api_billing_config_diagnostics
+# Read only the active global config, using omp's OMP_PROFILE precedence over
+# PI_CODING_AGENT_DIR and HOME. Report default, vision, tiny and fallback chain
+# keys/targets without emitting arbitrary config values, secrets or parser
+# exceptions. Neither omp Settings nor a provider is invoked; no config changes.
+# Missing config is silent; an existing unreadable config is diagnostic, not a
+# clean bill of health. Output is shared by bootstrap and remote doctor.
+fm_omp_api_billing_config_diagnostics() {
+  local agent_dir=${PI_CODING_AGENT_DIR:-$HOME/.omp/agent}
+  if [ -n "${OMP_PROFILE:-}" ]; then
+    agent_dir="$HOME/.omp/profiles/$OMP_PROFILE/agent"
+  fi
+  [ -e "$agent_dir/config.yml" ] || [ -L "$agent_dir/config.yml" ] || return 0
+  command -v ruby >/dev/null 2>&1 || {
+    echo "cannot inspect omp configuration: install Ruby for the read-only YAML check"
+    return 0
+  }
+  ruby -ryaml -e '
+begin
+  config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
+  config = {} if config.nil?
+  raise TypeError unless config.is_a?(Hash)
+  roles = config.fetch("modelRoles", {})
+  retry_config = config.fetch("retry", {})
+  raise TypeError unless roles.is_a?(Hash) && retry_config.is_a?(Hash)
+  chains = retry_config.fetch("fallbackChains", {})
+  raise TypeError unless chains.is_a?(Hash)
+  findings = []
+  report = lambda do |field, value|
+    next unless value.is_a?(String)
+    provider = value.split("/", 2).first
+    if value.start_with?("openai/", "openrouter/")
+      findings << "#{field} uses #{provider}/* (API billing); use openai-codex/<gpt-model> instead"
+    end
+  end
+  %w[default vision tiny].each { |role| report.call("modelRoles.#{role}", roles[role]) }
+  chains.each_with_index do |(key, targets), index|
+    raise TypeError unless targets.is_a?(Array)
+    report.call("retry.fallbackChains key[#{index}]", key)
+    targets.each_with_index { |target, slot| report.call("retry.fallbackChains target[#{index}][#{slot}]", target) }
+  end
+  puts findings
+rescue StandardError
+  puts "cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration"
+end
+' "$agent_dir/config.yml" 2>/dev/null || echo "cannot inspect omp configuration: Ruby YAML check failed"
+}
 
 # fm_api_key_guard_launch_env_config <config-dir>
 # Reads the same allowlist used to construct the launch, setting
