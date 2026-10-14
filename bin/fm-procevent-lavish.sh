@@ -28,9 +28,12 @@
 #            annotations; it is labeled SESSION-ENDING MESSAGE, and counted as
 #            session_ending_message_count, only when the session ended, and is
 #            otherwise CAPTAIN MESSAGE and captain_message_count. Declared and
-#            presented item counts,
-#            plus a completeness verdict, follow before all annotations so a
-#            partial read is obvious. Each annotation retains its element uid,
+#            presented item counts, plus a completeness verdict, follow before
+#            all annotations so a partial read is obvious. Both TOON table and
+#            list collections are accepted. An unparseable collection header
+#            (or feedback without one) prints parse_status: unreadable and
+#            complete: no, and exits nonzero rather than certifying an empty
+#            capture. Each annotation retains its element uid,
 #            selector, tag, and text. A non-choice freeform comment (`prompt`)
 #            is printed as its own field even when a selector is also present
 #            and even when that comment matches the element text, so typed
@@ -1114,9 +1117,110 @@ cmd_terminal() {
   return 1
 }
 
+# Decode the two published TOON collection forms once for read and choice rows.
+# List items have scalar fields at four spaces; nested target metadata is deeper
+# and must not overwrite the item text or selector. Only column-zero headers
+# frame a collection, never captain-supplied indented text.
+result_items() {  # <result-file>
+  perl -MJSON::PP -e '
+    use strict; use warnings;
+    open my $fh, "<:encoding(UTF-8)", $ARGV[0] or die "cannot read result: $!\n";
+    my ($kind, $want, $form, @fields, @rows);
+    my $header = "absent";
+    while (my $line = <$fh>) {
+      if ($header eq "absent") {
+        next unless $line =~ /^(?:prompts|feedback)/;
+        if ($line =~ /^(prompts|feedback)\[(\d+)\](?:\{([^}]+)\})?:\s*$/) {
+          ($kind, $want, my $columns) = ($1, 0 + $2, $3);
+          $form = defined($columns) ? "table" : "list";
+          @fields = split /,/, $columns, -1 if defined $columns;
+          $header = $form;
+          $header = "unreadable" if grep { !/\A[A-Za-z][A-Za-z0-9_]*\z/ } @fields;
+        } else {
+          $header = "unreadable";
+        }
+        last if $header eq "unreadable";
+        next;
+      }
+      last unless $line =~ /^\s/;
+      chomp $line;
+      push @rows, $line;
+    }
+    close $fh or die "cannot close result: $!\n";
+    my (@parsed, $malformed);
+    $malformed = 0;
+    sub scalar_value {
+      my ($value) = @_;
+      return $value unless $value =~ /^"/;
+      my $decoded = eval { JSON::PP->new->decode($value) };
+      die "invalid quoted field" if $@ || !defined($decoded) || ref($decoded);
+      return $decoded;
+    }
+    if ($header eq "table") {
+      for my $row (@rows) {
+        $row =~ s/^\s+//;
+        my @vals;
+        while (length $row) {
+          if ($row =~ s/^"((?:[^"\\]|\\.)*)"//) {
+            push @vals, $1;
+          } else {
+            $row =~ s/^([^,]*)//;
+            push @vals, $1;
+          }
+          last unless $row =~ s/^,//;
+        }
+        # Older captures emit unquoted freeform text containing commas.
+        if (@vals > @fields) {
+          my ($preserve) = grep { $fields[$_] eq "prompt" } 0 .. $#fields;
+          ($preserve) = grep { $fields[$_] eq "text" } 0 .. $#fields unless defined $preserve;
+          if (defined $preserve) {
+            my @parts = splice @vals, $preserve, @vals - @fields + 1;
+            splice @vals, $preserve, 0, join(",", @parts);
+          }
+        }
+        if (@vals != @fields || length $row) { $malformed++; next }
+        s/\\(.)/$1 eq "n" ? "\n" : $1 eq "t" ? "\t" : $1 eq "r" ? "\r" : $1/ge for @vals;
+        my %item;
+        @item{@fields} = @vals;
+        push @parsed, \%item;
+      }
+    } elsif ($header eq "list") {
+      my ($item, $invalid);
+      my $finish = sub {
+        return unless defined $item;
+        my @required = $kind eq "prompts" ? qw(uid prompt selector tag text) : qw(text);
+        if ($invalid || grep { !exists $item->{$_} } @required) { $malformed++ }
+        else { push @parsed, $item }
+      };
+      for my $line (@rows) {
+        if ($line =~ /^  - (.*)$/) {
+          $finish->();
+          $item = {}; $invalid = 0;
+          $line = "    $1";
+        }
+        if (!defined $item) { $malformed++; next }
+        if ($line =~ /^    ([A-Za-z][A-Za-z0-9_]*):(?: (.*))?$/) {
+          my ($key, $value) = ($1, $2);
+          # A nested object (notably target:) is not an item scalar.
+          next unless defined $value;
+          if (exists $item->{$key}) { $invalid = 1; next }
+          my $decoded = eval { scalar_value($value) };
+          if ($@) { $invalid = 1; next }
+          $item->{$key} = $decoded;
+        } elsif ($line !~ /^      /) {
+          $invalid = 1;
+        }
+      }
+      $finish->();
+    }
+    print encode_json({ header => $header, want => $want, kind => $kind,
+      parsed => \@parsed, malformed => $malformed });
+  ' "$1"
+}
+
 # Whether a completed result carries any queued content block at all. The
-# published response frames content as a top-level `prompts[N]{...}:` or
-# `feedback[N]{...}:` header whose rows are INDENTED, so this anchors on column
+# published response frames content as a top-level table or list header for
+# `prompts[N]` or `feedback[N]` whose rows are INDENTED, so this anchors on column
 # zero: an indented payload line is captain-supplied text and must never be able
 # to forge - or, here, to hide behind - a content header. Any recognized block
 # is content regardless of its declared count, while a malformed top-level
@@ -1127,7 +1231,7 @@ cmd_terminal() {
 # failed" is never proof that nothing was said.
 result_has_queued_content() {  # <result-file>
   awk '
-    /^(prompts|feedback)\[[0-9]+\]\{[^}]*\}:[[:space:]]*$/ {
+    /^(prompts|feedback)\[[0-9]+\](\{[^}]*\})?:[[:space:]]*$/ {
       verdict = "present"
       exit
     }
@@ -1166,10 +1270,9 @@ cmd_silent() {
 # Print `key<TAB>answer<TAB>label[<TAB>mode]` for each non-reconcile structured choice the
 # captain submitted in a captured result; the optional mode column relays the
 # card's declared close mode (`done` or `release`) to the keyed-answer intake. The published response frames queued feedback as
-# a `prompts[N]{field,...}:` header followed by exactly N indented CSV rows whose
-# quoted fields carry JSON-style escapes, so this reads the declared field ORDER
-# rather than assuming a fixed column, and takes only rows whose `tag` field is
-# `choice`. A freeform `message` row is captain prose and is deliberately never a
+# a table (`prompts[N]{field,...}:` with indented CSV rows) or a list
+# (`prompts[N]:` with indented objects). The shared decoder reads declared table
+# field order or list scalar keys and takes only rows whose `tag` is `choice`. A freeform `message` row is captain prose and is deliberately never a
 # source of decision keys. docs/captain-hold-lifecycle.md (How a board selection
 # creates a request) owns the versioned and legacy context contract. Resolve the
 # latest valid row before filtering either output so legacy Reconcile cannot
@@ -1181,46 +1284,23 @@ cmd_choice_rows() {
   local selection=$1 file=${2-}
   [ -n "$file" ] || usage
   [ -f "$file" ] && [ ! -L "$file" ] || die "result file does not exist: $file"
-  perl -MJSON::PP -e '
+  result_items "$file" | perl -MJSON::PP -e '
     use strict; use warnings;
-    my ($selection, $path) = @ARGV;
-    open my $fh, "<", $path or exit 1;
-    my (@fields, $want, @rows);
-    while (my $line = <$fh>) {
-      if (!@fields) {
-        next unless $line =~ /^prompts\[(\d+)\]\{([^}]*)\}:\s*$/;
-        ($want, @fields) = ($1, split /,/, $2);
-        next;
-      }
-      last unless $line =~ /^\s/;
-      last if @rows >= $want;
-      chomp $line;
-      push @rows, $line;
-    }
-    close $fh;
+    my ($selection, $lifecycle) = @ARGV;
+    binmode STDOUT, ":encoding(UTF-8)";
+    my $capture = decode_json(do { local $/; <STDIN> });
+    exit 1 if $capture->{header} eq "unreadable"
+      || ($capture->{header} eq "absent" && $lifecycle =~ /^(?:feedback|unknown)$/);
+    exit 0 unless defined($capture->{kind}) && $capture->{kind} eq "prompts";
     my %seen;
     my @choices;
-    for my $row (@rows) {
-      $row =~ s/^\s+//;
-      my @vals;
-      while (length $row) {
-        if ($row =~ s/^"((?:[^"\\]|\\.)*)"//) {
-          my $v = $1;
-          $v =~ s/\\(.)/$1 eq "n" ? "\n" : $1 eq "t" ? "\t" : $1 eq "r" ? "\r" : $1/ge;
-          push @vals, $v;
-        } else {
-          $row =~ s/^([^,]*)//;
-          push @vals, $1;
-        }
-        last unless $row =~ s/^,//;
-      }
-      my %f;
-      $f{$fields[$_]} = $vals[$_] for 0 .. $#fields;
+    for my $item (@{$capture->{parsed}}) {
+      my %f = %$item;
       next unless defined $f{tag} && $f{tag} eq "choice";
       my $prompt = $f{prompt};
       next unless defined $prompt && $prompt =~ /Context data:\s*(\{.*\})/s;
       my $ctx = $1;
-      my $data = eval { decode_json($ctx) };
+      my $data = eval { JSON::PP->new->decode($ctx) };
       next unless ref($data) eq "HASH";
       my ($key, $selected, $note, $answer, $legacy);
       if (defined($data->{schema}) && !ref($data->{schema})
@@ -1285,7 +1365,7 @@ cmd_choice_rows() {
         ? "$choice->{key}\t$choice->{answer}\t$choice->{label}\t$choice->{mode}\n"
         : "$choice->{key}\t$choice->{answer}\t$choice->{label}\n";
     }
-  ' "$selection" "$file"
+  ' "$selection" "$(cmd_classify "$file")"
 }
 
 cmd_answers() { cmd_choice_rows answers "$@"; }
@@ -1305,58 +1385,18 @@ cmd_read() {
   [ -f "$file" ] && [ ! -L "$file" ] || die "result file does not exist: $file"
   lifecycle=$(cmd_classify "$file")
   session_ended=$(session_field "$file" session_ended)
-  perl -e '
+  result_items "$file" | perl -MJSON::PP -e '
     use strict; use warnings;
-    my ($path, $lifecycle, $session_ended) = @ARGV;
-    open my $fh, "<", $path or exit 1;
-    my (@fields, $want, @rows);
-    while (my $line = <$fh>) {
-      if (!@fields) {
-        next unless $line =~ /^(?:prompts|feedback)\[(\d+)\]\{([^}]*)\}:\s*$/;
-        ($want, @fields) = ($1, split /,/, $2);
-        next;
-      }
-      last unless $line =~ /^\s/;
-      last if defined($want) && @rows >= $want;
-      chomp $line;
-      push @rows, $line;
-    }
-    close $fh;
-    $want = 0 unless defined $want;
-    my @parsed;
-    my $malformed = 0;
-    for my $row (@rows) {
-      $row =~ s/^\s+//;
-      my @vals;
-      while (length $row) {
-        if ($row =~ s/^"((?:[^"\\]|\\.)*)"//) {
-          push @vals, $1;
-        } else {
-          $row =~ s/^([^,]*)//;
-          push @vals, $1;
-        }
-        last unless $row =~ s/^,//;
-      }
-      if (@vals > @fields) {
-        my ($preserve) = grep { $fields[$_] eq "prompt" } 0 .. $#fields;
-        ($preserve) = grep { $fields[$_] eq "text" } 0 .. $#fields unless defined $preserve;
-        if (defined $preserve) {
-          my $count = @vals - @fields + 1;
-          my @parts = splice @vals, $preserve, $count;
-          splice @vals, $preserve, 0, join(",", @parts);
-        }
-      }
-      if (@vals != @fields) {
-        $malformed++;
-        next;
-      }
-      s/\\(.)/$1 eq "n" ? "\n" : $1 eq "t" ? "\t" : $1 eq "r" ? "\r" : $1/ge for @vals;
-      my %f;
-      $f{$fields[$_]} = $vals[$_] for 0 .. $#fields;
-      push @parsed, \%f;
-    }
+    my ($lifecycle, $session_ended) = @ARGV;
+    binmode STDOUT, ":encoding(UTF-8)";
+    my $capture = decode_json(do { local $/; <STDIN> });
+    my $unreadable = $capture->{header} eq "unreadable"
+      || ($capture->{header} eq "absent" && $lifecycle =~ /^(?:feedback|unknown)$/);
+    my $want = $unreadable ? "unreadable" : (defined($capture->{want}) ? $capture->{want} : 0);
+    my @parsed = @{$capture->{parsed}};
+    my $malformed = $capture->{malformed};
     my $presented = scalar @parsed;
-    my $complete = ($presented == $want && !$malformed) ? "yes" : "no";
+    my $complete = (!$unreadable && $presented == $want && !$malformed) ? "yes" : "no";
     my @messages;
     my @annotations;
     for my $f (@parsed) {
@@ -1393,6 +1433,7 @@ cmd_read() {
       print "SESSION-ENDING MESSAGE: (none)\n";
     }
     print "\n";
+    print "parse_status: ", ($unreadable ? "unreadable" : "readable"), "\n";
     print "declared_items: $want\n";
     print "presented_items: $presented\n";
     print "malformed_items: $malformed\n";
@@ -1427,10 +1468,11 @@ cmd_read() {
       }
       print "END ANNOTATIONS\n";
     } else {
-      print "ANNOTATIONS: (none)\n";
+      print $unreadable ? "ANNOTATIONS: (unreadable)\n" : "ANNOTATIONS: (none)\n";
     }
     print "END LAVISH RESULT ($presented of $want)\n";
-  ' "$file" "$lifecycle" "$session_ended"
+    exit 1 if $unreadable;
+  ' "$lifecycle" "$session_ended"
 }
 
 # --- orphans: leftover poll processes no listener owns -----------------------
