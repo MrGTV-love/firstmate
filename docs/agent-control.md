@@ -86,6 +86,7 @@ A relaunch does take one session reference when the endpoint's own runtime recor
    Claude replacements also honor the home's [Claude launcher](configuration.md#claude-launcher-configclaude-launcher) preflight.
    The resolved replacement is also subject to the home's [session launch policy](configuration.md#session-launch-policy-configsession-launch-policy) before checkpointing.
    Model resolution and selected-entry catalog preflight follow the [fleet model-index contract](configuration.md#fleet-model-index-configmodel-indexjson) before the old agent stops.
+   Omp replacements must pass the [launch owner's billing-route admission](../bin/fm-spawn.sh) for explicit, recorded, indexed, and secondmate-pinned model selections before checkpointing or stopping the old agent.
    Ship and scout replacements also pass the [worker tool exclusion checks](configuration.md#worker-tool-exclusions-configcrew-exclude-tools) at this step.
 2. **Check replacement admission, then checkpoint.**
    The control plane checks the launch owner's read-only backlog admission before appending a note or stopping the old agent, so a predictable held or dependency-blocked replacement refusal leaves that owner intact.

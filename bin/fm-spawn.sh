@@ -268,9 +268,18 @@
 #   tools, unlike Claude auto. Effort is part of Devin model ids, so the
 #   independent --effort axis is recorded but omitted from argv.
 #   For omp (Oh My Pi), explicit openai/* and openrouter/* model selections
-#   are refused before launch because they bill APIs; use openai-codex/<gpt-model>
-#   for the GPT subscription route. This applies to resolved model-index and
-#   dispatch-profile selections too, regardless of catalog availability.
+#   are refused before launch regardless of provider-qualifier case because
+#   they bill APIs; use openai-codex/<gpt-model> for the GPT subscription route.
+#   This applies to resolved model-index and dispatch-profile selections too,
+#   regardless of catalog availability. Dispatch fallback admission excludes
+#   these routes from both launch-time selection and generated native chains.
+#   Raw --model <value>, --model=<value>, and -m <value> arguments are checked
+#   when literal, including shell escapes and ANSI-C quoting, even with profile
+#   selection or unrelated expansions. The scan skips supported non-model
+#   option operands but keeps flag-looking successors visible after the
+#   extension-shadowable --plan flag. It never evaluates shell substitutions
+#   or expansions to establish a model selection; this check is separate from
+#   the conservative raw default-role directory evidence described below.
 #   fm-spawn resolves the `omp` executable from PATH once and refuses when absent.
 #   Every omp launch clears the foreign harness markers (omp publishes none of its own), sets the Firstmate-owned
 #   FM_OMP_HARNESS=omp detection marker, suppresses the first-run provider
@@ -336,8 +345,8 @@
 #   Secondmate lanes keep their memory settings; the captain's own
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written or
 #   renamed by Firstmate.
-#   A non-index-entry literal <provider>/<id> is validated against
-#   `omp models --json` only when that provider appears in the listing; a
+#   After billing admission, a non-index-entry literal <provider>/<id> is
+#   validated against `omp models --json` only when that provider appears in the listing; a
 #   provider absent from the listing (an extension-registered provider such as
 #   claude-bridge, which omp never lists) passes through unvalidated with a
 #   stderr notice, and a non-index-entry bare fuzzy pattern is left to omp's
@@ -371,13 +380,15 @@
 #   redirections (>, >>, <, <>, >&, <&). This applies to command words,
 #   assignments, arguments, and redirection targets. Anything else, including
 #   tilde expansion, process substitution, and here-documents, passes through
-#   unchanged without evaluation or a default-role catalog probe. Long literal
-#   prefixes ending in expansion characters also pass through promptly.
+#   unchanged without evaluation or a default-role catalog probe, but literal
+#   model arguments still undergo billing admission. Long literal prefixes
+#   ending in expansion characters also pass through promptly.
 #   Otherwise, raw launches honor literal absolute PI_CODING_AGENT_DIR
 #   assignments, including with redirections. An unknown effective directory
 #   (including ambient pane inheritance or profile selection via --profile,
-#   --profile=, OMP_PROFILE, or PI_PROFILE) passes through unchanged. When known,
-#   the same directory supplies both the role read and catalog probe.
+#   --profile=, OMP_PROFILE, or PI_PROFILE) skips default-role validation, not
+#   literal model billing admission. When known, the same directory supplies
+#   both the role read and catalog probe.
 #   Project settings and --config overlays are intentionally not inspected for
 #   roles. This guard covers fm-spawn launches only, not pipeline-agent sessions
 #   or direct operator launches; tests/fm-omp-harness.test.sh owns the behavioral
