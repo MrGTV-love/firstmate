@@ -1,0 +1,20 @@
+$ git init -b main /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project
+Initialized empty Git repository in /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project/.git/
+
+exit=0
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project -c user.name=Live Validation -c user.email=validation@example.invalid commit --allow-empty -m Disposable live scenario
+[main (root-commit) 669b865] Disposable live scenario
+
+exit=0
+
+$ bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-gjueetwu
+/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-gjueetwu
+
+exit=0
+
+$ bin/fm-spawn.sh initial /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model openai/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-gjueetwu
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1

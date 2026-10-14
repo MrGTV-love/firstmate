@@ -1,0 +1,114 @@
+$ bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/46ubl9ii
+/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/46ubl9ii
+
+exit=0
+
+$ tmux -L fm-lab -f /dev/null new-session -d -x 120 -y 40 -s primary -c /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT -e FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/46ubl9ii omp
+
+exit=0
+
+$ tmux -L fm-lab display-message -p -t primary #{socket_path},#{pid},0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/46ubl9ii/tmux/tmux-501/fm-lab,20995,0
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                        Tip: Say `orchestrate` in your message to drive a multi-phase task with
+                                     parallel subagents — watch it glow as you type
+
+ Warning: No default model selected. Use /login, set an API key environment variable, or select a local model with
+ /model or --model.
+
+ π > ⬢ no-model > 🌳 eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT > ⑂ detached ?1 > ◫ 20K/? ⟲ ▶──────────────────────────────
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ bin/fm-spawn.sh positive /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --model openai-codex/gpt-6.1-sol --append-system-prompt '--model=openai/gpt-6.1-sol'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/46ubl9ii
+skill selection for positive: undelivered - raw launch command has no supported brief transport
+spawned positive harness=omp kind=scout window=primary:fm-positive worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/1/project
+
+exit=0
+
+$ tmux -L fm-lab list-panes -a -F #{pane_id} #{window_name} #{pane_current_command} #{pane_current_path}
+%0 omp omp /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT
+%1 fm-positive omp /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/1/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-positive
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                        Tip: Log in to several accounts of the same provider — `/login` again —
+                                    and omp load-balances across them automatically
+
+
+ π > ◒ GPT-6.1 Sol > 🌳 project/project > ⑂ detached ▶─1%─────────────────────────────────────────────╎───┃────────500K─
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0

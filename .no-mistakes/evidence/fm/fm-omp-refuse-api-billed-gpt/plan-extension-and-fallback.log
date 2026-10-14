@@ -1,0 +1,434 @@
+$ bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6
+/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6
+
+exit=0
+
+$ tmux -L fm-lab -f /dev/null new-session -d -x 120 -y 40 -s primary -c /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT -e FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6 omp
+
+exit=0
+
+$ tmux -L fm-lab display-message -p -t primary #{socket_path},#{pid},0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6/tmux/tmux-501/fm-lab,13966,0
+
+exit=0
+
+$ bin/fm-spawn.sh plan-extension-0 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp -e /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/plan-mode.ts --plan --model openai-codex/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6
+skill selection for plan-extension-0: undelivered - raw launch command has no supported brief transport
+spawned plan-extension-0 harness=omp kind=scout window=primary:fm-plan-extension-0 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/1/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-plan-extension-0
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                           Tip: Run `omp auth-broker serve` once and every machine pulls live
+                             tokens over the wire — refresh keys never leave the host; `omp
+                        auth-gateway` fronts it as a drop-in proxy any OpenAI-compatible client
+                                                        can hit
+
+ Warning: No default model selected. Use /login, set an API key environment variable, or select a local model with
+ /model or --model.
+
+ π > ⬢ no-model > 🌳 project/project > ⑂ detached > ◫ 6.7K/? ⟲ ▶────────────────────────────────────────────────────────
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-plan-extension-0
+
+exit=0
+
+$ bin/fm-spawn.sh plan-extension-1 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp -e /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/plan-mode.ts --plan --model=openai-codex/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+skill selection for plan-extension-1: undelivered - raw launch command has no supported brief transport
+spawned plan-extension-1 harness=omp kind=scout window=primary:fm-plan-extension-1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/1/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-plan-extension-1
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                         Tip: Pair up live: `/collab` shares your session through an end-to-end
+                          encrypted relay link — a teammate runs `/join <link>` to watch tool
+                                  calls stream and prompt the agent from their own omp
+
+ Warning: No default model selected. Use /login, set an API key environment variable, or select a local model with
+ /model or --model.
+
+ π > ⬢ no-model > 🌳 project/project > ⑂ detached > ◫ 6.7K/? ⟲ ▶────────────────────────────────────────────────────────
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-plan-extension-1
+
+exit=0
+
+$ bin/fm-spawn.sh fallback-openai /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for fallback-openai: unavailable - no TypeSafe or OpenRouter key
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+spawned fallback-openai harness=omp kind=scout window=primary:fm-fallback-openai worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/1/project
+
+exit=0
+
+Persisted per-worker overlay /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6/state/fallback-openai.omp-fallback.yml
+{
+  "modelRoles": {
+    "smol": "openai-codex/gpt-6.1-sol",
+    "tiny": "openai-codex/gpt-6.1-sol"
+  },
+  "find": {
+    "enabled": "off"
+  },
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "openai-codex/gpt-6.1-sol": [],
+      "openai-codex/gpt-6.1-sol:high": []
+    }
+  }
+}
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-fallback-openai
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                         Tip: Use /tan to fork the current conversation into a background agent
+
+ Error: No API key found for openai-codex.
+
+ Use /login, set an API key environment variable, or create
+ /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.o
+ mp/agent/agent.db
+
+❯                                                                                           ⇧⇥ to change thinking effort
+ π · ◒ GPT-6.1 Sol · 🌳 project/project · ⑂ detached · ◫ 1.3%/500K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-fallback-openai
+
+exit=0
+
+$ bin/fm-spawn.sh fallback-openrouter /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for fallback-openrouter: unavailable - no TypeSafe or OpenRouter key
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+spawned fallback-openrouter harness=omp kind=scout window=primary:fm-fallback-openrouter worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/1/project
+
+exit=0
+
+Persisted per-worker overlay /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6/state/fallback-openrouter.omp-fallback.yml
+{
+  "modelRoles": {
+    "smol": "openai-codex/gpt-6.1-sol",
+    "tiny": "openai-codex/gpt-6.1-sol"
+  },
+  "find": {
+    "enabled": "off"
+  },
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "openai-codex/gpt-6.1-sol": [],
+      "openai-codex/gpt-6.1-sol:high": []
+    }
+  }
+}
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-fallback-openrouter
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                        Tip: Try starting your prompt with a ->, and writing a list (1. Do X, 2.
+                                                         Do Y)
+
+ Error: No API key found for openai-codex.
+
+ Use /login, set an API key environment variable, or create
+ /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.o
+ mp/agent/agent.db
+
+❯                                                                                           ⇧⇥ to change thinking effort
+ π · ◒ GPT-6.1 Sol · 🌳 project/project · ⑂ detached · ◫ 1.3%/500K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-fallback-openrouter
+
+exit=0
+
+$ bin/fm-spawn.sh fallback-OpenAI /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for fallback-OpenAI: unavailable - no TypeSafe or OpenRouter key
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+spawned fallback-OpenAI harness=omp kind=scout window=primary:fm-fallback-OpenAI worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/1/project
+
+exit=0
+
+Persisted per-worker overlay /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6/state/fallback-OpenAI.omp-fallback.yml
+{
+  "modelRoles": {
+    "smol": "openai-codex/gpt-6.1-sol",
+    "tiny": "openai-codex/gpt-6.1-sol"
+  },
+  "find": {
+    "enabled": "off"
+  },
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "openai-codex/gpt-6.1-sol": [],
+      "openai-codex/gpt-6.1-sol:high": []
+    }
+  }
+}
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-fallback-OpenAI
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                        Tip: Hit a Codex rate limit? `/usage reset` spends a saved reset credit
+                                           to immediately restore your quota
+
+ Error: No API key found for openai-codex.
+
+ Use /login, set an API key environment variable, or create
+ /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.o
+ mp/agent/agent.db
+
+❯                                                                                           ⇧⇥ to change thinking effort
+ π · ◒ GPT-6.1 Sol · 🌳 project/project · ⑂ detached · ◫ 1.3%/500K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-fallback-OpenAI
+
+exit=0
+
+$ bin/fm-spawn.sh fallback-oPeNrOuTeR /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model openai-codex/gpt-6.1-sol --effort high --dispatch-rule rule_1
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for fallback-oPeNrOuTeR: unavailable - no TypeSafe or OpenRouter key
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+spawned fallback-oPeNrOuTeR harness=omp kind=scout window=primary:fm-fallback-oPeNrOuTeR worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/1/project
+
+exit=0
+
+Persisted per-worker overlay /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/t2gsi4o6/state/fallback-oPeNrOuTeR.omp-fallback.yml
+{
+  "modelRoles": {
+    "smol": "openai-codex/gpt-6.1-sol",
+    "tiny": "openai-codex/gpt-6.1-sol"
+  },
+  "find": {
+    "enabled": "off"
+  },
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "openai-codex/gpt-6.1-sol": [],
+      "openai-codex/gpt-6.1-sol:high": []
+    }
+  }
+}
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-fallback-oPeNrOuTeR
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                        Tip: Log in to several accounts of the same provider — `/login` again —
+                                    and omp load-balances across them automatically
+
+ Error: No API key found for openai-codex.
+
+ Use /login, set an API key environment variable, or create
+ /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.o
+ mp/agent/agent.db
+
+❯                                                                                           ⇧⇥ to change thinking effort
+ π · ◒ GPT-6.1 Sol · 🌳 project/project · ⑂ detached · ◫ 1.3%/500K ⟲
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-fallback-oPeNrOuTeR
+
+exit=0

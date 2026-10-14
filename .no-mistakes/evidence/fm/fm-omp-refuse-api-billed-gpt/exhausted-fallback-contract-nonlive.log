@@ -1,0 +1,34 @@
+$ omp usage --provider openai-codex --json
+{
+  "generatedAt": 1792008380141,
+  "reports": [],
+  "accountsWithoutUsage": [],
+  "disabledCredentials": [],
+  "capacity": {}
+}
+
+exit=0
+
+$ bash -c . bin/fm-dispatch-capacity-lib.sh; fm_dispatch_select "$1" rule_1 "$2" "$3" '{"status":"exhausted"}' billing-contract /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/fallback-contract {"harness": "omp", "model": "openai-codex/gpt-6.1-sol", "effort": "high"} [{"harness": "omp", "model": "openai/gpt-6.1-sol", "effort": "high"}]
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+error: dispatch rule_1 has exhausted capacity and no supported permitted fallback
+
+exit=1
+
+$ bash -c . bin/fm-dispatch-capacity-lib.sh; fm_dispatch_select "$1" rule_1 "$2" "$3" '{"status":"exhausted"}' billing-contract /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/fallback-contract {"harness": "omp", "model": "openai-codex/gpt-6.1-sol", "effort": "high"} [{"harness": "omp", "model": "openrouter/gpt-6.1-sol", "effort": "high"}]
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+error: dispatch rule_1 has exhausted capacity and no supported permitted fallback
+
+exit=1
+
+$ bash -c . bin/fm-dispatch-capacity-lib.sh; fm_dispatch_select "$1" rule_1 "$2" "$3" '{"status":"exhausted"}' billing-contract /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/fallback-contract {"harness": "omp", "model": "openai-codex/gpt-6.1-sol", "effort": "high"} [{"harness": "omp", "model": "OpenAI/gpt-6.1-sol", "effort": "high"}]
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+error: dispatch rule_1 has exhausted capacity and no supported permitted fallback
+
+exit=1
+
+$ bash -c . bin/fm-dispatch-capacity-lib.sh; fm_dispatch_select "$1" rule_1 "$2" "$3" '{"status":"exhausted"}' billing-contract /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/fallback-contract {"harness": "omp", "model": "openai-codex/gpt-6.1-sol", "effort": "high"} [{"harness": "omp", "model": "oPeNrOuTeR/gpt-6.1-sol", "effort": "high"}]
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+error: dispatch rule_1 has exhausted capacity and no supported permitted fallback
+
+exit=1

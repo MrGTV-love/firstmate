@@ -1,0 +1,295 @@
+$ bin/fm-bootstrap.sh
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+OMP_API_BILLING: cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration
+
+exit=0
+
+$ bin/fm-remote-doctor.sh
+mode=check
+path=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=no
+note: not launched through the fixed remote entrypoint; the reported PATH is this caller environment.
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=MISSING
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=MISSING
+required python3=/opt/homebrew/bin/python3
+required harness=MISSING
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=absent
+optional gh=/opt/homebrew/bin/gh
+check herdr=human: the herdr CLI does not resolve on the remote runtime PATH
+check gui-session=ok: gui/501
+check remote-job-worker=fixable: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.remote-job.plist does not match the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=fixable: dev.firstmate.remote-job is not loaded in gui/501
+check remote-job-probe=fixable: the remote job worker has not reported a fresh probe
+check launchagent=fixable: no Firstmate herdr launch agent at /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist
+check launchagent-scope=skip: no launch agent is installed yet
+check launchagent-loaded=fixable: gui/501/dev.firstmate.herdr.fm-remote does not match the effective Firstmate-owned contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=human: herdr server status cannot be read without both herdr and jq on the runtime PATH
+check entrypoint-link=skip: this run did not come through the fixed remote entrypoint
+check omp-api-billing=human: cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration
+action: herdr: install herdr from https://herdr.dev on that account, or add a ~/.local/bin wrapper for it; a remote second mate always runs on the Herdr backend
+action: remote-job-worker: rerun this command with --fix to write dev.firstmate.remote-job
+action: remote-job-worker-loaded: rerun this command with --fix to bootstrap the worker
+action: remote-job-probe: rerun this command with --fix to restart the worker, then rerun through fm-on.sh
+action: launchagent: rerun this command with --fix to install it
+action: launchagent-loaded: rerun this command with --fix to replace the loaded job with the current launch-agent contract
+action: herdr-server: install the missing tool reported above, then rerun this command
+action: omp-api-billing: inspect the active omp config.yml; select openai-codex/<gpt-model> for GPT roles and fallback routes; this command never edits omp configuration
+error: required tools do not resolve on the remote runtime PATH: herdr treehouse harness
+fix: install each one where it resolves on the path reported above, or put a wrapper script for it in /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.local/bin, which is always on that PATH.
+fix: tools in an unselected nvm version or outside the discovered asdf or mise paths need an absolute wrapper; see docs/remote-secondmates.md for the wrapper recipe.
+error: this host is not ready for a remote second mate; unresolved: herdr remote-job-worker remote-job-worker-loaded remote-job-probe launchagent launchagent-loaded herdr-server omp-api-billing
+
+exit=1
+
+$ bin/fm-bootstrap.sh
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+OMP_API_BILLING: cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration
+
+exit=0
+
+$ bin/fm-remote-doctor.sh
+mode=check
+path=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=no
+note: not launched through the fixed remote entrypoint; the reported PATH is this caller environment.
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=MISSING
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=MISSING
+required python3=/opt/homebrew/bin/python3
+required harness=MISSING
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=absent
+optional gh=/opt/homebrew/bin/gh
+check herdr=human: the herdr CLI does not resolve on the remote runtime PATH
+check gui-session=ok: gui/501
+check remote-job-worker=fixable: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.remote-job.plist does not match the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=fixable: dev.firstmate.remote-job is not loaded in gui/501
+check remote-job-probe=fixable: the remote job worker has not reported a fresh probe
+check launchagent=fixable: no Firstmate herdr launch agent at /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist
+check launchagent-scope=skip: no launch agent is installed yet
+check launchagent-loaded=fixable: gui/501/dev.firstmate.herdr.fm-remote does not match the effective Firstmate-owned contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=human: herdr server status cannot be read without both herdr and jq on the runtime PATH
+check entrypoint-link=skip: this run did not come through the fixed remote entrypoint
+check omp-api-billing=human: cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration
+action: herdr: install herdr from https://herdr.dev on that account, or add a ~/.local/bin wrapper for it; a remote second mate always runs on the Herdr backend
+action: remote-job-worker: rerun this command with --fix to write dev.firstmate.remote-job
+action: remote-job-worker-loaded: rerun this command with --fix to bootstrap the worker
+action: remote-job-probe: rerun this command with --fix to restart the worker, then rerun through fm-on.sh
+action: launchagent: rerun this command with --fix to install it
+action: launchagent-loaded: rerun this command with --fix to replace the loaded job with the current launch-agent contract
+action: herdr-server: install the missing tool reported above, then rerun this command
+action: omp-api-billing: inspect the active omp config.yml; select openai-codex/<gpt-model> for GPT roles and fallback routes; this command never edits omp configuration
+error: required tools do not resolve on the remote runtime PATH: herdr treehouse harness
+fix: install each one where it resolves on the path reported above, or put a wrapper script for it in /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.local/bin, which is always on that PATH.
+fix: tools in an unselected nvm version or outside the discovered asdf or mise paths need an absolute wrapper; see docs/remote-secondmates.md for the wrapper recipe.
+error: this host is not ready for a remote second mate; unresolved: herdr remote-job-worker remote-job-worker-loaded remote-job-probe launchagent launchagent-loaded herdr-server omp-api-billing
+
+exit=1
+
+$ bin/fm-bootstrap.sh
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+OMP_API_BILLING: cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration
+
+exit=0
+
+$ bin/fm-remote-doctor.sh
+mode=check
+path=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=no
+note: not launched through the fixed remote entrypoint; the reported PATH is this caller environment.
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=MISSING
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=MISSING
+required python3=/opt/homebrew/bin/python3
+required harness=MISSING
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=absent
+optional gh=/opt/homebrew/bin/gh
+check herdr=human: the herdr CLI does not resolve on the remote runtime PATH
+check gui-session=ok: gui/501
+check remote-job-worker=fixable: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.remote-job.plist does not match the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=fixable: dev.firstmate.remote-job is not loaded in gui/501
+check remote-job-probe=fixable: the remote job worker has not reported a fresh probe
+check launchagent=fixable: no Firstmate herdr launch agent at /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist
+check launchagent-scope=skip: no launch agent is installed yet
+check launchagent-loaded=fixable: gui/501/dev.firstmate.herdr.fm-remote does not match the effective Firstmate-owned contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=human: herdr server status cannot be read without both herdr and jq on the runtime PATH
+check entrypoint-link=skip: this run did not come through the fixed remote entrypoint
+check omp-api-billing=human: cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration
+action: herdr: install herdr from https://herdr.dev on that account, or add a ~/.local/bin wrapper for it; a remote second mate always runs on the Herdr backend
+action: remote-job-worker: rerun this command with --fix to write dev.firstmate.remote-job
+action: remote-job-worker-loaded: rerun this command with --fix to bootstrap the worker
+action: remote-job-probe: rerun this command with --fix to restart the worker, then rerun through fm-on.sh
+action: launchagent: rerun this command with --fix to install it
+action: launchagent-loaded: rerun this command with --fix to replace the loaded job with the current launch-agent contract
+action: herdr-server: install the missing tool reported above, then rerun this command
+action: omp-api-billing: inspect the active omp config.yml; select openai-codex/<gpt-model> for GPT roles and fallback routes; this command never edits omp configuration
+error: required tools do not resolve on the remote runtime PATH: herdr treehouse harness
+fix: install each one where it resolves on the path reported above, or put a wrapper script for it in /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.local/bin, which is always on that PATH.
+fix: tools in an unselected nvm version or outside the discovered asdf or mise paths need an absolute wrapper; see docs/remote-secondmates.md for the wrapper recipe.
+error: this host is not ready for a remote second mate; unresolved: herdr remote-job-worker remote-job-worker-loaded remote-job-probe launchagent launchagent-loaded herdr-server omp-api-billing
+
+exit=1
+
+$ bin/fm-bootstrap.sh
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+
+exit=0
+
+$ bin/fm-remote-doctor.sh
+mode=check
+path=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=no
+note: not launched through the fixed remote entrypoint; the reported PATH is this caller environment.
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=MISSING
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=MISSING
+required python3=/opt/homebrew/bin/python3
+required harness=MISSING
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=absent
+optional gh=/opt/homebrew/bin/gh
+check herdr=human: the herdr CLI does not resolve on the remote runtime PATH
+check gui-session=ok: gui/501
+check remote-job-worker=fixable: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.remote-job.plist does not match the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=fixable: dev.firstmate.remote-job is not loaded in gui/501
+check remote-job-probe=fixable: the remote job worker has not reported a fresh probe
+check launchagent=fixable: no Firstmate herdr launch agent at /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist
+check launchagent-scope=skip: no launch agent is installed yet
+check launchagent-loaded=fixable: gui/501/dev.firstmate.herdr.fm-remote does not match the effective Firstmate-owned contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=human: herdr server status cannot be read without both herdr and jq on the runtime PATH
+check entrypoint-link=skip: this run did not come through the fixed remote entrypoint
+check omp-api-billing=skip: no active global omp configuration findings
+action: herdr: install herdr from https://herdr.dev on that account, or add a ~/.local/bin wrapper for it; a remote second mate always runs on the Herdr backend
+action: remote-job-worker: rerun this command with --fix to write dev.firstmate.remote-job
+action: remote-job-worker-loaded: rerun this command with --fix to bootstrap the worker
+action: remote-job-probe: rerun this command with --fix to restart the worker, then rerun through fm-on.sh
+action: launchagent: rerun this command with --fix to install it
+action: launchagent-loaded: rerun this command with --fix to replace the loaded job with the current launch-agent contract
+action: herdr-server: install the missing tool reported above, then rerun this command
+error: required tools do not resolve on the remote runtime PATH: herdr treehouse harness
+fix: install each one where it resolves on the path reported above, or put a wrapper script for it in /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.local/bin, which is always on that PATH.
+fix: tools in an unselected nvm version or outside the discovered asdf or mise paths need an absolute wrapper; see docs/remote-secondmates.md for the wrapper recipe.
+error: this host is not ready for a remote second mate; unresolved: herdr remote-job-worker remote-job-worker-loaded remote-job-probe launchagent launchagent-loaded herdr-server
+
+exit=1
+
+$ bin/fm-bootstrap.sh
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+OMP_API_BILLING: cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration
+
+exit=0
+
+$ bin/fm-remote-doctor.sh
+mode=check
+path=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=no
+note: not launched through the fixed remote entrypoint; the reported PATH is this caller environment.
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=MISSING
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=MISSING
+required python3=/opt/homebrew/bin/python3
+required harness=MISSING
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=absent
+optional gh=/opt/homebrew/bin/gh
+check herdr=human: the herdr CLI does not resolve on the remote runtime PATH
+check gui-session=ok: gui/501
+check remote-job-worker=fixable: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.remote-job.plist does not match the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=fixable: dev.firstmate.remote-job is not loaded in gui/501
+check remote-job-probe=fixable: the remote job worker has not reported a fresh probe
+check launchagent=fixable: no Firstmate herdr launch agent at /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist
+check launchagent-scope=skip: no launch agent is installed yet
+check launchagent-loaded=fixable: gui/501/dev.firstmate.herdr.fm-remote does not match the effective Firstmate-owned contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=human: herdr server status cannot be read without both herdr and jq on the runtime PATH
+check entrypoint-link=skip: this run did not come through the fixed remote entrypoint
+check omp-api-billing=human: cannot inspect omp configuration: global config.yml is unreadable or invalid YAML/configuration
+action: herdr: install herdr from https://herdr.dev on that account, or add a ~/.local/bin wrapper for it; a remote second mate always runs on the Herdr backend
+action: remote-job-worker: rerun this command with --fix to write dev.firstmate.remote-job
+action: remote-job-worker-loaded: rerun this command with --fix to bootstrap the worker
+action: remote-job-probe: rerun this command with --fix to restart the worker, then rerun through fm-on.sh
+action: launchagent: rerun this command with --fix to install it
+action: launchagent-loaded: rerun this command with --fix to replace the loaded job with the current launch-agent contract
+action: herdr-server: install the missing tool reported above, then rerun this command
+action: omp-api-billing: inspect the active omp config.yml; select openai-codex/<gpt-model> for GPT roles and fallback routes; this command never edits omp configuration
+error: required tools do not resolve on the remote runtime PATH: herdr treehouse harness
+fix: install each one where it resolves on the path reported above, or put a wrapper script for it in /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.local/bin, which is always on that PATH.
+fix: tools in an unselected nvm version or outside the discovered asdf or mise paths need an absolute wrapper; see docs/remote-secondmates.md for the wrapper recipe.
+error: this host is not ready for a remote second mate; unresolved: herdr remote-job-worker remote-job-worker-loaded remote-job-probe launchagent launchagent-loaded herdr-server omp-api-billing
+
+exit=1
+
+$ bin/fm-bootstrap.sh
+MISSING: treehouse (install: curl -fsSL https://kunchenguid.github.io/treehouse/install.sh | sh)
+MISSING: no-mistakes (install: curl -fsSL https://raw.githubusercontent.com/kunchenguid/no-mistakes/main/docs/install.sh | sh)
+BOOTSTRAP_INFO: lavish-axi >=0.1.80 enables confirmed board replies; this older compatible version retains the legacy reply path, but upgrade to prevent handing back a board before its reply is accepted
+
+exit=0
+
+$ bin/fm-remote-doctor.sh
+mode=check
+path=/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin
+entrypoint=no
+note: not launched through the fixed remote entrypoint; the reported PATH is this caller environment.
+platform=darwin
+required git=/usr/bin/git
+required jq=/usr/bin/jq
+required herdr=MISSING
+required tasks-axi=/opt/homebrew/bin/tasks-axi
+required treehouse=MISSING
+required python3=/opt/homebrew/bin/python3
+required harness=MISSING
+optional tmux=/opt/homebrew/bin/tmux
+optional no-mistakes=absent
+optional gh=/opt/homebrew/bin/gh
+check herdr=human: the herdr CLI does not resolve on the remote runtime PATH
+check gui-session=ok: gui/501
+check remote-job-worker=fixable: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.remote-job.plist does not match the Firstmate-owned Aqua worker contract
+check remote-job-worker-loaded=fixable: dev.firstmate.remote-job is not loaded in gui/501
+check remote-job-probe=fixable: the remote job worker has not reported a fresh probe
+check launchagent=fixable: no Firstmate herdr launch agent at /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/Library/LaunchAgents/dev.firstmate.herdr.fm-remote.plist
+check launchagent-scope=skip: no launch agent is installed yet
+check launchagent-loaded=fixable: gui/501/dev.firstmate.herdr.fm-remote does not match the effective Firstmate-owned contract
+check herdr-owner-reader=ok: python3 runs on the runtime PATH
+check herdr-server=human: herdr server status cannot be read without both herdr and jq on the runtime PATH
+check entrypoint-link=skip: this run did not come through the fixed remote entrypoint
+check omp-api-billing=skip: no active global omp configuration findings
+action: herdr: install herdr from https://herdr.dev on that account, or add a ~/.local/bin wrapper for it; a remote second mate always runs on the Herdr backend
+action: remote-job-worker: rerun this command with --fix to write dev.firstmate.remote-job
+action: remote-job-worker-loaded: rerun this command with --fix to bootstrap the worker
+action: remote-job-probe: rerun this command with --fix to restart the worker, then rerun through fm-on.sh
+action: launchagent: rerun this command with --fix to install it
+action: launchagent-loaded: rerun this command with --fix to replace the loaded job with the current launch-agent contract
+action: herdr-server: install the missing tool reported above, then rerun this command
+error: required tools do not resolve on the remote runtime PATH: herdr treehouse harness
+fix: install each one where it resolves on the path reported above, or put a wrapper script for it in /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.local/bin, which is always on that PATH.
+fix: tools in an unselected nvm version or outside the discovered asdf or mise paths need an absolute wrapper; see docs/remote-secondmates.md for the wrapper recipe.
+error: this host is not ready for a remote second mate; unresolved: herdr remote-job-worker remote-job-worker-loaded remote-job-probe launchagent launchagent-loaded herdr-server
+
+exit=1

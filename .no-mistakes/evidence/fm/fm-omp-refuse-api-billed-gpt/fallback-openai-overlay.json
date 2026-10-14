@@ -1,0 +1,17 @@
+{
+  "modelRoles": {
+    "smol": "openai-codex/gpt-6.1-sol",
+    "tiny": "openai-codex/gpt-6.1-sol"
+  },
+  "find": {
+    "enabled": "off"
+  },
+  "retry": {
+    "modelFallback": true,
+    "fallbackChains": {
+      "default": [],
+      "openai-codex/gpt-6.1-sol": [],
+      "openai-codex/gpt-6.1-sol:high": []
+    }
+  }
+}

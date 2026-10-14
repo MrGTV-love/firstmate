@@ -1,0 +1,619 @@
+$ bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+
+exit=0
+
+$ tmux -L fm-lab -f /dev/null new-session -d -x 120 -y 40 -s primary -c /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT -e FM_HOME=/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw omp
+
+exit=0
+
+$ tmux -L fm-lab display-message -p -t primary #{socket_path},#{pid},0
+/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw/tmux/tmux-501/fm-lab,39539,0
+
+exit=0
+
+$ bin/fm-spawn.sh subscription-0 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --model openai-codex/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+skill selection for subscription-0: undelivered - raw launch command has no supported brief transport
+spawned subscription-0 harness=omp kind=scout window=primary:fm-subscription-0 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/1/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-subscription-0
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                         Tip: Drop the word `ultrathink` in your message for harder multi-step
+                                     reasoning — watch it glow rainbow as you type
+
+
+ π > ◒ GPT-6.1 Sol > 🌳 project/project > ⑂ detached ▶─1%─────────────────────────────────────────────╎───┃────────500K─
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ bin/fm-spawn.sh subscription-1 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --mo\del=openai-codex/gpt\-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+skill selection for subscription-1: undelivered - raw launch command has no supported brief transport
+spawned subscription-1 harness=omp kind=scout window=primary:fm-subscription-1 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/2/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-subscription-1
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                                              Tip: Please use nerdfont 😭.
+
+
+ π > ◒ GPT-6.1 Sol > 🌳 project/project > ⑂ detached ▶─1%─────────────────────────────────────────────╎───┃────────500K─
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-subscription-1
+
+exit=0
+
+$ bin/fm-spawn.sh subscription-2 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp $'-\x6d' $'openai-codex/gpt\x2d6.1-sol'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for subscription-2: undelivered - raw launch command has no supported brief transport
+spawned subscription-2 harness=omp kind=scout window=primary:fm-subscription-2 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/2/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-subscription-2
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+GTT-CB:project charlesabrooker$ treehouse get
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.3
+Run "treehouse update" to update
+
+🌳 Setting up worktree...
+🌳 Entered worktree at ~/.treehouse/project-e8a20e/2/project. Type 'exit' to return.
+
+The default interactive shell is now zsh.
+To update your account to use zsh, please run `chsh -s /bin/zsh`.
+For more details, please visit https://support.apple.com/kb/HT208050.
+GTT-CB:project charlesabrooker$ cd -- '/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJX
+CMPT/.billing-live-validation/user/.treehouse/project-e8a20e/2/project'
+GTT-CB:project charlesabrooker$ export GOTMPDIR=/tmp/fm-subscription-2/gotmp
+GTT-CB:project charlesabrooker$ export COMPACT_ADVISER_DISABLE=1
+GTT-CB:project charlesabrooker$ export FM_TASK_ID=subscription-2
+GTT-CB:project charlesabrooker$ . '/tmp/fm-subscription-2+8b0eacc367b10fbc87d3bb2d374050fde44344574a6a793b3a60b49a677c91
+3f/launch.s1792007863.67948.28242.sh'
+Error: unknown flag: -m
+Run `omp --help` for available flags.
+GTT-CB:project charlesabrooker$
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-subscription-2
+
+exit=0
+
+$ bin/fm-spawn.sh subscription-3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --model openai-codex/gpt-6.1-sol --append-system-prompt '--model=openai/gpt-6.1-sol'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for subscription-3: undelivered - raw launch command has no supported brief transport
+spawned subscription-3 harness=omp kind=scout window=primary:fm-subscription-3 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/2/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-subscription-3
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                        Tip: With default keybindings, ⌃D deletes the character under the cursor
+                            instead of quitting your draft — see /hotkeys for your exit key
+
+
+ π > ◒ GPT-6.1 Sol > 🌳 project/project > ⑂ detached ▶─1%─────────────────────────────────────────────╎───┃────────500K─
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-subscription-3
+
+exit=0
+
+$ bin/fm-spawn.sh subscription-4 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --plan --model openai-codex/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for subscription-4: undelivered - raw launch command has no supported brief transport
+spawned subscription-4 harness=omp kind=scout window=primary:fm-subscription-4 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/2/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-subscription-4
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                        Tip: Say `orchestrate` in your message to drive a multi-phase task with
+                                     parallel subagents — watch it glow as you type
+
+ Warning: No default model selected. Use /login, set an API key environment variable, or select a local model with
+ /model or --model.
+
+ Error: No model selected.
+
+ Use /login, set an API key environment variable, or create
+ /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.o
+ mp/agent/agent.db
+
+ Then use /model to select a model.
+
+ π > ⬢ no-model > 🌳 project/project > ⑂ detached > ◫ 6.7K/? ⟲ ▶────────────────────────────────────────────────────────
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-subscription-4
+
+exit=0
+
+$ bin/fm-spawn.sh subscription-5 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --plan --model=openai-codex/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for subscription-5: undelivered - raw launch command has no supported brief transport
+spawned subscription-5 harness=omp kind=scout window=primary:fm-subscription-5 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/2/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-subscription-5
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                          Tip: `/force read` pins the next turn to one specific tool when the
+                                         model keeps reaching for the wrong one
+
+ Warning: No default model selected. Use /login, set an API key environment variable, or select a local model with
+ /model or --model.
+
+ π > ⬢ no-model > 🌳 project/project > ⑂ detached > ◫ 6.7K/? ⟲ ▶────────────────────────────────────────────────────────
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-subscription-5
+
+exit=0
+
+$ bin/fm-spawn.sh subscription-6 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --plan -m openai-codex/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+skill selection for subscription-6: undelivered - raw launch command has no supported brief transport
+spawned subscription-6 harness=omp kind=scout window=primary:fm-subscription-6 worktree=/Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.treehouse/project-e8a20e/2/project
+
+exit=0
+
+$ tmux -L fm-lab capture-pane -p -t primary:fm-subscription-6
+
+                                            ████████████
+                                               ██  ██       ▄▀▀▄ █▀▄▀▄ █▀▀▄
+                                               ██  ██       ▀▄▄▀ █ █ █ █▄▄▀
+                                               ▒▒  ██                  █
+                                                   ██       v18.10.4
+
+                        Tip: Lint/type errors piling up? `omp cleanse` (or /cleanse right here)
+                          hunts project diagnostics and fixes them with parallel subagents — ⎋
+                                                        cancels
+
+ Warning: No default model selected. Use /login, set an API key environment variable, or select a local model with
+ /model or --model.
+
+ Error: No model selected.
+
+ Use /login, set an API key environment variable, or create
+ /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/user/.o
+ mp/agent/agent.db
+
+ Then use /model to select a model.
+
+ π > ⬢ no-model > 🌳 project/project > ⑂ detached > ◫ 6.7K/? ⟲ ▶────────────────────────────────────────────────────────
+╰─                                                                                          ⇧⇥ to change thinking effort
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+exit=0
+
+$ tmux -L fm-lab kill-window -t primary:fm-subscription-6
+
+exit=0
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched. --model openai/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched. --model role:strong
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched. --model openrouter/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched. --model role:strong
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched. --model OpenAI/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched. --model role:strong
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched. --model oPeNrOuTeR/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched. --model role:strong
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch --note Keep the running subscription agent untouched.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True
+
+$ bin/fm-control.sh subscription-0 relaunch
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/2l_8hytw
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ tmux -L fm-lab list-panes -t primary:fm-subscription-0 -F #{pane_pid}:#{pane_current_command}
+41965:omp
+
+exit=0
+
+Preservation evidence: pane identity before=41965:omp after=41965:omp; metadata unchanged=True; brief unchanged=True; no checkpoint=True

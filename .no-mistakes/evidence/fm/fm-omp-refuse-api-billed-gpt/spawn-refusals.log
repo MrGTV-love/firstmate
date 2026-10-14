@@ -1,0 +1,208 @@
+$ bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+/Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+
+exit=0
+
+$ bin/fm-spawn.sh explicit-openai-ship /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --mode local-only --yolo off --harness omp --model openai/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-openai-scout /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model openai/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-openai-secondmate /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --secondmate --harness omp --model openai/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh indexed-openai /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model role:strong
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-openrouter-ship /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --mode local-only --yolo off --harness omp --model openrouter/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-openrouter-scout /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model openrouter/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-openrouter-secondmate /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --secondmate --harness omp --model openrouter/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh indexed-openrouter /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model role:strong
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-OpenAI-ship /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --mode local-only --yolo off --harness omp --model OpenAI/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-OpenAI-scout /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model OpenAI/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-OpenAI-secondmate /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --secondmate --harness omp --model OpenAI/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh indexed-OpenAI /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model role:strong
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-oPeNrOuTeR-ship /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --mode local-only --yolo off --harness omp --model oPeNrOuTeR/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-oPeNrOuTeR-scout /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model oPeNrOuTeR/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh explicit-oPeNrOuTeR-secondmate /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --secondmate --harness omp --model oPeNrOuTeR/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh indexed-oPeNrOuTeR /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout --harness omp --model role:strong
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-0 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --model openai/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-1 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --model=openrouter/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-2 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp -m OpenAI/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-3 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --mo\del openai/gpt\-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-4 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --mo\del=openrouter/gpt\-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-5 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp -\m openai/gpt\-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-6 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp $'--mo\x64el' $'openai/gpt\x2d6.1-sol'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-7 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp $'--mo\x64el'=$'openrouter/gpt\x2d6.1-sol'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-8 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp $'-\x6d' $'OpenAI/gpt\x2d6.1-sol'
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-9 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --plan --model OpenAI/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-10 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --plan --model=oPeNrOuTeR/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp oPeNrOuTeR/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-11 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --plan -m openai/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-12 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --profile billing -m openrouter/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-13 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --model openai-codex/gpt-6.1-sol --model=openai/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-14 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --append-system-prompt --model --model openai/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openai/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-15 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --system-prompt -m --model=openrouter/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-16 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp --plan saved-plan.md --model OpenAI/gpt-6.1-sol
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp OpenAI/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
+
+$ bin/fm-spawn.sh raw-17 /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/project --scout omp -m openrouter/gpt-6.1-sol --prompt "$(touch /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4XNCYJNHAWS4VG94GJXCMPT/.billing-live-validation/evaluated)"
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/.no-mistakes/evidence/01M4XNCYJNHAWS4VG94GJXCMPT/fm-lab-billing-24ocesem
+error: omp openrouter/* routes use API billing; select --model openai-codex/<gpt-model> instead
+
+exit=1
