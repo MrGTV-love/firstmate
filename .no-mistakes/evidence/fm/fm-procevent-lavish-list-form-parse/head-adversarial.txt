@@ -1,0 +1,73 @@
+--- bad1
+SESSION-ENDING MESSAGE: (none)
+
+parse_status: unreadable
+declared_items: unreadable
+presented_items: 0
+malformed_items: 0
+complete: no
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 0
+captain_message_count: 0
+
+ANNOTATIONS: (unreadable)
+END LAVISH RESULT (0 of unreadable)
+exit=1
+--- nocoll
+SESSION-ENDING MESSAGE: (none)
+
+parse_status: unreadable
+declared_items: unreadable
+presented_items: 0
+malformed_items: 0
+complete: no
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 0
+captain_message_count: 0
+
+ANNOTATIONS: (unreadable)
+END LAVISH RESULT (0 of unreadable)
+exit=1
+--- ended
+SESSION-ENDING MESSAGE: (none)
+
+parse_status: readable
+declared_items: 0
+presented_items: 0
+malformed_items: 0
+complete: yes
+lifecycle: ended
+session_ended: (unset)
+annotation_count: 0
+captain_message_count: 0
+
+ANNOTATIONS: (none)
+END LAVISH RESULT (0 of 0)
+exit=0
+--- malf
+SESSION-ENDING MESSAGE: (none)
+
+parse_status: readable
+declared_items: 3
+presented_items: 1
+malformed_items: 1
+complete: no
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 1
+captain_message_count: 0
+
+ANNOTATIONS
+ANNOTATION 1 of 1
+element_uid: 1
+element_selector: a
+tag: p
+text:
+| t
+prompt:
+| hi
+END ANNOTATIONS
+END LAVISH RESULT (1 of 3)
+exit=0

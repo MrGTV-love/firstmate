@@ -1,0 +1,54 @@
+=== HEAD read attachments ===
+CAPTAIN MESSAGE
+| compare with this
+attachment_path: /state/attachments/k/a7b8.webp
+END CAPTAIN MESSAGE
+
+parse_status: readable
+declared_items: 5
+presented_items: 5
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 4
+captain_message_count: 1
+
+ANNOTATIONS
+ANNOTATION 1 of 4
+element_uid: 12
+element_selector: main > p
+tag: p
+text:
+| Pricing paragraph
+prompt:
+| see image
+attachment_path: /state/attachments/k/a1b2.png
+ANNOTATION 2 of 4
+element_uid: 13
+element_selector: main > ul
+tag: ul
+text:
+| Option list
+prompt:
+| two screenshots, one renamed
+attachment_path: /state/attachments/k/c3d4.png
+attachment_path: /state/attachments/k/e5f6, "copy".jpg
+ANNOTATION 3 of 4
+element_uid: 20
+element_selector: #approve
+tag: choice
+text:
+| Approve
+attachment_path: /state/attachments/k/c9d0.png
+ANNOTATION 4 of 4
+element_uid: 21
+element_selector: #reconcile
+tag: choice
+text:
+| Reconcile
+attachment_path: /state/attachments/k/e1f2.png
+attachment_path: /state/attachments/k/a3b4.png
+END ANNOTATIONS
+END LAVISH RESULT (5 of 5)
+exit=0

@@ -1,0 +1,54 @@
+=== HEAD read list-form (9 items) ===
+CAPTAIN MESSAGE
+CAPTAIN MESSAGE PART 1 of 6
+| there will
+CAPTAIN MESSAGE PART 2 of 6
+| The estimate is not a firm fixed price. Let the customer set a threshold (e.g, % over budget).
+CAPTAIN MESSAGE PART 3 of 6
+| Capture and explain why the estimate was exceeded.
+CAPTAIN MESSAGE PART 4 of 6
+| Review the margin target.
+CAPTAIN MESSAGE PART 5 of 6
+| Compare the smaller example with the full case.
+CAPTAIN MESSAGE PART 6 of 6
+| I think the full case will be higher with messy data
+END CAPTAIN MESSAGE
+
+parse_status: readable
+declared_items: 9
+presented_items: 9
+malformed_items: 0
+complete: yes
+lifecycle: feedback
+session_ended: (unset)
+annotation_count: 3
+captain_message_count: 6
+
+ANNOTATIONS
+ANNOTATION 1 of 3
+element_uid: 38
+element_selector: body > main > div:nth-of-type(3) > ul > li:nth-of-type(3)
+tag: li
+text:
+| Estimate for a four-task case.
+prompt:
+| Build the estimate from the individual tasks. How will an alternative proposed by the customer be evaluated?
+ANNOTATION 2 of 3
+element_uid: 333
+element_selector: div > table > tbody > tr:nth-of-type(2) > td:nth-of-type(3)
+tag: td
+text:
+| Our margin moves when vendors move.
+prompt:
+| Option A is not what we do, B is the one that makes sense to me.
+ANNOTATION 3 of 3
+element_uid: 334
+element_selector: div > table > tbody > tr:nth-of-type(2) > td:nth-of-type(1)
+tag: td
+text:
+| B. Record a new schedule version when costs move
+prompt:
+| Two different things -- the value of units vs how to price with them.
+END ANNOTATIONS
+END LAVISH RESULT (9 of 9)
+exit=0

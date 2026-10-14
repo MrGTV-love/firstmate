@@ -1,0 +1,11 @@
+--- answers attach
+sample-call	approve	Approve
+exit=0
+--- reconciles attach
+other-call	Check this
+exit=0
+--- answers list
+exit=0
+--- classify list
+feedback
+exit=0

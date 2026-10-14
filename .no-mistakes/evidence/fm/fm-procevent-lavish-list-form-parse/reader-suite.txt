@@ -1,0 +1,25 @@
+FM_TEST_BEGIN 2026-10-14T15:38:30Z tests/fm-procevent.test.sh family=standalone expected_gate_skip=none
+ok - read preserves all nine captured list items including messages and nested targets
+ok - list choices preserve keyed answers, close mode, and latest-selection precedence
+ok - list items with image attachments keep their words, choices, and attachment paths
+ok - read never certifies an item whose attachments cannot all be decoded
+ok - read accepts both collection names and decodes quoted list scalars
+ok - unparseable or missing feedback headers are unreadable, never empty
+ok - read retains valid list neighbors without certifying malformed items
+ok - read distinguishes a live captain message from a session-ending message
+ok - read names the message count with the same label as the message section
+ok - read presents every annotation and a distinct session-ending message
+ok - read never certifies rows missing declared fields as complete
+ok - read keeps every annotation when the session-ending message is absent
+ok - read surfaces a typed comment on an annotated element
+ok - read still surfaces a typed comment that matches the element text
+ok - read still presents a pure annotation with no comment
+ok - read does not present choice context as a comment
+ok - read still presents a pure message with no selector
+ok - read distinguishes a feedback capture from an ended-with-nothing close
+FM_TEST_END 2026-10-14T15:38:44Z tests/fm-procevent.test.sh exit=0 duration_ms=13641 gate_skip=false
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFK7GX87ZNRC0FXG3C005Y/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=14835
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=13641 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-procevent.test.sh duration_ms=13641
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XFK7GX87ZNRC0FXG3C005Y/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
