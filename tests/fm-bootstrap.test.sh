@@ -253,7 +253,7 @@ assert_timeout_report() {
 #   mode=exact -> output must equal <expect>
 #   mode=grep  -> output must contain <expect> (fixed string); <notcontains> must not appear
 test_omp_api_billing_config_diagnostics() {
-  local case_dir fakebin out phase profile agent config override selected_profile field
+  local case_dir fakebin out phase profile agent config override selected_profile field api router
   case_dir="$TMP_ROOT/omp-billing"
   fakebin=$(make_fake_toolchain "$case_dir")
   mkdir -p "$case_dir/home/config" "$case_dir/user/.omp/agent"
@@ -267,21 +267,22 @@ SH
   for profile in default override named; do
     agent="$case_dir/user/.omp/agent"
     override='' selected_profile=''
+    api=openai router=openrouter
     case "$profile" in
-      override) agent="$case_dir/custom-agent"; override=$agent ;;
-      named) agent="$case_dir/user/.omp/profiles/billing-test/agent"; override="$case_dir/unused-agent"; selected_profile=billing-test ;;
+      override) agent="$case_dir/custom-agent"; override=$agent; api=OpenAI router=OpenRouter ;;
+      named) agent="$case_dir/user/.omp/profiles/billing-test/agent"; override="$case_dir/unused-agent"; selected_profile=billing-test; api=OPENAI router=OPENROUTER ;;
     esac
     mkdir -p "$agent"
     config="$agent/config.yml"
-    cat > "$config" <<'YAML'
+    cat > "$config" <<YAML
 modelRoles:
-  default: openai/gpt-6.1-sol:high
-  vision: openrouter/openai/gpt-6.1-sol
-  tiny: openai/gpt-6-mini
+  default: $api/gpt-6.1-sol:high
+  vision: $router/openai/gpt-6.1-sol
+  tiny: $api/gpt-6-mini
 retry:
   fallbackChains:
-    default: ['openrouter/openai/gpt-6.1-sol:high', openai-codex/gpt-6.1-sol]
-    openai/*: [deepseek/deepseek-v4-flash]
+    default: ['$router/openai/gpt-6.1-sol:high', openai-codex/gpt-6.1-sol]
+    $api/*: [deepseek/deepseek-v4-flash]
 providers:
   secret: do-not-print-this-credential
 YAML

@@ -405,13 +405,13 @@ new_case Linux no-herdr
 mkdir -p "$CASE_HOME/.omp/agent"
 cat > "$CASE_HOME/.omp/agent/config.yml" <<'YAML'
 modelRoles:
-  default: openai/gpt-6.1-sol:high
-  vision: openrouter/openai/gpt-6.1-sol
-  tiny: openai/gpt-6-mini
+  default: OpenAI/gpt-6.1-sol:high
+  vision: oPeNrOuTeR/openai/gpt-6.1-sol
+  tiny: OPENAI/gpt-6-mini
 retry:
   fallbackChains:
-    default: [openrouter/openai/gpt-6.1-sol]
-    openai/*: [deepseek/deepseek-v4-flash]
+    default: [OPENROUTER/openai/gpt-6.1-sol]
+    OpenAI/*: [deepseek/deepseek-v4-flash]
 providers:
   secret: doctor-must-not-print-this
 YAML

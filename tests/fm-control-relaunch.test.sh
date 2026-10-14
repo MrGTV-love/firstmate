@@ -770,7 +770,7 @@ SH
 test_relaunch_omp_billing_admission_preserves_running_agents() {
   local provider path dir id model meta out rc expected
   local -a args
-  for provider in openai openrouter openai-codex; do
+  for provider in openai openrouter OpenAI oPeNrOuTeR openai-codex; do
     for path in explicit recorded role secondmate; do
       id="rl-billing-$provider-$path"
       model="$provider/gpt-6.1-sol"

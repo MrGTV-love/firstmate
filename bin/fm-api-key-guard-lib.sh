@@ -18,7 +18,7 @@
 # availability or model-index membership. Never resolve or call those models.
 fm_omp_api_billing_route_check() {
   case "$1" in
-    openai/* | openrouter/*)
+    [oO][pP][eE][nN][aA][iI]/* | [oO][pP][eE][nN][rR][oO][uU][tT][eE][rR]/*)
       echo "error: omp ${1%%/*}/* routes use API billing; select --model openai-codex/<gpt-model> instead" >&2
       return 1
       ;;
@@ -56,8 +56,8 @@ begin
   findings = []
   report = lambda do |field, value|
     next unless value.is_a?(String)
-    provider = value.split("/", 2).first
-    if value.start_with?("openai/", "openrouter/")
+    provider = value.partition("/").first.downcase
+    if value.include?("/") && %w[openai openrouter].include?(provider)
       findings << "#{field} uses #{provider}/* (API billing); use openai-codex/<gpt-model> instead"
     end
   end

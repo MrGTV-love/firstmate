@@ -2532,7 +2532,7 @@ let pinned = false;
 const models = [];
 const literalToken = token => token?.type === "word" && token.literal && !token.unquotedExpansion;
 const operandOptions = new Set([
-  "--smol", "--slow", "--plan", "--goal", "--prewalk-into", "--plan-yolo-into",
+  "--smol", "--slow", "--goal", "--prewalk-into", "--plan-yolo-into",
   "--provider", "--api-key", "--system-prompt", "--system-prompt-template",
   "--append-system-prompt", "--profile", "--alias", "--cwd", "--mode", "--config",
   "--add-dir", "--session-dir", "--models", "--tools", "--thinking", "--service-tier",
@@ -2553,7 +2553,7 @@ for (i++; i < words.length; i++) {
     i++;
   } else if (operandOptions.has(option) && words[i + 1]?.type === "word") {
     i++;
-  } else if (["--resume", "--restore", "-r"].includes(option)
+  } else if (["--plan", "--resume", "--restore", "-r"].includes(option)
       && words[i + 1]?.type === "word" && !words[i + 1].value.startsWith("-")) {
     i++;
   }

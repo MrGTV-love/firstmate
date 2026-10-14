@@ -650,11 +650,12 @@ test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
 }
 
 test_spawn_refuses_api_billed_routes() {
-  local provider kind rec id out status
+  local provider kind rec id out status index=0
   local -a args
-  for provider in openai openrouter; do
+  for provider in openai openrouter OpenAI oPeNrOuTeR; do
     for kind in ship scout secondmate; do
-      id="omp-api-$provider-$kind"
+      index=$((index + 1))
+      id="omp-api-$index-$kind"
       rec=$(make_spawn_case "$id" omp "$id")
       read_case_record "$rec"
       case "$kind" in
@@ -671,8 +672,9 @@ test_spawn_refuses_api_billed_routes() {
       assert_absent "$HOME_DIR/state/$id.meta" "refusal must not publish task metadata"
     done
   done
-  for provider in openai openrouter; do
-    id="omp-api-indexed-$provider"
+  for provider in openai openrouter OpenAI oPeNrOuTeR; do
+    index=$((index + 1))
+    id="omp-api-indexed-$index"
     rec=$(make_spawn_case "$id" omp "$id")
     read_case_record "$rec"
     printf '{"version":1,"roles":{"strong":{"omp":{"model":"%s/gpt-6.1-sol"}}},"retired":[]}\n' "$provider" \
@@ -689,7 +691,7 @@ test_spawn_refuses_api_billed_routes() {
 
 test_spawn_raw_api_billing_admission() {
   local provider form spelling flag value rec id out status command expected index=0 profile
-  for provider in openai openrouter openai-codex; do
+  for provider in openai openrouter OpenAI oPeNrOuTeR openai-codex; do
     for form in long equals short; do
       for spelling in plain escaped ansi; do
         index=$((index + 1))
@@ -765,6 +767,16 @@ omp --system-prompt -m --model=openrouter/gpt-6.1-sol||1
 omp --append-system-prompt='--model=openai/gpt-6.1-sol' --model openai-codex/gpt-6.1-sol||0
 omp --resume --model openai/gpt-6.1-sol||1
 omp -r saved-session --model=openrouter/gpt-6.1-sol||1
+omp -e /fixture/plan-mode.ts --plan --model OpenAI/gpt-6.1-sol||1
+omp -e /fixture/plan-mode.ts --plan --model=oPeNrOuTeR/gpt-6.1-sol||1
+omp -e /fixture/plan-mode.ts --plan -m openai/gpt-6.1-sol||1
+omp --plan --model openai-codex/gpt-6.1-sol||0
+omp --plan --model=openai-codex/gpt-6.1-sol||0
+omp --plan -m openai-codex/gpt-6.1-sol||0
+omp --plan saved-plan.md --model OpenAI/gpt-6.1-sol||1
+omp --plan saved-plan.md --model openai-codex/gpt-6.1-sol||0
+omp --plan=saved-plan.md --model=oPeNrOuTeR/gpt-6.1-sol||1
+omp --plan=saved-plan.md --model=openai-codex/gpt-6.1-sol||0
 omp -- --model openai/gpt-6.1-sol||0
 omp '--model openrouter/gpt-6.1-sol'||0
 CASES
@@ -772,10 +784,11 @@ CASES
 }
 
 test_spawn_api_billed_fallback_admission() {
-  local provider capacity destination rec id out status expected
-  for provider in openai openrouter openai-codex; do
+  local provider capacity destination rec id out status expected index=0
+  for provider in openai openrouter OpenAI oPeNrOuTeR openai-codex; do
     for capacity in usable exhausted; do
-      id="omp-fallback-billing-$provider-$capacity"
+      index=$((index + 1))
+      id="omp-fallback-billing-$index"
       rec=$(make_spawn_case "$id" omp "$id")
       read_case_record "$rec"
       destination="$provider/gpt-6.1-sol"
@@ -4050,11 +4063,6 @@ test_watch_lifecycle_deadline_diagnostics() {
   expect_code 0 "$status" "omp lifecycle deadline diagnostics: $out"
   pass "omp shutdown, arm and host readiness, and unready retirement each log one expiry"
 }
-
-if [ -n "${FM_TEST_ONLY:-}" ]; then
-  "$FM_TEST_ONLY"
-  exit "$?"
-fi
 
 test_watch_lifecycle_deadline_diagnostics
 test_detection_anchored_name_and_marker_precedence
