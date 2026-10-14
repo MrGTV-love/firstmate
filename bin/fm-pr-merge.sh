@@ -16,11 +16,14 @@
 # is green at the exact current head commit, where github_checks_not_green below
 # owns what makes a check green and judges each one by its current run, and
 # every unwaived check the forge requires for the base branch has reported at
-# that head. When mergeable is the only failing condition and reads UNKNOWN,
-# meaning GitHub has not finished recomputing it, the caller re-reads and
-# re-checks every condition after a short bounded wait instead of refusing;
-# once that bound is spent it reports mergeability still pending rather than
-# unmergeable, with the same nonzero exit as any other refusal.
+# that head. The rollup is read with pagination at that exact commit, validating
+# page boundaries, total count, and unique context ids before classifying checks.
+# Producer reads likewise validate the paginated total. Unreadable or incomplete
+# sources, isolated missing-check visibility, and mergeable UNKNOWN use the same
+# five-attempt bounded wait, re-reading every condition on each attempt.
+# Only the final attempt is reported: incomplete sources remain unreadable,
+# never evidence that a required check is missing, and exhausted UNKNOWN alone
+# reports mergeability still pending rather than unmergeable.
 # A required check that never reported is absent from the checks
 # list rather than red, so github_read_required_contexts below reads the
 # required set from classic branch protection and active rulesets. Check-run
@@ -397,7 +400,9 @@ MERGE_EXPECTED_SPAWN_GEN=$FM_BACKLOG_META_SPAWN_GEN
 
 MERGE_CONTROL_LOCK=
 MERGE_META_LOCK=
+MERGE_VERIFY_LOG=
 merge_control_cleanup() {
+  [ -z "$MERGE_VERIFY_LOG" ] || rm -f "$MERGE_VERIFY_LOG"
   [ -z "$MERGE_META_LOCK" ] || fm_lock_release "$MERGE_META_LOCK" || true
   fm_afk_contract_lock_release || true
   [ -z "$MERGE_CONTROL_LOCK" ] || fm_lock_release "$MERGE_CONTROL_LOCK" || true
@@ -550,6 +555,46 @@ FIELDS
     "$URL" "$live_head" >&2
   FM_PR_MERGE_HEAD=$live_head
   FM_PR_GITLAB_ASYNC_CONFIGURED=$async_configured
+}
+
+# Read all rollup pages at the verified commit, retaining the count and page
+# boundary information gh pr view's flattened statusCheckRollup omits. A partial
+# response, changing count, duplicate page, or GraphQL error is unreadable, never
+# an authoritative empty or smaller check set. A commit with no rollup is empty.
+github_read_check_rollup() {
+  local head=$1 pages
+  # shellcheck disable=SC2016  # GraphQL variables are literal query syntax.
+  pages=$(gh api graphql --paginate \
+    -f query='query($owner:String!,$repo:String!,$head:GitObjectID!,$endCursor:String){repository(owner:$owner,name:$repo){object(oid:$head){... on Commit{oid statusCheckRollup{contexts(first:100,after:$endCursor){totalCount pageInfo{hasNextPage endCursor} nodes{__typename ... on CheckRun{id name status conclusion startedAt} ... on StatusContext{id context state}}}}}}}}' \
+    -F "owner=$PR_OWNER" -F "repo=$PR_REPO" -F "head=$head" 2>/dev/null) || return 1
+  printf '%s' "$pages" | jq -sce --arg head "$head" '
+    if length == 0 or any(.[]; (.errors // [] | length) != 0
+        or .data.repository.object.oid != $head
+        or (.data.repository.object | has("statusCheckRollup") | not))
+      then error("unreadable rollup") else . end
+    | map(.data.repository.object)
+    | if length == 1 and .[0].statusCheckRollup == null then [] else
+        map(.statusCheckRollup.contexts) as $pages
+        | if any($pages[]; (.nodes | type) != "array"
+            or (.totalCount | type) != "number" or .totalCount < 0
+            or .totalCount != (.totalCount | floor)
+            or (.pageInfo.hasNextPage | type) != "boolean")
+            or ($pages | map(.totalCount) | unique | length) != 1
+            or $pages[-1].pageInfo.hasNextPage != false
+            or any($pages[0:-1][]; .pageInfo.hasNextPage != true
+                or (.pageInfo.endCursor | type) != "string" or .pageInfo.endCursor == "")
+          then error("incomplete rollup pages") else . end
+        | [$pages[].nodes[]] as $nodes
+        | if ($nodes | length) != $pages[0].totalCount
+            or ($nodes | unique_by(.id) | length) != ($nodes | length)
+            or any($nodes[]; (.id | type) != "string" or .id == ""
+              or (if .__typename == "CheckRun" then
+                    (.name | type) != "string" or (.status | type) != "string"
+                  elif .__typename == "StatusContext" then
+                    (.context | type) != "string" or (.state | type) != "string"
+                  else true end))
+          then error("incomplete rollup nodes") else $nodes end
+      end' 2>/dev/null
 }
 
 # Every GitHub check that is not green in the given live pull-request JSON, one
@@ -714,19 +759,20 @@ github_required_checks_missing() {
   ' 2>/dev/null || return 1
 }
 
-# Pre-merge conditions from a live PR view, base requirements, and head producers.
-# Sets FM_PR_MERGE_HEAD to the verified head on success. Returns 3, rather than
-# the usual 1, when mergeable=UNKNOWN is the only failing condition, so the
-# caller can retry a still-computing mergeability read instead of refusing.
+# Pre-merge conditions from a live PR view, complete head rollup, base
+# requirements, and head producers. Sets FM_PR_MERGE_HEAD on success. Returns 3
+# for UNKNOWN alone, or 4 for an unreadable source or missing-check visibility
+# alone, so the caller can retry all live conditions within the same bound.
 github_verify_mergeable() {
-  local json fields line red name covered missing unreported producers runs
-  local total=0 named=0 refusals='' mergeable_refusal=''
+  local json fields line red name covered missing unreported producers runs rollup required
+  local total=0 named=0 refusals='' mergeable_refusal='' source_unreadable=false
+  local other_refusals=''
   local state='' draft='' mergeable='' merge_state='' live_head='' base=''
 
-  if ! json=$(gh pr view "$URL" --json state,isDraft,mergeable,mergeStateStatus,headRefOid,baseRefName,statusCheckRollup 2>/dev/null) \
+  if ! json=$(gh pr view "$URL" --json state,isDraft,mergeable,mergeStateStatus,headRefOid,baseRefName 2>/dev/null) \
     || [ -z "$json" ]; then
     echo "error: could not read the GitHub pull request state before merging" >&2
-    return 1
+    return 4
   fi
   if ! fields=$(printf '%s' "$json" | jq -r '
       if type == "object" then
@@ -739,7 +785,7 @@ github_verify_mergeable() {
         error("pull request payload is not an object")
       end' 2>/dev/null); then
     echo "error: could not read the GitHub pull request state before merging" >&2
-    return 1
+    return 4
   fi
   while IFS= read -r line; do
     total=$((total + 1))
@@ -757,17 +803,19 @@ $fields
 FIELDS
   if [ "$named" -ne 5 ] || [ "$total" -ne 5 ] || [ -z "$base" ]; then
     echo "error: could not read the GitHub pull request state before merging" >&2
-    return 1
+    return 4
   fi
 
   draft=$(fm_pr_json_draft_state "$json")
   if ! fm_pr_head_valid "$live_head"; then
     echo "error: could not read the GitHub pull request head commit before merging" >&2
-    return 1
+    return 4
   fi
-  if ! red=$(github_checks_not_green "$json"); then
-    echo "error: could not read the GitHub pull request state before merging" >&2
-    return 1
+  if ! rollup=$(github_read_check_rollup "$live_head") \
+    || ! json=$(printf '%s' "$json" | jq -c --argjson rollup "$rollup" '.statusCheckRollup = $rollup') \
+    || ! red=$(github_checks_not_green "$json"); then
+    echo "error: the GitHub pull request check rollup at head $live_head could not be read completely" >&2
+    return 4
   fi
 
   case "$state" in
@@ -805,8 +853,10 @@ FIELDS
 $red
 EOF
 
+  other_refusals=$refusals
   unreported=''
   if ! github_read_required_contexts "$base"; then
+    source_unreadable=true
     while IFS= read -r line; do
       refusals="$refusals  - $line, so a required check that has not reported cannot be ruled out
 "
@@ -815,19 +865,32 @@ $FM_PR_GITHUB_REQUIRED_ERROR
 EOF
   fi
   producers='[]'
-  if printf '%s' "$FM_PR_GITHUB_REQUIRED" | jq -e 'any(.[]; .app_id != null)' >/dev/null; then
+  required=$FM_PR_GITHUB_REQUIRED
+  if printf '%s' "$required" | jq -e 'any(.[]; .app_id != null)' >/dev/null; then
     if ! runs=$(gh api --paginate "repos/$PR_OWNER/$PR_REPO/commits/$live_head/check-runs" 2>/dev/null) \
       || [ -z "$runs" ] \
       || ! producers=$(printf '%s' "$runs" | jq -sc --arg head "$live_head" '
-        [ .[] | if (.check_runs | type) == "array" then .check_runs[] else error("invalid check runs") end
+        if length == 0 or any(.[]; (.check_runs | type) != "array"
+            or (.total_count | type) != "number" or .total_count < 0
+            or .total_count != (.total_count | floor))
+            or (map(.total_count) | unique | length) != 1
+          then error("invalid check run pages") else . end
+        | .[0].total_count as $count
+        | [ .[].check_runs[]
           | if (.name | type) == "string" and (.app.id | type) == "number" and .head_sha == $head
-            then . else error("invalid check producer") end ]' 2>/dev/null); then
+            then . else error("invalid check producer") end ]
+        | if length == $count then . else error("incomplete check producers") end' 2>/dev/null); then
+      source_unreadable=true
       producers='[]'
-      refusals="$refusals  - required check producers at head $live_head could not be read
+      # No producer evidence means bound contexts cannot be called absent.
+      # Name-only requirements from readable sources remain enforceable.
+      required=$(printf '%s' "$required" | jq -c 'map(select(.app_id == null))')
+      refusals="$refusals  - required check producers at head $live_head could not be read completely
 "
     fi
   fi
-  if ! missing=$(github_required_checks_missing "$json" "$FM_PR_GITHUB_REQUIRED" "$producers"); then
+  if ! missing=$(github_required_checks_missing "$json" "$required" "$producers"); then
+    source_unreadable=true
     refusals="$refusals  - the GitHub pull request check rollup could not be read
 "
   else
@@ -854,6 +917,11 @@ EOF
     printf '%s' "$refusals" >&2
     [ -z "$uncovered" ] || printf 'error: these checks are not green: %s\n' "$uncovered" >&2
     [ -z "$unreported" ] || printf 'error: these required checks have not reported: %s\n' "$unreported" >&2
+    [ "$source_unreadable" = false ] || return 4
+    if [ -z "$other_refusals" ] && [ -n "$unreported" ] \
+      && { [ "$mergeable" = MERGEABLE ] || [ "$mergeable" = UNKNOWN ]; }; then
+      return 4
+    fi
     return 1
   fi
   printf 'verified: %s is open and mergeable, with every unwaived required check reported and every unwaived check green at head %s\n' \
@@ -1348,11 +1416,15 @@ case "$PROVIDER" in
       merge_args=(--squash)
     fi
     FM_PR_GITHUB_CALLER_METHOD=$(caller_merge_method "$@")
-    # mergeable reads UNKNOWN for a short while after a push or base-branch
-    # change while GitHub recomputes it; retry a bounded number of times,
-    # re-reading and re-checking every live condition on each attempt, rather
-    # than refusing a pull request that is simply still being computed. The
-    # delay is capped at 0-10 seconds so the wait stays short under the lock.
+    # Retry UNKNOWN, unreadable sources, and isolated missing-check visibility
+    # within the same bounded wait, re-reading every condition on each attempt.
+    # Only the final attempt's diagnostics are authoritative: an incomplete
+    # source or a context that appears on retry must not be reported as missing.
+    # The delay is capped at 0-10 seconds so the wait stays short under the lock.
+    MERGE_VERIFY_LOG=$(mktemp "${TMPDIR:-/tmp}/fm-pr-merge-verify.XXXXXX") || {
+      echo "error: could not prepare GitHub pre-merge verification diagnostics" >&2
+      exit 1
+    }
     mergeable_retry_delay=${FM_PR_GITHUB_MERGEABLE_RETRY_DELAY:-3}
     case "$mergeable_retry_delay" in
       [0-9] | 10) ;;
@@ -1361,16 +1433,20 @@ case "$PROVIDER" in
     mergeable_attempt=1
     while :; do
       mergeable_status=0
-      github_verify_mergeable || mergeable_status=$?
+      github_verify_mergeable 2>"$MERGE_VERIFY_LOG" || mergeable_status=$?
       if [ "$mergeable_status" -eq 0 ]; then
         break
       fi
-      if [ "$mergeable_status" -ne 3 ] || [ "$mergeable_attempt" -ge 5 ]; then
+      if { [ "$mergeable_status" -ne 3 ] && [ "$mergeable_status" -ne 4 ]; } \
+        || [ "$mergeable_attempt" -ge 5 ]; then
         break
       fi
       sleep "$mergeable_retry_delay"
       mergeable_attempt=$((mergeable_attempt + 1))
     done
+    cat "$MERGE_VERIFY_LOG" >&2
+    rm -f "$MERGE_VERIFY_LOG"
+    MERGE_VERIFY_LOG=
     if [ "$mergeable_status" -ne 0 ]; then
       if [ "$mergeable_status" -eq 3 ]; then
         printf 'error: mergeability for %s is still being computed by GitHub; retry shortly\n' "$URL" >&2
