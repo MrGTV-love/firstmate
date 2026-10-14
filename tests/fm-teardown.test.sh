@@ -397,9 +397,10 @@ land_on_origin_main() {
   rm -rf "$tmp"
 }
 
-# Override GitHub lookups to report PR 7 as merged with the supplied head.
+# Override GitHub lookups to report PR 7 as merged with the supplied head and,
+# optionally, the actual merge commit used by archive cleanup.
 add_gh_pr_merged_for_head() {
-  local case_dir=$1 head=$2
+  local case_dir=$1 head=$2 merge=${3:-}
   cat > "$case_dir/fakebin/gh-axi" <<'SH'
 #!/usr/bin/env bash
 case "${1:-} ${2:-}" in
@@ -415,6 +416,7 @@ SH
 case "\${1:-} \${2:-}" in
   "pr view")
     case " \$* " in
+      *"state,headRefOid,mergeCommit"*) printf '%s\t%s\t%s\n' 'MERGED' '$head' '$merge' ; exit 0 ;;
       *"state,headRefOid,url"*) printf '%s\t%s\t%s\n' 'MERGED' '$head' 'https://github.com/example/repo/pull/7' ; exit 0 ;;
       *"--json state "*) printf '%s\n' MERGED ; exit 0 ;;
       *"headRefOid"*) printf '%s\n' '$head' ; exit 0 ;;
@@ -1335,6 +1337,222 @@ test_squash_merged_branch_deleted_allows() {
   expect_code 0 "$rc" "squash-merged: teardown should succeed when the PR is merged"
   ! grep -q REFUSED "$case_dir/stderr" || fail "squash-merged: teardown printed a REFUSED line"
   pass "squash-merged + deleted-branch worktree (PR merged) is torn down (the fix)"
+}
+
+# Land the fixture's task branch as a real squash commit and supply independent
+# forge head/merge evidence. The local task copy remains on the PR head.
+land_archive_fixture_pr() {
+  local case_dir=$1 head merge
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" merge -q --squash fm/task-x1 >/dev/null
+  git -C "$case_dir/project" -c user.email=t@t -c user.name=t commit -qm "squash task"
+  merge=$(git -C "$case_dir/project" rev-parse HEAD)
+  git -C "$case_dir/project" push -q origin main
+  append_pr_meta_url "$case_dir"
+  add_gh_pr_merged_for_head "$case_dir" "$head" "$merge"
+}
+
+assert_archive_ref() {  # <case-dir> <branch> <expected-sha>
+  local case_dir=$1 branch=$2 expected=$3 actual
+  actual=$(git -C "$case_dir/project" rev-parse --verify "refs/heads/$branch" 2>/dev/null) || actual=
+  [ "$actual" = "$expected" ] || fail "$branch: expected ref $expected, got $actual"
+}
+
+test_task_archives_reap_only_carried_refs() {
+  local case_dir base submitted replayed pipeline rc=0 name
+  case_dir=$(make_case archive-carried)
+  write_meta "$case_dir" no-mistakes ship
+  base=$(git -C "$case_dir/wt" rev-parse HEAD)
+  wt_commit_file "$case_dir" 'feature file.txt' alpha "add feature"
+  submitted=$(git -C "$case_dir/wt" rev-parse HEAD)
+  replayed=$(printf 'replayed feature\n' | git -C "$case_dir/project" commit-tree \
+    "$(git -C "$case_dir/wt" rev-parse "HEAD^{tree}")" -p "$base")
+  wt_commit_file "$case_dir" later.txt beta "pipeline follow-up"
+  pipeline=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a01 "$submitted"
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a02 "$replayed"
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$pipeline"
+  git -C "$case_dir/project" branch archive/other-pipeline-final "$pipeline"
+  git -C "$case_dir/project" branch archive/task-x1 "$submitted"
+  git -C "$case_dir/project" branch unrelated "$pipeline"
+  land_archive_fixture_pr "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "carried archives: teardown failed: $(cat "$case_dir/stderr")"
+  for name in submitted-0a0a0a01 submitted-0a0a0a02 pipeline-0b0b0b01; do
+    assert_archive_ref "$case_dir" "archive/task-x1-$name" ""
+    assert_grep "reaped archive/task-x1-$name" "$case_dir/stderr" "carried archive was not named"
+  done
+  assert_archive_ref "$case_dir" archive/other-pipeline-final "$pipeline"
+  assert_archive_ref "$case_dir" archive/task-x1 "$submitted"
+  assert_archive_ref "$case_dir" unrelated "$pipeline"
+  pass "teardown reaps only this task's ancestor and patch-equivalent archives carried by the squash"
+}
+
+test_task_archives_ignore_other_tasks_and_non_custody_names() {
+  local case_dir head rc=0 name
+  case_dir=$(make_case archive-prefix)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt alpha "feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$head"
+  for name in task-x1-2-pipeline-0b0b0b02 task-x1-2-submitted-0a0a0a02 \
+    task-x1-pipeline-final task-x1-pipeline-0B0B0B03 task-x1-pipeline-0b0b0b044 \
+    task-x1-submitted-0a0a0a05-extra; do
+    git -C "$case_dir/project" branch "archive/$name" "$head"
+  done
+  land_archive_fixture_pr "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "prefix archives: teardown failed: $(cat "$case_dir/stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b01 ""
+  assert_grep 'reaped archive/task-x1-pipeline-0b0b0b01' "$case_dir/stderr" "own archive was not named"
+  for name in task-x1-2-pipeline-0b0b0b02 task-x1-2-submitted-0a0a0a02 \
+    task-x1-pipeline-final task-x1-pipeline-0B0B0B03 task-x1-pipeline-0b0b0b044 \
+    task-x1-submitted-0a0a0a05-extra; do
+    assert_archive_ref "$case_dir" "archive/$name" "$head"
+    if grep -qF "archive/$name" "$case_dir/stderr"; then
+      fail "archive/$name belongs to another task or is not a custody name but was named"
+    fi
+  done
+  pass "teardown judges only the task's exact custody archive names, never another task's"
+}
+
+test_task_archives_keep_unproven_and_checked_out_refs() {
+  local case_dir landed extra merge edited rc=0 name
+  case_dir=$(make_case archive-unproven)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt alpha "landed feature"
+  landed=$(git -C "$case_dir/wt" rev-parse HEAD)
+  wt_commit_file "$case_dir" extra.txt unlanded "unlanded archive edit"
+  extra=$(git -C "$case_dir/wt" rev-parse HEAD)
+  # git cherry ignores merges: this archive has only a merge above the PR head,
+  # but that merge's tree contains an edit absent from both its parents.
+  merge=$(commit_tree_from_wt_head "$case_dir" "$landed" "empty second parent")
+  edited=$(printf 'edited merge\n' | git -C "$case_dir/project" commit-tree \
+    "$(git -C "$case_dir/wt" rev-parse "HEAD^{tree}")" -p "$landed" -p "$merge")
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a03 "$extra"
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b02 "$edited"
+  git -C "$case_dir/wt" reset -q --hard "$landed"
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b03 "$landed"
+  git -C "$case_dir/project" worktree add -q "$case_dir/archive-held" archive/task-x1-pipeline-0b0b0b03
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b04 "$landed"
+  land_archive_fixture_pr "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "unproven archives must not prevent landed task cleanup: $(cat "$case_dir/stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-submitted-0a0a0a03 "$extra"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b02 "$edited"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b03 "$landed"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b04 ""
+  for name in submitted-0a0a0a03 pipeline-0b0b0b02 pipeline-0b0b0b03; do
+    assert_grep "keeping archive/task-x1-$name" "$case_dir/stderr" "retained archive was not named"
+  done
+  [ "$(git -C "$case_dir/archive-held" symbolic-ref HEAD)" = refs/heads/archive/task-x1-pipeline-0b0b0b03 ] \
+    || fail "archive cleanup detached another copy"
+  pass "unlanded edits, cherry-invisible merge edits, and checked-out archives stay named and intact"
+}
+
+test_task_archives_require_matching_squash_content() {
+  local shape case_dir head merge rc
+  for shape in different missing; do
+    case_dir=$(make_case "archive-squash-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    wt_commit_file "$case_dir" feature.txt alpha "feature"
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$head"
+    append_pr_meta_url "$case_dir"
+    if [ "$shape" = different ]; then
+      land_on_origin_main "$case_dir" feature.txt different
+      git -C "$case_dir/project" fetch -q origin
+      merge=$(git -C "$case_dir/project" rev-parse origin/main)
+    else
+      merge=
+    fi
+    add_gh_pr_merged_for_head "$case_dir" "$head" "$merge"
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$shape squash: ordinary landing proof should still pass: $(cat "$case_dir/stderr")"
+    assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b01 "$head"
+    assert_grep 'keeping archive/task-x1-pipeline-0b0b0b01' "$case_dir/stderr" "$shape squash: archive not named"
+  done
+  pass "even ancestor archives stay when squash content differs or the merge object is unproven"
+}
+
+test_task_archives_include_deleted_and_literal_paths_in_merge_proof() {
+  local shape case_dir base head merge rc archive file=':(literal)renamed file.txt'
+  for shape in matching restored-source; do
+    case_dir=$(make_case "archive-deleted-$shape")
+    write_meta "$case_dir" no-mistakes ship
+    printf 'rename me\n' > "$case_dir/project/old.txt"
+    git -C "$case_dir/project" add old.txt
+    git -C "$case_dir/project" commit -qm "baseline file"
+    git -C "$case_dir/project" push -q origin main
+    base=$(git -C "$case_dir/project" rev-parse HEAD)
+    git -C "$case_dir/wt" reset -q --hard "$base"
+    git -C "$case_dir/wt" --literal-pathspecs mv -- old.txt "$file"
+    git -C "$case_dir/wt" commit -qm rename
+    head=$(git -C "$case_dir/wt" rev-parse HEAD)
+    archive=archive/task-x1-pipeline-0b0b0b05
+    git -C "$case_dir/project" branch "$archive" "$head"
+    if [ "$shape" = matching ]; then
+      land_archive_fixture_pr "$case_dir"
+    else
+      # The destination matches, but the squash did not carry the deletion.
+      # Treat both PR and squash path sets as literal filenames, not pathspecs.
+      printf 'rename me\n' > "$case_dir/project/$file"
+      git -C "$case_dir/project" --literal-pathspecs add -- "$file"
+      git -C "$case_dir/project" commit -qm "incomplete rename squash"
+      merge=$(git -C "$case_dir/project" rev-parse HEAD)
+      git -C "$case_dir/project" push -q origin main
+      append_pr_meta_url "$case_dir"
+      add_gh_pr_merged_for_head "$case_dir" "$head" "$merge"
+    fi
+    rc=0
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$shape rename: task landing proof should pass: $(cat "$case_dir/stderr")"
+    if [ "$shape" = matching ]; then
+      assert_archive_ref "$case_dir" "$archive" ""
+      assert_grep "reaped $archive" "$case_dir/stderr" "matching rename was not reaped"
+    else
+      assert_archive_ref "$case_dir" "$archive" "$head"
+      assert_grep "keeping $archive" "$case_dir/stderr" "incomplete rename was not named"
+    fi
+  done
+  pass "archive merge proof includes deleted paths and treats pathspec-like filenames literally"
+}
+
+test_task_archives_survive_refusal_and_forced_discard() {
+  local case_dir head rc=0
+  case_dir=$(make_case archive-refused)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt unlanded "unlanded feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a04 "$head"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "archive cleanup must not precede landing proof"
+  assert_archive_ref "$case_dir" archive/task-x1-submitted-0a0a0a04 "$head"
+  assert_refusal_retained_task_state "$case_dir" archive-refused "$head"
+  rc=0
+  run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+    > "$case_dir/forced.stdout" 2> "$case_dir/forced.stderr" || rc=$?
+  expect_code 0 "$rc" "authorized discard failed: $(cat "$case_dir/forced.stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-submitted-0a0a0a04 "$head"
+  pass "landing refusal and forced discard never reap recovery archives"
+}
+
+test_task_archives_keep_refs_when_forge_is_unreachable() {
+  local case_dir head rc=0
+  case_dir=$(make_case archive-offline)
+  write_meta "$case_dir" no-mistakes ship
+  wt_commit_file "$case_dir" feature.txt alpha "feature"
+  head=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b01 "$head"
+  land_on_origin_main "$case_dir" feature.txt alpha
+  append_pr_meta_url "$case_dir"
+  add_gh_axi_error "$case_dir"
+  run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 0 "$rc" "content landing fallback failed: $(cat "$case_dir/stderr")"
+  assert_archive_ref "$case_dir" archive/task-x1-pipeline-0b0b0b01 "$head"
+  assert_grep 'keeping archive/task-x1-pipeline-0b0b0b01' "$case_dir/stderr" "offline archive not named"
+  pass "content-only landing with an unreachable forge keeps and names recovery archives"
 }
 
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head() {
@@ -7986,7 +8204,8 @@ test_reassigned_dirty_slot_retires_only_finished_task() {
   wt_commit_file "$case_dir" delivered.txt 'merged task work' 'delivered task'
   delivered=$(git -C "$case_dir/wt" rev-parse HEAD)
   git -C "$case_dir/wt" push -q origin HEAD:main
-  add_gh_pr_merged_for_head "$case_dir" "$delivered"
+  add_gh_pr_merged_for_head "$case_dir" "$delivered" "$delivered"
+  git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b06 "$delivered"
   mkdir -p "$case_dir/pool/1" "$case_dir/primary-home/state"
   slot="$case_dir/pool/1/project"
   git -C "$case_dir/project" worktree move "$case_dir/wt" "$slot"
@@ -9730,6 +9949,13 @@ test_teardown_retires_v1_journal_when_projected_workspace_gone
 test_teardown_retains_v1_journal_when_projected_workspace_present
 test_teardown_retains_v1_journal_when_workspace_query_ambiguous
 test_squash_merged_branch_deleted_allows
+test_task_archives_reap_only_carried_refs
+test_task_archives_ignore_other_tasks_and_non_custody_names
+test_task_archives_keep_unproven_and_checked_out_refs
+test_task_archives_require_matching_squash_content
+test_task_archives_include_deleted_and_literal_paths_in_merge_proof
+test_task_archives_survive_refusal_and_forced_discard
+test_task_archives_keep_refs_when_forge_is_unreachable
 test_squash_merged_pr_allows_when_head_ancestor_of_pr_head
 test_no_pr_recorded_discovers_merged_pr_by_branch_allows
 test_squash_merged_pr_allows_replayed_unpushed_patch
