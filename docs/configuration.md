@@ -636,7 +636,9 @@ The handled-directory mtime records the latest move when it contains handled mes
 Pane activity, commits, pipeline progress, request creation, and transport delivery do not reset this clock.
 Each row's evidence names all three sources and any exclusion or pending request.
 An ordinary task that reported done or ready is informational here because its PR or landing evidence owns the next action.
-A named declared pause uses `FM_PAUSE_RESURFACE_SECS` and its existing default instead of 900 seconds; an elapsed declared clearing time restores the short cadence.
+A report with no status line, acknowledgement, or resolved reply yet starts its clock at its task record's mtime (dispatch), so a new worker is not overdue before its first line.
+A report whose status log holds an open `needs-decision` or `blocked` key, or whose current state is `parked` or `blocked` (including a no-mistakes gate at `awaiting_approval` or `fix_review`), is informational here because firstmate owes the next move and `unanswered_question` owns it.
+A declared `paused` or verified `captain-held` wait uses `FM_PAUSE_RESURFACE_SECS` and its existing default instead of 900 seconds; an elapsed declared clearing time restores the short cadence.
 An idle secondmate with no routed work in its own backlog's In flight section and no outstanding reply request remains informational and healthy regardless of a standing pause declaration.
 The secondmate backlog is read through the canonical lightweight fleet snapshot in that home, across its registered transport when remote; unreadable evidence degrades coverage rather than inventing idleness.
 Each secondmate home runs exactly the same tracker for its own direct workers, without surveying another home's children.

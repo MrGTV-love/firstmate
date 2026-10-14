@@ -1393,7 +1393,7 @@ fake.mkdir()
 now = int(time.time())
 def script(path, text):
     path.write_text(text); path.chmod(0o755)
-script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\nprintf "state: working · source: pane · building\\n"\n')
+script(code / 'bin/fm-crew-state.sh', '#!/usr/bin/env bash\nprintf "state: %s · source: pane · building\\n" "${FM_SILENCE_TEST_CREW_STATE:-working}"\n')
 # This fixture supplies endpoint observations, not a rendered vendor-process classifier.
 backend = code / 'bin/fm-backend.sh'
 backend.write_text(backend.read_text() + '\nfm_backend_agent_state() { printf "%s" "${FM_SILENCE_TEST_LIVENESS:-alive}"; }\n'
@@ -1461,12 +1461,36 @@ r = rows()['worker']; assert r['age_seconds'] == 901 and not r['overdue'] and r[
 record.unlink()
 # Named pauses are excluded from the short cadence, not forgotten forever; elapsed deadlines restore it.
 status('worker', f'paused [at={now - 901}]: awaiting CI to finish\n', now - 901)
-r = rows()['worker']; assert not r['overdue'] and r['limit_seconds'] == 14400 and 'declared pause' in r['evidence'], r
+r = rows()['worker']; assert not r['overdue'] and r['limit_seconds'] == 14400 and 'declared wait' in r['evidence'], r
 status('worker', f'paused [at={now - 14400}]: awaiting CI to finish\n', now - 14400)
 assert rows()['worker']['overdue']
 clearing = dt.datetime.fromtimestamp(now - 1, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 status('worker', f'paused [at={now - 901}]: awaiting CI until {clearing}\n', now - 901)
 r = rows()['worker']; assert r['overdue'] and r['limit_seconds'] == 900, r
+# A verified captain-held wait gets the same long cadence as a named pause.
+status('worker', f'captain-held [at={now - 901}]: awaiting captain approval\n', now - 901)
+r = rows()['worker']; assert not r['overdue'] and r['limit_seconds'] == 14400 and 'declared wait' in r['evidence'], r
+status('worker', f'captain-held [at={now - 14400}]: awaiting captain approval\n', now - 14400)
+assert rows()['worker']['overdue']
+# Firstmate owes the next move on an open decision, blocker, or parked gate, so the silence check-in stays out.
+for line in (f'needs-decision [at={now - 901}] [key=k]: pick A or B', f'blocked [at={now - 901}] [key=k]: waiting on answer'):
+    status('worker', line + '\n', now - 901)
+    r = rows()['worker']
+    assert not r['overdue'] and r['informational'] and 'waiting on firstmate' in r['evidence'], r
+status('worker', f'working [at={now - 901}]: building\n', now - 901)
+for state in ('parked', 'blocked'):
+    r = rows(extra={'FM_SILENCE_TEST_CREW_STATE': state})['worker']
+    assert not r['overdue'] and r['informational'] and 'waiting on firstmate' in r['evidence'], r
+assert rows()['worker']['overdue']
+# A worker with no status line yet starts its clock at dispatch (task record mtime).
+status_file = home / 'state/worker.status'; meta_file = home / 'state/worker.meta'
+status_file.rename(home / 'state/worker.status.hold')
+os.utime(meta_file, (now - 5, now - 5))
+r = rows()['worker']; assert r['age_seconds'] == 5 and not r['overdue'] and 'clock starts at dispatch' in r['evidence'], r
+os.utime(meta_file, (now - 901, now - 901))
+r = rows()['worker']; assert r['age_seconds'] == 901 and r['overdue'], r
+os.utime(meta_file, (now, now))
+(home / 'state/worker.status.hold').rename(status_file)
 status('worker', f'done [at={now - 2000}]: ready in branch\n', now - 2000)
 r = rows()['worker']; assert not r['overdue'] and r['informational'] and 'done/ready' in r['evidence'], r
 # Ordinary check-in uses the real inbox, requests a report before ack, never types payload or interrupts.

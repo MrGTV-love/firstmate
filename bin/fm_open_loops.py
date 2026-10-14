@@ -299,14 +299,16 @@ class Collector:
         out = self.bash('. "$1/fm-classify-lib.sh"; last=$(last_status_line "$2"); '
                         'printf "%s\\n" "$(status_line_at_epoch "$last" || :)" '
                         '"$(status_line_verb "$last")"; '
+                        'status_open_decisions_dated "$2" | awk -F"\\t" \'$2 == "needs-decision" || $2 == "blocked" '
+                        '{ n = 1 } END { print n + 0 }\'; '
                         'wait=$(status_declared_wait_line "$2"); '
-                        'if status_is_paused "$wait" && [ -n "$(status_line_note "$wait")" ]; then '
+                        'if status_is_paused_or_captain_held "$wait" && [ -n "$(status_line_note "$wait")" ]; then '
                         'printf "%s\\n%s\\n%s\\n" "${FM_PAUSE_RESURFACE_SECS:-$FM_PAUSE_RESURFACE_SECS_DEFAULT}" '
                         '"$(status_paused_until "$wait" || :)" "$(status_line_note "$wait")"; fi', BIN, path)
         fields = out.splitlines()
-        fields += [""] * (5 - len(fields))
-        stamp, verb, cadence, until, note = fields[:5]
-        return (int(stamp) if stamp.isdigit() else mtime(path), verb,
+        fields += [""] * (6 - len(fields))
+        stamp, verb, open_decision, cadence, until, note = fields[:6]
+        return (int(stamp) if stamp.isdigit() else mtime(path), verb, open_decision == "1",
                 int(cadence) if cadence.isdigit() and int(cadence) > 0 else None,
                 int(until) if until.isdigit() else None, note)
 
@@ -332,7 +334,7 @@ class Collector:
             raise ValueError("task generation changed during snapshot")
         if task["endpoint"].get("exists") is False or task["endpoint"].get("agent_alive") in ("dead", "missing"):
             return
-        status_at, verb, pause_limit, until, pause_note = self.report_status(ident)
+        status_at, verb, open_decision, pause_limit, until, pause_note = self.report_status(ident)
         records = self.reply_records(ident)
         open_replies = [r for r in records if r.get("phase") != "resolved"]
         inbox = self.state / (ident + ".inbox")
@@ -343,30 +345,36 @@ class Collector:
                         if r.get("phase") == "resolved" and r.get("resolved_epoch", "").isdigit()
                         and int(r["resolved_epoch"]) <= self.now), default=None)
         stamps = [s for s in (status_at, ack_at, reply_at) if s is not None and s <= self.now]
-        since = max(stamps, default=None)
+        dispatched = mtime(self.state / (ident + ".meta"))
+        since = max(stamps, default=dispatched if dispatched is not None and dispatched <= self.now else None)
         evidence = f"last heard: status={status_at}; inbox acknowledgement={ack_at}; resolved reply={reply_at}"
         excluded = None
-        if task["kind"] != "secondmate" and (verb == "done" or task["current_state"].get("state") in ("done", "ready")):
+        long_wait = False
+        if task["kind"] != "secondmate" and (verb == "done" or task["current_state"].get("state") == "done"):
             excluded = "excluded: done/ready task is covered by PR or landing evidence"
         elif task["kind"] == "secondmate" and not open_replies and not self.secondmate_has_work(task):
             excluded = "excluded: idle secondmate has no routed work in flight"
+        elif open_decision or task["current_state"].get("state") in ("parked", "blocked"):
+            excluded = "excluded: waiting on firstmate; its unanswered question or gate owns the next move"
         elif pause_limit and (until is None or until > self.now):
-            # Keep the named wait visible on the watcher's long cadence, not the ordinary check-in cadence.
-            excluded = "declared pause uses long cadence: " + pause_note
+            # Keep the declared wait visible on the watcher's long cadence, not the ordinary check-in cadence.
+            excluded = "declared wait uses long cadence: " + pause_note
+            long_wait = True
         pending = bool(open_replies) or any(CHECK_IN_TEXT in path.read_text()
                                            for path in inbox.glob("[0-9]*.msg"))
-        informational = bool(excluded and not excluded.startswith("declared pause")) or pending
+        informational = bool(excluded and not long_wait) or pending
         if pending:
             evidence += "; pending reply/check-in: do not repeat; existing reply or inbox escalation owns recovery"
         if excluded:
             evidence += "; " + excluded
+        if not stamps:
+            evidence += "; no report yet: clock starts at dispatch"
         self.add("silent_report", ident, "check in: progress, blockers, cross-workstream dependencies",
                  since, evidence=evidence, informational=informational)
-        if excluded and excluded.startswith("declared pause"):
+        if long_wait:
             row = next(r for r in self.rows.values() if r["category"] == "silent_report" and r["subject"] == ident)
             row["limit_seconds"] = pause_limit
-            row["overdue"] = not informational and (row["age_seconds"] is None or row["age_seconds"] >= pause_limit
-                                                        or (until is not None and self.now >= until))
+            row["overdue"] = not informational and (row["age_seconds"] is None or row["age_seconds"] >= pause_limit)
 
     def silent_reports(self):
         for task in self.direct_reports:
