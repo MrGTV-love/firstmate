@@ -106,6 +106,30 @@ run_case() {  # <case> <id>
     "$TEARDOWN" "$id" --force --drop-file "$(fm_test_drop_file)"
 }
 
+# Stages a live worker in the case's slot and sets SLOT_WORKER. Call it directly,
+# never in a $(...) subshell: a background child of one does not outlive it. The
+# worker stays alive until stop_event_holder releases it, not for a wall-clock
+# lifetime that can expire while teardown is slow under host load and then read
+# as teardown having killed it.
+start_slot_worker() {  # <case>
+  local dir=$1 i=0
+  mkfifo "$dir/worker-release"
+  (
+    trap - EXIT
+    cd "$dir/worktree" || exit 1
+    exec 9<> "$dir/worker-release"
+    : > "$dir/worker-ready"
+    IFS= read -r _ <&9
+  ) &
+  SLOT_WORKER=$!
+  EVENT_HOLDERS+=("$SLOT_WORKER")
+  while [ ! -e "$dir/worker-ready" ] && [ "$i" -lt 100 ]; do
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ -e "$dir/worker-ready" ] || fail 'could not stage the slot worker'
+}
+
 assert_refused_without_mutation() {  # <case> <id> <description>
   local dir=$1 id=$2 description=$3 rc
   set +e
@@ -537,11 +561,9 @@ test_reused_pool_slot_refuses_before_touching_the_other_task() {
   fm_write_meta "$dir/home/state/$other.meta" \
     "window=firstmate:fm-$other" "endpoint_task_id=$other" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
-  # Staged in this shell, not a command substitution: a background child of a
-  # $(...) subshell does not outlive it, and the point of this worker is to be
-  # alive in the slot while teardown runs.
-  ( cd "$dir/worktree" && exec sleep 30 ) &
-  worker=$!
+  # The point of this worker is to be alive in the slot while teardown runs.
+  start_slot_worker "$dir"
+  worker=$SLOT_WORKER
 
   set +e
   run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
@@ -557,8 +579,8 @@ test_reused_pool_slot_refuses_before_touching_the_other_task() {
     || fail "teardown reached the runtime on a contested pool slot: $(cat "$dir/runtime.log")"
   assert_contains "$(cat "$dir/stderr")" "$other" \
     "refusal should name the other task holding the slot"
-  kill "$worker" 2>/dev/null || true
-  wait "$worker" 2>/dev/null || true
+  stop_event_holder "$worker"
+  EVENT_HOLDERS=()
 
   # The same collision recorded on a secondmate home field rather than a task
   # worktree is the same slot, and refuses the same way.
@@ -1046,11 +1068,9 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=scout"
   claim_pool_slot "$dir" "$other" "$dir/other-home"
-  # Staged in this shell, not a command substitution: a background child of a
-  # $(...) subshell does not outlive it, and the point of this worker is to be
-  # alive in the slot while teardown runs.
-  ( cd "$dir/worktree" && exec sleep 30 ) &
-  worker=$!
+  # The point of this worker is to be alive in the slot while teardown runs.
+  start_slot_worker "$dir"
+  worker=$SLOT_WORKER
 
   set +e
   run_case "$dir" "$id" > "$dir/stdout" 2> "$dir/stderr"
@@ -1063,8 +1083,8 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   assert_reassigned_slot_left_alone "$dir" "$id" "$other" "dirty reassigned slot with --force"
   assert_contains "$(cat "$dir/stderr")" "$dir/other-home" \
     "the warning should name the claimant's home"
-  kill "$worker" 2>/dev/null || true
-  wait "$worker" 2>/dev/null || true
+  stop_event_holder "$worker"
+  EVENT_HOLDERS=()
 
   dir=$(make_case slot-reassigned-clean)
   mark_case_as_treehouse_pool "$dir"
@@ -1075,8 +1095,8 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
     "window=firstmate:fm-$id" "endpoint_task_id=$id" \
     "worktree=$dir/worktree" "project=$dir/project" "kind=ship"
   claim_pool_slot "$dir" "$other" "$dir/other-home"
-  ( cd "$dir/worktree" && exec sleep 30 ) &
-  worker=$!
+  start_slot_worker "$dir"
+  worker=$SLOT_WORKER
 
   set +e
   FM_HOME="$dir/home" FM_ROOT_OVERRIDE="$dir/code-root" \
@@ -1087,8 +1107,8 @@ test_reassigned_pool_slot_finishes_own_cleanup_without_touching_the_slot() {
   [ "$rc" -eq 0 ] || fail "teardown of a clean ship task whose slot was reassigned failed: $(cat "$dir/stderr")"
   kill -0 "$worker" 2>/dev/null || fail "teardown killed the worker holding the clean reassigned pool slot"
   assert_reassigned_slot_left_alone "$dir" "$id" "$other" "clean reassigned slot without --force"
-  kill "$worker" 2>/dev/null || true
-  wait "$worker" 2>/dev/null || true
+  stop_event_holder "$worker"
+  EVENT_HOLDERS=()
 
   # A claim that exists but cannot be read as a claim proves nothing either way,
   # so it refuses rather than guessing the slot is still this task's.
