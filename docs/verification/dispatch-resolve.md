@@ -55,6 +55,7 @@ ok - fixed questions, task extraction, and protected regions retain their privac
 ok - rule floor: a known shortfall falls through to default
 ok - per-rule confidence floors fall to the most probable runner-up that clears its own floor
 ok - proven exhaustion activates only the declared model-matrix stand-in
+ok - a powerful verdict filters declared stand-ins and every stand-in takes the route effort
 ok - task-horizon feasibility still vetoes the quota winner
 ok - absent key is off: one stderr line, exit 0, no network call or quota read
 ok - help and bare-filename startup isolate environment credentials
@@ -95,7 +96,7 @@ ok - chosen Codex and Pi entries never use supervisor catalogs and retain author
 
 No Bash with `EPOCHREALTIME` was installed on that host, so the fast-path check printed its skip line instead of running.
 
-The public-interface assertions cover one-request batching, the rule Choice deciding project-scoped and Claude-only rules with every rule offered, the session launch policy filtering the selected rule after judgment and escalating when it empties that rule, the Node fallback when Bun is absent, Haiku max and powerful-class effort floors, unrounded ambiguity boundaries, desktop thresholds, approval and quota-floor vetoes, a `fast` answer preferring quota-passing Haiku/Luna candidates (including a usable cheap pool with unmeasured limits) and ranking the whole rule when every cheap one is vetoed or has established short runway, a known rule-floor shortfall falling through to the default array, runner-up fallback below a declared `min_confidence`, and the declared model-matrix stand-in only on proven exhaustion.
+The public-interface assertions cover one-request batching, the rule Choice deciding project-scoped and Claude-only rules with every rule offered, the session launch policy filtering the selected rule after judgment and escalating when it empties that rule, the Node fallback when Bun is absent, Haiku max and powerful-class effort floors, unrounded ambiguity boundaries, desktop thresholds, approval and quota-floor vetoes, a `fast` answer preferring quota-passing Haiku/Luna candidates (including a usable cheap pool with unmeasured limits) and ranking the whole rule when every cheap one is vetoed or has established short runway, a `powerful` verdict never taking a cheap declared stand-in, a fast verdict's stand-in taking the route effort with Haiku at max, a known rule-floor shortfall falling through to the default array, runner-up fallback below a declared `min_confidence`, and the declared model-matrix stand-in only on proven exhaustion.
 When all components are known, they exercise both directions of the headroom/economic-urgency tradeoff and verify that extreme economic scalars are normalized before weighting.
 Privacy coverage checks outgoing requests rather than implementation source text.
 

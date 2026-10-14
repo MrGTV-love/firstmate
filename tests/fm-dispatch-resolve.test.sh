@@ -405,13 +405,35 @@ jq '.rules[2].fallback=[{harness:"omp",model:"anthropic/claude-haiku-5-5",effort
 run
 assert_contains "$OUT" 'status: clear' 'proven exhaustion takes the declared stand-in'
 assert_contains "$OUT" 'fallback: primary capacity exhausted; declared model-matrix fallback' 'the stand-in is named'
-assert_contains "$OUT" "--harness 'omp' --model 'anthropic/claude-haiku-5-5' --effort 'low' --dispatch-rule 'rule_3'" 'the stand-in profile carries its rule'
+assert_contains "$OUT" "--harness 'omp' --model 'anthropic/claude-haiku-5-5' --effort 'max' --dispatch-rule 'rule_3' --dispatch-route 'fast:low'" 'the stand-in carries its rule, route, and the Haiku max effort'
 cp "$TMP_ROOT/base-rules.json" "$RULES"
 run
 assert_contains "$OUT" 'status: escalate' 'exhaustion without a declared stand-in escalates'
 assert_contains "$OUT" 'reason: no rankable eligible candidate' 'the exhaustion reason is reported'
 cp "$TMP_ROOT/pre-exhaustion-quota.json" "$QUOTA"
 pass 'proven exhaustion activates only the declared model-matrix stand-in'
+
+# A powerful verdict also filters declared stand-ins: the router judged the task
+# too hard for Haiku/Luna, so exhausted Sonnet escalates instead of clearing Haiku.
+cp "$QUOTA" "$TMP_ROOT/pre-powerful-quota.json"
+cp "$POOL" "$TMP_ROOT/pre-powerful-pool.json"
+cp "$TMP_ROOT/exhausted-quota.json" "$QUOTA"
+printf '%s\n' '{"reports":[{"provider":"openai-codex","fetchedAt":9999999999999,"metadata":{"meterStates":{"chat":{"allowed":false,"limitReached":true}}}}]}' > "$POOL"
+jq '.rules[3].fallback=[{harness:"omp",model:"anthropic/claude-haiku-5-5",effort:"low"}]' "$TMP_ROOT/base-rules.json" > "$RULES"
+printf '%s\n' '{"rule":"rule_4","model":"powerful"}' > "$SETTINGS"
+run
+assert_contains "$OUT" 'status: escalate' 'a powerful verdict never takes a cheap declared stand-in'
+assert_contains "$OUT" 'reason: no rankable eligible candidate' 'the exhaustion reason is kept'
+assert_not_contains "$OUT" '  profile:' 'no stand-in profile is dispatched below the powerful class'
+assert_not_contains "$OUT" 'fallback: primary capacity exhausted' 'no stand-in is announced'
+printf '%s\n' '{"rule":"rule_4","model":"fast","effort":2}' > "$SETTINGS"
+run
+assert_contains "$OUT" "--harness 'omp' --model 'anthropic/claude-haiku-5-5' --effort 'max' --dispatch-rule 'rule_4' --dispatch-route 'fast:high'" 'a fast verdict takes the stand-in with the route effort and Haiku max'
+cp "$TMP_ROOT/pre-powerful-quota.json" "$QUOTA"
+cp "$TMP_ROOT/pre-powerful-pool.json" "$POOL"
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+printf '%s\n' '{}' > "$SETTINGS"
+pass 'a powerful verdict filters declared stand-ins and every stand-in takes the route effort'
 
 jq '(.providers[0].quotaSemantics.effectiveAvailability[0].runway) = {"status":"projected_exhaustion","projectionConfidence":"established","usableRunwaySeconds":60}' "$QUOTA" > "$TMP_ROOT/short.json"
 cp "$TMP_ROOT/short.json" "$QUOTA"

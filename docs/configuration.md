@@ -1556,6 +1556,9 @@ Natural-language `why` text does not authorize an executable fallback.
 
 `fm-dispatch-resolve.sh`, `fm-spawn.sh`, and `fm-control.sh relaunch` share the same fallback list.
 Only proven primary exhaustion activates it; approval, confidence, unknown capacity, and floor decisions are not bypassed.
+Typed resolution also passes `--dispatch-route <fast|powerful>:<low|high>`, its Level 5 class and effort verdict, which `fm-spawn.sh` records as `dispatch_route` and `fm-control.sh relaunch` reloads, so the shared stand-in selection applies it at launch and recovery alike.
+A `powerful` route never selects a Haiku/Luna stand-in from `fallback` or `default_fallback`, and every selected stand-in's effort is raised to the route level, Haiku to `max`; if none remains, launch or recovery refuses instead of launching.
+A launch without `--dispatch-route`, such as a manual route, keeps each stand-in exactly as declared.
 Spawn and recovery resolve each rule against their frozen model-index and dispatch pair, even when typed resolution is off.
 Only rules that contain the launched profile must resolve, so a retired model or unconfigured role in an unrelated rule does not block a launch or recovery.
 When the matched rule has a fallback policy, its identifier is recorded with the task and follows recovery; omitted model and effort axes match their persisted `default` representation.
@@ -1737,7 +1740,9 @@ The upstream model decision `fast` prefers the matched rule's configured Haiku/L
 Among them, a sole usable pool clears and otherwise the composite ranks them.
 When no cheap candidate passes, the whole rule ranks as usual: an exhausted or floor-vetoed cheap set leaves the rule's remaining approved candidates to be ranked before any stand-in is considered, and an established-short cheap candidate only leaves the preferred set, so an overall short winner still escalates under its own identity.
 This is not a guarantee of `clear`: a genuine tie, no comparable quota evidence, or an overall short winner still escalates.
-`powerful` excludes Haiku/Luna candidates.
+`powerful` excludes Haiku/Luna candidates and declared stand-ins, from `fallback` and `default_fallback` alike, and a selected stand-in takes the same route effort clamp as `use` candidates, Haiku at `max`.
+When only such stand-ins remain, the result is `escalate`.
+The resolver's profile line carries `--dispatch-route` beside `--dispatch-rule`, so launch and recovery apply the same class and effort.
 The adapter never imports a cheaper candidate from another rule.
 The upstream effort threshold maps scores above 1 to high, otherwise low, then code clamps each profile to its configured effort floor; Haiku uses max.
 These rules can lower proposed cost only within the captain's approved matrix; quota never lowers the reasoning class or minimum effort.

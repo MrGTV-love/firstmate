@@ -1,6 +1,6 @@
 // Firstmate policy around the vendored Level 5 questions and pure decisions.
 // CLI: prepare <rules> <task> <project>, call (request on stdin, key on fd 3),
-// apply <rules> <response> <request> <allowed-harnesses-json>.
+// apply <rules> <response> <request> <allowed-harnesses-json> <cheap-class-re> <max-effort-re>.
 import { readFileSync, writeFileSync } from "node:fs";
 import { JevClient, ContractError, validateResponse } from "./ten-levels/src/core/client.ts";
 import { choice } from "./ten-levels/src/core/helpers.ts";
@@ -62,7 +62,10 @@ try {
         ? { baseUrl: process.env.FM_TYPESAFE_TEST_ENDPOINT } : {}) });
     console.log(JSON.stringify(await client.systemOne(request.state, request.questions, { model: request.model })));
   } else if (action === "apply") {
-    const [rulesPath, responsePath, requestPath, allowedJson] = args;
+    const [rulesPath, responsePath, requestPath, allowedJson, cheapPattern, maxEffortPattern] = args;
+    if (!cheapPattern || !maxEffortPattern) throw new Error("classes");
+    const cheapClass = new RegExp(cheapPattern, "i");
+    const maxEffort = new RegExp(maxEffortPattern, "i");
     const cfg = config(rulesPath);
     const request: unknown = JSON.parse(readFileSync(requestPath, "utf8"));
     validateRequest(request);
@@ -78,7 +81,7 @@ try {
     if (agent.profile === "human" || a.ambiguity.score > 1 || agent.needsDesktopAccess || agent.profile === "browser_agent" || agent.profile === "deterministic_script") {
       route.escalate = a.ambiguity.score > 1 ? "high task ambiguity requires firstmate judgment" : `${agent.profile} requires an explicit handler or capability decision`;
     }
-    const cheap = (p: Profile) => /(?:haiku|luna)/i.test(p.model ?? "");
+    const cheap = (p: Profile) => cheapClass.test(p.model ?? "");
     const mapProfiles = (use: Profile[]) => {
       const filtered: Filtered[] = [];
       const keep = (ps: Profile[], ok: (p: Profile) => boolean, reason: string) =>
@@ -87,7 +90,7 @@ try {
       if (route.model.model === "powerful") ps = keep(ps, p => !cheap(p), "Level 5 model router chose powerful, which excludes Haiku/Luna");
       return { use: ps.map(p => {
         if (!p.effort || p.effort === "ultra") return { ...p, cheap: cheap(p) };
-        const effort = /haiku/i.test(p.model ?? "") ? "max" : levels[Math.max(levels.indexOf(p.effort), levels.indexOf(route.model.effort))];
+        const effort = maxEffort.test(p.model ?? "") ? "max" : levels[Math.max(levels.indexOf(p.effort), levels.indexOf(route.model.effort))];
         return { ...p, cheap: cheap(p), effort };
       }), filtered };
     };

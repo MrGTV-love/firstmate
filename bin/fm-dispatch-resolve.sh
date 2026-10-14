@@ -78,7 +78,7 @@
 #       quota_score=.. parts=.. weights=.. common=.. bounds=..
 #       -> eligible [warning: ..] | eligible, quota-scored; economic rank unknown: <reason>
 #          | eligible, unranked: <reason> | not eligible: <reason>
-#     profile: --harness <h> [--model <m>] [--effort <e>] [--dispatch-rule <r>]     (status clear only)
+#     profile: --harness <h> [--model <m>] [--effort <e>] [--dispatch-rule <r> --dispatch-route <class:effort>]     (status clear only)
 #   clear     -> pass the profile line to fm-spawn.sh unless you state a reason to override
 #   ambiguous -> confidence below the floor; decide as today from the probabilities
 #   escalate  -> approval required, unverifiable rule floor, high ambiguity, an
@@ -404,8 +404,11 @@ done < <(jq -r '[(.rules[].use | if type == "array" then .[] else . end),
 # apply consumes the same frozen rule set and validated questions as prepare.
 # This is a private derived snapshot, not a rewrite of the captain's policy.
 chmod 600 "$RULES"
-NORMALIZED=$("${LEVEL5[@]}" apply "$RULES" "$RESP_FILE" "$MODEL_CONFIG/level5-request.json" "$allowed_harnesses") \
+NORMALIZED=$("${LEVEL5[@]}" apply "$RULES" "$RESP_FILE" "$MODEL_CONFIG/level5-request.json" "$allowed_harnesses" \
+  "$FM_DISPATCH_CHEAP_CLASS_RE" "$FM_DISPATCH_MAX_EFFORT_RE") \
   || emit_error "Level 5 response or mapping failed"
+DISPATCH_ROUTE=$(jq -r '.route.model | "\(.model):\(.effort)"' <<<"$NORMALIZED")
+[[ "$DISPATCH_ROUTE" =~ $FM_DISPATCH_ROUTE_RE ]] || emit_error "Level 5 route is not a typed class and effort"
 printf '%s' "$NORMALIZED" > "$RESP_FILE"
 
 # ---- quota evidence: one quota-axi --json snapshot -----------------------------
@@ -432,7 +435,7 @@ if [ -n "$omp_models" ]; then
 fi
 
 # ---- resolution: declared gates + quota evidence + argmax, all in jq ------------
-RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --argjson pmap "$PMAP" \
+RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg none_criterion "$DEFAULT_WHEN" --arg route "$DISPATCH_ROUTE" --argjson pmap "$PMAP" \
   --argjson omp_pools "$OMP_POOLS" \
   --slurpfile resp "$RESP_FILE" --slurpfile rules "$RULES" --slurpfile quota "$QUOTA" "$FM_QUOTA_ROW_JQ$JEV_MODEL_ID_JQ"'
   ($resp[0]) as $r | ($rules[0]) as $cfg | ($quota[0]) as $q | ($r.answers.rule) as $a |
@@ -585,6 +588,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       elif $sel.source == "default" then (if (($cfg.default_fallback // []) | length) > 0 then "default" else null end)
       elif ((rule_at($sel.source).fallback // []) | length) > 0 then $sel.source else null end),
     rule_when: when_of($picked),
+    dispatch_route: $route,
     confidence: $a.confidence, probabilities: $a.probabilities, routing: $r.route
   }
   + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) probability \($fb.p) clears its floor \($fb.to_floor); \($picked) probability \($a.probabilities[$picked]) is below its floor \($picked_floor)"} else {} end)
@@ -651,7 +655,7 @@ if jq -e '.status == "escalate" and .reason == "no rankable eligible candidate" 
   primary=$(jq -c '.candidates[0].profile' <<<"$RESULT")
   fallbacks=$(fm_dispatch_fallbacks "$MODEL_CONFIG" "$dispatch_rule" "$(jq -r .harness <<<"$primary")" \
     "$(jq -r '.model // ""' <<<"$primary")" "$(jq -r '.effort // ""' <<<"$primary")" "$RULES") || emit_error "invalid fallback configuration"
-  if selected=$(fm_dispatch_select "$CONFIG" "$dispatch_rule" "$primary" "$(jq -c .fallback <<<"$fallbacks")" '{"status":"exhausted","reason":"captured primary capacity"}' "$MODEL_CONFIG" 2>/dev/null); then
+  if selected=$(fm_dispatch_select "$CONFIG" "$dispatch_rule" "$primary" "$(jq -c .fallback <<<"$fallbacks")" '{"status":"exhausted","reason":"captured primary capacity"}' "$MODEL_CONFIG" "$DISPATCH_ROUTE" 2>/dev/null); then
     if [ "$(jq -r .switched <<<"$selected")" = true ]; then
       RESULT=$(jq -c --argjson selected "$selected" '.status = "clear" | del(.reason) |
         .fallback = "primary capacity exhausted; declared model-matrix fallback" |
@@ -700,7 +704,7 @@ TEXT=$(jq -r '
   (if .chosen then "  profile: --harness \(.chosen.profile.harness | shell_arg)"
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end)
-      + (if .dispatch_rule then " --dispatch-rule \(.dispatch_rule | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
+      + (if .dispatch_rule then " --dispatch-rule \(.dispatch_rule | shell_arg) --dispatch-route \(.dispatch_route | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
 printf '%s\n' "$TEXT"
 emit_telemetry
 exit 0
