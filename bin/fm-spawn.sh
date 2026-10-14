@@ -270,9 +270,21 @@
 #   config/claude-permission-mode is not mapped: Devin auto approves read-only
 #   tools, unlike Claude auto. Effort is part of Devin model ids, so the
 #   independent --effort axis is recorded but omitted from argv.
-#   For omp (Oh My Pi), fm-spawn resolves the `omp` executable from PATH once and
-#   refuses when it is absent. Every omp launch clears the foreign harness
-#   markers (omp publishes none of its own), sets the Firstmate-owned
+#   For omp (Oh My Pi), explicit openai/* and openrouter/* model selections
+#   are refused before launch regardless of provider-qualifier case because
+#   they bill APIs; use openai-codex/<gpt-model> for the GPT subscription route.
+#   This applies to resolved model-index and dispatch-profile selections too,
+#   regardless of catalog availability. Dispatch fallback admission excludes
+#   these routes from both launch-time selection and generated native chains.
+#   Raw --model <value>, --model=<value>, and -m <value> arguments are checked
+#   when literal, including shell escapes and ANSI-C quoting, even with profile
+#   selection or unrelated expansions. The scan skips supported non-model
+#   option operands but keeps flag-looking successors visible after the
+#   extension-shadowable --plan flag. It never evaluates shell substitutions
+#   or expansions to establish a model selection; this check is separate from
+#   the conservative raw default-role directory evidence described below.
+#   fm-spawn resolves the `omp` executable from PATH once and refuses when absent.
+#   Every omp launch clears the foreign harness markers (omp publishes none of its own), sets the Firstmate-owned
 #   FM_OMP_HARNESS=omp detection marker, suppresses the first-run provider
 #   wizard with OMP_SKIP_SETUP=1, forces --auto-approve, pins the working
 #   directory with --cwd, and passes the tracked session posture overlay
@@ -336,8 +348,8 @@
 #   Secondmate lanes keep their memory settings; the captain's own
 #   ~/.omp/agent/config.yml (model roles, providers, theme) is never written or
 #   renamed by Firstmate.
-#   A non-index-entry literal <provider>/<id> is validated against
-#   `omp models --json` only when that provider appears in the listing; a
+#   After billing admission, a non-index-entry literal <provider>/<id> is
+#   validated against `omp models --json` only when that provider appears in the listing; a
 #   provider absent from the listing (an extension-registered provider such as
 #   claude-bridge, which omp never lists) passes through unvalidated with a
 #   stderr notice, and a non-index-entry bare fuzzy pattern is left to omp's
@@ -371,13 +383,15 @@
 #   redirections (>, >>, <, <>, >&, <&). This applies to command words,
 #   assignments, arguments, and redirection targets. Anything else, including
 #   tilde expansion, process substitution, and here-documents, passes through
-#   unchanged without evaluation or a default-role catalog probe. Long literal
-#   prefixes ending in expansion characters also pass through promptly.
+#   unchanged without evaluation or a default-role catalog probe, but literal
+#   model arguments still undergo billing admission. Long literal prefixes
+#   ending in expansion characters also pass through promptly.
 #   Otherwise, raw launches honor literal absolute PI_CODING_AGENT_DIR
 #   assignments, including with redirections. An unknown effective directory
 #   (including ambient pane inheritance or profile selection via --profile,
-#   --profile=, OMP_PROFILE, or PI_PROFILE) passes through unchanged. When known,
-#   the same directory supplies both the role read and catalog probe.
+#   --profile=, OMP_PROFILE, or PI_PROFILE) skips default-role validation, not
+#   literal model billing admission. When known, the same directory supplies
+#   both the role read and catalog probe.
 #   Project settings and --config overlays are intentionally not inspected for
 #   roles. This guard covers fm-spawn launches only, not pipeline-agent sessions
 #   or direct operator launches; tests/fm-omp-harness.test.sh owns the behavioral
@@ -2491,8 +2505,7 @@ omp_catalog_verdict() { # <listing> <provider/id>
 # writable Settings, so it is not a read-only global-file probe. The header
 # owns the default-role admission contract and points to its regression suite.
 omp_default_role_validate() {
-  local bin=$1 model=$2 raw=${3:-} agent_dir=${4:-} role selector verdict remedy model_flag dependency
-  [ -z "${OMP_PROFILE:-}" ] && [ -z "${PI_PROFILE:-}" ] || return 0
+  local bin=$1 model=$2 raw=${3:-} agent_dir=${4:-} role selector verdict remedy model_flag dependency raw_model
   if [ -n "$raw" ]; then
     model_flag=$(model_flag_for_harness omp "$model")
     raw=${raw//__MODELFLAG__/$model_flag}
@@ -2511,7 +2524,8 @@ const { tokens, error } = new LaunchLexer(process.argv[3]).tokenize();
 const readableToken = token => token.type === "word"
   ? /^(?:[A-Za-z0-9_./:=,@%+-]|\x27[^\x27]*\x27|\x22[^\x22\x24\x60\\]*\x22)+$/.test(token.source)
   : token.type === "redir" && [">", ">>", "<", "<>", ">&", "<&"].includes(token.value);
-if (error || !tokens.every(readableToken)) process.exit(1);
+if (error) process.exit(1);
+const readable = tokens.every(readableToken);
 const words = [];
 for (let i = 0; i < tokens.length; i++) {
   const token = tokens[i];
@@ -2534,24 +2548,48 @@ while (/^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]?.value || "")) {
 }
 if (!/(^|\/)omp$/.test(words[i]?.value || "")) certain = false;
 let pinned = false;
+const models = [];
+const literalToken = token => token?.type === "word" && token.literal && !token.unquotedExpansion;
+const operandOptions = new Set([
+  "--smol", "--slow", "--goal", "--prewalk-into", "--plan-yolo-into",
+  "--provider", "--api-key", "--system-prompt", "--system-prompt-template",
+  "--append-system-prompt", "--profile", "--alias", "--cwd", "--mode", "--config",
+  "--add-dir", "--session-dir", "--models", "--tools", "--thinking", "--service-tier",
+  "--hook", "--extension", "-e", "--skills", "--export", "--max-time",
+  "--approval-mode", "--plugin-dir", "--prompt",
+]);
 for (i++; i < words.length; i++) {
-  if (words[i].value === "--") break;
-  if (words[i].value === "--profile" || words[i].value.startsWith("--profile=")) certain = false;
-  if (/^--model=.+/.test(words[i].value) ||
-      ((words[i].value === "--model" || words[i].value === "-m") && words[i + 1]?.value)) {
+  if (words[i].type !== "word" || words[i].value === "--") break;
+  if (!literalToken(words[i])) continue;
+  const option = words[i].value;
+  if (option === "--profile" || option.startsWith("--profile=")) certain = false;
+  if (/^--model=.+/.test(option)) {
     pinned = true;
-    break;
+    models.push(option.slice("--model=".length));
+  } else if ((option === "--model" || option === "-m") && words[i + 1]?.type === "word") {
+    pinned = true;
+    if (literalToken(words[i + 1])) models.push(words[i + 1].value);
+    i++;
+  } else if (operandOptions.has(option) && words[i + 1]?.type === "word") {
+    i++;
+  } else if (["--plan", "--resume", "--restore", "-r"].includes(option)
+      && words[i + 1]?.type === "word" && !words[i + 1].value.startsWith("-")) {
+    i++;
   }
 }
-if (!certain || !agentDir.startsWith("/") || /[\n\r]/.test(agentDir)) agentDir = "";
-process.stdout.write(JSON.stringify({ pinned, agentDir }));
+if (!readable || !certain || !agentDir.startsWith("/") || /[\n\r]/.test(agentDir)) agentDir = "";
+process.stdout.write(JSON.stringify({ pinned, agentDir, models }));
 JS
     ) || return 0
+    while IFS= read -r raw_model; do
+      fm_omp_api_billing_route_check "$raw_model" || return 1
+    done < <(printf '%s' "$dependency" | jq -r '.models[]' 2>/dev/null)
     agent_dir=$(printf '%s' "$dependency" | jq -r '.agentDir' 2>/dev/null) || return 0
     [ "$(printf '%s' "$dependency" | jq -r '.pinned' 2>/dev/null)" = false ] || return 0
   else
     { [ -z "$model" ] || [ "$model" = default ]; } || return 0
   fi
+  [ -z "${OMP_PROFILE:-}" ] && [ -z "${PI_PROFILE:-}" ] || return 0
   [ -n "$agent_dir" ] || return 0
   role=$(ruby -ryaml -e '
 config = YAML.safe_load(File.read(File.expand_path(ARGV.fetch(0))), aliases: true)
@@ -3001,6 +3039,12 @@ else
   MODEL_INDEXED=0
 fi
 
+# Do not let dispatch fallback selection turn a forbidden explicit route into
+# an apparently accepted spawn. The final launch check also covers a stand-in.
+if [ "$HARNESS" = omp ]; then
+  fm_omp_api_billing_route_check "$MODEL" || exit 1
+fi
+
 # Preserve the chosen rule through launch and recovery. Only declared stand-ins
 # may replace a proven exhausted route; unknown OMP quota is never single-account
 # quota-axi exhaustion. Secondmate and raw launch identities remain unchanged.
@@ -3140,6 +3184,7 @@ cursor)
   fi
   ;;
 omp)
+  fm_omp_api_billing_route_check "$MODEL" || exit 1
   OMP_BIN=$(resolve_pi_executable omp) || {
     echo "error: omp executable not found on PATH; install Oh My Pi or select a different verified harness" >&2
     exit 1

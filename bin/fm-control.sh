@@ -1669,6 +1669,9 @@ resolve_relaunch_profile() {
         "$SCRIPT_DIR/fm-model-index.sh" model "$TARGET_HARNESS" "$TARGET_MODEL") || return 1
     fi
   fi
+  if [ "$TARGET_HARNESS" = omp ]; then
+    fm_omp_api_billing_route_check "$TARGET_MODEL" || return 1
+  fi
   if [ "$KIND" != secondmate ]; then
     local dispatch_set dispatch_profile dispatch_result config_dir
     config_dir="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
@@ -1699,6 +1702,9 @@ resolve_relaunch_profile() {
     fm_session_launch_policy_check "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}" "$TARGET_HARNESS" || return 1
     fm_control_harness_supports_kind "$TARGET_HARNESS" "$KIND" \
       || die "'$TARGET_HARNESS' is not verified to run a $KIND task"
+  fi
+  if [ "$TARGET_HARNESS" = omp ]; then
+    fm_omp_api_billing_route_check "$TARGET_MODEL" || return 1
   fi
   case "$(fm_meta_get "$META" omp_no_helpers)" in
     '') ;;

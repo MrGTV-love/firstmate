@@ -399,6 +399,34 @@ assert_no_dangerous_calls() { # <msg>
   assert_absent "$CASE_HOME/kcpassword" "the doctor wrote an auto-login password"
 }
 
+# --- omp billing diagnostics are read-only even without a working provider ---
+
+new_case Linux no-herdr
+mkdir -p "$CASE_HOME/.omp/agent"
+cat > "$CASE_HOME/.omp/agent/config.yml" <<'YAML'
+modelRoles:
+  default: OpenAI/gpt-6.1-sol:high
+  vision: oPeNrOuTeR/openai/gpt-6.1-sol
+  tiny: OPENAI/gpt-6-mini
+retry:
+  fallbackChains:
+    default: [OPENROUTER/openai/gpt-6.1-sol]
+    OpenAI/*: [deepseek/deepseek-v4-flash]
+providers:
+  secret: doctor-must-not-print-this
+YAML
+cp "$CASE_HOME/.omp/agent/config.yml" "$CASE_DIR/before.yml"
+PI_CODING_AGENT_DIR='' OMP_PROFILE='' doctor
+expect_code 1 "$DOCTOR_RC" "doctor must report the configuration gap"
+assert_contains "$DOCTOR_OUT" 'check omp-api-billing=human:' "doctor omitted omp billing gap"
+for field in modelRoles.default modelRoles.vision modelRoles.tiny 'retry.fallbackChains target[0][0]' 'retry.fallbackChains key[1]'; do
+  assert_contains "$DOCTOR_OUT" "$field" "doctor omitted $field"
+done
+assert_contains "$DOCTOR_OUT" 'openai-codex/<gpt-model>' "doctor omitted the subscription remedy"
+assert_not_contains "$DOCTOR_OUT" 'doctor-must-not-print-this' "doctor exposed a credential"
+cmp -s "$CASE_HOME/.omp/agent/config.yml" "$CASE_DIR/before.yml" || fail "doctor modified omp config"
+pass "remote doctor flags API-billed omp roles and fallback routes without changing config or printing secrets"
+
 # --- a host with no herdr is never ready, and --fix cannot install one -------
 
 new_case Darwin no-herdr gui

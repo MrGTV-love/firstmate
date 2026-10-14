@@ -534,7 +534,7 @@ test_indexed_native_catalog_guards_use_the_shared_boundary() {
       executable=$harness
       [ "$harness" != cursor ] || executable=cursor-agent
       model="pane-only"
-      [ "$harness" != omp ] || model=openai/pane-only
+      [ "$harness" != omp ] || model=openai-codex/pane-only
       cat > "$FAKEBIN/$executable" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in
@@ -542,7 +542,7 @@ case "\${1:-}" in
   --list-models|models)
     printf '%s\n' "\$*" >> '$CASE/native-catalogs'
     case '$harness' in
-      omp) printf '%s\n' '{"models":[{"provider":"openai","selector":"openai/supervisor-only"}]}' ;;
+      omp) printf '%s\n' '{"models":[{"provider":"openai-codex","selector":"openai-codex/supervisor-only"}]}' ;;
       cursor) printf 'supervisor-only - Supervisor model\n' ;;
     esac
     ;;
@@ -573,7 +573,7 @@ test_nonentry_literals_keep_the_native_catalog_guards() {
     executable=$harness
     [ "$harness" != cursor ] || executable=cursor-agent
     model=unsupported
-    [ "$harness" != omp ] || model=openai/unsupported
+    [ "$harness" != omp ] || model=openai-codex/unsupported
     cat > "$FAKEBIN/$executable" <<SH
 #!/usr/bin/env bash
 case "\${1:-}" in
@@ -581,7 +581,7 @@ case "\${1:-}" in
   --list-models|models)
     printf '%s\n' "\$*" >> '$CASE/native-catalogs'
     case '$harness' in
-      omp) printf '%s\n' '{"models":[{"provider":"openai","selector":"openai/supported"}]}' ;;
+      omp) printf '%s\n' '{"models":[{"provider":"openai-codex","selector":"openai-codex/supported"}]}' ;;
       cursor) printf 'supported - Supported model\n' ;;
     esac
     ;;
@@ -598,7 +598,7 @@ SH
     assert_present "$CASE/native-catalogs" "a non-entry literal must query the native catalog"
     assert_contains "$out" "is not" "the native guard must give concrete unsupported evidence"
     model=supported
-    [ "$harness" != omp ] || model=openai/supported
+    [ "$harness" != omp ] || model=openai-codex/supported
     out=$(spawn_ship "$id-supported" --model "$model"); rc=$?
     expect_code 0 "$rc" "a listed non-entry $harness literal should still launch: $out"
     assert_contains "$out" "not an index entry" "non-entry literals retain the index warning"

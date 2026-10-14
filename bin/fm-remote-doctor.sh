@@ -44,6 +44,8 @@
 # the state after the repair attempt, so a human gap is never presented as
 # fixed. Any remaining fixable or human gap, and any missing required tool,
 # exits non-zero.
+# The omp-api-billing check uses bin/fm-api-key-guard-lib.sh's read-only global
+# config diagnostic; --fix never edits omp configuration or calls a model.
 #
 # --fix is idempotent and closes only automatable gaps: it writes and reloads
 # both Firstmate-owned Aqua agents, starts the Linux workers where no Aqua agent
@@ -67,6 +69,8 @@ FM_ROOT="${FM_ROOT_OVERRIDE:-$(CDPATH='' cd "$SCRIPT_DIR/.." && pwd -P)}"
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-remote-herdr-owner-lib.sh
 . "$SCRIPT_DIR/fm-remote-herdr-owner-lib.sh"
+# shellcheck source=bin/fm-api-key-guard-lib.sh
+. "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
 REQUIRED_TOOLS=(git jq herdr tasks-axi treehouse python3)
 HARNESS_TOOLS=(claude codex opencode pi pi-signed grok kimi)
 OPTIONAL_TOOLS=(tmux no-mistakes gh)
@@ -765,6 +769,17 @@ check_entrypoint_link() {
     "rerun this command with --fix to create it"
 }
 
+check_omp_api_billing() {
+  local notes
+  notes=$(fm_omp_api_billing_config_diagnostics)
+  if [ -n "$notes" ]; then
+    record omp-api-billing "human: ${notes//$'\n'/; }" \
+      "inspect the active omp config.yml; select openai-codex/<gpt-model> for GPT roles and fallback routes; this command never edits omp configuration"
+  else
+    record omp-api-billing "skip: no active global omp configuration findings"
+  fi
+}
+
 run_checks() { # <resolved-login-shell>
   local shell=$1
   CHECK_NAMES=()
@@ -777,6 +792,7 @@ run_checks() { # <resolved-login-shell>
   check_herdr_owner_reader "$shell"
   check_herdr_server
   check_entrypoint_link
+  check_omp_api_billing
 }
 
 # --- repairs ----------------------------------------------------------------

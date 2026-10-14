@@ -5,6 +5,10 @@
 #          BOOTSTRAP_INFO no-action fact for completed benign bootstrap work, and
 #          exits 0.
 #          Silent = all good.
+#          OMP_API_BILLING lines report API-billed omp default, vision, tiny or
+#          fallback-chain references, or an existing config that cannot be read.
+#          bin/fm-api-key-guard-lib.sh owns the active-global-config YAML check;
+#          it never calls models, emits credentials or changes omp configuration.
 #          Lines: "MISSING: <tool> (install: <command>)",
 #                 "PRESENTATION_UNAVAILABLE: lavish-axi (requires >=<floor>; install: <command>) - nonvisual work may proceed with plain-text decisions and reports; install or upgrade before using Lavish",
 #                 "MISSING_MANUAL: <tool> (instructions: <url>)", "NEEDS_GH_AUTH",
@@ -1522,6 +1526,12 @@ detect_local_tools() {
 }
 
 detect_local_config() {
+  # The billing guard reads global YAML only, never credentials or model APIs.
+  # shellcheck source=bin/fm-api-key-guard-lib.sh
+  . "$SCRIPT_DIR/fm-api-key-guard-lib.sh"
+  while IFS= read -r billing_note; do
+    [ -z "$billing_note" ] || printf 'OMP_API_BILLING: %s\n' "$billing_note"
+  done < <(fm_omp_api_billing_config_diagnostics)
   # Worktree-tangle check: the firstmate primary checkout (FM_ROOT) must sit on its
   # default branch, not a feature branch (see fm-tangle-lib.sh). Scoped to the
   # primary only; detached-HEAD worktrees and secondmate homes never trip it.

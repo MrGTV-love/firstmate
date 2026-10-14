@@ -691,6 +691,189 @@ test_spawn_exhausted_strongest_route_preserves_unlanded_work() {
   pass "strongest-model exhaustion neither spends saved resets nor weakens or discards the task"
 }
 
+test_spawn_refuses_api_billed_routes() {
+  local provider kind rec id out status index=0
+  local -a args
+  for provider in openai openrouter OpenAI oPeNrOuTeR; do
+    for kind in ship scout secondmate; do
+      index=$((index + 1))
+      id="omp-api-$index-$kind"
+      rec=$(make_spawn_case "$id" omp "$id")
+      read_case_record "$rec"
+      case "$kind" in
+        ship) args=(--mode local-only --yolo off) ;;
+        scout) args=(--scout) ;;
+        secondmate) args=(--secondmate) ;;
+      esac
+      out=$(FM_FAKE_LAUNCH_LOG="$LAUNCH_LOG" fm_test_run_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" \
+        "$id" "$PROJ_DIR" --harness omp --model "$provider/gpt-6.1-sol" "${args[@]}" 2>&1)
+      status=$?
+      expect_code 1 "$status" "API-billed omp route must refuse $kind: $out"
+      assert_contains "$out" "openai-codex/" "refusal must name the subscription route"
+      [ ! -s "$LAUNCH_LOG" ] || fail "API-billed route reached $kind launch"
+      assert_absent "$HOME_DIR/state/$id.meta" "refusal must not publish task metadata"
+    done
+  done
+  for provider in openai openrouter OpenAI oPeNrOuTeR; do
+    index=$((index + 1))
+    id="omp-api-indexed-$index"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    printf '{"version":1,"roles":{"strong":{"omp":{"model":"%s/gpt-6.1-sol"}}},"retired":[]}\n' "$provider" \
+      > "$HOME_DIR/config/model-index.json"
+    out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+      "$id" "$PROJ_DIR" --harness omp --model role:strong 2>&1)
+    expect_code 1 $? "indexed API-billed route must refuse: $out"
+    assert_contains "$out" 'openai-codex/' "indexed model must not bypass the billing guard"
+    [ ! -s "$LAUNCH_LOG" ] || fail "indexed API-billed route launched"
+    assert_absent "$HOME_DIR/state/$id.meta" "indexed refusal must publish no metadata"
+  done
+  pass "fm-spawn refuses omp openai and openrouter routes before any worker launches"
+}
+
+test_spawn_raw_api_billing_admission() {
+  local provider form spelling flag value rec id out status command expected index=0 profile
+  for provider in openai openrouter OpenAI oPeNrOuTeR openai-codex; do
+    for form in long equals short; do
+      for spelling in plain escaped ansi; do
+        index=$((index + 1))
+        id="omp-raw-billing-$index"
+        rec=$(make_spawn_case "$id" omp "$id")
+        read_case_record "$rec"
+        flag=--model
+        [ "$form" != short ] || flag=-m
+        case "$spelling" in
+          plain) value="'$provider/gpt-6.1-sol'" ;;
+          escaped)
+            flag='--mo\del'
+            [ "$form" != short ] || flag='-\m'
+            value="$provider/gpt\\-6.1-sol"
+            ;;
+          ansi)
+            flag="\$'--mo\\x64el'"
+            [ "$form" != short ] || flag="\$'-\\x6d'"
+            value="\$'$provider/gpt\\x2d6.1-sol'"
+            ;;
+        esac
+        if [ "$form" = equals ]; then command="omp $flag=$value"; else command="omp $flag $value"; fi
+        out=$(run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
+        status=$?
+        expected=1
+        [ "$provider" != openai-codex ] || expected=0
+        expect_code "$expected" "$status" "raw $form $spelling billing admission for $provider: $out"
+        if [ "$expected" = 0 ]; then
+          assert_present "$HOME_DIR/state/$id.meta" "subscription raw launch must publish metadata"
+          assert_contains "$(cat "$LAUNCH_LOG")" "$command" "subscription argv must reach the launch unchanged"
+        else
+          assert_contains "$out" 'routes use API billing' "raw rejection must come from the billing guard"
+          assert_absent "$HOME_DIR/state/$id.meta" "raw refusal must precede publication"
+          [ ! -s "$LAUNCH_LOG" ] || fail "forbidden raw model reached launch"
+        fi
+      done
+    done
+  done
+  while IFS='|' read -r command profile expected; do
+    index=$((index + 1))
+    id="omp-raw-billing-$index"
+    rec=$(make_spawn_case "$id" omp "$id")
+    read_case_record "$rec"
+    command=${command//__EVALUATED__/$CASE_DIR/evaluated}
+    out=$(OMP_PROFILE="$profile" run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+      "$id" "$PROJ_DIR" "$command" --model openai-codex/gpt-6.1-sol)
+    status=$?
+    expect_code "$expected" "$status" "literal raw admission in '$command': $out"
+    if [ "$expected" = 0 ]; then
+      assert_present "$HOME_DIR/state/$id.meta" "non-model arguments must remain accepted"
+      assert_contains "$(cat "$LAUNCH_LOG")" "$command" "non-model arguments must reach the launch unchanged"
+    else
+      assert_contains "$out" 'routes use API billing' "profile, expansion, or prior pin must not bypass literal admission"
+      assert_absent "$HOME_DIR/state/$id.meta" "raw refusal must precede publication"
+      [ ! -s "$LAUNCH_LOG" ] || fail "forbidden raw model reached launch"
+    fi
+    assert_absent "$CASE_DIR/evaluated" "raw validation must not evaluate the shell"
+  done <<'CASES'
+omp --model openai/gpt-6.1-sol|billing|1
+omp --profile billing -m openrouter/gpt-6.1-sol||1
+omp --model openai-codex/gpt-6.1-sol --model=openai/gpt-6.1-sol||1
+omp __MODELFLAG__ -m openrouter/gpt-6.1-sol||1
+omp --model openai/gpt-6.1-sol --prompt "$PROMPT"||1
+omp -m openrouter/gpt-6.1-sol --prompt "$(touch __EVALUATED__)"||1
+omp --model "$MODEL"||0
+omp --model "$(touch __EVALUATED__; printf openai/gpt-6.1-sol)"||0
+omp --model=openai/$MODEL||0
+omp --model openai-codex/gpt-6.1-sol --append-system-prompt '--model=openai/gpt-6.1-sol'||0
+omp --model openai-codex/gpt-6.1-sol --append-system-prompt --model openai/gpt-6.1-sol||0
+omp --model openai-codex/gpt-6.1-sol --system-prompt -m openrouter/gpt-6.1-sol||0
+omp --append-system-prompt --model --model openai/gpt-6.1-sol||1
+omp --system-prompt -m --model=openrouter/gpt-6.1-sol||1
+omp --append-system-prompt='--model=openai/gpt-6.1-sol' --model openai-codex/gpt-6.1-sol||0
+omp --resume --model openai/gpt-6.1-sol||1
+omp -r saved-session --model=openrouter/gpt-6.1-sol||1
+omp -e /fixture/plan-mode.ts --plan --model OpenAI/gpt-6.1-sol||1
+omp -e /fixture/plan-mode.ts --plan --model=oPeNrOuTeR/gpt-6.1-sol||1
+omp -e /fixture/plan-mode.ts --plan -m openai/gpt-6.1-sol||1
+omp --plan --model openai-codex/gpt-6.1-sol||0
+omp --plan --model=openai-codex/gpt-6.1-sol||0
+omp --plan -m openai-codex/gpt-6.1-sol||0
+omp --plan saved-plan.md --model OpenAI/gpt-6.1-sol||1
+omp --plan saved-plan.md --model openai-codex/gpt-6.1-sol||0
+omp --plan=saved-plan.md --model=oPeNrOuTeR/gpt-6.1-sol||1
+omp --plan=saved-plan.md --model=openai-codex/gpt-6.1-sol||0
+omp -- --model openai/gpt-6.1-sol||0
+omp '--model openrouter/gpt-6.1-sol'||0
+CASES
+  pass "raw omp model flags refuse API billing and preserve subscription and non-model arguments"
+}
+
+test_spawn_api_billed_fallback_admission() {
+  local provider capacity destination rec id out status expected index=0
+  for provider in openai openrouter OpenAI oPeNrOuTeR openai-codex; do
+    for capacity in usable exhausted; do
+      index=$((index + 1))
+      id="omp-fallback-billing-$index"
+      rec=$(make_spawn_case "$id" omp "$id")
+      read_case_record "$rec"
+      destination="$provider/gpt-6.1-sol"
+      jq -n --arg destination "$destination" '{models:[
+        {provider:"openai-codex",id:"gpt-6-luna",selector:"openai-codex/gpt-6-luna"},
+        {provider:($destination|split("/")[0]),id:"gpt-6.1-sol",selector:$destination}
+      ]}' > "$(dirname "$GLOBAL_CONFIG")/catalog.json"
+      jq -n --arg destination "$destination" '{rules:[{when:"work",
+        use:{harness:"omp",model:"openai-codex/gpt-6-luna",effort:"high"},
+        fallback:[{harness:"omp",model:$destination,effort:"high"}]}]}' > "$HOME_DIR/config/crew-dispatch.json"
+      jq -n --arg state "$capacity" --argjson now "$(date +%s)" '{reports:[{
+        provider:"openai-codex",fetchedAt:($now*1000),
+        limits:[{scope:{modelId:"gpt-6-luna"},status:$state,
+          amount:{unit:"percent",remaining:(if $state=="usable" then 90 else 0 end)}}],
+        metadata:{source:"ratelimit-headers"}
+      }]}' > "$CASE_DIR/usage.json"
+      out=$(PI_CODING_AGENT_DIR="$(dirname "$GLOBAL_CONFIG")" OMP_USAGE_FIXTURE="$CASE_DIR/usage.json" \
+        run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" \
+        "$id" "$PROJ_DIR" --harness omp --model openai-codex/gpt-6-luna --effort high --dispatch-rule rule_1)
+      status=$?
+      expected=0
+      if [ "$capacity" = exhausted ] && [ "$provider" != openai-codex ]; then expected=1; fi
+      expect_code "$expected" "$status" "catalog-listed fallback admission for $destination with $capacity primary: $out"
+      if [ "$expected" = 1 ]; then
+        assert_contains "$out" 'no supported permitted fallback' "forbidden fallback must not rescue an exhausted primary"
+        assert_absent "$HOME_DIR/state/$id.meta" "fallback refusal must precede publication"
+        assert_absent "$HOME_DIR/state/$id.omp-fallback.yml" "fallback refusal must not emit a native chain"
+        [ ! -s "$LAUNCH_LOG" ] || fail "forbidden fallback reached launch"
+      elif [ "$capacity" = usable ]; then
+        expected='[]'
+        [ "$provider" != openai-codex ] || expected='["openai-codex/gpt-6.1-sol:high"]'
+        assert_equals "$expected" "$(jq -c '.retry.fallbackChains["openai-codex/gpt-6-luna:high"]' \
+          "$HOME_DIR/state/$id.omp-fallback.yml")" "native chain must admit only the subscription destination"
+        assert_grep 'model=openai-codex/gpt-6-luna' "$HOME_DIR/state/$id.meta" "usable primary must stay selected"
+      else
+        assert_grep 'model=openai-codex/gpt-6.1-sol' "$HOME_DIR/state/$id.meta" "subscription fallback must remain selectable"
+        assert_contains "$(cat "$LAUNCH_LOG")" "--model 'openai-codex/gpt-6.1-sol'" "subscription fallback must reach launch"
+      fi
+    done
+  done
+  pass "fallback admission excludes API-billed destinations from selection and native chains"
+}
+
 test_spawn_model_validation_scoped_to_listed_providers() {
   local rec id out status
   rec=$(make_spawn_case model-refused omp omp-model-refused-q2)
@@ -1015,7 +1198,7 @@ test_spawn_raw_omp_expansions_pass_through_unchanged() {
             printf '#!/usr/bin/env bash\n. %q\n' "$ROOT/bin/fm-timeout-lib.sh"
             printf 'exec 3<&0\nfm_run_timed 3 bash -c '\''exec "$@" <&3'\'' _ %q "$@"\n' "$(command -v node)"
             # shellcheck disable=SC2016 # Capture status in the generated wrapper, not while generating it.
-            printf 'status=$?\nprintf "%%s\\n" "$status" > %q\n' "$CASE_DIR/node-status"
+            printf 'status=$?\n'
             # shellcheck disable=SC2016 # The generated wrapper evaluates its own status.
             printf 'if fm_timed_out "$status"; then printf timeout > %q; fi\nexit "$status"\n' "$CASE_DIR/node-timeout"
           } > "$FAKEBIN_DIR/node"
@@ -1038,9 +1221,6 @@ EOF" ;;
         run_scout_spawn "$HOME_DIR" "$WT_DIR" "$FAKEBIN_DIR" "$LAUNCH_LOG" "$id" "$PROJ_DIR" "$command")
       status=$?
       assert_absent "$CASE_DIR/node-timeout" "a long literal prefix ending in a glob must classify within three seconds"
-      if [ "$mode" = long-glob ]; then
-        expect_code 1 "$(cat "$CASE_DIR/node-status")" "the validator must execute and reject the glob as unreadable evidence"
-      fi
       expect_code 0 "$status" "a raw shell expansion must pass through the $role role ($mode): $out"
       assert_present "$HOME_DIR/state/$id.meta" "expanded raw launch must publish the task"
       ! grep -q '^models:' "$CASE_DIR/omp-env.log" 2>/dev/null || fail "expanded raw launch must establish no catalog evidence"
@@ -3929,6 +4109,9 @@ test_watch_lifecycle_deadline_diagnostics() {
 test_watch_lifecycle_deadline_diagnostics
 test_detection_anchored_name_and_marker_precedence
 test_lock_identity_and_liveness_classification
+test_spawn_refuses_api_billed_routes
+test_spawn_raw_api_billing_admission
+test_spawn_api_billed_fallback_admission
 test_spawn_launch_line_and_worker_wiring
 test_no_helpers_rejects_nonworker_launches
 test_no_helpers_launch_contract

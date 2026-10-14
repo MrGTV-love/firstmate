@@ -3474,6 +3474,43 @@ Its native App Server peer and watcher-close process are deterministic fixtures;
 omp runs crewmate, scout, secondmate, and primary work; [`supervision.md`](supervision.md#omp-oh-my-pi-native-delivery-2026-09-05) owns the primary evidence.
 The evidence below was produced on 2026-09-05 against omp 18.1.11 (`~/.local/bin/omp`, a Bun-compiled single binary) on macOS 26 arm64 through the Herdr backend with the `openai-codex/gpt-6-astra` model, building on the 2026-09-02 adapter investigation against 18.1.2.
 
+### Billing-route configuration inspection
+
+Verified 2026-10-14 on macOS arm64 with `omp --version` reporting `omp/18.10.4`, without a model request.
+`omp config get modelRoles --json` exposed string entries for `default`, `vision`, and `tiny`; `omp config get retry.fallbackChains --json` exposed a mapping from role/model/provider selectors to ordered selector arrays.
+The production diagnostic reads that YAML directly rather than invoking Settings or printing provider credentials; [`fm-api-key-guard-lib.sh`](../../bin/fm-api-key-guard-lib.sh) owns its read-only boundary.
+
+With a fresh temporary `HOME`, the installed binary's `omp config path` returned these paths for the following environment selections:
+
+| Environment selection | Reported agent directory relative to the temporary home |
+| --- | --- |
+| No directory or profile override | `.omp/agent` |
+| `PI_CODING_AGENT_DIR=<temporary-home>/agent-override` | `agent-override` |
+| `OMP_PROFILE=billing-probe` | `.omp/profiles/billing-probe/agent` |
+| Both overrides above | `.omp/profiles/billing-probe/agent` |
+| `PI_PROFILE=billing-probe` only | `.omp/agent` |
+
+Refresh the schema and directory observations with the same model-free commands after an omp upgrade.
+`bash bin/fm-test-run.sh tests/fm-omp-harness.test.sh tests/fm-control-relaunch.test.sh tests/fm-bootstrap.test.sh tests/fm-remote-doctor.test.sh` exercises the public spawn, fallback, relaunch, and diagnostic paths with isolated configuration and no paid model launch.
+A public `fm-bootstrap.sh` detect-only local smoke reported all three forbidden roles and forbidden fallback keys/targets, left the fixture config byte-identical, and omitted its credential sentinel.
+
+Portable compatibility coverage: `bash bin/fm-test-run.sh --jobs 1 tests/fm-on.test.sh tests/fm-worker-account.test.sh` passed both complete scripts. The worker-account native catalog cases use `openai-codex/*` for omp, covering unsupported/supported non-index literals and indexed role, stand-in, primary-literal, and stand-in-literal selections. The transport fixture includes the doctor's shared billing guard; its executable bootstrap checks accept the current trusted doctor without Git and reject an altered copy. Changes to `fm-remote-doctor.sh` must also refresh the trusted checksum in `fm-remote-entrypoint.sh`.
+
+Billing-route regression map for the approved bounded scope:
+
+| Route | Named executable regression | Observable contract |
+| --- | --- | --- |
+| Explicit ship/scout/secondmate and indexed model selections, including mixed-case providers | `tests/fm-omp-harness.test.sh`: `test_spawn_refuses_api_billed_routes` | Refusal before launch or metadata publication |
+| Raw `--model`, `--model=`, and `-m`, escaped/ANSI-C literals, mixed-case providers, and flags after `--plan` | `tests/fm-omp-harness.test.sh`: `test_spawn_raw_api_billing_admission` | API routes refused; subscription and non-model operands preserved; shell substitutions not evaluated |
+| Exhausted-primary selection and usable-primary native chains | `tests/fm-omp-harness.test.sh`: `test_spawn_api_billed_fallback_admission` | API destinations excluded from both consumers; subscription fallback remains selectable and emitted |
+| Explicit, recorded, role-resolved, and secondmate-pinned relaunches | `tests/fm-control-relaunch.test.sh`: `test_relaunch_omp_billing_admission_preserves_running_agents` | Mixed-case API routes refused before lifecycle input, checkpointing, or metadata/instruction mutation; subscription replacement completes |
+| Default/vision/tiny roles and fallback keys/targets, with default, directory-override, and named-profile configurations | `tests/fm-bootstrap.test.sh`: `test_omp_api_billing_config_diagnostics` | Lowercase, mixed-case, and uppercase API providers reported locally without model calls, secrets, or config writes; subscription routes remain unflagged |
+| Doctor role and fallback inspection | `tests/fm-remote-doctor.test.sh`: billing diagnostic scenario | Mixed-case API providers produce an actionable gap without exposing secrets or modifying configuration |
+
+This map covers the refused routes and diagnostics exercised by the named regressions, not every API-billed selector representation.
+R7 padded-selector normalization and R8 comma-separated role diagnostics are excluded from this change and deferred to `fm-omp-billing-selector-followup`.
+The pipeline PR body must carry this bounded scope, both exclusions, and the route-to-named-regression mapping above.
+
 ### Process identity and markers
 
 `ps -o comm=` reports the bare name `omp` for the agent process, from both its `!` bash path and the model's bash tool, so identity is the anchored name; `ompd` and `comp` never match.
