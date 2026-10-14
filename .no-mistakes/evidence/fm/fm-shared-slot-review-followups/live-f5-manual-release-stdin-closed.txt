@@ -1,0 +1,17 @@
+## F5 live: documented manual release with stdin closed, on a slot holding untracked dirt
+
+base  main  (repository default)
+2     leased       /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/2/proj  (detached)  (held by remain)
+$ (cd proj && treehouse return /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/2/proj --if-lease-holder remain </dev/null)
+
+Worktree has uncommitted changes. Clean and return? [Y/n] 🌳 worktree not returned: it has uncommitted changes and the confirmation could not be answered (stdin reached EOF); prune will not reclaim this slot. Use treehouse return --force '/Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/2/proj' to clean and return it
+exit=3
+dirt.txt present after: yes
+
+base  main  (repository default)
+2     leased       /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/2/proj  (detached)  (held by remain)
+## F5 live contrast: the same command on a TTY without </dev/null waits at a default-yes prompt (no answer was sent)
+
+Worktree has uncommitted changes. Clean and return? [Y/n] 
+[no answer sent; process terminated after 8s]
+dirt.txt present after: yes

@@ -1,0 +1,33 @@
+## F1 live: plain fm-teardown.sh parked (real git, real treehouse v2.3.1-fm.e58947de, lab FM_HOME)
+head=8c0efe8e6b43fe8c7ac878dfccc6a11610657fec
+$ treehouse status (before)
+
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj  [fm/parked]  (held by parked)
+                   tmux (96815), sleep (96818)
+$ git -C proj worktree list
+/Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/proj                                                           29bfe41 [main]
+/Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj                             29bfe41 [fm/parked]
+/Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj/.claude/worktrees/parked-v2 4a20ee5 [fm/parked-v2]
+$ FM_HOME=$LAB bin/fm-teardown.sh parked
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.cW7qgA
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 900s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj contains registered copy /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj/.claude/worktrees/parked-v2 that is not one of task parked's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+$ checks after
+parked record: unchanged
+slot claim: unchanged
+
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj  [fm/parked]  (held by parked)
+                   tmux (96815), sleep (96818)
+nested unpushed commits: 3
+nested untracked files: 3
+tmux endpoint: fmses:fm-parked

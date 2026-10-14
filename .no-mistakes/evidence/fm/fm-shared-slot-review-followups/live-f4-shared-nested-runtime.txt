@@ -1,0 +1,20 @@
+## F4 live: finished record whose copy is its own nested copy in a shared, leased slot; plain fm-teardown.sh fin4
+own process (cwd = fin4 nested copy): pid 26425; parked root process (cwd = slot root): pid 26431
+launch agents dir $HOME/Library/LaunchAgents is absent in the lab; no-mistakes is kept off PATH: /Users/charlesabrooker/.local/bin/no-mistakes
+$ FM_HOME=$LAB bin/fm-teardown.sh fin4
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.cW7qgA
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+notice: task fin4 shares recorded pool slot /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/3/proj with task parked4; only the finished task's endpoint and records will retire, and every copy in the slot will stay untouched.
+teardown: reaping leaked worktree process(es) for fin4: 26425
+teardown fin4 complete (window fmses:fm-fin4; shared pool slot /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/3/proj and every copy inside it left untouched; only this task's own slot claim, if present, released)
+Backlog: fin4 just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.cW7qgA/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.cW7qgA/data/backlog.md - move fin4 to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+$ checks after
+fin4 record present: no
+parked4 record: unchanged
+own nested process alive: no
+parked root process alive: yes
+nested copy present: yes; parked root work present: yes
+treehouse state (slot lease): unchanged
+tmux endpoints: fmses:fm-parked4 
+NOTE (correction): the PATH filter above did not take effect (zsh does not word-split $PATH), so no-mistakes stayed on PATH. Teardown's run check therefore made one read-only 'no-mistakes axi status' query in the lab nested copy, which is not a registered no-mistakes repo; it found no parked run, so no abort was sent. Launch-agent retirement found no $HOME/Library/LaunchAgents dir in the lab HOME, so launchctl was never called. The run-abort and launch-agent bootout parts of F4 were not driven live.

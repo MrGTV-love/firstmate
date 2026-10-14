@@ -1,0 +1,18 @@
+## F1 live adversarial: fm-teardown.sh parked --force --drop-file (same lab, same unrecorded nested copy)
+$ FM_HOME=$LAB bin/fm-teardown.sh parked --force --drop-file $LAB/work/captain-words.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.cW7qgA
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj contains registered copy /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj/.claude/worktrees/parked-v2 that is not one of task parked's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj worktree remove <copy>. Re-run this teardown afterwards.
+$ checks after
+parked record: unchanged
+slot claim: unchanged
+
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj  [fm/parked]  (held by parked)
+                   tmux (96815), sleep (96818)
+nested copy registered: 1
+nested unpushed commits: 3
+nested untracked files: 3
+tmux endpoint: fmses:fm-parked
+repeat forced run exit=1; parked record present: yes

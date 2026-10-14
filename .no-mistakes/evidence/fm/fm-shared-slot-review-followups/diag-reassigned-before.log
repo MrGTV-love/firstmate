@@ -1,0 +1,3 @@
+DIAG teardown_seconds=5 worker_alive=yes reap_lines=0
+ok - fm-teardown: a pool slot claimed by another task is left alone while the task's own cleanup finishes
+exit=0 seconds=18

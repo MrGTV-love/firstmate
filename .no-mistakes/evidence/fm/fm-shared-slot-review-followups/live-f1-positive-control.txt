@@ -1,0 +1,22 @@
+## F1 live positive control: land the nested work, remove the copy by hand as the refusal says, then plain teardown
+landed fm/parked-v2 on origin/main
+nested status: '' unpushed: 0
+removed registered nested copy by hand
+$ FM_HOME=$LAB bin/fm-teardown.sh parked
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.cW7qgA
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+teardown: reaping leaked worktree process(es) for parked: 96815 96818
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.3
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown parked complete (window fmses:fm-parked, worktree /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj)
+Backlog: parked just finished (this home keeps no markdown backlog at /Users/charlesabrooker/tmp/fm-lab.cW7qgA/data/backlog.md). Update /Users/charlesabrooker/tmp/fm-lab.cW7qgA/data/backlog.md - move parked to Done, keep Done to the 10 most recent, then re-scan Queued and dispatch only work whose blockers are gone and date is due.
+exit=0
+$ checks after
+parked record present: no
+slot claim present: no
+
+base  main  (repository default)
+1     available    /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj  (detached)
+tmux endpoint: no server running on /Users/charlesabrooker/tmp/fm-lab.cW7qgA/tmux/tmux-501/default

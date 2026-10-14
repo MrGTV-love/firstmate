@@ -1,0 +1,22 @@
+## F3 live: shared slot with a real Treehouse recovered-state lease; plain fm-teardown.sh of the finished claimant
+
+base  main  (repository default)
+1     leased       /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj  [fm/fin3]  (held by recovered: state file was corrupt or truncated; verify before reuse)
+$ FM_HOME=$LAB bin/fm-teardown.sh fin3
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.cW7qgA
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: shared pool slot /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj is not a Firstmate home and carries Treehouse's recovered-state lease in /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/treehouse-state.json, which Treehouse 3.1.0 and later release on their own once the slot is idle, clean, and landed; prove a durable lease before retiring its claimant's record, so another allocation cannot reset the remaining copies before reassociation. Nothing was changed.
+Treehouse 2.3.1-fm has no supported non-forcing route to replace this recovered-state lease: treehouse lease refuses an already-leased slot. Do not return it to change the lease while copies remain.
+Inspect with (cd '/Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/proj' && treehouse status); report the slot /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/1/proj, state file /Users/charlesabrooker/tmp/fm-lab.cW7qgA/work/pool/.treehouse/proj-5a1f81/treehouse-state.json, recovered lease holder, and treehouse --version to firstmate for operator recovery. Keep all task records and copies in place.
+exit=1
+$ checks after
+finished record: unchanged
+parked record: unchanged
+slot claim: unchanged
+treehouse state: unchanged
+tmux endpoints: fmses:fm-fin3 fmses:fm-parked3 
+$ (cd proj && treehouse lease 1 --lease-holder parked3)   # the remedy the old message suggested
+
+worktree 1 is already leased (holder: "recovered: state file was corrupt or truncated; verify before reuse")
+treehouse lease exit=?
+treehouse state after lease attempt: unchanged

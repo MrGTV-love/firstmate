@@ -1,0 +1,15 @@
+## Secondmate pool home live adversarial: fm-teardown.sh domain --force --drop-file, with a live child crewmate in the home
+before: fmses:fm-domain fmses:fm-child 
+$ FM_HOME=$LAB $C/bin/fm-teardown.sh domain --force --drop-file $WK/captain-words.txt
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.cW7qgA
+WARNING: watcher still down (same stale episode; last beat: never, grace 900s) - full banner already printed this episode.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-labwk.a5S8NL/fmpool/.treehouse/fmcode-b9726d/1/fmcode contains registered copy /Users/charlesabrooker/tmp/fm-labwk.a5S8NL/fmpool/.treehouse/fmcode-b9726d/1/fmcode/.claude/worktrees/agent-x that is not one of task domain's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-labwk.a5S8NL/fmpool/.treehouse/fmcode-b9726d/1/fmcode worktree remove <copy>. Re-run this teardown afterwards.
+exit=1
+$ checks after
+secondmate record: unchanged
+child record: unchanged
+secondmate registry: unchanged
+home lease state: unchanged
+child copy present: yes; nested work present: yes
+tmux endpoints (both must survive): fmses:fm-domain fmses:fm-child 

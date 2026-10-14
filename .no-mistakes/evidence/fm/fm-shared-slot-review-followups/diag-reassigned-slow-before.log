@@ -1,0 +1,4 @@
+DIAG worker_alive=no reap_lines=0
+DIAG worker_wait_status=0 (0=exited by itself, 143=TERM)
+not ok - teardown killed the worker holding the clean reassigned pool slot
+exit=1 seconds=45
