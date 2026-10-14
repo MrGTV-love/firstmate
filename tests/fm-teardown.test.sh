@@ -1366,7 +1366,7 @@ test_task_archives_reap_only_carried_refs() {
   wt_commit_file "$case_dir" 'feature file.txt' alpha "add feature"
   submitted=$(git -C "$case_dir/wt" rev-parse HEAD)
   replayed=$(printf 'replayed feature\n' | git -C "$case_dir/project" commit-tree \
-    "$(git -C "$case_dir/wt" rev-parse HEAD^{tree})" -p "$base")
+    "$(git -C "$case_dir/wt" rev-parse "HEAD^{tree}")" -p "$base")
   wt_commit_file "$case_dir" later.txt beta "pipeline follow-up"
   pipeline=$(git -C "$case_dir/wt" rev-parse HEAD)
   git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a01 "$submitted"
@@ -1428,7 +1428,7 @@ test_task_archives_keep_unproven_and_checked_out_refs() {
   # but that merge's tree contains an edit absent from both its parents.
   merge=$(commit_tree_from_wt_head "$case_dir" "$landed" "empty second parent")
   edited=$(printf 'edited merge\n' | git -C "$case_dir/project" commit-tree \
-    "$(git -C "$case_dir/wt" rev-parse HEAD^{tree})" -p "$landed" -p "$merge")
+    "$(git -C "$case_dir/wt" rev-parse "HEAD^{tree}")" -p "$landed" -p "$merge")
   git -C "$case_dir/project" branch archive/task-x1-submitted-0a0a0a03 "$extra"
   git -C "$case_dir/project" branch archive/task-x1-pipeline-0b0b0b02 "$edited"
   git -C "$case_dir/wt" reset -q --hard "$landed"
