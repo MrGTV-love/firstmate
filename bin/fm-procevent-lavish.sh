@@ -39,9 +39,10 @@
 #            and even when that comment matches the element text, so typed
 #            words are never dropped. Choice Context data is not a comment.
 #            Each image the captain attached prints as an `attachment_path:`
-#            line under its message or annotation. Captain-supplied body lines are visibly prefixed so they cannot
-#            forge structural labels. Empty message and annotation sections
-#            are reported explicitly.
+#            line under its message or annotation. Captain-supplied body
+#            lines are visibly prefixed so they cannot forge structural
+#            labels. Empty message and annotation sections are reported
+#            explicitly.
 # orphans    List leftover Lavish poll processes that no listener owns, one
 #            `orphan:` or `kept:` line per process plus an `orphans:` total.
 #            Nothing is signalled without --kill, which sends TERM to each listed
