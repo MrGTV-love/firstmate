@@ -46,9 +46,10 @@
 # again until its newest status line changes or six hours pass.
 # A refusal because the other supervision actor holds the task's lease
 # (FM_LEASE_REFUSE_EXIT) is transient and records nothing. So is the
-# teardown's project-lock contention (FM_PROJECT_LOCK_BUSY_EXIT): the reaper's
-# teardown never waits in the project-lock queue, changes nothing, and the next
-# sweep retries it.
+# teardown's project-lock contention (FM_PROJECT_LOCK_BUSY_EXIT): before it
+# closes anything, the reaper's teardown never waits in the project-lock queue,
+# so that exit has closed nothing and the next sweep retries it. After closure
+# its short return stage waits in that queue (bin/fm-teardown.sh's header).
 #
 # `scan` rows are tab-separated: <class> <task-id> <kind> <age-secs> <detail>.
 # Classes: reap, wait-grace, refused, parked, awaiting-pipeline, awaiting-merge,

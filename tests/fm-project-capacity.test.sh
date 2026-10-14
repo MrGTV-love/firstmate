@@ -90,9 +90,9 @@ case "$*" in
         sleep 0.05
       done
     fi
-    if [ -n "${FM_FAKE_CHECK_LEASED:-}" ] && [ -f "$FM_FAKE_CHECK_RETIRE_META" ] \
-       && ! jq -e '.worktrees[0].leased == true' "$FM_FAKE_CHECK_LEASED" >/dev/null; then
-      echo "later spawn overtook the earlier teardown's slot reservation" >&2
+    if [ -n "${FM_FAKE_CHECK_HOLDS:-}" ] \
+       && ! grep -q '^start=.* operation=teardown retire$' "$FM_FAKE_CHECK_HOLDS" 2>/dev/null; then
+      echo "later spawn overtook the earlier queued teardown" >&2
       exit 1
     fi
     printf '%s\n' "${FM_FAKE_PANE_PATH:-}"
@@ -106,10 +106,20 @@ SH
 #!/usr/bin/env bash
 printf 'treehouse %s\n' "$*" >> "$FM_FAKE_CALL_LOG"
 case "${1:-}" in
-  --root)
-    state="$2/treehouse-state.json"
-    [ "${3:-}" = lease ] || exit 1
-    jq --arg name "$4" --arg holder "$6" \
+  lease)
+    # The installed CLI resolves the pool from the working directory's
+    # repository; model that through the repository's registered worktrees.
+    [ "$#" -eq 4 ] && [ "$3" = --lease-holder ] && [ -n "$4" ] || exit 2
+    state=
+    while IFS= read -r line; do
+      case "$line" in "worktree "*) wt=${line#worktree } ;; *) continue ;; esac
+      [ -f "${wt%/*/*}/treehouse-state.json" ] || continue
+      jq -e --arg name "$2" 'any(.worktrees[]; .name == $name)' "${wt%/*/*}/treehouse-state.json" >/dev/null || continue
+      state="${wt%/*/*}/treehouse-state.json"
+      break
+    done < <(git worktree list --porcelain 2>/dev/null)
+    [ -n "$state" ] || { echo "Error: no worktree named \"$2\" in pool" >&2; exit 1; }
+    jq --arg name "$2" --arg holder "$4" \
       '(.worktrees[] | select(.name == $name)) |= (.leased = true | .lease_holder = $holder)' \
       "$state" > "$state.next" && mv "$state.next" "$state" || exit 1
     ;;
@@ -1126,10 +1136,11 @@ run_domain_cleanups() {  # <case-dir>; sets CLEANUP_RC[1] and CLEANUP_RC[2]
 }
 
 # The actual spawn and teardown entry points share a queue. Teardown polls
-# slowly, while the later spawn polls aggressively: the retiring slot must be
-# safely reserved before the later spawn reaches its post-admission pane read.
+# slowly, while the later spawn polls aggressively: the queued teardown's
+# ownership admission must be recorded in the lock's hold record before the
+# later spawn reaches its post-admission pane read.
 test_mixed_operations_keep_fifo_even_with_a_slow_waiter() {
-  local case_dir home hold first slow fast wt next fm_meta_fixture i rc=0
+  local case_dir home hold first slow fast wt next fm_meta_fixture lock i rc=0
   case_dir=$(make_case mixed-fifo task-a task-c)
   home="$case_dir/home"
   hold="$case_dir/hold"
@@ -1162,8 +1173,9 @@ test_mixed_operations_keep_fifo_even_with_a_slow_waiter() {
     i=$((i + 1)); [ "$i" -lt 400 ] || fail "teardown never queued: $(cat "$case_dir/slow.out")"
     sleep 0.05
   done
-  FM_PROJECT_LOCK_POLL_SECS=0.05 FM_FAKE_CHECK_LEASED="$case_dir/pool/treehouse-state.json" \
-    FM_FAKE_CHECK_RETIRE_META="$fm_meta_fixture" \
+  lock=$(FM_HOME="$home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
+    _ "$ROOT" "$case_dir/project")
+  FM_PROJECT_LOCK_POLL_SECS=0.05 FM_FAKE_CHECK_HOLDS="$lock.holds" \
     spawn_ship "$case_dir" task-c "$next" > "$case_dir/fast.out" 2>&1 &
   fast=$!
   i=0
@@ -1335,6 +1347,101 @@ SH
   pass 'spawn proceeds during slow process cleanup, clone sync and backlog completion while the retiring slot stays reserved until return'
 }
 
+# A forced child return runs after that child's endpoint and Docker objects
+# are already gone, so it waits in the FIFO queue rather than exiting busy and
+# stranding the closed child's reserved slot.
+test_forced_child_return_waits_for_project_custody() {
+  local case_dir home child_home slot lock actor holder i queued ticket rc
+  case_dir=$(make_case child-return-wait)
+  home="$case_dir/home"
+  slot="$case_dir/pool/1/project"
+  mkdir -p "${slot%/*}"
+  git -C "$case_dir/project" worktree add --quiet --detach "$slot"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$slot" \
+    > "$case_dir/pool/treehouse-state.json"
+  child_home="$case_dir/retired-home"
+  make_home "$child_home"
+  printf '%s\n' retire > "$child_home/.fm-secondmate-home"
+  printf '%s\n' schema=fm-secondmate-parent.v1 route=local "parent_home=$home" \
+    > "$child_home/.fm-secondmate-parent"
+  printf -- '- retire - local domain (home: %s; scope: fixtures; projects: project; added 2026-10-12)\n' \
+    "$child_home" > "$home/data/secondmates.md"
+  fm_write_secondmate_meta "$home/state/retire.meta" "$child_home"
+  write_live "$child_home" child "$case_dir/project"
+  fm_write_meta "$child_home/state/child.meta" \
+    "window=firstmate:fm-child" "endpoint_task_id=child" \
+    "worktree=$slot" "project=$case_dir/project" "kind=scout" "harness=codex"
+  printf 'task=child\nhome=%s\n' "$child_home" > "${slot%/*}/.fm-slot-owner"
+  fm_fake_docker "$case_dir/fakebin"
+  mv "$case_dir/fakebin/docker" "$case_dir/fakebin/docker-fixture"
+  cat > "$case_dir/fakebin/docker" <<'SH'
+#!/usr/bin/env bash
+if mkdir "$FM_SLOW_CASE/delay-owned" 2>/dev/null; then
+  : > "$FM_SLOW_CASE/reached"
+  i=0
+  while [ ! -f "$FM_SLOW_CASE/project-held" ]; do
+    i=$((i + 1)); [ "$i" -lt 4000 ] || exit 1
+    sleep 0.05
+  done
+fi
+exec docker-fixture "$@"
+SH
+  chmod +x "$case_dir/fakebin/docker"
+  lock=$(FM_HOME="$home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
+    _ "$ROOT" "$case_dir/project")
+  FM_SLOW_CASE="$case_dir" FM_PROJECT_LOCK_POLL_SECS=0.05 \
+    FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
+    FM_FAKE_CALL_LOG="$case_dir/calls.log" PATH="$case_dir/fakebin:$PATH" \
+    "$TEARDOWN" retire --force --drop-file "$(fm_test_drop_file)" > "$case_dir/retire.out" 2>&1 &
+  actor=$!
+  i=0
+  while [ ! -f "$case_dir/reached" ]; do
+    i=$((i + 1)); [ "$i" -lt 1000 ] || {
+      kill "$actor" 2>/dev/null || true
+      fail "forced teardown never reached child Docker cleanup: $(cat "$case_dir/retire.out")"
+    }
+    sleep 0.05
+  done
+  FM_HOME="$home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    fm_lock_try_acquire "$2" || exit 1
+    trap '\''fm_lock_release "$2"'\'' EXIT
+    : > "$3/project-held"
+    while [ ! -f "$3/release" ]; do sleep 0.05; done
+  ' _ "$ROOT" "$lock" "$case_dir" &
+  holder=$!
+  i=0
+  while :; do
+    queued=0
+    for ticket in "$lock.queue"/ticket-*; do
+      [ ! -L "$ticket" ] || queued=1
+    done
+    [ "$queued" = 0 ] || break
+    if ! kill -0 "$actor" 2>/dev/null; then
+      : > "$case_dir/release"; wait "$holder" || true
+      rc=0; wait "$actor" || rc=$?
+      fail "forced teardown exited ($rc) instead of queueing for its child return: $(cat "$case_dir/retire.out")"
+    fi
+    i=$((i + 1)); [ "$i" -lt 1000 ] || {
+      : > "$case_dir/release"; wait "$holder" || true; wait "$actor" || true
+      fail "forced teardown never queued for its child return: $(cat "$case_dir/retire.out")"
+    }
+    sleep 0.05
+  done
+  assert_present "$child_home/state/child.meta" 'the queued child return retired its record early'
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the closed child lost its reservation while its return queued'
+  : > "$case_dir/release"
+  wait "$holder" || fail 'the project holder could not release'
+  rc=0; wait "$actor" || rc=$?
+  expect_code 0 "$rc" "the queued child return must finish: $(cat "$case_dir/retire.out")"
+  assert_absent "$home/state/retire.meta" 'forced teardown kept the parent record'
+  assert_absent "$child_home" 'forced teardown kept the child home'
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the child return left its slot leased'
+  pass 'a forced child return queues for project custody after closure and returns the reserved slot'
+}
+
 test_undeclared_capacity_keeps_dispatch_uncapped
 test_available_capacity_admits_the_worker
 test_exhausted_capacity_defers_without_leaving_anything_behind
@@ -1348,6 +1455,7 @@ test_capacity_is_shared_by_every_local_home
 test_unreadable_holders_refuse_admission
 test_concurrent_spawns_cannot_both_take_the_last_place
 test_spawn_progresses_during_non_pool_teardown_phases
+test_forced_child_return_waits_for_project_custody
 test_mixed_operations_keep_fifo_even_with_a_slow_waiter
 test_same_home_spawn_for_another_project_is_not_refused_while_one_waits
 test_project_queue_recovers_dead_waiter_and_holder

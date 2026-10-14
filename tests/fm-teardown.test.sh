@@ -9356,6 +9356,8 @@ test_nested_rerun_after_endpoint_refusal_records_landed() {
     FM_HOME="$case_dir/home" run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
     expect_code 0 "$rc" "$label: a plain re-run must finish: $(cat "$case_dir/stderr2")"
     assert_absent "$case_dir/state/task-x1.meta" "$label: the task record was not removed"
+    assert_absent "$NESTED_COPY" "$label: the retry left the nested copy in place"
+    assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the returned slot is still claimed"
     assert_absent "$case_dir/data/task-x1/captain-drop.md" "$label: landed work was recorded as a captain drop"
     grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null || fail "$label: the backlog row was not closed"
     assert_no_grep "dropped" "$case_dir/data/backlog.md" "$label: landed work was recorded as dropped"
@@ -9496,6 +9498,7 @@ test_nested_rerun_matrix_refusal_at_each_phase() {
       retire) assert_grep "still loaded" "$case_dir/stderr" "$label: the refusal did not name the unloaded agent" ;;
       pre-remove)
         assert_grep "claimed pool slot $NESTED_SLOT" "$case_dir/stderr" "$label: the refusal did not name the slot"
+        assert_present "$NESTED_SLOT/late.txt" "$label: the refusal removed the slot's late work"
         git -C "$NESTED_SLOT" add late.txt
         git -C "$NESTED_SLOT" -c user.email=t@t -c user.name=t commit -qm "late slot work"
         git -C "$NESTED_SLOT" push -q origin HEAD:main
@@ -10408,7 +10411,240 @@ SH
   pass 'ordinary pool return preserves dirt and new commits produced while final project custody is queued'
 }
 
+# A pool-slot ship whose only copy is the slot itself, recorded the way spawn
+# publishes it, with a Treehouse stand-in that models the installed CLI: lease
+# resolves the pool from the working directory's repository and records a
+# durable holder; return releases it.
+make_lease_modeling_pool_case() {  # <name> <state-json-or-empty> [kind]
+  local case_dir slot kind=${3:-ship}
+  case_dir=$(make_case "$1")
+  slot="$case_dir/pool/1/project"
+  mkdir -p "${slot%/*}" "$case_dir/primary-home/state"
+  git -C "$case_dir/project" worktree add -q -b fm/pool-root "$slot" main
+  slot=$(cd "$slot" && pwd -P)
+  if [ -n "$2" ]; then
+    printf '%s\n' "${2//@SLOT@/$slot}" > "$case_dir/pool/treehouse-state.json"
+  else
+    printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$slot" \
+      > "$case_dir/pool/treehouse-state.json"
+  fi
+  printf 'task=task-x1\nhome=%s\n' "$case_dir/primary-home" > "${slot%/*}/.fm-slot-owner"
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    'window=firstmate:fm-task-x1' 'endpoint_task_id=task-x1' \
+    "worktree=$slot" "project=$case_dir/project" "kind=$kind" 'mode=local-only' \
+    'spawn_gen=teardown-test-task-x1' 'branch=fm/pool-root'
+  printf 'manual\n' > "$case_dir/config/backlog-backend"
+  cat > "$case_dir/fakebin/treehouse" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FM_POOL_CASE/treehouse.log"
+case "${1:-}" in
+  lease)
+    [ "$#" -eq 4 ] && [ "$3" = --lease-holder ] || exit 2
+    state=
+    while IFS= read -r line; do
+      case "$line" in "worktree "*) wt=${line#worktree } ;; *) continue ;; esac
+      [ -f "${wt%/*/*}/treehouse-state.json" ] || continue
+      state="${wt%/*/*}/treehouse-state.json"
+      break
+    done < <(git worktree list --porcelain 2>/dev/null)
+    [ -n "$state" ] || { echo "Error: no worktree named \"$2\" in pool" >&2; exit 1; }
+    jq --arg name "$2" --arg holder "$4" \
+      '(.worktrees[] | select(.name == $name)) |= (.leased = true | .lease_holder = $holder)' \
+      "$state" > "$state.next" && mv "$state.next" "$state"
+    ;;
+  return)
+    slot=${@: -1}
+    state="${slot%/*/*}/treehouse-state.json"
+    if jq -e . "$state" >/dev/null 2>&1; then
+      jq --arg slot "$slot" '(.worktrees[] | select(.path == $slot)) |= (.leased = false | del(.lease_holder))' \
+        "$state" > "$state.next" && mv "$state.next" "$state"
+    fi
+    ;;
+esac
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  POOL_CASE=$case_dir
+  POOL_SLOT=$slot
+  POOL_LOCK=$(FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
+    bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
+    _ "$ROOT" "$case_dir/project")
+}
+
+# A "not ready yet" refusal must leave Treehouse state exactly as it found it.
+# The reservation is taken only after every non-destructive check has passed,
+# so a later reassociation never strands a state-only lease on the old slot.
+test_refusal_before_cleanup_takes_no_pool_reservation() {
+  local case_dir slot rc=0
+  make_lease_modeling_pool_case pool-refusal-no-reservation ''
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
+  printf 'unfinished\n' > "$slot/unfinished.txt"
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  [ "$rc" -ne 0 ] || fail "teardown accepted a slot with uncommitted work"
+  assert_present "$case_dir/state/task-x1.meta" 'the refusal removed the task record'
+  assert_present "$slot/unfinished.txt" 'the refusal changed the slot contents'
+  jq -e '.worktrees[0].leased == false and (.worktrees[0] | has("lease_holder") | not)' \
+    "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail "a refusal before cleanup left a durable lease: $(cat "$case_dir/pool/treehouse-state.json")"
+
+  rm -f "$slot/unfinished.txt"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "the clean retry must finish: $(cat "$case_dir/stderr2")"
+  assert_absent "$case_dir/state/task-x1.meta" 'the clean retry kept the task record'
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the completed teardown left its slot leased'
+  pass 'a refusal before cleanup leaves the pool slot unreserved, and the clean retry still returns it'
+}
+
+# Treehouse state that can be neither proved held nor leased never blocks
+# cleanup: teardown names the state, keeps project custody from the
+# reservation point through the return, and finishes as before.
+test_unprovable_pool_state_keeps_project_custody_through_return() {
+  local shape state logged case_dir slot rc returns recovered
+  recovered="recovered: state file was corrupt or truncated; verify before reuse"
+  for shape in recovered conflicting unreadable; do
+    logged=$shape
+    case "$shape" in
+      recovered) state='{"worktrees":[{"name":"1","path":"@SLOT@","leased":true,"lease_holder":"'"$recovered"'"}]}' ;;
+      conflicting) state='{"worktrees":[{"name":"1","path":"@SLOT@","leased":false},{"name":"1","path":"@SLOT@","leased":true,"lease_holder":"task-x1"}]}' ;;
+      unreadable) state='{"worktrees": ['; logged=unknown ;;
+    esac
+    make_lease_modeling_pool_case "pool-legacy-$shape" "$state"
+    case_dir=$POOL_CASE
+    slot=$POOL_SLOT
+    cat > "$case_dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-windows)
+    [ -f "$FM_POOL_CASE/closed" ] || printf '%s\n' fm-task-x1
+    ;;
+  kill-window)
+    if FM_STATE_OVERRIDE="$FM_POOL_CASE/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_lock_try_acquire "$2" || exit 1; fm_lock_release "$2"' \
+        _ "$FM_POOL_ROOT" "$FM_POOL_LOCK" 2>/dev/null; then
+      printf 'free\n' > "$FM_POOL_CASE/lock-at-close"
+    else
+      printf 'held\n' > "$FM_POOL_CASE/lock-at-close"
+    fi
+    : > "$FM_POOL_CASE/closed"
+    ;;
+esac
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/tmux"
+    rc=0
+    FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_ROOT="$ROOT" FM_POOL_LOCK="$POOL_LOCK" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$shape: an unprovable slot state must not refuse cleanup: $(cat "$case_dir/stderr")"
+    assert_grep "'$logged'" "$case_dir/stderr" "$shape: teardown did not log the slot's Treehouse state"
+    [ "$(cat "$case_dir/lock-at-close" 2>/dev/null)" = held ] \
+      || fail "$shape: project custody was released while the unreserved slot's endpoint was closing"
+    assert_absent "$case_dir/state/task-x1.meta" "$shape: teardown kept the task record"
+    assert_absent "${slot%/*}/.fm-slot-owner" "$shape: teardown kept the slot claim"
+    returns=$(grep -c "^return --force $slot\$" "$case_dir/treehouse.log" || true)
+    assert_equals 1 "$returns" "$shape: the slot must be returned exactly once"
+    assert_no_grep '^lease ' "$case_dir/treehouse.log" "$shape: teardown tried to lease a slot it could not prove unleased"
+    [ ! -e "$POOL_LOCK" ] || fail "$shape: teardown left the project lock held"
+  done
+  pass 'recovered, conflicting and unreadable slot states fall back to whole-cleanup project custody and return the slot'
+}
+
+# The idle reaper's teardown never waits before it has closed anything, but
+# once the endpoint is gone the task no longer classifies as reap-ready. Its
+# return stage therefore waits in the project queue and completes, instead of
+# exiting busy and leaving a closed task holding its slot with no retry.
+test_idle_reap_return_waits_for_project_custody_after_closure() {
+  local case_dir slot holder actor i queued ticket rc old returns
+  make_lease_modeling_pool_case pool-idle-reap-return '' scout
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
+  old=$(( $(date +%s) - 7200 ))
+  printf 'harness=claude\n' >> "$case_dir/state/task-x1.meta"
+  printf 'done [at=%s]: report written\n' "$old" > "$case_dir/state/task-x1.status"
+  printf 'g1.1.1\n' > "$case_dir/state/task-x1.busy-gen"
+  printf 'v1 gen=g1.1.1 seq=1 state=idle source=claude-hook event=Stop ts=%s\n' "$(date +%s)" \
+    > "$case_dir/state/task-x1.busy-state"
+  mkdir -p "$case_dir/data/task-x1"
+  printf '# report\nfindings\n' > "$case_dir/data/task-x1/report.md"
+  fm_touch_epoch "$old" "$case_dir/data/task-x1/report.md"
+  FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" "$ROOT/bin/fm-captain-hold.sh" complete task-x1 --none >/dev/null \
+    || fail 'could not record the scout captain-call inventory'
+  cat > "$case_dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-windows)
+    [ -f "$FM_POOL_CASE/closed" ] || printf '%s\n' fm-task-x1
+    ;;
+  kill-window)
+    : > "$FM_POOL_CASE/closing"
+    i=0
+    while [ ! -f "$FM_POOL_CASE/project-held" ]; do
+      i=$((i + 1)); [ "$i" -lt 2000 ] || exit 1
+      sleep 0.05
+    done
+    : > "$FM_POOL_CASE/closed"
+    ;;
+esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_IDLE_REAP_ADMISSION=1 \
+    FM_PROJECT_LOCK_POLL_SECS=0.05 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" &
+  actor=$!
+  i=0
+  while [ ! -f "$case_dir/closing" ]; do
+    i=$((i + 1)); [ "$i" -lt 1000 ] || { kill "$actor" 2>/dev/null || true; fail "automatic teardown did not reach endpoint closure: $(cat "$case_dir/stderr")"; }
+    sleep 0.05
+  done
+  FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
+    bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      fm_lock_try_acquire "$2" || exit 1
+      trap '\''fm_lock_release "$2"'\'' EXIT
+      : > "$3/project-held"
+      while [ ! -f "$3/release" ]; do sleep 0.05; done
+    ' _ "$ROOT" "$POOL_LOCK" "$case_dir" &
+  holder=$!
+  i=0
+  while :; do
+    queued=0
+    for ticket in "$POOL_LOCK.queue"/ticket-*; do
+      [ ! -L "$ticket" ] || queued=1
+    done
+    [ "$queued" = 0 ] || break
+    if ! kill -0 "$actor" 2>/dev/null; then
+      : > "$case_dir/release"; wait "$holder" || true
+      rc=0; wait "$actor" || rc=$?
+      fail "automatic teardown exited ($rc) instead of queueing for its return: $(cat "$case_dir/stderr")"
+    fi
+    i=$((i + 1)); [ "$i" -lt 1000 ] || {
+      : > "$case_dir/release"; wait "$holder" || true; wait "$actor" || true
+      fail "automatic teardown never queued for its return: $(cat "$case_dir/stderr")"
+    }
+    sleep 0.05
+  done
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the closed task lost its reservation while its return queued'
+  : > "$case_dir/release"
+  wait "$holder" || fail 'the project holder could not release'
+  rc=0; wait "$actor" || rc=$?
+  expect_code 0 "$rc" "the queued automatic return must finish: $(cat "$case_dir/stderr")"
+  assert_absent "$case_dir/state/task-x1.meta" 'the automatic teardown kept the closed task record'
+  returns=$(grep -c "^return --force $slot\$" "$case_dir/treehouse.log" || true)
+  assert_equals 1 "$returns" 'the automatic teardown must return the slot exactly once'
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the automatic teardown left its returned slot leased'
+  pass 'an automatic teardown that has closed its endpoint waits for project custody and returns its slot'
+}
+
 teardown_test_cases=(
+test_refusal_before_cleanup_takes_no_pool_reservation
+test_unprovable_pool_state_keeps_project_custody_through_return
+test_idle_reap_return_waits_for_project_custody_after_closure
 test_pool_return_rechecks_work_after_waiting_for_project_custody
 test_unverified_pool_reservation_preserves_processes
 test_non_pool_returns_recheck_registered_copies

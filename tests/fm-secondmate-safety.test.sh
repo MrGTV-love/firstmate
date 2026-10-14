@@ -2325,7 +2325,8 @@ SH
   [ -e "$lock" ] || fail "force teardown removed unproven child index.lock"
   [ -d "$subhome" ] || fail "force teardown removed subhome after child lock refusal"
   [ -e "$subhome/state/child.meta" ] || fail "force teardown cleared child meta after child lock refusal"
-  grep -F 'treehouse return' "$log" >/dev/null || fail "force teardown never attempted the child return"
+  [ "$(grep -c '^treehouse return' "$log" || true)" -ge 2 ] \
+    || fail "force teardown did not retry the child return behind its unproven lock"
   pass "secondmate force teardown preserves child worktree after unproven lock refusal"
 }
 

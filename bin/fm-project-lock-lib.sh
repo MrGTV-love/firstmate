@@ -23,9 +23,11 @@
 # fm_project_lock_try <project-lock> <operation>
 # One nonwaiting attempt for callers that already hold other locks (recursive
 # teardown preflight, home seeding, copy reassociation, relocating relaunch),
-# and for the idle reaper's teardown, whose fixed work bound must not include a
-# queue wait: waiting there would stretch the refusal windows of the locks they
-# hold. It refuses while any older live ticket is queued, so it never jumps a
+# and for the idle reaper's teardown before it has closed anything, so a busy
+# project leaves that task selectable by the next sweep: waiting there would
+# stretch the refusal windows of the locks they hold. Once a teardown has
+# closed anything, its return stage waits instead (bin/fm-teardown.sh's
+# header). It refuses while any older live ticket is queued, so it never jumps a
 # waiter. Contention (a live queued ticket, or a live process other than the
 # caller holding, reclaiming, or still publishing the lock, as recorded by
 # fm_lock_try_acquire at its refusal in FM_LOCK_BUSY) returns
@@ -88,9 +90,10 @@
 #     bin/fm-teardown.sh, 3s, which the sum counts as 1s;
 #   - fm_task_docker_cleanup in bin/fm-teardown.sh runs unbounded;
 #   - forced recursive secondmate teardown holds every descendant project lock
-#     acquired by preflight_descendant_treehouse_slots while
-#     cleanup_firstmate_home_children returns each child slot in turn, so its
-#     hold grows with the child count.
+#     acquired by preflight_descendant_treehouse_slots through
+#     cleanup_firstmate_home_children when a descendant slot's Treehouse state
+#     can be neither proved held nor leased, so that hold grows with the child
+#     count.
 # A hold that outlasts the allowance makes waiters refuse at the stall limit.
 # FM_PROJECT_LOCK_SERVICE_SECS overrides it with a positive integer for a newly
 # measured environment or bounded fixture.
