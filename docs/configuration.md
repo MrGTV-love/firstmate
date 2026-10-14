@@ -94,6 +94,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
+- The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
 `config/` holds local gitignored operating choices, including explicit extension bindings under `config/extensions.d/`.
@@ -1812,7 +1813,7 @@ The live rule-match evidence is recorded in [`verification/dispatch-resolve.md`]
 ## TypeSafe account health
 
 `bin/fm-typesafe-health.sh` tells the captain once when the TypeSafe (Jev) account stops answering for a reason only the captain can fix, and once when it answers again.
-Before it existed, an exhausted account returned HTTP 402 "Check account credits" for about 8.5 hours on 2026-10-13, and every Jev consumer failed silently and carried on without Jev.
+Without it, a credit or key failure makes every Jev consumer fail silently and carry on without Jev, and nobody is told.
 It is off in any home with no key, because [the typed-dispatch opt-in](#typed-dispatch-resolution-env-typesafe_api_key) is also off there.
 This section is the single owner of the alert contract; the script header owns its subcommands and output lines.
 
