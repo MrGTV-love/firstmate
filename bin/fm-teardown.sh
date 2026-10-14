@@ -78,6 +78,13 @@
 # captain-authorized forced discard below; otherwise the backlog stays open.
 # The one exception is a task's own nested copy that an earlier teardown
 # removed: teardown_nested_slot judges it first by its branch= ref.
+# After landing and runtime cleanup pass, ship teardown also reaps only local
+# archive/<task>-* branches whose exact head is an ancestor of the merged PR
+# head, or whose non-merge commits all have equivalent patches in that head.
+# The PR head must match its forge-reported merge commit on every changed path.
+# Forced discard, unavailable proof, non-ancestor merge commits, checked-out
+# archives, or a concurrently moved ref keep the archive and name it; another
+# task's refs and records-only shared/reassigned slots remain untouched.
 # Scout tasks (kind=scout in meta) carve out of that check: their worktree is
 # declared scratch and the regular, nonsymlink, nonempty report at
 # data/<task-id>/report.md is the work product. Non-forced teardown also requires
@@ -2056,6 +2063,103 @@ work_is_landed() {
   fi
   pr_is_merged "$branch" && return 0
   fm_task_copy_content_in_default "$dir" "$PROJ" "${BASE_BRANCH:-}" "$ref"
+}
+
+# Archive cleanup needs its own stricter proof, not the pipeline-input exception:
+# the forge's merged PR head must match its merge commit on every path either
+# side changed. Keep filenames NUL-delimited and literal, including deletions.
+TEARDOWN_ARCHIVE_PR_HEAD=
+task_archive_pr_matches_merge() {
+  local target=$1 view state head merge parent base paths_file path
+  local TEARDOWN_LANDED_DIR=$PROJ
+  local -a paths=()
+  TEARDOWN_ARCHIVE_PR_HEAD=
+  view=$(cd "$PROJ" && gh pr view "$target" --json state,headRefOid,mergeCommit \
+    -q '[.state, .headRefOid, (.mergeCommit.oid // "")] | join("\t")' 2>/dev/null) || return 1
+  IFS=$'\t' read -r state head merge <<< "$view"
+  [ "$state" = MERGED ] || return 1
+  fm_pr_head_valid "$head" && fm_pr_head_valid "$merge" || return 1
+  ensure_commit_object "$target" "$head" || return 1
+  if ! git -C "$PROJ" cat-file -e "$merge^{commit}" 2>/dev/null; then
+    git -C "$PROJ" fetch --quiet --no-tags origin "$merge" >/dev/null 2>&1 || return 1
+    git -C "$PROJ" cat-file -e "$merge^{commit}" 2>/dev/null || return 1
+  fi
+  parent=$(git -C "$PROJ" rev-parse --verify "$merge^" 2>/dev/null) || return 1
+  base=$(git -C "$PROJ" merge-base "$head" "$parent" 2>/dev/null) || return 1
+  paths_file=$(mktemp "$STATE/.$ID.archive-paths.XXXXXX") || return 1
+  if ! git -C "$PROJ" diff --no-ext-diff --no-renames --name-only -z "$base" "$head" -- > "$paths_file" \
+     || ! git -C "$PROJ" diff --no-ext-diff --no-renames --name-only -z "$parent" "$merge" -- >> "$paths_file"; then
+    rm -f -- "$paths_file"
+    return 1
+  fi
+  while IFS= read -r -d '' path; do paths+=("$path"); done < "$paths_file"
+  rm -f -- "$paths_file"
+  # An empty path set compares the whole tree instead of proving nothing.
+  git -C "$PROJ" --literal-pathspecs diff --no-ext-diff --no-textconv --quiet "$head" "$merge" -- \
+    "${paths[@]+"${paths[@]}"}" || return 1
+  TEARDOWN_ARCHIVE_PR_HEAD=$head
+}
+
+reap_task_archive_branches() {
+  local refs ref sha branch target head cherry merges checked_out reason
+  [ "$KIND" = ship ] && teardown_owns_worktree || return 0
+  refs=$(git -C "$PROJ" for-each-ref --format='%(refname) %(objectname)' \
+    "refs/heads/archive/$ID-*") || {
+    echo "warning: could not enumerate task $ID's archive branches; keeping them" >&2
+    return 0
+  }
+  [ -n "$refs" ] || return 0
+  reason=
+  head=
+  if [ "$FORCE" = --force ]; then
+    reason="forced discard is not landing proof"
+  else
+    target=$PR_URL
+    [ -n "$target" ] || target=$(pr_number_from_branch "$(teardown_record_branch)") || target=
+    if [ -n "$target" ] && task_archive_pr_matches_merge "$target"; then
+      head=$TEARDOWN_ARCHIVE_PR_HEAD
+    else
+      reason="merged PR head and matching merge content could not be proven"
+    fi
+  fi
+  checked_out=$(git -C "$PROJ" worktree list --porcelain 2>/dev/null) \
+    || reason="checked-out branch inventory could not be read"
+  while read -r ref sha; do
+    [ -n "$ref" ] || continue
+    branch=${ref#refs/heads/}
+    if [ -n "$reason" ]; then
+      echo "notice: keeping $branch ($reason)" >&2
+      continue
+    fi
+    if printf '%s\n' "$checked_out" | grep -qxF "branch $ref"; then
+      echo "notice: keeping $branch (checked out in a local copy)" >&2
+      continue
+    fi
+    if ! git -C "$PROJ" merge-base --is-ancestor "$sha" "$head" 2>/dev/null; then
+      # git cherry omits merge commits, so it alone cannot prove a merge's edits.
+      # Non-ancestor merges stay archived rather than being silently discarded.
+      if ! merges=$(git -C "$PROJ" rev-list --merges "$sha" --not "$head" -- 2>/dev/null) \
+         || [ -n "$merges" ] \
+         || ! cherry=$(git -C "$PROJ" cherry "$head" "$sha" 2>/dev/null); then
+        echo "notice: keeping $branch (archive history is not proven carried by the merged PR head)" >&2
+        continue
+      fi
+      case "$cherry" in
+        +*|*$'\n+'*)
+          echo "notice: keeping $branch (archive patches are not all carried by the merged PR head)" >&2
+          continue ;;
+      esac
+    fi
+    # The expected old value prevents a concurrently moved archive from being
+    # deleted on proof about its previous head. Never detach another copy.
+    if git -C "$PROJ" update-ref -d "$ref" "$sha" 2>/dev/null; then
+      echo "teardown: reaped $branch (carried by the merged PR lineage)" >&2
+    else
+      echo "notice: keeping $branch (archive deletion could not be completed at its proven head)" >&2
+    fi
+  done <<EOF
+$refs
+EOF
 }
 
 # The one landed-work rule, applied to <ref> in <dir>: the task copy's own HEAD,
@@ -5059,6 +5163,10 @@ elif [ "$BACKEND" = herdr ] \
   echo "warning: herdr presentation journal for $ID was not retired by its close; no workspace cleanup was attempted" >&2
 fi
 teardown_release_herdr_locks
+
+# Only now, after ordinary landing and runtime cleanup passed, consider this
+# task's recovery archives. Forced discard never counts as archive landing.
+reap_task_archive_branches
 
 # Best-effort: drop the local task branch so the shared repo does not accumulate refs.
 if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
