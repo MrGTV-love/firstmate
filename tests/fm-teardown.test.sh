@@ -9560,7 +9560,96 @@ SH
   pass "ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage"
 }
 
+# A provider return still sweeps nested copies when its pool inventory is absent.
+# Introduce a copy at each return boundary, not during earlier custody scans.
+test_non_pool_returns_recheck_registered_copies() {
+  local phase case_dir nested lock rc
+  for phase in initial retry stale; do
+    case_dir=$(make_case "non-pool-registered-$phase")
+    write_meta "$case_dir" no-mistakes ship
+    nested="$case_dir/wt/.claude/worktrees/parked"
+    lock=$(git_index_lock_path "$case_dir/wt")
+    if [ "$phase" = initial ]; then
+      git -C "$case_dir/project" worktree add -q --detach "$nested" main
+    fi
+    cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+if [ ! -e "$case_dir/attempted" ]; then
+  touch "$case_dir/attempted"
+  if [ "$phase" = retry ]; then
+    git -C "$case_dir/project" worktree add -q --detach "$nested" main || exit 2
+  elif [ "$phase" = stale ]; then
+    touch "$lock"
+    touch -t 200001010000 "$lock"
+  fi
+  echo "fatal: Unable to create '$lock': File exists." >&2
+  exit 128
+fi
+exit 0
+SH
+    if [ "$phase" = stale ]; then
+      cat > "$case_dir/fakebin/rm" <<SH
+#!/usr/bin/env bash
+/bin/rm "\$@" || exit
+for arg in "\$@"; do
+  if [ "\$arg" = "$lock" ]; then
+    git -C "$case_dir/project" worktree add -q --detach "$nested" main || exit 2
+  fi
+done
+SH
+      chmod +x "$case_dir/fakebin/rm"
+      add_lsof_no_holder "$case_dir"
+    fi
+    rc=0
+    FM_TREEHOUSE_RETURN_LOCK_RETRIES=$([ "$phase" = stale ] && printf 0 || printf 1) \
+    FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 FM_STALE_WORKTREE_LOCK_AGE_SECS=1 \
+      run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+      > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 1 "$rc" "$phase: an unproven registered copy must stop the return: $(cat "$case_dir/stderr")"
+    assert_grep "contains registered copy $nested" "$case_dir/stderr" "$phase: missing custody refusal"
+    assert_present "$nested/.git" "$phase: parked copy was lost"
+    assert_present "$case_dir/state/task-x1.meta" "$phase: task record was retired"
+    if [ "$phase" = initial ]; then
+      assert_absent "$case_dir/treehouse.log" 'initial: provider was called despite the parked copy'
+      assert_grep 'FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate' \
+        "$case_dir/stderr" 'recovery command omitted the owning home'
+    else
+      assert_equals 1 "$(wc -l < "$case_dir/treehouse.log" | tr -d ' ')" "$phase: provider retried despite the parked copy"
+    fi
+    if [ "$phase" = stale ]; then
+      assert_grep 'removed provably-stale git lock' "$case_dir/stderr" 'stale cleanup boundary was not reached'
+    fi
+  done
+  pass 'every forced return checks registered copies without pool inventory, and recovery names the owning home'
+}
+
+# A provider may lose its target between attempts; refusal must explain why.
+test_return_missing_slot_reports_canonicalization_refusal() {
+  local case_dir rc=0
+  case_dir=$(make_case return-missing-slot)
+  write_meta "$case_dir" no-mistakes ship
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+mv "$case_dir/wt" "$case_dir/retained-copy" || exit 2
+echo "fatal: Unable to create 'index.lock': File exists." >&2
+exit 128
+SH
+  FM_TREEHOUSE_RETURN_LOCK_RETRIES=1 FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
+    run_teardown "$case_dir" --force --drop-file "$FM_TEST_DROP_WORDS" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "missing slot must stop the retry: $(cat "$case_dir/stderr")"
+  assert_grep "REFUSED: cannot canonicalize pool slot $case_dir/wt" "$case_dir/stderr" 'missing slot refusal did not identify the path'
+  assert_equals 1 "$(wc -l < "$case_dir/treehouse.log" | tr -d ' ')" 'provider retried an unresolvable slot'
+  assert_present "$case_dir/state/task-x1.meta" 'missing-slot refusal retired the task record'
+  assert_present "$case_dir/retained-copy/.git" 'missing-slot refusal lost the retained copy'
+  pass 'an uncanonicalizable return target reports an explicit refusal and preserves its record'
+}
+
 teardown_test_cases=(
+test_non_pool_returns_recheck_registered_copies
+test_return_missing_slot_reports_canonicalization_refusal
 test_teardown_never_holds_up_a_steer_to_another_task
 test_lane_registry_scan_reads_each_distinct_registry_once
 test_task_teardown_preserves_another_homes_abandoned_worker

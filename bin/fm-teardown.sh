@@ -154,7 +154,8 @@
 # absent claim - a slot taken before claims existed, or already returned - keeps
 # the record-scan protection, because refusing it would strand every task in
 # flight across that change on no evidence at all. Independently, before any
-# pool return, the slot's Git worktree registrations must contain no nested
+# forced Treehouse return (even without pool inventory), the slot's Git
+# worktree registrations must contain no nested
 # copy outside this task's individually proven copies; otherwise teardown
 # refuses, even with --force, and names each such copy. If an active record
 # owns that copy's work, reassociate that task to it first. If none does,
@@ -2255,9 +2256,13 @@ cleanup_stale_lock_for_safety_check() {
 # before cleanup, and must all be removed before any provider return, even on
 # --force. Read the slot's own ref store, including paths containing newlines.
 require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
-  local task=$1 slot=$2 inventory field copy known allowed refused=0
+  local task=$1 slot=$2 canonical_slot inventory field copy known allowed refused=0
   shift 2
-  slot=$(fm_task_copy_canonical_dir "$slot") || return 1
+  if ! canonical_slot=$(fm_task_copy_canonical_dir "$slot"); then
+    echo "REFUSED: cannot canonicalize pool slot $slot; retain its records and lease and inspect the slot path before retrying." >&2
+    return 1
+  fi
+  slot=$canonical_slot
   inventory=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-worktrees.XXXXXX") || return 1
   if ! git -C "$slot" worktree list --porcelain -z > "$inventory" 2>/dev/null; then
     rm -f "$inventory"
@@ -2278,7 +2283,7 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
   done < "$inventory"
   rm -f "$inventory"
   if [ "$refused" = 1 ]; then
-    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy>. Re-run this teardown afterwards." >&2
+    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy>. Re-run this teardown afterwards." >&2
     return 1
   fi
 }
@@ -2291,9 +2296,7 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
 
   # Capture stdout+stderr so non-lock failures stay visible and lock failures can
   # be matched by signature even when the lock file is already gone mid-check.
-  if fm_treehouse_pool_slot "$cd_dir" "$dir"; then
-    require_registered_slot_copies "$owner" "$dir" || return 1
-  fi
+  require_registered_slot_copies "$owner" "$dir" || return 1
   if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
     [ -n "$out" ] && printf '%s\n' "$out"
     return 0
@@ -2319,9 +2322,7 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
     echo "teardown: $label return failed with transient git lock ($lock_desc); waiting ${TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS}s and retrying ($attempt/${max_retries})" >&2
     sleep "$TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS"
 
-    if fm_treehouse_pool_slot "$cd_dir" "$dir"; then
-      require_registered_slot_copies "$owner" "$dir" || return 1
-    fi
+    require_registered_slot_copies "$owner" "$dir" || return 1
     if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
       [ -n "$out" ] && printf '%s\n' "$out"
       echo "teardown: $label return succeeded on retry; lock cleared on its own" >&2
@@ -2349,9 +2350,7 @@ teardown_treehouse_return() {  # <dir> <cd-dir> <label> <owner-task> [<post-clea
           return 1
         fi
       fi
-      if fm_treehouse_pool_slot "$cd_dir" "$dir"; then
-        require_registered_slot_copies "$owner" "$dir" || return 1
-      fi
+      require_registered_slot_copies "$owner" "$dir" || return 1
       if out=$( ( cd "$cd_dir" && treehouse return --force "$dir" ) 2>&1 ); then
         [ -n "$out" ] && printf '%s\n' "$out"
         echo "teardown: $label return succeeded after stale-lock cleanup" >&2
