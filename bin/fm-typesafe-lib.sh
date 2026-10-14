@@ -6,9 +6,10 @@
 # existing .fm-secondmate-parent record (fm_firstmate_root_home), so a
 # secondmate home and its crews share the primary home's single key without
 # any copy. A remote-seeded home has no local primary and stops at its own .env.
-# fm_typesafe_post <request-json> <response-file> [transfer-seconds-file] uses
-# the fixed endpoint and five-second deadline, with no retries. Prints only the
-# HTTP code (000 on a transport failure), optionally saving curl's transfer time.
+# fm_typesafe_post <request-json> <response-file> [transfer-seconds-file]
+# [curl-exit-file] uses the fixed endpoint and five-second deadline, with no
+# retries. Prints only the HTTP code (000 on a transport failure), optionally
+# saving curl's transfer time and its exit status (28 is the deadline).
 # The private key is never exported or placed on argv.
 # fm_typesafe_permitted <request-json> <never-send-path> <scratch-file> checks
 # every request string against the existing dispatch-never-send policy.
@@ -56,13 +57,14 @@ fm_openrouter_key() {
 }
 
 fm_typesafe_post() {
-  local request=$1 response=$2 timing=${3:-} result rc=0 http
+  local request=$1 response=$2 timing=${3:-} exit_file=${4:-} result rc=0 http
   result=$(printf '%s' "$request" | curl -q -sS --max-time 5 -o "$response" -w '%{http_code} %{time_total}' \
     -X POST https://api.typesafe.ai/v1/systemone -H 'Content-Type: application/json' \
     -H @/dev/fd/3 3< <(printf 'Authorization: Bearer %s\n' "$TYPESAFE_API_KEY_PRIVATE") \
     --data-binary @- 2>/dev/null) || rc=$?
   http=${result%% *}
   [ "$rc" -eq 0 ] || http=000
+  [ -z "$exit_file" ] || printf '%s' "$rc" > "$exit_file"
   if [ -n "$timing" ]; then
     case "$result" in
       *' '*) printf '%s' "${result#* }" > "$timing" ;;

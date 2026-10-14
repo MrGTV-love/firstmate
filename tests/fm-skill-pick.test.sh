@@ -337,6 +337,34 @@ reset; keys ''
 out=$(pick FAKE_TYPESAFE=500)
 assert_contains "$out" "Skill selection was unavailable for this task (typesafe HTTP 500.)" "without an OpenRouter key a direct failure is unavailable"
 assert_equals "status=unavailable" "$(sed -n 1p "$TMP_ROOT/record")" "the failure is recorded"
+
+# A TypeSafe credit or key failure reaches the account-health alert at once, even
+# when the OpenRouter fallback then answered; a later TypeSafe answer recovers it.
+rm -rf "$HOME_DIR/state"
+HEALTH_QUEUE="$HOME_DIR/state/.wake-queue"
+health_wakes() {
+  local n
+  n=$(grep -cF "$(printf '\t%s\t' "$1")" "$HEALTH_QUEUE" 2>/dev/null) || true
+  printf '%s' "${n:-0}"
+}
+reset; keys
+out=$(pick FAKE_TYPESAFE=402 FAKE_PICK=gamma)
+assert_contains "$out" "through openrouter" "the fallback still answered while the account was out of credits"
+assert_equals 1 "$(health_wakes typesafe-health-credits)" "a TypeSafe 402 alerts even when OpenRouter answered"
+reset; keys ''
+out=$(pick FAKE_TYPESAFE=402)
+assert_contains "$out" "Skill selection was unavailable for this task (typesafe HTTP 402." "without a fallback the 402 is the stated reason"
+assert_equals 1 "$(health_wakes typesafe-health-credits)" "a repeated 402 raises no second wake"
+reset; keys
+out=$(pick FAKE_TYPESAFE=500 FAKE_PICK=gamma)
+assert_equals 1 "$(health_wakes typesafe-health-credits)" "an http 500 neither repeats nor clears the alert"
+assert_equals 0 "$(health_wakes typesafe-health-recovered)" "an OpenRouter answer is not proof that TypeSafe recovered"
+reset; keys
+out=$(pick FAKE_PICK=beta)
+assert_equals 1 "$(health_wakes typesafe-health-recovered)" "a TypeSafe answer raises one recovered note"
+assert_not_contains "$(cat "$HEALTH_QUEUE" "$HOME_DIR/state/.typesafe-health")" "ts-test-key" "the key is in no account-health record"
+rm -rf "$HOME_DIR/state"
+pass "a TypeSafe credit or key failure seen by the picker reaches the account-health alert once, and recovery clears it"
 reset; printf 'OPENROUTER_API_KEY=or-test-key\n' > "$HOME_DIR/.env"
 out=$(pick)
 assert_contains "$out" "through openrouter" "an OpenRouter key alone is used"
