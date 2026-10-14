@@ -2133,6 +2133,123 @@ SH
   pass "memory failures retry without source following, exclude cross-file codes, and preserve a real fallback finding"
 }
 
+test_cache_key_wait_preserves_root_retry_budget() {
+  local tmp repo fakebin out
+  tmp=$(fm_test_tmproot fm-lint-cache-retry-clock)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  fakebin=$(fm_fakebin "$tmp/fake")
+  cat > "$fakebin/shellcheck" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = --version ]; then
+  printf 'ShellCheck - shell script analysis tool\nversion: 0.11.0\n'
+  exit 0
+fi
+[ "${FM_TEST_SEED:-0}" = 1 ] && exit 0
+for arg in "$@"; do
+  if [ "$arg" = --external-sources ]; then
+    printf 'shellcheck: Heap exhausted;\n' >&2
+    exit 251
+  fi
+done
+exit 0
+SH
+  chmod +x "$fakebin/shellcheck"
+  out=$(PATH="$fakebin:$PATH" CI='' GITHUB_ACTIONS='' FM_TEST_SEED=1 \
+    FM_LINT_CACHE_DIR="$tmp/cache" "$repo/bin/fm-lint.sh" bin/consumer.sh 2>&1) \
+    || fail "key identity warm-up failed: $out"
+  # The test exercises the real watchdog's time budget, not address-space
+  # enforcement. macOS cannot enforce ulimit -v, so only that builtin is
+  # simulated in the private fixture; Linux retains the real memory bound.
+  : > "$tmp/bash-env"
+  if ! fm_lint_bounds_supported; then
+    cat > "$tmp/bash-env" <<'SH'
+ulimit() {
+  if [ "${1:-}" = -v ]; then return 0; fi
+  builtin ulimit "$@"
+}
+SH
+  fi
+  perl - "$repo/bin/fm-lint.sh" "$fakebin/shellcheck" "$tmp" <<'PL' || fail "cache queue consumed the memory retry budget"
+use strict;
+use warnings;
+use File::Path qw(make_path);
+use Fcntl qw(:flock);
+use POSIX qw(WNOHANG);
+use Time::HiRes qw(time sleep);
+my ($lint, $tool, $tmp) = @ARGV;
+my @locks = glob "$tmp/cache/*.lock";
+die "expected one warmed root key\n" unless @locks == 1;
+unlink $_ for glob "$tmp/cache/*.passed";
+open(my $holder, '>>', $locks[0]) or die "$!";
+flock($holder, LOCK_EX) or die "$!";
+open(my $module, '>', "$tmp/CacheReady.pm") or die "$!";
+print {$module} <<'MODULE';
+package CacheReady;
+use Fcntl qw(LOCK_NB);
+BEGIN {
+    *CORE::GLOBAL::flock = sub {
+        unless ($_[1] & LOCK_NB) {
+            open(my $fh, '>', "$ENV{CASE_DIR}/waiting") or die "$!";
+            close $fh;
+        }
+        return CORE::flock($_[0], $_[1]);
+    };
+}
+1;
+MODULE
+close $module;
+make_path("$tmp/out");
+open(my $manifest, '>', "$tmp/manifest") or die "$!";
+print {$manifest} "0\tbin/consumer.sh\n";
+close $manifest;
+local %ENV = (%ENV, FM_LINT_INTERNAL => 1, FM_LINT_INTERNAL_CACHE => "$tmp/cache",
+    FM_LINT_INTERNAL_SLOT_DIR => 'off', FM_LINT_INTERNAL_NCPU => 18,
+    FM_LINT_INTERNAL_BOUNDED => 'perl', FM_LINT_INTERNAL_MEMORY_KIB => 2097152,
+    FM_LINT_INTERNAL_ROOT_SECS => 8, FM_LINT_INTERNAL_GRACE => 1,
+    FM_LINT_INTERNAL_ROOTS_LOG => "$tmp/roots.tsv", FM_LINT_SHELLCHECK => $tool,
+    PERL5OPT => "-I$tmp -MCacheReady", CASE_DIR => $tmp, BASH_ENV => "$tmp/bash-env");
+my $pid = fork();
+die "fork: $!" unless defined $pid;
+if (!$pid) {
+    close $holder;
+    open STDOUT, '>', "$tmp/worker.out" or die "$!";
+    open STDERR, '>&', \*STDOUT or die "$!";
+    exec '/bin/bash', $lint, '--internal-worker', "$tmp/manifest", "$tmp/out", 0;
+    die "exec: $!";
+}
+my $error;
+eval {
+    my $deadline = time() + 30;
+    until (-e "$tmp/waiting") { die "key waiter did not start\n" if time() > $deadline; sleep 0.01; }
+    sleep 10; # Deliberately longer than the root's eight-second analysis budget.
+    close $holder;
+    $deadline = time() + 30;
+    while (waitpid($pid, WNOHANG) == 0) {
+        die "root did not finish\n" if time() > $deadline;
+        sleep 0.01;
+    }
+    die "memory fallback failed: $?\n" if $?;
+    open(my $roots, '<', "$tmp/roots.tsv") or die "$!";
+    my @ends = map { [split /\t/] } grep { /^end\t/ } <$roots>;
+    die "root did not finish with a successful memory retry\n"
+        unless @ends == 1 && $ends[0][8] == 0 && $ends[0][9] eq 'memory-fallback';
+    my $span = $ends[0][6] - $ends[0][5];
+    die "key queue time was charged to root duration\n" unless $span - $ends[0][7] >= 9000;
+};
+$error = $@;
+close $holder;
+if ($error) {
+    kill 'TERM', $pid;
+    waitpid($pid, 0);
+    open(my $output, '<', "$tmp/out/shard.0.out") or die "$!";
+    local $/;
+    die $error, <$output>;
+}
+PL
+  pass "a cache-key wait longer than the root deadline preserves its memory retry budget"
+}
+
 test_memory_fallback_spends_only_the_remaining_root_deadline() {
   if ! fm_lint_bounds_supported; then
     pass "SKIP (host cannot enforce the bounded envelope): fallback deadline check"
@@ -3103,6 +3220,30 @@ SH
   pass "shared cache single-flights identical misses and invalidates sources, binaries and failures"
 }
 
+test_explicit_root_can_equal_the_private_execution_marker() {
+  pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): leading-dash root"; return; }
+  local tmp repo out rc
+  tmp=$(fm_test_tmproot fm-lint-execution-marker)
+  repo="$tmp/repo"
+  fm_lint_small_repo "$repo"
+  printf '#!/usr/bin/env bash\nprintf "ok\\n"\n' > "$repo/--execute"
+  out=$(CI='' GITHUB_ACTIONS='' "$repo/bin/fm-lint.sh" -- --execute 2>&1) \
+    || fail "a valid explicit leading-dash root failed: $out"
+  cat > "$repo/--execute" <<'SH'
+#!/usr/bin/env bash
+bad() {
+  local a= b=
+  printf '%s\n' "$a$b"
+}
+bad
+SH
+  rc=0
+  out=$(CI='' GITHUB_ACTIONS='' "$repo/bin/fm-lint.sh" -- --execute 2>&1) || rc=$?
+  [ "$rc" -eq 1 ] || fail "the leading-dash root's finding returned $rc: $out"
+  assert_contains "$out" SC1007 "the explicit operand was interpreted as a private command marker"
+  pass "an explicit leading-dash root retains real ShellCheck findings"
+}
+
 test_cached_success_does_not_wait_for_host_slots() {
   pinned_ready || { pass "SKIP (ShellCheck $REQUIRED not resolved): cached slot bypass"; return; }
   local tmp repo out
@@ -3605,6 +3746,7 @@ test_worker_trees_stop_on_signal
 test_root_deadline_names_the_root_and_reaps_the_tree
 test_root_memory_limit_reports_a_named_death
 test_memory_failure_retries_without_external_sources
+test_cache_key_wait_preserves_root_retry_budget
 test_memory_fallback_spends_only_the_remaining_root_deadline
 test_memory_evidence_outranks_findings_and_signal_reasons
 test_source_excerpt_with_oom_text_stays_findings
@@ -3616,6 +3758,7 @@ test_seeded_joint_source_parity
 test_ci_forces_full_lint_even_with_empty_diff
 test_main_branch_forces_full_lint
 test_explicit_path_bypasses_changed_logic
+test_explicit_root_can_equal_the_private_execution_marker
 test_zero_changed_files_exits_clean
 test_ci_keeps_external_sources_without_local_exclusions
 test_main_branch_keeps_external_sources

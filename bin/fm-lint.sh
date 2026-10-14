@@ -78,10 +78,10 @@
 # any 1-minute load above two times ncpu, rounded to the nearest integer and
 # clamped between min(2, cap) and cap. Thus a lone default two-worker run keeps
 # both workers unless an explicit cap of one is selected.
-# Waiting roots queue rather than fail; queue time consumes neither the root
-# deadline nor its retry budget. Slot directory, file, or locking failures
-# warn and run ungated rather than failing lint. The private gate's locking
-# and process-lifetime invariants live in bin/fm-lint-cache.pl.
+# Waiting roots queue rather than fail; both cache-key and host-slot queue time
+# consume neither the root deadline nor its retry budget.
+# Slot directory, file, or locking failures warn and run ungated rather than failing lint.
+# The private gate's locking and process-lifetime invariants live in bin/fm-lint-cache.pl.
 # --partition 1of3/2of3/3of3 splits the entire canonical inventory across
 # three CI runners, each with those same concurrency-limited workers.
 # Partitions are complete, disjoint, and measured-duration balanced; --list-files
@@ -299,7 +299,7 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   # queue time counts toward neither the root deadline nor its peak RSS.
   gate_command=()
   wait_file="$rss_file.wait"
-  rm -f "$wait_file" "$rss_file.cache"
+  rm -f "$wait_file" "$rss_file.cache" "$rss_file.cache.wait"
   if [ "${FM_LINT_INTERNAL_SLOT_DIR:-off}" != off ]; then
     gate_command=("${FM_LINT_PERL_BIN:-perl}" "$SELF_DIR/fm-lint-cache.pl" gate \
       "$FM_LINT_INTERNAL_SLOT_DIR" "$FM_LINT_INTERNAL_NCPU" "$wait_file" --)
@@ -332,10 +332,15 @@ fm_lint_exec_root() {  # <path> <stdout-file> <stderr-file> <rss-file> <seconds>
   FM_LINT_WORKER_RUN_PID=
   FM_LINT_LAST_RC=$invocation_rc
   FM_LINT_LAST_WAIT_MS=0
-  if [ -r "$wait_file" ]; then
-    waited=$(tr -d '[:space:]' < "$wait_file" 2>/dev/null)
-    case "$waited" in ''|*[!0-9]*) ;; *) FM_LINT_LAST_WAIT_MS=$waited ;; esac
-  fi
+  for wait_file in "$rss_file.wait" "$rss_file.cache.wait"; do
+    if [ -r "$wait_file" ]; then
+      waited=$(tr -d '[:space:]' < "$wait_file" 2>/dev/null)
+      case "$waited" in
+        ''|*[!0-9]*) ;;
+        *) FM_LINT_LAST_WAIT_MS=$((FM_LINT_LAST_WAIT_MS + waited)) ;;
+      esac
+    fi
+  done
 }
 
 # Run one selected root, retry memory failures without source following, record

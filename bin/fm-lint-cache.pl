@@ -499,8 +499,10 @@ if ($mode eq 'select') {
 my $tool = shift @args;
 my @execute;
 for my $index (0 .. $#args) {
-    next unless $args[$index] eq '--execute';
-    @execute = splice @args, $index;
+    next unless $args[$index] eq '--';
+    my $marker = $index + 2; # The root operand follows the analysis delimiter.
+    next unless $marker <= $#args && $args[$marker] eq '--execute';
+    @execute = splice @args, $marker;
     shift @execute;
     die "fm-lint-cache: missing execution command\n" unless @execute;
     last;
@@ -524,8 +526,9 @@ sub fingerprint {
     }
     return sha256_hex(join "\0", @parts);
 }
-# A per-invocation sidecar distinguishes reused successes from cold analysis
-# without interpreting diagnostic text emitted by ShellCheck.
+# Per-invocation sidecars distinguish reused successes from cold analysis and
+# account for key-lock queue time outside the analysis watchdog and retry budget.
+my $key_wait_ms = 0;
 sub duration_outcome {
     my ($outcome) = @_;
     return unless defined $ENV{FM_LINT_CACHE_RESULT_FILE};
@@ -535,13 +538,29 @@ sub duration_outcome {
     } else {
         warn "fm-lint: cannot record cache outcome: $!\n";
     }
+    return if $key_wait_ms <= 0;
+    if (open(my $fh, '>', "$ENV{FM_LINT_CACHE_RESULT_FILE}.wait")) {
+        print {$fh} "$key_wait_ms\n";
+        close $fh;
+    } else {
+        warn "fm-lint: cannot record cache queue time: $!\n";
+    }
 }
 my $key = $cache eq 'off' ? undef : fingerprint();
 my ($lock, $passed);
 if (defined $key) {
     # An unavailable cache is an optimization failure, not a lint failure.
+    require Time::HiRes;
     if (eval { make_path($cache, {mode => 0700}); 1 }
-        && open($lock, '>>', "$cache/$key.lock") && flock($lock, LOCK_EX)) {
+        && open($lock, '>>', "$cache/$key.lock")
+        && do {
+            my $started = Time::HiRes::time();
+            my $got = flock($lock, LOCK_EX);
+            my $error = 0 + $!;
+            $key_wait_ms = int((Time::HiRes::time() - $started) * 1000);
+            $! = $error;
+            $got;
+        }) {
         $passed = "$cache/$key.passed";
         my $locked_key = fingerprint();
         if (!defined $locked_key || $locked_key ne $key) {
