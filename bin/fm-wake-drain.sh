@@ -879,6 +879,18 @@ if [ "$REEMIT" = true ]; then
     exit 0
   fi
 fi
+# The same ledger receipt boundary applies to main, the supervision-host's
+# branch actor, and secondmate homes. Never consume a wake before its overdue
+# obligations have an action recorded after presentation.
+OVERDUE_SECTION=
+if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
+  if [ -n "$ACK_THROUGH" ]; then
+    "$SCRIPT_DIR/fm-open-loops.sh" --check-actions || exit 1
+  else
+    OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue) || exit 1
+    [ -z "$OVERDUE_SECTION" ] || printf '%s\n' "$OVERDUE_SECTION"
+  fi
+fi
 rotate_scratch_locked
 reclaim_stale_branch_grant_locked || exit 1
 [ "$ACTOR" != main ] || retire_unconsumable_rows_locked
@@ -1014,6 +1026,15 @@ if [ ! -s "$FM_WAKE_QUEUE" ]; then
   : > "$FM_WAKE_QUEUE"
   fm_recovery_marker_snapshot "$RECOVERY_MARKER" || true
   RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+  if [ -n "$OVERDUE_SECTION" ]; then
+    case "$RECOVERY_MARKER_TOKEN" in
+      ''|acked:*)
+        fm_recovery_marker_publish "$RECOVERY_MARKER" downtime || exit 1
+        fm_recovery_marker_snapshot "$RECOVERY_MARKER" || exit 1
+        RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+        ;;
+    esac
+  fi
   case "$RECOVERY_MARKER_TOKEN" in
     pending:downtime:*|announced:downtime:*)
       fm_recovery_marker_begin_handling "$RECOVERY_MARKER" || {
@@ -1047,6 +1068,12 @@ if [ "$ACTOR" = main ]; then
     # drain that prints nothing while the queue is visibly non-empty reads as a
     # lost wake, and leaves the caller with no idea who owns what is queued.
     print_branch_held_notice
+    if [ -n "$OVERDUE_SECTION" ]; then
+      fm_recovery_marker_begin_handling "$RECOVERY_MARKER" || exit 1
+      RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+      printf 'WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation %s\n' \
+        "${RECOVERY_MARKER_TOKEN##*:}" >&2
+    fi
     fm_lock_release "$FM_WAKE_QUEUE_LOCK"
     DRAIN_LOCK_HELD=false
     (print_status_presentation) || true

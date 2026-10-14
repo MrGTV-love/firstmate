@@ -67,6 +67,10 @@ elif '/statuses' in path:
     value = []
 elif re.search(r'/pulls\?', path):
     value = double.get('pulls_by_repo', {}).get(path.split('/pulls?')[0], double['pulls'])
+elif '/rules/branches/' in path:
+    value = double.get('rules', [])
+elif '/branches/' in path:
+    value = double.get('protection', {'protected': False})
 else:
     value = double['single'][path.rsplit('/', 1)[1]]
 body = json.dumps(value)
@@ -218,6 +222,48 @@ bad = run([code / 'bin/fm-open-loops.sh', '--json'])
 assert bad.returncode == 1 and 'unknown open-loop age category' in bad.stdout, bad
 (home / 'config/open-loops.json').unlink()
 print('PASS: ordinary categories, PR proof, ages and configuration', flush=True)
+
+# Independent review must bind the exact live head; absent required checks prevent readiness.
+review_path = home / 'state/review-lane.status'
+review_url, review_head = PR_URL + '9', 'c' * 40
+review_path.write_text(f'done [at={now - 601}]: review PASS head={review_head} PR {review_url}\n')
+config_path = home / 'config/open-loops.json'
+config_path.write_text(json.dumps(dict(review_lanes={'test/project': ['review-lane']},
+                                     age_limits_seconds={'review_pass_not_merged': 600})))
+double['pulls'][2]['base'] = dict(ref='main')
+double['checks'][review_head][0]['completed_at'] = iso(now - 700)
+(world / 'gh.json').write_text(json.dumps(double))
+reviewed = ledger('--heartbeat')
+assert rows(reviewed, 'review_pass_not_merged')[review_url]['overdue'], reviewed
+assert review_url not in rows(reviewed, 'open_pr'), 'one actionable obligation per reviewed PR'
+review_path.write_text(f'done [at={now - 601}]: review PASS head={"d" * 40} PR {review_url}\n')
+assert not rows(ledger(), 'review_pass_not_merged'), 'replaced-head review is stale'
+review_path.write_text(f'done [at={now - 601}]: review FAIL head={review_head} PR {review_url}\n')
+assert not rows(ledger(), 'review_pass_not_merged'), 'latest review rejection supersedes PASS'
+review_path.write_text(f'done [at={now - 599}]: review PASS head={review_head} PR {review_url}\n')
+assert not rows(ledger(), 'review_pass_not_merged')[review_url]['overdue'], 'one interval grace boundary'
+review_path.write_text(f'done [at={now - 601}]: review PASS head={review_head} PR {review_url}\n')
+double['rules'] = [dict(type='required_status_checks', parameters=dict(required_status_checks=[
+    dict(context='missing', integration_id=3)]))]
+(world / 'gh.json').write_text(json.dumps(double))
+assert not rows(ledger(), 'review_pass_not_merged'), 'a required check that never reports is not green'
+double['rules'][0]['parameters']['required_status_checks'][0]['context'] = 'unit'
+double['rules'][0]['parameters']['required_status_checks'][0]['integration_id'] = 77
+(world / 'gh.json').write_text(json.dumps(double))
+assert not rows(ledger(), 'review_pass_not_merged'), 'a wrong producer cannot satisfy an app-bound check'
+double['rules'] = []
+review_pr = double['pulls'].pop(2)
+double['single']['9'] = dict(merged_at=iso(now), head=dict(sha=review_head))
+(world / 'gh.json').write_text(json.dumps(double))
+merged_report = ledger('--heartbeat')
+assert not rows(merged_report, 'review_pass_not_merged'), 'merge resolves the obligation'
+assert any(c['subject'] == review_url and 'merged' in c['evidence'] for c in merged_report['completions'])
+double['pulls'].append(review_pr)
+double['single'].pop('9')
+(world / 'gh.json').write_text(json.dumps(double))
+config_path.unlink()
+review_path.unlink()
+print('PASS: independent live-head review, interval boundary, missing and app-bound checks, merge completion', flush=True)
 
 # Captured answers stay firstmate's obligation independently of the board owner's lifecycle.
 answer_inbox = home / 'state/procevent-inbox'
@@ -631,17 +677,31 @@ assert {str(p.relative_to(readonly_git / 'objects')): p.read_bytes()
 print('PASS: collection leaves Git index and object inventory unchanged', flush=True)
 
 fixture([task('stalled', stalled)])
+step_store = world / 'active-step-proof'
+step_store.mkdir()
+with sqlite3.connect(step_store / 'state.sqlite') as db:
+    db.executescript('CREATE TABLE repos (id INTEGER, working_path TEXT);'
+                    'CREATE TABLE runs (id INTEGER, repo_id INTEGER, branch TEXT, created_at TEXT, status TEXT);'
+                    'CREATE TABLE step_results (run_id INTEGER, step TEXT, started_at TEXT, completed_at TEXT);')
+    db.execute('INSERT INTO repos VALUES (?, ?)', (1, tasks[0]['project']))
+    db.execute('INSERT INTO runs VALUES (?, ?, ?, ?, ?)', (1, 1, 'fm/stalled', iso(hours(5)), 'running'))
+    db.execute('INSERT INTO step_results VALUES (?, ?, ?, ?)', (1, 'lint.full.whole', iso(hours(4)), None))
+step_report = json.loads(out([code / 'bin/fm-open-loops.sh', '--json'], env=dict(env, NM_HOME=str(step_store))))
+step_evidence = rows(step_report, 'stalled_worker')['stalled']['evidence']
+assert 'lint.full.whole' in step_evidence and str(4 * 3600) in step_evidence, step_report
 for last_error in ('Error: ENOSPC: no space left on device, write', 'Exception: worker exploded',
                    'Fatal: unable to proceed', 'Error: generic failure', 'network connection timed out',
                    'ENOSPC'):
     pane = 'usage limit earlier\n' + last_error + '\nordinary progress-looking output\n'
     script(code / 'bin/fm-peek.sh', '#!/usr/bin/env python3\nprint(' + repr(pane) + ')\n')
     diagnosed = ledger()
-    assert rows(diagnosed, 'stalled_worker')['stalled']['evidence'] == last_error, diagnosed
+    evidence = rows(diagnosed, 'stalled_worker')['stalled']['evidence']
+    assert last_error in evidence and 'usage limit earlier' not in evidence, diagnosed
     human = out([code / 'bin/fm-open-loops.sh'])
-    assert last_error in human and 'overdue,evidence' in human and 'for evidence' not in human, human
-script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Everything normal\\n"\n')
-assert rows(ledger(), 'stalled_worker')['stalled']['evidence'] == 'no commit, status line, or pipeline progress'
+    assert last_error in human, human
+script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Waiting for lint.full.whole\\n"\n')
+wait_row = rows(ledger(), 'stalled_worker')['stalled']
+assert 'lint.full.whole' in wait_row['evidence'] and str(5 * 3600) in wait_row['evidence'], wait_row
 script(code / 'bin/fm-peek.sh', '#!/usr/bin/env bash\nprintf "Codex usage limit reached; retrying\\n"\n')
 print('PASS: last-error JSON and human representations', flush=True)
 tasks, backlog = saved_tasks, saved_backlog
@@ -1734,5 +1794,153 @@ finally:
             except ProcessLookupError:
                 pass
 print('PASS: real snapshot cancellation reaps nested groups and removes temporary inventory', flush=True)
+PY
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+import datetime as dt, json, os, re, shutil, subprocess, sys, time
+from pathlib import Path
+root, world = map(Path, sys.argv[1:])
+code = world / 'action-code'
+shutil.copytree(root / 'bin', code / 'bin')
+now = int(time.time())
+
+def case(name, actor='main', empty=False):
+    home = world / ('action-' + name)
+    for directory in ('state', 'config', 'data'):
+        (home / directory).mkdir(parents=True)
+    env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home),
+               FM_OPEN_LOOPS_NOW=str(now), FM_SUPERVISION_ACTOR=actor,
+               FM_TEST_SEAM='1', FM_TEST_HARNESS='codex')
+    for key in ('FM_STATE_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+        env.pop(key, None)
+    row = dict(id='row-' + name, category='stalled_worker', subject='worker', owner='worker:worker',
+               next_action='follow up on lint.full.whole', age_seconds=7200, limit_seconds=3600,
+               overdue=True, evidence='waiting for lint.full.whole; declaration age 7200s')
+    ledger = home / 'state/open-loops.json'
+    ledger.write_text(json.dumps(dict(schema='fm-open-loops.v1', generated_epoch=now, complete=True,
+                                     rows=[] if empty else [row],
+                                     completions=[dict(subject='shipped', evidence='completed fix')])) )
+    def call(*args):
+        return subprocess.run([str(a) for a in args], env=env, text=True, capture_output=True)
+    def ok(*args):
+        result = call(*args)
+        assert result.returncode == 0, (args, result.stdout, result.stderr)
+        return result
+    ok('bash', '-c', '. "$1"; fm_wake_append check report "check: board report"',
+       '_', code / 'bin/fm-wake-lib.sh')
+    if actor == 'branch':
+        (home / 'config/supervision-host').write_text('claude\n')
+        ok(code / 'bin/fm-wake-grant.sh', 'activate', os.getpid(), 'engine-turn')
+        ok(code / 'bin/fm-wake-grant.sh', 'publish', 'engine-turn', '1')
+    def drain():
+        result = ok(code / 'bin/fm-wake-drain.sh')
+        match = re.search(r'--ack-through (\d+) --recovery-generation ([A-Za-z0-9._-]+)', result.stderr)
+        assert match, (result.stdout, result.stderr)
+        return result, match.groups()
+    def ack(boundary):
+        return call(code / 'bin/fm-wake-drain.sh', '--ack-through', boundary[0],
+                    '--recovery-generation', boundary[1])
+    return home, ledger, row, call, ok, drain, ack
+
+for kind in ('steered', 'merged', 'escalated', 'deferred'):
+    home, ledger, row, call, ok, drain, ack = case(kind)
+    os.utime(ledger, (now - 7200, now - 7200))
+    publication_mtime = ledger.stat().st_mtime_ns
+    result, boundary = drain()
+    assert ledger.stat().st_mtime_ns == publication_mtime, 'presentation cannot conceal a stopped collector'
+    assert result.stdout.startswith('OVERDUE:'), result.stdout
+    assert 'lint.full.whole' in result.stdout and '7200' in result.stdout and 'worker:worker' in result.stdout
+    queue = (home / 'state/.wake-queue').read_bytes()
+    refused = ack(boundary)
+    assert refused.returncode == 1 and 'no action recorded' in refused.stdout, refused
+    assert (home / 'state/.wake-queue').read_bytes() == queue, 'refusal must preserve queued work'
+    evidence = {'steered': '001.msg', 'merged': 'https://github.com/test/project/pull/9',
+                'escalated': 'reported missing credential to captain', 'deferred': 'lint still producing output'}[kind]
+    args = [code / 'bin/fm-open-loops.sh', 'action', row['id'], kind, '--evidence', evidence]
+    if kind == 'deferred':
+        args += ['--recheck', dt.datetime.fromtimestamp(now + 600, dt.timezone.utc).isoformat()]
+    ok(*args)
+    assert ledger.stat().st_mtime_ns == publication_mtime, 'action receipts cannot refresh ledger publication age'
+    assert ack(boundary).returncode == 0
+    assert not (home / 'state/.wake-queue').read_text(), 'recorded action must permit consumption'
+    if kind == 'deferred':
+        refused = call(*args)
+        assert refused.returncode == 1 and 'second deferral refused' in refused.stdout, refused
+        assert json.loads(ledger.read_text())['rows'][0]['captain_visible'] is True
+        assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1
+        ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'second deferral escalated')
+        ok(code / 'bin/fm-open-loops.sh', '--check-actions')
+
+# The actual supervision-host actor and secondmate home use the same executable gate.
+for name, actor in (('host', 'branch'), ('secondmate', 'main')):
+    home, ledger, row, call, ok, drain, ack = case(name, actor)
+    if name == 'secondmate':
+        (home / '.fm-secondmate-home').write_text('mate\n')
+    result, boundary = drain()
+    assert ack(boundary).returncode == 1
+    ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '002.msg')
+    assert ack(boundary).returncode == 0
+    report = ok(code / 'bin/fm-open-loops.sh', '--report').stdout
+    assert 'shipped' in report and row['id'] in report and '7200' in report, report
+
+# Re-presentation is idempotent while an action is still missing. A later turn requires a new action.
+home, ledger, row, call, ok, drain, ack = case('repeat')
+_, boundary = drain()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '003.msg')
+assert ack(boundary).returncode == 0
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: followup"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+_, again = drain()
+assert boundary == again
+assert ack(boundary).returncode == 1, 'old action cannot discharge a later turn'
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'needs intervention')
+assert ack(boundary).returncode == 0
+
+# A collector's long-lived exclusion must not hold up the short publication/receipt boundary.
+import fcntl
+home, ledger, row, call, ok, drain, ack = case('collecting')
+with (home / 'state/.open-loops.lock').open('a') as collecting:
+    fcntl.lockf(collecting, fcntl.LOCK_EX, 1, 0)
+    receipt_env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home), FM_OPEN_LOOPS_NOW=str(now))
+    for key in ('FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+        receipt_env.pop(key, None)
+    presented = subprocess.run([str(code / 'bin/fm-open-loops.sh'), '--present-overdue'],
+                               env=receipt_env, text=True, capture_output=True, timeout=15)
+    assert presented.returncode == 0 and row['id'] in presented.stdout, presented
+
+# A refresh must preserve the receipt boundary, and unreadable sources cannot silently resolve it.
+home, ledger, row, call, ok, drain, ack = case('refresh')
+_, boundary = drain()
+refreshed = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
+assert not refreshed['complete'] and any(r['id'] == row['id'] for r in refreshed['rows']), refreshed
+assert ack(boundary).returncode == 1, 'a degraded sweep cannot erase presented obligations'
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '004.msg')
+sequence = json.loads(ledger.read_text())['handling']['actions'][row['id']]['sequence']
+refreshed = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
+assert refreshed['handling']['actions'][row['id']]['sequence'] == sequence, 'publication must retain action receipts'
+assert ack(boundary).returncode == 0
+
+home, ledger, row, call, ok, drain, ack = case('recheck')
+_, boundary = drain()
+future = dt.datetime.fromtimestamp(now + 600, dt.timezone.utc).isoformat()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'lint active', '--recheck', future)
+assert ack(boundary).returncode == 0
+record = json.loads(ledger.read_text())
+record['handling']['actions'][row['id']]['recheck_epoch'] = now
+ledger.write_text(json.dumps(record))
+assert call(code / 'bin/fm-open-loops.sh', '--check-actions').returncode == 1, 'a due deferral needs renewed followup'
+
+# Empty queue still presents overdue work and requires its action; no overdue work is unchanged.
+home, ledger, row, call, ok, drain, ack = case('no-wake')
+(home / 'state/.wake-queue').write_text('')
+_, boundary = drain()
+assert boundary[0] == '0' and ack(boundary).returncode == 1
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'reported overdue work')
+assert ack(boundary).returncode == 0
+home, ledger, row, call, ok, drain, ack = case('empty', empty=True)
+result, boundary = drain()
+assert 'OVERDUE:' not in result.stdout
+assert ack(boundary).returncode == 0
+assert 'handling' not in json.loads(ledger.read_text()), 'empty presentation need not mutate the ledger'
+print('PASS: refused acknowledgement, four action kinds, second deferral escalation, host and secondmate gates, repeat and empty turns')
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"

@@ -624,10 +624,11 @@ For a non-informational row, an unknown age stays `null` and counts as overdue, 
 | `unanswered_question` | a `needs-decision` or `blocked` status key is still open, or a current captain-held backlog row is in the `live` or `aged` hold bucket | 1800 s |
 | `unhandled_board_answer` | this home's `state/procevent-inbox/*.result` has a `lavish` `.adapter` sibling and no `.handled` sibling; captures from other adapters never appear; firstmate owns routing, the next action names the captured board-answer file and its `.owner-task` value (or an unknown owner), and age comes from the result's mtime regardless of a parked, dead, or missing owner task; a result whose owner task is a current, live `working` task is an informational row owned by `worker:<id>` whose action says that worker holds the round | 300 s |
 | `failed_task` | a task record's current state is `failed` and its deliverable is neither landed nor recorded as dropped | 1800 s |
-| `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row carries the last error-looking line from a bounded pane-tail sample when present, otherwise a no-progress explanation | 3600 s |
+| `stalled_worker` | a live worker reads `working` but has no recent commit, status line, or pipeline progress within its limit; the row names the concrete wait from the worker's active pipeline step, declared status, or bounded pane evidence, its step or declaration age when stamped, and any last error-looking pane line; missing wait evidence is stated explicitly rather than reported as merely busy | 3600 s |
 | `silent_report` | a live direct ship, scout, or secondmate has not reported to this home; excluded reports remain informational with their reason in evidence, and declared waits use the existing long cadence | 900 s |
 | `unlanded_commit` | a ship task's copy holds nonmerge commits absent from the default branch and not represented by its open or merged PR's actual head | 86400 s |
 | `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing | 3600 s |
+| `review_pass_not_merged` | a configured independent review lane recorded PASS for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | one `FM_OPEN_LOOPS_INTERVAL` (600 s by default) |
 | `red_check` | the latest run of a check on an open PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
 | `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
 
@@ -705,7 +706,18 @@ Both durable payloads are identical to their printed wake reasons, including the
 Both interval settings accept positive decimal seconds, including leading zeros; invalid values and all-zero spellings use their defaults.
 Stale-wake cooldown covers one continuous publication outage: a successful atomic ledger publication or a watcher observing a valid fresh regular nonsymlink ledger clears stale suppression, without resetting the unchanged-overdue-set cooldown; fresh corrupt content does not rearm it.
 Notification cooldown markers are committed only after durable wake publication succeeds, so publication failures remain eligible for delivery after repair.
-Acknowledging a wake resolves nothing: a row disappears only when fresh evidence resolves it.
+Drain presents `OVERDUE` before other sections, with every overdue row's id, owner, next action, evidence, and current age.
+`bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no action recorded after its presentation; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
+The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, and optional recheck time and captain-visible mark.
+The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer with its delivery id, a merge with its full PR URL, a captain escalation, or a reasoned deferral with a future recheck time.
+Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible`, and requires steering, merging, or escalation before acknowledgement.
+Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while the first deferral's recheck time is still in the future.
+The existing ledger lock file separates collection exclusion from the short publication/receipt critical section, so a slow source scan cannot delay overdue presentation or action recording, and atomic publication preserves action requirements and receipts rather than overwriting them.
+Receipt writes preserve the ledger's heartbeat modification time, so action recording cannot mask a reconciler that stopped publishing.
+An incomplete collection retains any missing presented rows as stale rather than treating unreadable evidence as completed work.
+An action receipt permits acknowledgement, never resolves the obligation: a row disappears only when fresh delivery evidence resolves it.
+The ledger's `completions` projection lists retained Done backlog items and owned PRs whose merge the forge confirmed.
+Process-event `when` outcomes append this projection and every still-overdue row with its current age after the bounded action output, so scheduled board reports use the same evidence without another list or daemon.
 The human ledger table and both Bearings representations preserve recorded evidence, including bounded pane-tail errors.
 Bearings lists every overdue row on its board and in `fm-bearings.v1` as `open_loops` (JSON and TOON), dated by the ledger's observation time rather than a fresh scan.
 No daemon, automatic worker restart, merge waiver, or CI exemption is introduced.
@@ -721,11 +733,16 @@ Create the optional local `config/open-loops.json` to override the limits:
 ```json
 {
   "age_limits_seconds": { "silent_report": 900, "stalled_worker": 3600, "unlanded_commit": 86400 },
-  "command_timeout_seconds": 60
+  "command_timeout_seconds": 60,
+  "review_lanes": { "owner/repository": ["independent-review"] }
 }
 ```
 
 Age limits are non-negative integer seconds for the categories above.
+`review_lanes` optionally maps case-insensitive GitHub `owner/repository` names to nonempty lists of local review task ids; no project-specific names or verdict sources are hard-coded.
+For each configured lane, the latest logical status event mentioning the exact PR URL must contain `PASS`, the full live head SHA, and a nonfuture numeric `[at=...]` timestamp; a FAIL or REJECTED event, a stale head, or the implementation task's own verdict cannot qualify.
+The reviewed-green age begins at the later of that verdict and the reported checks' completion times, so a PR must be both reviewed and green for one check interval before it is overdue.
+Unreadable review or requirement sources disclose degraded coverage, never a merge-ready verdict.
 `command_timeout_seconds` bounds each source command and accepts integers from 1 through 300; the whole collection is bounded at ten times that.
 On either deadline, cancellation freezes the owned command group while capturing its descendants, then resumes it with termination pending so source cleanup can run.
 It terminates observed descendants in nested groups, gives cleanup a short grace, and kills/reaps leftovers before returning or publishing degraded coverage.

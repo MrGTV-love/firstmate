@@ -24,7 +24,7 @@ DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
     "unhandled_board_answer": 300,
     "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
-    "open_pr": 3600, "red_check": 0, "coverage": 0, "silent_report": 900,
+    "open_pr": 3600, "review_pass_not_merged": 600, "red_check": 0, "coverage": 0, "silent_report": 900,
 }
 CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream dependencies that need resolution. "
                  "Reply through your supervised status/report channel before acknowledging this inbox message; "
@@ -96,6 +96,9 @@ class Collector:
         self.config = Path(os.environ.get("FM_CONFIG_OVERRIDE") or self.home / "config")
         self.projects_dir = Path(os.environ.get("FM_PROJECTS_OVERRIDE") or self.home / "projects")
         self.load_config()
+        self.required = {}
+        self.completions = []
+        self.pipeline_waits = {}
         self.env = dict(os.environ, FM_HOME=str(self.home), FM_STATE_OVERRIDE=str(self.state),
                         FM_DATA_OVERRIDE=str(self.data), FM_CONFIG_OVERRIDE=str(self.config),
                         FM_PROJECTS_OVERRIDE=str(self.projects_dir), FM_SNAPSHOT_NOW_EPOCH=str(now),
@@ -131,10 +134,20 @@ class Collector:
     def load_config(self):
         path = self.config / "open-loops.json"
         config = json.loads(path.read_text()) if path.exists() else {}
-        if not isinstance(config, dict) or set(config) - {"age_limits_seconds", "command_timeout_seconds"}:
-            raise ValueError("open-loops configuration must be an object with only age_limits_seconds"
-                             " and command_timeout_seconds")
+        if not isinstance(config, dict) or set(config) - {"age_limits_seconds", "command_timeout_seconds", "review_lanes"}:
+            raise ValueError("open-loops configuration supports age_limits_seconds, command_timeout_seconds and review_lanes")
+        self.review_lanes = config.get("review_lanes", {})
+        if not isinstance(self.review_lanes, dict) or any(
+                not isinstance(slug, str) or not re.fullmatch(r"[^/\s]+/[^/\s]+", slug)
+                or not isinstance(lanes, list) or not lanes
+                or any(not isinstance(lane, str) or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", lane)
+                       for lane in lanes) for slug, lanes in self.review_lanes.items()):
+            raise ValueError("review_lanes must map owner/repository to nonempty lists of local review task ids")
+        self.review_lanes = {slug.casefold(): lanes for slug, lanes in self.review_lanes.items()}
         self.ages = dict(DEFAULT_AGES)
+        interval = os.environ.get("FM_OPEN_LOOPS_INTERVAL", "")
+        if re.fullmatch(r"[0-9]+", interval) and int(interval) > 0:
+            self.ages["review_pass_not_merged"] = int(interval)
         supplied = config.get("age_limits_seconds", {})
         if not isinstance(supplied, dict) or set(supplied) - set(self.ages):
             raise ValueError("unknown open-loop age category")
@@ -482,6 +495,7 @@ class Collector:
 
     def pipeline_progress(self, worktree):
         """Latest recorded pipeline step time per (project, branch); no store is not a failure."""
+        self.pipeline_waits.clear()
         root = Path(os.environ.get("NM_HOME") or Path.home() / ".no-mistakes")
         if not root.is_absolute():
             if not worktree:
@@ -497,8 +511,12 @@ class Collector:
             fields = [k for k in ("started_at", "round_started_at", "completed_at", "last_activity_at") if k in columns]
             if not fields:
                 raise ValueError("pipeline step progress fields unavailable")
+            step = next((name for name in ("step", "step_name", "name") if name in columns), None)
+            selected = fields + ([step] if step else [])
+            run_status = "status" in {c[1] for c in db.execute("PRAGMA table_info(runs)")}
             query = ("SELECT runs.branch, repos.working_path, runs.created_at, "
-                     + ", ".join("step_results." + f for f in fields)
+                     + ("runs.status AS run_status, " if run_status else "")
+                     + ", ".join("step_results." + f for f in selected)
                      + " FROM runs JOIN repos ON runs.repo_id = repos.id"
                      " LEFT JOIN step_results ON step_results.run_id = runs.id")
             for row in db.execute(query):
@@ -507,6 +525,13 @@ class Collector:
                 valid = [s for s in stamps if s is not None and s <= self.now]
                 if valid:
                     out[key] = max([out[key]] + valid) if key in out else max(valid)
+                started = epoch(row["started_at"]) if "started_at" in fields else None
+                if run_status and row["run_status"] in ("running", "fixing", "pending") \
+                        and step and "completed_at" in fields and row["completed_at"] is None \
+                        and row[step] and started is not None and started <= self.now:
+                    previous = self.pipeline_waits.get(key)
+                    if previous is None or started > previous[1]:
+                        self.pipeline_waits[key] = (row[step], started)
         return out
 
     def stalled(self, task):
@@ -525,8 +550,27 @@ class Collector:
             return
         pane = self.run([BIN / "fm-peek.sh", task["id"], "80"])
         signatures = [line.strip() for line in pane.splitlines() if SIGNATURE.search(line)]
-        self.add("stalled_worker", task["id"], "inspect and recover the stalled-but-alive worker", since,
-                 evidence=signatures[-1][:300] if signatures else "no commit, status line, or pipeline progress")
+        declaration = self.bash('. "$1"; last_status_line "$2"', BIN / "fm-status-event-lib.sh",
+                                self.state / (task["id"] + ".status")).strip()
+        waits = [line.strip() for line in pane.splitlines()
+                 if re.search(r"\b(waiting|awaiting|lint|background job|step)\b", line, re.I)]
+        wait = waits[-1] if waits else declaration
+        if re.fullmatch(r"(?:harness |agent )?busy[.!]?", declaration.split(":", 1)[-1].strip(), re.I) and not waits:
+            wait = ""
+        pipeline_key = (str(Path(task["project"]).resolve()), task["branch"]) \
+            if task.get("project") and task.get("branch") else None
+        active_step = self.pipeline_waits.get(pipeline_key)
+        if active_step:
+            wait = f"pipeline step {active_step[0]}; step age {self.now - active_step[1]}s"
+        age = "unknown age" if since is None else f"{self.now - since}s without progress"
+        evidence = f"{wait or 'worker has not recorded its concrete wait'}; {age}"
+        declared_at = re.search(r"\[at=([0-9]+)\]", declaration.split(":", 1)[0])
+        if declaration and declared_at and int(declared_at[1]) <= self.now:
+            evidence += f"; declaration age {self.now - int(declared_at[1])}s"
+        if signatures:
+            evidence += "; " + signatures[-1]
+        self.add("stalled_worker", task["id"], "follow up on the recorded wait and recover the worker", since,
+                 owner="worker:" + task["id"], evidence=evidence)
 
     def task_worktree(self, task):
         worktree = task["paths"]["worktree"].get("path")
@@ -736,6 +780,66 @@ class Collector:
             statuses.setdefault(status["context"], status)  # newest first
         return list(newest.values()), list(statuses.values())
 
+    def review_pass(self, slug, url, sha, task):
+        for lane in self.review_lanes.get(slug.casefold(), []):
+            if task and lane == task["id"]:
+                continue  # a worker's own PASS is not an independent review
+            path = self.state / (lane + ".status")
+            if not path.exists():
+                continue
+            if path.is_symlink():
+                raise ValueError("review lane status must not be a symbolic link")
+            events = self.bash('. "$1"; while IFS= read -r line || [ -n "$line" ]; do '
+                               'if _fm_status_line_is_event "$line" "$FM_CLASSIFY_CAPTAIN_RE_DEFAULT"; '
+                               'then printf "%s\\n" "$line"; fi; done < "$2"',
+                               BIN / "fm-status-event-lib.sh", path)
+            # Exact URL tokens, not prefix matches on PR numbers.
+            lines = [line for line in events.splitlines()
+                     if any(match[0] == url for match in GITHUB_PR.finditer(line))]
+            if not lines:
+                continue
+            line = lines[-1]
+            if not re.search(r"\bPASS\b", line) or re.search(r"\b(?:FAIL|REJECTED)\b", line):
+                continue
+            if not re.search(r"(?<![0-9a-f])" + re.escape(sha) + r"(?![0-9a-f])", line):
+                continue
+            stamp = re.search(r"\[at=([0-9]+)\]", line.split(":", 1)[0])
+            if not stamp or int(stamp[1]) > self.now:
+                continue
+            return int(stamp[1]), lane
+        return None
+
+    def required_checks_green(self, slug, pr, checks, statuses):
+        base = pr["base"]["ref"]
+        key = (slug, base)
+        if key not in self.required:
+            from urllib.parse import quote
+            branch = quote(base, safe="")
+            summary = self.forge(f"/repos/{slug}/branches/{branch}")[0]
+            requirements = []
+            if summary["protected"]:
+                protection = summary["protection"]["required_status_checks"]
+                requirements += [(r["context"], r.get("app_id")) for r in protection.get("checks", [])]
+                requirements += [(context, None) for context in protection.get("contexts", [])]
+            for rule in self.forge(f"/repos/{slug}/rules/branches/{branch}"):
+                if rule["type"] == "required_status_checks":
+                    requirements += [(r["context"], r.get("integration_id"))
+                                     for r in rule["parameters"]["required_status_checks"]]
+            self.required[key] = [(name, None if app == -1 else app) for name, app in requirements]
+        # Match app-bound requirements to the actual producer; missing checks never count as green.
+        for name, app in self.required[key]:
+            runs = [c for c in checks if c.get("name") == name and
+                    (app is None or c.get("app", {}).get("id") == app)]
+            contexts = [s for s in statuses if s.get("context") == name]
+            if not runs and not contexts:
+                return False
+            if any(c.get("status") != "completed" or c.get("conclusion") not in
+                   ("success", "neutral", "skipped") for c in runs):
+                return False
+            if any(s.get("state") != "success" for s in contexts):
+                return False
+        return True
+
     def pr_row(self, slug, pr):
         url, sha = pr["html_url"], pr["head"]["sha"]
         task = next((t for t in self.tasks if t["pr"].get("url") == url), None)
@@ -751,6 +855,16 @@ class Collector:
             return
         pending = (not checks and not statuses) or any(c.get("status") != "completed" for c in checks) \
             or any(s["state"] == "pending" for s in statuses)
+        review = self.review_pass(slug, url, sha, task)
+        green = not pending and all(c.get("conclusion") in ("success", "neutral", "skipped") for c in checks) \
+            and all(s.get("state") == "success" for s in statuses)
+        if review and green and not pr.get("draft") and self.required_checks_green(slug, pr, checks, statuses):
+            finished = [epoch(c.get("completed_at")) for c in checks] \
+                + [epoch(s.get("updated_at") or s.get("created_at")) for s in statuses]
+            since = max([review[0]] + [stamp for stamp in finished if stamp is not None])
+            self.add("review_pass_not_merged", url, "merge with existing authority or escalate for approval", since,
+                     evidence=f"independent review PASS by {review[1]} at live head {sha}; required checks green")
+            return
         if pr.get("draft"):
             owner, action = worker, "finish the PR and mark it ready"
         elif pending:
@@ -839,6 +953,15 @@ class Collector:
         except SOURCE_ERRORS:
             return False
 
+    def completion_rows(self):
+        completed = {r["id"]: dict(subject=r["id"], evidence=r.get("title") or "backlog item completed")
+                     for r in self.backlog if r.get("state") == "done"}
+        for url in sorted(self.owned_urls):
+            pr = self.pr_state(url)
+            if pr and pr.get("merged_at"):
+                completed[url] = dict(subject=url, evidence="merged " + pr["merged_at"])
+        self.completions = list(completed.values())
+
     # -- run -------------------------------------------------------------------------------------
 
     def collect(self):
@@ -853,6 +976,7 @@ class Collector:
         self.source("report silence", self.silent_reports)
         self.source("questions", self.question_rows)
         self.source("board answers", self.board_answer_rows)
+        self.source("completions", self.completion_rows)
         if self.degraded:
             self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                      None, evidence="; ".join(self.degraded))
@@ -878,6 +1002,7 @@ class Collector:
                      None, evidence=reason)
             return
         self.stale_generated = previous["generated_epoch"]
+        self.completions = previous.get("completions", [])
         for row in previous["rows"]:
             if isinstance(row, dict) and isinstance(row.get("id"), str) and row.get("subject") != "ledger stale":
                 self.rows[row["id"]] = dict(row, stale=True)
@@ -887,7 +1012,8 @@ class Collector:
     def result(self):
         rows = sorted(self.rows.values(), key=lambda r: (r["category"], r["subject"]))
         report = dict(schema="fm-open-loops.v1", generated_epoch=self.stale_generated or self.now,
-                      home=str(self.home), complete=not self.degraded and not self.stale_reason, rows=rows)
+                      home=str(self.home), complete=not self.degraded and not self.stale_reason,
+                      rows=rows, completions=self.completions)
         if self.stale_reason:
             report.update(stale=True, stale_reason=self.stale_reason,
                           stale_until_epoch=self.quota_reset())
@@ -895,23 +1021,38 @@ class Collector:
 
     def publish(self):
         self.state.mkdir(parents=True, exist_ok=True)
+        lock_fd = os.open(self.state / ".open-loops.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        try:
+            fcntl.lockf(lock_fd, fcntl.LOCK_EX, 1, 1)
+            return self.publish_locked()
+        finally:
+            os.close(lock_fd)
+
+    def publish_locked(self):
         target = self.state / "open-loops.json"
         if target.is_symlink():
             raise ValueError("open-loop ledger must not be a symbolic link")
         report = self.result()
-        fd, temp = tempfile.mkstemp(prefix=".open-loops-", dir=self.state)
+        previous = read_ledger(self.state)
+        if previous and "handling" in previous:
+            report["handling"] = previous["handling"]
+            if not report["complete"]:
+                current = {row["id"] for row in report["rows"]}
+                presented = {ident for actor in report["handling"]["presentations"].values() for ident in actor}
+                for row in previous["rows"]:
+                    if row["id"] in presented and row["id"] not in current:
+                        retained = dict(row, stale=True)
+                        if retained.get("age_seconds") is not None:
+                            retained["age_seconds"] += max(0, self.now - previous["generated_epoch"])
+                        report["rows"].append(retained)
+            for row in report["rows"]:
+                if report["handling"]["actions"].get(row["id"], {}).get("captain_visible"):
+                    row["captain_visible"] = True
+        write_ledger(self.state, report)
         try:
-            with os.fdopen(fd, "w") as stream:
-                json.dump(report, stream)
-                stream.write("\n")
-            os.replace(temp, target)
-            try:
-                (self.state / ".open-loops-stale-surfaced").unlink()
-            except FileNotFoundError:
-                pass
-        finally:
-            if os.path.exists(temp):
-                os.unlink(temp)
+            (self.state / ".open-loops-stale-surfaced").unlink()
+        except FileNotFoundError:
+            pass
         return report
 
 
@@ -929,6 +1070,152 @@ def render(report):
     return "\n".join(lines)
 
 
+def read_ledger(state):
+    path = state / "open-loops.json"
+    if path.is_symlink():
+        raise ValueError("open-loop ledger must not be a symbolic link")
+    if not path.exists():
+        return None
+    report = json.loads(path.read_text())
+    if not isinstance(report, dict) or report.get("schema") != "fm-open-loops.v1" \
+            or not isinstance(report.get("rows"), list):
+        raise ValueError("unsupported open-loop ledger")
+    return report
+
+
+def write_ledger(state, report, receipt=False):
+    target = state / "open-loops.json"
+    if target.is_symlink():
+        raise ValueError("open-loop ledger must not be a symbolic link")
+    publication = target.stat() if receipt else None
+    fd, temp = tempfile.mkstemp(prefix=".open-loops-", dir=state)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            json.dump(report, stream)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        if publication is not None:
+            # The watcher dates reconciler freshness from the heartbeat's mtime;
+            # recording an action must not conceal a stopped collector.
+            os.utime(temp, ns=(publication.st_atime_ns, publication.st_mtime_ns))
+        os.replace(temp, target)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+def overdue_rows(report, now):
+    rows = []
+    for original in report.get("rows", []):
+        row = dict(original)
+        age = row.get("age_seconds")
+        if age is not None:
+            row["age_seconds"] = age + max(0, now - report["generated_epoch"])
+        if not row.get("informational") and (age is None or row["age_seconds"] >= row["limit_seconds"]):
+            rows.append(row)
+    return rows
+
+
+def render_overdue(rows):
+    fields = ["id", "owner", "subject", "next_action", "age_seconds", "evidence", "captain_visible"]
+    lines = ["OVERDUE:", f"rows[{len(rows)}]{{{','.join(fields)}}}:"]
+    lines += ["  " + ",".join(json.dumps(r.get(f), ensure_ascii=False) for f in fields) for r in rows]
+    return "\n".join(lines)
+
+
+def ledger_action(args, state, now):
+    """Receipts and per-actor presentations share the ledger's short publication lock range."""
+    report = read_ledger(state)
+    if report is None:
+        if args.command == "action":
+            raise ValueError("no published ledger; run bin/fm-open-loops.sh --heartbeat first")
+        return 0
+    if args.present_overdue and not overdue_rows(report, now):
+        return 0
+    controls = report.setdefault("handling", dict(sequence=0, presentations={}, actions={}))
+    actor = os.environ.get("FM_SUPERVISION_ACTOR") or "main"
+    if actor not in ("main", "branch"):
+        raise ValueError("unknown supervision actor")
+    rows = overdue_rows(report, now)
+    by_id = {r["id"]: r for r in rows}
+    actions = controls["actions"]
+    for row in rows:
+        row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
+    pending = controls["presentations"].setdefault(actor, {})
+    if args.present_overdue:
+        for row in rows:
+            ident = row["id"]
+            action = actions.get(ident, {})
+            deferred = action.get("kind") == "deferred" and action.get("recheck_epoch", 0) > now \
+                and not action.get("captain_visible")
+            if not deferred and (ident not in pending or action.get("sequence", 0) > pending[ident]):
+                pending[ident] = controls["sequence"]
+        write_ledger(state, report, receipt=True)
+        if rows:
+            print(render_overdue(rows))
+            print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred>"
+                  " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]")
+        return 0
+    if args.check_actions:
+        missing = [by_id[ident] for ident, presented in pending.items()
+                   if ident in by_id and (actions.get(ident, {}).get("sequence", 0) <= presented
+                       or (actions.get(ident, {}).get("kind") == "deferred"
+                           and actions[ident].get("recheck_epoch", 0) <= now))]
+        if missing:
+            print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
+            print(render_overdue(missing))
+            return 1
+        return 0
+    if args.report:
+        print(f"generated_epoch: {report['generated_epoch']}")
+        print("complete: " + str(report.get("complete", False)).lower())
+        completed = report.get("completions", [])
+        print(f"COMPLETIONS[{len(completed)}]{{subject,evidence}}:")
+        for completion in completed:
+            print("  " + ",".join(json.dumps(completion.get(f), ensure_ascii=False)
+                                  for f in ("subject", "evidence")))
+        print(render_overdue(rows) if rows else "OVERDUE: none")
+        return 0
+    if args.row_id not in by_id:
+        raise ValueError("row is not currently overdue in the published ledger")
+    ident = args.row_id
+    if not any(ident in presented for presented in controls["presentations"].values()):
+        raise ValueError("row has not been presented; run bin/fm-wake-drain.sh first")
+    old = actions.get(ident, {})
+    if not args.evidence or not args.evidence.strip():
+        raise ValueError("--evidence is required for every action")
+    if args.kind == "merged" and not GITHUB_PR.fullmatch(args.evidence):
+        raise ValueError("merged evidence must be the full GitHub PR URL")
+    recheck = epoch(args.recheck)
+    if args.kind == "deferred":
+        if old.get("deferrals", 0):
+            old["captain_visible"] = True
+            actions[ident] = old
+            for row in report["rows"]:
+                if row["id"] == ident:
+                    row["captain_visible"] = True
+            # Reopen the requirement even if the first deferral had already cleared this presentation.
+            for presented in controls["presentations"].values():
+                if ident in presented:
+                    presented[ident] = controls["sequence"]
+            write_ledger(state, report, receipt=True)
+            raise ValueError("second deferral refused; row is captain-visible; steer, merge or escalate it")
+        if recheck is None or recheck <= now:
+            raise ValueError("deferral requires --recheck at a future UTC time")
+    elif args.recheck:
+        raise ValueError("--recheck is only valid for deferred actions")
+    controls["sequence"] += 1
+    actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
+                         sequence=controls["sequence"], deferrals=old.get("deferrals", 0)
+                         + int(args.kind == "deferred"), captain_visible=old.get("captain_visible", False))
+    if recheck is not None:
+        actions[ident]["recheck_epoch"] = recheck
+    write_ledger(state, report, receipt=True)
+    print("action: " + json.dumps(ident) + "\nkind: " + args.kind)
+    return 0
+
+
 class CliParser(argparse.ArgumentParser):
     def error(self, message):
         print("error: " + json.dumps(message))
@@ -940,7 +1227,22 @@ def main():
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--heartbeat", action="store_true", help="publish state/open-loops.json")
     parser.add_argument("--check-in", metavar="TASK_ID", help="send one inbox check-in for an overdue silent report")
+    modes = parser.add_mutually_exclusive_group()
+    modes.add_argument("--present-overdue", action="store_true", help="present and require actions before wake acknowledgement")
+    modes.add_argument("--check-actions", action="store_true", help="refuse acknowledgement with unactioned presented rows")
+    modes.add_argument("--report", action="store_true", help="report published completions and all overdue ages without collecting")
+    commands = parser.add_subparsers(dest="command")
+    action = commands.add_parser("action", help="record an action on a presented overdue row")
+    action.add_argument("row_id")
+    action.add_argument("kind", choices=("steered", "merged", "escalated", "deferred"))
+    action.add_argument("--evidence", required=True, help="fm-send delivery id, PR URL, escalation or deferral reason")
+    action.add_argument("--recheck", help="future UTC ISO time (deferral only)")
     args = parser.parse_args()
+    receipt_mode = args.command == "action" or args.present_overdue or args.check_actions or args.report
+    if args.command == "action" and (args.present_overdue or args.check_actions or args.report):
+        parser.error("action cannot be combined with presentation, acknowledgement or report modes")
+    if receipt_mode and (args.heartbeat or args.json or args.check_in):
+        parser.error("receipt and report commands cannot collect or publish a heartbeat")
     if args.check_in and not os.environ.get("FM_HOME"):
         print('error: "FM_HOME is required for a check-in"')
         return 1
@@ -949,12 +1251,17 @@ def main():
         lock_dir = Path(os.environ.get("FM_STATE_OVERRIDE") or home / "state").resolve()
         lock_dir.mkdir(parents=True, exist_ok=True)
         lock_fd = os.open(lock_dir / ".open-loops.lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        now = int(os.environ.get("FM_OPEN_LOOPS_NOW", time.time()))
+        if receipt_mode:
+            # Byte 0 excludes concurrent collections; byte 1 serializes only
+            # atomic publication and receipts on the same existing lock file.
+            fcntl.lockf(lock_fd, fcntl.LOCK_EX, 1, 1)
+            return ledger_action(args, lock_dir, now)
         try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX | (fcntl.LOCK_NB if args.heartbeat else 0))
-        except BlockingIOError:
+            fcntl.lockf(lock_fd, fcntl.LOCK_EX | (fcntl.LOCK_NB if args.heartbeat else 0), 1, 0)
+        except (BlockingIOError, PermissionError):
             os.close(lock_fd)
             return 0
-        now = int(os.environ.get("FM_OPEN_LOOPS_NOW", time.time()))
         collector = Collector(home, now)
     except (OSError, ValueError) as error:
         print("error: " + json.dumps(str(error)))
