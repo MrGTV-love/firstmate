@@ -2083,7 +2083,8 @@ The service uses the canonical shared Jev client, pinned to the calibrated model
 It resolves the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its installation's client is first constructed; no key is exported to the worker environment or placed in configuration, new credential files or command arguments.
 omp reuses that client and key for the installation, while Claude constructs one per hook process; missing credentials do not create a successful client snapshot.
 The client retains its existing retry behavior and has a 10-second total request budget, including retries and response bodies.
-Both event handlers have a shared 25-second cancellation budget; the documented native tool-call and Claude hook deadlines remain 30 seconds.
+Both event handlers have a shared 25-second cancellation budget; the native tool-call deadline remains 30 seconds.
+Claude's host hook envelope uses `fm-duration.py limit` with a 30-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
 While active, required pre-tool judgments that fail, exceed the request bound, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
@@ -2120,7 +2121,8 @@ The wrapper therefore resolves the key at call time through the shared [TypeSafe
 The wrapper does not copy the key into Claude's environment, a new credential file, the Keychain, plugin options, or argv.
 Inherited TypeSafe credentials, `JEV_BASE_URL`, `JEV_MODEL`, `JEV_API_KEY`, and the plugin option copy of the key are scrubbed before external commands and direct executable launch, so nothing ambient can redirect the key or change the model pin.
 Every other published default is kept: threshold 0.7, decision log off, shadow mode off, model `jev-1.13.0`.
-The shared timeout runner bounds the wrapper's preflight and upstream process group to 20 seconds plus a 0.2-second termination grace, regardless of `JEV_BELAY_TIMEOUT_MS`, leaving time to publish completion before Claude's 25-second Stop deadline.
+The shared timeout runner bounds the wrapper's preflight and upstream process group to 20 seconds plus a 0.2-second termination grace, regardless of `JEV_BELAY_TIMEOUT_MS`, leaving time to publish completion before Claude's Stop deadline.
+The Stop host envelope uses `fm-duration.py limit` with a 25-second fallback and the same raise-only calibrated p99 x 3 policy.
 
 The wrapper launches Node with `--import` for [`bin/fm-jev-belay-policy.mjs`](../bin/fm-jev-belay-policy.mjs), leaving the pinned upstream `belay.mjs` unchanged.
 Before each actual outgoing JSON request, the preload checks the task, final message, and verification checks through the existing `fm_typesafe_permitted` dispatch-never-send policy rather than relying on the incoming Stop payload.

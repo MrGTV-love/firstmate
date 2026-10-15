@@ -770,6 +770,7 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+# shellcheck source=bin/fm-task-inbox-lib.sh
 . "$SCRIPT_DIR/fm-task-inbox-lib.sh"
 
 resolve_directory_input() {
@@ -5738,8 +5739,11 @@ BUSY_GEN=
     guard_entries=
     if [ "$KIND" != secondmate ]; then
     j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data") $(shell_quote "$guard_project") $(shell_quote "$guard_policy")")
-      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Bash|Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":30}]}],\"PostToolUse\":[{\"matcher\":\"^(Bash|Read)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":30}]}],"
-      submit_entries="$submit_entries,{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":30}"
+      # Resolve host envelopes through the duration owner, retaining the existing
+      # fallback above the guard handler's own deadline.
+      j_guard_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-guard.claude-hook --fallback 30 --percentile 99 --margin 3) || exit 1
+      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Bash|Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],\"PostToolUse\":[{\"matcher\":\"^(Bash|Read)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
+      submit_entries="$submit_entries,{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}"
     fi
     stop_entry=
     if [ "$KIND" = secondmate ] && grep -qF '.fm-busy-stop' "$WT/bin/fm-turnend-guard.sh" 2>/dev/null; then
@@ -5760,7 +5764,8 @@ BUSY_GEN=
       else
     j_stop=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guard_config") $(shell_quote "$FM_ROOT/bin/fm-jev-belay-hook.sh"); belay_status=\$?; [ \"\$belay_status\" -ne 2 ] || exit 2; touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
       fi
-      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\",\"timeout\":25}]}],"
+      j_stop_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-belay.claude-stop --fallback 25 --percentile 99 --margin 3) || exit 1
+      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\",\"timeout\":$j_stop_limit}]}],"
     fi
     hooks_json="\"hooks\":{${guard_entries}\"UserPromptSubmit\":[{\"hooks\":[${submit_entries}]}],${stop_entry}\"StopFailure\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stopfail\"}]}],\"SessionEnd\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_sessionend\"}]}]}"
     if [ "$KIND" = secondmate ]; then
