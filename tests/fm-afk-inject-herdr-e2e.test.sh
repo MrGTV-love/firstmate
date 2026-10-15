@@ -273,6 +273,9 @@ wait_daemon_started() {
 # The fixture pane is no real harness; pinning "unknown" keeps the typed U+2063
 # envelope whatever harness runs this test (a claude ancestry would select the
 # record-backed doorbell, which tests/fm-afk-inject-e2e.test.sh covers).
+# The host's open-work ledger is no input to these injection scenarios: a
+# no-op collector keeps its overdue rows (which the daemon escalates as their
+# own digest) out of the one-digest assertions.
 start_daemon() {
   local log_start=0
   [ ! -f "$STATE_DIR/.supervise-daemon.log" ] || log_start=$(wc -l < "$STATE_DIR/.supervise-daemon.log")
@@ -288,6 +291,7 @@ start_daemon() {
   FM_SIGNAL_GRACE=1 \
   FM_HEARTBEAT=999999 \
   FM_CHECK_INTERVAL=999999 \
+  FM_OPEN_LOOPS_BIN="$(command -v true)" \
   FM_INJECT_CONFIRM_SLEEP=0.5 \
   FM_INJECT_CONFIRM_RETRIES=6 \
   FM_STALE_ESCALATE_SECS=999999 \
