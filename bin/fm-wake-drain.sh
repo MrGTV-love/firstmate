@@ -6,6 +6,9 @@
 # newer branch outcome, OPEN DECISIONS, captain-call record divergence, and on
 # a supervision-host home the supervision session's new and unprocessed
 # outcomes (BRANCH OUTCOMES), then assert liveness.
+# Overdue open-work rows (OVERDUE, STANDING) are presented first, and
+# acknowledgement refuses while a presented row lacks an action receipt;
+# docs/configuration.md "Open-work ledger" owns that gate.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.
