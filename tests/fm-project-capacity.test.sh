@@ -1672,6 +1672,57 @@ test_locked_base_refresh_needs_no_network_once_the_base_is_fetched() {
   pass 'the locked base refresh uses the fetched commit and needs no network'
 }
 
+# While a spawn waits for the project lock, another fetch may move the shared
+# origin refs past the tip the spawn fetched earlier, and may record a different
+# remote default branch. The spawn still starts its worker from its own
+# validated tip, but never rewinds origin/main or overwrites origin/HEAD.
+test_queued_spawn_never_rewinds_newer_shared_origin_refs() {
+  local case_dir home rc=0 newer
+  queue_spawn_behind_a_holder stale-prefetch-newer-ref task-n
+  case_dir=$QUEUED_CASE
+  home="$case_dir/home"
+  git -C "$case_dir/project" cat-file -e "$QUEUED_TIP^{commit}" 2>/dev/null \
+    || { : > "$case_dir/release"; wait "$QUEUED_HOLDER" || true; wait "$QUEUED_ACTOR" || true; fail 'the queued spawn had not fetched origin base before it queued'; }
+  git -C "$case_dir/upstream" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m 'newer upstream work'
+  newer=$(git -C "$case_dir/upstream" rev-parse HEAD)
+  git -C "$case_dir/upstream" push -q origin HEAD:main
+  git -C "$case_dir/project" fetch --quiet origin
+  git -C "$case_dir/project" update-ref refs/remotes/origin/trunk "$newer"
+  git -C "$case_dir/project" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/trunk
+  assert_equals "$newer" "$(git -C "$case_dir/project" rev-parse refs/remotes/origin/main)" 'the fixture did not advance the shared ref'
+  : > "$case_dir/release"
+  wait "$QUEUED_HOLDER" || fail 'the project holder could not release'
+  wait "$QUEUED_ACTOR" || rc=$?
+  expect_code 0 "$rc" "the spawn must finish once the lock frees: $(cat "$case_dir/spawn.out")"
+  assert_equals "$QUEUED_TIP" "$(git -C "$case_dir/wt-task-n" rev-parse HEAD)" 'the worker did not start from its own fetched tip'
+  assert_equals "$newer" "$(git -C "$case_dir/project" rev-parse refs/remotes/origin/main)" 'the spawn rewound a newer shared origin/main'
+  assert_equals refs/remotes/origin/trunk "$(git -C "$case_dir/project" symbolic-ref refs/remotes/origin/HEAD)" \
+    'the spawn overwrote a newer origin/HEAD observation'
+  pass 'a queued spawn starts from its own fetched tip without rewinding newer shared origin refs'
+}
+
+# Task ids may contain characters Git refuses in ref names; a scout needs no
+# branch, so such ids launch. The private base ref is named from a hash, so
+# they still launch and leave no ref behind.
+test_spawn_ids_that_are_not_ref_names_still_launch() {
+  local case_dir home id rc tip
+  case_dir=$(make_case ref-unsafe-ids build..2 fix.lock step.)
+  home="$case_dir/home"
+  tip=$(git -C "$case_dir/project.origin.git" rev-parse main)
+  for id in build..2 fix.lock step.; do
+    ! git check-ref-format "refs/fm/spawn-base/$id" || fail "fixture id $id is a valid ref name"
+    git -C "$case_dir/project" worktree add --quiet --detach "$case_dir/wt-$id"
+    rc=0
+    run_spawn "$case_dir" "$home" "$case_dir/wt-$id" "$id" "$case_dir/project" --scout > "$case_dir/spawn-$id.out" 2>&1 || rc=$?
+    expect_code 0 "$rc" "task $id must launch: $(cat "$case_dir/spawn-$id.out")"
+    assert_present "$home/state/$id.meta" "task $id did not publish its record"
+    assert_equals "$tip" "$(git -C "$case_dir/wt-$id" rev-parse HEAD)" "task $id did not start from the fetched tip"
+  done
+  [ -z "$(git -C "$case_dir/project" for-each-ref 'refs/fm/spawn-base/')" ] \
+    || fail 'a launched spawn left its private base ref behind'
+  pass 'task ids that are not ref names still launch and clean up their private base refs'
+}
+
 test_fresh_same_id_spawn_cannot_cycle_with_slow_teardown() {
   local case_dir home slot lock actor holder spawner i queued ticket rc next
   case_dir=$(make_case same-id-spawn-cycle)
@@ -1788,6 +1839,8 @@ SH
 
 test_fresh_spawn_fetches_its_base_before_it_queues_for_the_project_lock
 test_locked_base_refresh_needs_no_network_once_the_base_is_fetched
+test_queued_spawn_never_rewinds_newer_shared_origin_refs
+test_spawn_ids_that_are_not_ref_names_still_launch
 test_undeclared_capacity_keeps_dispatch_uncapped
 test_available_capacity_admits_the_worker
 test_exhausted_capacity_defers_without_leaving_anything_behind

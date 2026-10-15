@@ -218,10 +218,14 @@
 #   the next spawn's claim replaces it.
 #   Before it queues for that lock, a fresh spawn discovers origin's default
 #   branch and fetches its tip, so no network call runs inside project custody.
-#   The tip lands in a ref private to the task (refs/fm/spawn-base/<id>), never
+#   The tip lands in a ref private to this spawn process
+#   (refs/fm/spawn-base/<hash of the id>-<pid>, valid for every task id), never
 #   in a shared remote-tracking ref or FETCH_HEAD, so concurrent fetches cannot
 #   race it. Under the lock the base refresh validates that immutable commit in
-#   the slot's own object store, records origin's refs locally and resets to it.
+#   the slot's own object store and resets to it. It moves the shared
+#   origin/<default> ref only forward by compare-and-set and creates
+#   origin/HEAD only when it is missing or dangling, so a newer value another
+#   fetch wrote while this spawn waited is never rewound.
 #   The base is therefore the tip this spawn itself fetched before it queued, at
 #   most its own queue wait old; a fetch failure still refuses, at the refresh's
 #   own position. A slot that does not share the project's objects (a sibling
@@ -4043,7 +4047,7 @@ spawn_fetch_base_evidence() {
     fi
     SPAWN_BASE_DISCOVERED=1
   fi
-  SPAWN_BASE_REF="refs/fm/spawn-base/$ID"
+  SPAWN_BASE_REF="refs/fm/spawn-base/$(printf '%s' "$ID" | git hash-object --stdin)-${BASHPID:-$$}"
   if ! GIT_TERMINAL_PROMPT=0 git -C "$PROJ_ABS" fetch --quiet --no-write-fetch-head --refmap= origin \
       "+refs/heads/$default:$SPAWN_BASE_REF" </dev/null >/dev/null 2>&1; then
     SPAWN_BASE_ERROR="could not fetch 'origin/$default'"
@@ -4393,8 +4397,21 @@ EOF
   printf '%s' "$lines" >&2
 }
 
+# Record a tip this spawn fetched before it queued, only forward and only by
+# compare-and-set: another fetch may have moved the shared ref past it while
+# the spawn waited, and a newer or unrelated value is never rewound.
+spawn_advance_origin_ref() { # <worktree> <ref> <sha>
+  local worktree=$1 ref=$2 sha=$3 current
+  current=$(git -C "$worktree" rev-parse --verify --quiet "$ref" 2>/dev/null || true)
+  if [ -z "$current" ]; then
+    git -C "$worktree" update-ref "$ref" "$sha" "" 2>/dev/null || true
+  elif [ "$current" != "$sha" ] && git -C "$worktree" merge-base --is-ancestor "$current" "$sha" 2>/dev/null; then
+    git -C "$worktree" update-ref "$ref" "$sha" "$current" 2>/dev/null || true
+  fi
+}
+
 freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
-  local worktree=$1 base=${2:-} default target expected actual status
+  local worktree=$1 base=${2:-} default target expected actual status current
   status=$(git -C "$worktree" -c core.quotePath=false status --porcelain) || {
     echo "error: could not inspect pooled worktree '$worktree' before refreshing its base" >&2
     return 1
@@ -4423,14 +4440,12 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     default=$SPAWN_BASE_DEFAULT
     target="origin/$default"
     expected=$SPAWN_BASE_SHA
-    if ! git -C "$worktree" update-ref "refs/remotes/origin/$default" "$expected"; then
-      echo "error: could not record '$target' for pooled worktree '$worktree'; refusing to launch" >&2
-      return 1
-    fi
-    if [ "$SPAWN_BASE_DISCOVERED" = 1 ] &&
-      ! git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default"; then
-      echo "error: could not record origin's default branch '$default' for pooled worktree '$worktree'; refusing to launch" >&2
-      return 1
+    spawn_advance_origin_ref "$worktree" "refs/remotes/origin/$default" "$expected"
+    if [ "$SPAWN_BASE_DISCOVERED" = 1 ]; then
+      current=$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)
+      if [ -z "$current" ] || ! git -C "$worktree" rev-parse --verify --quiet "$current" >/dev/null 2>&1; then
+        git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default" 2>/dev/null || true
+      fi
     fi
   else
     if ! git -C "$worktree" fetch --quiet origin; then
