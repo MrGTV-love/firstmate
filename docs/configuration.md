@@ -764,6 +764,8 @@ The command syntax and required delivery marker are owned by [`bin/fm-open-loops
 Every wait has a concrete recheck within 24 hours; its `waits` proof history prevents renewing an unchanged binding, and task-delivery citations cannot be reused for that obligation.
 Presentation and acknowledgement both reverify the bound local sources, including shared waits first presented by the other actor, so an answer, release, changed evidence, replaced task or stream, unavailable source, missing delivery, or due recheck restores the action requirement even before another collector publication.
 Changed observed PR heads and published obligation evidence also invalidate the wait; receipt commands make no new forge call, so remote changes become known through the normal collector refresh.
+Routed-task reconciliation selects `FM_CREW_STATE_NO_FORGE=1`, including the shared ship-completion proof used by status-log and run-monitoring paths: recorded local proof remains usable, but an unrecorded Gerrit publication requiring a live patch-set query stays blocked and cannot sustain a wait.
+Outside that local-only mode, ordinary forge-backed completion verification is unchanged.
 Waits on another waiting row are refused, preventing circular receipt cover, and the prerequisite's own independent action requirement remains intact.
 Rows collected before source identities existed require a normal refresh before a wait can be recorded; no live receipt migration or ownership rewrite is implied.
 If wait provenance cannot be read, an independently confirmed question, PR, or unlanded commit remains an obligation under the normal age limits without usable wait provenance; collection discloses the failed source and continues with later streams.

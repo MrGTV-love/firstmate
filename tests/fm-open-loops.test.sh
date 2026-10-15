@@ -2297,7 +2297,10 @@ if args in (['axi'], ['axi','status'], ['axi','status','--run','01WAIT']):
     if path.exists(): print(path.read_text())
 elif args[:2] == ['daemon','status']:
     pass
-elif args[:1] != ['runs']:
+elif args[:1] == ['runs']:
+    path=Path(os.environ['FM_HOME'])/'runs.txt'
+    if path.exists(): print(path.read_text())
+else:
     raise AssertionError(args)
 ''')
 # Only worker observation and the forge are doubled; holds use the real canonical backlog parser.
@@ -2499,6 +2502,79 @@ assert repair_status.read_text()==working
 refused=ack(boundary)
 assert refused.returncode==1 and obligation['id'] in refused.stdout,refused
 assert obligation['id'] in ok(loops,'--present-overdue').stdout
+
+gerrit='https://gerrit.example/c/test/project/+/140'
+gerrit_meta=repair_meta.replace('kind=scout','kind=ship')+'mode=direct-PR\n'
+forge_calls=home/'gerrit-requests.jsonl'
+executable(fake/'gerrit-axi', '''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+home=Path(os.environ['FM_HOME'])
+with (home/'gerrit-requests.jsonl').open('a') as log:
+    log.write(json.dumps(sys.argv[1:])+'\\n')
+assert sys.argv[1:]==['show','140','--host','gerrit.example','--json'],sys.argv
+print((home/'gerrit.json').read_text())
+''')
+(home/'gerrit.json').write_text(json.dumps({'ok':True,'changes':[{'change':140,'revision':repair_head}]}))
+for route in ('status-log','full-run','coarse-run'):
+    ledger.unlink()
+    repair.write_text(gerrit_meta)
+    repair_activity('idle')
+    if route=='status-log':
+        run_file.unlink()
+    else:
+        run_state('running')
+        if route=='coarse-run':
+            run_file.write_text(run_file.read_text().replace('branch: fm/repair-owner','branch: fm/another'))
+            (home/'runs.txt').write_text(f'  running  fm/repair-owner {repair_head}  2026-10-15 12:00\n')
+    completed=f'done [at={now}]: PR {gerrit} published for review'+(
+        '; checks green\n' if route!='status-log' else '\n')
+    repair_status.write_text(completed)
+    report=publish(); obligation=row(report,'held-job:ci-control'); boundary=drain()
+    message.write_text('schema=fm-task-inbox.v1\nat='+iso(now)+'\n--\nopen-loop-row: '+obligation['id']+'\n')
+    forge_calls.write_text('')
+    env['FM_CREW_STATE_NO_FORGE']='1'
+    state=ok(code/'bin/fm-crew-state.sh','repair-owner').stdout
+    assert state.startswith('state: blocked '),(route,state)
+    assert forge_calls.read_text()=='',(route,'local completion queried the forge')
+    env.pop('FM_CREW_STATE_NO_FORGE')
+    refused=call(loops,'action',obligation['id'],'waiting','--evidence','001.msg',
+                 '--prerequisite-task','repair-owner','--recheck',iso(now+600))
+    assert refused.returncode==1 and obligation['id'] not in json.loads(ledger.read_text())['handling']['actions'],(route,refused)
+    assert forge_calls.read_text()=='',(route,'receipt admission queried the forge')
+    state=ok(code/'bin/fm-crew-state.sh','repair-owner').stdout
+    assert state.startswith('state: done '),(route,state)
+    assert [json.loads(line) for line in forge_calls.read_text().splitlines()]==[
+        ['show','140','--host','gerrit.example','--json']],route
+    forge_calls.write_text('')
+    repair.write_text(gerrit_meta+'pr='+gerrit+'\n')
+    env['FM_CREW_STATE_NO_FORGE']='1'
+    state=ok(code/'bin/fm-crew-state.sh','repair-owner').stdout
+    assert state.startswith('state: done '),(route,state)
+    assert forge_calls.read_text()=='',(route,'recorded completion queried the forge')
+    env.pop('FM_CREW_STATE_NO_FORGE')
+    repair.write_text(gerrit_meta)
+    repair_status.write_text(working); repair_activity('busy')
+    state=ok(code/'bin/fm-crew-state.sh','repair-owner').stdout
+    expected_source='pane' if route=='status-log' else 'run-step'
+    assert state.startswith(f'state: working · source: {expected_source} ·'),(route,state)
+    action(obligation['id'],'waiting','001.msg','--prerequisite-task','repair-owner','--recheck',iso(now+600))
+    assert ack(boundary).returncode==0,route
+    boundary=drain(); assert ack(boundary).returncode==0,route
+    boundary=drain()
+    repair_status.write_text(completed); repair_activity('idle')
+    queued=(home/'state/.wake-queue').read_bytes()
+    refused=ack(boundary)
+    assert refused.returncode==1 and obligation['id'] in refused.stdout,(route,refused)
+    assert (home/'state/.wake-queue').read_bytes()==queued,route
+    presented=ok(loops,'--present-overdue').stdout
+    assert obligation['id'] in presented and 'STANDING' not in presented,(route,presented)
+    assert forge_calls.read_text()=='',(route,'standing receipt revalidation queried the forge')
+    current=row(json.loads(ledger.read_text()),obligation['subject'])
+    assert current['owner']=='firstmate' and current['overdue'] and not current.get('informational'),current
+    action(obligation['id'],'escalated','published prerequisite requires followup')
+    assert ack(boundary).returncode==0,route
+print('PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers')
 
 for producer, consumer in (('main','branch'),('branch','main')):
     for dependency in ('question','task'):

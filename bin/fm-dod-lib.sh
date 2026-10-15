@@ -776,6 +776,10 @@ fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state
     return 1
   fi
   if [ "$gerrit" = 1 ]; then
+    if [ "${FM_CREW_STATE_NO_FORGE:-0}" = 1 ]; then
+      printf '%s\n' "named head $sha cannot be verified locally: forge read skipped"
+      return 1
+    fi
     case "$mode" in
       no-mistakes|'')
         fm_dod_nm_custody_returned "$wt" || return 1 ;;
