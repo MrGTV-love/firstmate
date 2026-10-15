@@ -8738,6 +8738,206 @@ SH
   pass 'a task on a reassigned slot with no merged PR and an unlanded own branch refuses and keeps its records'
 }
 
+# Stop the run at its first unpushed-work inspection: past the early slot
+# ownership proof and its project-custody release, before the reservation
+# re-check, until the fresh allocator below has published the slot's new claim
+# and lease.
+add_window_swap_git_shim() {
+  local case_dir=$1
+  cat > "$case_dir/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" log --oneline HEAD --not --remotes "*)
+    if [ ! -e "$case_dir/in-window" ]; then
+      : > "$case_dir/in-window"
+      n=0
+      while [ ! -e "$case_dir/swap-done" ]; do
+        n=\$((n + 1)); [ "\$n" -lt 2000 ] || exit 1
+        sleep 0.01
+      done
+    fi
+    ;;
+esac
+exec "\${REAL_GIT_FOR_TEST:?}" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/git"
+}
+
+# A concurrent fresh allocator for the reservation window: it waits until the
+# run is inside the window, takes the project lock as bin/fm-spawn.sh does,
+# replaces the lapsed slot claim through the real claim helper, publishes its
+# own task record and pool lease, and releases custody. Sets
+# WINDOW_ALLOCATOR_PID.
+start_window_fresh_allocator() {
+  local case_dir=$1 lock=$2 slot=$3
+  FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
+    bash -c '
+      case_dir=$1 lock=$2 slot=$3 root=$4
+      n=0
+      while [ ! -e "$case_dir/in-window" ]; do
+        n=$((n + 1)); [ "$n" -lt 3000 ] || exit 2
+        sleep 0.05
+      done
+      . "$root/bin/fm-wake-lib.sh" || exit 3
+      . "$root/bin/fm-project-lock-lib.sh" || exit 3
+      fm_project_lock_acquire "$lock" "fresh spawn allocate" || exit 4
+      wc -l < "$lock.holds" | tr -d " " > "$case_dir/holds-at-swap"
+      fm_treehouse_slot_owner_claim "$slot" live-task "$case_dir/primary-home" || exit 5
+      cp "$case_dir/live-task.meta.new" "$case_dir/state/live-task.meta" || exit 5
+      cp "$case_dir/live-task.status.new" "$case_dir/state/live-task.status" || exit 5
+      jq --arg holder live-task \
+        "(.worktrees[] | select(.name == \"1\")) |= (.leased = true | .lease_holder = \$holder)" \
+        "$case_dir/pool/treehouse-state.json" > "$case_dir/pool/treehouse-state.json.next" || exit 6
+      mv "$case_dir/pool/treehouse-state.json.next" "$case_dir/pool/treehouse-state.json" || exit 6
+      cp "${slot%/*}/.fm-slot-owner" "$case_dir/claim.after-swap" || exit 6
+      cp "$case_dir/state/live-task.meta" "$case_dir/live-meta.before" || exit 6
+      cp "$case_dir/state/live-task.status" "$case_dir/live-status.before" || exit 6
+      fm_project_lock_release "$lock" || exit 7
+      : > "$case_dir/swap-done"
+    ' _ "$case_dir" "$lock" "$slot" "$ROOT" &
+  WINDOW_ALLOCATOR_PID=$!
+}
+
+# A fresh spawn that allocates the lapsed slot between the early ownership
+# proof and the reservation re-check claims the slot for itself. The retiring
+# task then completes records-only: the reaper finishes it with no refusal
+# memo, and the new owner's claim, lease, record and copy bytes survive.
+test_reservation_window_reassignment_retires_records_only() {
+  local case_dir slot rc=0 alloc_rc=0
+  make_lease_modeling_pool_case pool-window-reassigned-root ''
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
+  fm_write_meta "$case_dir/live-task.meta.new" \
+    "window=firstmate:fm-live-task" "endpoint_task_id=live-task" \
+    "worktree=$slot" "project=$case_dir/project" "kind=ship" "spawn_gen=live"
+  printf 'live task\n' > "$case_dir/live-task.status.new"
+  printf 'spawn_gen=%s\nslot=%s\n' 'teardown-test-task-x1' "$slot" \
+    > "$case_dir/state/task-x1.teardown-return-pending"
+  printf 'g1.1.1\n' > "$case_dir/state/task-x1.busy-gen"
+  printf 'v1 gen=g1.1.1 seq=1 state=idle source=claude-hook event=Stop ts=%s\n' "$(date +%s)" \
+    > "$case_dir/state/task-x1.busy-state"
+  git -C "$slot" rev-parse HEAD > "$case_dir/head.before"
+  git -C "$slot" symbolic-ref HEAD > "$case_dir/branch.before"
+  git -C "$slot" status --porcelain --untracked-files=all > "$case_dir/copy-status.before"
+  git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' > "$case_dir/refs.before"
+  add_window_swap_git_shim "$case_dir"
+  start_window_fresh_allocator "$case_dir" "$POOL_LOCK" "$slot"
+  FM_HOME="$case_dir/primary-home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" NM_HOME="$case_dir/nm" FM_POOL_CASE="$case_dir" \
+    PATH="$case_dir/fakebin:$PATH" \
+    "$ROOT/bin/fm-idle-session-reap.sh" reap > "$case_dir/reap.out" 2>&1 || rc=$?
+  alloc_rc=0
+  wait "$WINDOW_ALLOCATOR_PID" || alloc_rc=$?
+  [ "$alloc_rc" = 0 ] || fail "window-reassigned-root: the fresh allocator failed"
+  [ "$rc" = 0 ] || fail "window-reassigned-root: the reaper run failed: $(cat "$case_dir/reap.out")"
+  assert_equals 1 "$(cat "$case_dir/holds-at-swap" 2>/dev/null || true)" \
+    "window-reassigned-root: the swap did not land after the early ownership proof"
+  [ "$(awk -F'\t' '$2 == "task-x1" { print $1 }' "$case_dir/reap.out")" = reaped ] \
+    || fail "window-reassigned-root: the retiring task was not completed records-only: $(cat "$case_dir/reap.out")"
+  assert_absent "$case_dir/state/.idle-reap/task-x1.refused" \
+    "window-reassigned-root: the reassigned slot parked its record behind a refusal memo"
+  assert_absent "$case_dir/state/task-x1.meta" "window-reassigned-root: the retiring record survived"
+  assert_absent "$case_dir/state/task-x1.status" "window-reassigned-root: the retiring status survived"
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" \
+    "window-reassigned-root: the retiring return-pending record survived"
+  assert_absent "$case_dir/treehouse.log" "window-reassigned-root: the retiring task administered the pool"
+  cmp -s "$case_dir/claim.after-swap" "${slot%/*}/.fm-slot-owner" \
+    || fail "window-reassigned-root: the new owner claim changed"
+  jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "live-task"' \
+    "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail "window-reassigned-root: the new owner lease changed: $(cat "$case_dir/pool/treehouse-state.json")"
+  cmp -s "$case_dir/live-meta.before" "$case_dir/state/live-task.meta" \
+    || fail "window-reassigned-root: the new owner record changed"
+  cmp -s "$case_dir/live-status.before" "$case_dir/state/live-task.status" \
+    || fail "window-reassigned-root: the new owner status changed"
+  git -C "$slot" rev-parse HEAD | cmp -s - "$case_dir/head.before" || fail "window-reassigned-root: the claimant HEAD changed"
+  git -C "$slot" symbolic-ref HEAD | cmp -s - "$case_dir/branch.before" || fail "window-reassigned-root: the claimant branch changed"
+  git -C "$slot" status --porcelain --untracked-files=all | cmp -s - "$case_dir/copy-status.before" \
+    || fail "window-reassigned-root: the claimant copy status changed"
+  git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' | cmp -s - "$case_dir/refs.before" \
+    || fail "window-reassigned-root: the claimant refs changed"
+  pass 'a fresh allocation in the reservation window retires only the retiring record, preserving the new owner'
+}
+
+# The enclosing-slot variant of the same window: the fresh spawn claims the
+# slot the retiring task's nested copy sits in. The retiring task keeps its own
+# reassociated copy in place and returns nothing; the new owner's claim, lease,
+# record and slot bytes survive, and the reaper parks no refusal memo.
+test_enclosing_reservation_window_reassignment_leaves_claimant_slot() {
+  local case_dir slot copy lock rc=0 alloc_rc=0
+  make_nested_slot_case pool-window-reassigned-enclosing enclosing .claude/worktrees/x
+  case_dir=$NESTED_CASE
+  slot=$NESTED_SLOT
+  copy=$NESTED_COPY
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$slot" \
+    > "$case_dir/pool/treehouse-state.json"
+  fm_write_meta "$case_dir/live-task.meta.new" \
+    "window=firstmate:fm-live-task" "endpoint_task_id=live-task" \
+    "worktree=$slot" "project=$case_dir/project" "kind=ship" "spawn_gen=live"
+  printf 'live task\n' > "$case_dir/live-task.status.new"
+  printf 'spawn_gen=%s\nslot=%s\n' 'teardown-test-task-x1' "$slot" \
+    > "$case_dir/state/task-x1.teardown-return-pending"
+  printf 'g1.1.1\n' > "$case_dir/state/task-x1.busy-gen"
+  printf 'v1 gen=g1.1.1 seq=1 state=idle source=claude-hook event=Stop ts=%s\n' "$(date +%s)" \
+    > "$case_dir/state/task-x1.busy-state"
+  git -C "$slot" rev-parse HEAD > "$case_dir/slot-head.before"
+  git -C "$slot" symbolic-ref HEAD > "$case_dir/slot-branch.before"
+  git -C "$slot" status --porcelain --untracked-files=all > "$case_dir/slot-status.before"
+  git -C "$copy" rev-parse HEAD > "$case_dir/copy-head.before"
+  git -C "$copy" symbolic-ref HEAD > "$case_dir/copy-branch.before"
+  git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' > "$case_dir/refs.before"
+  lock=$(FM_HOME="$case_dir/home" FM_STATE_OVERRIDE="$case_dir/state" \
+    bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
+    _ "$ROOT" "$case_dir/project") \
+    || fail "window-reassigned-enclosing: cannot resolve the shared Treehouse project lock"
+  add_window_swap_git_shim "$case_dir"
+  start_window_fresh_allocator "$case_dir" "$lock" "$slot"
+  FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" NM_HOME="$case_dir/nm" FM_POOL_CASE="$case_dir" \
+    PATH="$case_dir/fakebin:$PATH" \
+    "$ROOT/bin/fm-idle-session-reap.sh" reap > "$case_dir/reap.out" 2>&1 || rc=$?
+  alloc_rc=0
+  wait "$WINDOW_ALLOCATOR_PID" || alloc_rc=$?
+  [ "$alloc_rc" = 0 ] || fail "window-reassigned-enclosing: the fresh allocator failed"
+  [ "$rc" = 0 ] || fail "window-reassigned-enclosing: the reaper run failed: $(cat "$case_dir/reap.out")"
+  assert_equals 1 "$(cat "$case_dir/holds-at-swap" 2>/dev/null || true)" \
+    "window-reassigned-enclosing: the swap did not land after the early ownership proof"
+  [ "$(awk -F'\t' '$2 == "task-x1" { print $1 }' "$case_dir/reap.out")" = reaped ] \
+    || fail "window-reassigned-enclosing: the retiring task was not completed records-only: $(cat "$case_dir/reap.out")"
+  assert_absent "$case_dir/state/.idle-reap/task-x1.refused" \
+    "window-reassigned-enclosing: the reassigned slot parked its record behind a refusal memo"
+  assert_absent "$case_dir/state/task-x1.meta" "window-reassigned-enclosing: the retiring record survived"
+  assert_absent "$case_dir/state/task-x1.status" "window-reassigned-enclosing: the retiring status survived"
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" \
+    "window-reassigned-enclosing: the retiring return-pending record survived"
+  assert_absent "$case_dir/treehouse.log" "window-reassigned-enclosing: the retiring task administered the pool"
+  [ -d "$copy" ] || fail "window-reassigned-enclosing: the retiring reassociated copy was removed"
+  cmp -s "$case_dir/claim.after-swap" "${slot%/*}/.fm-slot-owner" \
+    || fail "window-reassigned-enclosing: the new owner claim changed"
+  jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "live-task"' \
+    "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail "window-reassigned-enclosing: the new owner lease changed: $(cat "$case_dir/pool/treehouse-state.json")"
+  cmp -s "$case_dir/live-meta.before" "$case_dir/state/live-task.meta" \
+    || fail "window-reassigned-enclosing: the new owner record changed"
+  cmp -s "$case_dir/live-status.before" "$case_dir/state/live-task.status" \
+    || fail "window-reassigned-enclosing: the new owner status changed"
+  git -C "$slot" rev-parse HEAD | cmp -s - "$case_dir/slot-head.before" \
+    || fail "window-reassigned-enclosing: the claimant slot HEAD changed"
+  git -C "$slot" symbolic-ref HEAD | cmp -s - "$case_dir/slot-branch.before" \
+    || fail "window-reassigned-enclosing: the claimant slot branch changed"
+  git -C "$slot" status --porcelain --untracked-files=all | cmp -s - "$case_dir/slot-status.before" \
+    || fail "window-reassigned-enclosing: the claimant slot status changed"
+  git -C "$copy" rev-parse HEAD | cmp -s - "$case_dir/copy-head.before" \
+    || fail "window-reassigned-enclosing: the retiring copy HEAD changed"
+  git -C "$copy" symbolic-ref HEAD | cmp -s - "$case_dir/copy-branch.before" \
+    || fail "window-reassigned-enclosing: the retiring copy branch changed"
+  git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' | cmp -s - "$case_dir/refs.before" \
+    || fail "window-reassigned-enclosing: the claimant refs changed"
+  pass 'a fresh allocation in the enclosing-slot window leaves the claimant slot and the retiring copy untouched'
+}
+
 # A record re-pointed by bin/fm-control.sh reassociate names its earlier copies
 # in prior_worktree=. Teardown still runs the landed-work test on the current
 # copy, but leaves a current copy that is not a pool slot - and every prior
@@ -11478,6 +11678,8 @@ test_process_exit_during_identity_lookup_does_not_refuse
 test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_reassigned_dirty_slot_retires_only_finished_task
 test_reassigned_slot_unlanded_task_refuses
+test_reservation_window_reassignment_retires_records_only
+test_enclosing_reservation_window_reassignment_leaves_claimant_slot
 test_reassociated_copies_are_left_in_place
 test_reassociated_unlanded_copy_still_refuses
 test_released_slot_record_keeps_current_copy

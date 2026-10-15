@@ -3725,8 +3725,10 @@ TEARDOWN_SLOT_REASSIGNED=0
 TEARDOWN_SLOT_REASSIGNED_TO=
 TEARDOWN_SLOT_REASSIGNED_HOME=
 require_owned_task_worktree_slot() {
-  local slot rc=0
-  slot=$(teardown_live_slot_path) || return 0
+  local slot=${1:-} rc=0
+  if [ -z "$slot" ]; then
+    slot=$(teardown_live_slot_path) || return 0
+  fi
   require_owned_worktree_slot_record "$ID" "$slot" || rc=$?
   case "$rc" in
     0) return 0 ;;
@@ -3734,6 +3736,7 @@ require_owned_task_worktree_slot() {
       TEARDOWN_SLOT_REASSIGNED=1
       TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
       TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
+      TEARDOWN_RESERVED_SLOT=
       return 0
       ;;
   esac
@@ -5079,7 +5082,14 @@ cleanup_firstmate_home_children() {
         teardown_project_lock_wait "$child_project_lock" "teardown $ID return child $child_id" || return $?
         DESCENDANT_TREEHOUSE_LOCK_PATHS+=("$child_project_lock")
       fi
-      require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
+      child_owner_rc=0
+      require_owned_worktree_slot_record "$child_id" "$child_wt" || child_owner_rc=$?
+      case "$child_owner_rc" in
+        0|"$TEARDOWN_SLOT_REASSIGNED_RC") ;;
+        *) return 1 ;;
+      esac
+    fi
+    if [ "$child_pool_return" = 1 ] && [ "$child_owner_rc" != "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
       require_exclusive_worktree_slot_record "$child_meta" "$child_id" "$sub_state" "$child_wt" || return 1
       require_registered_slot_copies "$child_id" "$child_wt" || return 1
       child_leased=0
@@ -5375,12 +5385,13 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree; then
     fm_treehouse_slot_owner_state "$TEARDOWN_RESERVED_SLOT" "$ID"
     case "$FM_TREEHOUSE_SLOT_OWNER" in
       mine) ;;
-      absent|other) TEARDOWN_RESERVED_SLOT= ;;
-      *) require_owned_worktree_slot_record "$ID" "$TEARDOWN_RESERVED_SLOT" || exit 1 ;;
+      absent) TEARDOWN_RESERVED_SLOT= ;;
+      *) require_owned_task_worktree_slot "$TEARDOWN_RESERVED_SLOT" || exit 1 ;;
     esac
+  else
+    require_owned_task_worktree_slot "$TEARDOWN_RESERVED_SLOT" || exit 1
   fi
   if [ -n "$TEARDOWN_RESERVED_SLOT" ]; then
-    require_owned_worktree_slot_record "$ID" "$TEARDOWN_RESERVED_SLOT" || exit 1
     require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RESERVED_SLOT" || exit 1
     teardown_reserve_pool_slot "$TEARDOWN_RESERVED_SLOT" || exit 1
     teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT" || exit 1
@@ -5714,21 +5725,23 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
       exit 1
     fi
   else
-    require_owned_worktree_slot_record "$ID" "$TEARDOWN_RETURN_SLOT" || exit 1
-    require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RETURN_SLOT" || exit 1
-    if [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
-      FM_TASK_COPY_POOL_STATE_FILE=
-      FM_TASK_COPY_POOL_STATE_ENTRIES=
-      fm_task_copy_pool_slot_held "$TEARDOWN_RETURN_SLOT" || {
-        echo "REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents" >&2
-        exit 1
-      }
+    require_owned_task_worktree_slot "$TEARDOWN_RETURN_SLOT" || exit 1
+    if teardown_owns_worktree; then
+      require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RETURN_SLOT" || exit 1
+      if [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
+        FM_TASK_COPY_POOL_STATE_FILE=
+        FM_TASK_COPY_POOL_STATE_ENTRIES=
+        fm_task_copy_pool_slot_held "$TEARDOWN_RETURN_SLOT" || {
+          echo "REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents" >&2
+          exit 1
+        }
+      fi
+      # Dirt or HEAD may change while the final pool admission queues. Repeat
+      # the local proof under custody; an uncached HEAD refuses without fetching
+      # and an index lock refuses without sleeping or retrying here.
+      [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
+      teardown_nested_slot return
     fi
-    # Dirt or HEAD may change while the final pool admission queues. Repeat
-    # the local proof under custody; an uncached HEAD refuses without fetching
-    # and an index lock refuses without sleeping or retrying here.
-    [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
-    teardown_nested_slot return
   fi
   fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
   TEARDOWN_META_REMOVED=1
@@ -5784,7 +5797,7 @@ elif [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}; shared pool slot $TEARDOWN_SHARED_SLOT and every copy inside it left untouched; only this task's own slot claim, if present, released)"
-elif [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
+elif [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed and its pool slot $TEARDOWN_ENCLOSING_SLOT returned)"
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ] && [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ]; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT was already removed by an earlier teardown, and its pool slot $TEARDOWN_RECORD_SLOT is no longer this task's, so it was left alone)"
