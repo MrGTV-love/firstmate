@@ -11032,6 +11032,53 @@ SH
   pass 'a shared-slot claim release survives an endpoint refusal and session start, and the sharer then finishes normally'
 }
 
+# The deferred pool return of a child shares that rule after its project wait.
+test_child_pool_return_custody_refusal_keeps_slot() {
+  local case_dir home slot nested lock rc=0
+  case_dir=$(make_case child-pool-return-custody)
+  write_meta "$case_dir" local-only secondmate
+  configure_secondmate_with_tmux_children "$case_dir"
+  home="$case_dir/secondmate-home"
+  slot="$case_dir/pool/1/project"
+  mkdir -p "${slot%/*}" "$case_dir/primary-home/state"
+  git -C "$case_dir/project" worktree add -q -b fm/child-pool "$slot" main
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"child-a"}]}\n' \
+    "$slot" > "$case_dir/pool/treehouse-state.json"
+  printf 'task=child-a\nhome=%s\n' "$home" > "${slot%/*}/.fm-slot-owner"
+  fm_write_meta "$home/state/child-a.meta" \
+    'window=firstmate:fm-child-a' 'endpoint_task_id=child-a' \
+    "worktree=$slot" "project=$case_dir/project" 'kind=ship' 'mode=local-only'
+  nested="$slot/.claude/worktrees/parked"
+  lock=$(git_index_lock_path "$slot")
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+exit 0
+SH
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+if [ ! -e "$case_dir/attempted" ]; then
+  touch "$case_dir/attempted"
+  git -C "$case_dir/project" worktree add -q --detach "$nested" main || exit 2
+  echo "fatal: Unable to create '$lock': File exists." >&2
+  exit 128
+fi
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
+  FM_HOME="$case_dir/primary-home" FM_TREEHOUSE_RETURN_LOCK_RETRIES=1 FM_TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS=0 \
+    run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
+    > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 5 "$rc" "child pool custody refusal must stop teardown: $(cat "$case_dir/stderr")"
+  assert_grep "contains registered copy $nested" "$case_dir/stderr" 'child pool custody refusal was not reported'
+  assert_present "$nested/.git" 'child pool custody refusal lost the parked copy'
+  assert_present "$slot/.git" 'child pool custody refusal removed the child slot'
+  assert_present "${slot%/*}/.fm-slot-owner" 'child pool custody refusal dropped the slot claim'
+  assert_present "$home/state/child-a.meta" 'child pool custody refusal retired the child record'
+  assert_present "$case_dir/state/task-x1.meta" 'child pool custody refusal retired the parent record'
+  pass 'a custody refusal at a deferred child pool return keeps the slot, its claim and its parked copy'
+}
+
 teardown_test_cases=(
 test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap
 test_legacy_pool_teardown_keeps_its_return_pending_record_across_the_stamp
@@ -11047,6 +11094,7 @@ test_unverified_pool_reservation_preserves_processes
 test_non_pool_returns_recheck_registered_copies
 test_return_missing_slot_reports_canonicalization_refusal
 test_child_return_custody_refusal_keeps_non_pool_worktree
+test_child_pool_return_custody_refusal_keeps_slot
 test_teardown_never_holds_up_a_steer_to_another_task
 test_lane_registry_scan_reads_each_distinct_registry_once
 test_task_teardown_preserves_another_homes_abandoned_worker

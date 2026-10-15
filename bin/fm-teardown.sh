@@ -5071,7 +5071,10 @@ cleanup_firstmate_home_children() {
           fm_treehouse_slot_owner_release "$child_wt" "$child_id" || return 1
         else
           child_return_rc=$?
-          [ "$child_return_rc" -ne "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ] || return "$child_return_rc"
+          if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ] \
+             || [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED" ]; then
+            return "$child_return_rc"
+          fi
           safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
         fi
       else
