@@ -235,7 +235,9 @@
 # that can fail and before the pending backlog close is published, teardown
 # records state/<id>.teardown-return-pending (bin/fm-wake-lib.sh's
 # fm_teardown_return_pending owns the contract; a forced secondmate teardown
-# records it for itself, naming the child). Any later refusal keeps that
+# records it for itself, naming the child; an accepted --legacy-record stamp
+# rebinds it to the stamped generation, and a rolled-back stamp rebinds it
+# back). Any later refusal keeps that
 # durable record: the open-work ledger reports it, session-start backlog
 # replay leaves the record for the retry, the idle reaper selects the task by
 # that record unless its worker reads busy again, and every project
@@ -784,6 +786,22 @@ teardown_mark_return_pending() {  # <slot> [child-id]
   fi
   rm -f "$tmp"
   echo "warning: could not record that task $ID's pool slot $1 awaits its return at $marker" >&2
+}
+
+teardown_refresh_return_pending() {
+  local marker="$STATE/$ID.teardown-return-pending" tmp gen line
+  [ -f "$marker" ] && [ ! -L "$marker" ] || return 0
+  tmp="$STATE/.$ID.teardown-return-pending.refresh.${BASHPID:-$$}"
+  gen=$(fm_teardown_return_pending_gen "$META") || gen=
+  if { printf 'spawn_gen=%s\n' "$gen"
+       while IFS= read -r line || [ -n "$line" ]; do
+         case "$line" in spawn_gen=*) ;; *) printf '%s\n' "$line" ;; esac
+       done < "$marker"
+     } > "$tmp" && touch -r "$marker" "$tmp" && mv -f "$tmp" "$marker"; then
+    return 0
+  fi
+  rm -f "$tmp"
+  echo "warning: could not rebind task $ID's pool-return record at $marker to its current record generation" >&2
 }
 
 CONTROL_LOCK="$STATE/.control-$ID.lock"
@@ -5369,7 +5387,8 @@ teardown_legacy_stamp_rollback() {
   [ "$TEARDOWN_LEGACY_PRESTAMP_SIZE" -gt 0 ] 2>/dev/null || return 1
   perl -e 'truncate($ARGV[0], $ARGV[1]) or exit 1' -- \
     "$META" "$TEARDOWN_LEGACY_PRESTAMP_SIZE" || return 1
-  [ "$(wc -c < "$META" | tr -d ' ')" = "$TEARDOWN_LEGACY_PRESTAMP_SIZE" ]
+  [ "$(wc -c < "$META" | tr -d ' ')" = "$TEARDOWN_LEGACY_PRESTAMP_SIZE" ] || return 1
+  teardown_refresh_return_pending
 }
 
   if [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ] && [ -z "$TEARDOWN_LEGACY_RETAINED_STAMP" ]; then
@@ -5396,6 +5415,7 @@ teardown_legacy_stamp_rollback() {
       fi
       exit 1
     fi
+    teardown_refresh_return_pending
   fi
   if ! fm_backlog_atomic_transition publish "$BACKLOG_CLOSE_STAGE" "$BACKLOG_CLOSE_MARKER" \
       "pending-close record" "$STATE"; then

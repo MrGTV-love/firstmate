@@ -10840,7 +10840,101 @@ SH
   pass 'a waited return that meets a project-lock error exits 1, not the contention exit'
 }
 
+# A legacy record (no spawn_gen) is stamped only after its slot is reserved.
+# The return-pending record must follow that stamp, so an endpoint that refuses
+# to close after the stamp still leaves bootstrap unable to replay the close,
+# and a plain retry returns the slot once. A stamp rolled back by a failed
+# close publication must leave the record matching the unstamped task again.
+test_legacy_pool_teardown_keeps_its_return_pending_record_across_the_stamp() {
+  local case_dir slot rc out returns
+  make_lease_modeling_pool_case pool-legacy-return-pending ''
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    'window=firstmate:fm-task-x1' 'endpoint_task_id=task-x1' \
+    "worktree=$slot" "project=$case_dir/project" 'kind=ship' 'mode=local-only' \
+    'harness=codex' 'branch=fm/pool-root'
+  rm -f "$case_dir/config/backlog-backend"
+  seed_backlog_in_flight "$case_dir"
+  cat > "$case_dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-windows) [ ! -f "$FM_POOL_CASE/kill-attempted" ] || printf '%s\n' fm-task-x1 ;;
+  kill-window) : > "$FM_POOL_CASE/kill-attempted"; exit 1 ;;
+esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "the endpoint refusal must stop the legacy teardown: $(cat "$case_dir/stderr")"
+  [ "$(legacy_meta_gen_count "$case_dir")" = 1 ] || fail 'the legacy record was not stamped before the endpoint refusal'
+  assert_present "$case_dir/state/task-x1.backlog-close" 'the refusal came before the pending close was published'
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the refusal came before the slot was reserved'
+  out=$(PATH="$case_dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/primary-home" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" FM_BOOTSTRAP_NETWORK=skip \
+    "$ROOT/bin/fm-bootstrap.sh" 2>&1) || fail "session start failed beside a refused legacy endpoint: $out"
+  assert_present "$case_dir/state/task-x1.meta" 'session start retired the only record naming the leased slot'
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "session start closed the row while the slot was still leased: $(backlog_row_state "$case_dir")"
+  assert_present "${slot%/*}/.fm-slot-owner" 'session start dropped the slot claim'
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'session start released the reserved slot'
+
+  rm -f "$case_dir/kill-attempted"
+  cat > "$case_dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+exit 0
+SH
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" --legacy-record > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "the legacy retry must finish: $(cat "$case_dir/stderr2")"
+  assert_absent "$case_dir/state/task-x1.meta" 'the retry kept the task record'
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" 'the retry kept the return-pending record'
+  returns=$(grep -c "^return --force $slot\$" "$case_dir/treehouse.log" || true)
+  assert_equals 1 "$returns" 'the retry must return the slot exactly once'
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the retry left the slot leased'
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "the retry did not close the backlog row: $(backlog_row_state "$case_dir")"
+  pass 'an interrupted legacy pool teardown keeps its record through session start and its retry returns the slot once'
+}
+
+# The stamp's rollback after a failed close publication leaves the record
+# unstamped; the return-pending record written at reservation must then match
+# that rolled-back record again, not the stamp that no longer exists.
+test_legacy_stamp_rollback_rebinds_the_return_pending_record() {
+  local case_dir rc
+  make_lease_modeling_pool_case pool-legacy-rollback-pending ''
+  case_dir=$POOL_CASE
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    'window=firstmate:fm-task-x1' 'endpoint_task_id=task-x1' \
+    "worktree=$POOL_SLOT" "project=$case_dir/project" 'kind=ship' 'mode=local-only' \
+    'harness=codex' 'branch=fm/pool-root'
+  rm -f "$case_dir/config/backlog-backend"
+  seed_backlog_in_flight "$case_dir"
+  add_failing_close_publication_mv "$case_dir"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" --legacy-record > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "an unrecordable close must fail the legacy teardown: $(cat "$case_dir/stderr")"
+  [ "$(legacy_meta_gen_count "$case_dir")" = 0 ] || fail 'the failed close publication left the legacy stamp in place'
+  assert_present "$case_dir/state/task-x1.teardown-return-pending" 'the reserved slot lost its return-pending record'
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the failed close publication released the reserved slot'
+  FM_HOME="$case_dir/primary-home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_teardown_return_pending "$2" task-x1' \
+    _ "$ROOT" "$case_dir/state" \
+    || fail 'the rolled-back record no longer matches its return-pending record'
+  pass 'a rolled-back legacy stamp leaves its return-pending record bound to the unstamped record'
+}
+
 teardown_test_cases=(
+test_legacy_pool_teardown_keeps_its_return_pending_record_across_the_stamp
+test_legacy_stamp_rollback_rebinds_the_return_pending_record
 test_endpoint_refusal_after_reservation_survives_session_start
 test_waited_return_lock_error_is_not_reported_as_contention
 test_idle_reap_retries_a_closed_task_whose_return_stalled
