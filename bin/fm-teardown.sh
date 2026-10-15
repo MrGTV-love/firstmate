@@ -205,6 +205,11 @@
 # Treehouse's state-only durable lease, and finally to recheck, return the slot
 # and remove the record that names it. A refusal before that reservation
 # leaves no new lease; a failed cleanup after it retains the lease.
+# A recheck that finds the slot's claim now names another task reserves and
+# returns nothing: the earlier landed-work proof may have read the claimant's
+# copy, so teardown releases project custody and re-proves this record's own
+# delivery as the reassigned-slot cleanup above does, before its next
+# destructive step, refusing with its records in place when that proof fails.
 # A slot whose state is neither held nor unleased (recovered, conflicting,
 # unreadable, or needing jq), or an unleased slot with no treehouse installed
 # to lease it, cannot be reserved; teardown logs that state and keeps project
@@ -2880,6 +2885,10 @@ require_worktree_teardown_safety() {
   exit 1
 }
 
+# A slot found reassigned only at a later recheck was admitted by an owned-mode
+# proof. Repeat the proof in reassigned mode; when it settles on the recorded
+# PR, restage the pending backlog close so a local-only ship does not keep its
+# owned-mode local-main note.
 teardown_reprove_reassigned_slot() {
   local stage="$STATE/.$ID.backlog-close.${BASHPID:-$$}"
   teardown_release_project_lock || exit 1
