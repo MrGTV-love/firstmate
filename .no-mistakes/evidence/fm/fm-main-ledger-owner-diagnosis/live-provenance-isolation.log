@@ -1,0 +1,150 @@
+Isolated live validation of unmodified Firstmate commands.
+FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation
+HOME, NM_HOME and TMPDIR were disposable workspace-local directories; no operator state or credentials were used.
+TMUX addressed an absent private endpoint, never the default server.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792078884, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation", "complete": false, "rows": [{"id": "4badfa4c19ea57518aa4bfd1", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "question provenance a.status: task metadata a.meta must not be a symbolic link"}, {"id": "93d75dfade66e4157089b658", "category": "coverage", "subject": "no forge coverage: lab", "owner": "firstmate", "next_action": "none: this project's origin is a local path, so it has no forge pull requests to collect", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab: local origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/origin.git", "informational": true}, {"id": "243bec228fb34245e553f63d", "category": "missing_worker", "subject": "b", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 0, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "d5dc6d8185afdd47e4d71a46", "category": "unanswered_question", "subject": "a:answer", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36000, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: a still needs an answer"}, {"id": "a5d4f8cae226356d190e0744", "category": "unanswered_question", "subject": "b:answer", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36000, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: b still needs an answer", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/config", "task": "b", "generation": "9389842d7b2919613a24b47e265efa1474b76d3bc2c662757baad13c500feadc", "kind": "status", "key": "answer", "decision": "4a41e6dc2399fd0486a2e02faa5fbde9e91a06d6d7efc7efa01ffbcd70051612", "stream": [16777233, 529822885]}}]}
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "4badfa4c19ea57518aa4bfd1","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"question provenance a.status: task metadata a.meta must not be a symbolic link",false
+  "d5dc6d8185afdd47e4d71a46","firstmate","a:answer","answer or close this question, or record why it no longer applies",36001,"blocked: a still needs an answer",false
+  "a5d4f8cae226356d190e0744","firstmate","b:answer","answer or close this question, or record why it no longer applies",36001,"blocked: b still needs an answer",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792078884	1	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+a [key=answer] blocked: a still needs an answer
+b [key=answer] blocked: b still needs an answer
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 39910.1792078884.Q9ITMT
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 39910.1792078884.Q9ITMT
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "4badfa4c19ea57518aa4bfd1","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"question provenance a.status: task metadata a.meta must not be a symbolic link",false
+  "d5dc6d8185afdd47e4d71a46","firstmate","a:answer","answer or close this question, or record why it no longer applies",36002,"blocked: a still needs an answer",false
+  "a5d4f8cae226356d190e0744","firstmate","b:answer","answer or close this question, or record why it no longer applies",36002,"blocked: b still needs an answer",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action d5dc6d8185afdd47e4d71a46 waiting --evidence 'Cannot hide an unproved obligation' --prerequisite-task b --recheck 2026-10-15T15:51:26Z
+error: "waiting source does not belong to the effective home"
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792078886, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation", "complete": true, "rows": [{"id": "93d75dfade66e4157089b658", "category": "coverage", "subject": "no forge coverage: lab", "owner": "firstmate", "next_action": "none: this project's origin is a local path, so it has no forge pull requests to collect", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab: local origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/origin.git", "informational": true}, {"id": "6e1c796a557c26821fa9ddd5", "category": "missing_worker", "subject": "a", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 2, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "243bec228fb34245e553f63d", "category": "missing_worker", "subject": "b", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 2, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "d5dc6d8185afdd47e4d71a46", "category": "unanswered_question", "subject": "a:answer", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36002, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: a still needs an answer", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/config", "task": "a", "generation": "2d561a5c78a8aa49179ef90e79c3826f94b22cd534521a1ecb1b9106e097edf3", "kind": "status", "key": "answer", "decision": "1c65d7247ed52df2a73f3638fb7c53f6ada9f25c82c2e824991ce0ed0f992b2a", "stream": [16777233, 529822883]}}, {"id": "a5d4f8cae226356d190e0744", "category": "unanswered_question", "subject": "b:answer", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36002, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: b still needs an answer", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/config", "task": "b", "generation": "9389842d7b2919613a24b47e265efa1474b76d3bc2c662757baad13c500feadc", "kind": "status", "key": "answer", "decision": "4a41e6dc2399fd0486a2e02faa5fbde9e91a06d6d7efc7efa01ffbcd70051612", "stream": [16777233, 529822885]}}], "handling": {"sequence": 0, "presentations": {"main": {"d5dc6d8185afdd47e4d71a46": 0, "a5d4f8cae226356d190e0744": 0}}, "presented_at": {"main": {"d5dc6d8185afdd47e4d71a46": 1792078885, "a5d4f8cae226356d190e0744": 1792078885}}, "actions": {}}}
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --present-overdue
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d5dc6d8185afdd47e4d71a46","firstmate","a:answer","answer or close this question, or record why it no longer applies",36002,"blocked: a still needs an answer",false
+  "a5d4f8cae226356d190e0744","firstmate","b:answer","answer or close this question, or record why it no longer applies",36002,"blocked: b still needs an answer",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792078886, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation", "complete": false, "rows": [{"id": "4badfa4c19ea57518aa4bfd1", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "question provenance a.status: task metadata a.meta must not be a symbolic link"}, {"id": "93d75dfade66e4157089b658", "category": "coverage", "subject": "no forge coverage: lab", "owner": "firstmate", "next_action": "none: this project's origin is a local path, so it has no forge pull requests to collect", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab: local origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/origin.git", "informational": true}, {"id": "243bec228fb34245e553f63d", "category": "missing_worker", "subject": "b", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 2, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "d5dc6d8185afdd47e4d71a46", "category": "unanswered_question", "subject": "a:answer", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36002, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: a still needs an answer"}, {"id": "a5d4f8cae226356d190e0744", "category": "unanswered_question", "subject": "b:answer", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36002, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: b still needs an answer", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/config", "task": "b", "generation": "9389842d7b2919613a24b47e265efa1474b76d3bc2c662757baad13c500feadc", "kind": "status", "key": "answer", "decision": "4a41e6dc2399fd0486a2e02faa5fbde9e91a06d6d7efc7efa01ffbcd70051612", "stream": [16777233, 529822885]}}], "handling": {"sequence": 0, "presentations": {"main": {"d5dc6d8185afdd47e4d71a46": 0, "a5d4f8cae226356d190e0744": 0}}, "presented_at": {"main": {"d5dc6d8185afdd47e4d71a46": 1792078885, "a5d4f8cae226356d190e0744": 1792078885}}, "actions": {}}}
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "4badfa4c19ea57518aa4bfd1","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"question provenance a.status: task metadata a.meta must not be a symbolic link",false
+  "d5dc6d8185afdd47e4d71a46","firstmate","a:answer","answer or close this question, or record why it no longer applies",36003,"blocked: a still needs an answer",false
+  "a5d4f8cae226356d190e0744","firstmate","b:answer","answer or close this question, or record why it no longer applies",36003,"blocked: b still needs an answer",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792078887	2	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+a [key=answer] blocked: a still needs an answer
+b [key=answer] blocked: b still needs an answer
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 39910.1792078884.Q9ITMT
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 39910.1792078884.Q9ITMT
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "4badfa4c19ea57518aa4bfd1","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"question provenance a.status: task metadata a.meta must not be a symbolic link",false
+  "d5dc6d8185afdd47e4d71a46","firstmate","a:answer","answer or close this question, or record why it no longer applies",36004,"blocked: a still needs an answer",false
+  "a5d4f8cae226356d190e0744","firstmate","b:answer","answer or close this question, or record why it no longer applies",36004,"blocked: b still needs an answer",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action d5dc6d8185afdd47e4d71a46 waiting --evidence 'Cannot hide an unproved obligation' --prerequisite-task b --recheck 2026-10-15T15:51:28Z
+error: "waiting source does not belong to the effective home"
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792078888, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation", "complete": false, "rows": [{"id": "4badfa4c19ea57518aa4bfd1", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "fleet snapshot: cp: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/state/a.meta: Permiss; question provenance a.status: [Errno 13] Permission denied: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isol"}, {"id": "d5dc6d8185afdd47e4d71a46", "category": "unanswered_question", "subject": "a:answer", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36004, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: a still needs an answer"}, {"id": "a5d4f8cae226356d190e0744", "category": "unanswered_question", "subject": "b:answer", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 36004, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: b still needs an answer", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/config", "task": "b", "generation": "9389842d7b2919613a24b47e265efa1474b76d3bc2c662757baad13c500feadc", "kind": "status", "key": "answer", "decision": "4a41e6dc2399fd0486a2e02faa5fbde9e91a06d6d7efc7efa01ffbcd70051612", "stream": [16777233, 529822885]}}], "handling": {"sequence": 0, "presentations": {"main": {"d5dc6d8185afdd47e4d71a46": 0, "a5d4f8cae226356d190e0744": 0, "4badfa4c19ea57518aa4bfd1": 0}}, "presented_at": {"main": {"d5dc6d8185afdd47e4d71a46": 1792078885, "a5d4f8cae226356d190e0744": 1792078885, "4badfa4c19ea57518aa4bfd1": 1792078887}}, "actions": {}}}
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "4badfa4c19ea57518aa4bfd1","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: cp: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/state/a.meta: Permiss; question provenance a.status: [Errno 13] Permission denied: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isol",false
+  "d5dc6d8185afdd47e4d71a46","firstmate","a:answer","answer or close this question, or record why it no longer applies",36004,"blocked: a still needs an answer",false
+  "a5d4f8cae226356d190e0744","firstmate","b:answer","answer or close this question, or record why it no longer applies",36004,"blocked: b still needs an answer",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792078888	3	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+a [key=answer] blocked: a still needs an answer
+b [key=answer] blocked: b still needs an answer
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 39910.1792078884.Q9ITMT
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 39910.1792078884.Q9ITMT
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "4badfa4c19ea57518aa4bfd1","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"fleet snapshot: cp: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isolation/state/a.meta: Permiss; question provenance a.status: [Errno 13] Permission denied: '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-provenance-isol",false
+  "d5dc6d8185afdd47e4d71a46","firstmate","a:answer","answer or close this question, or record why it no longer applies",36005,"blocked: a still needs an answer",false
+  "a5d4f8cae226356d190e0744","firstmate","b:answer","answer or close this question, or record why it no longer applies",36005,"blocked: b still needs an answer",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action d5dc6d8185afdd47e4d71a46 waiting --evidence 'Cannot hide an unproved obligation' --prerequisite-task b --recheck 2026-10-15T15:51:29Z
+error: "waiting source does not belong to the effective home"
+
+[exit 1]

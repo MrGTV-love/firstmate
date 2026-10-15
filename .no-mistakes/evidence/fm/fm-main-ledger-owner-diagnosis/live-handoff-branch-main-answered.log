@@ -1,0 +1,113 @@
+Isolated live validation of unmodified Firstmate commands.
+FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered
+HOME, NM_HOME and TMPDIR were disposable workspace-local directories; no operator state or credentials were used.
+TMUX addressed an absent private endpoint, never the default server.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792078848, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered", "complete": true, "rows": [{"id": "4a08af822364470619df0224", "category": "coverage", "subject": "no forge coverage: lab", "owner": "firstmate", "next_action": "none: this project's origin is a local path, so it has no forge pull requests to collect", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab: local origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/origin.git", "informational": true}, {"id": "e0a2e93bf6372731ff1010b5", "category": "missing_worker", "subject": "job", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 1, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "c1584004630d9961637c9fa3", "category": "unanswered_question", "subject": "job:dependency", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7201, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: prerequisite decision outstanding", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered/config", "task": "job", "generation": "005aa6b8f7998c28f3df145be2a5112d583ccf5b6d910f7782502ddef3d004e3", "kind": "status", "key": "dependency", "decision": "375517c835a2cab31216a7cf94fd3b5f77077dd092bd1619702bd88458a017e3", "stream": [16777233, 529816893]}}, {"id": "17980fa850b1c78f16a9d3ca", "category": "unanswered_question", "subject": "job:obligation", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7201, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: original recovery remains owed", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-handoff-branch-main-answered/config", "task": "job", "generation": "005aa6b8f7998c28f3df145be2a5112d583ccf5b6d910f7782502ddef3d004e3", "kind": "status", "key": "obligation", "decision": "4864ce6f48ec4b2a0df00d4f8e2f50a2e2879732630b28e055aba9074806da7a", "stream": [16777233, 529816893]}}]}
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-grant.sh activate 76113 receipt-live
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-grant.sh publish receipt-live 1
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c1584004630d9961637c9fa3","firstmate","job:dependency","answer or close this question, or record why it no longer applies",7201,"blocked: prerequisite decision outstanding",false
+  "17980fa850b1c78f16a9d3ca","firstmate","job:obligation","answer or close this question, or record why it no longer applies",7201,"blocked: original recovery remains owed",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792078848	1	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+job [key=obligation] blocked: original recovery remains owed
+job [key=dependency] blocked: prerequisite decision outstanding
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 77157.1792078848.0VvNoS
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action c1584004630d9961637c9fa3 escalated --evidence 'Prerequisite decision routed to the policy owner'
+action: "c1584004630d9961637c9fa3"
+kind: escalated
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 17980fa850b1c78f16a9d3ca waiting --evidence 'This recovery requires the explicitly named prerequisite' --prerequisite c1584004630d9961637c9fa3 --recheck 2026-10-15T15:50:49Z
+action: "17980fa850b1c78f16a9d3ca"
+kind: waiting
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 77157.1792078848.0VvNoS
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-grant.sh deactivate 76113 receipt-live
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c1584004630d9961637c9fa3","firstmate","job:dependency","answer or close this question, or record why it no longer applies",7202,"blocked: prerequisite decision outstanding",false
+STANDING (a receipt stands; no action needed):
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "17980fa850b1c78f16a9d3ca","firstmate","job:obligation","answer or close this question, or record why it no longer applies",7202,"blocked: original recovery remains owed",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792078849	2	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+job [key=obligation] blocked: original recovery remains owed
+job [key=dependency] blocked: prerequisite decision outstanding
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 80008.1792078849.8wkJ5U
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action c1584004630d9961637c9fa3 escalated --evidence 'Continue following up on the still-open prerequisite'
+action: "c1584004630d9961637c9fa3"
+kind: escalated
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --check-actions
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 80008.1792078849.8wkJ5U
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "17980fa850b1c78f16a9d3ca","firstmate","job:obligation","answer or close this question, or record why it no longer applies",7204,"blocked: original recovery remains owed",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 17980fa850b1c78f16a9d3ca escalated --evidence 'Changed or due dependency needs renewed supervisor followup'
+action: "17980fa850b1c78f16a9d3ca"
+kind: escalated
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 80008.1792078849.8wkJ5U
+
+[exit 0]

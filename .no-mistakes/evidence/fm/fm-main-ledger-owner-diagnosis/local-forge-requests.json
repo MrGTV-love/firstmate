@@ -1,0 +1,17 @@
+{
+  "description": "Disposable external forge-data endpoint; real gh and all Firstmate product scripts were used unchanged. No operator token or real forge was accessed.",
+  "requests": [
+    "/api/v3/repos/lab/project/pulls?state=open&per_page=100",
+    "/api/v3/repos/lab/project/pulls?state=open&per_page=100",
+    "/api/v3/repos/lab/project/commits/f563b1c43fa4805dd88243d49129e2715f430abb/check-runs?per_page=100",
+    "/api/v3/repos/lab/project/commits/f563b1c43fa4805dd88243d49129e2715f430abb/statuses?per_page=100",
+    "/api/v3/repos/lab/project/pulls?state=open&per_page=100",
+    "/api/v3/repos/lab/project/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/check-runs?per_page=100",
+    "/api/v3/repos/lab/project/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/statuses?per_page=100",
+    "/api/v3/repos/lab/project/pulls?state=open&per_page=100",
+    "/api/v3/repos/lab/project/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/check-runs?per_page=100",
+    "/api/v3/repos/lab/project/commits/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/statuses?per_page=100",
+    "/api/v3/repos/lab/project/branches/main",
+    "/api/v3/repos/lab/project/rules/branches/main"
+  ]
+}

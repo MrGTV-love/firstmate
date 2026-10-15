@@ -1,0 +1,241 @@
+Isolated live validation of unmodified Firstmate commands.
+FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits
+HOME, NM_HOME and TMPDIR were disposable workspace-local directories; no operator state or credentials were used.
+TMUX addressed an absent private endpoint, never the default server.
+Real gh used a loopback HTTPS forge-data fixture via GH_HOST, an isolated GH_CONFIG_DIR, and a throwaway fixture token. This does not demonstrate a real hosted GitHub service.
+
+$ openssl req -x509 -newkey rsa:2048 -nodes -keyout /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/fixture-key.pem -out /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/fixture-cert.pem -days 1 -subj /CN=localhost -addext subjectAltName=DNS:localhost,IP:127.0.0.1
+................+...+....+.....+.+..+.......+.....+......+.........+...+..........+..+............+.........+....+++++++++++++++++++++++++++++++++++++++*.....+.....+.............+.................+.+.....+...+....+......+..+.........+...+.+..+...+.......+...+..+...+....+..+....+............+............+..+.+.....+...+..........+..+.......+...+..+.+......+.....+...+...+++++++++++++++++++++++++++++++++++++++*........+...+...........+.+.....+....+...+.....+...+....+......+.....+...+......+...+...+.......+......+.........+...+..+.+..+...+..........+...........+.+............+...............+..+.........+......+....+..+.............+..+...+....+......+.........+...........+......+.+..+..................+....+.....+.+............+..+.+.....+.........+.............+...+..+.+.....+....+...........+.+.....+..........+...+.....+.......+.....+......+...+....+...+.....+....+...+.....+.......+......+.....+.........+...+.+......+.........+..+...+.+.....+...+...+.......+...............+...+.........+.....+....+.........+........+.......+..+...+.++++++
+.....................+...+......+++++++++++++++++++++++++++++++++++++++*.....+......+...+.+.....+....+..+......+++++++++++++++++++++++++++++++++++++++*...+...............+.......+..............+.+........+....+...+.........+......+...+.....+..........+......+........+.+.....+....+.....+.......+.....+.+........+.+......+..+.+......+...+...........+.+...+.................+....+..+.........+......+.......+........+...................+......+.....+.........+.+..+......+...............+......+.+.....+....+.....+......+..........+.................+.+...........+.+.....+...+....+.....+...+...+.+...+........+..........+..+..........++++++
+-----
+
+[exit 0]
+
+$ gh api -i '/repos/lab/project/pulls?state=open&per_page=100'
+HTTP/1.0 200 OK
+Content-Length: 229
+Content-Type: application/json
+Date: Thu, 15 Oct 2026 15:45:57 GMT
+Server: BaseHTTP/0.6 Python/3.13.6
+X-Ratelimit-Limit: 5000
+X-Ratelimit-Remaining: 4000
+X-Ratelimit-Reset: 1792082757
+X-Ratelimit-Resource: core
+
+[{"number": 140, "html_url": "https://github.com/lab/project/pull/140", "state": "open", "draft": false, "head": {"sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "base": {"ref": "main"}, "updated_at": "2026-10-15T13:45:57Z"}]
+[exit 0]
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/projects/project
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/projects/project commit -q --allow-empty -m 'disposable PR baseline'
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/projects/project remote add origin https://github.com/lab/project.git
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/projects/project rev-parse HEAD
+f563b1c43fa4805dd88243d49129e2715f430abb
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792079201, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "complete": true, "rows": [{"id": "97d0e2e37bb678dd503932a8", "category": "missing_worker", "subject": "held-job", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 0, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "ef349c908e6edeb8296434f8", "category": "open_pr", "subject": "https://github.com/lab/project/pull/140", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 7244, "limit_seconds": 3600, "overdue": true, "evidence": "", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "task": "held-job", "generation": "c085d95110498c3a72a7c6ce94ee829484b0d1654216b9c2d7c0ff8bd9d0ddfc", "kind": "pr", "url": "https://github.com/lab/project/pull/140", "head": "f563b1c43fa4805dd88243d49129e2715f430abb"}}, {"id": "cf7fa90ad04b60eb3e956248", "category": "unanswered_question", "subject": "held-job:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 7200, "limit_seconds": 1800, "overdue": true, "evidence": "approve recovery route", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "kind": "captain_hold", "task": "held-job", "decision": "40e3cc20717bdd9e1f657cfaa195738d8e3a014c3b4d771813cf622b69704fe6"}}, {"id": "f711a9a73110263dd1a61083", "category": "unanswered_question", "subject": "held-job:recovery", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7200, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: current PR requires the captain decision", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "task": "held-job", "generation": "c085d95110498c3a72a7c6ce94ee829484b0d1654216b9c2d7c0ff8bd9d0ddfc", "kind": "status", "key": "recovery", "decision": "d824feb37382aa498ecb3815b6552f83b60b0d115c154c2e159aeb543de2010e", "stream": [16777233, 529867343], "pr": {"url": "https://github.com/lab/project/pull/140", "head": "f563b1c43fa4805dd88243d49129e2715f430abb"}}}]}
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "ef349c908e6edeb8296434f8","firstmate","https://github.com/lab/project/pull/140","route the green PR's review and obtain merge approval",7276,"",false
+  "cf7fa90ad04b60eb3e956248","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7232,"approve recovery route",false
+  "f711a9a73110263dd1a61083","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7232,"blocked: current PR requires the captain decision",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792079233	1	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: current PR requires the captain decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 69075.1792079233.fMdgQ2
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action cf7fa90ad04b60eb3e956248 escalated --evidence 'Captain decision is still held'
+action: "cf7fa90ad04b60eb3e956248"
+kind: escalated
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action ef349c908e6edeb8296434f8 waiting --evidence 'Only this named obligation depends on the captain decision' --prerequisite cf7fa90ad04b60eb3e956248 --recheck 2026-10-15T15:57:14Z
+action: "ef349c908e6edeb8296434f8"
+kind: waiting
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action f711a9a73110263dd1a61083 waiting --evidence 'Only this named obligation depends on the captain decision' --prerequisite cf7fa90ad04b60eb3e956248 --recheck 2026-10-15T15:57:14Z
+action: "f711a9a73110263dd1a61083"
+kind: waiting
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 69075.1792079233.fMdgQ2
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+1792079234	2	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: current PR requires the captain decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 71225.1792079234.qdseI6
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 71225.1792079234.qdseI6
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --report
+generated_epoch: 1792079201
+complete: true
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "ef349c908e6edeb8296434f8","firstmate","https://github.com/lab/project/pull/140","route the green PR's review and obtain merge approval",7279,"",false
+  "cf7fa90ad04b60eb3e956248","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7235,"approve recovery route",false
+  "f711a9a73110263dd1a61083","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7235,"blocked: current PR requires the captain decision",false
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --present-overdue
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --check-actions
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792079236, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "complete": true, "rows": [{"id": "97d0e2e37bb678dd503932a8", "category": "missing_worker", "subject": "held-job", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 35, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "ef349c908e6edeb8296434f8", "category": "open_pr", "subject": "https://github.com/lab/project/pull/140", "owner": "firstmate", "next_action": "route the green PR's review and obtain merge approval", "age_seconds": 7279, "limit_seconds": 3600, "overdue": true, "evidence": "", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "task": "held-job", "generation": "c085d95110498c3a72a7c6ce94ee829484b0d1654216b9c2d7c0ff8bd9d0ddfc", "kind": "pr", "url": "https://github.com/lab/project/pull/140", "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}, {"id": "cf7fa90ad04b60eb3e956248", "category": "unanswered_question", "subject": "held-job:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 7235, "limit_seconds": 1800, "overdue": true, "evidence": "approve recovery route", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "kind": "captain_hold", "task": "held-job", "decision": "40e3cc20717bdd9e1f657cfaa195738d8e3a014c3b4d771813cf622b69704fe6"}}, {"id": "f711a9a73110263dd1a61083", "category": "unanswered_question", "subject": "held-job:recovery", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7235, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: current PR requires the captain decision", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "task": "held-job", "generation": "c085d95110498c3a72a7c6ce94ee829484b0d1654216b9c2d7c0ff8bd9d0ddfc", "kind": "status", "key": "recovery", "decision": "d824feb37382aa498ecb3815b6552f83b60b0d115c154c2e159aeb543de2010e", "stream": [16777233, 529867343], "pr": {"url": "https://github.com/lab/project/pull/140", "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}}], "handling": {"sequence": 3, "presentations": {"main": {"ef349c908e6edeb8296434f8": 0, "cf7fa90ad04b60eb3e956248": 0, "f711a9a73110263dd1a61083": 0}}, "presented_at": {"main": {"ef349c908e6edeb8296434f8": 1792079233, "cf7fa90ad04b60eb3e956248": 1792079233, "f711a9a73110263dd1a61083": 1792079233}}, "actions": {"cf7fa90ad04b60eb3e956248": {"kind": "escalated", "evidence": "Captain decision is still held", "at_epoch": 1792079234, "sequence": 1, "deferrals": 0, "captain_visible": false, "digest": "2db47397bb644d1f8ca28809", "cited": []}, "ef349c908e6edeb8296434f8": {"kind": "waiting", "evidence": "Only this named obligation depends on the captain decision", "at_epoch": 1792079234, "sequence": 2, "deferrals": 0, "captain_visible": false, "digest": "b22d7b38f631dc7da2e484d6", "cited": [], "waits": ["9a3c76edd46f8b55801fb798b26b2bda75220c5b77c8a21173757722c53891d4"], "binding": {"source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "task": "held-job", "generation": "c085d95110498c3a72a7c6ce94ee829484b0d1654216b9c2d7c0ff8bd9d0ddfc", "kind": "pr", "url": "https://github.com/lab/project/pull/140", "head": "f563b1c43fa4805dd88243d49129e2715f430abb"}, "prerequisite": "cf7fa90ad04b60eb3e956248", "dependency": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "kind": "captain_hold", "task": "held-job", "decision": "40e3cc20717bdd9e1f657cfaa195738d8e3a014c3b4d771813cf622b69704fe6"}, "digest": "2db47397bb644d1f8ca28809"}, "recheck_epoch": 1792079834}, "f711a9a73110263dd1a61083": {"kind": "waiting", "evidence": "Only this named obligation depends on the captain decision", "at_epoch": 1792079234, "sequence": 3, "deferrals": 0, "captain_visible": false, "digest": "04bbd44ea7179bbc708d286f", "cited": [], "waits": ["75724b8a7bba13cc1c9ca95f7ba9653ae328651758958e19d85d676faa1f478e"], "binding": {"source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "task": "held-job", "generation": "c085d95110498c3a72a7c6ce94ee829484b0d1654216b9c2d7c0ff8bd9d0ddfc", "kind": "status", "key": "recovery", "decision": "d824feb37382aa498ecb3815b6552f83b60b0d115c154c2e159aeb543de2010e", "stream": [16777233, 529867343], "pr": {"url": "https://github.com/lab/project/pull/140", "head": "f563b1c43fa4805dd88243d49129e2715f430abb"}}, "prerequisite": "cf7fa90ad04b60eb3e956248", "dependency": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "kind": "captain_hold", "task": "held-job", "decision": "40e3cc20717bdd9e1f657cfaa195738d8e3a014c3b4d771813cf622b69704fe6"}, "digest": "2db47397bb644d1f8ca28809"}, "recheck_epoch": 1792079834}}}}
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "ef349c908e6edeb8296434f8","firstmate","https://github.com/lab/project/pull/140","route the green PR's review and obtain merge approval",7280,"",false
+  "f711a9a73110263dd1a61083","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7236,"blocked: current PR requires the captain decision",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792079237, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "complete": true, "rows": [{"id": "97d0e2e37bb678dd503932a8", "category": "missing_worker", "subject": "held-job", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 36, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "9d0f477a06a6ba2ee4267f83", "category": "review_pass_not_merged", "subject": "https://github.com/lab/project/pull/140", "owner": "firstmate", "next_action": "merge with existing authority or escalate for approval", "age_seconds": 1000, "limit_seconds": 600, "overdue": true, "evidence": "independent review PASS by independent-review at live head bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; required checks green"}, {"id": "cf7fa90ad04b60eb3e956248", "category": "unanswered_question", "subject": "held-job:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 7236, "limit_seconds": 1800, "overdue": true, "evidence": "approve recovery route", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "kind": "captain_hold", "task": "held-job", "decision": "40e3cc20717bdd9e1f657cfaa195738d8e3a014c3b4d771813cf622b69704fe6"}}, {"id": "f711a9a73110263dd1a61083", "category": "unanswered_question", "subject": "held-job:recovery", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7236, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: current PR requires the captain decision", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "task": "held-job", "generation": "c085d95110498c3a72a7c6ce94ee829484b0d1654216b9c2d7c0ff8bd9d0ddfc", "kind": "status", "key": "recovery", "decision": "d824feb37382aa498ecb3815b6552f83b60b0d115c154c2e159aeb543de2010e", "stream": [16777233, 529867343], "pr": {"url": "https://github.com/lab/project/pull/140", "head": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}}}], "handling": {"sequence": 3, "presentations": {"main": {"cf7fa90ad04b60eb3e956248": 0, "f711a9a73110263dd1a61083": 0}}, "presented_at": {"main": {"cf7fa90ad04b60eb3e956248": 1792079233, "f711a9a73110263dd1a61083": 1792079233}}, "actions": {"cf7fa90ad04b60eb3e956248": {"kind": "escalated", "evidence": "Captain decision is still held", "at_epoch": 1792079234, "sequence": 1, "deferrals": 0, "captain_visible": false, "digest": "2db47397bb644d1f8ca28809", "cited": []}, "f711a9a73110263dd1a61083": {"kind": "waiting", "evidence": "Only this named obligation depends on the captain decision", "at_epoch": 1792079234, "sequence": 3, "deferrals": 0, "captain_visible": false, "digest": "04bbd44ea7179bbc708d286f", "cited": [], "waits": ["75724b8a7bba13cc1c9ca95f7ba9653ae328651758958e19d85d676faa1f478e"], "binding": {"source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "task": "held-job", "generation": "c085d95110498c3a72a7c6ce94ee829484b0d1654216b9c2d7c0ff8bd9d0ddfc", "kind": "status", "key": "recovery", "decision": "d824feb37382aa498ecb3815b6552f83b60b0d115c154c2e159aeb543de2010e", "stream": [16777233, 529867343], "pr": {"url": "https://github.com/lab/project/pull/140", "head": "f563b1c43fa4805dd88243d49129e2715f430abb"}}, "prerequisite": "cf7fa90ad04b60eb3e956248", "dependency": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-pr-waits/config", "kind": "captain_hold", "task": "held-job", "decision": "40e3cc20717bdd9e1f657cfaa195738d8e3a014c3b4d771813cf622b69704fe6"}, "digest": "2db47397bb644d1f8ca28809"}, "recheck_epoch": 1792079834}}}}
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9d0f477a06a6ba2ee4267f83","firstmate","https://github.com/lab/project/pull/140","merge with existing authority or escalate for approval",1001,"independent review PASS by independent-review at live head bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; required checks green",false
+  "f711a9a73110263dd1a61083","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7237,"blocked: current PR requires the captain decision",false
+STANDING (a receipt stands; no action needed):
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "cf7fa90ad04b60eb3e956248","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7237,"approve recovery route",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792079238	3	check	report	check: live receipt supervision
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+independent-review done [at=1792078237]: review PASS head=bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb PR https://github.com/lab/project/pull/140
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: current PR requires the captain decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 74911.1792079238.QDneGo
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 9d0f477a06a6ba2ee4267f83 waiting --evidence 'Attempt to hide merge authority' --prerequisite cf7fa90ad04b60eb3e956248 --recheck 2026-10-15T15:57:19Z
+error: "this obligation cannot have a standing dependency wait"
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 9d0f477a06a6ba2ee4267f83 escalated --evidence 'Merge remains an explicit Firstmate action'
+action: "9d0f477a06a6ba2ee4267f83"
+kind: escalated
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action f711a9a73110263dd1a61083 waiting --evidence 'The changed-head question still depends on the captain decision' --prerequisite cf7fa90ad04b60eb3e956248 --recheck 2026-10-15T15:57:19Z
+action: "f711a9a73110263dd1a61083"
+kind: waiting
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 74911.1792079238.QDneGo
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9d0f477a06a6ba2ee4267f83","firstmate","https://github.com/lab/project/pull/140","merge with existing authority or escalate for approval",1003,"independent review PASS by independent-review at live head bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; required checks green",false
+STANDING (a receipt stands; no action needed):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "cf7fa90ad04b60eb3e956248","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7239,"approve recovery route",false
+  "f711a9a73110263dd1a61083","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7239,"blocked: current PR requires the captain decision",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792079240	4	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: current PR requires the captain decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 76694.1792079240.5PECPf
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 76694.1792079240.5PECPf
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9d0f477a06a6ba2ee4267f83","firstmate","https://github.com/lab/project/pull/140","merge with existing authority or escalate for approval",1004,"independent review PASS by independent-review at live head bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb; required checks green",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 9d0f477a06a6ba2ee4267f83 escalated --evidence 'Still awaiting the explicit merge action'
+action: "9d0f477a06a6ba2ee4267f83"
+kind: escalated
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 76694.1792079240.5PECPf
+
+[exit 0]

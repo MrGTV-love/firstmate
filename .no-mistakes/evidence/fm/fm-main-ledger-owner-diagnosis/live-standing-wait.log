@@ -1,0 +1,321 @@
+Isolated live validation of unmodified Firstmate commands.
+FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait
+HOME, NM_HOME and TMPDIR were disposable workspace-local directories; no operator state or credentials were used.
+TMUX addressed an absent private endpoint, never the default server.
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792078682, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "complete": false, "rows": [{"id": "7d20b7082b4f91d19a94f546", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "worker liveness held-job: worker liveness is inconclusive: not_checked; worker current state held-job: worktree gone (torn down?)"}, {"id": "8e84241255988366431d922b", "category": "silent_report", "subject": "held-job", "owner": "firstmate", "next_action": "check in: progress, blockers, cross-workstream dependencies", "age_seconds": 7200, "limit_seconds": 900, "overdue": false, "evidence": "last heard: status=1792071482; inbox acknowledgement=None; resolved reply=None; excluded: waiting on firstmate; its unanswered question or human-owned gate owns the next move", "informational": true}, {"id": "bdfc366d456a5af28287684e", "category": "unanswered_question", "subject": "held-job:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 7200, "limit_seconds": 1800, "overdue": true, "evidence": "choose recovery policy", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "kind": "captain_hold", "task": "held-job", "decision": "c10782bad66acb7c35e8c005cdcae24efdfec48898ece4bb0ca439c2544773d0"}}, {"id": "f7f489ad021fec9e7486c889", "category": "unanswered_question", "subject": "held-job:recovery", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7200, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: repair cannot proceed until a policy decision", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "task": "held-job", "generation": "b8ebeaafc8a7363695d8ed406a87d1211488b36a84267dd958ade2fa50b1ab9d", "kind": "status", "key": "recovery", "decision": "9e591208867586691b7936a006ba64931ce90f87f79162ca1ad6e6d58879b02f", "stream": [16777233, 529790535]}}]}
+
+[exit 0]
+
+$ git init -q -b main /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab commit -q --allow-empty -m 'disposable baseline'
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792078701, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "complete": true, "rows": [{"id": "f328d9e031657aa30e13f724", "category": "missing_worker", "subject": "held-job", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 19, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "bdfc366d456a5af28287684e", "category": "unanswered_question", "subject": "held-job:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 7219, "limit_seconds": 1800, "overdue": true, "evidence": "choose recovery policy", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "kind": "captain_hold", "task": "held-job", "decision": "c10782bad66acb7c35e8c005cdcae24efdfec48898ece4bb0ca439c2544773d0"}}, {"id": "f7f489ad021fec9e7486c889", "category": "unanswered_question", "subject": "held-job:recovery", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7219, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: repair cannot proceed until a policy decision", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "task": "held-job", "generation": "8ece21c8e8b7f228b46e423793d5b0fa5784ab3dbe9ee8b061bbe71f91f4fb0f", "kind": "status", "key": "recovery", "decision": "9e591208867586691b7936a006ba64931ce90f87f79162ca1ad6e6d58879b02f", "stream": [16777233, 529790535]}}]}
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bdfc366d456a5af28287684e","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7219,"choose recovery policy",false
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7219,"blocked: repair cannot proceed until a policy decision",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792078701	1	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: repair cannot proceed until a policy decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 22947.1792078701.ghacsM
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 22947.1792078701.ghacsM
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bdfc366d456a5af28287684e","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7220,"choose recovery policy",false
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7220,"blocked: repair cannot proceed until a policy decision",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action bdfc366d456a5af28287684e escalated --evidence 'Captain policy decision is explicitly outstanding'
+action: "bdfc366d456a5af28287684e"
+kind: escalated
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action f7f489ad021fec9e7486c889 waiting --evidence 'This recovery depends on the named captain policy decision' --prerequisite bdfc366d456a5af28287684e --recheck 2026-10-15T15:48:48Z
+action: "f7f489ad021fec9e7486c889"
+kind: waiting
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 22947.1792078701.ghacsM
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+1792078728	2	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: repair cannot proceed until a policy decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 75166.1792078728.7JwwLB
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 75166.1792078728.7JwwLB
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --report
+generated_epoch: 1792078701
+complete: true
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bdfc366d456a5af28287684e","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7248,"choose recovery policy",false
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7248,"blocked: repair cannot proceed until a policy decision",false
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action f7f489ad021fec9e7486c889 waiting --evidence 'self reference' --prerequisite f7f489ad021fec9e7486c889 --recheck 2026-10-15T15:48:48Z
+error: "prerequisite must be a distinct current unanswered question, not another wait"
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action f7f489ad021fec9e7486c889 waiting --evidence 'same wait again' --prerequisite bdfc366d456a5af28287684e --recheck 2026-10-15T15:48:48Z
+error: "unchanged dependency wait cannot be renewed; follow up on its prerequisite"
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action bdfc366d456a5af28287684e waiting --evidence 'captain must retain ownership' --prerequisite f7f489ad021fec9e7486c889 --recheck 2026-10-15T15:48:48Z
+error: "this obligation cannot have a standing dependency wait"
+
+[exit 1]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+1792078730	3	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: repair cannot proceed until a policy decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 78301.1792078730.ckC37D
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 78301.1792078730.ckC37D
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7249,"blocked: repair cannot proceed until a policy decision",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 78301.1792078730.ckC37D
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7249,"blocked: repair cannot proceed until a policy decision",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 78301.1792078730.ckC37D
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7249,"blocked: repair cannot proceed until a policy decision",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 78301.1792078730.ckC37D
+
+[exit 0]
+
+$ git init -q --bare /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/origin.git
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/origin.git symbolic-ref HEAD refs/heads/main
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab remote add origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/origin.git
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab push -q origin main
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab checkout -q -b fm/held-job
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab add retained.txt
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab commit -q -m 'retained unlanded deliverable'
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792078768, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "complete": true, "rows": [{"id": "42fa5e77b8c485e3a7485bb9", "category": "coverage", "subject": "no forge coverage: lab", "owner": "firstmate", "next_action": "none: this project's origin is a local path, so it has no forge pull requests to collect", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab: local origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/origin.git", "informational": true}, {"id": "f328d9e031657aa30e13f724", "category": "missing_worker", "subject": "held-job", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 86, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "bdfc366d456a5af28287684e", "category": "unanswered_question", "subject": "held-job:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 7286, "limit_seconds": 1800, "overdue": true, "evidence": "choose recovery policy", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "kind": "captain_hold", "task": "held-job", "decision": "c10782bad66acb7c35e8c005cdcae24efdfec48898ece4bb0ca439c2544773d0"}}, {"id": "f7f489ad021fec9e7486c889", "category": "unanswered_question", "subject": "held-job:recovery", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7286, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: repair cannot proceed until a policy decision", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "task": "held-job", "generation": "8ece21c8e8b7f228b46e423793d5b0fa5784ab3dbe9ee8b061bbe71f91f4fb0f", "kind": "status", "key": "recovery", "decision": "9e591208867586691b7936a006ba64931ce90f87f79162ca1ad6e6d58879b02f", "stream": [16777233, 529790535]}}], "handling": {"sequence": 2, "presentations": {"main": {"bdfc366d456a5af28287684e": 0, "f7f489ad021fec9e7486c889": 0}}, "presented_at": {"main": {"bdfc366d456a5af28287684e": 1792078701, "f7f489ad021fec9e7486c889": 1792078701}}, "actions": {"bdfc366d456a5af28287684e": {"kind": "escalated", "evidence": "Captain policy decision is explicitly outstanding", "at_epoch": 1792078728, "sequence": 1, "deferrals": 0, "captain_visible": false, "digest": "977cd0a52707bd9ea819aae2", "cited": []}, "f7f489ad021fec9e7486c889": {"kind": "waiting", "evidence": "This recovery depends on the named captain policy decision", "at_epoch": 1792078728, "sequence": 2, "deferrals": 0, "captain_visible": false, "digest": "9d95c956e4078a573bbe6c42", "cited": [], "waits": ["925474aadeaf4e4a62980077bcbe8e2602b1615f9d8f05d2c5a7b4a0382dee30"], "binding": {"source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "task": "held-job", "generation": "8ece21c8e8b7f228b46e423793d5b0fa5784ab3dbe9ee8b061bbe71f91f4fb0f", "kind": "status", "key": "recovery", "decision": "9e591208867586691b7936a006ba64931ce90f87f79162ca1ad6e6d58879b02f", "stream": [16777233, 529790535]}, "prerequisite": "bdfc366d456a5af28287684e", "dependency": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "kind": "captain_hold", "task": "held-job", "decision": "c10782bad66acb7c35e8c005cdcae24efdfec48898ece4bb0ca439c2544773d0"}, "digest": "977cd0a52707bd9ea819aae2"}, "recheck_epoch": 1792079328}}}}
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792078797, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "complete": true, "rows": [{"id": "42fa5e77b8c485e3a7485bb9", "category": "coverage", "subject": "no forge coverage: lab", "owner": "firstmate", "next_action": "none: this project's origin is a local path, so it has no forge pull requests to collect", "age_seconds": null, "limit_seconds": 0, "overdue": false, "evidence": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab: local origin /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/origin.git", "informational": true}, {"id": "f328d9e031657aa30e13f724", "category": "missing_worker", "subject": "held-job", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 115, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "bdfc366d456a5af28287684e", "category": "unanswered_question", "subject": "held-job:captain-hold", "owner": "captain", "next_action": "resolve the captain hold or record its next decision date", "age_seconds": 7315, "limit_seconds": 1800, "overdue": true, "evidence": "choose recovery policy", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "kind": "captain_hold", "task": "held-job", "decision": "c10782bad66acb7c35e8c005cdcae24efdfec48898ece4bb0ca439c2544773d0"}}, {"id": "f7f489ad021fec9e7486c889", "category": "unanswered_question", "subject": "held-job:recovery", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7315, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: repair cannot proceed until a policy decision", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "task": "held-job", "generation": "5b9c80ebaaf194d8cc6864483aad3f9ddc10618aeda5f2338aca475f49790445", "kind": "status", "key": "recovery", "decision": "9e591208867586691b7936a006ba64931ce90f87f79162ca1ad6e6d58879b02f", "stream": [16777233, 529790535]}}, {"id": "1c7ad64839aa3f851d276582", "category": "unlanded_commit", "subject": "held-job", "owner": "firstmate", "next_action": "land this work through its PR, or obtain the captain's drop", "age_seconds": 172829, "limit_seconds": 86400, "overdue": true, "evidence": "1 commit(s) not on refs/remotes/origin/main; newest: retained unlanded deliverable", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "task": "held-job", "generation": "5b9c80ebaaf194d8cc6864483aad3f9ddc10618aeda5f2338aca475f49790445", "kind": "commits", "worktree": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab", "head": "ca337c4b95fa1a41e5095b0c38a3aa4481e8356f", "commits": "8ea8c16415ded30c4575dfcd8a9db529edb76e5cad0c92fc7c904395a9549399"}}], "handling": {"sequence": 2, "presentations": {"main": {"bdfc366d456a5af28287684e": 0, "f7f489ad021fec9e7486c889": 0}}, "presented_at": {"main": {"bdfc366d456a5af28287684e": 1792078701, "f7f489ad021fec9e7486c889": 1792078701}}, "actions": {"bdfc366d456a5af28287684e": {"kind": "escalated", "evidence": "Captain policy decision is explicitly outstanding", "at_epoch": 1792078728, "sequence": 1, "deferrals": 0, "captain_visible": false, "digest": "977cd0a52707bd9ea819aae2", "cited": []}, "f7f489ad021fec9e7486c889": {"kind": "waiting", "evidence": "This recovery depends on the named captain policy decision", "at_epoch": 1792078728, "sequence": 2, "deferrals": 0, "captain_visible": false, "digest": "9d95c956e4078a573bbe6c42", "cited": [], "waits": ["925474aadeaf4e4a62980077bcbe8e2602b1615f9d8f05d2c5a7b4a0382dee30"], "binding": {"source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "task": "held-job", "generation": "8ece21c8e8b7f228b46e423793d5b0fa5784ab3dbe9ee8b061bbe71f91f4fb0f", "kind": "status", "key": "recovery", "decision": "9e591208867586691b7936a006ba64931ce90f87f79162ca1ad6e6d58879b02f", "stream": [16777233, 529790535]}, "prerequisite": "bdfc366d456a5af28287684e", "dependency": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/config", "kind": "captain_hold", "task": "held-job", "decision": "c10782bad66acb7c35e8c005cdcae24efdfec48898ece4bb0ca439c2544773d0"}, "digest": "977cd0a52707bd9ea819aae2"}, "recheck_epoch": 1792079328}}}}
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7316,"blocked: repair cannot proceed until a policy decision",false
+  "1c7ad64839aa3f851d276582","firstmate","held-job","land this work through its PR, or obtain the captain's drop",172830,"1 commit(s) not on refs/remotes/origin/main; newest: retained unlanded deliverable",false
+STANDING (a receipt stands; no action needed):
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bdfc366d456a5af28287684e","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7316,"choose recovery policy",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792078798	4	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: repair cannot proceed until a policy decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 87784.1792078798.44Wj7g
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 87784.1792078798.44Wj7g
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7317,"blocked: repair cannot proceed until a policy decision",false
+  "1c7ad64839aa3f851d276582","firstmate","held-job","land this work through its PR, or obtain the captain's drop",172831,"1 commit(s) not on refs/remotes/origin/main; newest: retained unlanded deliverable",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action f7f489ad021fec9e7486c889 waiting --evidence 'This named obligation waits for the exact captain decision' --prerequisite bdfc366d456a5af28287684e --recheck 2026-10-15T15:49:59Z
+action: "f7f489ad021fec9e7486c889"
+kind: waiting
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 1c7ad64839aa3f851d276582 waiting --evidence 'This named obligation waits for the exact captain decision' --prerequisite bdfc366d456a5af28287684e --recheck 2026-10-15T15:49:59Z
+action: "1c7ad64839aa3f851d276582"
+kind: waiting
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 87784.1792078798.44Wj7g
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+1792078799	5	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: repair cannot proceed until a policy decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 89635.1792078799.qiEZSn
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 89635.1792078799.qiEZSn
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --report
+generated_epoch: 1792078797
+complete: true
+OVERDUE:
+rows[3]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bdfc366d456a5af28287684e","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7319,"choose recovery policy",false
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7319,"blocked: repair cannot proceed until a policy decision",false
+  "1c7ad64839aa3f851d276582","firstmate","held-job","land this work through its PR, or obtain the captain's drop",172833,"1 commit(s) not on refs/remotes/origin/main; newest: retained unlanded deliverable",false
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-standing-wait/projects/lab commit -q --allow-empty -m 'additional preserved correction'
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "1c7ad64839aa3f851d276582","firstmate","held-job","land this work through its PR, or obtain the captain's drop",172833,"1 commit(s) not on refs/remotes/origin/main; newest: retained unlanded deliverable",false
+STANDING (a receipt stands; no action needed):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bdfc366d456a5af28287684e","captain","held-job:captain-hold","resolve the captain hold or record its next decision date",7319,"choose recovery policy",false
+  "f7f489ad021fec9e7486c889","firstmate","held-job:recovery","answer or close this question, or record why it no longer applies",7319,"blocked: repair cannot proceed until a policy decision",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792078801	6	check	report	check: live receipt supervision
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+held-job [key=recovery] blocked: repair cannot proceed until a policy decision
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 92119.1792078801.OeWC5S
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 92119.1792078801.OeWC5S
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "1c7ad64839aa3f851d276582","firstmate","held-job","land this work through its PR, or obtain the captain's drop",172834,"1 commit(s) not on refs/remotes/origin/main; newest: retained unlanded deliverable",false
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 1c7ad64839aa3f851d276582 escalated --evidence 'Additional retained correction requires a fresh landing decision'
+action: "1c7ad64839aa3f851d276582"
+kind: escalated
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh --ack-through 6 --recovery-generation 92119.1792078801.OeWC5S
+
+[exit 0]

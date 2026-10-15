@@ -1,0 +1,94 @@
+Isolated live validation of unmodified Firstmate commands.
+FM_HOME=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion
+HOME, NM_HOME and TMPDIR were disposable workspace-local directories; no operator state or credentials were used.
+TMUX addressed an absent private endpoint, never the default server.
+The shared completion-proof function was executed directly. Public crew-state/receipt admission was exercised with an absent endpoint; this is NOT evidence of a healthy routed harness.
+
+$ git init -q -b fm/repair /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/projects/repair
+
+[exit 0]
+
+$ git -C /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/projects/repair commit -q --allow-empty -m 'disposable repair head'
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_dod_accept_ship_done ship direct-PR "$2" "$2" "$3" "$4" repair "$5"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-dod-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/projects/repair 'done [at=1792079095]: PR https://gerrit.invalid/c/lab/repair/+/140 published for review' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/state/repair.meta
+named head 10b74a6f057c4429b853873f3aacdc5d6cc009fb cannot be verified locally: forge read skipped
+
+[exit 1]
+
+$ bash -c '. "$1"; fm_dod_accept_ship_done ship direct-PR "$2" "$2" "$3" "$4" repair "$5"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-dod-lib.sh /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/projects/repair 'done [at=1792079095]: PR https://gerrit.invalid/c/lab/repair/+/140 published for review' /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/state /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/state/repair.meta
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh --heartbeat --json
+{"schema": "fm-open-loops.v1", "generated_epoch": 1792079095, "home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion", "complete": false, "rows": [{"id": "eb2a7eb90a097c639ce8d47c", "category": "coverage", "subject": "ledger degraded", "owner": "firstmate", "next_action": "restore the unreadable sources and rerun the reconciler", "age_seconds": null, "limit_seconds": 0, "overdue": true, "evidence": "unlanded work repair: default branch is unknown"}, {"id": "7acc923bde66a30beef3aba7", "category": "missing_worker", "subject": "job", "owner": "firstmate", "next_action": "recover the assigned worker without discarding work", "age_seconds": 0, "limit_seconds": 600, "overdue": false, "evidence": ""}, {"id": "163bcfaacdd438bdacd61a4b", "category": "unanswered_question", "subject": "job:recovery", "owner": "firstmate", "next_action": "answer or close this question, or record why it no longer applies", "age_seconds": 7200, "limit_seconds": 1800, "overdue": true, "evidence": "blocked: repair prerequisite still owed", "source": {"home": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion", "state": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/state", "data": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/data", "config": "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/config", "task": "job", "generation": "81be688082d7d9455d2eebfe27f7dd5caf83c221491cbcc54c8f3643c75aaa7a", "kind": "status", "key": "recovery", "decision": "01693588632f24761aa81a3c8ae8070bd80cd48bef59877872a27e4d2bc0294a", "stream": [16777233, 529853439]}}]}
+
+[exit 0]
+
+$ bash -c '. "$1"; fm_wake_append check report "check: live receipt supervision"' _ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-lib.sh
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "eb2a7eb90a097c639ce8d47c","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"unlanded work repair: default branch is unknown",false
+  "163bcfaacdd438bdacd61a4b","firstmate","job:recovery","answer or close this question, or record why it no longer applies",7201,"blocked: repair prerequisite still owed",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>]
+1792079096	1	check	report	check: live receipt supervision
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+repair done [at=1792079095]: PR https://gerrit.invalid/c/lab/repair/+/140 published for review
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+job [key=recovery] blocked: repair prerequisite still owed
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 1 --recovery-generation 64225.1792079096.WwAqRr
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  2 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  After draining queued wakes, repair a missing or failed watcher cycle with the omp tool fm_watch_arm_omp, or restart omp inside this home so /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-turnend-guard.ts and /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.omp/extensions/fm-primary-omp-watch.ts auto-load from .omp/extensions/ (use -e with both paths only when starting omp from another directory).
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-crew-state.sh repair
+state: unknown · source: none · backend target gone: receipt-lab:fm-repair
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 163bcfaacdd438bdacd61a4b waiting --evidence 001.msg --prerequisite-task repair --recheck 2026-10-15T15:54:58Z
+error: "routed prerequisite is no longer working; follow up on its result or wait"
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-crew-state.sh repair
+state: unknown · source: none · backend target gone: receipt-lab:fm-repair
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 163bcfaacdd438bdacd61a4b waiting --evidence 001.msg --prerequisite-task repair --recheck 2026-10-15T15:54:58Z
+error: "routed prerequisite is no longer working; follow up on its result or wait"
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-crew-state.sh repair
+state: unknown · source: none · backend target gone: receipt-lab:fm-repair
+
+[exit 0]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-open-loops.sh action 163bcfaacdd438bdacd61a4b waiting --evidence 001.msg --prerequisite-task repair --recheck 2026-10-15T15:54:58Z
+error: "routed prerequisite is no longer working; follow up on its result or wait"
+
+[exit 1]
+
+$ /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/bin/fm-lab-home.sh create /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/primary-lab
+fm-lab-home: refusing '/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4ZZCSEQ70Q6KQN22YVZ5RZW/.receipt-live-bsu17yun/live-local-completion/primary-lab': a lab home must live outside the repository; use mktemp -d "${TMPDIR:-/tmp}/fm-lab.XXXXXX"
+
+[exit 1]
+
+$ bash -c 'command -v gerrit-axi'
+
+[exit 1]
