@@ -1,0 +1,2 @@
+fm-project-capacity rc=0
+fm-idle-session-reap rc=0
