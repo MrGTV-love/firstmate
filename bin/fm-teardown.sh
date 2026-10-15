@@ -2555,7 +2555,9 @@ teardown_refuse_removed_nested_copy() {
 
 # Scratch and --force copies are scrubbed before Treehouse return. See the
 # script header for why `git clean -fd` is not enough and why a dirty return
-# is not reported as clean.
+# is not reported as clean. The registered-copy custody proof runs before the
+# clean, so a refused return never deletes a registered nested worktree
+# (tests/fm-teardown.test.sh test_non_pool_returns_recheck_registered_copies).
 teardown_scrub_scratch_copy() {  # <wt> <owner-task>
   local wt=$1 owner=$2
   # A non-git path has no nested repository this clean can remove.

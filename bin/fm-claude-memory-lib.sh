@@ -19,7 +19,8 @@
 # Both the logical and the physical spelling of each ancestor are listed,
 # because Claude matches the path it walked, not the path we resolved.
 #
-# Sourced by bin/fm-spawn.sh for canonical templates' per-launch --settings JSON.
+# Sourced by bin/fm-spawn.sh for canonical templates' per-launch --settings JSON
+# and for a Claude secondmate's state/<id>.claude-settings.json file.
 # For a recognized raw Claude launch nested under a firstmate home, the spawn
 # instead runs this file as <exclusions-json> <program> [arguments...], inside
 # the TeamClaude wrapper when selected. It merges the required exclusions into

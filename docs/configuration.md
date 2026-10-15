@@ -1092,7 +1092,7 @@ The [portable omp regression suite](../tests/fm-omp-harness.test.sh) covers defa
 [Native direct-route and no-helper verification](verification/runtime-backends.md#omp-direct-judge-and-primary-model-only-workers) records the real-runtime fake-key probes, unavailable-provider boundary, interactive speech check and evidence limits.
 
 For a Claude secondmate, `fm-spawn.sh` writes the busy hooks into the parent home's `state/<id>.claude-settings.json` and passes that file as Claude Code's one `--settings` value.
-The same file carries `feedbackDrafts` and, unless `config/keep-ai-trailers` is present, the attribution policy every other Claude launch puts in its inline `--settings` JSON.
+The same file carries what every other Claude launch puts in its inline `--settings` JSON: `feedbackDrafts`, the attribution policy unless `config/keep-ai-trailers` is present, and the ancestor-home memory exclusions owned by [`bin/fm-claude-memory-lib.sh`](../bin/fm-claude-memory-lib.sh).
 Claude Code applies `--settings` for that session and does not write the file into the mate home.
 A key the file sets overrides the same key in user, project, and local settings.
 A key it omits keeps the file-based value, so a `.claude/settings.local.json` already in the home is left untouched.
