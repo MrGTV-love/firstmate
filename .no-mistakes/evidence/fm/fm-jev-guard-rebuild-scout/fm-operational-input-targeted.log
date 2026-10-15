@@ -1,0 +1,21 @@
+calibration: "0 of 5 samples for test.tests/fm-operational-input.test.sh on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+ok - operational input: every current generic envelope retains its exact structured kind
+progress: "test.tests/fm-operational-input.test.sh elapsed=0.2s output_bytes=89 tree_cpu=0.02s"
+ok - operational input: the established from-firstmate carrier remains structurally typed and byte-compatible
+ok - operational input: untyped landed FIRSTMATE_OP transcripts are explicit legacy-operational input
+ok - operational input: historical prose compatibility is isolated from current parsing
+progress: "test.tests/fm-operational-input.test.sh elapsed=0.3s output_bytes=389 tree_cpu=0.02s"
+ok - operational input: quoted, ASCII-only, arbitrary-U+2063, altered-legacy, and label-only near misses stay genuine
+progress: "test.tests/fm-operational-input.test.sh elapsed=0.3s output_bytes=507 tree_cpu=0.02s"
+ok - operational input: the OpenCode adapter constructs through the canonical owner
+progress: "test.tests/fm-operational-input.test.sh elapsed=0.4s output_bytes=591 tree_cpu=0.02s"
+ok - operational input: current construction rejects legacy kinds and empty bodies
+progress: "test.tests/fm-operational-input.test.sh elapsed=0.4s output_bytes=674 tree_cpu=0.02s"
+ok - record-backed carrier: Claude-only selection, an ASCII doorbell naming an exact envelope record, home-bound open, and no recognition without the record
+progress: "test.tests/fm-operational-input.test.sh elapsed=0.7s output_bytes=831 tree_cpu=0.02s"
+progress: "test.tests/fm-operational-input.test.sh elapsed=1.7s output_bytes=831 tree_cpu=0.22s"
+progress: "test.tests/fm-operational-input.test.sh elapsed=2.7s output_bytes=831 tree_cpu=0.98s"
+progress: "test.tests/fm-operational-input.test.sh elapsed=3.7s output_bytes=831 tree_cpu=1.68s"
+ok - record pruning: expired records past one argument list are all pruned on a write
+progress: "test.tests/fm-operational-input.test.sh elapsed=4.3s output_bytes=917 tree_cpu=1.68s"

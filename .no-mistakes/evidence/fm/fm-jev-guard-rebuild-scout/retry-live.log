@@ -1,0 +1,75 @@
+calibration: "0 of 5 samples for test.retry-live on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+Published first retry: 001.msg at 2026-10-15T03:03:17Z
+progress: "test.retry-live elapsed=0.2s output_bytes=55 tree_cpu=0.02s"
+Published second retry: 002.msg at 2026-10-15T03:03:20Z; ordinary record: 003.msg
+Individual recovery doorbells before acknowledgement:
+progress: "test.retry-live elapsed=3.5s output_bytes=191 tree_cpu=0.02s"
+: Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'validation.inbox' steering inbox, record '001.msg' - omp full-file read: append :raw - read only this record in numeric order after earlier doorbells and acknowledgements, then act and mv it into handled/.progress: "test.retry-live elapsed=3.5s output_bytes=466 tree_cpu=0.02s"
+
+progress: "test.retry-live elapsed=3.5s output_bytes=467 tree_cpu=0.02s"
+: Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'validation.inbox' steering inbox, record '002.msg' - omp full-file read: append :raw - read only this record in numeric order after earlier doorbells and acknowledgements, then act and mv it into handled/.progress: "test.retry-live elapsed=3.5s output_bytes=742 tree_cpu=0.02s"
+
+progress: "test.retry-live elapsed=3.5s output_bytes=743 tree_cpu=0.02s"
+: Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'validation.inbox' steering inbox, record '003.msg' - omp full-file read: append :raw - read only this record in numeric order after earlier doorbells and acknowledgements, then act and mv it into handled/.progress: "test.retry-live elapsed=3.6s output_bytes=1018 tree_cpu=0.02s"
+
+progress: "test.retry-live elapsed=3.6s output_bytes=1019 tree_cpu=0.02s"
+Write-time consistency receipts:
+progress: "test.retry-live elapsed=3.6s output_bytes=1052 tree_cpu=0.02s"
+{
+  "schema": "fm-channel-consistency.v1",
+  "kind": "steering-inbox",
+  "task": "validation",
+  "record_name": "001.msg",
+  "byte_length": 81,
+  "file_sha256": "6ad775d2d55b231b239eccc6cec0aab23adc086018cc54e5b08257c29eb980f5",
+  "doorbell_sha256": "d4a47de177f7971de50e874b6e0ba6d163467e6cf15137f102903b76600c01cd",
+  "error_type": null
+}
+progress: "test.retry-live elapsed=3.6s output_bytes=1393 tree_cpu=0.02s"
+{
+  "schema": "fm-channel-consistency.v1",
+  "kind": "steering-inbox",
+  "task": "validation",
+  "record_name": "002.msg",
+  "byte_length": 82,
+  "file_sha256": "e217ad8d86fdb3462b654bd5455e12f7aab5af9e797ca1c9efe5e20de1c6f693",
+  "doorbell_sha256": "31825493cd07de9a30007b42a2aa58632da379f0353f92e8502face59ea55466",
+  "error_type": null
+}
+progress: "test.retry-live elapsed=3.6s output_bytes=1734 tree_cpu=0.02s"
+{
+  "schema": "fm-channel-consistency.v1",
+  "kind": "steering-inbox",
+  "task": "validation",
+  "record_name": "003.msg",
+  "byte_length": 58,
+  "file_sha256": "87aae8f0a340d025d4969b2dd0e45284f8f3b20dfdbbf53c00a6d850093177fd",
+  "doorbell_sha256": "c16d4f1db6061bef1e4abe81d148ae97392818c99dd2efff6aeb8c01d7c9fab4",
+  "error_type": null
+}
+progress: "test.retry-live elapsed=3.6s output_bytes=2075 tree_cpu=0.02s"
+Observed scheduler action: retry <disposable-lab>/state/validation.inbox/001.msg
+progress: "test.retry-live elapsed=3.6s output_bytes=2156 tree_cpu=0.02s"
+Observed scheduler action: quiet
+progress: "test.retry-live elapsed=3.6s output_bytes=2189 tree_cpu=0.02s"
+progress: "test.retry-live elapsed=4.6s output_bytes=2189 tree_cpu=0.03s"
+Observed scheduler action: retry <disposable-lab>/state/validation.inbox/002.msg
+progress: "test.retry-live elapsed=6.7s output_bytes=2270 tree_cpu=0.03s"
+Observed scheduler action: ring <disposable-lab>/state/validation.inbox/003.msg
+progress: "test.retry-live elapsed=6.8s output_bytes=2350 tree_cpu=0.03s"
+Doorbells after two acknowledgements:
+progress: "test.retry-live elapsed=6.8s output_bytes=2388 tree_cpu=0.03s"
+: Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your 'validation.inbox' steering inbox, record '003.msg' - omp full-file read: append :raw - read only this record in numeric order after earlier doorbells and acknowledgements, then act and mv it into handled/.progress: "test.retry-live elapsed=6.8s output_bytes=2663 tree_cpu=0.03s"
+
+progress: "test.retry-live elapsed=6.8s output_bytes=2664 tree_cpu=0.03s"
+Observed scheduler action: quiet
+progress: "test.retry-live elapsed=6.8s output_bytes=2697 tree_cpu=0.03s"
+Final acknowledgement state:
+progress: "test.retry-live elapsed=6.8s output_bytes=2726 tree_cpu=0.03s"
+001.msg: handled=true unhandled=false
+progress: "test.retry-live elapsed=6.8s output_bytes=2764 tree_cpu=0.03s"
+002.msg: handled=true unhandled=false
+progress: "test.retry-live elapsed=6.8s output_bytes=2802 tree_cpu=0.03s"
+003.msg: handled=true unhandled=false
+progress: "test.retry-live elapsed=6.8s output_bytes=2840 tree_cpu=0.03s"

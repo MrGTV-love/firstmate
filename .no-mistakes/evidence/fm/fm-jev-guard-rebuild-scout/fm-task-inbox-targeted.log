@@ -1,0 +1,183 @@
+calibration: "0 of 5 samples for test.tests/fm-task-inbox.test.sh on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+ok - inbox: a steer is written durably and round-trips byte-exact with a self-describing doorbell
+progress: "test.tests/fm-task-inbox.test.sh elapsed=0.6s output_bytes=98 tree_cpu=0.02s"
+ok - inbox: a hostile-name doorbell executes as a no-op in bare shells
+progress: "test.tests/fm-task-inbox.test.sh elapsed=0.8s output_bytes=169 tree_cpu=0.02s"
+ok - inbox: terminal-control inbox names are rejected without typing
+progress: "test.tests/fm-task-inbox.test.sh elapsed=1.4s output_bytes=238 tree_cpu=0.02s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=2.4s output_bytes=238 tree_cpu=0.06s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=3.4s output_bytes=238 tree_cpu=0.08s"
+ok - inbox: the ring skips dead or missing endpoints and still rings live or unclassifiable endpoints
+progress: "test.tests/fm-task-inbox.test.sh elapsed=4.3s output_bytes=340 tree_cpu=0.08s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=5.3s output_bytes=340 tree_cpu=0.10s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=6.4s output_bytes=340 tree_cpu=0.13s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=7.4s output_bytes=340 tree_cpu=0.15s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=8.4s output_bytes=340 tree_cpu=0.16s"
+ok - inbox: the ring submits its own stuck doorbell, skips other pending text, and retries a lost Enter once on both paths
+progress: "test.tests/fm-task-inbox.test.sh elapsed=8.8s output_bytes=463 tree_cpu=0.16s"
+ok - inbox: the idempotent enqueue dedups an exact re-run onto the same record, handled or not
+progress: "test.tests/fm-task-inbox.test.sh elapsed=9.2s output_bytes=558 tree_cpu=0.16s"
+ok - inbox: idempotent enqueue follows a record concurrently moved to handled
+progress: "test.tests/fm-task-inbox.test.sh elapsed=9.4s output_bytes=636 tree_cpu=0.16s"
+ok - inbox: the handled mv is the idempotent ack and sequences are never reissued
+progress: "test.tests/fm-task-inbox.test.sh elapsed=9.9s output_bytes=718 tree_cpu=0.17s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=10.9s output_bytes=718 tree_cpu=0.25s"
+ok - inbox: concurrent writers serialize on the sequence lock and lose nothing
+progress: "test.tests/fm-task-inbox.test.sh elapsed=11.2s output_bytes=797 tree_cpu=0.25s"
+ok - inbox: a writer retries when a competing lock vanishes after its failed claim
+progress: "test.tests/fm-task-inbox.test.sh elapsed=11.6s output_bytes=880 tree_cpu=0.25s"
+ok - inbox: ladder bookkeeping ignores a concurrently removed inbox
+progress: "test.tests/fm-task-inbox.test.sh elapsed=11.8s output_bytes=948 tree_cpu=0.25s"
+ok - inbox: fire-and-forget records stay durable and outside the ladder
+progress: "test.tests/fm-task-inbox.test.sh elapsed=12.1s output_bytes=1020 tree_cpu=0.26s"
+ok - inbox: a fire-and-forget record whose ring did not land is owed exactly one retry
+progress: "test.tests/fm-task-inbox.test.sh elapsed=12.8s output_bytes=1107 tree_cpu=0.26s"
+ok - inbox: without config/wait-no-turns a fire-and-forget retry mark stays quiet
+progress: "test.tests/fm-task-inbox.test.sh elapsed=13.0s output_bytes=1189 tree_cpu=0.26s"
+ok - inbox: the re-ring ladder paces by grace, escalates once, and resets on ack
+progress: "test.tests/fm-task-inbox.test.sh elapsed=13.6s output_bytes=1270 tree_cpu=0.27s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=14.6s output_bytes=1270 tree_cpu=0.54s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=15.6s output_bytes=1270 tree_cpu=0.58s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=17.7s output_bytes=1270 tree_cpu=0.60s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=18.7s output_bytes=1270 tree_cpu=0.64s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=19.8s output_bytes=1270 tree_cpu=0.67s"
+ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it
+progress: "test.tests/fm-task-inbox.test.sh elapsed=20.3s output_bytes=1381 tree_cpu=0.67s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=21.3s output_bytes=1381 tree_cpu=0.90s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=22.4s output_bytes=1381 tree_cpu=0.95s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=23.4s output_bytes=1381 tree_cpu=0.98s"
+ok - watcher: a live idle task with draft risk defers without input, retains its record, and escalates once at the ladder budget
+progress: "test.tests/fm-task-inbox.test.sh elapsed=23.8s output_bytes=1510 tree_cpu=0.98s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=24.8s output_bytes=1510 tree_cpu=1.22s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=25.9s output_bytes=1510 tree_cpu=1.26s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=26.9s output_bytes=1510 tree_cpu=1.29s"
+ok - watcher: a live idle task with draft risk defers without input, retains its record, and escalates once at the ladder budget
+progress: "test.tests/fm-task-inbox.test.sh elapsed=27.5s output_bytes=1639 tree_cpu=1.29s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=28.5s output_bytes=1639 tree_cpu=1.41s"
+ok - watcher: busy deferrals survive restart, escalate once at the bound, and never type
+progress: "test.tests/fm-task-inbox.test.sh elapsed=28.8s output_bytes=1728 tree_cpu=1.41s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=29.8s output_bytes=1728 tree_cpu=1.52s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=30.8s output_bytes=1728 tree_cpu=1.53s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=31.8s output_bytes=1728 tree_cpu=1.59s"
+ok - watcher: delivery and acknowledgement reset the durable busy budget
+progress: "test.tests/fm-task-inbox.test.sh elapsed=31.9s output_bytes=1801 tree_cpu=1.59s"
+ok - watcher: unwritable busy bookkeeping surfaces without typing
+progress: "test.tests/fm-task-inbox.test.sh elapsed=32.6s output_bytes=1867 tree_cpu=1.59s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=33.6s output_bytes=1867 tree_cpu=1.71s"
+ok - watcher: idle successor surfaces once despite unremovable predecessor bookkeeping
+progress: "test.tests/fm-task-inbox.test.sh elapsed=34.4s output_bytes=1954 tree_cpu=1.71s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=35.4s output_bytes=1954 tree_cpu=1.83s"
+ok - watcher: busy successor surfaces once despite unremovable predecessor bookkeeping
+progress: "test.tests/fm-task-inbox.test.sh elapsed=36.2s output_bytes=2041 tree_cpu=1.83s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=37.2s output_bytes=2041 tree_cpu=1.94s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=38.2s output_bytes=2041 tree_cpu=2.05s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=39.3s output_bytes=2041 tree_cpu=2.07s"
+ok - watcher: persistent idle busy-reset failure escalates once and later instructions still deliver
+progress: "test.tests/fm-task-inbox.test.sh elapsed=39.5s output_bytes=2142 tree_cpu=2.07s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=40.5s output_bytes=2142 tree_cpu=2.18s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=41.6s output_bytes=2142 tree_cpu=2.29s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=42.6s output_bytes=2142 tree_cpu=2.30s"
+ok - watcher: persistent protected busy-reset failure escalates once and later instructions still deliver
+progress: "test.tests/fm-task-inbox.test.sh elapsed=42.8s output_bytes=2248 tree_cpu=2.30s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=43.8s output_bytes=2248 tree_cpu=2.41s"
+ok - watcher: busy limit '999999999999999999999999999999' escalates exactly once at 2
+progress: "test.tests/fm-task-inbox.test.sh elapsed=44.1s output_bytes=2334 tree_cpu=2.41s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=45.1s output_bytes=2334 tree_cpu=2.42s"
+ok - watcher: busy limit '1000000000' escalates exactly once at 2
+progress: "test.tests/fm-task-inbox.test.sh elapsed=45.3s output_bytes=2400 tree_cpu=2.42s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=46.3s output_bytes=2400 tree_cpu=2.54s"
+ok - watcher: busy limit '0' escalates exactly once at 2
+progress: "test.tests/fm-task-inbox.test.sh elapsed=46.6s output_bytes=2457 tree_cpu=2.54s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=47.6s output_bytes=2457 tree_cpu=2.66s"
+ok - watcher: busy limit '000' escalates exactly once at 2
+progress: "test.tests/fm-task-inbox.test.sh elapsed=47.8s output_bytes=2516 tree_cpu=2.66s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=48.8s output_bytes=2516 tree_cpu=2.77s"
+ok - watcher: busy limit '' escalates exactly once at 2
+progress: "test.tests/fm-task-inbox.test.sh elapsed=49.1s output_bytes=2572 tree_cpu=2.77s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=50.1s output_bytes=2572 tree_cpu=2.89s"
+ok - watcher: busy limit 'invalid' escalates exactly once at 2
+progress: "test.tests/fm-task-inbox.test.sh elapsed=50.4s output_bytes=2635 tree_cpu=2.89s"
+ok - watcher: busy limit '1' escalates exactly once at 1
+progress: "test.tests/fm-task-inbox.test.sh elapsed=51.2s output_bytes=2692 tree_cpu=2.89s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=52.3s output_bytes=2692 tree_cpu=2.98s"
+ok - watcher: busy limit '3' escalates exactly once at 3
+progress: "test.tests/fm-task-inbox.test.sh elapsed=52.7s output_bytes=2749 tree_cpu=2.98s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=53.7s output_bytes=2749 tree_cpu=3.07s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=54.8s output_bytes=2749 tree_cpu=3.09s"
+ok - watcher: unremovable obsolete busy state does not block or escalate a fire-and-forget retry
+progress: "test.tests/fm-task-inbox.test.sh elapsed=55.5s output_bytes=2846 tree_cpu=3.09s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=56.5s output_bytes=2846 tree_cpu=3.21s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=57.5s output_bytes=2846 tree_cpu=3.26s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=58.5s output_bytes=2846 tree_cpu=3.35s"
+ok - watcher: busy successor escalates once despite stale predecessor ring history
+progress: "test.tests/fm-task-inbox.test.sh elapsed=58.9s output_bytes=2929 tree_cpu=3.35s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=59.9s output_bytes=2929 tree_cpu=3.47s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=60.9s output_bytes=2929 tree_cpu=3.50s"
+ok - watcher: dead successor escalates once despite stale predecessor ring history
+progress: "test.tests/fm-task-inbox.test.sh elapsed=62.0s output_bytes=3012 tree_cpu=3.50s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=63.0s output_bytes=3012 tree_cpu=3.61s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=64.0s output_bytes=3012 tree_cpu=3.62s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=65.1s output_bytes=3012 tree_cpu=3.63s"
+ok - watcher: missing successor escalates once despite stale predecessor ring history
+progress: "test.tests/fm-task-inbox.test.sh elapsed=65.1s output_bytes=3098 tree_cpu=3.63s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=66.1s output_bytes=3098 tree_cpu=3.74s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=67.1s output_bytes=3098 tree_cpu=3.76s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=68.2s output_bytes=3098 tree_cpu=3.77s"
+ok - watcher: unwritable successor escalates once despite stale predecessor ring history
+progress: "test.tests/fm-task-inbox.test.sh elapsed=68.3s output_bytes=3187 tree_cpu=3.77s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=69.3s output_bytes=3187 tree_cpu=3.88s"
+ok - watcher: a non-busy protected delivery breaks the busy streak and preserves the attempt ladder
+progress: "test.tests/fm-task-inbox.test.sh elapsed=70.0s output_bytes=3287 tree_cpu=3.88s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=71.0s output_bytes=3287 tree_cpu=3.98s"
+ok - watcher: a non-busy failed delivery breaks the busy streak and preserves the attempt ladder
+progress: "test.tests/fm-task-inbox.test.sh elapsed=71.8s output_bytes=3384 tree_cpu=3.98s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=72.8s output_bytes=3384 tree_cpu=4.14s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=73.8s output_bytes=3384 tree_cpu=4.15s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=74.9s output_bytes=3384 tree_cpu=4.18s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=75.9s output_bytes=3384 tree_cpu=4.23s"
+ok - watcher: a healthy or empty inbox stays completely silent
+progress: "test.tests/fm-task-inbox.test.sh elapsed=76.0s output_bytes=3447 tree_cpu=4.23s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=77.0s output_bytes=3447 tree_cpu=4.44s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=78.0s output_bytes=3447 tree_cpu=4.46s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=79.1s output_bytes=3447 tree_cpu=4.47s"
+ok - watcher: acknowledgement silences an unwritable ladder without a stale wake
+progress: "test.tests/fm-task-inbox.test.sh elapsed=79.5s output_bytes=3528 tree_cpu=4.47s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=80.5s output_bytes=3528 tree_cpu=4.68s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=81.5s output_bytes=3528 tree_cpu=4.70s"
+ok - watcher: unwritable ladder bookkeeping surfaces a stale wake after the doorbell
+progress: "test.tests/fm-task-inbox.test.sh elapsed=82.2s output_bytes=3613 tree_cpu=4.70s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=83.2s output_bytes=3613 tree_cpu=5.07s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=84.2s output_bytes=3613 tree_cpu=5.10s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=85.2s output_bytes=3613 tree_cpu=5.12s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=86.3s output_bytes=3613 tree_cpu=5.17s"
+ok - watcher: a fire-and-forget record's owed retry rings exactly once and never escalates
+progress: "test.tests/fm-task-inbox.test.sh elapsed=87.1s output_bytes=3704 tree_cpu=5.17s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=88.1s output_bytes=3704 tree_cpu=5.30s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=89.1s output_bytes=3704 tree_cpu=5.32s"
+ok - watcher: a fire-and-forget retry waits out the worker's own decision, then rings once
+progress: "test.tests/fm-task-inbox.test.sh elapsed=89.6s output_bytes=3795 tree_cpu=5.32s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=90.6s output_bytes=3795 tree_cpu=5.43s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=91.6s output_bytes=3795 tree_cpu=5.44s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=92.7s output_bytes=3795 tree_cpu=5.56s"
+ok - watcher: spending a retry keeps a newer record's mark written during its ring
+progress: "test.tests/fm-task-inbox.test.sh elapsed=93.4s output_bytes=3878 tree_cpu=5.56s"
+ok - inbox: staggered retry records use their own publication clocks without superseding earlier recovery
+progress: "test.tests/fm-task-inbox.test.sh elapsed=94.3s output_bytes=3984 tree_cpu=5.57s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=95.3s output_bytes=3984 tree_cpu=5.67s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=96.3s output_bytes=3984 tree_cpu=5.69s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=97.4s output_bytes=3984 tree_cpu=5.81s"
+ok - watcher: multi-record skipped rings recover individually in acknowledgement order
+progress: "test.tests/fm-task-inbox.test.sh elapsed=98.0s output_bytes=4071 tree_cpu=5.81s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=99.0s output_bytes=4071 tree_cpu=6.04s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=100.0s output_bytes=4071 tree_cpu=6.07s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=101.1s output_bytes=4071 tree_cpu=6.09s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=102.1s output_bytes=4071 tree_cpu=6.14s"
+ok - watcher: a spent ring budget emits exactly one ordinary stale wake for recovery
+progress: "test.tests/fm-task-inbox.test.sh elapsed=102.4s output_bytes=4156 tree_cpu=6.14s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=103.4s output_bytes=4156 tree_cpu=6.31s"
+ok - watcher: a positively dead pane is never typed into and surfaces exactly one stale wake
+progress: "test.tests/fm-task-inbox.test.sh elapsed=104.0s output_bytes=4249 tree_cpu=6.31s"
+progress: "test.tests/fm-task-inbox.test.sh elapsed=105.0s output_bytes=4249 tree_cpu=6.50s"
+ok - watcher: dead-pane recovery overrides stale busy state
+progress: "test.tests/fm-task-inbox.test.sh elapsed=105.5s output_bytes=4309 tree_cpu=6.50s"

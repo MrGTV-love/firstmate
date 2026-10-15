@@ -1,0 +1,54 @@
+calibration: "0 of 5 samples for test.tests/fm-typesafe-key-source.test.sh on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+ok - a home without .env resolves the key from the primary home
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=0.2s output_bytes=64 tree_cpu=0.01s"
+ok - precedence is environment, then own .env, then primary .env
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=0.2s output_bytes=129 tree_cpu=0.01s"
+ok - remote, malformed and absent bindings stay off
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=0.3s output_bytes=181 tree_cpu=0.01s"
+ok - the OpenRouter fallback key resolves from own, then primary .env, never the environment
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=0.4s output_bytes=274 tree_cpu=0.01s"
+ok - native omp command credentials reach the primary privately for firstmate only and stay unavailable with no helpers
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=0.5s output_bytes=394 tree_cpu=0.01s"
+ok - the jev-guard resolves the primary key and denies unavailable remote-bound credentials without egress
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=0.9s output_bytes=501 tree_cpu=0.01s"
+ok - the wrapper hands the primary key to belay only, with redirecting variables cleared
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=1.7s output_bytes=590 tree_cpu=0.03s"
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=2.8s output_bytes=590 tree_cpu=0.12s"
+ok - exported keys retain private/public precedence and never reach wrapper or policy children
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=3.2s output_bytes=685 tree_cpu=0.12s"
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=3.4s output_bytes=775 tree_cpu=0.12s"
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=3.7s output_bytes=865 tree_cpu=0.12s"
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=3.9s output_bytes=955 tree_cpu=0.13s"
+ok - actual task, final_message and checks_run JSON is gated with case and whitespace normalization
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=3.9s output_bytes=1055 tree_cpu=0.13s"
+{"event":"fetch-error","attempt":1,"name":"Error","message":"jev-belay request withheld"}
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=4.4s output_bytes=1145 tree_cpu=0.13s"
+ok - each fetch attempt is checked against its own request body
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=4.5s output_bytes=1209 tree_cpu=0.13s"
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=4.9s output_bytes=1299 tree_cpu=0.13s"
+ok - config override selects the effective policy
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=5.4s output_bytes=1349 tree_cpu=0.14s"
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=6.4s output_bytes=1349 tree_cpu=0.27s"
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=9.3s output_bytes=1439 tree_cpu=0.27s"
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=10.3s output_bytes=1439 tree_cpu=0.34s"
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=13.4s output_bytes=1439 tree_cpu=0.39s"
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=14.5s output_bytes=1529 tree_cpu=0.39s"
+ok - stalled policy is reaped and withheld at both its group deadline and outer startup ceiling
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=14.7s output_bytes=1625 tree_cpu=0.41s"
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=15.1s output_bytes=1715 tree_cpu=0.41s"
+{"event":"fetch-error","attempt":0,"name":"Error","message":"jev-belay request withheld"}
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=15.5s output_bytes=1805 tree_cpu=0.41s"
+ok - invalid and unreadable policy refuse before transport
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=15.6s output_bytes=1864 tree_cpu=0.41s"
+ok - belay's own exit status reaches Claude
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=16.0s output_bytes=1908 tree_cpu=0.43s"
+ok - pin mismatch, missing clone and missing key exit 0 without running belay
+progress: "test.tests/fm-typesafe-key-source.test.sh elapsed=16.3s output_bytes=1986 tree_cpu=0.43s"

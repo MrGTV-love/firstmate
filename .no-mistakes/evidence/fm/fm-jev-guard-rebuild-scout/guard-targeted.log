@@ -1,0 +1,34 @@
+calibration: "0 of 5 samples for test.tests/fm-jev-guard.test.sh on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+ok - pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values
+progress: "test.tests/fm-jev-guard.test.sh elapsed=0.4s output_bytes=104 tree_cpu=0.08s"
+ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+progress: "test.tests/fm-jev-guard.test.sh elapsed=1.1s output_bytes=208 tree_cpu=0.08s"
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+progress: "test.tests/fm-jev-guard.test.sh elapsed=2.0s output_bytes=325 tree_cpu=0.12s"
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+progress: "test.tests/fm-jev-guard.test.sh elapsed=2.0s output_bytes=416 tree_cpu=0.12s"
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+progress: "test.tests/fm-jev-guard.test.sh elapsed=2.4s output_bytes=520 tree_cpu=0.12s"
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+progress: "test.tests/fm-jev-guard.test.sh elapsed=2.9s output_bytes=622 tree_cpu=0.12s"
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+progress: "test.tests/fm-jev-guard.test.sh elapsed=3.1s output_bytes=747 tree_cpu=0.15s"
+ok - OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence
+progress: "test.tests/fm-jev-guard.test.sh elapsed=3.6s output_bytes=892 tree_cpu=0.15s"
+ok - Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node
+progress: "test.tests/fm-jev-guard.test.sh elapsed=3.9s output_bytes=994 tree_cpu=0.15s"
+ok - separate Claude native hooks preserve only session-delivered exact bytes and screen foreign-session/changed content
+progress: "test.tests/fm-jev-guard.test.sh elapsed=4.3s output_bytes=1115 tree_cpu=0.17s"
+progress: "test.tests/fm-jev-guard.test.sh elapsed=5.3s output_bytes=1115 tree_cpu=0.44s"
+progress: "test.tests/fm-jev-guard.test.sh elapsed=6.3s output_bytes=1115 tree_cpu=0.48s"
+ok - actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages
+progress: "test.tests/fm-jev-guard.test.sh elapsed=6.8s output_bytes=1257 tree_cpu=0.48s"
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+progress: "test.tests/fm-jev-guard.test.sh elapsed=7.2s output_bytes=1369 tree_cpu=0.48s"
+progress: "test.tests/fm-jev-guard.test.sh elapsed=8.2s output_bytes=1369 tree_cpu=0.70s"
+progress: "test.tests/fm-jev-guard.test.sh elapsed=17.6s output_bytes=1369 tree_cpu=0.72s"
+ok - actual stalled requests produce typed pre-tool denial and result replacement before the documented host deadline
+progress: "test.tests/fm-jev-guard.test.sh elapsed=27.4s output_bytes=1487 tree_cpu=0.72s"
+ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
+progress: "test.tests/fm-jev-guard.test.sh elapsed=27.5s output_bytes=1593 tree_cpu=0.72s"
