@@ -786,29 +786,33 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
 teardown_mark_return_pending() {  # <slot> [child-id]
   local marker="$STATE/$ID.teardown-return-pending" tmp gen
   tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
-  gen=$(fm_teardown_return_pending_gen "$META") || gen=
-  if { printf 'spawn_gen=%s\n' "$gen"; printf 'slot=%s\n' "$1"; [ -z "${2:-}" ] || printf 'child=%s\n' "$2"; } > "$tmp" \
-      && mv -f "$tmp" "$marker"; then
+  if gen=$(fm_teardown_return_pending_gen "$META") \
+      && { printf 'spawn_gen=%s\n' "$gen" && printf 'slot=%s\n' "$1" \
+           && { [ -z "${2:-}" ] || printf 'child=%s\n' "$2"; }; } > "$tmp" \
+      && mv -f "$tmp" "$marker" && [ -f "$marker" ] && [ ! -L "$marker" ]; then
     return 0
   fi
   rm -f "$tmp"
   echo "warning: could not record that task $ID's pool slot $1 awaits its return at $marker" >&2
+  return 1
 }
 
 teardown_refresh_return_pending() {
   local marker="$STATE/$ID.teardown-return-pending" tmp gen line
   [ -f "$marker" ] && [ ! -L "$marker" ] || return 0
   tmp="$STATE/.$ID.teardown-return-pending.refresh.${BASHPID:-$$}"
-  gen=$(fm_teardown_return_pending_gen "$META") || gen=
-  if { printf 'spawn_gen=%s\n' "$gen"
-       while IFS= read -r line || [ -n "$line" ]; do
-         case "$line" in spawn_gen=*) ;; *) printf '%s\n' "$line" ;; esac
-       done < "$marker"
-     } > "$tmp" && touch -r "$marker" "$tmp" && mv -f "$tmp" "$marker"; then
+  if gen=$(fm_teardown_return_pending_gen "$META") \
+      && { printf 'spawn_gen=%s\n' "$gen" \
+           && while IFS= read -r line || [ -n "$line" ]; do
+                case "$line" in spawn_gen=*) ;; *) printf '%s\n' "$line" ;; esac
+              done < "$marker"
+         } > "$tmp" && touch -r "$marker" "$tmp" && mv -f "$tmp" "$marker" \
+      && [ -f "$marker" ] && [ ! -L "$marker" ]; then
     return 0
   fi
   rm -f "$tmp"
   echo "warning: could not rebind task $ID's pool-return record at $marker to its current record generation" >&2
+  return 1
 }
 
 CONTROL_LOCK="$STATE/.control-$ID.lock"
@@ -4605,7 +4609,7 @@ preflight_descendant_treehouse_slots() {
   done
   for ((i=0; i < ${#reserve_slots[@]}; i++)); do
     teardown_reserve_pool_slot "${reserve_slots[$i]}" "${reserve_projects[$i]}" "${reserve_tasks[$i]}" || return 1
-    teardown_mark_return_pending "${reserve_slots[$i]}" "${reserve_tasks[$i]}"
+    teardown_mark_return_pending "${reserve_slots[$i]}" "${reserve_tasks[$i]}" || return 1
     if [ "$TEARDOWN_SLOT_CUSTODY" = project ]; then
       DESCENDANT_LEGACY_CUSTODY=1
     else
@@ -5066,7 +5070,7 @@ cleanup_firstmate_home_children() {
     status_retire_presentation_task "$sub_state" "$child_id" || return 1
     fm_wake_queue_prune_task "$sub_state" "$child_id" "$child_t" 2>/dev/null || true
     if [ "$child_pool_return" = 1 ]; then
-      teardown_mark_return_pending "$child_wt" "$child_id"
+      teardown_mark_return_pending "$child_wt" "$child_id" || return 1
       if [ "$DESCENDANT_LEGACY_CUSTODY" != 1 ]; then
         child_project_lock=$(fm_treehouse_project_lock_path "$child_proj") || return 1
         # This child's endpoint is already closed, so wait in the FIFO queue
@@ -5379,13 +5383,13 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree; then
     require_owned_worktree_slot_record "$ID" "$TEARDOWN_RESERVED_SLOT" || exit 1
     require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RESERVED_SLOT" || exit 1
     teardown_reserve_pool_slot "$TEARDOWN_RESERVED_SLOT" || exit 1
-    teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT"
+    teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT" || exit 1
   fi
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
 fi
 if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
-  [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT"
+  [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT" || exit 1
 fi
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire
@@ -5458,7 +5462,7 @@ teardown_legacy_stamp_rollback() {
       fi
       exit 1
     fi
-    teardown_refresh_return_pending
+    teardown_refresh_return_pending || exit 1
   fi
   if ! fm_backlog_atomic_transition publish "$BACKLOG_CLOSE_STAGE" "$BACKLOG_CLOSE_MARKER" \
       "pending-close record" "$STATE"; then
@@ -5694,7 +5698,7 @@ fi
 # see a false shared-slot collision. Backlog completion and clone sync need
 # only task custody and run after project custody is released.
 if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
-  teardown_mark_return_pending "${TEARDOWN_RETURN_SLOT:-$TEARDOWN_SHARED_SLOT}"
+  teardown_mark_return_pending "${TEARDOWN_RETURN_SLOT:-$TEARDOWN_SHARED_SLOT}" || exit 1
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = return ]; then
     TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
     teardown_nested_slot reprove || exit 1

@@ -10954,6 +10954,194 @@ test_legacy_stamp_rollback_rebinds_the_return_pending_record() {
   pass 'a rolled-back legacy stamp leaves its return-pending record bound to the unstamped record'
 }
 
+# The return-pending record is the only retry evidence for a reserved slot, so
+# a record that cannot be persisted must stop the run before anything closes,
+# retires or returns: the reservation is idempotent on a retry, which then
+# finishes the slot return exactly once. Each case injects one record failure
+# (its rename, its path already occupied, its generation unreadable), checks
+# the refusal kept every owner and record through a session start, then
+# retries to completion.
+assert_unrecorded_return_refusal_state() {  # <case-dir> <slot> <label>
+  local case_dir=$1 slot=$2 label=$3
+  assert_present "$case_dir/state/task-x1.meta" "$label: the refused teardown retired the task record"
+  assert_absent "$case_dir/state/task-x1.backlog-close" "$label: the refused teardown published the backlog close"
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "$label: the refused teardown closed the backlog row: $(backlog_row_state "$case_dir")"
+  assert_absent "$case_dir/endpoint-closed" "$label: the refused teardown closed the endpoint"
+  [ "$(grep -c '^return' "$case_dir/treehouse.log" 2>/dev/null || true)" = 0 ] \
+    || fail "$label: the refused teardown returned the pool slot"
+  jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "task-x1"' \
+    "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail "$label: the refused teardown did not keep its durable lease: $(cat "$case_dir/pool/treehouse-state.json")"
+  assert_present "${slot%/*}/.fm-slot-owner" "$label: the refused teardown dropped the slot claim"
+}
+
+assert_unrecorded_return_retry_finished() {  # <case-dir> <slot> <label>
+  local case_dir=$1 slot=$2 label=$3 returns
+  assert_absent "$case_dir/state/task-x1.meta" "$label: the retry kept the task record"
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$label: the retry kept the return-pending record"
+  assert_present "$case_dir/endpoint-closed" "$label: the retry left its endpoint unclosed"
+  returns=$(grep -c "^return --force $slot\$" "$case_dir/treehouse.log" || true)
+  assert_equals 1 "$returns" "$label: the slot must be returned exactly once across the refusal and the retry"
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail "$label: the retry left the returned slot leased"
+  [ "$(backlog_row_state "$case_dir")" = done ] \
+    || fail "$label: the retry did not close the backlog row: $(backlog_row_state "$case_dir")"
+}
+
+# A fake tmux that records every endpoint close attempt in
+# <case-dir>/endpoint-closed and reports the window live until then, so a
+# refusal can prove no close ran.
+recording_endpoint_tmux() {  # <case-dir>
+  local case_dir=$1
+  cat > "$case_dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-windows)
+    [ -f "$FM_POOL_CASE/endpoint-closed" ] || printf '%s\n' fm-task-x1 ;;
+  kill-window)
+    : > "$FM_POOL_CASE/endpoint-closed" ;;
+esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+}
+
+# Fails only the return-pending record's own rename; every other mv in the
+# lifecycle still runs the real binary.
+add_failing_return_pending_mv() {  # <case-dir>
+  local case_dir=$1 real_mv
+  real_mv=$(command -v mv)
+  cat > "$case_dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+case "\${*: -1}" in
+  "$case_dir/state/task-x1.teardown-return-pending") exit 1 ;;
+esac
+exec "$real_mv" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/mv"
+}
+
+# The record's generation read is the only task-record read between the pool
+# reservation and the marker write: the lease reserves the slot and makes the
+# record unreadable, and the marker's rename restores readability so a run
+# that ignores the failed read behaves exactly like an ordinary run.
+add_unreadable_return_pending_gen() {  # <case-dir>
+  local case_dir=$1 real_mv
+  cp "$case_dir/fakebin/treehouse" "$case_dir/fakebin/treehouse.real"
+  chmod +x "$case_dir/fakebin/treehouse.real"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = lease ] && [ -f "$case_dir/inject-unreadable-gen" ]; then
+  chmod 000 "$case_dir/state/task-x1.meta"
+fi
+exec "$case_dir/fakebin/treehouse.real" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+  real_mv=$(command -v mv)
+  cat > "$case_dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+case "\${*: -1}" in
+  "$case_dir/state/task-x1.teardown-return-pending")
+    [ ! -f "$case_dir/inject-unreadable-gen" ] || chmod 644 "$case_dir/state/task-x1.meta" ;;
+esac
+exec "$real_mv" "\$@"
+SH
+  chmod +x "$case_dir/fakebin/mv"
+}
+
+test_return_pending_write_failure_refuses_and_the_retry_finishes() {
+  local case_dir slot rc out
+  make_lease_modeling_pool_case pool-pending-write-failure ''
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
+  rm -f "$case_dir/config/backlog-backend"
+  seed_backlog_in_flight "$case_dir"
+  recording_endpoint_tmux "$case_dir"
+  add_failing_return_pending_mv "$case_dir"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" \
+    "pending-write: an unrecordable return-pending record must stop teardown: $(cat "$case_dir/stderr")"
+  assert_unrecorded_return_refusal_state "$case_dir" "$slot" pending-write
+  rm -f "$case_dir/fakebin/mv"
+  out=$(PATH="$case_dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/primary-home" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" FM_BOOTSTRAP_NETWORK=skip \
+    "$ROOT/bin/fm-bootstrap.sh" 2>&1) \
+    || fail "pending-write: session start failed beside the refused record: $out"
+  assert_unrecorded_return_refusal_state "$case_dir" "$slot" pending-write
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "pending-write: the retry must finish: $(cat "$case_dir/stderr2")"
+  assert_unrecorded_return_retry_finished "$case_dir" "$slot" pending-write
+  pass 'a failed return-pending record write refuses before any destruction and the retry returns the slot once'
+}
+
+test_return_pending_occupied_marker_path_refuses_and_the_retry_finishes() {
+  local case_dir slot rc out
+  make_lease_modeling_pool_case pool-pending-occupied-path ''
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
+  rm -f "$case_dir/config/backlog-backend"
+  seed_backlog_in_flight "$case_dir"
+  recording_endpoint_tmux "$case_dir"
+  mkdir "$case_dir/state/task-x1.teardown-return-pending"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" \
+    "pending-path: an unrecordable return-pending record must stop teardown: $(cat "$case_dir/stderr")"
+  assert_unrecorded_return_refusal_state "$case_dir" "$slot" pending-path
+  rm -rf "$case_dir/state/task-x1.teardown-return-pending"
+  out=$(PATH="$case_dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/primary-home" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" FM_BOOTSTRAP_NETWORK=skip \
+    "$ROOT/bin/fm-bootstrap.sh" 2>&1) \
+    || fail "pending-path: session start failed beside the refused record: $out"
+  assert_unrecorded_return_refusal_state "$case_dir" "$slot" pending-path
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "pending-path: the retry must finish: $(cat "$case_dir/stderr2")"
+  assert_unrecorded_return_retry_finished "$case_dir" "$slot" pending-path
+  pass 'a stale directory at the return-pending path refuses before any destruction and the retry returns the slot once'
+}
+
+test_return_pending_unreadable_generation_refuses_and_the_retry_finishes() {
+  local case_dir slot rc out
+  make_lease_modeling_pool_case pool-pending-unreadable-gen ''
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
+  rm -f "$case_dir/config/backlog-backend"
+  seed_backlog_in_flight "$case_dir"
+  recording_endpoint_tmux "$case_dir"
+  add_unreadable_return_pending_gen "$case_dir"
+  : > "$case_dir/inject-unreadable-gen"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" \
+    "pending-gen: an unreadable record generation must stop teardown: $(cat "$case_dir/stderr")"
+  rm -f "$case_dir/inject-unreadable-gen"
+  chmod 644 "$case_dir/state/task-x1.meta"
+  assert_unrecorded_return_refusal_state "$case_dir" "$slot" pending-gen
+  out=$(PATH="$case_dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/primary-home" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" FM_BOOTSTRAP_NETWORK=skip \
+    "$ROOT/bin/fm-bootstrap.sh" 2>&1) \
+    || fail "pending-gen: session start failed beside the refused record: $out"
+  assert_unrecorded_return_refusal_state "$case_dir" "$slot" pending-gen
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "pending-gen: the retry must finish: $(cat "$case_dir/stderr2")"
+  assert_unrecorded_return_retry_finished "$case_dir" "$slot" pending-gen
+  pass 'an unreadable return-pending generation refuses before any destruction and the retry returns the slot once'
+}
+
 # Task A shares a pool slot with live task B: B holds the durable lease and A's
 # claim still sits beside the slot. A's endpoint refuses to close after the
 # pending backlog close is published. Session start must not replay that close
@@ -11105,6 +11293,9 @@ teardown_test_cases=(
 test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap
 test_legacy_pool_teardown_keeps_its_return_pending_record_across_the_stamp
 test_legacy_stamp_rollback_rebinds_the_return_pending_record
+test_return_pending_write_failure_refuses_and_the_retry_finishes
+test_return_pending_occupied_marker_path_refuses_and_the_retry_finishes
+test_return_pending_unreadable_generation_refuses_and_the_retry_finishes
 test_endpoint_refusal_after_reservation_survives_session_start
 test_waited_return_lock_error_is_not_reported_as_contention
 test_idle_reap_retries_a_closed_task_whose_return_stalled
