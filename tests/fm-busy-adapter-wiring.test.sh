@@ -609,7 +609,7 @@ test_secondmate_claude_spawn_arms_busy_for_the_stall_gate() {
   launch=$(cat "$case_dir/launch.log")
   assert_present "$state/$id.busy-state" "claude secondmate spawn did not arm the busy contract"
   assert_present "$settings" "claude secondmate spawn did not write hook settings"
-  local probe="$case_dir/argv-probe" arg previous= settings_count=0
+  local probe="$case_dir/argv-probe" arg previous='' settings_count=0
   mkdir -p "$probe"
   fm_fake_claude_recording "$probe"
   fm_eval_launch "$launch" "$sm" "$probe" "FM_FAKE_CLAUDE_ENV_LOG=$probe/env" \

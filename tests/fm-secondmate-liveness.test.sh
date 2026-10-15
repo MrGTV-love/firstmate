@@ -454,7 +454,7 @@ test_relaunch_waits_for_other_mates_relaunch_lock() {
     # shortens, the caller's bound. It never calibrates a production table.
     for sample in 1 2 3 4 5; do
       FM_DURATION_FILE="$w/durations.jsonl" python3 "$ROOT/bin/fm-duration.py" \
-        record secondmate.relaunch 1000 0 || fail "cannot seed isolated relaunch calibration"
+        record secondmate.relaunch 1000 0 || fail "cannot seed isolated relaunch calibration sample $sample"
     done
   fi
 
