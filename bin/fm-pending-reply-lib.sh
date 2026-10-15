@@ -126,8 +126,7 @@ _FM_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/n
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-backend.sh"
 # shellcheck source=bin/fm-tmux-lib.sh
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-tmux-lib.sh"
-# shellcheck source=bin/fm-status-io-lib.sh
-. "$_FM_PENDING_REPLY_LIB_DIR/fm-status-io-lib.sh"
+# The decision owner supplies the status I/O APIs as well.
 # shellcheck source=bin/fm-status-decision-lib.sh
 . "$_FM_PENDING_REPLY_LIB_DIR/fm-status-decision-lib.sh"
 
