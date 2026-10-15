@@ -129,7 +129,7 @@ Decision answers need no routing from you: the runner feeds the board's binding 
 A current structured Reconcile selection closes nothing: the versioned board context carries its exact selected option separately from any typed note, and the adapter routes that selection only into a durable re-check request while preserving the note as provenance.
 For legacy formats, repeated choices, and uncertain captures, follow the [captured-choice contract](../../../docs/captain-hold-lifecycle.md#how-a-board-selection-creates-a-request).
 Verify the call's latest state, then retire the request through `bin/fm-captain-hold.sh reconcile close <id> --evidence-file <path>` when it turns out to be moot, or `reconcile note <id> --note-file <path>` when it is genuinely still open.
-Both outcomes refuse without that pending board-created request, and `bin/fm-captain-hold.sh reconcile list` names every request still outstanding.
+`captain-hold-lifecycle` owns standalone evidence-backed closure when no board request exists; `bin/fm-captain-hold.sh reconcile list` names every board request still outstanding.
 A remote-secondmate card whose task is absent from the main backlog remains on the board unchanged, but its reconcile request is refused in the main home until the separately tracked owner-aware routing follow-up can query and mutate the authoritative secondmate home; handle the announced capture without claiming that a request or reconciliation succeeded.
 `captain-hold-lifecycle` owns why a reconcile may never be recorded as the captain's answer.
 Route the non-decision keys yourself:

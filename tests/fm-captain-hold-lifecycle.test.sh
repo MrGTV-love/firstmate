@@ -2948,6 +2948,254 @@ SH
   pass "reconcile outcomes apply durable mutations once across partial failures"
 }
 
+# Recorded answers are evidence of settlement, not new captain words. No
+# board interaction is required, including when parent publication must retry.
+test_verified_close_without_board_request() {
+  local home parent channel outcome id show before out
+  home=$(make_home verified-close)
+  parent=$(make_home verified-parent)
+  printf 'verified-mate\n' > "$home/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+    > "$home/.fm-secondmate-parent"
+  channel="$parent/state/verified-mate.status"
+  printf 'Use north; keep the admission order.\n' > "$home/captured-answers.txt"
+  printf 'Verified both choices against captured-answers.txt: Use north; keep the admission order. No unanswered choice remains.\n' > "$home/evidence.txt"
+  for outcome in answered moot; do
+    id="sample-verified-$outcome"
+    run_captain "$home" hold "$id" --title "Verify $outcome" --reason "two choices to verify" >/dev/null \
+      || fail "could not hold the verified-close fixture"
+    if [ "$outcome" = answered ]; then
+      # Block parent publication after the backlog mutation, without any board
+      # request available as a retry trigger.
+      mv "$channel" "$home/parent-open.backup"
+      mkdir "$channel"
+      if run_captain "$home" reconcile close "$id" --verified-outcome "$outcome" \
+        --evidence-file "$home/evidence.txt" > "$home/publish.out" 2>&1; then
+        fail "failed standalone parent publication reported success"
+      fi
+      show=$(tasks_in "$home" show "$id" --full)
+      assert_contains "$show" "state: done" "parent publication failure undid the evidence-backed close"
+      rmdir "$channel"
+      mv "$home/parent-open.backup" "$channel"
+    fi
+    run_captain "$home" reconcile close "$id" --verified-outcome "$outcome" \
+      --evidence-file "$home/evidence.txt" >/dev/null || fail "standalone verified close failed"
+    show=$(tasks_in "$home" show "$id" --full)
+    assert_contains "$show" "state: done" "verified call remained open"
+    assert_contains "$show" "Resolution mode: reconciled" "evidence was recorded as a fresh answer"
+    assert_contains "$show" "Verified outcome: $outcome" "verified disposition was not durable"
+    assert_contains "$show" "captured-answers.txt" "recorded answer evidence was lost"
+    assert_not_contains "$show" "Captain decision:" "operator evidence impersonated the captain"
+    before=$show
+    run_captain "$home" reconcile close "$id" --verified-outcome "$outcome" \
+      --evidence-file "$home/evidence.txt" >/dev/null || fail "verified close replay required a board request"
+    [ "$(tasks_in "$home" show "$id" --full)" = "$before" ] || fail "verified replay rewrote the durable resolution"
+    printf 'Different evidence.\n' > "$home/different.txt"
+    if run_captain "$home" reconcile close "$id" --verified-outcome "$outcome" \
+      --evidence-file "$home/different.txt" >/dev/null 2>&1; then
+      fail "changed evidence rewrote a closed call"
+    fi
+    if run_captain "$home" reconcile close "$id" --verified-outcome reconcile \
+      --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+      fail "reconcile was accepted as a verified outcome"
+    fi
+  done
+  out=$(run_captain "$home" reconcile list)
+  assert_contains "$out" "reconcile-requests: 0" "standalone closure manufactured a board request"
+  out=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$channel")
+  [ -z "$out" ] || fail "standalone reconciliation left a parent decision open: $out"
+  pass "verified recorded-answer and moot closes work without board requests and replay parent publication"
+}
+
+test_verified_close_retries_only_its_own_hold() {
+  local home id show before
+  home=$(make_home verified-interrupted-close)
+  id=sample-verified-interrupted
+  FM_CAPTAIN_HOLD_NOW=2026-10-01T01:00:00Z run_captain "$home" hold "$id" \
+    --title "Verified interrupted close" --reason "old choice" >/dev/null
+  printf 'Verified source captured.txt: the old choice was already answered.\n' > "$home/evidence.txt"
+  cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = done ] && [ ! -e "$FM_HOME/close-failed" ]; then
+  : > "$FM_HOME/close-failed"
+  exit 92
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+  chmod +x "$home/fakebin/tasks-axi"
+  if run_captain "$home" reconcile close "$id" --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "an interrupted standalone close reported success"
+  fi
+  show=$(tasks_in "$home" show "$id" --full)
+  assert_contains "$show" "held: yes" "failed close lost the active hold"
+  assert_contains "$show" "Captain hold set: 2026-10-01T01:00:00Z" "failed close lost the hold age"
+  assert_contains "$show" "Verified outcome: answered" "failed close lost the verified evidence"
+  run_captain "$home" reconcile close "$id" --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null || fail "standalone close could not resume without a board request"
+  show=$(tasks_in "$home" show "$id" --full)
+  [ "$(printf '%s\n' "$show" | grep -o 'Resolution mode: reconciled' | wc -l | tr -d ' ')" -eq 1 ] \
+    || fail "interrupted standalone close duplicated its resolution"
+  # Model an externally reopened historical task, then establish a new hold.
+  tasks_in "$home" reopen "$id" >/dev/null
+  FM_CAPTAIN_HOLD_NOW=2026-10-02T01:00:00Z run_captain "$home" hold "$id" --reason "new unanswered choice" >/dev/null
+  before=$(tasks_in "$home" show "$id" --full)
+  if run_captain "$home" reconcile close "$id" --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "old evidence closed a new hold on a reopened task"
+  fi
+  [ "$(tasks_in "$home" show "$id" --full)" = "$before" ] || fail "old-hold replay mutated the new call"
+  pass "standalone close retries preserve hold age and cannot replay across hold lifecycles"
+}
+
+test_verified_closes_refuse_unanswered_or_unsupported_calls() {
+  local home id outcome file show
+  home=$(make_home verified-refusals)
+  id=sample-unanswered
+  run_captain "$home" hold "$id" --title "Unanswered captain choice" --reason "which option?" >/dev/null
+  printf 'Verified source: no decision yet.\n' > "$home/evidence.txt"
+  : > "$home/empty.txt"
+  printf ' \t\n' > "$home/blank.txt"
+  printf 'reconcile\n' > "$home/reconcile.txt"
+  for outcome in active unanswered reconcile; do
+    if run_captain "$home" reconcile close "$id" --verified-outcome "$outcome" \
+      --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+      fail "an $outcome call closed without an answer"
+    fi
+  done
+  if run_captain "$home" reconcile close "$id" --verified-outcome moot >/dev/null 2>&1; then
+    fail "verified close mutated a hold without an evidence file"
+  fi
+  for file in missing empty blank reconcile; do
+    if run_captain "$home" reconcile close "$id" --verified-outcome moot \
+      --evidence-file "$home/$file.txt" >/dev/null 2>&1; then
+      fail "verified close accepted $file evidence"
+    fi
+  done
+  if run_captain "$home" answer "$id" --decision-file "$home/reconcile.txt" >/dev/null 2>&1; then
+    fail "a direct answer accepted the reserved reconcile value"
+  fi
+  show=$(tasks_in "$home" show "$id" --full)
+  assert_contains "$show" "held: yes" "refused settlement released an unanswered call"
+  assert_not_contains "$show" "Resolution recorded by" "refused settlement wrote a resolution"
+  # An evidence close must not mark live work complete, even when its separate
+  # captain choice has already been settled elsewhere.
+  printf 'kind=ship\n' > "$home/state/$id.meta"
+  if run_captain "$home" reconcile close "$id" --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "verified settlement completed worker-owned work"
+  fi
+  tasks_in "$home" add ordinary-work "Ordinary queued work" --repo sample >/dev/null
+  if run_captain "$home" reconcile close ordinary-work --verified-outcome moot \
+    --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "verified settlement completed work that was never captain-held"
+  fi
+  pass "verified closes refuse active calls, missing evidence, reserved answers, and unfinished work"
+}
+
+test_operational_key_closes_with_durable_evidence_and_replay() {
+  local home key outcome out evidence before open
+  home=$(make_home operational-key-close)
+  printf 'kind=secondmate\n' > "$home/state/lane.meta"
+  printf 'needs-decision [key=recorded]: old answer not mirrored\nblocked [key=obsolete]: obsolete prerequisite\nneeds-decision [key=still-live]: captain must choose\n' \
+    > "$home/state/lane.status"
+  printf 'Verified source captured-answers.txt records the answer; obsolete prerequisite no longer applies.\n' > "$home/evidence.txt"
+  for key in recorded obsolete; do
+    if [ "$key" = recorded ]; then outcome=answered; else outcome=moot; fi
+    out=$(run_captain "$home" reconcile close-key lane --key "$key" --verified-outcome "$outcome" \
+      --evidence-file "$home/evidence.txt") || fail "could not close the status-only operational key"
+    evidence=$(printf '%s\n' "$out" | sed -n 's/^evidence: //p')
+    [ -f "$evidence" ] || fail "operational close lost its full evidence"
+    assert_contains "$(cat "$evidence")" "Verified outcome: $outcome" "operational evidence lost its disposition"
+    assert_contains "$(cat "$evidence")" "captured-answers.txt" "operational evidence lost its source"
+    before=$(cat "$home/state/lane.status")
+    run_captain "$home" reconcile close-key lane --key "$key" --verified-outcome "$outcome" \
+      --evidence-file "$home/evidence.txt" >/dev/null || fail "operational evidence replay failed"
+    [ "$(cat "$home/state/lane.status")" = "$before" ] || fail "operational replay appended duplicate close events"
+    printf 'Different facts.\n' > "$home/different.txt"
+    if run_captain "$home" reconcile close-key lane --key "$key" --verified-outcome "$outcome" \
+      --evidence-file "$home/different.txt" >/dev/null 2>&1; then
+      fail "different evidence rewrote a closed operational key"
+    fi
+  done
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/lane.status")
+  assert_contains "$open" "still-live" "closing operational keys lost an unrelated captain call"
+  assert_not_contains "$open" "recorded" "answered operational key remained open"
+  assert_not_contains "$open" "obsolete" "moot operational key remained open"
+  printf 'needs-decision [key=recorded]: a new captain choice\n' >> "$home/state/lane.status"
+  if run_captain "$home" reconcile close-key lane --key recorded --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "old evidence closed a reopened operational key"
+  fi
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/lane.status")
+  assert_contains "$open" "recorded" "replay refusal lost the reopened call"
+  pass "status-only operational closes preserve evidence, unrelated calls, and reopened-key replay safety"
+}
+
+test_operational_key_close_refusals_and_interrupted_append() {
+  local home key before open evidence
+  home=$(make_home operational-key-refusals)
+  printf 'kind=secondmate\n' > "$home/state/lane.meta"
+  printf 'needs-decision [key=plain]: verify operational question\nneeds-decision [key=held-call]: captain still owns this\nneeds-decision [key=legacy]: captain owns legacy task\nneeds-decision [key=captain-hold-child-1]: captain hold child\nblocked [key=pending-reply-child]: pending-reply-missed: unavailable\n' \
+    > "$home/state/lane.status"
+  run_captain "$home" hold held-call --title "Held call" --reason "still needs captain" >/dev/null
+  run_captain "$home" hold lane-decision-legacy --title "Legacy held call" --reason "still needs captain" >/dev/null
+  printf 'Verified dependency is now available.\n' > "$home/evidence.txt"
+  before=$(cat "$home/state/lane.status")
+  for key in held-call legacy captain-hold-child-1 pending-reply-child; do
+    if run_captain "$home" reconcile close-key lane --key "$key" --verified-outcome moot \
+      --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+      fail "operational closer bypassed the owner of $key"
+    fi
+  done
+  if run_captain "$home" reconcile close-key lane --key plain --verified-outcome active \
+    --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "operational closer accepted an active call"
+  fi
+  if run_captain "$home" reconcile close-key lane --key plain --verified-outcome moot >/dev/null 2>&1; then
+    fail "operational closer accepted no evidence"
+  fi
+  if run_captain "$home" reconcile close-key lane --key plain --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "operational closer inferred a disposition from prose"
+  fi
+  if run_captain "$home" reconcile close-key lane --key absent --verified-outcome moot \
+    --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "operational closer created a close for an absent key"
+  fi
+  cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = show ] && [ "${2:-}" = plain ]; then
+  printf 'error: fixture backend unavailable\n'
+  exit 86
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+  chmod +x "$home/fakebin/tasks-axi"
+  if run_captain "$home" reconcile close-key lane --key plain --verified-outcome moot \
+    --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "operational closer treated an unreadable backlog as proof of no captain hold"
+  fi
+  rm "$home/fakebin/tasks-axi"
+  [ "$(cat "$home/state/lane.status")" = "$before" ] || fail "a refused operational close mutated the status stream"
+  [ ! -e "$home/state/reconcile-evidence" ] || fail "a refused operational close wrote evidence"
+  # Stage evidence successfully, but force the subsequent status append to fail.
+  chmod 0400 "$home/state/lane.status"
+  if run_captain "$home" reconcile close-key lane --key plain --verified-outcome moot \
+    --evidence-file "$home/evidence.txt" > "$home/append.out" 2>&1; then
+    fail "failed status append reported a successful close"
+  fi
+  evidence=$(find "$home/state/reconcile-evidence" -name '*.txt' -type f)
+  [ -f "$evidence" ] || fail "interrupted append lost staged evidence"
+  chmod 0600 "$home/state/lane.status"
+  [ "$(cat "$home/state/lane.status")" = "$before" ] || fail "failed append changed the status stream"
+  run_captain "$home" reconcile close-key lane --key plain --verified-outcome moot \
+    --evidence-file "$home/evidence.txt" >/dev/null || fail "operational append could not retry from durable evidence"
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/lane.status")
+  assert_not_contains "$open" "plain" "retried operational close stayed open"
+  assert_contains "$open" "held-call" "operational close lost a captain-owned call"
+  pass "operational closes enforce ownership and attestation and recover after an interrupted append"
+}
+
 test_unbound_source_closes_no_hold() {
   local home id sid artifact result out show rc
   home=$(make_home lavish-unbound)
@@ -6620,6 +6868,11 @@ test_reconcile_never_closes_through_the_keyed_answer_intake
 test_normal_answers_retire_pending_reconcile_requests
 test_reconcile_closes_with_evidence_or_keeps_the_call_open
 test_reconcile_outcomes_retry_partial_failures_once
+test_verified_close_without_board_request
+test_verified_close_retries_only_its_own_hold
+test_verified_closes_refuse_unanswered_or_unsupported_calls
+test_operational_key_closes_with_durable_evidence_and_replay
+test_operational_key_close_refusals_and_interrupted_append
 test_unbound_source_closes_no_hold
 test_legacy_identities_keep_working
 test_board_answer_reaches_the_keyed_answer_intake
