@@ -1,0 +1,1137 @@
+Live lab transcript at target commit 729bfc48 (this run). Real firstmate scripts from the gate worktree; disposable FM_HOME from bin/fm-lab-home.sh (/Users/charlesabrooker/tmp/fm-lab.eq2Jsr); NM_HOME and gh REST double in a scratch dir; no real forge, fleet, or no-mistakes store touched.
+
+
+==================== A1 real watcher queued wakes; drain presents OVERDUE first ====================
+--- watcher output: signal: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bea8826d67dcf2e5502988f5","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7220,"needs-decision: which schema version should the import use",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+1792039638	2	signal	alpha.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 94753.1792039638.j7brsu
+wake annotation: latest wake-EVENT observed at drain, not current state: alpha.status: needs-decision [at=1792032428] [key=schema]: which schema version should the import use
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+alpha [key=schema] needs-decision: which schema version should the import use
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+
+==================== A2 ack refused while the presented row has no action; queue kept ====================
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 94753.1792039638.j7brsu
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bea8826d67dcf2e5502988f5","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7224,"needs-decision: which schema version should the import use",false
+[exit 1]
+--- queue after refused ack:
+1792039637	1	signal	alpha.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status
+1792039638	2	signal	alpha.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status
+
+
+==================== A3 fake or weak evidence refused; ack still refused ====================
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 steered --evidence 001.msg
+error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+[exit 1]
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 steered --evidence I told them in chat
+error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+[exit 1]
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 merged --evidence https://github.com/acme/widget/pull/7
+error: "merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh"
+[exit 1]
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 deferred --evidence busy
+error: "deferral requires --recheck at a future UTC time within 24 hours"
+[exit 1]
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 deferred --evidence busy --recheck 2026-10-15T04:46:45Z
+error: "deferral requires --recheck at a future UTC time within 24 hours"
+[exit 1]
+--- recheck 24h + 2min ahead (past the one-day policy window):
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 deferred --evidence busy --recheck 2026-10-16T04:49:45Z
+error: "deferral requires --recheck at a future UTC time within 24 hours"
+[exit 1]
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 escalated --evidence    
+error: "--evidence is required for every action"
+[exit 1]
+
+$ bin/fm-open-loops.sh action deadbeefdeadbeefdeadbeef escalated --evidence x
+error: "row is not currently overdue in the published ledger"
+[exit 1]
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 94753.1792039638.j7brsu
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bea8826d67dcf2e5502988f5","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7248,"needs-decision: which schema version should the import use",false
+[exit 1]
+--- steer alpha with the real bin/fm-send.sh:
+
+$ bin/fm-send.sh alpha Use schema v3 for the import; reply done when switched.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.eq2Jsr
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+error: target 'alpha' is not resolvable (tried meta=/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.meta; metadata window/terminal lookup; backend=none). Use fm-alpha for a recorded task/lane, or pass a well-formed explicit backend target such as session:window.
+[exit 1]
+ls: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.inbox: No such file or directory
+
+$ bin/fm-send.sh alpha Use schema v3 for the import; reply done when switched.
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.eq2Jsr
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+fm-send: doorbell not typed because the agent in lab:alpha has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.inbox/001.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+[exit 0]
+001.msg
+handled
+
+/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.inbox/handled:
+schema=fm-task-inbox.v1
+at=2026-10-15T04:48:15Z
+--
+Use schema v3 for the import; reply done when switched.
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 steered --evidence 001.msg
+action: "bea8826d67dcf2e5502988f5"
+kind: steered
+[exit 0]
+
+
+==================== A4 real steer accepted; ack consumes the wakes ====================
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 94753.1792039638.j7brsu
+[exit 0]
+--- queue after ack:
+(end queue)
+--- ledger handling block:
+{
+  "sequence": 1,
+  "presentations": {
+    "main": {
+      "bea8826d67dcf2e5502988f5": 0
+    }
+  },
+  "presented_at": {
+    "main": {
+      "bea8826d67dcf2e5502988f5": 1792039648
+    }
+  },
+  "actions": {
+    "bea8826d67dcf2e5502988f5": {
+      "kind": "steered",
+      "evidence": "001.msg",
+      "at_epoch": 1792039703,
+      "sequence": 1,
+      "deferrals": 0,
+      "captain_visible": false,
+      "digest": "4bc5e5798b25e0171bbc7585",
+      "cited": [
+        "001.msg"
+      ]
+    }
+  }
+}
+
+
+==================== A5 next turn (idle drain, empty queue): old steer does not carry over; re-cite refused ====================
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bea8826d67dcf2e5502988f5","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7278,"needs-decision: which schema version should the import use",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+alpha [key=schema] needs-decision: which schema version should the import use
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 78682.1792039707.F7ocQb
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 78682.1792039707.F7ocQb
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bea8826d67dcf2e5502988f5","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7283,"needs-decision: which schema version should the import use",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 steered --evidence 001.msg
+error: "steered evidence must be a new delivery sent after this row's presentation"
+[exit 1]
+
+
+==================== A6 first deferral just inside the 24h window accepted; ack passes ====================
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 deferred --evidence worker mid-migration; recheck after it lands --recheck 2026-10-16T04:46:39Z
+action: "bea8826d67dcf2e5502988f5"
+kind: deferred
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 78682.1792039707.F7ocQb
+[exit 0]
+
+
+==================== A7 deferral stands next turn: idle drain prints no block and opens no episode ====================
+
+$ bin/fm-wake-drain.sh
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+alpha [key=schema] needs-decision: which schema version should the import use
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+$ bin/fm-open-loops.sh --report
+generated_epoch: 1792039636
+complete: true
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bea8826d67dcf2e5502988f5","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7301,"needs-decision: which schema version should the import use",false
+[exit 0]
+
+
+==================== A8 second deferral refused; row turns captain-visible and needs a real action ====================
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 deferred --evidence still busy --recheck 2026-10-15T05:48:39Z
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+[exit 1]
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bea8826d67dcf2e5502988f5","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7303,"needs-decision: which schema version should the import use",true
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+alpha [key=schema] needs-decision: which schema version should the import use
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 9781.1792039732.bN6ofg
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 9781.1792039732.bN6ofg
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "bea8826d67dcf2e5502988f5","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7308,"needs-decision: which schema version should the import use",true
+[exit 1]
+
+$ bin/fm-open-loops.sh action bea8826d67dcf2e5502988f5 escalated --evidence asked captain in session: pick schema v2 or v3
+action: "bea8826d67dcf2e5502988f5"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 9781.1792039732.bN6ofg
+[exit 0]
+
+
+==================== A9 answering the question resolves the row; receipts are dropped; receipts never resolved it alone ====================
+--- before answering, a fresh heartbeat still lists the row (receipt did not resolve it):
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792039744
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"worker current state alpha: worktree gone (torn down?)"
+  "missing_worker","alpha","firstmate","recover the assigned worker without discarding work",116,false,""
+  "unanswered_question","alpha:schema","firstmate","answer or close this question, or record why it no longer applies",7316,true,"needs-decision: which schema version should the import use"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-send.sh alpha --resolve-key schema captain chose schema v3
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.eq2Jsr
+fm-send: doorbell not typed because the agent in lab:alpha has exited; the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.inbox/002.msg for recovery (stuck-crewmate-recovery), and the watcher will not re-ring a dead pane
+[exit 0]
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792039749
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"worker current state alpha: worktree gone (torn down?)"
+  "missing_worker","alpha","firstmate","recover the assigned worker without discarding work",1,false,""
+  "unanswered_question","alpha:schema","firstmate","answer or close this question, or record why it no longer applies",7321,false,"needs-decision: which schema version should the import use"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+--- handling after resolution:
+{"sequence":3,"presentations":{"main":{"bea8826d67dcf2e5502988f5":2}},"presented_at":{"main":{"bea8826d67dcf2e5502988f5":1792039730}},"actions":{"bea8826d67dcf2e5502988f5":{"kind":"escalated","evidence":"asked captain in session: pick schema v2 or v3","at_epoch":1792039737,"sequence":3,"deferrals":1,"captain_visible":true,"digest":"4bc5e5798b25e0171bbc7585","cited":["001.msg"]}}}
+
+$ bin/fm-open-loops.sh --report
+generated_epoch: 1792039749
+complete: false
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "7073124aca3e066c5d903e3c","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"worker current state alpha: worktree gone (torn down?)",false
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+--- fixture cleanup: the alpha pane was a plain shell, so remove alpha.meta; the worker then records the answer in its status log
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792039758
+rows: []
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+--- handling after resolution:
+{"sequence":3,"presentations":{"main":{}},"presented_at":{"main":{}},"actions":{}}
+
+$ bin/fm-open-loops.sh --report
+generated_epoch: 1792039758
+complete: true
+OVERDUE: none
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+
+==================== B1 review PASS at live head + required checks green -> review_pass_not_merged row (10 min limit) ====================
+--- fixture: widget-review.status: done [at=1792038272]: review PASS head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PR https://github.com/acme/widget/pull/42
+--- fixture: config/open-loops.json: {"review_lanes":{"acme/widget":["widget-review"]}}
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792039773
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "missing_worker","widget-fix","firstmate","recover the assigned worker without discarding work",null,true,""
+  "review_pass_not_merged","https://github.com/acme/widget/pull/42","firstmate","merge with existing authority or escalate for approval",1301,true,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+--- forge requests (GitHub REST double):
+/repos/acme/widget/pulls?state=open&per_page=100
+/repos/acme/widget/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100
+/repos/acme/widget/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100
+/repos/acme/widget/branches/main
+/repos/acme/widget/rules/branches/main
+--- fixture: backlog row moved to Done so no worker obligation shadows the PR row
+
+
+==================== B0 adversarial: PASS for a stale head does not qualify (ordinary open_pr row instead) ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792039787
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "open_pr","https://github.com/acme/widget/pull/42","firstmate","route the green PR's review and obtain merge approval",3015,false,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+--- adversarial: FAIL verdict at live head
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792039790
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "open_pr","https://github.com/acme/widget/pull/42","firstmate","route the green PR's review and obtain merge approval",3018,false,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+
+==================== B1b genuine PASS at live head ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792039793
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "review_pass_not_merged","https://github.com/acme/widget/pull/42","firstmate","merge with existing authority or escalate for approval",1321,true,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+
+==================== B2 turn A: drain presents the reviewed-green PR; a first deferral answers only this turn ====================
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9ea92a7ceca025e0874b17bb","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1338,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+widget-review done [at=1792038272]: review PASS head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PR https://github.com/acme/widget/pull/42
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 3018.1792039811.pDTJP2
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 3018.1792039811.pDTJP2
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9ea92a7ceca025e0874b17bb","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1344,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action 9ea92a7ceca025e0874b17bb deferred --evidence merge after lunch --recheck 2026-10-15T06:50:09Z
+action: "9ea92a7ceca025e0874b17bb"
+kind: deferred
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 3018.1792039811.pDTJP2
+[exit 0]
+
+
+==================== B3 turn B: the deferral does NOT stand on a review_pass_not_merged row ====================
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9ea92a7ceca025e0874b17bb","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1349,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 16339.1792039821.am69jK
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 16339.1792039821.am69jK
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9ea92a7ceca025e0874b17bb","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1354,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+[exit 1]
+--- first deferral already used; a second is refused:
+
+$ bin/fm-open-loops.sh action 9ea92a7ceca025e0874b17bb deferred --evidence later --recheck 2026-10-15T05:50:09Z
+error: "second deferral refused; row is captain-visible; steer, merge or escalate it"
+[exit 1]
+
+$ bin/fm-open-loops.sh action 9ea92a7ceca025e0874b17bb escalated --evidence asked captain to approve merge
+action: "9ea92a7ceca025e0874b17bb"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 16339.1792039821.am69jK
+[exit 0]
+
+
+==================== B4 turn C: the escalation does NOT stand either; merged needs a recorded merge of this PR ====================
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9ea92a7ceca025e0874b17bb","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1359,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",true
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 29424.1792039831.uFyhbc
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 29424.1792039831.uFyhbc
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "9ea92a7ceca025e0874b17bb","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1363,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",true
+[exit 1]
+
+$ bin/fm-open-loops.sh action 9ea92a7ceca025e0874b17bb merged --evidence https://github.com/acme/widget/pull/42
+error: "merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh"
+[exit 1]
+
+
+==================== B5 merge recorded by the real merge-outcome recorder; merged accepted; PR merge resolves the row ====================
+recorder rc=0
+fm-pr-poll-merge-notified-v1
+github
+github.com
+acme/widget
+42
+
+$ bin/fm-open-loops.sh action 9ea92a7ceca025e0874b17bb merged --evidence https://github.com/acme/widget/pull/43
+error: "merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh"
+[exit 1]
+
+$ bin/fm-open-loops.sh action 9ea92a7ceca025e0874b17bb merged --evidence https://github.com/acme/widget/pull/42
+action: "9ea92a7ceca025e0874b17bb"
+kind: merged
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 29424.1792039831.uFyhbc
+[exit 0]
+--- forge now reports no open PRs (merged):
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792039848
+rows: []
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-open-loops.sh --report
+generated_epoch: 1792039848
+complete: true
+OVERDUE: none
+[exit 0]
+
+
+==================== C1 captain-owned row: presented, gated, escalation recorded ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792039860
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","rollout-hold:captain-hold","captain","resolve the captain hold or record its next decision date",432001,true,"approve rollout window"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "5f121b9524fc641b96ec059d","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",432003,"approve rollout window",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+1792039843	3	check	merged-widget-fix-https://github.com/acme/widget/pull/42	check: merge landed: widget-fix https://github.com/acme/widget/pull/42
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 29424.1792039831.uFyhbc
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 29424.1792039831.uFyhbc
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "5f121b9524fc641b96ec059d","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",432006,"approve rollout window",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action 5f121b9524fc641b96ec059d escalated --evidence asked captain in session to pick the rollout window
+action: "5f121b9524fc641b96ec059d"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 29424.1792039831.uFyhbc
+[exit 0]
+
+
+==================== C2 escalation of a captain-owned row stands: next idle drain prints nothing and opens no episode ====================
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+
+==================== C3 the row changes (new hold reason): the old escalation no longer stands ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792039873
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","rollout-hold:captain-hold","captain","resolve the captain hold or record its next decision date",432014,true,"approve rollout window and the freeze exception"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "5f121b9524fc641b96ec059d","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",432016,"approve rollout window and the freeze exception",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 91178.1792039875.IP4v7l
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 91178.1792039875.IP4v7l
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "5f121b9524fc641b96ec059d","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",432023,"approve rollout window and the freeze exception",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action 5f121b9524fc641b96ec059d escalated --evidence asked captain about the freeze exception
+action: "5f121b9524fc641b96ec059d"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 91178.1792039875.IP4v7l
+[exit 0]
+
+
+==================== D1 stalled worker whose only declaration is 'harness busy' (the overnight incident shape; real idle Claude pane, busy record via bin/fm-busy-event.sh as Claude's hook writes it) ====================
+
+$ bin/fm-crew-state.sh stuck
+state: working · source: pane · harness busy (claude-hook)
+[exit 0]
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792040021
+rows[5]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"no-mistakes run store stuck: unable to open database file"
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "silent_report","stuck","firstmate","check in: progress, blockers, cross-workstream dependencies",18080,true,"last heard: status=1792021941; inbox acknowledgement=None; resolved reply=None"
+  "stalled_worker","stuck","worker:stuck","follow up on the recorded wait and recover the worker",18080,true,"worker has not recorded its concrete wait; 18080s without progress; declaration age 18080s"
+  "unanswered_question","rollout-hold:captain-hold","captain","resolve the captain hold or record its next decision date",432162,false,"approve rollout window and the freeze exception"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+
+==================== D2 stalled worker that declared a concrete wait 2.5h ago ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792040024
+rows[5]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"no-mistakes run store stuck: unable to open database file"
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "silent_report","stuck","firstmate","check in: progress, blockers, cross-workstream dependencies",9000,true,"last heard: status=1792031024; inbox acknowledgement=None; resolved reply=None"
+  "stalled_worker","stuck","worker:stuck","follow up on the recorded wait and recover the worker",9000,true,"working [at=1792031024]: waiting for lint.full.whole to finish before pushing; 9000s without progress; declaration age 9000s"
+  "unanswered_question","rollout-hold:captain-hold","captain","resolve the captain hold or record its next decision date",432165,false,"approve rollout window and the freeze exception"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+
+==================== D3 stalled worker with an active no-mistakes step (real-schema store under scratch NM_HOME) ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792040026
+rows[5]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"no-mistakes run store stuck: unable to open database file"
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "silent_report","stuck","firstmate","check in: progress, blockers, cross-workstream dependencies",9002,true,"last heard: status=1792031024; inbox acknowledgement=None; resolved reply=None"
+  "stalled_worker","stuck","worker:stuck","follow up on the recorded wait and recover the worker",9002,true,"working [at=1792031024]: waiting for lint.full.whole to finish before pushing; 9002s without progress; declaration age 9002s"
+  "unanswered_question","rollout-hold:captain-hold","captain","resolve the captain hold or record its next decision date",432167,false,"approve rollout window and the freeze exception"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+--- real-schema no-mistakes store (created by the real no-mistakes CLI under scratch NM_HOME), held open as a running daemon does; run on fm/stuck, step 'lint' running 4h
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792040080
+rows[4]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"worker current state stuck: unreadable runs table; run ids: run1; last reported run id: run1"
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "silent_report","stuck","firstmate","check in: progress, blockers, cross-workstream dependencies",9056,true,"last heard: status=1792031024; inbox acknowledgement=None; resolved reply=None"
+  "unanswered_question","rollout-hold:captain-hold","captain","resolve the captain hold or record its next decision date",432221,false,"approve rollout window and the freeze exception"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+--- D3 fixture removed: the real no-mistakes CLI (read by bin/fm-crew-state.sh) rejects a hand-inserted run row as 'unreadable runs table', so crew state turns unknown; the active-step wording is covered by tests/fm-open-loops.test.sh instead
+
+
+==================== D4 stalled worker row through the drain gate; steered with the real bin/fm-send.sh to the live pane (store held open, so coverage is complete) ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792040103
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "silent_report","stuck","firstmate","check in: progress, blockers, cross-workstream dependencies",9079,true,"last heard: status=1792031024; inbox acknowledgement=None; resolved reply=None"
+  "stalled_worker","stuck","worker:stuck","follow up on the recorded wait and recover the worker",9079,true,"working [at=1792031024]: waiting for lint.full.whole to finish before pushing; 9079s without progress; declaration age 9079s"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c32227c337a5f7069e3dcf4c","firstmate","stuck","check in: progress, blockers, cross-workstream dependencies",9082,"last heard: status=1792031024; inbox acknowledgement=None; resolved reply=None",false
+  "0cdb66855906395002c2bb74","worker:stuck","stuck","follow up on the recorded wait and recover the worker",9082,"working [at=1792031024]: waiting for lint.full.whole to finish before pushing; 9079s without progress; declaration age 9079s",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 7929.1792040106.a2Zxqy
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 7929.1792040106.a2Zxqy
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c32227c337a5f7069e3dcf4c","firstmate","stuck","check in: progress, blockers, cross-workstream dependencies",9084,"last heard: status=1792031024; inbox acknowledgement=None; resolved reply=None",false
+  "0cdb66855906395002c2bb74","worker:stuck","stuck","follow up on the recorded wait and recover the worker",9084,"working [at=1792031024]: waiting for lint.full.whole to finish before pushing; 9079s without progress; declaration age 9079s",false
+[exit 1]
+
+$ bin/fm-send.sh stuck lint has run 4h on fm/stuck with no progress: kill the lint job, rerun lint for changed files only, and report the result in your status log
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.eq2Jsr
+fm-send: doorbell skipped (composer holds pending text or identified draft risk); the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/stuck.inbox/001.msg and the watcher will re-ring
+[exit 0]
+001.msg
+handled
+
+$ bin/fm-open-loops.sh action 0cdb66855906395002c2bb74 steered --evidence 001.msg
+action: "0cdb66855906395002c2bb74"
+kind: steered
+[exit 0]
+
+$ bin/fm-open-loops.sh action c32227c337a5f7069e3dcf4c steered --evidence 001.msg
+action: "c32227c337a5f7069e3dcf4c"
+kind: steered
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 7929.1792040106.a2Zxqy
+[exit 0]
+
+
+==================== D5 branch actor (supervision-host) has its own presentation; main's steer does not answer it; unknown actor refused ====================
+
+$ env FM_SUPERVISION_ACTOR=branch bin/fm-open-loops.sh --present-overdue
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c32227c337a5f7069e3dcf4c","firstmate","stuck","check in: progress, blockers, cross-workstream dependencies",9094,"last heard: status=1792031024; inbox acknowledgement=None; resolved reply=None",false
+  "0cdb66855906395002c2bb74","worker:stuck","stuck","follow up on the recorded wait and recover the worker",9094,"working [at=1792031024]: waiting for lint.full.whole to finish before pushing; 9079s without progress; declaration age 9079s",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+[exit 0]
+
+$ env FM_SUPERVISION_ACTOR=branch bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c32227c337a5f7069e3dcf4c","firstmate","stuck","check in: progress, blockers, cross-workstream dependencies",9095,"last heard: status=1792031024; inbox acknowledgement=None; resolved reply=None",false
+  "0cdb66855906395002c2bb74","worker:stuck","stuck","follow up on the recorded wait and recover the worker",9095,"working [at=1792031024]: waiting for lint.full.whole to finish before pushing; 9079s without progress; declaration age 9079s",false
+[exit 1]
+--- main is still satisfied:
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+$ env FM_SUPERVISION_ACTOR=branch bin/fm-open-loops.sh action 0cdb66855906395002c2bb74 steered --evidence 001.msg
+error: "steered evidence must be a new delivery sent after this row's presentation"
+[exit 1]
+
+$ env FM_SUPERVISION_ACTOR=bogus bin/fm-open-loops.sh --present-overdue
+error: "unknown supervision actor"
+[exit 1]
+--- tear down the stuck-worker fixture (Claude pane killed via the lab socket; meta, status, busy record and backlog row removed)
+
+
+==================== E1 corrupt ledger never blocks a drain or acknowledgement; action and report refuse it; heartbeat rebuilds ====================
+
+$ bin/fm-wake-drain.sh
+error: open-loops ledger unreadable (Expecting value: line 1 column 38 (char 37)); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/open-loops.json (the next heartbeat rebuilds it)
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through --recovery-generation
+wake drain: invalid acknowledgement sequence
+[exit 2]
+
+$ bin/fm-open-loops.sh --report
+error: "Expecting value: line 1 column 38 (char 37)"
+[exit 1]
+
+$ bin/fm-open-loops.sh action 0cdb66855906395002c2bb74 escalated --evidence x
+error: "Expecting value: line 1 column 38 (char 37)"
+[exit 1]
+--- symlinked ledger:
+
+$ bin/fm-open-loops.sh --present-overdue
+error: open-loops ledger unreadable (open-loop ledger must not be a symbolic link); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/open-loops.json (the next heartbeat rebuilds it)
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+error: open-loops ledger unreadable (open-loop ledger must not be a symbolic link); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/open-loops.json (the next heartbeat rebuilds it)
+[exit 0]
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792040137
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+--- queue one wake with the watcher's own fm_wake_append, then drain + ack with the corrupt ledger
+
+$ bin/fm-wake-drain.sh
+error: open-loops ledger unreadable (Expecting value: line 1 column 38 (char 37)); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/open-loops.json (the next heartbeat rebuilds it)
+1792040144	4	check	lab-probe	check: lab probe
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 69992.1792040145.WP8vhw
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 4 --recovery-generation 69992.1792040145.WP8vhw
+error: open-loops ledger unreadable (Expecting value: line 1 column 38 (char 37)); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/open-loops.json (the next heartbeat rebuilds it)
+[exit 0]
+--- queue after ack:
+(end)
+
+
+==================== F1 stale retention: present an open-PR row and defer it once ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792040166
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",7202,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c1b837f7a37c6911b32d66c1","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7205,"",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 7346.1792040169.rejabK
+[exit 0]
+
+$ bin/fm-open-loops.sh action c1b837f7a37c6911b32d66c1 deferred --evidence CI queue is backed up --recheck 2026-10-15T06:56:04Z
+action: "c1b837f7a37c6911b32d66c1"
+kind: deferred
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 7346.1792040169.rejabK
+[exit 0]
+
+
+==================== F2 forge outage: incomplete collection keeps the unseen presented row as stale informational, with its receipts ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792040177
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"open PRs acme/widget: gh api failed"
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",7213,false,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+{"complete":false,"rows":[{"category":"coverage","subject":"ledger degraded","overdue":true,"stale":null,"informational":null,"last_seen":null},{"category":"coverage","subject":"no forge coverage: stuckproj","overdue":false,"stale":null,"informational":true,"last_seen":null},{"category":"open_pr","subject":"https://github.com/acme/widget/pull/77","overdue":false,"stale":true,"informational":true,"last_seen":1792040166}],"actions":["c1b837f7a37c6911b32d66c1"]}
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "7073124aca3e066c5d903e3c","firstmate","ledger degraded","restore the unreadable sources and rerun the reconciler",null,"open PRs acme/widget: gh api failed",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 22127.1792040180.V4lQrH
+[exit 0]
+
+$ bin/fm-open-loops.sh action 7073124aca3e066c5d903e3c escalated --evidence forge outage reported to captain
+action: "7073124aca3e066c5d903e3c"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 22127.1792040180.V4lQrH
+[exit 0]
+
+
+==================== F3 same outage, 24h + 1s after last seen: stale row and its receipts are pruned (one-day policy window) ====================
+--- last_seen=1792040166; FM_OPEN_LOOPS_NOW=1792126565 first (1s before the window ends):
+
+$ env FM_OPEN_LOOPS_NOW=1792126565 bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792126565
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"open PRs acme/widget: gh api failed"
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",93601,false,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+{"rows":[{"subject":"https://github.com/acme/widget/pull/77","stale":true,"last_seen":1792040166}],"actions":["7073124aca3e066c5d903e3c","c1b837f7a37c6911b32d66c1"]}
+--- FM_OPEN_LOOPS_NOW=1792126567:
+
+$ env FM_OPEN_LOOPS_NOW=1792126567 bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792126567
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"open PRs acme/widget: gh api failed"
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+{"rows":[],"actions":["7073124aca3e066c5d903e3c"],"presentations":{"main":{"7073124aca3e066c5d903e3c":1}}}
+
+
+==================== F4 forge back, same PR still stalled: fresh row history, so a first deferral is allowed again ====================
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792040200
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",7236,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-open-loops.sh --present-overdue
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c1b837f7a37c6911b32d66c1","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7239,"",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+[exit 0]
+
+$ bin/fm-open-loops.sh action c1b837f7a37c6911b32d66c1 deferred --evidence CI queue again --recheck 2026-10-15T05:56:43Z
+action: "c1b837f7a37c6911b32d66c1"
+kind: deferred
+[exit 0]
+
+
+==================== F5 GitLab-origin project: target treats it as an informational skip (ledger complete, nothing overdue); base degrades the whole ledger ====================
+--- TARGET 729bfc48:
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792040214
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","no forge coverage: glab","firstmate","none: this project's origin is not GitHub, so its pull requests are outside this ledger's scope",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/glab: unsupported non-GitHub origin https://gitlab.com/acme/glab.git"
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",7250,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-open-loops.sh --report
+generated_epoch: 1792040214
+complete: true
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c1b837f7a37c6911b32d66c1","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7252,"",false
+[exit 0]
+--- BASE 3dac7017 (same lab, read-only --json, no publication):
+--- BASE 3dac7017 (same lab; config/open-loops.json moved aside because base rejects the new review_lanes key; read-only --json):
+{"complete":false,"rows":[{"subject":"ledger degraded","overdue":true,"evidence":"project origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/glab: unsupported non-GitHub origin: https://gitlab.com/acme/glab.git"},{"subject":"no forge coverage: stuckproj","overdue":false,"evidence":"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"}]}
+--- TARGET with the same config moved aside:
+{"complete":true,"rows":[{"subject":"no forge coverage: glab","overdue":false,"evidence":"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/glab: unsupported non-GitHub origin https://gitlab.com/acme/glab.git"},{"subject":"no forge coverage: stuckproj","overdue":false,"evidence":"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"}]}
+
+
+==================== G1 scheduled report watch (when-report-*) appends every overdue row after the bounded action tail; an ordinary watch does not ====================
+--- when-report-daily result (head 8 lines + tail 12 lines):
+when: when-report-daily
+status: fired
+detail: the condition held and the action exited 0
+condition_polls: 1
+action_exit: 0
+output:
+g padding padding
+board line 267: crew summary padding padding padding padding
+...
+board line 396: crew summary padding padding padding padding
+board line 397: crew summary padding padding padding padding
+board line 398: crew summary padding padding padding padding
+board line 399: crew summary padding padding padding padding
+board line 400: crew summary padding padding padding padding
+
+OPEN WORK REPORT:
+generated_epoch: 1792040236
+complete: true
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c1b837f7a37c6911b32d66c1","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7330,"",false
+--- when-deploy-check result (full):
+when: when-deploy-check
+status: fired
+detail: the condition held and the action exited 0
+condition_polls: 1
+action_exit: 0
+output:
+deploy check ok
+--- ledger --report at the same moment:
+
+$ bin/fm-open-loops.sh --report
+generated_epoch: 1792040236
+complete: true
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "c1b837f7a37c6911b32d66c1","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7345,"",false
+[exit 0]
+
+
+==================== H1 real away daemon (bin/fm-afk-start.sh -> fm-supervise-daemon.sh, private lab tmux): overdue rows join the digest and get escalated receipts; wakes are acknowledged, not wedged ====================
+--- daemon log:
+[2026-10-14T23:58:59-0500] daemon starting (pid 70547); target=lab:sup; target_source=FM_SUPERVISOR_TARGET; backend=tmux; backend_source=FM_SUPERVISOR_BACKEND; afk=on; inject_skip='heartbeat'; stale_escalate=240s; batch=90s
+[2026-10-14T23:59:49-0500] wake: signal: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/widget-review.status
+[2026-10-15T00:00:17-0500] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+[2026-10-15T00:00:18-0500] daemon shutting down
+--- escalation buffer (state/.subsuper-escalations):
+alpha.status: needs-decision [at=1792036730] [key=fmt]: which date format for exports (catch-all scan)
+widget-review.status: done [at=1792038272]: review PASS head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PR https://github.com/acme/widget/pull/42 (catch-all scan)
+--- ledger receipts after the daemon:
+{"id":"c1b837f7a37c6911b32d66c1","kind":"deferred","evidence":"CI queue again"}
+--- wake queue after the daemon:
+1792040294	5	check	procevent:when-deploy-check:1	check: procevent when when-deploy-check 1
+1792040295	6	check	procevent:when-report-daily:1	check: procevent when when-report-daily 1
+1792040359	7	signal	alpha.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/widget-review.status
+1792040366	8	signal	widget-review.status	signal: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/widget-review.status
+1792040374	9	signal	alpha.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/widget-review.status
+1792040379	10	signal	widget-review.status	signal: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/widget-review.status
+(end)
+--- second daemon run (the first run was cut by its 75 s timeout mid-handling):
+[2026-10-15T00:00:57-0500] daemon starting (pid 53481); target=lab:sup; target_source=FM_SUPERVISOR_TARGET; backend=tmux; backend_source=FM_SUPERVISOR_BACKEND; afk=on; inject_skip='heartbeat'; stale_escalate=240s; batch=90s
+[2026-10-15T00:01:07-0500] wake: check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+[2026-10-15T00:01:13-0500] escalate: check: procevent when when-deploy-check 1 -> check: procevent when when-deploy-check 1
+[2026-10-15T00:01:13-0500] escalate: check: procevent when when-report-daily 1 -> check: procevent when when-report-daily 1
+[2026-10-15T00:01:14-0500] self-handle: needs-decision: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/widget-review.status -> signal already escalated (catch-all scan): alpha.status: needs-decision [at=1792036730] [key=fmt]: which date format for exports | widget-review.status: done [at=1792038272]: review PASS head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PR https://github.com/acme/widget/pull/42
+[2026-10-15T00:01:15-0500] self-handle: signal: /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/alpha.status /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/state/widget-review.status -> signal already escalated (catch-all scan): alpha.status: needs-decision [at=1792036730] [key=fmt]: which date format for exports | widget-review.status: done [at=1792038272]: review PASS head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PR https://github.com/acme/widget/pull/42
+[2026-10-15T00:01:15-0500] escalate: check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json) -> check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+--- escalation buffer (state/.subsuper-escalations):
+check: procevent when when-deploy-check 1
+check: procevent when when-report-daily 1
+check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+overdue open work: "fbe2dcc8ee205f8347c2c698","firstmate","alpha:fmt","answer or close this question, or record why it no longer applies",3746,"needs-decision: which date format for exports",false
+--- ledger receipts after the daemon:
+{"id":"c1b837f7a37c6911b32d66c1","kind":"deferred","evidence":"CI queue again"}
+{"id":"fbe2dcc8ee205f8347c2c698","kind":"escalated","evidence":"away supervisor escalation digest"}
+--- wake queue after the daemon (acknowledged rows are gone):
+(end)
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+
+
+==================== H2 away return (real bin/fm-afk-return.sh): catch-up drain presents OVERDUE first; the escalated digest item is listed; ack still gated ====================
+
+$ timeout 180 bin/fm-afk-return.sh
+fm-afk-launch: away-mode daemon did not exit after SIGTERM; preserving lifecycle state
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+=== Return brief (away 2026-10-15T05:00:45Z -> 2026-10-15T05:02:10Z, 1m) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 8s old at return)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 0 task(s) live at return.
+fm-afk-return: catch-up must finish before the captain request
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 8s old at return)
+catch-up lifecycle: away-mode shutdown failed; lifecycle state preserved for retry
+catch-up wake: OVERDUE:
+catch-up wake: rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+catch-up wake:   "fbe2dcc8ee205f8347c2c698","firstmate","alpha:fmt","answer or close this question, or record why it no longer applies",3797,"needs-decision: which date format for exports",false
+catch-up wake: STANDING (a receipt stands; no action needed):
+catch-up wake:   "c1b837f7a37c6911b32d66c1","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7563,"",false
+catch-up wake: help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+catch-up wake: 1792040522 12 check procevent:when-deploy-check:1 check: procevent when when-deploy-check 1
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: alpha [key=fmt] needs-decision: which date format for exports
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up escalation: check: procevent when when-deploy-check 1
+catch-up escalation: check: procevent when when-report-daily 1
+catch-up escalation: check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+catch-up escalation: overdue open work: "fbe2dcc8ee205f8347c2c698","firstmate","alpha:fmt","answer or close this question, or record why it no longer applies",3746,"needs-decision: which date format for exports",false
+fm-afk-return: handle each blocker now, or close it with resolved [key=...] and append a durable reclassification reason, then run bin/fm-afk-return.sh check
+[exit 3]
+--- the daemon finished shutting down 3 s after fm-afk-launch's SIGTERM bound (lab daemon was started directly, not through fm-afk-launch); rerun the return:
+
+$ timeout 180 bin/fm-afk-return.sh
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+=== Return brief (away 2026-10-15T05:00:45Z -> 2026-10-15T05:02:26Z, 1m) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 8s old at return)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  (nothing)
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 0 task(s) live at return.
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 8s old at return)
+catch-up lifecycle: away-mode shutdown failed; lifecycle state preserved for retry
+catch-up wake: OVERDUE:
+catch-up wake: rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+catch-up wake:   "fbe2dcc8ee205f8347c2c698","firstmate","alpha:fmt","answer or close this question, or record why it no longer applies",3797,"needs-decision: which date format for exports",false
+catch-up wake: STANDING (a receipt stands; no action needed):
+catch-up wake:   "c1b837f7a37c6911b32d66c1","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7563,"",false
+catch-up wake: help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+catch-up wake: 1792040522 12 check procevent:when-deploy-check:1 check: procevent when when-deploy-check 1
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: alpha [key=fmt] needs-decision: which date format for exports
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up escalation: check: procevent when when-deploy-check 1
+catch-up escalation: check: procevent when when-report-daily 1
+catch-up escalation: check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+catch-up escalation: overdue open work: "fbe2dcc8ee205f8347c2c698","firstmate","alpha:fmt","answer or close this question, or record why it no longer applies",3746,"needs-decision: which date format for exports",false
+catch-up wake:   "fbe2dcc8ee205f8347c2c698","firstmate","alpha:fmt","answer or close this question, or record why it no longer applies",3814,"needs-decision: which date format for exports",false
+catch-up wake:   "c1b837f7a37c6911b32d66c1","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7580,"",false
+catch-up wake: 1792040529 13 check procevent:when-report-daily:1 check: procevent when when-report-daily 1
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 70753.1792040524.BuqIDY
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+[exit 0]
+
+
+==================== H3 after return, the catch-up acknowledgement is still gated on the overdue row ====================
+
+$ bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 70753.1792040524.BuqIDY
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "fbe2dcc8ee205f8347c2c698","firstmate","alpha:fmt","answer or close this question, or record why it no longer applies",3823,"needs-decision: which date format for exports",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action fbe2dcc8ee205f8347c2c698 escalated --evidence asked captain for the export date format on return
+action: "fbe2dcc8ee205f8347c2c698"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 70753.1792040524.BuqIDY
+[exit 0]
+
+
+==================== I1 BASE 3dac7017 comparison in the same lab: an overdue row exists, yet the wake is acknowledged with no action ====================
+
+$ /Users/charlesabrooker/tmp/fm-drive.EcKFLa/base/bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/tmp/fm-drive.EcKFLa/base/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792040562
+rows[3]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.eq2Jsr/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.eq2Jsr/origin-stuck.git"
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",7598,true,""
+  "unanswered_question","alpha:fmt","firstmate","answer or close this question, or record why it no longer applies",3832,true,"needs-decision: which date format for exports"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ /Users/charlesabrooker/tmp/fm-drive.EcKFLa/base/bin/fm-wake-drain.sh
+1792040564	14	check	lab-probe-base	check: lab probe (base)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 72068.1792040564.rWSTyq
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+alpha [key=fmt] needs-decision: which date format for exports
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+$ /Users/charlesabrooker/tmp/fm-drive.EcKFLa/base/bin/fm-wake-drain.sh --ack-through 14 --recovery-generation 72068.1792040564.rWSTyq
+[exit 0]
+--- queue after base ack (no action recorded):
+(end)
+
+
+==================== H4 real Claude primary (claude CLI on the private fm-lab tmux socket, FM_HOME=lab) handled the OVERDUE block on its own and the acknowledgement passed ====================
+--- task given to the primary: run bin/fm-wake-drain.sh, handle every overdue row as its output instructs, record an action per row, then run the printed WAKE_ACK_REQUIRED command
+--- primary transcript (assistant text, commands, results) saved to /Users/charlesabrooker/.no-mistakes/evidence/01M4XKTDXTD3BER6ZZGAYCX104/lab-primary-transcript-729bfc48.txt
+--- ledger receipts written by the primary:
+{"id":"fbe2dcc8ee205f8347c2c698","kind":"escalated","evidence":"escalated to captain in chat reply: alpha needs a decision on which date format to use for exports"}
+{"id":"7b04910347b157e753092937","kind":"escalated","evidence":"escalated to captain in chat reply: alpha needs a decision on how many days of export logs to keep"}
+--- check-actions after the primary's ack:
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+(worktree clean check done)

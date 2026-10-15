@@ -1,0 +1,233 @@
+[assistant] I will run the wake drain in the lab home first.
+[tool_use] echo "FM_HOME=$FM_HOME"; bin/fm-wake-drain.sh; echo "EXIT=$?"
+[tool_result] FM_HOME=/Users/charlesabrooker/tmp/fm-lab.eq2Jsr
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "fbe2dcc8ee205f8347c2c698","firstmate","alpha:fmt","answer or close this question, or record why it no longer applies",3903,"needs-decision: which date format for exports",false
+  "7b04910347b157e753092937","firstmate","alpha:retention","answer or close this question, or record why it no longer applies",7244,"needs-decision: how many days of export logs should we keep",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+alpha [key=fmt] needs-decision: which date format for exports
+alpha [key=retention] needs-decision: how many days of export logs should we keep
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 13045.1792040634.kJf8NW
+EXIT=0
+[assistant] The drain shows 2 overdue rows. Both are open captain questions. I may not send or answer them myself, so I will mark both as escalated. First I check the action command help.
+[tool_use] bin/fm-open-loops.sh --help 2>&1 | head -60; echo "EXIT=$?"
+[tool_result] fm-open-loops.sh - reconcile assigned work against live delivery evidence.
+Usage: fm-open-loops.sh [--json] [--heartbeat] [--check-in <task-id>]
+       fm-open-loops.sh --present-overdue | --check-actions | --report
+       fm-open-loops.sh action ROW_ID steered|merged|escalated|deferred --evidence TEXT [--recheck UTC_TIME]
+--check-in freshly reconciles and sends one standard progress/blocker/dependency
+request through fm-send's non-interrupting inbox path for an overdue silent_report.
+A pending request suppresses repeats under the same ledger lock. Secondmate sends
+use fm-send's existing pending-reply correlation, recovery and escalation; ordinary
+workers report before moving the inbox record into handled/, whose absence is
+escalated by the existing inbox ladder. Fresh or excluded reports are not sent.
+Requires explicit FM_HOME for sends; unresolved targets are refused by fm-send.
+Default: reconcile this home, TOON output. --json prints fm-open-loops.v1 for
+reconciliation or the check-in result object for --check-in.
+--present-overdue presents every overdue row that still needs an action first and records this actor's action
+requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
+An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
+--check-actions exits 1 while a presented overdue row has no subsequent action receipt.
+--report reads all overdue rows with current ages from the published ledger, without a forge scan.
+action records follow-up evidence, verified against local records: a new steered inbox record (NNN.msg) sent
+after the row's presentation, the row's own PR URL with its merge recorded by fm-pr-merge.sh, a captain
+escalation, or a deferral reason.
+deferred requires an ISO UTC --recheck time within 24 hours; a second deferral refuses and marks the row captain-visible.
+Receipts remain in state/open-loops.json across collection; they permit acknowledgement, never resolve work.
+Examples: fm-open-loops.sh action ROW_ID steered --evidence 001.msg
+          fm-open-loops.sh action ROW_ID deferred --evidence 'lint still producing output' --recheck '<future-UTC-time>'
+--heartbeat also atomically publishes state/open-loops.json. The watcher runs it as a
+detached helper and surfaces overdue rows as a durable check wake; there is no daemon.
+Sources: the fleet snapshot (backlog and direct reports), status logs, task worktrees,
+unhandled captured Lavish board answers, the no-mistakes run store, and discovered GitHub pull requests.
+docs/configuration.md owns config/open-loops.json, row fields, age limits, quota
+refusal, coverage degradation, and supported proof limits. Use --json for each row's limit_seconds.
+Examples: fm-open-loops.sh; fm-open-loops.sh --json; fm-open-loops.sh --heartbeat
+EXIT=0
+[assistant] I check what evidence the `escalated` action accepts.
+[tool_use] grep -n -i "escalat" bin/fm-open-loops.sh | head -60
+[tool_result] 5:#        fm-open-loops.sh action ROW_ID steered|merged|escalated|deferred --evidence TEXT [--recheck UTC_TIME]
+9:# use fm-send's existing pending-reply correlation, recovery and escalation; ordinary
+11:# escalated by the existing inbox ladder. Fresh or excluded reports are not sent.
+22:# escalation, or a deferral reason.
+[tool_use] grep -rn -i "escalated" bin/*.py bin/lib 2>/dev/null | grep -v test | head -40; grep -n "exec\|python" bin/fm-open-loops.sh | head
+[tool_result] bin/fm_open_loops.py:1144:    if kind == "escalated" and row.get("owner") == "captain":
+bin/fm_open_loops.py:1228:            print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred>"
+bin/fm_open_loops.py:1322:    action.add_argument("kind", choices=("steered", "merged", "escalated", "deferred"))
+39:command -v python3 >/dev/null 2>&1 || { printf 'error: Python 3 is required to reconcile open work\n'; exit 1; }
+40:exec python3 "$SCRIPT_DIR/fm_open_loops.py" "$@"
+[tool_use] sed -n 1090,1200p bin/fm_open_loops.py
+[tool_result]                 or not isinstance(handling.get("presented_at", {}), dict)
+                or any(not isinstance(v, dict) for v in handling.get("presented_at", {}).values())
+                or any(not isinstance(v, dict) for v in [*handling["actions"].values(),
+                                                         *handling["presentations"].values()])):
+        raise ValueError("unsupported open-loop ledger")
+    return report
+
+
+def write_ledger(state, report, receipt=False):
+    target = state / "open-loops.json"
+    if target.is_symlink():
+        raise ValueError("open-loop ledger must not be a symbolic link")
+    publication = target.stat() if receipt else None
+    fd, temp = tempfile.mkstemp(prefix=".open-loops-", dir=state)
+    try:
+        with os.fdopen(fd, "w") as stream:
+            json.dump(report, stream)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        if publication is not None:
+            # The watcher dates reconciler freshness from the heartbeat's mtime;
+            # recording an action must not conceal a stopped collector.
+            os.utime(temp, ns=(publication.st_atime_ns, publication.st_mtime_ns))
+        os.replace(temp, target)
+    finally:
+        if os.path.exists(temp):
+            os.unlink(temp)
+
+
+def overdue_rows(report, now):
+    rows = []
+    for original in report.get("rows", []):
+        row = dict(original)
+        age = row.get("age_seconds")
+        if age is not None:
+            row["age_seconds"] = age + max(0, now - report["generated_epoch"])
+        if not row.get("informational") and (age is None or row["age_seconds"] >= row["limit_seconds"]):
+            rows.append(row)
+    return rows
+
+
+def row_digest(row):
+    return hashlib.sha256(json.dumps([row.get(f) for f in ("category", "subject", "owner", "next_action",
+                                                           "evidence")]).encode()).hexdigest()[:24]
+
+
+def receipt_stands(action, row, now):
+    """A standing receipt also answers later turns; any other receipt answers only the turn it followed."""
+    kind = action.get("kind")
+    if row.get("category") == "review_pass_not_merged":
+        return False
+    if kind == "deferred":
+        return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
+    if kind == "escalated" and row.get("owner") == "captain":
+        return action.get("digest") == row_digest(row)  # only the captain can move it; stands until the row changes
+    return False
+
+
+def steer_record_epoch(state, row, record):
+    """When the row's task steering inbox (bin/fm-task-inbox-lib.sh) recorded this delivery, or None."""
+    if not re.fullmatch(r"[0-9]+[.]msg", record):
+        return None
+    owner = str(row.get("owner", ""))
+    tasks = [owner[len("worker:"):]] if owner.startswith("worker:") else []
+    tasks.append(str(row.get("subject", "")).split(":", 1)[0])
+    for task in tasks:
+        if not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", t
+[tool_use] sed -n 1200,1290p bin/fm_open_loops.py
+[tool_result]     controls = report.setdefault("handling", dict(sequence=0, presentations={}, presented_at={}, actions={}))
+    stamps = controls.setdefault("presented_at", {})
+    actor = os.environ.get("FM_SUPERVISION_ACTOR") or "main"
+    if actor not in ("main", "branch"):
+        raise ValueError("unknown supervision actor")
+    rows = overdue_rows(report, now)
+    by_id = {r["id"]: r for r in rows}
+    actions = controls["actions"]
+    for row in rows:
+        row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
+    pending = controls["presentations"].setdefault(actor, {})
+    if args.present_overdue:
+        needing, standing = [], []
+        for row in rows:
+            ident = row["id"]
+            action = actions.get(ident, {})
+            if receipt_stands(action, row, now):
+                standing.append(row)
+                continue
+            needing.append(row)
+            if ident not in pending or action.get("sequence", 0) > pending[ident]:
+                pending[ident] = controls["sequence"]
+                stamps.setdefault(actor, {})[ident] = now
+        write_ledger(state, report, receipt=True)
+        if needing:
+            print(render_overdue(needing))
+            if standing:
+                print(render_overdue(standing).replace("OVERDUE:", "STANDING (a receipt stands; no action needed):", 1))
+            print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred>"
+                  " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]")
+        return 0
+    if args.check_actions:
+        missing = [by_id[ident] for ident, presented in pending.items()
+                   if ident in by_id and (actions.get(ident, {}).get("sequence", 0) <= presented
+                       or (actions.get(ident, {}).get("kind") == "deferred"
+                           and actions[ident].get("recheck_epoch", 0) <= now))]
+        if missing:
+            print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
+            print(render_overdue(missing))
+            return 1
+        return 0
+    if args.report:
+        print(f"generated_epoch: {report['generated_epoch']}")
+        print("complete: " + str(report.get("complete", False)).lower())
+        print(render_overdue(rows) if rows else "OVERDUE: none")
+        return 0
+    if args.row_id not in by_id:
+        raise ValueError("row is not currently overdue in the published ledger")
+    ident = args.row_id
+    if not any(ident in presented for presented in controls["presentations"].values()):
+        raise ValueError("row has not been presented; run bin/fm-wake-drain.sh first")
+    old = actions.get(ident, {})
+    if not args.evidence or not args.evidence.strip():
+        raise ValueError("--evidence is required for every action")
+    cited = old.get("cited", [])
+    if args.kind == "steered":
+        sent = steer_record_epoch(state, by_id[ident], args.evidence)
+        if sent is None:
+ 
+[assistant] Escalation evidence is free text. I record both rows as escalated to the captain.
+[tool_use] bin/fm-open-loops.sh action fbe2dcc8ee205f8347c2c698 escalated --evidence 'escalated to captain in chat reply: alpha needs a decision on which date format to use for exports'; echo "EXIT=$?"
+bin/fm-open-loops.sh action 7b04910347b157e753092937 escalated --evidence 'escalated to captain in chat reply: alpha needs a decision on how many days of export logs to keep'; echo "EXIT=$?"
+[tool_result] action: "fbe2dcc8ee205f8347c2c698"
+kind: escalated
+EXIT=0
+action: "7b04910347b157e753092937"
+kind: escalated
+EXIT=0
+[assistant] Both actions are recorded. Now I run the exact acknowledgement command.
+[tool_use] bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 13045.1792040634.kJf8NW; echo "EXIT=$?"
+[tool_result] EXIT=0
+[assistant] LAB_DONE
+
+Captain, the lab run worked. Every command exited 0.
+
+**Commands I ran (lab home `FM_HOME=/Users/charlesabrooker/tmp/fm-lab.eq2Jsr`):**
+
+| # | Command | Exit |
+|---|---------|------|
+| 1 | `bin/fm-wake-drain.sh` | 0 |
+| 2 | `bin/fm-open-loops.sh --help` (read-only) | 0 |
+| 3 | `bin/fm-open-loops.sh action fbe2dcc8ee205f8347c2c698 escalated --evidence 'escalated to captain in chat reply: alpha needs a decision on which date format to use for exports'` | 0 |
+| 4 | `bin/fm-open-loops.sh action 7b04910347b157e753092937 escalated --evidence 'escalated to captain in chat reply: alpha needs a decision on how many days of export logs to keep'` | 0 |
+| 5 | `bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 13045.1792040634.kJf8NW` | 0 |
+
+I also read `bin/fm_open_loops.py` with `grep` and `sed` to see what proof the "escalated" action needs. It needs only free text. I changed no files. I did not spawn, send, or run any other fleet command.
+
+**What the drain showed:** 2 overdue rows. Both are open questions on the `alpha` task:
+
+1. `fbe2dcc8…` (`alpha:fmt`): about 65 minutes overdue.
+2. `7b049109…` (`alpha:retention`): about 2 hours overdue.
+
+**Why I escalated them:** These are product choices for you to make. I was not allowed to send answers. So I recorded both as escalated to you.
+
+**Your two decisions for `alpha`:**
+
+1. **Date format for exports.** Which format do you want? An example is ISO 8601 (`2026-10-15`).
+2. **How long to keep export logs.** How many days?
+
+I have no evidence that favors one answer over another, so I give no recommendation. In a real home, you answer each one with `bin/fm-send.sh alpha --resolve-key fmt '<answer>'` and `bin/fm-send.sh alpha --resolve-key retention '<answer>'`.
+
+result: Lab drain done: both overdue `alpha` questions (date format, log retention) were recorded as escalated to the captain, and the acknowledgement exited 0.
