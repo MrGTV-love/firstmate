@@ -2468,7 +2468,10 @@ move_case_to_pool_slot() {
   dest="$case_dir/pool/$slot/repo"
   mkdir -p "$case_dir/pool/$slot"
   git -C "$case_dir/project" worktree move "$case_dir/wt" "$dest"
-  printf '{"worktrees":[{"name":"%s","path":"%s"}]}\n' "$slot" "$dest" \
+  # The worker's durable lease, as spawn publishes it: teardown's reservation
+  # then proves the slot already held instead of taking a new lease (the
+  # lease-protocol cases use make_lease_modeling_pool_case).
+  printf '{"worktrees":[{"name":"%s","path":"%s","leased":true,"lease_holder":"task-x1"}]}\n' "$slot" "$dest" \
     > "$case_dir/pool/treehouse-state.json"
   printf '%s\n' "$dest"
 }
@@ -2561,29 +2564,48 @@ test_dirty_return_warns_even_when_a_later_step_refuses() {
   wt=$(move_case_to_pool_slot "$case_dir" 8)
   write_meta "$case_dir" no-mistakes scout "$wt"
   prepare_scout_teardown "$case_dir"
-  add_treehouse_that_leaves_residue "$case_dir"
-  cat > "$case_dir/fakebin/tmux" <<'SH'
+  # The pool return is teardown's final pool critical section: it runs only
+  # after the endpoint is closed, so an endpoint-close refusal stops teardown
+  # with the slot unreturned and nothing dirty yet. The first step that can
+  # refuse after a completed return is the task-record removal, so the later
+  # failure is injected there: the return plants the same residue as
+  # add_treehouse_that_leaves_residue and then makes the state directory
+  # unwritable so that removal refuses.
+  cat > "$case_dir/fakebin/treehouse" <<SH
 #!/usr/bin/env bash
-case "${1:-}" in
-  kill-window) exit 1 ;;
-  list-windows) printf '%s\n' fm-task-x1 ;;
-esac
+if [ "\${1:-}" = return ]; then
+  shift
+  wt=
+  for a in "\$@"; do
+    case "\$a" in
+      --force) ;;
+      *) wt=\$a ;;
+    esac
+  done
+  if [ -n "\$wt" ]; then
+    git -C "\$wt" clean -fdq || true
+    git init -q "\$wt/left-behind-clone"
+    git -C "\$wt/left-behind-clone" commit -q --allow-empty -m residue
+    chmod a-w "$case_dir/state"
+  fi
+fi
 exit 0
 SH
-  chmod +x "$case_dir/fakebin/tmux"
+  chmod +x "$case_dir/fakebin/treehouse"
 
   set +e
   FM_HOME="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr"
   rc=$?
   set -e
+  chmod u+w "$case_dir/state"
 
-  expect_code 1 "$rc" "dirty-return-later-refusal: the endpoint refusal should fail teardown"
-  assert_grep "could not be closed" "$case_dir/stderr" \
-    "dirty-return-later-refusal: fixture did not reach the endpoint close refusal"
+  expect_code 1 "$rc" "dirty-return-later-refusal: the later record-removal refusal should fail teardown"
   assert_grep "pool slot 8" "$case_dir/stderr" \
     "dirty-return-later-refusal: a later refusal dropped the lost-slot warning"
   assert_grep "left-behind-clone" "$case_dir/stderr" \
     "dirty-return-later-refusal: a later refusal dropped the remaining paths"
+  assert_present "$case_dir/state/task-x1.meta" \
+    "dirty-return-later-refusal: the refused record removal still deleted the record"
   pass "a dirty return is reported even when a later teardown step refuses"
 }
 
@@ -2648,7 +2670,7 @@ test_forced_secondmate_dirty_child_return_warns_and_completes() {
   child_wt="$case_dir/pool/6/repo"
   mkdir -p "$case_dir/pool/6"
   git -C "$case_dir/project" worktree add -q -b fm/child-scout "$child_wt" main
-  printf '{"worktrees":[{"name":"6","path":"%s"}]}\n' "$child_wt" \
+  printf '{"worktrees":[{"name":"6","path":"%s","leased":true,"lease_holder":"child-scout"}]}\n' "$child_wt" \
     > "$case_dir/pool/treehouse-state.json"
   fm_write_meta "$home/state/child-scout.meta" \
     "window=firstmate:fm-child-scout" \

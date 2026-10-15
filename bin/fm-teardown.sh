@@ -5089,7 +5089,13 @@ cleanup_firstmate_home_children() {
         }
       fi
       if command -v treehouse >/dev/null 2>&1; then
+        # A forced secondmate teardown scrubs every child copy it returns and
+        # checks that return for residue, exactly as the parent's own return
+        # and the non-pool child return above do; a dirty or unverifiable
+        # return is a lost pool slot (exit 4 after cleanup).
+        teardown_scrub_scratch_copy "$child_wt" "$child_id" || return $?
         if teardown_treehouse_return "$child_wt" "$child_proj" "child worktree" "$child_id"; then
+          teardown_note_dirty_return "$child_wt"
           fm_treehouse_slot_owner_release "$child_wt" "$child_id" || return 1
         else
           child_return_rc=$?
