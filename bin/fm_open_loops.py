@@ -32,7 +32,7 @@ CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream depe
                  "Handle this at your next safe checkpoint; do not interrupt a running step.")
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
-DAY_SECONDS = 86400  # longest deferral
+DAY_SECONDS = 86400  # longest deferral, and how long an unseen row is retained
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
@@ -700,7 +700,9 @@ class Collector:
             return self.prs[url]
         match = GITHUB_PR.fullmatch(url)
         if not match:
-            self.degraded.append("unsupported PR forge: " + url)
+            self.add("coverage", "no forge coverage: " + url,
+                     "none: this pull request is not on GitHub, so it is outside this ledger's scope",
+                     None, evidence="unsupported PR forge: " + url, informational=True)
             self.prs[url] = None
             return None
         pr = self.source("PR state " + url, lambda: self.forge(f"/repos/{match[1]}/pulls/{match[2]}")[0])
@@ -751,18 +753,19 @@ class Collector:
                 slugs.add(match[1])
                 self.owned_branches.update((match[1].casefold(), t["branch"]) for t in self.tasks
                                            if t.get("project") == path and t.get("branch"))
-            else:  # repo_origin admits only a GitHub or local-path origin, and a local path has no forge to read
+            elif is_local_origin(origin):  # a local path has no forge to read
                 self.add("coverage", "no forge coverage: " + Path(path).name,
                          "none: this project's origin is a local path, so it has no forge pull requests to collect",
                          None, evidence=f"{path}: local origin {origin}", informational=True)
+            else:
+                self.add("coverage", "no forge coverage: " + Path(path).name,
+                         "none: this project's origin is not GitHub, so its pull requests are outside this ledger's scope",
+                         None, evidence=f"{path}: unsupported non-GitHub origin {origin}", informational=True)
         return sorted(slugs)
 
     def repo_origin(self, path):
         self.git(path, "rev-parse", "--git-dir")
-        origin = self.run(["git", "-C", path, "config", "--get", "remote.origin.url"], missing_ok=True).strip()
-        if origin and not GITHUB_ORIGIN.fullmatch(origin) and not is_local_origin(origin):
-            raise ValueError("unsupported non-GitHub origin: " + origin)
-        return origin
+        return self.run(["git", "-C", path, "config", "--get", "remote.origin.url"], missing_ok=True).strip()
 
     def latest_checks(self, slug, sha):
         runs = [c for page in self.forge(f"/repos/{slug}/commits/{sha}/check-runs?per_page=100")
@@ -1031,8 +1034,9 @@ class Collector:
                 presented = {ident for actor in handling["presentations"].values() for ident in actor}
                 for row in previous["rows"]:
                     # Unconfirmed either way: shown stale, never an overdue obligation needing a receipt.
-                    if row["id"] in presented and row["id"] not in current:
-                        retained = dict(row, stale=True, overdue=False, informational=True)
+                    seen = row.get("last_seen", previous["generated_epoch"])
+                    if row["id"] in presented and row["id"] not in current and self.now - seen < DAY_SECONDS:
+                        retained = dict(row, stale=True, overdue=False, informational=True, last_seen=seen)
                         if retained.get("age_seconds") is not None:
                             retained["age_seconds"] += max(0, self.now - previous["generated_epoch"])
                         report["rows"].append(retained)
@@ -1133,6 +1137,8 @@ def row_digest(row):
 def receipt_stands(action, row, now):
     """A standing receipt also answers later turns; any other receipt answers only the turn it followed."""
     kind = action.get("kind")
+    if row.get("category") == "review_pass_not_merged":
+        return False
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
     if kind == "escalated" and row.get("owner") == "captain":

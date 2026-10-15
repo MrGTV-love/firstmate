@@ -791,8 +791,10 @@ unsupported = home / 'projects/gitlab'
 out(['git', 'init', '-q', '-b', 'main', unsupported])
 git(unsupported, 'remote', 'add', 'origin', 'https://gitlab.com/test/project.git')
 unsupported_report = ledger()
-assert not unsupported_report['complete'] and len(rows(unsupported_report, 'coverage')) == 1, unsupported_report
-assert 'non-GitHub' in rows(unsupported_report, 'coverage')['ledger degraded']['evidence'], unsupported_report
+assert unsupported_report['complete'], unsupported_report
+assert 'ledger degraded' not in rows(unsupported_report, 'coverage'), unsupported_report
+skipped = rows(unsupported_report, 'coverage')['no forge coverage: gitlab']
+assert skipped['informational'] and not skipped['overdue'] and 'non-GitHub' in skipped['evidence'], skipped
 shutil.rmtree(unsupported)
 for origin_url in ('https://github.com/test/project.git', 'git@github.com:test/project.git',
                    'ssh://git@github.com/test/project.git', 'git://github.com/test/project.git'):
@@ -806,8 +808,9 @@ for origin_url in ('https://evilgithub.com/test/lookalike.git',
     git(no_origin, 'config', 'remote.origin.url', origin_url)
     (world / 'gh-requests').write_text('')
     hostname_report = ledger()
-    assert not hostname_report['complete'], (origin_url, hostname_report)
-    assert 'non-GitHub' in rows(hostname_report, 'coverage')['ledger degraded']['evidence'], hostname_report
+    assert hostname_report['complete'], (origin_url, hostname_report)
+    skipped = rows(hostname_report, 'coverage')['no forge coverage: no-origin']
+    assert skipped['informational'] and 'non-GitHub' in skipped['evidence'], hostname_report
     assert '/repos/test/lookalike/' not in (world / 'gh-requests').read_text(), origin_url
     assert rows(hostname_report, 'open_pr'), 'unsupported hosts must not hide healthy peers'
 git(no_origin, 'config', '--unset', 'remote.origin.url')
@@ -841,7 +844,8 @@ unsupported_pr = dict(number=90, html_url='https://evilgithub.com/test/project/p
 double['pulls'].append(unsupported_pr)
 (world / 'gh.json').write_text(json.dumps(double))
 projection_report = ledger()
-assert not projection_report['complete'], projection_report
+assert projection_report['complete'], projection_report
+assert rows(projection_report, 'coverage')['no forge coverage: ' + unsupported_pr['html_url']]['informational']
 assert unsupported_pr['html_url'] not in rows(projection_report), projection_report
 assert rows(projection_report, 'open_pr') and rows(projection_report, 'red_check'), projection_report
 double['pulls'].pop()
@@ -852,8 +856,9 @@ unsupported_task['project'] = None
 fixture(tasks + [unsupported_task], backlog)
 (world / 'gh-requests').write_text('')
 admission_report = ledger()
-assert not admission_report['complete'], admission_report
-assert 'unsupported PR forge' in rows(admission_report, 'coverage')['ledger degraded']['evidence'], admission_report
+assert admission_report['complete'], admission_report
+skipped = rows(admission_report, 'coverage')['no forge coverage: https://github.com.evil/test/project/pull/91']
+assert skipped['informational'] and 'unsupported PR forge' in skipped['evidence'], admission_report
 assert '/pulls/91' not in (world / 'gh-requests').read_text(), admission_report
 assert rows(admission_report, 'open_pr') and rows(admission_report, 'red_check'), admission_report
 fixture(tasks, backlog)
@@ -2039,6 +2044,18 @@ assert ack(boundary).returncode == 1, 'an escalation cannot silence a mergeable 
 ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'escalated', '--evidence', 'asked the captain again')
 assert ack(boundary).returncode == 0
 
+home, ledger, row, call, ok, drain, ack = case('approval-deferred', category='review_pass_not_merged', subject=PR,
+                                               next_action='merge with existing authority or escalate for approval',
+                                               evidence='independent review PASS at live head', limit_seconds=600)
+_, boundary = drain()
+future = dt.datetime.fromtimestamp(now + 600, dt.timezone.utc).isoformat()
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'deferred', '--evidence', 'waiting', '--recheck', future)
+assert ack(boundary).returncode == 0
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: deferred approval row"', '_', code / 'bin/fm-wake-lib.sh')
+result, boundary = drain()
+assert row['id'] in result.stdout and 'STANDING' not in result.stdout, result
+assert ack(boundary).returncode == 1, 'a deferral cannot hold a mergeable reviewed PR across turns'
+
 # One escalation of a captain-owned row stands until the row changes.
 home, ledger, row, call, ok, drain, ack = case('captain', category='unanswered_question', subject='hold:captain-hold',
                                                owner='captain', next_action='resolve the captain hold',
@@ -2121,6 +2138,22 @@ kept = next(r for r in refreshed['rows'] if r['id'] == row['id'])
 assert not refreshed['complete'] and kept['stale'] and not kept['overdue'], refreshed
 assert refreshed['handling']['actions'][row['id']]['sequence'] == sequence, 'publication must retain action receipts'
 assert ack(boundary).returncode == 0
+
+# An unseen presented row is retained for 24 hours after it was last seen; then it and its receipts are dropped.
+home, ledger, row, call, ok, drain, ack = case('retention')
+_, boundary = drain()
+inbox(home, '030.msg')
+ok(code / 'bin/fm-open-loops.sh', 'action', row['id'], 'steered', '--evidence', '030.msg')
+clock['now'] = now + 3600
+first = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
+kept = next(r for r in first['rows'] if r['id'] == row['id'])
+assert kept['stale'] and kept['last_seen'] == now and row['id'] in first['handling']['actions'], first
+clock['now'] = now + 86400
+second = json.loads(ok(code / 'bin/fm-open-loops.sh', '--heartbeat', '--json').stdout)
+assert row['id'] not in {r['id'] for r in second['rows']}, second
+assert row['id'] not in second['handling']['actions'], 'a returning stall starts a fresh row history'
+assert row['id'] not in second['handling']['presentations']['main'], second
+clock['now'] = now
 
 home, ledger, row, call, ok, drain, ack = case('recheck')
 _, boundary = drain()

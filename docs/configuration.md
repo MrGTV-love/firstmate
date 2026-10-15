@@ -630,7 +630,7 @@ For a non-informational row, an unknown age stays `null` and counts as overdue, 
 | `open_pr` | an open PR this home owns waits on checks, a reviewer, or firstmate's review routing | 3600 s |
 | `review_pass_not_merged` | a configured independent review lane recorded PASS for an owned, nondraft PR's exact live head, every reported check is green, and every classic-protection and ruleset requirement has reported green from its required producer; the row replaces the ordinary open-PR obligation and resolves when the PR merges | 600 s |
 | `red_check` | the latest run of a check on an open PR this home owns failed; the next action is always `diagnose: code or test`, never a waiver | 0 s |
-| `coverage` | a source is unreadable or its forge is unsupported, so coverage is incomplete | 0 s |
+| `coverage` | a source is unreadable, so coverage is incomplete; an unsupported forge is instead an informational skip | 0 s |
 
 Each home reports only what it owns.
 The `silent_report` clock is the newest nonfuture time among the last logical status event's canonical `[at=...]` stamp (or status-file mtime when unstamped), the latest acknowledgement move into the report's steering inbox `handled/`, and a pending-reply record's `resolved_epoch` for that report.
@@ -670,7 +670,7 @@ Captain-held backlog questions use subject `<id>:captain-hold`, owner `captain`,
 Blocked, dated, and Done holds are excluded, and no historical audit or new persistence is required.
 For local-only projects, the ledger uses the qualified local default branch advanced by `fm-merge-local` as delivery proof; other project modes retain their normal remote-default proof, with nonmerge commit patch equivalence against the actual PR head.
 GitHub repositories are discovered from recorded local task and backlog PR URLs as well as project origins, including fork-only delivery; their open PRs are classified before PR-head coverage can suppress unlanded commits.
-Only exact `github.com` hosts are admitted or projected, and unsupported origins or PR URLs disclose degraded coverage; GitLab and Gerrit merge proofs are outside this ledger's current scope.
+Only exact `github.com` hosts are admitted or projected, and an unsupported origin or PR URL is a known skip that adds an informational `coverage` row named `no forge coverage: <project or URL>` without degrading the ledger; GitLab and Gerrit merge proofs are outside this ledger's current scope.
 A project whose origin is a local filesystem path (an absolute or relative path or a `file://` URL) has no forge pull requests to collect, so it adds an informational `coverage` row named `no forge coverage: <project>` and does not degrade the ledger.
 An existing worker endpoint with reconciled `working` state counts as live when its backend's recovery verdict is `unverified`; other inconclusive liveness adds degraded coverage unless the worker recorded a stop.
 Unknown current task state adds degraded coverage independently of liveness, except when a recorded stop or a confirmed dead or missing agent with `backend target gone:` detail explains it.
@@ -719,12 +719,12 @@ Escalation evidence is free text: no receipt is checked against the forge or aga
 A deferral's recheck time must be in the future and at most 24 hours ahead.
 Only one deferral is allowed per row; a second attempt refuses, marks the row `captain_visible`, and requires steering, merging, or escalation before acknowledgement.
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
-A first deferral stands until its recheck time.
+A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
-A `review_pass_not_merged` row has no standing receipt: firstmate holds merge authority for a reviewed, green PR, so each presentation needs a merge or a routed action.
+A `review_pass_not_merged` row has no standing receipt of any kind, escalated or deferred: firstmate holds merge authority for a reviewed, green PR, so each presentation needs a merge or a routed action.
 The existing ledger lock file separates collection exclusion from the short publication/receipt critical section, so a slow source scan cannot delay overdue presentation or action recording, and atomic publication preserves action requirements and receipts rather than overwriting them.
 Receipt writes preserve the ledger's heartbeat modification time, so action recording cannot mask a reconciler that stopped publishing.
-An incomplete collection keeps a presented row it no longer sees as a stale informational row: it is shown, never overdue, and needs no receipt; a complete collection drops it.
+An incomplete collection keeps a presented row it no longer sees as a stale informational row: it is shown, never overdue, and needs no receipt; a complete collection drops it, and any collection drops it, with its receipts, 24 hours after it was last seen.
 Every publication drops `handling` entries for rows it no longer publishes, so a later recurrence of the same obligation starts with no receipts or deferrals, and an unreadable previous ledger is replaced rather than blocking publication.
 An unreadable ledger (corrupt JSON, wrong schema, or a symbolic link) never blocks a drain, acknowledgement, session start, or away return: the drain prints one stderr line naming the exact repair command, `rm state/open-loops.json`, and the next heartbeat rebuilds the file; `action` and `--report` still refuse it.
 An action receipt permits acknowledgement, never resolves the obligation: a row disappears only when fresh delivery evidence resolves it.
