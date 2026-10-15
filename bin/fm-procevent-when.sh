@@ -82,6 +82,8 @@
 #   action_exit: <code>        (fired and action-failed only)
 #   output:
 #   <bounded tail of the relevant command output>
+#   OPEN WORK REPORT: ...       (watches named board-* or report-* only:
+#                               bin/fm-open-loops.sh --report after the tail)
 #
 # Ownership, durable capture, publication, restart recovery, and the handled
 # acknowledgement all belong to bin/fm-procevent.sh; this adapter owns only the
@@ -352,6 +354,16 @@ emit_doc() {
   if [ -n "$outfile" ] && [ -f "$outfile" ]; then
     tail -c "$OUTPUT_TAIL_BYTES" "$outfile" 2>/dev/null || true
   fi
+  # The scheduled board and report watches append every overdue row after the
+  # bounded action tail so none is cut; other watches do not.
+  case "$sid" in
+    when-board-*|when-report-*)
+      if [ -f "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
+        printf '\nOPEN WORK REPORT:\n'
+        "$SCRIPT_DIR/fm-open-loops.sh" --report || printf 'error: open-work report unavailable; inspect the ledger before reporting\n'
+      fi
+      ;;
+  esac
 }
 
 cmd_run() {

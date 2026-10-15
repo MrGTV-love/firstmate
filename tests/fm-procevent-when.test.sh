@@ -646,4 +646,32 @@ assert_grep 'status: fired' "$RESULT" \
 assert_grep 'v2 ran against' "$RESULT" "the fired action ran the rebound (v2) bytes, not a rejection from a torn read"
 pass "the fire-time reload never observes rebind_one's spec/trust publish mid-rename"
 
+# Scheduled board and report wakes carry every overdue row after the bounded action output.
+H="$TMP_ROOT/h-board-report"; new_home "$H"
+now=$(date +%s)
+python3 - "$H/state/open-loops.json" "$now" <<'PY'
+import json, sys
+rows = [dict(id=f'row-{i}', category='stalled_worker', subject=f'worker-{i}', owner='firstmate',
+             next_action='follow up on lint', evidence='lint is still running', age_seconds=7200 + i,
+             limit_seconds=3600, overdue=True) for i in range(25)]
+with open(sys.argv[1], 'w') as stream:
+    json.dump(dict(schema='fm-open-loops.v1', generated_epoch=int(sys.argv[2]), complete=True, rows=rows), stream)
+PY
+: > "$TMP_ROOT/board-trigger"
+when "$H" arm board-0900 --stable 1 --condition "$COND" "$TMP_ROOT/board-trigger" "$TMP_ROOT/board-count" \
+  --action "$ACT" "$TMP_ROOT/board-action" >/dev/null || fail "could not arm the board report"
+out=$(FM_OPEN_LOOPS_NOW="$now" when "$H" run when-board-0900) || fail "board report source failed"
+assert_contains "$out" 'status: fired' 'scheduled board condition did not fire'
+assert_contains "$out" 'row-0' 'board wake lost its first overdue row'
+assert_contains "$out" 'row-24' 'board wake truncated its overdue rows'
+assert_contains "$out" '7200' 'board wake omitted overdue ages'
+pass 'scheduled board outcomes list every overdue row with its age'
+: > "$TMP_ROOT/other-trigger"
+when "$H" arm deploy-check --stable 1 --condition "$COND" "$TMP_ROOT/other-trigger" "$TMP_ROOT/other-count" \
+  --action "$ACT" "$TMP_ROOT/other-action" >/dev/null || fail "could not arm the ordinary watch"
+out=$(FM_OPEN_LOOPS_NOW="$now" when "$H" run when-deploy-check) || fail "ordinary watch source failed"
+assert_contains "$out" 'status: fired' 'ordinary watch condition did not fire'
+case "$out" in *'OPEN WORK REPORT'*) fail 'an ordinary watch outcome carried the open-work report' ;; esac
+pass 'only the scheduled report watches carry the open-work report'
+
 printf 'all fm-procevent-when tests passed\n'

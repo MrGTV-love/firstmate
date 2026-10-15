@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # fm-open-loops.sh - reconcile assigned work against live delivery evidence.
 # Usage: fm-open-loops.sh [--json] [--heartbeat] [--check-in <task-id>]
+#        fm-open-loops.sh --present-overdue | --check-actions | --report
+#        fm-open-loops.sh action ROW_ID steered|merged|escalated|deferred --evidence TEXT [--recheck UTC_TIME]
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
 # request through fm-send's non-interrupting inbox path for an overdue silent_report.
 # A pending request suppresses repeats under the same ledger lock. Secondmate sends
@@ -10,6 +12,18 @@
 # Requires explicit FM_HOME for sends; unresolved targets are refused by fm-send.
 # Default: reconcile this home, TOON output. --json prints fm-open-loops.v1 for
 # reconciliation or the check-in result object for --check-in.
+# --present-overdue presents every overdue row that still needs an action first and records this actor's action
+# requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
+# An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
+# --check-actions exits 1 while a presented overdue row has no subsequent action receipt.
+# --report reads all overdue rows with current ages from the published ledger, without a forge scan.
+# action records follow-up evidence, verified against local records: a new steered inbox record (NNN.msg) sent
+# after the row's presentation, the row's own PR URL with its merge recorded by fm-pr-merge.sh, a captain
+# escalation, or a deferral reason.
+# deferred requires an ISO UTC --recheck time within 24 hours; a second deferral refuses and marks the row captain-visible.
+# Receipts remain in state/open-loops.json across collection; they permit acknowledgement, never resolve work.
+# Examples: fm-open-loops.sh action ROW_ID steered --evidence 001.msg
+#           fm-open-loops.sh action ROW_ID deferred --evidence 'lint still producing output' --recheck '<future-UTC-time>'
 # --heartbeat also atomically publishes state/open-loops.json. The watcher runs it as a
 # detached helper and surfaces overdue rows as a durable check wake; there is no daemon.
 # Sources: the fleet snapshot (backlog and direct reports), status logs, task worktrees,

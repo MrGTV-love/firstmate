@@ -9,6 +9,7 @@ set -u
 
 WATCH="$ROOT/bin/fm-watch.sh"
 DRAIN="$ROOT/bin/fm-wake-drain.sh"
+OPEN_LOOPS="$ROOT/bin/fm-open-loops.sh"
 TMP_ROOT=$(fm_test_tmproot fm-watch-open-loops-tests)
 
 # The shared poll-count seam: each completed watcher poll is recorded, so a test can wait
@@ -156,13 +157,18 @@ reap() {
 }
 
 ack_stopped_cycle() {  # <state>
-  local state=$1 err sequence generation
+  local state=$1 err sequence generation id
   err="$state/.test-cycle-drain.err"
   FM_STATE_OVERRIDE="$state" "$DRAIN" >/dev/null 2> "$err" || return 1
   sequence=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through \([0-9][0-9]*\) --recovery-generation [A-Za-z0-9._-][A-Za-z0-9._-]*$/\1/p' "$err")
   generation=$(sed -n 's/^WAKE_ACK_REQUIRED:.*--ack-through [0-9][0-9]* --recovery-generation \([A-Za-z0-9._-][A-Za-z0-9._-]*\)$/\1/p' "$err")
   rm -f "$err"
   [ -n "$sequence" ] && [ -n "$generation" ] || return 1
+  # The drain presented every overdue row; acknowledgement needs an action on each.
+  for id in $(FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" --report | sed -n 's/^  "\([^"]*\)",.*/\1/p'); do
+    FM_STATE_OVERRIDE="$state" "$OPEN_LOOPS" action "$id" escalated --evidence 'test supervisor escalated' \
+      >/dev/null || return 1
+  done
   FM_STATE_OVERRIDE="$state" "$DRAIN" --ack-through "$sequence" \
     --recovery-generation "$generation"
 }

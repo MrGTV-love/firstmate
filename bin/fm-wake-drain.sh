@@ -6,6 +6,9 @@
 # newer branch outcome, OPEN DECISIONS, captain-call record divergence, and on
 # a supervision-host home the supervision session's new and unprocessed
 # outcomes (BRANCH OUTCOMES), then assert liveness.
+# Overdue open-work rows (OVERDUE, STANDING) are presented first, and
+# acknowledgement refuses while a presented row lacks an action receipt;
+# docs/configuration.md "Open-work ledger" owns that gate.
 #
 # Keep sequence-bound row consumption independent from generation-bound episode
 # retirement; docs/watcher-continuity.md owns the recovery contract.
@@ -879,6 +882,18 @@ if [ "$REEMIT" = true ]; then
     exit 0
   fi
 fi
+# The same ledger receipt boundary applies to main, the supervision-host's
+# branch actor, and secondmate homes. Never consume a wake before its overdue
+# obligations have an action recorded after presentation.
+OVERDUE_SECTION=
+if [ -e "$STATE/open-loops.json" ] || [ -L "$STATE/open-loops.json" ]; then
+  if [ -n "$ACK_THROUGH" ]; then
+    "$SCRIPT_DIR/fm-open-loops.sh" --check-actions || exit 1
+  else
+    OVERDUE_SECTION=$("$SCRIPT_DIR/fm-open-loops.sh" --present-overdue) || exit 1
+    [ -z "$OVERDUE_SECTION" ] || printf '%s\n' "$OVERDUE_SECTION"
+  fi
+fi
 rotate_scratch_locked
 reclaim_stale_branch_grant_locked || exit 1
 [ "$ACTOR" != main ] || retire_unconsumable_rows_locked
@@ -1014,6 +1029,15 @@ if [ ! -s "$FM_WAKE_QUEUE" ]; then
   : > "$FM_WAKE_QUEUE"
   fm_recovery_marker_snapshot "$RECOVERY_MARKER" || true
   RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+  if [ -n "$OVERDUE_SECTION" ]; then
+    case "$RECOVERY_MARKER_TOKEN" in
+      ''|acked:*)
+        fm_recovery_marker_publish "$RECOVERY_MARKER" downtime || exit 1
+        fm_recovery_marker_snapshot "$RECOVERY_MARKER" || exit 1
+        RECOVERY_MARKER_TOKEN=$FM_RECOVERY_MARKER_TOKEN
+        ;;
+    esac
+  fi
   case "$RECOVERY_MARKER_TOKEN" in
     pending:downtime:*|announced:downtime:*)
       fm_recovery_marker_begin_handling "$RECOVERY_MARKER" || {

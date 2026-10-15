@@ -166,6 +166,9 @@ chmod +x "$TMUX_SHIM_DIR/tmux"
 # the daemon would otherwise detect from this test's own process ancestry:
 # "unknown" preserves the typed U+2063 envelope, "claude" selects the
 # record-backed doorbell that a marker-stripping Claude Code primary receives.
+# The host's open-work ledger is no input to these injection scenarios: a
+# no-op collector keeps its overdue rows (which the daemon escalates as their
+# own digest) out of the one-digest assertions.
 start_daemon() {  # [primary-harness]
   FM_DAEMON_PRIMARY_HARNESS="${1:-unknown}" \
   PATH="$TMUX_SHIM_DIR:$PATH" \
@@ -178,6 +181,7 @@ start_daemon() {  # [primary-harness]
   FM_SIGNAL_GRACE=1 \
   FM_HEARTBEAT=999999 \
   FM_CHECK_INTERVAL=999999 \
+  FM_OPEN_LOOPS_BIN="$(command -v true)" \
   FM_INJECT_CONFIRM_SLEEP=0.3 \
   FM_INJECT_CONFIRM_RETRIES=5 \
   FM_STALE_ESCALATE_SECS=999999 \
