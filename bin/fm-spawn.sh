@@ -5985,7 +5985,7 @@ export default function (pi: any) {
   });
 }
 EOF
-    LAUNCH="env PI_EDIT_VARIANT=replace $LAUNCH"
+    [ "$KIND" = secondmate ] || LAUNCH="env PI_EDIT_VARIANT=replace $LAUNCH"
     ;;
   codex*)
     # Semantic busy-state source negotiation (bin/fm-busy-lib.sh owns the
