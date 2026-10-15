@@ -39,6 +39,10 @@ FIXTURE_ROOT="$TMP_ROOT/firstmate-code"
 mkdir -p "$FIXTURE_ROOT"
 cp -R "$ROOT/bin" "$FIXTURE_ROOT/bin"
 git -C "$FIXTURE_ROOT" init -q
+# The self-repository publication gate needs a readable code-root history to
+# prove the unrelated fixture projects are not firstmate's own repository.
+git -C "$FIXTURE_ROOT" -c user.name='Firstmate Tests' -c user.email='tests@example.invalid' \
+  commit -q --allow-empty -m 'fixture code root'
 export FM_HERDR_LAB_STATE_DIR="$TMP_ROOT/herdr-lab-state"
 export CLAUDE_CONFIG_DIR="$TMP_ROOT/claude-config"
 mkdir -p "$CLAUDE_CONFIG_DIR"

@@ -113,7 +113,9 @@ Initial group hints are 415321 ms for signal/delivery and 1026519 ms for stale/w
 Each log contains the identical ordered sequence of 159 `ok -` reports; successive timestamp differences assign every elapsed interval to its case, including suite startup in the first interval.
 Sum the slowest observed interval per retained case and charge the maximum final cleanup interval (1613 ms) to each new group.
 This conservatively replays observed CI work, but is not a measurement of independently launched groups; refresh both hints from their own successful runner artifacts after CI exercises the split.
-On 2026-10-13, `bin/fm-test-run.sh --check-coverage` reported `serial_shards=14 serial_unhinted=0 serial_max_ms=1182165 serial_budget_ms=1200000`; this is a dated packing check, not a measured new-head CI duration.
+The upstream-sync merge added `tests/fm-project-mode.test.sh` and `tests/fm-self-repo-role.test.sh` to the serial lane; their default weights packed the largest shard at 1210091 ms.
+Their hints (496 ms and 7316 ms) and the `tests/fm-secondmate-busy-contract-live-e2e.test.sh` hint (5810 ms, replacing an unmeasured 90000 ms estimate) are the successful `exit=0`, `gate_skip=false` records from the serial shards of [run 38679906333](https://github.com/MrGTV-love/firstmate/actions/runs/38679906333) on 2026-10-15; the live suite's record measures the ordinary portable gate path, not its opt-in live scenario.
+On 2026-10-15, `bin/fm-test-run.sh --check-coverage` reported `serial_shards=14 serial_unhinted=0 serial_max_ms=1198243 serial_budget_ms=1200000`; this is a dated packing check, not a measured new-head CI duration.
 The estimates use per-file maxima from different runs, not measured rebalanced jobs or an end-to-end latency guarantee.
 Even so, maxima from five runs do not establish a P95 or guarantee future headroom.
 Job timeouts remain hang tripwires under the policy in [Timeouts](#timeouts) below; they are not the desired healthy duration.
