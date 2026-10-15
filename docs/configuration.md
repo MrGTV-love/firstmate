@@ -751,6 +751,10 @@ Only one deferral is allowed per row; a second attempt refuses, marks the row `c
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
 A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
+An escalation of a firstmate-owned `open_pr`, `unanswered_question`, or `unlanded_commit` row stands the same way while the receipt is bound to a task still held for the captain, and also ends when that hold is answered, released, deferred to a date, or held again.
+The recorder binds every live captain-held backlog task the escalation names: each `--hold TASK_ID`, or else the row's own task, its legacy `<task>-decision-<key>` task, and any task id written in the evidence.
+An explicit `--hold` that is not live is refused, and an escalation that names no live hold answers only the turn it followed, which the command reports.
+A receipt recorded before this binding existed needs one new escalation to stand.
 Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
 A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; it is never a task-wide ownership inference or an answer to its prerequisite.
 The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.

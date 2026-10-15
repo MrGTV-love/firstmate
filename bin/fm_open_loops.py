@@ -33,6 +33,9 @@ CHECK_IN_TEXT = ("Check in: report progress, blockers, and cross-workstream depe
 RED_CONCLUSIONS = {"failure", "timed_out", "cancelled", "action_required", "startup_failure"}
 GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
+# Categories a captain decision can park: the same set a dependency wait may bind.
+CAPTAIN_PARKABLE = ("open_pr", "unanswered_question", "unlanded_commit")
+TASK_ID = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9._-]*")
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
@@ -1200,6 +1203,57 @@ class WaitVerifier:
         self.backlog = None
         self.decisions = {}
 
+    def captain_hold(self, task):
+        """The canonical backlog record of a task still held for the captain, or ValueError."""
+        if self.backlog is None:
+            snapshot = json.loads(self.collector.run([BIN / "fm-fleet-snapshot.sh", "--contribution-input"]))
+            if not snapshot["backlog"].get("present"):
+                raise ValueError("prerequisite backlog is unavailable")
+            self.backlog = snapshot["backlog"]["records"]
+        record = next((r for r in self.backlog if r.get("structured") and r["id"] == task
+                       and r.get("hold_kind") == "captain" and r.get("hold_bucket") in ("live", "aged")), None)
+        if record is None:
+            raise ValueError("captain prerequisite was answered, released, or is no longer actionable")
+        return record
+
+    def hold_marker(self, task):
+        """Identity of one hold lifecycle: a re-hold restamps it, while a note or aging does not."""
+        record = self.captain_hold(task)
+        return str(record.get("hold_set") or record.get("since") or "")
+
+    def named_holds(self, row, evidence, explicit):
+        """Live captain holds an escalation of this row names, as {task, marker} records.
+
+        Explicit --hold ids must each be live. Otherwise the row's own task, its legacy
+        <task>-decision-<key> task, and any task id written in the evidence are tried.
+        """
+        if explicit:
+            return [dict(task=task, marker=self.hold_marker(task)) for task in dict.fromkeys(explicit)]
+        source = row.get("source") if isinstance(row.get("source"), dict) else {}
+        subject = str(row.get("subject", ""))
+        task = source.get("task") or (subject.split(":", 1)[0] if row.get("category") == "unanswered_question" else "")
+        key = source.get("key") or (subject.split(":", 1)[1] if ":" in subject else "")
+        candidates = [task, f"{task}-decision-{key}" if task and key else ""]
+        candidates += [token.rstrip(".") for token in TASK_ID.findall(evidence or "")]
+        found = []
+        for candidate in dict.fromkeys(c for c in candidates if c and TASK_ID.fullmatch(c)):
+            try:
+                found.append(dict(task=candidate, marker=self.hold_marker(candidate)))
+            except SOURCE_ERRORS:
+                continue
+        return found
+
+    def holds_stand(self, action, row):
+        """An escalation bound to live captain holds stands until the row changes or a hold ends."""
+        holds = action.get("holds")
+        if row.get("stale") or row.get("category") not in CAPTAIN_PARKABLE or row.get("owner") == "captain" \
+                or action.get("digest") != row_digest(row) or not isinstance(holds, list) or not holds:
+            return False
+        try:
+            return all(self.hold_marker(hold["task"]) == hold["marker"] for hold in holds)
+        except SOURCE_ERRORS:
+            return False  # an answered, released, deferred, or unreadable hold restores the action requirement
+
     def current_source(self, source):
         c = self.collector
         if not isinstance(source, dict) or any(source.get(k) != v for k, v in c.source_context().items()):
@@ -1209,16 +1263,7 @@ class WaitVerifier:
             raise ValueError("invalid prerequisite task identity")
         kind = source.get("kind")
         if kind == "captain_hold":
-            if self.backlog is None:
-                snapshot = json.loads(c.run([BIN / "fm-fleet-snapshot.sh", "--contribution-input"]))
-                if not snapshot["backlog"].get("present"):
-                    raise ValueError("prerequisite backlog is unavailable")
-                self.backlog = snapshot["backlog"]["records"]
-            record = next((r for r in self.backlog if r.get("structured") and r["id"] == task
-                           and r.get("hold_kind") == "captain" and r.get("hold_bucket") in ("live", "aged")), None)
-            if record is None:
-                raise ValueError("captain prerequisite was answered, released, or is no longer actionable")
-            return c.hold_source(record)
+            return c.hold_source(self.captain_hold(task))
         if not task:
             raise ValueError("waiting source has no task identity; recollect before binding it")
         if kind == "status":
@@ -1344,6 +1389,9 @@ def receipt_stands(action, row, now, waits=None):
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
     if kind == "escalated" and row.get("owner") == "captain":
         return action.get("digest") == row_digest(row)  # only the captain can move it; stands until the row changes
+    if kind == "escalated":
+        # A firstmate-owned row parked behind a live captain hold waits on the same single mover.
+        return waits is not None and waits.holds_stand(action, row)
     return False
 
 
@@ -1407,14 +1455,19 @@ def ledger_action(args, state, now):
     by_id = {r["id"]: r for r in rows}
     actions = controls["actions"]
     waits = None
-    if getattr(args, "kind", None) == "waiting" or any(a.get("kind") == "waiting" for a in actions.values()):
+    recorded = getattr(args, "kind", None)
+    pending_waits = any(a.get("kind") == "waiting" or a.get("holds") for a in actions.values())
+    parks = recorded == "escalated" and getattr(args, "row_id", None) in by_id \
+        and by_id[args.row_id].get("category") in CAPTAIN_PARKABLE and by_id[args.row_id].get("owner") != "captain"
+    if recorded == "waiting" or pending_waits or parks:
         try:
             waits = WaitVerifier(report, state, now)
         except SOURCE_ERRORS as error:
-            if getattr(args, "kind", None) == "waiting":
+            if recorded == "waiting":
                 raise
-            print(f"error: waiting evidence unavailable ({str(error)[:120]}); its obligations need follow-up",
-                  file=sys.stderr)
+            if pending_waits:
+                print(f"error: standing evidence unavailable ({str(error)[:120]}); its obligations need follow-up",
+                      file=sys.stderr)
     for row in rows:
         row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
     pending = controls["presentations"].setdefault(actor, {})
@@ -1522,6 +1575,22 @@ def ledger_action(args, state, now):
         for marked in stamps.values():
             if ident in marked:
                 marked[ident] = now
+    holds, parked = [], False
+    if args.hold and args.kind != "escalated":
+        raise ValueError("--hold is only valid for escalated actions")
+    if args.kind == "escalated" and by_id[ident].get("category") in CAPTAIN_PARKABLE \
+            and by_id[ident].get("owner") != "captain":
+        parked = True
+        if waits is not None:
+            try:
+                holds = waits.named_holds(by_id[ident], args.evidence, args.hold)
+            except SOURCE_ERRORS as error:
+                if args.hold:
+                    raise ValueError("--hold must name a task still held for the captain: " + str(error)[:120])
+        elif args.hold:
+            raise ValueError("--hold needs a current ledger and readable backlog to verify the captain hold")
+    elif args.hold:
+        raise ValueError("only a firstmate-owned open_pr, unanswered_question or unlanded_commit row can wait on a hold")
     controls["sequence"] += 1
     actions[ident] = dict(kind=args.kind, evidence=args.evidence, at_epoch=now,
                          sequence=controls["sequence"], deferrals=old.get("deferrals", 0)
@@ -1531,10 +1600,17 @@ def ledger_action(args, state, now):
         actions[ident]["waits"] = wait_history
     if binding is not None:
         actions[ident]["binding"] = binding
+    if holds:
+        actions[ident]["holds"] = holds
     if recheck is not None:
         actions[ident]["recheck_epoch"] = recheck
     write_ledger(state, report, receipt=True)
     print("action: " + json.dumps(ident) + "\nkind: " + args.kind)
+    if parked:
+        print("standing: " + ("captain hold " + ", ".join(h["task"] for h in holds) + "; stands until this row changes"
+                              " or that hold is answered or released" if holds else
+                              "no; no task held for the captain was named, so this receipt answers only the turn it"
+                              " followed (name the hold with --hold TASK_ID)"))
     return 0
 
 
@@ -1559,6 +1635,8 @@ def main():
     action.add_argument("kind", choices=("steered", "merged", "escalated", "deferred", "waiting"))
     action.add_argument("--evidence", required=True, help="delivery id, PR URL, escalation, deferral or dependency reason")
     action.add_argument("--recheck", help="future UTC ISO time (deferred or waiting)")
+    action.add_argument("--hold", action="append", metavar="TASK_ID",
+                        help="task held for the captain that this escalation waits on (escalated only; repeatable)")
     dependency = action.add_mutually_exclusive_group()
     dependency.add_argument("--prerequisite", help="exact same-task unanswered-question row id (waiting only)")
     dependency.add_argument("--prerequisite-task", help="distinct routed ship or scout task id (waiting only)")
