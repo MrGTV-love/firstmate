@@ -220,10 +220,11 @@
 # releases project custody before slow cleanup, or keeps every descendant lock
 # through cleanup when a slot cannot be reserved. Each actual child return and
 # matching record removal otherwise takes only that child's project lock and
-# releases it immediately. A child return the provider refuses keeps the
-# durably leased slot, the child's record and the pending-return record for a
-# retry; only the unreserved, whole-cleanup-custody path falls back to the
-# guarded raw removal of the child copy.
+# releases it immediately. A refused return of a child whose own slot is
+# durably leased, whatever state its siblings' slots are in, keeps that slot,
+# the child's record and the pending-return record for a retry; only a child
+# whose slot was never leased, and so ran under whole-cleanup custody, falls
+# back to the guarded raw removal of its copy.
 # Project-lock contention uses bin/fm-project-lock-lib.sh's FIFO wait, which
 # refuses only when the holder stalls past the measured allowance, with holder
 # progress messages; callers no longer need retry loops for allocation/return
@@ -823,6 +824,15 @@ DESCENDANT_TASK_KINDS=()
 DESCENDANT_TASK_HOMES=()
 DESCENDANT_TREEHOUSE_LOCK_PATHS=()
 DESCENDANT_LEGACY_CUSTODY=0
+DESCENDANT_LEASED_SLOTS=()
+teardown_descendant_slot_leased() {  # <slot>
+  local slot s
+  slot=$(cd "$1" 2>/dev/null && pwd -P) || return 1
+  for s in ${DESCENDANT_LEASED_SLOTS[@]+"${DESCENDANT_LEASED_SLOTS[@]}"}; do
+    [ "$s" != "$slot" ] || return 0
+  done
+  return 1
+}
 teardown_release_locks() {
   local status=$? i
   if [ -n "$BACKLOG_CLOSE_STAGE" ]; then
@@ -4596,7 +4606,11 @@ preflight_descendant_treehouse_slots() {
   for ((i=0; i < ${#reserve_slots[@]}; i++)); do
     teardown_reserve_pool_slot "${reserve_slots[$i]}" "${reserve_projects[$i]}" "${reserve_tasks[$i]}" || return 1
     teardown_mark_return_pending "${reserve_slots[$i]}" "${reserve_tasks[$i]}"
-    [ "$TEARDOWN_SLOT_CUSTODY" != project ] || DESCENDANT_LEGACY_CUSTODY=1
+    if [ "$TEARDOWN_SLOT_CUSTODY" = project ]; then
+      DESCENDANT_LEGACY_CUSTODY=1
+    else
+      DESCENDANT_LEASED_SLOTS+=("$(cd "${reserve_slots[$i]}" && pwd -P)")
+    fi
   done
   [ "$DESCENDANT_LEGACY_CUSTODY" = 1 ] || teardown_release_descendant_project_locks
 }
@@ -4906,7 +4920,7 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
 }
 
 cleanup_firstmate_home_children() {
-  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i child_copy_mode child_keep_copy child_pool_return child_project_lock child_pool_slot
+  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i child_copy_mode child_keep_copy child_pool_return child_project_lock child_leased child_pool_slot
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
@@ -5064,7 +5078,9 @@ cleanup_firstmate_home_children() {
       require_owned_worktree_slot_record "$child_id" "$child_wt" || return 1
       require_exclusive_worktree_slot_record "$child_meta" "$child_id" "$sub_state" "$child_wt" || return 1
       require_registered_slot_copies "$child_id" "$child_wt" || return 1
-      if [ "$DESCENDANT_LEGACY_CUSTODY" != 1 ]; then
+      child_leased=0
+      ! teardown_descendant_slot_leased "$child_wt" || child_leased=1
+      if [ "$child_leased" = 1 ]; then
         FM_TASK_COPY_POOL_STATE_FILE=
         FM_TASK_COPY_POOL_STATE_ENTRIES=
         fm_task_copy_pool_slot_held "$child_wt" || {
@@ -5081,14 +5097,14 @@ cleanup_firstmate_home_children() {
              || [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED" ]; then
             return "$child_return_rc"
           fi
-          if [ "$DESCENDANT_LEGACY_CUSTODY" != 1 ]; then
+          if [ "$child_leased" = 1 ]; then
             echo "REFUSED: child $child_id pool slot is durably leased and its return failed; retaining the slot, its task record and the pending-return record for a retry" >&2
             return 1
           fi
           safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
         fi
       else
-        if [ "$DESCENDANT_LEGACY_CUSTODY" != 1 ]; then
+        if [ "$child_leased" = 1 ]; then
           echo "REFUSED: child $child_id pool slot is durably leased and treehouse is not installed to return it; retaining the slot, its task record and the pending-return record for a retry" >&2
           return 1
         fi

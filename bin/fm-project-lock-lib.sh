@@ -66,9 +66,10 @@
 #   3.972s, `git remote set-head origin --auto` 0.542s, default-branch fetch
 #   0.511s; bin/fm-teardown.sh `gh-axi pr list` 1.092s,
 #   `git fetch origin refs/pull/<n>/head` 0.486s, `gh pr view` 0.599s
-#   and 0.505s, counted twice. A fresh spawn also fetches origin into the
-#   project clone before it queues, so its in-lock refresh moves little data;
-#   the sum below keeps the full in-lock fetch cost as an upper bound.
+#   and 0.505s, counted twice. A fresh spawn now runs its default-branch
+#   discovery and fetch before it queues; its locked refresh is local-only. The
+#   sum below keeps those network costs as an upper bound, which only a slot
+#   that does not share the project's objects still pays under the lock.
 # The previous sum, 128.764s, counted NM_TEARDOWN_TIMEOUT once and left out
 # the return retries, bootout poll and reaping sleep. Adding four more
 # NM_TEARDOWN_TIMEOUT calls (40s), the retry waits (3s), four more returns

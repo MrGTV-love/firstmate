@@ -12,7 +12,7 @@ Verified on 2026-10-14 on macOS arm64 with stock Bash 3.2.57 through isolated, m
 The ordinary overlap fixture publishes a fresh worker while process scanning, local-origin synchronization or backlog completion is deliberately held open.
 The recursive overlap fixture publishes a worker while Docker cleanup remains held open, with the descendant slot durably reserved.
 The multi-project recursive fixture also completes both domains despite opposite child enumeration orders.
-The spawn fixture holds the project lock from another process and proves a queued fresh spawn has already fetched origin into the project clone, then starts its worker from that current tip once the lock frees.
+The spawn fixtures hold the project lock from another process and prove a queued fresh spawn has already fetched its base without writing a shared remote-tracking ref or FETCH_HEAD, and that its locked refresh then starts the worker from that tip even if the remote has vanished.
 These checks use real disposable Git repositories, `lsof` and `tasks-axi` where installed, with modeled Treehouse and terminal calls; they do not return a shared pool slot or prove an installed backend's lifecycle behavior.
 
 Refresh the portable coverage with:
