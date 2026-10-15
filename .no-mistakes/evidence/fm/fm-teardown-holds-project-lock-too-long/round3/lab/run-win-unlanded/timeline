@@ -1,0 +1,5 @@
+killed worker window fm-la at 1792104289.953
+paused teardown pid 3734 after first hold at 1792104291.964
+fresh spawn sl rc=0 end 1792104298.423
+resumed teardown pid 3734 at 1792104298.561
+teardown la rc=1 end 1792104299.020

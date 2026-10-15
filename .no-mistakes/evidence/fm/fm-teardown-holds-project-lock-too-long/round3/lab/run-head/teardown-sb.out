@@ -1,0 +1,14 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.1pn2qL
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.4
+Run "treehouse update" to update
+
+🌳 Leased worktree 1 at ~/tmp/fm-lab.1pn2qL/work/pool/.treehouse/demo-7386f6/1/demo. Run 'treehouse return ~/tmp/fm-lab.1pn2qL/work/pool/.treehouse/demo-7386f6/1/demo' to release it.
+/Users/charlesabrooker/tmp/fm-lab.1pn2qL/work/pool/.treehouse/demo-7386f6/1/demo
+teardown: reaping leaked worktree process(es) for sb: 87645 90775
+teardown: force-killing leaked worktree process(es) for sb: 87645
+A new version of treehouse is available: v2.3.1-fm.e58947de → v3.1.4
+Run "treehouse update" to update
+
+🌳 Worktree returned to pool.
+teardown sb complete (window firstmate:fm-sb, worktree /Users/charlesabrooker/tmp/fm-lab.1pn2qL/work/pool/.treehouse/demo-7386f6/1/demo)
+Backlog: sb is closed in /Users/charlesabrooker/tmp/fm-lab.1pn2qL/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.

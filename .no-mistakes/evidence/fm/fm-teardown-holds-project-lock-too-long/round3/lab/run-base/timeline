@@ -1,0 +1,6 @@
+setup-spawn sd start 1792104096.008
+setup-spawn sd rc=0 end 1792104101.228
+teardown sd start 1792104101.592
+teardown sd rc=0 end 1792104111.467
+race-spawn se start 1792104111.482 teardown_alive=no
+race-spawn se rc=0 end 1792104118.590 teardown_alive=no

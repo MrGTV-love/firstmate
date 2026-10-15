@@ -1,0 +1,6 @@
+setup-spawn sh start 1792104177.168
+setup-spawn sh rc=0 end 1792104182.429
+teardown sh start 1792104182.768
+race-spawn si start 1792104185.274 teardown_alive=yes
+race-spawn si rc=0 end 1792104192.547 teardown_alive=yes
+teardown sh rc=0 end 1792104194.695

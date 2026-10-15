@@ -1,0 +1,5 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.1pn2qL
+REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.
+unpushed commits:
+3111d89 la: unlanded work
+Merge the branch into local main first (bin/fm-merge-local.sh after the captain approves), land its PR, or get the captain's own words to drop it and pass --force --drop-file.

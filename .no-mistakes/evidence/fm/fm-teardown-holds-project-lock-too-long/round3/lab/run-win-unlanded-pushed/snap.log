@@ -1,0 +1,78 @@
+== before
+{"name":"1","leased":null,"lease_holder":null,"owner_pid":57104}
+{"name":"2","leased":null,"lease_holder":null,"owner_pid":37808}
+{"name":"3","leased":null,"lease_holder":null,"owner_pid":null}
+{"name":"4","leased":null,"lease_holder":null,"owner_pid":16045}
+claim 1: task=sk home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 2: task=si home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 3: task=la home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 3111d89 la: unlanded work
+claim 4: task=sl home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+  state: la.git-hooks
+  state: la.meta
+  backlog: - [ ] la - lab ship la (kind: ship) (since 2026-10-15)
+  backlog: - [ ] sm - lab scout sm (kind: scout) (since 2026-10-15)
+== paused
+{"name":"1","leased":null,"lease_holder":null,"owner_pid":57104}
+{"name":"2","leased":null,"lease_holder":null,"owner_pid":37808}
+{"name":"3","leased":null,"lease_holder":null,"owner_pid":null}
+{"name":"4","leased":null,"lease_holder":null,"owner_pid":16045}
+claim 1: task=sk home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 2: task=si home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 3: task=la home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 3111d89 la: unlanded work
+claim 4: task=sl home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+  state: la.git-hooks
+  state: la.meta
+  backlog: - [ ] la - lab ship la (kind: ship) (since 2026-10-15)
+  backlog: - [ ] sm - lab scout sm (kind: scout) (since 2026-10-15)
+== after-fresh-spawn
+{"name":"1","leased":null,"lease_holder":null,"owner_pid":57104}
+{"name":"2","leased":null,"lease_holder":null,"owner_pid":37808}
+{"name":"3","leased":null,"lease_holder":null,"owner_pid":null}
+{"name":"4","leased":null,"lease_holder":null,"owner_pid":16045}
+{"name":"5","leased":null,"lease_holder":null,"owner_pid":76529}
+claim 1: task=sk home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 2: task=si home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 3: task=la home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 3111d89 la: unlanded work
+claim 4: task=sl home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 5: task=sm home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+  state: la.git-hooks
+  state: la.meta
+  state: sm.git-hooks
+  state: sm.meta
+  backlog: - [ ] sm - lab scout sm (kind: scout) (since 2026-10-15)
+  backlog: - [ ] la - lab ship la (kind: ship) (since 2026-10-15)
+== final
+{"name":"1","leased":null,"lease_holder":null,"owner_pid":57104}
+{"name":"2","leased":null,"lease_holder":null,"owner_pid":37808}
+{"name":"3","leased":null,"lease_holder":null,"owner_pid":null}
+{"name":"4","leased":null,"lease_holder":null,"owner_pid":16045}
+{"name":"5","leased":null,"lease_holder":null,"owner_pid":76529}
+claim 1: task=sk home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 2: task=si home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 3: task=la home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 3111d89 la: unlanded work
+claim 4: task=sl home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 5: task=sm home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+  state: la.git-hooks
+  state: la.meta
+  state: sm.git-hooks
+  state: sm.meta
+  backlog: - [ ] sm - lab scout sm (kind: scout) (since 2026-10-15)
+  backlog: - [ ] la - lab ship la (kind: ship) (since 2026-10-15)

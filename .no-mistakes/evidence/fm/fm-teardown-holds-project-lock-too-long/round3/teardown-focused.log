@@ -1,0 +1,12 @@
+ok - a failed return-pending record write refuses before any destruction and the retry returns the slot once
+ok - a stale directory at the return-pending path refuses before any destruction and the retry returns the slot once
+ok - an unreadable return-pending generation refuses before any destruction and the retry returns the slot once
+ok - an endpoint refusal after reservation keeps its record through session start and the retry returns the slot
+ok - a refusal before cleanup leaves the pool slot unreserved, and the clean retry still returns it
+ok - ordinary pool return preserves dirt and new commits produced while final project custody is queued
+ok - a lease command without durable state proof cannot reap processes or return the slot, even with authorized discard
+ok - a fresh allocation in the reservation window retires only the retiring record, preserving the new owner
+ok - a slot reassigned in the reservation window is proved again from the retiring record, never from the claimant copy
+ok - a fresh allocation in the enclosing-slot window leaves the claimant slot and the retiring copy untouched
+bash tests/fm-teardown.test.sh            24.41s user 35.77s system 85% cpu 1:10.78 total
+rc=0

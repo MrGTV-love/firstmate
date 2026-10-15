@@ -1,0 +1,4 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.1pn2qL
+fm-project-lock: waiting for spawn sg; current holder teardown sf (PID 60842); 369s left before the stall limit
+skill selection for sg: unavailable - no TypeSafe or OpenRouter key
+spawned sg harness=bash kind=scout window=firstmate:fm-sg worktree=/Users/charlesabrooker/tmp/fm-lab.1pn2qL/work/pool/.treehouse/demo-7386f6/1/demo

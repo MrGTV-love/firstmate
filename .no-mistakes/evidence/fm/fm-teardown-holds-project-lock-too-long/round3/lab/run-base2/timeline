@@ -1,0 +1,6 @@
+setup-spawn sf start 1792104141.239
+setup-spawn sf rc=0 end 1792104146.289
+teardown sf start 1792104146.604
+race-spawn sg start 1792104148.055 teardown_alive=yes
+teardown sf rc=0 end 1792104156.202
+race-spawn sg rc=0 end 1792104161.731 teardown_alive=no

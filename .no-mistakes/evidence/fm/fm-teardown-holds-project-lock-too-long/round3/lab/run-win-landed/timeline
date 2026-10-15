@@ -1,0 +1,5 @@
+killed worker window fm-sj at 1792104257.306
+paused teardown pid 51380 after first hold at 1792104258.986
+fresh spawn sk rc=0 end 1792104263.956
+resumed teardown pid 51380 at 1792104264.030
+teardown sj rc=0 end 1792104265.640

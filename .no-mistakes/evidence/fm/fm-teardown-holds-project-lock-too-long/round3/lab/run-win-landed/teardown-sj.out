@@ -1,0 +1,4 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.1pn2qL
+warning: task sj's recorded worktree /Users/charlesabrooker/tmp/fm-lab.1pn2qL/work/pool/.treehouse/demo-7386f6/1/demo was reassigned to task sk (home /Users/charlesabrooker/tmp/fm-lab.1pn2qL), which claimed that pool slot after this record was written; that slot is no longer sj's, so its processes, copy, and claim are left untouched and only sj's own cleanup runs.
+teardown sj complete (window firstmate:fm-sj; pool slot /Users/charlesabrooker/tmp/fm-lab.1pn2qL/work/pool/.treehouse/demo-7386f6/1/demo left to task sk (home /Users/charlesabrooker/tmp/fm-lab.1pn2qL), which it was reassigned to)
+Backlog: sj is closed in /Users/charlesabrooker/tmp/fm-lab.1pn2qL/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.

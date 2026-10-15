@@ -1,0 +1,46 @@
+== before
+{"name":"1","leased":null,"lease_holder":null,"owner_pid":38825}
+{"name":"2","leased":null,"lease_holder":null,"owner_pid":37808}
+claim 1: task=sj home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 2: task=si home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+  state: sj.git-hooks
+  state: sj.meta
+  backlog: - [ ] sj - lab scout sj (kind: scout) (since 2026-10-15)
+  backlog: - [ ] sk - lab scout sk (kind: scout) (since 2026-10-15)
+== paused
+{"name":"1","leased":null,"lease_holder":null,"owner_pid":38825}
+{"name":"2","leased":null,"lease_holder":null,"owner_pid":37808}
+claim 1: task=sj home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 2: task=si home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+  state: sj.git-hooks
+  state: sj.meta
+  backlog: - [ ] sj - lab scout sj (kind: scout) (since 2026-10-15)
+  backlog: - [ ] sk - lab scout sk (kind: scout) (since 2026-10-15)
+== after-fresh-spawn
+{"name":"1","leased":null,"lease_holder":null,"owner_pid":57104}
+{"name":"2","leased":null,"lease_holder":null,"owner_pid":37808}
+claim 1: task=sk home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 2: task=si home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+  state: sj.git-hooks
+  state: sj.meta
+  state: sk.git-hooks
+  state: sk.meta
+  backlog: - [ ] sk - lab scout sk (kind: scout) (since 2026-10-15)
+  backlog: - [ ] sj - lab scout sj (kind: scout) (since 2026-10-15)
+== final
+{"name":"1","leased":null,"lease_holder":null,"owner_pid":57104}
+{"name":"2","leased":null,"lease_holder":null,"owner_pid":37808}
+claim 1: task=sk home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+claim 2: task=si home=/Users/charlesabrooker/tmp/fm-lab.1pn2qL 
+  head: 5270387 init
+  state: sk.git-hooks
+  state: sk.meta
+  backlog: - [ ] sk - lab scout sk (kind: scout) (since 2026-10-15)
+  backlog: - [x] sj - lab scout sj data/sj/report.md (kind: scout) (reported 2026-10-15)
