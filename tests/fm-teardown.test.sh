@@ -10590,6 +10590,15 @@ SH
   chmod +x "$case_dir/fakebin/tmux"
 }
 
+# The number of live tickets queued for <lock>.
+queued_tickets() {  # <lock>
+  local ticket n=0
+  for ticket in "$1.queue"/ticket-*; do
+    [ ! -L "$ticket" ] || n=$((n + 1))
+  done
+  printf '%s' "$n"
+}
+
 # Holds <lock> from another process until <case>/release exists.
 hold_project_lock_until_release() {  # <case-dir> <lock>
   FM_HOME="$1/primary-home" FM_STATE_OVERRIDE="$1/state" \
@@ -10659,7 +10668,7 @@ test_idle_reap_return_waits_for_project_custody_after_closure() {
 # durable return-pending record lets the very next sweep select it again
 # without a live busy state, and that sweep finishes the return.
 test_idle_reap_retries_a_closed_task_whose_return_stalled() {
-  local case_dir slot holder actor i rc out returns
+  local case_dir slot holder actor contender reaper i rc out returns
   make_idle_reap_pool_case pool-idle-reap-stalled-return
   case_dir=$POOL_CASE
   slot=$POOL_SLOT
@@ -10703,12 +10712,43 @@ test_idle_reap_retries_a_closed_task_whose_return_stalled() {
   [ "$(printf '%s\n' "$out" | awk -F'\t' '$2 == "task-x1" { print $1 }')" = reap ] \
     || fail "the next sweep could not select the closed task again: $out"
 
+  # The retry meets a still-held lock with a live waiter already queued. A
+  # nonwaiting admission would refuse behind that waiter on every sweep; the
+  # retry must queue behind it and finish once the queue drains.
+  FM_PROJECT_LOCK_POLL_SECS=0.05 FM_HOME="$case_dir/primary-home" FM_STATE_OVERRIDE="$case_dir/state" \
+    bash -c '
+      . "$1/bin/fm-wake-lib.sh"; . "$1/bin/fm-project-lock-lib.sh"
+      fm_project_lock_acquire "$2" contender || exit 1
+      fm_project_lock_release "$2"
+    ' _ "$ROOT" "$POOL_LOCK" > "$case_dir/contender.out" 2>&1 &
+  contender=$!
+  i=0
+  while [ "$(queued_tickets "$POOL_LOCK")" -lt 1 ]; do
+    i=$((i + 1)); [ "$i" -lt 1000 ] || fail "the contender never queued: $(cat "$case_dir/contender.out")"
+    sleep 0.05
+  done
+  FM_HOME="$case_dir/primary-home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
+    NM_HOME="$case_dir/nm" FM_POOL_CASE="$case_dir" PATH="$case_dir/fakebin:$PATH" FM_PROJECT_LOCK_POLL_SECS=0.05 \
+    "$ROOT/bin/fm-idle-session-reap.sh" reap > "$case_dir/reap.out" 2>&1 &
+  reaper=$!
+  i=0
+  while [ "$(queued_tickets "$POOL_LOCK")" -lt 2 ]; do
+    if ! kill -0 "$reaper" 2>/dev/null; then
+      : > "$case_dir/release"; wait "$holder" || true; wait "$contender" || true
+      fail "the retry did not queue behind the live waiter: $(cat "$case_dir/reap.out")"
+    fi
+    i=$((i + 1)); [ "$i" -lt 2000 ] || {
+      : > "$case_dir/release"; wait "$holder" || true; wait "$contender" || true; wait "$reaper" || true
+      fail "the retry never queued: $(cat "$case_dir/reap.out")"
+    }
+    sleep 0.05
+  done
   : > "$case_dir/release"
   wait "$holder" || fail 'the project holder could not release'
-  out=$(FM_HOME="$case_dir/primary-home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
-    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
-    NM_HOME="$case_dir/nm" FM_POOL_CASE="$case_dir" PATH="$case_dir/fakebin:$PATH" \
-    "$ROOT/bin/fm-idle-session-reap.sh" reap) || fail "the retry sweep failed: $out"
+  wait "$contender" || fail "the queued contender was not admitted: $(cat "$case_dir/contender.out")"
+  wait "$reaper" || fail "the retry sweep failed: $(cat "$case_dir/reap.out")"
+  out=$(cat "$case_dir/reap.out")
   [ "$(printf '%s\n' "$out" | awk -F'\t' '$2 == "task-x1" { print $1 }')" = reaped ] \
     || fail "the retry sweep did not finish the closed task: $out"
   assert_absent "$case_dir/state/task-x1.meta" 'the retry kept the closed task record'
@@ -10719,10 +10759,90 @@ test_idle_reap_retries_a_closed_task_whose_return_stalled() {
     || fail 'the retry left the returned slot leased'
   [ "$(backlog_row_state "$case_dir")" = "done" ] \
     || fail "the retry did not close the backlog row: $(backlog_row_state "$case_dir")"
-  pass 'a closed task whose return stalled survives session start and is finished by the next sweep'
+  pass 'a closed task whose return stalled survives session start and the next sweep finishes it behind a queued waiter'
+}
+
+# An endpoint that refuses to close after the slot was reserved and the
+# pending backlog close was published leaves a closed-or-closing task holding
+# a durable lease. Session start must not replay that close and retire the
+# only record naming the slot; the plain retry returns the slot and closes it.
+test_endpoint_refusal_after_reservation_survives_session_start() {
+  local case_dir slot rc out returns
+  make_lease_modeling_pool_case pool-endpoint-refusal-replay ''
+  case_dir=$POOL_CASE
+  slot=$POOL_SLOT
+  rm -f "$case_dir/config/backlog-backend"
+  seed_backlog_in_flight "$case_dir"
+  stuck_endpoint_tmux "$case_dir"
+  : > "$case_dir/endpoint-stuck"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "the endpoint refusal must stop teardown: $(cat "$case_dir/stderr")"
+  assert_present "$case_dir/state/task-x1.backlog-close" 'the refusal came before the pending close was published'
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the refusal came before the slot was reserved'
+  out=$(PATH="$case_dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/primary-home" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" FM_BOOTSTRAP_NETWORK=skip \
+    "$ROOT/bin/fm-bootstrap.sh" 2>&1) || fail "session start failed beside a refused endpoint: $out"
+  assert_present "$case_dir/state/task-x1.meta" 'session start retired the only record naming the leased slot'
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "session start closed the row while the slot was still leased: $(backlog_row_state "$case_dir")"
+  assert_present "${slot%/*}/.fm-slot-owner" 'session start dropped the slot claim'
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'session start released the reserved slot'
+
+  rm -f "$case_dir/endpoint-stuck"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" \
+    run_teardown "$case_dir" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "the plain retry must finish: $(cat "$case_dir/stderr2")"
+  assert_absent "$case_dir/state/task-x1.meta" 'the retry kept the task record'
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" 'the retry kept the return-pending record'
+  returns=$(grep -c "^return --force $slot\$" "$case_dir/treehouse.log" || true)
+  assert_equals 1 "$returns" 'the retry must return the slot exactly once'
+  jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the retry left the slot leased'
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "the retry did not close the backlog row: $(backlog_row_state "$case_dir")"
+  pass 'an endpoint refusal after reservation keeps its record through session start and the retry returns the slot'
+}
+
+# A project-lock error at the waited return stage is not contention: it keeps
+# exit 1, which the idle reaper records as a refusal, instead of the busy exit
+# a stall uses for a silent retry.
+test_waited_return_lock_error_is_not_reported_as_contention() {
+  local case_dir rc
+  make_idle_reap_pool_case pool-return-lock-error
+  case_dir=$POOL_CASE
+  : > "$case_dir/project-held"
+  cat > "$case_dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-windows) [ -f "$FM_POOL_CASE/closed" ] || printf '%s\n' fm-task-x1 ;;
+  kill-window)
+    mkdir -p "$FM_POOL_LOCK.queue" && printf 'corrupt\n' > "$FM_POOL_LOCK.queue/sequence"
+    : > "$FM_POOL_CASE/closed"
+    ;;
+esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux"
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_LOCK="$POOL_LOCK" FM_IDLE_REAP_ADMISSION=1 \
+    run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "a lock error at the waited return must keep its error exit: $(cat "$case_dir/stderr")"
+  assert_present "$case_dir/closed" 'the lock error was injected before the endpoint closed'
+  assert_present "$case_dir/state/task-x1.meta" 'the lock error erased the task record'
+  jq -e '.worktrees[0].leased == true' "$case_dir/pool/treehouse-state.json" >/dev/null \
+    || fail 'the lock error released the reserved slot'
+  pass 'a waited return that meets a project-lock error exits 1, not the contention exit'
 }
 
 teardown_test_cases=(
+test_endpoint_refusal_after_reservation_survives_session_start
+test_waited_return_lock_error_is_not_reported_as_contention
 test_idle_reap_retries_a_closed_task_whose_return_stalled
 test_refusal_before_cleanup_takes_no_pool_reservation
 test_unprovable_pool_state_keeps_project_custody_through_return

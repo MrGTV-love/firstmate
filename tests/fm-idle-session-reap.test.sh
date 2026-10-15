@@ -551,6 +551,32 @@ test_project_lock_acquisition_error_is_not_skipped() {
   pass "a project lock nobody holds but the teardown cannot take is recorded as a refusal, not a lock skip"
 }
 
+# An interrupted teardown's return-pending record names the current record's
+# generation. Its task is selected again although the earlier teardown retired
+# its busy state, but never while its worker reads busy again, and a record
+# naming an older generation selects nothing.
+test_return_pending_task_is_selected_unless_busy() {
+  local home out
+  home=$(make_home return-pending)
+  mk_task "$home" closed scout none "done [at=$OLD]: report written"
+  scout_report "$home" closed
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" closed active "a task without a busy state is not idle on its own"
+  printf 'spawn_gen=\nslot=%s/pool/1/project\n' "$home" > "$home/state/closed.teardown-return-pending"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" closed reap "an interrupted teardown is selected again by its return-pending record"
+  printf 'g1.1.1\n' > "$home/state/closed.busy-gen"
+  printf 'v1 gen=g1.1.1 seq=2 state=busy source=claude-hook event=UserPromptSubmit ts=%s\n' "$NOW" \
+    > "$home/state/closed.busy-state"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" closed active "a worker that reads busy again is never selected by its record"
+  rm -f "$home/state/closed.busy-state" "$home/state/closed.busy-gen"
+  printf 'spawn_gen=s-older\nslot=%s/pool/1/project\n' "$home" > "$home/state/closed.teardown-return-pending"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" closed active "a record from an older generation selects nothing"
+  pass "a return-pending record selects its interrupted task unless the worker is busy or the record is stale"
+}
+
 test_single_flight_lock() {
   local home out pid hung
   home=$(make_home lock)
@@ -815,6 +841,7 @@ test_stale_selection_is_revalidated
 test_admission_reads_after_metadata_lock
 test_admission_rechecks_every_gate
 test_teardown_timeout_is_bounded
+test_return_pending_task_is_selected_unless_busy
 test_single_flight_lock
 test_stale_memo_is_pruned
 test_bad_usage

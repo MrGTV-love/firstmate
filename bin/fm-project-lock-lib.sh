@@ -104,8 +104,9 @@
 # current holder's operation/PID or the earlier waiter whose turn is reserved.
 # A refusal returns nonzero with an "fm-project-lock:" line naming its class
 # (invalid input, registration failure, filesystem error, sampling error, stall
-# limit), so
-# callers retain their existing refusal and safety checks; capacity admission
+# limit); FM_PROJECT_LOCK_ERROR is empty after a stall-limit refusal and names
+# the class after every other one, so a caller can tell contention from an
+# error. Callers retain their existing refusal and safety checks; capacity admission
 # remains inside the acquired project lock.
 
 FM_PROJECT_LOCK_BUSY_EXIT=75
@@ -194,18 +195,20 @@ fm_project_lock_acquire() {  # <lock> <operation>
   local poll=${FM_PROJECT_LOCK_POLL_SECS:-1} number='^[0-9]+([.][0-9]+)?$' zero='^0*([.]0*)?$'
   local ticket head='' holder='' key last_key='' since=0 stalled=0 mtime now
   local next_message message_interval rc=1
+  FM_PROJECT_LOCK_ERROR=
   case "$service" in
     ''|*[!0-9]*|0|0[0-9]*)
-      echo "fm-project-lock: invalid input for $operation: FM_PROJECT_LOCK_SERVICE_SECS '$service' is not a positive integer" >&2
+      FM_PROJECT_LOCK_ERROR="invalid input: FM_PROJECT_LOCK_SERVICE_SECS '$service' is not a positive integer"
+      echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR for $operation" >&2
       return 1 ;;
   esac
   if ! [[ $poll =~ $number ]] || [[ $poll =~ $zero ]]; then
-    echo "fm-project-lock: invalid input for $operation: FM_PROJECT_LOCK_POLL_SECS '$poll' is not a positive number of seconds" >&2
+    FM_PROJECT_LOCK_ERROR="invalid input: FM_PROJECT_LOCK_POLL_SECS '$poll' is not a positive number of seconds"
+    echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR for $operation" >&2
     return 1
   fi
   message_interval=$((service / 4))
   [ "$message_interval" -gt 0 ] || message_interval=1
-  FM_PROJECT_LOCK_ERROR=
   if ! fm_project_lock_register "$lock" "$service" "$operation"; then
     echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR; $operation was not queued" >&2
     return 1

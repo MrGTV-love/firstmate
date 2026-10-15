@@ -1754,11 +1754,12 @@ fm_treehouse_slot_owner_state() {  # <worktree> <task-id>
 
 # Teardown return-pending record: bin/fm-teardown.sh writes
 # <state>/<id>.teardown-return-pending, naming the task record's spawn_gen,
-# once a pool task's processes and endpoint may be gone and before its final
-# slot return, and removes it when teardown completes. While it names the
-# current record, the task is closed but still holds its slot: the idle reaper
-# selects it by this record alone, session-start backlog replay leaves
-# its record to the teardown retry, and the open-work ledger reports it.
+# as soon as it reserves a pool task's slot and before any cleanup that can
+# fail, and removes it when teardown completes. While it names the current
+# record, the task's teardown is interrupted and the slot is still held for
+# it: the idle reaper selects it by this record unless its worker reads busy,
+# teardown's retry waits for project custody, session-start backlog replay
+# leaves its record to that retry, and the open-work ledger reports it.
 fm_teardown_return_pending_gen() {  # <file>; prints the last spawn_gen= value
   local line value=
   while IFS= read -r line || [ -n "$line" ]; do

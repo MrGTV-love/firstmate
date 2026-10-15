@@ -67,9 +67,15 @@ fm_idle_reap_classify() {
   esac
   status="$state/$id.status"
   IDLE_REAP_LAST=$(last_status_line "$status")
-  # A teardown admitted this task and already retired its busy state and
-  # status; only its pool slot return remains for the next sweep to finish.
+  # A teardown admitted this task, reserved its slot and was interrupted; it
+  # may already have retired the busy state and status read below. Only a
+  # worker that reads busy again keeps it from the next sweep.
   if fm_teardown_return_pending "$state" "$id"; then
+    busy=$(fm_busy_classify_meta "$meta" "$id" "$state")
+    if [ "${busy%% *}" = busy ]; then
+      IDLE_REAP_DETAIL="busy state $busy"
+      return 0
+    fi
     fm_epoch_seconds_to now
     if fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
       IDLE_REAP_CLASS=refused
