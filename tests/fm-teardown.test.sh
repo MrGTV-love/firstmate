@@ -11275,7 +11275,7 @@ assert_unrecorded_return_retry_finished() {  # <case-dir> <slot> <label>
   assert_equals 1 "$returns" "$label: the slot must be returned exactly once across the refusal and the retry"
   jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
     || fail "$label: the retry left the returned slot leased"
-  [ "$(backlog_row_state "$case_dir")" = done ] \
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
     || fail "$label: the retry did not close the backlog row: $(backlog_row_state "$case_dir")"
 }
 
