@@ -11,7 +11,7 @@ Cross-harness provider and credential identity is owned by `references/common/mo
 |---|---|
 | Binary | `omp`, a single Bun-compiled executable resolved from `PATH` by `../../../bin/fm-spawn.sh`; a missing binary or unsupported version refuses every worker, scout, local secondmate, and relaunch before launch; `../../../bin/fm-control.sh` checks the replacement before stopping the current agent; upgrade with `omp update`. |
 | Launch | [`fm-spawn.sh --help`](../../../bin/fm-spawn.sh) owns launch flags, session posture, worker memory scope, and secondmate extension loading. |
-| Busy state | `../../../bin/fm-busy-lib.sh` source `omp-ext`: the crewmate/scout per-task extension marks busy at `agent_start`, and idle at `agent_end` only when `willContinue` is not true; `ctx.isIdle()` is deliberately not consulted because it reads false at a natural TUI `agent_end` (`session_stop` is awaited before settle). Secondmates do not load a parent-task busy adapter. |
+| Busy state | `../../../bin/fm-busy-lib.sh` source `omp-ext`: the per-task extension marks busy at `agent_start`, and idle at `agent_end` only when `willContinue` is not true; `ctx.isIdle()` is deliberately not consulted because it reads false at a natural TUI `agent_end` (`session_stop` is awaited before settle). Secondmates load the parent-task busy adapter without worker guard or memory overrides. |
 | Exit command | `/quit` (`/exit` and `/q` are aliases). |
 | Interrupt | Single Escape, no clear key; queued follow-ups can return to the composer (see [restored-wake recovery](../../../docs/watcher-continuity.md#omp-restored-wake-recovery)). |
 | Skill invocation | No separate verified form beyond normal command behavior; use natural language when the exact command is uncertain. |
@@ -45,8 +45,8 @@ Inspect pooled headroom through `bin/fm-dispatch-capacity.sh`, not quota-axi's s
 ## Extension loading
 
 omp auto-discovers `<cwd>/.omp/extensions/*.ts` (top level only, cwd only, no ancestor walk, no trust dialog) and the active profile's `agent/extensions/`; `.pi/extensions/` is not a discovery root.
-A file that is both auto-discovered and named with `-e` loads twice, so a canonical crewmate/scout launch loads its semantic busy extension explicitly from the parent's `state/`.
-Ordinary secondmate launches use home-local auto-discovery for their tracked primary extensions, without a parent-task busy adapter or explicit duplicate loading.
+A file that is both auto-discovered and named with `-e` loads twice, so the per-task busy extension lives in `state/` and is the only `-e` a secondmate launch names.
+The primary extensions stay auto-discovered and are not named again.
 There is no `agent_settled` event; `agent_end` plus `willContinue` replaces it.
 
 ## Primary integration

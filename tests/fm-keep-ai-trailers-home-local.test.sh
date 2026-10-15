@@ -288,7 +288,8 @@ make_retry_boundary() {
   local base=$1 bin
   bin="$base/bin"
   mkdir -p "$bin" "$base/delivery"
-  cp "$ROOT/bin/fm-config-inherit-lib.sh" "$ROOT/bin/fm-startup-memory-budget-lib.sh" "$bin/"
+  cp "$ROOT/bin/fm-config-inherit-lib.sh" "$ROOT/bin/fm-startup-memory-budget-lib.sh" \
+    "$ROOT/bin/fm-role-lib.sh" "$bin/"
   cat > "$bin/fm-send.sh" <<'SH'
 #!/usr/bin/env bash
 set -eu

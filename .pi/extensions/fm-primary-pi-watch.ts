@@ -1346,8 +1346,6 @@ export default function (pi: ExtensionAPI) {
 
   pi.on?.("before_agent_start", (event) => {
     if (!instance.isCurrent()) return;
-    // Only a user-prompt run carries `prompt` (Pi 1.2.0 also fires this event for a
-    // pi.sendMessage(..., { triggerTurn }) run, which never delivers a wake follow-up).
     if (!("prompt" in event) || typeof event.prompt !== "string") return;
     consumeWake(generation, event.prompt);
   });

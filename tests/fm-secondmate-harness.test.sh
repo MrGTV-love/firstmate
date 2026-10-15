@@ -773,6 +773,13 @@ sm_assert_claude_launch() {  # <world> <home> <launch> <model> <effort> <permiss
   done
 }
 
+# The parent-state settings file a Claude secondmate launch passes to --settings.
+sm_claude_settings() {  # <world> <id>
+  local real
+  real=$(cd "$1/home/state" && pwd -P)
+  printf '%s' "$real/$2.claude-settings.json"
+}
+
 # spawn_secondmate_capture <world> <id> <home> <launchlog> [extra fm-spawn.sh args...]
 # Same shape as spawn_secondmate but captures the launch command into <launchlog>
 # and does not discard stderr, so callers can assert on both.
@@ -876,6 +883,9 @@ test_spawn_secondmate_harness_model_token() {
   [ "$(meta_field "$meta" effort)" = default ] || fail "model-token: meta effort not default (got '$(meta_field "$meta" effort)')"
   launch=$(cat "$launchlog")
   sm_assert_claude_launch "$w" "$sm" "$launch" opus "" bypass
+  jq -e '.feedbackDrafts == "off" and .attribution.commit == "" and .attribution.pr == "" and .attribution.sessionUrl == false and .hooks.UserPromptSubmit' \
+    "$(sm_claude_settings "$w" sm)" >/dev/null \
+    || fail "model-token: the --settings file did not carry the session keys and busy hooks"
   pass "C3 spawn: config/secondmate-harness's model token threads --model into the launch and meta"
 }
 

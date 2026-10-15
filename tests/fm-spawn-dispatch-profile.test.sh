@@ -2162,7 +2162,13 @@ if [ "$FM_ARG_KIND" = permissions ]; then
 fi
 if [ "$FM_ARG_KIND" = settings ]; then
   while [ "$#" -gt 0 ]; do
-    if [ "$1" = --settings ]; then printf '%s' "$2"; exit; fi
+    if [ "$1" = --settings ]; then
+      case "$2" in
+        \{*) printf '%s' "$2" ;;
+        *) cat "$2" ;;
+      esac
+      exit
+    fi
     shift
   done
   exit 1

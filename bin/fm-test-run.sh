@@ -336,7 +336,7 @@ family_for_basename() {
     fm-lint-workflows.test.sh|\
     fm-operational-input.test.sh|fm-pi-primary-types.test.sh|\
     fm-calm-claude-mod.test.sh|\
-    fm-harness-adapter-references.test.sh|\
+    fm-harness-adapter-references.test.sh|fm-project-mode.test.sh|\
     fm-send-popup-settle.test.sh|fm-send-settle.test.sh|\
     fm-dispatch-capacity.test.sh|\
     fm-supervision-instructions.test.sh|fm-task-delivery.test.sh|\
@@ -423,6 +423,7 @@ family_for_basename() {
     fm-host-mirror-live-e2e.test.sh|\
     fm-quota-array-dispatch-live-e2e.test.sh|fm-model-index-live-e2e.test.sh|fm-send-secondmate-marker-herdr-e2e.test.sh|\
     fm-send-inbox-doorbell-live-e2e.test.sh|\
+    fm-secondmate-busy-contract-live-e2e.test.sh|\
     fm-calm-claude-mod-plugin.test.sh|fm-calm-claude-mod-live-e2e.test.sh|\
     fm-calm-pi-queue-retention-live-e2e.test.sh|\
     fm-herdr-submit-confirm-live-e2e.test.sh|fm-task-docker-live-e2e.test.sh)
@@ -902,6 +903,7 @@ tests/fm-procevent-runner-custody.test.sh 29845
 tests/fm-procevent-when.test.sh 25674
 tests/fm-procevent.test.sh 699239
 tests/fm-project-capacity.test.sh 56739
+tests/fm-project-mode.test.sh 496
 tests/fm-project-origin.test.sh 619
 tests/fm-public-followup.test.sh 398234
 tests/fm-quota-array-dispatch-live-e2e.test.sh 303
@@ -925,12 +927,14 @@ tests/fm-remote-transport-lanes.test.sh 75888
 tests/fm-rovo-harness.test.sh 16331
 tests/fm-rovo-signals-live-e2e.test.sh 425
 tests/fm-secondmate-harness.test.sh 202240
+tests/fm-secondmate-busy-contract-live-e2e.test.sh 5810
 tests/fm-secondmate-lifecycle-e2e.test.sh 12465
 tests/fm-secondmate-liveness.test.sh 24564
 tests/fm-secondmate-reconcile.test.sh 100853
 tests/fm-secondmate-restart.test.sh 80736
 tests/fm-secondmate-safety.test.sh 127260
 tests/fm-secondmate-sync.test.sh 55501
+tests/fm-self-repo-role.test.sh 7316
 tests/fm-send-agy-confirm.test.sh 4440
 tests/fm-send-inbox-doorbell-live-e2e.test.sh 810
 tests/fm-send-inbox.test.sh 47058
