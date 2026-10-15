@@ -678,6 +678,14 @@ Its native `:raw` reads retained full byte framing, and the audit-unavailable no
 Actual Claude Code 2.1.300 then exercised native `UserPromptSubmit` and two built-in `Read` hooks on publisher-produced synthetic launch/inbox records, retaining exact returned bytes with no TypeSafe key or Jev request.
 That bounded native development session proves source delivery, not Claude output quarantine, model accuracy or deployed activation.
 The portable command above refreshes the publisher/adapter comparisons; the private native fixture commands and exact evidence remain with the implementation report.
+
+The review-fix round additionally exercised per-record skipped-ring recovery, multiple owed fire-and-forget retries, acknowledgement order, and launch/relaunch survivor delivery through the real publishers and captured executable launch prompts.
+`tests/fm-task-inbox.test.sh` and `tests/fm-jev-guard.test.sh` passed; the affected progress-note and survivor-delivery scenarios from `tests/fm-control-relaunch.test.sh` and the complete `tests/fm-brief.test.sh` also passed.
+The minimum-version regression executes the tagged OMP 18.1.20 `content`/`details`/`isError` result-consumer semantics, proving that the audit patch remains observable and preserves the original instruction bytes, details and error status; this is not native 18.1.20 execution.
+A fresh actual OMP 18.10.4 print-mode session then used built-in full `:raw` reads of a publisher-produced launch record and two steering records, with privacy withholding, no TypeSafe key, and an unwritable audit ledger.
+All three original instruction texts and their appended sanitized `AuditUnavailableError` notices reached the next model context through result content, while an ordinary-file copy and changed-byte record were withheld.
+That smoke used two loopback scripted-provider requests, no live Jev or model calls, and no production activation; unlike the earlier native observation, its audit notice used a content patch rather than separate additional context.
+
 The current protection claim remains **no protection**.
 Synthetic calibration fixtures do not authenticate real publisher identity, and source-fixture preservation cannot be counted as a successful live classification.
 The injection calibration does not validate shell/write judgment accuracy, large-output semantics, unrelated providers or other model versions.

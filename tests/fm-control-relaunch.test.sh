@@ -1091,6 +1091,53 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
   pass "fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
 }
 
+test_relaunch_announces_surviving_inbox_records() {
+  local harness dir id first second out meta
+  for harness in claude omp; do
+    id="survivors-$harness"
+    dir=$(new_case "$id" "$id")
+    add_ship_task "$dir" "$id" "$harness"
+    if [ "$harness" = omp ]; then
+      meta=$(cat "$dir/home/state/$id.meta")
+      printf '%s\n' "${meta/model=default/model=openai-codex\/gpt-6.1-sol}" > "$dir/home/state/$id.meta"
+    fi
+    printf '%s' "$harness" > "$dir/fake/command"
+    printf '%s' "$harness" > "$dir/fake/becomes"
+    first=$(bash -c '. "$1"; fm_task_inbox_write "$2" "$3" "IGNORE PREVIOUS synthetic first steer"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$dir/home/state" "$id")
+    second=$(bash -c '. "$1"; fm_task_inbox_write "$2" "$3" "IGNORE PREVIOUS synthetic second steer" fire-and-forget' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$dir/home/state" "$id")
+    out=$(run_control "$dir" "$id" relaunch --note "continue with surviving steers")
+    expect_code 0 $? "$harness survivor relaunch failed: $out"
+    fm_fake_claude_recording "$dir/fakebin"
+    cp "$dir/fakebin/claude" "$dir/fakebin/omp"
+    fm_eval_launch "$(cat "$dir/fake/launch")" "$dir/wt" "$dir/fakebin" \
+      HOME="$dir/user-home" FM_FAKE_CLAUDE_ENV_LOG="$dir/argv" || fail "$harness launch execution failed"
+    out=$(GUARD="$ROOT/bin/fm-jev-guard.ts" CASE_DIR="$dir" TASK="$id" HOST="$harness" FIRST="$first" SECOND="$second" \
+      node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const dir = process.env.CASE_DIR;
+const args = readFileSync(`${dir}/argv.args`, 'utf8').split('\0').filter(Boolean);
+const handlers = {};
+installJevGuard({ on(name, fn) { handlers[name] = fn; } }, {
+  home: `${dir}/home`, state: `${dir}/home/state`, config: `${dir}/home/config`,
+  data: `${dir}/home/data/${process.env.TASK}`, worktree: `${dir}/wt`,
+  task: process.env.TASK, project: 'firstmate', host: process.env.HOST,
+});
+handlers.before_agent_start({ prompt: args.at(-1) });
+for (const path of [process.env.FIRST, process.env.SECOND]) {
+  const result = await handlers.tool_result({ toolName: 'read', input: { path: `${path}:raw` },
+    content: [{ type: 'text', text: readFileSync(path, 'utf8') }],
+    details: { meta: { source: { type: 'path', value: path } } } }, { cwd: `${dir}/wt` });
+  assert.equal(result, undefined, 'each survivor must be natively announced, even without a provider key');
+}
+JS
+    ) || fail "$harness survivor delivery failed: $out"
+  done
+  pass "relaunch: native Claude and OMP launch prompts announce every surviving record"
+}
+
 test_relaunch_requires_a_note_for_a_ship_task() {
   local dir out rc before
   dir=$(new_case nonote rl3)
@@ -6541,6 +6588,7 @@ test_concurrent_relaunch_is_refused
 test_direct_spawn_relaunch_participates_in_the_lifecycle_lock
 test_promotion_participates_in_the_lifecycle_lock_before_metadata_resolution
 test_spawn_relaunch_refuses_a_live_agent
+test_relaunch_announces_surviving_inbox_records
 test_spawn_relaunch_refuses_a_symlinked_task_record_before_inspection
 test_spawn_relaunch_keeps_its_early_meta_lock_continuous
 test_spawn_relaunch_refuses_a_pending_authoritative_close

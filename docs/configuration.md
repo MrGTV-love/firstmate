@@ -2030,7 +2030,13 @@ omp captures native `before_agent_start` prompts in memory; Claude captures nati
 Tool results never contribute native delivery bindings, and a marker, path prefix or receipt alone grants no exception.
 The check compares the returned text bytes, not a fresh disk reread substituted for what the host delivered; omp full-file `:raw` reads preserve byte framing that ordinary/ranged rendering can change.
 Missing or mismatched delivery, copied claimed-authority instructions, changed bytes, mixed/partial content and symlink aliases receive ordinary untrusted-result screening.
-Consistent instructions bypass model/privacy/credential outages; an audit failure adds an explicit review notice outside those original instructions rather than erasing them.
+Consistent instructions bypass model/privacy/credential outages; an audit failure adds an explicit review notice rather than erasing them.
+On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
+Claude keeps its distinct advisory `additionalContext`, containing neither the source text nor its path.
+Each steering doorbell requests only its exact record, after earlier records have been handled; an unannounced sibling must wait for its own doorbell.
+Watcher recovery announces successive ordinary records as they are acknowledged, and each skipped fire-and-forget record retains its own owed retry without newer records superseding it.
+Launches and relaunches carry individual doorbells for every surviving record in the native prompt, including Claude's record-backed launch carrier.
+Checkpoint checks list the inbox but read only already announced records; unannounced survivors are reported to Firstmate for re-delivery.
 This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
 Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
 

@@ -49,6 +49,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 
 - `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
   Its host response handling and one isolated Firstmate-channel consistency function consume the service and pure policies; no signing, alternate transport or tool proxy is introduced.
+  Consistent-read audit failure preserves original OMP content and appends a sanitized review part through the content patch supported by [the 18.1.20 result consumer](https://github.com/can1357/oh-my-pi/blob/v18.1.20/packages/coding-agent/src/extensibility/extensions/runner.ts#L1418-L1459); Claude receives a source-free advisory instead.
   The [operator contract](../../docs/configuration.md#jev-guard) owns the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
 - `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.
   Current Claude documentation describes built-in output replacement, but this adapter does not claim installed-host support or use it without verification.
@@ -57,6 +58,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 - `bin/fm-spawn.sh` remains the launch owner for physical project scope, context, Claude hook registration, omp extension loading and process-local replace-edit mode.
   Native omp prompt events and Claude's separate prompt/tool hooks bind exact source reads without copying raw prompts into the latter's task/session-local hash context.
 - The existing `bin/fm-operational-input.sh` publisher owns write-time consistency metadata; `bin/fm-task-inbox-lib.sh` reuses it and names the exact record in its bounded doorbell.
+  Delivery requests only announced records, retains every owed fire-and-forget retry, and `bin/fm-spawn.sh` includes individual survivor doorbells in native launch prompts.
 
 [`tests/fm-jev-guard.test.sh`](../../tests/fm-jev-guard.test.sh) exercises the public service and adapters with isolated synthetic HTTP fixtures.
 [Native verification](../../docs/verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes actual host delivery, controlled decision fixtures, live calibration and deployed acceptance.

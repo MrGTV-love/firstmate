@@ -88,7 +88,7 @@ case "${1:-}" in
       fi
       # A concurrent fire-and-forget send marking its newer record mid-ring.
       if [ -n "${FM_RING_MARKS_RETRY:-}" ]; then
-        printf '%s\n' "${FM_RING_MARKS_RETRY##*/}" > "${FM_RING_MARKS_RETRY%/*}/.retry-ring"
+        bash -c '. "$1"; fm_task_inbox_mark_retry "${2%/*/*}" "${3:-t1}" "$2"' _ "$FM_INBOX_LIB" "$FM_RING_MARKS_RETRY"
       fi
     else
       printf '%s\n' "${1:-}" >> "${FM_SEND_KEY_LOG:-/dev/null}"
@@ -567,15 +567,16 @@ test_fire_and_forget_retry_is_owed_once() {
   age_path "$state/t1.inbox/.retry-ring"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = "retry $fire" ] || fail "an aged retry mark should be due its ring, got: $action"
-  # An ordinary record's ladder rings the same inbox, so the retry waits behind it.
   tracked=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "tracked steer")
   age_path "$tracked"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
-  [ "$action" = "ring $tracked" ] || fail "a pending ordinary record should own the ring, got: $action"
-  mv "$tracked" "$state/t1.inbox/handled/"
+  [ "$action" = "retry $fire" ] || fail "an earlier retry must be announced before the later ordinary record, got: $action"
+  mv "$fire" "$state/t1.inbox/handled/"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
-  [ "$action" = "retry $fire" ] || fail "the retry should resume once the ordinary record is handled, got: $action"
+  [ "$action" = "ring $tracked" ] || fail "the ordinary record should follow the earlier retry, got: $action"
+  mv "$tracked" "$state/t1.inbox/handled/"
   # Once spent, the record is quiet for good: no second retry and no escalation.
+  mv "$state/t1.inbox/handled/${fire##*/}" "$fire"
   inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$fire"
   action=$(FM_TASK_INBOX_GRACE_SECS=0 FM_TASK_INBOX_RING_MAX=0 \
     inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
@@ -605,6 +606,26 @@ test_fire_and_forget_retry_is_quiet_without_the_flag() {
   [ -e "$state/t1.inbox/.retry-ring" ] || fail "an absent flag removed a retry mark it should have left"
   unset FM_CONFIG_OVERRIDE
   pass "inbox: without config/wait-no-turns a fire-and-forget retry mark stays quiet"
+}
+
+test_retry_marks_never_supersede_earlier_records() {
+  local state config first second action
+  state="$TMP_ROOT/faf-queued/state"; config="$TMP_ROOT/faf-queued/config"
+  mkdir -p "$state" "$config"
+  : > "$config/wait-no-turns"
+  first=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 first fire-and-forget)
+  second=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 second fire-and-forget)
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$first"
+  inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$second"
+  action=$(FM_CONFIG_OVERRIDE="$config" FM_TASK_INBOX_GRACE_SECS=0 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "retry $first" ] || fail "a newer retry superseded the earlier record: $action"
+  inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$first"
+  mv "$first" "$state/t1.inbox/handled/"
+  action=$(FM_CONFIG_OVERRIDE="$config" FM_TASK_INBOX_GRACE_SECS=0 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "retry $second" ] || fail "spending the earlier retry lost the newer record: $action"
+  inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$second"
+  [ -f "$second" ] || fail "spending the retry removed its unhandled steer"
+  pass "inbox: each skipped fire-and-forget record retains its own retry"
 }
 
 test_ring_ladder_policy() {
@@ -1093,9 +1114,36 @@ test_watcher_pays_fire_and_forget_retry_once() {
 # One watcher inbox check against an idle pane, through the production watcher
 # functions, so a status log the case writes is not also read as a wake.
 steer_check_once() {  # <case-dir>
-  PATH="$1/fakebin:$PATH" FM_STATE_OVERRIDE="$1/state" FM_SEND_LOG="$1/send.log" \
+  PATH="$1/fakebin:$PATH" FM_STATE_OVERRIDE="$1/state" FM_SEND_LOG="$1/send.log" FM_INBOX_LIB="$ROOT/bin/fm-task-inbox-lib.sh" \
     FM_FAKE_TMUX_CAPTURE="$(idle_capture "$1")" FM_TASK_INBOX_GRACE_SECS=1 \
     bash -c '. "$1" && inbox_steer_check sess:fm-t1 t1' _ "$WATCH" >/dev/null 2>&1
+}
+
+test_watcher_recovers_each_skipped_record() {
+  local dir state first second rec rc
+  dir=$(setup_watch_case queued-skips)
+  state="$dir/state"
+  first=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 first)
+  second=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 second)
+  printf '────────\n❯ preface\n ❯ nested draft\n────────\n' > "$dir/draft.capture"
+  : > "$dir/send.log"
+  for rec in "$first" "$second"; do
+    rc=0
+    PATH="$dir/fakebin:$PATH" FM_SEND_LOG="$dir/send.log" \
+      FM_FAKE_TMUX_CAPTURE="$dir/draft.capture" FM_FAKE_TMUX_CURSOR_Y=2 FM_FAKE_TMUX_AGENT=claude \
+      inbox_lib "$state" fm_task_inbox_ring tmux sess:fm-t1 "$rec" fm-t1 || rc=$?
+    [ "$rc" = 1 ] || fail "queued ring did not defer for draft protection: $rc"
+    age_path "$rec"
+  done
+  [ ! -s "$dir/send.log" ] || fail "draft protection typed a queued doorbell"
+  steer_check_once "$dir"
+  [ "$(cat "$dir/send.log")" = "$(inbox_lib "$state" fm_task_inbox_doorbell_line "$first")" ] || fail "recovery did not announce the oldest record alone"
+  mv "$first" "$state/t1.inbox/handled/"
+  : > "$dir/send.log"
+  steer_check_once "$dir"
+  [ "$(cat "$dir/send.log")" = "$(inbox_lib "$state" fm_task_inbox_doorbell_line "$second")" ] || fail "recovery did not announce the second record after acknowledgement"
+  [ -f "$second" ] || fail "recovery removed the second steer before acknowledgement"
+  pass "watcher: multi-record skipped rings recover individually in acknowledgement order"
 }
 
 test_watcher_holds_retry_while_the_worker_decides() {
@@ -1272,6 +1320,8 @@ test_watcher_surfaces_unwritable_ladder
 test_watcher_pays_fire_and_forget_retry_once
 test_watcher_holds_retry_while_the_worker_decides
 test_watcher_retry_keeps_a_newer_mark
+test_retry_marks_never_supersede_earlier_records
+test_watcher_recovers_each_skipped_record
 test_watcher_escalates_once_after_budget
 test_watcher_dead_pane_escalates_once_without_ringing
 test_watcher_dead_pane_ignores_stale_busy_state

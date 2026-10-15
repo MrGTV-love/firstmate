@@ -1854,9 +1854,9 @@ record_note() {
           echo "uncommitted change are exactly as the previous worker left them."
         fi
         echo
-        echo "First, check your instruction inbox: list $STATE/$ID.inbox/*.msg, act on"
-        echo "each message in numeric order, then mv each handled file into"
-        echo "$STATE/$ID.inbox/handled/. A steer sent before the relaunch survives there."
+        echo "First, handle the surviving instruction records individually announced"
+        echo "by this launch, in numeric order, then mv each handled file into"
+        echo "$STATE/$ID.inbox/handled/. Wait for unannounced records' own doorbells."
         echo
         printf '%s\n' "$NOTE"
       } >> "$RELAUNCH_BRIEF" \

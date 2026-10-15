@@ -36,8 +36,8 @@ export interface GuardResultEvent extends GuardCallEvent {
 export interface GuardCallPatch { block: true; reason: string }
 export type GuardResultPatch = {
   content: { type: "text"; text: string }[];
-  details: Record<string, never>;
-  isError: true;
+  details?: unknown;
+  isError?: boolean;
 } | { additionalContext: string };
 export interface GuardPromptEvent { prompt?: unknown }
 export type GuardPromptHandler = (event: GuardPromptEvent) => void;
@@ -188,10 +188,12 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     return { block: true, reason: `[jev-guard] ${why} ${OUTAGE_POLICY}. ${BLOCK_NOTICE}` };
   }
 
-  function finishResult(terminal: GuardTerminal): GuardResultPatch | undefined {
+  function finishResult(terminal: GuardTerminal, consistentContent?: { type: "text"; text: string }[]): GuardResultPatch | undefined {
     const final = record(terminal);
-    if (terminal.branch === "supervisor_consistency" && final.audit_error_type) {
-      return { additionalContext: `[jev-guard] Review required: AuditUnavailableError. ${OUTAGE_POLICY}. Exact Firstmate-channel-consistent instructions remain visible; this is not producer authentication.` };
+    if (terminal.branch === "supervisor_consistency" && final.audit_error_type && consistentContent) {
+      const notice = `[jev-guard] Review required: AuditUnavailableError. ${OUTAGE_POLICY}. Exact Firstmate-channel-consistent instructions remain visible; this is not producer authentication.`;
+      return service.host === "claude" ? { additionalContext: notice }
+        : { content: [...consistentContent, { type: "text", text: notice }] };
     }
     if (final.decision !== "flag" && final.decision !== "review") return;
     const failure = final.audit_error_type ?? final.error_type;
@@ -255,7 +257,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     if (!service.active) return finishResult({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
     const enforcement = service.host === "claude" ? "claude_advisory_only" : "omp_replace";
     if (supervisorReadAdmission(event, c, doorbells)) {
-      return finishResult({ ...terminal, branch: "supervisor_consistency" });
+      return finishResult({ ...terminal, branch: "supervisor_consistency" }, event.content as { type: "text"; text: string }[]);
     }
     try {
       if (!Array.isArray(event.content)) throw new GuardUnavailableError("UnsupportedToolResultError");

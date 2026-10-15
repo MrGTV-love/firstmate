@@ -770,6 +770,7 @@ FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
 # shellcheck source=bin/fm-backlog-transition-lib.sh
 . "$SCRIPT_DIR/fm-backlog-transition-lib.sh"
+. "$SCRIPT_DIR/fm-task-inbox-lib.sh"
 
 resolve_directory_input() {
   local name=$1 path=$2 resolved
@@ -6506,6 +6507,16 @@ if [ "$HARNESS" = rovo ]; then
   }
   LAUNCH=${LAUNCH//__ROVOCONFIGOVERRIDE__/$ROVOCONFIGOVERRIDE}
 fi
+inbox_doorbells=''
+if [ "$KIND" != secondmate ]; then
+  inbox_doorbells=$(fm_task_inbox_doorbells "$STATE" "$ID") || {
+    echo "error: could not announce surviving instruction records for $ID" >&2
+    exit 1
+  }
+  if [ -n "$inbox_doorbells" ]; then
+    printf '\n%s\n' "$inbox_doorbells" >> "$BRIEF" || exit 1
+  fi
+fi
 LAUNCH=${LAUNCH//__BRIEF__/$sq_brief}
 LAUNCH=${LAUNCH//__TURNEND__/$sq_turnend}
 LAUNCH=${LAUNCH//__PIEXT__/$sq_piext}
@@ -6540,6 +6551,9 @@ case "$LAUNCH" in
     echo "error: could not publish the launch brief for $ID as an operational-inbox record under $brief_opstate; $HARNESS strips the typed operational marker, so the worker was not launched" >&2
     exit 1
   }
+  if [ -n "$inbox_doorbells" ]; then
+    brief_doorbell+=$'\n'"$inbox_doorbells"
+  fi
   LAUNCH=${LAUNCH//__BRIEFDOORBELL__/"$(shell_quote "$brief_doorbell")"}
   ;;
 esac
