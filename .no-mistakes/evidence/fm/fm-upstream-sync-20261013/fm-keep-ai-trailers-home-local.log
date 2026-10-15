@@ -1,0 +1,46 @@
+ok - bootstrap preserves enqueue failures and silently drains a full reread retry queue
+ok - remote item enumeration and receiver refuse both flag operations while preserving each local choice
+ok - spawn primary-absent lane-present preserves the lane's home-local choice while unrelated config converges
+ok - spawn primary-absent lane-absent preserves the lane's home-local choice while unrelated config converges
+ok - spawn primary-present lane-present preserves the lane's home-local choice while unrelated config converges
+ok - spawn primary-present lane-absent preserves the lane's home-local choice while unrelated config converges
+ok - bootstrap primary-absent lane-present preserves the lane's home-local choice while unrelated config converges
+ok - bootstrap primary-absent lane-absent preserves the lane's home-local choice while unrelated config converges
+ok - bootstrap primary-present lane-present preserves the lane's home-local choice while unrelated config converges
+ok - bootstrap primary-present lane-absent preserves the lane's home-local choice while unrelated config converges
+ok - config_push primary-absent lane-present preserves the lane's home-local choice while unrelated config converges
+ok - config_push primary-absent lane-absent preserves the lane's home-local choice while unrelated config converges
+ok - config_push primary-present lane-present preserves the lane's home-local choice while unrelated config converges
+ok - config_push primary-present lane-absent preserves the lane's home-local choice while unrelated config converges
+ok - config_push silently retires retained-only instructions without enqueueing a reread
+ok - bootstrap silently retires retained-only instructions without enqueueing a reread
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-pending-mixed/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-pending-mixed/bin/fm-role-lib.sh: No such file or directory
+ok - pending mixed retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-pending-flag-only/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-pending-flag-only/bin/fm-role-lib.sh: No such file or directory
+ok - pending flag-only retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-staged-mixed/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-staged-mixed/bin/fm-role-lib.sh: No such file or directory
+ok - staged mixed retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-staged-flag-only/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-staged-flag-only/bin/fm-role-lib.sh: No such file or directory
+ok - staged flag-only retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-staged-pending-mixed/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-staged-pending-mixed/bin/fm-role-lib.sh: No such file or directory
+ok - staged-pending mixed retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-staged-pending-flag-only/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-staged-pending-flag-only/bin/fm-role-lib.sh: No such file or directory
+ok - staged-pending flag-only retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-exact-temp-mixed/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-exact-temp-mixed/bin/fm-role-lib.sh: No such file or directory
+ok - exact-temp mixed retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-exact-temp-flag-only/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-exact-temp-flag-only/bin/fm-role-lib.sh: No such file or directory
+ok - exact-temp flag-only retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-legacy-report-mixed/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-legacy-report-mixed/bin/fm-role-lib.sh: No such file or directory
+ok - legacy-report mixed retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-legacy-report-flag-only/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/retry-legacy-report-flag-only/bin/fm-role-lib.sh: No such file or directory
+ok - legacy-report flag-only retry removes retained home-local ABSENT instructions and converges
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/excluded-report-report-only-routing-only/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/excluded-report-report-only-routing-only/bin/fm-role-lib.sh: No such file or directory
+ok - report-only routing-only report recovery waits for the complete allowlist before delivering destination bytes
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/excluded-report-report-only-mixed/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/excluded-report-report-only-mixed/bin/fm-role-lib.sh: No such file or directory
+ok - report-only mixed report recovery waits for the complete allowlist before delivering destination bytes
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/excluded-report-empty-stage-routing-only/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/excluded-report-empty-stage-routing-only/bin/fm-role-lib.sh: No such file or directory
+ok - empty-stage routing-only report recovery waits for the complete allowlist before delivering destination bytes
+/Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/excluded-report-empty-stage-mixed/bin/fm-config-inherit-lib.sh: line 81: /Users/charlesabrooker/tmp/fm-keep-trailers-local.yMQAVX/excluded-report-empty-stage-mixed/bin/fm-role-lib.sh: No such file or directory
+ok - empty-stage mixed report recovery waits for the complete allowlist before delivering destination bytes
+# all fm-keep-ai-trailers-home-local tests passed
+exit=0

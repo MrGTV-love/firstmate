@@ -1,0 +1,20 @@
+ok - fm_branch_outcomes and fm_branch_processed call headers match stock on Pi before and from 0.99
+skip: installed @earendil-works/pi-coding-agent package not found
+skip: installed @earendil-works/pi-coding-agent package not found
+ok - branch owns accepted wakes with a stable prefix and deterministic verdict-driven delivery
+ok - a captain outcome reaches main's model as one typed, sequence-keyed processing request while routine notes stay plain
+not ok - requested and unsolicited healthy outcomes must follow their distinct public delivery paths: file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Y86AQYH16Y1CRXJ9QK76VS/[eval1]:194
+    throw new Error(`the widened processing request lost seq ${seq}: ${processingRequests[1].message.content}`);
+          ^
+
+Error: the widened processing request lost seq 2: ⁣FIRSTMATE_OP: v1 branch-outcome: This is a supervision processing request delivered automatically by the supervision branch. It was not typed by the captain. The outcomes below are stored durably, and each was recorded earlier, possibly before a restart or a switch of primary, so the captain may already have seen it and it may already have been handled; each fleet event is already handled, so do not re-drain, re-run, or acknowledge the wake. Each outcome says what was true when it was recorded and how long ago, so check the task's current state first. An abbreviated line is incomplete: read the full outcome before acting on, relaying, or acknowledging it, using that line's lookup --seqs command. First sort the outcomes by that current state into still open and already settled, such as a decision since answered, a PR since merged, or a task since finished. Your reply to the captain covers only the still-open outcomes: give the captain a visible response where one is due, answer or escalate a decision, or act on a blocker or failure. Write that reply as if the settled outcomes had never been listed: leave them out entirely, without naming them, summarizing them, or saying they are settled, because checking them is all the processing they need. When every outcome below is processed, call fm_branch_processed with through=5 exactly once. Until that call the outcomes stay open and are presented again; an answer that does not make that call never counts as processing.
+
+[seq 2, recorded 1m ago] branch-driver: healthy resource report: CPU 12%, memory 41%
+[seq 3, recorded 0m ago] branch-driver: healthy resource report: CPU 12%, memory 41%
+[seq 4, recorded 0m ago] branch-driver: healthy resource report: CPU 12%, memory 41%
+[seq 5, recorded 0m ago] branch-driver: healthy resource report: CPU 12%, memory 41%
+    at file:///Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4Y86AQYH16Y1CRXJ9QK76VS/[eval1]:194:11
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v26.4.0: expected exit 0, got 1
+exit=1
