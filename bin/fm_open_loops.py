@@ -690,8 +690,9 @@ class Collector:
         coverage = f"; PR head {head[:8]} is not in this copy, so PR coverage was not applied" if head else ""
         self.add("unlanded_commit", task["id"], "land this work through its PR, or obtain the captain's drop",
                  oldest, evidence=f"{len(pending)} commit(s) not on {base}{coverage}; newest: {title}",
-                 source=dict(self.task_source(task["id"]), kind="commits", worktree=str(Path(worktree).resolve()),
-                             head=self.git(worktree, "rev-parse", "HEAD"), commits=fingerprint(pending)))
+                 source=self.source("commit provenance " + task["id"], lambda: dict(
+                     self.task_source(task["id"]), kind="commits", worktree=str(Path(worktree).resolve()),
+                     head=self.git(worktree, "rev-parse", "HEAD"), commits=fingerprint(pending))))
 
     def forge(self, path):
         """Pages of one conditional REST read, flattened; fm-gh-rest.sh owns the ETag cache and quota headers."""
@@ -887,9 +888,9 @@ class Collector:
             owner, action = "firstmate", "route the green PR's review and obtain merge approval"
         task_id = task["id"] if task else next((r["id"] for r in self.backlog
                     if url == r.get("pr_url") or url in (r.get("links") or [])), None)
-        source = self.task_source(task_id) if task_id else self.source_context()
+        source = self.source("PR provenance " + url, self.task_source, task_id) if task_id else self.source_context()
         self.add("open_pr", url, action, epoch(pr.get("updated_at")), owner,
-                 source=dict(source, kind="pr", url=url, head=sha))
+                 source=dict(source, kind="pr", url=url, head=sha) if source is not None else None)
 
     def pr_rows(self, slug):
         pulls = self.forge(f"/repos/{slug}/pulls?state=open&per_page=100")
@@ -910,7 +911,7 @@ class Collector:
         source = dict(self.source_context(), task=task)
         meta = self.state / (task + ".meta")
         if meta.is_symlink():
-            raise ValueError("task metadata must not be a symbolic link")
+            raise ValueError(f"task metadata {meta.name} must not be a symbolic link")
         source["generation"] = fingerprint(meta.read_text()) if meta.exists() else None
         return source
 
@@ -959,7 +960,8 @@ class Collector:
                 self.add("unanswered_question", f"{status.stem}:{key}",
                          "answer or close this question, or record why it no longer applies",
                          int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}",
-                         source=self.decision_source(status.stem, key, line))
+                         source=self.source("question provenance " + status.name,
+                                            self.decision_source, status.stem, key, line))
 
     def board_answer_rows(self):
         inbox = self.state / "procevent-inbox"
@@ -1247,12 +1249,13 @@ class WaitVerifier:
             path = c.state / (task + ".status")
             if path.is_symlink() or not path.is_file():
                 raise ValueError("prerequisite status is unavailable")
-            status = c.bash('. "$1/fm-status-event-lib.sh"; line=$(last_status_line "$2"); '
-                            'printf "%s\n%s\n" "$(status_line_verb "$line")" "$line"', BIN, path).splitlines()
-            if len(status) != 2 or status[0] != "working":
+            status = c.bash('. "$1/fm-classify-lib.sh"; export FM_CREW_STATE_NO_FORGE=1; '
+                            'if crew_is_provably_working "$3"; then last_status_line "$2"; fi',
+                            BIN, path, task).strip()
+            if not status:
                 raise ValueError("routed prerequisite is no longer working; follow up on its result or wait")
             stat = path.stat()
-            return dict(current, kind="task", status=fingerprint(status[1]), stream=[stat.st_dev, stat.st_ino])
+            return dict(current, kind="task", status=fingerprint(status), stream=[stat.st_dev, stat.st_ino])
         raise ValueError("unsupported waiting source; recollect before binding it")
 
     def verify_source(self, source):
@@ -1437,12 +1440,12 @@ def ledger_action(args, state, now):
                   " [--prerequisite <row-id> | --prerequisite-task <task-id>]")
         return 0
     if args.check_actions:
-        missing = [by_id[ident] for ident, presented in pending.items()
-                   if ident in by_id and (actions.get(ident, {}).get("sequence", 0) <= presented
+        missing = [row for ident, row in by_id.items()
+                   if (ident in pending and (actions.get(ident, {}).get("sequence", 0) <= pending[ident]
                        or (actions.get(ident, {}).get("kind") == "deferred"
-                           and actions[ident].get("recheck_epoch", 0) <= now)
-                       or (actions.get(ident, {}).get("kind") == "waiting"
-                           and not receipt_stands(actions[ident], by_id[ident], now, waits)))]
+                           and actions[ident].get("recheck_epoch", 0) <= now)))
+                   or (actions.get(ident, {}).get("kind") == "waiting"
+                       and not receipt_stands(actions[ident], row, now, waits))]
         if missing:
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
             print(render_overdue(missing))
