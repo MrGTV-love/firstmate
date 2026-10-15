@@ -231,7 +231,8 @@
 # reaper's return stage and every forced child return wait in that FIFO queue
 # instead, bounded per holder by the same stall allowance as every other
 # waiter (370s, measured in bin/fm-project-lock-lib.sh), inside the reaper's
-# 600s teardown limit. As soon as a slot is reserved, before any cleanup
+# 600s teardown limit. As soon as a slot is reserved, or this task's own claim
+# beside a slot another task leases awaits release, and before any cleanup
 # that can fail and before the pending backlog close is published, teardown
 # records state/<id>.teardown-return-pending (bin/fm-wake-lib.sh's
 # fm_teardown_return_pending owns the contract; a forced secondmate teardown
@@ -772,10 +773,11 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
   TEARDOWN_SLOT_CUSTODY=lease
 }
 
-# Record, once this task's slot is reserved and before any cleanup that can
-# fail, that the slot is still held for it (bin/fm-wake-lib.sh's
-# fm_teardown_return_pending owns the contract). A refusal from here on
-# leaves the record for the retry.
+# Record, once this task's slot is reserved (or, for a slot shared with another
+# task, once this task's claim beside it awaits release) and before any
+# cleanup that can fail, that the slot is still held for it
+# (bin/fm-wake-lib.sh's fm_teardown_return_pending owns the contract). A
+# refusal from here on leaves the record for the retry.
 teardown_mark_return_pending() {  # <slot> [child-id]
   local marker="$STATE/$ID.teardown-return-pending" tmp gen
   tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
@@ -5343,6 +5345,10 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree; then
     teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT"
   fi
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
+fi
+if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
+  fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
+  [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT"
 fi
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire

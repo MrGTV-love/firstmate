@@ -10932,7 +10932,108 @@ test_legacy_stamp_rollback_rebinds_the_return_pending_record() {
   pass 'a rolled-back legacy stamp leaves its return-pending record bound to the unstamped record'
 }
 
+# Task A shares a pool slot with live task B: B holds the durable lease and A's
+# claim still sits beside the slot. A's endpoint refuses to close after the
+# pending backlog close is published. Session start must not replay that close
+# and retire A's record while A's claim still names the slot, because B's own
+# teardown would then read the slot as reassigned and never return it. A's plain
+# retry releases only its claim; B keeps its lease and later finishes normally.
+test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap() {
+  local case_dir slot delivered rc out returns mode gen; local -a flags
+  for mode in plain legacy; do
+  flags=()
+  gen="spawn_gen=finished"
+  if [ "$mode" = legacy ]; then flags=(--legacy-record); gen="harness=codex"; fi
+  case_dir=$(make_case "shared-claim-refusal-$mode")
+  wt_commit_file "$case_dir" delivered.txt 'merged task work' 'delivered task'
+  delivered=$(git -C "$case_dir/wt" rev-parse HEAD)
+  git -C "$case_dir/wt" push -q origin HEAD:main
+  add_gh_pr_merged_for_head "$case_dir" "$delivered"
+  mkdir -p "$case_dir/pool/1" "$case_dir/primary-home/state"
+  slot="$case_dir/pool/1/project"
+  git -C "$case_dir/project" worktree move "$case_dir/wt" "$slot"
+  slot=$(cd "$slot" && pwd -P)
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"live-task"}]}\n' "$slot" \
+    > "$case_dir/pool/treehouse-state.json"
+  printf 'task=task-x1\nhome=%s\n' "$case_dir/primary-home" > "${slot%/*}/.fm-slot-owner"
+  fm_write_meta "$case_dir/state/task-x1.meta" \
+    "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+    "worktree=$slot" "project=$case_dir/project" "kind=ship" \
+    "mode=no-mistakes" "branch=fm/task-x1" "$gen" \
+    "pr=https://github.com/example/repo/pull/7" "pr_head=$delivered"
+  fm_write_meta "$case_dir/state/live-task.meta" \
+    "window=firstmate:fm-live-task" "endpoint_task_id=live-task" \
+    "worktree=$slot" "project=$case_dir/project" "kind=ship" "mode=no-mistakes" \
+    "branch=fm/task-x1" "spawn_gen=live" \
+    "pr=https://github.com/example/repo/pull/7" "pr_head=$delivered"
+  rm -f "$case_dir/config/backlog-backend"
+  seed_backlog_in_flight "$case_dir"
+  tasks-axi add live-task "sharing task" --kind ship --file "$case_dir/data/backlog.md" >/dev/null
+  tasks-axi start live-task --file "$case_dir/data/backlog.md" >/dev/null
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+if [ -e "$case_dir/endpoint-stuck" ]; then
+  case "\${1:-}" in
+    kill-window) : > "$case_dir/kill-attempted"; exit 1 ;;
+    list-windows) [ ! -e "$case_dir/kill-attempted" ] || printf '%s\n' fm-task-x1; exit 0 ;;
+  esac
+fi
+exit 0
+SH
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/tmux" "$case_dir/fakebin/treehouse"
+  cp "$case_dir/pool/treehouse-state.json" "$case_dir/lease.before"
+  cp "$case_dir/state/live-task.meta" "$case_dir/live-meta.before"
+  : > "$case_dir/endpoint-stuck"
+
+  rc=0
+  FM_HOME="$case_dir/primary-home" run_teardown "$case_dir" "${flags[@]+"${flags[@]}"}" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+  expect_code 1 "$rc" "the endpoint refusal must stop the shared-slot teardown: $(cat "$case_dir/stderr")"
+  assert_present "$case_dir/state/task-x1.backlog-close" 'the refusal came before the pending close was published'
+  assert_present "$case_dir/state/task-x1.teardown-return-pending" 'the shared claim awaiting release has no return-pending record'
+
+  out=$(PATH="$case_dir/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$case_dir/primary-home" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" \
+    FM_CONFIG_OVERRIDE="$case_dir/config" FM_BOOTSTRAP_NETWORK=skip \
+    "$ROOT/bin/fm-bootstrap.sh" 2>&1) || fail "session start failed beside a refused shared endpoint: $out"
+  assert_present "$case_dir/state/task-x1.meta" 'session start retired the record whose claim still names the shared slot'
+  [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+    || fail "session start closed the row before the claim was released: $(backlog_row_state "$case_dir")"
+  assert_grep 'task=task-x1' "${slot%/*}/.fm-slot-owner" 'session start changed the slot claim'
+  cmp -s "$case_dir/lease.before" "$case_dir/pool/treehouse-state.json" || fail 'session start changed the sharer lease'
+
+  rm -f "$case_dir/endpoint-stuck" "$case_dir/kill-attempted"
+  rc=0
+  FM_HOME="$case_dir/primary-home" run_teardown "$case_dir" "${flags[@]+"${flags[@]}"}" > "$case_dir/stdout2" 2> "$case_dir/stderr2" || rc=$?
+  expect_code 0 "$rc" "the plain retry must finish: $(cat "$case_dir/stderr2")"
+  assert_absent "$case_dir/state/task-x1.meta" 'the retry kept the task record'
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" 'the retry kept the return-pending record'
+  assert_absent "${slot%/*}/.fm-slot-owner" "the retry left the finished task's claim beside the shared slot"
+  assert_no_grep '^return ' "$case_dir/treehouse.log" 'the retry returned a slot another task still holds'
+  cmp -s "$case_dir/lease.before" "$case_dir/pool/treehouse-state.json" || fail 'the retry changed the sharer lease'
+  cmp -s "$case_dir/live-meta.before" "$case_dir/state/live-task.meta" || fail 'the retry changed the sharer record'
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "the retry did not close the backlog row: $(backlog_row_state "$case_dir")"
+
+  rc=0
+  FM_HOME="$case_dir/primary-home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
+    FM_STATE_OVERRIDE="$case_dir/state" FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
+    NM_HOME="$case_dir/nm" PATH="$case_dir/fakebin:$PATH" \
+    "$TEARDOWN" live-task > "$case_dir/b.stdout" 2> "$case_dir/b.stderr" || rc=$?
+  expect_code 0 "$rc" "the sharer's own teardown must finish once the claim is released: $(cat "$case_dir/b.stderr")"
+  assert_absent "$case_dir/state/live-task.meta" 'the sharer kept its record'
+  returns=$(grep -c "^return --force $slot\$" "$case_dir/treehouse.log" || true)
+  assert_equals 1 "$returns" 'the sharer must return the slot exactly once'
+  done
+  pass 'a shared-slot claim release survives an endpoint refusal and session start, and the sharer then finishes normally'
+}
+
 teardown_test_cases=(
+test_shared_slot_claim_release_survives_endpoint_refusal_and_bootstrap
 test_legacy_pool_teardown_keeps_its_return_pending_record_across_the_stamp
 test_legacy_stamp_rollback_rebinds_the_return_pending_record
 test_endpoint_refusal_after_reservation_survives_session_start
