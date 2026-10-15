@@ -319,6 +319,72 @@ assert again.returncode == 0, ('a recurring obligation starts without earlier de
 ledger_file.unlink()
 print('PASS: stale non-overdue retention, receipt pruning, corrupt-ledger replacement, deferral bound', flush=True)
 
+for name in ('a', 'b'):
+    (home / f'state/{name}.status').write_text(f'blocked [at={hours(10)}] [key=answer]: {name} needs an answer\n')
+    (home / f'state/{name}.meta').write_text(f'kind=scout\nspawn_gen={name}-generation\n')
+a_meta = home / 'state/a.meta'
+lost_meta, pr_meta = home / 'state/lost.meta', home / 'state/route-9.meta'
+for refresh in (False, True):
+    if refresh:
+        ledger('--heartbeat')
+        assert loops('--present-overdue').returncode == 0
+    a_meta.unlink()
+    a_meta.symlink_to(home / 'missing-meta')
+    lost_meta.symlink_to(home / 'missing-meta')
+    pr_meta.symlink_to(home / 'missing-meta')
+    degraded = ledger('--heartbeat')
+    assert not degraded['complete'], degraded
+    obligations = [rows(degraded, 'unanswered_question')[name + ':answer'] for name in ('a', 'b')]
+    obligations += [rows(degraded, 'unlanded_commit')['lost'], rows(degraded, 'open_pr')[PR_URL + '9']]
+    for obligation in obligations:
+        assert obligation['overdue'] and not obligation.get('stale') and not obligation.get('informational'), obligation
+    assert 'source' not in obligations[0] and obligations[1].get('source'), obligations
+    assert all('source' not in obligation for obligation in obligations[2:]), obligations
+    assert 'a.meta' in rows(degraded, 'coverage')['ledger degraded']['evidence'], degraded
+    assert loops('--present-overdue').returncode == 0
+    refused = loops('--check-actions')
+    assert refused.returncode == 1 and all(r['id'] in refused.stdout for r in obligations), refused
+    for obligation in (obligations[0], *obligations[2:]):
+        refused = loops('action', obligation['id'], 'waiting', '--evidence', 'unproved binding',
+                        '--prerequisite-task', 'b', '--recheck', iso(now + 600))
+        assert refused.returncode == 1, refused
+        assert obligation['id'] not in json.loads(ledger_file.read_text())['handling']['actions']
+    for path in (a_meta, lost_meta, pr_meta):
+        path.unlink()
+    a_meta.write_text('kind=scout\nspawn_gen=a-generation\n')
+a_meta.chmod(0)
+degraded = ledger('--heartbeat')
+assert not degraded['complete'], degraded
+assert 'a.meta' in rows(degraded, 'coverage')['ledger degraded']['evidence'], degraded
+for name in ('a', 'b'):
+    obligation = rows(degraded, 'unanswered_question')[name + ':answer']
+    assert obligation['overdue'] and not obligation.get('stale') and not obligation.get('informational'), obligation
+a_meta.chmod(0o600)
+real_bash = shutil.which('bash')
+script(fake / 'bash', f'''#!/usr/bin/env python3
+import subprocess, sys
+from pathlib import Path
+result = subprocess.run([{real_bash!r}, *sys.argv[1:]], capture_output=True)
+if any('status_open_decisions_dated' in arg for arg in sys.argv[1:]) and sys.argv[-1].endswith('/a.status'):
+    Path(sys.argv[-1]).unlink()
+sys.stdout.buffer.write(result.stdout)
+sys.stderr.buffer.write(result.stderr)
+sys.exit(result.returncode)
+''')
+degraded = ledger('--heartbeat')
+(fake / 'bash').unlink()
+assert not degraded['complete'], degraded
+for name in ('a', 'b'):
+    obligation = rows(degraded, 'unanswered_question')[name + ':answer']
+    assert obligation['overdue'] and not obligation.get('stale') and not obligation.get('informational'), obligation
+assert 'source' not in rows(degraded, 'unanswered_question')['a:answer'], degraded
+(home / 'state/a.status').write_text(f'blocked [at={hours(10)}] [key=answer]: a needs an answer\n')
+for name in ('a', 'b'):
+    (home / f'state/{name}.status').unlink()
+    (home / f'state/{name}.meta').unlink()
+ledger_file.unlink()
+print('PASS: failed question, PR and commit provenance preserves confirmed acknowledgement obligations on collection and refresh', flush=True)
+
 # Captured answers stay firstmate's obligation independently of the board owner's lifecycle.
 answer_inbox = home / 'state/procevent-inbox'
 answer_inbox.mkdir()
@@ -2069,6 +2135,12 @@ _, boundary = drain()
 assert ack(boundary).returncode == 0, 'an unchanged captain row needs no new escalation'
 clock['now'] = now
 record = json.loads(ledger.read_text())
+record['rows'][0]['source'] = dict(kind='captain_hold', home=str(home), task='hold', decision='same hold')
+ledger.write_text(json.dumps(record))
+ok('bash', '-c', '. "$1"; fm_wake_append check report "check: source provenance added"', '_', code / 'bin/fm-wake-lib.sh')
+_, boundary = drain()
+assert ack(boundary).returncode == 0, 'a collector schema addition must not require replaying an unchanged escalation'
+record = json.loads(ledger.read_text())
 record['rows'][0]['evidence'] = 'captain asked for a revised budget'
 ledger.write_text(json.dumps(record))
 ok('bash', '-c', '. "$1"; fm_wake_append check report "check: changed"', '_', code / 'bin/fm-wake-lib.sh')
@@ -2179,5 +2251,391 @@ assert ack(boundary).returncode == 0
 assert 'handling' not in json.loads(ledger.read_text()), 'empty presentation need not mutate the ledger'
 print('PASS: refused acknowledgement, four verified action kinds, second deferral escalation, host and secondmate gates,'
       ' repeat, fresh steers, standing captain receipts, and empty turns')
+PY
+python3 - "$ROOT" "$TMP_ROOT" <<'PY'
+# Explicit dependency receipts through the collector, drain and generation-bound acknowledgement.
+import datetime as dt, json, os, re, shutil, subprocess, sys, time
+from pathlib import Path
+root, world = map(Path, sys.argv[1:])
+code, home = world / 'wait-code', world / 'wait-home'
+shutil.copytree(root / 'bin', code / 'bin')
+for name in ('state', 'data', 'config', 'projects'):
+    (home / name).mkdir(parents=True)
+now = int(time.time())
+iso = lambda stamp: dt.datetime.fromtimestamp(stamp, dt.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+env = dict(os.environ, FM_HOME=str(home), FM_ROOT_OVERRIDE=str(home), FM_TEST_SEAM='1',
+           FM_TEST_HARNESS='codex', FM_SUPERVISION_ACTOR='main', FM_OPEN_LOOPS_NOW=str(now),
+           NM_HOME=str(world / 'wait-nm'))
+for key in ('FM_STATE_OVERRIDE', 'FM_DATA_OVERRIDE', 'FM_CONFIG_OVERRIDE', 'FM_PROJECTS_OVERRIDE'):
+    env.pop(key, None)
+def call(*args):
+    return subprocess.run([str(x) for x in args], env=env, text=True, capture_output=True, timeout=120)
+def ok(*args):
+    result = call(*args)
+    assert result.returncode == 0, (args, result.stdout, result.stderr)
+    return result
+
+def executable(path, text):
+    path.write_text(text); path.chmod(0o755)
+fake = world / 'wait-fakebin'
+fake.mkdir()
+env['PATH'] = str(fake) + os.pathsep + env['PATH']
+executable(fake / 'tmux', '''#!/usr/bin/env bash
+case "$1" in
+  list-windows) printf 'fm-repair-owner\\n' ;;
+  display-message) printf '%%1\\n' ;;
+  capture-pane) printf 'all quiet\\n' ;;
+  *) exit 1 ;;
+esac
+''')
+executable(fake / 'no-mistakes', '''#!/usr/bin/env python3
+import os, sys
+from pathlib import Path
+args=sys.argv[1:]
+if args in (['axi'], ['axi','status'], ['axi','status','--run','01WAIT']):
+    path=Path(os.environ['FM_HOME'])/'run.toon'
+    if path.exists(): print(path.read_text())
+elif args[:2] == ['daemon','status']:
+    pass
+elif args[:1] == ['runs']:
+    path=Path(os.environ['FM_HOME'])/'runs.txt'
+    if path.exists(): print(path.read_text())
+else:
+    raise AssertionError(args)
+''')
+# Only worker observation and the forge are doubled; holds use the real canonical backlog parser.
+shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
+executable(code / 'bin/fm-fleet-snapshot.sh', '''#!/usr/bin/env python3
+import json, os, subprocess, sys
+from pathlib import Path
+p=Path(__file__).parent
+if sys.argv[1]=='--contribution-input':
+    os.execv(str(p/'real-fleet-snapshot.sh'),[str(p/'real-fleet-snapshot.sh'),*sys.argv[1:]])
+assert sys.argv[1]=='--home-input'
+snap=json.loads(subprocess.check_output([str(p/'real-fleet-snapshot.sh'),'--contribution-input']))
+for task in snap['tasks']:
+    task.update(current_state={'state':'paused' if task['id']=='held-job' else 'working','source':'status-log'},
+                endpoint={'exists':True,'agent_alive':'alive'},paths={'worktree':{'path':None}},hints={})
+snap['schema']='fm-fleet-home-input.v1'
+print(json.dumps(snap))
+''')
+executable(code / 'bin/fm-gh-rest.sh', '''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+p=json.loads((Path(os.environ['FM_HOME'])/'forge.json').read_text())
+url=sys.argv[2]
+if '/pulls?' in url: value=[p]
+elif '/check-runs' in url: value={'check_runs':[{'status':'completed','conclusion':'success'}]}
+elif '/statuses?' in url: value=[]
+else: raise AssertionError(url)
+print(json.dumps([value]))
+''')
+pr='https://github.com/test/project/pull/140'
+forge=dict(html_url=pr,number=140,state='open',draft=False,head={'sha':'a'*40},updated_at=iso(now-7200))
+(home / 'forge.json').write_text(json.dumps(forge))
+meta=home / 'state/held-job.meta'
+meta.write_text('kind=ship\nspawn_gen=s-held\npr='+pr+'\n')
+status=home / 'state/held-job.status'
+original=f'blocked [at={now-7200}] [key=ci-control]: supported recovery control is missing\npaused [at={now}]: awaiting the recorded recovery decision\n'
+status.write_text(original)
+backlog=home / 'data/backlog.md'
+held='## In flight\n- [ ] held-job - Recover the run (repo: firstmate) (kind: ship) (hold: exact run recovery) (hold-kind: captain)\n  Captain hold set: '+iso(now-7200)+'\n\n## Queued\n\n## Done\n'
+backlog.write_text(held)
+ledger=home / 'state/open-loops.json'
+loops=code / 'bin/fm-open-loops.sh'
+def publish():
+    # Keep real file mtimes on the fixture clock, so freshly written workers are not future-dated.
+    stamp=int(env['FM_OPEN_LOOPS_NOW'])
+    for path in (home/'state').glob('*.status'):
+        os.utime(path,(stamp,stamp))
+    return json.loads(ok(loops,'--heartbeat','--json').stdout)
+def row(report,subject):
+    return next(r for r in report['rows'] if r['subject']==subject)
+def action(ident,kind,evidence,*extra):
+    return ok(loops,'action',ident,kind,'--evidence',evidence,*extra)
+def drain():
+    ok('bash','-c','. "$1"; fm_wake_append check report "check: dependency followup"','_',code/'bin/fm-wake-lib.sh')
+    if env['FM_SUPERVISION_ACTOR'] == 'branch':
+        (home/'config/supervision-host').write_text('claude\n')
+        ok(code/'bin/fm-wake-grant.sh','activate',os.getpid(),'wait-turn')
+        sequences=[line.split('\t')[1] for line in (home/'state/.wake-queue').read_text().splitlines()]
+        ok(code/'bin/fm-wake-grant.sh','publish','wait-turn',*sequences)
+    result=ok(code/'bin/fm-wake-drain.sh')
+    boundary=re.search(r'--ack-through (\d+) --recovery-generation ([A-Za-z0-9._-]+)',result.stderr)
+    assert boundary,(result.stdout,result.stderr)
+    return boundary.groups()
+def ack(boundary):
+    return call(code/'bin/fm-wake-drain.sh','--ack-through',boundary[0],'--recovery-generation',boundary[1])
+report=publish()
+assert report['complete'],report
+p=row(report,pr); question=row(report,'held-job:ci-control'); hold=row(report,'held-job:captain-hold')
+boundary=drain()
+assert ack(boundary).returncode==1
+action(hold['id'],'escalated','existing exact recovery decision was routed')
+for obligation in (p,question):
+    action(obligation['id'],'waiting','this exact obligation awaits the recorded recovery question',
+           '--prerequisite',hold['id'],'--recheck',iso(now+600))
+assert ack(boundary).returncode==0
+assert row(json.loads(ledger.read_text()),pr)['owner']=='firstmate'
+assert row(json.loads(ledger.read_text()),'held-job:ci-control')['owner']=='firstmate'
+assert status.read_text()==original and backlog.read_text()==held
+boundary=drain()
+assert ack(boundary).returncode==0,'unchanged bound PR/status waits must not need a fictitious second action'
+assert p['id'] in ok(loops,'--report').stdout,'a standing wait must remain visible'
+refused=call(loops,'action',question['id'],'waiting','--evidence','self-loop','--prerequisite',question['id'],'--recheck',iso(now+600))
+assert refused.returncode==1 and 'distinct current unanswered question' in refused.stdout,refused
+# Exercise the published row protocol's protected reviewed-green transition.
+saved_ledger=ledger.read_text(); reviewed=json.loads(saved_ledger)
+next(r for r in reviewed['rows'] if r['id']==p['id'])['category']='review_pass_not_merged'
+ledger.write_text(json.dumps(reviewed))
+refused=call(loops,'action',p['id'],'waiting','--evidence','must not park a reviewed green PR','--prerequisite',hold['id'],'--recheck',iso(now+600))
+assert refused.returncode==1 and 'cannot have a standing dependency wait' in refused.stdout,refused
+assert call(loops,'--check-actions').returncode==1
+ledger.write_text(saved_ledger)
+# Immediate source transitions invalidate the wait even before another collection or presentation.
+for text in (held.replace('exact run recovery','different recovery'),held.replace(' (hold-kind: captain)',''),
+             held.replace('- [ ] held-job','- [x] held-job').replace('## In flight','## Done')):
+    backlog.write_text(text)
+    assert call(loops,'--check-actions').returncode==1,'changed/released/answered hold must reopen followup'
+    backlog.write_text(held)
+status.write_text(original+f'resolved [at={now}] [key=ci-control]: answered elsewhere\n')
+assert call(loops,'--check-actions').returncode==1,'an answered source key cannot retain its wait'
+status.write_text(original)
+backlog.unlink(); backlog.symlink_to(home/'missing-backlog')
+assert call(loops,'--check-actions').returncode==1,'unreadable binding must not buy acknowledgement'
+backlog.unlink(); backlog.write_text(held)
+# A changed observed PR head or full evidence beyond the 400-character display bound reactivates the row.
+forge['head']['sha']='b'*40; (home/'forge.json').write_text(json.dumps(forge)); publish()
+assert call(loops,'--check-actions').returncode==1,'a new head must not inherit the old standing receipt'
+forge['head']['sha']='a'*40; (home/'forge.json').write_text(json.dumps(forge)); publish()
+status.write_text(original+f'blocked [at={now-7200}] [key=unrelated]: another same-task subject\n')
+report=publish(); unrelated=row(report,'held-job:unrelated')
+# Presenting an unrelated question must not inherit the task's other binding.
+boundary=drain(); assert ack(boundary).returncode==1
+assert unrelated['id'] in call(loops,'--check-actions').stdout
+status.write_text(original); publish()
+env['FM_OPEN_LOOPS_NOW']=str(now+600)
+assert call(loops,'--check-actions').returncode==1,'concrete recheck must restore followup'
+refused=call(loops,'action',question['id'],'waiting','--evidence','renew unchanged wait','--prerequisite',hold['id'],
+             '--recheck',iso(now+1200))
+assert refused.returncode==1 and 'cannot be renewed' in refused.stdout,refused
+env['FM_OPEN_LOOPS_NOW']=str(now)
+# A Main-owned dependency wait must prove a new, exact routed delivery to a distinct assigned worker.
+# A pause alone is deliberately insufficient; the prerequisite must actually report working.
+ledger.unlink(); backlog.write_text('## In flight\n\n## Queued\n\n## Done\n')
+meta.write_text('kind=ship\nspawn_gen=s-held\n')
+(home/'forge.json').write_text(json.dumps(dict(forge,html_url=pr)))
+long_note='preserve original work; '+('evidence '*70)
+status.write_text(f'blocked [at={now-7200}] [key=archive-prerequisite]: {long_note}A\npaused [at={now}]: awaiting custody-owner repair\n')
+repair_tree=world/'wait-repair-tree'
+ok('git','init','-q','-b','fm/repair-owner',repair_tree)
+ok('git','-C',repair_tree,'commit','-q','--allow-empty','-m','fixture')
+repair_head=ok('git','-C',repair_tree,'rev-parse','HEAD').stdout.strip()
+repair_meta=f'kind=scout\nspawn_gen=s-repair\nworktree={repair_tree}\nharness=claude\nwindow=fm:fm-repair-owner\n'
+repair=home/'state/repair-owner.meta'; repair.write_text(repair_meta)
+ok(code/'bin/fm-busy-event.sh','arm',home/'state','repair-owner')
+def repair_activity(state):
+    ok(code/'bin/fm-busy-event.sh','apply',home/'state','repair-owner',state,
+       '--current-gen','--source','claude-hook','--event','fixture')
+repair_status=home/'state/repair-owner.status'; working=f'working [at={now}]: repairing the admitted custody prerequisite\n'
+repair_status.write_text(working)
+report=publish(); obligation=row(report,'held-job:archive-prerequisite')
+boundary=drain()
+inbox=home/'state/repair-owner.inbox'; inbox.mkdir()
+message=inbox/'001.msg'
+message.write_text('schema=fm-task-inbox.v1\nat='+iso(now)+'\n--\nUnrelated instruction without an obligation marker.\n')
+refused=call(loops,'action',obligation['id'],'waiting','--evidence','001.msg','--prerequisite-task','repair-owner','--recheck',iso(now+600))
+assert refused.returncode==1 and 'explicitly name open-loop-row' in refused.stdout,refused
+message.write_text('schema=fm-task-inbox.v1\nat='+iso(now)+'\n--\nopen-loop-row: '+obligation['id']+'\nRepair only this routed prerequisite.\n')
+blocked=f'blocked [at={now}] [key=credentials]: credentials missing\n'+working
+repair_activity('idle')
+for inactive in (f'paused [at={now}]: another subject is held\n', blocked, working):
+    repair_status.write_text(inactive)
+    refused=call(loops,'action',obligation['id'],'waiting','--evidence','001.msg',
+                 '--prerequisite-task','repair-owner','--recheck',iso(now+600))
+    assert refused.returncode==1,refused
+    assert obligation['id'] not in json.loads(ledger.read_text())['handling']['actions']
+repair_status.write_text(working)
+repair_activity('busy')
+action(obligation['id'],'waiting','001.msg','--prerequisite-task','repair-owner','--recheck',iso(now+600))
+assert ack(boundary).returncode==0
+boundary=drain(); assert ack(boundary).returncode==0
+assert status.read_text().startswith('blocked') and row(json.loads(ledger.read_text()),obligation['subject'])['owner']=='firstmate'
+for changed in (f'paused [at={now}]: waiting on somebody else\n',f'done [at={now}]: delivered repair\n',f'working [at={now}]: scope or evidence changed\n'):
+    repair_status.write_text(changed)
+    assert call(loops,'--check-actions').returncode==1,'changed prerequisite must reopen followup'
+repair_status.write_text(working)
+repair_activity('idle'); repair_status.write_text(blocked)
+assert call(loops,'--check-actions').returncode==1,'an unresolved blocker survives unrelated working events'
+repair_status.write_text(working); repair_activity('busy')
+repair.write_text(repair_meta.replace('s-repair','s-replacement'))
+assert call(loops,'--check-actions').returncode==1,'replacement worker cannot inherit the routed binding'
+repair.write_text(repair_meta)
+status.write_text(f'blocked [at={now-7200}] [key=archive-prerequisite]: {long_note}B\npaused [at={now}]: awaiting custody-owner repair\n')
+assert call(loops,'--check-actions').returncode==1,'full evidence identity must survive display truncation'
+# Pending original correlations remain actionable even with another valid wait in the same stream.
+status.write_text(f'blocked [at={now-7200}] [key=pending-reply-0123456789abcdef]: pending-reply-missed: task=held-job pending-reply-id=0123456789abcdef request=original reply not received\n')
+report=publish(); pending=row(report,'held-job:pending-reply-0123456789abcdef'); boundary=drain()
+message.write_text('schema=fm-task-inbox.v1\nat='+iso(now)+'\n--\nopen-loop-row: '+pending['id']+'\n')
+refused=call(loops,'action',pending['id'],'waiting','--evidence','001.msg','--prerequisite-task','repair-owner','--recheck',iso(now+600))
+assert refused.returncode==1 and 'correlated replies' in refused.stdout,refused
+assert ack(boundary).returncode==1 and 'original reply not received' in ok(loops,'--report').stdout
+
+ledger.unlink(); status.write_text(original); repair_status.write_text(working)
+repair.write_text(repair_meta.replace('kind=scout','kind=ship'))
+run_file=home/'run.toon'
+def run_state(state):
+    run_file.write_text(f'run:\n  id: "01WAIT"\n  branch: fm/repair-owner\n  status: {state}\n'
+                        f'  head: "{repair_head}"\n  pr: ""\n  findings: none\n')
+report=publish(); obligation=row(report,'held-job:ci-control'); boundary=drain()
+message.write_text('schema=fm-task-inbox.v1\nat='+iso(now)+'\n--\nopen-loop-row: '+obligation['id']+'\n')
+run_state('awaiting_approval')
+refused=call(loops,'action',obligation['id'],'waiting','--evidence','001.msg',
+             '--prerequisite-task','repair-owner','--recheck',iso(now+600))
+assert refused.returncode==1,refused
+run_state('running')
+action(obligation['id'],'waiting','001.msg','--prerequisite-task','repair-owner','--recheck',iso(now+600))
+assert ack(boundary).returncode==0
+boundary=drain()
+run_state('awaiting_approval')
+assert repair_status.read_text()==working
+refused=ack(boundary)
+assert refused.returncode==1 and obligation['id'] in refused.stdout,refused
+assert obligation['id'] in ok(loops,'--present-overdue').stdout
+
+gerrit='https://gerrit.example/c/test/project/+/140'
+gerrit_meta=repair_meta.replace('kind=scout','kind=ship')+'mode=direct-PR\n'
+forge_calls=home/'gerrit-requests.jsonl'
+executable(fake/'gerrit-axi', '''#!/usr/bin/env python3
+import json, os, sys
+from pathlib import Path
+home=Path(os.environ['FM_HOME'])
+with (home/'gerrit-requests.jsonl').open('a') as log:
+    log.write(json.dumps(sys.argv[1:])+'\\n')
+assert sys.argv[1:]==['show','140','--host','gerrit.example','--json'],sys.argv
+print((home/'gerrit.json').read_text())
+''')
+(home/'gerrit.json').write_text(json.dumps({'ok':True,'changes':[{'change':140,'revision':repair_head}]}))
+for route in ('status-log','full-run','coarse-run'):
+    ledger.unlink()
+    repair.write_text(gerrit_meta)
+    repair_activity('idle')
+    if route=='status-log':
+        run_file.unlink()
+    else:
+        run_state('running')
+        if route=='coarse-run':
+            run_file.write_text(run_file.read_text().replace('branch: fm/repair-owner','branch: fm/another'))
+            (home/'runs.txt').write_text(f'  running  fm/repair-owner {repair_head}  2026-10-15 12:00\n')
+    completed=f'done [at={now}]: PR {gerrit} published for review'+(
+        '; checks green\n' if route!='status-log' else '\n')
+    repair_status.write_text(completed)
+    report=publish(); obligation=row(report,'held-job:ci-control'); boundary=drain()
+    message.write_text('schema=fm-task-inbox.v1\nat='+iso(now)+'\n--\nopen-loop-row: '+obligation['id']+'\n')
+    forge_calls.write_text('')
+    env['FM_CREW_STATE_NO_FORGE']='1'
+    state=ok(code/'bin/fm-crew-state.sh','repair-owner').stdout
+    assert state.startswith('state: blocked '),(route,state)
+    assert forge_calls.read_text()=='',(route,'local completion queried the forge')
+    env.pop('FM_CREW_STATE_NO_FORGE')
+    refused=call(loops,'action',obligation['id'],'waiting','--evidence','001.msg',
+                 '--prerequisite-task','repair-owner','--recheck',iso(now+600))
+    assert refused.returncode==1 and obligation['id'] not in json.loads(ledger.read_text())['handling']['actions'],(route,refused)
+    assert forge_calls.read_text()=='',(route,'receipt admission queried the forge')
+    state=ok(code/'bin/fm-crew-state.sh','repair-owner').stdout
+    assert state.startswith('state: done '),(route,state)
+    assert [json.loads(line) for line in forge_calls.read_text().splitlines()]==[
+        ['show','140','--host','gerrit.example','--json']],route
+    forge_calls.write_text('')
+    repair.write_text(gerrit_meta+'pr='+gerrit+'\n')
+    env['FM_CREW_STATE_NO_FORGE']='1'
+    state=ok(code/'bin/fm-crew-state.sh','repair-owner').stdout
+    assert state.startswith('state: done '),(route,state)
+    assert forge_calls.read_text()=='',(route,'recorded completion queried the forge')
+    env.pop('FM_CREW_STATE_NO_FORGE')
+    repair.write_text(gerrit_meta)
+    repair_status.write_text(working); repair_activity('busy')
+    state=ok(code/'bin/fm-crew-state.sh','repair-owner').stdout
+    expected_source='pane' if route=='status-log' else 'run-step'
+    assert state.startswith(f'state: working · source: {expected_source} ·'),(route,state)
+    action(obligation['id'],'waiting','001.msg','--prerequisite-task','repair-owner','--recheck',iso(now+600))
+    assert ack(boundary).returncode==0,route
+    boundary=drain(); assert ack(boundary).returncode==0,route
+    boundary=drain()
+    repair_status.write_text(completed); repair_activity('idle')
+    queued=(home/'state/.wake-queue').read_bytes()
+    refused=ack(boundary)
+    assert refused.returncode==1 and obligation['id'] in refused.stdout,(route,refused)
+    assert (home/'state/.wake-queue').read_bytes()==queued,route
+    presented=ok(loops,'--present-overdue').stdout
+    assert obligation['id'] in presented and 'STANDING' not in presented,(route,presented)
+    assert forge_calls.read_text()=='',(route,'standing receipt revalidation queried the forge')
+    current=row(json.loads(ledger.read_text()),obligation['subject'])
+    assert current['owner']=='firstmate' and current['overdue'] and not current.get('informational'),current
+    action(obligation['id'],'escalated','published prerequisite requires followup')
+    assert ack(boundary).returncode==0,route
+print('PASS: local-only Gerrit completion keeps unproved prerequisites actionable without forge reads across receipt paths and completion callers')
+
+for producer, consumer in (('main','branch'),('branch','main')):
+    for dependency in ('question','task'):
+        for transition in ('changed','answered','due'):
+            home=world/f'wait-{producer}-{dependency}-{transition}'
+            for name in ('state','data','config','projects'):
+                (home/name).mkdir(parents=True)
+            env.update(FM_HOME=str(home),FM_ROOT_OVERRIDE=str(home),
+                       FM_SUPERVISION_ACTOR=producer,FM_OPEN_LOOPS_NOW=str(now))
+            ledger=home/'state/open-loops.json'
+            (home/'data/backlog.md').write_text('## In flight\n\n## Queued\n\n## Done\n')
+            (home/'state/held-job.meta').write_text('kind=ship\nspawn_gen=s-held\n')
+            target_status=home/'state/held-job.status'
+            target_text=f'blocked [at={now-7200}] [key=obligation]: original obligation\n'
+            dependency_line=f'blocked [at={now-7200}] [key=dependency]: prerequisite answer needed\n'
+            target_status.write_text(target_text+(dependency_line if dependency=='question' else ''))
+            if dependency=='task':
+                (home/'state/repair-owner.meta').write_text(repair_meta)
+                (home/'state/repair-owner.status').write_text(working)
+                ok(code/'bin/fm-busy-event.sh','arm',home/'state','repair-owner')
+            report=publish(); obligation=row(report,'held-job:obligation')
+            boundary=drain()
+            if dependency=='question':
+                prerequisite=row(report,'held-job:dependency')
+                action(prerequisite['id'],'escalated','prerequisite question routed')
+                options=('--prerequisite',prerequisite['id'])
+                evidence='explicit prerequisite question'
+            else:
+                delivery=home/'state/repair-owner.inbox/001.msg'
+                delivery.parent.mkdir()
+                delivery.write_text('schema=fm-task-inbox.v1\nat='+iso(now)+
+                                    '\n--\nopen-loop-row: '+obligation['id']+'\n')
+                options=('--prerequisite-task','repair-owner')
+                evidence='001.msg'
+            action(obligation['id'],'waiting',evidence,*options,'--recheck',iso(now+600))
+            assert ack(boundary).returncode==0
+            if producer=='branch':
+                ok(code/'bin/fm-wake-grant.sh','deactivate',os.getpid(),'wait-turn')
+            env['FM_SUPERVISION_ACTOR']=consumer
+            boundary=drain()
+            if dependency=='question':
+                action(prerequisite['id'],'escalated','prerequisite followup routed')
+            assert call(loops,'--check-actions').returncode==0
+            if transition=='due':
+                env['FM_OPEN_LOOPS_NOW']=str(now+600)
+            elif dependency=='question':
+                event=(f'blocked [at={now}] [key=dependency]: changed prerequisite\n' if transition=='changed'
+                       else f'resolved [at={now}] [key=dependency]: answered\n')
+                target_status.write_text(target_text+dependency_line+event)
+            else:
+                event=(f'working [at={now}]: changed prerequisite scope\n' if transition=='changed'
+                       else f'done [at={now}]: delivered prerequisite\n')
+                (home/'state/repair-owner.status').write_text(event)
+            queued=(home/'state/.wake-queue').read_bytes()
+            refused=ack(boundary)
+            assert refused.returncode==1 and obligation['id'] in refused.stdout,(producer,dependency,transition,refused)
+            assert (home/'state/.wake-queue').read_bytes()==queued
+            action(obligation['id'],'escalated','invalidated dependency followup routed')
+            assert ack(boundary).returncode==0
+            current=row(json.loads(ledger.read_text()),obligation['subject'])
+            assert current['owner']=='firstmate' and current['overdue'] and not current.get('informational'),current
+print('PASS: bound PR/status and Main-owned routed waits survive unchanged presentations; real obligations remain visible; changed, answered, released, unreadable, due and unanswered-reply boundaries reactivate followup')
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"
