@@ -1232,8 +1232,8 @@ class WaitVerifier:
                              if line.split("\t", 1)[0] == source.get("key")), None)
             if decision is None:
                 raise ValueError("prerequisite decision is no longer open")
-            # PR identity is the collector's latest forge observation; the row digest
-            # invalidates it on publication, while this read rechecks the live local key.
+            # PR identity is the collector's latest forge observation; full source
+            # comparisons invalidate a changed head on publication, while this read rechecks the live local key.
             return c.decision_source(task, source["key"], decision, source.get("pr"))
         if kind in ("pr", "commits"):
             current = dict(source, **c.task_source(task))

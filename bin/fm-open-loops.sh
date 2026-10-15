@@ -17,23 +17,16 @@
 # --present-overdue presents every overdue row that still needs an action first and records this actor's action
 # requirements; rows under a standing receipt are listed after them and print nothing when only they remain.
 # An unreadable ledger prints one repair line on stderr and never blocks a drain or acknowledgement.
-# --check-actions exits 1 while a presented overdue row has no subsequent action receipt.
+# --check-actions exits 1 when an overdue action requirement is unmet under the receipt contract below.
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
-# action records follow-up evidence, verified against local records: a new steered inbox record (NNN.msg) sent
-# after the row's presentation, the row's own PR URL with its merge recorded by fm-pr-merge.sh, a captain
-# escalation, or a deferral reason.
-# deferred requires an ISO UTC --recheck time within 24 hours; a second deferral refuses and marks the row captain-visible.
-# waiting explicitly binds only the named open_pr, status question, or unlanded_commit to a prerequisite.
-# --prerequisite selects a distinct same-task question, verified from its current captain hold or exact open status key.
-# --prerequisite-task selects a distinct assigned ship/scout reporting working; its new inbox delivery must include
-# a body line `open-loop-row: ROW_ID`, naming this exact obligation. A pause alone is not an active routed repair.
-# The receipt keeps the real owner and full source/head/evidence identity; it never answers the prerequisite.
-# Both forms require a future --recheck within 24 hours and reverify source evidence on presentation and acknowledgement.
-# An unchanged binding cannot be renewed, and a task delivery cannot be cited twice for this row.
-# Answered/released/changed, unreadable, replaced or due prerequisites restore follow-up immediately.
-# Old rows without collected source identity must be recollected before waiting can be recorded.
-# Captain-owned decisions, original correlated replies, stale rows and review_pass_not_merged cannot be bound waits.
-# Receipts remain in state/open-loops.json across collection; they permit acknowledgement, never resolve work.
+# action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
+# the row's PR URL for merged, or free text for escalated/deferred.
+# deferred and waiting require an ISO UTC --recheck time within 24 hours.
+# waiting selects either --prerequisite QUESTION_ROW_ID (a distinct same-task question) or
+# --prerequisite-task TASK_ID (a distinct assigned ship/scout). For the task form, --evidence names its new
+# inbox delivery (NNN.msg), whose body must include a line `open-loop-row: ROW_ID`.
+# docs/configuration.md#open-work-ledger-configopen-loopsjson owns receipt eligibility, source
+# verification, standing waits, acknowledgement, and invalidation; a receipt never resolves the obligation.
 # Examples: fm-open-loops.sh action ROW_ID steered --evidence 001.msg
 #           fm-open-loops.sh action ROW_ID deferred --evidence 'lint still producing output' --recheck '<future-UTC-time>'
 # --heartbeat also atomically publishes state/open-loops.json. The watcher runs it as a

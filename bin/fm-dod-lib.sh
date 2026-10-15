@@ -37,9 +37,12 @@
 # ref a fetch can see, so a done naming a Gerrit change skips the remote-tracking
 # reachability test entirely: it passes when that change is already the task's
 # recorded pr=, which bin/fm-pr-check.sh writes only after this gate accepted it
-# at arming, and otherwise only when a live read shows the change's current
-# patch set carrying the worker copy's HEAD tree. A published-for-review report
-# whose URL is not a canonical Gerrit change is refused outright. A squash is a new commit on the
+# at arming, and otherwise only when forge reads are enabled and a live read shows
+# the change's current patch set carrying the worker copy's HEAD tree.
+# FM_CREW_STATE_NO_FORGE=1 preserves recorded local proof but refuses an unrecorded
+# Gerrit publication before any live completion query; callers must not treat that
+# refusal as working or completed. Ordinary forge-backed proof is unchanged when unset.
+# A published-for-review report whose URL is not a canonical Gerrit change is refused outright. A squash is a new commit on the
 # server's base, so the tree rather than the commit is what names the published
 # content. In no-mistakes mode that live read is preceded by
 # fm_dod_nm_custody_returned: a copy that publishes before recovering the
@@ -739,15 +742,10 @@ fm_dod_named_head_reachable_outside_worktree() {  # <worktree> <project> <mode> 
   [ "$mode" = local-only ] && fm_dod_ref_contains "$project" refs/heads "$sha"
 }
 
-# 0 when <line> is not a ship done: to gate, when it names the task's recorded
-# PR whose head the forge holds, when it names a Gerrit change whose current
-# patch set carries the worker copy's HEAD tree, or otherwise when its named
-# head - the worker copy's HEAD - is reachable outside that disposable copy. A
-# published-for-review report that names no Gerrit change is refused.
+# Completion eligibility, including local-only reconciliation, is owned by this file's header.
 # There is no free-text SHA scan: a SHA that happens to appear in the note is
-# not the named head. 1 when
-# the claim is refused; stdout then holds a one-line reason and no other
-# output. <state> <id> <meta> supply pr=,
+# not the named head. Returns 0 for an accepted or ungated claim, or 1 when refused;
+# only refusal prints a one-line reason. <state> <id> <meta> supply pr=,
 # pr_head=, and the merge-notified marker; <meta> may be a captured copy
 # (bin/fm-fleet-snapshot.sh), so the marker is read from <state>.
 fm_dod_accept_ship_done() {  # <kind> <mode> <worktree> <project> <line> [<state> <id> <meta>]

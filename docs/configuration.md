@@ -752,20 +752,19 @@ Repeated presentation while an action is missing is idempotent; a subsequent han
 A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
 Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
-A `waiting` receipt is an explicit relationship for one named `open_pr`, status question, or `unlanded_commit`, never a task-wide ownership inference or an answer to its prerequisite.
+A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; it is never a task-wide ownership inference or an answer to its prerequisite.
 The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.
 The collected `source` identifies the physical home/state/data/config scope, task metadata generation, and the exact keyed decision and status stream, captain-hold record, observed PR URL/head, or retained commit head and evidence as applicable.
 A projected secondmate question is bound to its authoritative parent-visible stream and key, not to a captain-hold phrase or a guessed child-home backlog relationship.
 The receipt's `binding` stores that obligation source and either a distinct same-task unanswered-question row with its full dependency identity and digest, or a newly routed distinct ship/scout task with its working-status identity and exact inbox delivery proof.
 The supervisor explicitly identifies which obligation depends on which prerequisite; another question on the same held task does not inherit that relationship.
 The source owner verifies a question against the current canonical local backlog or exact open status key; a routed task must have existing launch-generation metadata, be provably working through `fm-crew-state.sh`'s harness/backend-aware reconciliation, and have a fresh delivery naming the exact obligation.
-A pause alone, an unrelated hold, an unproved assignment, and an unanswered original correlation cannot establish a standing wait.
+A pause alone, an unrelated hold, or an unproved assignment cannot establish a standing wait; an unanswered original correlated reply cannot be either side of that relationship.
 The command syntax and required delivery marker are owned by [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh).
 Every wait has a concrete recheck within 24 hours; its `waits` proof history prevents renewing an unchanged binding, and task-delivery citations cannot be reused for that obligation.
 Presentation and acknowledgement both reverify the bound local sources, including shared waits first presented by the other actor, so an answer, release, changed evidence, replaced task or stream, unavailable source, missing delivery, or due recheck restores the action requirement even before another collector publication.
 Changed observed PR heads and published obligation evidence also invalidate the wait; receipt commands make no new forge call, so remote changes become known through the normal collector refresh.
-Routed-task reconciliation selects `FM_CREW_STATE_NO_FORGE=1`, including the shared ship-completion proof used by status-log and run-monitoring paths: recorded local proof remains usable, but an unrecorded Gerrit publication requiring a live patch-set query stays blocked and cannot sustain a wait.
-Outside that local-only mode, ordinary forge-backed completion verification is unchanged.
+Routed-task reconciliation selects `FM_CREW_STATE_NO_FORGE=1`; [`bin/fm-dod-lib.sh`](../bin/fm-dod-lib.sh) owns the shared completion-proof boundary, so a prerequisite requiring unavailable forge proof stays non-working and cannot sustain a wait.
 Waits on another waiting row are refused, preventing circular receipt cover, and the prerequisite's own independent action requirement remains intact.
 Rows collected before source identities existed require a normal refresh before a wait can be recorded; no live receipt migration or ownership rewrite is implied.
 If wait provenance cannot be read, an independently confirmed question, PR, or unlanded commit remains an obligation under the normal age limits without usable wait provenance; collection discloses the failed source and continues with later streams.
