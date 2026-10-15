@@ -1,0 +1,8 @@
+== base fm-pending-reply-lib.sh
+shellcheck -x -P $d $d/$f > /dev/null  13.17s user 0.41s system 95% cpu 14.222 total
+== cand fm-pending-reply-lib.sh
+shellcheck -x -P $d $d/$f > /dev/null  12.57s user 0.40s system 96% cpu 13.502 total
+== base fm-classify-lib.sh
+shellcheck -x -P $d $d/$f > /dev/null  3.82s user 0.14s system 96% cpu 4.093 total
+== cand fm-classify-lib.sh
+shellcheck -x -P $d $d/$f > /dev/null  2.60s user 0.11s system 96% cpu 2.800 total

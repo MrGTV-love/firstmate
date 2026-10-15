@@ -1,0 +1,12 @@
+== bin/fm-classify-lib.sh
+shellcheck -x -P bin "$f"  2.55s user 0.09s system 88% cpu 2.974 total
+exit=0
+== bin/fm-status-wake-lib.sh
+shellcheck -x -P bin "$f"  1.56s user 0.05s system 91% cpu 1.745 total
+exit=0
+== bin/fm-pending-reply-lib.sh
+shellcheck -x -P bin "$f"  12.13s user 0.32s system 92% cpu 13.530 total
+exit=0
+== bin/fm-watch.sh
+shellcheck -x -P bin "$f"  35.10s user 1.57s system 93% cpu 39.185 total
+exit=0

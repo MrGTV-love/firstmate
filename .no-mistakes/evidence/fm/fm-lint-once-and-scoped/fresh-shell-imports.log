@@ -1,0 +1,18 @@
+== fm-classify-lib
+has _fm_status_file_size
+has _fm_decision_key
+has _fm_open_decisions_file_ident
+has _fm_decision_fold_line
+dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4YPJ15P21QE0CA6QT7QM71K/bin
+== fm-status-wake-lib
+has _fm_status_file_size
+has _fm_decision_key
+has _fm_open_decisions_file_ident
+has _fm_decision_fold_line
+dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4YPJ15P21QE0CA6QT7QM71K/bin
+== fm-pending-reply-lib
+has _fm_status_file_size
+has _fm_decision_key
+has _fm_open_decisions_file_ident
+has _fm_decision_fold_line
+dir=/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4YPJ15P21QE0CA6QT7QM71K/bin
