@@ -2007,17 +2007,32 @@ The primary home's wake already reaches the captain, so a secondmate never dupli
 
 ## Jev guard
 
-Claude and omp ship and scout workers run the unchanged level 6 jev-guard from disler's ten-levels-of-jev under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md), with Firstmate-specific reporting and adapters.
-[`SOURCE.md`](../bin/ten-levels/SOURCE.md) there owns the upstream commit, the license, and every Firstmate change with its reason.
-`fm-spawn.sh` installs it at launch: omp loads it through the generated worker extension, and Claude runs it through `bin/fm-jev-guard-hook.sh` on `PreToolUse` for `Bash`, `Write` and `Edit` and on `PostToolUse` for `Bash` and `Read`.
-Existing sessions need a normal authorized relaunch to load it.
-Primary and secondmate sessions and other harnesses do not run it.
+Current protection claim: **no protection** until the rebuild is landed and actual deployed validation supports a host-specific claim.
+Claude result handling remains advisory-only/**no protection**, not quarantine.
+The guard supplements, never replaces, deterministic permissions, path checks or required approvals.
 
-The guard asks Jev three things, exactly as upstream does:
+[`bin/fm-jev-guard.ts`](../bin/fm-jev-guard.ts) owns worker event handling and uses the shared Jev core under [`bin/ten-levels/`](../bin/ten-levels/SOURCE.md).
+[`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
+`fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `UserPromptSubmit`, `PreToolUse` on `Bash|Write|Edit` and `PostToolUse` on `Bash|Read`.
+Primary and secondmate sessions and other harnesses do not run this guard.
+Existing sessions require an authorized normal relaunch to load changed code; isolated verification is not production activation.
 
-- Before a shell command runs, what it does to the machine and whether it aims to destroy something; an irreversible or destructive judgment meeting the [upstream thresholds](../bin/ten-levels/src/levels/level06/bash-gate.ts) blocks the command.
-- Before a write or edit, a path outside the allowed roots blocks without a Jev call; inside them, Jev judges whether the content holds a real credential or the target is a secrets file, blocking at the [upstream thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
-- After a shell command or file read, whether the output holds instructions aimed at the agent; flagged output reaches the agent with a warning banner.
+Questions and numeric policy are code-owned:
+
+- Shell screening keeps the independent effect Choice and destructive-intent Noul and their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/bash-gate.ts).
+- Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
+- Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
+
+`supervisorReadAdmission` is the single isolated Firstmate-channel consistency check.
+It preserves a launch-record or numeric steering-inbox result only when the host's native user-prompt delivery named that exact file and record name/sequence, and the returned full bytes match the existing publisher's write-time digest.
+The existing [launch publisher](../bin/fm-operational-input.sh) owns the consistency-receipt format, reused by the [numeric inbox publisher](../bin/fm-task-inbox-lib.sh); neither the reader nor a tool-result authority claim creates a receipt.
+omp captures native `before_agent_start` prompts in memory; Claude captures native `UserPromptSubmit` and persists only exact path/doorbell binding hashes in task/session-local context for its separate hook processes.
+Tool results never contribute native delivery bindings, and a marker, path prefix or receipt alone grants no exception.
+The check compares the returned text bytes, not a fresh disk reread substituted for what the host delivered; omp full-file `:raw` reads preserve byte framing that ordinary/ranged rendering can change.
+Missing or mismatched delivery, copied claimed-authority instructions, changed bytes, mixed/partial content and symlink aliases receive ordinary untrusted-result screening.
+Consistent instructions bypass model/privacy/credential outages; an audit failure adds an explicit review notice outside those original instructions rather than erasing them.
+This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
+Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
 
 The allowed write roots are the task worktree, the task's `data/<task>` directory in the owning home, and the system temporary directory.
 The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
@@ -2037,32 +2052,53 @@ Admitted devices skip Jev and file-root selection because their payloads are nat
 This is bounded trusted local-tool access, not a confinement claim: an LSP server can still send an unsolicited `workspace/applyEdit` that omp applies without Jev judgment, and a job disappearing between snapshot validation and native proc dispatch leaves a race with a same-name project service.
 `xd://report_issue` remains blocked because it can upload reports; all other xd devices and schemes, including `agent`, `cfg`, `conflict`, `local`, `ssh`, and `vault`, remain blocked with the existing plain-path reason.
 Device `edit` calls remain blocked, and every path-spelling refusal tells the agent to use a plain path and report if that is not possible.
-omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the unchanged upstream write gate.
+omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
 A block tells the agent the block is final and to report it rather than work around it.
-On Claude the banner arrives as added context next to the unchanged output, because Claude hooks cannot replace a built-in tool's output.
+On Claude, review notices arrive as added context next to the unchanged output.
+The current [Claude hook reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) documents `updatedToolOutput` for built-in tools; this integration intentionally does not use that capability without installed-host verification.
+Advisory context is not evidence that Claude was prevented from seeing or acting on the original output.
 
 The captain data-egress decision 2026-10-08 authorizes Jev guard requests only for the `firstmate` project.
 `fm-spawn.sh` determines the project once by comparing physical roots: `firstmate` when the project root equals the Firstmate code root, otherwise the project directory's basename.
 Every other project, including Vernant, and every missing, empty or unresolvable project scope sends nothing to a model provider.
-This authorization check runs once at the shared `decide` preflight before resolving a credential.
-The same decision governs omp's native model routes: only a `firstmate`-project omp worker receives the native TypeSafe judge credential and `find.enabled=on`, while every other worker keeps the direct-only judge role with no credential and `find.enabled=off`, so its native find, thinking and stop judgments send nothing to TypeSafe or OpenRouter; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that launch contract.
-For `firstmate` only, shell screening sends the command and working directory, write screening sends the path and first 4,000 characters of content, and result screening sends the tool name and first 6,000 characters of output.
-It calls only TypeSafe direct, resolving the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its client is first constructed; no key enters the worker environment, configuration, files or command arguments.
-The client snapshots its key: omp reuses it for the session, while Claude constructs it in each hook process; a decision with no key constructs no client, so the next decision looks the key up again.
-An unavailable or failed TypeSafe call never falls back to OpenRouter, even when an OpenRouter key exists.
-A tool state matching the [never-send list](#typed-dispatch-resolution-env-typesafe_api_key), or an invalid or unreadable policy, is withheld from TypeSafe.
-The client has a 10-second total request budget including upstream retries and response bodies, and each complete handler has a shared 25-second cancellation budget.
-omp's native tool-call deadline and both Claude hook timeouts are 30 seconds; omp result screening relies on the shared 25-second handler budget rather than `extensionHandlers.toolCallTimeoutMs`.
-A withheld request, missing keys, exhausted budget or any other inference failure lets the tool call proceed, as upstream does, while writes outside the allowed roots, unsupported path spellings and unsupported edit schemas still block without a Jev call.
-The guard supplements, never replaces, existing deterministic protections or required approvals.
-An omp worker launched with `--omp-no-helpers` withholds every guard judgment before credential lookup, using the same no-key behavior while retaining the deterministic path and edit-schema blocks.
-[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that opt-in switch's session scope, other helper restrictions and relaunch behavior; it does not change an already running worker.
-The owning home's private `state/jev-guard.jsonl` receives one line per reported `jev`, `hook` or `error` event, selecting answers, usage, model, answering provider, latency and hook outcome without commands, paths, request bodies, reasons, banners or error messages.
-Ledger writes are best-effort and do not gate execution; early adapter rejections for unsupported paths or edit schemas return before upstream reporting.
-omp session entries retain the full upstream report payload, including request-derived state; the Claude adapter supplies no session-entry writer.
-[`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) is the portable regression, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) holds the live host evidence.
+The shared [guard service](../bin/ten-levels/extensions/report.ts) checks scope and the complete serialized request before resolving a credential or calling the provider.
+The same project decision governs omp's native model routes; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that separate launch contract.
+For authorized screening, shell state contains the command and working directory, write state contains the path and complete replacement content, and result state contains the tool name, `source_role: tool_result` and complete text output.
+These fields can contain worker prompt or instruction text, so guard calls can send that text to TypeSafe; the guard does not intentionally send the whole conversation or system prompt.
+The entire static request, including pinned model and questions, must fit the code-owned UTF-8 byte ceiling.
+Oversize requests require review rather than screening a prefix as if it were the full input.
+The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
+
+The service uses the canonical shared Jev client, pinned to the calibrated model, with TypeSafe direct only and no provider fallback.
+It resolves the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its installation's client is first constructed; no key is exported to the worker environment or placed in configuration, new credential files or command arguments.
+omp reuses that client and key for the installation, while Claude constructs one per hook process; missing credentials do not create a successful client snapshot.
+The client retains its existing retry behavior and has a 10-second total request budget, including retries and response bodies.
+Both event handlers have a shared 25-second cancellation budget; the documented native tool-call and Claude hook deadlines remain 30 seconds.
+
+`REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
+While active, required pre-tool judgments that fail, exceed the request bound, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
+On omp, flagged, ambiguous or unavailable result judgments replace the untrusted content and details with a review notice and an error result before the receiving model sees the result.
+Non-text results that cannot be assessed also require review rather than an unexamined pass.
+Claude receives only the explicit advisory notice, not a quarantine claim.
+Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop pre-tool execution with a stable error type; post-tool feedback cannot undo the tool's effects.
+The command wrapper publishes only successful handler stdout, normalizes active nonzero runtime exits to exit 2, and emits `RuntimeExecutionError` with the observed numeric exit status instead of raw failure output.
+Inactive project scope remains nonblocking when the runtime fails, and successful deterministic refusal or advisory output keeps its existing hook semantics.
+
+Other or absent project scopes and an omp worker's `--omp-no-helpers` posture are intentionally inactive/**no protection**, not inference outages.
+They perform no guard key lookup or provider request and retain deterministic path, root, native-device and edit-schema checks.
+[`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns the no-helper switch's session scope and relaunch behavior; it does not change an already running worker.
+
+Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
+The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, numeric thresholds, named outage/enforcement branch, allowlisted answer fields, usage, models, latency, attempts and cost certainty.
+Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
+A generic provider `Error` stays visible without inventing an HTTP category by parsing its message.
+Reported, estimated, unknown and not-called costs are distinct; unknown charges are not zero.
+Commands, paths, state, questions, raw exchanges, provider extension fields and exception messages are excluded; the guard no longer adds raw session report entries.
+An active durable-record failure requires review with `AuditUnavailableError`; if judgment also failed, its stable error type remains visible in the notice.
+Intentionally inactive scope does not become active merely because its optional record cannot be written.
+[`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, calibration limitations and deployed acceptance.
 
 ## Jev belay Stop hook
 

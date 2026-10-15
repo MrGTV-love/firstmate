@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # fm-task-inbox-lib.sh - the per-task steering inbox: durable records plus a
-# constant doorbell.
+# bounded record-specific doorbell.
 #
 # ONE owner of the steering-inbox contract: the record format, sequence
 # allocation, the idempotent re-enqueue dedup, the handled/ acknowledgement,
@@ -13,8 +13,8 @@
 #
 # Design (captain-adopted, data/fm-send-reliability-reframe-s1/report.md): the
 # payload moves to the filesystem, which is reliable; the terminal carries only
-# a short constant doorbell line. While the endpoint remains available, that
-# line does not need to be reliable because ringing it again is free. A
+# a short doorbell naming the inbox and exact record, never its payload. While
+# the endpoint remains available, ringing that same record again is free. A
 # duplicated doorbell is a no-op by construction (the worker finds the inbox
 # empty or already handled), and a swallowed doorbell is detected by the
 # absence of the worker's acknowledgement and re-rung on a bounded schedule.
@@ -24,6 +24,8 @@
 #
 # Layout under <state-dir>:
 #   <task>.inbox/NNN.msg       one durable steer, numeric sequence, atomic rename
+#   <task>.inbox/NNN.msg.consistency.json
+#                              write-time receipt; fm-operational-input.sh owns its format
 #   <task>.inbox/handled/      the worker's `mv` here IS the acknowledgement
 #   <task>.inbox/.seq.lock     serializes sequence allocation across writers
 #                              (the session and the away daemon)
@@ -100,6 +102,8 @@ _FM_TASK_INBOX_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$_FM_TASK_INBOX_LIB_DIR/fm-wake-lib.sh"
 # shellcheck source=/dev/null
 . "$_FM_TASK_INBOX_LIB_DIR/fm-backend.sh"
+# shellcheck source=/dev/null
+. "$_FM_TASK_INBOX_LIB_DIR/fm-operational-input.sh"
 
 FM_TASK_INBOX_SCHEMA='fm-task-inbox.v1'
 FM_TASK_INBOX_GRACE_DEFAULT=90
@@ -202,7 +206,7 @@ fm_task_inbox_lock_acquire() {  # <lock-path>
 # Write one record into the next sequence slot: temp-write, then atomic
 # rename. Prints the record path. Caller must hold .seq.lock.
 _fm_task_inbox_write_record_locked() {  # <inbox-dir> <text> [delivery-mode]
-  local dir=$1 text=$2 delivery_mode=${3:-} seq tmp rec status=0
+  local dir=$1 text=$2 delivery_mode=${3:-} seq tmp rec line task status=0
   seq=$(fm_task_inbox_next_seq "$dir")
   rec="$dir/$seq.msg"
   tmp=$(mktemp "$dir/.staging.XXXXXX") || return 1
@@ -212,8 +216,18 @@ _fm_task_inbox_write_record_locked() {  # <inbox-dir> <text> [delivery-mode]
     [ "$delivery_mode" != fire-and-forget ] || printf 'delivery=fire-and-forget\n'
     printf -- '--\n'
     printf '%s' "$text"
-  } > "$tmp" && mv "$tmp" "$rec" || status=1
-  [ "$status" -eq 0 ] || { rm -f "$tmp"; return 1; }
+  } > "$tmp" || status=1
+  task=${dir##*/}
+  task=${task%.inbox}
+  # An unrenderable inbox name still retains the durable steer for recovery;
+  # it cannot produce a host doorbell or gain the guard's consistency exception.
+  if [ "$status" -eq 0 ] && line=$(fm_task_inbox_doorbell_line "$rec"); then
+    fm_operational_consistency_write "$tmp" "$rec" steering-inbox "$task" "$line" || status=1
+  fi
+  if [ "$status" -ne 0 ] || ! mv "$tmp" "$rec"; then
+    rm -f "$tmp" "$rec.consistency.json"
+    return 1
+  fi
   printf '%s' "$rec"
 }
 
@@ -308,7 +322,8 @@ fm_task_inbox_body() {  # <record-path>
   return 1
 }
 
-# The constant self-describing doorbell line for the inbox containing a record.
+# The self-describing doorbell names one exact record while retaining ordered
+# drain-all instructions. Its omp hint selects full-byte, unrendered reads.
 # It names the inbox by the literal "$FM_TASK_INBOX", which bin/fm-spawn.sh
 # exports into every launch as the inbox's absolute path, so the worker can
 # resolve it from its own environment even after losing its brief context.
@@ -323,7 +338,8 @@ fm_task_inbox_body() {  # <record-path>
 # non-printable inbox name fails without output so terminal controls never
 # reach the pane's line discipline.
 fm_task_inbox_doorbell_line() {  # <record-path>
-  local dir=${1%/*} abs name quoted LC_ALL=C
+  local dir=${1%/*} abs name quoted record=${1##*/} LC_ALL=C
+  fm_task_inbox_seq_of "$record" >/dev/null || return 1
   abs=$(cd "$dir" 2>/dev/null && pwd) || abs=$dir
   abs=${abs%/handled}
   name=${abs##*/}
@@ -331,8 +347,8 @@ fm_task_inbox_doorbell_line() {  # <record-path>
     ''|*[![:print:]]*) return 1 ;;
   esac
   quoted=$(printf '%s' "$name" | sed "s/'/'\\\\''/g")
-  printf ": Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your '%s' steering inbox, read and act on each in numeric order, then mv each into its handled/." \
-    "$quoted"
+  printf ": Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your '%s' steering inbox, record '%s' - omp full-file read: append :raw - read and act on each in numeric order, then mv each into its handled/." \
+    "$quoted" "$record"
 }
 
 # Ring the doorbell, best-effort: one endpoint-liveness pre-check, one advisory

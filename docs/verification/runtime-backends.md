@@ -616,7 +616,8 @@ FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=563483
 
 The current behavior and privacy boundary are owned by [Jev guard](../configuration.md#jev-guard).
 Recorded native-hook observations from 2026-10-07 used Claude Code 2.1.293 and omp 18.8.1, with the guard vendored from ten-levels-of-jev commit `777adaf4`.
-They predate the firstmate-only egress boundary and later adapter restrictions; they do not establish current launch-time activation or project authorization.
+They predate the firstmate-only egress boundary and later adapter restrictions; they do not establish current launch-time activation, project authorization, replacement, outage policy or supervisor-source admission.
+In particular, observing a banner does not prove that untrusted output was withheld.
 
 Each host ran one real session in a scratch git project whose guard pointed at a loopback fake TypeSafe endpoint (`FM_TEST_SEAM=1` with `FM_JEV_GUARD_BASE_URL`) answering risky for `rm -rf` and injection text.
 Claude loaded the hooks from `.claude/settings.local.json` and ran `claude -p --permission-mode bypassPermissions --model sonnet`.
@@ -644,9 +645,46 @@ The installer changed `PI_DISABLE_LSPMUX` from an inherited `0` to process-local
 The service and remaining task-private compiler children were stopped after the proof; no other process was stopped.
 These guard-only observations establish native device transport and the bounded exception behavior, not current spawn activation, firstmate-scoped provider authorization, arbitrary LSP-server confinement, or freedom from the documented snapshot-to-dispatch race.
 
-[`tests/fm-jev-guard.test.sh`](../../tests/fm-jev-guard.test.sh) covers the current adapters, authorization and failure boundaries offline, not live host activation.
-A current live refresh must launch fresh Claude and omp workers through `fm-spawn.sh` in an authorized disposable lab with an isolated backend, exercise firstmate-scoped allow, block and banner paths, and verify that non-firstmate scopes reach neither provider.
-Repeat the live refresh after a Claude Code or omp upgrade; the scratch-project sessions above alone cannot refresh the current egress or spawn guarantees.
+### Current offline policy verification
+
+Verified on 2026-10-15 UTC with Node.js 26.11.1 and Bun 1.3.14:
+
+```sh
+bash tests/fm-jev-guard.test.sh
+```
+
+Observed output:
+
+```text
+ok - pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values
+ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence
+ok - Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node
+ok - separate Claude native hooks preserve only session-delivered exact bytes and screen foreign-session/changed content
+ok - actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - actual stalled requests produce typed pre-tool denial and result replacement before the documented host deadline
+ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
+```
+
+These are controlled HTTP-fixture policy and executable-adapter results, not live model accuracy, native Claude replacement or deployed protection.
+The source exception is the [operator contract's Firstmate-channel consistency check](../configuration.md#jev-guard), with the role-file receipt trust limit, not producer authentication; a same-user process deliberately forging the recorded digest can pass.
+On 2026-10-15 UTC, actual omp 18.10.4 with a scripted provider and in-process Jev fixtures preserved publisher-produced launch/inbox reads, screened an ordinary-file claimed-authority copy and post-publication changed bytes, and preserved consistent instructions during privacy/credential/provider/audit outages.
+Its native `:raw` reads retained full byte framing, and the audit-unavailable notice reached the next model context outside the original result; there were two fixture HTTP calls and zero live Jev or model calls.
+Actual Claude Code 2.1.300 then exercised native `UserPromptSubmit` and two built-in `Read` hooks on publisher-produced synthetic launch/inbox records, retaining exact returned bytes with no TypeSafe key or Jev request.
+That bounded native development session proves source delivery, not Claude output quarantine, model accuracy or deployed activation.
+The portable command above refreshes the publisher/adapter comparisons; the private native fixture commands and exact evidence remain with the implementation report.
+The current protection claim remains **no protection**.
+Synthetic calibration fixtures do not authenticate real publisher identity, and source-fixture preservation cannot be counted as a successful live classification.
+The injection calibration does not validate shell/write judgment accuracy, large-output semantics, unrelated providers or other model versions.
+
+Current native deployment acceptance must exercise fresh Claude and omp workers through authorized isolated launch, including firstmate-only egress, inactive scopes, pre-tool refusal, omp result replacement, Claude advisory limits, provider/privacy/audit outages and the approved supervisor-read source positives and negatives.
+Repeat native validation after a Claude Code or omp upgrade; the historical scratch sessions and portable fixture suite alone cannot refresh those guarantees.
+Exact task-private native fixtures and delivery evidence remain with the private report or PR evidence rather than being treated as deployment or publisher-authentication proof.
 
 ## Claude primary feedback
 

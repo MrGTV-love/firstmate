@@ -1,32 +1,74 @@
-/**
- * The side channel every agent level extension reports on.
- *
- * Firstmate copy of upstream apps/ten-levels/extensions/report.ts; ../SOURCE.md lists every change.
- * Firstmate reporting boundaries, ledger availability and session-entry retention are owned by
- * docs/configuration.md "Jev guard". The payload contains request-derived text; report must
- * not spread it into the metadata ledger.
- *
- * `decide` is the one way an extension calls Jev: it validates, calls, reports, and returns.
- * `extra` must not use the keys the report already sets: source, state, questions, answers, usage, model, ms.
- */
+/** Firstmate's bounded Jev service and minimized audit owner; see docs/configuration.md. */
 import { AsyncLocalStorage } from "node:async_hooks";
+import { Buffer } from "node:buffer";
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { JevClient } from "../src/core/client.ts";
-import { validateQuestions, type Answer, type Questions, type State } from "../src/core/types.ts";
+import { ContractError, JevClient, type SystemOneResult } from "../src/core/client.ts";
+import { QuestionValidationError, validateRequest, type Questions, type State } from "../src/core/types.ts";
+import { BASH_THRESHOLDS, SCREEN_THRESHOLDS, WRITE_THRESHOLDS } from "../src/levels/level06/index.ts";
 
-const bin = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const lib = resolve(bin, "fm-typesafe-lib.sh");
-let home = resolve(bin, "..");
-let config = resolve(home, "config");
-let ledger: string | undefined;
-let task = "";
-let project: string | undefined;
-let noHelpers = false;
-
+export const GUARD_POLICY_VERSION = "FIRSTMATE_JEV_GUARD_V1";
+export const OUTAGE_POLICY = "REVIEW_ON_UNAVAILABLE_V1";
+export const GUARD_MODEL = "jev-1.13.0";
+export const MAX_REQUEST_BYTES = 16_384;
+const lib = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-typesafe-lib.sh");
 const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
+
+export type GuardFailureType = "ContractError" | "QuestionValidationError" | "TimeoutError" | "AbortError"
+  | "TypeError" | "Error" | "PrivacyWithheldError" | "CredentialUnavailableError" | "RequestTooLargeError"
+  | "AuditUnavailableError" | "InvalidToolInputError" | "UnsupportedToolResultError"
+  | "InactiveGuardError";
+
+export class GuardUnavailableError extends Error {
+  readonly errorType: GuardFailureType;
+  readonly requestStarted: boolean;
+  constructor(errorType: GuardFailureType, requestStarted = false, cause?: unknown) {
+    super("Jev guard requires review.", { cause });
+    this.name = errorType;
+    this.errorType = errorType;
+    this.requestStarted = requestStarted;
+  }
+}
+
+/** Preserve known original types without copying exception text or arbitrary exception names. */
+export function failureType(error: unknown): GuardFailureType {
+  if (error instanceof GuardUnavailableError) return error.errorType;
+  if (error instanceof ContractError) return "ContractError";
+  if (error instanceof QuestionValidationError) return "QuestionValidationError";
+  if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) return error.name;
+  return error instanceof TypeError ? "TypeError" : "Error";
+}
+
+export interface GuardServiceContext {
+  home: string;
+  config: string;
+  state: string;
+  task: string;
+  project?: string;
+  noHelpers?: boolean;
+  host?: "omp" | "claude";
+}
+
+export interface GuardTerminal {
+  hook: "tool_call" | "tool_result";
+  tool: "bash" | "read" | "write" | "edit";
+  decision: "allow" | "block" | "clear" | "flag" | "review" | "inactive";
+  enforcement: "pretool_allow" | "pretool_deny" | "result_pass" | "omp_replace"
+    | "claude_advisory_only" | "inactive_no_protection";
+  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency";
+  error_type: GuardFailureType | null;
+  request_started: boolean;
+  result?: SystemOneResult;
+}
+
+export interface GuardService {
+  readonly active: boolean;
+  readonly host: "omp" | "claude";
+  decide(state: State, questions: Questions): Promise<SystemOneResult>;
+  record(terminal: GuardTerminal): void;
+}
 
 export async function withDecisionBudget<T>(run: () => Promise<T>): Promise<T> {
   const controller = new AbortController();
@@ -46,76 +88,85 @@ function preflightTimeout(): number {
   return remaining;
 }
 
-/** Firstmate: the owning home, its config and state directories, and the task this session runs. */
-export function configure(c: { home: string; config: string; state: string; task: string; project?: string; noHelpers?: boolean }): void {
-  home = c.home;
-  config = c.config;
-  ledger = resolve(c.state, "jev-guard.jsonl");
-  task = c.task;
-  project = c.project;
-  noHelpers = c.noHelpers === true;
-}
+/** Each installation owns one canonical client; no credential enters its environment or argv. */
+export function createGuardService(context: GuardServiceContext): GuardService {
+  const active = context.noHelpers !== true && context.project === "firstmate";
+  let client: JevClient | undefined;
+  const ledger = resolve(context.state, "jev-guard.jsonl");
 
-/** Firstmate: the single primary-home key, resolved at call time and never placed in the environment. */
-function typesafeKey(): string {
-  return execFileSync("bash", ["-c", '. "$1"; fm_typesafe_key "$2" && printf %s "$TYPESAFE_API_KEY_PRIVATE"', "jev-guard", lib, home], {
-    encoding: "utf8",
-    stdio: ["ignore", "pipe", "ignore"],
-    timeout: preflightTimeout(),
-  });
-}
-
-/** Firstmate: the existing config/dispatch-never-send policy decides what may leave the machine. */
-function permitted(state: State): void {
-  if (noHelpers) throw new Error("Model-assisted tools are disabled for this worker.");
-  if (project !== "firstmate") throw new Error("Jev guard data egress is authorized only for the firstmate project.");
-  execFileSync("bash", ["-c", '. "$1"; s=$(mktemp) || exit 1; fm_typesafe_permitted "$(cat)" "$2" "$s"; rc=$?; rm -f "$s"; exit "$rc"', "jev-guard", lib, resolve(config, "dispatch-never-send")], {
-    input: JSON.stringify(state),
-    stdio: ["pipe", "ignore", "ignore"],
-    timeout: preflightTimeout(),
-  });
-}
-
-const seam = (name: string) => process.env.FM_TEST_SEAM === "1" ? process.env[name] || undefined : undefined;
-let client: JevClient | undefined;
-export const jev = () => (client ??= new JevClient({ provider: "typesafe", apiKey: typesafeKey(), baseUrl: seam("FM_JEV_GUARD_BASE_URL"), timeoutMs: 10_000 }));
-
-/** The level config the lab passed in, JEV_LEVEL_CONFIG as JSON. */
-export function levelConfig<T extends object>(fallback: T): T {
-  try {
-    const raw = process.env.JEV_LEVEL_CONFIG;
-    return raw ? { ...fallback, ...(JSON.parse(raw) as Partial<T>) } : fallback;
-  } catch {
-    return fallback;
+  function permitted(requestText: string): void {
+    const timeout = preflightTimeout();
+    try {
+      execFileSync("bash", ["-c", '. "$1"; s=$(mktemp) || exit 1; fm_typesafe_permitted "$(cat)" "$2" "$s"; rc=$?; rm -f "$s"; exit "$rc"',
+        "jev-guard", lib, resolve(context.config, "dispatch-never-send")], {
+        input: requestText, stdio: ["pipe", "ignore", "ignore"], timeout,
+      });
+    } catch (cause) {
+      throw new GuardUnavailableError("PrivacyWithheldError", false, cause);
+    }
   }
-}
 
-export function report(pi: any, kind: string, payload: Record<string, unknown>): void {
-  const { source, hook, tool, block, flag, noul, answers, model, provider, ms } = payload;
-  const usage = payload.usage as Decision["usage"] | undefined;
-  const body = { kind, at: Date.now(), task, source, hook, tool, block, flag, noul, answers, model, provider, ms,
-    usage: usage && { input_tokens: usage.input_tokens, output_tokens: usage.output_tokens, cost: usage.cost } };
-  try { if (ledger) appendFileSync(ledger, JSON.stringify(body) + "\n", { mode: 0o600 }); } catch { /* the ledger is optional */ }
-  try { pi.appendEntry?.(`jev-${kind}`, payload); } catch { /* entries are optional */ }
-}
+  function typesafeKey(): string {
+    const timeout = preflightTimeout();
+    try {
+      return execFileSync("bash", ["-c", '. "$1"; fm_typesafe_key "$2" && printf %s "$TYPESAFE_API_KEY_PRIVATE"', "jev-guard", lib, context.home], {
+        encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout,
+      });
+    } catch (cause) {
+      throw new GuardUnavailableError("CredentialUnavailableError", false, cause);
+    }
+  }
 
-export interface Decision {
-  answers: Record<string, Answer>;
-  usage: { input_tokens: number; output_tokens: number; cost?: number };
-  model: string;
-  ms: number;
-}
-
-/**
- * One Jev call from inside the harness. `source` names who asked, a hook or a tool.
- * Reporting and retention follow docs/configuration.md "Jev guard", not the upstream lab stream.
- */
-export async function decide(pi: any, source: string, state: State, questions: Questions, extra: Record<string, unknown> = {}): Promise<Decision> {
-  validateQuestions(questions);
-  permitted(state);
-  const started = performance.now();
-  const result = await jev().systemOne(state, questions, { signal: budgets.getStore()?.signal });
-  const out: Decision = { answers: result.answers, usage: result.usage, model: result.model, ms: Math.round(performance.now() - started) };
-  report(pi, "jev", { source, state, questions, answers: out.answers, usage: out.usage, model: out.model, ms: out.ms, provider: result.meta.provider, ...extra });
-  return out;
+  return {
+    active,
+    host: context.host ?? "omp",
+    async decide(state, questions) {
+      let requestStarted = false;
+      try {
+        if (!active) throw new GuardUnavailableError("InactiveGuardError");
+        const body = { model: GUARD_MODEL, state, questions };
+        validateRequest(body);
+        const requestText = JSON.stringify(body);
+        if (Buffer.byteLength(requestText, "utf8") > MAX_REQUEST_BYTES) throw new GuardUnavailableError("RequestTooLargeError");
+        const snapshot: unknown = JSON.parse(requestText);
+        validateRequest(snapshot);
+        permitted(requestText);
+        client ??= new JevClient({ provider: "typesafe", apiKey: typesafeKey(), model: GUARD_MODEL, timeoutMs: 10_000,
+          baseUrl: process.env.FM_TEST_SEAM === "1" ? process.env.FM_JEV_GUARD_BASE_URL || undefined : undefined });
+        requestStarted = true;
+        return await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
+      } catch (cause) {
+        if (cause instanceof GuardUnavailableError) throw cause;
+        throw new GuardUnavailableError(failureType(cause), requestStarted, cause);
+      }
+    },
+    record(terminal) {
+      const result = terminal.result;
+      // Question IDs and answer fields are allowlisted; provider extensions can contain input text.
+      const answers: Record<string, { type: "noul"; noul: number } | { type: "choice"; choice: string; confidence: number }> = {};
+      if (result) {
+        for (const key of ["effect", "destructive_intent", "kind", "contains_secret", "injection"]) {
+          const answer = result.answers[key];
+          if (answer?.type === "noul") answers[key] = { type: "noul", noul: answer.noul };
+          else if (answer?.type === "choice") answers[key] = { type: "choice", choice: answer.choice, confidence: answer.confidence };
+        }
+      }
+      const row = {
+        kind: "terminal", at: Date.now(), task: context.task, policy_version: GUARD_POLICY_VERSION, outage_policy: OUTAGE_POLICY,
+        thresholds: { bash: BASH_THRESHOLDS, write: WRITE_THRESHOLDS, injection: SCREEN_THRESHOLDS },
+        hook: terminal.hook, tool: terminal.tool, decision: terminal.decision, enforcement: terminal.enforcement, branch: terminal.branch,
+        error_type: terminal.error_type, request_started: terminal.request_started,
+        provider: result?.meta.provider ?? (terminal.request_started ? "typesafe" : null),
+        requested_model: terminal.request_started ? GUARD_MODEL : null, model: result?.model ?? null,
+        attempts: result?.meta.attempts ?? null, ms: result?.meta.elapsedMs ?? null,
+        usage: result ? { input_tokens: result.usage.input_tokens, output_tokens: result.usage.output_tokens } : null,
+        cost: result?.meta.cost ?? { amount: null, source: terminal.request_started ? "unknown" : "not_called" }, answers,
+      };
+      try {
+        appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });
+      } catch (cause) {
+        throw new GuardUnavailableError("AuditUnavailableError", terminal.request_started, cause);
+      }
+    },
+  };
 }
