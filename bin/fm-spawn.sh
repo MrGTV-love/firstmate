@@ -5598,6 +5598,12 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_REPLACEMENT_STATE=$STATE_REAL
   RELAUNCH_REPLACEMENT_WT=$WT
 fi
+if [ "$KIND" != secondmate ]; then
+  guard_policy=FIRSTMATE_JEV_GUARD_V1
+  if [ "$RELAUNCH" -eq 1 ]; then
+    guard_policy=$(fm_meta_get "$RELAUNCH_META" jev_guard_policy)
+  fi
+fi
 # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
 # adapter with a verified semantic source, including a --secondmate launch.
 # The parent watcher reads this home's record; skipping the arm left a
@@ -5731,7 +5737,7 @@ BUSY_GEN=
     j_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end 2>/dev/null || true")
     guard_entries=
     if [ "$KIND" != secondmate ]; then
-    j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data") $(shell_quote "$guard_project")")
+    j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data") $(shell_quote "$guard_project") $(shell_quote "$guard_policy")")
       guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Bash|Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":30}]}],\"PostToolUse\":[{\"matcher\":\"^(Bash|Read)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":30}]}],"
       submit_entries="$submit_entries,{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":30}"
     fi
@@ -5938,8 +5944,8 @@ EOF
     # omp 18.1.11). Lives in state/, cleaned by teardown.
     guard_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guard_config" --arg state "$STATE_REAL" \
       --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" --arg project "$guard_project" \
-      --argjson noHelpers "$OMP_NO_HELPERS" \
-      '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project, noHelpers: ($noHelpers == 1)}') || exit 1
+      --argjson noHelpers "$OMP_NO_HELPERS" --arg policy "$guard_policy" \
+      '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project, noHelpers: ($noHelpers == 1), policy: $policy}') || exit 1
     rm -f "$STATE/$ID.live-model"
     # Exact model and effort keys override ambient default or provider chains.
     # This per-task overlay travels to all local backends through --config.
@@ -6274,6 +6280,9 @@ preserve_relaunch_meta() {
   [ -z "${MODEL_STALE:-}" ] || echo "model_stale=$MODEL_STALE"
   echo "effort=${EFFORT:-default}"
   [ "$OMP_NO_HELPERS" = 0 ] || echo "omp_no_helpers=on"
+  if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
+    echo "jev_guard_policy=$guard_policy"
+  fi
   [ -z "$SKILL_SELECTION_STATUS" ] || echo "skill_selection=$SKILL_SELECTION_STATUS"
   [ -z "$SKILL_SELECTION_REASON" ] || echo "skill_selection_reason=$SKILL_SELECTION_REASON"
   [ -z "$SKILL_SELECTION_PICKED" ] || echo "skill_selection_picked=$SKILL_SELECTION_PICKED"

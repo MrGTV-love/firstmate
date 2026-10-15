@@ -156,7 +156,7 @@ fm_brief_reconciliation_role() {
 This section supersedes every instruction below that would advance the task, including Setup, progress notes, validation, and Definition of done.
 You are recovering an exited instruction owner, not resuming implementation.
 The original task instructions below are historical context only until the lock-owning main Firstmate clears recovery with `fm-control <task-id> authorize-continuation` after reconciling the real hold and dependency state.
-Read and acknowledge the task-owned instruction inbox in numeric order, reconcile the preserved local files, commits, prior results, and outstanding decisions, then report the factual outcome and wait.
+Read and acknowledge the task-owned instruction inbox's individually announced records in numeric order, wait for unannounced records' own doorbells, reconcile the preserved local files, commits, prior results, and outstanding decisions, then report the factual outcome and wait.
 Do not edit project files, create a branch or commit, run implementation or validation, start or respond to no-mistakes, push, open or merge a PR, clear a dependency, or lift a hold.
 A relaunch, a restored agent, an older progress note, and a dependency becoming green are not clearance.
 If any inbox instruction would advance blocked work or conflicts with a real hold, report that conflict to firstmate without executing it.

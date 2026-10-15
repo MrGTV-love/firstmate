@@ -677,7 +677,24 @@ On 2026-10-15 UTC, actual omp 18.10.4 with a scripted provider and in-process Je
 Its native `:raw` reads retained full byte framing, and the audit-unavailable notice reached the next model context outside the original result; there were two fixture HTTP calls and zero live Jev or model calls.
 Actual Claude Code 2.1.300 then exercised native `UserPromptSubmit` and two built-in `Read` hooks on publisher-produced synthetic launch/inbox records, retaining exact returned bytes with no TypeSafe key or Jev request.
 That bounded native development session proves source delivery, not Claude output quarantine, model accuracy or deployed activation.
-The portable command above refreshes the publisher/adapter comparisons; the private native fixture commands and exact evidence remain with the implementation report.
+Maintained native refresh commands use this checkout's `ROOT`, synthetic publisher records and local scripted providers rather than the historical private probes:
+
+```sh
+bash tests/fm-jev-guard-omp-live-e2e.test.sh
+FM_JEV_GUARD_CLAUDE_LIVE=1 bash tests/fm-jev-guard-claude-live-e2e.test.sh
+```
+
+Both belong to `live-harness-optin` and open with `tests/lib.sh`'s `fm_live_gate`.
+OMP is token-free and default-on when its dependencies are installed; Claude stays explicitly opt-in.
+Their own control variable or `FM_LIVE=1` forces execution and makes missing dependencies fail, while absent optional harnesses report an explicit skip, never a native pass.
+The fixtures import current-worktree guard source, consume actual native built-in read results in the next scripted model request, and keep their services and synthetic records private to the test.
+Verified on 2026-10-15 UTC against installed OMP 18.10.4 and Claude Code 2.1.300 using the maintained commands above with both guard-specific controls forced to `1`.
+Each host passed all 20 combinations of launch/inbox exact-byte positives and ordinary-copy/changed-byte negatives across normal, privacy, missing-credential, provider-outage and audit-outage conditions.
+Every case observed a native built-in read and its subsequent model request; Claude's actual read-hook payload retained the source bytes, and OMP audit notices preserved those bytes while reaching the next model context.
+Both model transports and Jev judgments were private loopback fixtures with synthetic credentials, zero live model/Jev calls, and cleanup of the fixture services.
+The portable guard and inbox suites also passed, including legacy-receipt negatives, launch-only activation, and staggered publication-clock recovery.
+The focused relaunch command covers the changed delivery and activation paths plus the file's mandatory lifecycle preamble, not the complete lifecycle suite.
+`bash tests/fm-control-relaunch.test.sh --jev-guard` passed the progress-note, survivor-announcement and legacy/current cutover scenarios on both host adapters; `bash tests/fm-typesafe-key-source.test.sh` also passed, including unavailable remote-bound credentials denying without egress.
 
 The review-fix round additionally exercised per-record skipped-ring recovery, multiple owed fire-and-forget retries, acknowledgement order, and launch/relaunch survivor delivery through the real publishers and captured executable launch prompts.
 `tests/fm-task-inbox.test.sh` and `tests/fm-jev-guard.test.sh` passed; the affected progress-note and survivor-delivery scenarios from `tests/fm-control-relaunch.test.sh` and the complete `tests/fm-brief.test.sh` also passed.
@@ -691,8 +708,9 @@ Synthetic calibration fixtures do not authenticate real publisher identity, and 
 The injection calibration does not validate shell/write judgment accuracy, large-output semantics, unrelated providers or other model versions.
 
 Current native deployment acceptance must exercise fresh Claude and omp workers through authorized isolated launch, including firstmate-only egress, inactive scopes, pre-tool refusal, omp result replacement, Claude advisory limits, provider/privacy/audit outages and the approved supervisor-read source positives and negatives.
-Repeat native validation after a Claude Code or omp upgrade; the historical scratch sessions and portable fixture suite alone cannot refresh those guarantees.
-Exact task-private native fixtures and delivery evidence remain with the private report or PR evidence rather than being treated as deployment or publisher-authentication proof.
+Repeat native validation after a Claude Code or omp upgrade; historical scratch sessions and portable fixtures alone cannot refresh those guarantees.
+The [launch-only cutover contract](../configuration.md#jev-guard) applies independently of this verification: only current-format records qualify, legacy tasks remain unguarded across shared-code updates and relaunch, and manual Main reissue plus acknowledged delivery precedes retiring an old pending identity.
+PR evidence must carry that cutover limit and the same-user digest-forgery limit, and must distinguish executed native versions from minimum-version consumer emulation and explicit capability skips.
 
 ## Claude primary feedback
 

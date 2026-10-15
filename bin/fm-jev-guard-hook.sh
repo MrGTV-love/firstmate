@@ -2,13 +2,14 @@
 # Claude Code command hook that runs the ten-levels jev-guard adapter
 # (bin/fm-jev-guard-claude.ts) for one Firstmate ship or scout worker.
 # Usage (registered by bin/fm-spawn.sh in the worker's .claude/settings.local.json):
-#   bin/fm-jev-guard-hook.sh <home> <config> <state> <task> <worktree> <data> <project> < Claude hook payload
+#   bin/fm-jev-guard-hook.sh <home> <config> <state> <task> <worktree> <data> <project> <policy> < Claude hook payload
 # The adapter is TypeScript: bun runs it when installed, otherwise node with
 # type stripping. Missing or failed active runtimes return blocking exit 2 with
 # sanitized diagnostics; successful handler stdout retains its hook semantics.
 # Post-tool feedback remains advisory-only/no protection on this integration.
 # docs/configuration.md "Jev guard" owns the contract.
 set -u
+[ "${8:-}" = FIRSTMATE_JEV_GUARD_V1 ] || exit 0
 
 SCRIPT_DIR=${BASH_SOURCE[0]%/*}
 [ "$SCRIPT_DIR" != "${BASH_SOURCE[0]}" ] || SCRIPT_DIR=.

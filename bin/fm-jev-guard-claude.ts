@@ -6,7 +6,7 @@ import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { hostReadBindings, installJevGuard, type GuardCallHandler, type GuardPromptHandler, type GuardResultHandler } from "./fm-jev-guard.ts";
 
-const [home, config, state, task, worktree, data, project] = process.argv.slice(2);
+const [home, config, state, task, worktree, data, project, policy] = process.argv.slice(2);
 
 function object(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -24,6 +24,7 @@ function text(response: unknown): string {
 }
 
 async function main(): Promise<void> {
+  if (policy !== "FIRSTMATE_JEV_GUARD_V1") return;
   const payload: unknown = JSON.parse(readFileSync(0, "utf8"));
   if (!object(payload)) throw new Error("Invalid hook input.");
   const session = typeof payload.session_id === "string" && payload.session_id.length > 0
@@ -65,7 +66,7 @@ async function main(): Promise<void> {
   type Handlers = { tool_call: GuardCallHandler; tool_result: GuardResultHandler; before_agent_start: GuardPromptHandler };
   const handlers: Partial<Handlers> = {};
   installJevGuard({ on<K extends keyof Handlers>(name: K, handler: Handlers[K]) { handlers[name] = handler; } },
-    { home, config, state, task, worktree, data, project, host: "claude", hostReadBindings: doorbells });
+    { home, config, state, task, worktree, data, project, policy, host: "claude", hostReadBindings: doorbells });
   const input = object(payload.tool_input) ? payload.tool_input : {};
   const ctx = { cwd: typeof payload.cwd === "string" ? payload.cwd : worktree };
   const toolCallId = typeof payload.tool_use_id === "string" ? payload.tool_use_id : undefined;

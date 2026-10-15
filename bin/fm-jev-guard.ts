@@ -1,6 +1,6 @@
 // Installs disler's ten-levels level 6 jev-guard (bin/ten-levels, see SOURCE.md
 // there) into one Firstmate ship or scout worker session.
-// Usage: installJevGuard(pi, {home, config, state, task, worktree, data, project, noHelpers}) from the
+// Usage: installJevGuard(pi, {home, config, state, task, worktree, data, project, policy, noHelpers}) from the
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by
 // docs/configuration.md "Jev guard"; SOURCE.md records the upstream changes.
@@ -9,12 +9,13 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { ContractError, type SystemOneResult } from "./ten-levels/src/core/client.ts";
-import { createGuardService, failureType, GuardUnavailableError, OUTAGE_POLICY, withDecisionBudget,
+import { createGuardService, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_POLICY, withDecisionBudget,
   type GuardServiceContext, type GuardTerminal } from "./ten-levels/extensions/report.ts";
 import { BASH_QUESTIONS, BLOCK_NOTICE, gateBash, gateWrite, insideRepo, screenToolResult, WRITE_QUESTIONS } from "./ten-levels/src/levels/level06/index.ts";
 
 export interface JevGuardContext extends GuardServiceContext {
   worktree: string;
+  policy?: string;
   data: string;
   hostReadBindings?: ReadonlySet<string>;
 }
@@ -159,6 +160,7 @@ function real(path: string): string[] {
 }
 
 export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
+  if (c.policy !== GUARD_POLICY_VERSION) return;
   // Set before native LSP startup; this is process-local, never a profile setting.
   process.env.PI_DISABLE_LSPMUX = "1";
   const service = createGuardService(c);

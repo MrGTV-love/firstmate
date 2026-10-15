@@ -55,7 +55,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
   Current Claude documentation describes built-in output replacement, but this adapter does not claim installed-host support or use it without verification.
 - `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.
   Only successful handler stdout is published; raw failure streams are withheld and the observed exit status is carried in a stable sanitized diagnostic.
-- `bin/fm-spawn.sh` remains the launch owner for physical project scope, context, Claude hook registration, omp extension loading and process-local replace-edit mode.
+- `bin/fm-spawn.sh` remains the launch owner for physical project scope, per-task launch-only guard activation retained on relaunch, context, Claude hook registration, omp extension loading and process-local replace-edit mode.
   Native omp prompt events and Claude's separate prompt/tool hooks bind exact source reads without copying raw prompts into the latter's task/session-local hash context.
 - The existing `bin/fm-operational-input.sh` publisher owns write-time consistency metadata; `bin/fm-task-inbox-lib.sh` reuses it and names the exact record in its bounded doorbell.
   Delivery requests only announced records, retains every owed fire-and-forget retry, and `bin/fm-spawn.sh` includes individual survivor doorbells in native launch prompts.

@@ -72,8 +72,8 @@
 # Retry ring (fm_task_inbox_mark_retry): only while config/wait-no-turns is
 # present. A fire-and-forget record never enters the ladder, but when
 # fm-send's ring at enqueue did not land
-# (fm_task_inbox_ring returned 1 or 2) it marks the record, and one grace later
-# the due action is `retry`: once the worker has no open decision of its own,
+# (fm_task_inbox_ring returned 1 or 2) it marks the record, and one grace after
+# that record's publication the due action is `retry`: once the worker has no open decision of its own,
 # the watcher rings once more and spends the mark
 # whatever the result, so the record never rings a third time and never
 # escalates. A waiting worker does not poll its inbox (bin/fm-brief.sh), so
@@ -477,7 +477,7 @@ fm_task_inbox_clear_retry() {  # <state-dir> <task-id> <record-path>
     if [ "$status" -ne 0 ]; then
       rm -f "$tmp"
     elif [ -s "$tmp" ]; then
-      if ! touch -r "$dir/.retry-ring" "$tmp" || ! mv "$tmp" "$dir/.retry-ring"; then
+      if ! mv "$tmp" "$dir/.retry-ring"; then
         rm -f "$tmp"
         status=1
       fi
@@ -518,7 +518,7 @@ fm_task_inbox_due_action() {  # <state-dir> <task-id>
     done < "$dir/.retry-ring"
   fi
   if [ -n "$retry" ] && { [ -z "$oldest" ] || [ "$retry_n" -lt "$(fm_task_inbox_seq_of "${oldest##*/}")" ]; }; then
-    if [ "$(fm_path_age "$dir/.retry-ring")" -ge "$(fm_task_inbox_grace_secs)" ]; then
+    if [ "$(fm_path_age "$dir/$retry")" -ge "$(fm_task_inbox_grace_secs)" ]; then
       printf 'retry %s' "$dir/$retry"
     else
       printf 'quiet'

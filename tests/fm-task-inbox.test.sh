@@ -560,13 +560,12 @@ test_fire_and_forget_retry_is_owed_once() {
   : > "$TMP_ROOT/faf-retry/config/wait-no-turns"
   export FM_CONFIG_OVERRIDE="$TMP_ROOT/faf-retry/config"
   fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
-  age_path "$fire"
   inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
   action=$(FM_TASK_INBOX_GRACE_SECS=3600 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "a retry inside grace should be quiet, got: $action"
-  age_path "$state/t1.inbox/.retry-ring"
+  age_path "$fire"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
-  [ "$action" = "retry $fire" ] || fail "an aged retry mark should be due its ring, got: $action"
+  [ "$action" = "retry $fire" ] || fail "an aged record should be due its retry ring, got: $action"
   tracked=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "tracked steer")
   age_path "$tracked"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
@@ -583,7 +582,6 @@ test_fire_and_forget_retry_is_owed_once() {
   [ "$action" = quiet ] || fail "a spent retry rang or escalated again: $action"
   # An acknowledged record drops its mark.
   inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
-  age_path "$state/t1.inbox/.retry-ring"
   mv "$fire" "$state/t1.inbox/handled/"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "an acknowledged record's retry should be dropped, got: $action"
@@ -600,7 +598,6 @@ test_fire_and_forget_retry_is_quiet_without_the_flag() {
   fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
   age_path "$fire"
   inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
-  age_path "$state/t1.inbox/.retry-ring"
   action=$(FM_TASK_INBOX_GRACE_SECS=60 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
   [ "$action" = quiet ] || fail "an absent flag still owed a retry ring, got: $action"
   [ -e "$state/t1.inbox/.retry-ring" ] || fail "an absent flag removed a retry mark it should have left"
@@ -609,23 +606,37 @@ test_fire_and_forget_retry_is_quiet_without_the_flag() {
 }
 
 test_retry_marks_never_supersede_earlier_records() {
-  local state config first second action
+  local state config first second tracked action
   state="$TMP_ROOT/faf-queued/state"; config="$TMP_ROOT/faf-queued/config"
   mkdir -p "$state" "$config"
   : > "$config/wait-no-turns"
   first=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 first fire-and-forget)
-  second=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 second fire-and-forget)
   inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$first"
+  second=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 second fire-and-forget)
   inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$second"
-  action=$(FM_CONFIG_OVERRIDE="$config" FM_TASK_INBOX_GRACE_SECS=0 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
-  [ "$action" = "retry $first" ] || fail "a newer retry superseded the earlier record: $action"
+  tracked=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 tracked)
+  node -e '
+    const fs = require("node:fs"), now = Date.now() / 1000;
+    for (let i = 1; i < process.argv.length; i += 2) {
+      const at = now - Number(process.argv[i + 1]);
+      fs.utimesSync(process.argv[i], at, at);
+    }
+  ' "$first" 100 "$second" 20 "$tracked" 100
+  action=$(FM_CONFIG_OVERRIDE="$config" FM_TASK_INBOX_GRACE_SECS=90 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "retry $first" ] || fail "a fresh newer mark postponed an overdue earlier record: $action"
   inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$first"
   mv "$first" "$state/t1.inbox/handled/"
-  action=$(FM_CONFIG_OVERRIDE="$config" FM_TASK_INBOX_GRACE_SECS=0 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
-  [ "$action" = "retry $second" ] || fail "spending the earlier retry lost the newer record: $action"
+  action=$(FM_CONFIG_OVERRIDE="$config" FM_TASK_INBOX_GRACE_SECS=90 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = quiet ] || fail "a younger retry must wait its own publication grace before later recovery: $action"
+  age_path "$second"
+  action=$(FM_CONFIG_OVERRIDE="$config" FM_TASK_INBOX_GRACE_SECS=90 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "retry $second" ] || fail "spending the earlier retry lost or postponed the newer record: $action"
   inbox_lib "$state" fm_task_inbox_clear_retry "$state" t1 "$second"
   [ -f "$second" ] || fail "spending the retry removed its unhandled steer"
-  pass "inbox: each skipped fire-and-forget record retains its own retry"
+  mv "$second" "$state/t1.inbox/handled/"
+  action=$(FM_CONFIG_OVERRIDE="$config" FM_TASK_INBOX_GRACE_SECS=90 inbox_lib "$state" fm_task_inbox_due_action "$state" t1)
+  [ "$action" = "ring $tracked" ] || fail "ordinary recovery did not follow the spent retries: $action"
+  pass "inbox: staggered retry records use their own publication clocks without superseding earlier recovery"
 }
 
 test_ring_ladder_policy() {
@@ -1183,14 +1194,13 @@ test_watcher_retry_keeps_a_newer_mark() {
   fire=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "one-shot steer" fire-and-forget)
   age_path "$fire"
   inbox_lib "$state" fm_task_inbox_mark_retry "$state" t1 "$fire"
-  age_path "$state/t1.inbox/.retry-ring"
   newer=$(inbox_lib "$state" fm_task_inbox_write "$state" t1 "newer steer" fire-and-forget)
   FM_RING_MARKS_RETRY="$newer" steer_check_once "$dir"
   rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
   [ "$rings" = 1 ] || fail "expected the owed retry to ring once, got $rings:"$'\n'"$(cat "$log")"
   [ "$(cat "$state/t1.inbox/.retry-ring" 2>/dev/null)" = "${newer##*/}" ] \
     || fail "the spent retry removed a newer record's mark written during its ring"
-  age_path "$state/t1.inbox/.retry-ring"
+  age_path "$newer"
   steer_check_once "$dir"
   rings=$(grep -cF 'Firstmate instruction waiting' "$log" || true)
   [ "$rings" = 2 ] || fail "the newer record's retry did not ring, got $rings:"$'\n'"$(cat "$log")"

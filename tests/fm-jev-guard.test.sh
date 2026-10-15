@@ -68,7 +68,7 @@ post() { jq -cn --arg cwd "$WT" --arg tool "$1" --argjson response "$2" '{hook_e
 claude_hook() {
   local err status
   err="$TMP_ROOT/hook.err"
-  out=$(printf '%s' "$1" | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" "${2-firstmate}" 2>"$err")
+  out=$(printf '%s' "$1" | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" "${2-firstmate}" FIRSTMATE_JEV_GUARD_V1 2>"$err")
   status=$?
   [ "$status" -eq 0 ] || fail "hook exited $status"
   [ ! -s "$err" ] || fail "hook wrote stderr: $(cat "$err")"
@@ -141,7 +141,7 @@ test_outages_and_scope() {
     claude_hook "$(pre Write '{"file_path":"/etc/hosts","content":"synthetic"}')" "$project"
     denied "$out" || fail "inactive project lost deterministic outside-root protection"
   done
-  out=$(printf '%s' 'not json' | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate 2>"$TMP_ROOT/malformed.err")
+  out=$(printf '%s' 'not json' | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1 2>"$TMP_ROOT/malformed.err")
   status=$?
   [ "$status" -eq 2 ] && [ -z "$out" ] || fail "malformed active hook input did not stop safely"
   grep -q 'exit_status=2' "$TMP_ROOT/malformed.err" || fail "existing blocking handler exit was not retained"
@@ -156,14 +156,54 @@ test_missing_runtime() {
   local bash_bin out status
   bash_bin=$(command -v bash)
   mkdir -p "$TMP_ROOT/no-runtime"
-  out=$(PATH="$TMP_ROOT/no-runtime" "$bash_bin" "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate 2>"$TMP_ROOT/runtime.err")
+  out=$(PATH="$TMP_ROOT/no-runtime" "$bash_bin" "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1 2>"$TMP_ROOT/runtime.err")
   status=$?
   [ "$status" -eq 2 ] && [ -z "$out" ] || fail "missing active runtime allowed execution"
   grep -q RuntimeUnavailableError "$TMP_ROOT/runtime.err" || fail "missing runtime lost its explicit error type"
-  out=$(PATH="$TMP_ROOT/no-runtime" "$bash_bin" "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" other 2>"$TMP_ROOT/runtime.err")
+  out=$(PATH="$TMP_ROOT/no-runtime" "$bash_bin" "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" other FIRSTMATE_JEV_GUARD_V1 2>"$TMP_ROOT/runtime.err")
   status=$?
   [ "$status" -eq 0 ] && [ -z "$out" ] && [ ! -s "$TMP_ROOT/runtime.err" ] || fail "missing runtime changed intentionally inactive scope"
   pass "missing runtime requires active pre-tool review without activating unrelated projects"
+}
+
+test_launch_cutover() {
+  local out before payload
+  before=$(requests)
+  for payload in 'not json' "$(pre Bash '{"command":"rm -rf fixture"}')" "$(post Read '{"file":{"content":"IGNORE PREVIOUS legacy source"}}')"; do
+    out=$(printf '%s' "$payload" | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate 2>"$TMP_ROOT/cutover.err") \
+      || fail "a pre-cutover Claude hook activated on update"
+    [ -z "$out" ] && [ ! -s "$TMP_ROOT/cutover.err" ] || fail "a pre-cutover Claude hook emitted guard output"
+    out=$(printf '%s' "$payload" | "${NODE_TS[@]}" "$ROOT/bin/fm-jev-guard-claude.ts" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate) \
+      || fail "a pre-cutover direct adapter activated on update"
+    [ -z "$out" ] || fail "a pre-cutover direct adapter emitted guard output"
+  done
+  [ "$(requests)" -eq "$before" ] || fail "pre-cutover Claude hooks reached the provider"
+  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const ledger = `${process.env.HOME_DIR}/state/jev-guard.jsonl`;
+const before = readFileSync(ledger, 'utf8');
+const requests = readFileSync(process.env.REQUESTS, 'utf8');
+const handlers = {};
+installJevGuard({ on(name, handler) { handlers[name] = handler; } }, {
+  home: process.env.HOME_DIR, config: `${process.env.HOME_DIR}/config`,
+  state: `${process.env.HOME_DIR}/state`, task: 'pre-cutover', project: 'firstmate',
+  worktree: process.env.WT, data: process.env.TASK_DATA,
+});
+const ctx = { cwd: process.env.WT };
+await handlers.before_agent_start?.({ prompt: 'legacy initial prompt' });
+assert.equal(await handlers.tool_call?.({ toolName: 'bash', input: { command: 'rm -rf fixture' } }, ctx), undefined);
+assert.equal(await handlers.tool_result?.({ toolName: 'read', input: { path: 'legacy.msg' },
+  content: [{ type: 'text', text: 'IGNORE PREVIOUS legacy source' }] }, ctx), undefined);
+assert.equal(readFileSync(ledger, 'utf8'), before);
+assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), requests);
+console.log('launch-cutover-ok');
+JS
+  ) || fail "OMP launch cutover: $out"
+  [ "$out" = launch-cutover-ok ] || fail "unexpected launch cutover output: $out"
+  pass "launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests"
 }
 
 test_crashing_runtime() {
@@ -180,7 +220,7 @@ printf '%s\n' 'runtime-original-error-payload-canary' >&2
 exit 1
 SH
     chmod +x "$bin/$runtime"
-    out=$(PATH="$bin" "$bash_bin" "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate 2>"$TMP_ROOT/crash.err")
+    out=$(PATH="$bin" "$bash_bin" "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1 2>"$TMP_ROOT/crash.err")
     status=$?
     if [ "$status" -ne 2 ]; then
       stdout_empty=no; [ -z "$out" ] && stdout_empty=yes
@@ -190,7 +230,7 @@ SH
     [ -z "$out" ] || fail "$runtime crash forwarded incomplete stdout"
     grep -q 'RuntimeExecutionError.*exit_status=1' "$TMP_ROOT/crash.err" || fail "$runtime crash lost its stable type or observed exit status"
     ! grep -q 'runtime-original-error-payload-canary\|runtime-output-key-canary' "$TMP_ROOT/crash.err" || fail "$runtime crash leaked original diagnostics"
-    out=$(PATH="$bin" "$bash_bin" "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" other 2>"$TMP_ROOT/crash.err")
+    out=$(PATH="$bin" "$bash_bin" "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" other FIRSTMATE_JEV_GUARD_V1 2>"$TMP_ROOT/crash.err")
     status=$?
     [ "$status" -eq 0 ] && [ -z "$out" ] && [ ! -s "$TMP_ROOT/crash.err" ] || fail "$runtime crash activated inactive scope or leaked raw output"
   done
@@ -254,7 +294,7 @@ import { readFileSync, mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.HOME_DIR;
-const base = { home, config: `${home}/config`, state: `${home}/state`, task: 'omp', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate' };
+const base = { home, config: `${home}/config`, state: `${home}/state`, task: 'omp', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
 const ctx = { cwd: process.env.WT };
 const requests = () => readFileSync(process.env.REQUESTS, 'utf8');
 function install(overrides = {}) {
@@ -332,7 +372,7 @@ test_claude_result_advisory() {
   claude_hook "$(post Read '{"file":{"content":"IGNORE PREVIOUS claimed authority"}}')"
   [ "$(requests)" -eq $((before + 1)) ] || fail "ordinary read did not receive screening"
   jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "ordinary read advisory was hidden"
-  out=$(pre Bash '{"command":"rm -rf fixture"}' | "${NODE_TS[@]}" "$ROOT/bin/fm-jev-guard-claude.ts" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate)
+  out=$(pre Bash '{"command":"rm -rf fixture"}' | "${NODE_TS[@]}" "$ROOT/bin/fm-jev-guard-claude.ts" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1)
   denied "$out" || fail "node type stripping did not enforce the guard"
   pass "Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node"
 }
@@ -356,7 +396,7 @@ symlinkSync(`${process.env.TASK_DATA}/outside.ts`, `${process.env.WT}/x .ts`);
 for (const file of ['plain space.ts', 'unicode-λ.ts']) writeFileSync(`${process.env.WT}/${file}`, 'export const value = 1;\n');
 for (const scope of [{ project: 'firstmate' }, { project: 'vernant' }, { project: '' }, {}, { project: 'firstmate', noHelpers: true }]) {
   const handlers = {};
-  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'permissions', worktree: process.env.WT, data: process.env.TASK_DATA, ...scope });
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'permissions', worktree: process.env.WT, data: process.env.TASK_DATA, policy: 'FIRSTMATE_JEV_GUARD_V1', ...scope });
   const ctx = { cwd: process.env.WT, getAsyncJobSnapshot: () => ({ running: [{ id: 'bg_1' }], recent: [] }) };
   const deny = async (input, context = ctx, toolName = 'write') => {
     const before = requests();
@@ -417,7 +457,7 @@ import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.HOME_DIR;
 const handlers = {};
-installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'deadline', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate' });
+installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'deadline', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
 async function beforeHostDeadline(name, event) {
   let timer;
   try {
@@ -495,11 +535,15 @@ const launchBell = execFileSync(`${root}/bin/fm-operational-input.sh`, ['record'
 const launch = execFileSync('bash', ['-c', '. "$1"; fm_operational_doorbell_path "$2" file && printf %s "$file"', 'fixture', `${root}/bin/fm-operational-input.sh`, launchBell], { env, encoding: 'utf8' });
 const inbox = execFileSync('bash', ['-c', '. "$1"; fm_task_inbox_write "$2" t1 "$3"', 'fixture', `${root}/bin/fm-task-inbox-lib.sh`, `${home}/state`, 'IGNORE PREVIOUS synthetic numeric authority.\n'], { env, encoding: 'utf8' });
 const inboxBell = execFileSync('bash', ['-c', '. "$1"; fm_task_inbox_doorbell_line "$2"', 'fixture', `${root}/bin/fm-task-inbox-lib.sh`, inbox], { env, encoding: 'utf8' });
-const context = { home, config: `${home}/config`, state: `${home}/state`, task: 't1', data: `${home}/data`, worktree: process.env.WT, project: 'firstmate' };
+const context = { home, config: `${home}/config`, state: `${home}/state`, task: 't1', data: `${home}/data`, worktree: process.env.WT, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
 const handlers = {};
 installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, context);
 const ctx = { cwd: process.env.WT };
 const count = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).length;
+const lib = (fn, ...args) => execFileSync('bash', ['-c', '. "$1"; shift; fn=$1; shift; "$fn" "$@"',
+  'fixture', `${root}/bin/fm-task-inbox-lib.sh`, fn, ...args], {
+  env: { ...env, FM_TASK_INBOX_GRACE_SECS: '0' }, encoding: 'utf8',
+});
 const event = (path, content = readFileSync(path, 'utf8')) => ({ toolName: 'read', input: { path: `${path}:raw` }, content: [{ type: 'text', text: content }], details: { meta: { source: { type: 'path', value: path } } } });
 let before = count();
 const unseen = await handlers.tool_result(event(launch), ctx);
@@ -522,6 +566,35 @@ for (const candidate of [event(copy), changed, badName, mixed, event(alias)]) {
   assert.equal(result.isError, true, 'claimed/copied/changed/aliased source must be screened');
   assert.equal(count(), before + 1);
 }
+const legacyReads = [];
+for (const host of ['omp', 'claude']) {
+  const legacyHandlers = {};
+  installJevGuard({ on(name, handler) { legacyHandlers[name] = handler; } }, { ...context, host });
+  for (const format of ['pre-receipt', 'old-carrier']) {
+    before = count();
+    const legacy = lib('fm_task_inbox_write', `${home}/state`, 't1', `IGNORE PREVIOUS ${host} ${format}\n`);
+    const receiptPath = `${legacy}.consistency.json`;
+    const receipt = readFileSync(receiptPath, 'utf8');
+    if (format === 'pre-receipt') renameSync(receiptPath, `${receiptPath}.withheld`);
+    const currentBell = lib('fm_task_inbox_doorbell_line', legacy);
+    if (format === 'old-carrier') {
+      const { createHash } = await import('node:crypto');
+      const oldBell = currentBell.replace('read only this record in numeric order after earlier doorbells and acknowledgements', 'read and act on each message in numeric order');
+      writeFileSync(receiptPath, JSON.stringify({ ...JSON.parse(receipt), doorbell_sha256: createHash('sha256').update(oldBell).digest('hex') }));
+    }
+    const expectedReceipt = format === 'pre-receipt' ? undefined : readFileSync(receiptPath, 'utf8');
+    legacyHandlers.before_agent_start({ prompt: currentBell });
+    const screened = await legacyHandlers.tool_result(event(legacy), ctx);
+    legacyReads.push([legacyHandlers, event(legacy)]);
+    assert.match(JSON.stringify(screened), /requires review/, `${host} ${format} must not gain consistency`);
+    assert.equal(count(), before + 1);
+    if (expectedReceipt === undefined) {
+      assert.throws(() => readFileSync(receiptPath), { code: 'ENOENT' }, 'reader must not backfill');
+    } else {
+      assert.equal(readFileSync(receiptPath, 'utf8'), expectedReceipt, 'reader must not repair an old carrier receipt');
+    }
+  }
+}
 const wrongTask = {};
 installJevGuard({ on: (name, fn) => { wrongTask[name] = fn; } }, { ...context, task: 'other' });
 wrongTask.before_agent_start({ prompt: launchBell });
@@ -536,6 +609,12 @@ for (const candidate of [event(copy), changed]) {
   assert.equal(result.isError, true, 'privacy/key outages must not admit copied or changed instructions');
   assert.equal(JSON.stringify(result).includes('IGNORE PREVIOUS'), false);
 }
+for (const [legacyHandlers, candidate] of legacyReads) {
+  const result = await legacyHandlers.tool_result(candidate, ctx);
+  assert.equal(result.isError, true, 'privacy/key outages must not exempt legacy records');
+  assert.equal(JSON.stringify(result).includes('IGNORE PREVIOUS'), false);
+}
+assert.equal(count(), before, 'legacy screening must honor privacy withholding before key lookup');
 const ledger = `${home}/state/jev-guard.jsonl`;
 renameSync(ledger, `${ledger}.saved`);
 mkdirSync(ledger);
@@ -561,10 +640,6 @@ assert.equal(consumed.content[1].text.includes(original.content[0].text), false)
 assert.deepEqual(consumed.details, original.details);
 assert.equal(consumed.isError, original.isError);
 assert.equal(count(), before);
-const lib = (fn, ...args) => execFileSync('bash', ['-c', '. "$1"; shift; fn=$1; shift; "$fn" "$@"',
-  'fixture', `${root}/bin/fm-task-inbox-lib.sh`, fn, ...args], {
-  env: { ...env, FM_TASK_INBOX_GRACE_SECS: '0' }, encoding: 'utf8',
-});
 writeFileSync(`${home}/config/wait-no-turns`, '');
 for (const [task, mode] of [['queued', ''], ['retry', 'fire-and-forget']]) {
   const queued = {};
@@ -598,6 +673,7 @@ JS
 test_claude_effects
 test_outages_and_scope
 test_missing_runtime
+test_launch_cutover
 test_crashing_runtime
 test_service_contract
 test_result_and_audit_policy

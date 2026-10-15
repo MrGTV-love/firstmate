@@ -416,6 +416,7 @@ family_for_basename() {
     fm-pi-primary-live-e2e.test.sh|fm-pi-codex-native.test.sh|fm-omp-primary-live-e2e.test.sh|fm-omp-reboot-live-e2e.test.sh|\
     fm-omp-composer-box-live-e2e.test.sh|fm-omp-wake-restore-live-e2e.test.sh|fm-omp-fallback-chain-live-e2e.test.sh|\
     fm-omp-stale-wake-live-e2e.test.sh|\
+    fm-jev-guard-omp-live-e2e.test.sh|fm-jev-guard-claude-live-e2e.test.sh|\
     fm-claude-titled-composer-live-e2e.test.sh|\
     fm-pr-state-live-e2e.test.sh|\
     fm-sessionstart-hook-live-e2e.test.sh|fm-sessionstart-instruction-refresh-live-e2e.test.sh|\

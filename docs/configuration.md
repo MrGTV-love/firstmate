@@ -2015,7 +2015,11 @@ The guard supplements, never replaces, deterministic permissions, path checks or
 [`SOURCE.md`](../bin/ten-levels/SOURCE.md) owns upstream provenance and the bounded Firstmate modifications.
 `fm-spawn.sh` loads the omp worker extension and registers `bin/fm-jev-guard-hook.sh` for Claude `UserPromptSubmit`, `PreToolUse` on `Bash|Write|Edit` and `PostToolUse` on `Bash|Read`.
 Primary and secondmate sessions and other harnesses do not run this guard.
-Existing sessions require an authorized normal relaunch to load changed code; isolated verification is not production activation.
+Activation is selected per task at its initial launch and retained across relaunches; a task launched before this cutover remains unguarded even when the shared hook code updates.
+There is no legacy exemption, automatic compatibility, receipt backfill or automatic republication.
+Pre-receipt records and receipts for an older doorbell never gain the consistency exception.
+To enable the guard for an already-running legacy task, Main must manually reissue its pending messages through the existing current publisher and normal delivery, verify acknowledgement, and only then retire the old pending identity before an authorized fresh guarded launch.
+This is an operator-only migration, not an automated retrofit; isolated verification is not production activation.
 
 Questions and numeric policy are code-owned:
 
@@ -2034,8 +2038,8 @@ Consistent instructions bypass model/privacy/credential outages; an audit failur
 On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
 Claude keeps its distinct advisory `additionalContext`, containing neither the source text nor its path.
 Each steering doorbell requests only its exact record, after earlier records have been handled; an unannounced sibling must wait for its own doorbell.
-Watcher recovery announces successive ordinary records as they are acknowledged, and each skipped fire-and-forget record retains its own owed retry without newer records superseding it.
-Launches and relaunches carry individual doorbells for every surviving record in the native prompt, including Claude's record-backed launch carrier.
+Watcher recovery announces successive ordinary records as they are acknowledged, and each skipped fire-and-forget record retains its own owed retry, scheduled from that record's publication mtime rather than a shared retry-queue clock.
+Guarded launches and relaunches carry individual doorbells for surviving current-format records in the native prompt, including Claude's record-backed launch carrier; announcement never repairs a legacy record's receipt.
 Checkpoint checks list the inbox but read only already announced records; unannounced survivors are reported to Firstmate for re-delivery.
 This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
 Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
