@@ -3,6 +3,8 @@
 # Usage: fm-open-loops.sh [--json] [--heartbeat] [--check-in <task-id>]
 #        fm-open-loops.sh --present-overdue | --check-actions | --report
 #        fm-open-loops.sh action ROW_ID steered|merged|escalated|deferred --evidence TEXT [--recheck UTC_TIME]
+#        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
+#        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg --recheck UTC_TIME
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
 # request through fm-send's non-interrupting inbox path for an overdue silent_report.
 # A pending request suppresses repeats under the same ledger lock. Secondmate sends
@@ -21,6 +23,16 @@
 # after the row's presentation, the row's own PR URL with its merge recorded by fm-pr-merge.sh, a captain
 # escalation, or a deferral reason.
 # deferred requires an ISO UTC --recheck time within 24 hours; a second deferral refuses and marks the row captain-visible.
+# waiting explicitly binds only the named open_pr, status question, or unlanded_commit to a prerequisite.
+# --prerequisite selects a distinct same-task question, verified from its current captain hold or exact open status key.
+# --prerequisite-task selects a distinct assigned ship/scout reporting working; its new inbox delivery must include
+# a body line `open-loop-row: ROW_ID`, naming this exact obligation. A pause alone is not an active routed repair.
+# The receipt keeps the real owner and full source/head/evidence identity; it never answers the prerequisite.
+# Both forms require a future --recheck within 24 hours and reverify source evidence on presentation and acknowledgement.
+# An unchanged binding cannot be renewed, and a task delivery cannot be cited twice for this row.
+# Answered/released/changed, unreadable, replaced or due prerequisites restore follow-up immediately.
+# Old rows without collected source identity must be recollected before waiting can be recorded.
+# Captain-owned decisions, original correlated replies, stale rows and review_pass_not_merged cannot be bound waits.
 # Receipts remain in state/open-loops.json across collection; they permit acknowledgement, never resolve work.
 # Examples: fm-open-loops.sh action ROW_ID steered --evidence 001.msg
 #           fm-open-loops.sh action ROW_ID deferred --evidence 'lint still producing output' --recheck '<future-UTC-time>'

@@ -741,7 +741,7 @@ Drain presents `OVERDUE` before other sections, with the id, owner, next action,
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
 The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest, at most one buffered item per row id until the digest flushes, and records an `escalated` receipt for it before acknowledging, so away mode neither wedges nor consumes overdue work silently.
 The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time and captain-visible mark.
-The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer, a merge, a captain escalation, or a reasoned deferral; it verifies evidence against local records only, without a forge call.
+The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer, a merge, a captain escalation, a reasoned deferral, or an explicitly bound dependency wait; it verifies evidence against local records only, without a forge call.
 A steer's evidence is a delivery record name (`NNN.msg`) present in the steering inbox, or its `handled/` directory, of the row's task: its `worker:` owner or the task id leading its subject.
 The record's `at=` time must not precede the acting actor's latest presentation of the row (or the earliest presentation by any actor, when it has none) and any recorded deferral, and a record already cited for the row is refused.
 A merge's evidence is the row's own PR URL, and a merge of that PR must be recorded locally by `bin/fm-pr-merge.sh` or the merge poll (the `fm-pr-poll-merge-notified-v1` marker).
@@ -751,7 +751,22 @@ Only one deferral is allowed per row; a second attempt refuses, marks the row `c
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
 A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
-A `review_pass_not_merged` row has no standing receipt of any kind, escalated or deferred: firstmate holds merge authority for a reviewed, green PR, so each presentation needs a merge or a routed action.
+Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
+A `waiting` receipt is an explicit relationship for one named `open_pr`, status question, or `unlanded_commit`, never a task-wide ownership inference or an answer to its prerequisite.
+The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.
+The collected `source` identifies the physical home/state/data/config scope, task metadata generation, and the exact keyed decision and status stream, captain-hold record, observed PR URL/head, or retained commit head and evidence as applicable.
+A projected secondmate question is bound to its authoritative parent-visible stream and key, not to a captain-hold phrase or a guessed child-home backlog relationship.
+The receipt's `binding` stores that obligation source and either a distinct same-task unanswered-question row with its full dependency identity and digest, or a newly routed distinct ship/scout task with its working-status identity and exact inbox delivery proof.
+The supervisor explicitly identifies which obligation depends on which prerequisite; another question on the same held task does not inherit that relationship.
+The source owner verifies a question against the current canonical local backlog or exact open status key; a routed task must have existing launch-generation metadata, report `working`, and have a fresh delivery naming the exact obligation.
+A pause alone, an unrelated hold, an unproved assignment, and an unanswered original correlation cannot establish a standing wait.
+The command syntax and required delivery marker are owned by [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh).
+Every wait has a concrete recheck within 24 hours; its `waits` proof history prevents renewing an unchanged binding, and task-delivery citations cannot be reused for that obligation.
+Presentation and acknowledgement both reverify the bound local sources, so an answer, release, changed evidence, replaced task or stream, unavailable source, missing delivery, or due recheck restores the action requirement even before another collector publication.
+Changed observed PR heads and published obligation evidence also invalidate the wait; receipt commands make no new forge call, so remote changes become known through the normal collector refresh.
+Waits on another waiting row are refused, preventing circular receipt cover, and the prerequisite's own independent action requirement remains intact.
+Rows collected before source identities existed require a normal refresh before a wait can be recorded; no live receipt migration or ownership rewrite is implied.
+A `review_pass_not_merged` row has no standing receipt of any kind, escalated, deferred, or waiting: firstmate holds merge authority for a reviewed, green PR, so each presentation needs a merge or a routed action.
 The existing ledger lock file separates collection exclusion from the short publication/receipt critical section, so a slow source scan cannot delay overdue presentation or action recording, and atomic publication preserves action requirements and receipts rather than overwriting them.
 Receipt writes preserve the ledger's heartbeat modification time, so action recording cannot mask a reconciler that stopped publishing.
 An incomplete collection keeps a presented row it no longer sees as a stale informational row, marked `stale: true` with `last_seen` set to the epoch it was last observed: it is shown, never overdue, and needs no receipt; a complete collection drops it, and any collection drops it, with its receipts, 24 hours after it was last seen.

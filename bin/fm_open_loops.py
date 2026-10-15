@@ -88,6 +88,10 @@ def mtime(path):
         return None
 
 
+def fingerprint(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True).encode()).hexdigest()
+
+
 class Collector:
     def __init__(self, home, now):
         self.home = Path(home).resolve()
@@ -250,7 +254,8 @@ class Collector:
     def bash(self, script, *args):
         return self.run(["bash", "-c", script, "open-loops", *args])
 
-    def add(self, category, subject, action, since=None, owner="firstmate", evidence="", informational=False):
+    def add(self, category, subject, action, since=None, owner="firstmate", evidence="", informational=False,
+            source=None):
         """An informational row is visible context, never an obligation: it is not overdue at any age."""
         identity = hashlib.sha256(f"{self.home}\0{category}\0{subject}".encode()).hexdigest()[:24]
         age = None if since is None or since > self.now else self.now - since
@@ -260,6 +265,8 @@ class Collector:
                    overdue=not informational and (age is None or age >= limit), evidence=str(evidence)[:400])
         if informational:
             row["informational"] = True
+        if source is not None:
+            row["source"] = source
         self.rows[identity] = row
 
     def source(self, name, reader, *args):
@@ -682,7 +689,9 @@ class Collector:
         head = self.missing_heads.get(task["id"])
         coverage = f"; PR head {head[:8]} is not in this copy, so PR coverage was not applied" if head else ""
         self.add("unlanded_commit", task["id"], "land this work through its PR, or obtain the captain's drop",
-                 oldest, evidence=f"{len(pending)} commit(s) not on {base}{coverage}; newest: {title}")
+                 oldest, evidence=f"{len(pending)} commit(s) not on {base}{coverage}; newest: {title}",
+                 source=dict(self.task_source(task["id"]), kind="commits", worktree=str(Path(worktree).resolve()),
+                             head=self.git(worktree, "rev-parse", "HEAD"), commits=fingerprint(pending)))
 
     def forge(self, path):
         """Pages of one conditional REST read, flattened; fm-gh-rest.sh owns the ETag cache and quota headers."""
@@ -876,7 +885,11 @@ class Collector:
             owner, action = ",".join(people + teams), "complete the requested PR review"
         else:
             owner, action = "firstmate", "route the green PR's review and obtain merge approval"
-        self.add("open_pr", url, action, epoch(pr.get("updated_at")), owner)
+        task_id = task["id"] if task else next((r["id"] for r in self.backlog
+                    if url == r.get("pr_url") or url in (r.get("links") or [])), None)
+        source = self.task_source(task_id) if task_id else self.source_context()
+        self.add("open_pr", url, action, epoch(pr.get("updated_at")), owner,
+                 source=dict(source, kind="pr", url=url, head=sha))
 
     def pr_rows(self, slug):
         pulls = self.forge(f"/repos/{slug}/pulls?state=open&per_page=100")
@@ -889,13 +902,49 @@ class Collector:
             if self.owns_pr(pr):
                 self.source(f"PR {slug}#{pr.get('number', '?')}", self.pr_row, slug, pr)
 
+    def source_context(self):
+        return {name: str(path.resolve()) for name, path in
+                (("home", self.home), ("state", self.state), ("data", self.data), ("config", self.config))}
+
+    def task_source(self, task):
+        source = dict(self.source_context(), task=task)
+        meta = self.state / (task + ".meta")
+        if meta.is_symlink():
+            raise ValueError("task metadata must not be a symbolic link")
+        source["generation"] = fingerprint(meta.read_text()) if meta.exists() else None
+        return source
+
+    def decision_source(self, task, key, decision, observed_pr=None):
+        path = self.state / (task + ".status")
+        if path.is_symlink() or not path.is_file():
+            raise ValueError("decision status must be a regular file")
+        stat = path.stat()
+        source = dict(self.task_source(task), kind="status", key=key, decision=fingerprint(decision),
+                      stream=[stat.st_dev, stat.st_ino])
+        if observed_pr is None:
+            assigned = next((t for t in self.tasks if t["id"] == task), {})
+            pr = self.prs.get(assigned.get("pr", {}).get("url"))
+            if pr and pr.get("head", {}).get("sha"):
+                observed_pr = dict(url=pr["html_url"], head=pr["head"]["sha"])
+        if observed_pr is not None:
+            source["pr"] = observed_pr
+        return source
+
+    def hold_source(self, record):
+        # The canonical backlog projection, not hold-reason prose, owns eligibility.
+        return dict(self.source_context(), kind="captain_hold", task=record["id"],
+                    decision=fingerprint({key: record.get(key) for key in
+                        ("id", "state", "hold_kind", "hold_bucket", "hold_set", "hold_reason",
+                         "hold_until", "unresolved_blocker_ids", "body_lines")}))
+
     def question_rows(self):
         for record in self.backlog:
             if record.get("hold_kind") == "captain" and record.get("hold_bucket") in ("live", "aged"):
                 self.add("unanswered_question", record["id"] + ":captain-hold",
                          "resolve the captain hold or record its next decision date",
                          epoch(record.get("hold_set") or record.get("since")), owner="captain",
-                         evidence=record.get("hold_reason") or record.get("title") or "")
+                         evidence=record.get("hold_reason") or record.get("title") or "",
+                         source=self.hold_source(record))
         for status in (p for p in self.state_files if p.name.endswith(".status")):
             if status.is_symlink():
                 continue
@@ -909,7 +958,8 @@ class Collector:
                 key, verb, opened, summary = (line.split("\t", 3) + ["", "", "", ""])[:4]
                 self.add("unanswered_question", f"{status.stem}:{key}",
                          "answer or close this question, or record why it no longer applies",
-                         int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}")
+                         int(opened) if opened.isdigit() else None, evidence=f"{verb}: {summary}",
+                         source=self.decision_source(status.stem, key, line))
 
     def board_answer_rows(self):
         inbox = self.state / "procevent-inbox"
@@ -1130,15 +1180,163 @@ def overdue_rows(report, now):
 
 
 def row_digest(row):
-    return hashlib.sha256(json.dumps([row.get(f) for f in ("category", "subject", "owner", "next_action",
-                                                           "evidence")]).encode()).hexdigest()[:24]
+    # Preserve the original escalation/deferral receipt identity. A waiting receipt
+    # separately compares its full collected source and authoritative dependency.
+    fields = [row.get(f) for f in ("category", "subject", "owner", "next_action", "evidence")]
+    return hashlib.sha256(json.dumps(fields).encode()).hexdigest()[:24]
 
 
-def receipt_stands(action, row, now):
+class WaitVerifier:
+    """Verify explicit per-obligation dependencies against this home's existing source owners."""
+    def __init__(self, report, state, now):
+        home = Path(os.environ.get("FM_HOME") or os.environ.get("FM_ROOT_OVERRIDE") or BIN.parent).resolve()
+        self.collector = Collector(home, now)
+        if self.collector.state.resolve() != state.resolve() or report.get("home") != str(home) or report.get("stale"):
+            raise ValueError("waiting requires a current ledger collected for the effective home and state directory")
+        self.rows = {row["id"]: row for row in report["rows"]}
+        self.actions = report.get("handling", {}).get("actions", {})
+        self.backlog = None
+        self.decisions = {}
+
+    def current_source(self, source):
+        c = self.collector
+        if not isinstance(source, dict) or any(source.get(k) != v for k, v in c.source_context().items()):
+            raise ValueError("waiting source does not belong to the effective home")
+        task = source.get("task")
+        if task is not None and not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", task):
+            raise ValueError("invalid prerequisite task identity")
+        kind = source.get("kind")
+        if kind == "captain_hold":
+            if self.backlog is None:
+                snapshot = json.loads(c.run([BIN / "fm-fleet-snapshot.sh", "--contribution-input"]))
+                if not snapshot["backlog"].get("present"):
+                    raise ValueError("prerequisite backlog is unavailable")
+                self.backlog = snapshot["backlog"]["records"]
+            record = next((r for r in self.backlog if r.get("structured") and r["id"] == task
+                           and r.get("hold_kind") == "captain" and r.get("hold_bucket") in ("live", "aged")), None)
+            if record is None:
+                raise ValueError("captain prerequisite was answered, released, or is no longer actionable")
+            return c.hold_source(record)
+        if not task:
+            raise ValueError("waiting source has no task identity; recollect before binding it")
+        if kind == "status":
+            if task not in self.decisions:
+                path = c.state / (task + ".status")
+                if path.is_symlink() or not path.is_file():
+                    raise ValueError("prerequisite status is unavailable")
+                self.decisions[task] = c.bash('. "$1/fm-status-decision-lib.sh"; '
+                    'status_open_decisions_dated "$2"', BIN, path).splitlines()
+            decision = next((line for line in self.decisions[task]
+                             if line.split("\t", 1)[0] == source.get("key")), None)
+            if decision is None:
+                raise ValueError("prerequisite decision is no longer open")
+            # PR identity is the collector's latest forge observation; the row digest
+            # invalidates it on publication, while this read rechecks the live local key.
+            return c.decision_source(task, source["key"], decision, source.get("pr"))
+        if kind in ("pr", "commits"):
+            current = dict(source, **c.task_source(task))
+            if kind == "commits":
+                current["head"] = c.git(source["worktree"], "rev-parse", "HEAD")
+            return current
+        if kind == "task":
+            meta = c.state / (task + ".meta")
+            current = c.task_source(task)
+            fields = c.read_fields(meta)
+            if fields.get("kind") not in ("ship", "scout") or not fields.get("spawn_gen"):
+                raise ValueError("prerequisite must be an assigned ship or scout with a launch generation")
+            path = c.state / (task + ".status")
+            if path.is_symlink() or not path.is_file():
+                raise ValueError("prerequisite status is unavailable")
+            status = c.bash('. "$1/fm-status-event-lib.sh"; line=$(last_status_line "$2"); '
+                            'printf "%s\n%s\n" "$(status_line_verb "$line")" "$line"', BIN, path).splitlines()
+            if len(status) != 2 or status[0] != "working":
+                raise ValueError("routed prerequisite is no longer working; follow up on its result or wait")
+            stat = path.stat()
+            return dict(current, kind="task", status=fingerprint(status[1]), stream=[stat.st_dev, stat.st_ino])
+        raise ValueError("unsupported waiting source; recollect before binding it")
+
+    def verify_source(self, source):
+        if isinstance(source, dict) and source.get("kind") != "captain_hold" and not source.get("generation"):
+            raise ValueError("waiting requires existing task metadata; recollect after assignment")
+        if self.current_source(source) != source:
+            raise ValueError("prerequisite identity or evidence changed")
+
+    def binding(self, row, prerequisite, task, evidence, boundary):
+        if row["category"] not in ("open_pr", "unanswered_question", "unlanded_commit") \
+                or row.get("stale") or row.get("owner") == "captain":
+            raise ValueError("this obligation cannot have a standing dependency wait")
+        source = row.get("source")
+        self.verify_source(source)
+        if source.get("key", "").startswith(("pending-reply-", "remote-reply-continuity-")):
+            raise ValueError("unanswered correlated replies cannot have a standing wait")
+        if prerequisite:
+            dependency = self.rows.get(prerequisite)
+            if dependency is None or prerequisite == row["id"] or dependency.get("stale") \
+                    or dependency.get("informational") or dependency["category"] != "unanswered_question" \
+                    or self.actions.get(prerequisite, {}).get("kind") == "waiting":
+                raise ValueError("prerequisite must be a distinct current unanswered question, not another wait")
+            dep_source = dependency.get("source", {})
+            if dep_source.get("key", "").startswith(("pending-reply-", "remote-reply-continuity-")):
+                raise ValueError("an unanswered correlated reply is not a standing-wait prerequisite")
+            if dep_source.get("task") != source.get("task"):
+                raise ValueError("cross-task dependencies require a new explicitly routed task delivery")
+            self.verify_source(dep_source)
+            return dict(source=source, prerequisite=prerequisite, dependency=dep_source,
+                        digest=row_digest(dependency))
+        if not task or task == source.get("task") or not re.fullmatch(r"[A-Za-z0-9_-][A-Za-z0-9._-]*", task):
+            raise ValueError("waiting requires a distinct assigned prerequisite task")
+        c = self.collector
+        dep_source = self.current_source(dict(c.source_context(), kind="task", task=task))
+        proof_row = dict(owner="worker:" + task, subject=task)
+        inbox = c.state / (task + ".inbox")
+        if inbox.is_symlink() or (inbox / "handled").is_symlink():
+            raise ValueError("prerequisite delivery namespace must not be redirected")
+        sent = steer_record_epoch(c.state, proof_row, evidence)
+        if sent is None or sent < boundary:
+            raise ValueError("waiting requires a new prerequisite-task delivery after presentation")
+        proof = next((p for p in (inbox / evidence, inbox / "handled" / evidence) if p.is_file()), None)
+        if proof is None or proof.is_symlink():
+            raise ValueError("waiting delivery is unavailable")
+        text = proof.read_text()
+        if "open-loop-row: " + row["id"] not in text.split("\n--\n", 1)[-1].splitlines():
+            raise ValueError("prerequisite delivery must explicitly name open-loop-row: " + row["id"])
+        return dict(source=source, dependency=dep_source, delivery=evidence, proof=fingerprint(text))
+
+    def stands(self, action, row, now):
+        if row.get("stale") or action.get("recheck_epoch", 0) <= now or action.get("digest") != row_digest(row):
+            return False
+        try:
+            binding = action["binding"]
+            if binding["source"] != row.get("source"):
+                return False
+            self.verify_source(binding["source"])
+            self.verify_source(binding["dependency"])
+            prerequisite = binding.get("prerequisite")
+            if prerequisite:
+                dependency = self.rows.get(prerequisite)
+                return bool(dependency and not dependency.get("stale") and not dependency.get("informational")
+                            and self.actions.get(prerequisite, {}).get("kind") != "waiting"
+                            and dependency.get("source") == binding["dependency"]
+                            and binding["digest"] == row_digest(dependency))
+            task, record = binding["dependency"]["task"], binding["delivery"]
+            inbox = self.collector.state / (task + ".inbox")
+            if not re.fullmatch(r"[0-9]+[.]msg", record) or inbox.is_symlink() \
+                    or (inbox / "handled").is_symlink():
+                return False
+            proof = next((p for p in (inbox / record, inbox / "handled" / record)
+                          if p.is_file() and not p.is_symlink()), None)
+            return proof is not None and fingerprint(proof.read_text()) == binding["proof"]
+        except (KeyError, *SOURCE_ERRORS):
+            return False  # unreadable or changed evidence never buys standing acknowledgement
+
+
+def receipt_stands(action, row, now, waits=None):
     """A standing receipt also answers later turns; any other receipt answers only the turn it followed."""
     kind = action.get("kind")
     if row.get("category") == "review_pass_not_merged":
         return False
+    if kind == "waiting":
+        return waits is not None and waits.stands(action, row, now)
     if kind == "deferred":
         return action.get("recheck_epoch", 0) > now and not action.get("captain_visible")
     if kind == "escalated" and row.get("owner") == "captain":
@@ -1205,6 +1403,15 @@ def ledger_action(args, state, now):
     rows = overdue_rows(report, now)
     by_id = {r["id"]: r for r in rows}
     actions = controls["actions"]
+    waits = None
+    if getattr(args, "kind", None) == "waiting" or any(a.get("kind") == "waiting" for a in actions.values()):
+        try:
+            waits = WaitVerifier(report, state, now)
+        except SOURCE_ERRORS as error:
+            if getattr(args, "kind", None) == "waiting":
+                raise
+            print(f"error: waiting evidence unavailable ({str(error)[:120]}); its obligations need follow-up",
+                  file=sys.stderr)
     for row in rows:
         row["captain_visible"] = bool(actions.get(row["id"], {}).get("captain_visible"))
     pending = controls["presentations"].setdefault(actor, {})
@@ -1213,7 +1420,7 @@ def ledger_action(args, state, now):
         for row in rows:
             ident = row["id"]
             action = actions.get(ident, {})
-            if receipt_stands(action, row, now):
+            if receipt_stands(action, row, now, waits):
                 standing.append(row)
                 continue
             needing.append(row)
@@ -1225,14 +1432,17 @@ def ledger_action(args, state, now):
             print(render_overdue(needing))
             if standing:
                 print(render_overdue(standing).replace("OVERDUE:", "STANDING (a receipt stands; no action needed):", 1))
-            print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred>"
-                  " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]")
+            print("help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting>"
+                  " --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]"
+                  " [--prerequisite <row-id> | --prerequisite-task <task-id>]")
         return 0
     if args.check_actions:
         missing = [by_id[ident] for ident, presented in pending.items()
                    if ident in by_id and (actions.get(ident, {}).get("sequence", 0) <= presented
                        or (actions.get(ident, {}).get("kind") == "deferred"
-                           and actions[ident].get("recheck_epoch", 0) <= now))]
+                           and actions[ident].get("recheck_epoch", 0) <= now)
+                       or (actions.get(ident, {}).get("kind") == "waiting"
+                           and not receipt_stands(actions[ident], by_id[ident], now, waits)))]
         if missing:
             print("error: overdue rows have no action recorded since presentation; acknowledgement refused")
             print(render_overdue(missing))
@@ -1265,6 +1475,26 @@ def ledger_action(args, state, now):
     if args.kind == "merged" and not merge_recorded(state, by_id[ident], args.evidence):
         raise ValueError("merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh")
     recheck = epoch(args.recheck)
+    binding = None
+    wait_history = old.get("waits", [])
+    if args.kind == "waiting":
+        if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
+            raise ValueError("waiting requires --recheck at a future UTC time within 24 hours")
+        boundary = stamps.get(actor, {}).get(ident)
+        if boundary is None:
+            boundary = min((marked[ident] for marked in stamps.values() if ident in marked), default=now)
+        binding = waits.binding(by_id[ident], args.prerequisite, args.prerequisite_task, args.evidence, boundary)
+        if args.prerequisite_task:
+            delivery = f"waiting:{args.prerequisite_task}:{args.evidence}"
+            if delivery in cited:
+                raise ValueError("waiting delivery has already been cited for this obligation")
+            cited = cited + [delivery]
+        proof = fingerprint(binding)
+        if proof in wait_history:
+            raise ValueError("unchanged dependency wait cannot be renewed; follow up on its prerequisite")
+        wait_history = wait_history + [proof]
+    elif args.prerequisite or args.prerequisite_task:
+        raise ValueError("prerequisite options are only valid for waiting actions")
     if args.kind == "deferred":
         if old.get("deferrals", 0):
             old["captain_visible"] = True
@@ -1283,8 +1513,8 @@ def ledger_action(args, state, now):
             raise ValueError("second deferral refused; row is captain-visible; steer, merge or escalate it")
         if recheck is None or recheck <= now or recheck > now + DAY_SECONDS:
             raise ValueError("deferral requires --recheck at a future UTC time within 24 hours")
-    elif args.recheck:
-        raise ValueError("--recheck is only valid for deferred actions")
+    elif args.recheck and args.kind != "waiting":
+        raise ValueError("--recheck is only valid for deferred or waiting actions")
     if args.kind == "deferred":
         for marked in stamps.values():
             if ident in marked:
@@ -1294,6 +1524,10 @@ def ledger_action(args, state, now):
                          sequence=controls["sequence"], deferrals=old.get("deferrals", 0)
                          + int(args.kind == "deferred"), captain_visible=old.get("captain_visible", False),
                          digest=row_digest(by_id[ident]), cited=cited)
+    if wait_history:
+        actions[ident]["waits"] = wait_history
+    if binding is not None:
+        actions[ident]["binding"] = binding
     if recheck is not None:
         actions[ident]["recheck_epoch"] = recheck
     write_ledger(state, report, receipt=True)
@@ -1319,9 +1553,12 @@ def main():
     commands = parser.add_subparsers(dest="command")
     action = commands.add_parser("action", help="record an action on a presented overdue row")
     action.add_argument("row_id")
-    action.add_argument("kind", choices=("steered", "merged", "escalated", "deferred"))
-    action.add_argument("--evidence", required=True, help="fm-send delivery id, PR URL, escalation or deferral reason")
-    action.add_argument("--recheck", help="future UTC ISO time (deferral only)")
+    action.add_argument("kind", choices=("steered", "merged", "escalated", "deferred", "waiting"))
+    action.add_argument("--evidence", required=True, help="delivery id, PR URL, escalation, deferral or dependency reason")
+    action.add_argument("--recheck", help="future UTC ISO time (deferred or waiting)")
+    dependency = action.add_mutually_exclusive_group()
+    dependency.add_argument("--prerequisite", help="exact same-task unanswered-question row id (waiting only)")
+    dependency.add_argument("--prerequisite-task", help="distinct routed ship or scout task id (waiting only)")
     args = parser.parse_args()
     receipt_mode = args.command == "action" or args.present_overdue or args.check_actions or args.report
     if args.command == "action" and (args.present_overdue or args.check_actions or args.report):
