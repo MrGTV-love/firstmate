@@ -673,11 +673,7 @@ ok - private terminal audit keeps typed errors and cost certainty without payloa
 
 These are controlled HTTP-fixture policy and executable-adapter results, not live model accuracy, native Claude replacement or deployed protection.
 The source exception is the [operator contract's Firstmate-channel consistency check](../configuration.md#jev-guard), with the role-file receipt trust limit, not producer authentication; a same-user process deliberately forging the recorded digest can pass.
-On 2026-10-15 UTC, actual omp 18.10.4 with a scripted provider and in-process Jev fixtures preserved publisher-produced launch/inbox reads, screened an ordinary-file claimed-authority copy and post-publication changed bytes, and preserved consistent instructions during privacy/credential/provider/audit outages.
-Its native `:raw` reads retained full byte framing, and the audit-unavailable notice reached the next model context outside the original result; there were two fixture HTTP calls and zero live Jev or model calls.
-Actual Claude Code 2.1.300 then exercised native `UserPromptSubmit` and two built-in `Read` hooks on publisher-produced synthetic launch/inbox records, retaining exact returned bytes with no TypeSafe key or Jev request.
-That bounded native development session proves source delivery, not Claude output quarantine, model accuracy or deployed activation.
-Maintained native refresh commands use this checkout's `ROOT`, synthetic publisher records and local scripted providers rather than the historical private probes:
+Maintained native refresh commands use this checkout's `ROOT`, synthetic publisher records and local scripted providers:
 
 ```sh
 bash tests/fm-jev-guard-omp-live-e2e.test.sh
@@ -698,20 +694,16 @@ The portable guard and inbox suites also passed, including legacy-receipt negati
 The focused relaunch command covers the changed delivery and activation paths plus the file's mandatory lifecycle preamble, not the complete lifecycle suite.
 `bash tests/fm-control-relaunch.test.sh --jev-guard` passed the progress-note, survivor-announcement and legacy/current cutover scenarios on both host adapters; `bash tests/fm-typesafe-key-source.test.sh` also passed, including unavailable remote-bound credentials denying without egress.
 
-The review-fix round additionally exercised per-record skipped-ring recovery, multiple owed fire-and-forget retries, acknowledgement order, and launch/relaunch survivor delivery through the real publishers and captured executable launch prompts.
-`tests/fm-task-inbox.test.sh` and `tests/fm-jev-guard.test.sh` passed; the affected progress-note and survivor-delivery scenarios from `tests/fm-control-relaunch.test.sh` and the complete `tests/fm-brief.test.sh` also passed.
-The minimum-version regression executes the tagged OMP 18.1.20 `content`/`details`/`isError` result-consumer semantics, proving that the audit patch remains observable and preserves the original instruction bytes, details and error status; this is not native 18.1.20 execution.
-A fresh actual OMP 18.10.4 print-mode session then used built-in full `:raw` reads of a publisher-produced launch record and two steering records, with privacy withholding, no TypeSafe key, and an unwritable audit ledger.
-All three original instruction texts and their appended sanitized `AuditUnavailableError` notices reached the next model context through result content, while an ordinary-file copy and changed-byte record were withheld.
-That smoke used two loopback scripted-provider requests, no live Jev or model calls, and no production activation; unlike the earlier native observation, its audit notice used a content patch rather than separate additional context.
+The minimum-version regression in `tests/fm-jev-guard.test.sh` executes the tagged [OMP 18.1.20 result-consumer semantics](https://github.com/can1357/oh-my-pi/blob/v18.1.20/packages/coding-agent/src/extensibility/extensions/runner.ts#L1418-L1459) for `content`/`details`/`isError`, proving that the audit patch remains observable and preserves the original instruction bytes, details and error status; this is not native 18.1.20 execution.
+The maintained native commands above refresh the actual installed-host evidence, not that minimum-version emulation.
 
-The current protection claim remains **no protection**.
+The [operator contract](../configuration.md#jev-guard) owns the current protection claim.
 Synthetic calibration fixtures do not authenticate real publisher identity, and source-fixture preservation cannot be counted as a successful live classification.
 The injection calibration does not validate shell/write judgment accuracy, large-output semantics, unrelated providers or other model versions.
 
 Current native deployment acceptance must exercise fresh Claude and omp workers through authorized isolated launch, including firstmate-only egress, inactive scopes, pre-tool refusal, omp result replacement, Claude advisory limits, provider/privacy/audit outages and the approved supervisor-read source positives and negatives.
 Repeat native validation after a Claude Code or omp upgrade; historical scratch sessions and portable fixtures alone cannot refresh those guarantees.
-The [launch-only cutover contract](../configuration.md#jev-guard) applies independently of this verification: only current-format records qualify, legacy tasks remain unguarded across shared-code updates and relaunch, and manual Main reissue plus acknowledged delivery precedes retiring an old pending identity.
+The [operator-owned launch-only cutover contract](../configuration.md#jev-guard) applies independently of this verification.
 PR evidence must carry that cutover limit and the same-user digest-forgery limit, and must distinguish executed native versions from minimum-version consumer emulation and explicit capability skips.
 
 ## Claude primary feedback
@@ -1745,7 +1737,8 @@ tmux has no agy identity probe, so an agy pane on tmux still reads `unknown`; th
 
 ## Steering-inbox doorbell
 
-The steering channel's one behavioral assumption - a real worker agent follows the constant self-describing doorbell line (list the inbox, read and act on its records in numeric order, then `mv` each into `handled/`) - was verified on 2026-08-23 against every installed verified harness, on tmux 3.6a, macOS arm64, on an isolated private socket, driving the REAL `bin/fm-send.sh` end to end (durable record plus doorbell, with one mid-wait re-ring playing the watcher's role).
+On 2026-08-23, real workers followed the then-current drain-all doorbell on every installed verified harness, using tmux 3.6a, macOS arm64 and an isolated private socket, driving `bin/fm-send.sh` end to end with one mid-wait re-ring playing the watcher's role.
+That observation predates the current record-specific [inbox contract](../../bin/fm-task-inbox-lib.sh); it does not establish ordered per-record delivery or guard consistency admission.
 
 ```sh
 FM_SEND_INBOX_LIVE_E2E=1 tests/fm-send-inbox-doorbell-live-e2e.test.sh
@@ -1765,15 +1758,14 @@ ok - muse (Muse Code 0.2.1 (0.2.1-R1215.1)): the doorbell reached a real worker,
 ```
 
 All six installed harnesses honored the doorbell contract with real model turns: each listed the inbox named by the doorbell, read its record, executed the instruction inside it, and acknowledged with the atomic `mv`.
-Two findings from the run shaped the shipped behavior: an OpenCode vendor update modal swallowed the first doorbell and the single re-ring recovered it, which is exactly the watcher ladder's job; and grok 1.0.5's idle composer never classifies `empty` (a classifier drift owned by the [Composer classification matrix](#composer-classification-matrix) guard, whose refresh for grok 1.0.5 is still owed), which motivated the ring's advisory pre-check not to skip on ambiguity - a doorbell into an ambiguous composer is a recoverable constant line, while skipping on ambiguity would starve steering for any harness the classifier cannot positively identify.
+Two findings from the run shaped the shipped behavior: an OpenCode vendor update modal swallowed the first doorbell and the single re-ring recovered it, which is exactly the watcher ladder's job; and grok 1.0.5's idle composer never classifies `empty` (a classifier drift owned by the [Composer classification matrix](#composer-classification-matrix) guard, whose refresh for grok 1.0.5 is still owed), which motivated the ring's advisory pre-check not to skip on ambiguity - a doorbell into an ambiguous composer is recoverable, while skipping on ambiguity would starve steering for any harness the classifier cannot positively identify.
 The [inbox ring owner](../../bin/fm-task-inbox-lib.sh) defines the current advisory pre-check, draft-risk deferral, and own-doorbell retry contract.
 Kimi was not installed on the verification machine; its receive path is the same one-line-plus-shell contract, and the portable ladder and enqueue regressions in `tests/fm-task-inbox.test.sh` and `tests/fm-send-inbox.test.sh` cover every harness-independent half.
 This guard is the refresh command after any harness upgrade; it spends a small number of real tokens per installed harness, reports an absent harness explicitly, and refuses a run that verified nothing.
 
-The doorbell no longer prints the inbox's absolute path, so its length no longer grows with the home's depth.
-It names the inbox as `"$FM_TASK_INBOX"`, which `bin/fm-spawn.sh` exports into every launch as the absolute `state/<task>.inbox` path, followed by the short `<task>.inbox` name; the brief's full path remains the fallback for a worker launched without that export.
+The [inbox owner](../../bin/fm-task-inbox-lib.sh) defines the current environment-relative, record-specific doorbell shape.
 The guard now launches each worker with `FM_TASK_INBOX` exported and no brief, so the worker must resolve the inbox from the doorbell and its environment alone.
-It is the refresh command for that shape, which has not yet been recorded live here.
+It is the refresh command for the current shape, which has not yet been recorded with real model turns here; the [Jev guard native refresh](#jev-guard-native-tool-hooks) instead uses scripted loopback providers.
 The run below, on 2026-09-30 on tmux 3.6, Linux (WSL2), with the same command, covered the earlier brief-primed shape, whose doorbell named only the short `<task>.inbox` name and whose guard gave each worker the brief's steering-inbox sentence before the steer:
 
 ```text

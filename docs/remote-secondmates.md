@@ -458,8 +458,8 @@ FM_HOME=<primary-home> bin/fm-send.sh fm-<id> '<request>'
 ```
 
 The [`fm-send.sh` header](../bin/fm-send.sh) owns the exact delivery-status contract.
-A routed request is delivered as a durable record in the remote home's steering inbox plus a best-effort doorbell, a constant line rung into the terminal.
-It is never delivered by typing the payload into the pane.
+Routed requests use the [steering-inbox contract](../bin/fm-task-inbox-lib.sh) in the remote home.
+The payload is never delivered by typing it into the pane.
 Exit 0 means the record durably exists.
 
 ### Retries and safe resends
@@ -483,8 +483,9 @@ When deduplication finds that the worker already moved the matching record into 
 
 The remote host runs no doorbell re-ring ladder of its own.
 A swallowed doorbell for an ordinary reply-bearing request surfaces through the parent's pending-reply recovery and escalation.
-Its recovery request rings the doorbell again when it is enqueued.
-A fire-and-forget record, such as a reconcile ask, gets its single retry ring only on the local plane, and only when `config/wait-no-turns` is present: the remote steer leg owes no re-ring, so a swallowed remote doorbell for one waits for the next ring into that inbox.
+Each recovery request announces its own record, not any older unannounced records.
+The [inbox owner](../bin/fm-task-inbox-lib.sh) defines local fire-and-forget retries; the remote steer leg owes no re-ring.
+A swallowed remote fire-and-forget doorbell requires delivery of that record's own doorbell again, not a later ring for another record.
 
 ### Remote reads
 

@@ -1825,7 +1825,7 @@ On 2026-10-07, the captain authorized worker skill selection to send the same sa
 This authorization does not widen any other sending boundary.
 Outside that worker skill-selection authorization, do not send real Vernant/customer text until separately authorized: TypeSafe's public terms have not established the required `standard_confidential/v1` processor protections of deletion within 30 days and no training, and the [Jev guard](#jev-guard) withholds every project except `firstmate`.
 
-Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; for Jev guard, each string in the tool state before credential lookup, not the fixed questions or model ID; belay checks every request string.
+Before sending, `bin/fm-typesafe-lib.sh` checks literal matches: for dispatch resolution, the project name, the sanitized task text, each rule's `when`, and the fixed question text; for worker skill selection, each complete outbound request, including task text, question instructions, assembled skill criteria, and the requested model ID, before either direct or fallback transport; [Jev guard](#jev-guard) owns its complete-request preflight; belay checks every request string.
 A literal match stops the request: the resolver behaves exactly as when it is off, printing one `dispatch-resolve: off (...; nothing sent)` line on stderr and nothing on stdout, making no network or quota call, and exiting 0, so firstmate dispatches through its existing intake.
 A list that cannot be inspected through its ancestors, is present but not a readable regular file, contains an invalid directive, or has a marker problem also stops the request the same way rather than sending unchecked text.
 That one diagnostic names the list line number at most and never prints the listed value or the matching text.
@@ -2037,10 +2037,8 @@ Missing or mismatched delivery, copied claimed-authority instructions, changed b
 Consistent instructions bypass model/privacy/credential outages; an audit failure adds an explicit review notice rather than erasing them.
 On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
 Claude keeps its distinct advisory `additionalContext`, containing neither the source text nor its path.
-Each steering doorbell requests only its exact record, after earlier records have been handled; an unannounced sibling must wait for its own doorbell.
-Watcher recovery announces successive ordinary records as they are acknowledged, and each skipped fire-and-forget record retains its own owed retry, scheduled from that record's publication mtime rather than a shared retry-queue clock.
-Guarded launches and relaunches carry individual doorbells for surviving current-format records in the native prompt, including Claude's record-backed launch carrier; announcement never repairs a legacy record's receipt.
-Checkpoint checks list the inbox but read only already announced records; unannounced survivors are reported to Firstmate for re-delivery.
+The [steering-inbox owner](../bin/fm-task-inbox-lib.sh) defines record-specific delivery, ordered survivor announcements, checkpoint handling and publication-clock retry scheduling.
+Native launch prompts carry the survivor doorbells separately from Claude's record-backed launch carrier, so the guard sees each binding without reading that carrier first; announcement never repairs a legacy receipt.
 This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
 Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
 

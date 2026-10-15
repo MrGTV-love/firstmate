@@ -14,13 +14,18 @@
 # Design (captain-adopted, data/fm-send-reliability-reframe-s1/report.md): the
 # payload moves to the filesystem, which is reliable; the terminal carries only
 # a short doorbell naming the inbox and exact record, never its payload. While
-# the endpoint remains available, ringing that same record again is free. A
-# duplicated doorbell is a no-op by construction (the worker finds the inbox
-# empty or already handled), and a swallowed doorbell is detected by the
-# absence of the worker's acknowledgement and re-rung on a bounded schedule.
+# the endpoint remains available, ringing that same record again is free.
+# A duplicate doorbell is a no-op when its named record is already handled;
+# a swallowed doorbell is detected by the absence of acknowledgement and
+# re-rung on a bounded schedule.
 # A positively dead or missing endpoint bypasses that schedule without being
 # typed into, and its unhandled record surfaces through the ordinary stale wake
 # into stuck-crewmate-recovery.
+# Each doorbell requests only its named record, after earlier records have
+# been acknowledged. At checkpoints, workers list the inbox but read only
+# announced records and report unannounced survivors for re-delivery.
+# Launch and relaunch prompts announce surviving records individually in
+# numeric order; announcement never creates or repairs a consistency receipt.
 #
 # Layout under <state-dir>:
 #   <task>.inbox/NNN.msg       one durable steer, numeric sequence, atomic rename
@@ -77,10 +82,10 @@
 # the watcher rings once more and spends the mark
 # whatever the result, so the record never rings a third time and never
 # escalates. A waiting worker does not poll its inbox (bin/fm-brief.sh), so
-# without this retry the record could sit unread until a checkpoint. Retries and
-# ordinary records ring in numeric order, and an acknowledged record drops its
-# mark. The remote steer leg has no watcher
-# ladder and owes no retry.
+# without this retry a missed doorbell leaves the record unannounced until
+# explicit re-delivery or launch/relaunch. Retries and ordinary records ring
+# in numeric order, and an acknowledged record drops its mark. The remote
+# steer leg has no watcher ladder and owes no retry.
 #
 # Inbox names containing bytes outside printable ASCII are unsupported. The
 # doorbell refuses them rather than sending terminal control bytes to a pane.
