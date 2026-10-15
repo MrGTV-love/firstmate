@@ -245,12 +245,10 @@
 # admission of that retry, including ownership and reservation, waits in the
 # FIFO queue. A waited admission that reaches the stall limit exits
 # FM_PROJECT_LOCK_BUSY_EXIT, so the next sweep retries it rather than standing
-# on a refusal memo; a lock error keeps exit 1 and is recorded as a refusal. On
-# 2026-10-14 (macOS arm64, 18 CPUs, load 136-177, modeled Treehouse) the
-# return stage itself held the lock 1s for an ordinary teardown and 1-4s per
-# recursive child. Project holders never wait for task custody (fresh spawn
-# refuses a held task-set lock), so these waits cannot deadlock with the
-# descendant locks recursive cleanup holds.
+# on a refusal memo; a lock error keeps exit 1 and is recorded as a refusal.
+# Project holders never wait for task custody (fresh spawn refuses a held
+# task-set lock), so these waits cannot deadlock with the descendant locks
+# recursive cleanup holds.
 # Recursive cleanup already holds every descendant home's lifecycle locks, so
 # its admission makes one nonwaiting attempt per descendant project lock that
 # never jumps a queued waiter; it collects and deduplicates those paths and
