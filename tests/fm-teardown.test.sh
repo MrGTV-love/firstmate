@@ -8860,6 +8860,96 @@ test_reservation_window_reassignment_retires_records_only() {
   pass 'a fresh allocation in the reservation window retires only the retiring record, preserving the new owner'
 }
 
+# The same window when the fresh allocator has already reset the slot to a
+# landed tip: the owned-copy proof read the claimant's copy, so the retiring
+# task is proved again from its own record. With its own branch unlanded and no
+# merged PR it refuses and keeps its records; with a merged recorded PR it
+# completes records-only and its backlog row records that PR, not local main.
+test_reservation_window_reassignment_reproves_own_landing() {
+  local shape case_dir slot own rc alloc_rc label
+  for shape in unlanded merged-pr; do
+    label="window-reproof-$shape"
+    make_lease_modeling_pool_case "pool-$label" ''
+    case_dir=$POOL_CASE
+    slot=$POOL_SLOT
+    rm -f "$case_dir/config/backlog-backend"
+    seed_backlog_in_flight "$case_dir"
+    own="$case_dir/own-copy"
+    git -C "$case_dir/project" worktree add -q -b fm/task-x1-own "$own" main
+    printf 'undelivered\n' > "$own/undelivered.txt"
+    git -C "$own" add undelivered.txt
+    git -C "$own" -c user.email=t@t -c user.name=t commit -qm 'undelivered task work'
+    git -C "$case_dir/project" worktree remove --force "$own"
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      'window=firstmate:fm-task-x1' 'endpoint_task_id=task-x1' \
+      "worktree=$slot" "project=$case_dir/project" 'kind=ship' 'mode=local-only' \
+      'spawn_gen=teardown-test-task-x1' 'branch=fm/task-x1-own'
+    if [ "$shape" = merged-pr ]; then
+      append_pr_meta_url "$case_dir"
+      add_gh_pr_merged_for_head "$case_dir" "$(git -C "$case_dir/project" rev-parse fm/task-x1-own)"
+    fi
+    printf 'unfinished task\n' > "$case_dir/state/task-x1.status"
+    cp "$case_dir/state/task-x1.meta" "$case_dir/task-meta.before"
+    cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/tmux"
+    fm_write_meta "$case_dir/live-task.meta.new" \
+      "window=firstmate:fm-live-task" "endpoint_task_id=live-task" \
+      "worktree=$slot" "project=$case_dir/project" "kind=ship" "spawn_gen=live"
+    printf 'live task\n' > "$case_dir/live-task.status.new"
+    git -C "$slot" rev-parse HEAD > "$case_dir/head.before"
+    git -C "$slot" symbolic-ref HEAD > "$case_dir/branch.before"
+    git -C "$slot" status --porcelain --untracked-files=all > "$case_dir/copy-status.before"
+    git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' > "$case_dir/refs.before"
+    add_window_swap_git_shim "$case_dir"
+    start_window_fresh_allocator "$case_dir" "$POOL_LOCK" "$slot"
+    rc=0
+    FM_POOL_CASE="$case_dir" run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    alloc_rc=0
+    wait "$WINDOW_ALLOCATOR_PID" || alloc_rc=$?
+    [ "$alloc_rc" = 0 ] || fail "$label: the fresh allocator failed"
+    assert_equals 1 "$(cat "$case_dir/holds-at-swap" 2>/dev/null || true)" \
+      "$label: the swap did not land after the early ownership proof"
+    if [ "$shape" = unlanded ]; then
+      expect_code 1 "$rc" "$label: an unlanded task must not retire records-only on a slot reassigned in the window"$'\n'"$(cat "$case_dir/stderr")"
+      assert_grep "REFUSED: task task-x1's recorded copy $slot was reassigned to task live-task" "$case_dir/stderr" \
+        "$label: the refusal did not name the reassigned slot"
+      assert_grep 'its own branch fm/task-x1-own is not proved landed' "$case_dir/stderr" \
+        "$label: the refusal lost its delivery proof boundary"
+      cmp -s "$case_dir/task-meta.before" "$case_dir/state/task-x1.meta" || fail "$label: the retiring record changed"
+      assert_present "$case_dir/state/task-x1.status" "$label: the retiring status was removed"
+      assert_absent "$case_dir/state/task-x1.backlog-close" "$label: a pending backlog close was published"
+      assert_absent "$case_dir/endpoint.log" "$label: the refused teardown touched an endpoint"
+      [ "$(backlog_row_state "$case_dir")" = in_flight ] || fail "$label: the backlog row left In flight"
+    else
+      expect_code 0 "$rc" "$label: a merged recorded PR must complete records-only: $(cat "$case_dir/stderr")"
+      assert_absent "$case_dir/state/task-x1.meta" "$label: the retiring record survived"
+      grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null || fail "$label: the backlog row was not closed"
+      assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
+        "$label: the closed row does not record the merged PR"
+      assert_no_grep 'local main' "$case_dir/data/backlog.md" \
+        "$label: the closed row certifies a local-main landing read from the claimant copy"
+    fi
+    assert_absent "$case_dir/treehouse.log" "$label: the retiring task administered the pool"
+    cmp -s "$case_dir/claim.after-swap" "${slot%/*}/.fm-slot-owner" || fail "$label: the new owner claim changed"
+    jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "live-task"' \
+      "$case_dir/pool/treehouse-state.json" >/dev/null \
+      || fail "$label: the new owner lease changed: $(cat "$case_dir/pool/treehouse-state.json")"
+    cmp -s "$case_dir/live-meta.before" "$case_dir/state/live-task.meta" || fail "$label: the new owner record changed"
+    cmp -s "$case_dir/live-status.before" "$case_dir/state/live-task.status" || fail "$label: the new owner status changed"
+    git -C "$slot" rev-parse HEAD | cmp -s - "$case_dir/head.before" || fail "$label: the claimant HEAD changed"
+    git -C "$slot" symbolic-ref HEAD | cmp -s - "$case_dir/branch.before" || fail "$label: the claimant branch changed"
+    git -C "$slot" status --porcelain --untracked-files=all | cmp -s - "$case_dir/copy-status.before" \
+      || fail "$label: the claimant copy status changed"
+    git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' | cmp -s - "$case_dir/refs.before" \
+      || fail "$label: the refs changed"
+  done
+  pass 'a slot reassigned in the reservation window is proved again from the retiring record, never from the claimant copy'
+}
+
 # The enclosing-slot variant of the same window: the fresh spawn claims the
 # slot the retiring task's nested copy sits in. The retiring task keeps its own
 # reassociated copy in place and returns nothing; the new owner's claim, lease,
@@ -11679,6 +11769,7 @@ test_run_abort_precedes_process_reap_precedes_worktree_removal
 test_reassigned_dirty_slot_retires_only_finished_task
 test_reassigned_slot_unlanded_task_refuses
 test_reservation_window_reassignment_retires_records_only
+test_reservation_window_reassignment_reproves_own_landing
 test_enclosing_reservation_window_reassignment_leaves_claimant_slot
 test_reassociated_copies_are_left_in_place
 test_reassociated_unlanded_copy_still_refuses

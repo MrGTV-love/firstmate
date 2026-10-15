@@ -2880,6 +2880,24 @@ require_worktree_teardown_safety() {
   exit 1
 }
 
+teardown_reprove_reassigned_slot() {
+  local stage="$STATE/.$ID.backlog-close.${BASHPID:-$$}"
+  teardown_release_project_lock || exit 1
+  require_worktree_teardown_safety
+  [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 1 ] || return 0
+  if ! backlog_done_args \
+     || ! fm_backlog_record_remove "$stage" "pending-close staged record" "$STATE" \
+     || ! fm_backlog_close_marker_stage "$stage" "$ID" "$DATA" "$TEARDOWN_META_SPAWN_GEN" "$STATE" 0 \
+       "${BACKLOG_TRANSITION_FLAGS[@]+"${BACKLOG_TRANSITION_FLAGS[@]}"}" \
+       "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}" \
+     || { [ "$BACKLOG_CLOSED" = 1 ] \
+          && ! fm_backlog_atomic_transition publish "$stage" "$BACKLOG_CLOSE_MARKER" "pending-close record" "$STATE"; }; then
+    fm_backlog_record_remove "$stage" "pending-close staged record" "$STATE" || true
+    echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
+    exit 1
+  fi
+}
+
 # Fix 1 (see script header): does the active-or-most-recent no-mistakes run in
 # worktree $1 belong to THIS task, and is it parked at a gate awaiting an agent
 # that is about to be removed? Prints nothing; returns 0 only on a genuine
@@ -5397,6 +5415,7 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree; then
     teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT" || exit 1
   fi
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
+  teardown_owns_worktree || teardown_reprove_reassigned_slot
 fi
 if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
@@ -5741,6 +5760,8 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
       # and an index lock refuses without sleeping or retrying here.
       [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
       teardown_nested_slot return
+    else
+      teardown_reprove_reassigned_slot
     fi
   fi
   fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
