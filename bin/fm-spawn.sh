@@ -223,9 +223,11 @@
 #   in a shared remote-tracking ref or FETCH_HEAD, so concurrent fetches cannot
 #   race it. Under the lock the base refresh validates that immutable commit in
 #   the slot's own object store and resets to it. It moves the shared
-#   origin/<default> ref only forward by compare-and-set and creates
-#   origin/HEAD only when it is missing or dangling, so a newer value another
-#   fetch wrote while this spawn waited is never rewound.
+#   origin/<default> ref only forward by compare-and-set, and repoints origin/HEAD
+#   (the remote's default branch, found by the discovery before the lock) only
+#   when it is missing, dangling or last written before that discovery, so a
+#   default-branch rename is followed and a newer observation another fetch
+#   wrote while this spawn waited is never overwritten.
 #   The base is therefore the tip this spawn itself fetched before it queued, at
 #   most its own queue wait old; a fetch failure still refuses, at the refresh's
 #   own position. A slot that does not share the project's objects (a sibling
@@ -1691,6 +1693,7 @@ SPAWN_BASE_DEFAULT=
 SPAWN_BASE_REF=
 SPAWN_BASE_ERROR=
 SPAWN_BASE_DISCOVERED=0
+SPAWN_BASE_DISCOVERED_AT=
 SPAWN_SLOT_CLAIMED=0
 RELAUNCH_REPLACEMENT_PENDING=0
 RELAUNCH_REPLACEMENT_BUSY_GEN=
@@ -4046,6 +4049,7 @@ spawn_fetch_base_evidence() {
       return 0
     fi
     SPAWN_BASE_DISCOVERED=1
+    fm_epoch_seconds_to SPAWN_BASE_DISCOVERED_AT
   fi
   SPAWN_BASE_REF="refs/fm/spawn-base/$(printf '%s' "$ID" | git hash-object --stdin)-${BASHPID:-$$}"
   if ! GIT_TERMINAL_PROMPT=0 git -C "$PROJ_ABS" fetch --quiet --no-write-fetch-head --refmap= origin \
@@ -4410,6 +4414,16 @@ spawn_advance_origin_ref() { # <worktree> <ref> <sha>
   fi
 }
 
+# True when origin/HEAD was last written strictly before <epoch>, the moment
+# this spawn observed the remote's default branch: its discovery is then newer.
+# A write at or after that moment, or one whose time cannot be read, is kept.
+spawn_origin_head_older_than() { # <worktree> <epoch>
+  local path written
+  path=$(git -C "$1" rev-parse --path-format=absolute --git-path refs/remotes/origin/HEAD 2>/dev/null) || return 1
+  written=$(fm_path_mtime "$path") || return 1
+  [ -n "$written" ] && [ -n "$2" ] && [ "$written" -lt "$2" ]
+}
+
 freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
   local worktree=$1 base=${2:-} default target expected actual status current
   status=$(git -C "$worktree" -c core.quotePath=false status --porcelain) || {
@@ -4443,7 +4457,10 @@ freshen_spawn_worktree_base() { # <worktree> [<base-branch>]
     spawn_advance_origin_ref "$worktree" "refs/remotes/origin/$default" "$expected"
     if [ "$SPAWN_BASE_DISCOVERED" = 1 ]; then
       current=$(git -C "$worktree" symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)
-      if [ -z "$current" ] || ! git -C "$worktree" rev-parse --verify --quiet "$current" >/dev/null 2>&1; then
+      if [ "$current" != "refs/remotes/origin/$default" ] &&
+        { [ -z "$current" ] ||
+          ! git -C "$worktree" rev-parse --verify --quiet "$current" >/dev/null 2>&1 ||
+          spawn_origin_head_older_than "$worktree" "$SPAWN_BASE_DISCOVERED_AT"; }; then
         git -C "$worktree" symbolic-ref refs/remotes/origin/HEAD "refs/remotes/origin/$default" 2>/dev/null || true
       fi
     fi

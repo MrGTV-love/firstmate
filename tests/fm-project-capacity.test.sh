@@ -1701,6 +1701,34 @@ test_queued_spawn_never_rewinds_newer_shared_origin_refs() {
   pass 'a queued spawn starts from its own fetched tip without rewinding newer shared origin refs'
 }
 
+# The remote renames its default branch while the project clone's origin/HEAD
+# still names the old, still-resolvable one. The spawn discovers the new default
+# before the lock, starts the worker from it and repoints origin/HEAD, because
+# its observation is newer than the last write to that ref. (The test above
+# proves the opposite ordering: a newer write made while the spawn queued stays.)
+test_spawn_follows_a_renamed_remote_default_branch() {
+  local case_dir home upstream rc=0 tip head_ref
+  case_dir=$(make_case renamed-default task-r)
+  home="$case_dir/home"
+  upstream="$case_dir/upstream"
+  git clone --quiet "$case_dir/project.origin.git" "$upstream"
+  git -C "$upstream" checkout --quiet -b trunk
+  git -C "$upstream" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m 'work on trunk'
+  tip=$(git -C "$upstream" rev-parse HEAD)
+  git -C "$upstream" push -q origin trunk
+  git --git-dir="$case_dir/project.origin.git" symbolic-ref HEAD refs/heads/trunk
+  git -C "$case_dir/project" fetch --quiet origin
+  git -C "$case_dir/project" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+  head_ref=$(git -C "$case_dir/project" rev-parse --path-format=absolute --git-path refs/remotes/origin/HEAD)
+  fm_touch_epoch $(( $(date +%s) - 3600 )) "$head_ref"
+  spawn_ship "$case_dir" task-r > "$case_dir/spawn.out" 2>&1 || rc=$?
+  expect_code 0 "$rc" "the spawn must follow the renamed default branch: $(cat "$case_dir/spawn.out")"
+  assert_equals "$tip" "$(git -C "$case_dir/wt-task-r" rev-parse HEAD)" 'the worker did not start from the renamed default branch'
+  assert_equals refs/remotes/origin/trunk "$(git -C "$case_dir/project" symbolic-ref refs/remotes/origin/HEAD)" \
+    'the spawn did not repoint origin/HEAD at the renamed default branch'
+  pass 'a spawn follows a renamed remote default branch and repoints origin/HEAD'
+}
+
 # Task ids may contain characters Git refuses in ref names; a scout needs no
 # branch, so such ids launch. The private base ref is named from a hash, so
 # they still launch and leave no ref behind.
@@ -1840,6 +1868,7 @@ SH
 test_fresh_spawn_fetches_its_base_before_it_queues_for_the_project_lock
 test_locked_base_refresh_needs_no_network_once_the_base_is_fetched
 test_queued_spawn_never_rewinds_newer_shared_origin_refs
+test_spawn_follows_a_renamed_remote_default_branch
 test_spawn_ids_that_are_not_ref_names_still_launch
 test_undeclared_capacity_keeps_dispatch_uncapped
 test_available_capacity_admits_the_worker
