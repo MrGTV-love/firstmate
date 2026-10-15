@@ -688,6 +688,8 @@ Both belong to `live-harness-optin` and open with `tests/lib.sh`'s `fm_live_gate
 OMP is token-free and default-on when its dependencies are installed; Claude stays explicitly opt-in.
 Their own control variable or `FM_LIVE=1` forces execution and makes missing dependencies fail, while absent optional harnesses report an explicit skip, never a native pass.
 The fixtures import current-worktree guard source, consume actual native built-in read results in the next scripted model request, and keep their services and synthetic records private to the test.
+The shared launcher clears the worker-account owner's Claude provider/credential shed list before either harness starts, then supplies only the synthetic local provider identity.
+Native assertions distinguish policy flags from privacy/credential/provider outages using terminal decision, branch, error type, request-started state and the consumed notice; Claude's unique numbered Read result is compared with the complete source separately from its advisory.
 Verified on 2026-10-15 UTC against installed OMP 18.10.4 and Claude Code 2.1.300 using the maintained commands above with both guard-specific controls forced to `1`.
 Each host passed all 20 combinations of launch/inbox exact-byte positives and ordinary-copy/changed-byte negatives across normal, privacy, missing-credential, provider-outage and audit-outage conditions.
 Every case observed a native built-in read and its subsequent model request; Claude's actual read-hook payload retained the source bytes, and OMP audit notices preserved those bytes while reaching the next model context.

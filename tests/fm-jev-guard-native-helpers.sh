@@ -2,6 +2,13 @@
 
 fm_jev_native_run() {
   local backend=$1 version phase kind bell record inbox inbox_bell path prompt status
+  . "$ROOT/bin/fm-worker-account-lib.sh"
+  local credential
+  for credential in $FM_WORKER_ACCOUNT_CLAUDE_SHED; do
+    unset "$credential"
+  done
+  unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE OPENROUTER_API_KEY JEV_BACKEND JEV_LEVEL_CONFIG
+  unset ANTHROPIC_OAUTH_TOKEN CLAUDECODE
   version=$("$backend" --version 2>&1) || fail "$backend: version unavailable: $version"
   local subject="$backend ($version)"
   local lab
@@ -19,8 +26,6 @@ fm_jev_native_run() {
   trap 'exit 143' TERM HUP
   umask 077
   mkdir -p "$lab/tmp" "$lab/os-home" "$lab/agent" "$lab/claude"
-  unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE OPENROUTER_API_KEY JEV_BACKEND JEV_LEVEL_CONFIG
-  unset ANTHROPIC_AUTH_TOKEN ANTHROPIC_OAUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN CLAUDECODE
   export FM_TEST_SEAM=1 TMPDIR="$lab/tmp"
   : > "$lab/jev.jsonl"
   : > "$lab/model.jsonl"
