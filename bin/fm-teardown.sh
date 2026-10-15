@@ -220,7 +220,10 @@
 # releases project custody before slow cleanup, or keeps every descendant lock
 # through cleanup when a slot cannot be reserved. Each actual child return and
 # matching record removal otherwise takes only that child's project lock and
-# releases it immediately.
+# releases it immediately. A child return the provider refuses keeps the
+# durably leased slot, the child's record and the pending-return record for a
+# retry; only the unreserved, whole-cleanup-custody path falls back to the
+# guarded raw removal of the child copy.
 # Project-lock contention uses bin/fm-project-lock-lib.sh's FIFO wait, which
 # refuses only when the holder stalls past the measured allowance, with holder
 # progress messages; callers no longer need retry loops for allocation/return
@@ -229,9 +232,12 @@
 # attempts, so contention exits FM_PROJECT_LOCK_BUSY_EXIT with nothing closed
 # and the next sweep retries. Once processes or endpoints may be gone, the
 # reaper's return stage and every forced child return wait in that FIFO queue
-# instead, bounded per holder by the same stall allowance as every other
-# waiter (370s, measured in bin/fm-project-lock-lib.sh), inside the reaper's
-# 600s teardown limit. As soon as a slot is reserved, or this task's own claim
+# instead, each waited admission bounded per holder by the same stall
+# allowance as every other waiter (370s, measured in
+# bin/fm-project-lock-lib.sh). The wait has no total bound of its own; the
+# reaper's 600s teardown limit ends an overlong teardown, which keeps its
+# durable record and is retried by the next sweep without a refusal memo.
+# As soon as a slot is reserved, or this task's own claim
 # beside a slot another task leases awaits release, and before any cleanup
 # that can fail and before the pending backlog close is published, teardown
 # records state/<id>.teardown-return-pending (bin/fm-wake-lib.sh's
@@ -5075,9 +5081,17 @@ cleanup_firstmate_home_children() {
              || [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED" ]; then
             return "$child_return_rc"
           fi
+          if [ "$DESCENDANT_LEGACY_CUSTODY" != 1 ]; then
+            echo "REFUSED: child $child_id pool slot is durably leased and its return failed; retaining the slot, its task record and the pending-return record for a retry" >&2
+            return 1
+          fi
           safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
         fi
       else
+        if [ "$DESCENDANT_LEGACY_CUSTODY" != 1 ]; then
+          echo "REFUSED: child $child_id pool slot is durably leased and treehouse is not installed to return it; retaining the slot, its task record and the pending-return record for a retry" >&2
+          return 1
+        fi
         safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
       fi
     fi

@@ -216,6 +216,11 @@
 #   while it still holds the allocation lock drops its own claim; an abort after
 #   metadata publication has released that lock leaves the claim in place, and
 #   the next spawn's claim replaces it.
+#   Before it queues for that lock, a fresh spawn fetches origin into the project
+#   clone, best effort and bounded, so the object transfer of its base refresh
+#   runs outside project custody. Slots are worktrees of that clone and share its
+#   objects; the refresh that decides the base stays under the lock and still
+#   fetches and refuses on failure, so the freshness guarantee is unchanged.
 #   The local root is whatever bin/fm-wake-lib.sh's
 #   fm_firstmate_root_home resolves, so a home seeded from another machine anchors
 #   that lock itself rather than failing to resolve one;
@@ -3985,12 +3990,17 @@ if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ]; then
   SPAWN_PROJECT_CAPACITY=$FM_PROJECT_CAPACITY
   SPAWN_PROJECT_CAPACITY_ANY=$FM_PROJECT_CAPACITY_ANY
 fi
+spawn_prefetch_origin() {
+  git -C "$PROJ_ABS" remote get-url origin >/dev/null 2>&1 || return 0
+  GIT_TERMINAL_PROMPT=0 fm_run_timed 60 git -C "$PROJ_ABS" fetch --quiet origin </dev/null >/dev/null 2>&1 || true
+}
 if [ "$RELAUNCH" -eq 0 ] && [ "$KIND" != secondmate ] &&
   { [ "$BACKEND" != orca ] || [ -n "$SPAWN_PROJECT_CAPACITY_ANY" ]; }; then
   SPAWN_TREEHOUSE_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$PROJ_ABS") || {
     echo "error: could not resolve the shared Treehouse project lock for $PROJ_ABS" >&2
     exit 1
   }
+  [ "$BACKEND" = orca ] || spawn_prefetch_origin
   if ! fm_project_lock_acquire "$SPAWN_TREEHOUSE_PROJECT_LOCK" "spawn $ID"; then
     if [ "$BACKEND" = orca ]; then
       echo "error: another spawn or cleanup holds the shared project lock for $PROJ_ABS; refusing to race its capacity admission" >&2

@@ -60,8 +60,11 @@
 # the same measured stall bound as every other waiter. A stalled wait exits
 # FM_PROJECT_LOCK_BUSY_EXIT with that durable record kept, reported by the
 # open-work ledger, and the next sweep selects the task by that record and
-# retries it; a lock error is recorded as a refusal (bin/fm-teardown.sh's
-# header owns the mechanics).
+# retries it. So does a teardown that outlasts the 600-second limit below
+# while that record still stands: the wait has no total bound of its own, the
+# limit is what ends it, and the timeout records no refusal memo for it.
+# A lock error is recorded as a refusal (bin/fm-teardown.sh's header owns the
+# mechanics).
 #
 # `scan` rows are tab-separated: <class> <task-id> <kind> <age-secs> <detail>.
 # Classes: reap, wait-grace, refused, parked, awaiting-pipeline, awaiting-merge,
@@ -250,6 +253,10 @@ reap_one() {  # <task-id> <status-line>
   [ -n "$reason" ] || reason=${out##*$'\n'}
   [ -n "$reason" ] || reason="exit status $rc"
   if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+    if fm_teardown_return_pending "$STATE" "$id"; then
+      add_row teardown-timeout "$id" - - "teardown exceeded 600s; its pool slot return is pending and the next sweep retries it"
+      return 0
+    fi
     add_row teardown-timeout "$id" - - "teardown exceeded 600s"
   else
     add_row teardown-refused "$id" - - "$reason"

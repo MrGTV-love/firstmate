@@ -840,7 +840,38 @@ test_captain_holds
 test_stale_selection_is_revalidated
 test_admission_reads_after_metadata_lock
 test_admission_rechecks_every_gate
+# A teardown that outlasts the sweep's limit after it reserved its slot keeps
+# its return-pending record. The timeout must then record no refusal memo, so
+# the very next sweep selects the closed task again instead of parking it.
+test_timeout_with_a_pending_return_is_retried_by_the_next_sweep() {
+  local home out fakebin
+  home=$(make_home timeout-pending)
+  fakebin=$(fm_fakebin "$home")
+  cat > "$fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = 600 ]; then
+  exec /bin/sleep 1
+fi
+exec /bin/sleep "$@"
+SH
+  chmod +x "$fakebin/sleep"
+  : > "$STUB_LOG"
+  printf 'hang\n' > "$STUB_MODE_FILE"
+  mk_task "$home" scout-pending scout idle "done [at=$OLD]: report written"
+  scout_report "$home" scout-pending
+  printf 'spawn_gen=\nslot=%s/pool/1/project\n' "$home" > "$home/state/scout-pending.teardown-return-pending"
+  out=$(PATH="$fakebin:$PATH" FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_IDLE_REAP_TEARDOWN_SECS=0 run_reap "$home" reap) \
+    || fail "reap failed: $out"
+  expect_class "$out" scout-pending teardown-timeout "the real timeout runner cuts the hung teardown"
+  assert_absent "$home/state/.idle-reap/scout-pending.refused" "a timeout with a pending return records no refusal memo"
+  assert_present "$home/state/scout-pending.meta" "the timeout retired the task"
+  assert_present "$home/state/scout-pending.teardown-return-pending" "the timeout dropped the pending-return record"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" scout-pending reap "the next sweep selects the closed task again"
+  pass "a timeout with a pending pool return leaves the task selectable by the next sweep"
+}
 test_teardown_timeout_is_bounded
+test_timeout_with_a_pending_return_is_retried_by_the_next_sweep
 test_return_pending_task_is_selected_unless_busy
 test_single_flight_lock
 test_stale_memo_is_pruned
