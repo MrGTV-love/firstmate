@@ -1,0 +1,40 @@
+ok - a fresh spawn fetches its base before it queues, writes no shared ref outside custody, and cleans up its private ref
+ok - the locked base refresh uses the fetched commit and needs no network
+ok - a queued spawn starts from its own fetched tip without rewinding newer shared origin refs
+ok - a spawn follows a renamed remote default branch and repoints origin/HEAD
+ok - task ids that are not ref names still launch and clean up their private base refs
+ok - a project with no declared capacity keeps today's uncapped dispatch
+ok - a spawn is admitted while its project still has a free place
+ok - a spawn beyond capacity is deferred before any record, brief, endpoint, worktree, or backlog move exists
+ok - a project name with spaces is declared by taking the capacity from the last field
+ok - a project name beginning with # is declared, and a # comment stays a comment
+ok - a home reached through a symlink counts each of its workers once
+ok - a recorded PR handoff or a cleanup each frees exactly one place
+ok - a restart of a task id does not count that task's own record
+ok - only this project's ship and scout records hold places
+ok - every local home shares one declared capacity per project origin, and remote homes do not count
+ok - an unreadable state directory or task record refuses admission rather than undercounting
+ok - concurrent spawns can never both take the last place
+ok - spawn proceeds during slow process cleanup, clone sync and backlog completion while the retiring slot stays reserved until return
+ok - a forced child return queues for project custody after closure and returns the reserved slot
+ok - a refused forced child return keeps its reserved slot and records, and the retry returns the slot
+ok - a refused forced child return without a reservation falls back to guarded removal and finishes cleanup
+ok - a refused forced child return keeps only the slot this teardown leased, whatever its siblings did, and the retry returns it
+ok - a fresh same-ID spawn refuses at task admission during a slow teardown, so pool return still progresses
+ok - spawn and teardown remain FIFO and a slow poller cannot starve behind a faster later spawn
+ok - a same-home spawn for another project launches while one spawn waits for its project
+ok - dead queued waiters are skipped and dead project holders are reclaimed without bypassing a live holder
+ok - bounded waiting identifies and preserves the live holder and removes its own expired ticket
+ok - a stalled holder refuses its waiters together, so a later waiter never goes ahead of an earlier one
+ok - a queue that keeps progressing admits every waiter in order and records each hold
+ok - nonwaiting admission refuses while the lock is held or an older waiter is queued
+ok - nonwaiting admission returns the busy status only for a live holder, and an error for a lock nobody holds
+ok - a departed waiter's reused PID does not reserve the queue for an unrelated live process
+ok - an observed steal-mutex contention remains transient when another reclaimer releases or renames its owner
+ok - invalid overrides and registration failures refuse before queueing, each with its own class
+ok - concurrent recursive cleanup with reversed child project order tries globally sorted project locks once and completes both homes
+ok - a spawn that fails after admission leaves no record and holds no place
+ok - an unreadable declaration refuses every fresh spawn rather than guessing the limit
+ok - a batch reports a capacity deferral as deferred, not failed
+ok - an Orca spawn takes the shared project lock whenever a same-origin clone is capped and defers before creating anything
+bash tests/fm-project-capacity.test.sh  76.98s user 130.37s system 54% cpu 6:20.14 total

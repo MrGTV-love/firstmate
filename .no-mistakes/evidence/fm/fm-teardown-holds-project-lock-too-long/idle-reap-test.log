@@ -1,0 +1,24 @@
+ok - scan selects exactly the finished, idle, landed tasks and reports parked ones with their reason
+ok - canonical declared waits retain reasons across keyed resolutions and configured verbs without weakening cleanup gates
+ok - reap hands only reap-ready tasks to teardown, by id, without --force, and publishes parked reasons
+ok - the fixed three-task budget bounds each pass
+ok - a teardown refusal is remembered, retried on a status change or after the retry interval, and cleared on success
+ok - the real fm-teardown.sh refuses without touching the task, and the sweep records why
+ok - a lease refusal is skipped without a memo and retried next pass
+ok - a sweep teardown meeting project-lock contention returns at once, changes nothing, and is retried next sweep
+ok - a sweep teardown meeting a freshly published project lock skips it, preserves it, and records no refusal
+ok - a project lock nobody holds but the teardown cannot take is recorded as a refusal, not a lock skip
+ok - both terminal timestamps must be known and the grace remains fixed
+ok - canonical merge identities work across all supported forges
+ok - the sweep uses semantic harness classification and source trust
+ok - durable and unreadable captain holds prevent automatic cleanup
+ok - locked automatic admission rejects eligibility made stale by an earlier teardown
+ok - automatic admission observes inbox delivery before the metadata lock is released
+ok - automatic admission rechecks all selection gates for ships and scouts
+ok - the fixed teardown timeout cuts a hung command and records its refusal
+ok - a timeout with a pending pool return leaves the task selectable by the next sweep
+ok - a return-pending record selects its interrupted task unless the worker is busy or the record is stale
+ok - overlapping sweeps are single-flight
+ok - refusal memos for retired tasks are pruned
+ok - unknown subcommands exit 2
+bash tests/fm-idle-session-reap.test.sh  12.77s user 25.92s system 67% cpu 57.314 total
