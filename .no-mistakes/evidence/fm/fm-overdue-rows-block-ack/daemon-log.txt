@@ -1,0 +1,15 @@
+[2026-10-14T22:33:52-0500] daemon starting (pid 65834); target=%0; target_source=FM_SUPERVISOR_TARGET; backend=tmux; backend_source=FM_SUPERVISOR_BACKEND; afk=on; inject_skip='heartbeat'; stale_escalate=240s; batch=15s
+[2026-10-14T22:33:54-0500] wake: check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+[2026-10-14T22:33:56-0500] escalate: check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json) -> check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+[2026-10-14T22:34:01-0500] wake: heartbeat
+[2026-10-14T22:34:03-0500] wake force-self (FM_INJECT_SKIP): heartbeat
+[2026-10-14T22:34:08-0500] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+[2026-10-14T22:34:23-0500] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+[2026-10-14T22:34:38-0500] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+[2026-10-14T22:34:53-0500] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+[2026-10-14T22:35:09-0500] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+[2026-10-14T22:35:24-0500] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+[2026-10-14T22:35:26-0500] wake: signal: /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/alpha.status
+[2026-10-14T22:35:29-0500] escalate: needs-decision: /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/alpha.status -> alpha.status: done [at=1792035281]: unrelated progress note ; needs-decision [at=1792035318] [key=fmt]: which date format for exports
+[2026-10-14T22:35:39-0500] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)
+[2026-10-14T22:35:53-0500] inject deferred: supervisor composer not confirmed-empty (state=unknown: pending input, dead-shell prompt, or unreadable pane)

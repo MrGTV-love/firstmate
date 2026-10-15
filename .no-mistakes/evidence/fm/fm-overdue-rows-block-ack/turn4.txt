@@ -1,0 +1,17 @@
+--- ack refused?
+
+$ bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 58591.1792034749.k6WlFt
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "2ace5cdce6086d4b5bea03e3","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7364,"needs-decision: which schema version should the import use",true
+[exit 1]
+--- escalate (row is firstmate-owned, so it answers this turn only)
+
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 escalated --evidence asked captain in session: pick schema v2 or v3
+action: "2ace5cdce6086d4b5bea03e3"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 5 --recovery-generation 58591.1792034749.k6WlFt
+[exit 0]

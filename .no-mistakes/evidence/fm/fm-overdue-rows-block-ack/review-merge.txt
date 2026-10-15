@@ -1,0 +1,34 @@
+--- merge recorded by fm_merge_outcome_report (bin/fm-merge-outcome-lib.sh), origin self
+recorder rc=0
+fm-pr-poll-merge-notified-v1
+github
+github.com
+acme/widget
+42
+
+$ bin/fm-open-loops.sh action 8d7f6ddd7ec34693689d700c merged --evidence https://github.com/acme/widget/pull/43
+error: "merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh"
+[exit 1]
+
+$ bin/fm-open-loops.sh action 8d7f6ddd7ec34693689d700c merged --evidence https://github.com/acme/widget/pull/42
+action: "8d7f6ddd7ec34693689d700c"
+kind: merged
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 10630.1792034892.20k5q7
+[exit 0]
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792034919
+rows: []
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-open-loops.sh --report
+generated_epoch: 1792034919
+complete: true
+OVERDUE: none
+[exit 0]

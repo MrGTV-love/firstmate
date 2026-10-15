@@ -1,0 +1,18 @@
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 80296.1792034985.byKptA
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d6037fa5ef89b7307d59e391","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",444591,"approve rollout window and the freeze exception",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action d6037fa5ef89b7307d59e391 escalated --evidence asked captain about the freeze exception
+action: "d6037fa5ef89b7307d59e391"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 80296.1792034985.byKptA
+[exit 0]
+--- recovery marker:
+acked:handling:80296.1792034985.byKptA
+

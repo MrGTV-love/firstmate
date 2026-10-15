@@ -1,0 +1,36 @@
+fm-afk-launch: away mode stopped; no daemon terminal was running, .afk cleared, and the posture record archived
+=== Return brief (away 2026-10-15T03:33:51Z -> 2026-10-15T03:36:25Z, 2m) ===
+Supervisor health:
+  - supervision ran through the away window with no detected gap (watcher beat 10s old at return)
+Your instructions:
+  (no away-posture record for this window; legacy away flag only)
+Waiting on you:
+  held in the backlog:
+    tasks[1]{id,state,kind,repo,title,hold_kind,hold_reason,hold_until}:
+      rollout-hold,queued,ship,widget,Decide rollout window,captain,approve rollout window,"-"
+Tried and failed, or could not be fixed:
+  (nothing)
+Landed, cleanup due:
+  (nothing)
+Handled while away:
+  0 outcome(s) handled by the away session (0 routine, 0 escalated above)
+  (no routine outcomes recorded in the store for this window)
+Cost: 0 supervision outcome(s) recorded (0 routine, 0 captain); 0 task(s) live at return.
+catch-up health: supervision ran through the away window with no detected gap (watcher beat 10s old at return)
+catch-up wake: OVERDUE:
+catch-up wake: rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+catch-up wake:   "f15669a4b5366e882706be77","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7566,"",false
+catch-up wake: STANDING (a receipt stands; no action needed):
+catch-up wake:   "d6037fa5ef89b7307d59e391","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",444980,"approve rollout window",false
+catch-up wake: help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+catch-up wake: OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+catch-up wake: alpha [key=fmt] needs-decision: which date format for exports
+catch-up wake: OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+catch-up escalation: widget-review.status: done [at=1792033308]: review PASS head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PR https://github.com/acme/widget/pull/42 (catch-all scan)
+catch-up escalation: check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+catch-up escalation: overdue open work: "f15669a4b5366e882706be77","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7422,"",false
+catch-up escalation: overdue open work: "d6037fa5ef89b7307d59e391","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",444836,"approve rollout window",false
+catch-up escalation: alpha.status: done [at=1792035281]: unrelated progress note ; needs-decision [at=1792035318] [key=fmt]: which date format for exports
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 34749.1792035379.M6o8mA
+fm-afk-return: catch-up clear; ordinary captain work may proceed
+rc=0

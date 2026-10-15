@@ -1,0 +1,67 @@
+=== present the row, record a first deferral
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f15669a4b5366e882706be77","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7215,"",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 47431.1792035029.3njQLV
+[exit 0]
+
+$ bin/fm-open-loops.sh action f15669a4b5366e882706be77 deferred --evidence CI queue is backed up --recheck 2026-10-15T06:30:36Z
+action: "f15669a4b5366e882706be77"
+kind: deferred
+[exit 0]
+=== forge outage: collection incomplete, row unseen
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792035037
+rows[2]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"open PRs acme/widget: gh api failed"
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",7223,false,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+complete: False
+  coverage ledger degraded {'stale': None, 'informational': None, 'overdue': True, 'last_seen': None}
+  open_pr https://github.com/acme/widget/pull/77 {'stale': True, 'informational': True, 'overdue': False, 'last_seen': 1792035015}
+ actions kept: ['f15669a4b5366e882706be77']
+=== same outage, 24h + 1s after last seen (FM_OPEN_LOOPS_NOW)
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792121430
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"open PRs acme/widget: gh api failed"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+complete: False
+  coverage ledger degraded {'stale': None, 'informational': None, 'overdue': True}
+ actions kept: [] presentations: {'main': {}}
+=== forge back: same PR stalls again -> fresh history, first deferral allowed
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792121431
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",93617,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+
+$ bin/fm-open-loops.sh --present-overdue
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f15669a4b5366e882706be77","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",93618,"",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+[exit 0]
+
+$ bin/fm-open-loops.sh action f15669a4b5366e882706be77 deferred --evidence CI queue again --recheck 2026-10-16T04:30:33Z
+action: "f15669a4b5366e882706be77"
+kind: deferred
+[exit 0]

@@ -1,0 +1,5 @@
+widget-review.status: done [at=1792033308]: review PASS head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PR https://github.com/acme/widget/pull/42 (catch-all scan)
+check: open-loop-ledger (2 overdue assigned obligations; read state/open-loops.json)
+overdue open work: "f15669a4b5366e882706be77","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7422,"",false
+overdue open work: "d6037fa5ef89b7307d59e391","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",444836,"approve rollout window",false
+alpha.status: done [at=1792035281]: unrelated progress note ; needs-decision [at=1792035318] [key=fmt]: which date format for exports

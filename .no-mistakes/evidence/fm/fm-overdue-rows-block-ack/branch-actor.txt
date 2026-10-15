@@ -1,0 +1,42 @@
+=== branch actor (supervision-host) sees the same overdue row; main's steer does not answer the branch's presentation
+
+$ bin/fm-open-loops.sh --present-overdue
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "346e8de083b781195541be57","worker:stuck","stuck","follow up on the recorded wait and recover the worker",9155,"pipeline step lint; step age 14448s; 9111s without progress; declaration age 9111s",false
+STANDING (a receipt stands; no action needed):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f15669a4b5366e882706be77","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7899,"",false
+  "d6037fa5ef89b7307d59e391","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",445313,"approve rollout window",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "346e8de083b781195541be57","worker:stuck","stuck","follow up on the recorded wait and recover the worker",9156,"pipeline step lint; step age 14448s; 9111s without progress; declaration age 9111s",false
+[exit 1]
+--- main is still satisfied:
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+--- branch re-cites main's record (refused) then sends a fresh steer
+
+$ bin/fm-open-loops.sh action 346e8de083b781195541be57 steered --evidence 001.msg
+error: "steered evidence must be a new delivery sent after this row's presentation"
+[exit 1]
+record: 002.msg
+
+$ bin/fm-open-loops.sh action 346e8de083b781195541be57 steered --evidence 002.msg
+action: "346e8de083b781195541be57"
+kind: steered
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+=== unknown actor
+
+$ bin/fm-open-loops.sh --present-overdue
+error: "unknown supervision actor"
+[exit 1]

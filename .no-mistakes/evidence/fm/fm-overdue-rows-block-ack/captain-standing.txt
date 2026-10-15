@@ -1,0 +1,31 @@
+
+$ bin/fm-wake-drain.sh --ack-through 12 --recovery-generation 10630.1792034892.20k5q7
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d6037fa5ef89b7307d59e391","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",444547,"approve rollout window",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action d6037fa5ef89b7307d59e391 escalated --evidence captain asked in session to pick the rollout window
+action: "d6037fa5ef89b7307d59e391"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 12 --recovery-generation 10630.1792034892.20k5q7
+[exit 0]
+queue bytes now:        0
+=== next turn, idle queue: captain-owned escalation stands -> no OVERDUE block, no episode
+
+$ bin/fm-wake-drain.sh
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
+=== a queued wake while the receipt stands
+check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+
+$ bin/fm-wake-drain.sh
+1792034972	13	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 37588.1792034972.DlaI5K
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]

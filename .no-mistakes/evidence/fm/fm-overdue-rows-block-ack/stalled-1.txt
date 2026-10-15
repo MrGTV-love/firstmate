@@ -1,0 +1,16 @@
+=== worker declared only 'harness busy' 5h ago (the overnight incident shape)
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792035544
+rows[6]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"no-mistakes run store stuck: unable to open database file"
+  "coverage","no forge coverage: stuckproj","firstmate","none: this project's origin is a local path, so it has no forge pull requests to collect",null,false,"/Users/charlesabrooker/tmp/fm-lab.lVOlOh/projects/stuckproj: local origin /Users/charlesabrooker/tmp/fm-lab.lVOlOh/origin-stuck.git"
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",7730,true,""
+  "stalled_worker","stuck","worker:stuck","follow up on the recorded wait and recover the worker",18015,true,"worker has not recorded its concrete wait; 18015s without progress; declaration age 18015s"
+  "unanswered_question","alpha:fmt","firstmate","answer or close this question, or record why it no longer applies",226,false,"needs-decision: which date format for exports"
+  "unanswered_question","rollout-hold:captain-hold","captain","resolve the captain hold or record its next decision date",445144,true,"approve rollout window"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]

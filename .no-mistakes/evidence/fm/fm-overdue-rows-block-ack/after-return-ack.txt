@@ -1,0 +1,15 @@
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 34749.1792035379.M6o8mA
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f15669a4b5366e882706be77","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7586,"",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action f15669a4b5366e882706be77 deferred --evidence CI provider outage; recheck in 2h --recheck 2026-10-15T05:36:40Z
+action: "f15669a4b5366e882706be77"
+kind: deferred
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 34749.1792035379.M6o8mA
+[exit 0]

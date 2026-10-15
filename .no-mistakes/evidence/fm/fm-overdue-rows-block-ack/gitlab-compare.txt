@@ -1,0 +1,16 @@
+=== BASE: GitLab origin project
+bin: /private/tmp/fm-drive-01M4/base/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: false
+generated_epoch: 1792035774
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","ledger degraded","firstmate","restore the unreadable sources and rerun the reconciler",null,true,"project origin /Users/charlesabrooker/tmp/fm-lab.GC6w0A/projects/glab: unsupported non-GitHub origin: https://gitlab.com/acme/glab.git"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+=== TARGET: GitLab origin project
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792035775
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "coverage","no forge coverage: glab","firstmate","none: this project's origin is not GitHub, so its pull requests are outside this ledger's scope",null,false,"/Users/charlesabrooker/tmp/fm-lab.GC6w0A/projects/glab: unsupported non-GitHub origin https://gitlab.com/acme/glab.git"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows

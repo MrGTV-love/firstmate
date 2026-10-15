@@ -1,0 +1,14 @@
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "2ace5cdce6086d4b5bea03e3","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7254,"needs-decision: which schema version should the import use",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+1792034633	2	signal	alpha.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/alpha.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 49227.1792034632.EAbsYn
+wake annotation: latest wake-EVENT observed at drain, not current state: alpha.status: needs-decision [at=1792027388] [key=schema]: which schema version should the import use
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+alpha [key=schema] needs-decision: which schema version should the import use
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]

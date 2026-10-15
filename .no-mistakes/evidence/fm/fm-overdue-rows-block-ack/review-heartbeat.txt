@@ -1,0 +1,16 @@
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792034809
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "review_pass_not_merged","https://github.com/acme/widget/pull/42","firstmate","merge with existing authority or escalate for approval",1301,true,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+--- forge requests:
+/repos/acme/widget/pulls?state=open&per_page=100
+/repos/acme/widget/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100
+/repos/acme/widget/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/statuses?per_page=100
+/repos/acme/widget/branches/main
+/repos/acme/widget/rules/branches/main

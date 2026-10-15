@@ -1,0 +1,23 @@
+--- ack without new action (old steer must not carry over)
+
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 61229.1792034675.aVioT4
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "2ace5cdce6086d4b5bea03e3","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7297,"needs-decision: which schema version should the import use",false
+[exit 1]
+--- re-cite the same record
+
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 steered --evidence 001.msg
+error: "steered evidence must be a new delivery sent after this row's presentation"
+[exit 1]
+--- first deferral with a valid recheck
+
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 deferred --evidence worker is mid-migration; recheck after it lands --recheck 2026-10-15T05:24:45Z
+action: "2ace5cdce6086d4b5bea03e3"
+kind: deferred
+[exit 0]
+--- ack now
+
+$ bin/fm-wake-drain.sh --ack-through 3 --recovery-generation 61229.1792034675.aVioT4
+[exit 0]

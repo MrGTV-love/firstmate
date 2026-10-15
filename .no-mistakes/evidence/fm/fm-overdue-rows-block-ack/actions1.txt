@@ -1,0 +1,80 @@
+
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 steered --evidence 001.msg
+error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+[exit 1]
+
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 steered --evidence I told them in chat
+error: "steered evidence must be a delivery record name (NNN.msg) in this row's task inbox"
+[exit 1]
+
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 merged --evidence https://github.com/acme/widget/pull/7
+error: "merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh"
+[exit 1]
+
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 deferred --evidence busy
+error: "deferral requires --recheck at a future UTC time within 24 hours"
+[exit 1]
+
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 deferred --evidence busy --recheck 2026-10-16T09:24:24Z
+error: "deferral requires --recheck at a future UTC time within 24 hours"
+[exit 1]
+
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 escalated --evidence    
+error: "--evidence is required for every action"
+[exit 1]
+
+$ bin/fm-open-loops.sh action deadbeefdeadbeefdeadbeef escalated --evidence x
+error: "row is not currently overdue in the published ledger"
+[exit 1]
+--- ack still refused?
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 49227.1792034632.EAbsYn
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "2ace5cdce6086d4b5bea03e3","firstmate","alpha:schema","answer or close this question, or record why it no longer applies",7277,"needs-decision: which schema version should the import use",false
+[exit 1]
+--- real steer into alpha's inbox via fm_task_inbox_write (the writer bin/fm-send.sh uses)
+record: /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/alpha.inbox/001.msg
+schema=fm-task-inbox.v1
+at=2026-10-15T03:24:25Z
+--
+Use schema v3 for the import; reply with done when switched.
+$ bin/fm-open-loops.sh action 2ace5cdce6086d4b5bea03e3 steered --evidence 001.msg
+action: "2ace5cdce6086d4b5bea03e3"
+kind: steered
+[exit 0]
+--- ack now
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 49227.1792034632.EAbsYn
+[exit 0]
+--- queue after ack:
+(end queue)
+--- handling in ledger:
+{
+ "sequence": 1,
+ "presentations": {
+  "main": {
+   "2ace5cdce6086d4b5bea03e3": 0
+  }
+ },
+ "presented_at": {
+  "main": {
+   "2ace5cdce6086d4b5bea03e3": 1792034642
+  }
+ },
+ "actions": {
+  "2ace5cdce6086d4b5bea03e3": {
+   "kind": "steered",
+   "evidence": "001.msg",
+   "at_epoch": 1792034665,
+   "sequence": 1,
+   "deferrals": 0,
+   "captain_visible": false,
+   "digest": "4bc5e5798b25e0171bbc7585",
+   "cited": [
+    "001.msg"
+   ]
+  }
+ }
+}

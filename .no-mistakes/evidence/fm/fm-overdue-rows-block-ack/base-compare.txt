@@ -1,0 +1,27 @@
+=== BASE commit 3516c9b6 (before this change), same lab shape
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /private/tmp/fm-drive-01M4/base/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792035729
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","alpha:schema","firstmate","answer or close this question, or record why it no longer applies",7200,true,"needs-decision: which schema version should the import use"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+signal: /Users/charlesabrooker/tmp/fm-lab.GC6w0A/state/alpha.status
+
+$ bin/fm-wake-drain.sh
+1792035761	2	signal	alpha.status	needs-decision: /Users/charlesabrooker/tmp/fm-lab.GC6w0A/state/alpha.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 95772.1792035761.u5Cn9Z
+wake annotation: latest wake-EVENT observed at drain, not current state: alpha.status: needs-decision [at=1792028529] [key=schema]: which schema version should the import use
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+alpha [key=schema] needs-decision: which schema version should the import use
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 2 --recovery-generation 95772.1792035761.u5Cn9Z
+[exit 0]
+queue after base ack (no action recorded):
+(end)

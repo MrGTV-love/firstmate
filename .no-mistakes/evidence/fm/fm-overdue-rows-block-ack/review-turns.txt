@@ -1,0 +1,74 @@
+=== TURN A
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "8d7f6ddd7ec34693689d700c","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1351,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+1792034856	8	signal	alpha.status	signal: /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/alpha.status /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/widget-review.status
+1792034857	9	signal	widget-review.status	signal: /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/alpha.status /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/widget-review.status
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 19964.1792034855.0iRcUm
+wake annotation: latest wake-EVENT observed at drain, not current state: alpha.status: resolved [at=1792034763] [key=schema]: captain chose schema v3
+wake annotation: latest wake-EVENT observed at drain, not current state: widget-review.status: done [at=1792033308]: review PASS head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PR https://github.com/acme/widget/pull/42
+STATUS OUTCOME BACKSTOP (newest captain-facing task event has no covering branch outcome):
+widget-review done [at=1792033308]: review PASS head=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa PR https://github.com/acme/widget/pull/42
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 19964.1792034855.0iRcUm
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "8d7f6ddd7ec34693689d700c","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1354,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action 8d7f6ddd7ec34693689d700c deferred --evidence merge after lunch --recheck 2026-10-15T23:27:42Z
+action: "8d7f6ddd7ec34693689d700c"
+kind: deferred
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 9 --recovery-generation 19964.1792034855.0iRcUm
+[exit 0]
+=== TURN B (deferral must NOT stand on a review PASS row)
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "8d7f6ddd7ec34693689d700c","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1360,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+1792034867	10	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 95070.1792034867.xTf4ne
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 95070.1792034867.xTf4ne
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "8d7f6ddd7ec34693689d700c","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1363,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+[exit 1]
+
+$ bin/fm-open-loops.sh action 8d7f6ddd7ec34693689d700c escalated --evidence asked captain to approve merge
+action: "8d7f6ddd7ec34693689d700c"
+kind: escalated
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 10 --recovery-generation 95070.1792034867.xTf4ne
+[exit 0]
+=== TURN C (escalation must NOT stand either)
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "8d7f6ddd7ec34693689d700c","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1385,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+1792034892	11	check	open-loop-ledger	check: open-loop-ledger (1 overdue assigned obligations; read state/open-loops.json)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 10630.1792034892.20k5q7
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+
+$ bin/fm-wake-drain.sh --ack-through 11 --recovery-generation 10630.1792034892.20k5q7
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "8d7f6ddd7ec34693689d700c","firstmate","https://github.com/acme/widget/pull/42","merge with existing authority or escalate for approval",1387,"independent review PASS by widget-review at live head aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa; required checks green",false
+[exit 1]
+--- merged with no local merge record
+
+$ bin/fm-open-loops.sh action 8d7f6ddd7ec34693689d700c merged --evidence https://github.com/acme/widget/pull/42
+error: "merged evidence must be this row's PR URL with its merge recorded by bin/fm-pr-merge.sh"
+[exit 1]

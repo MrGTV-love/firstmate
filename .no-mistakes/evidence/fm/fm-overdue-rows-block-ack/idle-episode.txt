@@ -1,0 +1,26 @@
+
+$ bin/fm-wake-drain.sh --ack-through 13 --recovery-generation 37588.1792034972.DlaI5K
+[exit 0]
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792034983
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "unanswered_question","rollout-hold:captain-hold","captain","resolve the captain hold or record its next decision date",444583,true,"approve rollout window and the freeze exception"
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+queue bytes:        0  (empty queue)
+=== idle drain: row changed, escalation no longer stands
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "d6037fa5ef89b7307d59e391","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",444584,"approve rollout window and the freeze exception",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 80296.1792034985.byKptA
+[exit 0]
+--- recovery marker:
+pending:handling:80296.1792034985.byKptA
+

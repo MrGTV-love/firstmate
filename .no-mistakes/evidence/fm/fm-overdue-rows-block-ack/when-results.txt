@@ -1,0 +1,33 @@
+=== when-report-daily result (head + tail)
+when: when-report-daily
+status: fired
+detail: the condition held and the action exited 0
+condition_polls: 1
+action_exit: 0
+output:
+g padding padding
+board line 267: crew summary padding padding padding padding
+...
+board line 395: crew summary padding padding padding padding
+board line 396: crew summary padding padding padding padding
+board line 397: crew summary padding padding padding padding
+board line 398: crew summary padding padding padding padding
+board line 399: crew summary padding padding padding padding
+board line 400: crew summary padding padding padding padding
+
+OPEN WORK REPORT:
+generated_epoch: 1792035220
+complete: true
+OVERDUE:
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f15669a4b5366e882706be77","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7636,"",false
+  "d6037fa5ef89b7307d59e391","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",445050,"approve rollout window",false
+
+=== when-deploy-check result
+when: when-deploy-check
+status: fired
+detail: the condition held and the action exited 0
+condition_polls: 1
+action_exit: 0
+output:
+deploy check ok

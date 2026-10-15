@@ -1,0 +1,45 @@
+=== corrupt ledger
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-wake-lib.sh: line 605: 84472 Terminated: 15          sleep "$POLL"
+watch rc=124
+
+$ bin/fm-wake-drain.sh
+error: open-loops ledger unreadable (Expecting value: line 1 column 41 (char 40)); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/open-loops.json (the next heartbeat rebuilds it)
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 11619.1792035129.w58sIu
+[exit 0]
+ack args: 0 11619.1792035129.w58sIu
+
+$ bin/fm-wake-drain.sh --ack-through 0 --recovery-generation 11619.1792035129.w58sIu
+error: open-loops ledger unreadable (Expecting value: line 1 column 41 (char 40)); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/open-loops.json (the next heartbeat rebuilds it)
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+error: open-loops ledger unreadable (Expecting value: line 1 column 41 (char 40)); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/open-loops.json (the next heartbeat rebuilds it)
+[exit 0]
+
+$ bin/fm-open-loops.sh --report
+error: "Expecting value: line 1 column 41 (char 40)"
+[exit 1]
+
+$ bin/fm-open-loops.sh action f15669a4b5366e882706be77 escalated --evidence x
+error: "Expecting value: line 1 column 41 (char 40)"
+[exit 1]
+=== symlinked ledger
+
+$ bin/fm-open-loops.sh --present-overdue
+error: open-loops ledger unreadable (open-loop ledger must not be a symbolic link); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/open-loops.json (the next heartbeat rebuilds it)
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+error: open-loops ledger unreadable (open-loop ledger must not be a symbolic link); this drain is not gated on overdue rows. Repair: rm /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/open-loops.json (the next heartbeat rebuilds it)
+[exit 0]
+=== next heartbeat rebuilds it
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792035139
+rows[1]{category,subject,owner,next_action,age_seconds,overdue,evidence}:
+  "open_pr","https://github.com/acme/widget/pull/77","firstmate","monitor CI and route its result",7325,true,""
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]

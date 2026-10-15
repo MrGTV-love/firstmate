@@ -1,0 +1,46 @@
+
+$ bin/fm-wake-drain.sh
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "346e8de083b781195541be57","worker:stuck","stuck","follow up on the recorded wait and recover the worker",9131,"pipeline step lint; step age 14448s; 9111s without progress; declaration age 9111s",false
+STANDING (a receipt stands; no action needed):
+rows[2]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "f15669a4b5366e882706be77","firstmate","https://github.com/acme/widget/pull/77","monitor CI and route its result",7875,"",false
+  "d6037fa5ef89b7307d59e391","captain","rollout-hold:captain-hold","resolve the captain hold or record its next decision date",445289,"approve rollout window",false
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>]
+1792035451	18	check	procevent:when-deploy-check:1	check: procevent when when-deploy-check 1
+1792035451	19	check	procevent:when-report-daily:1	check: procevent when when-report-daily 1
+WAKE_ACK_REQUIRED: after handling completes run bin/fm-wake-drain.sh --ack-through 19 --recovery-generation 74979.1792035451.Rlh13P
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+alpha [key=fmt] needs-decision: which date format for exports
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+[exit 0]
+ack args: 19 74979.1792035451.Rlh13P
+
+$ bin/fm-wake-drain.sh --ack-through 19 --recovery-generation 74979.1792035451.Rlh13P
+error: overdue rows have no action recorded since presentation; acknowledgement refused
+OVERDUE:
+rows[1]{id,owner,subject,next_action,age_seconds,evidence,captain_visible}:
+  "346e8de083b781195541be57","worker:stuck","stuck","follow up on the recorded wait and recover the worker",9136,"pipeline step lint; step age 14448s; 9111s without progress; declaration age 9111s",false
+[exit 1]
+--- steer the stalled worker with the real fm-send.sh
+
+$ bin/fm-send.sh stuck lint has run 4h on fm/stuck: kill the lint job, rerun lint.full only for changed files, and report the result in your status log
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.lVOlOh
+WARNING: queued wakes pending - drain them with bin/fm-wake-drain.sh before anything else.
+fm-send: doorbell skipped (composer holds pending text or identified draft risk); the steer is durably recorded at /Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/stuck.inbox/001.msg and the watcher will re-ring
+[exit 0]
+/Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/stuck.inbox/:
+001.msg
+handled
+
+/Users/charlesabrooker/tmp/fm-lab.lVOlOh/state/stuck.inbox/handled:
+
+$ bin/fm-open-loops.sh action 346e8de083b781195541be57 steered --evidence 001.msg
+action: "346e8de083b781195541be57"
+kind: steered
+[exit 0]
+
+$ bin/fm-wake-drain.sh --ack-through 19 --recovery-generation 74979.1792035451.Rlh13P
+[exit 0]

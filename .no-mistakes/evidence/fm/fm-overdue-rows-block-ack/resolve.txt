@@ -1,0 +1,29 @@
+
+$ bin/fm-open-loops.sh --heartbeat
+bin: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M4XKTDXTD3BER6ZZGAYCX104/bin/fm-open-loops.sh
+description: Reconcile assigned work against live delivery evidence
+complete: true
+generated_epoch: 1792034764
+rows: []
+help: Run bin/fm-open-loops.sh --json for age limits and structured rows
+[exit 0]
+--- handling after resolution:
+{
+ "sequence": 3,
+ "presentations": {
+  "main": {}
+ },
+ "presented_at": {
+  "main": {}
+ },
+ "actions": {}
+}
+
+$ bin/fm-open-loops.sh --report
+generated_epoch: 1792034764
+complete: true
+OVERDUE: none
+[exit 0]
+
+$ bin/fm-open-loops.sh --check-actions
+[exit 0]
