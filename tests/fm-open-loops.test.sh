@@ -2662,6 +2662,7 @@ HELD = ('## In flight\n- [ ] held-job - Recover the run (repo: firstmate) (kind:
 RELEASED = HELD.replace(' (hold-kind: captain)', '')
 ANSWERED = HELD.replace('- [ ] held-job', '- [x] held-job').replace('## In flight', '## Done')
 DEFERRED = HELD.replace('(hold-kind: captain)', '(hold-kind: captain) (hold-until: 2999-01-01)')
+BLOCKED = HELD.replace('(hold-kind: captain)', '(hold-kind: captain) (blocked-by: unfinished-prerequisite)')
 REHELD = HELD.replace(iso(now - 7200), iso(now - 3600))
 PR = 'https://github.com/test/project/pull/9'
 
@@ -2757,11 +2758,11 @@ assert named.returncode == 0 and 'standing: captain hold elsewhere' in named.std
 wrong_kind = act('deferred', 'still waiting', '--hold', 'elsewhere', '--recheck', iso(now + 600))
 assert wrong_kind.returncode == 1 and 'only valid for escalated' in wrong_kind.stdout, wrong_kind
 
-# (b) A changed row, or a hold that is answered, released, deferred to a date, or re-held, restores the requirement.
+# (b) A changed row, or a hold that is answered, released, blocked on an unresolved task, or re-held, restores the requirement.
 def changed_row(record):
     record['rows'][0]['evidence'] = 'blocked: the captain asked for a revised plan'
     return record
-transitions = (('digest', None), ('released', RELEASED), ('answered', ANSWERED), ('dated', DEFERRED), ('reheld', REHELD))
+transitions = (('digest', None), ('released', RELEASED), ('answered', ANSWERED), ('blocked', BLOCKED), ('reheld', REHELD))
 for label, text in transitions:
     home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('change-' + label)
     _, boundary = drain()
@@ -2791,6 +2792,30 @@ for label, text in transitions:
         result, boundary = drain('next-' + label)
         assert row['id'] in result.stdout, (label, 'a receipt without a live hold must not stand')
         assert ack(boundary).returncode == 1, label
+# A hold the captain defers to a date is still held for the captain: the receipt keeps standing until the hold ends.
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('dated')
+_, boundary = drain()
+assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
+assert ack(boundary).returncode == 0
+backlog.write_text(DEFERRED)
+for label in ('deferred', 'next-turn'):
+    result, boundary = drain(label)
+    assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, result.stdout)
+assert call(loops, '--check-actions').returncode == 0
+assert row['id'] in ok(loops, '--report').stdout, 'a standing receipt never resolves the obligation'
+backlog.write_text(RELEASED)
+result, boundary = drain('released-after-dated')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'a deferred hold that is then released needs a new action'
+# An escalation recorded while the hold is already deferred to a date binds it as well.
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('dated-record')
+backlog.write_text(DEFERRED)
+_, boundary = drain()
+recorded = act('escalated', 'asked the captain')
+assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, recorded
+assert stored()['handling']['actions'][row['id']]['holds'][0]['task'] == 'held-job'
+assert ack(boundary).returncode == 0
+result, boundary = drain('after-dated-record')
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, result.stdout
 # An unreadable backlog never buys standing acknowledgement.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('unreadable')
 _, boundary = drain()
@@ -2954,7 +2979,7 @@ broken = ok(loops, '--present-overdue')
 assert all(each['id'] in broken.stdout for each in standing) and 'STANDING' not in broken.stdout, broken
 assert snapshot_runs() == 1, ('an unreadable backlog was read again for each standing row', snapshot_runs())
 print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
-      ' a changed row or an answered, released, deferred or re-held hold re-presents it; evidence text, other owners, reviewed'
+      ' a changed row or an answered, released, blocked or re-held hold re-presents it while a hold deferred to a date keeps it standing; evidence text, other owners, reviewed'
       ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not')
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"

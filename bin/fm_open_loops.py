@@ -1224,17 +1224,17 @@ class WaitVerifier:
                 raise
         return self.backlog
 
-    def captain_hold(self, task):
+    def captain_hold(self, task, buckets=("live", "aged")):
         """The canonical backlog record of a task still held for the captain, or ValueError."""
         record = next((r for r in self.backlog_records() if r.get("structured") and r["id"] == task
-                       and r.get("hold_kind") == "captain" and r.get("hold_bucket") in ("live", "aged")), None)
+                       and r.get("hold_kind") == "captain" and r.get("hold_bucket") in buckets), None)
         if record is None:
             raise ValueError("captain prerequisite was answered, released, or is no longer actionable")
         return record
 
     def hold_marker(self, task):
-        """Identity of one hold lifecycle: a re-hold restamps it, while a note or aging does not."""
-        record = self.captain_hold(task)
+        """Identity of one hold lifecycle: a re-hold restamps it, while a note, aging or a deferral date does not."""
+        record = self.captain_hold(task, ("live", "aged", "dated"))
         return str(record.get("hold_set") or record.get("since") or "")
 
     def named_holds(self, row, explicit):
@@ -1272,7 +1272,7 @@ class WaitVerifier:
         try:
             return all(self.hold_marker(hold["task"]) == hold["marker"] for hold in holds)
         except SOURCE_ERRORS:
-            return False  # an answered, released, deferred, or unreadable hold restores the action requirement
+            return False  # an answered, released, blocked, or unreadable hold restores the action requirement
 
     def current_source(self, source):
         c = self.collector
