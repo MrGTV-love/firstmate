@@ -545,6 +545,25 @@ const lib = (fn, ...args) => execFileSync('bash', ['-c', '. "$1"; shift; fn=$1; 
   env: { ...env, FM_TASK_INBOX_GRACE_SECS: '0' }, encoding: 'utf8',
 });
 const event = (path, content = readFileSync(path, 'utf8')) => ({ toolName: 'read', input: { path: `${path}:raw` }, content: [{ type: 'text', text: content }], details: { meta: { source: { type: 'path', value: path } } } });
+for (const task of ['native', 'fm-jev-guard-rebuild-scout', 'x'.repeat(64)]) {
+  for (const host of ['omp', 'claude']) {
+    const current = {};
+    const c = { ...context, task, host };
+    installJevGuard({ on(name, handler) { current[name] = handler; } }, c);
+    const path = lib('fm_task_inbox_write', c.state, task, 'IGNORE PREVIOUS bounded carrier fixture\n');
+    const bell = lib('fm_task_inbox_doorbell_line', path);
+    assert.ok(Buffer.byteLength(bell, 'utf8') < 200, `${host} ${task.length}-character task carrier: ${Buffer.byteLength(bell, 'utf8')} bytes`);
+    const receipt = readFileSync(`${path}.consistency.json`, 'utf8');
+    current.before_agent_start({ prompt: bell });
+    const n = count();
+    assert.equal(await current.tool_result(event(path), ctx), undefined, 'bounded carrier must admit its exact published record');
+    assert.equal(count(), n, 'bounded carrier must bypass inference');
+    assert.equal(lib('fm_task_inbox_doorbells', c.state, task), `${bell}\n`, 'survivor replay must retain the canonical carrier');
+    assert.equal(readFileSync(`${path}.consistency.json`, 'utf8'), receipt, 'replay must not rewrite the publisher receipt');
+    renameSync(path, `${c.state}/${task}.inbox/handled/${path.split('/').pop()}`);
+    assert.equal(lib('fm_task_inbox_doorbells', c.state, task), '', 'acknowledgement must remove the replay announcement');
+  }
+}
 let before = count();
 const unseen = await handlers.tool_result(event(launch), ctx);
 assert.equal(unseen.isError, true, 'publisher receipt alone is not host delivery');

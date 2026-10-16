@@ -181,8 +181,8 @@ test_text_steer_rides_inbox() {
   body=$(record_body _ "$rec")
   [ "$body" = "please rebase onto main" ] || fail "the recorded body differs: $body"
   typed=$(cat "$dir/send.log")
-  assert_contains "$typed" "Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" \
-    "the doorbell should direct the worker to drain the inbox"
+  assert_contains "$typed" "t1.inbox/${rec##*/}" \
+    "the doorbell must identify the exact enqueued record"
   case "$typed" in
   *"please rebase onto main"*) fail "the payload must never be typed:"$'\n'"$typed" ;;
   esac
@@ -257,8 +257,8 @@ test_resend_enqueues_new_sequence() {
   doorbells=$(grep -cF 'Firstmate instruction waiting' "$dir/send.log" || true)
   [ "$doorbells" = 1 ] || fail "each send rings once (the log is truncated per send), got $doorbells"
   typed=$(cat "$dir/send.log")
-  assert_contains "$typed" "numeric order" \
-    "a newer record's doorbell should preserve inbox sequence ordering"
+  assert_contains "$typed" "t1.inbox/002.msg" \
+    "a re-send must announce the new record rather than the previous record"
   case "$typed" in
   *"check the CI result"*) fail "a re-send typed the payload" ;;
   esac
@@ -321,8 +321,8 @@ test_unknown_idle_composer_still_rings_advisorily() {
   [ "$(record_body _ "$dir/home/state/t1.inbox/001.msg")" = "ring an unfamiliar idle composer" ] \
     || fail "the ordinary unknown-idle steer was not recorded"
   typed=$(cat "$dir/send.log")
-  assert_contains "$typed" "Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" \
-    "ordinary unknown-idle must still receive the inbox doorbell"
+  assert_contains "$typed" "t1.inbox/001.msg" \
+    "ordinary unknown-idle must receive the exact enqueued record"
   assert_contains "$typed" "[KEY] enter" "ordinary unknown-idle must still submit the doorbell"
   case "$typed" in
     *"ring an unfamiliar idle composer"*) fail "the unknown-idle steer payload was typed" ;;

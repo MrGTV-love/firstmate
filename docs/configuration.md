@@ -2027,6 +2027,7 @@ Questions and numeric policy are code-owned:
 - Shell screening keeps the independent effect Choice and destructive-intent Noul and their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/bash-gate.ts).
 - Write/edit screening retains deterministic root checks and the independent file-kind Choice and credential Noul with their existing [valid-answer thresholds](../bin/ten-levels/src/levels/level06/write-gate.ts).
 - Result screening uses the calibrated [injection Noul and clear/flag/review policy](../bin/ten-levels/src/levels/level06/result-screen.ts), not a Score or a claim that shell/write semantics were calibrated.
+  The [accepted frozen calibration summary](verification/runtime-backends.md#accepted-frozen-live-calibration) records the paired split, baseline/candidate denominators, abstentions, fixture-preservation limits and estimated-only costs.
 
 `supervisorReadAdmission` is the single isolated Firstmate-channel consistency check.
 It preserves a launch-record or numeric steering-inbox result only when the host's native user-prompt delivery named that exact file and record name/sequence, and the returned full bytes match the existing publisher's write-time digest.
@@ -2039,7 +2040,7 @@ Consistent instructions bypass model/privacy/credential outages; an audit failur
 On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
 Claude keeps its distinct advisory `additionalContext`, containing neither the source text nor its path.
 The [steering-inbox owner](../bin/fm-task-inbox-lib.sh) defines record-specific delivery, ordered survivor announcements, checkpoint handling and publication-clock retry scheduling.
-Its shared carrier keeps the inbox reference independent of home depth and carries the exact record, acknowledgement ordering and omp `:raw` hint in the existing short-line budget; publication, sends, retries and survivor replay all use that same formatter.
+Its shared carrier keeps the inbox reference independent of home depth and carries the exact record, acknowledgement ordering and omp `:raw` hint under 200 characters for task IDs up to 64 characters; publication, sends, retries and survivor replay all use that same formatter.
 Native launch prompts carry the survivor doorbells separately from Claude's record-backed launch carrier, so the guard sees each binding without reading that carrier first; announcement never repairs a legacy receipt.
 This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
 Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.

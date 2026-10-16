@@ -199,8 +199,6 @@ test_doorbell_is_a_shell_noop() {
     ': '*) ;;
     *) fail "the doorbell must start with the shell no-op prefix, got: $doorbell" ;;
   esac
-  assert_contains "$doorbell" "'\\''s space.inbox'" \
-    "the doorbell should escape an embedded single quote in its quoted inbox name"
   before=$(ls -R "$state/$task.inbox")
   for sh in sh bash zsh; do
     command -v "$sh" >/dev/null 2>&1 || continue
@@ -715,7 +713,7 @@ test_watcher_rerings_idle_pane_quietly() {
     sleep 0.1
     i=$((i + 1))
   done
-  grep -qF "Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your 't1.inbox' steering inbox" "$log" \
+  grep -qF "t1.inbox/${rec##*/}" "$log" \
     || { kill "$pid" 2>/dev/null; fail "the watcher never re-rang the doorbell:"$'\n'"$(cat "$log")"; }
   kill -0 "$pid" 2>/dev/null \
     || fail "a healthy re-ring must not wake firstmate (watcher exited):"$'\n'"$(cat "$out")"

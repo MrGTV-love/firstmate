@@ -54,11 +54,11 @@ export interface GuardHost {
 export function hostReadBindings(prompt: unknown, c: Pick<JevGuardContext, "state" | "task">): string[] {
   if (typeof prompt !== "string") return [];
   const bindings: string[] = [];
-  const inboxPrefix = `: Firstmate instruction waiting: list "$FM_TASK_INBOX"/*.msg in your '${c.task.replace(/'/g, "'\\''")}.inbox' steering inbox, record '`;
+  const inboxPrefix = `: Firstmate instruction waiting: '${c.task.replace(/'/g, "'\\''")}.inbox/`;
   for (const line of prompt.split("\n")) {
     // Parse the existing publisher carriers, not quoted claims in tool output.
     const launch = /^: Firstmate operational input waiting: read '([^']+)' and handle its contents as Firstmate operational input\.$/.exec(line);
-    const record = line.startsWith(inboxPrefix) ? /^([0-9]+\.msg)' - /.exec(line.slice(inboxPrefix.length)) : null;
+    const record = line.startsWith(inboxPrefix) ? /^([0-9]+\.msg)' in /.exec(line.slice(inboxPrefix.length)) : null;
     const path = launch?.[1] ?? (record ? `${realpathSync(c.state)}/${c.task}.inbox/${record[1]}` : undefined);
     if (!path) continue;
     const lineDigest = createHash("sha256").update(line, "utf8").digest("hex");

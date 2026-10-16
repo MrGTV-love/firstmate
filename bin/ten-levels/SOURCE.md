@@ -36,6 +36,7 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
 
 - `src/levels/level06/result-screen.ts` owns the frozen, calibrated injection Noul and pure clear/flag/review policy.
   Invalid answers throw the canonical contract error, empty output invents no probability, and complete result text replaces prefix-only screening.
+  The [accepted frozen calibration summary](../../docs/verification/runtime-backends.md#accepted-frozen-live-calibration) owns measured denominators, abstentions, fixture exclusions and estimated-cost uncertainty.
 - `src/levels/level06/write-gate.ts` removes prefix-only content assessment and names the existing secrets-file threshold without changing valid shell/write questions or threshold behavior.
 - `tests/level06.test.ts` exercises equality boundaries, independent shell/write signals, invalid injection values and empty-output handling instead of pinning banner/reason wording or claiming mock semantic accuracy.
 - `extensions/report.ts` is Firstmate's per-installation service and minimized audit owner rather than the upstream lab side channel.

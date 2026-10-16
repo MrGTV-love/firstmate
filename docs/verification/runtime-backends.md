@@ -705,6 +705,38 @@ These checks exercise generated hooks, not a native harness session; they do not
 The minimum-version regression in `tests/fm-jev-guard.test.sh` executes the tagged [OMP 18.1.20 result-consumer semantics](https://github.com/can1357/oh-my-pi/blob/v18.1.20/packages/coding-agent/src/extensibility/extensions/runner.ts#L1418-L1459) for `content`/`details`/`isError`, proving that the audit patch remains observable and preserves the original instruction bytes, details and error status; this is not native 18.1.20 execution.
 The maintained native commands above refresh the actual installed-host evidence, not that minimum-version emulation.
 
+### Accepted frozen live calibration
+
+The accepted Main-run trial used 200 synthetic paired episodes: 100 injection and 100 benign examples, with no Vernant or customer content.
+The family-separated split reserved 40 rows for calibration and 160 for held-out evaluation (80 injection and 80 benign); the authored families remain correlated, not an independent production sample.
+All nine threshold grid points were eligible, and the frozen tie-break selected clear at `p <= 0.20` and flag at `p >= 0.80` before held-out evaluation, without retuning.
+The baseline is the previous guard; the candidate is the frozen rebuilt policy.
+
+| Held-out label (denominator) | Baseline flag / clear | Candidate flag / clear / review |
+| --- | --- | --- |
+| Injection (80) | 74 / 6 | 75 / 0 / 5 |
+| Benign (80) | 14 / 66 | 0 / 77 / 3 |
+
+- Baseline flag precision: `74/88 = 84.09%`; recall: `74/80 = 92.5%`; benign flag rate: `14/80 = 17.5%`; classification error: `(6+14)/160 = 12.5%`.
+- Candidate flag precision: `75/75 = 100%`; strict flag recall: `75/80 = 93.75%`; cleared-injection rate: `0/80`; benign flag rate: `0/80`.
+  Review rate is `(5+3)/160 = 5%`; observed classification error among decided policy rows is `0/152`.
+  The eight abstentions are not correct classifications.
+  If review also stops an action, benign flag-or-review rate is `3/80 = 3.75%`, not zero benign interruption.
+- Operational API error rate: `0/580` TypeSafe `jev-1.13.0` calls/attempts, with zero errors or halts; this is a separate denominator from classification errors and abstentions.
+  The accepted run recorded 305,801 input and 21,360 output tokens.
+
+All 15 trusted held-out rows were fixture-preserved rather than candidate-model-tested, and all 14 baseline benign flags occurred among those rows.
+Candidate model-tested held-out denominators are therefore 80 injection and 65 benign: 62 benign clears and three reviews were model judgments; the other 15 benign clears were fixture policy.
+The apparent precision improvement is not solely evidence of better model discrimination and does not establish real publisher provenance.
+Native publisher/host consistency proofs are separate boundary exercises, not additional live classification accuracy.
+
+The accepted estimated total was USD 0.012843642, with a USD 4.78937088 reservation within the USD 5 cap.
+All costs were estimated without an account statement; unknown billed cost is not a reported charge.
+These are retained frozen aggregates, not a new paid trial or retuning; private corpus and raw exchanges are not published here.
+This injection trial does not calibrate shell/write questions, untested content sizes, another model/provider or deployed protection.
+
+### Deployment acceptance limits
+
 The [operator contract](../configuration.md#jev-guard) owns the current protection claim.
 Synthetic calibration fixtures do not authenticate real publisher identity, and source-fixture preservation cannot be counted as a successful live classification.
 The injection calibration does not validate shell/write judgment accuracy, large-output semantics, unrelated providers or other model versions.
