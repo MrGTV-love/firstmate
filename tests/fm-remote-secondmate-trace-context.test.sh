@@ -92,6 +92,16 @@ SH
 chmod +x "$REMOTE_ROOT/bin/tmux"
 install_remote_herdr_fixture "$REMOTE_ROOT" "$HERDR_STATE" "$HERDR_LOG" \
   "$TMP_ROOT/herdr-send-fail" "$TMP_ROOT/herdr.sock"
+# The remote host's omp only answers the version gate and the model catalog.
+cat > "$REMOTE_ROOT/bin/omp" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  --version) printf 'omp/18.1.20\n' ;;
+  models) printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"}]}' ;;
+esac
+exit 0
+SH
+chmod +x "$REMOTE_ROOT/bin/omp"
 git -C "$REMOTE_ROOT" init -q -b main
 git -C "$REMOTE_ROOT" config user.email test@example.com
 git -C "$REMOTE_ROOT" config user.name Test
@@ -258,6 +268,30 @@ fm_trace_context_valid "$SECOND_TP" \
 [ "$(remote_injected_traceparent)" = "$SECOND_TP" ] \
   || fail "the second remote route's pane must receive its own recorded carrier"
 pass "boundary: each remote-routed second mate roots its own trace and never adopts the spawning environment's carrier"
+
+# --- omp on the second remote route: host record, pane executable, relaunch gate
+# PR 142's tests/fm-spawn-compact-adviser-disable-remote.test.sh pins the parent
+# record and the launch marker. These read the host-side record, the executable
+# the pane was told to run, and the relaunch outcome that suite never inspects.
+reset_remote_herdr_fixture "$HERDR_STATE"
+: > "$HERDR_LOG"
+OMP_OUT=$(remote_env "$ROOT/bin/fm-spawn.sh" ios2 --secondmate --harness omp \
+  --model openai-codex/gpt-6.1-sol 2>&1); OMP_RC=$?
+expect_code 0 "$OMP_RC" "remote omp spawn failed"$'\n'"$OMP_OUT"
+assert_grep 'harness=omp' "$SECOND_HOME/state/parent-route/ios2.meta" "the remote host did not record the omp harness"
+assert_contains "$(remote_staged_launch)" '/bin/omp' "the remote pane was not told to run the omp executable"
+pass "omp: the remote host records the harness and its pane launches the omp executable"
+
+# The fixture's synthetic agent cannot prove live launch ownership, so the
+# relaunch must stop at that ordinary safety gate without typing into the pane.
+OMP_WRITES=$(grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true)
+OMP_RELAUNCH_OUT=$(remote_env "$ROOT/bin/fm-on.sh" ios2 fm-remote-secondmate-control.sh relaunch ios2 omp - - 2>&1); OMP_RELAUNCH_RC=$?
+[ "$OMP_RELAUNCH_RC" -ne 0 ] || fail "a synthetic omp endpoint unexpectedly passed live ownership"
+assert_contains "$OMP_RELAUNCH_OUT" 'cannot positively attribute its live Herdr agent to this task' \
+  "a remote omp relaunch did not reach the ordinary ownership gate"
+[ "$(grep -Ec '^(pane (send-text|send-keys|run|close)|tab (create|close)) ' "$HERDR_LOG" || true)" = "$OMP_WRITES" ] \
+  || fail "a refused omp relaunch sent pane or tab lifecycle input"
+pass "omp: a remote relaunch reaches the ordinary ownership gate and sends no lifecycle input"
 
 # --- the enablement flag is one allowlist, shared by both remote ends --------
 # config/trace-context reaches the remote home only because the sender and the
