@@ -2528,6 +2528,10 @@ EOF
 # and prints nothing.
 # Recorded 2026-10-05 on Claude Code 2.1.289: /exit while a background shell
 # is still running opens this picker, and its selected row is Exit and stop tasks.
+# The name is a constant so a caller that answers one dialog compares against
+# it instead of copying the string; bin/fm-control.sh answers only this one.
+FM_COMPOSER_DIALOG_CLAUDE_EXIT_PICKER='Claude background-task exit picker'
+
 fm_composer_blocking_dialog() {  # <screen> -> dialog name
   local screen=${1-}
   [ -n "$screen" ] || return 1
@@ -2537,7 +2541,7 @@ fm_composer_blocking_dialog() {  # <screen> -> dialog name
     /[^ \t\r]/ { last = $0 }
     END { exit !(selected && last ~ /^[ \t]*Enter to confirm · Esc to cancel[ \t\r]*$/) }
   '; then
-    printf '%s' 'Claude background-task exit picker'
+    printf '%s' "$FM_COMPOSER_DIALOG_CLAUDE_EXIT_PICKER"
     return 0
   fi
   return 1

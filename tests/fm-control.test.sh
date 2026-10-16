@@ -17,6 +17,9 @@
 #   6. Marker non-regression: a control command to a kind=secondmate task
 #      carries NO from-firstmate marker and opens no pending-reply expectation,
 #      while fm-send's marking of the same task is untouched.
+#   7. Claude's background-task exit picker: exit answers it only for a finished
+#      claude ship or scout and refuses every other task, harness, and dialog;
+#      stay closes it for a live task and leaves the agent running.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -77,6 +80,16 @@ verified_adapter_contract() {  # <harness> -> exit command, interrupt key, repea
 #            last Escape was a moment ago) ->picker, and picker->idle unless
 #            FM_FAKE_DEVIN_PICKER_STUCK is set. Real sleeps apply while it
 #            exists, so key-times carry the true gap between presses.
+#   picker   optional Claude background-task exit picker model: `typed` after
+#            the exit command was typed (the composer shows its ordinary pane),
+#            `open` once the submitting Enter opened the picker (capture-pane
+#            renders picker-screen), `closed` afterwards. Enter on `open` is
+#            the confirming key and stops the agent; Escape on `open` is Stay.
+#            A test starts with `open` for a picker that was already up.
+#   command-after-enter  optional process name the first Enter replaces
+#            `command` with, so the agent-state reader stops proving a live
+#            agent once the submitting Enter has run: a name it cannot
+#            attribute reads ambiguous, an empty one reads unreadable.
 # Two transitions make it a lifecycle model rather than a recorder: a literal
 # that is the harness's exit command flips `command` to a shell (the agent
 # stopped), and a literal carrying a launch brief flips it to the value in
@@ -135,9 +148,20 @@ case "${1:-}" in
       case "$payload" in
         *'encode launch-brief'* | *'Firstmate operational input waiting: read'*) cat "$D/becomes" > "$D/command" ;;
       esac
+      if [ -f "$D/picker" ] && [ "$payload" = /exit ]; then printf typed > "$D/picker"; fi
     else
       printf '%s\n' "$payload" >> "$D/keys"
       printf '%s %s\n' "$(perl -MTime::HiRes=time -e 'printf "%.3f", time')" "$payload" >> "$D/key-times"
+      if [ "$payload" = Enter ] && [ -f "$D/command-after-enter" ]; then
+        cat "$D/command-after-enter" > "$D/command"
+      fi
+      if [ -f "$D/picker" ]; then
+        case "$(cat "$D/picker"):$payload" in
+          typed:Enter) printf open > "$D/picker" ;;
+          open:Enter) printf zsh > "$D/command"; printf closed > "$D/picker" ;;
+          open:Escape) [ -n "${FM_FAKE_PICKER_STUCK:-}" ] || printf closed > "$D/picker" ;;
+        esac
+      fi
       if [ "$payload" = Escape ] && [ -f "$D/devin" ]; then
         case "$(cat "$D/devin")" in
           running) printf armed > "$D/devin" ;;
@@ -176,6 +200,10 @@ case "${1:-}" in
     done
     printf 'fakepane\n'; exit 0 ;;
   capture-pane)
+    if [ -f "$D/picker" ] && [ "$(cat "$D/picker")" = open ]; then
+      cat "$D/picker-screen"
+      exit 0
+    fi
     if [ -f "$D/after-enter" ] && [ -f "$D/keys" ] && grep -qx Enter "$D/keys"; then
       # after-enter-late holds how many captures after Enter still show the
       # ordinary pane, for a screen that renders after the submit has read it.
@@ -241,6 +269,16 @@ if [ "$*" = '-p 4343 -o args=' ]; then printf 'claude --resume\n'; exit 0; fi
 exec /bin/ps "$@"
 SH
   chmod +x "$fb/ps"
+  # The state reader exit consults only while the exit picker is showing.
+  # Default: a task that is still working, so no picker is ever answered
+  # unless a case writes a finished state to $FM_FAKE_DIR/crew-state.
+  cat > "$fb/crew-state" <<'SH'
+#!/usr/bin/env bash
+if [ -f "$FM_FAKE_DIR/crew-state" ]; then cat "$FM_FAKE_DIR/crew-state"; else
+  printf 'state: working · source: run-step · step: review\n'
+fi
+SH
+  chmod +x "$fb/crew-state"
   printf '%s\n' "$fb"
 }
 
@@ -288,12 +326,15 @@ add_task() {
 run_control() {
   local dir=$1; shift
   env PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" FM_FAKE_DIR="$dir/fake" \
+    FM_CREW_STATE_BIN="$dir/fakebin/crew-state" \
     FM_CONTROL_POLL=0.01 FM_CONTROL_SETTLE_WAIT=0.05 \
     FM_CONTROL_EXIT_WAIT=0.05 FM_CONTROL_LAUNCH_WAIT=0.05 \
     FM_FAKE_MUSE_LOG="${FM_FAKE_MUSE_LOG:-}" \
     FM_FAKE_MUSE_DISAPPEAR_BEFORE_ACK="${FM_FAKE_MUSE_DISAPPEAR_BEFORE_ACK:-}" \
     FM_FAKE_INTERRUPT_STOPS_AGENT="${FM_FAKE_INTERRUPT_STOPS_AGENT:-}" \
     FM_FAKE_DEVIN_PICKER_STUCK="${FM_FAKE_DEVIN_PICKER_STUCK:-}" \
+    FM_FAKE_NEVER_DIES="${FM_FAKE_NEVER_DIES:-}" \
+    FM_FAKE_PICKER_STUCK="${FM_FAKE_PICKER_STUCK:-}" \
     "$CONTROL" "$@" 2>&1
 }
 
@@ -619,12 +660,17 @@ test_unverified_state_backends_refuse_stop_verbs() {
     assert_contains "$out" "no recovery-grade agent-state classifier" \
       "the $backend refusal should name the missing stop proof"
     [ -z "$(literals "$dir")" ] || fail "$backend must receive no exit command"
+    out=$(run_control "$dir" t1 stay); rc=$?
+    expect_code 1 "$rc" "stay on $backend should refuse"$'\n'"$out"
+    assert_contains "$out" "no recovery-grade agent-state classifier" \
+      "the $backend stay refusal should name the missing liveness proof"
+    [ -z "$(keys_sent "$dir")" ] || fail "$backend must receive no stay key"
     out=$(run_control "$dir" t1 relaunch --note x); rc=$?
     expect_code 1 "$rc" "relaunch on $backend should refuse"$'\n'"$out"
     assert_contains "$out" "no recovery-grade agent-state classifier" \
       "the $backend relaunch refusal should name the missing stop proof"
   done
-  pass "fm-control: a backend that cannot prove an agent stopped refuses exit and relaunch"
+  pass "fm-control: a backend that cannot prove an agent stopped refuses exit, stay, and relaunch"
 }
 
 test_state_verified_backends_are_exactly_tmux_and_herdr() {
@@ -697,7 +743,7 @@ test_record_bound_to_another_task_is_refused() {
 # refuses, and none of them reaches a local endpoint.
 test_remote_secondmate_is_refused_by_placement() {
   local dir out rc verb
-  for verb in interrupt exit relaunch; do
+  for verb in interrupt exit stay relaunch; do
     dir=$(new_case "remote-$verb")
     add_task "$dir" t1 claude secondmate
     alive_as "$dir" claude
@@ -736,7 +782,7 @@ hold_lifecycle_lock() {  # <lock-path>
 
 test_interrupt_and_exit_lock_before_task_state_resolution() {
   local case_dir out rc verb lifecycle_lock_path holder i
-  for verb in interrupt exit; do
+  for verb in interrupt exit stay; do
     case_dir=$(new_case "locked-$verb")
     add_task "$case_dir" t1 claude
     alive_as "$case_dir" claude
@@ -1077,7 +1123,8 @@ test_exit_refuses_the_confirming_enter() {
   alive_as "$dir" claude
   exit_picker_screen > "$dir/fake/after-enter"
   out=$(env FM_FAKE_NEVER_DIES=1 PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" \
-    FM_FAKE_DIR="$dir/fake" FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+    FM_FAKE_DIR="$dir/fake" FM_CREW_STATE_BIN="$dir/fakebin/crew-state" \
+    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
     "$CONTROL" t1 exit 2>&1); rc=$?
   expect_code 1 "$rc" "the confirming Enter should refuse"$'\n'"$out"
   assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
@@ -1100,7 +1147,8 @@ test_exit_names_a_picker_that_renders_after_the_submit() {
   exit_picker_screen > "$dir/fake/after-enter"
   printf '1' > "$dir/fake/after-enter-late"
   out=$(env FM_FAKE_NEVER_DIES=1 PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" \
-    FM_FAKE_DIR="$dir/fake" FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+    FM_FAKE_DIR="$dir/fake" FM_CREW_STATE_BIN="$dir/fakebin/crew-state" \
+    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
     "$CONTROL" t1 exit 2>&1); rc=$?
   expect_code 1 "$rc" "a picker that renders after the submit should refuse"$'\n'"$out"
   [ "$(cat "$dir/fake/after-enter-late")" = 0 ] \
@@ -1112,6 +1160,477 @@ test_exit_names_a_picker_that_renders_after_the_submit() {
   enters=$(grep -c '^Enter$' "$dir/fake/keys" || true)
   [ "$enters" -eq 1 ] || fail "only the submitting Enter should be sent, got $enters"
   pass "fm-control exit: a picker that renders after the submit returned is named when the stop wait times out"
+}
+
+# --- the exit picker: answered for a finished task, closed with Stay ---------
+
+# arm_busy_gen <case-dir> [state] [source]: arm t1's busy record, idle from
+# fm-spawn unless named, and echo its generation. The exit marker binds to that
+# incarnation, and a picker is answered only when the record reads idle.
+arm_busy_gen() {  # <case-dir> [state] [source]
+  local dir=$1 gen meta
+  meta="$dir/home/state/t1.meta"
+  gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" t1 --state "${2:-idle}" --source "${3:-fm-spawn}" --event seed)
+  { grep -v '^busy_gen=' "$meta" || true; printf 'busy_gen=%s\n' "$gen"; } > "$meta.new"
+  mv "$meta.new" "$meta"
+  printf '%s\n' "$gen"
+}
+
+# A case whose pane runs the picker model: /exit, then its submitting Enter,
+# opens the recognised picker and the fake agent stays up until a key answers
+# it. <state-line> is what the state reader reports, "-" for its default
+# (a task that is still working). The task's busy record is armed idle.
+picker_case() {  # <name> <state-line|-> [kind]
+  local dir
+  dir=$(new_case "$1")
+  add_task "$dir" t1 claude "${3:-ship}"
+  alive_as "$dir" claude
+  arm_busy_gen "$dir" >/dev/null
+  exit_picker_screen > "$dir/fake/picker-screen"
+  printf 'closed' > "$dir/fake/picker"
+  [ "$2" = - ] || printf '%s\n' "$2" > "$dir/fake/crew-state"
+  printf '%s\n' "$dir"
+}
+
+test_exit_answers_a_finished_tasks_picker() {
+  local dir out rc kind
+  for kind in ship scout; do
+    dir=$(picker_case "answer-$kind" "state: done · source: run-step · run: r1" "$kind")
+    out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+    expect_code 0 "$rc" "a finished $kind parked on the picker should exit"$'\n'"$out"
+    assert_contains "$out" "stopped t1 harness=claude" "exit should report the verified stop"
+    assert_contains "$out" 'chose "Exit and stop tasks"' "exit should say which row it chose"
+    [ "$(literals "$dir")" = /exit ] || fail "only /exit may be typed, got: $(literals "$dir")"
+    [ "$(cat "$dir/fake/keys")" = $'Enter\nEnter' ] \
+      || fail "a finished task takes the submitting Enter and one confirming Enter, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+    [ "$(cat "$dir/fake/command")" = zsh ] || fail "the agent should have stopped"
+  done
+  pass "fm-control exit: a finished claude ship or scout parked on the picker is stopped through Exit and stop tasks and verified"
+}
+
+test_exit_leaves_a_live_tasks_picker_alone() {
+  local dir out rc line
+  while IFS= read -r line; do
+    dir=$(picker_case live-picker "$line")
+    out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+    expect_code 1 "$rc" "'$line' is not finished, so the picker must refuse"$'\n'"$out"
+    assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+      "the refusal should name the dialog for '$line'"
+    assert_contains "$out" "fm-control t1 stay" "the refusal should name the supported way to close it"
+    assert_not_contains "$out" "Esc" "the refusal must not name a dismissal key"
+    [ "$(cat "$dir/fake/keys")" = Enter ] \
+      || fail "only the submitting Enter may be sent for '$line', got: $(tr '\n' ' ' < "$dir/fake/keys")"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused exit must leave the agent running"
+    [ "$(cat "$dir/fake/picker")" = open ] || fail "a refused exit must leave the picker as it was"
+  done <<'EOF'
+state: working · source: run-step · step: review
+state: parked · source: run-step · gate: review
+state: failed · source: run-step · run: r1
+state: blocked · source: status-log · blocked: needs a credential
+state: paused · source: status-log · waiting on CI
+state: unknown · source: none · no metadata for t1
+EOF
+  pass "fm-control exit: a task whose own state is not done keeps the picker refusal"
+}
+
+test_exit_refuses_the_picker_when_the_state_cannot_be_read() {
+  local dir out rc
+  dir=$(picker_case unreadable-state '')
+  : > "$dir/fake/crew-state"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "an unreadable state is not proof of a finished task"$'\n'"$out"
+  assert_contains "$out" "its current state could not be read" "the refusal should say why"
+  [ "$(cat "$dir/fake/keys")" = Enter ] || fail "only the submitting Enter may be sent"
+  pass "fm-control exit: an unreadable task state keeps the picker refusal"
+}
+
+test_exit_refuses_the_picker_for_a_finished_task_with_an_active_turn() {
+  local dir out rc
+  dir=$(picker_case busy-finished 'state: done · source: run-step · run: r1')
+  arm_busy_gen "$dir" busy >/dev/null
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "a done task whose busy record shows a turn is still working"$'\n'"$out"
+  assert_contains "$out" "its busy record reads 'busy fm-spawn', not idle" "the refusal should say why"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused exit must leave the agent running"
+  [ "$(cat "$dir/fake/picker")" = open ] || fail "a refused exit must leave the picker as it was"
+  pass "fm-control exit: a finished task whose busy record shows an active turn keeps the picker refusal"
+}
+
+test_exit_refuses_the_picker_when_the_busy_record_is_unknown() {
+  local dir out rc shape reason
+  for shape in no-record malformed gen-mismatch source-mismatch; do
+    dir=$(picker_case "unknown-busy-$shape" 'state: done · source: run-step · run: r1')
+    case "$shape" in
+      no-record)
+        reason=missing
+        rm -f "$dir/home/state/t1.busy-state" "$dir/home/state/t1.busy-gen"
+        ;;
+      malformed)
+        reason=malformed
+        printf 'not a busy record\n' > "$dir/home/state/t1.busy-state"
+        ;;
+      gen-mismatch)
+        reason='gen-mismatch'
+        printf 'another-incarnation\n' > "$dir/home/state/t1.busy-gen"
+        ;;
+      source-mismatch)
+        reason='source-mismatch'
+        arm_busy_gen "$dir" idle not-a-claude-source >/dev/null
+        ;;
+    esac
+    out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+    expect_code 1 "$rc" "a done task whose busy record reads unknown ($shape) must not be answered"$'\n'"$out"
+    assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+      "the $shape refusal should name the dialog"
+    assert_contains "$out" "its busy record reads 'unknown $reason', not idle" \
+      "the $shape refusal should say why"
+    assert_not_contains "$out" 'chose "Exit and stop tasks"' "no answer may be reported for $shape"
+    [ "$(cat "$dir/fake/keys")" = Enter ] \
+      || fail "only the submitting Enter may be sent for $shape, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+    [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused exit must leave the agent running"
+    [ "$(cat "$dir/fake/picker")" = open ] || fail "a refused exit must leave the picker as it was"
+  done
+  pass "fm-control exit: a finished task whose busy record is unknown, however it came to be, keeps the picker refusal"
+}
+
+# queue_steer <case-dir> <text>: enqueue one steer for t1 through the inbox
+# library's own writer and echo the record path.
+queue_steer() {  # <case-dir> <text>
+  # shellcheck disable=SC2016 # The child shell expands its own positional parameters.
+  env FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/home/state" \
+    bash -c '. "$1"; fm_task_inbox_write "$2" t1 "$3"' _ \
+    "$ROOT/bin/fm-task-inbox-lib.sh" "$1/home/state" "$2"
+}
+
+test_exit_refuses_the_picker_while_steering_is_unread() {
+  local dir out rc first
+  dir=$(picker_case unread-steering 'state: done · source: run-step · run: r1')
+  first=$(queue_steer "$dir" "check the second table")
+  queue_steer "$dir" "then rerun the audit" >/dev/null
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "a finished task with unread steering must not be stopped"$'\n'"$out"
+  assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+    "the refusal should name the dialog"
+  assert_contains "$out" "unread steering (${first##*/})" "the refusal should name the oldest unread steer"
+  assert_contains "$out" "fm-control t1 stay" "the refusal should name the supported way to close the picker"
+  assert_not_contains "$out" 'chose "Exit and stop tasks"' "no answer may be reported"
+  [ "$(cat "$dir/fake/keys")" = Enter ] \
+    || fail "only the submitting Enter may be sent, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused exit must leave the agent running"
+  [ "$(cat "$dir/fake/picker")" = open ] || fail "a refused exit must leave the picker as it was"
+  [ -f "$first" ] || fail "the unread steering must stay in the inbox"
+  pass "fm-control exit: a finished task with unread steering keeps the picker refusal and names stay"
+}
+
+test_exit_answers_the_picker_once_the_steering_is_handled() {
+  local dir out rc rec
+  dir=$(picker_case handled-steering 'state: done · source: run-step · run: r1')
+  rec=$(queue_steer "$dir" "check the second table")
+  mv "$rec" "$dir/home/state/t1.inbox/handled/"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 0 "$rc" "a finished task whose steering is acknowledged should exit"$'\n'"$out"
+  assert_contains "$out" 'chose "Exit and stop tasks"' "exit should say which row it chose"
+  [ "$(cat "$dir/fake/keys")" = $'Enter\nEnter' ] \
+    || fail "a finished task takes the submitting Enter and one confirming Enter, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ "$(cat "$dir/fake/command")" = zsh ] || fail "the agent should have stopped"
+  pass "fm-control exit: a finished task whose steering is acknowledged is still stopped through the picker"
+}
+
+test_exit_leaves_an_open_picker_alone_while_steering_is_unread() {
+  local dir out rc first
+  dir=$(picker_case open-unread-steering 'state: done · source: run-step · run: r1')
+  printf 'open' > "$dir/fake/picker"
+  first=$(queue_steer "$dir" "check the second table")
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "an already-open picker with unread steering must refuse"$'\n'"$out"
+  assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+    "the refusal should name the dialog"
+  assert_contains "$out" "unread steering (${first##*/})" "the refusal should name the unread steer"
+  assert_contains "$out" "fm-control t1 stay" "the refusal should name the supported way to close the picker"
+  [ ! -s "$dir/fake/keys" ] || fail "the picker must receive no key, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ ! -s "$dir/fake/literal" ] || fail "the picker must be typed nothing"
+  [ "$(cat "$dir/fake/picker")" = open ] || fail "the picker must be left as it was"
+  pass "fm-control exit: an already-open picker is not closed or answered while steering is unread"
+}
+
+test_exit_does_not_answer_a_picker_on_an_unclassified_endpoint() {
+  local dir out rc shape
+  for shape in ambiguous unreadable; do
+    dir=$(picker_case "unclassified-$shape" 'state: done · source: run-step · run: r1')
+    case "$shape" in
+      ambiguous) printf 'node' > "$dir/fake/command-after-enter" ;;
+      unreadable) : > "$dir/fake/command-after-enter" ;;
+    esac
+    out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+    expect_code 1 "$rc" "a finished task's picker on a $shape endpoint must refuse"$'\n'"$out"
+    assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+      "the $shape refusal should name the dialog"
+    assert_contains "$out" "$shape' rather than a positively classified live agent" \
+      "the $shape refusal should name the endpoint read"
+    assert_not_contains "$out" 'chose "Exit and stop tasks"' "no answer may be reported for a $shape endpoint"
+    [ "$(cat "$dir/fake/keys")" = Enter ] \
+      || fail "only the submitting Enter may be sent on a $shape endpoint, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+    [ "$(cat "$dir/fake/picker")" = open ] || fail "a refused exit must leave the picker as it was"
+  done
+  pass "fm-control exit: a finished task's picker is not answered while the endpoint reads ambiguous or unreadable"
+}
+
+test_exit_does_not_answer_a_late_picker_on_an_unclassified_endpoint() {
+  local dir out rc
+  dir=$(new_case late-unclassified)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  arm_busy_gen "$dir" >/dev/null
+  printf '%s\n' 'state: done · source: run-step · run: r1' > "$dir/fake/crew-state"
+  exit_picker_screen > "$dir/fake/after-enter"
+  printf '1' > "$dir/fake/after-enter-late"
+  printf 'node' > "$dir/fake/command-after-enter"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "a picker found after the stop wait on an ambiguous endpoint must refuse"$'\n'"$out"
+  assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+    "the refusal should name the dialog"
+  assert_contains "$out" "'ambiguous' rather than a positively classified live agent" \
+    "the refusal should name the endpoint read"
+  [ "$(cat "$dir/fake/keys")" = Enter ] \
+    || fail "only the submitting Enter may be sent, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  pass "fm-control exit: a picker found after the stop wait is not answered while the endpoint reads ambiguous"
+}
+
+test_exit_never_answers_a_secondmates_picker() {
+  local dir out rc
+  dir=$(picker_case secondmate-picker 'state: done · source: status-log' secondmate)
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "a persistent secondmate is never finished"$'\n'"$out"
+  assert_contains "$out" "a secondmate is never finished" "the refusal should say why"
+  [ "$(cat "$dir/fake/keys")" = Enter ] || fail "only the submitting Enter may be sent"
+  pass "fm-control exit: a secondmate's picker is never answered, whatever its state reads"
+}
+
+test_exit_does_not_answer_the_picker_for_another_harness() {
+  local dir out rc
+  # opencode also exits with /exit, so the picker model reaches it unchanged.
+  dir=$(new_case other-harness-picker)
+  add_task "$dir" t1 opencode
+  alive_as "$dir" opencode
+  exit_picker_screen > "$dir/fake/picker-screen"
+  printf 'closed' > "$dir/fake/picker"
+  printf '%s\n' 'state: done · source: run-step · run: r1' > "$dir/fake/crew-state"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "only the Claude adapter has a recognised picker answer"$'\n'"$out"
+  [ "$(cat "$dir/fake/keys")" = Enter ] || fail "only the submitting Enter may be sent"
+  pass "fm-control exit: no other adapter's picker is answered"
+}
+
+test_exit_closes_an_already_open_picker_for_a_finished_task() {
+  local dir out rc
+  dir=$(picker_case open-finished 'state: done · source: run-step · run: r1')
+  printf 'open' > "$dir/fake/picker"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 0 "$rc" "a finished task already parked on the picker should exit"$'\n'"$out"
+  assert_contains "$out" "stopped t1 harness=claude" "exit should report the verified stop"
+  assert_contains "$out" "closed it with Stay and read the composer again" \
+    "exit should say it closed the picker first"
+  [ "$(cat "$dir/fake/keys")" = $'Escape\nEnter\nEnter' ] \
+    || fail "the picker takes Stay, then the exit takes its own Enter and the confirming Enter, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ "$(literals "$dir")" = /exit ] || fail "only /exit may be typed, got: $(literals "$dir")"
+  pass "fm-control exit: a picker already open for a finished task is closed with Stay, the composer is proven empty, then the exit completes"
+}
+
+test_exit_keeps_text_the_open_picker_was_hiding() {
+  local dir out rc
+  dir=$(picker_case hidden-draft 'state: done · source: run-step · run: r1')
+  printf 'open' > "$dir/fake/picker"
+  printf '%s\n' '╭────────────────────╮' '│ half-typed note    │' '╰────────────────────╯' > "$dir/fake/pane"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "text the picker was hiding must refuse the exit"$'\n'"$out"
+  assert_contains "$out" "composer visibly holds pending text" "the refusal should name the pending text"
+  [ "$(cat "$dir/fake/keys")" = Escape ] || fail "only Stay may be sent, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ ! -s "$dir/fake/literal" ] || fail "nothing may be typed over the hidden draft"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "the agent must keep running"
+  pass "fm-control exit: a draft the open picker was hiding is preserved and refuses the exit"
+}
+
+test_exit_keeps_an_already_open_picker_for_a_live_task() {
+  local dir out rc
+  dir=$(picker_case open-live -)
+  printf 'open' > "$dir/fake/picker"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "a live task's open picker must refuse"$'\n'"$out"
+  assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" "the refusal should name the dialog"
+  [ ! -s "$dir/fake/keys" ] || fail "a live task's picker must receive no key, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ ! -s "$dir/fake/literal" ] || fail "a live task's picker must be typed nothing"
+  [ "$(cat "$dir/fake/picker")" = open ] || fail "the picker must be left as it was"
+  pass "fm-control exit: a live task's already-open picker is neither closed nor answered"
+}
+
+test_exit_never_answers_an_unrecognised_dialog() {
+  local dir out rc
+  dir=$(picker_case other-dialog 'state: done · source: run-step · run: r1')
+  printf '%s\n' \
+    'Allow external CLAUDE.md file imports?' \
+    '  This project is using external files.' \
+    '❯ 1. Yes, allow external imports' \
+    '  2. No, disable external imports' \
+    'Enter to confirm · Esc to cancel' > "$dir/fake/pane"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "an unrecognised dialog must never be answered"$'\n'"$out"
+  assert_not_contains "$out" 'chose "Exit and stop tasks"' "no dialog may be answered here"
+  assert_not_contains "$out" "closed it with Stay" "no dialog may be answered here"
+  [ ! -s "$dir/fake/keys" ] || fail "an unrecognised dialog must receive no key, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ ! -s "$dir/fake/literal" ] || fail "an unrecognised dialog must be typed nothing"
+  pass "fm-control exit: a dialog the control plane does not recognise receives no key and no text"
+}
+
+test_relaunch_never_answers_the_picker() {
+  local dir out rc
+  dir=$(picker_case relaunch-picker 'state: done · source: run-step · run: r1')
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 relaunch --note "picker probe"); rc=$?
+  expect_code 1 "$rc" "relaunch must not answer the picker"$'\n'"$out"
+  assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+    "relaunch should name the dialog"
+  assert_contains "$out" "relaunch never answers it" "relaunch should say it never answers the picker"
+  [ "$(cat "$dir/fake/keys")" = Enter ] \
+    || fail "only the submitting Enter may be sent, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused relaunch must leave the agent running"
+  pass "fm-control relaunch: its own stop never answers the exit picker"
+}
+
+test_stay_closes_the_picker_and_leaves_the_agent_running() {
+  local dir out rc
+  dir=$(picker_case stay-live -)
+  printf 'open' > "$dir/fake/picker"
+  out=$(run_control "$dir" t1 stay); rc=$?
+  expect_code 0 "$rc" "stay on the recognised picker should succeed"$'\n'"$out"
+  assert_contains "$out" "stayed t1 harness=claude" "stay should report the outcome"
+  assert_contains "$out" "verified=picker-closed agent=alive" "stay should report what it verified"
+  [ "$(cat "$dir/fake/keys")" = Escape ] || fail "stay sends exactly one Escape, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ ! -s "$dir/fake/literal" ] || fail "stay types no text"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "the agent must still be running"
+  [ "$(cat "$dir/fake/picker")" = closed ] || fail "the picker should be closed"
+  pass "fm-control stay: one Escape closes the recognised picker and the agent keeps running"
+}
+
+test_stay_sends_nothing_on_any_other_screen() {
+  local dir out rc shape
+  for shape in composer unrecognised quoted; do
+    dir=$(new_case "stay-$shape")
+    add_task "$dir" t1 claude
+    alive_as "$dir" claude
+    case "$shape" in
+      composer) : ;;
+      unrecognised)
+        printf '%s\n' \
+          'Do you trust the files in this folder?' \
+          '❯ 1. Yes, proceed' \
+          '  2. No, exit' \
+          'Enter to confirm · Esc to cancel' > "$dir/fake/pane"
+        ;;
+      quoted)
+        {
+          exit_picker_screen
+          printf '%s\n' '' '╭────╮' '│    │' '╰────╯'
+        } > "$dir/fake/pane"
+        ;;
+    esac
+    out=$(run_control "$dir" t1 stay); rc=$?
+    expect_code 1 "$rc" "stay on a $shape screen must refuse"$'\n'"$out"
+    assert_contains "$out" "does not show the recognised Claude background-task exit picker" \
+      "the $shape refusal should say why"
+    [ ! -s "$dir/fake/keys" ] || fail "stay on a $shape screen must send no key"
+    [ ! -s "$dir/fake/literal" ] || fail "stay on a $shape screen must type nothing"
+  done
+  pass "fm-control stay: a screen that is not exactly the recognised picker receives no key"
+}
+
+test_stay_reports_a_picker_that_did_not_close() {
+  local dir out rc
+  dir=$(picker_case stay-stuck -)
+  printf 'open' > "$dir/fake/picker"
+  out=$(FM_FAKE_PICKER_STUCK=1 run_control "$dir" t1 stay); rc=$?
+  expect_code 1 "$rc" "a picker that did not close must not be reported as closed"$'\n'"$out"
+  assert_contains "$out" "still shows the exit picker after one Escape" "the refusal should say what it saw"
+  [ "$(cat "$dir/fake/keys")" = Escape ] || fail "stay must not retry or add keys, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  pass "fm-control stay: an unconfirmed close is a refusal that names the screen and sends no second key"
+}
+
+test_stay_refuses_an_adapter_with_no_recognised_picker() {
+  local dir out rc
+  dir=$(new_case stay-codex)
+  add_task "$dir" t1 codex
+  alive_as "$dir" codex
+  exit_picker_screen > "$dir/fake/pane"
+  out=$(run_control "$dir" t1 stay); rc=$?
+  expect_code 1 "$rc" "stay on codex must refuse"$'\n'"$out"
+  assert_contains "$out" "has no recognised exit picker" "the refusal should say why"
+  [ ! -s "$dir/fake/keys" ] || fail "stay on codex must send no key"
+  pass "fm-control stay: an adapter with no recognised picker is refused before any key"
+}
+
+test_stay_refuses_when_no_agent_runs() {
+  local dir out rc
+  dir=$(new_case stay-dead)
+  add_task "$dir" t1 claude
+  alive_as "$dir" zsh
+  exit_picker_screen > "$dir/fake/pane"
+  out=$(run_control "$dir" t1 stay); rc=$?
+  expect_code 1 "$rc" "stay with no agent must refuse"$'\n'"$out"
+  assert_contains "$out" "there is no exit picker to close" "the refusal should say there is nothing to close"
+  [ ! -s "$dir/fake/keys" ] || fail "stay with no agent must send no key"
+  pass "fm-control stay: a stopped agent's leftover picker text is never keyed"
+}
+
+test_stay_takes_no_options() {
+  local dir out rc
+  dir=$(new_case stay-flags)
+  add_task "$dir" t1 claude
+  out=$(run_control "$dir" t1 stay --note x); rc=$?
+  expect_code 1 "$rc" "stay takes no options"$'\n'"$out"
+  assert_contains "$out" "apply to 'relaunch' only" "the refusal should scope the flags"
+  pass "fm-control stay: relaunch options are refused"
+}
+
+test_stay_cancels_the_exit_a_refused_exit_left_behind() {
+  local dir out rc gen
+  dir=$(picker_case stay-marker -)
+  gen=$(arm_busy_gen "$dir")
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "a live task's picker must refuse the exit"$'\n'"$out"
+  [ "$(cat "$dir/home/state/t1.control-exit")" = "gen=$gen" ] \
+    || fail "the refused exit should keep its deliberate-exit marker while the picker waits for a person"
+  out=$(run_control "$dir" t1 stay); rc=$?
+  expect_code 0 "$rc" "stay should close the picker the refused exit left open"$'\n'"$out"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "the agent must still be running"
+  [ ! -e "$dir/home/state/t1.control-exit" ] \
+    || fail "stay left the cancelled exit's deliberate-exit marker: $(cat "$dir/home/state/t1.control-exit")"
+  pass "fm-control stay: closing the picker a refused exit opened removes that exit's deliberate-exit marker"
+}
+
+test_stay_leaves_a_marker_from_another_generation() {
+  local dir out rc
+  dir=$(picker_case stay-other-gen -)
+  arm_busy_gen "$dir" >/dev/null
+  printf 'open' > "$dir/fake/picker"
+  printf 'gen=an-earlier-incarnation\n' > "$dir/home/state/t1.control-exit"
+  out=$(run_control "$dir" t1 stay); rc=$?
+  expect_code 0 "$rc" "stay on the recognised picker should succeed"$'\n'"$out"
+  [ "$(cat "$dir/home/state/t1.control-exit")" = 'gen=an-earlier-incarnation' ] \
+    || fail "stay must not clear a marker that names another busy generation"
+  pass "fm-control stay: a deliberate-exit marker from another generation is left alone"
+}
+
+test_exit_that_closes_an_open_picker_cancels_the_earlier_exit() {
+  local dir out rc gen
+  dir=$(picker_case open-marker 'state: done · source: run-step · run: r1')
+  gen=$(arm_busy_gen "$dir")
+  printf 'open' > "$dir/fake/picker"
+  printf 'gen=%s\n' "$gen" > "$dir/home/state/t1.control-exit"
+  printf '%s\n' '╭────────────────────╮' '│ half-typed note    │' '╰────────────────────╯' > "$dir/fake/pane"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "text the picker was hiding must refuse the exit"$'\n'"$out"
+  [ "$(cat "$dir/fake/keys")" = Escape ] || fail "only Stay may be sent, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ ! -e "$dir/home/state/t1.control-exit" ] \
+    || fail "closing the open picker left the earlier exit's marker: $(cat "$dir/home/state/t1.control-exit")"
+  pass "fm-control exit: closing an already-open picker clears the marker of the exit it cancels"
 }
 
 test_idle_agent_is_not_interrupted() {
@@ -1238,7 +1757,8 @@ test_agent_that_does_not_stop_fails_closed() {
   gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" t1)
   printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/t1.meta"
   out=$(env FM_FAKE_NEVER_DIES=1 PATH="$dir/fakebin:$PATH" FM_HOME="$dir/home" \
-    FM_FAKE_DIR="$dir/fake" FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
+    FM_FAKE_DIR="$dir/fake" FM_CREW_STATE_BIN="$dir/fakebin/crew-state" \
+    FM_CONTROL_POLL=0.01 FM_CONTROL_EXIT_WAIT=0.05 \
     "$CONTROL" t1 exit 2>&1); rc=$?
   expect_code 1 "$rc" "an agent that ignores its exit command should fail closed"
   assert_contains "$out" "did not stop" "the failure should say the agent did not stop"
@@ -1406,6 +1926,32 @@ test_exit_drops_meta_busy_gen_with_the_sidecar
 test_exit_refuses_an_open_background_picker
 test_exit_refuses_the_confirming_enter
 test_exit_names_a_picker_that_renders_after_the_submit
+test_exit_answers_a_finished_tasks_picker
+test_exit_leaves_a_live_tasks_picker_alone
+test_exit_refuses_the_picker_when_the_state_cannot_be_read
+test_exit_refuses_the_picker_for_a_finished_task_with_an_active_turn
+test_exit_refuses_the_picker_when_the_busy_record_is_unknown
+test_exit_refuses_the_picker_while_steering_is_unread
+test_exit_answers_the_picker_once_the_steering_is_handled
+test_exit_leaves_an_open_picker_alone_while_steering_is_unread
+test_exit_does_not_answer_a_picker_on_an_unclassified_endpoint
+test_exit_does_not_answer_a_late_picker_on_an_unclassified_endpoint
+test_exit_never_answers_a_secondmates_picker
+test_exit_does_not_answer_the_picker_for_another_harness
+test_exit_closes_an_already_open_picker_for_a_finished_task
+test_exit_keeps_text_the_open_picker_was_hiding
+test_exit_keeps_an_already_open_picker_for_a_live_task
+test_exit_never_answers_an_unrecognised_dialog
+test_relaunch_never_answers_the_picker
+test_stay_closes_the_picker_and_leaves_the_agent_running
+test_stay_sends_nothing_on_any_other_screen
+test_stay_reports_a_picker_that_did_not_close
+test_stay_refuses_an_adapter_with_no_recognised_picker
+test_stay_refuses_when_no_agent_runs
+test_stay_takes_no_options
+test_stay_cancels_the_exit_a_refused_exit_left_behind
+test_stay_leaves_a_marker_from_another_generation
+test_exit_that_closes_an_open_picker_cancels_the_earlier_exit
 test_interrupt_without_acknowledgement_preserves_busy_state
 test_muse_interrupt_confirms_adapter_acknowledgement
 test_interrupt_revalidates_agent_after_acknowledgement_wait

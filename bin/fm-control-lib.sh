@@ -50,12 +50,13 @@ exit
 relaunch
 authorize-continuation
 reassociate
+stay
 EOF
 }
 
 fm_control_verb_allowed() {  # <verb>
   case "${1-}" in
-    interrupt|exit|relaunch|authorize-continuation|reassociate) return 0 ;;
+    interrupt|exit|relaunch|authorize-continuation|reassociate|stay) return 0 ;;
   esac
   return 1
 }
@@ -254,6 +255,34 @@ fm_control_exit_command() {  # <harness>
   case "${1-}" in
     claude|opencode|grok|kimi|cursor|muse|rovo) printf '/exit' ;;
     codex|pi|pi-signed|omp|gemini|agy|devin) printf '/quit' ;;
+    *) return 1 ;;
+  esac
+}
+
+# The key that answers a recognised exit picker with its Stay option, which
+# closes the picker and leaves the agent running; nothing for an adapter with
+# no recognised picker. Only Claude's background-task exit picker is recognised
+# (fm_composer_blocking_dialog in bin/fm-composer-lib.sh owns the structure).
+# Its Dialog binds Escape to the same handler as its Stay row, read from the
+# bundled source of Claude Code 2.1.301. A Down-and-Enter sequence is not used
+# because the row count varies: "Move to background and exit" is absent when
+# the session has no background handler. Ctrl+C is never sent: the dialog
+# exits the session on Ctrl+C and Ctrl+D.
+fm_control_exit_picker_stay_key() {  # <harness>
+  case "${1-}" in
+    claude) printf 'Escape' ;;
+    codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|muse|rovo|agy|devin) ;;
+    *) return 1 ;;
+  esac
+}
+
+# The key that confirms the recognised exit picker's selected row, which the
+# recogniser requires to be "Exit and stop tasks"; nothing for an adapter with
+# no recognised picker.
+fm_control_exit_picker_confirm_key() {  # <harness>
+  case "${1-}" in
+    claude) printf 'Enter' ;;
+    codex|opencode|pi|pi-signed|omp|grok|kimi|cursor|gemini|muse|rovo|agy|devin) ;;
     *) return 1 ;;
   esac
 }
