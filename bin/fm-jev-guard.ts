@@ -187,7 +187,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     const why = final.audit_error_type
       ? `Review required: AuditUnavailableError; judgment error_type=${final.error_type ?? "null"}.`
       : final.decision === "review" ? `Review required: ${final.error_type ?? "uncertain judgment"}.` : reason;
-    return { block: true, reason: `[jev-guard] ${why} ${OUTAGE_POLICY}. ${final.decision === "review" ? OUTAGE_NOTICE : BLOCK_NOTICE}` };
+    return { block: true, reason: `[jev-guard] ${why} ${OUTAGE_POLICY}. ${terminal.decision === "review" ? OUTAGE_NOTICE : BLOCK_NOTICE}` };
   }
 
   function finishResult(terminal: GuardTerminal, consistentContent?: { type: "text"; text: string }[]): GuardResultPatch | undefined {

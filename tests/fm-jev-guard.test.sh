@@ -155,7 +155,7 @@ test_outages_and_scope() {
 }
 
 test_bounded_retry() {
-  local out before reason
+  local out before reason ledger
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"flaky-once ls"}')"
   [ -z "$out" ] || fail "an outage followed by success did not allow the call"
@@ -179,6 +179,24 @@ test_bounded_retry() {
   denied "$out" || fail "malformed response allowed a required judgment"
   [ "$(requests)" -eq $((before + 1)) ] || fail "contract failure was retried"
   jq -se '.[-1] | .error_type == "ContractError" and .attempts == 1' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "contract failure row lost its single try"
+  ledger="$HOME_DIR/state/jev-guard.jsonl"
+  mv "$ledger" "$ledger.saved"
+  mkdir "$ledger"
+  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  denied "$out" || fail "policy block was not denied while the ledger write failed"
+  reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
+  [[ "$reason" == *"AuditUnavailableError"* ]] || fail "failed ledger write was not named: $reason"
+  [[ "$reason" == *"This block is final. Do not try to work around it"* && "$reason" != *"same call once more"* ]] || fail "policy block lost its final text when the ledger write failed: $reason"
+  claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"x"}')"
+  denied "$out" || fail "deterministic refusal was not denied while the ledger write failed"
+  reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
+  [[ "$reason" == *"This block is final. Do not try to work around it"* && "$reason" != *"same call once more"* ]] || fail "deterministic refusal lost its final text when the ledger write failed: $reason"
+  claude_hook "$(pre Bash '{"command":"fail500 ledger"}')"
+  denied "$out" || fail "outage was not denied while the ledger write failed"
+  reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
+  [[ "$reason" == *"same call once more"* && "$reason" != *"block is final"* ]] || fail "outage lost its retry text when the ledger write failed: $reason"
+  rmdir "$ledger"
+  mv "$ledger.saved" "$ledger"
   before=$(requests)
   claude_hook "$(post Bash '{"stdout":"probability=0.5 flagged-canary","stderr":""}')"
   jq -e '.hookSpecificOutput.additionalContext | contains("review")' <<<"$out" >/dev/null || fail "ambiguous result was not reviewed"

@@ -41,7 +41,8 @@ if backend == 'claude':
     text = separator + notice
 positive = kind in ('launch', 'inbox')
 requests = (lab / 'jev.jsonl').read_text().splitlines()
-assert len(requests) == (0 if positive or phase in ('privacy', 'credentials') else 1), 'unexpected Jev egress count'
+expected_requests = 0 if positive or phase in ('privacy', 'credentials') else 2 if phase == 'provider' else 1
+assert len(requests) == expected_requests, f'unexpected Jev egress count: expected {expected_requests}, got {len(requests)}'
 if positive:
     if backend == 'omp':
         assert source in text, 'original exact instruction bytes absent from next model context'
