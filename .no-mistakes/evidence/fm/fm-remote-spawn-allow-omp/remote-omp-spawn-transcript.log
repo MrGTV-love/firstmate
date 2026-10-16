@@ -1,0 +1,57 @@
+ok - a remote second mate on omp is accepted and its launch command carries the model and effort
+---- ios.meta (remote spawn record) ----
+window=remote:ios
+endpoint_task_id=ios
+worktree=/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-home
+project=/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-root
+harness=omp
+kind=secondmate
+mode=secondmate
+yolo=off
+tasktmp=
+model=openai-codex/gpt-6.1-sol
+effort=high
+home=/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-home
+projects=
+remote_host=remote-mac
+remote_root=/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-root
+remote_backend=herdr
+remote_herdr_session=fm-remote
+remote_target=fm-remote:w1:p3
+---- launch command the remote pane received ----
+fm_launch_git_hooks() {
+  fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
+  fm_i=0 fm_out=0 fm_key= fm_value=
+  case "$fm_count" in ''|*[!0-9]*) return 0 ;; esac
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
+    if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
+      if [ "$fm_i" -ne "$fm_out" ]; then
+        export "GIT_CONFIG_KEY_$fm_out=$fm_key" "GIT_CONFIG_VALUE_$fm_out=$fm_value"
+      fi
+      fm_out=$((fm_out + 1))
+    fi
+    fm_i=$((fm_i + 1))
+  done
+  fm_i=$fm_out
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
+    fm_i=$((fm_i + 1))
+  done
+  if [ "$fm_keep" = 0 ]; then
+    export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
+    fm_out=$((fm_out + 1))
+  fi
+  if [ "$fm_out" -eq 0 ]; then
+    unset GIT_CONFIG_COUNT
+  else
+    export GIT_CONFIG_COUNT=$fm_out
+  fi
+}
+
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-home/state/parent-route/ios.git-hooks' 0; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; (export FM_SPAWN_GEN='s1792115932.38949.7060'; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_TASK_INBOX='/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-home/state/parent-route/ios.inbox'; FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME='/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-root' FM_HOME='/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-home' FM_TRACE_CONTEXT=off FM_SUPERVISION_MODEL=extension PI_CODING_AGENT_DIR='/Users/charlesabrooker/.omp/agent' env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 '/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-root/bin/omp' --config '/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-root/.omp/fm-session-overlay.yml' --auto-approve --cwd '/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-home' --model 'openai-codex/gpt-6.1-sol' --thinking 'high' -e '/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-home/state/parent-route/ios.omp-ext.ts' "$('/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-root/bin/fm-operational-input.sh' encode launch-brief < '/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-home/data/charter.md')"
+)
+---- parent spawn output ----
+spawned ios harness=omp kind=secondmate mode=secondmate yolo=off window=remote:ios worktree=/Users/charlesabrooker/tmp/fm-remote-compact-adviser.nTILje/remote-home remote=remote-mac backend=herdr
+ok - an unverified remote harness name is still refused at the parent spawn and both host-local verbs
+OMP SCENARIO DONE

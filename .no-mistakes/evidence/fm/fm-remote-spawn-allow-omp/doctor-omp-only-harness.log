@@ -1,0 +1,30 @@
+### Setup: PATH = disposable dir with required tools + omp (no claude/codex/opencode/pi/grok/kimi); real fm-remote-doctor.sh --worker-tool-probe
+### NEW code (c4013bb8)
+required git=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/git
+required jq=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/jq
+required herdr=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/herdr
+required tasks-axi=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/tasks-axi
+required treehouse=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/treehouse
+required python3=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/python3
+required harness=omp:/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/omp
+exit=0
+
+### OLD code (8221de43): same PATH
+required git=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/git
+required jq=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/jq
+required herdr=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/herdr
+required tasks-axi=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/tasks-axi
+required treehouse=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/treehouse
+required python3=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/python3
+required harness=MISSING
+exit=1
+
+### NEW code, no harness at all (omp link removed): still reports MISSING
+required git=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/git
+required jq=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/jq
+required herdr=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/herdr
+required tasks-axi=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/tasks-axi
+required treehouse=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/treehouse
+required python3=/Users/charlesabrooker/tmp/fm-omp-doctor.TPQJF6/python3
+required harness=MISSING
+exit=1
