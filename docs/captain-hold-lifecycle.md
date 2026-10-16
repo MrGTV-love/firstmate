@@ -321,24 +321,17 @@ Worker-owned unfinished work is not completed by this operator path.
 Both standalone paths are decision answers under the [supervision role partition](pi-supervision-branch.md#consistency): main-owned while attended, refused for the supervision branch, and relocated to it only under the away-posture record.
 The board-request `reconcile close`, `answer`, and `answers` are not part of that guard.
 One exact-replay rule governs every retry of a task close, on the board-request path and the `--verified-outcome` path alike.
-After an interrupted close a retry is accepted only as an exact replay of the newest record: the same evidence digest, written by reconciliation, for the same hold-set stamp.
-The verified outcome is part of the digest, and a record and a hold that both carry no stamp match each other.
-The retry finishes parent publication under the hold's original opening occurrence key.
-A different digest or outcome against the newest record of the current hold is refused by name; it stacks no record and publishes no later occurrence key, and a closed call refuses it too.
-A retry never closes a newer or reopened hold: the same evidence is refused there, while a different digest on a reopened open task is the first close of that new opening and resolves only the new hold's key.
-A hold with no stamp and two or more records cannot identify its opening and is refused as legacy stacked records.
+An interrupted close finishes only as an exact replay of the newest record for the current hold, and the retry publishes the parent resolution under the hold's original opening key.
+A changed digest or outcome against the current hold's newest record is refused without stacking a record, and old evidence never closes a newer or reopened hold; the help text owns the full retry contract.
 Only a `--verified-outcome` retry may finish without a pending board request; the default close and a still-active note need one in every state.
 
 For an ordinary status-owned operational key, `reconcile close-key` addresses the active home's status stream, not a worker endpoint or another home's backlog.
 It checks the key's owner before recording anything and leaves captain-held tasks and reserved library keys to their respective owners.
 It also probes the migrated hold row a Beads migration recorded for the key, so a key backed by any open local captain-held task stays with that task.
-The full evidence and verified outcome are saved together, beside the status line that opened the call, before the normal status resolution event is appended through the self-announced writer.
+The full evidence and verified outcome are saved together, bound to the status line that opened the call, before the normal status resolution event is appended through the self-announced writer.
 The event carries the evidence digest rather than truncating the evidence into a status excerpt.
-The returned evidence path identifies the durable file.
-An interrupted append can retry against that file only while the call still has the opening the evidence was verified against; a successful exact retry appends nothing.
+An interrupted append can retry against that saved evidence only while the call still has the opening the evidence was verified against; a successful exact retry appends nothing.
 A changed evidence digest cannot rewrite a closed key, and neither an earlier matching close event nor staged evidence from an earlier opening can close a reopened key.
-Other keys in the stream remain unchanged.
-No board adapter, source binding, or remote routing behavior changes.
 
 ## Card hygiene: a landed subject is not a live call
 

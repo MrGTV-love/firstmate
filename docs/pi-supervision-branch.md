@@ -667,11 +667,13 @@ At that moment the branch reports any refusal instead of concluding there is "no
 
 `tests/fm-secondmate-safety.test.sh` covers the branch actor being refused second-mate retirement with the mate's record, home, route, and endpoint left intact.
 
-`tests/fm-send-resolve-key.test.sh` and `tests/fm-captain-hold-lifecycle.test.sh` cover the decision-answer partition; the lifecycle suite holds the coverage for `fm-captain-hold.sh reconcile close --verified-outcome` and `reconcile close-key`:
+`tests/fm-send-resolve-key.test.sh` covers the decision-answer partition:
 
 - A needs-decision or captain-held key refuses the attended branch before anything is sent.
 - A `blocked:` key stays ordinary steering.
 - The record relocates the answer.
+
+`tests/fm-captain-hold-lifecycle.test.sh` covers the same partition for `fm-captain-hold.sh reconcile close --verified-outcome` and `reconcile close-key`; [its case list](captain-hold-lifecycle.md#reconcile-coverage) lives with the lifecycle verification record.
 
 For the away posture:
 
