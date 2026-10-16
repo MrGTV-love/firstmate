@@ -1,5 +1,5 @@
-// Installs disler's ten-levels level 6 jev-guard (bin/ten-levels, see SOURCE.md
-// there) into one Firstmate ship or scout worker session.
+// Installs Firstmate's worker guard using the shared ten-levels policies and
+// client (bin/ten-levels/SOURCE.md) into one ship or scout worker session.
 // Usage: installJevGuard(pi, {home, config, state, task, worktree, data, project, policy, noHelpers}) from the
 // omp extension fm-spawn.sh generates, or through bin/fm-jev-guard-claude.ts.
 // Firstmate's boundary and compatibility requirements are owned by

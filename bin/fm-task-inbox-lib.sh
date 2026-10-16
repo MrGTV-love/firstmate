@@ -100,7 +100,7 @@
 #   FM_TASK_INBOX_BUSY_MAX     default 2; consecutive busy-deferred due polls before escalation
 
 _FM_TASK_INBOX_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# Both dependencies are canonical lint roots in their own right. Keep them as
+# These dependencies are canonical lint roots in their own right. Keep them as
 # analysis boundaries here so ShellCheck's external-source traversal does not
 # recursively duplicate the full backend graph for every inbox consumer.
 # shellcheck source=/dev/null
@@ -332,9 +332,9 @@ fm_task_inbox_body() {  # <record-path>
 # It names the inbox by the literal "$FM_TASK_INBOX", which bin/fm-spawn.sh
 # exports into every launch as the inbox's absolute path, so the worker can
 # resolve it from its own environment even after losing its brief context.
-# The short `<task>.inbox` name follows as the fallback for a worker launched
-# before that export, whose brief carries the full path (bin/fm-dod-lib.sh
-# role contract, bin/fm-brief.sh inbox section). No absolute path is printed,
+# The `<task>.inbox/NNN.msg` reference comes first and remains usable with the
+# brief's full inbox path for a worker launched before that export (see
+# bin/fm-dod-lib.sh and bin/fm-brief.sh). No absolute path is printed,
 # so the line's length never grows with the home's depth: a long line wraps
 # past what a harness composer read can prove, and a Herdr submit then reports
 # it did not reach the pane on every re-ring. The leading `: ` is the POSIX
