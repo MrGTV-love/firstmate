@@ -1,0 +1,40 @@
+=== [base-node] S1 network drop once, then success -> call allowed
+exit=0 wall_s=0.2 provider_requests=1 stderr_bytes=0
+hook_output: {"decision":"deny","reason":"[jev-guard] Review required: TypeError. REVIEW_ON_UNAVAILABLE_V1. This block is final. Do not try to work around it with another command, another tool, a different path, or an encoding that does the same thing. Stop and tell the user what was blocked and why.","ctx":null}
+ledger_last: {"decision":"review","branch":"outage","error_type":"TypeError","request_started":true,"attempts":null,"ms":null}
+=== [base-node] S2 network drop twice -> outage deny, one retry only
+exit=0 wall_s=0.2 provider_requests=1 stderr_bytes=0
+hook_output: {"decision":"deny","reason":"[jev-guard] Review required: TypeError. REVIEW_ON_UNAVAILABLE_V1. This block is final. Do not try to work around it with another command, another tool, a different path, or an encoding that does the same thing. Stop and tell the user what was blocked and why.","ctx":null}
+ledger_last: {"decision":"review","branch":"outage","error_type":"TypeError","request_started":true,"attempts":null,"ms":null}
+=== [base-node] S5 oversize request (17 KiB) -> no provider call, not retried
+exit=0 wall_s=0.1 provider_requests=0 stderr_bytes=0
+hook_output: {"decision":"deny","reason":"[jev-guard] Review required: RequestTooLargeError. REVIEW_ON_UNAVAILABLE_V1. This block is final. Do not try to work around it with another command, another tool, a different path, or an encoding that does the same thing. Stop and tell the user what was blocked and why.","ctx":null}
+ledger_last: {"decision":"review","branch":"outage","error_type":"RequestTooLargeError","request_started":false,"attempts":null,"ms":null}
+=== [base-node] S6 policy block rm -rf -> one request, final text
+exit=0 wall_s=0.2 provider_requests=1 stderr_bytes=0
+hook_output: {"decision":"deny","reason":"[jev-guard] irreversible (1.00): nothing would restore what this removes or overwrites REVIEW_ON_UNAVAILABLE_V1. This block is final. Do not try to work around it with another command, another tool, a different path, or an encoding that does the same thing. Stop and tell the user what was blocked and why.","ctx":null}
+ledger_last: {"decision":"block","branch":"policy","error_type":null,"request_started":true,"attempts":1,"ms":21}
+=== [base-node] S8a flagged tool result (p=0.9) -> one request, no retry
+exit=0 wall_s=0.2 provider_requests=1 stderr_bytes=0
+hook_output: {"decision":null,"reason":null,"ctx":"[jev-guard] Tool output requires review (flag). REVIEW_ON_UNAVAILABLE_V1. Advisory only: original output remains visible; no protection."}
+ledger_last: {"decision":"flag","branch":"policy","error_type":null,"request_started":true,"attempts":1,"ms":21}
+=== [base-node] S8b ambiguous tool result (p=0.5) -> one request, no retry
+exit=0 wall_s=0.2 provider_requests=1 stderr_bytes=0
+hook_output: {"decision":null,"reason":null,"ctx":"[jev-guard] Tool output requires review (review). REVIEW_ON_UNAVAILABLE_V1. Advisory only: original output remains visible; no protection."}
+ledger_last: {"decision":"review","branch":"policy","error_type":null,"request_started":true,"attempts":1,"ms":20}
+=== [base-node] S7a result screen: provider 500 once then success -> no review
+exit=0 wall_s=0.3 provider_requests=1 stderr_bytes=0
+hook_output: {"decision":null,"reason":null,"ctx":"[jev-guard] Tool output requires review (Error). REVIEW_ON_UNAVAILABLE_V1. Advisory only: original output remains visible; no protection."}
+ledger_last: {"decision":"review","branch":"outage","error_type":"Error","request_started":true,"attempts":null,"ms":null}
+=== [base-node] S7b result screen: provider 500 twice -> outage advisory
+exit=0 wall_s=0.2 provider_requests=1 stderr_bytes=0
+hook_output: {"decision":null,"reason":null,"ctx":"[jev-guard] Tool output requires review (Error). REVIEW_ON_UNAVAILABLE_V1. Advisory only: original output remains visible; no protection."}
+ledger_last: {"decision":"review","branch":"outage","error_type":"Error","request_started":true,"attempts":null,"ms":null}
+=== [base-node] S3 stall once (10 s timeout) then success -> allowed after one retry
+exit=0 wall_s=10.2 provider_requests=1 stderr_bytes=0
+hook_output: {"decision":"deny","reason":"[jev-guard] Review required: TimeoutError. REVIEW_ON_UNAVAILABLE_V1. This block is final. Do not try to work around it with another command, another tool, a different path, or an encoding that does the same thing. Stop and tell the user what was blocked and why.","ctx":null}
+ledger_last: {"decision":"review","branch":"outage","error_type":"TimeoutError","request_started":true,"attempts":null,"ms":null}
+=== [base-node] S4 stall twice -> TimeoutError deny within the 30 s host envelope
+exit=0 wall_s=10.2 provider_requests=1 stderr_bytes=0
+hook_output: {"decision":"deny","reason":"[jev-guard] Review required: TimeoutError. REVIEW_ON_UNAVAILABLE_V1. This block is final. Do not try to work around it with another command, another tool, a different path, or an encoding that does the same thing. Stop and tell the user what was blocked and why.","ctx":null}
+ledger_last: {"decision":"review","branch":"outage","error_type":"TimeoutError","request_started":true,"attempts":null,"ms":null}

@@ -1,0 +1,21 @@
+ok - claude (2.1.302 (Claude Code)): claude: normal/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: normal/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: normal/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: normal/changed: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: privacy/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: privacy/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: privacy/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: privacy/changed: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: credentials/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: credentials/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: credentials/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: credentials/changed: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: provider/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: provider/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: provider/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: provider/changed: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: audit/launch: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: audit/inbox: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: audit/copy: native read and next model context consumed
+ok - claude (2.1.302 (Claude Code)): claude: audit/changed: native read and next model context consumed
+exit=0
