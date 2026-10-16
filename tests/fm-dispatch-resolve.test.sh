@@ -1768,4 +1768,155 @@ cp "$TMP_ROOT/base-quota.json" "$QUOTA"
 settings '{}'
 pass 'chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks'
 
+# ---- equivalent options pool their probability; every result is logged ------
+# Rules that select identical profiles are one dispatch decision, so a split
+# between them is not a low-confidence pick. Options that differ stay split.
+LOG="$HOME_DIR/data/dispatch-resolve.jsonl"
+SENTINEL='PRIVATE-BRIEF-SENTINEL-7731'
+printf '%s\n' '# Task' "## Captain's intent" "Repair the pager. $SENTINEL" > "$BRIEF"
+cp "$TMP_ROOT/base-quota.json" "$QUOTA"
+POOL_RULES="$TMP_ROOT/pool-rules.json"
+jq '.rules[3].use = .rules[2].use' "$TMP_ROOT/base-rules.json" > "$POOL_RULES"
+rm -f "$LOG"
+cp "$POOL_RULES" "$RULES"
+floor_answer rule_3 0.51 0 0 0.51 0.49 0
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: clear' 'a 0.51/0.49 split between rules with identical profiles resolves'
+assert_contains "$OUT" '  pooled: rule_3 rule_4 select the same profiles, approval and floors; combined probability 1 clears floor 0.6' 'pooling is reported with the options and floor'
+assert_contains "$OUT" '  rule: rule_3 ' 'the picked rule is still the one reported'
+assert_not_contains "$OUT" '  replaced:' 'a pick that is the answer choice reports no replacement'
+floor_answer rule_4 0.51 0 0 0.49 0.51 0
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: clear' 'the pool does not depend on which equivalent rule is picked'
+assert_contains "$OUT" '  pooled: rule_4 rule_3 ' 'the pick leads the pooled options'
+# The neutral option pools with a rule that selects the same default profiles.
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+floor_answer default 0.51 0.49 0 0 0 0.51
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: clear' 'the neutral option pools with a rule that selects the default profiles'
+assert_contains "$OUT" '  pooled: default rule_1 ' 'the neutral option is named in the pool'
+# Different profiles, differing approval, and a pool still below the floor stay ambiguous.
+floor_answer rule_3 0.51 0 0 0.51 0.49 0
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: ambiguous' 'a 0.51/0.49 split between different profiles stays ambiguous'
+assert_not_contains "$OUT" '  pooled:' 'different profiles are never pooled'
+jq '.rules[3].approval = "captain"' "$POOL_RULES" > "$RULES"
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: ambiguous' 'identical profiles with different approval are different decisions'
+jq '.rules[3].floor = {scope:"all_models",min_percent:10,provider:"claude"}' "$POOL_RULES" > "$RULES"
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: ambiguous' 'identical profiles with a different quota floor are different decisions'
+cp "$POOL_RULES" "$RULES"
+floor_answer rule_3 0.3 0.1 0.15 0.3 0.25 0.2
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: ambiguous' 'a pool whose combined probability is below the floor stays ambiguous'
+assert_contains "$OUT" '  reason: rule_3 pooled probability 0.55 below floor 0.6' 'the ambiguous reason names the pooled probability'
+# A declared floor is checked against the pooled probability of the pick.
+jq '.rules[2].min_confidence = 0.9' "$POOL_RULES" > "$RULES"
+floor_answer rule_3 0.51 0 0 0.51 0.49 0
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: clear' 'a declared floor is met by the pooled probability'
+floor_answer rule_3 0.4 0 0.2 0.4 0.39 0.01
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: ambiguous' 'a declared floor above the pooled probability still hands the decision back'
+# One record per finished resolve, one for each status, and nothing private.
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+settings '{"rule":"rule_3"}'
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: clear' 'a confident pick is clear'
+jq '.rules[2].approval = "captain"' "$TMP_ROOT/base-rules.json" > "$RULES"
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: escalate' 'an approval-gated rule escalates'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+keyed FAKE_QUOTA_FAIL=1 -- "$BRIEF"
+assert_contains "$OUT" '  status: error' 'a quota failure is an error'
+rm "$RULES"
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  reason: no rules to match' 'an absent rules file reports no rules'
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+assert_present "$LOG" 'the result log is created'
+jq -e -s 'all(.[]; (.ts | test("\\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}Z\\z")) and (keys == ["choice","confidence","floor","pooled","profile","reason","rule","selected","status","ts"]))' "$LOG" >/dev/null \
+  || fail "log records are not well formed: $(cat "$LOG")"
+assert_equals 'clear clear clear ambiguous ambiguous ambiguous ambiguous clear ambiguous clear escalate error escalate' \
+  "$(jq -r '.status' "$LOG" | paste -sd' ' -)" 'every resolve appends exactly one record, in order, with its status'
+first=$(sed -n 1p "$LOG")
+assert_equals 'rule_3' "$(jq -r .choice <<<"$first")" 'the record names the answer choice'
+assert_equals 'rule_3' "$(jq -r .rule <<<"$first")" 'the record names the picked rule'
+assert_equals 'rule_3' "$(jq -r .selected <<<"$first")" 'the record names the selected rule'
+assert_equals '0.6' "$(jq -r .floor <<<"$first")" 'the record carries the floor applied'
+assert_equals '0.51' "$(jq -r .confidence <<<"$first")" 'the record carries the answer confidence'
+assert_equals '1' "$(jq -r .pooled <<<"$first")" 'the record carries the pooled probability when pooling decided'
+assert_equals 'claude' "$(jq -r .profile.harness <<<"$first")" 'a clear record names the chosen profile'
+assert_equals 'null' "$(jq -c .profile <<<"$(sed -n 4p "$LOG")")" 'a non-clear record has no chosen profile'
+assert_equals 'confidence 0.51 below floor 0.6' "$(jq -r .reason <<<"$(sed -n 4p "$LOG")")" 'an ambiguous record carries the coarse reason'
+assert_equals 'error' "$(jq -r .status <<<"$(sed -n 12p "$LOG")")" 'an error record carries its status'
+assert_equals 'no rules to match' "$(jq -r .reason <<<"$(sed -n 13p "$LOG")")" 'a no-rules record carries its reason'
+for private in "$SENTINEL" 'Repair the pager' "$KEY" 'Trivial mechanical edit' 'Non-Vernant ship task'; do
+  assert_no_grep "$private" "$LOG" "the result log never holds $private"
+done
+printf '%s\n' '{}' > "$SETTINGS"
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+printf '%s\n' '# Task' "## Captain's intent" 'Fix the off-by-one in the pager.' > "$BRIEF"
+pass 'equivalent options pool behind the pick, and each resolve appends one private result record'
+
+# ---- a larger pooled group replaces a choice that falls below its floor ------
+# Rules 2 to 4 and the neutral option dispatch identically; rule_1 is distinct.
+GROUP_RULES="$TMP_ROOT/group-rules.json"
+jq '.rules[1].use = .rules[2].use | .rules[3].use = .rules[2].use | .default = .rules[2].use' "$TMP_ROOT/base-rules.json" > "$GROUP_RULES"
+cp "$GROUP_RULES" "$RULES"
+floor_answer rule_1 0.3 0.3 0.2 0.2 0.15 0.15
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: clear' 'four options sharing 0.7 outrank a distinct rule at 0.3 that is the single argmax'
+assert_contains "$OUT" '  rule: rule_2 ' 'the pooled group is stood for by its most probable member'
+assert_contains "$OUT" '  pooled: rule_2 rule_3 rule_4 default select the same profiles, approval and floors; combined probability 0.7 clears floor 0.6' 'the pooled report names the group and its combined probability'
+assert_contains "$OUT" "  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'" 'the pooled group profiles are resolved'
+assert_contains "$OUT" '  replaced: answer choice rule_1 (probability 0.3, floor 0.6) did not clear; pooled group rule_2 rule_3 rule_4 default (probability 0.7) stands in' 'a pooled group replacing the answer choice is reported'
+last=$(tail -n 1 "$LOG")
+assert_equals 'clear rule_1 rule_2 rule_2 0.7 0.6' "$(jq -r '[.status, .choice, .rule, .selected, .pooled, .floor] | join(" ")' <<<"$last")" 'the record carries the answer choice, the pooled pick and its pooled probability'
+floor_answer rule_1 0.45 0.45 0.2 0.15 0.1 0.1
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: ambiguous' 'a pooled group of 0.55 against a distinct 0.45 is still below the floor'
+assert_contains "$OUT" '  reason: confidence 0.45 below floor 0.6' 'a close split keeps the answer confidence reason'
+assert_not_contains "$OUT" '  pooled:' 'a pooled group below the floor reports no pooling'
+assert_not_contains "$OUT" '  profile:' 'a close split emits no profile'
+floor_answer rule_1 0.55 0.55 0.15 0.1 0.1 0.1
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: ambiguous' 'a distinct 0.55 against a pooled 0.45 is below the floor'
+assert_contains "$OUT" '  reason: confidence 0.55 below floor 0.6' 'a distinct pick above the group keeps the confidence reason'
+floor_answer rule_1 0.5 0.5 0.2 0.1 0.1 0.1
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  reason: confidence 0.5 below floor 0.6' 'an equal split goes to the group holding the answer choice'
+# The floor of the member that stands for the pooled group applies to its pooled probability.
+jq '.rules[2].min_confidence = 0.5' "$GROUP_RULES" > "$RULES"
+floor_answer rule_1 0.45 0.45 0.1 0.25 0.1 0.1
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: clear' 'a declared floor on the leading member is met by the pooled group'
+assert_contains "$OUT" '  rule: rule_3 ' 'the declaring member stands for the group when it leads'
+assert_contains "$OUT" '  pooled: rule_3 rule_2 rule_4 default select the same profiles, approval and floors; combined probability 0.55 clears floor 0.5' 'the pooled floor is the declared floor'
+cp "$GROUP_RULES" "$RULES"
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: ambiguous' 'without the declared floor the same pooled group stays ambiguous'
+assert_contains "$OUT" '  reason: confidence 0.45 below floor 0.6' 'the undeclared group keeps the global floor'
+# A choice that clears its own declared floor stays the pick over a larger pooled group.
+jq '.rules[0].min_confidence = 0.25' "$GROUP_RULES" > "$RULES"
+floor_answer rule_1 0.3 0.3 0.2 0.2 0.15 0.15
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: clear' 'a choice clearing its declared floor resolves'
+assert_contains "$OUT" '  rule: rule_1 ' 'the choice stays the pick'
+assert_not_contains "$OUT" '  pooled:' 'a choice that clears alone reports no pooling'
+assert_not_contains "$OUT" '  replaced:' 'a choice that stays the pick reports no replacement'
+# A stand-in that clears its own lower declared floor alone still leaves the replaced choice on record.
+jq '.rules[1].use = .rules[2].use | .rules[0].min_confidence = 0.9 | .rules[1].min_confidence = 0.3' "$TMP_ROOT/base-rules.json" > "$RULES"
+floor_answer rule_1 0.4 0.4 0.3 0.25 0.05 0
+keyed -- "$BRIEF"
+assert_contains "$OUT" '  status: clear' 'a pooled group clearing a lower declared floor replaces a choice below its own'
+assert_contains "$OUT" '  rule: rule_2 ' 'the most probable pooled member stands in'
+assert_contains "$OUT" '  replaced: answer choice rule_1 (probability 0.4, floor 0.9) did not clear; pooled group rule_2 rule_3 (probability 0.55) stands in' 'the replaced choice is shown with its probability and floor'
+assert_not_contains "$OUT" '  fallback:' 'a replacement is not a runner-up fallback'
+last=$(tail -n 1 "$LOG")
+assert_equals 'clear rule_1 rule_2 rule_2' "$(jq -r '[.status, .choice, .rule, .selected] | join(" ")' <<<"$last")" 'the record keeps the answer choice beside the replacing rule'
+printf '%s\n' '{}' > "$SETTINGS"
+cp "$TMP_ROOT/base-rules.json" "$RULES"
+pass 'a pooled group with more probability than the answer choice is the pick when it clears its floor and the choice does not'
+
 printf '# all fm-dispatch-resolve tests passed\n'
