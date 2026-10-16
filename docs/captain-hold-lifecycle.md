@@ -107,6 +107,15 @@ A post-teardown visual review can complete against the surviving report and dura
 `complete` accepts `--none` as an explicit semantic inventory result.
 `--none` is refused while the origin still has a lifecycle-open keyed status decision.
 Before recording completion, `complete` verifies every listed task against tasks-axi.
+On the markdown backend, a closed call that backlog retention moved to the done archive named by the home's `.tasks.toml` (beside the backlog when it names none) still resolves, but only when the newest resolution record in its archived body is the captain's recorded answer: the full record the answer path writes, with a non-empty `Captain decision:` text, which may follow blank lines.
+A record written by the retired `fm-decision-hold.sh` counts too when it carries its full genuine shape: the decision digest, a non-empty `Routed identities:` line, an optional `Resolution mode:` of answered, repaired, routed, or declined (the oldest records have none), and a non-empty `Captain decision:` text.
+A call closed only by `reconcile close` evidence, or a body that merely quotes the record markers, is refused, and the operator resolves that case by hand.
+When the home's `.tasks.toml` names no archive but `~/.tasks-axi/config.toml` does, that path is not read and the gate refuses rather than falling back to the default archive file.
+The archive setting is parsed by python3's `tomllib`, and the gate accepts only the plain `[markdown]` or `[ markdown ]` header with a plain quoted `archive` value.
+A file that does not parse, a value that is not one non-empty string, an escape, a triple quote, an inline table, a quoted table name, or a dotted key (which tasks-axi does not read) is refused the same way.
+A missing python3 or `tomllib` (3.11 or newer) is refused with its own reason.
+`complete` prints `[answered and archived: <ids>]` for the keys that passed only through the archive.
+[`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns the archive lookup and its limits.
 The origin is never its own inventory entry, so a hold that failed cannot be vouched for by the origin row.
 For a historical inventory that names its own origin, hold a separate captain task with `--origin`, replace only the invalid entry in the final `decision_keys=` line of the origin metadata with that task id while preserving all other entries, and re-run `complete`.
 An entry whose recorded origin differs from the one being completed is refused.
@@ -551,6 +560,23 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 - A report-only unresolved captain call refuses `--none` completion before teardown can erase the source.
 - Non-forced scout teardown always requires the durable inventory verification.
 - The recorded-answer guard holds: a bare `tasks-axi done` close fails `verify` until `answer` records the captain's word, and an ordinary finished task cannot be dressed up as an answered call.
+- A call that backlog retention archived follows the same guard.
+  `test_archived_answered_call_resolves_through_the_gate` and `test_scout_teardown_gate_follows_the_archived_answer` cover an answered archived call passing `verify`, `complete --none`, and non-forced scout teardown.
+  `test_archive_is_read_from_the_configured_path` covers the `.tasks.toml` archive path.
+  `test_archived_released_work_item_resolves_through_the_gate` covers a call answered through the release path.
+  `test_archived_call_without_a_recorded_answer_refuses`, `test_archived_call_held_for_another_origin_refuses`, and `test_call_absent_from_backlog_and_archive_keeps_its_refusal` cover the unchanged refusals, and `test_live_rows_resolve_exactly_as_before_the_archive_lookup` covers live rows.
+  `test_archived_evidence_only_close_refuses` and `test_archived_row_quoting_the_record_markers_refuses` cover the archive accepting only a recorded captain answer, never reconciliation evidence or quoted markers.
+  `test_archived_retired_decision_hold_records_resolve` covers records of the retired `fm-decision-hold.sh` passing, including mode declined and the oldest records with no mode line.
+  `test_archived_retired_decision_hold_records_that_are_not_answers_refuse` covers a retired record that is evidence-only, has an empty answer, lacks its `Routed identities:` line, or carries a mode it never wrote.
+  `test_archived_answer_after_leading_blank_lines_resolves` covers a recorded answer whose text starts with blank lines.
+  `test_archived_record_with_only_blank_lines_after_the_label_refuses` covers a record with no answer text before the end of the body or the next record.
+  `test_user_level_only_archive_path_refuses` and `test_stale_default_archive_does_not_stand_in_for_the_user_level_archive` cover an archive path set only in `~/.tasks-axi/config.toml`.
+  `test_archive_path_with_a_hash_is_read_whole`, `test_single_quoted_archive_path_with_a_hash_is_read_whole` and `test_trailing_comment_after_the_archive_path_still_works` cover a quoted archive path.
+  `test_spaced_table_header_redirects_the_archive` covers a `[ markdown ]` header that redirects real retention, with a stale answer in the default archive.
+  `test_inline_quoted_header_and_dotted_archive_settings_refuse` covers the settings tasks-axi does not read, at the gate.
+  `test_archive_setting_reader_parses_every_toml_spelling` runs the reader on every plain spelling it reads and every setting it must refuse, including escapes, triple-quoted values, and multi-line values.
+  `test_archive_setting_the_gate_cannot_read_exactly_refuses` covers duplicate tables and an unterminated, unquoted, empty, non-string, or non-table value at the gate.
+  `test_missing_python3_or_tomllib_refuses_with_its_own_reason` covers a missing python3 or `tomllib`, run on the reader and at the gate, which names `tomllib` instead of blaming the file's syntax.
 
 ### Answers, stamps, and deferral
 
