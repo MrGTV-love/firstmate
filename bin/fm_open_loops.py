@@ -1206,15 +1206,22 @@ class WaitVerifier:
         self.rows = {row["id"]: row for row in report["rows"]}
         self.actions = report.get("handling", {}).get("actions", {})
         self.backlog = None
+        self.backlog_error = None
         self.decisions = {}
 
     def backlog_records(self):
-        """This home's canonical backlog records, read once, or ValueError when the backlog is unavailable."""
+        """This home's canonical backlog records, read once, or the first read's error when it is unavailable."""
+        if self.backlog_error is not None:
+            raise self.backlog_error
         if self.backlog is None:
-            snapshot = json.loads(self.collector.run([BIN / "fm-fleet-snapshot.sh", "--contribution-input"]))
-            if not snapshot["backlog"].get("present"):
-                raise ValueError("prerequisite backlog is unavailable")
-            self.backlog = snapshot["backlog"]["records"]
+            try:
+                snapshot = json.loads(self.collector.run([BIN / "fm-fleet-snapshot.sh", "--contribution-input"]))
+                if not snapshot["backlog"].get("present"):
+                    raise ValueError("prerequisite backlog is unavailable")
+                self.backlog = snapshot["backlog"]["records"]
+            except SOURCE_ERRORS as error:
+                self.backlog_error = error
+                raise
         return self.backlog
 
     def captain_hold(self, task):

@@ -2928,8 +2928,33 @@ record['handling']['actions'][row['id']]['holds'] = [dict(task='held-job', marke
 ledger.write_text(json.dumps(record))
 result, boundary = drain('forged')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
+# (g) One presentation reads the backlog at most once, however many standing rows depend on it, and a failed read fails closed.
+shutil.copy2(code / 'bin/fm-fleet-snapshot.sh', code / 'bin/real-fleet-snapshot.sh')
+counting = code / 'bin/fm-fleet-snapshot.sh'
+counting.write_text('#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$FM_HOME/snapshot-runs"\n'
+                    'exec "$(dirname "$0")/real-fleet-snapshot.sh" "$@"\n')
+counting.chmod(0o755)
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('read-once')
+standing = [row] + [dict(row, id=f'row-read-once-{n}', subject=f'held-job:ci-control-{n}',
+                         source=dict(kind='status', task='held-job', key=f'ci-control-{n}')) for n in (2, 3)]
+publish(standing)
+runs = home / 'snapshot-runs'
+snapshot_runs = lambda: len(runs.read_text().splitlines()) if runs.exists() else 0
+_, boundary = drain()
+for each in standing:
+    recorded = call(loops, 'action', each['id'], 'escalated', '--evidence', 'asked the captain')
+    assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, recorded
+assert ack(boundary).returncode == 0
+runs.unlink(missing_ok=True)
+healthy = ok(loops, '--present-overdue')
+assert not any(each['id'] in healthy.stdout for each in standing) and snapshot_runs() == 1, (healthy, snapshot_runs())
+runs.unlink()
+backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
+broken = ok(loops, '--present-overdue')
+assert all(each['id'] in broken.stdout for each in standing) and 'STANDING' not in broken.stdout, broken
+assert snapshot_runs() == 1, ('an unreadable backlog was read again for each standing row', snapshot_runs())
 print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
       ' a changed row or an answered, released, deferred or re-held hold re-presents it; evidence text, other owners, reviewed'
-      ' PRs, other categories and the deferral limit never bind or stand')
+      ' PRs, other categories and the deferral limit never bind or stand; one presentation reads the backlog once, failed or not')
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"
