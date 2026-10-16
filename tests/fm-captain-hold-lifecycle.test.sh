@@ -7298,14 +7298,14 @@ archive_an_unanswered_call() {  # <home> <id>
   local home=$1 id=$2
   tasks_in "$home" add "$id" "Closed with no answer $id" --kind captain --repo sample >/dev/null \
     || fail "could not create the unanswered fixture $id"
-  tasks_in "$home" done "$id" >/dev/null || fail "could not close the unanswered fixture $id"
+  tasks_in "$home" "done" "$id" >/dev/null || fail "could not close the unanswered fixture $id"
   push_through_retention "$home" "retention-filler-$(printf '%s' "$id" | cksum | cut -d' ' -f1)"
 }
 
 push_through_retention() {  # <home> <filler-id>
   tasks_in "$1" add "$2" "Filler closed row" --kind captain --repo sample >/dev/null \
-    && tasks_in "$1" done "$2" >/dev/null \
-    || fail "could not close the retention filler $2"
+    || fail "could not create the retention filler $2"
+  tasks_in "$1" "done" "$2" >/dev/null || fail "could not close the retention filler $2"
 }
 
 test_archived_answered_call_resolves_through_the_gate() {
