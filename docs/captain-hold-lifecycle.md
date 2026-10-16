@@ -107,6 +107,7 @@ A post-teardown visual review can complete against the surviving report and dura
 `complete` accepts `--none` as an explicit semantic inventory result.
 `--none` is refused while the origin still has a lifecycle-open keyed status decision.
 Before recording completion, `complete` verifies every listed task against tasks-axi.
+On the markdown backend, a closed call that backlog retention moved to the configured done archive still resolves, but only when its archived body carries a recorded captain answer; [`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns the archive lookup and its limits.
 The origin is never its own inventory entry, so a hold that failed cannot be vouched for by the origin row.
 For a historical inventory that names its own origin, hold a separate captain task with `--origin`, replace only the invalid entry in the final `decision_keys=` line of the origin metadata with that task id while preserving all other entries, and re-run `complete`.
 An entry whose recorded origin differs from the one being completed is refused.
@@ -551,6 +552,10 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 - A report-only unresolved captain call refuses `--none` completion before teardown can erase the source.
 - Non-forced scout teardown always requires the durable inventory verification.
 - The recorded-answer guard holds: a bare `tasks-axi done` close fails `verify` until `answer` records the captain's word, and an ordinary finished task cannot be dressed up as an answered call.
+- A call that backlog retention archived follows the same guard.
+  `test_archived_answered_call_resolves_through_the_gate` and `test_scout_teardown_gate_follows_the_archived_answer` cover an answered archived call passing `verify`, `complete --none`, and non-forced scout teardown.
+  `test_archive_is_read_from_the_configured_path` covers the `.tasks.toml` archive path.
+  `test_archived_call_without_a_recorded_answer_refuses`, `test_archived_call_held_for_another_origin_refuses`, and `test_call_absent_from_backlog_and_archive_keeps_its_refusal` cover the unchanged refusals, and `test_live_rows_resolve_exactly_as_before_the_archive_lookup` covers live rows.
 
 ### Answers, stamps, and deferral
 
