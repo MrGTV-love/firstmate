@@ -7903,7 +7903,7 @@ test_spaced_table_header_redirects_the_archive() {
 test_archive_setting_reader_parses_every_toml_spelling() {
   local file="$TMP_ROOT/reader.toml" out rc case_name want
   eval "$(sed -n '/^captain_markdown_archive_setting() {/,/^}/p' "$ROOT/bin/fm-captain-hold.sh")"
-  for case_name in table spaced-table spaced-table-comment hash single-quote comment crlf escape unset other-table; do
+  for case_name in table spaced-table spaced-table-comment hash single-quote comment crlf unset other-table; do
     want='data/read.md'
     case $case_name in
       table) printf '%s\n' '[markdown]' 'archive = "data/read.md"' > "$file" ;;
@@ -7913,7 +7913,6 @@ test_archive_setting_reader_parses_every_toml_spelling() {
       single-quote) printf '%s\n' '[markdown]' "archive = 'data/read.md' # closed calls" > "$file" ;;
       comment) printf '%s\n' '[markdown] # backend' 'archive = "data/read.md"   # closed calls' > "$file" ;;
       crlf) printf '[markdown]\r\narchive = "data/read.md"\r\n' > "$file" ;;
-      escape) printf '%s\n' '[markdown]' 'archive = "data/read.md"' > "$file" ;;
       unset) printf '%s\n' '[markdown]' 'path = "data/backlog.md"' > "$file"; want= ;;
       other-table) printf '%s\n' '[other]' 'archive = "data/elsewhere.md"' > "$file"; want= ;;
     esac
@@ -7922,7 +7921,7 @@ test_archive_setting_reader_parses_every_toml_spelling() {
     [ "$rc" -eq 0 ] || fail "the reader refused the $case_name spelling (exit $rc)"
     [ "$out" = "$want" ] || fail "the reader read '$out' for the $case_name spelling, wanted '$want'"
   done
-  for case_name in inline quoted-header single-quoted-header dotted dotted-with-header-text duplicate-tables duplicate-key dotted-and-table unterminated unquoted trailing-text empty non-string non-table newline-escape not-toml; do
+  for case_name in inline quoted-header single-quoted-header dotted dotted-with-header-text duplicate-tables duplicate-key dotted-and-table unterminated unquoted trailing-text empty non-string non-table escape backslash-backslash tab-escape newline-escape triple-quote multi-line not-toml; do
     case $case_name in
       inline) printf '%s\n' 'markdown = { archive = "data/a.md" }' > "$file" ;;
       quoted-header) printf '%s\n' '["markdown"]' 'archive = "data/a.md"' > "$file" ;;
@@ -7938,8 +7937,17 @@ test_archive_setting_reader_parses_every_toml_spelling() {
       empty) printf '%s\n' '[markdown]' 'archive = ""' > "$file" ;;
       non-string) printf '%s\n' '[markdown]' 'archive = 5' > "$file" ;;
       non-table) printf '%s\n' 'markdown = "data/a.md"' > "$file" ;;
+      escape) printf '%s\n' '[markdown]' 'archive = "data/\u0072ead.md"' > "$file" ;;
+      backslash-backslash) printf '%s\n' '[markdown]' 'archive = "data\\a.md"' > "$file" ;;
+      tab-escape) printf '%s\n' '[markdown]' 'archive = "data/a\tb.md"' > "$file" ;;
       newline-escape) printf '%s\n' '[markdown]' 'archive = "data/a.md\n"' > "$file" ;;
+      triple-quote) printf '%s\n' '[markdown]' 'archive = """data/a.md"""' > "$file" ;;
+      multi-line) printf '%s\n' '[markdown]' 'archive = """' 'data/a.md"""' > "$file" ;;
       not-toml) printf '%s\n' 'this is not toml' > "$file" ;;
+    esac
+    case $case_name in
+      escape|backslash-backslash|tab-escape|newline-escape)
+        grep -qF $'\\' "$file" || fail "the $case_name fixture holds no backslash" ;;
     esac
     rc=0
     out=$(captain_markdown_archive_setting "$file") || rc=$?
@@ -8004,6 +8012,56 @@ test_archive_setting_the_gate_cannot_read_exactly_refuses() {
     assert_gate_refuses_both "$home" "$scout" "an archive setting that is $case_name" "$reason"
   done
   pass "an archive setting that does not parse as one string refuses"
+}
+
+# A host without python3, or with a python3 that has no tomllib, gets its own
+# status (4) and reason, not the syntax refusal a malformed file gets.
+test_missing_python3_or_tomllib_refuses_with_its_own_reason() {
+  local file="$TMP_ROOT/no-python.toml" stubs="$TMP_ROOT/no-python-stubs" hidden="$TMP_ROOT/no-tomllib-stubs"
+  local empty="$TMP_ROOT/no-python-path" saved_path=$PATH real_python out rc case_name home scout id
+  real_python=$(command -v python3) || fail "this test needs a python3 to wrap"
+  eval "$(sed -n '/^captain_markdown_archive_setting() {/,/^}/p' "$ROOT/bin/fm-captain-hold.sh")"
+  mkdir -p "$stubs" "$hidden" "$empty"
+  printf '#!/bin/sh\nexit 1\n' > "$stubs/python3"
+  cat > "$hidden/python3" <<STUB
+#!/bin/sh
+shift 2
+exec "$real_python" -I -c 'import sys; sys.modules["tomllib"] = None; exec(sys.stdin.read())' "\$@"
+STUB
+  chmod +x "$stubs/python3" "$hidden/python3"
+  printf '%s\n' '[markdown]' 'archive = "data/read.md"' > "$file"
+  rc=0
+  out=$(captain_markdown_archive_setting "$file") || rc=$?
+  [ "$rc" -eq 0 ] && [ "$out" = "data/read.md" ] || fail "the reader did not read the fixture with the real python3 (exit $rc, read '$out')"
+  for case_name in failing-python no-tomllib no-python; do
+    case $case_name in
+      failing-python) PATH="$stubs:$saved_path" ;;
+      no-tomllib) PATH="$hidden:$saved_path" ;;
+      no-python) PATH="$empty" ;;
+    esac
+    hash -r
+    rc=0
+    out=$(captain_markdown_archive_setting "$file" 2>/dev/null) || rc=$?
+    PATH=$saved_path
+    hash -r
+    [ "$rc" -eq 4 ] || fail "the $case_name host did not return 4 (exit $rc)"
+    [ -z "$out" ] || fail "the reader printed '$out' on the $case_name host"
+  done
+
+  home=$(make_home archived-no-tomllib)
+  scout=sample-archive-no-tomllib-scout
+  id=sample-no-tomllib-call
+  set_archive_retention "$home" data/done-archive.md
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_grep "Captain decision:" "$home/data/done-archive.md" "the answered row is not in the archive fixture"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+  rc=0
+  out=$(PATH="$stubs:$PATH" run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "verify passed with no working python3: $out"
+  assert_contains "$out" "tomllib" "the refusal does not name tomllib: $out"
+  assert_not_contains "$out" "uses syntax the gate cannot read exactly" "the refusal blames the syntax of a valid file: $out"
+  assert_gate_resolves "$home" "$scout" "$id" "the same call with the real python3"
+  pass "a missing python3 or tomllib refuses with its own reason"
 }
 
 tests=(
@@ -8122,6 +8180,7 @@ test_spaced_table_header_redirects_the_archive
 test_archive_setting_reader_parses_every_toml_spelling
 test_inline_quoted_header_and_dotted_archive_settings_refuse
 test_archive_setting_the_gate_cannot_read_exactly_refuses
+test_missing_python3_or_tomllib_refuses_with_its_own_reason
 )
 if [ "$#" -gt 0 ]; then
   for requested in "$@"; do

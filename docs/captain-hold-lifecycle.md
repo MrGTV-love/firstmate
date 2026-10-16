@@ -111,7 +111,9 @@ On the markdown backend, a closed call that backlog retention moved to the done 
 A record written by the retired `fm-decision-hold.sh` counts too when it carries its full genuine shape: the decision digest, a non-empty `Routed identities:` line, an optional `Resolution mode:` of answered, repaired, routed, or declined (the oldest records have none), and a non-empty `Captain decision:` text.
 A call closed only by `reconcile close` evidence, or a body that merely quotes the record markers, is refused, and the operator resolves that case by hand.
 When the home's `.tasks.toml` names no archive but `~/.tasks-axi/config.toml` does, that path is not read and the gate refuses rather than falling back to the default archive file.
-The archive setting is parsed by python3's `tomllib`, and a file that does not parse, a missing `tomllib`, an archive value that is not one non-empty string, or a setting made by an inline table, a quoted table name, or a dotted key (which tasks-axi does not read) is refused the same way.
+The archive setting is parsed by python3's `tomllib`, and the gate accepts only the plain `[markdown]` or `[ markdown ]` header with a plain quoted `archive` value.
+A file that does not parse, a value that is not one non-empty string, an escape, a triple quote, an inline table, a quoted table name, or a dotted key (which tasks-axi does not read) is refused the same way.
+A missing python3 or `tomllib` (3.11 or newer) is refused with its own reason.
 `complete` prints `[answered and archived: <ids>]` for the keys that passed only through the archive.
 [`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns the archive lookup and its limits.
 The origin is never its own inventory entry, so a hold that failed cannot be vouched for by the origin row.
@@ -572,8 +574,9 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
   `test_archive_path_with_a_hash_is_read_whole`, `test_single_quoted_archive_path_with_a_hash_is_read_whole` and `test_trailing_comment_after_the_archive_path_still_works` cover a quoted archive path.
   `test_spaced_table_header_redirects_the_archive` covers a `[ markdown ]` header that redirects real retention, with a stale answer in the default archive.
   `test_inline_quoted_header_and_dotted_archive_settings_refuse` covers the settings tasks-axi does not read, at the gate.
-  `test_archive_setting_reader_parses_every_toml_spelling` runs the reader on every spelling it reads and every setting it must refuse.
+  `test_archive_setting_reader_parses_every_toml_spelling` runs the reader on every plain spelling it reads and every setting it must refuse, including escapes, triple-quoted values, and multi-line values.
   `test_archive_setting_the_gate_cannot_read_exactly_refuses` covers duplicate tables and an unterminated, unquoted, empty, non-string, or non-table value at the gate.
+  `test_missing_python3_or_tomllib_refuses_with_its_own_reason` covers a missing python3 or `tomllib`, run on the reader and at the gate, which names `tomllib` instead of blaming the file's syntax.
 
 ### Answers, stamps, and deferral
 

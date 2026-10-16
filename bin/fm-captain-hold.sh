@@ -230,11 +230,13 @@
 # markers, is refused. When the home's `.tasks.toml` names no archive but
 # `~/.tasks-axi/config.toml` does, that path is not read and the lookup refuses
 # instead of falling back to the default archive file. The archive setting is
-# parsed by python3 tomllib; a file that does not parse, a missing tomllib, a
-# value that is not one non-empty string, or a setting made by an inline table,
-# a quoted header or a dotted key is refused the same way. `complete` prints
-# `[answered and archived: <ids>]` for the keys that passed only through the
-# archive.
+# parsed by python3 tomllib, and the gate accepts only the plain header
+# (`[markdown]` or `[ markdown ]`) with a plain quoted value: a file that does
+# not parse, a value that is not one non-empty string, an escape, a triple
+# quote, an inline table, a quoted header, or a dotted key is refused the same
+# way. A missing python3 or tomllib is refused with its own reason. `complete`
+# prints `[answered and archived: <ids>]` for the keys that passed only through
+# the archive.
 #
 # `open` is the read-only predicate a mechanical closer asks before it may
 # retire a task's row: is this task still an open captain call? Exit 0 means it
@@ -898,24 +900,25 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 
 ARCHIVE_ROW_BODY=
 
-# [markdown] archive value from a .tasks.toml or ~/.tasks-axi/config.toml,
-# taken from the document python3's standard-library tomllib parses, so quoting,
-# escapes, comments, CRLF and the spaced header `[ markdown ]` are read exactly.
-# tasks-axi reads the file with its own small parser that honours only a plain
-# markdown table header, so a value set by an inline table, a quoted header or
-# a dotted key is refused too: tasks-axi never writes the archive it names.
-# Prints nothing when the key is unset. Returns 3, printing nothing, when the
-# file does not parse (duplicate tables included), when tomllib or python3 is
-# missing, when the value is not a non-empty string without control characters,
-# or when no plain markdown header line is present: the gate does not guess at a
-# path tasks-axi may read differently.
+# [markdown] archive value from a .tasks.toml or ~/.tasks-axi/config.toml. The
+# gate trusts only the one plain form tasks-axi reads literally, a header line
+# [markdown] or [ markdown ] followed by archive = "plain text" (or 'plain text')
+# with no escape and no triple quote; every other form refuses. python3's tomllib
+# parses the file. Prints nothing when the key is unset. Returns 3, printing
+# nothing, for a file that does not parse (duplicate tables included), a value
+# that is not a non-empty string without control characters, and any form
+# outside the allowlist. Returns 4, printing nothing, when python3 or its
+# tomllib (3.11 or newer) is missing.
 captain_markdown_archive_setting() {  # <toml-file>
   [ -f "$1" ] || return 0
-  python3 -I - "$1" <<'PY' || return 3
+  python3 -I - "$1" <<'PY' || { [ $? -eq 3 ] && return 3; return 4; }
 import re
 import sys
 try:
     import tomllib
+except ImportError:
+    raise SystemExit(4)
+try:
     with open(sys.argv[1], "rb") as config:
         raw = config.read()
     document = tomllib.loads(raw.decode("utf-8"))
@@ -929,11 +932,13 @@ try:
     value = section["archive"]
     if not isinstance(value, str) or not value or any(ord(c) < 32 or ord(c) == 127 for c in value):
         raise SystemExit(3)
-    # tasks-axi reads the file with its own small parser, which honours only a
-    # plain markdown table header; an inline table, a quoted header or a dotted
-    # key would name an archive it never writes, so those refuse.
     header = rb"^[ \t]*\[[ \t]*markdown[ \t]*\][ \t]*(#[^\n]*)?\r?$"
     if not re.search(header, raw, re.M):
+        raise SystemExit(3)
+    quote = b"([\"'])"
+    literal = (rb"^[ \t]*archive[ \t]*=[ \t]*" + quote + re.escape(value.encode("utf-8"))
+               + rb"\1[ \t]*(#[^\n]*)?\r?$")
+    if not re.search(literal, raw, re.M):
         raise SystemExit(3)
     sys.stdout.write(value + "\n")
 except SystemExit:
@@ -943,9 +948,14 @@ except Exception:
 PY
 }
 
-# The refusal for an archive setting the gate cannot read exactly.
-archive_setting_unreadable() {  # <toml-file>
-  printf 'fm-captain-hold: the done archive setting in %s uses syntax the gate cannot read exactly; resolve the archived call by hand\n' "$1" >&2
+# The refusal for an archive setting the gate cannot read exactly, or (status 4)
+# for a host without python3 and its tomllib.
+archive_setting_unreadable() {  # <toml-file> <reader-status>
+  if [ "$2" -eq 4 ]; then
+    printf 'fm-captain-hold: reading the done archive setting in %s needs python3 with tomllib (3.11 or newer); resolve the archived call by hand\n' "$1" >&2
+  else
+    printf 'fm-captain-hold: the done archive setting in %s uses syntax the gate cannot read exactly; resolve the archived call by hand\n' "$1" >&2
+  fi
 }
 
 # Look <id> up in the configured archive. Returns 0 and sets ARCHIVE_ROW_BODY to
@@ -961,7 +971,7 @@ archive_row_lookup() {  # <resolved-data-dir> <id>
     return 2
   }
   archive=$(captain_markdown_archive_setting "$root/.tasks.toml") || {
-    archive_setting_unreadable "$root/.tasks.toml"
+    archive_setting_unreadable "$root/.tasks.toml" "$?"
     return 2
   }
   if [ -z "$archive" ] && [ -n "${HOME:-}" ]; then
@@ -970,7 +980,7 @@ archive_row_lookup() {  # <resolved-data-dir> <id>
     # beside the backlog may be an older archive, so naming it would pass a
     # stale answer for a row that was archived somewhere else.
     outside=$(captain_markdown_archive_setting "$HOME/.tasks-axi/config.toml") || {
-      archive_setting_unreadable "$HOME/.tasks-axi/config.toml"
+      archive_setting_unreadable "$HOME/.tasks-axi/config.toml" "$?"
       return 2
     }
     if [ -n "$outside" ]; then
