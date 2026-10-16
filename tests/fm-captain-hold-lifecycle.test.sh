@@ -3048,6 +3048,60 @@ SH
   pass "standalone close retries preserve hold age and cannot replay across hold lifecycles"
 }
 
+test_verified_close_supersession_resolves_the_original_parent_key() {
+  local home parent channel id show open
+  home=$(make_home verified-supersede)
+  parent=$(make_home verified-supersede-parent)
+  printf 'verified-mate\n' > "$home/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+    > "$home/.fm-secondmate-parent"
+  channel="$parent/state/verified-mate.status"
+  id=sample-verified-supersede
+  run_captain "$home" hold "$id" --title "Superseded evidence close" --reason "old choice" >/dev/null \
+    || fail "could not hold the supersession fixture"
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$channel")
+  assert_contains "$open" "captain-hold-$id-1" "the hold did not publish its parent key"
+  printf 'Verified source captured.txt: the choice was already answered.\n' > "$home/answered.txt"
+  printf 'Verified premise: the choice no longer applies.\n' > "$home/moot.txt"
+  cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = done ]; then
+  attempts=$(cat "$FM_HOME/done-attempts" 2>/dev/null || echo 0)
+  printf '%s\n' "$((attempts + 1))" > "$FM_HOME/done-attempts"
+  [ "$attempts" -ge 2 ] || exit 92
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+  chmod +x "$home/fakebin/tasks-axi"
+  if run_captain "$home" reconcile close "$id" --verified-outcome answered \
+    --evidence-file "$home/answered.txt" >/dev/null 2>&1; then
+    fail "an interrupted close reported success"
+  fi
+  if run_captain "$home" reconcile close "$id" --verified-outcome moot \
+    --evidence-file "$home/moot.txt" >/dev/null 2>&1; then
+    fail "an interrupted superseding close reported success"
+  fi
+  assert_contains "$(tasks_in "$home" show "$id" --full)" "held: yes" "interrupted closes released the hold"
+  # The exact retry of the newest record finishes the close over two stacked records.
+  run_captain "$home" reconcile close "$id" --verified-outcome moot \
+    --evidence-file "$home/moot.txt" >/dev/null || fail "the superseding close did not finish on retry"
+  show=$(tasks_in "$home" show "$id" --full)
+  assert_contains "$show" "state: done" "the superseding close left the task open"
+  assert_contains "$show" "Verified outcome: moot" "the superseding evidence was not recorded"
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$channel")
+  [ -z "$open" ] || fail "a superseded verified close left the original parent key open: $open"
+  assert_contains "$(cat "$channel")" "resolved [key=captain-hold-$id-1]" \
+    "the superseding close did not resolve the hold's original key"
+  assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "the superseding close minted a second occurrence key"
+  assert_not_contains "$(cat "$channel")" "captain-hold-$id-3" "the superseding close minted a third occurrence key"
+  # A closed-task retry republishes the same original key, never a later one.
+  run_captain "$home" reconcile close "$id" --verified-outcome moot \
+    --evidence-file "$home/moot.txt" >/dev/null || fail "closed-task retry failed"
+  assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "the closed-task retry minted a second occurrence key"
+  assert_not_contains "$(cat "$channel")" "captain-hold-$id-3" "the closed-task retry minted a third occurrence key"
+  pass "a superseding verified close resolves the hold's original parent key across stacked records and retries"
+}
+
 test_verified_closes_refuse_unanswered_or_unsupported_calls() {
   local home id outcome file show
   home=$(make_home verified-refusals)
@@ -6962,6 +7016,7 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open
 test_reconcile_outcomes_retry_partial_failures_once
 test_verified_close_without_board_request
 test_verified_close_retries_only_its_own_hold
+test_verified_close_supersession_resolves_the_original_parent_key
 test_verified_closes_refuse_unanswered_or_unsupported_calls
 test_operational_key_closes_with_durable_evidence_and_replay
 test_operational_key_close_refusals_and_interrupted_append

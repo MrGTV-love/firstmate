@@ -322,6 +322,8 @@ Both standalone paths are decision answers under the [supervision role partition
 The board-request `reconcile close`, `answer`, and `answers` are not part of that guard.
 A matching closed-task retry can finish parent publication and retirement even when no pending board request remains.
 A retry of an interrupted close against an open task must match its recorded hold-set association; old evidence cannot settle a newer hold.
+A `--verified-outcome` retry with changed evidence or a changed outcome against that open task records a superseding resolution on the same hold and resolves the hold's original parent key, never a new occurrence.
+A closed call refuses changed evidence or a changed outcome.
 A still-active note retains its existing request requirement.
 
 For an ordinary status-owned operational key, `reconcile close-key` addresses the active home's status stream, not a worker endpoint or another home's backlog.

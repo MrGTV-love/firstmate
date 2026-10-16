@@ -128,8 +128,12 @@
 # under `Reconciliation evidence:`, never as the captain's words. A verified
 # close refuses unfinished worker-owned work. Exact retries finish parent
 # publication and request retirement even after the request was removed;
-# changed evidence, changed outcome, incompatible modes, and old-hold retries
-# are refused. `note` still requires the board request, appends one dated
+# incompatible modes and old-hold retries are refused, and a closed call refuses
+# changed evidence or a changed outcome. A --verified-outcome close interrupted
+# before the task closed accepts changed evidence or a changed outcome as a
+# superseding record on the same hold, and publishes it under that hold's
+# original parent key.
+# `note` still requires the board request, appends one dated
 # `Captain hold reconciled:` note, and leaves the hold in place. A normal answer
 # also retires a pending request. `list` enumerates only pending board requests.
 #
@@ -564,6 +568,23 @@ resolution_record_count() {  # <task-body>
   body=$(decode_shown_value "$1") || return 1
   printf '%s\n' "$body" \
     | grep -Ec '^Resolution recorded by fm-(captain|decision)-hold\.$' || true
+}
+
+# The occurrence a parent hold key carries: one past the records written for
+# earlier hold lifecycles, so a record stacked on the same hold still names the
+# key that hold opened. Prints the fallback when the hold set is unknown.
+hold_lifecycle_occurrence() {  # <task-body> <hold-set> <fallback>
+  local body
+  [ -n "$2" ] || { printf '%s\n' "$3"; return 0; }
+  body=$(decode_shown_value "$1") || return 1
+  printf '%s\n' "$body" | awk -v want="Resolves hold set: $2" '
+    /^Resolution recorded by fm-(captain|decision)-hold\.$/ { total++; inrec = 1; next }
+    inrec && /^Resolution mode: / {
+      inrec = 0
+      if (getline > 0 && $0 == want) same++
+    }
+    END { print total - same + 1 }
+  '
 }
 
 # The newest record's `Resolution mode:` value; empty for a record predating it.
@@ -1821,6 +1842,8 @@ reconcile_close() {
     [ "$(recorded_resolution_mode "$body" || true)" = reconciled ] \
       || fail "task $id was not closed by reconciliation"
     occurrence=$(resolution_record_count "$body")
+    [ -z "$verified_outcome" ] \
+      || occurrence=$(hold_lifecycle_occurrence "$body" "$(recorded_resolved_hold_set "$body")" "$occurrence")
     remove_interrupted_answer_stamp "$id"
     publish_parent_hold "$id" "$occurrence" resolved reconciled
     [ "$PARENT_HOLD_PUBLISHED" = 1 ] \
@@ -1836,16 +1859,18 @@ reconcile_close() {
   if [ -n "$verified_outcome" ] && live_work_item "$id" "$state"; then
     fail "task $id still owns unfinished work; use answer --release with the captain's words rather than completing it"
   fi
+  cur=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
+  [ -z "$verified_outcome" ] \
+    || occurrence=$(hold_lifecycle_occurrence "$body" "$cur" "$occurrence")
   if body_has_resolution_record "$body" \
     && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
     recorded_mode=$(recorded_resolution_mode "$body" || true)
     [ "$recorded_mode" = reconciled ] \
       || fail "task $id records this resolution with mode ${recorded_mode:-unknown}; it is not a reconciliation retry"
-    cur=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
     resolved_hold_set=$(recorded_resolved_hold_set "$body")
     [ -n "$cur" ] && [ "$cur" = "$resolved_hold_set" ] \
       || fail "task $id has a newer or unidentifiable hold; old evidence cannot resolve it"
-    occurrence=$(resolution_record_count "$body")
+    [ -n "$verified_outcome" ] || occurrence=$(resolution_record_count "$body")
   else
     write_resolution_record "$id" reconciled "$body"
   fi
