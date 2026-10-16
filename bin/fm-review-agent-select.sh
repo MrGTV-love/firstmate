@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 # fm-review-agent-select.sh - dry-run choice of the no-mistakes review agent.
 #
-# Usage: fm-review-agent-select.sh --dry-run [--log] [--json] [--rule <N|rule_N>]
+# Usage: fm-review-agent-select.sh --dry-run [--log] [--json]
 #
 # Stage one of dynamic review-agent selection. It answers one question from live
 # evidence: which candidate of the review rule would firstmate pick for the next
-# no-mistakes run, and what would the managed config block say. It never writes
-# the no-mistakes config or any agent_config; there is no write mode, so a run
-# without --dry-run is refused. The only file it ever appends to is the evidence
-# log below, and only with --log.
+# no-mistakes run, and how does that differ from the live agent order. It never
+# writes the no-mistakes config or any agent_config; there is no write mode, so a
+# run without --dry-run is refused. The only file it ever appends to is the
+# evidence log below, and only with --log.
 #
 # Candidates: the single rule in config/crew-dispatch.json whose `when` starts
-# with "Isolated independent quality review" (--rule pins it by position, as in
-# rule_N). Zero or several matching rules is an error, never a guess. Roles and
-# retired ids resolve through bin/fm-model-index.sh profiles, and each chosen
-# profile is preflighted through its check verb under the pinned worker account,
-# exactly as bin/fm-dispatch-resolve.sh does for a dispatch.
+# with "Isolated independent quality review". Zero or several matching rules is
+# an error, never a guess. Roles and retired ids resolve through
+# bin/fm-model-index.sh profiles, and each chosen profile is preflighted through
+# its check verb under the pinned worker account, exactly as
+# bin/fm-dispatch-resolve.sh does for a dispatch.
 #
 # Procedure: the quota-array-dispatch skill owns it. Three gates, then
 # spendPriority:
@@ -42,7 +42,6 @@
 #     reason: <why>
 #     candidate: <harness>:<model> provider=.. tier=.. ... -> eligible | not eligible
 #     current: the live no-mistakes agent order and per-agent models, read only
-#     would-write: the managed block stage two would write, not written
 # Exit status: 0 selected; 1 no selection (escalate or tie); 2 a usage,
 # configuration, or evidence error, which is never selected around.
 #
@@ -51,7 +50,7 @@
 # heartbeat runs can be compared with real quota and real failures. A second run
 # started while one is in flight exits quietly. bin/fm-watch.sh runs this from
 # the heartbeat tick; docs/configuration.md "Review-agent selection" owns the
-# record fields and what stage two adds.
+# record fields.
 #
 # Environment: FM_HOME, FM_STATE_OVERRIDE and FM_CONFIG_OVERRIDE resolve the
 # home like the other bin/ scripts; NO_MISTAKES_HOME names the no-mistakes home
@@ -84,7 +83,7 @@ usage() {
   awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "${BASH_SOURCE[0]}"
 }
 
-DRY_RUN=0 LOG=0 AS_JSON=0 RULE_SEL=''
+DRY_RUN=0 LOG=0 AS_JSON=0
 RUN_AT=$(date +%s)
 TMP=''
 cleanup() {
@@ -108,23 +107,11 @@ while [ "$#" -gt 0 ]; do
     --dry-run) DRY_RUN=1; shift ;;
     --log) LOG=1; shift ;;
     --json) AS_JSON=1; shift ;;
-    --rule)
-      [ "$#" -ge 2 ] && [ -n "$2" ] || fail '--rule needs a value'
-      RULE_SEL=$2; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) fail "unknown argument: $1 (see --help)" ;;
   esac
 done
 [ "$DRY_RUN" = 1 ] || fail 'stage one is dry-run only: pass --dry-run (no write mode exists)'
-case "$RULE_SEL" in
-  '') ;;
-  rule_[1-9]*) ;;
-  [1-9]*) RULE_SEL="rule_$RULE_SEL" ;;
-  *) fail "--rule must be a position such as 4 or rule_4: $RULE_SEL" ;;
-esac
-case "$RULE_SEL" in
-  *[!a-z0-9_]*) fail "--rule must be a position such as 4 or rule_4: $RULE_SEL" ;;
-esac
 
 command -v jq >/dev/null 2>&1 || fail 'jq required'
 TMP=$(mktemp -d) || fail 'mktemp failed'
@@ -153,7 +140,7 @@ RESOLVED=$(FM_HOME="$FM_HOME" FM_CONFIG_OVERRIDE="$CONFIG" "$SCRIPT_DIR/fm-model
   || fail "model index/profile resolution failed: $(grep -m1 -v '^model-index: warning' "$TMP/profiles.err" 2>/dev/null || true)"
 VERIFIED=$(fm_control_harnesses | jq -Rsc 'split("\n") | map(select(length > 0))')
 
-RULE=$(printf '%s\n' "$RESOLVED" | jq -c --arg sel "$RULE_SEL" --arg prefix "$REVIEW_WHEN_PREFIX" \
+RULE=$(printf '%s\n' "$RESOLVED" | jq -c --arg prefix "$REVIEW_WHEN_PREFIX" \
   --argjson verified "$VERIFIED" --arg provider_re "$FM_QUOTA_PROVIDER_ID_RE" \
   --argjson default_horizon "$DEFAULT_HORIZON_MINUTES" "$FM_DISPATCH_VALID_FALLBACK_JQ"'
   def profiles($v): if ($v | type) == "array" then $v elif ($v | type) == "object" then [$v] else [] end;
@@ -177,16 +164,11 @@ RULE=$(printf '%s\n' "$RESOLVED" | jq -c --arg sel "$RULE_SEL" --arg prefix "$RE
       "profile " + $p.model + " floor needs scope, min_percent 0..100 and no provider"
     else null end;
   (.rules // []) as $rules |
-  (if $sel != "" then
-     [$rules | to_entries[] | select(("rule_" + ((.key + 1) | tostring)) == $sel)]
-   else
-     [$rules | to_entries[] | select(.value | type == "object" and (.when | type) == "string" and (.when | startswith($prefix)))]
-   end) as $found |
+  [$rules | to_entries[] | select(.value | type == "object" and (.when | type) == "string" and (.when | startswith($prefix)))] as $found |
   if ($found | length) == 0 then
-    {error: (if $sel != "" then "review rule " + $sel + " is not in the rules file"
-             else "no rule whose when starts with \"" + $prefix + "\"; pass --rule" end)}
+    {error: ("no rule whose when starts with \"" + $prefix + "\"")}
   elif ($found | length) > 1 then
-    {error: ("more than one rule starts with \"" + $prefix + "\"; pass --rule")}
+    {error: ("more than one rule starts with \"" + $prefix + "\"")}
   else
     $found[0] as $e | $e.value as $r |
     (profiles($r.use)) as $use |
@@ -209,7 +191,8 @@ HORIZON_SECONDS=$(jq -r '.horizon_minutes * 60 | floor' <<<"$RULE")
 
 # ---- evidence: one quota snapshot, one pooled omp report -----------------------
 command -v quota-axi >/dev/null 2>&1 || fail 'quota-axi not installed'
-fm_quota_axi_compatible || fail "quota-axi requires >= $FM_QUOTA_AXI_MIN; installed version is older, unreadable, or unparseable"
+# measured: value=10 date=2026-10-15 host=Mac-Studio margin=100x (three quota-axi --version runs, slowest 0.08s)
+fm_quota_axi_compatible 10 || fail "quota-axi requires >= $FM_QUOTA_AXI_MIN; installed version is older, unreadable, or unparseable"
 QUOTA="$TMP/quota.json"
 # measured: value=30 date=2026-10-15 host=Mac-Studio margin=10x (three quota-axi --json runs, slowest 2.89s)
 fm_run_timed 30 quota-axi --json > "$QUOTA" 2>/dev/null </dev/null || fail 'quota-axi --json failed'
@@ -271,7 +254,7 @@ ASSESS_JQ='
     ($pool // {status: "unknown", accounts: []}) as $p |
     base + {provider: "codex", scope: "omp-pool", pct: ($p.bestAccountHeadroom // null), capacity: $p} +
     (if ($c.floor // null) != null then
-       {eligible: true, unknown: true, uncertainty: ["profile floor cannot be verified against an OMP pool"],
+       {eligible: ($p.status != "exhausted"), unknown: true, uncertainty: ["profile floor cannot be verified against an OMP pool"],
         reason: "OMP pooled Codex capacity \($p.status); profile floor is unverifiable"}
      elif $p.status == "usable" then
        {eligible: true, reason: "OMP pooled Codex capacity usable; the pool reports no spendPriority"}
@@ -428,7 +411,7 @@ if jq -e 'length > 0 and all(.[]; .exhausted == true)' <<<"$CANDIDATES" >/dev/nu
   done < <(jq -c '.fallback[]' <<<"$RULE")
 fi
 
-# ---- selection and the would-be managed block -----------------------------------
+# ---- selection ------------------------------------------------------------------
 CURRENT=$(
   f="$NM_HOME/config.yaml"
   if [ -r "$f" ]; then
@@ -436,7 +419,7 @@ CURRENT=$(
       /^agent:/ { v = $0; sub(/^agent:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); print "agent\t" v; next }
       /^agent_config:/ { in_cfg = 1; next }
       in_cfg && /^[^ \t#]/ { in_cfg = 0 }
-      in_cfg && /^[ \t]+[^ \t#][^:]*:[ \t]*$/ {
+      in_cfg && /^[ \t]+[^ \t#].*:[ \t]*$/ {
         name = $0; sub(/^[ \t]+/, "", name); sub(/:[ \t]*$/, "", name); gsub(/"/, "", name); next
       }
       in_cfg && name != "" && /^[ \t]+model:/ {
@@ -457,8 +440,6 @@ RESULT=$(jq -cn --argjson primary "$CANDIDATES" --argjson fallback "$FALLBACKS" 
   --argjson current "$CURRENT" --argjson at "$RUN_AT" --arg horizon "$HORIZON_SECONDS" '
   def agent_of($p): if $p.harness == "omp" then "acp:omp" else $p.harness end;
   def cname($c): "\($c.profile.harness):\($c.profile.model)";
-  def rank_key($c): [(if ($c.spendPriority | type) == "number" then 0 elif $c.unknown then 2 else 1 end),
-                     -($c.spendPriority // 0)];
   ($primary | to_entries | map(.value + {order: .key})) as $p |
   [$p[] | select(.eligible)] as $elig |
   [$elig[] | select((.spendPriority | type) == "number")] as $ranked |
@@ -502,21 +483,12 @@ RESULT=$(jq -cn --argjson primary "$CANDIDATES" --argjson fallback "$FALLBACKS" 
      {status: "escalate", chosen: null,
       reason: "no eligible candidate: \($p | map(cname(.) + " (" + .reason + ")") | join("; "))"}
    end) as $sel |
-  (if $sel.chosen == null then []
-   elif $sel.tier == "fallback" then [$sel.chosen]
-   else [$sel.chosen] + ([$elig[] | select(.order != $sel.chosen.order)] | sort_by(rank_key(.), .order))
-   end) as $ordered |
-  ($ordered | reduce .[] as $c ([]; if any(.[]; . == agent_of($c.profile)) then . else . + [agent_of($c.profile)] end)) as $agents |
   {schema: "fm-review-agent-select.v1", at: $at, mode: "dry-run", status: $sel.status, reason: $sel.reason,
    rule: $rule.rule, when: ($rule.when | .[0:80]), horizon_minutes: $rule.horizon_minutes,
    selected: (if $sel.chosen == null then null else
      {harness: $sel.chosen.profile.harness, model: $sel.chosen.profile.model, effort: ($sel.chosen.profile.effort // null),
       agent: agent_of($sel.chosen.profile), tier: $sel.tier, spendPriority: $sel.chosen.spendPriority} end),
    current: $current,
-   would_write: (if $sel.chosen == null then null else
-     {agent: $agents,
-      agent_config: ($agents | map(. as $a | ($ordered | map(select(agent_of(.profile) == $a)) | first) as $c |
-        {key: $a, value: ({model: $c.profile.model} + (if $c.profile.effort then {effort: $c.profile.effort} else {} end))}) | from_entries)} end),
    candidates: (($primary + $fallback) | map({harness: .profile.harness, model: .profile.model, effort: (.profile.effort // null),
      provider, tier, eligible, exhausted, unknown, spendPriority, pct, scope, runway, reason, uncertainty,
      bounds: (.bounds // null), capacity: (.capacity // null)}))}')
@@ -546,18 +518,7 @@ else
        + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))"
           else "  spendPriority=\(show(.spendPriority))" end)
        + "  -> " + (if .eligible then "eligible" else "not eligible" end) + ": \(.reason | flat)"
-       + (if (.uncertainty | length) > 0 then " [uncertain: \(.uncertainty | join("; ") | flat)]" else "" end)),
-    (if .would_write then
-       "  would-write (not written):",
-       "    # >>> fm-review-agent-select (managed; do not edit) >>>",
-       "    agent: [\(.would_write.agent | join(", "))]",
-       "    agent_config:",
-       (.would_write.agent_config | to_entries[] |
-         "      \"\(.key)\":",
-         "        model: \(.value.model | flat)",
-         (if .value.effort then "        effort: \(.value.effort | flat)" else empty end)),
-       "    # <<< fm-review-agent-select <<<"
-     else empty end)' <<<"$RESULT"
+       + (if (.uncertainty | length) > 0 then " [uncertain: \(.uncertainty | join("; ") | flat)]" else "" end))' <<<"$RESULT"
 fi
 
 [ "$STATUS" = selected ]

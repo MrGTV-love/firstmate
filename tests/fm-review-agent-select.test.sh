@@ -103,14 +103,28 @@ assert_equals 2 "$(jq '.candidates | length' <<<"$OUT")" 'every use candidate is
 assert_equals false "$(jq '[.candidates[] | select(.tier == "fallback")] | length > 0' <<<"$OUT")" 'no fallback is evaluated without proven exhaustion'
 assert_equals '[claude, acp:omp]' "$(jq -r .current.agent <<<"$OUT")" 'the live agent order is read'
 assert_equals '{}' "$(jq -c .current.models <<<"$OUT")" 'a commented-out agent_config is not read as a pin'
-assert_equals '["claude","acp:omp"]' "$(jq -c .would_write.agent <<<"$OUT")" 'the would-be block lists agents in rank order'
 assert_equals "$before" "$(cksum < "$NM_DIR/config.yaml")" 'the no-mistakes config is never written'
 assert_absent "$LOG" 'no log without --log'
+cat > "$NM_DIR/config.yaml" <<'YAML'
+agent: [claude, acp:omp]
+agent_config:
+  claude:
+    model: claude-opus-5-5
+    effort: high
+  "acp:omp":
+    model: openai-codex/gpt-6.1-sol   # pinned
+other_key: value
+YAML
+before=$(cksum < "$NM_DIR/config.yaml")
+select_run --dry-run --json
+expect_code 0 "$CODE" 'a live agent_config does not change the choice'
+assert_equals '{"claude":"claude-opus-5-5","acp:omp":"openai-codex/gpt-6.1-sol"}' "$(jq -c .current.models <<<"$OUT")" \
+  'each live pin is attributed to its own agent, including a quoted key with a colon'
 select_run --dry-run
 expect_code 0 "$CODE" 'text output selects'
 assert_contains "$OUT" '  selected: claude:claude-sonnet-5-5[1m] effort=high agent=claude tier=primary' 'text names the choice'
-assert_contains "$OUT" '    # >>> fm-review-agent-select (managed; do not edit) >>>' 'text prints the managed block'
-assert_contains "$OUT" 'would-write (not written):' 'the block is labelled as not written'
+assert_contains "$OUT" '  current: agent=[claude, acp:omp] models={"claude":"claude-opus-5-5","acp:omp":"openai-codex/gpt-6.1-sol"}' 'text names the live pins'
+assert_not_contains "$OUT" 'would-write' 'text offers no config block'
 pass 'a healthy pool selects the highest known spendPriority and discloses the pool'
 
 # ---- quota-tight pool: a short runway fails the gate, the measured pool is used ----
@@ -123,7 +137,7 @@ claude_reason=$(jq -r '.candidates[] | select(.harness == "claude") | .reason' <
 assert_contains "$claude_reason" 'shorter than the 14400s task horizon' 'the runway refusal names the horizon'
 assert_equals false "$(jq '.candidates[] | select(.harness == "claude") | .eligible' <<<"$OUT")" 'the tight candidate is not eligible'
 assert_equals false "$(jq '.candidates[] | select(.harness == "claude") | .exhausted' <<<"$OUT")" 'a short runway is not proven exhaustion'
-assert_equals '["acp:omp"]' "$(jq -c .would_write.agent <<<"$OUT")" 'the block holds only the selected agent'
+assert_equals acp:omp "$(jq -r .selected.agent <<<"$OUT")" 'the selected pool runs as the omp review agent'
 assert_equals 12 "$(jq '.candidates[] | select(.harness == "omp") | .pct' <<<"$OUT")" 'pool headroom is the best usable account'
 write_pool 4
 select_run --dry-run --json
@@ -148,13 +162,13 @@ expect_code 0 "$CODE" 'proven exhaustion uses the declared fallback'
 assert_equals deepseek/deepseek-v4-flash "$(selected_model)" 'the declared fallback is selected'
 assert_equals fallback "$(jq -r .selected.tier <<<"$OUT")" 'the tier is reported'
 assert_contains "$(jq -r .reason <<<"$OUT")" 'proven exhausted' 'the reason states proven exhaustion'
-assert_equals '["acp:omp"]' "$(jq -c .would_write.agent <<<"$OUT")" 'the fallback is the only agent in the block'
+assert_equals acp:omp "$(jq -r .selected.agent <<<"$OUT")" 'the fallback runs as the omp review agent'
 write_rules "$DEFAULT_USE"
 select_run --dry-run --json
 expect_code 1 "$CODE" 'exhaustion with no declared fallback does not select'
 assert_equals escalate "$(jq -r .status <<<"$OUT")" 'no fallback escalates'
 assert_contains "$(jq -r .reason <<<"$OUT")" 'the rule declares no fallback' 'the reason names the missing fallback'
-assert_equals null "$(jq -c .would_write <<<"$OUT")" 'no block is offered without a selection'
+assert_equals null "$(jq -c .selected <<<"$OUT")" 'no choice is offered without a selection'
 write_rules "$DEFAULT_USE" "[$DEEPSEEK]"
 pass 'one account out keeps the pool; every account out opens only the declared fallback'
 
@@ -193,7 +207,24 @@ write_pool 30
 select_run --dry-run --json
 assert_equals openai-codex/gpt-6.1-sol "$(selected_model)" 'a profile floor below its minimum removes the candidate'
 assert_contains "$(jq -r '.candidates[] | select(.harness == "claude") | .reason' <<<"$OUT")" 'profile floor all_models below 50%' 'the floor refusal is named'
+SOL_FLOOR=$(jq -c '. + {floor: {scope: "all_models", min_percent: 50}}' <<<"$SOL")
+write_rules "[$SOL_FLOOR,$SONNET]"
+write_quota "[$(row all_models 94 "$THROUGH" 1.5)]"
+write_pool 30
+select_run --dry-run --json
+expect_code 0 "$CODE" 'a floored pool with headroom still selects the ranked candidate'
+assert_equals claude-sonnet-5-5\[1m\] "$(selected_model)" 'a floored pool has no scalar and does not outrank a known one'
+assert_equals true "$(jq '.candidates[] | select(.harness == "omp") | .eligible' <<<"$OUT")" 'a floor the pool cannot verify keeps a usable pool eligible'
+assert_contains "$(jq -r .reason <<<"$OUT")" 'unranked, disclosed: omp:openai-codex/gpt-6.1-sol' 'the floored pool is disclosed beside the winner'
+write_pool 0 0
+select_run --dry-run --json
+expect_code 0 "$CODE" 'an exhausted floored pool does not block the ranked candidate'
+assert_equals claude-sonnet-5-5\[1m\] "$(selected_model)" 'the ranked candidate is selected'
+assert_equals false "$(jq '.candidates[] | select(.harness == "omp") | .eligible' <<<"$OUT")" 'an exhausted pool is not eligible even when its floor is unverifiable'
+assert_equals false "$(jq '.candidates[] | select(.harness == "omp") | .exhausted' <<<"$OUT")" 'an unverifiable floor does not prove exhaustion'
+assert_not_contains "$(jq -r .reason <<<"$OUT")" 'gpt-6.1-sol' 'an exhausted pool is not disclosed as a candidate'
 write_rules "$DEFAULT_USE" "[$DEEPSEEK]"
+write_pool 30
 printf 'omp-or-tc\n' > "$HOME_DIR/config/session-launch-policy"
 write_quota "[$(row all_models 94 "$THROUGH" 1.5)]"
 select_run --dry-run --json
@@ -240,7 +271,6 @@ write_quota "[$(row all_models 94 "$THROUGH" 1.5)]"
 write_pool 52
 assert_error 'a run without --dry-run' 'pass --dry-run' --json
 assert_error 'an unknown flag' 'unknown argument' --dry-run --frobnicate
-assert_error 'a malformed --rule' '--rule must be a position' --dry-run --rule 'x;y'
 printf '%s\n' '{"rules": [' > "$RULES"
 assert_error 'rules that are not JSON' 'malformed rules file' --dry-run
 rm -f "$RULES"
@@ -264,15 +294,9 @@ assert_error 'an omp candidate with no provider family' 'declare provider' --dry
 write_rules "$DEFAULT_USE"
 jq '.rules += [.rules[1]]' "$RULES" > "$RULES.tmp" && mv "$RULES.tmp" "$RULES"
 assert_error 'two matching review rules' 'more than one rule starts with' --dry-run
-select_run --dry-run --json --rule 2
-expect_code 0 "$CODE" '--rule pins one of two matching rules'
-assert_equals rule_2 "$(jq -r .rule <<<"$OUT")" '--rule names the pinned rule'
 write_rules "$DEFAULT_USE"
 jq '.rules[1].when = "Something else entirely."' "$RULES" > "$RULES.tmp" && mv "$RULES.tmp" "$RULES"
 assert_error 'no review rule' 'no rule whose when starts with' --dry-run
-assert_error 'a --rule that is not in the file' 'is not in the rules file' --dry-run --rule 9
-select_run --dry-run --json --rule 2
-expect_code 0 "$CODE" '--rule selects a rule whose text does not match the prefix'
 write_rules "$DEFAULT_USE"
 EXTRA_ENV=(FAKE_QUOTA_FAIL=1)
 assert_error 'a quota-axi failure' 'quota-axi --json failed' --dry-run

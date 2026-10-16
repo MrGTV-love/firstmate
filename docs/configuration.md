@@ -1747,13 +1747,13 @@ Secondmate homes inherit this file from the primary, so a secondmate's own crewm
 
 ## Review-agent selection (bin/fm-review-agent-select.sh)
 
-`bin/fm-review-agent-select.sh --dry-run` reports which candidate of the review rule firstmate would give the next no-mistakes review run, and the config block that choice implies.
+`bin/fm-review-agent-select.sh --dry-run` reports which candidate of the review rule firstmate would give the next no-mistakes review run, and how that differs from the live agent order.
 It reads live evidence and writes nothing but its own log: no mode of it writes `~/.no-mistakes/config.yaml` or any `agent_config`, and a run without `--dry-run` is refused.
 The script header owns flags, the output block, and exit status.
 
 **Candidates**
 
-- The review rule is the single rule in `config/crew-dispatch.json` whose `when` starts with `Isolated independent quality review`; `--rule <N>` pins a rule by position instead.
+- The review rule is the single rule in `config/crew-dispatch.json` whose `when` starts with `Isolated independent quality review`.
 - No match, or more than one match, is an error rather than a guess.
 - Roles and retired ids resolve through `bin/fm-model-index.sh profiles`, and each profile passes the model-index `check` preflight under the pinned worker account, as a dispatch does.
 - Every `use` profile needs an explicit `model` and a harness that has a no-mistakes review agent: `omp` runs as `acp:omp` and `claude` runs as `claude`.
@@ -1768,7 +1768,7 @@ The script header owns flags, the output block, and exit status.
 **Evidence log**
 
 - With `--log`, every run appends one `fm-review-agent-select.v1` JSON line to `state/review-agent-select.jsonl`, errors included.
-- A record holds the status, reason, rule, task horizon, selection, the live `current` agent order and per-agent models read from the no-mistakes config, the `would_write` block, and every candidate with its eligibility, exhaustion, scalar, headroom, runway, and uncertainty.
+- A record holds the status, reason, rule, task horizon, selection, the live `current` agent order and per-agent models read from the no-mistakes config, and every candidate with its eligibility, exhaustion, scalar, headroom, runway, and uncertainty.
 - The watcher starts one detached `--dry-run --log` run on each heartbeat tick when the home has `config/crew-dispatch.json`; a second run started while one is in flight exits quietly.
 
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
