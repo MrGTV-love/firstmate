@@ -12,6 +12,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
+| Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
@@ -92,6 +93,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Private secondmate config-reread generations with their retry and quarantine state.
 - Per-task steering-inbox records under `state/<id>.inbox/` (`bin/fm-task-inbox-lib.sh`).
 - The dated open-work ledger `state/open-loops.json`, published by `bin/fm-open-loops.sh --heartbeat`.
+- The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`, with its single-flight marker `state/.review-agent-select.pid`.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
@@ -1743,6 +1745,32 @@ See [`docs/examples/crew-dispatch.json`](examples/crew-dispatch.json) for a star
 
 Secondmate homes inherit this file from the primary, so a secondmate's own crewmates apply the same dispatch profile behavior.
 
+## Review-agent selection (bin/fm-review-agent-select.sh)
+
+`bin/fm-review-agent-select.sh --dry-run` reports which candidate of the review rule firstmate would give the next no-mistakes review run, and the config block that choice implies.
+It reads live evidence and writes nothing but its own log: no mode of it writes `~/.no-mistakes/config.yaml` or any `agent_config`, and a run without `--dry-run` is refused.
+The script header owns flags, the output block, and exit status.
+
+**Candidates**
+
+- The review rule is the single rule in `config/crew-dispatch.json` whose `when` starts with `Isolated independent quality review`; `--rule <N>` pins a rule by position instead.
+- No match, or more than one match, is an error rather than a guess.
+- Roles and retired ids resolve through `bin/fm-model-index.sh profiles`, and each profile passes the model-index `check` preflight under the pinned worker account, as a dispatch does.
+- Every `use` profile needs an explicit `model` and a harness that has a no-mistakes review agent: `omp` runs as `acp:omp` and `claude` runs as `claude`.
+- A malformed rule, duplicate profile, invalid fallback, unreadable rules file, failed quota read, or invalid quota snapshot is reported as an error; the selector never selects around it.
+
+**Procedure**
+
+- The [quota-array-dispatch skill](../.agents/skills/quota-array-dispatch/SKILL.md) owns the gates and the `spendPriority` ranking; the script applies them to one `quota-axi --json` snapshot and one pooled `omp usage` report.
+- Among eligible candidates the highest known `spendPriority` wins, a tie is reported without a winner, and an unknown scalar is disclosed, never read as zero or as healthy.
+- A declared `fallback` is considered only when every `use` candidate is proven exhausted.
+
+**Evidence log**
+
+- With `--log`, every run appends one `fm-review-agent-select.v1` JSON line to `state/review-agent-select.jsonl`, errors included.
+- A record holds the status, reason, rule, task horizon, selection, the live `current` agent order and per-agent models read from the no-mistakes config, the `would_write` block, and every candidate with its eligibility, exhaustion, scalar, headroom, runway, and uncertainty.
+- The watcher starts one detached `--dry-run --log` run on each heartbeat tick when the home has `config/crew-dispatch.json`; a second run started while one is in flight exits quietly.
+
 ## Typed dispatch resolution (.env TYPESAFE_API_KEY)
 
 `bin/fm-dispatch-resolve.sh` resolves one concrete crewmate or scout profile from a written brief with typesafe.ai's System One model (Jev), so the rule match that firstmate otherwise reasons out in its own context becomes one short tool turn.
@@ -3294,6 +3322,7 @@ FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this ho
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
 FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
+FM_REVIEW_AGENT_SELECT_BIN=   # test seam: the dry-run selector the watcher's heartbeat launches instead of bin/fm-review-agent-select.sh
 FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-session sweeps (bin/fm-idle-session-reap.sh); 0 turns the sweep off without changing its deadline; an unscheduled home waits one full interval, and watcher handoffs retain the deadline; invalid values use 900
 # Fixed reap policy and safety gates are owned by bin/fm-idle-session-reap.sh's header, not configurable overrides.
 FM_IDLE_REAP_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-idle-session-reap.sh

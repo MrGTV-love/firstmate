@@ -7350,6 +7350,64 @@ test_heartbeat_no_change_absorbed() {
   pass "a heartbeat with no captain-relevant change is absorbed and backs off the cadence"
 }
 
+review_select_case() {  # <name> <with-rules:0|1>; sets dir state fakebin out config calls
+  dir=$(make_case "$1"); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  config="$dir/config"; calls="$dir/select-calls"
+  mkdir -p "$config"
+  printf 'working: routine heartbeat history\n' > "$state/routine.status"
+  printf '%s' "$(seen_sig "$state/routine.status")" > "$state/.seen-routine_status"
+  # A recorder stands in for the selector so no live quota or omp is read.
+  cat > "$fakebin/fake-review-select" <<'SH'
+#!/usr/bin/env bash
+printf '%s|%s|%s\n' "$*" "$FM_STATE_OVERRIDE" "$FM_CONFIG_OVERRIDE" >> "$FM_TEST_SELECT_CALLS"
+SH
+  chmod +x "$fakebin/fake-review-select"
+  [ "$2" = 0 ] || printf '%s\n' '{"rules":[]}' > "$config/crew-dispatch.json"
+}
+
+test_heartbeat_runs_review_agent_selector_dry_run() {
+  local dir state fakebin out config calls pid i
+  # With dispatch rules the heartbeat starts the dry-run selector with a log, in this home.
+  review_select_case heartbeat-review-select 1
+  FM_TEST_SELECT_CALLS="$calls" FM_CONFIG_OVERRIDE="$config" FM_REVIEW_AGENT_SELECT_BIN="$fakebin/fake-review-select" \
+    watch_bg "$state" "$fakebin" "$out" env FM_HEARTBEAT=1
+  pid=$!
+  i=0
+  while [ "$i" -lt 200 ]; do
+    [ -s "$calls" ] && break
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  reap "$pid"
+  [ -s "$calls" ] || fail "the heartbeat did not start the review-agent selector"
+  assert_equals "--dry-run --log|$state|$config" "$(sed -n 1p "$calls")" \
+    'the selector runs dry-run with a log against this home'
+  [ ! -s "$out" ] || fail "the selector run printed a wake reason: $(cat "$out")"
+  pass "the heartbeat starts the dry-run review-agent selector"
+}
+
+test_heartbeat_skips_review_agent_selector_without_rules() {
+  local dir state fakebin out config calls pid i
+  # Without dispatch rules there is nothing to select from: no launch, no logged error.
+  review_select_case heartbeat-review-select-norules 0
+  FM_TEST_SELECT_CALLS="$calls" FM_CONFIG_OVERRIDE="$config" FM_REVIEW_AGENT_SELECT_BIN="$fakebin/fake-review-select" \
+    watch_bg "$state" "$fakebin" "$out" env FM_HEARTBEAT=1
+  pid=$!
+  i=0
+  while [ "$i" -lt 200 ]; do
+    [ "$(cat "$state/.heartbeat-streak" 2>/dev/null || echo 0)" -ge 1 ] && break
+    kill -0 "$pid" 2>/dev/null || break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ "$(cat "$state/.heartbeat-streak" 2>/dev/null || echo 0)" -ge 1 ] \
+    || { reap "$pid"; fail "the heartbeat did not complete"; }
+  reap "$pid"
+  [ ! -e "$calls" ] || fail "the selector ran for a home with no dispatch rules: $(cat "$calls")"
+  pass "the heartbeat skips the review-agent selector when the home has no dispatch rules"
+}
+
 test_heartbeat_backstop_surfaces_a_masked_status() {
   local dir state fakebin out sig pid
   dir=$(make_case heartbeat-masked); state="$dir/state"; fakebin="$dir/fakebin"

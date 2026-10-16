@@ -363,6 +363,7 @@ case "$OPEN_LOOPS_RESURFACE" in
 esac
 [ "$OPEN_LOOPS_RESURFACE" -gt 0 ] || OPEN_LOOPS_RESURFACE=21600
 OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-$SCRIPT_DIR/fm-open-loops.sh}
+REVIEW_SELECT_BIN=${FM_REVIEW_AGENT_SELECT_BIN:-$SCRIPT_DIR/fm-review-agent-select.sh}
 IDLE_REAP_INTERVAL=${FM_IDLE_REAP_INTERVAL:-900}
 case "$IDLE_REAP_INTERVAL" in
   ''|*[!0-9]*) IDLE_REAP_INTERVAL=900 ;;
@@ -2683,6 +2684,26 @@ open_loops_refresh_detached() {
   [ -e "$STATE/.open-loops-started" ] || : > "$STATE/.open-loops-started"
 }
 
+# Review-agent selector evidence, detached for the same reason. It is dry-run only:
+# it reads live quota and appends one record to state/review-agent-select.jsonl, and
+# it has no way to write the no-mistakes config. A home with no dispatch rules has
+# nothing to select from, so it is skipped rather than logging an error every beat.
+REVIEW_SELECT_PID=
+review_agent_select_detached() {
+  [ -r "$CONFIG/crew-dispatch.json" ] || return 0
+  [ -x "$REVIEW_SELECT_BIN" ] || return 0
+  if [ -n "$REVIEW_SELECT_PID" ]; then
+    if kill -0 "$REVIEW_SELECT_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$REVIEW_SELECT_PID" 2>/dev/null || true
+    REVIEW_SELECT_PID=
+  fi
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_CONFIG_OVERRIDE="$CONFIG" \
+    "$REVIEW_SELECT_BIN" --dry-run --log </dev/null >/dev/null 2>&1 &
+  REVIEW_SELECT_PID=$!
+}
+
 # Finished-session cleanup, detached for the same reason as the ledgers above: a
 # sweep that runs teardown can take minutes, and the poll must keep advancing the
 # beacon. The sweep is single-flight on its own lock, and it only ever asks
@@ -3768,6 +3789,7 @@ while :; do
   hb=$(( HEARTBEAT * (1 << streak) ))
   [ "$hb" -gt "$HEARTBEAT_MAX" ] && hb=$HEARTBEAT_MAX
   if [ "$(age_of "$STATE/.last-heartbeat")" -ge "$hb" ]; then
+    review_agent_select_detached
     # Triage: in always-on mode a heartbeat is benign unless the cheap fleet-scan
     # turns up a captain-relevant status the per-wake path missed. Absorb the
     # no-change case (advance the schedule and back off exactly as wake() would,
