@@ -1,0 +1,30 @@
+== G (BASELINE 8221de43): exit on a parked finished task
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+error: task t1 is blocked on a prompt: Claude background-task exit picker. Refusing to type Enter into it.
+rc=1
+== pane: picker still open, nothing chosen
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Background work is running
+   The following will stop when you exit:
+   shell · sleep 903
+   ❯ 1. Exit and stop tasks
+     2. Move to background and exit
+     3. Stay
+   Enter to confirm · Esc to cancel
+45391 sleep 903
+
+== G2 (BASELINE): is there any supported verb to close it? stay
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+error: 'stay' is not a control verb
+allowed verbs:
+  interrupt
+  exit
+  relaunch
+  authorize-continuation
+  reassociate
+rc=2
+     2. Move to background and exit
+     3. Stay
+   Enter to confirm · Esc to cancel
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+stayed t1 harness=claude backend=tmux endpoint=fmses:fm-t1 verified=picker-closed agent=alive

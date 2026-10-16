@@ -1,0 +1,7 @@
+== H: stay against a stopped agent (shell only)
+fmses:sleep sleep
+fmses:fm-t1 zsh
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+error: no agent is running at task t1's recorded endpoint (state: dead); there is no exit picker to close
+rc=1
+pane unchanged: nothing was typed

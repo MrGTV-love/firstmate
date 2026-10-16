@@ -1,0 +1,26 @@
+== pre: picker opened by hand
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Background work is running
+   The following will stop when you exit:
+   shell · sleep 902
+   ❯ 1. Exit and stop tasks
+     2. Move to background and exit
+     3. Stay
+   Enter to confirm · Esc to cancel
+13418 sleep 902
+== F: picker ALREADY open, finished (stub), idle, steering handled; exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+note: task t1 finished and was parked on the background-task exit picker; exit closed it with Stay and read the composer again
+note: task t1 finished, so exit chose "Exit and stop tasks" on the background-task exit picker
+stopped t1 harness=claude backend=tmux endpoint=fmses:fm-t1 worktree=/Users/charlesabrooker/tmp/fm-lab.tQpW7T/wt-t1
+VERB=exit $LAB/ctl.sh FM_CREW_STATE_BIN=$LAB/crew-done.sh 2>&1  0.58s user 1.19s system 31% cpu 5.590 total
+rc=0
+== post
+efix (the * is not expanded) and matches only commands containing a literal * at
+ that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+Resume this session with:
+claude --resume 71ba5269-b999-4273-ba9f-50239c084106
+Mac-Studio%
+fmses:sleep sleep
+fmses:fm-t1 zsh
+bg shell gone

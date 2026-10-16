@@ -1,0 +1,20 @@
+== D1: finished (stub state=done), busy idle, ONE unhandled steer; exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+error: task t1 is blocked on a prompt: Claude background-task exit picker. Refusing to type Enter into it. It was left as it was because its steering inbox still holds unread steering (001.msg) that stopping it would leave unread. Run 'fm-control t1 stay' to close it and keep the agent running.
+rc=1
+== pane
+❯ /exit
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Background work is running
+   The following will stop when you exit:
+   shell · sleep 900
+   ❯ 1. Exit and stop tasks
+     2. Move to background and exit
+     3. Stay
+   Enter to confirm · Esc to cancel
+== bg shell
+8779 sleep 900
+9785 sleep 900
+== steer still unread
+001.msg
+handled

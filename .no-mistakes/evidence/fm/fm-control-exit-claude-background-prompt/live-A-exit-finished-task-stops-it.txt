@@ -1,0 +1,27 @@
+== pre
+v1 gen=g1792120451.93674.24704 seq=1 state=idle source=fm-spawn event=seed ts=1792120451
+0
+18276 sleep 901
+fmses:sleep sleep
+fmses:fm-t1 2.1.301
+== A: finished (stub done), idle, steering handled; exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+note: task t1 finished, so exit chose "Exit and stop tasks" on the background-task exit picker
+stopped t1 harness=claude backend=tmux endpoint=fmses:fm-t1 worktree=/Users/charlesabrooker/tmp/fm-lab.tQpW7T/wt-t1
+VERB=exit $LAB/ctl.sh FM_CREW_STATE_BIN=$LAB/crew-done.sh 2>&1  0.47s user 0.95s system 34% cpu 4.145 total
+rc=0
+== post: pane
+:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal pr
+efix (the * is not expanded) and matches only commands containing a literal * at
+ that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+Resume this session with:
+claude --resume 6619e8d8-0a43-40af-bcd9-7f223c7733cb
+Mac-Studio%
+fmses:sleep sleep
+fmses:fm-t1 zsh
+== bg shell sleep 901 (must be gone)
+gone
+== state files
+t1.control-exit
+t1.inbox
+t1.meta

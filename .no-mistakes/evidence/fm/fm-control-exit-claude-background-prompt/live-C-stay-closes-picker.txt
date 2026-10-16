@@ -1,0 +1,23 @@
+== stay
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+stayed t1 harness=claude backend=tmux endpoint=fmses:fm-t1 verified=picker-closed agent=alive
+rc=0
+== pane after
+  Ran 1 shell command
+⏺ ready
+✻ Crunched for 3s · done 10:16 PM · 1 shell still running
+❯ /exit
+                                                            ◐ medium · /effort
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 3% 33k/1.0M task-t1 wt-t1:d7e235a1
+  ⏵⏵ auto mode on · 1 shell · ← for agents
+== marker present?
+no control-exit marker
+== bg shell
+8779 sleep 900
+9785 sleep 900
+== pane cmd
+fmses:zsh sleep
+fmses:fm-t1 2.1.301

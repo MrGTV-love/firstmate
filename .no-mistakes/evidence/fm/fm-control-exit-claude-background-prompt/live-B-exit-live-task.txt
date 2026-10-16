@@ -1,0 +1,16 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+error: task t1 is blocked on a prompt: Claude background-task exit picker. Refusing to type Enter into it. It was left as it was because its current state is unknown, not done. Run 'fm-control t1 stay' to close it and keep the agent running.
+ ▝▝   ▝▝   ~/tmp/fm-lab.tQpW7T/wt-t1
+❯ Use the Bash tool with run_in_background set to true to run exactly: sleep
+  900. Do nothing else, then reply with the single word ready.
+  Ran 1 shell command
+⏺ ready
+✻ Crunched for 3s · done 10:16 PM · 1 shell still running
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Background work is running
+   The following will stop when you exit:
+   shell · sleep 900
+   ❯ 1. Exit and stop tasks
+     2. Move to background and exit
+     3. Stay
+   Enter to confirm · Esc to cancel

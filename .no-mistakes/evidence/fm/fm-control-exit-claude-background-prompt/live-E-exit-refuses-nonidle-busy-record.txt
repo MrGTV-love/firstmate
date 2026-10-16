@@ -1,0 +1,40 @@
+== E1: finished (stub), steering handled, busy record = busy (claude-hook); exit
+v1 gen=g1792120451.93674.24704 seq=2 state=busy source=claude-hook event=UserPromptSubmit ts=1792120692
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+error: task t1 is blocked on a prompt: Claude background-task exit picker. Refusing to type Enter into it. It was left as it was because its busy record reads 'busy claude-hook', not idle. Run 'fm-control t1 stay' to close it and keep the agent running.
+rc=1
+== pane
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Background work is running
+   The following will stop when you exit:
+   shell · sleep 900
+   ❯ 1. Exit and stop tasks
+     2. Move to background and exit
+     3. Stay
+   Enter to confirm · Esc to cancel
+8779 sleep 900
+9785 sleep 900
+
+== E2: picker already open; busy record malformed (unknown); exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+error: task t1 is blocked on a prompt: Claude background-task exit picker. Refusing to type Enter into it. It was left as it was because its busy record reads 'unknown malformed', not idle. Run 'fm-control t1 stay' to close it and keep the agent running.
+rc=1
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Background work is running
+   The following will stop when you exit:
+   shell · sleep 900
+   ❯ 1. Exit and stop tasks
+     2. Move to background and exit
+     3. Stay
+   Enter to confirm · Esc to cancel
+8779 sleep 900
+9785 sleep 900
+
+== stay
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+stayed t1 harness=claude backend=tmux endpoint=fmses:fm-t1 verified=picker-closed agent=alive
+rc=0
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 3% 33k/1.0M task-t1 wt-t1:d7e235a1
+  ⏵⏵ auto mode on · 1 shell · ← for agents

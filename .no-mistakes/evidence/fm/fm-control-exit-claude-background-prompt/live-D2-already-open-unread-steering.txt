@@ -1,0 +1,23 @@
+== D2: picker ALREADY open, finished, unread steer; exit
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+error: task t1 is blocked on a prompt: Claude background-task exit picker. Refusing to type Enter into it. It was left as it was because its steering inbox still holds unread steering (001.msg) that stopping it would leave unread. Run 'fm-control t1 stay' to close it and keep the agent running.
+rc=1
+== pane (picker must still be open, nothing typed)
+▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔▔
+   Background work is running
+   The following will stop when you exit:
+   shell · sleep 900
+   ❯ 1. Exit and stop tasks
+     2. Move to background and exit
+     3. Stay
+   Enter to confirm · Esc to cancel
+== stay
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.tQpW7T
+stayed t1 harness=claude backend=tmux endpoint=fmses:fm-t1 verified=picker-closed agent=alive
+rc=0
+────────────────────────────────────────────────────────────────────────────────
+❯ 
+────────────────────────────────────────────────────────────────────────────────
+  Haiku 5.5 ░░░░░░░░░░ 3% 33k/1.0M task-t1 wt-t1:d7e235a1
+  ⏵⏵ auto mode on · 1 shell · ← for agents
+no control-exit marker
