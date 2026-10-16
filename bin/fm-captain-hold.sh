@@ -229,9 +229,10 @@
 # only by `reconcile close` evidence, or a body that merely quotes the record
 # markers, is refused. When the home's `.tasks.toml` names no archive but
 # `~/.tasks-axi/config.toml` does, that path is not read and the lookup refuses
-# instead of falling back to the default archive file. An archive setting the
-# gate cannot read exactly (empty, unquoted, unterminated, trailed by other
-# text, or holding a backslash) is refused the same way. `complete` prints
+# instead of falling back to the default archive file. The archive setting is
+# parsed by python3 tomllib; a file that does not parse, a missing tomllib, a
+# value that is not one non-empty string, or a setting made by an inline table,
+# a quoted header or a dotted key is refused the same way. `complete` prints
 # `[answered and archived: <ids>]` for the keys that passed only through the
 # archive.
 #
@@ -897,38 +898,49 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 
 ARCHIVE_ROW_BODY=
 
-# Section-aware [markdown] archive value from a .tasks.toml. The value must be
-# one quoted string, read up to its matching quote so a `#` inside the quotes
-# stays part of the path, followed only by blanks or a `#` comment. Prints
-# nothing when the key is unset. Returns 3, printing nothing, when the value is
-# empty, unquoted, unterminated, followed by other text, or holds a backslash:
-# the gate does not guess at a path tasks-axi may read differently.
+# [markdown] archive value from a .tasks.toml or ~/.tasks-axi/config.toml,
+# taken from the document python3's standard-library tomllib parses, so quoting,
+# escapes, comments, CRLF and the spaced header `[ markdown ]` are read exactly.
+# tasks-axi reads the file with its own small parser that honours only a plain
+# markdown table header, so a value set by an inline table, a quoted header or
+# a dotted key is refused too: tasks-axi never writes the archive it names.
+# Prints nothing when the key is unset. Returns 3, printing nothing, when the
+# file does not parse (duplicate tables included), when tomllib or python3 is
+# missing, when the value is not a non-empty string without control characters,
+# or when no plain markdown header line is present: the gate does not guess at a
+# path tasks-axi may read differently.
 captain_markdown_archive_setting() {  # <toml-file>
   [ -f "$1" ] || return 0
-  LC_ALL=C awk '
-    function trim(v) { sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); return v }
-    BEGIN { inmd = 0; bad = 0 }
-    {
-      line = trim($0)
-      if (line ~ /^\[/) {
-        sub(/[[:space:]]*#.*/, "", line)
-        if (line ~ /^\[[^]]+\]$/) inmd = (line == "[markdown]")
-        next
-      }
-      if (!inmd || line !~ /^archive[[:space:]]*=/) next
-      sub(/^[^=]*=[[:space:]]*/, "", line)
-      q = substr(line, 1, 1)
-      if (q != "\"" && q != "'\''") { bad = 1; exit }
-      len = index(substr(line, 2), q)
-      if (len == 0) { bad = 1; exit }
-      value = substr(line, 2, len - 1)
-      rest = trim(substr(line, len + 2))
-      if (value == "" || index(value, "\\") || (rest != "" && substr(rest, 1, 1) != "#")) { bad = 1; exit }
-      print value
-      exit
-    }
-    END { if (bad) exit 3 }
-  ' "$1"
+  python3 -I - "$1" <<'PY' || return 3
+import re
+import sys
+try:
+    import tomllib
+    with open(sys.argv[1], "rb") as config:
+        raw = config.read()
+    document = tomllib.loads(raw.decode("utf-8"))
+    section = document.get("markdown")
+    if section is None:
+        raise SystemExit(0)
+    if not isinstance(section, dict):
+        raise SystemExit(3)
+    if "archive" not in section:
+        raise SystemExit(0)
+    value = section["archive"]
+    if not isinstance(value, str) or not value or any(ord(c) < 32 or ord(c) == 127 for c in value):
+        raise SystemExit(3)
+    # tasks-axi reads the file with its own small parser, which honours only a
+    # plain markdown table header; an inline table, a quoted header or a dotted
+    # key would name an archive it never writes, so those refuse.
+    header = rb"^[ \t]*\[[ \t]*markdown[ \t]*\][ \t]*(#[^\n]*)?\r?$"
+    if not re.search(header, raw, re.M):
+        raise SystemExit(3)
+    sys.stdout.write(value + "\n")
+except SystemExit:
+    raise
+except Exception:
+    raise SystemExit(3)
+PY
 }
 
 # The refusal for an archive setting the gate cannot read exactly.

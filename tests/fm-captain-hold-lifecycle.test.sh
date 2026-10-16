@@ -7843,34 +7843,167 @@ test_trailing_comment_after_the_archive_path_still_works() {
   pass "a trailing comment after the archive path still works"
 }
 
+# Writes a .tasks.toml whose markdown settings are the given lines (everything
+# after the backend line), for the TOML spellings the gate must read.
+write_tasks_toml() {  # <home> <line>...
+  local home=$1
+  shift
+  { printf '%s\n' 'backend = "markdown"'; printf '%s\n' "$@"; } > "$home/.tasks.toml"
+}
+
+# An older answered row sits in the default archive; <toml-lines> then send
+# retention to data/redirected.md, where a later row of the same id is closed
+# with no answer. Leaves the scout ready for the gate.
+setup_stale_default_then_redirected() {  # <home> <scout> <id> <toml-line>...
+  local home=$1 scout=$2 id=$3
+  shift 3
+  set_archive_retention "$home" data/done-archive.md
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_grep "Captain decision:" "$home/data/done-archive.md" "the older answered row is not in the default archive"
+  write_tasks_toml "$home" "$@"
+  tasks_in "$home" add "$id" "Closed again with no answer" --kind captain --repo sample >/dev/null \
+    || fail "could not recreate $id"
+  tasks_in "$home" "done" "$id" >/dev/null || fail "could not close the later $id"
+  push_through_retention "$home" "retention-filler-redirect-$(printf '%s' "$id" | cksum | cut -d' ' -f1)"
+  assert_grep "$id" "$home/data/redirected.md" "retention did not archive the later row at the redirected path"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+}
+
+# The same spelling with the answered row in the redirected archive resolves.
+setup_answered_in_redirected() {  # <home> <scout> <id> <toml-line>...
+  local home=$1 scout=$2 id=$3
+  shift 3
+  write_tasks_toml "$home" "$@"
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_grep "Captain decision:" "$home/data/redirected.md" "the answered row is not in the redirected archive"
+  assert_absent "$home/data/done-archive.md" "the fixture wrote the default archive"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+}
+
+test_spaced_table_header_redirects_the_archive() {
+  local home scout id
+  home=$(make_home archived-spaced-header)
+  scout=sample-archive-spaced-scout
+  id=sample-spaced-header-call
+  setup_stale_default_then_redirected "$home" "$scout" "$id" '' '[ markdown ]' \
+    'path = "data/backlog.md"' 'archive = "data/redirected.md"' 'done_keep = 1'
+  assert_gate_refuses_both "$home" "$scout" "a stale answer from the default archive behind a spaced table header"
+
+  home=$(make_home archived-spaced-header-answered)
+  scout=sample-archive-spaced-answered-scout
+  id=sample-spaced-answered-call
+  setup_answered_in_redirected "$home" "$scout" "$id" '' '[ markdown ]' \
+    'path = "data/backlog.md"' 'archive = "data/redirected.md"' 'done_keep = 1'
+  assert_gate_resolves "$home" "$scout" "$id" "an answered call archived behind a spaced table header"
+  pass "a spaced [ markdown ] table header redirects the archive the gate reads"
+}
+
+# The gate's reader is cut out of the script and run on fixture files, so every
+# spelling is checked directly, including the ones tasks-axi 0.2.6 cannot take.
+test_archive_setting_reader_parses_every_toml_spelling() {
+  local file="$TMP_ROOT/reader.toml" out rc case_name want
+  eval "$(sed -n '/^captain_markdown_archive_setting() {/,/^}/p' "$ROOT/bin/fm-captain-hold.sh")"
+  for case_name in table spaced-table spaced-table-comment hash single-quote comment crlf escape unset other-table; do
+    want='data/read.md'
+    case $case_name in
+      table) printf '%s\n' '[markdown]' 'archive = "data/read.md"' > "$file" ;;
+      spaced-table) printf '%s\n' '[ markdown ]' 'archive = "data/read.md"' > "$file" ;;
+      spaced-table-comment) printf '%s\n' '[  markdown  ] # backend' 'archive = "data/read.md"' > "$file" ;;
+      hash) printf '%s\n' '[markdown]' 'archive = "data/read#me.md"' > "$file"; want='data/read#me.md' ;;
+      single-quote) printf '%s\n' '[markdown]' "archive = 'data/read.md' # closed calls" > "$file" ;;
+      comment) printf '%s\n' '[markdown] # backend' 'archive = "data/read.md"   # closed calls' > "$file" ;;
+      crlf) printf '[markdown]\r\narchive = "data/read.md"\r\n' > "$file" ;;
+      escape) printf '%s\n' '[markdown]' 'archive = "data/read.md"' > "$file" ;;
+      unset) printf '%s\n' '[markdown]' 'path = "data/backlog.md"' > "$file"; want= ;;
+      other-table) printf '%s\n' '[other]' 'archive = "data/elsewhere.md"' > "$file"; want= ;;
+    esac
+    rc=0
+    out=$(captain_markdown_archive_setting "$file") || rc=$?
+    [ "$rc" -eq 0 ] || fail "the reader refused the $case_name spelling (exit $rc)"
+    [ "$out" = "$want" ] || fail "the reader read '$out' for the $case_name spelling, wanted '$want'"
+  done
+  for case_name in inline quoted-header single-quoted-header dotted dotted-with-header-text duplicate-tables duplicate-key dotted-and-table unterminated unquoted trailing-text empty non-string non-table newline-escape not-toml; do
+    case $case_name in
+      inline) printf '%s\n' 'markdown = { archive = "data/a.md" }' > "$file" ;;
+      quoted-header) printf '%s\n' '["markdown"]' 'archive = "data/a.md"' > "$file" ;;
+      single-quoted-header) printf '%s\n' "['markdown']" 'archive = "data/a.md"' > "$file" ;;
+      dotted) printf '%s\n' 'markdown.archive = "data/a.md"' > "$file" ;;
+      dotted-with-header-text) printf '%s\n' 'markdown.archive = "data/a.md"' '# [markdown]' > "$file" ;;
+      duplicate-tables) printf '%s\n' '[markdown]' 'archive = "data/a.md"' '[markdown]' 'done_keep = 1' > "$file" ;;
+      duplicate-key) printf '%s\n' '[markdown]' 'archive = "data/a.md"' 'archive = "data/b.md"' > "$file" ;;
+      dotted-and-table) printf '%s\n' 'markdown.archive = "data/a.md"' '[markdown]' 'done_keep = 1' > "$file" ;;
+      unterminated) printf '%s\n' '[markdown]' 'archive = "data/a.md' > "$file" ;;
+      unquoted) printf '%s\n' '[markdown]' 'archive = data/a.md' > "$file" ;;
+      trailing-text) printf '%s\n' '[markdown]' 'archive = "data/a.md" extra' > "$file" ;;
+      empty) printf '%s\n' '[markdown]' 'archive = ""' > "$file" ;;
+      non-string) printf '%s\n' '[markdown]' 'archive = 5' > "$file" ;;
+      non-table) printf '%s\n' 'markdown = "data/a.md"' > "$file" ;;
+      newline-escape) printf '%s\n' '[markdown]' 'archive = "data/a.md\n"' > "$file" ;;
+      not-toml) printf '%s\n' 'this is not toml' > "$file" ;;
+    esac
+    rc=0
+    out=$(captain_markdown_archive_setting "$file") || rc=$?
+    [ "$rc" -eq 3 ] || fail "the reader did not refuse the $case_name setting (exit $rc, read '$out')"
+    [ -z "$out" ] || fail "the reader printed '$out' while refusing the $case_name setting"
+  done
+  rc=0
+  out=$(captain_markdown_archive_setting "$TMP_ROOT/no-such-file.toml") || rc=$?
+  [ "$rc" -eq 0 ] && [ -z "$out" ] || fail "the reader did not treat an absent file as no setting"
+  pass "the archive setting reader parses every TOML spelling and refuses what does not parse"
+}
+
+test_inline_quoted_header_and_dotted_archive_settings_refuse() {
+  local home scout id case_name
+  scout=sample-archive-unread-scout
+  id=sample-unread-setting-call
+  # tasks-axi ignores an inline table and a quoted table name, and stops on a
+  # dotted key, so the archive is written under a plain header and the setting
+  # is then rewritten; the stale answer is in the archive the new setting names.
+  for case_name in inline quoted-header dotted; do
+    home=$(make_home "archived-unread-$case_name")
+    set_archive_retention "$home" data/redirected.md
+    archive_an_answered_call "$home" "$id" "$scout"
+    assert_grep "Captain decision:" "$home/data/redirected.md" "the answered row is not in the archive fixture"
+    write_scout_with_attested_inventory "$home" "$scout" "$id"
+    case $case_name in
+      inline) write_tasks_toml "$home" 'markdown = { path = "data/backlog.md", archive = "data/redirected.md", done_keep = 1 }' ;;
+      quoted-header) write_tasks_toml "$home" '["markdown"]' 'path = "data/backlog.md"' 'archive = "data/redirected.md"' 'done_keep = 1' ;;
+      dotted) write_tasks_toml "$home" 'markdown.path = "data/backlog.md"' 'markdown.archive = "data/redirected.md"' 'markdown.done_keep = 1' ;;
+    esac
+    assert_gate_refuses_both "$home" "$scout" "a setting made by the $case_name form"
+  done
+  pass "an archive named by an inline table, a quoted header or a dotted key refuses"
+}
+
 test_archive_setting_the_gate_cannot_read_exactly_refuses() {
-  local home scout id case_name line reason
+  local home scout id case_name reason
   scout=sample-archive-syntax-scout
   id=sample-syntax-call
-  # tasks-axi accepts a backslash in a quoted path (an escape in a basic string,
-  # literal in a single-quoted one), so only those reach the gate's own reader.
-  # The other forms stop in tasks-axi first and must refuse for any reason.
-  for case_name in backslash backslash-literal unterminated unquoted trailing-text empty; do
+  # The fixture archives under a readable setting, then the setting is replaced.
+  # Some of these stop in tasks-axi first, so only the duplicate-table case is
+  # certain to reach the gate's own reader and must carry its reason.
+  for case_name in duplicate-tables unterminated unquoted trailing-text empty non-string non-table; do
     reason=
-    case $case_name in
-      backslash) line='archive = "data\\syntax.md"'; reason="uses syntax the gate cannot read exactly" ;;
-      backslash-literal) line="archive = 'data\\syntax.md'"; reason="uses syntax the gate cannot read exactly" ;;
-      unterminated) line='archive = "data/syntax.md' ;;
-      unquoted) line='archive = data/syntax.md' ;;
-      trailing-text) line='archive = "data/syntax.md" extra' ;;
-      empty) line='archive = ""' ;;
-    esac
     home=$(make_home "archived-syntax-$case_name")
     set_archive_retention "$home" data/syntax.md
     archive_an_answered_call "$home" "$id" "$scout"
     assert_grep "Captain decision:" "$home/data/syntax.md" "the answered row is not in the archive fixture"
     write_scout_with_attested_inventory "$home" "$scout" "$id"
-    printf '%s\n' 'backend = "markdown"' '' '[markdown]' 'path = "data/backlog.md"' \
-      "$line" 'done_keep = 1' > "$home/.tasks.toml"
-    assert_gate_refuses_both "$home" "$scout" "an archive setting that is $case_name" \
-      "$reason"
+    case $case_name in
+      duplicate-tables)
+        write_tasks_toml "$home" '' '[markdown]' 'path = "data/backlog.md"' 'archive = "data/syntax.md"' \
+          '' '[markdown]' 'done_keep = 1'
+        reason="uses syntax the gate cannot read exactly" ;;
+      unterminated) write_tasks_toml "$home" '[markdown]' 'path = "data/backlog.md"' 'archive = "data/syntax.md' 'done_keep = 1' ;;
+      unquoted) write_tasks_toml "$home" '[markdown]' 'path = "data/backlog.md"' 'archive = data/syntax.md' 'done_keep = 1' ;;
+      trailing-text) write_tasks_toml "$home" '[markdown]' 'path = "data/backlog.md"' 'archive = "data/syntax.md" extra' 'done_keep = 1' ;;
+      empty) write_tasks_toml "$home" '[markdown]' 'path = "data/backlog.md"' 'archive = ""' 'done_keep = 1' ;;
+      non-string) write_tasks_toml "$home" '[markdown]' 'path = "data/backlog.md"' 'archive = 5' 'done_keep = 1' ;;
+      non-table) write_tasks_toml "$home" 'markdown = "data/syntax.md"' ;;
+    esac
+    assert_gate_refuses_both "$home" "$scout" "an archive setting that is $case_name" "$reason"
   done
-  pass "an archive setting the gate cannot read exactly refuses"
+  pass "an archive setting that does not parse as one string refuses"
 }
 
 tests=(
@@ -7985,6 +8118,9 @@ test_stale_default_archive_does_not_stand_in_for_the_user_level_archive
 test_archive_path_with_a_hash_is_read_whole
 test_single_quoted_archive_path_with_a_hash_is_read_whole
 test_trailing_comment_after_the_archive_path_still_works
+test_spaced_table_header_redirects_the_archive
+test_archive_setting_reader_parses_every_toml_spelling
+test_inline_quoted_header_and_dotted_archive_settings_refuse
 test_archive_setting_the_gate_cannot_read_exactly_refuses
 )
 if [ "$#" -gt 0 ]; then
