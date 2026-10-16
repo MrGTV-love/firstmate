@@ -1,0 +1,32 @@
+=== driving gate tree: /Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M52NPG4NM4041AN2CEDP37NA (fixed-HEAD) ===
+PASS [fixed-HEAD] S1a verify passes for an answered call that retention archived (rc=0)
+    output: verified: sample-s1-scout captain-call inventory
+PASS [fixed-HEAD] S1b complete --none passes and names the archive (rc=0)
+    output: complete: sample-s1-scout captain-call inventory reviewed (sample-s1-call) [answered and archived: sample-s1-call]
+    meta: decision_keys=sample-s1-call
+PASS [fixed-HEAD] S2 archived call with no recorded answer is refused (rc=1)
+    output: fm-captain-hold: captain-held task sample-s2-call is archived without a recorded captain answer
+PASS [fixed-HEAD] S3 archived call held for another origin is refused (rc=1)
+    output: fm-captain-hold: captain-held task sample-s3-call was held for origin sample-s3-other, not sample-s3-scout; hold a task for sample-s3-scout or list the right one
+PASS [fixed-HEAD] S4 call absent from backlog and archive keeps its refusal (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s4-never-existed and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.2U7CeM/s4/data); the nearest legacy identity sample-s4-scout-decision-sample-s4-never-existed also resolves to nothing
+PASS [fixed-HEAD] S5 an archived id that only shares a prefix does not stand in (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s5-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.2U7CeM/s5/data); the nearest legacy identity sample-s5-scout-decision-sample-s5-call also resolves to nothing
+PASS [fixed-HEAD] S6 archived answer whose text starts with blank lines passes (rc=0)
+    output: complete: sample-s6-scout captain-call inventory reviewed (sample-s6-call) [answered and archived: sample-s6-call]
+PASS [fixed-HEAD] S7 gate reads the archive path named in .tasks.toml (rc=0)
+    output: complete: sample-s7-scout captain-call inventory reviewed (sample-s7-call) [answered and archived: sample-s7-call]
+PASS [fixed-HEAD] S8 archive path only in the user-level config is refused (not read) (rc=2)
+    output: fm-captain-hold: the done archive path is set outside this home's .tasks.toml, in /Users/charlesabrooker/tmp/drive-archive.2U7CeM/s8/userhome/.tasks-axi/config.toml, and is not read; resolve the archived call by hand
+PASS [fixed-HEAD] S9 live held and live answered rows still pass, no archive note (rc=0)
+    output: complete: sample-s9-scout captain-call inventory reviewed (sample-s9-answered,sample-s9-held)
+PASS [fixed-HEAD] S10a scout teardown blocks an archived call with no recorded answer (rc=1)
+    output: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ●  WATCHER DOWN - SUPERVISION IS OFF ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s). ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair. ●  This is a supervision warning only; the guarded operation WILL still run. ●  watcher supervision n
+PASS [fixed-HEAD] S10b scout teardown passes an archived answered call (rc=0)
+    output: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode. teardown sample-s10-scout complete (window firstmate:fm-sample-s10-scout, worktree /Users/charlesabrooker/tmp/drive-archive.2U7CeM/s10/projects/sample-s10-scout) Backlog: sample-s10-scout is closed in /Users/charlesabrooker/tmp/drive-archive.2U7CeM/s10/data/backlog.md. Run bin
+PASS [fixed-HEAD] S11 archived call closed only by reconcile evidence is refused (rc=1)
+    output: fm-captain-hold: captain-held task sample-s11-call is archived with only reconciliation evidence, not a recorded captain answer; resolve the entry by hand
+PASS [fixed-HEAD] S12 archived row that merely quotes the record markers is refused (rc=1)
+    output: fm-captain-hold: captain-held task sample-s12-call is archived without a recorded captain answer
+NOTE S13: a closed call cannot be reopened through hold here; stacked flow not reachable live
+=== [fixed-HEAD] 14 checks, 0 failed ===

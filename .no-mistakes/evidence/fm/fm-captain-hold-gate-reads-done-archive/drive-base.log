@@ -1,0 +1,32 @@
+=== driving gate tree: /Users/charlesabrooker/tmp/fm-base.ib28t2 (base-353ee799) ===
+FAIL [base-353ee799] S1a verify passes for an answered call that retention archived (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s1-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s1/data); the nearest legacy identity sample-s1-scout-decision-sample-s1-call also resolves to nothing
+FAIL [base-353ee799] S1b complete --none passes and names the archive (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s1-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s1/data); the nearest legacy identity sample-s1-scout-decision-sample-s1-call also resolves to nothing
+    meta: decision_keys=sample-s1-call
+PASS [base-353ee799] S2 archived call with no recorded answer is refused (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s2-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s2/data); the nearest legacy identity sample-s2-scout-decision-sample-s2-call also resolves to nothing
+FAIL [base-353ee799] S3 archived call held for another origin is refused (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s3-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s3/data); the nearest legacy identity sample-s3-scout-decision-sample-s3-call also resolves to nothing
+PASS [base-353ee799] S4 call absent from backlog and archive keeps its refusal (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s4-never-existed and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s4/data); the nearest legacy identity sample-s4-scout-decision-sample-s4-never-existed also resolves to nothing
+PASS [base-353ee799] S5 an archived id that only shares a prefix does not stand in (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s5-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s5/data); the nearest legacy identity sample-s5-scout-decision-sample-s5-call also resolves to nothing
+FAIL [base-353ee799] S6 archived answer whose text starts with blank lines passes (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s6-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s6/data); the nearest legacy identity sample-s6-scout-decision-sample-s6-call also resolves to nothing
+FAIL [base-353ee799] S7 gate reads the archive path named in .tasks.toml (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s7-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s7/data); the nearest legacy identity sample-s7-scout-decision-sample-s7-call also resolves to nothing
+PASS [base-353ee799] S8 archive path only in the user-level config is refused (not read) (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s8-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s8/data); the nearest legacy identity sample-s8-scout-decision-sample-s8-call also resolves to nothing
+PASS [base-353ee799] S9 live held and live answered rows still pass, no archive note (rc=0)
+    output: complete: sample-s9-scout captain-call inventory reviewed (sample-s9-answered,sample-s9-held)
+PASS [base-353ee799] S10a scout teardown blocks an archived call with no recorded answer (rc=1)
+    output: ●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ ●  WATCHER DOWN - SUPERVISION IS OFF ●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s). ●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair. ●  This is a supervision warning only; the guarded operation WILL still run. ●  watcher supervision n
+FAIL [base-353ee799] S10b scout teardown passes an archived answered call (rc=1)
+    output: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode. fm-captain-hold: no captain-held task sample-s10-answered and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s10/data); the nearest legacy identity sample-s10-scout-decision-sample-s10-answered also res
+FAIL S10b passing teardown left meta behind
+PASS [base-353ee799] S11 archived call closed only by reconcile evidence is refused (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s11-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s11/data); the nearest legacy identity sample-s11-scout-decision-sample-s11-call also resolves to nothing
+PASS [base-353ee799] S12 archived row that merely quotes the record markers is refused (rc=1)
+    output: fm-captain-hold: no captain-held task sample-s12-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/drive-archive.iI5fWh/s12/data); the nearest legacy identity sample-s12-scout-decision-sample-s12-call also resolves to nothing
+=== [base-353ee799] 14 checks, 7 failed ===
