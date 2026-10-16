@@ -1,0 +1,12 @@
+ok - overdue obligations survive an empty composed board with owner, next action, and age
+ok - a decision card shows the recommendation reason beside its option and both evidence lists
+ok - an underway row leads with the task name and still reports its run status
+ok - an underway identifier label is not replaced by run status
+ok - charted next renders the most recently filed work first
+ok - charted rows with no filed date follow the dated rows in payload order
+ok - a warning row badges needs repair while queued work keeps waiting
+ok - the charted next count counts queued work only, and still renders warnings
+ok - a warning-only board reports nothing queued and still shows the warning
+ok - omitted warnings remain separate from omitted queued work
+ok - an omitted kind renders exactly as queued work always did
+bash tests/$t.test.sh  9.30s user 14.25s system 76% cpu 30.697 total

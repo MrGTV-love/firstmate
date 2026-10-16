@@ -1,0 +1,11 @@
+--- present-overdue output (help line)
+help: Run bin/fm-open-loops.sh action <id> <steered|merged|escalated|deferred|waiting> --evidence <delivery-id|PR-URL|escalation|reason> [--recheck <UTC-time>] [--prerequisite <row-id> | --prerequisite-task <task-id>] [--hold <captain-held-task-id>]
+action: "fe52a3e91adfd2771a78f2a7"
+kind: escalated
+standing: captain hold d1-expired-preservation-ledger; stands until this row changes or that hold is answered or released
+clear exit 0
+--- mark ledger quota-stale (as the collector does when the GitHub quota floor trips)
+stale+held: row presented=0 (want 0)
+stale+held: clear exit 0 (want 0)
+stale+answered: row presented=1 (want 1)
+stale+answered: clear exit 1 (want 1)

@@ -1,0 +1,37 @@
+
+=== [base] 1 collect the ledger with the real collector (--heartbeat)
+  -> exit 0
+  firstmate-owned incident row id=e7dd95e5b794b2a549fa0bde owner=firstmate
+
+=== [base] 2 first handling turn: drain presents the overdue row; clear is refused without a receipt
+  -> exit 0
+OVERDUE:
+  "e7dd95e5b794b2a549fa0bde","firstmate","vernant-d1-intake:d1-expired-preservation-ledger","answer or close this question, or record why it no longer applies",36001,"blocked: needs captain decision on ledger expiry",false
+  boundary: --ack-through 1 --recovery-generation 66052.1792124847.oVdFMX
+  -> exit 1
+
+
+=== [base] 3 record escalated receipt (no --hold: the key binds the captain-held task automatically)
+  (the collector also emits the captain-owned hold row e7dc3e9fec1f47e303eb9150; it takes its own standing receipt)
+  -> exit 0
+action: "e7dd95e5b794b2a549fa0bde"
+kind: escalated
+  -> exit 0
+  stored hold: null
+  -> exit 0
+  (exit 0 above = the wake clear succeeded)
+  queued wake records after clear: 0
+
+=== [base] 4 the pile-up cannot form: five later handling turns over two days, with re-collection each time
+  turn 1: drain exit=0 row presented=1 clear exit=1 queued after=1
+  turn 2: drain exit=0 row presented=1 clear exit=1 queued after=2
+  turn 3: drain exit=0 row presented=1 clear exit=1 queued after=3
+  turn 4: drain exit=0 row presented=1 clear exit=1 queued after=4
+  turn 5: drain exit=0 row presented=1 clear exit=1 queued after=5
+  --check-actions exit: 1
+  row still visible in report: 1
+
+=== [base] 5 the captain answers the hold: the row is presented again and clear is refused until a new action
+  -> exit 0
+  row presented again: 1
+  -> exit 1

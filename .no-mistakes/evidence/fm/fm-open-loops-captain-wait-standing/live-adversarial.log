@@ -1,0 +1,33 @@
+### A. one clear empties a large pile (the 465-record incident shape)
+  PASS  receipt reports a standing captain hold
+  queued before drain: 465
+  PASS  465-record pile: firstmate row is not re-presented
+  PASS  465-record pile: one acknowledgement is accepted
+  PASS  queue is empty after one clear
+### B. hold deferred to a date (--until) keeps standing
+  PASS  dated hold: row not re-presented
+  PASS  dated hold: clear accepted
+  PASS  dated hold: --check-actions passes
+### C. hold re-stamped (a new hold lifecycle) re-presents the row
+  PASS  re-held: row presented again
+  PASS  re-held: clear refused
+### D. unreadable backlog fails closed (no standing from a read failure)
+  PASS  unreadable backlog: row presented again
+  PASS  unreadable backlog: clear refused
+### E. bound hold ending re-presents; a non-bound candidate ending does not
+  PASS  two held candidates: the row key binds first
+  PASS  non-bound candidate ended: still standing
+  PASS  non-bound candidate ended: clear accepted
+  PASS  bound hold ended: row presented again
+  PASS  bound hold ended: clear refused
+### F. a task id written in the evidence never binds; unheld explicit --hold is refused
+  PASS  evidence mentions a held task: reported as no standing
+  PASS  evidence mention stores no hold
+  PASS  evidence-only receipt answers just its own turn (re-presented)
+  PASS  explicit --hold on an unheld task is refused
+  PASS  explicit --hold on a held task binds it
+  PASS  explicit hold stands on later turns
+### G. --hold on a non-escalated kind is refused
+  PASS  --hold with deferred is refused
+
+RESULT: pass=23 fail=0
