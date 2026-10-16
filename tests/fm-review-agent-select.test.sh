@@ -76,9 +76,9 @@ select_run() {  # <args...>; sets OUT, CODE; stderr in $ERR
     bash "$SELECT" "$@" 2>"$ERR") && CODE=0 || CODE=$?
 }
 EXTRA_ENV=(FM_SELECT_TEST=1)
-select_json() {  # <args...>; runs with --log and sets OUT to the record that run appended
+select_json() {  # runs with --log and sets OUT to the record that run appended
   rm -f "$LOG"
-  select_run --dry-run --log "$@"
+  select_run --dry-run --log
   OUT=$(tail -n 1 "$LOG" 2>/dev/null)
 }
 selected_model() { jq -r '.selected.model // "none"' <<<"$OUT"; }
