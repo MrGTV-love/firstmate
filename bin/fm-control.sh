@@ -106,7 +106,8 @@
 #              exit answers it with "Exit and stop tasks" only for a claude
 #              ship or scout whose own state (fm-crew-state.sh) is a terminal
 #              done, whose busy record read idle before
-#              anything was sent, and whose composer this same exit proved
+#              anything was sent, whose steering inbox holds no unread
+#              steering, and whose composer this same exit proved
 #              empty before typing /exit; the endpoint must still read alive
 #              (and, on Herdr, attributed to the task) when the key is sent,
 #              and the postcondition is the ordinary
@@ -262,6 +263,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-task-inbox-lib.sh
+. "$SCRIPT_DIR/fm-task-inbox-lib.sh"
 # shellcheck source=bin/fm-project-lock-lib.sh
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
@@ -1158,14 +1161,15 @@ dismiss_exit_picker() {
 # exit may answer this dialog. It must be the recognised picker, on an exit
 # (relaunch answers nothing), for a claude ship or scout whose OWN state is a
 # terminal done, with a busy record that read idle before this exit sent
-# anything. Any other verdict, unknown included, refuses: unknown is never
-# promoted to idle. The busy verdict is passed in rather than
-# re-read, so a hook that records the /exit line itself as a turn cannot make a
-# finished task read as active. Sets EXIT_PICKER_WHY to the reason when it
-# returns 1.
+# anything and no unread steering in its inbox, which a parked picker leaves
+# unhandled and stopping the task would leave unread. Any other busy verdict,
+# unknown included, refuses: unknown is never promoted to idle. The busy
+# verdict is passed in rather than re-read, so a hook that records the /exit
+# line itself as a turn cannot make a finished task read as active. Sets
+# EXIT_PICKER_WHY to the reason when it returns 1.
 EXIT_PICKER_WHY=
 exit_picker_answerable() {
-  local dialog=$1 busy=$2 line rc=0 state
+  local dialog=$1 busy=$2 line rc=0 state unread
   EXIT_PICKER_WHY=
   if [ "$dialog" != "$FM_COMPOSER_DIALOG_CLAUDE_EXIT_PICKER" ]; then
     EXIT_PICKER_WHY="it is not a dialog exit knows how to answer"
@@ -1208,6 +1212,10 @@ exit_picker_answerable() {
       return 1
       ;;
   esac
+  if unread=$(fm_task_inbox_oldest_unhandled "$STATE" "$ID"); then
+    EXIT_PICKER_WHY="its steering inbox still holds unread steering (${unread##*/}) that stopping it would leave unread"
+    return 1
+  fi
   return 0
 }
 

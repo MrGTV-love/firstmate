@@ -1293,6 +1293,65 @@ test_exit_refuses_the_picker_when_the_busy_record_is_unknown() {
   pass "fm-control exit: a finished task whose busy record is unknown, however it came to be, keeps the picker refusal"
 }
 
+# queue_steer <case-dir> <text>: enqueue one steer for t1 through the inbox
+# library's own writer and echo the record path.
+queue_steer() {  # <case-dir> <text>
+  env FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/home/state" \
+    bash -c '. "$1"; fm_task_inbox_write "$2" t1 "$3"' _ \
+    "$ROOT/bin/fm-task-inbox-lib.sh" "$1/home/state" "$2"
+}
+
+test_exit_refuses_the_picker_while_steering_is_unread() {
+  local dir out rc first
+  dir=$(picker_case unread-steering 'state: done · source: run-step · run: r1')
+  first=$(queue_steer "$dir" "check the second table")
+  queue_steer "$dir" "then rerun the audit" >/dev/null
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "a finished task with unread steering must not be stopped"$'\n'"$out"
+  assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+    "the refusal should name the dialog"
+  assert_contains "$out" "unread steering (${first##*/})" "the refusal should name the oldest unread steer"
+  assert_contains "$out" "fm-control t1 stay" "the refusal should name the supported way to close the picker"
+  assert_not_contains "$out" 'chose "Exit and stop tasks"' "no answer may be reported"
+  [ "$(cat "$dir/fake/keys")" = Enter ] \
+    || fail "only the submitting Enter may be sent, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "a refused exit must leave the agent running"
+  [ "$(cat "$dir/fake/picker")" = open ] || fail "a refused exit must leave the picker as it was"
+  [ -f "$first" ] || fail "the unread steering must stay in the inbox"
+  pass "fm-control exit: a finished task with unread steering keeps the picker refusal and names stay"
+}
+
+test_exit_answers_the_picker_once_the_steering_is_handled() {
+  local dir out rc rec
+  dir=$(picker_case handled-steering 'state: done · source: run-step · run: r1')
+  rec=$(queue_steer "$dir" "check the second table")
+  mv "$rec" "$dir/home/state/t1.inbox/handled/"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 0 "$rc" "a finished task whose steering is acknowledged should exit"$'\n'"$out"
+  assert_contains "$out" 'chose "Exit and stop tasks"' "exit should say which row it chose"
+  [ "$(cat "$dir/fake/keys")" = $'Enter\nEnter' ] \
+    || fail "a finished task takes the submitting Enter and one confirming Enter, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ "$(cat "$dir/fake/command")" = zsh ] || fail "the agent should have stopped"
+  pass "fm-control exit: a finished task whose steering is acknowledged is still stopped through the picker"
+}
+
+test_exit_leaves_an_open_picker_alone_while_steering_is_unread() {
+  local dir out rc first
+  dir=$(picker_case open-unread-steering 'state: done · source: run-step · run: r1')
+  printf 'open' > "$dir/fake/picker"
+  first=$(queue_steer "$dir" "check the second table")
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "an already-open picker with unread steering must refuse"$'\n'"$out"
+  assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+    "the refusal should name the dialog"
+  assert_contains "$out" "unread steering (${first##*/})" "the refusal should name the unread steer"
+  assert_contains "$out" "fm-control t1 stay" "the refusal should name the supported way to close the picker"
+  [ ! -s "$dir/fake/keys" ] || fail "the picker must receive no key, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ ! -s "$dir/fake/literal" ] || fail "the picker must be typed nothing"
+  [ "$(cat "$dir/fake/picker")" = open ] || fail "the picker must be left as it was"
+  pass "fm-control exit: an already-open picker is not closed or answered while steering is unread"
+}
+
 test_exit_does_not_answer_a_picker_on_an_unclassified_endpoint() {
   local dir out rc shape
   for shape in ambiguous unreadable; do
@@ -1871,6 +1930,9 @@ test_exit_leaves_a_live_tasks_picker_alone
 test_exit_refuses_the_picker_when_the_state_cannot_be_read
 test_exit_refuses_the_picker_for_a_finished_task_with_an_active_turn
 test_exit_refuses_the_picker_when_the_busy_record_is_unknown
+test_exit_refuses_the_picker_while_steering_is_unread
+test_exit_answers_the_picker_once_the_steering_is_handled
+test_exit_leaves_an_open_picker_alone_while_steering_is_unread
 test_exit_does_not_answer_a_picker_on_an_unclassified_endpoint
 test_exit_does_not_answer_a_late_picker_on_an_unclassified_endpoint
 test_exit_never_answers_a_secondmates_picker
