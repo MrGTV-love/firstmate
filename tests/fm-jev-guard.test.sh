@@ -17,6 +17,7 @@ cat > "$TMP_ROOT/fake.mjs" <<'JS'
 import { createServer } from 'node:http';
 import { appendFileSync, writeFileSync } from 'node:fs';
 const [log, portFile] = process.argv.slice(2);
+const seen = new Set();
 const server = createServer((req, res) => {
   let body = '';
   req.on('data', chunk => { body += chunk; });
@@ -25,6 +26,7 @@ const server = createServer((req, res) => {
     const request = JSON.parse(body);
     const text = JSON.stringify(request.state);
     if (text.includes('fail500') || text.includes('http402')) { res.statusCode = text.includes('http402') ? 402 : 500; res.end('{}'); return; }
+    if (text.includes('flaky-once') && !seen.has(text)) { seen.add(text); res.statusCode = 500; res.end('{}'); return; }
     if (text.includes('stall-direct')) return;
     if (text.includes('invalid-json')) { res.end('{'); return; }
     const risky = /rm -rf|IGNORE PREVIOUS|sk-live/.test(text);
@@ -129,7 +131,7 @@ test_outages_and_scope() {
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"fail500"}')"
   denied "$out" || fail "TypeSafe failure did not require review"
-  [ "$(requests)" -eq $((before + 1)) ] || fail "TypeSafe failure fell back or retried HTTP 500"
+  [ "$(requests)" -eq $((before + 2)) ] || fail "TypeSafe failure fell back or did not make exactly one bounded retry of HTTP 500"
   jq -se 'all(.[]; .path == "/v1/systemone")' "$REQUESTS" >/dev/null || fail "guard used another provider"
   for project in vernant other ""; do
     before=$(requests)
@@ -150,6 +152,40 @@ test_outages_and_scope() {
   [ -z "$out" ] || fail "malformed inactive input activated the guard"
   printf 'TYPESAFE_API_KEY=%s\n' "$KEY" > "$HOME_DIR/.env"
   pass "active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks"
+}
+
+test_bounded_retry() {
+  local out before reason
+  before=$(requests)
+  claude_hook "$(pre Bash '{"command":"flaky-once ls"}')"
+  [ -z "$out" ] || fail "an outage followed by success did not allow the call"
+  [ "$(requests)" -eq $((before + 2)) ] || fail "outage then success did not use exactly two tries"
+  before=$(requests)
+  claude_hook "$(pre Bash '{"command":"fail500 again"}')"
+  denied "$out" || fail "two outages allowed a required judgment"
+  [ "$(requests)" -eq $((before + 2)) ] || fail "persistent outage did not stop after one retry"
+  reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
+  [[ "$reason" == *"could not run"* && "$reason" == *"same call once more"* ]] || fail "outage deny text lost the retry guidance: $reason"
+  [[ "$reason" != *"block is final"* ]] || fail "outage deny text still says the block is final: $reason"
+  jq -se '.[-1] | .error_type == "Error" and .request_started == true and .attempts == 2 and (.ms | type == "number")' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "failure row lost attempts and ms"
+  before=$(requests)
+  claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
+  denied "$out" || fail "policy block was not denied"
+  [ "$(requests)" -eq $((before + 1)) ] || fail "policy block was retried"
+  reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
+  [[ "$reason" == *"This block is final. Do not try to work around it"* ]] || fail "policy block lost its final text: $reason"
+  before=$(requests)
+  claude_hook "$(pre Bash '{"command":"invalid-json"}')"
+  denied "$out" || fail "malformed response allowed a required judgment"
+  [ "$(requests)" -eq $((before + 1)) ] || fail "contract failure was retried"
+  jq -se '.[-1] | .error_type == "ContractError" and .attempts == 1' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "contract failure row lost its single try"
+  before=$(requests)
+  claude_hook "$(post Bash '{"stdout":"probability=0.5 flagged-canary","stderr":""}')"
+  jq -e '.hookSpecificOutput.additionalContext | contains("review")' <<<"$out" >/dev/null || fail "ambiguous result was not reviewed"
+  [ "$(requests)" -eq $((before + 1)) ] || fail "ambiguous result was retried"
+  claude_hook "$(post Bash '{"stdout":"probability=0.9 flagged-canary","stderr":""}')"
+  [ "$(requests)" -eq $((before + 2)) ] || fail "flagged result was retried"
+  pass "one bounded retry: outage then success allows, repeated outage gets retry text, policy and contract results are not retried"
 }
 
 test_missing_runtime() {
@@ -453,6 +489,7 @@ test_deadlines() {
   local out
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.HOME_DIR;
@@ -467,6 +504,11 @@ async function beforeHostDeadline(name, event) {
 const pre = await beforeHostDeadline('tool_call', { toolName: 'bash', input: { command: 'stall-direct' } });
 assert.equal(pre.block, true);
 assert.match(pre.reason, /TimeoutError/);
+assert.match(pre.reason, /same call once more/);
+const lastRow = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+const stalled = lastRow();
+assert.equal(stalled.attempts, 2, 'a stalled request gets one retry');
+assert.ok(stalled.ms >= 19000 && stalled.ms < 25000, `both 10-second tries fit the 25-second handler budget: ${stalled.ms}`);
 const post = await beforeHostDeadline('tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] });
 assert.equal(post.isError, true);
 assert.match(post.content[0].text, /TimeoutError/);
@@ -691,6 +733,7 @@ JS
 
 test_claude_effects
 test_outages_and_scope
+test_bounded_retry
 test_missing_runtime
 test_launch_cutover
 test_crashing_runtime
