@@ -8955,7 +8955,7 @@ SH
 # reassociated copy in place and returns nothing; the new owner's claim, lease,
 # record and slot bytes survive, and the reaper parks no refusal memo.
 test_enclosing_reservation_window_reassignment_leaves_claimant_slot() {
-  local case_dir slot copy lock rc=0 alloc_rc=0
+  local case_dir slot copy lock rc=0 alloc_rc=0 worker own_alive=0
   make_nested_slot_case pool-window-reassigned-enclosing enclosing .claude/worktrees/x
   case_dir=$NESTED_CASE
   slot=$NESTED_SLOT
@@ -8981,6 +8981,9 @@ test_enclosing_reservation_window_reassignment_leaves_claimant_slot() {
     bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
     _ "$ROOT" "$case_dir/project") \
     || fail "window-reassigned-enclosing: cannot resolve the shared Treehouse project lock"
+  teardown_fixture_start "$copy" KILL sleep 300
+  worker=$TEARDOWN_FIXTURE_PID
+  sleep 0.3
   add_window_swap_git_shim "$case_dir"
   start_window_fresh_allocator "$case_dir" "$lock" "$slot"
   FM_HOME="$case_dir/home" FM_ROOT_OVERRIDE="$case_dir/code-root" \
@@ -8990,7 +8993,10 @@ test_enclosing_reservation_window_reassignment_leaves_claimant_slot() {
     "$ROOT/bin/fm-idle-session-reap.sh" reap > "$case_dir/reap.out" 2>&1 || rc=$?
   alloc_rc=0
   wait "$WINDOW_ALLOCATOR_PID" || alloc_rc=$?
+  kill -0 "$worker" 2>/dev/null && own_alive=1
+  teardown_fixture_stop "$worker"
   [ "$alloc_rc" = 0 ] || fail "window-reassigned-enclosing: the fresh allocator failed"
+  [ "$own_alive" = 0 ] || fail "window-reassigned-enclosing: the retiring copy's leaked process survived"
   [ "$rc" = 0 ] || fail "window-reassigned-enclosing: the reaper run failed: $(cat "$case_dir/reap.out")"
   assert_equals 1 "$(cat "$case_dir/holds-at-swap" 2>/dev/null || true)" \
     "window-reassigned-enclosing: the swap did not land after the early ownership proof"
@@ -9026,6 +9032,179 @@ test_enclosing_reservation_window_reassignment_leaves_claimant_slot() {
   git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' | cmp -s - "$case_dir/refs.before" \
     || fail "window-reassigned-enclosing: the claimant refs changed"
   pass 'a fresh allocation in the enclosing-slot window leaves the claimant slot and the retiring copy untouched'
+}
+
+# Two ownership questions that a slot claim must never answer as one. Who the
+# pool slot's claim names decides whether this teardown may administer that
+# slot: reserve it, return it, drop its claim. Whether the retiring task's own
+# copy is the slot itself or a worktree nested inside it decides whether that
+# copy and the runtime inside it are the task's to prove and retire. A copy
+# nested in a slot another task claims is still this task's own. Each row is
+# one claimant by retiring copy; the landed variant must finish and the
+# unlanded variant must refuse with its records and work kept.
+make_ownership_table_case() {  # <name> <claimant> <shape> <landing>
+  local name=$1 claimant=$2 shape=$3 landing=$4 case_dir slot own holder
+  case_dir=$(make_case "$name")
+  mkdir -p "$case_dir/home/state" "$case_dir/pool/1"
+  rm -f "$case_dir/config/backlog-backend"
+  git -C "$case_dir/project" worktree move "$case_dir/wt" "$case_dir/pool/1/project"
+  slot=$(cd "$case_dir/pool/1/project" && pwd -P)
+  OWN_TABLE_CASE=$case_dir
+  OWN_TABLE_SLOT=$slot
+  if [ "$shape" = nested ]; then
+    own="$slot/.claude/worktrees/x"
+    mkdir -p "${own%/*}"
+    git -C "$case_dir/project" worktree add -q -b fm/task-x1-v2 "$own" main
+    OWN_TABLE_BRANCH=fm/task-x1-v2
+  else
+    own=$slot
+    OWN_TABLE_BRANCH=fm/task-x1
+  fi
+  OWN_TABLE_COPY=$own
+  if [ "$landing" = landed ]; then
+    git -C "$own" -c user.email=t@t -c user.name=t commit -q --allow-empty -m 'shippable work'
+    git -C "$own" push -q origin "$OWN_TABLE_BRANCH"
+    git -C "$case_dir/project" fetch -q origin
+  else
+    printf 'undelivered\n' > "$own/undelivered.txt"
+    git -C "$own" add undelivered.txt
+    git -C "$own" -c user.email=t@t -c user.name=t commit -q -m 'undelivered task work'
+  fi
+  case "$claimant" in
+    this) holder=task-x1 ;;
+    visible) holder=live-task ;;
+    unregistered) holder=ghost-task ;;
+  esac
+  if [ "$claimant" != this ]; then
+    git -C "$slot" checkout -q -b fm/live-task main 2>/dev/null \
+      || git -C "$slot" checkout -q --detach main
+    printf 'claimant untracked work\n' > "$slot/scratch.txt"
+  fi
+  printf 'task=%s\nhome=%s\n' "$holder" "$case_dir/home" > "$case_dir/pool/1/.fm-slot-owner"
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":true,"lease_holder":"%s"}]}\n' \
+    "$slot" "$holder" > "$case_dir/pool/treehouse-state.json"
+  if [ "$claimant" = visible ]; then
+    fm_write_meta "$case_dir/state/live-task.meta" \
+      "window=firstmate:fm-live-task" "endpoint_task_id=live-task" \
+      "worktree=$slot" "project=$case_dir/project" "kind=ship" "spawn_gen=live"
+    printf 'live task\n' > "$case_dir/state/live-task.status"
+  fi
+  if [ "$shape" = nested ]; then
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$own" "branch=fm/task-x1-v2" "project=$case_dir/project" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+      "prior_worktree=$slot"
+  else
+    fm_write_meta "$case_dir/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$slot" "branch=fm/task-x1" "project=$case_dir/project" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1"
+  fi
+  printf 'unfinished task\n' > "$case_dir/state/task-x1.status"
+  seed_backlog_in_flight "$case_dir"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  cat > "$case_dir/fakebin/tmux" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$case_dir/endpoint.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse" "$case_dir/fakebin/tmux"
+}
+
+test_slot_claim_and_copy_ownership_table() {
+  local claimant shape landing label case_dir slot copy rc own_pid claimant_pid
+  local own_owned own_alive claimant_alive head
+  for claimant in this visible unregistered; do
+    for shape in root nested; do
+      for landing in landed unlanded; do
+        label="ownership-$claimant-$shape-$landing"
+        make_ownership_table_case "$label" "$claimant" "$shape" "$landing"
+        case_dir=$OWN_TABLE_CASE
+        slot=$OWN_TABLE_SLOT
+        copy=$OWN_TABLE_COPY
+        own_owned=1
+        [ "$claimant" = this ] || [ "$shape" = nested ] || own_owned=0
+        teardown_fixture_start "$copy" KILL sleep 300
+        own_pid=$TEARDOWN_FIXTURE_PID
+        claimant_pid=
+        if [ "$claimant" != this ] && [ "$shape" = nested ]; then
+          teardown_fixture_start "$slot" KILL sleep 300
+          claimant_pid=$TEARDOWN_FIXTURE_PID
+        fi
+        sleep 0.3
+        head=$(git -C "$copy" rev-parse HEAD)
+        cp "$case_dir/state/task-x1.meta" "$case_dir/task-meta.before"
+        cp "$case_dir/pool/1/.fm-slot-owner" "$case_dir/claim.before"
+        cp "$case_dir/pool/treehouse-state.json" "$case_dir/lease.before"
+        git -C "$slot" rev-parse HEAD > "$case_dir/slot-head.before"
+        git -C "$slot" symbolic-ref -q HEAD > "$case_dir/slot-branch.before" || : > "$case_dir/slot-branch.before"
+        git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' > "$case_dir/refs.before"
+        rc=0
+        FM_HOME="$case_dir/home" \
+        FM_FAKE_AXI_STATUS="$(parked_axi_status_toon "$OWN_TABLE_BRANCH" "$head")" \
+        FM_FAKE_NM_ABORT_LOG="$case_dir/nm-abort.log" \
+          run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+        own_alive=0
+        claimant_alive=0
+        kill -0 "$own_pid" 2>/dev/null && own_alive=1
+        [ -z "$claimant_pid" ] || ! kill -0 "$claimant_pid" 2>/dev/null || claimant_alive=1
+        teardown_fixture_stop "$own_pid"
+        [ -z "$claimant_pid" ] || teardown_fixture_stop "$claimant_pid"
+        if [ "$landing" = landed ]; then
+          expect_code 0 "$rc" "$label: a landed task must finish: $(cat "$case_dir/stderr")"
+          assert_absent "$case_dir/state/task-x1.meta" "$label: the finished record survived"
+          grep -F "[x] task-x1" "$case_dir/data/backlog.md" >/dev/null \
+            || fail "$label: the backlog row was not closed"
+          if [ "$own_owned" = 1 ]; then
+            [ "$own_alive" = 0 ] || fail "$label: the retiring task's own leaked process survived"
+            assert_grep 'abort --run 01RUN' "$case_dir/nm-abort.log" \
+              "$label: the retiring task's parked run was not concluded"
+          else
+            [ "$own_alive" = 1 ] || fail "$label: the claimant's process was reaped"
+            assert_absent "$case_dir/nm-abort.log" "$label: a run on the claimant's slot was aborted"
+          fi
+        else
+          expect_code 1 "$rc" "$label: an unlanded task must refuse: $(cat "$case_dir/stderr")"
+          cmp -s "$case_dir/task-meta.before" "$case_dir/state/task-x1.meta" \
+            || fail "$label: the refusal changed the retiring record"
+          assert_present "$case_dir/state/task-x1.status" "$label: the refusal removed the status"
+          [ "$(backlog_row_state "$case_dir")" = in_flight ] \
+            || fail "$label: the refused task's backlog row left In flight"
+          assert_absent "$case_dir/endpoint.log" "$label: the refusal touched an endpoint"
+          assert_absent "$case_dir/nm-abort.log" "$label: the refusal aborted a run"
+          [ "$own_alive" = 1 ] || fail "$label: the refusal reaped a process before proving landing"
+          assert_present "$case_dir/pool/1/.fm-slot-owner" "$label: the refusal dropped the slot claim"
+          git -C "$case_dir/project" cat-file -e "$OWN_TABLE_BRANCH:undelivered.txt" \
+            || fail "$label: the refusal lost the unlanded work"
+        fi
+        if [ "$claimant" = this ] && [ "$landing" = landed ]; then
+          assert_grep "return --force $slot" "$case_dir/treehouse.log" "$label: the finished task's slot was not returned"
+          assert_absent "$case_dir/pool/1/.fm-slot-owner" "$label: the finished task's claim survived"
+          [ "$shape" != nested ] || assert_absent "$copy" "$label: the nested copy was not removed"
+        else
+          assert_absent "$case_dir/treehouse.log" "$label: the slot was administered without an owning claim or a finished record"
+          cmp -s "$case_dir/claim.before" "$case_dir/pool/1/.fm-slot-owner" || fail "$label: the slot claim changed"
+          cmp -s "$case_dir/lease.before" "$case_dir/pool/treehouse-state.json" || fail "$label: the pool lease changed"
+          git -C "$slot" rev-parse HEAD | cmp -s - "$case_dir/slot-head.before" || fail "$label: the slot HEAD changed"
+          [ "$claimant" = this ] || {
+            git -C "$slot" symbolic-ref -q HEAD | cmp -s - "$case_dir/slot-branch.before" \
+              || fail "$label: the claimant branch changed"
+            assert_grep 'claimant untracked work' "$slot/scratch.txt" "$label: the claimant's work changed"
+          }
+          [ "$shape" != nested ] || assert_present "$copy/.git" "$label: the nested copy was removed"
+          [ -z "$claimant_pid" ] || [ "$claimant_alive" = 1 ] || fail "$label: the claimant's process was reaped"
+          git -C "$case_dir/project" for-each-ref --format='%(refname) %(objectname)' | cmp -s - "$case_dir/refs.before" \
+            || fail "$label: refs changed"
+        fi
+      done
+    done
+  done
+  pass 'a slot claim decides slot administration while the retiring copy decides runtime retirement, for every claimant and copy shape'
 }
 
 # A record re-pointed by bin/fm-control.sh reassociate names its earlier copies
@@ -11858,6 +12037,7 @@ test_reassigned_slot_unlanded_task_refuses
 test_reservation_window_reassignment_retires_records_only
 test_reservation_window_reassignment_reproves_own_landing
 test_enclosing_reservation_window_reassignment_leaves_claimant_slot
+test_slot_claim_and_copy_ownership_table
 test_reassociated_copies_are_left_in_place
 test_reassociated_unlanded_copy_still_refuses
 test_released_slot_record_keeps_current_copy

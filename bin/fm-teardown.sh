@@ -210,6 +210,10 @@
 # copy, so teardown releases project custody and re-proves this record's own
 # delivery as the reassigned-slot cleanup above does, before its next
 # destructive step, refusing with its records in place when that proof fails.
+# That holds when the record's copy is the slot itself. A reassociated copy
+# nested inside the slot stays this task's own whoever the claim names: only the
+# slot steps are dropped, and the copy's runtime is retired and its landing
+# proved exactly as for any reassociated copy.
 # A slot whose state is neither held nor unleased (recovered, conflicting,
 # unreadable, or needing jq), or an unleased slot whose installed treehouse is
 # missing or has no lease command (probed once with treehouse lease --help),
@@ -3768,6 +3772,29 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree>
 TEARDOWN_SLOT_REASSIGNED=0
 TEARDOWN_SLOT_REASSIGNED_TO=
 TEARDOWN_SLOT_REASSIGNED_HOME=
+
+# The slot claim answers two questions that must stay separate. This one is
+# whether this teardown may still administer the pool slot enclosing a nested
+# current copy: when it may not, nothing in that slot is reserved, returned or
+# released, and the early proof's derivations are redone from the record as if
+# the claim had never named this task. Whether the copy at WT and its runtime
+# are this task's own is the other, teardown_owns_worktree.
+teardown_release_enclosing_slot() {
+  local line
+  TEARDOWN_RESERVED_SLOT=
+  TEARDOWN_ENCLOSING_SLOT=$TEARDOWN_RECORD_SLOT
+  TEARDOWN_RETURN_SLOT=
+  TEARDOWN_NESTED_COPIES=()
+  TEARDOWN_PROOF_COPIES=()
+  TEARDOWN_PRIOR_COPIES=()
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      prior_worktree=?*) TEARDOWN_PRIOR_COPIES+=("${line#prior_worktree=}") ;;
+    esac
+  done < "$META"
+  teardown_nested_slot prove
+}
+
 require_owned_task_worktree_slot() {
   local slot=${1:-} rc=0
   if [ -z "$slot" ]; then
@@ -3777,10 +3804,14 @@ require_owned_task_worktree_slot() {
   case "$rc" in
     0) return 0 ;;
     "$TEARDOWN_SLOT_REASSIGNED_RC")
-      TEARDOWN_SLOT_REASSIGNED=1
-      TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
-      TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
-      TEARDOWN_RESERVED_SLOT=
+      if teardown_live_slot_path >/dev/null; then
+        TEARDOWN_SLOT_REASSIGNED=1
+        TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
+        TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
+        TEARDOWN_RESERVED_SLOT=
+      else
+        teardown_release_enclosing_slot || return 1
+      fi
       return 0
       ;;
   esac
@@ -3874,6 +3905,10 @@ require_shared_task_worktree_slot() {
   return 0
 }
 
+# Whether the copy at WT, and the runtime inside it, are this task's own. A
+# slot claim decides it only when WT is that pool slot itself, or when another
+# record shares the slot; a worktree nested in a slot another task claims stays
+# this task's own and loses only its slot steps (teardown_release_enclosing_slot).
 teardown_owns_worktree() {
   [ "$TEARDOWN_SLOT_REASSIGNED" != 1 ]
 }
@@ -5429,7 +5464,7 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree; then
     fm_treehouse_slot_owner_state "$TEARDOWN_RESERVED_SLOT" "$ID"
     case "$FM_TREEHOUSE_SLOT_OWNER" in
       mine) ;;
-      absent) TEARDOWN_RESERVED_SLOT= ;;
+      absent) teardown_release_enclosing_slot || exit 1 ;;
       *) require_owned_task_worktree_slot "$TEARDOWN_RESERVED_SLOT" || exit 1 ;;
     esac
   else
@@ -5770,8 +5805,13 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
       exit 1
     fi
   else
+    TEARDOWN_DEFERRED_RETURN_SLOT=$TEARDOWN_RETURN_SLOT
     require_owned_task_worktree_slot "$TEARDOWN_RETURN_SLOT" || exit 1
-    if teardown_owns_worktree; then
+    if ! teardown_owns_worktree; then
+      teardown_reprove_reassigned_slot
+    elif [ -n "$TEARDOWN_DEFERRED_RETURN_SLOT" ] && [ -z "$TEARDOWN_RETURN_SLOT" ]; then
+      :
+    else
       require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RETURN_SLOT" || exit 1
       if [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
         FM_TASK_COPY_POOL_STATE_FILE=
@@ -5786,8 +5826,6 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
       # and an index lock refuses without sleeping or retrying here.
       [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
       teardown_nested_slot return
-    else
-      teardown_reprove_reassigned_slot
     fi
   fi
   fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
