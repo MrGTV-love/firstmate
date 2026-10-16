@@ -469,6 +469,34 @@ shutil.rmtree(answer_inbox)
                                                     backlog=dict(present=True, records=backlog))))
 print('PASS: board answer ages, handling, live and dead parked missing owners, non-board captures, and home-local secondmate publication', flush=True)
 
+# A teardown that closed a pool task but could not return its slot leaves a record bound to the task's
+# spawn generation; only a record naming the current task record is open work.
+def pending_return(task_id, marker_gen, meta_gen=None, child=None, age=0):
+    marker = home / 'state' / (task_id + '.teardown-return-pending')
+    marker.write_text(f'spawn_gen={marker_gen}\nslot=/pool/{task_id}/project\n' + (f'child={child}\n' if child else ''))
+    os.utime(marker, (now - age, now - age))
+    if meta_gen is not None:
+        (home / 'state' / (task_id + '.meta')).write_text(f'kind=ship\nspawn_gen={meta_gen}\n')
+    return marker
+pending = [pending_return('closed-pool', 'g1', 'g1', age=1800),
+           pending_return('closed-domain', 'g2', 'g2', child='child-1', age=60),
+           pending_return('respawned-pool', 'g1', 'g9', age=1800),
+           pending_return('retired-pool', 'g1', age=1800)]
+teardown_rows = rows(ledger(), 'interrupted_teardown')
+assert set(teardown_rows) == {'closed-pool', 'closed-domain'}, teardown_rows
+closed = teardown_rows['closed-pool']
+assert closed['overdue'] and closed['limit_seconds'] == 1800 and closed['age_seconds'] == 1800, closed
+assert 'fm-teardown.sh closed-pool' in closed['next_action'] and closed['evidence'] == '/pool/closed-pool/project', closed
+domain = teardown_rows['closed-domain']
+assert not domain['overdue'] and 'child child-1' in domain['next_action'], domain
+pending[0].unlink()
+assert 'closed-pool' not in rows(ledger(), 'interrupted_teardown'), 'a completed teardown is no longer open work'
+for marker in pending[1:]:
+    marker.unlink(missing_ok=True)
+for task_id in ('closed-pool', 'closed-domain', 'respawned-pool'):
+    (home / 'state' / (task_id + '.meta')).unlink()
+print('PASS: interrupted teardown records bound to the current task record', flush=True)
+
 # A PR for A cannot hide a local correction B, whether the PR is open or merged.
 def correction(path):
     (path / 'correction').write_text('B\n')

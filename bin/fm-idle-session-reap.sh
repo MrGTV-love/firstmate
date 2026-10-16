@@ -30,6 +30,12 @@
 #   - no refusal from a recent teardown attempt still stands (see below).
 # A ship that is done but has no merge marker is awaiting its pipeline or its
 # merge and is reported, not reaped.
+# An ordinary ship or scout whose earlier admitted teardown reserved its slot
+# and was then interrupted (state/<id>.teardown-return-pending, as
+# bin/fm-wake-lib.sh's fm_teardown_return_pending reads it) is reap-ready on
+# that record unless its worker reads busy again or a refusal still stands:
+# that teardown may already have retired the busy state and status the gates
+# above read.
 # Standing declared waits are PARKED with their reason before busy-state and
 # steering-inbox classification, including busy, unknown, and idle workers.
 # bin/fm-status-event-lib.sh owns configured wait verbs and wait retraction.
@@ -46,9 +52,19 @@
 # again until its newest status line changes or six hours pass.
 # A refusal because the other supervision actor holds the task's lease
 # (FM_LEASE_REFUSE_EXIT) is transient and records nothing. So is the
-# teardown's project-lock contention (FM_PROJECT_LOCK_BUSY_EXIT): the reaper's
-# teardown never waits in the project-lock queue, changes nothing, and the next
-# sweep retries it.
+# teardown's project-lock contention (FM_PROJECT_LOCK_BUSY_EXIT): before it
+# closes anything, the reaper's teardown never waits in the project-lock queue,
+# so that exit has closed nothing and the next sweep retries it. After closure
+# its short return stage, and every admission of a retry that carries the
+# task's state/<id>.teardown-return-pending record, waits in that queue with
+# the same measured stall bound as every other waiter. A stalled wait exits
+# FM_PROJECT_LOCK_BUSY_EXIT with that durable record kept, reported by the
+# open-work ledger, and the next sweep selects the task by that record and
+# retries it. So does a teardown that outlasts the 600-second limit below
+# while that record still stands: the wait has no total bound of its own, the
+# limit is what ends it, and the timeout records no refusal memo for it.
+# A lock error is recorded as a refusal (bin/fm-teardown.sh's header owns the
+# mechanics).
 #
 # `scan` rows are tab-separated: <class> <task-id> <kind> <age-secs> <detail>.
 # Classes: reap, wait-grace, refused, parked, awaiting-pipeline, awaiting-merge,
@@ -237,6 +253,10 @@ reap_one() {  # <task-id> <status-line>
   [ -n "$reason" ] || reason=${out##*$'\n'}
   [ -n "$reason" ] || reason="exit status $rc"
   if [ "$rc" -eq 124 ] || [ "$rc" -eq 137 ]; then
+    if fm_teardown_return_pending "$STATE" "$id"; then
+      add_row teardown-timeout "$id" - - "teardown exceeded 600s; its pool slot return is pending and the next sweep retries it"
+      return 0
+    fi
     add_row teardown-timeout "$id" - - "teardown exceeded 600s"
   else
     add_row teardown-refused "$id" - - "$reason"

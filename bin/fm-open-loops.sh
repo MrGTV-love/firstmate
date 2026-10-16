@@ -36,7 +36,8 @@
 # --heartbeat also atomically publishes state/open-loops.json. The watcher runs it as a
 # detached helper and surfaces overdue rows as a durable check wake; there is no daemon.
 # Sources: the fleet snapshot (backlog and direct reports), status logs, task worktrees,
-# unhandled captured Lavish board answers, the no-mistakes run store, and discovered GitHub pull requests.
+# unhandled captured Lavish board answers, interrupted teardown records, the no-mistakes run store, and
+# discovered GitHub pull requests.
 # docs/configuration.md owns config/open-loops.json, row fields, age limits, quota
 # refusal, coverage degradation, and supported proof limits. Use --json for each row's limit_seconds.
 # Examples: fm-open-loops.sh; fm-open-loops.sh --json; fm-open-loops.sh --heartbeat

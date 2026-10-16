@@ -1752,6 +1752,33 @@ fm_treehouse_slot_owner_state() {  # <worktree> <task-id>
   fi
 }
 
+# Teardown return-pending record: bin/fm-teardown.sh writes
+# <state>/<id>.teardown-return-pending, naming the task record's spawn_gen,
+# as soon as it reserves a pool task's slot and before any cleanup that can
+# fail, and removes it when teardown completes. While it names the current
+# record, the task's teardown is interrupted and the slot is still held for
+# it: the idle reaper selects it by this record unless its worker reads busy,
+# teardown's retry waits for project custody, session-start backlog replay
+# leaves its record to that retry, and the open-work ledger reports it.
+# A teardown that cannot write or rebind this record refuses at once rather
+# than continuing without it, so no task is closed while its held slot lacks
+# this record.
+fm_teardown_return_pending_gen() {  # <file>; prints the last spawn_gen= value
+  local line value=
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in spawn_gen=*) value=${line#spawn_gen=} ;; esac
+  done < "$1" || return 1
+  printf '%s' "$value"
+}
+
+fm_teardown_return_pending() {  # <state-dir> <id>
+  local marker="$1/$2.teardown-return-pending" meta="$1/$2.meta" marked current
+  [ -f "$marker" ] && [ ! -L "$marker" ] && [ -f "$meta" ] && [ ! -L "$meta" ] || return 1
+  marked=$(fm_teardown_return_pending_gen "$marker") || return 1
+  current=$(fm_teardown_return_pending_gen "$meta") || return 1
+  [ "$marked" = "$current" ]
+}
+
 # Drop a task's own claim once its slot is back in the pool. Never removes
 # another task's claim, so a misdirected release cannot strip the evidence that
 # protects the slot's real owner.

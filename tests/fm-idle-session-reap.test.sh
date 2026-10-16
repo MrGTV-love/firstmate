@@ -401,6 +401,15 @@ test_lease_refusal_is_transient() {
 }
 
 
+# A finished, idle pool-slot scout whose tmux endpoint record validates, so the
+# real teardown reaches its project-lock admission.
+mk_pool_scout() {  # <home> <slot> <project>
+  mk_task "$1" scout-pool scout idle "done [at=$OLD]: report written"
+  fm_write_meta "$1/state/scout-pool.meta" "window=firstmate:fm-scout-pool" \
+    "endpoint_task_id=scout-pool" "kind=scout" "harness=claude" "worktree=$2" "project=$3"
+  scout_report "$1" scout-pool
+}
+
 # The project lock is shared with spawns and other teardowns. The sweep's
 # teardown must not wait in its queue, because its fixed work bound would then
 # include the wait: with the lock held, the real teardown returns at once,
@@ -414,9 +423,7 @@ test_project_lock_contention_is_skipped_and_retried() {
   mkdir -p "${slot%/*}"
   git -C "$project" worktree add --quiet --detach "$slot"
   printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot" > "$home/pool/treehouse-state.json"
-  mk_task "$home" scout-pool scout idle "done [at=$OLD]: report written" \
-    -- "worktree=$slot" "project=$project"
-  scout_report "$home" scout-pool
+  mk_pool_scout "$home" "$slot" "$project"
   lock=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$project") \
     || fail "could not resolve the project lock"
   FM_HOME="$home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_lock_try_acquire "$2" || exit 1; : > "$3"; exec sleep 60' _ \
@@ -462,9 +469,7 @@ test_project_lock_fresh_publication_is_skipped_not_refused() {
   mkdir -p "${slot%/*}"
   git -C "$project" worktree add --quiet --detach "$slot"
   printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot" > "$home/pool/treehouse-state.json"
-  mk_task "$home" scout-pool scout idle "done [at=$OLD]: report written" \
-    -- "worktree=$slot" "project=$project"
-  scout_report "$home" scout-pool
+  mk_pool_scout "$home" "$slot" "$project"
   lock=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$project") \
     || fail "could not resolve the project lock"
   FM_HOME="$home" bash -c '
@@ -522,9 +527,7 @@ test_project_lock_acquisition_error_is_not_skipped() {
   mkdir -p "${slot%/*}"
   git -C "$project" worktree add --quiet --detach "$slot"
   printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$slot" > "$home/pool/treehouse-state.json"
-  mk_task "$home" scout-pool scout idle "done [at=$OLD]: report written" \
-    -- "worktree=$slot" "project=$project"
-  scout_report "$home" scout-pool
+  mk_pool_scout "$home" "$slot" "$project"
   lock=$(FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$project") \
     || fail "could not resolve the project lock"
   printf 'not a lock\n' > "$lock"
@@ -546,6 +549,32 @@ test_project_lock_acquisition_error_is_not_skipped() {
     [ ! -L "$i" ] || fail "the sweep's teardown registered in the project-lock queue"
   done
   pass "a project lock nobody holds but the teardown cannot take is recorded as a refusal, not a lock skip"
+}
+
+# An interrupted teardown's return-pending record names the current record's
+# generation. Its task is selected again although the earlier teardown retired
+# its busy state, but never while its worker reads busy again, and a record
+# naming an older generation selects nothing.
+test_return_pending_task_is_selected_unless_busy() {
+  local home out
+  home=$(make_home return-pending)
+  mk_task "$home" closed scout none "done [at=$OLD]: report written"
+  scout_report "$home" closed
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" closed active "a task without a busy state is not idle on its own"
+  printf 'spawn_gen=\nslot=%s/pool/1/project\n' "$home" > "$home/state/closed.teardown-return-pending"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" closed reap "an interrupted teardown is selected again by its return-pending record"
+  printf 'g1.1.1\n' > "$home/state/closed.busy-gen"
+  printf 'v1 gen=g1.1.1 seq=2 state=busy source=claude-hook event=UserPromptSubmit ts=%s\n' "$NOW" \
+    > "$home/state/closed.busy-state"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" closed active "a worker that reads busy again is never selected by its record"
+  rm -f "$home/state/closed.busy-state" "$home/state/closed.busy-gen"
+  printf 'spawn_gen=s-older\nslot=%s/pool/1/project\n' "$home" > "$home/state/closed.teardown-return-pending"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" closed active "a record from an older generation selects nothing"
+  pass "a return-pending record selects its interrupted task unless the worker is busy or the record is stale"
 }
 
 test_single_flight_lock() {
@@ -811,7 +840,39 @@ test_captain_holds
 test_stale_selection_is_revalidated
 test_admission_reads_after_metadata_lock
 test_admission_rechecks_every_gate
+# A teardown that outlasts the sweep's limit after it reserved its slot keeps
+# its return-pending record. The timeout must then record no refusal memo, so
+# the very next sweep selects the closed task again instead of parking it.
+test_timeout_with_a_pending_return_is_retried_by_the_next_sweep() {
+  local home out fakebin
+  home=$(make_home timeout-pending)
+  fakebin=$(fm_fakebin "$home")
+  cat > "$fakebin/sleep" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = 600 ]; then
+  exec /bin/sleep 1
+fi
+exec /bin/sleep "$@"
+SH
+  chmod +x "$fakebin/sleep"
+  : > "$STUB_LOG"
+  printf 'hang\n' > "$STUB_MODE_FILE"
+  mk_task "$home" scout-pending scout idle "done [at=$OLD]: report written"
+  scout_report "$home" scout-pending
+  printf 'spawn_gen=\nslot=%s/pool/1/project\n' "$home" > "$home/state/scout-pending.teardown-return-pending"
+  out=$(PATH="$fakebin:$PATH" FM_TIMEOUT_MECHANISM_OVERRIDE=bash FM_IDLE_REAP_TEARDOWN_SECS=0 run_reap "$home" reap) \
+    || fail "reap failed: $out"
+  expect_class "$out" scout-pending teardown-timeout "the real timeout runner cuts the hung teardown"
+  assert_absent "$home/state/.idle-reap/scout-pending.refused" "a timeout with a pending return records no refusal memo"
+  assert_present "$home/state/scout-pending.meta" "the timeout retired the task"
+  assert_present "$home/state/scout-pending.teardown-return-pending" "the timeout dropped the pending-return record"
+  out=$(run_reap "$home" scan) || fail "scan failed: $out"
+  expect_class "$out" scout-pending reap "the next sweep selects the closed task again"
+  pass "a timeout with a pending pool return leaves the task selectable by the next sweep"
+}
 test_teardown_timeout_is_bounded
+test_timeout_with_a_pending_return_is_retried_by_the_next_sweep
+test_return_pending_task_is_selected_unless_busy
 test_single_flight_lock
 test_stale_memo_is_pruned
 test_bad_usage

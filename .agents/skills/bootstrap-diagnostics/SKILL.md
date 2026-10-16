@@ -63,6 +63,9 @@ When any diagnostic needs captain attention, report the plain consequence and re
   A validation error means the record cannot be trusted, so do not assume cleanup completed or follow any path or argument stored in it.
   Read the named reason, inspect the marker as inert data when validation failed, fix the record or backlog-file problem, and rerun session start so the valid recorded transition replays.
   Never delete `state/<id>.backlog-close` by hand - that can discard a completion link or captain-call retention the cleanup captured, and the surviving marker prevents the record sweep from starting the item meanwhile.
+- `BACKLOG_RECONCILE: <id>: its teardown still owes a pool slot return; leaving the recorded close for the teardown retry` - an interrupted teardown reserved the task's pool slot and has not returned it, so session start did not replay its recorded close.
+  Re-run `bin/fm-teardown.sh <id>` to finish returning the slot; the idle reaper retries an ordinary task itself, and the open-work ledger reports the same task as an `interrupted_teardown` row.
+  Never delete `state/<id>.teardown-return-pending` by hand - the surviving record is what keeps the close from being replayed over a still-leased slot.
 - `BACKLOG_RECONCILE: <id>: worker record exists but its backlog item could not be read: <reason>` - this home could not determine whether the item matches its worker record.
   Resolve the named backlog read problem and rerun session start; never guess by starting or closing an unreadable item.
 - `BACKLOG_RECONCILE: <id>: worker record exists but its backlog item could not be moved to In flight: <reason>` - this home owns a worker whose backlog item is still queued, and the reconciliation could not correct it.

@@ -23,9 +23,11 @@
 # fm_project_lock_try <project-lock> <operation>
 # One nonwaiting attempt for callers that already hold other locks (recursive
 # teardown preflight, home seeding, copy reassociation, relocating relaunch),
-# and for the idle reaper's teardown, whose fixed work bound must not include a
-# queue wait: waiting there would stretch the refusal windows of the locks they
-# hold. It refuses while any older live ticket is queued, so it never jumps a
+# and for the idle reaper's teardown before it has closed anything, so a busy
+# project leaves that task selectable by the next sweep: waiting there would
+# stretch the refusal windows of the locks they hold. Once a teardown has
+# closed anything, its return stage waits instead (bin/fm-teardown.sh's
+# header). It refuses while any older live ticket is queued, so it never jumps a
 # waiter. Contention (a live queued ticket, or a live process other than the
 # caller holding, reclaiming, or still publishing the lock, as recorded by
 # fm_lock_try_acquire at its refusal in FM_LOCK_BUSY) returns
@@ -64,7 +66,10 @@
 #   3.972s, `git remote set-head origin --auto` 0.542s, default-branch fetch
 #   0.511s; bin/fm-teardown.sh `gh-axi pr list` 1.092s,
 #   `git fetch origin refs/pull/<n>/head` 0.486s, `gh pr view` 0.599s
-#   and 0.505s, counted twice.
+#   and 0.505s, counted twice. A fresh spawn now runs its default-branch
+#   discovery and fetch before it queues; its locked refresh is local-only. The
+#   sum below keeps those network costs as an upper bound, which only a slot
+#   that does not share the project's objects still pays under the lock.
 # The previous sum, 128.764s, counted NM_TEARDOWN_TIMEOUT once and left out
 # the return retries, bootout poll and reaping sleep. Adding four more
 # NM_TEARDOWN_TIMEOUT calls (40s), the retry waits (3s), four more returns
@@ -88,9 +93,10 @@
 #     bin/fm-teardown.sh, 3s, which the sum counts as 1s;
 #   - fm_task_docker_cleanup in bin/fm-teardown.sh runs unbounded;
 #   - forced recursive secondmate teardown holds every descendant project lock
-#     acquired by preflight_descendant_treehouse_slots while
-#     cleanup_firstmate_home_children returns each child slot in turn, so its
-#     hold grows with the child count.
+#     acquired by preflight_descendant_treehouse_slots through
+#     cleanup_firstmate_home_children when a descendant slot's Treehouse state
+#     can be neither proved held nor leased, so that hold grows with the child
+#     count.
 # A hold that outlasts the allowance makes waiters refuse at the stall limit.
 # FM_PROJECT_LOCK_SERVICE_SECS overrides it with a positive integer for a newly
 # measured environment or bounded fixture.
@@ -101,8 +107,9 @@
 # current holder's operation/PID or the earlier waiter whose turn is reserved.
 # A refusal returns nonzero with an "fm-project-lock:" line naming its class
 # (invalid input, registration failure, filesystem error, sampling error, stall
-# limit), so
-# callers retain their existing refusal and safety checks; capacity admission
+# limit); FM_PROJECT_LOCK_ERROR is empty after a stall-limit refusal and names
+# the class after every other one, so a caller can tell contention from an
+# error. Callers retain their existing refusal and safety checks; capacity admission
 # remains inside the acquired project lock.
 
 FM_PROJECT_LOCK_BUSY_EXIT=75
@@ -191,18 +198,20 @@ fm_project_lock_acquire() {  # <lock> <operation>
   local poll=${FM_PROJECT_LOCK_POLL_SECS:-1} number='^[0-9]+([.][0-9]+)?$' zero='^0*([.]0*)?$'
   local ticket head='' holder='' key last_key='' since=0 stalled=0 mtime now
   local next_message message_interval rc=1
+  FM_PROJECT_LOCK_ERROR=
   case "$service" in
     ''|*[!0-9]*|0|0[0-9]*)
-      echo "fm-project-lock: invalid input for $operation: FM_PROJECT_LOCK_SERVICE_SECS '$service' is not a positive integer" >&2
+      FM_PROJECT_LOCK_ERROR="invalid input: FM_PROJECT_LOCK_SERVICE_SECS '$service' is not a positive integer"
+      echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR for $operation" >&2
       return 1 ;;
   esac
   if ! [[ $poll =~ $number ]] || [[ $poll =~ $zero ]]; then
-    echo "fm-project-lock: invalid input for $operation: FM_PROJECT_LOCK_POLL_SECS '$poll' is not a positive number of seconds" >&2
+    FM_PROJECT_LOCK_ERROR="invalid input: FM_PROJECT_LOCK_POLL_SECS '$poll' is not a positive number of seconds"
+    echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR for $operation" >&2
     return 1
   fi
   message_interval=$((service / 4))
   [ "$message_interval" -gt 0 ] || message_interval=1
-  FM_PROJECT_LOCK_ERROR=
   if ! fm_project_lock_register "$lock" "$service" "$operation"; then
     echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR; $operation was not queued" >&2
     return 1

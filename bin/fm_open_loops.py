@@ -22,7 +22,7 @@ BIN = Path(__file__).resolve().parent
 GH_REST = BIN / "fm-gh-rest.sh"  # conditional REST reads and the shared quota floor
 DEFAULT_AGES = {
     "missing_worker": 600, "ready_not_started": 1800, "unanswered_question": 1800,
-    "unhandled_board_answer": 300,
+    "unhandled_board_answer": 300, "interrupted_teardown": 1800,
     "failed_task": 1800, "stalled_worker": 3600, "unlanded_commit": 86400,
     "open_pr": 3600, "review_pass_not_merged": 600, "red_check": 0, "coverage": 0, "silent_report": 900,
 }
@@ -998,6 +998,33 @@ class Collector:
                      + (owner_task or "unknown (no owner task recorded)"),
                      mtime(result), evidence=result)
 
+    @staticmethod
+    def spawn_gen(path):
+        """The last spawn_gen= value, as bin/fm-wake-lib.sh's fm_teardown_return_pending reads it."""
+        value = ""
+        for line in path.read_text().splitlines():
+            if line.startswith("spawn_gen="):
+                value = line[len("spawn_gen="):]
+        return value
+
+    def interrupted_teardown_rows(self):
+        """A teardown that closed a pool task but has not returned its slot leaves a record naming that task."""
+        for marker in self.state_files:
+            if not marker.name.endswith(".teardown-return-pending") or marker.is_symlink() or not marker.is_file():
+                continue
+            task_id = marker.name[:-len(".teardown-return-pending")]
+            meta = self.state / (task_id + ".meta")
+            if meta.is_symlink() or not meta.is_file():
+                continue
+            if self.spawn_gen(marker) != self.spawn_gen(meta):
+                continue
+            fields = dict(line.split("=", 1) for line in marker.read_text().splitlines() if "=" in line)
+            child = f" for child {fields['child']}" if fields.get("child") else ""
+            self.add("interrupted_teardown", task_id,
+                     f"re-run bin/fm-teardown.sh {task_id} to finish returning its pool slot{child}; "
+                     "its processes and endpoint may already be closed",
+                     mtime(marker), evidence=fields.get("slot", ""))
+
     def owner_working(self, owner_task):
         """A board round held by a live, working owner task is the worker's to finish, not an overdue answer."""
         task = next((t for t in self.tasks if t["id"] == owner_task), None)
@@ -1022,6 +1049,7 @@ class Collector:
         self.source("report silence", self.silent_reports)
         self.source("questions", self.question_rows)
         self.source("board answers", self.board_answer_rows)
+        self.source("interrupted teardowns", self.interrupted_teardown_rows)
         if self.degraded:
             self.add("coverage", "ledger degraded", "restore the unreadable sources and rerun the reconciler",
                      None, evidence="; ".join(self.degraded))

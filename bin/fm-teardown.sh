@@ -195,31 +195,86 @@
 # before cleanup. Its current working directory is only incidental process
 # state: the same worker remains the owner after changing directory, so cwd can
 # never veto teardown of that exact recorded endpoint.
-# The scan and destructive return hold a project-identity lock in the local root
-# Firstmate home's state directory, as resolved by bin/fm-wake-lib.sh's
-# fm_firstmate_root_home; a home seeded from another machine is its own local
-# root, since a lock on this filesystem cannot be held or observed across that
-# boundary. Fresh Treehouse spawns for that project in
-# every local Firstmate home hold the same lock from before slot allocation
-# through metadata publication, closing the publication
-# gap; forced secondmate teardown takes it and runs the same checks for every
-# descendant Treehouse slot before touching any child.
+# The ownership scan and pool mutations hold a project-identity lock in the
+# local root Firstmate home's state directory, as resolved by
+# bin/fm-wake-lib.sh's fm_firstmate_root_home; a home seeded from another
+# machine anchors its own lock. Fresh Treehouse spawns hold that same lock
+# from allocation through metadata publication, closing the publication gap.
+# Ordinary teardown takes it briefly to prove ownership, again after every
+# non-destructive refusal check to recheck ownership and reserve its slot with
+# Treehouse's state-only durable lease, and finally to recheck, return the slot
+# and remove the record that names it. A refusal before that reservation
+# leaves no new lease; a failed cleanup after it retains the lease.
+# A recheck that finds the slot's claim now names another task reserves and
+# returns nothing: the earlier landed-work proof may have read the claimant's
+# copy, so teardown releases project custody and re-proves this record's own
+# delivery as the reassigned-slot cleanup above does, before its next
+# destructive step, refusing with its records in place when that proof fails.
+# That holds when the record's copy is the slot itself. A reassociated copy
+# nested inside the slot stays this task's own whoever the claim names: only the
+# slot steps are dropped, and the copy's runtime is retired and its landing
+# proved exactly as for any reassociated copy.
+# A slot whose state is neither held nor unleased (recovered, conflicting,
+# unreadable, or needing jq), or an unleased slot whose installed treehouse is
+# missing or has no lease command (probed once with treehouse lease --help),
+# cannot be reserved; teardown logs that state and keeps project custody from
+# the reservation point through the return with treehouse return --force, as
+# before the narrowing.
+# Pipeline conclusion, process reaping, endpoint closure, status retirement,
+# backlog completion and clone sync otherwise run outside project custody.
+# Successful landing proofs bind to immutable commits; final dirty/HEAD checks
+# reuse those proofs without doing forge or fetch work while the narrowed lock
+# is held.
+# Forced secondmate teardown proves every descendant under its project locks
+# just before its first child is touched, durably reserves the owned slots and
+# releases project custody before slow cleanup, or keeps every descendant lock
+# through cleanup when a slot cannot be reserved. Each actual child return and
+# matching record removal otherwise takes only that child's project lock and
+# releases it immediately. A refused return of a child whose own slot is
+# durably leased, whatever state its siblings' slots are in, keeps that slot,
+# the child's record and the pending-return record for a retry; only a child
+# whose slot was never leased, and so ran under whole-cleanup custody, falls
+# back to the guarded raw removal of its copy.
 # Project-lock contention uses bin/fm-project-lock-lib.sh's FIFO wait, which
 # refuses only when the holder stalls past the measured allowance, with holder
 # progress messages; callers no longer need retry loops for allocation/return
-# contention. The idle reaper's teardown (FM_IDLE_REAP_ADMISSION=1) instead
-# makes one nonwaiting attempt, so its fixed work bound never includes a queue
-# wait; contention exits FM_PROJECT_LOCK_BUSY_EXIT with nothing changed, and the
-# next sweep retries. Recursive cleanup already holds every descendant home's lifecycle
-# locks, so it makes one nonwaiting attempt per descendant project lock that
+# contention. Before anything is closed, the idle reaper's teardown
+# (FM_IDLE_REAP_ADMISSION=1) instead makes nonwaiting ownership and reservation
+# attempts, so contention exits FM_PROJECT_LOCK_BUSY_EXIT with nothing closed
+# and the next sweep retries. Once processes or endpoints may be gone, the
+# reaper's return stage and every forced child return wait in that FIFO queue
+# instead, each waited admission bounded per holder by the same stall
+# allowance as every other waiter (370s, measured in
+# bin/fm-project-lock-lib.sh). The wait has no total bound of its own; the
+# reaper's 600s teardown limit ends an overlong teardown, which keeps its
+# durable record and is retried by the next sweep without a refusal memo.
+# As soon as a slot is reserved, or this task's own claim
+# beside a slot another task leases awaits release, and before any cleanup
+# that can fail and before the pending backlog close is published, teardown
+# records state/<id>.teardown-return-pending (bin/fm-wake-lib.sh's
+# fm_teardown_return_pending owns the contract; a forced secondmate teardown
+# records it for itself, naming the child; an accepted --legacy-record stamp
+# rebinds it to the stamped generation, and a rolled-back stamp rebinds it
+# back). Any later refusal keeps that
+# durable record: the open-work ledger reports it, session-start backlog
+# replay leaves the record for the retry, the idle reaper selects the task by
+# that record unless its worker reads busy again, and every project
+# admission of that retry, including ownership and reservation, waits in the
+# FIFO queue. A waited admission that reaches the stall limit exits
+# FM_PROJECT_LOCK_BUSY_EXIT, so the next sweep retries it rather than standing
+# on a refusal memo; a lock error keeps exit 1 and is recorded as a refusal.
+# Project holders never wait for task custody (fresh spawn refuses a held
+# task-set lock), so these waits cannot deadlock with the descendant locks
+# recursive cleanup holds.
+# Recursive cleanup already holds every descendant home's lifecycle locks, so
+# its admission makes one nonwaiting attempt per descendant project lock that
 # never jumps a queued waiter; it collects and deduplicates those paths and
 # tries them in global byte order before slot proofs, so opposite child
 # enumeration orders cannot each hold the project the other needs.
-# The project-lock wait runs after this task's lease-guard lock, so a steer or
-# control action on this same task waits until teardown is admitted or refused;
-# no other task waits on it. Waiting for the project lock first would instead
-# make the project-lock holder wait, without a limit, for a control action on
-# this task, and stall every waiter for the project behind it.
+# Project waits run after this task's lease-guard, control and metadata locks,
+# so a steer or control action on this same task waits for teardown; no other
+# task waits on those locks. Project custody never spans a wait for task custody,
+# which would stall unrelated allocation behind that task's lifecycle action.
 # Other lifecycle lock refusals are unchanged.
 # These refusals are not relaxed by --force: --force authorizes discarding THIS
 # task's unlanded work, never another task's live work. Nothing of this task's
@@ -644,6 +699,8 @@ META="$STATE/$ID.meta"
 TREEHOUSE_PROJECT_LOCK=
 TREEHOUSE_PROJECT_LOCK_HELD=0
 TREEHOUSE_SLOT_LOCK_REQUIRED=0
+TEARDOWN_DEFERRED_POOL_CLEANUP=
+TEARDOWN_META_REMOVED=0
 if [ -f "$META" ] && [ ! -L "$META" ]; then
   TEARDOWN_LOCK_KIND=$(fm_meta_get "$META" kind)
   [ -n "$TEARDOWN_LOCK_KIND" ] || TEARDOWN_LOCK_KIND=ship
@@ -659,23 +716,131 @@ if [ -f "$META" ] && [ ! -L "$META" ]; then
       echo "REFUSED: cannot resolve the shared Treehouse project lock for ${TEARDOWN_LOCK_PROJECT:-<missing>}; nothing was changed" >&2
       exit 1
     }
-    TEARDOWN_PROJECT_LOCK_RC=0
-    if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
-      fm_project_lock_try "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || TEARDOWN_PROJECT_LOCK_RC=$?
-    else
-      fm_project_lock_acquire "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || TEARDOWN_PROJECT_LOCK_RC=$?
-    fi
-    if [ "$TEARDOWN_PROJECT_LOCK_RC" -eq 1 ] && [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ]; then
-      echo "REFUSED: cannot acquire the shared Treehouse project lock for $TEARDOWN_LOCK_PROJECT; nothing was changed" >&2
-      exit 1
-    fi
-    if [ "$TEARDOWN_PROJECT_LOCK_RC" -ne 0 ]; then
-      echo "REFUSED: another Treehouse slot allocation or return is in progress for $TEARDOWN_LOCK_PROJECT; nothing was changed" >&2
-      exit "$TEARDOWN_PROJECT_LOCK_RC"
-    fi
-    TREEHOUSE_PROJECT_LOCK_HELD=1
+
   fi
 fi
+# A waited admission that reaches the stall limit is contention, not an error:
+# report it as FM_PROJECT_LOCK_BUSY_EXIT and keep 1 for real lock errors.
+teardown_project_lock_wait() {  # <lock> <operation>
+  fm_project_lock_acquire "$1" "$2" && return 0
+  [ -z "$FM_PROJECT_LOCK_ERROR" ] || return 1
+  return "$FM_PROJECT_LOCK_BUSY_EXIT"
+}
+
+teardown_acquire_project_lock() {  # [wait]
+  local rc=0
+  [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] || return 0
+  if [ "${FM_IDLE_REAP_ADMISSION:-0}" = 1 ] && [ "${1:-}" != wait ] \
+     && ! fm_teardown_return_pending "$STATE" "$ID"; then
+    fm_project_lock_try "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || rc=$?
+  else
+    teardown_project_lock_wait "$TREEHOUSE_PROJECT_LOCK" "teardown $ID" || rc=$?
+  fi
+  if [ "$rc" -ne 0 ]; then
+    echo "REFUSED: cannot acquire the shared Treehouse project lock for $TEARDOWN_LOCK_PROJECT; the task record and slot are retained" >&2
+    return "$rc"
+  fi
+  TREEHOUSE_PROJECT_LOCK_HELD=1
+}
+
+teardown_release_project_lock() {
+  [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] || return 0
+  fm_project_lock_release "$TREEHOUSE_PROJECT_LOCK" || return 1
+  TREEHOUSE_PROJECT_LOCK_HELD=0
+}
+
+# Whether the installed treehouse has the state-only lease command, probed
+# once: an older Treehouse reports an unknown command and a missing one
+# reports nothing, and neither can reserve a slot.
+TEARDOWN_TREEHOUSE_LEASE_SUPPORT=
+teardown_treehouse_supports_lease() {
+  local help
+  if [ -z "$TEARDOWN_TREEHOUSE_LEASE_SUPPORT" ]; then
+    TEARDOWN_TREEHOUSE_LEASE_SUPPORT=0
+    if help=$(treehouse lease --help 2>&1) \
+        && grep -Eq '(^|[^[:alnum:]_-])--lease-holder([^[:alnum:]_-]|$)' <<<"$help"; then
+      TEARDOWN_TREEHOUSE_LEASE_SUPPORT=1
+    fi
+  fi
+  [ "$TEARDOWN_TREEHOUSE_LEASE_SUPPORT" = 1 ]
+}
+
+# A process lease lapses when the worker exits. Reserve only this slot before
+# releasing project custody, so unrelated allocation can proceed during the
+# slow process and status phases without ever resetting this copy.
+# A failed cleanup deliberately retains this state-only lease for its retry.
+# Sets TEARDOWN_SLOT_CUSTODY to lease when the slot is durably held, or to
+# project when its state can be neither proved held nor leased: the caller
+# then keeps project custody through the return.
+TEARDOWN_SLOT_CUSTODY=
+teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
+  local slot project=${2:-$PROJ} task_id=${3:-$ID} name
+  TEARDOWN_SLOT_CUSTODY=
+  slot=$(cd "$1" && pwd -P) || return 1
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  if fm_task_copy_pool_slot_held "$slot"; then
+    TEARDOWN_SLOT_CUSTODY=lease
+    return 0
+  fi
+  if [ "$FM_TASK_COPY_SLOT_STATE" != unleased ]; then
+    echo "warning: pool slot $slot is in Treehouse state '$FM_TASK_COPY_SLOT_STATE' and $FM_TASK_COPY_SLOT_REASON; keeping project custody through its return instead of reserving it" >&2
+    TEARDOWN_SLOT_CUSTODY=project
+    return 0
+  fi
+  if ! teardown_treehouse_supports_lease; then
+    echo "warning: pool slot $slot is unleased and the installed treehouse is missing or has no lease command to reserve it; keeping project custody through its return instead" >&2
+    TEARDOWN_SLOT_CUSTODY=project
+    return 0
+  fi
+  name=$FM_TASK_COPY_SLOT_NAME
+  (cd "$project" && treehouse lease "$name" --lease-holder "$task_id") || return 1
+  FM_TASK_COPY_POOL_STATE_FILE=
+  FM_TASK_COPY_POOL_STATE_ENTRIES=
+  fm_task_copy_pool_slot_held "$slot" || {
+    echo "REFUSED: pool slot $slot was not proved durably leased after reservation; retaining its task record and contents" >&2
+    return 1
+  }
+  TEARDOWN_SLOT_CUSTODY=lease
+}
+
+# Record, once this task's slot is reserved (or, for a slot shared with another
+# task, once this task's claim beside it awaits release) and before any
+# cleanup that can fail, that the slot is still held for it
+# (bin/fm-wake-lib.sh's fm_teardown_return_pending owns the contract). A
+# refusal from here on leaves the record for the retry.
+teardown_mark_return_pending() {  # <slot> [child-id]
+  local marker="$STATE/$ID.teardown-return-pending" tmp gen
+  tmp="$STATE/.$ID.teardown-return-pending.${BASHPID:-$$}"
+  if gen=$(fm_teardown_return_pending_gen "$META") \
+      && { printf 'spawn_gen=%s\n' "$gen" && printf 'slot=%s\n' "$1" \
+           && { [ -z "${2:-}" ] || printf 'child=%s\n' "$2"; }; } > "$tmp" \
+      && mv -f "$tmp" "$marker" && [ -f "$marker" ] && [ ! -L "$marker" ]; then
+    return 0
+  fi
+  rm -f "$tmp"
+  echo "warning: could not record that task $ID's pool slot $1 awaits its return at $marker" >&2
+  return 1
+}
+
+teardown_refresh_return_pending() {
+  local marker="$STATE/$ID.teardown-return-pending" tmp gen line
+  [ -f "$marker" ] && [ ! -L "$marker" ] || return 0
+  tmp="$STATE/.$ID.teardown-return-pending.refresh.${BASHPID:-$$}"
+  if gen=$(fm_teardown_return_pending_gen "$META") \
+      && { printf 'spawn_gen=%s\n' "$gen" \
+           && while IFS= read -r line || [ -n "$line" ]; do
+                case "$line" in spawn_gen=*) ;; *) printf '%s\n' "$line" ;; esac
+              done < "$marker"
+         } > "$tmp" && touch -r "$marker" "$tmp" && mv -f "$tmp" "$marker" \
+      && [ -f "$marker" ] && [ ! -L "$marker" ]; then
+    return 0
+  fi
+  rm -f "$tmp"
+  echo "warning: could not rebind task $ID's pool-return record at $marker to its current record generation" >&2
+  return 1
+}
+
 CONTROL_LOCK="$STATE/.control-$ID.lock"
 CONTROL_LOCK_HELD=0
 SM_LIVENESS_LOCK=
@@ -688,6 +853,16 @@ DESCENDANT_TASK_IDS=()
 DESCENDANT_TASK_KINDS=()
 DESCENDANT_TASK_HOMES=()
 DESCENDANT_TREEHOUSE_LOCK_PATHS=()
+DESCENDANT_LEGACY_CUSTODY=0
+DESCENDANT_LEASED_SLOTS=()
+teardown_descendant_slot_leased() {  # <slot>
+  local slot s
+  slot=$(cd "$1" 2>/dev/null && pwd -P) || return 1
+  for s in ${DESCENDANT_LEASED_SLOTS[@]+"${DESCENDANT_LEASED_SLOTS[@]}"}; do
+    [ "$s" != "$slot" ] || return 0
+  done
+  return 1
+}
 teardown_release_locks() {
   local status=$? i
   if [ -n "$BACKLOG_CLOSE_STAGE" ]; then
@@ -1422,7 +1597,7 @@ if [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ] \
     echo "REFUSED: cannot resolve the shared Treehouse project lock for ${PROJ:-<missing>}; nothing was changed" >&2
     exit 1
   }
-  if [ "$TREEHOUSE_PROJECT_LOCK_HELD" != 1 ] \
+  if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" != 1 ] \
      || [ "$TREEHOUSE_PROJECT_LOCK" != "$EXPECTED_TREEHOUSE_PROJECT_LOCK" ]; then
     echo "REFUSED: task $ID's Treehouse project identity changed while teardown acquired its locks; nothing was changed" >&2
     exit 1
@@ -2088,9 +2263,35 @@ pr_is_merged() {
 }
 
 
+# A successful landing proof binds to a directory and immutable commit, not
+# to a branch name. Reuse it during the final return's dirty/HEAD recheck, so
+# forge and fetch calls run outside project custody. A changed HEAD there
+# refuses for a fresh proof on retry rather than doing network work under it.
+TEARDOWN_LANDED_DIRS=()
+TEARDOWN_LANDED_HEADS=()
+work_is_landed() {
+  local branch=$1 dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD} head i
+  head=$(git -C "$dir" rev-parse --verify "$ref^{commit}" 2>/dev/null) || return 1
+  TEARDOWN_UNPROVEN_COMMITS=
+  TEARDOWN_PIPELINE_INPUT_REASON=
+  for i in "${!TEARDOWN_LANDED_DIRS[@]}"; do
+    if [ "${TEARDOWN_LANDED_DIRS[$i]}" = "$dir" ] && [ "${TEARDOWN_LANDED_HEADS[$i]}" = "$head" ]; then
+      return 0
+    fi
+  done
+  if [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] && [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
+    echo "REFUSED: $dir changed to HEAD $head after its landing proof; retain the lease and task record and retry for a fresh proof" >&2
+    return 1
+  fi
+  local TEARDOWN_LANDED_DIR=$dir TEARDOWN_LANDED_REF=$head
+  work_is_landed_proof "$branch" || return 1
+  TEARDOWN_LANDED_DIRS+=("$dir")
+  TEARDOWN_LANDED_HEADS+=("$head")
+}
+
 # A pushed branch proves recoverability, not delivery: require the landing
 # proofs documented in this script's header even when every commit is pushed.
-work_is_landed() {
+work_is_landed_proof() {
   local branch=$1
   local dir=${TEARDOWN_LANDED_DIR:-$WT} ref=${TEARDOWN_LANDED_REF:-HEAD}
   # Each call reports on its own directory and ref, never on an earlier call's.
@@ -2703,6 +2904,28 @@ require_worktree_teardown_safety() {
     return 0
   fi
   exit 1
+}
+
+# A slot found reassigned only at a later recheck was admitted by an owned-mode
+# proof. Repeat the proof in reassigned mode; when it settles on the recorded
+# PR, restage the pending backlog close so a local-only ship does not keep its
+# owned-mode local-main note.
+teardown_reprove_reassigned_slot() {
+  local stage="$STATE/.$ID.backlog-close.${BASHPID:-$$}"
+  teardown_release_project_lock || exit 1
+  require_worktree_teardown_safety
+  [ "$TEARDOWN_BACKLOG_APPLIES" = 1 ] && [ "$TEARDOWN_RECORDED_PR_ONLY" = 1 ] || return 0
+  if ! backlog_done_args \
+     || ! fm_backlog_record_remove "$stage" "pending-close staged record" "$STATE" \
+     || ! fm_backlog_close_marker_stage "$stage" "$ID" "$DATA" "$TEARDOWN_META_SPAWN_GEN" "$STATE" 0 \
+       "${BACKLOG_TRANSITION_FLAGS[@]+"${BACKLOG_TRANSITION_FLAGS[@]}"}" \
+       "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}" \
+     || { [ "$BACKLOG_CLOSED" = 1 ] \
+          && ! fm_backlog_atomic_transition publish "$stage" "$BACKLOG_CLOSE_MARKER" "pending-close record" "$STATE"; }; then
+    fm_backlog_record_remove "$stage" "pending-close staged record" "$STATE" || true
+    echo "error: the pending backlog $BACKLOG_TRANSITION for $ID could not be recorded ($FM_BACKLOG_TRANSITION_ERROR); retaining every durable task record" >&2
+    exit 1
+  fi
 }
 
 # Fix 1 (see script header): does the active-or-most-recent no-mistakes run in
@@ -3549,16 +3772,46 @@ require_owned_worktree_slot_record() {  # <task-id> <worktree>
 TEARDOWN_SLOT_REASSIGNED=0
 TEARDOWN_SLOT_REASSIGNED_TO=
 TEARDOWN_SLOT_REASSIGNED_HOME=
+
+# The slot claim answers two questions that must stay separate. This one is
+# whether this teardown may still administer the pool slot enclosing a nested
+# current copy: when it may not, nothing in that slot is reserved, returned or
+# released, and the early proof's derivations are redone from the record as if
+# the claim had never named this task. Whether the copy at WT and its runtime
+# are this task's own is the other, teardown_owns_worktree.
+teardown_release_enclosing_slot() {
+  local line
+  TEARDOWN_RESERVED_SLOT=
+  TEARDOWN_ENCLOSING_SLOT=$TEARDOWN_RECORD_SLOT
+  TEARDOWN_RETURN_SLOT=
+  TEARDOWN_NESTED_COPIES=()
+  TEARDOWN_PROOF_COPIES=()
+  TEARDOWN_PRIOR_COPIES=()
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      prior_worktree=?*) TEARDOWN_PRIOR_COPIES+=("${line#prior_worktree=}") ;;
+    esac
+  done < "$META"
+  teardown_nested_slot prove
+}
+
 require_owned_task_worktree_slot() {
-  local slot rc=0
-  slot=$(teardown_live_slot_path) || return 0
+  local slot=${1:-} rc=0
+  if [ -z "$slot" ]; then
+    slot=$(teardown_live_slot_path) || return 0
+  fi
   require_owned_worktree_slot_record "$ID" "$slot" || rc=$?
   case "$rc" in
     0) return 0 ;;
     "$TEARDOWN_SLOT_REASSIGNED_RC")
-      TEARDOWN_SLOT_REASSIGNED=1
-      TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
-      TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
+      if teardown_live_slot_path >/dev/null; then
+        TEARDOWN_SLOT_REASSIGNED=1
+        TEARDOWN_SLOT_REASSIGNED_TO=$FM_TREEHOUSE_SLOT_OWNER_ID
+        TEARDOWN_SLOT_REASSIGNED_HOME=$FM_TREEHOUSE_SLOT_OWNER_HOME
+        TEARDOWN_RESERVED_SLOT=
+      else
+        teardown_release_enclosing_slot || return 1
+      fi
       return 0
       ;;
   esac
@@ -3652,6 +3905,10 @@ require_shared_task_worktree_slot() {
   return 0
 }
 
+# Whether the copy at WT, and the runtime inside it, are this task's own. A
+# slot claim decides it only when WT is that pool slot itself, or when another
+# record shares the slot; a worktree nested in a slot another task claims stays
+# this task's own and loses only its slot steps (teardown_release_enclosing_slot).
 teardown_owns_worktree() {
   [ "$TEARDOWN_SLOT_REASSIGNED" != 1 ]
 }
@@ -4351,6 +4608,7 @@ preflight_descendant_treehouse_slots() {
   local i j state task_id meta kind backend target worktree project lock_path held owner_rc
   local LC_ALL=C
   local -a project_locks=() project_tasks=()
+  local -a reserve_slots=() reserve_projects=() reserve_tasks=()
   for ((i=0; i < ${#DESCENDANT_TASK_IDS[@]}; i++)); do
     state=${DESCENDANT_TASK_STATES[$i]}
     task_id=${DESCENDANT_TASK_IDS[$i]}
@@ -4421,11 +4679,34 @@ preflight_descendant_treehouse_slots() {
     owner_rc=0
     require_owned_worktree_slot_record "$task_id" "$worktree" || owner_rc=$?
     case "$owner_rc" in
-      0) require_registered_slot_copies "$task_id" "$worktree" || return 1 ;;
+      0)
+        require_registered_slot_copies "$task_id" "$worktree" || return 1
+        reserve_slots+=("$worktree")
+        reserve_projects+=("$project")
+        reserve_tasks+=("$task_id")
+        ;;
       "$TEARDOWN_SLOT_REASSIGNED_RC") ;;
       *) return 1 ;;
     esac
   done
+  for ((i=0; i < ${#reserve_slots[@]}; i++)); do
+    teardown_reserve_pool_slot "${reserve_slots[$i]}" "${reserve_projects[$i]}" "${reserve_tasks[$i]}" || return 1
+    teardown_mark_return_pending "${reserve_slots[$i]}" "${reserve_tasks[$i]}" || return 1
+    if [ "$TEARDOWN_SLOT_CUSTODY" = project ]; then
+      DESCENDANT_LEGACY_CUSTODY=1
+    else
+      DESCENDANT_LEASED_SLOTS+=("$(cd "${reserve_slots[$i]}" && pwd -P)")
+    fi
+  done
+  [ "$DESCENDANT_LEGACY_CUSTODY" = 1 ] || teardown_release_descendant_project_locks
+}
+
+teardown_release_descendant_project_locks() {
+  local lock_path
+  for lock_path in "${DESCENDANT_TREEHOUSE_LOCK_PATHS[@]+"${DESCENDANT_TREEHOUSE_LOCK_PATHS[@]}"}"; do
+    fm_project_lock_release "$lock_path" || return 1
+  done
+  DESCENDANT_TREEHOUSE_LOCK_PATHS=()
 }
 
 validate_firstmate_home_children_removal() {
@@ -4693,9 +4974,9 @@ preflight_firstmate_home_herdr_children() {  # <home>
 # Returns 0 when the caller must continue anyway and 1 when it must stop.
 # <honors-force> is 1 at exactly one site, the generic non-Herdr/non-Orca
 # close, where --force is the operator's existing authority to discard this
-# task's records deliberately AND continuing is actually reachable: the
-# worktree is already returned by then and nothing after it needs the backend
-# that could not close.
+# task's records deliberately AND continuing is actually reachable: ordinary
+# pool return needs Treehouse, not the endpoint backend that could not close.
+# Non-pool return may already have completed by then.
 # It is 0 everywhere else. The Orca site refuses under --force too, because
 # the step immediately after it removes the Orca worktree through the same CLI
 # whose absence is the only thing that arm ever reports, so a forced continue
@@ -4725,7 +5006,7 @@ endpoint_close_refusal() {  # <subject> <backend> <target> <honors-force>
 }
 
 cleanup_firstmate_home_children() {
-  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i child_copy_mode child_keep_copy child_pool_slot
+  local home=$1 sub_state child_meta child_id child_t child_wt child_proj child_kind child_home child_backend child_orca_worktree_id child_return_rc child_busy_gen child_owner_rc child_admission_i child_copy_mode child_keep_copy child_pool_return child_project_lock child_leased child_pool_slot
   sub_state="$home/state"
   [ -d "$sub_state" ] || return 0
   for child_meta in "$sub_state"/*.meta; do
@@ -4741,6 +5022,7 @@ cleanup_firstmate_home_children() {
     child_kind=$(meta_value "$child_meta" kind)
     [ -n "$child_kind" ] || child_kind=ship
     child_backend=$(fm_backend_of_meta "$child_meta")
+    child_pool_return=0
     child_keep_copy=0
     if teardown_preserves_reassociated_copy "$child_meta" "$child_kind" "$child_backend" "$child_proj" "$child_wt"; then
       child_keep_copy=1
@@ -4820,11 +5102,18 @@ cleanup_firstmate_home_children() {
       fi
     elif [ "$child_keep_copy" = 1 ]; then
       :
+    elif [ "$child_owner_rc" -eq 0 ] && fm_treehouse_pool_slot "$child_proj" "$child_wt"; then
+      child_pool_return=1
+      validate_child_worktree_for_removal "$child_wt" "$child_proj" >/dev/null || return 1
+      rm -f "$child_wt/.claude/settings.local.json" "$child_wt/.opencode/plugins/fm-turn-end.js" \
+        "$child_wt/.opencode/plugins/fm-busy-state.js" \
+        "$child_wt/.fm-grok-turnend" "$child_wt/.fm-kimi-turnend"
     elif [ -n "$child_wt" ] && [ -d "$child_wt" ]; then
       # The same ownership determination as the parent's own slot: a child
       # slot reassigned to another task is not this child's to kill, reset,
       # or return, so only its records are cleaned up. The preflight above
-      # already named the reassignment on stderr under the same lock.
+      # already named the reassignment under project custody; this records-only
+      # route still returns nothing after that custody has been released.
       if [ "$child_owner_rc" -eq "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
         :
       else
@@ -4862,7 +5151,67 @@ cleanup_firstmate_home_children() {
     retire_busy_state "$sub_state" "$child_id" "$child_busy_gen" || return 1
     status_retire_presentation_task "$sub_state" "$child_id" || return 1
     fm_wake_queue_prune_task "$sub_state" "$child_id" "$child_t" 2>/dev/null || true
+    if [ "$child_pool_return" = 1 ]; then
+      teardown_mark_return_pending "$child_wt" "$child_id" || return 1
+      if [ "$DESCENDANT_LEGACY_CUSTODY" != 1 ]; then
+        child_project_lock=$(fm_treehouse_project_lock_path "$child_proj") || return 1
+        # This child's endpoint is already closed, so wait in the FIFO queue
+        # rather than strand its reserved slot. Project holders refuse rather
+        # than wait for the task-set locks this cleanup holds.
+        teardown_project_lock_wait "$child_project_lock" "teardown $ID return child $child_id" || return $?
+        DESCENDANT_TREEHOUSE_LOCK_PATHS+=("$child_project_lock")
+      fi
+      child_owner_rc=0
+      require_owned_worktree_slot_record "$child_id" "$child_wt" || child_owner_rc=$?
+      case "$child_owner_rc" in
+        0|"$TEARDOWN_SLOT_REASSIGNED_RC") ;;
+        *) return 1 ;;
+      esac
+    fi
+    if [ "$child_pool_return" = 1 ] && [ "$child_owner_rc" != "$TEARDOWN_SLOT_REASSIGNED_RC" ]; then
+      require_exclusive_worktree_slot_record "$child_meta" "$child_id" "$sub_state" "$child_wt" || return 1
+      require_registered_slot_copies "$child_id" "$child_wt" || return 1
+      child_leased=0
+      ! teardown_descendant_slot_leased "$child_wt" || child_leased=1
+      if [ "$child_leased" = 1 ]; then
+        FM_TASK_COPY_POOL_STATE_FILE=
+        FM_TASK_COPY_POOL_STATE_ENTRIES=
+        fm_task_copy_pool_slot_held "$child_wt" || {
+          echo "REFUSED: child $child_id pool slot is no longer durably reserved; retaining its task record and contents" >&2
+          return 1
+        }
+      fi
+      if command -v treehouse >/dev/null 2>&1; then
+        # A forced secondmate teardown scrubs every child copy it returns and
+        # checks that return for residue, exactly as the parent's own return
+        # and the non-pool child return above do; a dirty or unverifiable
+        # return is a lost pool slot (exit 4 after cleanup).
+        teardown_scrub_scratch_copy "$child_wt" "$child_id" || return $?
+        if teardown_treehouse_return "$child_wt" "$child_proj" "child worktree" "$child_id"; then
+          teardown_note_dirty_return "$child_wt"
+          fm_treehouse_slot_owner_release "$child_wt" "$child_id" || return 1
+        else
+          child_return_rc=$?
+          if [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_LOCK_REFUSED" ] \
+             || [ "$child_return_rc" -eq "$TEARDOWN_TREEHOUSE_CUSTODY_REFUSED" ]; then
+            return "$child_return_rc"
+          fi
+          if [ "$child_leased" = 1 ]; then
+            echo "REFUSED: child $child_id pool slot is durably leased and its return failed; retaining the slot, its task record and the pending-return record for a retry" >&2
+            return 1
+          fi
+          safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
+        fi
+      else
+        if [ "$child_leased" = 1 ]; then
+          echo "REFUSED: child $child_id pool slot is durably leased and treehouse is not installed to return it; retaining the slot, its task record and the pending-return record for a retry" >&2
+          return 1
+        fi
+        safe_rm_rf_child_worktree "$child_wt" "$child_proj" "$child_id" || return 1
+      fi
+    fi
     fm_backlog_atomic_transition remove "$sub_state/$child_id.meta" "task record" "$sub_state" || return 1
+    [ "$DESCENDANT_LEGACY_CUSTODY" = 1 ] || teardown_release_descendant_project_locks || return 1
     rm -f "$sub_state/$child_id.turn-ended" "$sub_state/$child_id.progress" \
       "$(fm_wake_signal_seen_path "$sub_state" "$sub_state/$child_id.turn-ended")" \
       "$sub_state/$child_id.pi-ext.ts" "$sub_state/$child_id.omp-ext.ts" "$sub_state/$child_id.omp-fallback.yml" \
@@ -4914,11 +5263,13 @@ if [ -n "$LAUNCH_HOME_TOKEN" ]; then
   require_cleanup_copy_clearance "$META" "$ID" "$STATE" "/tmp/fm-$ID+$LAUNCH_HOME_TOKEN" || exit 1
 fi
 
+teardown_acquire_project_lock || exit $?
 require_owned_task_worktree_slot || exit 1
 require_shared_task_worktree_slot || exit 1
 if teardown_owns_worktree; then
   require_exclusive_task_worktree_slot || exit 1
 fi
+teardown_release_project_lock || exit 1
 if [ "$KIND" != secondmate ] && teardown_owns_worktree \
    && ! fm_treehouse_pool_slot "$PROJ" "$WT"; then
   require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$WT" || exit 1
@@ -4949,7 +5300,6 @@ if [ "$KIND" = secondmate ]; then
     validate_firstmate_home_children_removal "$HOME_PATH" || exit 1
     require_cleanup_copy_clearance "$META" "$ID" "$STATE" "$HOME_PATH" home || exit 1
     require_cleanup_copy_clearance "$META" "$ID" "$STATE" "$WT" home || exit 1
-    preflight_descendant_treehouse_slots || exit 1
     if [ "$BACKEND" = herdr ]; then
       teardown_herdr_admit_meta "$META" "$ID" "$STATE" || exit 1
     fi
@@ -4982,6 +5332,7 @@ if [ "$KIND" = secondmate ]; then
 fi
 
 if [ "$KIND" = secondmate ] && [ "$FORCE" = "--force" ]; then
+  preflight_descendant_treehouse_slots || exit 1
   teardown_release_herdr_locks
   cleanup_firstmate_home_children "$HOME_PATH" || exit $?
 fi
@@ -5104,6 +5455,33 @@ fi
 # kind=secondmate: a secondmate home's own runtime lifecycle is owned by the
 # dedicated process-event and firstmate-home removal machinery further below,
 # not by task-worktree cleanup.
+# Every refusal above leaves the slot as it found it. Reserve it under fresh
+# project custody only now, immediately before the first destructive step.
+if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree; then
+  teardown_acquire_project_lock || exit $?
+  if ! TEARDOWN_RESERVED_SLOT=$(teardown_live_slot_path); then
+    TEARDOWN_RESERVED_SLOT=$(teardown_record_enclosing_slot "$META" "$PROJ" "$WT") || exit 1
+    fm_treehouse_slot_owner_state "$TEARDOWN_RESERVED_SLOT" "$ID"
+    case "$FM_TREEHOUSE_SLOT_OWNER" in
+      mine) ;;
+      absent) teardown_release_enclosing_slot || exit 1 ;;
+      *) require_owned_task_worktree_slot "$TEARDOWN_RESERVED_SLOT" || exit 1 ;;
+    esac
+  else
+    require_owned_task_worktree_slot "$TEARDOWN_RESERVED_SLOT" || exit 1
+  fi
+  if [ -n "$TEARDOWN_RESERVED_SLOT" ]; then
+    require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RESERVED_SLOT" || exit 1
+    teardown_reserve_pool_slot "$TEARDOWN_RESERVED_SLOT" || exit 1
+    teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT" || exit 1
+  fi
+  [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
+  teardown_owns_worktree || teardown_reprove_reassigned_slot
+fi
+if [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
+  fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
+  [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || teardown_mark_return_pending "$TEARDOWN_SHARED_SLOT" || exit 1
+fi
 if [ "$KIND" != secondmate ] && teardown_owns_worktree; then
   teardown_nested_slot retire
 elif [ "$KIND" != secondmate ] && [ "$TEARDOWN_SLOT_SHARED" = 1 ] \
@@ -5147,7 +5525,8 @@ teardown_legacy_stamp_rollback() {
   [ "$TEARDOWN_LEGACY_PRESTAMP_SIZE" -gt 0 ] 2>/dev/null || return 1
   perl -e 'truncate($ARGV[0], $ARGV[1]) or exit 1' -- \
     "$META" "$TEARDOWN_LEGACY_PRESTAMP_SIZE" || return 1
-  [ "$(wc -c < "$META" | tr -d ' ')" = "$TEARDOWN_LEGACY_PRESTAMP_SIZE" ]
+  [ "$(wc -c < "$META" | tr -d ' ')" = "$TEARDOWN_LEGACY_PRESTAMP_SIZE" ] || return 1
+  teardown_refresh_return_pending
 }
 
   if [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ] && [ -z "$TEARDOWN_LEGACY_RETAINED_STAMP" ]; then
@@ -5174,6 +5553,7 @@ teardown_legacy_stamp_rollback() {
       fi
       exit 1
     fi
+    teardown_refresh_return_pending || exit 1
   fi
   if ! fm_backlog_atomic_transition publish "$BACKLOG_CLOSE_STAGE" "$BACKLOG_CLOSE_MARKER" \
       "pending-close record" "$STATE"; then
@@ -5289,20 +5669,16 @@ if [ "$BACKEND" = orca ] && [ "$KIND" != secondmate ]; then
   fi
 elif [ "$KIND" != secondmate ] && ! teardown_owns_worktree; then
   if [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
-    # This is Firstmate's claim beside the slot, not Treehouse's durable lease.
-    # The pool and its contents remain untouched; a remaining record can now
-    # claim this slot through reassociate after other finished records retire.
-    fm_treehouse_slot_owner_release "$TEARDOWN_SHARED_SLOT" "$ID"
-    fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
-    if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || [ "$FM_TREEHOUSE_SLOT_OWNER" = unsafe ]; then
-      echo "error: could not release task $ID's shared-slot claim; retaining its task record for a retry" >&2
-      exit 1
-    fi
+    TEARDOWN_DEFERRED_POOL_CLEANUP=shared
   fi
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ] && [ -z "$TEARDOWN_ENCLOSING_SLOT" ]; then
   :
 elif { [ -d "$WT" ] || [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; } && [ "$KIND" != secondmate ]; then
-  teardown_nested_slot return
+  if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ]; then
+    TEARDOWN_DEFERRED_POOL_CLEANUP='return'
+  else
+    teardown_nested_slot return
+  fi
 fi
 
 if [ "$BACKEND" != herdr ] && [ "$BACKEND" != orca ] && [ "$TEARDOWN_WINDOWLESS" != 1 ]; then
@@ -5407,13 +5783,64 @@ if [ -e "$HERDR_PRESENTATION_JOURNAL" ] || [ -L "$HERDR_PRESENTATION_JOURNAL" ];
     echo "warning: retaining herdr presentation journal for $ID; it still names a projected workspace the session-start sweep owns, not the closed endpoint" >&2
   fi
 fi
+# Slow endpoint, reporting and status work is complete. Return the reserved
+# slot and retire its record in one pool critical section: publishing an
+# available slot while its old record still names it would let the next holder
+# see a false shared-slot collision. Backlog completion and clone sync need
+# only task custody and run after project custody is released.
+if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
+  teardown_mark_return_pending "${TEARDOWN_RETURN_SLOT:-$TEARDOWN_SHARED_SLOT}" || exit 1
+  if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = return ]; then
+    TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
+    teardown_nested_slot reprove || exit 1
+    [ ! -d "$WT" ] || require_worktree_teardown_safety
+  fi
+  [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] || teardown_acquire_project_lock wait || exit $?
+  if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = shared ]; then
+    # Drop only this task's claim, never the remaining task's durable lease.
+    fm_treehouse_slot_owner_release "$TEARDOWN_SHARED_SLOT" "$ID"
+    fm_treehouse_slot_owner_state "$TEARDOWN_SHARED_SLOT" "$ID"
+    if [ "$FM_TREEHOUSE_SLOT_OWNER" = mine ] || [ "$FM_TREEHOUSE_SLOT_OWNER" = unsafe ]; then
+      echo "error: could not release task $ID's shared-slot claim; retaining its task record for a retry" >&2
+      exit 1
+    fi
+  else
+    TEARDOWN_DEFERRED_RETURN_SLOT=$TEARDOWN_RETURN_SLOT
+    require_owned_task_worktree_slot "$TEARDOWN_RETURN_SLOT" || exit 1
+    if ! teardown_owns_worktree; then
+      teardown_reprove_reassigned_slot
+    elif [ -n "$TEARDOWN_DEFERRED_RETURN_SLOT" ] && [ -z "$TEARDOWN_RETURN_SLOT" ]; then
+      :
+    else
+      require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RETURN_SLOT" || exit 1
+      if [ "$TEARDOWN_SLOT_CUSTODY" != project ]; then
+        FM_TASK_COPY_POOL_STATE_FILE=
+        FM_TASK_COPY_POOL_STATE_ENTRIES=
+        fm_task_copy_pool_slot_held "$TEARDOWN_RETURN_SLOT" || {
+          echo "REFUSED: reserved pool slot $TEARDOWN_RETURN_SLOT lost its durable lease; retaining the task record and contents" >&2
+          exit 1
+        }
+      fi
+      # Dirt or HEAD may change while the final pool admission queues. Repeat
+      # the local proof under custody; an uncached HEAD refuses without fetching
+      # and an index lock refuses without sleeping or retrying here.
+      [ ! -d "$WT" ] || validate_worktree_teardown_safety || exit 1
+      teardown_nested_slot return
+    fi
+  fi
+  fm_backlog_atomic_transition remove "$META" "task record" "$STATE" || exit 1
+  TEARDOWN_META_REMOVED=1
+  teardown_release_project_lock || exit 1
+fi
 # The record is gone, so the backlog must not still show this task in flight
 # when teardown reports success. Still under this task's meta lock, so a steer
 # racing the same id stays serialized exactly as it was before. A captain-held
 # row takes the retain transition here instead of the close: same record, same
 # ordering, the row returns to Queued with its deliverable recorded.
+TEARDOWN_CLOSE_META=$META
+[ "$TEARDOWN_META_REMOVED" != 1 ] || TEARDOWN_CLOSE_META=
 if [ "$BACKLOG_CLOSED" = 1 ]; then
-  if ! fm_backlog_atomic_transition "$BACKLOG_TRANSITION" "$STATE/$ID.meta" "$BACKLOG_CLOSE_MARKER" \
+  if ! fm_backlog_atomic_transition "$BACKLOG_TRANSITION" "$TEARDOWN_CLOSE_META" "$BACKLOG_CLOSE_MARKER" \
       "$DATA" "$ID" "$STATE" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"; then
     fm_lock_release "$META_LOCK"
     META_LOCK_HELD=0
@@ -5439,6 +5866,7 @@ else
 fi
 fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
+rm -f "$STATE/$ID.teardown-return-pending"
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \
     && teardown_owns_worktree; then
   "$FM_ROOT/bin/fm-fleet-sync.sh" "$PROJ" || true
@@ -5454,7 +5882,7 @@ elif [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}, worktree $WT, legacy record accepted without spawn_gen: endpoint $TEARDOWN_LEGACY_ENDPOINT, incarnation $TEARDOWN_META_SPAWN_GEN)"
 elif [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}; shared pool slot $TEARDOWN_SHARED_SLOT and every copy inside it left untouched; only this task's own slot claim, if present, released)"
-elif [ -n "$TEARDOWN_ENCLOSING_SLOT" ]; then
+elif [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed and its pool slot $TEARDOWN_ENCLOSING_SLOT returned)"
 elif [ "$TEARDOWN_KEEP_COPY" = 1 ] && [ -n "$TEARDOWN_RECORD_SLOT" ] && [ ! -d "$WT" ]; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT was already removed by an earlier teardown, and its pool slot $TEARDOWN_RECORD_SLOT is no longer this task's, so it was left alone)"

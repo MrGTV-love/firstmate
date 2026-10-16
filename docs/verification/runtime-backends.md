@@ -6,6 +6,25 @@ This record contains reusable version-scoped evidence for active runtime guarant
 The backend guides own current setup, safety boundaries, and limitations.
 Exact task chronology, branch names, temporary homes, local paths, process ids, thread ids, and delivery transcripts remain in private reports or PR evidence.
 
+## Pool-only cleanup critical sections
+
+Verified on 2026-10-14 on macOS arm64 with stock Bash 3.2.57 through isolated, model-free executions of the actual `fm-teardown.sh` and `fm-spawn.sh` paths.
+The ordinary overlap fixture publishes a fresh worker while process scanning, local-origin synchronization or backlog completion is deliberately held open.
+The recursive overlap fixture publishes a worker while Docker cleanup remains held open, with the descendant slot durably reserved.
+The multi-project recursive fixture also completes both domains despite opposite child enumeration orders.
+The spawn fixtures hold the project lock from another process and prove a queued fresh spawn has already fetched its base without writing a shared remote-tracking ref or FETCH_HEAD, and that its locked refresh then starts the worker from that tip even if the remote has vanished.
+They also prove the locked refresh never rewinds a newer shared `origin/<default>` or a newer `origin/HEAD` another fetch wrote while the spawn queued, repoints a stale `origin/HEAD` after a remote default-branch rename, and launches task ids that are not valid Git ref names without leaving a private base ref behind.
+These checks use real disposable Git repositories, `lsof` and `tasks-axi` where installed, with modeled Treehouse and terminal calls; they do not return a shared pool slot or prove an installed backend's lifecycle behavior.
+
+Refresh the portable coverage with:
+
+```sh
+bash bin/fm-test-run.sh tests/fm-project-capacity.test.sh tests/fm-teardown.test.sh tests/fm-teardown-endpoint-safety.test.sh tests/fm-secondmate-safety.test.sh
+```
+
+[`bin/fm-teardown.sh`](../../bin/fm-teardown.sh)'s header owns durable reservation, short project custody, refusal retention and return-before-record-release mechanics.
+The [architecture](../architecture.md) owns the shared allocation/publication boundary; measurements and host-specific chronology belong in private evidence rather than this reusable record.
+
 ## Launch-scoped Git hook selection
 
 Verified on 2026-10-05 on macOS arm64 with tmux 3.5a, Apple Git 2.50.1, and stock Bash 3.2.57:
