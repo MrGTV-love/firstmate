@@ -43,7 +43,7 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
   It snapshots and checks the complete request before key lookup, uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
   Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input-derived text.
   Durable-record failure is explicit rather than silently optional while active.
-  It also makes one bounded retry of an outage of a required judgment inside the handler budget, owns the outage-only deny text that replaces the permanent block notice, and records tries and elapsed time on failure rows.
+  It also makes one bounded retry of an outage of a required judgment inside the handler budget, owns the outage-only deny text that replaces the permanent block notice, and records its own tries and elapsed time on failure rows that hold no provider answer.
 
 The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error handling are removed, not retained as a second runtime path.
 
