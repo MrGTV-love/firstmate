@@ -60,6 +60,9 @@ fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
       [inputs | capture("^\\s*(?<pid>[0-9]+)\\s+(?<ppid>[0-9]+)\\s*$")
         | {key:.pid,value:(.ppid | tonumber)}] | from_entries') \
       || return 1
+    # A candidate Herdr listed but this later table lacks exited between the
+    # reads, so it is dropped. Its pid stays in $ids, so a vanished agent still
+    # drops its own children and leaves no survivor; a broken chain still fails.
     candidates=$(printf '%s' "$candidates" | jq -ec --argjson parents "$parents" --argjson group "$group" '
       map(.pid) as $ids
       | def below($pid; $targets; $seen):
@@ -69,7 +72,8 @@ fm_launch_proof_herdr_pid() { # <meta> -> the attributed live foreground PID
             elif $parent <= 1 then false
             elif ($seen | length) >= 64 then error("deep ancestry")
             else below($parent; $targets; $seen + [$parent]) end;
-        map(select(below(.pid; $ids; [.pid]) | not))
+        map(select($parents[.pid | tostring] != null))
+        | map(select(below(.pid; $ids; [.pid]) | not))
         | map(select(.pid == $group or below(.pid; [$group]; [.pid])))' 2>/dev/null) \
       || return 1
   fi
