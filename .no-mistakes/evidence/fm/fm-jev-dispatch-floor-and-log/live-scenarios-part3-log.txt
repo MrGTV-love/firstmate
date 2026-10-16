@@ -1,0 +1,19 @@
+##### S9 result log. Base home has no log; target home has one record per resolve so far (S1-S8b = 9 target resolves)
+ls: home-base/data: No such file or directory
+       9 home-target/data/dispatch-resolve.jsonl
+{"ts":"2026-10-16T02:56:07Z","status":"clear","choice":"rule_5","rule":"rule_5","selected":"rule_5","profile":{"harness":"claude","model":"claude-sonnet-5-5[1m]","effort":"high"},"confidence":0.51,"floor":0.6,"pooled":1,"reason":null}
+{"ts":"2026-10-16T02:56:08Z","status":"ambiguous","choice":"rule_3","rule":"rule_3","selected":"rule_3","profile":null,"confidence":0.51,"floor":0.6,"pooled":null,"reason":"confidence 0.51 below floor 0.6"}
+{"ts":"2026-10-16T02:56:10Z","status":"ambiguous","choice":"rule_4","rule":"rule_4","selected":"rule_4","profile":null,"confidence":0.51,"floor":0.6,"pooled":null,"reason":"rule_4 pooled probability 0.51 below floor 0.6"}
+{"ts":"2026-10-16T02:56:11Z","status":"ambiguous","choice":"rule_4","rule":"rule_4","selected":"rule_4","profile":null,"confidence":0.51,"floor":0.6,"pooled":null,"reason":"rule_4 pooled probability 0.51 below floor 0.6"}
+{"ts":"2026-10-16T02:56:13Z","status":"ambiguous","choice":"rule_3","rule":"rule_3","selected":"rule_3","profile":null,"confidence":0.45,"floor":0.6,"pooled":null,"reason":"confidence 0.45 below floor 0.6"}
+{"ts":"2026-10-16T02:56:23Z","status":"clear","choice":"rule_1","rule":"rule_4","selected":"rule_4","profile":{"harness":"claude","model":"claude-sonnet-5-5[1m]","effort":"high"},"confidence":0.3,"floor":0.6,"pooled":0.7,"reason":null}
+{"ts":"2026-10-16T02:56:24Z","status":"clear","choice":"rule_1","rule":"rule_2","selected":"rule_2","profile":{"harness":"claude","model":"opus","effort":"high"},"confidence":0.4,"floor":0.3,"pooled":null,"reason":null}
+{"ts":"2026-10-16T02:56:25Z","status":"clear","choice":"rule_3","rule":"rule_3","selected":"rule_3","profile":{"harness":"claude","model":"claude-haiku-5-5","effort":"max"},"confidence":0.95,"floor":0.6,"pooled":null,"reason":null}
+{"ts":"2026-10-16T02:56:27Z","status":"clear","choice":"rule_3","rule":"rule_3","selected":"rule_3","profile":{"harness":"claude","model":"claude-haiku-5-5","effort":"max"},"confidence":0.6,"floor":0.6,"pooled":null,"reason":null}
+
+statuses in order:
+clear ambiguous ambiguous ambiguous ambiguous clear clear clear clear
+distinct key sets:
+["choice","confidence","floor","pooled","profile","reason","rule","selected","status","ts"]
+privacy grep (sentinel, key, rule text, brief text) -> expect no match:
+0

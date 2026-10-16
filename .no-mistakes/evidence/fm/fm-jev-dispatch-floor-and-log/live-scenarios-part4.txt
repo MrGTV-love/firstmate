@@ -1,0 +1,43 @@
+##### S10 remaining statuses reach the log
+--- escalate: rule_3 gated by approval=captain ---
+dispatch-resolve:
+  status: escalate
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  reason: rule requires the captain's explicit approval before dispatch
+--- error: quota snapshot fails (FAKE) -> use broken quota-axi ---
+dispatch-resolve: error (quota-axi --json failed)
+dispatch-resolve:
+  status: error
+  reason: quota-axi --json failed
+--- escalate: rules file absent ---
+dispatch-resolve:
+  status: escalate
+  reason: no rules to match
+
+log tail (last 3 records):
+{"ts":"2026-10-16T02:56:49Z","status":"escalate","choice":"rule_3","rule":"rule_3","selected":"rule_3","profile":null,"confidence":0.95,"floor":0.6,"pooled":null,"reason":"rule requires the captain's explicit approval before dispatch"}
+{"ts":"2026-10-16T02:56:50Z","status":"error","choice":null,"rule":null,"selected":null,"profile":null,"confidence":null,"floor":null,"pooled":null,"reason":"quota-axi --json failed"}
+{"ts":"2026-10-16T02:56:50Z","status":"escalate","choice":null,"rule":null,"selected":null,"profile":null,"confidence":null,"floor":null,"pooled":null,"reason":"no rules to match"}
+total records:       12; statuses: clear ambiguous ambiguous ambiguous ambiguous clear clear clear clear escalate error escalate
+
+##### S11 off path (no API key) writes nothing and prints off
+dispatch-resolve: off (TYPESAFE_API_KEY absent from the environment and /Users/charlesabrooker/tmp/fm-dr-live.toBgVa/home-target/.env or the primary home .env)
+exit=0
+records before=      12 after=      12
+
+##### S12 a symlinked log is refused silently and the result is unchanged
+dispatch-resolve:
+  status: clear
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  note: rule matched
+exit=
+symlink target content: TARGET-FILE-UNTOUCHED
+
+##### S13 FM_DATA_OVERRIDE moves the log directory
+dispatch-resolve:
+  status: clear
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+ls: home-ovr/data: No such file or directory
+ovr-data:
+dispatch-resolve.jsonl
+{"ts":"2026-10-16T02:56:51Z","status":"clear","choice":"rule_3","rule":"rule_3","selected":"rule_3","profile":{"harness":"claude","model":"claude-haiku-5-5","effort":"max"},"confidence":0.95,"floor":0.6,"pooled":null,"reason":null}

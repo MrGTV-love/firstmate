@@ -1,0 +1,62 @@
+##### S6 larger pooled group replaces a distinct single argmax (rule_1 0.3 vs rule_4/5/6/default 0.7 pooled)
+--- base ---
+dispatch-resolve:
+  status: ambiguous
+  rule: rule_1 (Only when the captain expressly requires Claude for this tas)   confidence: 0.3
+  probabilities: rule_1=0.3 rule_2=0 rule_3=0 rule_4=0.2 rule_5=0.2 rule_6=0.15 rule_7=0 default=0.15
+  reason: confidence 0.3 below floor 0.6
+--- target ---
+dispatch-resolve:
+  status: clear
+  rule: rule_4 (Well understood ship task A.)   confidence: 0.3
+  probabilities: rule_1=0.3 rule_2=0 rule_3=0 rule_4=0.2 rule_5=0.2 rule_6=0.15 rule_7=0 default=0.15
+  replaced: answer choice rule_1 (probability 0.3, floor 0.6) did not clear; pooled group rule_4 rule_5 rule_6 rule_7 default (probability 0.7) stands in
+  pooled: rule_4 rule_5 rule_6 rule_7 default select the same profiles, approval and floors; combined probability 0.7 clears floor 0.6
+  note: rule matched
+  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'
+
+##### S7 replaced pick, stand-in clears own lower floor (rule_1 p0.4 min_conf 0.9; rule_2 0.3 min_conf 0.3 + rule_3 0.25 identical profiles)
+--- base ---
+dispatch-resolve:
+  status: clear
+  rule: rule_1 (Only when the captain expressly requires Claude for this tas)   confidence: 0.4
+  probabilities: rule_1=0.4 rule_2=0.3 rule_3=0.25 rule_4=0.05 rule_5=0 rule_6=0 rule_7=0 default=0
+  fallback: rule_2 (Ship task in the Vernant project that needs design.) probability 0.3 clears its floor 0.3; rule_1 probability 0.4 is below its floor 0.9
+  note: rule matched
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+--- target ---
+dispatch-resolve:
+  status: clear
+  rule: rule_2 (Ship task in the Vernant project that needs design.)   confidence: 0.4
+  probabilities: rule_1=0.4 rule_2=0.3 rule_3=0.25 rule_4=0.05 rule_5=0 rule_6=0 rule_7=0 default=0
+  replaced: answer choice rule_1 (probability 0.4, floor 0.9) did not clear; pooled group rule_2 rule_3 (probability 0.55) stands in
+  note: rule matched
+  profile: --harness 'claude' --model 'opus' --effort 'high'
+
+##### S8 regression: confident distinct pick (rule_3 0.95) is unchanged, no pooled/replaced lines
+--- base ---
+dispatch-resolve:
+  status: clear
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=0.95 rule_4=0.05 rule_5=0 rule_6=0 rule_7=0 default=0
+  note: rule matched
+  profile: --harness 'claude' --model 'claude-haiku-5-5' --effort 'max'
+--- target ---
+dispatch-resolve:
+  status: clear
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.95
+  probabilities: rule_1=0 rule_2=0 rule_3=0.95 rule_4=0.05 rule_5=0 rule_6=0 rule_7=0 default=0
+  note: rule matched
+  profile: --harness 'claude' --model 'claude-haiku-5-5' --effort 'max'
+
+##### S8b regression: pick clearing exactly 0.6 floor (rule_3 0.6), inclusive
+--- base ---
+dispatch-resolve:
+  status: clear
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.6
+  probabilities: rule_1=0 rule_2=0 rule_3=0.6 rule_4=0.4 rule_5=0 rule_6=0 rule_7=0 default=0
+--- target ---
+dispatch-resolve:
+  status: clear
+  rule: rule_3 (Trivial mechanical edit.)   confidence: 0.6
+  probabilities: rule_1=0 rule_2=0 rule_3=0.6 rule_4=0.4 rule_5=0 rule_6=0 rule_7=0 default=0

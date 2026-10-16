@@ -1,0 +1,28 @@
+##### S14 neutral default is the answer (default 0.51 vs rule_6 0.49): pools with the identical rule
+dispatch-resolve:
+  status: clear
+  rule: default (No listed rule applies to this task.)   confidence: 0.51
+  pooled: default rule_4 rule_5 rule_6 rule_7 select the same profiles, approval and floors; combined probability 1 clears floor 0.6
+  note: no rule matched
+  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'
+
+##### S15 confident pick inside the shared-profile group (rule_5 0.8): clears alone, no pooled or replaced line
+dispatch-resolve:
+  status: clear
+  rule: rule_5 (Well understood ship task B.)   confidence: 0.8
+  note: rule matched
+  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'
+
+##### S16 declared min_confidence on the shared-profile rule (rule_5 min_confidence 0.5, rule_5 0.45 + rule_6 0.1)
+--- base ---
+dispatch-resolve:
+  status: ambiguous
+  rule: rule_5 (Well understood ship task B.)   confidence: 0.45
+  reason: rule_5 probability 0.45 below its floor 0.5; no other option clears its own floor
+--- target ---
+dispatch-resolve:
+  status: clear
+  rule: rule_5 (Well understood ship task B.)   confidence: 0.45
+  pooled: rule_5 rule_4 rule_6 rule_7 default select the same profiles, approval and floors; combined probability 0.55 clears floor 0.5
+  note: rule matched
+  profile: --harness 'claude' --model 'claude-sonnet-5-5[1m]' --effort 'high'
