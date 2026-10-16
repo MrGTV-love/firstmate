@@ -1,0 +1,217 @@
+
+=== S1  answered call archived by real retention: base refuses, head passes
+backlog.md mentions of the id: 1
+3:- [x] d7-archived-call - Captain call d7-archived-call (repo: sample) (kind: captain) (done 2026-10-16) (hold: fm-hold-v1:Y2FwdGFpbiBtdXN0IGRlY2lkZSBkNy1hcmNoaXZlZC1jYWxs) (hold-kind: captain)
+$ BASE complete vernant-scout --none
+fm-captain-hold: no captain-held task d7-archived-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-lab.I3GO7R/data); the nearest legacy identity vernant-scout-decision-d7-archived-call also resolves to nothing
+RESULT PASS: S1 base refuses the archived answered call (the reported bug) (rc=1)
+$ HEAD complete vernant-scout --none
+complete: vernant-scout captain-call inventory reviewed (d7-archived-call) [answered and archived: d7-archived-call]
+RESULT PASS: S1 head retires it, naming the archive (rc=0)
+8:decisions_reviewed=1
+9:decision_keys=d7-archived-call
+
+=== S2  scout teardown completion gate follows the archived answer (base blocks, head passes)
+$ BASE fm-teardown.sh td-scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.KsMhNt
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+fm-captain-hold: no captain-held task teardown-answered and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-lab.KsMhNt/data); the nearest legacy identity td-scout-decision-teardown-answered also resolves to nothing
+REFUSED: scout task td-scout has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+RESULT PASS: S2 base teardown blocked by the completion gate (rc=1)
+RESULT PASS: S2 blocked teardown left the scout record
+$ HEAD fm-teardown.sh td-scout
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.KsMhNt
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+teardown td-scout complete (window firstmate:fm-td-scout, worktree /Users/charlesabrooker/tmp/fm-lab.KsMhNt/projects/missing-td-scout)
+Backlog: td-scout is closed in /Users/charlesabrooker/tmp/fm-lab.KsMhNt/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+RESULT PASS: S2 head teardown passes the gate (rc=0)
+RESULT PASS: S2 passing teardown removed the scout record
+
+=== S3  adversarial: archived call closed with NO recorded answer
+$ fm-captain-hold.sh verify s3-scout
+fm-captain-hold: captain-held task plain-closed is archived without a recorded captain answer
+RESULT PASS: S3 unanswered archived call refuses: verify (rc=1)
+$ fm-captain-hold.sh complete s3-scout --none
+fm-captain-hold: captain-held task plain-closed is archived without a recorded captain answer
+RESULT PASS: S3 unanswered archived call refuses: complete --none (rc=1)
+
+=== S4  adversarial: call closed only by reconcile evidence, then archived
+archive evidence records: 1
+$ fm-captain-hold.sh verify s4-scout
+fm-captain-hold: captain-held task moot-call is archived with only reconciliation evidence, not a recorded captain answer; resolve the entry by hand
+RESULT PASS: S4 reconcile-evidence-only archived call stays refused: verify (rc=1)
+$ fm-captain-hold.sh complete s4-scout --none
+fm-captain-hold: captain-held task moot-call is archived with only reconciliation evidence, not a recorded captain answer; resolve the entry by hand
+RESULT PASS: S4 reconcile-evidence-only archived call stays refused: complete --none (rc=1)
+
+=== S5  adversarial: archived answered call held for a DIFFERENT scout
+$ fm-captain-hold.sh verify s5-scout
+fm-captain-hold: captain-held task other-origin-call was held for origin somebody-elses-scout, not s5-scout; hold a task for s5-scout or list the right one
+RESULT PASS: S5 archived call held for another origin refuses: verify (rc=1)
+$ fm-captain-hold.sh complete s5-scout --none
+fm-captain-hold: captain-held task other-origin-call was held for origin somebody-elses-scout, not s5-scout; hold a task for s5-scout or list the right one
+RESULT PASS: S5 archived call held for another origin refuses: complete --none (rc=1)
+
+=== S6  adversarial: key present in neither backlog nor archive
+$ fm-captain-hold.sh verify s6-scout
+fm-captain-hold: no captain-held task never-existed-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-lab.MsWV2r/data); the nearest legacy identity s6-scout-decision-never-existed-call also resolves to nothing
+RESULT PASS: S6 key absent everywhere keeps its refusal: verify (rc=1)
+$ fm-captain-hold.sh complete s6-scout --none
+fm-captain-hold: no captain-held task never-existed-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-lab.MsWV2r/data); the nearest legacy identity s6-scout-decision-never-existed-call also resolves to nothing
+RESULT PASS: S6 key absent everywhere keeps its refusal: complete --none (rc=1)
+
+=== S7  quoted archive path with a '#': whole file is read; truncated stale file cannot stand in
+data/: backlog.md
+data/: closed#later.md
+data/: note-archive.md
+$ fm-captain-hold.sh verify s7-scout
+verified: s7-scout captain-call inventory
+RESULT PASS: S7 answered call archived at data/closed#later.md resolves: verify (rc=0)
+$ fm-captain-hold.sh complete s7-scout --none
+complete: s7-scout captain-call inventory reviewed (hash-call) [answered and archived: hash-call]
+RESULT PASS: S7 answered call archived at data/closed#later.md resolves: complete --none (rc=0)
+data/: backlog.md
+data/: closed
+data/: closed#later.md
+data/: note-archive.md
+$ fm-captain-hold.sh verify s7b-scout
+fm-captain-hold: captain-held task hash-stale is archived without a recorded captain answer
+RESULT PASS: S7b stale answer in truncated 'data/closed' does not stand in: verify (rc=1)
+$ fm-captain-hold.sh complete s7b-scout --none
+fm-captain-hold: captain-held task hash-stale is archived without a recorded captain answer
+RESULT PASS: S7b stale answer in truncated 'data/closed' does not stand in: complete --none (rc=1)
+$ fm-captain-hold.sh verify s7c-scout
+verified: s7c-scout captain-call inventory
+RESULT PASS: S7c single-quoted '#' path with trailing comment resolves: verify (rc=0)
+$ fm-captain-hold.sh complete s7c-scout --none
+complete: s7c-scout captain-call inventory reviewed (single-call) [answered and archived: single-call]
+RESULT PASS: S7c single-quoted '#' path with trailing comment resolves: complete --none (rc=0)
+
+=== S8  adversarial: archive settings the gate cannot read exactly are refused with a reason
+[backslash] .tasks.toml archive line: archive = "data\\syntax.md"
+$ fm-captain-hold.sh verify s8-scout
+fm-captain-hold: the done archive setting in /Users/charlesabrooker/tmp/fm-lab.pJj0O7/.tasks.toml uses syntax the gate cannot read exactly; resolve the archived call by hand
+RESULT PASS: S8[backslash] refused: verify (rc=2)
+$ fm-captain-hold.sh complete s8-scout --none
+fm-captain-hold: the done archive setting in /Users/charlesabrooker/tmp/fm-lab.pJj0O7/.tasks.toml uses syntax the gate cannot read exactly; resolve the archived call by hand
+RESULT PASS: S8[backslash] refused: complete --none (rc=2)
+[backslash-literal] .tasks.toml archive line: archive = 'data\syntax.md'
+$ fm-captain-hold.sh verify s8-scout
+fm-captain-hold: the done archive setting in /Users/charlesabrooker/tmp/fm-lab.oIcx3X/.tasks.toml uses syntax the gate cannot read exactly; resolve the archived call by hand
+RESULT PASS: S8[backslash-literal] refused: verify (rc=2)
+$ fm-captain-hold.sh complete s8-scout --none
+fm-captain-hold: the done archive setting in /Users/charlesabrooker/tmp/fm-lab.oIcx3X/.tasks.toml uses syntax the gate cannot read exactly; resolve the archived call by hand
+RESULT PASS: S8[backslash-literal] refused: complete --none (rc=2)
+[unterminated] .tasks.toml archive line: archive = "data/syntax.md
+$ fm-captain-hold.sh verify s8-scout
+fm-captain-hold: error: markdown.archive has an unterminated quoted value
+RESULT PASS: S8[unterminated] refused: verify (rc=2)
+$ fm-captain-hold.sh complete s8-scout --none
+fm-captain-hold: error: markdown.archive has an unterminated quoted value
+RESULT PASS: S8[unterminated] refused: complete --none (rc=2)
+[unquoted] .tasks.toml archive line: archive = data/syntax.md
+$ fm-captain-hold.sh verify s8-scout
+fm-captain-hold: error: markdown.archive has an invalid value
+RESULT PASS: S8[unquoted] refused: verify (rc=2)
+$ fm-captain-hold.sh complete s8-scout --none
+fm-captain-hold: error: markdown.archive has an invalid value
+RESULT PASS: S8[unquoted] refused: complete --none (rc=2)
+[trailing-text] .tasks.toml archive line: archive = "data/syntax.md" extra
+$ fm-captain-hold.sh verify s8-scout
+fm-captain-hold: error: markdown.archive has an unterminated quoted value
+RESULT PASS: S8[trailing-text] refused: verify (rc=2)
+$ fm-captain-hold.sh complete s8-scout --none
+fm-captain-hold: error: markdown.archive has an unterminated quoted value
+RESULT PASS: S8[trailing-text] refused: complete --none (rc=2)
+[empty] .tasks.toml archive line: archive = ""
+$ fm-captain-hold.sh verify s8-scout
+fm-captain-hold: error: markdown.archive must not be empty
+RESULT PASS: S8[empty] refused: verify (rc=2)
+$ fm-captain-hold.sh complete s8-scout --none
+fm-captain-hold: error: markdown.archive must not be empty
+RESULT PASS: S8[empty] refused: complete --none (rc=2)
+
+=== S9  adversarial: archive path set only in ~/.tasks-axi/config.toml stays refused
+data/: backlog.md
+data/: note-archive.md
+data/: user-archive.md
+$ HEAD (HOME=userhome) complete s9-scout --none
+fm-captain-hold: the done archive path is set outside this home's .tasks.toml, in /Users/charlesabrooker/tmp/fm-live-scratch.752X2N/userhome/.tasks-axi/config.toml, and is not read; resolve the archived call by hand
+RESULT PASS: S9 user-level-only archive path refused with a reason (rc=2)
+
+=== S10 retired fm-decision-hold records in the archive
+$ fm-captain-hold.sh verify s10-declined
+verified: s10-declined captain-call inventory
+RESULT PASS: S10 retired declined record resolves: verify (rc=0)
+$ fm-captain-hold.sh complete s10-declined --none
+complete: s10-declined captain-call inventory reviewed (ret-declined) [answered and archived: ret-declined] [no recorded origin on: ret-declined; not checked against s10-declined]
+RESULT PASS: S10 retired declined record resolves: complete --none (rc=0)
+$ fm-captain-hold.sh verify s10-modeless
+verified: s10-modeless captain-call inventory
+RESULT PASS: S10 retired modeless record resolves: verify (rc=0)
+$ fm-captain-hold.sh complete s10-modeless --none
+complete: s10-modeless captain-call inventory reviewed (ret-modeless) [answered and archived: ret-modeless] [no recorded origin on: ret-modeless; not checked against s10-modeless]
+RESULT PASS: S10 retired modeless record resolves: complete --none (rc=0)
+$ fm-captain-hold.sh verify s10-reconciled
+fm-captain-hold: captain-held task ret-reconciled is archived with only reconciliation evidence, not a recorded captain answer; resolve the entry by hand
+RESULT PASS: S10 retired reconciled record refuses: verify (rc=1)
+$ fm-captain-hold.sh complete s10-reconciled --none
+fm-captain-hold: captain-held task ret-reconciled is archived with only reconciliation evidence, not a recorded captain answer; resolve the entry by hand
+RESULT PASS: S10 retired reconciled record refuses: complete --none (rc=1)
+$ fm-captain-hold.sh verify s10-empty
+fm-captain-hold: captain-held task ret-empty is archived without a recorded captain answer
+RESULT PASS: S10 retired empty record refuses: verify (rc=1)
+$ fm-captain-hold.sh complete s10-empty --none
+fm-captain-hold: captain-held task ret-empty is archived without a recorded captain answer
+RESULT PASS: S10 retired empty record refuses: complete --none (rc=1)
+$ fm-captain-hold.sh verify s10-norouted
+fm-captain-hold: captain-held task ret-norouted is archived without a recorded captain answer
+RESULT PASS: S10 retired norouted record refuses: verify (rc=1)
+$ fm-captain-hold.sh complete s10-norouted --none
+fm-captain-hold: captain-held task ret-norouted is archived without a recorded captain answer
+RESULT PASS: S10 retired norouted record refuses: complete --none (rc=1)
+
+=== S11 answer text that starts with blank lines resolves; label followed only by blank lines refuses
+- [x] blank-lead - Blank lead (repo: sample) (kind: captain) (done 2026-10-16) (hold: fm-hold-v1:Y2FwdGFpbiBtdXN0IGRlY2lkZQ==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 58cc8016c554d4db80c6592f7e0d1335e7162ffddc338e6c391df563708f670e
+  Resolution mode: answered
+  Resolves hold set: 2026-10-16T18:40:59Z
+
+  Captain decision:
+
+
+  Use option B.
+
+  Captain hold origin: s11-scout
+
+  Origin: s11-scout
+$ fm-captain-hold.sh verify s11-scout
+verified: s11-scout captain-call inventory
+RESULT PASS: S11 blank-led answer resolves: verify (rc=0)
+$ fm-captain-hold.sh complete s11-scout --none
+complete: s11-scout captain-call inventory reviewed (blank-lead) [answered and archived: blank-lead]
+RESULT PASS: S11 blank-led answer resolves: complete --none (rc=0)
+$ fm-captain-hold.sh verify s11b-scout
+fm-captain-hold: captain-held task blank-only is archived without a recorded captain answer
+RESULT PASS: S11b label followed only by blank lines refuses: verify (rc=1)
+$ fm-captain-hold.sh complete s11b-scout --none
+fm-captain-hold: captain-held task blank-only is archived without a recorded captain answer
+RESULT PASS: S11b label followed only by blank lines refuses: complete --none (rc=1)
+
+=== S12 live (unarchived) closed answered call still resolves exactly as before
+backlog.md mentions: 1
+RESULT PASS: S12 base verify on live row (rc=0)
+complete: s12-scout captain-call inventory reviewed (live-call)
+RESULT PASS: S12 head complete on live row, no archive disclosure (rc=0)
+RESULT PASS: S12 no archive disclosure for a live row
+
+=== SUMMARY: 50 pass, 0 fail
+/Users/charlesabrooker/.no-mistakes/evidence/01M52ZH23SX91WSKMYA45JWA4V/live-driver.sh: line 256: LABS[@]: unbound variable
