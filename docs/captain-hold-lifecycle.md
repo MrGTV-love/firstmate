@@ -320,11 +320,13 @@ The close uses the same task control lock, body archival, retained-artifact hand
 Worker-owned unfinished work is not completed by this operator path.
 Both standalone paths are decision answers under the [supervision role partition](pi-supervision-branch.md#consistency): main-owned while attended, refused for the supervision branch, and relocated to it only under the away-posture record.
 The board-request `reconcile close`, `answer`, and `answers` are not part of that guard.
-One exact-replay rule governs every retry of a task close.
-A retry may finish parent publication and request retirement only against a record written by reconciliation with the same evidence digest and the same hold-set stamp.
+One exact-replay rule governs every retry of a task close, on the board-request path and the `--verified-outcome` path alike.
+After an interrupted close a retry is accepted only as an exact replay of the newest record: the same evidence digest, written by reconciliation, for the same hold-set stamp.
 The verified outcome is part of the digest, and a record and a hold that both carry no stamp match each other.
-Any other mismatch is refused by name, and a retry never closes a newer or reopened hold.
-A retry whose digest matches no record is not a replay: a closed call refuses it, while an interrupted `--verified-outcome` close accepts it as a superseding resolution on the same hold and resolves the hold's original parent key, never a new occurrence.
+The retry finishes parent publication under the hold's original opening occurrence key.
+A different digest or outcome against the newest record of the current hold is refused by name; it stacks no record and publishes no later occurrence key, and a closed call refuses it too.
+A retry never closes a newer or reopened hold: the same evidence is refused there, while a different digest on a reopened open task is the first close of that new opening and resolves only the new hold's key.
+A hold with no stamp and two or more records cannot identify its opening and is refused as legacy stacked records.
 Only a `--verified-outcome` retry may finish without a pending board request; the default close and a still-active note need one in every state.
 
 For an ordinary status-owned operational key, `reconcile close-key` addresses the active home's status stream, not a worker endpoint or another home's backlog.
@@ -627,9 +629,9 @@ Around those outcomes, it proves:
 - `test_operational_key_closes_with_durable_evidence_and_replay` covers full evidence retention, exact retry, changed evidence, reopened calls, and preservation of unrelated keys.
 - `test_close_key_leaves_a_migrated_captain_hold_to_its_owner` covers a Beads-migrated captain hold keeping its key until the owner closes it.
 - `test_operational_key_close_refusals_and_interrupted_append` covers captain-task and library ownership, required attestation, absent keys, retry after evidence publication but before status append, and refusal of that staged evidence once the key has reopened.
-- `test_verified_close_supersession_resolves_the_original_parent_key` covers an interrupted close superseded by changed evidence or a changed outcome, with the original parent key resolved across stacked records and closed-task retries.
+- `test_interrupted_close_retries_only_as_an_exact_replay` covers an interrupted close refusing changed evidence or a changed outcome without stacking a record, then finishing on the exact retry and resolving the original parent key.
 - `test_standalone_closes_follow_the_supervision_role_partition` covers the attended branch refused on both standalone paths, the board-request close left unguarded, the away record relocating both, and main unaffected.
-- `test_verified_close_retry_matrix` covers the exact-replay rule over open or closed task, same or changed evidence, same or changed outcome, request present or absent, stamped or legacy hold, and same or reopened opening, with the board-path retry requiring its pending request.
+- `test_verified_close_retry_matrix` covers the exact-replay rule over open or closed task, same or changed evidence, same or changed outcome, request present or absent, stamped or legacy hold, and same or reopened opening, plus the board-path retry and a legacy hold with stacked records.
 - Each durable mutation applies only once across close, probe, and request-retirement failures.
 - A later distinct request with the same note still appends its own dated record.
 - Every failed retirement is surfaced with its pending request retained.

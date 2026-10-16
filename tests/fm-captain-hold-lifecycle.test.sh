@@ -3048,17 +3048,17 @@ SH
   pass "standalone close retries preserve hold age and cannot replay across hold lifecycles"
 }
 
-test_verified_close_supersession_resolves_the_original_parent_key() {
+test_interrupted_close_retries_only_as_an_exact_replay() {
   local home parent channel id show open
-  home=$(make_home verified-supersede)
-  parent=$(make_home verified-supersede-parent)
+  home=$(make_home interrupted-replay)
+  parent=$(make_home interrupted-replay-parent)
   printf 'verified-mate\n' > "$home/.fm-secondmate-home"
   printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
     > "$home/.fm-secondmate-parent"
   channel="$parent/state/verified-mate.status"
-  id=sample-verified-supersede
-  run_captain "$home" hold "$id" --title "Superseded evidence close" --reason "old choice" >/dev/null \
-    || fail "could not hold the supersession fixture"
+  id=sample-interrupted-replay
+  run_captain "$home" hold "$id" --title "Interrupted evidence close" --reason "old choice" >/dev/null \
+    || fail "could not hold the interrupted-close fixture"
   open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$channel")
   assert_contains "$open" "captain-hold-$id-1" "the hold did not publish its parent key"
   printf 'Verified source captured.txt: the choice was already answered.\n' > "$home/answered.txt"
@@ -3068,7 +3068,7 @@ test_verified_close_supersession_resolves_the_original_parent_key() {
 if [ "${1:-}" = done ]; then
   attempts=$(cat "$FM_HOME/done-attempts" 2>/dev/null || echo 0)
   printf '%s\n' "$((attempts + 1))" > "$FM_HOME/done-attempts"
-  [ "$attempts" -ge 2 ] || exit 92
+  [ "$attempts" -ge 1 ] || exit 92
 fi
 exec "$REAL_TASKS_AXI" "$@"
 SH
@@ -3077,45 +3077,57 @@ SH
     --evidence-file "$home/answered.txt" >/dev/null 2>&1; then
     fail "an interrupted close reported success"
   fi
+  show=$(tasks_in "$home" show "$id" --full)
+  assert_contains "$show" "held: yes" "the interrupted close released the hold"
+  # A different outcome, different evidence, or both is no replay of the recorded
+  # close: it stacks no second record and publishes no later occurrence key.
+  for retry in "moot moot.txt" "answered moot.txt" "moot answered.txt"; do
+    if out=$(run_captain "$home" reconcile close "$id" --verified-outcome "${retry%% *}" \
+      --evidence-file "$home/${retry##* }" 2>&1); then
+      fail "a changed retry ($retry) replaced an interrupted close: $out"
+    fi
+    assert_contains "$out" "records a different resolution for this hold" \
+      "the changed retry ($retry) refusal did not name its reason: $out"
+    [ "$(tasks_in "$home" show "$id" --full)" = "$show" ] || fail "the refused changed retry ($retry) mutated the task"
+  done
+  assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "a refused retry minted a second occurrence key"
+  run_captain "$home" reconcile close "$id" --verified-outcome answered \
+    --evidence-file "$home/answered.txt" >/dev/null || fail "the exact retry did not finish the interrupted close"
+  show=$(tasks_in "$home" show "$id" --full)
+  assert_contains "$show" "state: done" "the exact retry left the task open"
+  [ "$(printf '%s\n' "$show" | grep -o 'Resolution mode: reconciled' | wc -l | tr -d ' ')" -eq 1 ] \
+    || fail "the interrupted close stacked a second resolution"
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$channel")
+  [ -z "$open" ] || fail "the exact retry left the original parent key open: $open"
+  assert_contains "$(cat "$channel")" "resolved [key=captain-hold-$id-1]" \
+    "the exact retry did not resolve the hold's original key"
+  assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "the exact retry minted a second occurrence key"
+  run_captain "$home" reconcile close "$id" --verified-outcome answered \
+    --evidence-file "$home/answered.txt" >/dev/null || fail "closed-task exact retry failed"
+  assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "the closed-task retry minted a second occurrence key"
   if run_captain "$home" reconcile close "$id" --verified-outcome moot \
     --evidence-file "$home/moot.txt" >/dev/null 2>&1; then
-    fail "an interrupted superseding close reported success"
+    fail "a closed call accepted a different resolution"
   fi
-  assert_contains "$(tasks_in "$home" show "$id" --full)" "held: yes" "interrupted closes released the hold"
-  # The exact retry of the newest record finishes the close over two stacked records.
-  run_captain "$home" reconcile close "$id" --verified-outcome moot \
-    --evidence-file "$home/moot.txt" >/dev/null || fail "the superseding close did not finish on retry"
-  show=$(tasks_in "$home" show "$id" --full)
-  assert_contains "$show" "state: done" "the superseding close left the task open"
-  assert_contains "$show" "Verified outcome: moot" "the superseding evidence was not recorded"
-  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$channel")
-  [ -z "$open" ] || fail "a superseded verified close left the original parent key open: $open"
-  assert_contains "$(cat "$channel")" "resolved [key=captain-hold-$id-1]" \
-    "the superseding close did not resolve the hold's original key"
-  assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "the superseding close minted a second occurrence key"
-  assert_not_contains "$(cat "$channel")" "captain-hold-$id-3" "the superseding close minted a third occurrence key"
-  # A closed-task retry republishes the same original key, never a later one.
-  run_captain "$home" reconcile close "$id" --verified-outcome moot \
-    --evidence-file "$home/moot.txt" >/dev/null || fail "closed-task retry failed"
-  assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "the closed-task retry minted a second occurrence key"
-  assert_not_contains "$(cat "$channel")" "captain-hold-$id-3" "the closed-task retry minted a third occurrence key"
-  pass "a superseding verified close resolves the hold's original parent key across stacked records and retries"
+  pass "an interrupted close retries only as an exact replay and resolves the hold's original parent key"
 }
 
 # The one exact-replay rule, pinned cell by cell. Every cell builds a call whose
 # first evidence close wrote a resolution record, then retries it. A retry may
-# finish only a record with the same evidence digest (the verified outcome is
-# part of it) for the same hold. A different digest is no replay: a closed call
-# refuses it and an open call takes it as a fresh close of whatever hold it now
-# carries, resolving only that hold's own parent key. Older evidence never closes
-# a newer hold, and a closed call never replays across a newer hold.
+# finish only the newest record, with the same evidence digest (the verified
+# outcome is part of it) for the same hold, and then resolves that hold's own
+# parent key. A different digest against the hold the record names is refused
+# and stacks nothing; only an open task whose hold is a newer opening takes it
+# as the first close of that opening. Older evidence never closes a newer hold,
+# and a closed call never replays across one.
 matrix_expectation() {  # <task-state> <digest> <opening> -> "accept <key-occurrence>" | "refuse <reason>"
   case "$1:$3:$2" in
     closed:same:same) echo "accept 1" ;;
-    closed:same:changed) echo "refuse records a different resolution" ;;
+    closed:same:changed) echo "refuse records a different resolution; it cannot be reconciled again" ;;
     closed:reopened:same) echo "refuse newer or unidentifiable hold" ;;
-    closed:reopened:changed) echo "refuse records a different resolution" ;;
-    open:same:*) echo "accept 1" ;;
+    closed:reopened:changed) echo "refuse records a different resolution; it cannot be reconciled again" ;;
+    open:same:same) echo "accept 1" ;;
+    open:same:changed) echo "refuse records a different resolution for this hold" ;;
     open:reopened:same) echo "refuse newer or unidentifiable hold" ;;
     open:reopened:changed) echo "accept 2" ;;
   esac
@@ -3200,6 +3212,9 @@ matrix_cell() {  # <n> <task-state> <evidence> <outcome> <request> <stamp> <open
   kind=${want%% *}
   detail=${want#* }
   after_open=$(matrix_open_keys "$channel" "$id")
+  if [ "$opening" = same ]; then
+    assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "matrix $label: a same-opening retry published a later occurrence key"
+  fi
   if [ "$kind" = refuse ]; then
     [ "$rc" -ne 0 ] || fail "matrix $label: a retry that must be refused succeeded: $out"
     assert_contains "$out" "$detail" "matrix $label: the refusal did not name its reason: $out"
@@ -3208,7 +3223,7 @@ matrix_cell() {  # <n> <task-state> <evidence> <outcome> <request> <stamp> <open
     [ "$after_open" = "$before_open" ] || fail "matrix $label: a refused retry changed the open parent keys"
     [ "$request" = absent ] || [ -f "$req_path" ] || fail "matrix $label: a refused retry retired the request"
   else
-    [ "$rc" -eq 0 ] || fail "matrix $label: an exact or superseding retry was refused: $out"
+    [ "$rc" -eq 0 ] || fail "matrix $label: an exact retry or the first close of a new opening was refused: $out"
     assert_contains "$out" "reconciled: $id" "matrix $label: the accepted retry did not report success"
     assert_contains "$(tasks_in "$home" show "$id" --full)" "state: done" "matrix $label: the accepted retry left the task open"
     assert_contains "$(cat "$channel")" "resolved [key=captain-hold-$id-$detail]" \
@@ -3220,7 +3235,7 @@ matrix_cell() {  # <n> <task-state> <evidence> <outcome> <request> <stamp> <open
 }
 
 matrix_board_cell() {  # <n> <task-state> <stamp>
-  local n=$1 task_state=$2 stamp=$3 id="matrix-$1" home channel out
+  local n=$1 task_state=$2 stamp=$3 id="matrix-$1" home channel out show
   matrix_home "$n"
   home=$MATRIX_HOME
   channel=$MATRIX_CHANNEL
@@ -3229,15 +3244,68 @@ matrix_board_cell() {  # <n> <task-state> <stamp>
   else
     tasks_in "$home" add "$id" "Board $n" --repo sample >/dev/null
     tasks_in "$home" hold "$id" --reason "board choice $n" --kind captain >/dev/null
+    printf 'needs-decision [key=captain-hold-%s-1]: captain hold %s: board choice %s\n' "$id" "$id" "$n" >> "$channel"
   fi
   request_reconciles "$home" matrix-src "$id" || fail "board $task_state/$stamp: could not file the request"
+  cp "$home/state/reconcile-requests/$id.request" "$home/request.backup"
   [ "$task_state" = closed ] || : > "$home/fail-done-$id"
   run_captain "$home" reconcile close "$id" --evidence-file "$home/e1.txt" >/dev/null 2>&1 || true
-  rm -f "$home/fail-done-$id" "$home/state/reconcile-requests/$id.request"
+  rm -f "$home/fail-done-$id"
+  if [ "$task_state" = open ]; then
+    # The board path takes the same exact-replay rule: a different digest is no
+    # replay of the interrupted close, stacks nothing, and publishes no later key.
+    show=$(tasks_in "$home" show "$id" --full)
+    out=$(run_captain "$home" reconcile close "$id" --evidence-file "$home/e2.txt" 2>&1) \
+      && fail "board $task_state/$stamp: a changed retry replaced an interrupted close: $out"
+    assert_contains "$out" "records a different resolution for this hold" \
+      "board $task_state/$stamp: the changed retry refusal did not name its reason: $out"
+    [ "$(tasks_in "$home" show "$id" --full)" = "$show" ] || fail "board $task_state/$stamp: the refused changed retry mutated the task"
+    assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "board $task_state/$stamp: a refused retry minted a second occurrence key"
+  fi
+  rm -f "$home/state/reconcile-requests/$id.request"
   out=$(run_captain "$home" reconcile close "$id" --evidence-file "$home/e1.txt" 2>&1) \
     && fail "board $task_state/$stamp: a default close retry succeeded without a pending request: $out"
   assert_contains "$out" "no pending board-created reconcile request" \
     "board $task_state/$stamp: the refusal did not name the missing request: $out"
+  if [ "$task_state" = open ]; then
+    cp "$home/request.backup" "$home/state/reconcile-requests/$id.request"
+    run_captain "$home" reconcile close "$id" --evidence-file "$home/e1.txt" >/dev/null \
+      || fail "board $task_state/$stamp: the exact retry did not finish the interrupted close"
+    assert_contains "$(tasks_in "$home" show "$id" --full)" "state: done" "board $task_state/$stamp: the exact retry left the task open"
+    assert_contains "$(cat "$channel")" "resolved [key=captain-hold-$id-1]" \
+      "board $task_state/$stamp: the exact retry did not resolve the hold's original key"
+    assert_not_contains "$(cat "$channel")" "captain-hold-$id-2" "board $task_state/$stamp: the exact retry minted a second occurrence key"
+    [ -z "$(matrix_open_keys "$channel" "$id")" ] || fail "board $task_state/$stamp: the exact retry left a parent key open"
+  fi
+}
+
+matrix_legacy_stacked_cell() {  # <n>
+  local n=$1 id="matrix-$1" home channel out show attempt
+  matrix_home "$n"
+  home=$MATRIX_HOME
+  channel=$MATRIX_CHANNEL
+  tasks_in "$home" add "$id" "Legacy $n" --repo sample >/dev/null
+  tasks_in "$home" hold "$id" --reason "legacy choice $n" --kind captain >/dev/null
+  printf 'needs-decision [key=captain-hold-%s-1]: captain hold %s: legacy choice %s\n' "$id" "$id" "$n" >> "$channel"
+  : > "$home/fail-done-$id"
+  for attempt in one two; do
+    printf 'The captain chose %s.\n' "$attempt" > "$home/decision-$attempt.txt"
+    run_captain "$home" answer "$id" --decision-file "$home/decision-$attempt.txt" >/dev/null 2>&1 || true
+  done
+  rm -f "$home/fail-done-$id"
+  show=$(tasks_in "$home" show "$id" --full)
+  [ "$(printf '%s\n' "$show" | grep -o 'Resolution recorded by' | wc -l | tr -d ' ')" -eq 2 ] \
+    || fail "legacy stacked: the fixture did not stack two unstamped records"
+  for attempt in e1 e2; do
+    out=$(run_captain "$home" reconcile close "$id" --verified-outcome answered \
+      --evidence-file "$home/$attempt.txt" 2>&1) \
+      && fail "legacy stacked: a close of an unidentifiable opening succeeded: $out"
+    assert_contains "$out" "legacy stacked records, opening not identifiable" \
+      "legacy stacked: the refusal did not name its reason: $out"
+  done
+  [ "$(tasks_in "$home" show "$id" --full)" = "$show" ] || fail "legacy stacked: a refused close mutated the task"
+  assert_not_contains "$(cat "$channel")" "resolved [key=captain-hold-$id" "legacy stacked: a refused close published to the parent"
+  assert_contains "$(matrix_open_keys "$channel" "$id")" "captain-hold-$id-1" "legacy stacked: a refused close closed the parent key"
 }
 
 test_verified_close_retry_matrix() {
@@ -3267,6 +3335,8 @@ test_verified_close_retry_matrix() {
       cells[n]="matrix_board_cell $n $task_state $stamp"
     done
   done
+  n=$((n + 1))
+  cells[n]="matrix_legacy_stacked_cell $n"
   cell=1
   while [ "$cell" -le "$n" ]; do
     (${cells[cell]} > "$dir/$cell.log" 2>&1; echo $? > "$dir/$cell.rc") &
@@ -3282,7 +3352,7 @@ test_verified_close_retry_matrix() {
     [ "$(cat "$dir/$cell.rc" 2>/dev/null)" = 0 ] || failed="$failed${failed:+; }cell $cell: $(tail -n 3 "$dir/$cell.log" | tr '\n' ' ')"
   done
   [ -z "$failed" ] || fail "retry matrix failures: $failed"
-  pass "the verified-close retry matrix accepts only exact or interrupted superseding retries and never closes a newer opening"
+  pass "the close retry matrix accepts only exact replays and the first close of a new opening, and never closes a newer or unidentifiable one"
 }
 
 test_verified_closes_refuse_unanswered_or_unsupported_calls() {
@@ -7248,7 +7318,7 @@ test_reconcile_closes_with_evidence_or_keeps_the_call_open
 test_reconcile_outcomes_retry_partial_failures_once
 test_verified_close_without_board_request
 test_verified_close_retries_only_its_own_hold
-test_verified_close_supersession_resolves_the_original_parent_key
+test_interrupted_close_retries_only_as_an_exact_replay
 test_verified_close_retry_matrix
 test_verified_closes_refuse_unanswered_or_unsupported_calls
 test_close_key_leaves_a_migrated_captain_hold_to_its_owner

@@ -127,19 +127,23 @@
 # It records the evidence and any verified outcome in a `reconciled` resolution
 # under `Reconciliation evidence:`, never as the captain's words. A verified
 # close refuses unfinished worker-owned work. One exact-replay rule governs
-# every retry of a close: it may finish parent publication and request
-# retirement only against a record written by reconciliation with the same
-# evidence digest (the verified outcome is part of the digest) for the same
-# hold stamp, where a record and a hold with no stamp match each other. A
-# record with another digest is no replay: a closed call refuses it, and an
-# interrupted --verified-outcome close accepts it as a superseding record on the
-# same hold, published under that hold's original parent key. Any other
-# mismatch is refused by name, and a retry never closes a newer or reopened
-# hold. Only a --verified-outcome retry may finish without a pending request;
-# the default close and `note` need one in every state. `note` appends one
-# dated `Captain hold reconciled:` note and leaves the hold in place. A normal
-# answer also retires a pending request. `list` enumerates only pending board
-# requests.
+# every retry of a close on every path, board request or --verified-outcome:
+# after an interrupted close a retry is accepted only as an exact replay of the
+# newest record, with the same evidence digest (the verified outcome is part of
+# the digest), written by reconciliation, for the same hold stamp, where a
+# record and a hold with no stamp match each other. It finishes parent
+# publication under that hold's original opening occurrence key. A different
+# digest or outcome against the newest record of the current hold is refused by
+# name; it stacks no record and publishes no later key. A closed call refuses a
+# different digest as well. A retry never closes a newer or reopened hold: the
+# same evidence is refused there, while a different digest on a reopened open
+# task is the first close of that new opening and resolves only its own key. A
+# hold with no stamp and two or more records cannot identify its opening and is
+# refused as legacy stacked records. Only a --verified-outcome retry may finish
+# without a pending request; the default close and `note` need one in every
+# state. `note` appends one dated `Captain hold reconciled:` note and leaves the
+# hold in place. A normal answer also retires a pending request. `list`
+# enumerates only pending board requests.
 #
 # `close-key` applies that explicit verified-outcome/evidence requirement to a
 # status-owned operational key in THIS home's <owner-id>.status, without a
@@ -579,20 +583,22 @@ resolution_record_count() {  # <task-body>
 # The occurrence a parent hold key carries: one past the records written for
 # earlier hold lifecycles, so a record stacked on the same hold still names the
 # key that hold opened. A hold with no stamp matches a newest record with no
-# stamp, which then names the same opening.
-hold_lifecycle_occurrence() {  # <task-body> <hold-set>
-  local body count
-  count=$(resolution_record_count "$1")
-  if [ -z "$2" ]; then
-    if [ "$count" -gt 0 ] && [ -z "$(recorded_resolved_hold_set "$1")" ]; then
+# stamp, which then names the same opening; two or more such records cannot
+# say which of them belong to this hold, so the opening is refused by name.
+hold_lifecycle_occurrence() {  # <task-id> <task-body> <hold-set>
+  local id=$1 body count
+  count=$(resolution_record_count "$2")
+  if [ -z "$3" ]; then
+    if [ "$count" -gt 0 ] && [ -z "$(recorded_resolved_hold_set "$2")" ]; then
+      [ "$count" -lt 2 ] || fail "task $id: legacy stacked records, opening not identifiable"
       printf '%s\n' "$count"
     else
       printf '%s\n' "$((count + 1))"
     fi
     return 0
   fi
-  body=$(decode_shown_value "$1") || return 1
-  printf '%s\n' "$body" | awk -v want="Resolves hold set: $2" '
+  body=$(decode_shown_value "$2") || return 1
+  printf '%s\n' "$body" | awk -v want="Resolves hold set: $3" '
     /^Resolution recorded by fm-(captain|decision)-hold\.$/ { total++; inrec = 1; next }
     inrec && /^Resolution mode: / {
       inrec = 0
@@ -1874,7 +1880,6 @@ reconcile_close() {
   body=$(show_field "$show" body)
   [ "$has_request" = 1 ] || [ -n "$verified_outcome" ] \
     || fail "task $id has no pending board-created reconcile request; verify the recorded answers or moot premise and supply --verified-outcome answered|moot"
-  occurrence=$(( $(resolution_record_count "$body") + 1 ))
   cur=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
   if [ "$state" = "done" ]; then
     # An exact retry finishes an interrupted close and stays idempotent; a
@@ -1886,9 +1891,7 @@ reconcile_close() {
     [ "$replay" -ne 2 ] || fail "$REPLAY_REFUSAL"
     [ "$replay" -eq 0 ] \
       || fail "task $id records a different resolution; it cannot be reconciled again"
-    occurrence=$(resolution_record_count "$body")
-    [ -z "$verified_outcome" ] \
-      || occurrence=$(hold_lifecycle_occurrence "$body" "$(recorded_resolved_hold_set "$body")")
+    occurrence=$(hold_lifecycle_occurrence "$id" "$body" "$(recorded_resolved_hold_set "$body")") || exit 1
     remove_interrupted_answer_stamp "$id"
     publish_parent_hold "$id" "$occurrence" resolved reconciled
     [ "$PARENT_HOLD_PUBLISHED" = 1 ] \
@@ -1902,14 +1905,14 @@ reconcile_close() {
   if [ -n "$verified_outcome" ] && live_work_item "$id" "$state"; then
     fail "task $id still owns unfinished work; use answer --release with the captain's words rather than completing it"
   fi
+  occurrence=$(hold_lifecycle_occurrence "$id" "$body" "$cur") || exit 1
   replay=0
   reconcile_replay_check "$id" "$body" "$cur" "$state" || replay=$?
   [ "$replay" -ne 2 ] || fail "$REPLAY_REFUSAL"
-  [ -z "$verified_outcome" ] \
-    || occurrence=$(hold_lifecycle_occurrence "$body" "$cur")
-  if [ "$replay" -eq 0 ]; then
-    [ -n "$verified_outcome" ] || occurrence=$(resolution_record_count "$body")
-  else
+  if [ "$replay" -eq 1 ]; then
+    if body_has_resolution_record "$body" && [ "$cur" = "$(recorded_resolved_hold_set "$body")" ]; then
+      fail "task $id records a different resolution for this hold; an interrupted close retries only with the same evidence and verified outcome"
+    fi
     write_resolution_record "$id" reconciled "$body"
   fi
   close_answered "$id" 0 || fail "could not close reconciled captain-held task $id"
