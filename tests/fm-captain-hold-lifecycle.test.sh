@@ -7267,6 +7267,209 @@ SH
   pass "sweeps reuse migration note and prefix precedence and keep ambiguous or unreadable identities"
 }
 
+# --- calls moved to the done archive by backlog retention -------------------
+#
+# Backlog retention moves a closed call out of data/backlog.md into the archive
+# tasks-axi writes, and the completion gate must still resolve it. These
+# fixtures use the real layout: the rows are closed through the real commands
+# and pushed out by retention (done_keep = 1), never hand-written into the file.
+
+# Retention keeps one closed row, so the next closed row archives this one.
+set_archive_retention() {  # <home> <archive-path-in-toml>
+  printf '%s\n' 'backend = "markdown"' '' '[markdown]' 'path = "data/backlog.md"' \
+    "archive = \"$2\"" 'done_keep = 1' > "$1/.tasks.toml"
+}
+
+# Closes <id> with the captain's recorded answer for <origin>, then closes a
+# filler row so retention archives it.
+archive_an_answered_call() {  # <home> <id> <origin>
+  local home=$1 id=$2 origin=$3
+  run_captain "$home" hold "$id" --title "Captain call $id" \
+    --reason "captain must decide $id" --repo sample --origin "$origin" >/dev/null \
+    || fail "could not hold the archived-call fixture $id"
+  printf 'Go with the recorded option for %s.\n' "$id" > "$home/answer-$id.txt"
+  run_captain "$home" answer "$id" --decision-file "$home/answer-$id.txt" >/dev/null \
+    || fail "could not answer the archived-call fixture $id"
+  push_through_retention "$home" "retention-filler-$(printf '%s' "$id" | cksum | cut -d' ' -f1)"
+}
+
+# Closes <id> without any recorded captain answer, then archives it.
+archive_an_unanswered_call() {  # <home> <id>
+  local home=$1 id=$2
+  tasks_in "$home" add "$id" "Closed with no answer $id" --kind captain --repo sample >/dev/null \
+    || fail "could not create the unanswered fixture $id"
+  tasks_in "$home" done "$id" >/dev/null || fail "could not close the unanswered fixture $id"
+  push_through_retention "$home" "retention-filler-$(printf '%s' "$id" | cksum | cut -d' ' -f1)"
+}
+
+push_through_retention() {  # <home> <filler-id>
+  tasks_in "$1" add "$2" "Filler closed row" --kind captain --repo sample >/dev/null \
+    && tasks_in "$1" done "$2" >/dev/null \
+    || fail "could not close the retention filler $2"
+}
+
+test_archived_answered_call_resolves_through_the_gate() {
+  local home scout id out rc=0
+  home=$(make_home archived-answered)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-scout
+  id=sample-archived-call
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_no_grep "$id" "$home/data/backlog.md" "retention did not move the call out of the backlog"
+  assert_grep "$id" "$home/data/done-archive.md" "the call is not in the archive fixture"
+  tasks_in "$home" show "$id" >/dev/null 2>&1 \
+    && fail "the live backlog still resolves the archived call"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+
+  out=$(run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "verify refused an answered call that retention archived: $out"
+  rc=0
+  out=$(run_captain "$home" complete "$scout" --none 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "complete refused an answered call that retention archived: $out"
+  assert_contains "$out" "[answered and archived: $id]" \
+    "the attestation does not name the archive as its evidence"
+  assert_grep "decision_keys=$id" "$home/state/$scout.meta" \
+    "the archived call was not recorded in the scout inventory"
+  pass "the completion gate resolves an answered call that retention archived"
+}
+
+test_archive_is_read_from_the_configured_path() {
+  local home scout id out rc=0
+  home=$(make_home archived-custom-path)
+  mkdir -p "$home/data/closed"
+  set_archive_retention "$home" data/closed/answered.md
+  scout=sample-archive-path-scout
+  id=sample-custom-archive-call
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_absent "$home/data/done-archive.md" "the fixture wrote the default archive path"
+  assert_grep "$id" "$home/data/closed/answered.md" "the call is not in the configured archive"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+
+  out=$(run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "verify did not read the archive named by .tasks.toml: $out"
+  pass "the archive lookup follows the archive path in .tasks.toml"
+}
+
+test_archived_call_without_a_recorded_answer_refuses() {
+  local home scout id out rc=0
+  home=$(make_home archived-unanswered)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-unanswered-scout
+  id=sample-archived-no-answer
+  archive_an_unanswered_call "$home" "$id"
+  assert_grep "$id" "$home/data/done-archive.md" "the unanswered call is not in the archive fixture"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+
+  out=$(run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "verify accepted an archived call with no recorded captain answer"
+  assert_contains "$out" "archived without a recorded captain answer" \
+    "the refusal does not say the archived call has no recorded answer"
+  rc=0
+  out=$(run_captain "$home" complete "$scout" "$id" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "complete accepted an archived call with no recorded captain answer"
+  pass "an archived call with no recorded captain answer still refuses"
+}
+
+test_call_absent_from_backlog_and_archive_keeps_its_refusal() {
+  local home scout out rc=0
+  home=$(make_home archived-absent)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-absent-scout
+  archive_an_answered_call "$home" sample-some-other-call "$scout"
+  write_scout_with_attested_inventory "$home" "$scout" sample-never-existed
+
+  out=$(run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "verify accepted a call that exists nowhere"
+  assert_contains "$out" "no captain-held task sample-never-existed and no migrated hold for it" \
+    "a key absent from the backlog and the archive lost its existing refusal"
+  rm -f "$home/data/done-archive.md"
+  rc=0
+  out=$(run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "verify accepted a call once the archive file was gone"
+  assert_contains "$out" "no captain-held task sample-never-existed" \
+    "a missing archive file changed the existing refusal"
+  pass "a call absent from the backlog and the archive keeps the existing refusal"
+}
+
+test_archived_call_held_for_another_origin_refuses() {
+  local home scout id out rc=0
+  home=$(make_home archived-other-origin)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-origin-scout
+  id=sample-archived-other-origin
+  archive_an_answered_call "$home" "$id" sample-someone-elses-scout
+  tasks_in "$home" add sample-someone-elses-scout "The other investigation" --kind scout \
+    --repo sample >/dev/null || fail "could not create the other origin"
+  tasks_in "$home" add "$scout" "This investigation" --kind scout --repo sample >/dev/null \
+    || fail "could not create this origin"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+
+  out=$(run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "verify accepted an archived call held for another origin"
+  assert_contains "$out" "was held for origin sample-someone-elses-scout, not $scout" \
+    "the archived call skipped the origin mismatch check"
+  pass "an archived call held for another origin still refuses"
+}
+
+test_live_rows_resolve_exactly_as_before_the_archive_lookup() {
+  local home scout out rc=0
+  home=$(make_home archived-live-unchanged)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-live-scout
+  # One call is still held, one is answered and still inside retention.
+  run_captain "$home" hold sample-live-held --title "Held call" \
+    --reason "captain must decide" --repo sample --origin "$scout" >/dev/null \
+    || fail "could not hold the live fixture"
+  run_captain "$home" hold sample-live-answered --title "Answered call" \
+    --reason "captain must decide" --repo sample --origin "$scout" >/dev/null \
+    || fail "could not hold the live answered fixture"
+  printf 'Go.\n' > "$home/live-answer.txt"
+  run_captain "$home" answer sample-live-answered --decision-file "$home/live-answer.txt" >/dev/null \
+    || fail "could not answer the live fixture"
+  write_scout_with_attested_inventory "$home" "$scout" "sample-live-answered,sample-live-held"
+
+  out=$(run_captain "$home" complete "$scout" --none 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "complete refused live rows: $out"
+  assert_not_contains "$out" "answered and archived" \
+    "a live row was reported as archive evidence"
+  pass "live held and live closed rows resolve exactly as before"
+}
+
+test_scout_teardown_gate_follows_the_archived_answer() {
+  local home answered unanswered scout rc
+  home=$(make_home archived-teardown)
+  set_archive_retention "$home" data/done-archive.md
+  answered=sample-archive-teardown-answered
+  unanswered=sample-archive-teardown-unanswered
+  scout=sample-archive-teardown-scout
+  archive_an_answered_call "$home" "$answered" "$scout"
+  archive_an_unanswered_call "$home" "$unanswered"
+  mkdir -p "$home/data/$scout" "$home/projects/$scout"
+  tasks_in "$home" add "$scout" "Investigate the archived calls" --kind scout \
+    --repo sample --start >/dev/null || fail "could not create the teardown scout"
+  fm_write_meta "$home/state/$scout.meta" \
+    "window=firstmate:fm-$scout" "worktree=$home/projects/$scout" \
+    "project=$home/projects/sample" "harness=codex" "kind=scout" \
+    "mode=scout" "spawn_gen=fixture-$scout" "decisions_reviewed=1" \
+    "decision_keys=$unanswered"
+  printf 'done: report complete\n' > "$home/state/$scout.status"
+  printf '# Report\n\nThe investigation finished.\n' > "$home/data/$scout/report.md"
+
+  rc=0
+  run_teardown "$home" "$scout" > "$home/teardown-blocked.out" 2> "$home/teardown-blocked.err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "teardown retired a scout whose archived call has no recorded answer"
+  assert_grep "has not passed the captain-call completion gate" "$home/teardown-blocked.err" \
+    "teardown did not name the completion gate for the unanswered archived call"
+  assert_present "$home/state/$scout.meta" "the refused teardown removed the scout record"
+
+  printf 'decisions_reviewed=1\ndecision_keys=%s\n' "$answered" >> "$home/state/$scout.meta"
+  rc=0
+  run_teardown "$home" "$scout" > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
+  [ "$rc" -eq 0 ] || fail "teardown refused a scout whose only call is archived and answered: $(cat "$home/teardown.err")"
+  assert_absent "$home/state/$scout.meta" "the passing teardown left the scout record behind"
+  pass "scout teardown passes an archived answered call and blocks an archived unanswered one"
+}
+
 tests=(
 test_sweep_retires_only_finished_board_listeners
 test_sweep_stops_a_live_listener_of_a_finished_board
@@ -7360,6 +7563,13 @@ test_verify_names_the_unresolvable_legacy_id_once
 test_verify_resolves_a_pre_collapse_key_through_its_derived_marker
 test_captain_hold_mutations_address_the_beads_backend
 test_hold_creates_a_captain_row_when_beads_requires_due_without_custom_type
+test_archived_answered_call_resolves_through_the_gate
+test_archive_is_read_from_the_configured_path
+test_archived_call_without_a_recorded_answer_refuses
+test_call_absent_from_backlog_and_archive_keeps_its_refusal
+test_archived_call_held_for_another_origin_refuses
+test_live_rows_resolve_exactly_as_before_the_archive_lookup
+test_scout_teardown_gate_follows_the_archived_answer
 )
 if [ "$#" -gt 0 ]; then
   for requested in "$@"; do
