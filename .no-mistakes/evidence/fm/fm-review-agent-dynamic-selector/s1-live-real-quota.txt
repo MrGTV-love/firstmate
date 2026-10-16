@@ -1,0 +1,14 @@
+### S1 live: real quota-axi + real omp, lab home, --dry-run --log
+review-agent-select: dry-run (nothing written)
+  status: selected
+  rule: rule_2 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  selected: claude:claude-sonnet-5-5[1m] effort=high agent=claude tier=primary
+  reason: highest known spendPriority 1.3147 among 1 ranked candidate(s); unranked, disclosed: omp:openai-codex/gpt-6.1-sol
+  current: agent=[claude, acp:omp]
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  tier=primary  scope=omp-pool  remaining=43.99999999999999%  spendPriority=-  runway=-  -> eligible: OMP pooled Codex capacity usable; the pool reports no spendPriority [uncertain: no model index: catalog not checked]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=93%  spendPriority=1.3147  runway=through_reset  -> eligible: ok [uncertain: no model index: catalog not checked]
+exit=0
+
+### log line
+{"schema":"fm-review-agent-select.v1","status":"selected","reason":"highest known spendPriority 1.3147 among 1 ranked candidate(s); unranked, disclosed: omp:openai-codex/gpt-6.1-sol","rule":"rule_2","selected":{"harness":"claude","model":"claude-sonnet-5-5[1m]","effort":"high","agent":"claude","tier":"primary","spendPriority":1.3147},"current":{"agent":"[claude, acp:omp]"},"cands":[{"m":"omp:openai-codex/gpt-6.1-sol","eligible":true,"unknown":false,"spendPriority":null,"reason":"OMP pooled Codex capacity usable; the pool reports no spendPriority"},{"m":"claude:claude-sonnet-5-5[1m]","eligible":true,"unknown":false,"spendPriority":1.3147,"reason":"ok"}]}
+nm config cksum before=3063729330 11682 after=3063729330 11682

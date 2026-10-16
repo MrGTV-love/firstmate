@@ -1,0 +1,51 @@
+### S3 malformed configuration is an error (exit 2), never selected around
+-- 3a invalid JSON
+error: malformed rules file: /Users/charlesabrooker/tmp/fm-lab.CDM4pq/config/crew-dispatch.json (not exactly one JSON object)
+exit=2
+-- 3b no review rule
+error: no rule whose when starts with "Isolated independent quality review"
+exit=2
+-- 3c two review rules
+error: more than one rule starts with "Isolated independent quality review"
+exit=2
+-- 3d bad effort
+error: review rule: profile claude-sonnet-5-5[1m] effort must be one of low, medium, high, xhigh, max
+exit=2
+-- 3e harness without a no-mistakes agent (codex)
+error: review rule: harness codex has no no-mistakes review agent (only omp and claude)
+exit=2
+-- 3f missing model
+error: review rule: profile claude needs an explicit model
+exit=2
+-- 3g one good + one malformed profile (must not skip the bad one)
+error: review rule: profile claude needs an explicit model
+exit=2
+-- 3h duplicate profiles
+error: review rule use must not contain duplicate harness, model, and effort profiles
+exit=2
+-- 3i bad fallback null
+review-agent-select: dry-run (nothing written)
+  status: selected
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  selected: claude:claude-sonnet-5-5[1m] effort=high agent=claude tier=primary
+  reason: highest known spendPriority 1.3151 among 1 ranked candidate(s)
+  current: agent=[claude, acp:omp]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=93%  spendPriority=1.3151  runway=through_reset  -> eligible: ok [uncertain: no model index: catalog not checked]
+exit=0
+-- 3j bad horizon
+error: task_horizon_minutes must be a positive number when present
+exit=2
+-- 3k rules file missing
+error: rules file not readable: /Users/charlesabrooker/tmp/fm-lab.CDM4pq/config/crew-dispatch.json
+exit=2
+{"status":"error","reason":"malformed rules file: /Users/charlesabrooker/tmp/fm-lab.CDM4pq/config/crew-dispatch.json (not exactly one JSON object)"}
+{"status":"error","reason":"no rule whose when starts with \"Isolated independent quality review\""}
+{"status":"error","reason":"more than one rule starts with \"Isolated independent quality review\""}
+{"status":"error","reason":"review rule: profile claude-sonnet-5-5[1m] effort must be one of low, medium, high, xhigh, max"}
+{"status":"error","reason":"review rule: harness codex has no no-mistakes review agent (only omp and claude)"}
+{"status":"error","reason":"review rule: profile claude needs an explicit model"}
+{"status":"error","reason":"review rule: profile claude needs an explicit model"}
+{"status":"error","reason":"review rule use must not contain duplicate harness, model, and effort profiles"}
+{"status":"selected","reason":"highest known spendPriority 1.3151 among 1 ranked candidate(s)"}
+{"status":"error","reason":"task_horizon_minutes must be a positive number when present"}
+{"status":"error","reason":"rules file not readable: /Users/charlesabrooker/tmp/fm-lab.CDM4pq/config/crew-dispatch.json"}

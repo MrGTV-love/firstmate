@@ -1,0 +1,12 @@
+ok - a healthy pool selects the highest known spendPriority and discloses the pool
+ok - a quota-tight pool moves off the candidate whose runway cannot finish the task
+ok - one account out keeps the pool; every account out opens only the declared fallback
+ok - unmeasured quota escalates instead of selecting around
+ok - known scalars rank by their limiting row and a tie is reported, never broken
+ok - floors and the launch policy gate eligibility
+ok - the model index refuses retired and catalog-absent ids
+ok - malformed configuration and evidence report an error and select nothing
+ok - every logged run appends one record and nothing else is written
+ok - --help prints the header
+# all fm-review-agent-select tests passed
+bash tests/fm-review-agent-select.test.sh  4.00s user 9.29s system 57% cpu 23.117 total

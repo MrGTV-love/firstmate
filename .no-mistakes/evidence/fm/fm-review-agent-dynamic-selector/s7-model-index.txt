@@ -1,0 +1,24 @@
+### S7 fleet model index (real quota-axi + real omp)
+-- 7a rule uses roles; the index resolves them
+review-agent-select: dry-run (nothing written)
+  status: selected
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  selected: claude:claude-sonnet-5-5[1m] effort=high agent=claude tier=primary
+  reason: highest known spendPriority 1.3155 among 1 ranked candidate(s); unranked, disclosed: omp:openai-codex/gpt-6.1-sol
+  current: agent=[claude, acp:omp]
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  tier=primary  scope=omp-pool  remaining=43.00000000000001%  spendPriority=-  runway=-  -> eligible: OMP pooled Codex capacity usable; the pool reports no spendPriority [uncertain: model-index: notice: omp catalog unavailable (effective worker account context is not established); 'openai-codex/gpt-6.1-sol' (role 'review') not validated]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=93%  spendPriority=1.3155  runway=through_reset  -> eligible: ok [uncertain: model-index: notice: claude catalog unavailable (effective worker account context is not established); 'claude-sonnet-5-5[1m]' (role 'review') not validated]
+exit=0
+-- 7b claude catalog lacks the id: candidate removed, other selected
+review-agent-select: dry-run (nothing written)
+  status: selected
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  selected: omp:openai-codex/gpt-6.1-sol effort=high agent=acp:omp tier=primary
+  reason: no candidate carries a known spendPriority; omp:openai-codex/gpt-6.1-sol is the only one with measured headroom
+  current: agent=[claude, acp:omp]
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  tier=primary  scope=omp-pool  remaining=43.00000000000001%  spendPriority=-  runway=-  -> eligible: OMP pooled Codex capacity usable; the pool reports no spendPriority
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  spendPriority=-  -> not eligible: model index refuses claude claude-sonnet-5-5[1m]: model-index: id 'claude-sonnet-5-5[1m]' absent or retired in claude catalog (role 'review')
+exit=0
+-- 7c retired id in the rules -> configuration error
+error: model index/profile resolution failed: jq: error (at /var/folders/z8/7g01lsx95d77m5k2z1qzsngr0000gn/T/tmp.KDVJ5Aefvv/dispatch.json:14): retired model: claude-sonnet-5-5[1m]
+exit=2

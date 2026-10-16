@@ -1,0 +1,104 @@
+######## S4 quota-tight pool: Claude runway 600s < 14400s horizon; Sol pool at 12%
+$ fm-review-agent-select.sh --dry-run --log   # Claude short runway, pool thin but usable
+review-agent-select: dry-run (nothing written)
+  status: selected
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  selected: omp:openai-codex/gpt-6.1-sol effort=high agent=acp:omp tier=primary
+  reason: no candidate carries a known spendPriority; omp:openai-codex/gpt-6.1-sol is the only one with measured headroom
+  current: agent=[claude, acp:omp]
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  tier=primary  scope=omp-pool  remaining=12%  spendPriority=-  runway=-  -> eligible: OMP pooled Codex capacity usable; the pool reports no spendPriority [uncertain: no model index: catalog not checked]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=5%  spendPriority=-  runway=projected_exhaustion  -> not eligible: established runway 600s at all_models is shorter than the 14400s task horizon [uncertain: no model index: catalog not checked]
+exit=0
+
+######## S4b both tight: Claude short runway, pool 4% (thin but usable)
+$ fm-review-agent-select.sh --dry-run --log   # pool thin but usable still counts as measured headroom
+review-agent-select: dry-run (nothing written)
+  status: selected
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  selected: omp:openai-codex/gpt-6.1-sol effort=high agent=acp:omp tier=primary
+  reason: no candidate carries a known spendPriority; omp:openai-codex/gpt-6.1-sol is the only one with measured headroom
+  current: agent=[claude, acp:omp]
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  tier=primary  scope=omp-pool  remaining=4%  spendPriority=-  runway=-  -> eligible: OMP pooled Codex capacity usable; the pool reports no spendPriority [uncertain: no model index: catalog not checked]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=5%  spendPriority=-  runway=projected_exhaustion  -> not eligible: established runway 600s at all_models is shorter than the 14400s task horizon [uncertain: no model index: catalog not checked]
+exit=0
+
+######## S5 one account out: Claude exhausted_now, pool accounts [0%, 35%]
+$ fm-review-agent-select.sh --dry-run --log   # one account out; surviving account serves
+review-agent-select: dry-run (nothing written)
+  status: selected
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  selected: omp:openai-codex/gpt-6.1-sol effort=high agent=acp:omp tier=primary
+  reason: no candidate carries a known spendPriority; omp:openai-codex/gpt-6.1-sol is the only one with measured headroom
+  current: agent=[claude, acp:omp]
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  tier=primary  scope=omp-pool  remaining=35%  spendPriority=-  runway=-  -> eligible: OMP pooled Codex capacity usable; the pool reports no spendPriority [uncertain: no model index: catalog not checked]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  -> not eligible: runway exhausted_now at all_models [uncertain: no model index: catalog not checked]
+exit=0
+
+######## S5b every account out: pool [0,0], Claude exhausted, declared fallback
+$ fm-review-agent-select.sh --dry-run --log   # all proven exhausted -> declared fallback tier
+review-agent-select: dry-run (nothing written)
+  status: selected
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  selected: omp:deepseek/deepseek-v4-flash effort=high agent=acp:omp tier=fallback
+  reason: every use candidate is proven exhausted; declared fallback omp:deepseek/deepseek-v4-flash (declared fallback; capacity unknown)
+  current: agent=[claude, acp:omp]
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  tier=primary  scope=omp-pool  remaining=-%  spendPriority=-  runway=-  -> not eligible: OMP pooled Codex capacity exhausted [uncertain: no model index: catalog not checked]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  -> not eligible: runway exhausted_now at all_models [uncertain: no model index: catalog not checked]
+  candidate: omp:deepseek/deepseek-v4-flash  provider=-  tier=fallback  spendPriority=-  -> eligible: declared fallback; capacity unknown [uncertain: fallback capacity unknown]
+exit=0
+
+######## S5c every account out and NO declared fallback
+$ fm-review-agent-select.sh --dry-run --log   # escalate, nothing selected
+review-agent-select: dry-run (nothing written)
+  status: escalate
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  reason: every candidate is proven exhausted and the rule declares no fallback
+  current: agent=[claude, acp:omp]
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  tier=primary  scope=omp-pool  remaining=-%  spendPriority=-  runway=-  -> not eligible: OMP pooled Codex capacity exhausted [uncertain: no model index: catalog not checked]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=0%  spendPriority=-  runway=exhausted_now  -> not eligible: runway exhausted_now at all_models [uncertain: no model index: catalog not checked]
+exit=1
+
+######## S6a unknown quota: empty quota snapshot (no claude row), pool [0,0]
+$ fm-review-agent-select.sh --dry-run --log   # unmeasured is NOT proven exhaustion; no fallback; escalate
+review-agent-select: dry-run (nothing written)
+  status: escalate
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  reason: no candidate has measured headroom: claude:claude-sonnet-5-5[1m] (provider claude is not in the quota snapshot)
+  current: agent=[claude, acp:omp]
+  candidate: omp:openai-codex/gpt-6.1-sol  provider=codex  tier=primary  scope=omp-pool  remaining=-%  spendPriority=-  runway=-  -> not eligible: OMP pooled Codex capacity exhausted [uncertain: no model index: catalog not checked]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  spendPriority=-  -> eligible: provider claude is not in the quota snapshot [uncertain: no quota row for provider claude; no model index: catalog not checked]
+exit=1
+
+######## S6b tie: two Claude candidates with equal spendPriority
+$ fm-review-agent-select.sh --dry-run --log   # tie reported, no winner, array order does not break it
+review-agent-select: dry-run (nothing written)
+  status: tie
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  reason: genuine quota evidence tie at spendPriority 1.0: claude:claude-sonnet-5-5[1m], claude:opus; captain choice
+  current: agent=[claude, acp:omp]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=90%  spendPriority=1.0  runway=through_reset  -> eligible: ok [uncertain: no model index: catalog not checked]
+  candidate: claude:opus  provider=claude  tier=primary  scope=all_models  remaining=90%  spendPriority=1.0  runway=through_reset  -> eligible: ok [uncertain: no model index: catalog not checked]
+exit=1
+
+######## S6c no tie: opus limiting row 0.4 < sonnet 1.0
+$ fm-review-agent-select.sh --dry-run --log   # highest known spendPriority wins
+review-agent-select: dry-run (nothing written)
+  status: selected
+  rule: rule_1 (Isolated independent quality review of a specific pull request, commit, or revie)   horizon_minutes: 240
+  selected: claude:claude-sonnet-5-5[1m] effort=high agent=claude tier=primary
+  reason: highest known spendPriority 1.0 among 2 ranked candidate(s)
+  current: agent=[claude, acp:omp]
+  candidate: claude:claude-sonnet-5-5[1m]  provider=claude  tier=primary  scope=all_models  remaining=90%  spendPriority=1.0  runway=through_reset  -> eligible: ok [uncertain: no model index: catalog not checked]
+  candidate: claude:opus  provider=claude  tier=primary  scope=model:opus  remaining=90%  spendPriority=0.4  runway=through_reset  -> eligible: ok [uncertain: no model index: catalog not checked]
+exit=0
+
+######## record counts
+{"status":"selected","selected":"openai-codex/gpt-6.1-sol","tier":"primary","current":{"agent":"[claude, acp:omp]"}}
+{"status":"selected","selected":"openai-codex/gpt-6.1-sol","tier":"primary","current":{"agent":"[claude, acp:omp]"}}
+{"status":"selected","selected":"openai-codex/gpt-6.1-sol","tier":"primary","current":{"agent":"[claude, acp:omp]"}}
+{"status":"selected","selected":"deepseek/deepseek-v4-flash","tier":"fallback","current":{"agent":"[claude, acp:omp]"}}
+{"status":"escalate","selected":null,"tier":null,"current":{"agent":"[claude, acp:omp]"}}
+{"status":"escalate","selected":null,"tier":null,"current":{"agent":"[claude, acp:omp]"}}
+{"status":"tie","selected":null,"tier":null,"current":{"agent":"[claude, acp:omp]"}}
+{"status":"selected","selected":"claude-sonnet-5-5[1m]","tier":"primary","current":{"agent":"[claude, acp:omp]"}}
+nm config cksum before=3827001334 44 after=3827001334 44

@@ -1,0 +1,4 @@
+### S8b real watcher heartbeat, home WITHOUT config/crew-dispatch.json
+heartbeat ticked: .last-heartbeat exists=yes streak=2
+review-agent-select.jsonl exists=no
+watcher_alive_after_kill=no

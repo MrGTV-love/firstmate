@@ -1,0 +1,41 @@
+watcher pid=47466 (real bin/fm-watch.sh, lab home /Users/charlesabrooker/tmp/fm-lab.CDM4pq, real selector, real quota-axi/omp)
+waited ticks=36 watcher_alive=yes
+--- state/review-agent-select.jsonl after first heartbeat
+{"schema":"fm-review-agent-select.v1","status":"selected","mode":"dry-run","at_iso":"2026-10-16T03:27:42Z","selected":"claude-sonnet-5-5[1m]","current":{"agent":"[claude, acp:omp]"},"n_candidates":2}
+--- after ~12s more
+records=2
+--- watch.out (wake lines printed)
+/Users/charlesabrooker/tmp/fm-lab.CDM4pq/hb.sh: line 18: 47466 Terminated: 15          env -u NO_MISTAKES_GATE -u FM_GATE_REFUSE_BYPASS -u FM_ROOT_OVERRIDE -u FM_STATE_OVERRIDE -u FM_DATA_OVERRIDE -u FM_CONFIG_OVERRIDE -u FM_PROJECTS_OVERRIDE TMUX_TMPDIR="$LAB/tmux" FM_HOME="$LAB" FM_OPEN_LOOPS_BIN="$(command -v true)" FM_POLL=1 FM_HEARTBEAT=2 FM_CHECK_INTERVAL=999999 FM_SIGNAL_GRACE=1 bash bin/fm-watch.sh > "$LAB/watch.out" 2> "$LAB/watch.err"
+watcher_alive_after_kill=no
+nm config cksum before=3063729330 11682 after=3063729330 11682
+lab files:
+./.fm-lab-home
+./cat/claude.json
+./cat/omp.json
+./config/crew-dispatch.json
+./drive.sh
+./hb.sh
+./nm/config.yaml
+./pool.json
+./quota.json
+./shim/omp
+./shim/quota-axi
+./state/.heartbeat-streak
+./state/.idle-reap-next
+./state/.inactive-outcome-reconcile
+./state/.last-check
+./state/.last-heartbeat
+./state/.last-watcher-beat
+./state/.omp-turnend-extension-loaded
+./state/.omp-watch-extension-loaded
+./state/.open-loops-started
+./state/.prelude-progress
+./state/.secondmate-liveness-tick
+./state/.typesafe-health-next
+./state/.watch-triage.log
+./state/.watcher-down
+./state/extensions/omp-primary-watch/lifecycle.log
+./state/home-summary.json
+./state/review-agent-select.jsonl
+./watch.err
+./watch.out

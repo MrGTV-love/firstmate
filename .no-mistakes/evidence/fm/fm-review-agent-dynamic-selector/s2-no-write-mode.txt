@@ -1,0 +1,38 @@
+### S2 no write mode: flags that would write, or no --dry-run
+-- args: []
+error: stage one is dry-run only: pass --dry-run (no write mode exists)
+exit=2
+-- args: [--log]
+error: stage one is dry-run only: pass --dry-run (no write mode exists)
+exit=2
+-- args: [--write]
+error: unknown argument: --write (see --help)
+exit=2
+-- args: [--apply]
+error: unknown argument: --apply (see --help)
+exit=2
+-- args: [--dry-run --write]
+error: unknown argument: --dry-run --write (see --help)
+exit=2
+-- args: [--dry-run --apply-config]
+error: unknown argument: --dry-run --apply-config (see --help)
+exit=2
+-- grep help for write mode
+8:writes the no-mistakes config or any agent_config; there is no write mode, so a
+nm config cksum before=3063729330 11682 after=3063729330 11682
+./.fm-lab-home
+./config/crew-dispatch.json
+./state/.omp-turnend-extension-loaded
+./state/.omp-watch-extension-loaded
+./state/extensions/omp-primary-watch/lifecycle.log
+./state/review-agent-select.jsonl
+### S2b (re-run with real argv splitting)
+error: unknown argument: --write (see --help)
+exit=2
+error: unknown argument: --apply-config (see --help)
+exit=2
+error: unknown argument: --write (see --help)
+exit=2
+error: unknown argument: --enable-write (see --help)
+exit=2
+nm config cksum before=3063729330 11682 after=3063729330 11682

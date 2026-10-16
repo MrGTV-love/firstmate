@@ -1,0 +1,4 @@
+ok - the heartbeat starts the dry-run review-agent selector
+ok - the heartbeat skips the review-agent selector when the home has no dispatch rules
+# heartbeat selector tests passed
+bash "$D/drv.sh"  2.09s user 5.43s system 71% cpu 10.585 total
