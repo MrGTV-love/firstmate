@@ -229,7 +229,9 @@
 # only by `reconcile close` evidence, or a body that merely quotes the record
 # markers, is refused. When the home's `.tasks.toml` names no archive but
 # `~/.tasks-axi/config.toml` does, that path is not read and the lookup refuses
-# instead of falling back to the default archive file.
+# instead of falling back to the default archive file. `complete` prints
+# `[answered and archived: <ids>]` for the keys that passed only through the
+# archive.
 #
 # `open` is the read-only predicate a mechanical closer asks before it may
 # retire a task's row: is this task still an open captain call? Exit 0 means it

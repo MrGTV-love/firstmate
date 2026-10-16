@@ -111,6 +111,7 @@ On the markdown backend, a closed call that backlog retention moved to the done 
 A record written by the retired `fm-decision-hold.sh` counts too when it carries its full genuine shape: the decision digest, a non-empty `Routed identities:` line, an optional `Resolution mode:` of answered, repaired, routed, or declined (the oldest records have none), and a non-empty `Captain decision:` text.
 A call closed only by `reconcile close` evidence, or a body that merely quotes the record markers, is refused, and the operator resolves that case by hand.
 When the home's `.tasks.toml` names no archive but `~/.tasks-axi/config.toml` does, that path is not read and the gate refuses rather than falling back to the default archive file.
+`complete` prints `[answered and archived: <ids>]` for the keys that passed only through the archive.
 [`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns the archive lookup and its limits.
 The origin is never its own inventory entry, so a hold that failed cannot be vouched for by the origin row.
 For a historical inventory that names its own origin, hold a separate captain task with `--origin`, replace only the invalid entry in the final `decision_keys=` line of the origin metadata with that task id while preserving all other entries, and re-run `complete`.
@@ -562,6 +563,10 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
   `test_archived_released_work_item_resolves_through_the_gate` covers a call answered through the release path.
   `test_archived_call_without_a_recorded_answer_refuses`, `test_archived_call_held_for_another_origin_refuses`, and `test_call_absent_from_backlog_and_archive_keeps_its_refusal` cover the unchanged refusals, and `test_live_rows_resolve_exactly_as_before_the_archive_lookup` covers live rows.
   `test_archived_evidence_only_close_refuses` and `test_archived_row_quoting_the_record_markers_refuses` cover the archive accepting only a recorded captain answer, never reconciliation evidence or quoted markers.
+  `test_archived_retired_decision_hold_records_resolve` covers records of the retired `fm-decision-hold.sh` passing, including mode declined and the oldest records with no mode line.
+  `test_archived_retired_decision_hold_records_that_are_not_answers_refuse` covers a retired record that is evidence-only, has an empty answer, lacks its `Routed identities:` line, or carries a mode it never wrote.
+  `test_archived_answer_after_leading_blank_lines_resolves` covers a recorded answer whose text starts with blank lines.
+  `test_archived_record_with_only_blank_lines_after_the_label_refuses` covers a record with no answer text before the end of the body or the next record.
   `test_user_level_only_archive_path_refuses` and `test_stale_default_archive_does_not_stand_in_for_the_user_level_archive` cover an archive path set only in `~/.tasks-axi/config.toml`.
 
 ### Answers, stamps, and deferral
