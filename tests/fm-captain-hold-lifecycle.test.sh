@@ -3102,6 +3102,189 @@ SH
   pass "a superseding verified close resolves the hold's original parent key across stacked records and retries"
 }
 
+# The one exact-replay rule, pinned cell by cell. Every cell builds a call whose
+# first evidence close wrote a resolution record, then retries it. A retry may
+# finish only a record with the same evidence digest (the verified outcome is
+# part of it) for the same hold. A different digest is no replay: a closed call
+# refuses it and an open call takes it as a fresh close of whatever hold it now
+# carries, resolving only that hold's own parent key. Older evidence never closes
+# a newer hold, and a closed call never replays across a newer hold.
+matrix_expectation() {  # <task-state> <digest> <opening> -> "accept <key-occurrence>" | "refuse <reason>"
+  case "$1:$3:$2" in
+    closed:same:same) echo "accept 1" ;;
+    closed:same:changed) echo "refuse records a different resolution" ;;
+    closed:reopened:same) echo "refuse newer or unidentifiable hold" ;;
+    closed:reopened:changed) echo "refuse records a different resolution" ;;
+    open:same:*) echo "accept 1" ;;
+    open:reopened:same) echo "refuse newer or unidentifiable hold" ;;
+    open:reopened:changed) echo "accept 2" ;;
+  esac
+}
+
+matrix_open_keys() {  # <channel> <task-id>
+  bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$1" \
+    | awk -F'\t' -v p="captain-hold-$2-" 'index($1, p) == 1 { print $1 }' | sort
+}
+
+matrix_home() {  # <n>; builds one secondmate home with a parent, sets MATRIX_HOME and MATRIX_CHANNEL
+  local home parent
+  home=$(make_home "retry-matrix-$1")
+  parent=$(make_home "retry-matrix-parent-$1")
+  printf 'verified-mate\n' > "$home/.fm-secondmate-home"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$parent" \
+    > "$home/.fm-secondmate-parent"
+  printf 'Verified source captured.txt: the recorded answers settle this call.\n' > "$home/e1.txt"
+  printf 'Corrected verified source captured-v2.txt: the answers settle this call.\n' > "$home/e2.txt"
+  cat > "$home/fakebin/tasks-axi" <<'SH'
+#!/usr/bin/env bash
+if [ "${1:-}" = done ] && [ -e "$FM_HOME/fail-done-${2:-}" ]; then
+  exit 92
+fi
+exec "$REAL_TASKS_AXI" "$@"
+SH
+  chmod +x "$home/fakebin/tasks-axi"
+  MATRIX_HOME=$home
+  MATRIX_CHANNEL="$parent/state/verified-mate.status"
+}
+
+matrix_cell() {  # <n> <task-state> <evidence> <outcome> <request> <stamp> <opening>
+  local n=$1 task_state=$2 evidence=$3 outcome=$4 request=$5 stamp=$6 opening=$7
+  local id="matrix-$n" digest=same file outcome_arg=answered label want kind detail rc=0 out
+  local home channel before_show before_chan before_open after_open req_path
+  matrix_home "$n"
+  home=$MATRIX_HOME
+  channel=$MATRIX_CHANNEL
+  req_path="$home/state/reconcile-requests/$id.request"
+  [ "$evidence" = same ] && [ "$outcome" = same ] || digest=changed
+  label="$task_state/evidence-$evidence/outcome-$outcome/request-$request/$stamp/$opening"
+  if [ "$stamp" = stamped ]; then
+    FM_CAPTAIN_HOLD_NOW=2026-10-01T01:00:00Z run_captain "$home" hold "$id" \
+      --title "Matrix $n" --reason "choice $n" >/dev/null || fail "matrix $label: could not hold"
+  else
+    tasks_in "$home" add "$id" "Matrix $n" --repo sample >/dev/null
+    tasks_in "$home" hold "$id" --reason "choice $n" --kind captain >/dev/null
+    printf 'needs-decision [key=captain-hold-%s-1]: captain hold %s: choice %s\n' "$id" "$id" "$n" >> "$channel"
+  fi
+  request_reconciles "$home" matrix-src "$id" || fail "matrix $label: could not file the request"
+  cp "$req_path" "$home/request.backup"
+  rm -f "$req_path"
+  [ "$task_state" = closed ] || : > "$home/fail-done-$id"
+  if run_captain "$home" reconcile close "$id" --verified-outcome answered \
+    --evidence-file "$home/e1.txt" >/dev/null 2>&1; then
+    [ "$task_state" = closed ] || fail "matrix $label: the interrupted close fixture succeeded"
+  else
+    [ "$task_state" = open ] || fail "matrix $label: the first close failed"
+  fi
+  rm -f "$home/fail-done-$id"
+  if [ "$opening" = reopened ]; then
+    if [ "$task_state" = open ]; then
+      tasks_in "$home" unhold "$id" >/dev/null || fail "matrix $label: could not release the hold"
+    else
+      tasks_in "$home" reopen "$id" >/dev/null || fail "matrix $label: could not reopen"
+    fi
+    FM_CAPTAIN_HOLD_NOW=2026-10-02T01:00:00Z run_captain "$home" hold "$id" \
+      --reason "new choice $n" >/dev/null || fail "matrix $label: could not re-hold"
+    [ "$task_state" = open ] || tasks_in "$home" "done" "$id" >/dev/null \
+      || fail "matrix $label: could not close the reopened call outside the tool"
+  fi
+  [ "$request" = present ] && cp "$home/request.backup" "$req_path"
+  file="$home/e1.txt"
+  [ "$evidence" = same ] || file="$home/e2.txt"
+  [ "$outcome" = same ] || outcome_arg=moot
+  before_show=$(tasks_in "$home" show "$id" --full)
+  before_chan=$(cat "$channel")
+  before_open=$(matrix_open_keys "$channel" "$id")
+  out=$(run_captain "$home" reconcile close "$id" --verified-outcome "$outcome_arg" \
+    --evidence-file "$file" 2>&1) || rc=$?
+  want=$(matrix_expectation "$task_state" "$digest" "$opening")
+  kind=${want%% *}
+  detail=${want#* }
+  after_open=$(matrix_open_keys "$channel" "$id")
+  if [ "$kind" = refuse ]; then
+    [ "$rc" -ne 0 ] || fail "matrix $label: a retry that must be refused succeeded: $out"
+    assert_contains "$out" "$detail" "matrix $label: the refusal did not name its reason: $out"
+    [ "$(tasks_in "$home" show "$id" --full)" = "$before_show" ] || fail "matrix $label: a refused retry mutated the task"
+    [ "$(cat "$channel")" = "$before_chan" ] || fail "matrix $label: a refused retry published to the parent"
+    [ "$after_open" = "$before_open" ] || fail "matrix $label: a refused retry changed the open parent keys"
+    [ "$request" = absent ] || [ -f "$req_path" ] || fail "matrix $label: a refused retry retired the request"
+  else
+    [ "$rc" -eq 0 ] || fail "matrix $label: an exact or superseding retry was refused: $out"
+    assert_contains "$out" "reconciled: $id" "matrix $label: the accepted retry did not report success"
+    assert_contains "$(tasks_in "$home" show "$id" --full)" "state: done" "matrix $label: the accepted retry left the task open"
+    assert_contains "$(cat "$channel")" "resolved [key=captain-hold-$id-$detail]" \
+      "matrix $label: the accepted retry did not resolve its own opening"
+    [ "$after_open" = "$(printf '%s\n' "$before_open" | grep -vxF "captain-hold-$id-$detail" || true)" ] \
+      || fail "matrix $label: the accepted retry closed a different opening: $after_open"
+    [ ! -e "$req_path" ] || fail "matrix $label: the accepted retry left its request pending"
+  fi
+}
+
+matrix_board_cell() {  # <n> <task-state> <stamp>
+  local n=$1 task_state=$2 stamp=$3 id="matrix-$1" home channel out
+  matrix_home "$n"
+  home=$MATRIX_HOME
+  channel=$MATRIX_CHANNEL
+  if [ "$stamp" = stamped ]; then
+    run_captain "$home" hold "$id" --title "Board $n" --reason "board choice $n" >/dev/null
+  else
+    tasks_in "$home" add "$id" "Board $n" --repo sample >/dev/null
+    tasks_in "$home" hold "$id" --reason "board choice $n" --kind captain >/dev/null
+  fi
+  request_reconciles "$home" matrix-src "$id" || fail "board $task_state/$stamp: could not file the request"
+  [ "$task_state" = closed ] || : > "$home/fail-done-$id"
+  run_captain "$home" reconcile close "$id" --evidence-file "$home/e1.txt" >/dev/null 2>&1 || true
+  rm -f "$home/fail-done-$id" "$home/state/reconcile-requests/$id.request"
+  out=$(run_captain "$home" reconcile close "$id" --evidence-file "$home/e1.txt" 2>&1) \
+    && fail "board $task_state/$stamp: a default close retry succeeded without a pending request: $out"
+  assert_contains "$out" "no pending board-created reconcile request" \
+    "board $task_state/$stamp: the refusal did not name the missing request: $out"
+}
+
+test_verified_close_retry_matrix() {
+  local n=0 task_state evidence outcome request stamp opening running=0 dir pid cell failed=''
+  local -a cells
+  dir="$TMP_ROOT/retry-matrix-results"
+  mkdir -p "$dir"
+  for task_state in open closed; do
+    for evidence in same changed; do
+      for outcome in same changed; do
+        for request in present absent; do
+          for stamp in stamped legacy; do
+            for opening in same reopened; do
+              n=$((n + 1))
+              cells[n]="matrix_cell $n $task_state $evidence $outcome $request $stamp $opening"
+            done
+          done
+        done
+      done
+    done
+  done
+  # The default board-path close keeps its request requirement in every state,
+  # including as a retry of an already closed call.
+  for task_state in open closed; do
+    for stamp in stamped legacy; do
+      n=$((n + 1))
+      cells[n]="matrix_board_cell $n $task_state $stamp"
+    done
+  done
+  cell=1
+  while [ "$cell" -le "$n" ]; do
+    (${cells[cell]} > "$dir/$cell.log" 2>&1; echo $? > "$dir/$cell.rc") &
+    running=$((running + 1))
+    if [ "$running" -ge 8 ]; then
+      wait
+      running=0
+    fi
+    cell=$((cell + 1))
+  done
+  wait
+  for cell in $(seq 1 "$n"); do
+    [ "$(cat "$dir/$cell.rc" 2>/dev/null)" = 0 ] || failed="$failed${failed:+; }cell $cell: $(tail -n 3 "$dir/$cell.log" | tr '\n' ' ')"
+  done
+  [ -z "$failed" ] || fail "retry matrix failures: $failed"
+  pass "the verified-close retry matrix accepts only exact or interrupted superseding retries and never closes a newer opening"
+}
+
 test_verified_closes_refuse_unanswered_or_unsupported_calls() {
   local home id outcome file show
   home=$(make_home verified-refusals)
@@ -3239,6 +3422,37 @@ test_standalone_closes_follow_the_supervision_role_partition() {
   pass "standalone evidence closes refuse the attended branch, relocate under the away record, and leave main and the board path unchanged"
 }
 
+test_close_key_leaves_a_migrated_captain_hold_to_its_owner() {
+  local fixture home beads before open
+  require_tasks_axi_beads "close-key against a beads-migrated hold" || return 0
+  fixture=$(make_beads_home close-key-migrated)
+  home=${fixture%%|*}
+  beads=${fixture##*|}
+  printf 'kind=secondmate\n' > "$home/state/lane.meta"
+  printf 'needs-decision [key=call-a]: the captain owns the migrated call\n' > "$home/state/lane.status"
+  (cd "$home" && BEADS_ACTOR=fixture tasks-axi add fm-lane-call-a "Migrated call" --repo sample) >/dev/null 2>&1 \
+    || fail "could not create the migrated hold fixture"
+  (cd "$home" && BEADS_ACTOR=fixture tasks-axi hold fm-lane-call-a --kind captain --reason "captain must choose") >/dev/null 2>&1 \
+    || fail "could not hold the migrated fixture row"
+  bdrow "$beads" note fm-lane-call-a "migrated from data/backlog.md id lane-decision-call-a on 2026-09-04" \
+    >/dev/null 2>&1 || fail "could not record the migration marker note"
+  printf 'Verified source captured.txt: the recorded answer settles this call.\n' > "$home/evidence.txt"
+  before=$(cat "$home/state/lane.status")
+  if run_captain "$home" reconcile close-key lane --key call-a --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
+    fail "close-key closed a key backed by an open migrated captain hold"
+  fi
+  [ "$(cat "$home/state/lane.status")" = "$before" ] || fail "the refused migrated-hold close mutated the status stream"
+  assert_absent "$home/state/reconcile-evidence" "the refused migrated-hold close persisted evidence"
+  (cd "$home" && BEADS_ACTOR=fixture tasks-axi "done" fm-lane-call-a) >/dev/null 2>&1 \
+    || fail "could not close the migrated fixture row"
+  run_captain "$home" reconcile close-key lane --key call-a --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null || fail "close-key refused a key whose migrated hold is already closed"
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/lane.status")
+  assert_not_contains "$open" "call-a" "the close left the key open once its migrated hold closed"
+  pass "close-key leaves a key backed by an open migrated captain hold to its owner"
+}
+
 test_operational_key_closes_with_durable_evidence_and_replay() {
   local home key outcome out evidence before open
   home=$(make_home operational-key-close)
@@ -3282,7 +3496,7 @@ test_operational_key_close_refusals_and_interrupted_append() {
   local home key before open evidence
   home=$(make_home operational-key-refusals)
   printf 'kind=secondmate\n' > "$home/state/lane.meta"
-  printf 'needs-decision [key=plain]: verify operational question\nneeds-decision [key=held-call]: captain still owns this\nneeds-decision [key=legacy]: captain owns legacy task\nneeds-decision [key=captain-hold-child-1]: captain hold child\nblocked [key=pending-reply-child]: pending-reply-missed: unavailable\n' \
+  printf 'needs-decision [key=plain]: verify operational question\nneeds-decision [key=stale]: verify the second operational question\nneeds-decision [key=held-call]: captain still owns this\nneeds-decision [key=legacy]: captain owns legacy task\nneeds-decision [key=captain-hold-child-1]: captain hold child\nblocked [key=pending-reply-child]: pending-reply-missed: unavailable\n' \
     > "$home/state/lane.status"
   run_captain "$home" hold held-call --title "Held call" --reason "still needs captain" >/dev/null
   run_captain "$home" hold lane-decision-legacy --title "Legacy held call" --reason "still needs captain" >/dev/null
@@ -3326,20 +3540,38 @@ SH
   [ ! -e "$home/state/reconcile-evidence" ] || fail "a refused operational close wrote evidence"
   # Stage evidence successfully, but force the subsequent status append to fail.
   chmod 0400 "$home/state/lane.status"
-  if run_captain "$home" reconcile close-key lane --key plain --verified-outcome moot \
-    --evidence-file "$home/evidence.txt" > "$home/append.out" 2>&1; then
-    fail "failed status append reported a successful close"
-  fi
-  evidence=$(find "$home/state/reconcile-evidence" -name '*.txt' -type f)
-  [ -f "$evidence" ] || fail "interrupted append lost staged evidence"
+  for key in plain stale; do
+    if run_captain "$home" reconcile close-key lane --key "$key" --verified-outcome moot \
+      --evidence-file "$home/evidence.txt" > "$home/append.out" 2>&1; then
+      fail "failed status append reported a successful close of $key"
+    fi
+    evidence=$(find "$home/state/reconcile-evidence" -name "$key-*.txt" -type f)
+    [ -f "$evidence" ] || fail "interrupted append lost staged evidence for $key"
+  done
   chmod 0600 "$home/state/lane.status"
   [ "$(cat "$home/state/lane.status")" = "$before" ] || fail "failed append changed the status stream"
+  # The second call is settled elsewhere and then asked again as a new unanswered
+  # choice: its staged evidence belongs to the earlier opening and must not close it.
+  printf 'resolved [key=stale]: answered elsewhere\nneeds-decision [key=stale]: a new unanswered captain choice\n' \
+    >> "$home/state/lane.status"
+  before=$(cat "$home/state/lane.status")
+  if run_captain "$home" reconcile close-key lane --key stale --verified-outcome moot \
+    --evidence-file "$home/evidence.txt" > "$home/stale.out" 2>&1; then
+    fail "stale staged evidence closed a reopened unanswered call"
+  fi
+  assert_contains "$(cat "$home/stale.out")" "earlier or unidentifiable opening" \
+    "the stale staged evidence refusal did not name the opening mismatch"
+  [ "$(cat "$home/state/lane.status")" = "$before" ] || fail "the refused stale retry mutated the reopened call"
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/lane.status")
+  assert_contains "$open" "stale" "the stale retry closed the reopened call"
+  # The same opening still resumes from its staged evidence.
   run_captain "$home" reconcile close-key lane --key plain --verified-outcome moot \
     --evidence-file "$home/evidence.txt" >/dev/null || fail "operational append could not retry from durable evidence"
   open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/lane.status")
   assert_not_contains "$open" "plain" "retried operational close stayed open"
   assert_contains "$open" "held-call" "operational close lost a captain-owned call"
-  pass "operational closes enforce ownership and attestation and recover after an interrupted append"
+  assert_contains "$open" "stale" "the retry of another key closed the reopened call"
+  pass "operational closes enforce ownership and attestation, recover after an interrupted append, and refuse staged evidence once the call reopened"
 }
 
 test_unbound_source_closes_no_hold() {
@@ -7017,7 +7249,9 @@ test_reconcile_outcomes_retry_partial_failures_once
 test_verified_close_without_board_request
 test_verified_close_retries_only_its_own_hold
 test_verified_close_supersession_resolves_the_original_parent_key
+test_verified_close_retry_matrix
 test_verified_closes_refuse_unanswered_or_unsupported_calls
+test_close_key_leaves_a_migrated_captain_hold_to_its_owner
 test_operational_key_closes_with_durable_evidence_and_replay
 test_operational_key_close_refusals_and_interrupted_append
 test_standalone_closes_follow_the_supervision_role_partition

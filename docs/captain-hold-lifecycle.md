@@ -320,19 +320,21 @@ The close uses the same task control lock, body archival, retained-artifact hand
 Worker-owned unfinished work is not completed by this operator path.
 Both standalone paths are decision answers under the [supervision role partition](pi-supervision-branch.md#consistency): main-owned while attended, refused for the supervision branch, and relocated to it only under the away-posture record.
 The board-request `reconcile close`, `answer`, and `answers` are not part of that guard.
-A matching closed-task retry can finish parent publication and retirement even when no pending board request remains.
-A retry of an interrupted close against an open task must match its recorded hold-set association; old evidence cannot settle a newer hold.
-A `--verified-outcome` retry with changed evidence or a changed outcome against that open task records a superseding resolution on the same hold and resolves the hold's original parent key, never a new occurrence.
-A closed call refuses changed evidence or a changed outcome.
-A still-active note retains its existing request requirement.
+One exact-replay rule governs every retry of a task close.
+A retry may finish parent publication and request retirement only against a record written by reconciliation with the same evidence digest and the same hold-set stamp.
+The verified outcome is part of the digest, and a record and a hold that both carry no stamp match each other.
+Any other mismatch is refused by name, and a retry never closes a newer or reopened hold.
+A retry whose digest matches no record is not a replay: a closed call refuses it, while an interrupted `--verified-outcome` close accepts it as a superseding resolution on the same hold and resolves the hold's original parent key, never a new occurrence.
+Only a `--verified-outcome` retry may finish without a pending board request; the default close and a still-active note need one in every state.
 
 For an ordinary status-owned operational key, `reconcile close-key` addresses the active home's status stream, not a worker endpoint or another home's backlog.
 It checks the key's owner before recording anything and leaves captain-held tasks and reserved library keys to their respective owners.
-The full evidence and verified outcome are saved together before the normal status resolution event is appended through the self-announced writer.
+It also probes the migrated hold row a Beads migration recorded for the key, so a key backed by any open local captain-held task stays with that task.
+The full evidence and verified outcome are saved together, beside the status line that opened the call, before the normal status resolution event is appended through the self-announced writer.
 The event carries the evidence digest rather than truncating the evidence into a status excerpt.
 The returned evidence path identifies the durable file.
-An interrupted append can retry against that file; a successful exact retry appends nothing.
-A changed evidence digest cannot rewrite a closed key, and an earlier matching close event prevents that evidence from closing a reopened key.
+An interrupted append can retry against that file only while the call still has the opening the evidence was verified against; a successful exact retry appends nothing.
+A changed evidence digest cannot rewrite a closed key, and neither an earlier matching close event nor staged evidence from an earlier opening can close a reopened key.
 Other keys in the stream remain unchanged.
 No board adapter, source binding, or remote routing behavior changes.
 
@@ -623,7 +625,11 @@ Around those outcomes, it proves:
 - `test_verified_close_retries_only_its_own_hold` covers an interrupted standalone close, original hold age, and refusal to reuse evidence across hold lifecycles.
 - `test_verified_closes_refuse_unanswered_or_unsupported_calls` covers active/unanswered outcomes, absent, empty, or reserved evidence, and unfinished or non-held work.
 - `test_operational_key_closes_with_durable_evidence_and_replay` covers full evidence retention, exact retry, changed evidence, reopened calls, and preservation of unrelated keys.
-- `test_operational_key_close_refusals_and_interrupted_append` covers captain-task and library ownership, required attestation, absent keys, and retry after evidence publication but before status append.
+- `test_close_key_leaves_a_migrated_captain_hold_to_its_owner` covers a Beads-migrated captain hold keeping its key until the owner closes it.
+- `test_operational_key_close_refusals_and_interrupted_append` covers captain-task and library ownership, required attestation, absent keys, retry after evidence publication but before status append, and refusal of that staged evidence once the key has reopened.
+- `test_verified_close_supersession_resolves_the_original_parent_key` covers an interrupted close superseded by changed evidence or a changed outcome, with the original parent key resolved across stacked records and closed-task retries.
+- `test_standalone_closes_follow_the_supervision_role_partition` covers the attended branch refused on both standalone paths, the board-request close left unguarded, the away record relocating both, and main unaffected.
+- `test_verified_close_retry_matrix` covers the exact-replay rule over open or closed task, same or changed evidence, same or changed outcome, request present or absent, stamped or legacy hold, and same or reopened opening, with the board-path retry requiring its pending request.
 - Each durable mutation applies only once across close, probe, and request-retirement failures.
 - A later distinct request with the same note still appends its own dated record.
 - Every failed retirement is surfaced with its pending request retained.
