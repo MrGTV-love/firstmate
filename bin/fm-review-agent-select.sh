@@ -40,10 +40,11 @@
 # Output (stdout, TOON-style block):
 #   review-agent-select: dry-run (nothing written)
 #     status: selected | escalate | tie
+#     rule: <rule_N> (<when>)   horizon_minutes: <N>
 #     selected: <harness>:<model> effort=.. agent=.. tier=primary|fallback
 #     reason: <why>
-#     candidate: <harness>:<model> provider=.. tier=.. ... -> eligible | not eligible
 #     current: the live no-mistakes agent order, read only
+#     candidate: <harness>:<model> provider=.. tier=.. ... -> eligible | not eligible
 # Exit status: 0 selected; 1 no selection (escalate or tie); 2 a usage,
 # configuration, or evidence error, which is never selected around.
 #

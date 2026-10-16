@@ -1755,16 +1755,17 @@ The script header owns flags, the output block, and exit status.
 
 - The review rule is the single rule in `config/crew-dispatch.json` whose `when` starts with `Isolated independent quality review`.
 - No match, or more than one match, is an error rather than a guess.
-- Roles and retired ids resolve through `bin/fm-model-index.sh profiles`, and each profile passes the model-index `check` preflight under the pinned worker account, as a dispatch does.
+- Roles and retired ids resolve through `bin/fm-model-index.sh profiles`, and each profile is preflighted through the model-index `check` under the pinned worker account, as a dispatch does.
+- A refused preflight makes that one candidate ineligible; it is reported, not an error.
 - Every `use` profile needs an explicit `model` and a harness that has a no-mistakes review agent: `omp` runs as `acp:omp` and `claude` runs as `claude`.
 - A `use` profile's `effort`, when present, is one of `low`, `medium`, `high`, `xhigh`, or `max`; any other value is an error.
 - A malformed rule, duplicate profile, invalid fallback, unreadable rules file, failed quota read, or invalid quota snapshot is reported as an error; the selector never selects around it.
 
 **Procedure**
 
-- The [quota-array-dispatch skill](../.agents/skills/quota-array-dispatch/SKILL.md) owns the gates and the `spendPriority` ranking; the script applies them to one `quota-axi --json` snapshot and one pooled `omp usage` report.
+- The [quota-array-dispatch skill](../.agents/skills/quota-array-dispatch/SKILL.md) owns the gates and the `spendPriority` ranking; the script applies them to one `quota-axi --json` snapshot and one pooled `omp usage` report for the `use` candidates.
 - Among eligible candidates the highest known `spendPriority` wins, a tie is reported without a winner, and an unknown scalar is disclosed, never read as zero or as healthy.
-- A declared `fallback` is considered only when every `use` candidate is proven exhausted.
+- A declared `fallback` is considered only when every `use` candidate is proven exhausted, and then each fallback makes its own capacity read.
 
 **Evidence log**
 
