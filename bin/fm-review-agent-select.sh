@@ -415,16 +415,26 @@ fi
 CURRENT=$(
   f="$NM_HOME/config.yaml"
   if [ -r "$f" ]; then
-    awk '
-      /^agent:/ { v = $0; sub(/^agent:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); print "agent\t" v; next }
-      /^agent_config:/ { in_cfg = 1; next }
+    awk -v sq="'" '
+      function unquote(s) { gsub("[\"" sq "]", "", s); return s }
       in_cfg && /^[^ \t#]/ { in_cfg = 0 }
-      in_cfg && /^[ \t]+[^ \t#].*:[ \t]*$/ {
-        name = $0; sub(/^[ \t]+/, "", name); sub(/:[ \t]*$/, "", name); gsub(/"/, "", name); next
-      }
-      in_cfg && name != "" && /^[ \t]+model:/ {
-        v = $0; sub(/^[ \t]+model:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); gsub(/"/, "", v)
-        print "model\t" name "\t" v
+      /^agent:/ { v = $0; sub(/^agent:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); print "agent\t" v; next }
+      /^agent_config:/ { in_cfg = 1; base = -1; name = ""; next }
+      !in_cfg || /^[ \t]*(#.*)?$/ { next }
+      {
+        line = $0; sub(/[ \t]+#.*$/, "", line)
+        match(line, /^[ \t]*/); ind = RLENGTH
+        if (base < 0) base = ind
+        if (ind == base) {
+          name = ""; child = -1
+          if (line ~ /:[ \t]*$/) { name = line; sub(/^[ \t]+/, "", name); sub(/:[ \t]*$/, "", name); name = unquote(name) }
+        } else if (name != "") {
+          if (child < 0) child = ind
+          if (ind == child && line ~ /^[ \t]+model:/) {
+            v = line; sub(/^[ \t]+model:[ \t]*/, "", v)
+            print "model\t" name "\t" unquote(v)
+          }
+        }
       }
     ' "$f" 2>/dev/null | jq -Rsc '
       split("\n") | map(select(length > 0) | split("\t")) |

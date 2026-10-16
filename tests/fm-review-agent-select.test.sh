@@ -125,6 +125,33 @@ expect_code 0 "$CODE" 'text output selects'
 assert_contains "$OUT" '  selected: claude:claude-sonnet-5-5[1m] effort=high agent=claude tier=primary' 'text names the choice'
 assert_contains "$OUT" '  current: agent=[claude, acp:omp] models={"claude":"claude-opus-5-5","acp:omp":"openai-codex/gpt-6.1-sol"}' 'text names the live pins'
 assert_not_contains "$OUT" 'would-write' 'text offers no config block'
+cat > "$NM_DIR/config.yaml" <<'YAML'
+agent: [claude, acp:omp]
+agent_config:
+  # a comment between the header and the first agent
+  claude:
+    effort: high
+    model: claude-opus-5-5
+  "acp:omp":   # live pin
+    env:
+      FOO: bar
+      model: not-a-pin
+    args:
+      - --fast
+    model: openai-codex/gpt-6.1-sol   # pinned
+  'quoted':
+    model: 'single-quoted-model'
+agent_path_override:
+  quoted: /somewhere
+other_section:
+  nested:
+    model: not-an-agent-pin
+YAML
+before=$(cksum < "$NM_DIR/config.yaml")
+select_run --dry-run --json
+expect_code 0 "$CODE" 'an awkward agent_config does not change the choice'
+assert_equals '{"claude":"claude-opus-5-5","acp:omp":"openai-codex/gpt-6.1-sol","quoted":"single-quoted-model"}' "$(jq -c .current.models <<<"$OUT")" \
+  'a commented key line, a nested block before model, single quotes, and a later section do not move a pin to another agent'
 pass 'a healthy pool selects the highest known spendPriority and discloses the pool'
 
 # ---- quota-tight pool: a short runway fails the gate, the measured pool is used ----
