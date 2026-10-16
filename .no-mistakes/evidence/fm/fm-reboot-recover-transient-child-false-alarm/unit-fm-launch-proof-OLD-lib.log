@@ -1,0 +1,3 @@
+ok - live process environment distinguishes matching pins, missing records, mismatches and unavailable proof
+ok - recorded generation binds the positively identified live PID across harnesses, shells and helpers
+not ok - a non-agent child gone from the process table must not fail attribution

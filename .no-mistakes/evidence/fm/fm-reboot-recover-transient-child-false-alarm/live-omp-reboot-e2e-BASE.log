@@ -1,0 +1,6 @@
+installed omp integration to /Users/charlesabrooker/tmp/fm-omp-reboot.vhw1dG/native-home/.omp/agent/extensions/herdr-omp-agent-state.ts
+native child captured: pid=38023 start=Fri Oct 16 06:58:57 2026    
+not ok - inspection or refusal created lifecycle state
+guarded teardown completed for session 'fm-lab-omp-reboot-32876-10975'; waiting for native child exit
+native child exit confirmed: pid=38023 start=Fri Oct 16 06:58:57 2026    
+private fixture tree removed: /Users/charlesabrooker/tmp/fm-omp-reboot.vhw1dG

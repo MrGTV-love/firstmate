@@ -1,0 +1,25 @@
+session=fm-lab-race-85106-9120 lab=/Users/charlesabrooker/tmp/fm-lab.ukmIEv
+/Users/charlesabrooker/tmp/fm-lab.ukmIEv
+ws=w1 tab=w1:t1 pane=w1:p1
+--- process-info sample:
+{"group":89985,"procs":[{"pid":94701,"name":"sleep"},{"pid":94685,"name":"sleep"},{"pid":94632,"name":"sleep"},{"pid":89985,"name":"python3.13"}]}
+--- agent pid via target lib:
+89985
+
+agent pid=89985
+=== A. attribution under a continuous stream of short-lived children
+ATTRIB base(c6bb05bf): runs=40 attributed_agent=0 refused=40 wrong_pid=0
+ATTRIB target(b7f0d478): runs=40 attributed_agent=40 refused=0 wrong_pid=0
+=== B. full reboot-recovery sweep on the healthy lane
+SWEEP base(c6bb05bf): runs=40 unreadable_wakes=40 silent=0 other=0
+SWEEP target(b7f0d478): runs=40 unreadable_wakes=0 silent=40 other=0
+=== C. adversarial: a pin that does NOT match must still be reported unmanaged (never silently managed)
+target sweep output: REBOOT_RECOVERY: race-secondmate: live launch is unmanaged; no lifecycle action taken
+RESULT C: pass (unmanaged still reported)
+=== D. adversarial: two real agents in one foreground group, plus the child stream, must still refuse
+--- process-info sample (two agents):
+{"group":20643,"procs":[{"pid":27819,"name":"python3.13","argv0":"omp"},{"pid":27811,"name":"sleep","argv0":"sleep"},{"pid":27804,"name":"sleep","argv0":"sleep"},{"pid":27789,"name":"sleep","argv0":"sleep"},{"pid":27783,"name":"sleep","argv0":"sleep"},{"pid":27729,"name":"sleep","argv0":"sleep"},{"pid":20662,"name":"python3.13","argv0":"omp"},{"pid":20659,"name":"python3.13","argv0":"omp"},{"pid":20643,"name":"bash","argv0":"bash"}]}
+ATTRIB two-agents target: runs=40 attributed=0 refused=40
+SWEEP two-agents target: runs=40 unreadable_wakes=40
+=== liveness after: agent still alive?
+teardown ok: fm-lab-race-85106-9120

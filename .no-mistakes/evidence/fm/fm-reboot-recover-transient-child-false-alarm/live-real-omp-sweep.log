@@ -1,0 +1,10 @@
+session=fm-lab-race-37086-9799 lab=/Users/charlesabrooker/tmp/fm-lab.64D9uL
+/Users/charlesabrooker/tmp/fm-lab.64D9uL
+ws=w1 tab=w1:t1 pane=w1:p1
+real omp pid=41611
+{"group":41611,"procs":[{"pid":41611,"name":"omp","argv0":"omp"}]}
+=== real omp, pinned, healthy: sweep must stay silent
+SWEEP base(c6bb05bf): runs=10 unreadable_wakes=0 silent=10 other=0
+SWEEP target(b7f0d478): runs=10 unreadable_wakes=0 silent=10 other=0
+real omp pid 41611 still alive after sweeps
+teardown ok: fm-lab-race-37086-9799
