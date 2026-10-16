@@ -1,0 +1,12 @@
+base	reap	slow_phase=8s	teardown_rc=0	spawn_rc=0	teardown_lock_holds=1	teardown_lock_hold_sum=11s	teardown_longest_hold=11s	spawn_meta_published_after_slow_phase_began=12.2s	teardown_wall=16.4s
+    holds[base/reap]: start=1792119585 end=1792119596 seconds=11 pid=11287 operation=teardown retire
+    holds[base/reap]: start=1792119596 end=1792119599 seconds=3 pid=20206 operation=spawn task-new
+base	sync	slow_phase=8s	teardown_rc=0	spawn_rc=0	teardown_lock_holds=1	teardown_lock_hold_sum=13s	teardown_longest_hold=13s	spawn_meta_published_after_slow_phase_began=11.3s	teardown_wall=17.7s
+    holds[base/sync]: start=1792119602 end=1792119615 seconds=13 pid=61804 operation=teardown retire
+    holds[base/sync]: start=1792119615 end=1792119618 seconds=3 pid=77697 operation=spawn task-new
+base	backlog	slow_phase=8s	teardown_rc=0	spawn_rc=0	teardown_lock_holds=1	teardown_lock_hold_sum=11s	teardown_longest_hold=11s	spawn_meta_published_after_slow_phase_began=11.6s	teardown_wall=16.3s
+    holds[base/backlog]: start=1792119621 end=1792119632 seconds=11 pid=15547 operation=teardown retire
+    holds[base/backlog]: start=1792119632 end=1792119635 seconds=3 pid=24431 operation=spawn task-new
+base	docker	slow_phase=8s	teardown_rc=0	spawn_rc=0	teardown_lock_holds=1	teardown_lock_hold_sum=17s	teardown_longest_hold=17s	spawn_meta_published_after_slow_phase_began=18.6s	teardown_wall=22.9s
+    holds[base/docker]: start=1792119638 end=1792119655 seconds=17 pid=61722 operation=teardown retire
+    holds[base/docker]: start=1792119656 end=1792119659 seconds=3 pid=68162 operation=spawn task-new

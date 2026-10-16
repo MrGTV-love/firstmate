@@ -1,0 +1,29 @@
+== target: mode=nolease slow_phase=8s slot=/Users/charlesabrooker/tmp/fm-lab.lli5gF/pool/.treehouse/proj-8eb45c/1/proj
+  before: treehouse status -> [{"name":"1","leased":null,"lease_holder":null}]
+  during the slow phase (teardown is still running: yes):
+    treehouse status -> [{"name":"1","status":"in-use","lease_holder":""}]
+  PASS  the retiring task's leaked process is still alive (the reap phase is genuinely in progress)
+live-real-treehouse.sh: line 143: 47714 Terminated: 15          ( cd "$SLOT" && exec sleep 3000 )
+    competing allocator waited 16.1s for the project lock (teardown still running afterwards: no) and got /Users/charlesabrooker/tmp/fm-lab.lli5gF/pool/.treehouse/proj-8eb45c/1/proj
+  PASS  without a lease command, project custody is kept: the competitor only got in after teardown ended
+  teardown rc=0 wall=20.7s
+    teardown: ●  This is a supervision warning only; the guarded operation WILL still run.
+    teardown: warning: pool slot /Users/charlesabrooker/tmp/fm-lab.lli5gF/pool/.treehouse/proj-8eb45c/1/proj is unleased and the installed treehouse is missing or has no lease command to reserve it; keeping project custody through its return instead
+    teardown: teardown retire complete (window firstmate:fm-retire, worktree /Users/charlesabrooker/tmp/fm-lab.lli5gF/pool/.treehouse/proj-8eb45c/1/proj)
+  holds (state-dir lock record):
+    start=1792119943 end=1792119943 seconds=0 pid=48153 operation=teardown retire
+    start=1792119944 end=1792119961 seconds=17 pid=48153 operation=teardown retire
+    start=1792119961 end=1792119961 seconds=0 pid=61177 operation=spawn lab-competitor
+  RESULT label=target mode=nolease slow_phase=8s teardown_rc=0 teardown_lock_holds=2 teardown_lock_hold_sum=17s teardown_longest_hold=17s competitor_lock_wait=16.1s teardown_wall=20.7s
+  after:
+    treehouse status -> [{"name":"1","status":"leased","lease_holder":"lab-competitor"}]
+  PASS  teardown exits 0
+  PASS  the task record is gone
+  PASS  no return-pending record is left
+  PASS  the retiring task's slot claim is dropped
+  PASS  the retiring slot is no longer held for the retiring task
+  PASS  the leaked process was reaped before the slot went back
+  PASS  the real tmux window was closed
+  PASS  the backlog item is closed
+  PASS  the competitor's own slot stays leased to it
+  FAILS=0

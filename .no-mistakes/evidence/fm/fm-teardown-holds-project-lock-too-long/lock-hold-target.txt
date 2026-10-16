@@ -1,0 +1,20 @@
+target	reap	slow_phase=8s	teardown_rc=0	spawn_rc=0	teardown_lock_holds=3	teardown_lock_hold_sum=1s	teardown_longest_hold=1s	spawn_meta_published_after_slow_phase_began=3.4s	teardown_wall=12.4s
+    holds[target/reap]: start=1792119665 end=1792119665 seconds=0 pid=32738 operation=teardown retire
+    holds[target/reap]: start=1792119665 end=1792119665 seconds=0 pid=32738 operation=teardown retire
+    holds[target/reap]: start=1792119666 end=1792119669 seconds=3 pid=39972 operation=spawn task-new
+    holds[target/reap]: start=1792119674 end=1792119675 seconds=1 pid=32738 operation=teardown retire
+target	sync	slow_phase=8s	teardown_rc=0	spawn_rc=0	teardown_lock_holds=3	teardown_lock_hold_sum=0s	teardown_longest_hold=0s	spawn_meta_published_after_slow_phase_began=3.7s	teardown_wall=12.9s
+    holds[target/sync]: start=1792119678 end=1792119678 seconds=0 pid=71620 operation=teardown retire
+    holds[target/sync]: start=1792119679 end=1792119679 seconds=0 pid=71620 operation=teardown retire
+    holds[target/sync]: start=1792119680 end=1792119680 seconds=0 pid=71620 operation=teardown retire
+    holds[target/sync]: start=1792119682 end=1792119684 seconds=2 pid=81992 operation=spawn task-new
+target	backlog	slow_phase=8s	teardown_rc=0	spawn_rc=0	teardown_lock_holds=3	teardown_lock_hold_sum=0s	teardown_longest_hold=0s	spawn_meta_published_after_slow_phase_began=3.1s	teardown_wall=13.2s
+    holds[target/backlog]: start=1792119692 end=1792119692 seconds=0 pid=12405 operation=teardown retire
+    holds[target/backlog]: start=1792119692 end=1792119692 seconds=0 pid=12405 operation=teardown retire
+    holds[target/backlog]: start=1792119694 end=1792119694 seconds=0 pid=12405 operation=teardown retire
+    holds[target/backlog]: start=1792119695 end=1792119697 seconds=2 pid=22253 operation=spawn task-new
+target	docker	slow_phase=8s	teardown_rc=0	spawn_rc=0	teardown_lock_holds=3	teardown_lock_hold_sum=0s	teardown_longest_hold=0s	spawn_meta_published_after_slow_phase_began=3.7s	teardown_wall=13.4s
+    holds[target/docker]: start=1792119707 end=1792119707 seconds=0 pid=43999 operation=teardown retire
+    holds[target/docker]: start=1792119707 end=1792119707 seconds=0 pid=43999 operation=teardown retire
+    holds[target/docker]: start=1792119709 end=1792119712 seconds=3 pid=56199 operation=spawn task-new
+    holds[target/docker]: start=1792119717 end=1792119717 seconds=0 pid=43999 operation=teardown retire

@@ -1,0 +1,34 @@
+== target: mode=lease slow_phase=8s slot=/Users/charlesabrooker/tmp/fm-lab.z8nUYp/pool/.treehouse/proj-6a04d6/1/proj
+  before: treehouse status -> [{"name":"1","leased":null,"lease_holder":null}]
+  during the slow phase (teardown is still running: yes):
+    treehouse status -> [{"name":"1","status":"leased","lease_holder":"retire"}]
+  PASS  the retiring slot is not allocatable during the slow phase (not available)
+  PASS  the slot is durably leased to the retiring task (holder=retire)
+  PASS  the retiring task's leaked process is still alive (the reap phase is genuinely in progress)
+    competing allocator waited 0.3s for the project lock (teardown still running afterwards: yes) and got /Users/charlesabrooker/tmp/fm-lab.z8nUYp/pool/.treehouse/proj-6a04d6/2/proj
+  PASS  competing allocator proceeded while the slow phase was still running
+  PASS  competing allocator got a different slot than the retiring one
+live-real-treehouse.sh: line 155: 95007 Terminated: 15          ( cd "$SLOT" && exec sleep 3000 )
+  teardown rc=0 wall=19.6s
+    teardown: ●  This is a supervision warning only; the guarded operation WILL still run.
+    teardown: 🌳 Leased worktree 1 at ~/tmp/fm-lab.z8nUYp/pool/.treehouse/proj-6a04d6/1/proj. Run 'treehouse return ~/tmp/fm-lab.z8nUYp/pool/.treehouse/proj-6a04d6/1/proj' to release it.
+    teardown: teardown retire complete (window firstmate:fm-retire, worktree /Users/charlesabrooker/tmp/fm-lab.z8nUYp/pool/.treehouse/proj-6a04d6/1/proj)
+  holds (state-dir lock record):
+    start=1792119894 end=1792119894 seconds=0 pid=95339 operation=teardown retire
+    start=1792119895 end=1792119895 seconds=0 pid=95339 operation=teardown retire
+    start=1792119896 end=1792119896 seconds=0 pid=5860 operation=spawn lab-competitor
+    start=1792119910 end=1792119911 seconds=1 pid=95339 operation=teardown retire
+  RESULT label=target mode=lease slow_phase=8s teardown_rc=0 teardown_lock_holds=3 teardown_lock_hold_sum=1s teardown_longest_hold=1s competitor_lock_wait=0.3s teardown_wall=19.6s
+  after:
+    treehouse status -> [{"name":"1","status":"available","lease_holder":""},{"name":"2","status":"leased","lease_holder":"lab-competitor"}]
+  PASS  teardown exits 0
+  PASS  the task record is gone
+  PASS  no return-pending record is left
+  PASS  the retiring task's slot claim is dropped
+  PASS  the retiring slot is no longer held for the retiring task
+  PASS  the retiring slot is back in the pool (not leased)
+  PASS  the leaked process was reaped before the slot went back
+  PASS  the real tmux window was closed
+  PASS  the backlog item is closed
+  PASS  the competitor's own slot stays leased to it
+  FAILS=0

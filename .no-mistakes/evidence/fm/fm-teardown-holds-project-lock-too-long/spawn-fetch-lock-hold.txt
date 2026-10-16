@@ -1,0 +1,10 @@
+base	slow_remote_fetch=8s	spawn_rc=0	spawn_lock_hold=11s	second_allocator_lock_wait=7.8s
+    holds: start=1792119982 end=1792119993 seconds=11 pid=64873 operation=spawn task-new
+    holds: start=1792119993 end=1792119993 seconds=0 pid=80401 operation=second-allocator
+    spawn: skill selection for task-new: unavailable - no TypeSafe or OpenRouter key
+    spawn: spawned task-new harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-task-new worktree=/Users/charlesabrooker/tmp/fm-project-capacity.TnpkCW/sf-base/wt-task-new
+target	slow_remote_fetch=8s	spawn_rc=0	spawn_lock_hold=3s	second_allocator_lock_wait=0.4s
+    holds: start=1792120000 end=1792120000 seconds=0 pid=15526 operation=second-allocator
+    holds: start=1792120007 end=1792120010 seconds=3 pid=10607 operation=spawn task-new
+    spawn: skill selection for task-new: unavailable - no TypeSafe or OpenRouter key
+    spawn: spawned task-new harness=codex kind=ship mode=no-mistakes yolo=off window=firstmate:fm-task-new worktree=/Users/charlesabrooker/tmp/fm-project-capacity.OD6mZp/sf-target/wt-task-new

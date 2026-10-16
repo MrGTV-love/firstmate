@@ -1,0 +1,28 @@
+== target: refused teardown after the slot was reserved, then a clean retry (real treehouse lease)
+  attempt 1: process inventory (lsof) fails after the slot was reserved
+    rc=1
+    ●  This is a supervision warning only; the guarded operation WILL still run.
+    REFUSED: cannot determine leaked processes under /Users/charlesabrooker/tmp/fm-lab.iiCF9E/pool/.treehouse/proj-e208bb/1/proj for retire (lsof failed); preserving the worktree/tasktmp for manual inspection or retry.
+    treehouse status -> [{"name":"1","status":"leased","lease_holder":"retire"}]
+  PASS  attempt 1 refuses (nonzero)
+  PASS  the task record is kept
+  PASS  the slot is still leased to the retiring task (not allocatable)
+  PASS  the return-pending record names the held slot
+  PASS  the slot claim is kept for the retry
+  PASS  the leaked process is untouched by a refused attempt
+    a fresh allocator in the refusal window got: /Users/charlesabrooker/tmp/fm-lab.iiCF9E/pool/.treehouse/proj-e208bb/2/proj
+  PASS  a fresh allocator is not handed the held slot
+  session-start (real fm-bootstrap.sh) between the attempts:
+  PASS  session start did not close the item or remove the record while the return is owed
+  attempt 2: the retry with a working process inventory
+    rc=0
+    Backlog: retire is closed in /Users/charlesabrooker/tmp/fm-lab.iiCF9E/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+    live-real-treehouse-retry.sh: line 102: 59633 Terminated: 15          ( cd "$SLOT" && exec sleep 3000 )
+    treehouse status -> [{"name":"1","status":"available","lease_holder":""},{"name":"2","status":"leased","lease_holder":"lab-competitor"}]
+  PASS  the retry exits 0
+  PASS  the record and the return-pending record are gone
+  PASS  the retired slot is back in the pool
+  PASS  the competitor's slot is untouched
+  PASS  the leaked process was reaped
+  PASS  the backlog item is closed
+  FAILS=0
