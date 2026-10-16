@@ -229,7 +229,9 @@
 # only by `reconcile close` evidence, or a body that merely quotes the record
 # markers, is refused. When the home's `.tasks.toml` names no archive but
 # `~/.tasks-axi/config.toml` does, that path is not read and the lookup refuses
-# instead of falling back to the default archive file. `complete` prints
+# instead of falling back to the default archive file. An archive setting the
+# gate cannot read exactly (empty, unquoted, unterminated, trailed by other
+# text, or holding a backslash) is refused the same way. `complete` prints
 # `[answered and archived: <ids>]` for the keys that passed only through the
 # archive.
 #
@@ -895,26 +897,43 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 
 ARCHIVE_ROW_BODY=
 
-# Section-aware [markdown] archive value from a .tasks.toml, comments stripped.
+# Section-aware [markdown] archive value from a .tasks.toml. The value must be
+# one quoted string, read up to its matching quote so a `#` inside the quotes
+# stays part of the path, followed only by blanks or a `#` comment. Prints
+# nothing when the key is unset. Returns 3, printing nothing, when the value is
+# empty, unquoted, unterminated, followed by other text, or holds a backslash:
+# the gate does not guess at a path tasks-axi may read differently.
 captain_markdown_archive_setting() {  # <toml-file>
   [ -f "$1" ] || return 0
   LC_ALL=C awk '
     function trim(v) { sub(/^[[:space:]]+/, "", v); sub(/[[:space:]]+$/, "", v); return v }
-    BEGIN { inmd = 0 }
+    BEGIN { inmd = 0; bad = 0 }
     {
-      line = $0
-      sub(/[[:space:]]*#.*/, "", line)
-      line = trim(line)
-      if (line ~ /^\[[^]]+\]$/) { inmd = (line == "[markdown]"); next }
-      if (!inmd) next
-      if (line ~ /^archive[[:space:]]*=/) {
-        sub(/^[^=]*=[[:space:]]*/, "", line)
-        gsub(/^"|"$/, "", line); gsub(/^'\''|'\''$/, "", line)
-        print line
-        exit
+      line = trim($0)
+      if (line ~ /^\[/) {
+        sub(/[[:space:]]*#.*/, "", line)
+        if (line ~ /^\[[^]]+\]$/) inmd = (line == "[markdown]")
+        next
       }
+      if (!inmd || line !~ /^archive[[:space:]]*=/) next
+      sub(/^[^=]*=[[:space:]]*/, "", line)
+      q = substr(line, 1, 1)
+      if (q != "\"" && q != "'\''") { bad = 1; exit }
+      len = index(substr(line, 2), q)
+      if (len == 0) { bad = 1; exit }
+      value = substr(line, 2, len - 1)
+      rest = trim(substr(line, len + 2))
+      if (value == "" || index(value, "\\") || (rest != "" && substr(rest, 1, 1) != "#")) { bad = 1; exit }
+      print value
+      exit
     }
+    END { if (bad) exit 3 }
   ' "$1"
+}
+
+# The refusal for an archive setting the gate cannot read exactly.
+archive_setting_unreadable() {  # <toml-file>
+  printf 'fm-captain-hold: the done archive setting in %s uses syntax the gate cannot read exactly; resolve the archived call by hand\n' "$1" >&2
 }
 
 # Look <id> up in the configured archive. Returns 0 and sets ARCHIVE_ROW_BODY to
@@ -929,13 +948,19 @@ archive_row_lookup() {  # <resolved-data-dir> <id>
       "$FM_BACKLOG_TRANSITION_ERROR" >&2
     return 2
   }
-  archive=$(captain_markdown_archive_setting "$root/.tasks.toml")
+  archive=$(captain_markdown_archive_setting "$root/.tasks.toml") || {
+    archive_setting_unreadable "$root/.tasks.toml"
+    return 2
+  }
   if [ -z "$archive" ] && [ -n "${HOME:-}" ]; then
     # tasks-axi takes the archive from ~/.tasks-axi/config.toml when the home's
     # .tasks.toml names none. That path is not read here, and the default file
     # beside the backlog may be an older archive, so naming it would pass a
     # stale answer for a row that was archived somewhere else.
-    outside=$(captain_markdown_archive_setting "$HOME/.tasks-axi/config.toml")
+    outside=$(captain_markdown_archive_setting "$HOME/.tasks-axi/config.toml") || {
+      archive_setting_unreadable "$HOME/.tasks-axi/config.toml"
+      return 2
+    }
     if [ -n "$outside" ]; then
       printf 'fm-captain-hold: the done archive path is set outside this home'\''s .tasks.toml, in %s/.tasks-axi/config.toml, and is not read; resolve the archived call by hand\n' \
         "$HOME" >&2

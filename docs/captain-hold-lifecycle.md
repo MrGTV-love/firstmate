@@ -111,6 +111,7 @@ On the markdown backend, a closed call that backlog retention moved to the done 
 A record written by the retired `fm-decision-hold.sh` counts too when it carries its full genuine shape: the decision digest, a non-empty `Routed identities:` line, an optional `Resolution mode:` of answered, repaired, routed, or declined (the oldest records have none), and a non-empty `Captain decision:` text.
 A call closed only by `reconcile close` evidence, or a body that merely quotes the record markers, is refused, and the operator resolves that case by hand.
 When the home's `.tasks.toml` names no archive but `~/.tasks-axi/config.toml` does, that path is not read and the gate refuses rather than falling back to the default archive file.
+An archive setting the gate cannot read exactly is refused the same way: the value must be one quoted string without a backslash, so a `#` inside the quotes is part of the path and a `#` after them starts a comment.
 `complete` prints `[answered and archived: <ids>]` for the keys that passed only through the archive.
 [`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns the archive lookup and its limits.
 The origin is never its own inventory entry, so a hold that failed cannot be vouched for by the origin row.
@@ -568,6 +569,8 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
   `test_archived_answer_after_leading_blank_lines_resolves` covers a recorded answer whose text starts with blank lines.
   `test_archived_record_with_only_blank_lines_after_the_label_refuses` covers a record with no answer text before the end of the body or the next record.
   `test_user_level_only_archive_path_refuses` and `test_stale_default_archive_does_not_stand_in_for_the_user_level_archive` cover an archive path set only in `~/.tasks-axi/config.toml`.
+  `test_archive_path_with_a_hash_is_read_whole`, `test_single_quoted_archive_path_with_a_hash_is_read_whole` and `test_trailing_comment_after_the_archive_path_still_works` cover the quote-aware archive path reader.
+  `test_archive_setting_the_gate_cannot_read_exactly_refuses` covers a backslash, an unterminated, unquoted, or empty value, and text after the closing quote.
 
 ### Answers, stamps, and deferral
 

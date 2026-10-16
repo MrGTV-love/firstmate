@@ -7761,6 +7761,118 @@ test_stale_default_archive_does_not_stand_in_for_the_user_level_archive() {
   pass "a stale default archive cannot stand in for an archive path the gate does not read"
 }
 
+# Gate checks for the quoted archive-path tests.
+assert_gate_resolves() {  # <home> <scout> <id> <what>
+  local out rc=0
+  out=$(run_captain "$1" verify "$2" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "verify refused $4: $out"
+  rc=0
+  out=$(run_captain "$1" complete "$2" --none 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "complete refused $4: $out"
+  assert_contains "$out" "[answered and archived: $3]" "the attestation does not name the archive for $4"
+}
+
+assert_gate_refuses_both() {  # <home> <scout> <what> [reason]
+  local out rc=0
+  out=$(run_captain "$1" verify "$2" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "verify passed $3: $out"
+  [ -z "${4:-}" ] || assert_contains "$out" "$4" "the verify refusal for $3 lacks its reason: $out"
+  rc=0
+  out=$(run_captain "$1" complete "$2" --none 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "complete --none passed $3: $out"
+  [ -z "${4:-}" ] || assert_contains "$out" "$4" "the complete refusal for $3 lacks its reason: $out"
+}
+
+test_archive_path_with_a_hash_is_read_whole() {
+  local home scout id
+  home=$(make_home archived-hash-path)
+  scout=sample-archive-hash-scout
+  id=sample-hash-archive-call
+  # An older answered row sits in the truncated path `data/closed`; the
+  # configured path `data/closed#later.md` holds a later row of the same id.
+  set_archive_retention "$home" data/closed
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_grep "Captain decision:" "$home/data/closed" "the older answered row is not in the truncated path"
+  set_archive_retention "$home" 'data/closed#later.md'
+  tasks_in "$home" add "$id" "Closed again with no answer" --kind captain --repo sample >/dev/null \
+    || fail "could not recreate $id"
+  tasks_in "$home" "done" "$id" >/dev/null || fail "could not close the later $id"
+  push_through_retention "$home" retention-filler-hash-second
+  assert_grep "$id" "$home/data/closed#later.md" "retention did not archive the later row at the path with a hash"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+  assert_gate_refuses_both "$home" "$scout" "a stale answer from the path cut at its hash"
+
+  # The same configured path with an answered row in it resolves: the whole path is read.
+  home=$(make_home archived-hash-path-answered)
+  scout=sample-archive-hash-answered-scout
+  id=sample-hash-answered-call
+  set_archive_retention "$home" 'data/closed#later.md'
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_grep "Captain decision:" "$home/data/closed#later.md" "the answered row is not in the path with a hash"
+  assert_absent "$home/data/closed" "the fixture wrote the truncated path"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+  assert_gate_resolves "$home" "$scout" "$id" "an answered call archived at a path with a hash"
+  pass "a hash inside the quoted archive path is read as part of the path"
+}
+
+test_single_quoted_archive_path_with_a_hash_is_read_whole() {
+  local home scout id
+  home=$(make_home archived-single-quote-hash)
+  scout=sample-archive-single-scout
+  id=sample-single-quote-call
+  printf '%s\n' 'backend = "markdown"' '' '[markdown]' 'path = "data/backlog.md"' \
+    "archive = 'data/single#quote.md'" 'done_keep = 1' > "$home/.tasks.toml"
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_grep "Captain decision:" "$home/data/single#quote.md" "the answered row is not in the single-quoted path"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+  assert_gate_resolves "$home" "$scout" "$id" "an answered call archived at a single-quoted path with a hash"
+  pass "a single-quoted archive path with a hash is read whole"
+}
+
+test_trailing_comment_after_the_archive_path_still_works() {
+  local home scout id
+  home=$(make_home archived-trailing-comment)
+  scout=sample-archive-comment-scout
+  id=sample-trailing-comment-call
+  printf '%s\n' 'backend = "markdown"' '' '[markdown] # the markdown backend' 'path = "data/backlog.md"' \
+    'archive = "data/commented.md"   # closed calls' 'done_keep = 1' > "$home/.tasks.toml"
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_grep "Captain decision:" "$home/data/commented.md" "the answered row is not in the commented path"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+  assert_gate_resolves "$home" "$scout" "$id" "an answered call whose archive setting has a trailing comment"
+  pass "a trailing comment after the archive path still works"
+}
+
+test_archive_setting_the_gate_cannot_read_exactly_refuses() {
+  local home scout id case_name line reason
+  scout=sample-archive-syntax-scout
+  id=sample-syntax-call
+  # tasks-axi accepts a backslash in a quoted path (an escape in a basic string,
+  # literal in a single-quoted one), so only those reach the gate's own reader.
+  # The other forms stop in tasks-axi first and must refuse for any reason.
+  for case_name in backslash backslash-literal unterminated unquoted trailing-text empty; do
+    reason=
+    case $case_name in
+      backslash) line='archive = "data\\syntax.md"'; reason="uses syntax the gate cannot read exactly" ;;
+      backslash-literal) line="archive = 'data\\syntax.md'"; reason="uses syntax the gate cannot read exactly" ;;
+      unterminated) line='archive = "data/syntax.md' ;;
+      unquoted) line='archive = data/syntax.md' ;;
+      trailing-text) line='archive = "data/syntax.md" extra' ;;
+      empty) line='archive = ""' ;;
+    esac
+    home=$(make_home "archived-syntax-$case_name")
+    set_archive_retention "$home" data/syntax.md
+    archive_an_answered_call "$home" "$id" "$scout"
+    assert_grep "Captain decision:" "$home/data/syntax.md" "the answered row is not in the archive fixture"
+    write_scout_with_attested_inventory "$home" "$scout" "$id"
+    printf '%s\n' 'backend = "markdown"' '' '[markdown]' 'path = "data/backlog.md"' \
+      "$line" 'done_keep = 1' > "$home/.tasks.toml"
+    assert_gate_refuses_both "$home" "$scout" "an archive setting that is $case_name" \
+      "$reason"
+  done
+  pass "an archive setting the gate cannot read exactly refuses"
+}
+
 tests=(
 test_sweep_retires_only_finished_board_listeners
 test_sweep_stops_a_live_listener_of_a_finished_board
@@ -7870,6 +7982,10 @@ test_archived_record_with_only_blank_lines_after_the_label_refuses
 test_archived_released_work_item_resolves_through_the_gate
 test_user_level_only_archive_path_refuses
 test_stale_default_archive_does_not_stand_in_for_the_user_level_archive
+test_archive_path_with_a_hash_is_read_whole
+test_single_quoted_archive_path_with_a_hash_is_read_whole
+test_trailing_comment_after_the_archive_path_still_works
+test_archive_setting_the_gate_cannot_read_exactly_refuses
 )
 if [ "$#" -gt 0 ]; then
   for requested in "$@"; do
