@@ -86,6 +86,10 @@ verified_adapter_contract() {  # <harness> -> exit command, interrupt key, repea
 #            renders picker-screen), `closed` afterwards. Enter on `open` is
 #            the confirming key and stops the agent; Escape on `open` is Stay.
 #            A test starts with `open` for a picker that was already up.
+#   command-after-enter  optional process name the first Enter replaces
+#            `command` with, so the agent-state reader stops proving a live
+#            agent once the submitting Enter has run: a name it cannot
+#            attribute reads ambiguous, an empty one reads unreadable.
 # Two transitions make it a lifecycle model rather than a recorder: a literal
 # that is the harness's exit command flips `command` to a shell (the agent
 # stopped), and a literal carrying a launch brief flips it to the value in
@@ -148,6 +152,9 @@ case "${1:-}" in
     else
       printf '%s\n' "$payload" >> "$D/keys"
       printf '%s %s\n' "$(perl -MTime::HiRes=time -e 'printf "%.3f", time')" "$payload" >> "$D/key-times"
+      if [ "$payload" = Enter ] && [ -f "$D/command-after-enter" ]; then
+        cat "$D/command-after-enter" > "$D/command"
+      fi
       if [ -f "$D/picker" ]; then
         case "$(cat "$D/picker"):$payload" in
           typed:Enter) printf open > "$D/picker" ;;
@@ -1238,6 +1245,48 @@ test_exit_refuses_the_picker_for_a_finished_task_with_an_active_turn() {
   pass "fm-control exit: a finished task whose busy record shows an active turn keeps the picker refusal"
 }
 
+test_exit_does_not_answer_a_picker_on_an_unclassified_endpoint() {
+  local dir out rc shape
+  for shape in ambiguous unreadable; do
+    dir=$(picker_case "unclassified-$shape" 'state: done · source: run-step · run: r1')
+    case "$shape" in
+      ambiguous) printf 'node' > "$dir/fake/command-after-enter" ;;
+      unreadable) : > "$dir/fake/command-after-enter" ;;
+    esac
+    out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+    expect_code 1 "$rc" "a finished task's picker on a $shape endpoint must refuse"$'\n'"$out"
+    assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+      "the $shape refusal should name the dialog"
+    assert_contains "$out" "$shape' rather than a positively classified live agent" \
+      "the $shape refusal should name the endpoint read"
+    assert_not_contains "$out" 'chose "Exit and stop tasks"' "no answer may be reported for a $shape endpoint"
+    [ "$(cat "$dir/fake/keys")" = Enter ] \
+      || fail "only the submitting Enter may be sent on a $shape endpoint, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+    [ "$(cat "$dir/fake/picker")" = open ] || fail "a refused exit must leave the picker as it was"
+  done
+  pass "fm-control exit: a finished task's picker is not answered while the endpoint reads ambiguous or unreadable"
+}
+
+test_exit_does_not_answer_a_late_picker_on_an_unclassified_endpoint() {
+  local dir out rc
+  dir=$(new_case late-unclassified)
+  add_task "$dir" t1 claude
+  alive_as "$dir" claude
+  printf '%s\n' 'state: done · source: run-step · run: r1' > "$dir/fake/crew-state"
+  exit_picker_screen > "$dir/fake/after-enter"
+  printf '1' > "$dir/fake/after-enter-late"
+  printf 'node' > "$dir/fake/command-after-enter"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "a picker found after the stop wait on an ambiguous endpoint must refuse"$'\n'"$out"
+  assert_contains "$out" "blocked on a prompt: Claude background-task exit picker" \
+    "the refusal should name the dialog"
+  assert_contains "$out" "'ambiguous' rather than a positively classified live agent" \
+    "the refusal should name the endpoint read"
+  [ "$(cat "$dir/fake/keys")" = Enter ] \
+    || fail "only the submitting Enter may be sent, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  pass "fm-control exit: a picker found after the stop wait is not answered while the endpoint reads ambiguous"
+}
+
 test_exit_never_answers_a_secondmates_picker() {
   local dir out rc
   dir=$(picker_case secondmate-picker 'state: done · source: status-log' secondmate)
@@ -1781,6 +1830,8 @@ test_exit_answers_a_finished_tasks_picker
 test_exit_leaves_a_live_tasks_picker_alone
 test_exit_refuses_the_picker_when_the_state_cannot_be_read
 test_exit_refuses_the_picker_for_a_finished_task_with_an_active_turn
+test_exit_does_not_answer_a_picker_on_an_unclassified_endpoint
+test_exit_does_not_answer_a_late_picker_on_an_unclassified_endpoint
 test_exit_never_answers_a_secondmates_picker
 test_exit_does_not_answer_the_picker_for_another_harness
 test_exit_closes_an_already_open_picker_for_a_finished_task

@@ -107,7 +107,9 @@
 #              ship or scout whose own state (fm-crew-state.sh) is a terminal
 #              done or failed, whose busy record showed no active turn before
 #              anything was sent, and whose composer this same exit proved
-#              empty before typing /exit; the postcondition is the ordinary
+#              empty before typing /exit; the endpoint must still read alive
+#              (and, on Herdr, attributed to the task) when the key is sent,
+#              and the postcondition is the ordinary
 #              agent-gone proof. A picker already open when exit begins is
 #              closed with the stay key first, then the composer is read again,
 #              so pending text still refuses. Every other case, including
@@ -1239,14 +1241,21 @@ refuse_exit_picker() {  # <dialog-name>
 # confirm_exit_picker <dialog-name> <pre-exit-busy-verdict>: the picker opened
 # AFTER this exit proved the composer empty and typed /exit, so the only input
 # it holds is that command. Choose its selected row, "Exit and stop tasks", when
-# exit_picker_answerable says the task is finished; otherwise refuse. The screen
-# is read again immediately before the key so a changed screen gets nothing.
+# exit_picker_answerable says the task is finished; otherwise refuse. The
+# endpoint must read positively alive, and on Herdr stay attributed to this
+# task, at the key: both callers reach here after time has passed. The screen is
+# read again immediately before the key so a changed screen gets nothing.
 confirm_exit_picker() {
-  local dialog=$1 busy=$2 key
+  local dialog=$1 busy=$2 key state
   exit_picker_answerable "$dialog" "$busy" || refuse_exit_picker "$dialog"
   key=$(fm_control_exit_picker_confirm_key "$HARNESS")
   fm_control_backend_supports_key "$BACKEND" "$key" \
     || die "task $ID's $BACKEND backend cannot deliver $key; the exit picker was left as it was"
+  state=$(agent_state)
+  [ "$state" = alive ] \
+    || refuse_blocking_prompt "$dialog" "It was left as it was because the endpoint reads '$state' rather than a positively classified live agent."
+  require_live_task_attribution alive \
+    || refuse_blocking_prompt "$dialog" "It was left as it was because the live agent cannot be positively attributed to this task."
   if ! exit_picker_visible; then
     EXIT_PICKER_WHY="the screen changed before the key could be sent"
     refuse_exit_picker "$dialog"

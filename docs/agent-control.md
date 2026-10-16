@@ -82,6 +82,7 @@ A worker parked on it holds every later steering message behind it, so two suppo
 - **A finished task is stopped.**
   `exit` chooses "Exit and stop tasks" only for a Claude ship or scout whose own state, read through [`bin/fm-crew-state.sh`](../bin/fm-crew-state.sh), is a terminal `done` or `failed`, and whose busy record showed no active turn before anything was sent.
   The composer proof is this exit's own: the picker opened after the exit proved the composer `empty` and typed `/exit`, so `/exit` is the only input it holds.
+  The endpoint is read again immediately before the confirming Enter and must still classify the agent `alive`, and on Herdr it must still pass the [live task-attribution guard](#live-herdr-task-attribution); an ambiguous, unreadable, or missing read refuses with the picker left as it was.
   The screen is read again immediately before the confirming Enter, and the postcondition is the ordinary agent-gone proof.
   A picker that was already open when `exit` began is first closed with the stay key and the composer is read again, so a draft the picker was hiding still refuses the exit and is preserved.
 - **A live task is released with `stay`.**
