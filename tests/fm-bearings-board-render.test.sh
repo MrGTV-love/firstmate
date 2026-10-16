@@ -273,12 +273,15 @@ test_overdue_obligations_cannot_be_omitted_by_the_board_composer() {
 {"schema":"fm-open-loops.v1","generated_epoch":1790770000,"home":"lane","complete":true,"rows":[
   {"id":"expired","category":"red_check","subject":"failing PR","owner":"firstmate","next_action":"diagnose: code or test","age_seconds":3600,"overdue":true},
   {"id":"stalled","category":"stalled_worker","subject":"disk worker","owner":"firstmate","next_action":"inspect stalled worker","age_seconds":7200,"overdue":true,"evidence":"Error: ENOSPC: no space left on device"},
+  {"id":"parked","category":"unanswered_question","subject":"held-job:ci-control","owner":"firstmate","next_action":"answer or close this question","age_seconds":9000,"overdue":true},
   {"id":"recent","category":"ready_not_started","subject":"recently assigned","owner":"firstmate","next_action":"dispatch","age_seconds":1,"overdue":false}
-]}
+],"handling":{"actions":{"parked":{"kind":"escalated","holds":[{"task":"held-job","marker":"2026-10-15T10:00:00Z"}]}}}}
 JSON
   out=$(render "$home" '[]')
   printf '%s' "$out" | jq -e '
-    (.charted | length) == 2
+    (.charted | length) == 3
+    and (.charted[2] | .pickable == false and (.title | contains("held-job:ci-control"))
+      and (.sub | contains("answer or close this question") and contains("9000s")))
     and (.charted[0] | .pickable == false
       and (.title | contains("failing PR"))
       and (.sub | contains("firstmate") and contains("diagnose: code or test") and contains("3600s"))

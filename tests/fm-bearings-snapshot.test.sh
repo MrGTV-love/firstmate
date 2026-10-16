@@ -1111,22 +1111,28 @@ test_open_work_ledger_is_dated_evidence_from_the_effective_state_root() {
   jq -n '{schema:"fm-open-loops.v1",generated_epoch:1783792800,home:"lane",complete:false,rows:[
     {id:"late",category:"red_check",subject:"failing PR",owner:"firstmate",next_action:"diagnose: code or test",age_seconds:3600,overdue:true,limit_seconds:0},
     {id:"stalled",category:"stalled_worker",subject:"disk worker",owner:"firstmate",next_action:"inspect stalled worker",age_seconds:7200,overdue:true,limit_seconds:3600,evidence:"Error: ENOSPC: no space left on device"},
-    {id:"fine",category:"open_pr",subject:"fresh PR",owner:"firstmate",next_action:"route review",age_seconds:5,overdue:false,limit_seconds:3600}]}' \
+    {id:"parked",category:"unanswered_question",subject:"held-job:ci-control",owner:"firstmate",next_action:"answer or close this question, or record why it no longer applies",age_seconds:9000,overdue:true,limit_seconds:1800,evidence:"blocked: supported recovery control is missing"},
+    {id:"fine",category:"open_pr",subject:"fresh PR",owner:"firstmate",next_action:"route review",age_seconds:5,overdue:false,limit_seconds:3600}],
+    handling:{actions:{parked:{kind:"escalated",holds:[{task:"held-job",marker:"2026-10-15T10:00:00Z"}]}}}}' \
     > "$home/special-state/open-loops.json"
   json=$(FM_STATE_OVERRIDE="$home/special-state" run_prepared "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '
     .open_loops.generated_epoch == 1783792800 and .open_loops.complete == false
-    and (.open_loops.rows | map(.id) == ["late","stalled"])
+    and (.open_loops.rows | map(.id) == ["late","stalled","parked"])
     and .open_loops.rows[0].evidence == ""
     and .open_loops.rows[1].evidence == "Error: ENOSPC: no space left on device"' >/dev/null \
     || fail "ledger rows were not projected from the effective state root with their observation time: $json"
   toon=$(FM_STATE_OVERRIDE="$home/special-state" run_prepared "$home" "$fakebin")
-  printf '%s\n' "$toon" | grep -Fq 'rows[2]{id,category,subject,owner,next_action,age_seconds,evidence}:' \
+  printf '%s\n' "$toon" | grep -Fq 'rows[3]{id,category,subject,owner,next_action,age_seconds,evidence}:' \
     || fail "TOON ledger rows omitted the evidence column: $toon"
   printf '%s\n' "$toon" | grep -Fq 'late,red_check,failing PR,firstmate,"diagnose: code or test",3600,""' \
     || fail "TOON ledger rows omitted evidence-less compatibility: $toon"
   printf '%s\n' "$toon" | grep -Fq 'stalled,stalled_worker,disk worker,firstmate,inspect stalled worker,7200,"Error: ENOSPC: no space left on device"' \
     || fail "TOON ledger rows omitted the recorded error: $toon"
+  # A standing escalation never resolves the obligation, so the row stays on the board's evidence.
+  printf '%s\n' "$toon" | grep -Fq 'parked,unanswered_question,"held-job:ci-control"' \
+    || printf '%s\n' "$toon" | grep -Fq 'parked,unanswered_question,held-job:ci-control' \
+    || fail "a row under a standing escalation was omitted from the open-work projection: $toon"
   printf '{"schema":"other.v9","rows":[]}\n' > "$home/special-state/open-loops.json"
   FM_STATE_OVERRIDE="$home/special-state" run_prepared "$home" "$fakebin" --json >/dev/null 2>&1 \
     && fail "an unsupported ledger schema was projected as if it were valid"
