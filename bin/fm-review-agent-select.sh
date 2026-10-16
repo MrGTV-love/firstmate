@@ -33,7 +33,9 @@
 # healthy: it is used only when no candidate carries a known scalar and exactly
 # one has measured headroom, and is otherwise disclosed beside the winner.
 # Headroom comes from one `quota-axi --json` snapshot and, for omp
-# openai-codex/ routes, one `omp usage` pooled report; each is read once.
+# openai-codex/ routes, one `omp usage` pooled report; each is read once. The
+# fallback tier is the exception: it is entered only when every `use` candidate
+# is proven exhausted, and then each declared fallback makes its own omp reads.
 #
 # Output (stdout, TOON-style block):
 #   review-agent-select: dry-run (nothing written)
@@ -140,8 +142,8 @@ RULE=$(printf '%s\n' "$RESOLVED" | jq -c --arg prefix "$REVIEW_WHEN_PREFIX" \
       "harness " + $p.harness + " has no no-mistakes review agent (only omp and claude)"
     elif (($p.model | type) != "string") or ($p.model | length) == 0 then
       "profile " + $p.harness + " needs an explicit model"
-    elif ($p | has("effort")) and ((($p.effort | type) != "string") or ($p.effort | length) == 0) then
-      "profile " + $p.model + " effort must be a non-empty string"
+    elif ($p | has("effort")) and ((["low", "medium", "high", "xhigh", "max"] | index($p.effort)) == null) then
+      "profile " + $p.model + " effort must be one of low, medium, high, xhigh, max"
     elif ($p | has("provider")) and ((($p.provider | type) != "string") or (($p.provider | test($provider_re)) | not)) then
       "profile " + $p.model + " provider must match " + $provider_re
     elif ($p | has("floor")) and floor_bad($p.floor) then

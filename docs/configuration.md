@@ -1757,6 +1757,7 @@ The script header owns flags, the output block, and exit status.
 - No match, or more than one match, is an error rather than a guess.
 - Roles and retired ids resolve through `bin/fm-model-index.sh profiles`, and each profile passes the model-index `check` preflight under the pinned worker account, as a dispatch does.
 - Every `use` profile needs an explicit `model` and a harness that has a no-mistakes review agent: `omp` runs as `acp:omp` and `claude` runs as `claude`.
+- A `use` profile's `effort`, when present, is one of `low`, `medium`, `high`, `xhigh`, or `max`; any other value is an error.
 - A malformed rule, duplicate profile, invalid fallback, unreadable rules file, failed quota read, or invalid quota snapshot is reported as an error; the selector never selects around it.
 
 **Procedure**

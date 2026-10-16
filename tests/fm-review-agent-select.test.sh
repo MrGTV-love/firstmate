@@ -262,6 +262,10 @@ rm -f "$RULES"
 assert_error 'an absent rules file' 'rules file not readable' --dry-run
 write_rules "[$(jq -c 'del(.model)' <<<"$SONNET"),$SOL]"
 assert_error 'a candidate with no model' 'needs an explicit model' --dry-run
+write_rules "[$(jq -c '.effort = "hgih"' <<<"$SONNET"),$SOL]"
+assert_error 'a candidate with an unknown effort' 'effort must be one of low, medium, high, xhigh, max' --dry-run
+write_rules "[$(jq -c '.effort = ""' <<<"$SONNET"),$SOL]"
+assert_error 'a candidate with an empty effort' 'effort must be one of low, medium, high, xhigh, max' --dry-run
 write_rules "[{\"harness\":\"codex\",\"model\":\"gpt-6.1-sol\",\"effort\":\"high\"},$SOL]"
 assert_error 'a harness with no review agent' 'no no-mistakes review agent' --dry-run
 write_rules "[$SOL,$SOL]"
