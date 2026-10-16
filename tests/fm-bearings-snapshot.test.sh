@@ -1113,7 +1113,7 @@ test_open_work_ledger_is_dated_evidence_from_the_effective_state_root() {
     {id:"stalled",category:"stalled_worker",subject:"disk worker",owner:"firstmate",next_action:"inspect stalled worker",age_seconds:7200,overdue:true,limit_seconds:3600,evidence:"Error: ENOSPC: no space left on device"},
     {id:"parked",category:"unanswered_question",subject:"held-job:ci-control",owner:"firstmate",next_action:"answer or close this question, or record why it no longer applies",age_seconds:9000,overdue:true,limit_seconds:1800,evidence:"blocked: supported recovery control is missing"},
     {id:"fine",category:"open_pr",subject:"fresh PR",owner:"firstmate",next_action:"route review",age_seconds:5,overdue:false,limit_seconds:3600}],
-    handling:{actions:{parked:{kind:"escalated",holds:[{task:"held-job",marker:"2026-10-15T10:00:00Z"}]}}}}' \
+    handling:{actions:{parked:{kind:"escalated",hold:{task:"held-job",marker:"2026-10-15T10:00:00Z"}}}}}' \
     > "$home/special-state/open-loops.json"
   json=$(FM_STATE_OVERRIDE="$home/special-state" run_prepared "$home" "$fakebin" --json)
   printf '%s' "$json" | jq -e '

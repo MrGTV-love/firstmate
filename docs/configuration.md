@@ -751,11 +751,13 @@ Only one deferral is allowed per row; a second attempt refuses, marks the row `c
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
 A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
-An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` stands the same way while the receipt is bound to a task still held for the captain, and also ends when that hold is answered, released, blocked on an unresolved task, or held again.
+An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` stands the same way while the receipt is bound to one task still held for the captain, and also ends when that one hold is answered, released, blocked on an unresolved task, or held again.
 A hold the captain defers to a date is still held for the captain, so the receipt keeps standing and the row stays visible until the hold ends.
 A row owned by a worker or a reviewer never takes a hold binding; its escalation answers only the turn it followed.
-The recorder binds every captain-held backlog task the escalation names, whether the hold is live, aged, or deferred to a date: each `--hold TASK_ID`, or else the row's own task and its legacy `<task>-decision-<key>` task. Task ids written in the evidence never bind.
-An explicit `--hold` that is not held for the captain is refused, and an escalation that names no held task answers only the turn it followed, which the command reports.
+A receipt binds exactly one captain-held backlog task, whether its hold is live, aged, or deferred to a date. It is the first of these that is currently held: the explicit `--hold TASK_ID`, the row's key used as a task id (a keyed question's captain-held task id is its key, the same order `bin/fm-captain-hold.sh` resolves an entry), the retired legacy `<task>-decision-<key>` task, and the row's own task. Task ids written in the evidence never bind.
+`--hold` takes one task id and is named in the `help:` line that presents an overdue row, so a lane learns of it before it records.
+An explicit `--hold` that is not held for the captain is refused, and an escalation that finds no held task answers only the turn it followed, which the command reports.
+When two candidates are held, only the first binds: the other ending does not end the receipt, and the bound one ending re-presents the row.
 Hold standing reads only the local backlog and the row, so it survives a quota-stale ledger, and a hold can be recorded while the ledger is stale.
 When the backlog or the home's ledger cannot be read, an escalation without `--hold` is recorded with no binding and the command reports that the hold could not be verified, never that none was named.
 An explicit `--hold` that cannot be verified for the same reason is refused with `--hold must name a task still held for the captain` or `--hold needs a current ledger and readable backlog to verify the captain hold`, and no receipt is written.

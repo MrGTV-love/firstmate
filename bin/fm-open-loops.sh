@@ -3,7 +3,7 @@
 # Usage: fm-open-loops.sh [--json] [--heartbeat] [--check-in <task-id>]
 #        fm-open-loops.sh --present-overdue | --check-actions | --report
 #        fm-open-loops.sh action ROW_ID steered|merged|escalated|deferred --evidence TEXT [--recheck UTC_TIME]
-#        fm-open-loops.sh action ROW_ID escalated --evidence TEXT [--hold TASK_ID ...]
+#        fm-open-loops.sh action ROW_ID escalated --evidence TEXT [--hold TASK_ID]
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg --recheck UTC_TIME
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
@@ -22,10 +22,11 @@
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
 # the row's PR URL for merged, or free text for escalated/deferred.
-# --hold names a task held for the captain that a firstmate-owned open_pr, unanswered_question or
-# unlanded_commit row waits on; without it the row's own task and its <task>-decision-<key> task are tried.
+# --hold names the one task held for the captain that a firstmate-owned open_pr, unanswered_question or
+# unlanded_commit row waits on; without it the first of the row's key (a keyed question's captain-held
+# task id), its <task>-decision-<key> task and its own task that is held binds.
 # Task ids written in the evidence never bind. Rows owned by a worker or a reviewer take no binding.
-# The receipt then stands like a captain-owned row's, until the row changes or the hold ends.
+# The receipt then stands like a captain-owned row's, until the row changes or that hold ends.
 # That check reads only the local backlog, so a quota-stale ledger does not end it.
 # deferred and waiting require an ISO UTC --recheck time within 24 hours.
 # waiting selects either --prerequisite QUESTION_ROW_ID (a distinct same-task question) or

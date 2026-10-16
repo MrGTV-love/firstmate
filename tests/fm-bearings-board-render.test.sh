@@ -275,7 +275,7 @@ test_overdue_obligations_cannot_be_omitted_by_the_board_composer() {
   {"id":"stalled","category":"stalled_worker","subject":"disk worker","owner":"firstmate","next_action":"inspect stalled worker","age_seconds":7200,"overdue":true,"evidence":"Error: ENOSPC: no space left on device"},
   {"id":"parked","category":"unanswered_question","subject":"held-job:ci-control","owner":"firstmate","next_action":"answer or close this question","age_seconds":9000,"overdue":true},
   {"id":"recent","category":"ready_not_started","subject":"recently assigned","owner":"firstmate","next_action":"dispatch","age_seconds":1,"overdue":false}
-],"handling":{"actions":{"parked":{"kind":"escalated","holds":[{"task":"held-job","marker":"2026-10-15T10:00:00Z"}]}}}}
+],"handling":{"actions":{"parked":{"kind":"escalated","hold":{"task":"held-job","marker":"2026-10-15T10:00:00Z"}}}}}
 JSON
   out=$(render "$home" '[]')
   printf '%s' "$out" | jq -e '

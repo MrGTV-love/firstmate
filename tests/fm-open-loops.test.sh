@@ -2717,7 +2717,7 @@ assert result.stdout.startswith('OVERDUE:') and row['id'] in result.stdout, resu
 assert ack(boundary).returncode == 1, 'an unreceipted overdue row refuses acknowledgement'
 recorded = act('escalated', 'asked the captain to decide the recovery')
 assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, recorded
-assert stored()['handling']['actions'][row['id']]['holds'][0]['task'] == 'held-job'
+assert stored()['handling']['actions'][row['id']]['hold']['task'] == 'held-job'
 assert ack(boundary).returncode == 0
 for label, later in (('same-day', 0), ('two-days', 2 * 86400)):
     clock['now'] = now + later
@@ -2740,23 +2740,55 @@ assert 'row-fresh' in mixed.stdout and 'STANDING' in mixed.stdout, mixed
 assert mixed.stdout.index('row-fresh') < mixed.stdout.index('STANDING') and mixed.stdout.count(row['id']) == 1, mixed
 assert ack(boundary).returncode == 1, 'the fresh row still needs its own action'
 
-# The hold can be named by id or by the legacy decision task, never by a task id in the evidence; an explicit id must be live.
-home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('named', subject='gate:key-1',
-        source=dict(kind='status', task='gate', key='key-1'))
-backlog.write_text(HELD.replace('held-job', 'gate-decision-key-1'))
+# One receipt binds exactly one held task: the explicit --hold, else the first held of the row's key, its legacy
+# <task>-decision-<key> task and its own task. Task ids written in the evidence never bind.
+KEY, ORIGIN = 'd1-expired-preservation-ledger', 'vernant-d1-intake'
+LEGACY = ORIGIN + '-decision-' + KEY
+KEYED = dict(subject=ORIGIN + ':' + KEY, source=dict(kind='status', task=ORIGIN, key=KEY))
+ENTRY = HELD.split('## In flight\n')[1].split('\n\n## Queued')[0]
+def held(*tasks):
+    return '## In flight\n' + '\n'.join(ENTRY.replace('held-job', task) for task in tasks) + '\n\n## Queued\n\n## Done\n'
+def bound_to(label, tasks, expected):
+    home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(label, **KEYED)
+    backlog.write_text(held(*tasks))
+    _, boundary = drain()
+    recorded = act('escalated', 'asked the captain')
+    assert recorded.returncode == 0 and 'standing: captain hold ' + expected + ';' in recorded.stdout, (label, recorded)
+    action = stored()['handling']['actions'][row['id']]
+    assert action['hold']['task'] == expected and 'holds' not in action, (label, action)
+    assert ack(boundary).returncode == 0
+    result, boundary = drain(label + '-later')
+    assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, result.stdout)
+    return home, backlog, row, drain, ack, stored
+bound_to('key-named', [KEY], KEY)
+bound_to('origin-task', [ORIGIN], ORIGIN)
+bound_to('legacy-name', [LEGACY], LEGACY)
+bound_to('order-legacy-first', [ORIGIN, LEGACY], LEGACY)
+home, backlog, row, drain, ack, stored = bound_to('order-key-first', [ORIGIN, LEGACY, KEY], KEY)
+backlog.write_text(held(KEY))
+result, boundary = drain('other-candidates-ended')
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, 'only the bound hold ends the receipt'
+backlog.write_text(held(ORIGIN, LEGACY))
+result, boundary = drain('bound-ended')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'the bound hold ending re-presents the row'
+
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('explicit', **KEYED)
+backlog.write_text(held(KEY, ORIGIN, 'elsewhere'))
 _, boundary = drain()
-legacy = act('escalated', 'asked the captain')
-assert 'standing: captain hold gate-decision-key-1' in legacy.stdout, legacy
-backlog.write_text(HELD.replace('held-job', 'elsewhere'))
+mentioned = act('escalated', 'tracked as elsewhere; captain notified.', '--hold', 'not-held')
+assert mentioned.returncode == 1 and 'still held for the captain' in mentioned.stdout, mentioned
+assert row['id'] not in stored()['handling']['actions'], 'a refused --hold records no receipt'
+named = act('escalated', 'asked the captain', '--hold', ORIGIN)
+assert named.returncode == 0 and 'standing: captain hold ' + ORIGIN + ';' in named.stdout, named
+assert stored()['handling']['actions'][row['id']]['hold']['task'] == ORIGIN, 'an explicit --hold outranks the row key'
+wrong_kind = act('deferred', 'still waiting', '--hold', ORIGIN, '--recheck', iso(now + 600))
+assert wrong_kind.returncode == 1 and 'only valid for escalated' in wrong_kind.stdout, wrong_kind
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('evidence-only', **KEYED)
+backlog.write_text(held('elsewhere'))
+_, boundary = drain()
 mentioned = act('escalated', 'tracked as elsewhere; captain notified.')
 assert mentioned.returncode == 0 and 'standing: no' in mentioned.stdout and 'captain hold' not in mentioned.stdout, mentioned
-assert 'holds' not in stored()['handling']['actions'][row['id']], 'free text in the evidence must not bind a hold'
-refused = act('escalated', 'asked the captain', '--hold', 'not-held')
-assert refused.returncode == 1 and 'still held for the captain' in refused.stdout, refused
-named = act('escalated', 'asked the captain', '--hold', 'elsewhere')
-assert named.returncode == 0 and 'standing: captain hold elsewhere' in named.stdout, named
-wrong_kind = act('deferred', 'still waiting', '--hold', 'elsewhere', '--recheck', iso(now + 600))
-assert wrong_kind.returncode == 1 and 'only valid for escalated' in wrong_kind.stdout, wrong_kind
+assert 'hold' not in stored()['handling']['actions'][row['id']], 'free text in the evidence must not bind a hold'
 
 # (b) A changed row, or a hold that is answered, released, blocked on an unresolved task, or re-held, restores the requirement.
 def changed_row(record):
@@ -2812,7 +2844,7 @@ backlog.write_text(DEFERRED)
 _, boundary = drain()
 recorded = act('escalated', 'asked the captain')
 assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, recorded
-assert stored()['handling']['actions'][row['id']]['holds'][0]['task'] == 'held-job'
+assert stored()['handling']['actions'][row['id']]['hold']['task'] == 'held-job'
 assert ack(boundary).returncode == 0
 result, boundary = drain('after-dated-record')
 assert row['id'] not in result.stdout and ack(boundary).returncode == 0, result.stdout
@@ -2852,10 +2884,10 @@ assert recorded.returncode == 0 and 'standing:' not in recorded.stdout, recorded
 assert ack(boundary).returncode == 0
 result, boundary = drain('again')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'an escalation cannot silence a mergeable reviewed PR'
-assert 'holds' not in stored()['handling']['actions'][row['id']]
+assert 'hold' not in stored()['handling']['actions'][row['id']]
 # Even a forged binding on the stored receipt cannot make it stand.
 record = stored()
-record['handling']['actions'][row['id']]['holds'] = [dict(task='held-job', marker=iso(now - 7200))]
+record['handling']['actions'][row['id']]['hold'] = dict(task='held-job', marker=iso(now - 7200))
 ledger.write_text(json.dumps(record))
 result, boundary = drain('forged')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
@@ -2908,13 +2940,13 @@ for label, hold_args in (('explicit', ('--hold', 'held-job')), ('automatic', ())
     go_stale(ledger)
     recorded = act('escalated', 'asked the captain', *hold_args)
     assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, (label, recorded)
-    assert stored()['handling']['actions'][row['id']]['holds'][0]['task'] == 'held-job', label
+    assert stored()['handling']['actions'][row['id']]['hold']['task'] == 'held-job', label
     assert ack(boundary).returncode == 0
     result, boundary = drain('stale-after')
     assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, result.stdout)
     renewed = act('escalated', 'asked the captain again', *hold_args)
     assert renewed.returncode == 0 and 'standing: captain hold held-job' in renewed.stdout, (label, renewed)
-    assert stored()['handling']['actions'][row['id']]['holds'][0]['task'] == 'held-job', label
+    assert stored()['handling']['actions'][row['id']]['hold']['task'] == 'held-job', label
 
 # An unreadable backlog is reported as an unverifiable hold, never as a hold that nobody named.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('unverified')
@@ -2923,7 +2955,7 @@ backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
 recorded = act('escalated', 'asked the captain')
 assert recorded.returncode == 0 and 'standing: no' in recorded.stdout, recorded
 assert 'could not be verified' in recorded.stdout and 'no task held for the captain was named' not in recorded.stdout, recorded
-assert 'holds' not in stored()['handling']['actions'][row['id']]
+assert 'hold' not in stored()['handling']['actions'][row['id']]
 refused = act('escalated', 'asked the captain', '--hold', 'held-job')
 assert refused.returncode == 1 and 'still held for the captain' in refused.stdout, refused
 assert ack(boundary).returncode == 0
@@ -2934,7 +2966,7 @@ assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'an unverif
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('marker')
 _, boundary = drain()
 assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
-marker = stored()['handling']['actions'][row['id']]['holds'][0]['marker']
+marker = stored()['handling']['actions'][row['id']]['hold']['marker']
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(
     'reviewer', category='open_pr', subject=PR, owner='alice', next_action='complete the requested PR review',
     evidence='', limit_seconds=600, source=dict(kind='pr', task='held-job'))
@@ -2948,8 +2980,8 @@ refused = act('escalated', 'asked the captain', '--hold', 'held-job')
 assert refused.returncode == 1 and 'only a firstmate-owned' in refused.stdout, refused
 # Even a receipt carrying a live, matching hold binding cannot make a reviewer-owned row stand.
 record = stored()
-assert 'holds' not in record['handling']['actions'][row['id']]
-record['handling']['actions'][row['id']]['holds'] = [dict(task='held-job', marker=marker)]
+assert 'hold' not in record['handling']['actions'][row['id']]
+record['handling']['actions'][row['id']]['hold'] = dict(task='held-job', marker=marker)
 ledger.write_text(json.dumps(record))
 result, boundary = drain('forged')
 assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
