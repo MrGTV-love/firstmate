@@ -2144,8 +2144,13 @@ The shared [guard service](../bin/ten-levels/extensions/report.ts) checks scope 
 The same project decision governs omp's native model routes; [`fm-spawn.sh --help`](../bin/fm-spawn.sh) owns that separate launch contract.
 For authorized screening, shell state contains the command and working directory, write state contains the path and complete replacement content, and result state contains the tool name, `source_role: tool_result` and complete text output.
 These fields can contain worker prompt or instruction text, so guard calls can send that text to TypeSafe; the guard does not intentionally send the whole conversation or system prompt.
-The entire static request, including pinned model and questions, must fit the code-owned UTF-8 byte ceiling.
-Oversize requests require review rather than screening a prefix as if it were the full input.
+Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
+A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling, never as a prefix standing in for the whole.
+Each piece ends after a line break when one is near its end and repeats the last 1,024 escaped bytes of the piece before it, so any span of up to 1,000 bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
+A payload that would need more than 16 pieces, about 230 KB of text, still requires review before anything is sent, and the never-send policy checks the whole payload before the first piece leaves.
+The pieces run together under the same 10-second and 25-second budgets and the same thresholds, and a payload passes only when every piece passes.
+A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
+A policy verdict on one piece outranks an outage on another.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
 
 The service uses the canonical shared Jev client, pinned to the calibrated model, with TypeSafe direct only and no provider fallback.
@@ -2176,6 +2181,7 @@ The owning home's private `state/jev-guard.jsonl` receives minimized terminal re
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 or 2), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
+A payload screened in pieces records `chunks` (the piece count; 1 for a single request, 0 when none was sent), the usage and tries of every answered piece added together, and the longest elapsed time, with a failed piece's own tries added to the total.
 A generic provider `Error` stays visible without inventing an HTTP category by parsing its message.
 Reported, estimated, unknown and not-called costs are distinct; unknown charges are not zero.
 Commands, paths, state, questions, raw exchanges, provider extension fields and exception messages are excluded; the guard no longer adds raw session report entries.

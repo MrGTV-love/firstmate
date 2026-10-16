@@ -9,9 +9,11 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { ContractError, type SystemOneResult } from "./ten-levels/src/core/client.ts";
+import type { Questions, State } from "./ten-levels/src/core/types.ts";
 import { createGuardService, failureTiming, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, withDecisionBudget,
-  type GuardServiceContext, type GuardTerminal } from "./ten-levels/extensions/report.ts";
-import { BASH_QUESTIONS, BLOCK_NOTICE, gateBash, gateWrite, insideRepo, screenToolResult, WRITE_QUESTIONS } from "./ten-levels/src/levels/level06/index.ts";
+  type GuardService, type GuardServiceContext, type GuardTerminal } from "./ten-levels/extensions/report.ts";
+import { BASH_QUESTIONS, BLOCK_NOTICE, gateBash, gateWrite, insideRepo, SCREEN_QUESTIONS, screenToolResult, WRITE_QUESTIONS,
+  type GateDecision, type ScreenDecision } from "./ten-levels/src/levels/level06/index.ts";
 
 export interface JevGuardContext extends GuardServiceContext {
   worktree: string;
@@ -159,6 +161,47 @@ function real(path: string): string[] {
   }
 }
 
+type Judge = (state: State, questions: Questions) => Promise<SystemOneResult>;
+type Gated = GateDecision & { risk: number };
+type Trail = Pick<GuardTerminal, "chunks" | "results">;
+/** One piece of a payload: its policy judgment, or why it could not be judged. Either way it keeps any answer it received. */
+type Part<D> = { result?: SystemOneResult } & ({ decision: D } | { failure: unknown });
+type Settled<D> = { result?: SystemOneResult; trail: Trail } & ({ decision: D; part: number; of: number } | { failure: unknown });
+
+/** Judges every piece to the end, so one piece that cannot be screened never hides a verdict on another. */
+function screenParts<D>(pieces: string[], run: (piece: string, judge: Judge) => Promise<D>, service: GuardService): Promise<Part<D>[]> {
+  return Promise.all(pieces.map(async (piece): Promise<Part<D>> => {
+    let result: SystemOneResult | undefined;
+    try {
+      const decision = await run(piece, async (state, questions) => (result = await service.decide(state, questions)));
+      return { result, decision };
+    } catch (failure) {
+      return { result, failure };
+    }
+  }));
+}
+
+/**
+ * The verdict for the whole payload. The first piece that `stops` it decides; otherwise a piece that could not be screened does;
+ * otherwise every piece passed and the riskiest one is the record. A payload is never passed on the strength of some of its pieces.
+ */
+function settle<D>(parts: Part<D>[], stops: (decision: D) => boolean, risk: (decision: D) => number): Settled<D> {
+  const results = parts.flatMap((part) => part.result ?? []);
+  const trail: Trail = parts.length > 1 ? { chunks: parts.length, results } : {};
+  const judged = parts.flatMap((part, index) => ("decision" in part ? [{ part: index, result: part.result, decision: part.decision }] : []));
+  const stopped = judged.find((piece) => stops(piece.decision));
+  if (stopped) return { ...stopped, of: parts.length, trail };
+  const bad = parts.find((part) => "failure" in part);
+  if (bad && "failure" in bad) return { result: bad.result ?? results[0], failure: bad.failure, trail };
+  const top = judged.reduce((best, piece) => (risk(piece.decision) > risk(best.decision) ? piece : best));
+  return { ...top, of: parts.length, trail };
+}
+
+/** A multi-piece block names its piece, so the worker can find the part that was refused. */
+function whereBlocked(settled: { part: number; of: number }, reason: string): string {
+  return settled.of > 1 ? `${reason} (part ${settled.part + 1} of ${settled.of})` : reason;
+}
+
 export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
   if (c.policy !== GUARD_POLICY_VERSION) return;
   // Set before native LSP startup; this is process-local, never a profile setting.
@@ -209,6 +252,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     const tool = event.toolName;
     if (tool !== "bash" && tool !== "write" && tool !== "edit") return;
     let result: SystemOneResult | undefined;
+    let trail: Trail = {};
     const terminal: GuardTerminal = { hook: "tool_call", tool, decision: "allow", enforcement: "pretool_allow",
       branch: "policy", error_type: null, request_started: false };
     try {
@@ -229,23 +273,29 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
         const content = tool === "edit" ? input.new_string : input.content;
         if (typeof content !== "string") throw new GuardUnavailableError("InvalidToolInputError");
-        result = await service.decide({ path, content }, WRITE_QUESTIONS);
-        const { kind, contains_secret } = result.answers;
-        if (kind?.type !== "choice" || contains_secret?.type !== "noul") throw new ContractError("Invalid write answers.");
-        const decision = gateWrite({ kind, contains_secret });
-        return finishCall({ ...terminal, decision: decision.block ? "block" : "allow",
-          enforcement: decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, decision.reason);
+        const settled = settle(await screenParts(service.plan({ path, content }, "content", WRITE_QUESTIONS), async (piece, judge) => {
+          const { kind, contains_secret } = (await judge({ path, content: piece }, WRITE_QUESTIONS)).answers;
+          if (kind?.type !== "choice" || contains_secret?.type !== "noul") throw new ContractError("Invalid write answers.");
+          return { ...gateWrite({ kind, contains_secret }), risk: contains_secret.noul };
+        }, service), (decision: Gated) => decision.block, (decision) => decision.risk);
+        ({ result, trail } = settled);
+        if ("failure" in settled) throw settled.failure;
+        return finishCall({ ...terminal, ...trail, decision: settled.decision.block ? "block" : "allow",
+          enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
       }
       if (!service.active) return finishCall({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
       if (typeof input.command !== "string") throw new GuardUnavailableError("InvalidToolInputError");
-      result = await service.decide({ command: input.command, cwd: ctx.cwd }, BASH_QUESTIONS);
-      const { effect, destructive_intent } = result.answers;
-      if (effect?.type !== "choice" || destructive_intent?.type !== "noul") throw new ContractError("Invalid shell answers.");
-      const decision = gateBash({ effect, destructive_intent });
-      return finishCall({ ...terminal, decision: decision.block ? "block" : "allow",
-        enforcement: decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, decision.reason);
+      const settled = settle(await screenParts(service.plan({ command: input.command, cwd: ctx.cwd }, "command", BASH_QUESTIONS), async (piece, judge) => {
+        const { effect, destructive_intent } = (await judge({ command: piece, cwd: ctx.cwd }, BASH_QUESTIONS)).answers;
+        if (effect?.type !== "choice" || destructive_intent?.type !== "noul") throw new ContractError("Invalid shell answers.");
+        return { ...gateBash({ effect, destructive_intent }), risk: destructive_intent.noul };
+      }, service), (decision: Gated) => decision.block, (decision) => decision.risk);
+      ({ result, trail } = settled);
+      if ("failure" in settled) throw settled.failure;
+      return finishCall({ ...terminal, ...trail, decision: settled.decision.block ? "block" : "allow",
+        enforcement: settled.decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, whereBlocked(settled, settled.decision.reason));
     } catch (error) {
-      return finishCall({ ...terminal, decision: "review", enforcement: "pretool_deny", branch: "outage", error_type: failureType(error),
+      return finishCall({ ...terminal, ...trail, decision: "review", enforcement: "pretool_deny", branch: "outage", error_type: failureType(error),
         request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result, ...failureTiming(error) });
     }
   }));
@@ -254,6 +304,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     const tool = event.toolName;
     if (tool !== "read" && tool !== "bash") return;
     let result: SystemOneResult | undefined;
+    let trail: Trail = {};
     const terminal: GuardTerminal = { hook: "tool_result", tool, decision: "clear", enforcement: "result_pass",
       branch: "policy", error_type: null, request_started: false };
     if (!service.active) return finishResult({ ...terminal, decision: "inactive", enforcement: "inactive_no_protection", branch: "inactive" });
@@ -270,14 +321,15 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         text += separator + part.text;
         separator = "\n";
       }
-      const decision = await screenToolResult(tool, text, async (state, questions) => {
-        result = await service.decide(state, questions);
-        return result;
-      });
-      return finishResult({ ...terminal, decision: decision.decision, enforcement: decision.decision === "clear" ? "result_pass" : enforcement,
+      const pieces = service.plan({ tool, source_role: "tool_result", content: text }, "content", SCREEN_QUESTIONS);
+      const settled = settle(await screenParts(pieces, (piece, judge) => screenToolResult(tool, piece, judge), service),
+        (screen: ScreenDecision) => screen.decision === "flag", (screen) => screen.noul ?? -1);
+      ({ result, trail } = settled);
+      if ("failure" in settled) throw settled.failure;
+      return finishResult({ ...terminal, ...trail, decision: settled.decision.decision, enforcement: settled.decision.decision === "clear" ? "result_pass" : enforcement,
         branch: result ? "policy" : "empty", request_started: result !== undefined, result });
     } catch (error) {
-      return finishResult({ ...terminal, decision: "review", enforcement, branch: "outage", error_type: failureType(error),
+      return finishResult({ ...terminal, ...trail, decision: "review", enforcement, branch: "outage", error_type: failureType(error),
         request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result, ...failureTiming(error) });
     }
   }));

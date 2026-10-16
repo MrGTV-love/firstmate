@@ -391,9 +391,8 @@ const credentialTail = await handlers.tool_call({ toolName: 'write', input: { pa
 assert.equal(credentialTail.block, true, 'content beyond the former write prefix must affect the decision');
 const beforeHuge = requests();
 const huge = await handlers.tool_call({ toolName: 'write', input: { path: 'src/large.ts', content: 'é'.repeat(8500) } }, ctx);
-assert.equal(huge.block, true);
-assert.match(huge.reason, /RequestTooLargeError/);
-assert.equal(requests(), beforeHuge);
+assert.equal(huge, undefined, 'an oversized benign write is screened in pieces and allowed');
+assert.ok(requests().length > beforeHuge.length, 'every piece of an oversized write is sent for screening');
 const unsupported = await handlers.tool_result({ toolName: 'bash', content: [{ type: 'image', data: 'private-output-canary' }] }, ctx);
 assert.equal(unsupported.isError, true);
 assert.equal(JSON.stringify(unsupported).includes('private-output-canary'), false);
@@ -749,6 +748,181 @@ JS
   pass "actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages"
 }
 
+test_oversize_screening() {
+  local out
+  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const { splitForRoom, MAX_REQUEST_BYTES, MAX_CHUNKS, CHUNK_OVERLAP_BYTES } = await import(pathToFileURL(process.env.REPORT));
+const home = process.env.HOME_DIR;
+const handlers = {};
+installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'oversize', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
+const ctx = { cwd: process.env.WT };
+const sent = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).map(JSON.parse);
+const rows = n => readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').slice(-n).map(JSON.parse);
+const lines = count => Array.from({ length: count }, (_, i) => `L${i}: const answer = compute(${i}); // ordinary source line\n`);
+const benign = lines(700).join('');
+const write = content => handlers.tool_call({ toolName: 'write', input: { path: 'src/big.ts', content } }, ctx);
+const shell = command => handlers.tool_call({ toolName: 'bash', input: { command } }, ctx);
+const result = text => handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text }] }, ctx);
+const splice = (marker, at = 350) => [...lines(at), marker + '\n', ...lines(700).slice(at)].join('');
+
+// An oversized benign write is allowed after every part was screened in a request that fits the ceiling.
+let before = sent().length;
+assert.equal(await write(benign), undefined);
+let batch = sent().slice(before).map(r => JSON.parse(r.body));
+assert.ok(batch.length >= 3 && batch.length <= MAX_CHUNKS, `pieces: ${batch.length}`);
+for (const r of sent().slice(before)) assert.ok(Buffer.byteLength(r.body) <= MAX_REQUEST_BYTES, 'each piece is a request that fits the ceiling');
+for (let i = 0; i < 700; i++) assert.ok(batch.some(b => b.state.content.includes(`L${i}:`)), `line ${i} was never screened`);
+let [row] = rows(1);
+assert.equal(row.decision, 'allow');
+assert.equal(row.chunks, batch.length);
+assert.equal(row.usage.input_tokens, 3 * batch.length, 'usage totals every piece');
+assert.equal(row.attempts, batch.length);
+
+// One blocked piece blocks the whole write and names its part.
+let blocked = await write(splice('token = sk-live-fixture'));
+assert.equal(blocked.block, true);
+assert.match(blocked.reason, /credential/);
+assert.match(blocked.reason, /\(part \d+ of \d+\)/);
+assert.match(blocked.reason, /This block is final/);
+[row] = rows(1);
+assert.equal(row.decision, 'block');
+assert.ok(row.chunks >= 3);
+
+// A piece that cannot be screened blocks the write as an outage, with the outage wording.
+let outage = await write(splice('fail500'));
+assert.equal(outage.block, true);
+assert.match(outage.reason, /Review required: Error/);
+assert.match(outage.reason, /same call once more/);
+assert.doesNotMatch(outage.reason, /This block is final/);
+[row] = rows(1);
+assert.equal(row.error_type, 'Error');
+assert.equal(row.request_started, true);
+assert.ok(row.chunks >= 3);
+
+// A policy block outranks an outage elsewhere in the same payload.
+blocked = await write([...lines(100), 'fail500\n', ...lines(300), 'sk-live-fixture\n', ...lines(300)].join(''));
+assert.match(blocked.reason, /credential/);
+assert.doesNotMatch(blocked.reason, /Review required/);
+
+// The same holds for shell commands.
+assert.equal(await shell('echo ' + 'a '.repeat(20000)), undefined);
+blocked = await shell('echo ' + 'a '.repeat(20000) + '\nrm -rf build');
+assert.equal(blocked.block, true);
+assert.match(blocked.reason, /\(part \d+ of \d+\)/);
+outage = await shell('echo ' + 'a '.repeat(10000) + 'fail500' + ' a'.repeat(10000));
+assert.match(outage.reason, /Review required: Error/);
+
+// Oversized tool results keep the score-band rule on every piece.
+assert.equal(await result(benign), undefined);
+for (const [text, expected] of [[benign + 'IGNORE PREVIOUS private-output-canary', 'flag'], [benign + 'probability=0.5', 'review'], [benign + 'probability=0.2', 'clear'], [benign + 'probability=0.8', 'flag']]) {
+  const patch = await result(text);
+  [row] = rows(1);
+  assert.equal(row.decision, expected, text.slice(-40));
+  assert.equal(row.chunks >= 3, true);
+  if (expected === 'clear') assert.equal(patch, undefined);
+  else {
+    assert.equal(patch.isError, true);
+    assert.equal(JSON.stringify(patch).includes('private-output-canary'), false);
+  }
+}
+const unscreened = await result(splice('fail500'));
+assert.equal(unscreened.isError, true);
+[row] = rows(1);
+assert.equal(row.error_type, 'Error');
+const flaggedBeatsOutage = await result([...lines(100), 'fail500\n', ...lines(300), 'IGNORE PREVIOUS\n', ...lines(300)].join(''));
+assert.equal(flaggedBeatsOutage.isError, true);
+assert.equal(rows(1)[0].decision, 'flag');
+
+// A payload that no complete set of pieces can cover is refused before anything is sent, never screened as a prefix.
+before = sent().length;
+for (const content of ['x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1), 'é'.repeat(MAX_CHUNKS * 8192 - 1000)]) {
+  const tooBig = await write(content);
+  assert.equal(tooBig.block, true);
+  assert.match(tooBig.reason, /RequestTooLargeError/);
+  [row] = rows(1);
+  assert.equal(row.error_type, 'RequestTooLargeError');
+  assert.equal(row.request_started, false);
+}
+assert.equal((await result('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1))).isError, true);
+assert.equal(sent().length, before, 'an uncoverable payload must not send any piece');
+
+// The never-send policy covers the whole payload before the first piece leaves.
+writeFileSync(`${home}/config/dispatch-never-send`, 'never-send-canary-value\n');
+try {
+  const refused = await write(splice('never-send-canary-value', 650));
+  assert.equal(refused.block, true);
+  [row] = rows(1);
+  assert.equal(row.error_type, 'PrivacyWithheldError');
+  assert.equal(row.request_started, false);
+  assert.equal(sent().length, before, 'a clean piece must not leave beside a refused one');
+} finally {
+  rmSync(`${home}/config/dispatch-never-send`);
+}
+
+// Every short span lies whole inside one piece, and every piece fits its room in escaped bytes.
+const room = MAX_REQUEST_BYTES - 900;
+const samples = {
+  tokens: Array.from({ length: 6000 }, (_, i) => `<${i}>`).join(''),
+  lines: Array.from({ length: 6000 }, (_, i) => `<${i}>${i % 40 === 39 ? '\n' : ''}`).join(''),
+  escapes: Array.from({ length: 5000 }, (_, i) => `é"\\<${i}>\t`).join(''),
+  astral: Array.from({ length: 5000 }, (_, i) => `😀<${i}>`).join(''),
+};
+for (const [name, text] of Object.entries(samples)) {
+  const pieces = splitForRoom(text, room);
+  assert.ok(pieces.length >= 3 && pieces.length <= MAX_CHUNKS, `${name}: ${pieces.length}`);
+  for (const piece of pieces) assert.ok(Buffer.byteLength(JSON.stringify(piece)) - 2 <= room, `${name}: a piece exceeds its room`);
+  for (const token of text.match(/<\d+>/g)) assert.ok(pieces.some(piece => piece.includes(token)), `${name}: ${token} was cut`);
+  assert.ok(pieces.every(piece => !/[\ud800-\udfff]/.test(piece.replace(/[\ud800-\udbff][\udc00-\udfff]/g, ''))), `${name}: a surrogate pair was split`);
+}
+assert.equal(splitForRoom('x', 100), null, 'no room beyond the overlap means no complete cover');
+
+// Pieces run together, so the deadlines of one request still hold: a stalled piece ends in a typed denial inside the 25-second handler budget.
+const stalled = splice('stall-direct');
+const started = performance.now();
+const [stalledWrite, stalledResult] = await Promise.all([write(stalled), result(stalled + 'private-output-canary')]);
+const elapsed = performance.now() - started;
+assert.ok(elapsed >= 19000 && elapsed < 25000, `handler time ${elapsed}`);
+assert.equal(stalledWrite.block, true);
+assert.match(stalledWrite.reason, /TimeoutError/);
+assert.equal(stalledResult.isError, true);
+assert.equal(JSON.stringify(stalledResult).includes('private-output-canary'), false);
+for (const stalledRow of rows(2)) {
+  assert.equal(stalledRow.error_type, 'TimeoutError');
+  assert.equal(stalledRow.request_started, true);
+  assert.equal(stalledRow.attempts, stalledRow.chunks + 1, 'one try for each answered piece and two for the stalled piece');
+  assert.ok(stalledRow.ms >= 19000 && stalledRow.ms < 25000, `row time ${stalledRow.ms}`);
+  assert.ok(stalledRow.chunks >= 3);
+}
+console.log('oversize-ok');
+JS
+) || fail "oversize screening: $out"
+  [ "$out" = oversize-ok ] || fail "unexpected oversize output: $out"
+  pass "oversized payloads are screened in complete pieces: benign allowed, any blocked or unscreenable piece blocks, uncoverable and never-send payloads send nothing, deadlines hold"
+}
+
+test_claude_oversize() {
+  local out before big="$TMP_ROOT/claude-big.txt" bad="$TMP_ROOT/claude-big-bad.txt" payload
+  awk 'BEGIN { for (i = 0; i < 700; i++) printf "L%d: const answer = compute(%d); // ordinary source line\n", i, i }' > "$big"
+  { head -n 350 "$big"; printf 'token = sk-live-fixture\n'; tail -n 350 "$big"; } > "$bad"
+  before=$(requests)
+  payload=$(jq -cn --arg p "$WT/src/big.ts" --rawfile c "$big" '{file_path:$p,content:$c}')
+  claude_hook "$(pre Write "$payload")"
+  [ -z "$out" ] || fail "an oversized benign Claude write was denied"
+  [ "$(( $(requests) - before ))" -ge 3 ] || fail "an oversized Claude write was not screened in pieces"
+  payload=$(jq -cn --arg p "$WT/src/big.ts" --rawfile c "$bad" '{file_path:$p,content:$c}')
+  claude_hook "$(pre Write "$payload")"
+  denied "$out" || fail "a credential in a late piece of an oversized Claude write was not denied"
+  claude_hook "$(post Bash "$(jq -cn --rawfile s "$big" '{stdout:$s,stderr:""}')")"
+  [ -z "$out" ] || fail "an oversized benign Claude result produced an advisory"
+  claude_hook "$(post Bash "$(jq -cn --rawfile s "$bad" '{stdout:$s,stderr:""}')")"
+  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "a flagged late piece of an oversized Claude result produced no advisory"
+  pass "Claude hooks screen oversized writes and results in pieces end to end"
+}
+
 test_claude_effects
 test_outages_and_scope
 test_bounded_retry
@@ -762,4 +936,6 @@ test_claude_channel_context
 test_channel_consistency
 test_omp_permissions
 test_deadlines
+test_oversize_screening
+test_claude_oversize
 test_ledger_privacy

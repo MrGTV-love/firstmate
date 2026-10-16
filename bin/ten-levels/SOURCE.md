@@ -40,7 +40,7 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
 - `src/levels/level06/write-gate.ts` removes prefix-only content assessment and names the existing secrets-file threshold without changing valid shell/write questions or threshold behavior.
 - `tests/level06.test.ts` exercises equality boundaries, independent shell/write signals, invalid injection values and empty-output handling instead of pinning banner/reason wording or claiming mock semantic accuracy.
 - `extensions/report.ts` is Firstmate's per-installation service and minimized audit owner rather than the upstream lab side channel.
-  It snapshots and checks the complete request before key lookup, uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
+  It snapshots and checks the complete request before key lookup, plans an oversized payload as overlapping pieces that each fit the request ceiling (`plan`), refuses one that no complete cover fits, uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
   Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input-derived text.
   Durable-record failure is explicit rather than silently optional while active.
   It also makes one bounded retry of an outage of a required judgment inside the handler budget, owns the outage-only deny text that replaces the permanent block notice, and records its own tries and elapsed time on failure rows that hold no provider answer.
@@ -50,6 +50,7 @@ The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error
 ## Firstmate glue outside this directory
 
 - `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
+  It judges every piece of an oversized payload with the unchanged level 6 policies and passes the payload only when every piece passes.
   Its host response handling and one isolated Firstmate-channel consistency function consume the service and pure policies; no signing, alternate transport or tool proxy is introduced.
   The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
 - `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.
