@@ -92,6 +92,7 @@ ok - typed intake resolves roles before quota ranking and detects concrete dupli
 ok - typed intake checks the chosen id against the pinned worker account's catalog
 ok - chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks
 ok - equivalent options pool behind the pick, and each resolve appends one private result record
+ok - a pooled group with more probability than the answer choice is the pick when it clears its floor and the choice does not
 # all fm-dispatch-resolve tests passed
 ```
 
@@ -122,6 +123,7 @@ It proves the fixed 0.6 floor is inclusive and returns `ambiguous` with candidat
 It proves a declared `min_confidence` is checked against the rule's own probability as the pick and as a runner-up, including a runner-up exactly at its floor, and that a file without declared floors keeps the global floor on confidence unchanged.
 It proves that a 0.51/0.49 split between rules, or between a rule and the neutral option, that select identical profiles, approval, floor, `select`, and fallback resolves with a `pooled:` line, while the same split between different profiles, between identical profiles with different approval or floor, or with a combined probability still below the floor stays `ambiguous`.
 It proves a declared `min_confidence` is met by the pooled probability of the pick.
+It proves a distinct answer choice at 0.3 against four options sharing 0.7 (0.2, 0.2, 0.15, 0.15) resolves to the pooled group, stood for by its most probable member, with the combined probability in the `pooled:` line and the log; that a pooled 0.55 against a distinct 0.45 stays `ambiguous` below the floor, as does a distinct 0.55 against a pooled 0.45; that a tie goes to the group holding the answer choice; that the floor of the member standing for the group applies; and that a choice clearing its own declared floor stays the pick over a larger pooled group.
 It proves each resolve that reaches a status appends exactly one `data/dispatch-resolve.jsonl` record, one for each of `clear`, `ambiguous`, `escalate` (an approval-gated rule and an absent rules file), and `error`, in a fixed field set, and that no brief text, rule criterion, or credential is written.
 It proves an unverifiable rule floor (a missing scope, a provider absent from the snapshot, or the OMP Codex pool) escalates rather than falling through to the default array.
 It proves declared providers, known and unverifiable profile floors, nonnumeric `spendPriority`, partial providers, unknown exact-model rows, missing applicable rows, and limiting provider-wide bounds produce the candidate evidence and eligibility the contract states.

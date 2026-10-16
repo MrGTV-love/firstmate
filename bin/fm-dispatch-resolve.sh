@@ -29,8 +29,11 @@
 #   (0.6 on the answer confidence, or a rule's declared `min_confidence` on that
 #   rule's probability, falling to the most probable other option that clears
 #   its own floor; options that select identical profiles, approval, floor,
-#   select and fallback pool their probabilities behind the pick, because a
-#   split between them cannot be a wrong pick), the rule's declared `approval`
+#   select and fallback pool their probabilities, because a split between them
+#   cannot be a wrong pick, and a pooled group with more probability than the
+#   answer choice group is the pick when that choice group falls below its
+#   floor and it clears its own; the neutral `default` cannot declare `min_confidence`, so pooling is
+#   how a default pick shares a rule's support), the rule's declared `approval`
 #   and `floor`, each profile's
 #   declared `provider` and `floor`, and the normalized quota composite over ONE
 #   compatible quota-axi --json snapshot and one OMP pool report. Proven
@@ -76,7 +79,7 @@
 #   or raw API error bodies, which may echo sensitive input.
 #     routing: <Level 5 agent and model decisions, and any escalation>
 #     fallback: <runner-up rule or declared stand-in taken, and why>
-#     pooled: <the options pooled behind the pick, when pooling cleared its floor>
+#     pooled: <the options pooled with the pick, when pooling cleared its floor>
 #     reason: <why the status is not clear>
 #     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. pool=..
 #       quota_score=.. parts=.. weights=.. common=.. bounds=..
@@ -98,8 +101,9 @@
 #
 # Result log: every resolve that reaches a status appends one JSON line to
 #   data/dispatch-resolve.jsonl (FM_DATA_OVERRIDE moves its directory):
-#   ts (UTC), status, rule (the option the model picked), selected (the option
-#   whose profiles were used), profile (harness/model/effort when clear),
+#   ts (UTC), status, rule (the pick: the answer choice, or the most probable
+#   member of the pooled group that replaced it), selected (the option whose
+#   profiles were used), profile (harness/model/effort when clear),
 #   confidence, floor, pooled (the combined probability when pooling cleared
 #   the floor), and reason. The block rate is every status other than clear.
 #   Off paths and exit-2 usage or configuration errors have no status and write
@@ -605,24 +609,41 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
       else {use: (profiles($x.use) | map(tojson) | sort), filtered: ($x.filtered // []), approval: ($x.approval // null),
             floor: ($x.floor // null), select: ($x.select // null), fallback: ($x.fallback // [])} end
     end;
-  ($a.choice) as $picked |
-  (confidence_floor($picked)) as $picked_floor |
-  (outcome($picked)) as $picked_outcome |
-  ([$a.probabilities | to_entries[] | select(.key != $picked and $picked_outcome != null and outcome(.key) == $picked_outcome)]) as $twins |
-  # The support the floor tests for the pick: the answer confidence (or the
-  # own probability of a pick that declares a floor) plus the probability of
-  # every option that selects the same outcome.
-  (if declared_confidence($picked) then $a.probabilities[$picked] else $a.confidence end) as $own_p |
-  ([(($own_p + ([$twins[].value] | add // 0)) * 1000000000 | round) / 1000000000, 1] | min) as $pooled_p |
+  def own_p($c): if $c == $a.choice and (declared_confidence($c) | not) then $a.confidence else $a.probabilities[$c] end;
+  def rounded: (. * 1000000000 | round) / 1000000000;
+  # A group of options that select the identical outcome is one decision. It is
+  # stood for by the answer choice when that is a member and by its most
+  # probable member otherwise, and the floor is the stand-in floor. The support
+  # the floor tests is the answer confidence (or the own probability of a choice
+  # that declares a floor) plus the probability of every other member.
+  def stands($m): if ($m | index($a.choice)) != null then $a.choice else ($m | sort_by(-($a.probabilities[.])) | first) end;
+  def group_floor($m): confidence_floor(stands($m));
+  def group_support($m): ($m | map(own_p(.)) | add) as $s | if ($m | length) > 1 then [($s | rounded), 1] | min else $s end;
+  def group_clears($m): group_support($m) >= group_floor($m);
+  # The pick is the group holding the answer choice; when that group does not
+  # reach its floor and the group with the most probability does, the pick is
+  # that group.
+  ($a.choice) as $asked |
+  ([$a.probabilities | keys_unsorted[] | {key: ., outcome: (outcome(.) // .)}] | group_by(.outcome)
+    | map({members: map(.key), support: (map($a.probabilities[.key]) | add | rounded)})) as $groups |
+  ($groups | max_by([.support, (.members | index($asked) != null)])) as $top |
+  ($groups | map(select(.members | index($asked) != null)) | first) as $own |
+  (if ($top.members | length) > 1 and $top.members != $own.members and group_clears($top.members) and (group_clears($own.members) | not)
+   then $top else $own end) as $won |
+  ($won.members) as $members |
+  (stands($members)) as $picked |
+  ($members | length > 1) as $pooled_group |
+  (group_floor($members)) as $picked_floor |
+  (declared_confidence($picked)) as $declared |
+  (group_support($members)) as $pooled_p |
+  (if $pooled_group then $pooled_p else $a.probabilities[$picked] end) as $shown_p |
+  (if $pooled_group then "pooled probability" else "probability" end) as $p_word |
   # A declared floor is checked against the probability of that option whether
   # it is the pick or a runner-up, so a runner-up never needs weaker support
-  # than it would as the pick. Options that select the identical outcome pool
-  # their probability behind the pick, so only a split between different
-  # outcomes counts as a low-confidence pick. Only a rule that declares its own
-  # floor falls through to a runner-up, so a file with no declared floors and no
-  # equivalent options keeps the single global floor on the answer confidence
-  # exactly.
-  (if declared_confidence($picked) | not then
+  # than it would as the pick. Only a pick that declares its own floor falls
+  # through to a runner-up, so a file with no declared floors and no equivalent
+  # options keeps the single global floor on the answer confidence exactly.
+  (if $declared | not then
      (if $pooled_p >= $picked_floor then {below: false} else {below: true, global: true} end)
    elif $pooled_p >= $picked_floor then {below: false}
    else
@@ -650,10 +671,10 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
      then $default_sel + {note: "rule \($choice) floor \($rule.floor.scope) below \($rule.floor.min_percent)%: fall through to default"}
    else {source: $choice, use: profiles($rule.use), filtered: ($rule.filtered // []), note: "rule matched"} end) as $sel |
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
-  # Reported only when pooling is what let the pick clear its floor.
-  (if ($fb.below | not) and ($twins | length) > 0 and
-      $own_p < $picked_floor
-   then {pooled: {probability: $pooled_p, floor: $picked_floor, options: ([$picked] + [$twins[].key])}} else {} end) as $pool |
+  # Reported only when pooling is what let the group clear its floor: no member
+  # reaches its own floor alone.
+  (if ($fb.below | not) and $pooled_group and all($members[]; own_p(.) < confidence_floor(.))
+   then {pooled: {probability: $pooled_p, floor: $picked_floor, options: ([$picked] + ($members | map(select(. != $picked))))}} else {} end) as $pool |
   {
     model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
     rule: $picked, selected: $sel.source, floor: $picked_floor,
@@ -664,15 +685,15 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     dispatch_route: $route,
     confidence: $a.confidence, probabilities: $a.probabilities, routing: $r.route
   }
-  + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) probability \($fb.p) clears its floor \($fb.to_floor); \($picked) probability \($a.probabilities[$picked]) is below its floor \($picked_floor)"} else {} end)
+  + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) probability \($fb.p) clears its floor \($fb.to_floor); \($picked) \($p_word) \($shown_p) is below its floor \($picked_floor)"} else {} end)
   + $pool
   as $ev |
   if $r.route.escalate then $ev + {status: "escalate", reason: $r.route.escalate, candidates: ($answer_use | map(evaluate(.)))}
   elif $sel.invalid then $ev + {status: "error", reason: $sel.invalid}
   elif $fb.below and $fb.global then
-    $ev + {status: "ambiguous", reason: "confidence \($a.confidence) below floor \($floor)", candidates: ($answer_use | map(evaluate(.)))}
+    $ev + {status: "ambiguous", reason: (if $pooled_group then "\($picked) \($p_word) \($shown_p) below floor \($floor)" else "confidence \($a.confidence) below floor \($floor)" end), candidates: ($answer_use | map(evaluate(.)))}
   elif $fb.below and ($fb.to | not) then
-    $ev + {status: "ambiguous", reason: "\($picked) probability \($a.probabilities[$picked]) below its floor \($picked_floor); \($fb.why)", candidates: ($answer_use | map(evaluate(.)))}
+    $ev + {status: "ambiguous", reason: "\($picked) \($p_word) \($shown_p) below its floor \($picked_floor); \($fb.why)", candidates: ($answer_use | map(evaluate(.)))}
   elif $sel.escalate then
     $ev + {status: "escalate", reason: $sel.escalate, candidates: ($answer_use | map(evaluate(.)))}
   elif ($sel.use | length) == 0 and ($sel.filtered | length) > 0 then

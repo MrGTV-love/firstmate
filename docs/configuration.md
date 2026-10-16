@@ -1890,11 +1890,16 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 
 - A rule that declares `min_confidence` is checked against that rule's own probability, whether it is the picked option or a runner-up, so a runner-up never needs weaker support than it would as the pick.
 - A picked rule without `min_confidence`, and the neutral option, keep the global 0.6 floor on the answer's confidence exactly as before, so a file with no declared floors behaves as it did.
-- Options that select the identical outcome pool their probability behind the pick: the same `use` profiles (in any order) after the session policy and class filter, `approval`, `floor`, `select`, and fallback list, with `when` and `min_confidence` ignored.
+- Options that select the identical outcome pool their probability: the same `use` profiles (in any order) after the session policy and class filter, `approval`, `floor`, `select`, and fallback list, with `when` and `min_confidence` ignored.
   The neutral option counts as a rule with the `default` array and no approval or floor.
-  The pick clears its floor when its own support (the answer confidence, or its probability when it declares `min_confidence`) plus the probability of every such option reaches it, so a 0.51/0.49 split between rules that dispatch identically resolves, and the output carries a `pooled:` line naming the pooled options.
-  The same split between different profiles, approval, or floor is a real low-confidence pick and stays `ambiguous`.
-  A runner-up is still checked on its own probability.
+  The pick is the group holding the answer's `choice`, which a group of one option makes the option itself.
+  That group clears when its support (the answer confidence for the `choice`, or its probability when it declares `min_confidence`, plus the probability of every other member) reaches the `choice` floor: its `min_confidence`, or 0.6.
+  When it does not clear, the pooled group with the most probability becomes the pick if that group clears its own floor on the sum of its members' probabilities; the group is then stood for by its most probable member, whose `min_confidence` or 0.6 is the floor.
+  So a 0.51/0.49 split between rules that dispatch identically resolves, and so does four options sharing 0.7 against one distinct `choice` at 0.3; the output carries a `pooled:` line naming the pooled options and the combined probability.
+  The same split between different profiles, approval, or floor is a real low-confidence pick and stays `ambiguous`, as does a pooled group still below its floor.
+  A `choice` that clears its own declared floor stays the pick, and a runner-up is still checked on its own probability.
+- Deviation from the approved plan, with its codebase reason: the plan reads "add per-rule floors for equivalent rules", and `min_confidence` already existed per rule.
+  The neutral `default` option cannot carry `min_confidence`, so a default pick at 0.51 stays under the global 0.6 however its equivalent rules are configured; pooling the support of identical outcomes is the only change that lets that split resolve without a floor on `default`.
 
 When the picked rule declares its own floor but its probability falls below it, the tool checks the other options:
 
