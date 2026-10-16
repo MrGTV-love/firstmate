@@ -23,8 +23,10 @@
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
 # the row's PR URL for merged, or free text for escalated/deferred.
 # --hold names a task held for the captain that a firstmate-owned open_pr, unanswered_question or
-# unlanded_commit row waits on; without it the row's own task and task ids in the evidence are tried.
+# unlanded_commit row waits on; without it the row's own task and its <task>-decision-<key> task are tried.
+# Task ids written in the evidence never bind. Rows owned by a worker or a reviewer take no binding.
 # The receipt then stands like a captain-owned row's, until the row changes or the hold ends.
+# That check reads only the local backlog, so a quota-stale ledger does not end it.
 # deferred and waiting require an ISO UTC --recheck time within 24 hours.
 # waiting selects either --prerequisite QUESTION_ROW_ID (a distinct same-task question) or
 # --prerequisite-task TASK_ID (a distinct assigned ship/scout). For the task form, --evidence names its new

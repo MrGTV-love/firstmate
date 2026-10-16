@@ -2382,6 +2382,15 @@ assert status.read_text()==original and backlog.read_text()==held
 boundary=drain()
 assert ack(boundary).returncode==0,'unchanged bound PR/status waits must not need a fictitious second action'
 assert p['id'] in ok(loops,'--report').stdout,'a standing wait must remain visible'
+# A quota-stale ledger records no provenance wait and lets none stand, even though every source is otherwise current.
+fresh_ledger=ledger.read_text(); stale_ledger=json.loads(fresh_ledger)
+stale_ledger.update(stale=True,stale_reason='quota low (500 of 5000)',complete=False)
+ledger.write_text(json.dumps(stale_ledger))
+refused=call(loops,'action',question['id'],'waiting','--evidence','stale ledger','--prerequisite',hold['id'],'--recheck',iso(now+1200))
+assert refused.returncode==1 and 'requires a current ledger' in refused.stdout,refused
+assert call(loops,'--check-actions').returncode==1,'a stale ledger must not let a provenance wait stand'
+ledger.write_text(fresh_ledger)
+assert call(loops,'--check-actions').returncode==0
 refused=call(loops,'action',question['id'],'waiting','--evidence','self-loop','--prerequisite',question['id'],'--recheck',iso(now+600))
 assert refused.returncode==1 and 'distinct current unanswered question' in refused.stdout,refused
 # Exercise the published row protocol's protected reviewed-green transition.
@@ -2730,7 +2739,7 @@ assert 'row-fresh' in mixed.stdout and 'STANDING' in mixed.stdout, mixed
 assert mixed.stdout.index('row-fresh') < mixed.stdout.index('STANDING') and mixed.stdout.count(row['id']) == 1, mixed
 assert ack(boundary).returncode == 1, 'the fresh row still needs its own action'
 
-# The hold can be named by id, by the legacy decision task, or in the evidence; an explicit id must be live.
+# The hold can be named by id or by the legacy decision task, never by a task id in the evidence; an explicit id must be live.
 home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('named', subject='gate:key-1',
         source=dict(kind='status', task='gate', key='key-1'))
 backlog.write_text(HELD.replace('held-job', 'gate-decision-key-1'))
@@ -2739,7 +2748,8 @@ legacy = act('escalated', 'asked the captain')
 assert 'standing: captain hold gate-decision-key-1' in legacy.stdout, legacy
 backlog.write_text(HELD.replace('held-job', 'elsewhere'))
 mentioned = act('escalated', 'tracked as elsewhere; captain notified.')
-assert 'standing: captain hold elsewhere' in mentioned.stdout, mentioned
+assert mentioned.returncode == 0 and 'standing: no' in mentioned.stdout and 'captain hold' not in mentioned.stdout, mentioned
+assert 'holds' not in stored()['handling']['actions'][row['id']], 'free text in the evidence must not bind a hold'
 refused = act('escalated', 'asked the captain', '--hold', 'not-held')
 assert refused.returncode == 1 and 'still held for the captain' in refused.stdout, refused
 named = act('escalated', 'asked the captain', '--hold', 'elsewhere')
@@ -2847,7 +2857,79 @@ assert escalated.returncode == 0 and 'standing: captain hold held-job' in escala
 assert ack(boundary).returncode == 0
 result, boundary = drain('settled')
 assert row['id'] not in result.stdout and ack(boundary).returncode == 0
-print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation; a changed row or an answered,'
-      ' released, deferred or re-held hold re-presents it; reviewed PRs, other categories and the deferral limit are unchanged')
+# (e) Hold standing reads only the local backlog and the row, so a quota-stale ledger neither voids it nor blocks recording it.
+def go_stale(ledger):
+    record = json.loads(ledger.read_text())
+    record.update(stale=True, stale_reason='quota low (500 of 5000); resets in an hour', complete=False)
+    for each in record['rows']:
+        each['stale'] = True
+    ledger.write_text(json.dumps(record))
+
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('stale-stands')
+_, boundary = drain()
+assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
+assert ack(boundary).returncode == 0
+go_stale(ledger)
+result, boundary = drain('stale')
+assert row['id'] not in result.stdout and ack(boundary).returncode == 0, ('a live hold stands on a stale ledger', result)
+assert call(loops, '--check-actions').returncode == 0
+backlog.write_text(ANSWERED)
+result, boundary = drain('stale-answered')
+assert row['id'] in result.stdout and result.stdout.startswith('OVERDUE:'), result
+assert ack(boundary).returncode == 1, 'a hold that ended is presented again on a stale ledger'
+for label, hold_args in (('explicit', ('--hold', 'held-job')), ('automatic', ())):
+    home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('stale-record-' + label)
+    _, boundary = drain()
+    go_stale(ledger)
+    recorded = act('escalated', 'asked the captain', *hold_args)
+    assert recorded.returncode == 0 and 'standing: captain hold held-job' in recorded.stdout, (label, recorded)
+    assert stored()['handling']['actions'][row['id']]['holds'][0]['task'] == 'held-job', label
+    assert ack(boundary).returncode == 0
+    result, boundary = drain('stale-after')
+    assert row['id'] not in result.stdout and ack(boundary).returncode == 0, (label, result.stdout)
+    renewed = act('escalated', 'asked the captain again', *hold_args)
+    assert renewed.returncode == 0 and 'standing: captain hold held-job' in renewed.stdout, (label, renewed)
+    assert stored()['handling']['actions'][row['id']]['holds'][0]['task'] == 'held-job', label
+
+# An unreadable backlog is reported as an unverifiable hold, never as a hold that nobody named.
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('unverified')
+_, boundary = drain()
+backlog.unlink(); backlog.symlink_to(home / 'missing-backlog')
+recorded = act('escalated', 'asked the captain')
+assert recorded.returncode == 0 and 'standing: no' in recorded.stdout, recorded
+assert 'could not be verified' in recorded.stdout and 'no task held for the captain was named' not in recorded.stdout, recorded
+assert 'holds' not in stored()['handling']['actions'][row['id']]
+refused = act('escalated', 'asked the captain', '--hold', 'held-job')
+assert refused.returncode == 1 and 'still held for the captain' in refused.stdout, refused
+assert ack(boundary).returncode == 0
+result, boundary = drain('unverified-after')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'an unverified receipt answers only its own turn'
+
+# (f) Only a row owned by firstmate can be parked: a reviewer-owned open_pr stays presented under a live captain hold.
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park('marker')
+_, boundary = drain()
+assert 'standing: captain hold held-job' in act('escalated', 'asked the captain').stdout
+marker = stored()['handling']['actions'][row['id']]['holds'][0]['marker']
+home, backlog, row, ledger, clock, publish, call, ok, drain, ack, act, stored = park(
+    'reviewer', category='open_pr', subject=PR, owner='alice', next_action='complete the requested PR review',
+    evidence='', limit_seconds=600, source=dict(kind='pr', task='held-job'))
+_, boundary = drain()
+recorded = act('escalated', 'asked the captain about held-job')
+assert recorded.returncode == 0 and 'standing:' not in recorded.stdout, recorded
+assert ack(boundary).returncode == 0
+result, boundary = drain('again')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, 'a reviewer-owned row must keep being presented'
+refused = act('escalated', 'asked the captain', '--hold', 'held-job')
+assert refused.returncode == 1 and 'only a firstmate-owned' in refused.stdout, refused
+# Even a receipt carrying a live, matching hold binding cannot make a reviewer-owned row stand.
+record = stored()
+assert 'holds' not in record['handling']['actions'][row['id']]
+record['handling']['actions'][row['id']]['holds'] = [dict(task='held-job', marker=marker)]
+ledger.write_text(json.dumps(record))
+result, boundary = drain('forged')
+assert row['id'] in result.stdout and ack(boundary).returncode == 1, result
+print('PASS: a firstmate-owned row parked behind a live captain hold takes one standing escalation, also on a quota-stale ledger;'
+      ' a changed row or an answered, released, deferred or re-held hold re-presents it; evidence text, other owners, reviewed'
+      ' PRs, other categories and the deferral limit never bind or stand')
 PY
 echo "ok - open-work reconciliation reports owned obligations from live records"
