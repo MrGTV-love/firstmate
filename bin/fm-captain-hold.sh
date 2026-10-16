@@ -220,11 +220,16 @@
 # file is parsed directly. An archived row is accepted, with `archive` as its
 # attestation evidence, only when its newest resolution record is the captain's
 # recorded answer (the full record the answer path writes, with a non-empty
-# `Captain decision:` text), and it then faces the same origin checks as a live
-# row. A call closed only by `reconcile close` evidence, or a body that merely
-# quotes the record markers, is refused. When the home's `.tasks.toml` names no
-# archive but `~/.tasks-axi/config.toml` does, that path is not read and the
-# lookup refuses instead of falling back to the default archive file.
+# `Captain decision:` text, which may follow blank lines), and it then faces the
+# same origin checks as a live row. A record written by the retired
+# fm-decision-hold.sh counts when it carries its full genuine shape: the
+# decision digest, a non-empty `Routed identities:` line, an optional
+# `Resolution mode:` of answered, repaired, routed, or declined (the oldest
+# records have none), and a non-empty `Captain decision:` text. A call closed
+# only by `reconcile close` evidence, or a body that merely quotes the record
+# markers, is refused. When the home's `.tasks.toml` names no archive but
+# `~/.tasks-axi/config.toml` does, that path is not read and the lookup refuses
+# instead of falling back to the default archive file.
 #
 # `open` is the read-only predicate a mechanical closer asks before it may
 # retire a task's row: is this task still an open captain call? Exit 0 means it
@@ -979,6 +984,10 @@ archived_answer_state() {  # <dedented-archived-body>
   local state
   state=$(printf '%s\n' "$1" | LC_ALL=C awk '
     function verdict(v) { print v; decided = 1; exit }
+    function is_leader(l) {
+      return l == "Resolution recorded by fm-captain-hold." \
+          || l == "Resolution recorded by fm-decision-hold."
+    }
     BEGIN { st = 0; decided = 0 }
     st == 0 {
       if ($0 == "Resolution recorded by fm-captain-hold.") { retired = 0; st = 1 }
@@ -996,8 +1005,11 @@ archived_answer_state() {  # <dedented-archived-body>
     }
     st == 3 {
       if ($0 == "Resolution mode: reconciled") verdict("evidence")
-      if ($0 == "Resolution mode: answered" || $0 == "Resolution mode: released" \
-          || $0 == "Resolution mode: repaired" || $0 == "Resolution mode: routed") { st = 4; next }
+      if ($0 == "Resolution mode: answered" || $0 == "Resolution mode: repaired" \
+          || $0 == "Resolution mode: routed") { st = 4; next }
+      if (!retired && $0 == "Resolution mode: released") { st = 4; next }
+      if (retired && $0 == "Resolution mode: declined") { st = 4; next }
+      if (retired && $0 == "") { st = 5; next }
       verdict("none")
     }
     st == 4 {
@@ -1008,7 +1020,11 @@ archived_answer_state() {  # <dedented-archived-body>
       verdict("none")
     }
     st == 5 { if ($0 == "Captain decision:") { st = 6; next } verdict("none") }
-    st == 6 { if ($0 ~ /[^[:space:]]/) verdict("answer"); verdict("none") }
+    st == 6 {
+      if ($0 !~ /[^[:space:]]/) next
+      if (is_leader($0) || (retired && $0 == "Routed work:")) verdict("none")
+      verdict("answer")
+    }
     END { if (!decided) print "none" }
   ') || return 1
   case "$state" in

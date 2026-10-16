@@ -107,7 +107,8 @@ A post-teardown visual review can complete against the surviving report and dura
 `complete` accepts `--none` as an explicit semantic inventory result.
 `--none` is refused while the origin still has a lifecycle-open keyed status decision.
 Before recording completion, `complete` verifies every listed task against tasks-axi.
-On the markdown backend, a closed call that backlog retention moved to the done archive named by the home's `.tasks.toml` (beside the backlog when it names none) still resolves, but only when the newest resolution record in its archived body is the captain's recorded answer: the full record the answer path writes, with a non-empty `Captain decision:` text.
+On the markdown backend, a closed call that backlog retention moved to the done archive named by the home's `.tasks.toml` (beside the backlog when it names none) still resolves, but only when the newest resolution record in its archived body is the captain's recorded answer: the full record the answer path writes, with a non-empty `Captain decision:` text, which may follow blank lines.
+A record written by the retired `fm-decision-hold.sh` counts too when it carries its full genuine shape: the decision digest, a non-empty `Routed identities:` line, an optional `Resolution mode:` of answered, repaired, routed, or declined (the oldest records have none), and a non-empty `Captain decision:` text.
 A call closed only by `reconcile close` evidence, or a body that merely quotes the record markers, is refused, and the operator resolves that case by hand.
 When the home's `.tasks.toml` names no archive but `~/.tasks-axi/config.toml` does, that path is not read and the gate refuses rather than falling back to the default archive file.
 [`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns the archive lookup and its limits.

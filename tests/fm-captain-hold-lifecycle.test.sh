@@ -7548,6 +7548,136 @@ test_archived_row_quoting_the_record_markers_refuses() {
   pass "an archived body that only quotes or imitates the record markers still refuses"
 }
 
+# Writes a body in the shape the retired fm-decision-hold.sh recorded. An empty
+# <routed-line> or <mode-line> leaves that line out.
+write_retired_record() {  # <file> <routed-line> <mode-line> <answer>
+  local file=$1 routed=$2 mode=$3 answer=$4
+  {
+    printf 'Resolution recorded by fm-decision-hold.\nDecision digest: %s\n' \
+      "$(printf '%064d' 5 | tr 0 c)"
+    [ -z "$routed" ] || printf '%s\n' "$routed"
+    [ -z "$mode" ] || printf '%s\n' "$mode"
+    printf '\nCaptain decision:\n%s\n\nRouted work:\n(none)\n' "$answer"
+  } > "$file"
+}
+
+test_archived_retired_decision_hold_records_resolve() {
+  local home scout out rc=0
+  home=$(make_home archived-retired-pass)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-retired-scout
+  write_retired_record "$home/retired-declined.txt" 'Routed identities: (none)' \
+    'Resolution mode: declined' 'Dropped by the captain.'
+  write_retired_record "$home/retired-modeless.txt" 'Routed identities: (none)' '' \
+    'Go with option B.'
+  write_retired_record "$home/retired-routed.txt" 'Routed identities: sample-routed-work' \
+    'Resolution mode: routed' 'Route it to the sample work.'
+  archive_a_done_row_with_body "$home" sample-retired-declined "$home/retired-declined.txt"
+  archive_a_done_row_with_body "$home" sample-retired-modeless "$home/retired-modeless.txt"
+  archive_a_done_row_with_body "$home" sample-retired-routed "$home/retired-routed.txt"
+  push_through_retention "$home" retention-filler-retired-last
+  assert_grep "sample-retired-declined" "$home/data/done-archive.md" "the declined retired row is not archived"
+  assert_grep "sample-retired-modeless" "$home/data/done-archive.md" "the mode-less retired row is not archived"
+  assert_grep "sample-retired-routed" "$home/data/done-archive.md" "the routed retired row is not archived"
+  write_scout_with_attested_inventory "$home" "$scout" \
+    "sample-retired-declined,sample-retired-modeless,sample-retired-routed"
+
+  out=$(run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "verify refused an archived retired decision-hold record: $out"
+  rc=0
+  out=$(run_captain "$home" complete "$scout" --none 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "complete refused an archived retired decision-hold record: $out"
+  assert_contains "$out" "[answered and archived: sample-retired-declined sample-retired-modeless sample-retired-routed]" \
+    "the retired records were not all attested from the archive"
+  pass "archived records of the retired decision hold, declined and mode-less included, resolve"
+}
+
+test_archived_retired_decision_hold_records_that_are_not_answers_refuse() {
+  local home scout n
+  home=$(make_home archived-retired-refuse)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-retired-refuse-scout
+  write_retired_record "$home/retired-reconciled.txt" 'Routed identities: (none)' \
+    'Resolution mode: reconciled' 'Nothing is pending.'
+  write_retired_record "$home/retired-empty.txt" 'Routed identities: (none)' \
+    'Resolution mode: declined' ''
+  write_retired_record "$home/retired-noroutes.txt" '' 'Resolution mode: declined' \
+    'Dropped by the captain.'
+  write_retired_record "$home/retired-emptyroutes.txt" 'Routed identities: ' \
+    'Resolution mode: declined' 'Dropped by the captain.'
+  write_retired_record "$home/retired-badmode.txt" 'Routed identities: (none)' \
+    'Resolution mode: released' 'Go.'
+  for n in reconciled empty noroutes emptyroutes badmode; do
+    archive_a_done_row_with_body "$home" "sample-retired-$n" "$home/retired-$n.txt"
+    assert_grep "sample-retired-$n" "$home/data/done-archive.md" "the retired row $n is not archived"
+  done
+  push_through_retention "$home" retention-filler-retired-refuse-last
+  assert_gate_refuses_archived "$home" "$scout" sample-retired-reconciled \
+    "only reconciliation evidence, not a recorded captain answer"
+  for n in empty noroutes emptyroutes badmode; do
+    assert_gate_refuses_archived "$home" "$scout" "sample-retired-$n" \
+      "archived without a recorded captain answer"
+  done
+  pass "an archived retired record that is evidence-only, empty, or malformed still refuses"
+}
+
+test_archived_answer_after_leading_blank_lines_resolves() {
+  local home scout out rc=0
+  home=$(make_home archived-blank-lead)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-blank-lead-scout
+  run_captain "$home" hold sample-blank-lead-one --title "Captain call one" \
+    --reason "captain must decide" --repo sample --origin "$scout" >/dev/null \
+    || fail "could not hold the first blank-led fixture"
+  printf '\nUse option B.\n' > "$home/blank-lead-one.txt"
+  run_captain "$home" answer sample-blank-lead-one --decision-file "$home/blank-lead-one.txt" >/dev/null \
+    || fail "could not answer the first blank-led fixture"
+  run_captain "$home" hold sample-blank-lead-two --title "Captain call two" \
+    --reason "captain must decide" --repo sample --origin "$scout" >/dev/null \
+    || fail "could not hold the second blank-led fixture"
+  printf '\n\n\nUse option C.\n' > "$home/blank-lead-two.txt"
+  run_captain "$home" answer sample-blank-lead-two --decision-file "$home/blank-lead-two.txt" >/dev/null \
+    || fail "could not answer the second blank-led fixture"
+  push_through_retention "$home" retention-filler-blank-lead-first
+  push_through_retention "$home" retention-filler-blank-lead-second
+  assert_grep "sample-blank-lead-one" "$home/data/done-archive.md" "the first blank-led call is not archived"
+  assert_grep "sample-blank-lead-two" "$home/data/done-archive.md" "the second blank-led call is not archived"
+  write_scout_with_attested_inventory "$home" "$scout" "sample-blank-lead-one,sample-blank-lead-two"
+
+  out=$(run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "verify refused an archived answer that starts with blank lines: $out"
+  rc=0
+  out=$(run_captain "$home" complete "$scout" --none 2>&1) || rc=$?
+  [ "$rc" -eq 0 ] || fail "complete refused an archived answer that starts with blank lines: $out"
+  pass "an archived answer whose text starts with blank lines resolves"
+}
+
+test_archived_record_with_only_blank_lines_after_the_label_refuses() {
+  local home scout digest
+  home=$(make_home archived-blank-only)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-blank-only-scout
+  digest=$(printf '%064d' 9 | tr 0 d)
+  # Blank lines to the end of the body.
+  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: answered\n\nCaptain decision:\n\n\n\n' \
+    "$digest" > "$home/blank-only-end.txt"
+  # Blank lines, then an older genuine record: its text is not this record's answer.
+  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: answered\n\nCaptain decision:\n\n\nResolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: answered\n\nCaptain decision:\nGo.\n' \
+    "$digest" "$digest" > "$home/blank-only-stacked.txt"
+  # The same, with the older record written by the retired decision hold.
+  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: answered\n\nCaptain decision:\n\nResolution recorded by fm-decision-hold.\nDecision digest: %s\nRouted identities: (none)\nResolution mode: declined\n\nCaptain decision:\nGo.\n\nRouted work:\n(none)\n' \
+    "$digest" "$digest" > "$home/blank-only-retired.txt"
+  archive_a_done_row_with_body "$home" sample-blank-only-end "$home/blank-only-end.txt"
+  archive_a_done_row_with_body "$home" sample-blank-only-stacked "$home/blank-only-stacked.txt"
+  archive_a_done_row_with_body "$home" sample-blank-only-retired "$home/blank-only-retired.txt"
+  push_through_retention "$home" retention-filler-blank-only-last
+  assert_grep "sample-blank-only-retired" "$home/data/done-archive.md" "the blank-only rows are not archived"
+  assert_gate_refuses_archived "$home" "$scout" sample-blank-only-end "archived without a recorded captain answer"
+  assert_gate_refuses_archived "$home" "$scout" sample-blank-only-stacked "archived without a recorded captain answer"
+  assert_gate_refuses_archived "$home" "$scout" sample-blank-only-retired "archived without a recorded captain answer"
+  pass "an archived record with only blank lines after the label still refuses"
+}
+
 test_archived_released_work_item_resolves_through_the_gate() {
   local home scout id
   home=$(make_home archived-released)
@@ -7733,6 +7863,10 @@ test_live_rows_resolve_exactly_as_before_the_archive_lookup
 test_scout_teardown_gate_follows_the_archived_answer
 test_archived_evidence_only_close_refuses
 test_archived_row_quoting_the_record_markers_refuses
+test_archived_retired_decision_hold_records_resolve
+test_archived_retired_decision_hold_records_that_are_not_answers_refuse
+test_archived_answer_after_leading_blank_lines_resolves
+test_archived_record_with_only_blank_lines_after_the_label_refuses
 test_archived_released_work_item_resolves_through_the_gate
 test_user_level_only_archive_path_refuses
 test_stale_default_archive_does_not_stand_in_for_the_user_level_archive
