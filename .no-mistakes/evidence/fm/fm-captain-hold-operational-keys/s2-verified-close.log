@@ -1,0 +1,32 @@
+### HEAD: reconcile close --verified-outcome answered, no board request
+reconciled: lane-b6-framing
+rc=0
+### open probe after close
+open rc=1
+### backlog
+## In flight
+
+## Queued
+## Done
+- [x] lane-b6-framing - B6 framing decisions (repo: sample) (kind: captain) (done 2026-10-15) (hold: fm-hold-v1:Y2FwdGFpbiBtdXN0IGRlY2lkZSB0d2VsdmUgZnJhbWluZyBjYWxscw==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 27c15b5841d87e32828837101804045f68f8bd1724adfd98c31bbb5ec56d712d
+  Resolution mode: reconciled
+  Resolves hold set: 2026-10-16T04:08:04Z
+
+  Reconciliation evidence:
+  Verified outcome: answered
+
+  All twelve framing answers are recorded in data/vernant-d3/answers.md (captured 2026-10-14). No unanswered captain choice remains.
+
+### exact replay (idempotent)
+reconciled: lane-b6-framing
+rc=0
+### changed evidence on closed call
+fm-captain-hold: task lane-b6-framing records a different resolution; it cannot be reconciled again
+rc=1
+### changed outcome on closed call
+fm-captain-hold: task lane-b6-framing records a different resolution; it cannot be reconciled again
+rc=1
+### diverged
+rc=0

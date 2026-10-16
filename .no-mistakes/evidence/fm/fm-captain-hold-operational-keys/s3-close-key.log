@@ -1,0 +1,67 @@
+### open set BEFORE
+recorded	needs-decision	old answer not mirrored
+obsolete	blocked	obsolete prerequisite
+still-live	needs-decision	captain must choose
+captain-hold-x-1	needs-decision	parent hold key### close-key recorded (answered)
+reconciled-key: lane-d3 recorded
+evidence: /Users/charlesabrooker/tmp/fm-lab.S5h09M/state/reconcile-evidence/lane-d3/recorded-4668d1711aea616d0b210242ee0386a6779efb62bed6866234758975373d8c60.txt
+rc=0
+### close-key obsolete (moot)
+reconciled-key: lane-d3 obsolete
+evidence: /Users/charlesabrooker/tmp/fm-lab.S5h09M/state/reconcile-evidence/lane-d3/obsolete-7b25f47217246b67d191ad0fee547bc5ce89ac75c06fc188df9c69a6e40651f5.txt
+rc=0
+### open set AFTER (still-live + captain-hold-x-1 must remain)
+still-live	needs-decision	captain must choose
+captain-hold-x-1	needs-decision	parent hold key### status file
+needs-decision [key=recorded]: old answer not mirrored
+blocked [key=obsolete]: obsolete prerequisite
+needs-decision [key=still-live]: captain must choose
+needs-decision [key=captain-hold-x-1]: parent hold key
+resolved [key=recorded] [at=1792123722]: reconciled: outcome=answered evidence-sha256=4668d1711aea616d0b210242ee0386a6779efb62bed6866234758975373d8c60
+resolved [key=obsolete] [at=1792123724]: reconciled: outcome=moot evidence-sha256=7b25f47217246b67d191ad0fee547bc5ce89ac75c06fc188df9c69a6e40651f5
+### evidence dir
+total 32
+drwx------  6 charlesabrooker  staff  192 Oct 15 23:08 .
+drwx------  3 charlesabrooker  staff   96 Oct 15 23:08 ..
+-rw-------  1 charlesabrooker  staff    2 Oct 15 23:08 obsolete-7b25f47217246b67d191ad0fee547bc5ce89ac75c06fc188df9c69a6e40651f5.opening
+-rw-------  1 charlesabrooker  staff  113 Oct 15 23:08 obsolete-7b25f47217246b67d191ad0fee547bc5ce89ac75c06fc188df9c69a6e40651f5.txt
+-rw-------  1 charlesabrooker  staff    2 Oct 15 23:08 recorded-4668d1711aea616d0b210242ee0386a6779efb62bed6866234758975373d8c60.opening
+-rw-------  1 charlesabrooker  staff  117 Oct 15 23:08 recorded-4668d1711aea616d0b210242ee0386a6779efb62bed6866234758975373d8c60.txt
+Verified outcome: answered
+
+Verified source captured-answers.txt records the answer; prerequisite no longer applies.
+### replay recorded (no-op)
+reconciled-key: lane-d3 recorded (already closed)
+evidence: /Users/charlesabrooker/tmp/fm-lab.S5h09M/state/reconcile-evidence/lane-d3/recorded-4668d1711aea616d0b210242ee0386a6779efb62bed6866234758975373d8c60.txt
+rc=0
+status unchanged by replay
+### changed evidence on closed key
+fm-captain-hold: key recorded is not open in lane-d3; no matching evidence-backed close to replay
+rc=1
+### captain-hold-* parent key refused
+fm-captain-hold: key captain-hold-x-1 belongs to a captain-held task; reconcile that task in its owning home
+rc=1
+### active outcome refused
+fm-captain-hold: --verified-outcome must be answered or moot; an active captain call cannot close
+rc=1
+### missing outcome refused
+fm-captain-hold: --verified-outcome answered|moot is required; an unanswered call cannot close
+rc=1
+### missing evidence refused
+fm-captain-hold: --evidence-file is required; a call closes on evidence, never on assertion
+rc=1
+### empty/whitespace evidence refused
+fm-captain-hold: evidence file must contain verified facts, not only whitespace
+rc=1
+### reserved word reconcile as evidence refused
+fm-captain-hold: reconcile requests verification; it is not evidence that a call is settled
+rc=1
+### absent key refused
+fm-captain-hold: key nope is not open in lane-d3; no matching evidence-backed close to replay
+rc=1
+### oversize evidence refused
+fm-captain-hold: decision file exceeds 8192 bytes
+rc=1
+### final open set
+still-live	needs-decision	captain must choose
+captain-hold-x-1	needs-decision	parent hold key

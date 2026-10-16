@@ -1,0 +1,21 @@
+### hold b6-decisions in secondmate home; parent channel gets needs-decision key
+b6-decisions
+rc=0
+needs-decision [key=captain-hold-b6-decisions-1] [at=1792123837]: captain hold b6-decisions: twelve calls
+### interrupted verified close (done fails) then CHANGED-evidence retry then exact retry
+error: injected done failure
+fm-captain-hold: could not close reconciled captain-held task b6-decisions
+rc=1 (expected 1)
+-- parent channel after interrupted close:
+needs-decision [key=captain-hold-b6-decisions-1] [at=1792123837]: captain hold b6-decisions: twelve calls
+fm-captain-hold: task b6-decisions records a different resolution for this hold; an interrupted close retries only with the same evidence and verified outcome
+changed retry rc=1 (expected 1)
+-- parent channel after changed retry (no later key):
+needs-decision [key=captain-hold-b6-decisions-1] [at=1792123837]: captain hold b6-decisions: twelve calls
+reconciled: b6-decisions
+exact retry rc=0 (expected 0)
+-- parent channel after exact retry (resolved under ORIGINAL key -1):
+needs-decision [key=captain-hold-b6-decisions-1] [at=1792123837]: captain hold b6-decisions: twelve calls
+resolved [key=captain-hold-b6-decisions-1] [at=1792123840]: captain hold b6-decisions: reconciled
+-- open captain-hold keys on parent channel:
+(end)

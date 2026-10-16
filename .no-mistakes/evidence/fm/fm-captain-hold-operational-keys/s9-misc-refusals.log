@@ -1,0 +1,23 @@
+### help advertises new surface
+37:    [--verified-outcome answered|moot]
+38:  fm-captain-hold.sh reconcile close-key <owner-id> --key <key> \
+39:    --verified-outcome answered|moot --evidence-file <path>
+121:--verified-outcome answered|moot without a board request. The required
+129:every retry of a close on every path, board request or --verified-outcome:
+141:refused as legacy stacked records. Only a --verified-outcome retry may finish
+### reconcile note without board request still refused
+fm-captain-hold: task note-test has no pending board-created reconcile request
+rc=1
+### reconcile list shows only board requests (none)
+reconcile-requests: 0
+rc=0
+### reopen: re-hold the already-closed b6-decisions, retry SAME evidence must not close the new hold
+fm-captain-hold: task b6-decisions is already closed; a new captain call needs its own task
+re-hold rc=1
+open rc=1 (0 = held again)
+reconciled: b6-decisions
+stale same-evidence retry rc=0 (expect 1)
+open rc=1 (0 = new call survives)
+-- parent channel keys:
+needs-decision [key=captain-hold-b6-decisions-1] [at=1792123837]: captain hold b6-decisions: twelve calls
+resolved [key=captain-hold-b6-decisions-1] [at=1792123840]: captain hold b6-decisions: reconciled

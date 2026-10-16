@@ -1,0 +1,20 @@
+### wake-drain BEFORE close-key
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane-d3 [key=recorded] needs-decision: old answer not mirrored
+lane-d3 [key=still-live] needs-decision: captain must choose
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+●  WATCHER DOWN - SUPERVISION IS OFF
+●  1 task(s) in flight, but no watcher has a fresh beacon (last beat: never, grace 300s).
+●  Trust the emitted supervision protocol for this harness; do not use shell & for watcher repair.
+●  This is a supervision warning only; the guarded operation WILL still run.
+●  watcher supervision needs Stop-owned automatic recovery; inspect the hook registration and startup status before ending the turn.
+●━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+### close-key
+reconciled-key: lane-d3 recorded
+evidence: /Users/charlesabrooker/tmp/fm-lab.MZcghK/state/reconcile-evidence/lane-d3/recorded-a1ba2c4cab746c1ddba1d0e64b43086910e1912263c243afb6e3c1c820a29076.txt
+### wake-drain AFTER close-key
+OPEN DECISIONS (still open, folded from the durable status logs - not just the latest line):
+lane-d3 [key=still-live] needs-decision: captain must choose
+OPEN DECISIONS: close one by answering it: bin/fm-send.sh <task> --resolve-key <key> '<answer>'
+WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.

@@ -1,0 +1,30 @@
+### interrupted verified close: tasks-axi done fails after the record is written
+error: injected done failure
+fm-captain-hold: could not close reconciled captain-held task call-x
+rc=1
+records=1
+### retry with CHANGED outcome -> refused, no stacked record
+fm-captain-hold: task call-x records a different resolution for this hold; an interrupted close retries only with the same evidence and verified outcome
+rc=1
+records=1
+### retry with CHANGED evidence -> refused, no stacked record
+fm-captain-hold: task call-x records a different resolution for this hold; an interrupted close retries only with the same evidence and verified outcome
+rc=1
+records=1
+### exact retry (failure cleared) -> completes, exactly one record
+reconciled: call-x
+rc=0
+records=1
+open rc=1 (1 = closed)
+### unfinished worker-owned work is not completed by the verified close
+fm-captain-hold: task call-y still owns unfinished work; use answer --release with the captain's words rather than completing it
+rc=1
+open rc=0 (0 = still held)
+### non-held task refused
+  - Run `tasks-axi start plain-task` to move it to in flight
+  - Run `tasks-axi block plain-task --by <other>` to record a dependency
+fm-captain-hold: task plain-task is not held for the captain; there is no captain call to reconcile
+rc=1
+### verified-outcome active refused
+fm-captain-hold: --verified-outcome must be answered or moot; an active captain call cannot close
+rc=1

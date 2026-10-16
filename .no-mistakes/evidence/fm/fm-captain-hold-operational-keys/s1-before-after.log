@@ -1,0 +1,13 @@
+### BASE (8221de43) evidence-only close, no board request
+fm-captain-hold: task lane-b6-framing has no pending board-created reconcile request
+rc=1
+### BASE with --verified-outcome (flag unknown)
+fm-captain-hold.sh - deterministic mechanics for tasks held for the captain.
+
+The semantic policy is owned once by
+rc=
+### HEAD: default close (no outcome, no request) still refused
+fm-captain-hold: task lane-b6-framing has no pending board-created reconcile request; verify the recorded answers or moot premise and supply --verified-outcome answered|moot
+rc=1
+### HEAD: backlog still holds task
+open rc=0

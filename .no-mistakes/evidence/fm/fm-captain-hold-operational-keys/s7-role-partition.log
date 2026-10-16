@@ -1,0 +1,23 @@
+### attended BRANCH: verified task close refused
+error: decision answer (captain-hold reconcile close) refused - the supervision branch never performs this action; report the outcome and leave it to main (role partition: docs/pi-supervision-branch.md)
+rc=6 (6 = partition refusal)
+open rc=0 (0 = still held)
+### attended BRANCH: close-key refused, status + evidence untouched
+error: decision answer (captain-hold reconcile close) refused - the supervision branch never performs this action; report the outcome and leave it to main (role partition: docs/pi-supervision-branch.md)
+rc=6
+status unchanged
+0
+### main (default actor): close-key works
+reconciled-key: lane-d3 part-a
+evidence: /Users/charlesabrooker/tmp/fm-lab.MZcghK/state/reconcile-evidence/lane-d3/part-a-c5bc82fa83fe7c268527bbb5a325a59d7c52e421a19367a889905945b1c0cb86.txt
+rc=0
+### away posture entered -> branch relocated
+  reach: hold-for-return only. No phone channel is configured; anything that needs you waits for your return.
+  your words: (none)
+note: decision answer (captain-hold reconcile close) proceeds for the supervision branch under the away-posture record: main is parked and its standing authority is relocated; this script's own gate still applies (docs/pi-supervision-branch.md "Postures")
+reconciled-key: lane-d3 part-b
+evidence: /Users/charlesabrooker/tmp/fm-lab.MZcghK/state/reconcile-evidence/lane-d3/part-b-c5bc82fa83fe7c268527bbb5a325a59d7c52e421a19367a889905945b1c0cb86.txt
+rc=0
+open set:
+still-live	needs-decision	captain must choose
+plain	needs-decision	SECOND call, genuinely unanswered

@@ -1,0 +1,26 @@
+### step1: status read-only -> close-key stages evidence but append fails
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M50ZGSPKWPPKV92GDSHG0EQ0/bin/fm-wake-lib.sh: line 2776: /Users/charlesabrooker/tmp/fm-lab.MZcghK/state/lane-d3.status: Permission denied
+fm-captain-hold: could not append the reconciliation for lane-d3 key plain; retry with the same evidence
+rc=1
+plain-56dcb660f76e6339a9e2df830a4d096d95b4cf39566854e02140ca09c27db9d2.opening
+plain-56dcb660f76e6339a9e2df830a4d096d95b4cf39566854e02140ca09c27db9d2.txt
+### step2: independently resolve plain, then reopen with a NEW unanswered call
+open set:
+still-live	needs-decision	captain must choose
+plain	needs-decision	SECOND call, genuinely unanswered
+### step3: retry original evidence -> must be refused, new call stays open
+fm-captain-hold: staged evidence for key plain was recorded against an earlier or unidentifiable opening of the key; it cannot close this call
+rc=1
+open set after retry:
+still-live	needs-decision	captain must choose
+plain	needs-decision	SECOND call, genuinely unanswered
+### control: same-opening interrupted-append recovery still works
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M50ZGSPKWPPKV92GDSHG0EQ0/bin/fm-wake-lib.sh: line 2776: /Users/charlesabrooker/tmp/fm-lab.MZcghK/state/lane-d3.status: Permission denied
+fm-captain-hold: could not append the reconciliation for lane-d3 key other; retry with the same evidence
+first attempt rc=1 (expected non-zero)
+reconciled-key: lane-d3 other
+evidence: /Users/charlesabrooker/tmp/fm-lab.MZcghK/state/reconcile-evidence/lane-d3/other-1bf42b9d3b0d9b4023a63dff3fb8922cb94a2aed889a5ef07740f562ca34db01.txt
+retry rc=0 (expected 0)
+open set:
+still-live	needs-decision	captain must choose
+plain	needs-decision	SECOND call, genuinely unanswered
