@@ -756,7 +756,8 @@ A row owned by a worker or a reviewer never takes a hold binding; its escalation
 The recorder binds every live captain-held backlog task the escalation names: each `--hold TASK_ID`, or else the row's own task and its legacy `<task>-decision-<key>` task. Task ids written in the evidence never bind.
 An explicit `--hold` that is not live is refused, and an escalation that names no live hold answers only the turn it followed, which the command reports.
 Hold standing reads only the local backlog and the row, so it survives a quota-stale ledger, and a hold can be recorded while the ledger is stale.
-When the backlog or the home's ledger cannot be read, the escalation is recorded the same way and the command reports that the hold could not be verified, never that none was named.
+When the backlog or the home's ledger cannot be read, an escalation without `--hold` is recorded with no binding and the command reports that the hold could not be verified, never that none was named.
+An explicit `--hold` that cannot be verified for the same reason is refused with `--hold must name a task still held for the captain` or `--hold needs a current ledger and readable backlog to verify the captain hold`, and no receipt is written.
 A `waiting` receipt is provenance-based: it is refused and does not stand while the ledger is quota-stale.
 A receipt recorded before this binding existed needs one new escalation to stand.
 Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.

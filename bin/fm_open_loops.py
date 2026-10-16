@@ -35,7 +35,6 @@ GITHUB_PR = re.compile(r"https://github[.]com/([^/]+/[^/]+)/pull/(\d+)")
 DAY_SECONDS = int(dt.timedelta(days=1).total_seconds())  # policy: longest deferral, unseen-row retention
 # Categories a captain decision can park: the same set a dependency wait may bind.
 CAPTAIN_PARKABLE = ("open_pr", "unanswered_question", "unlanded_commit")
-TASK_ID = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9._-]*")
 GITHUB_ORIGIN = re.compile(r"(?:https?://github[.]com/|git://github[.]com/"
                            r"|ssh://(?:git@)?github[.]com/|git@github[.]com:)"
                            r"([^/]+/[^/]+?)(?:[.]git)?")
@@ -1244,7 +1243,7 @@ class WaitVerifier:
         task = source.get("task") or (subject.split(":", 1)[0] if row.get("category") == "unanswered_question" else "")
         key = source.get("key") or (subject.split(":", 1)[1] if ":" in subject else "")
         candidates = [task, f"{task}-decision-{key}" if task and key else ""]
-        names = list(dict.fromkeys(c for c in candidates if c and TASK_ID.fullmatch(c)))
+        names = list(dict.fromkeys(c for c in candidates if c))
         if names:
             self.backlog_records()
         found = []
@@ -1326,7 +1325,7 @@ class WaitVerifier:
     def binding(self, row, prerequisite, task, evidence, boundary):
         if self.stale:
             raise ValueError("waiting requires a current ledger; this one is held stale until the quota window resets")
-        if row["category"] not in ("open_pr", "unanswered_question", "unlanded_commit") \
+        if row["category"] not in CAPTAIN_PARKABLE \
                 or row.get("stale") or row.get("owner") == "captain":
             raise ValueError("this obligation cannot have a standing dependency wait")
         source = row.get("source")
