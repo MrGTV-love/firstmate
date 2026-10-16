@@ -744,7 +744,7 @@ Drain presents `OVERDUE` before other sections, with the id, owner, next action,
 `bin/fm-wake-drain.sh --ack-through` refuses to consume any presented wake while an overdue row has no action recorded after its presentation; this same boundary applies to main, the supervision-host actor, and secondmate homes, including turns with overdue work but no queued wake.
 When every queued wake is reserved by a live branch grant, main's drain shows the overdue rows as information and opens no handling episode for them; main's next handling turn gates on them.
 The away-mode supervise daemon adds every overdue row presented without an action to its escalation digest, at most one buffered item per row id until the digest flushes, and records an `escalated` receipt for it before acknowledging, so away mode neither wedges nor consumes overdue work silently.
-The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time and captain-visible mark.
+The ledger's `handling` object stores a monotonic action `sequence`, per-actor `presentations` mapping row ids to their required sequence, per-actor `presented_at` mapping row ids to when that actor's latest action requirement opened (a recorded deferral restamps it), and `actions` mapping row ids to the action kind, evidence, action time, sequence, deferral count, row digest, delivery records already cited, and optional recheck time, captain-visible mark, and captain-hold binding (`hold`: the bound task and its hold marker).
 The command in [`bin/fm-open-loops.sh`](../bin/fm-open-loops.sh) records a steer, a merge, a captain escalation, a reasoned deferral, or an explicitly bound dependency wait; it verifies evidence against local records only, without a forge call.
 A steer's evidence is a delivery record name (`NNN.msg`) present in the steering inbox, or its `handled/` directory, of the row's task: its `worker:` owner or the task id leading its subject.
 The record's `at=` time must not precede the acting actor's latest presentation of the row (or the earliest presentation by any actor, when it has none) and any recorded deferral, and a record already cited for the row is refused.
@@ -755,6 +755,20 @@ Only one deferral is allowed per row; a second attempt refuses, marks the row `c
 Repeated presentation while an action is missing is idempotent; a subsequent handling turn requires a new action on work still overdue, except while a standing receipt holds.
 A first deferral stands until its recheck time, except on a `review_pass_not_merged` row.
 An escalation of a captain-owned row stands until the row's category, subject, owner, next action, or evidence changes.
+An escalation of an `open_pr`, `unanswered_question`, or `unlanded_commit` row whose owner is `firstmate` stands the same way while the receipt is bound to one task still held for the captain, and also ends when that one hold is answered, released, blocked on an unresolved task, or held again.
+A row owned by a worker or a reviewer never takes a hold binding; its escalation answers only the turn it followed.
+A receipt binds exactly one captain-held backlog task, whether its hold is live, aged, or deferred to a date, so a hold the captain defers to a date keeps the receipt standing until that hold ends.
+The first of these that is currently held binds: the explicit `--hold TASK_ID`, the row's key used as a task id (a keyed question's captain-held task id is its key, the same order `bin/fm-captain-hold.sh` resolves an entry), the retired legacy `<task>-decision-<key>` task, and the row's own task.
+Task ids written in the evidence never bind.
+`--hold` takes one task id and is named in the `help:` line that presents an overdue row, so a lane learns of it before it records.
+An explicit `--hold` is refused when its task is not held for the captain, when the action is not `escalated`, or when the row cannot take a binding.
+An escalation that finds no held task answers only the turn it followed, which the command reports.
+When two candidates are held, only the first binds: the other ending does not end the receipt, and the bound one ending re-presents the row.
+Hold standing reads only the local backlog and the row, so it survives a quota-stale ledger, and a hold can be recorded while the ledger is stale.
+When the backlog or the home's ledger cannot be read, an escalation without `--hold` is recorded with no binding and the command reports that the hold could not be verified, never that none was named.
+An explicit `--hold` that cannot be verified for the same reason is refused, and no receipt is written.
+A `waiting` receipt is provenance-based: it is refused and does not stand while the ledger is quota-stale.
+A receipt recorded before this binding existed needs one new escalation to stand.
 Adding collected source provenance does not invalidate existing escalation or deferral receipts; full source and dependency comparisons belong to the new bound wait.
 A `waiting` receipt binds one current, non-captain-owned `open_pr`, status question, or `unlanded_commit` to a prerequisite; it is never a task-wide ownership inference or an answer to its prerequisite.
 The row keeps its actual owner and remains overdue and visible in reports and Bearings even while the receipt permits acknowledgement.

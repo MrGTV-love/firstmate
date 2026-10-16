@@ -3,6 +3,7 @@
 # Usage: fm-open-loops.sh [--json] [--heartbeat] [--check-in <task-id>]
 #        fm-open-loops.sh --present-overdue | --check-actions | --report
 #        fm-open-loops.sh action ROW_ID steered|merged|escalated|deferred --evidence TEXT [--recheck UTC_TIME]
+#        fm-open-loops.sh action ROW_ID escalated --evidence TEXT [--hold TASK_ID]
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite QUESTION_ROW_ID --evidence REASON --recheck UTC_TIME
 #        fm-open-loops.sh action ROW_ID waiting --prerequisite-task TASK_ID --evidence NNN.msg --recheck UTC_TIME
 # --check-in freshly reconciles and sends one standard progress/blocker/dependency
@@ -21,12 +22,15 @@
 # --report reads all overdue rows with current ages from the published ledger, without a forge scan.
 # action records follow-up evidence with --evidence: a new inbox record (NNN.msg) for steered,
 # the row's PR URL for merged, or free text for escalated/deferred.
+# --hold TASK_ID, valid only with escalated, names the one task held for the captain that a firstmate-owned
+# open_pr, unanswered_question or unlanded_commit row waits on; omitted, the documentation below owns which task binds.
 # deferred and waiting require an ISO UTC --recheck time within 24 hours.
 # waiting selects either --prerequisite QUESTION_ROW_ID (a distinct same-task question) or
 # --prerequisite-task TASK_ID (a distinct assigned ship/scout). For the task form, --evidence names its new
 # inbox delivery (NNN.msg), whose body must include a line `open-loop-row: ROW_ID`.
 # docs/configuration.md#open-work-ledger-configopen-loopsjson owns receipt eligibility, source
-# verification, standing waits, acknowledgement, and invalidation; a receipt never resolves the obligation.
+# verification, standing waits, captain-hold bindings, acknowledgement, and invalidation; a receipt never
+# resolves the obligation.
 # Examples: fm-open-loops.sh action ROW_ID steered --evidence 001.msg
 #           fm-open-loops.sh action ROW_ID deferred --evidence 'lint still producing output' --recheck '<future-UTC-time>'
 # --heartbeat also atomically publishes state/open-loops.json. The watcher runs it as a
