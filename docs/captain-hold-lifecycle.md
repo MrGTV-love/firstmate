@@ -41,7 +41,8 @@ It never reads report bodies, review artifacts, terminal output, or chat.
 | `answers` | Channel-agnostic entry point for keyed answers. | [Answer-time resolution](#answer-time-resolution) |
 | `bind`, `unbind`, `binding` | Record that a captured-answer source feeds the keyed-answer intake. | [Source bindings](#source-bindings) |
 | `reconcile-requests` | Internal intake that records a reconcile request from a board selection. | [Reconcile](#reconcile-re-check-reality-never-a-blind-close) |
-| `reconcile close`, `reconcile note`, `reconcile list` | Retire or list pending reconcile requests. | [Verifying and retiring a request](#verifying-and-retiring-a-request) |
+| `reconcile close`, `reconcile note`, `reconcile list` | Resolve verified calls, or retire/list pending board requests. | [Verifying and retiring a request](#verifying-and-retiring-a-request) |
+| `reconcile close-key` | Record evidence and close a status-owned operational key without sending an answer. | [Operator-verified closure](#operator-verified-closure-without-a-board-request) |
 | `diverged` | Read-only report of a call whose two records disagree. | [Record divergence](#record-divergence) |
 
 ### Creating a hold (`hold`)
@@ -290,7 +291,7 @@ The binding-checked `reconcile-requests` command is that internal intake rather 
 ### Verifying and retiring a request
 
 Verification retires a request through one of two outcomes.
-Each outcome requires both the pending board-created request and the operator input that supports its claim:
+By default, each outcome requires both the pending board-created request and the operator input that supports its claim; an explicitly verified close may instead use the [standalone path](#operator-verified-closure-without-a-board-request):
 
 - `reconcile close <task-id> --evidence-file <path>` is the moot outcome.
   It writes a resolution record whose mode is `reconciled` and whose body is the supplied EVIDENCE under a `Reconciliation evidence:` label, then closes the task.
@@ -307,6 +308,30 @@ A successful normal answer also retires any pending request, because an answered
 Every retirement is checked.
 If request removal fails after an answer, close, or note is already durable, the durable outcome stands, but the command fails and leaves the pending request visible for retry.
 No path here closes a captain call without either the captain's words through `answer` or the evidence through `reconcile close`.
+
+### Operator-verified closure without a board request
+
+Already-recorded answers and moot operational questions need not originate in a board selection.
+The standalone paths use the same owner, not a synthetic reconcile request or a new answer delivered to a worker.
+[`bin/fm-captain-hold.sh --help`](../bin/fm-captain-hold.sh) owns their exact arguments, evidence limits, and refusal/retry contract; the lifecycle skill owns the verification policy.
+
+For a captain-held task, the explicit verified outcome is incorporated into the evidence digest and written in the existing reconciled resolution block.
+The close uses the same task control lock, body archival, retained-artifact handling, parent publication, and checked request retirement as board reconciliation.
+Worker-owned unfinished work is not completed by this operator path.
+Both standalone paths are decision answers under the [supervision role partition](pi-supervision-branch.md#consistency): main-owned while attended, refused for the supervision branch, and relocated to it only under the away-posture record.
+The board-request `reconcile close`, `answer`, and `answers` are not part of that guard.
+One exact-replay rule governs every retry of a task close, on the board-request path and the `--verified-outcome` path alike.
+An interrupted close finishes only as an exact replay of the newest record for the current hold, and the retry publishes the parent resolution under the hold's original opening key.
+A changed digest or outcome against the current hold's newest record is refused without stacking a record, and old evidence never closes a newer or reopened hold; the help text owns the full retry contract.
+Only a `--verified-outcome` retry may finish without a pending board request; the default close and a still-active note need one in every state.
+
+For an ordinary status-owned operational key, `reconcile close-key` addresses the active home's status stream, not a worker endpoint or another home's backlog.
+It checks the key's owner before recording anything and leaves captain-held tasks and reserved library keys to their respective owners.
+It also probes the migrated hold row a Beads migration recorded for the key, so a key backed by any open local captain-held task stays with that task.
+The full evidence and verified outcome are saved together, bound to the status line that opened the call, before the normal status resolution event is appended through the self-announced writer.
+The event carries the evidence digest rather than truncating the evidence into a status excerpt.
+An interrupted append can retry against that saved evidence only while the call still has the opening the evidence was verified against; a successful exact retry appends nothing.
+A changed evidence digest cannot rewrite a closed key, and neither an earlier matching close event nor staged evidence from an earlier opening can close a reopened key.
 
 ## Card hygiene: a landed subject is not a live call
 
@@ -590,7 +615,16 @@ It also proves the two verification outcomes:
 
 Around those outcomes, it proves:
 
-- Both outcomes refuse without a pending board request.
+- Default close and note refuse without a pending board request; a verified close needs the explicit attestation and evidence instead.
+- `test_verified_close_without_board_request` covers recorded-answer and moot outcomes, durable evidence, exact replay, and parent-publication recovery with no request.
+- `test_verified_close_retries_only_its_own_hold` covers an interrupted standalone close, original hold age, and refusal to reuse evidence across hold lifecycles.
+- `test_verified_closes_refuse_unanswered_or_unsupported_calls` covers active/unanswered outcomes, absent, empty, or reserved evidence, and unfinished or non-held work.
+- `test_operational_key_closes_with_durable_evidence_and_replay` covers full evidence retention, exact retry, changed evidence, reopened calls, and preservation of unrelated keys.
+- `test_close_key_leaves_a_migrated_captain_hold_to_its_owner` covers a Beads-migrated captain hold keeping its key until the owner closes it.
+- `test_operational_key_close_refusals_and_interrupted_append` covers captain-task and library ownership, required attestation, absent keys, retry after evidence publication but before status append, and refusal of that staged evidence once the key has reopened.
+- `test_interrupted_close_retries_only_as_an_exact_replay` covers an interrupted close refusing changed evidence or a changed outcome without stacking a record, then finishing on the exact retry and resolving the original parent key.
+- `test_standalone_closes_follow_the_supervision_role_partition` covers the attended branch refused on both standalone paths, the board-request close left unguarded, the away record relocating both, and main unaffected.
+- `test_verified_close_retry_matrix` covers the exact-replay rule over open or closed task, same or changed evidence, same or changed outcome, request present or absent, stamped or legacy hold, and same or reopened opening, plus the board-path retry and a legacy hold with stacked records.
 - Each durable mutation applies only once across close, probe, and request-retirement failures.
 - A later distinct request with the same note still appends its own dated record.
 - Every failed retirement is surfaced with its pending request retained.

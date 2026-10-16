@@ -29,7 +29,8 @@ Do not close a captain-held task merely because the originating investigation co
 Holding the work item the question gates is safe for exactly that reason: cleanup keeps such a row open with the finished work's deliverable recorded and returns it to the queue, so it still reads as the captain's own call.
 Only `answer` with the captain's words or an evidence-backed `reconcile close` may resolve it.
 
-Never close anything the captain owns without recording what he actually said: `bin/fm-captain-hold.sh answer` writes his exact words into the task and closes a question-shaped call, while `--release` frees a captain-gated work item to proceed.
+Never close a genuinely unanswered captain call: `bin/fm-captain-hold.sh answer` writes his exact words into the task and closes a question-shaped call, while `--release` frees a captain-gated work item to proceed.
+When verified evidence establishes that all answers were already recorded elsewhere or the premise is moot, use the evidence-only reconciliation path rather than inventing new captain words.
 A merge approval uses that existing release path because approval permits the merge to proceed; cleanup closes the work only after it lands and records what shipped.
 Closing a held row at merge approval instead records completion before landing, so the backlog claims completion before the work actually ships.
 When the answer changes what a task must build, follow `AGENTS.md` section 7's mid-task ask rule to preserve the captain's words in the brief and steer the worker.
@@ -41,7 +42,11 @@ One answer value is reserved and closes nothing: `reconcile` means "go re-check 
 A bound captured source uses a separate seam: its adapter omits reconcile from keyed answers and emits the selected task id through `reconciles`, the generic runner feeds that into `reconcile-requests`, and the intake verifies the source binding and the local captain-held task before filing the durable board request.
 A remote-secondmate card whose task is absent from the main backlog therefore remains announced but cannot create a main-home request; owner-aware request and mutation routing to the authoritative secondmate home is a separate follow-up.
 That board-created request is yours to work off in the turn that receives it: `bin/fm-captain-hold.sh reconcile close <id> --evidence-file <path>` records the EVIDENCE and closes a moot call, while `reconcile note <id> --note-file <path>` annotates a genuinely active call and leaves it held.
-Both outcomes refuse unless that task still has the pending request created by the captain's board selection, so neither is a standalone way to mutate a captain call.
+Without a board request, `reconcile close` requires the explicit operator-verified outcome supported by its `--help`; a still-active note continues to require the request.
+Before using that standalone close, verify every question against the recorded answer source or the facts making it moot, and supply that evidence file with an explicit attestation that no unanswered captain choice remains.
+The command records this as evidence, not as a fresh captain answer, and refuses to complete unfinished worker-owned work.
+A status-owned operational key with no captain-held task behind it uses the same owner's evidence-backed `reconcile close-key` path in its authoritative home, not a fabricated answer or a send to an idle worker.
+That path cannot close a captain-hold parent key, a library-owned key, or a key backed by an open local captain-held task; reconcile the owning task or use the library instead.
 A normal captain answer also retires any pending request because the call is settled, including close, release, and idempotent replay paths.
 A retirement failure makes the command fail without reversing the already-durable answer, close, or note, and `reconcile list` keeps the surviving request visible for retry.
 `reconcile list` names every request still outstanding.
@@ -63,7 +68,7 @@ The absence of a routed work item is not a divergence and the guard never requir
 3. Hold that task - or create one captain-held task for the review's open questions - with a concise reason carrying the question and options.
 4. Run `complete` with the full captain-held inventory for that review pass.
 5. Relay the choices to the captain as decisions from Bearings' Captain's Call section under `AGENTS.md` section 9; do not use the word hold in captain chat.
-6. Close each call only through `answer` (or a channel that feeds `answers`), close a board-requested moot call through evidence-backed `reconcile close`, record a still-active reconciliation through `reconcile note`, use `--until` when the captain defers it, or confirm a channel already closed it.
+6. Record new captain words through `answer` (or a channel that feeds `answers`), settle verified recorded-answer or moot calls through the evidence-backed reconciliation policy above, record a still-active board reconciliation through `reconcile note`, use `--until` when the captain defers it, or confirm a channel already closed it.
 7. Confirm Bearings reflects the outcome: answered or reconciled-moot calls leave Captain's Call, released work resumes, active reconciliations remain held, and deferred calls sit in Charted Next with their date.
 
 `bin/fm-captain-hold.sh --help` owns command syntax, close modes, legacy-identity compatibility, completion attestation, retry behavior, and close ordering.

@@ -34,7 +34,10 @@
 #   fm-captain-hold.sh open-bound <source-id> <card-key>
 #   fm-captain-hold.sh diverged
 #   fm-captain-hold.sh reconcile list
-#   fm-captain-hold.sh reconcile close <task-id> --evidence-file <path>
+#   fm-captain-hold.sh reconcile close <task-id> --evidence-file <path> \
+#     [--verified-outcome answered|moot]
+#   fm-captain-hold.sh reconcile close-key <owner-id> --key <key> \
+#     --verified-outcome answered|moot --evidence-file <path>
 #   fm-captain-hold.sh reconcile note <task-id> --note-file <path>
 #
 # `hold` places an existing task under an active captain hold, or creates the
@@ -113,15 +116,52 @@
 # `reconcile-requests` intake verifies a captured source's binding before it
 # records a durable request under `state/reconcile-requests/`.
 #
-# `reconcile` is the verify-then-decide half. Both outcomes require the pending
-# request created by the captain's board selection. `close` is the moot outcome:
-# it requires the evidence that made the call moot, writes a `reconciled` resolution record
-# under a `Reconciliation evidence:` label so it can never read as the
-# captain's words, and closes the task. `note` is the still-active outcome: it
-# appends one dated `Captain hold reconciled:` note and leaves the hold in
-# place. A normal answer also retires the request because the call is settled.
-# `list` is the read-only enumeration.
-# docs/captain-hold-lifecycle.md owns the semantics.
+# `reconcile` is the verify-then-decide half. `close` normally requires a
+# pending request created by the captain's board selection. An operator who
+# has verified existing recorded answers or a moot premise may instead pass
+# --verified-outcome answered|moot without a board request. The required
+# non-empty evidence file (at most 8192 bytes) must identify the recorded-answer
+# source or the facts making the choice moot, establishing that NO unanswered
+# captain choice remains. The outcome is an explicit semantic attestation,
+# never an inference from prose; active/unanswered/reconcile are not outcomes.
+# It records the evidence and any verified outcome in a `reconciled` resolution
+# under `Reconciliation evidence:`, never as the captain's words. A verified
+# close refuses unfinished worker-owned work. One exact-replay rule governs
+# every retry of a close on every path, board request or --verified-outcome:
+# after an interrupted close a retry is accepted only as an exact replay of the
+# newest record, with the same evidence digest (the verified outcome is part of
+# the digest), written by reconciliation, for the same hold stamp, where a
+# record and a hold with no stamp match each other. It finishes parent
+# publication under that hold's original opening occurrence key. A different
+# digest or outcome against the newest record of the current hold is refused by
+# name; it stacks no record and publishes no later key. A closed call refuses a
+# different digest as well. A retry never closes a newer or reopened hold: the
+# same evidence is refused there, while a different digest on a reopened open
+# task is the first close of that new opening and resolves only its own key. A
+# hold with no stamp and two or more records cannot identify its opening and is
+# refused as legacy stacked records. Only a --verified-outcome retry may finish
+# without a pending request; the default close and `note` need one in every
+# state. `note` appends one dated `Captain hold reconciled:` note and leaves the
+# hold in place. A normal answer also retires a pending request. `list`
+# enumerates only pending board requests.
+#
+# `close-key` applies that explicit verified-outcome/evidence requirement to a
+# status-owned operational key in THIS home's <owner-id>.status, without a
+# worker send or any board request. It refuses library-reserved keys,
+# captain-hold parent keys, and exact, legacy, or migrated keys backed by an
+# open local captain-held task: use their owner instead. Full evidence is
+# durably saved in state/reconcile-evidence/<owner-id>/<key>-<digest>.txt, bound
+# to the status line that opened the call (<key>-<digest>.opening), before the
+# fold-recognized resolved event is appended. Exact replay is a no-op, changed
+# evidence cannot rewrite a closed key, and the same evidence cannot close a
+# reopened key, whether only its staged record or its close event was written.
+# Neither this command nor a reconcile selection supplies a missing answer.
+# Both verified-outcome paths are decision answers under the supervision
+# role partition (contract: bin/fm-lease-lib.sh): main-owned while attended,
+# refused for the supervision branch, and relocated to it only under the
+# away-posture record, as for fm-send --resolve-key. The board-request path
+# of `close` and `answer` are not part of that guard.
+# docs/captain-hold-lifecycle.md owns the mechanism; the skill owns policy.
 #
 # A channel's ONLY job is to turn whatever it received into those keyed lines
 # and pipe them here. It must never map keys to tasks, build decision records,
@@ -241,6 +281,9 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # shellcheck source=bin/fm-classify-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-classify-lib.sh"
+# shellcheck source=bin/fm-line-cap-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-line-cap-lib.sh"
 # shellcheck source=bin/fm-tasks-axi-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-tasks-axi-lib.sh"
@@ -256,6 +299,9 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # shellcheck source=bin/fm-parent-channel-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-parent-channel-lib.sh"
+# shellcheck source=bin/fm-lease-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-lease-lib.sh"
 
 PARENT_HOLD_PUBLISHED=0
 publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
@@ -359,6 +405,29 @@ load_decision() {  # <path>; sets DECISION_TEXT and DECISION_DIGEST
     || fail "decision file exceeds 8192 bytes"
   DECISION_TEXT=$decision
   DECISION_DIGEST=$(sha256_text "$decision")
+}
+
+# An explicit outcome is the operator's attestation that verification found no
+# unanswered captain choice. Never infer it from evidence prose or from a board
+# request. Include it in the durable evidence and digest, not only argv.
+load_reconciliation_evidence() {  # <path> <verified-outcome-or-empty>
+  local path=$1 outcome=$2
+  case "$outcome" in
+    ''|answered|moot) : ;;
+    *) fail "--verified-outcome must be answered or moot; an active captain call cannot close" ;;
+  esac
+  [ -n "$path" ] || fail "--evidence-file is required; a call closes on evidence, never on assertion"
+  load_decision "$path"
+  case "$DECISION_TEXT" in
+    *[![:space:]]*) : ;;
+    *) fail "evidence file must contain verified facts, not only whitespace" ;;
+  esac
+  [ "$DECISION_TEXT" != "$RECONCILE_VALUE" ] \
+    || fail "reconcile requests verification; it is not evidence that a call is settled"
+  if [ -n "$outcome" ]; then
+    DECISION_TEXT=$(printf 'Verified outcome: %s\n\n%s' "$outcome" "$DECISION_TEXT")
+    DECISION_DIGEST=$(sha256_text "$DECISION_TEXT")
+  fi
 }
 
 # Mutations address the configured data directory's backlog from its root, the
@@ -509,6 +578,34 @@ resolution_record_count() {  # <task-body>
   body=$(decode_shown_value "$1") || return 1
   printf '%s\n' "$body" \
     | grep -Ec '^Resolution recorded by fm-(captain|decision)-hold\.$' || true
+}
+
+# The occurrence a parent hold key carries: one past the records written for
+# earlier hold lifecycles, so a record stacked on the same hold still names the
+# key that hold opened. A hold with no stamp matches a newest record with no
+# stamp, which then names the same opening; two or more such records cannot
+# say which of them belong to this hold, so the opening is refused by name.
+hold_lifecycle_occurrence() {  # <task-id> <task-body> <hold-set>
+  local id=$1 body count
+  count=$(resolution_record_count "$2")
+  if [ -z "$3" ]; then
+    if [ "$count" -gt 0 ] && [ -z "$(recorded_resolved_hold_set "$2")" ]; then
+      [ "$count" -lt 2 ] || fail "task $id: legacy stacked records, opening not identifiable"
+      printf '%s\n' "$count"
+    else
+      printf '%s\n' "$((count + 1))"
+    fi
+    return 0
+  fi
+  body=$(decode_shown_value "$2") || return 1
+  printf '%s\n' "$body" | awk -v want="Resolves hold set: $3" '
+    /^Resolution recorded by fm-(captain|decision)-hold\.$/ { total++; inrec = 1; next }
+    inrec && /^Resolution mode: / {
+      inrec = 0
+      if (getline > 0 && $0 == want) same++
+    }
+    END { print total - same + 1 }
+  '
 }
 
 # The newest record's `Resolution mode:` value; empty for a record predating it.
@@ -1701,6 +1798,7 @@ command_reconcile() {
   case "$action" in
     list)    reconcile_list "$@" ;;
     close)   reconcile_close "$@" ;;
+    close-key) reconcile_close_key "$@" ;;
     note)    reconcile_note "$@" ;;
     *) usage >&2; exit 2 ;;
   esac
@@ -1724,39 +1822,76 @@ reconcile_list() {
 
 # The moot outcome. The evidence is what closes the call, and the `reconciled`
 # resolution mode is what keeps the record from claiming the captain answered.
+# The one exact-replay rule for an evidence close of a task. A record replays
+# only when it carries this close's evidence digest (the verified outcome is in
+# the digest), was written by reconciliation, and names the hold in front of the
+# command; no stamp on both sides matches. Returns 0 on an exact replay, 1 when
+# no record carries this digest, and 2 with the named reason in REPLAY_REFUSAL.
+REPLAY_REFUSAL=
+reconcile_replay_check() {  # <task-id> <shown-body> <hold-set> <task-state>
+  local id=$1 body=$2 cur=$3 state=$4 mode
+  REPLAY_REFUSAL=
+  body_has_resolution_record "$body" || return 1
+  [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ] || return 1
+  mode=$(recorded_resolution_mode "$body" || true)
+  if [ "$mode" != reconciled ]; then
+    if [ "$state" = "done" ]; then
+      REPLAY_REFUSAL="task $id was not closed by reconciliation"
+    else
+      REPLAY_REFUSAL="task $id records this resolution with mode ${mode:-unknown}; it is not a reconciliation retry"
+    fi
+    return 2
+  fi
+  [ "$cur" = "$(recorded_resolved_hold_set "$body")" ] \
+    || { [ "$state" = "done" ] && [ -z "$cur" ]; } \
+    || { REPLAY_REFUSAL="task $id has a newer or unidentifiable hold; old evidence cannot resolve it"; return 2; }
+  return 0
+}
+
 reconcile_close() {
-  local id=${1:-} evidence_file='' show state hold_kind body occurrence recorded_mode
+  local id=${1:-} evidence_file='' verified_outcome='' show state hold_kind body occurrence replay
+  local has_request=0 request cur
   [ "$#" -ge 1 ] || { usage >&2; exit 2; }
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --evidence-file) shift; evidence_file=${1:-} ;;
+      --verified-outcome) shift; verified_outcome=${1:-}; [ -n "$verified_outcome" ] || fail "--verified-outcome requires answered or moot" ;;
       *) usage >&2; exit 2 ;;
     esac
     shift
   done
+  if [ -n "$verified_outcome" ]; then
+    fm_lease_forbid_branch "decision answer (captain-hold reconcile close)" --away-relocated
+  fi
   validate_slug task-id "$id"
-  [ -n "$evidence_file" ] || fail "--evidence-file is required; a moot call closes on evidence, never on assertion"
-  load_decision "$evidence_file"
+  load_reconciliation_evidence "$evidence_file" "$verified_outcome"
   acquire_task_control_lock "$id"
-  reconcile_request_read "$id" \
-    || fail "task $id has no pending board-created reconcile request"
+  request=$(reconcile_request_path "$id")
+  if reconcile_request_read "$id"; then
+    has_request=1
+  elif [ -e "$request" ] || [ -L "$request" ]; then
+    fail "cannot read the pending reconcile request for $id"
+  fi
   require_tasks_axi
   task_show_or_fail "$id" "captain-held task $id is absent from this home's configured backlog (data directory $DATA)"
   state=$(show_field "$show" state)
   hold_kind=$(show_field_value "$show" hold_kind)
   body=$(show_field "$show" body)
-  occurrence=$(( $(resolution_record_count "$body") + 1 ))
+  [ "$has_request" = 1 ] || [ -n "$verified_outcome" ] \
+    || fail "task $id has no pending board-created reconcile request; verify the recorded answers or moot premise and supply --verified-outcome answered|moot"
+  cur=$(body_hold_set_timestamp "$(decode_shown_value "$body")")
   if [ "$state" = "done" ]; then
     # An exact retry finishes an interrupted close and stays idempotent; a
     # different evidence text on an already closed call is refused.
     body_has_resolution_record "$body" \
       || fail "task $id is already closed with no resolution record; use answer to record what closed it"
-    [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ] \
+    replay=0
+    reconcile_replay_check "$id" "$body" "$cur" "$state" || replay=$?
+    [ "$replay" -ne 2 ] || fail "$REPLAY_REFUSAL"
+    [ "$replay" -eq 0 ] \
       || fail "task $id records a different resolution; it cannot be reconciled again"
-    [ "$(recorded_resolution_mode "$body" || true)" = reconciled ] \
-      || fail "task $id was not closed by reconciliation"
-    occurrence=$(resolution_record_count "$body")
+    occurrence=$(hold_lifecycle_occurrence "$id" "$body" "$(recorded_resolved_hold_set "$body")") || exit 1
     remove_interrupted_answer_stamp "$id"
     publish_parent_hold "$id" "$occurrence" resolved reconciled
     [ "$PARENT_HOLD_PUBLISHED" = 1 ] \
@@ -1767,13 +1902,17 @@ reconcile_close() {
   fi
   [ "$hold_kind" = captain ] \
     || fail "task $id is not held for the captain; there is no captain call to reconcile"
-  if body_has_resolution_record "$body" \
-    && [ "$(recorded_decision_digest "$body" || true)" = "$DECISION_DIGEST" ]; then
-    recorded_mode=$(recorded_resolution_mode "$body" || true)
-    [ "$recorded_mode" = reconciled ] \
-      || fail "task $id records this resolution with mode ${recorded_mode:-unknown}; it is not a reconciliation retry"
-    occurrence=$(resolution_record_count "$body")
-  else
+  if [ -n "$verified_outcome" ] && live_work_item "$id" "$state"; then
+    fail "task $id still owns unfinished work; use answer --release with the captain's words rather than completing it"
+  fi
+  occurrence=$(hold_lifecycle_occurrence "$id" "$body" "$cur") || exit 1
+  replay=0
+  reconcile_replay_check "$id" "$body" "$cur" "$state" || replay=$?
+  [ "$replay" -ne 2 ] || fail "$REPLAY_REFUSAL"
+  if [ "$replay" -eq 1 ]; then
+    if body_has_resolution_record "$body" && [ "$cur" = "$(recorded_resolved_hold_set "$body")" ]; then
+      fail "task $id records a different resolution for this hold; an interrupted close retries only with the same evidence and verified outcome"
+    fi
     write_resolution_record "$id" reconciled "$body"
   fi
   close_answered "$id" 0 || fail "could not close reconciled captain-held task $id"
@@ -1786,6 +1925,144 @@ reconcile_close() {
     || fail "could not publish the reconciled captain-held task $id to its parent"
   reconcile_request_retire "$id"
   printf 'reconciled: %s\n' "$id"
+}
+
+# The status-stream line number of the line that opened <key>'s current call,
+# found with the fold's own readers; empty when the key is not open. Status
+# logs are append-only, so the number names one opening for the life of the log.
+key_opening_line() {  # <status-file> <key>
+  local f=$1 key=$2 line verb open='' kind resolve held n=0 row tab=$'\t'
+  _fm_status_kind "$f" '' kind
+  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  while IFS= read -r line || [ -n "$line" ]; do
+    n=$((n + 1))
+    status_line_verb "$line" verb
+    case "$verb" in
+      needs-decision|blocked|done|failed|"$resolve"|"$held")
+        _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open "$n"
+        ;;
+    esac
+  done < "$f"
+  while IFS= read -r row; do
+    case "$row" in
+      "$key$tab"*) row=${row#*"$tab"}; printf '%s' "${row#*"$tab"}"; return 0 ;;
+    esac
+  done <<OPEN_SET
+$open
+OPEN_SET
+}
+
+# Persist full evidence outside the capped status event. The digest includes
+# the attested outcome, so a retry cannot silently change either claim. The
+# evidence is staged beside the line number of the opening it was verified
+# against (<key>-<digest>.opening), written first, so a staged record that was
+# never appended can only resume on that same opening. An empty opening replays
+# a close whose event is already recorded, which needs no binding.
+record_key_evidence() {  # <owner-id> <key> <opening-line-or-empty>; sets KEY_EVIDENCE_PATH
+  local base="$STATE/reconcile-evidence" dir tmp binding
+  dir="$base/$1"
+  KEY_EVIDENCE_PATH="$dir/$2-$DECISION_DIGEST.txt"
+  binding="$dir/$2-$DECISION_DIGEST.opening"
+  [ ! -L "$base" ] && [ ! -L "$dir" ] \
+    || fail "reconciliation evidence directory must not be a symlink"
+  (umask 077; mkdir -p "$dir") || fail "cannot create the reconciliation evidence directory"
+  [ -d "$base" ] && [ -d "$dir" ] || fail "invalid reconciliation evidence directory"
+  if [ -e "$KEY_EVIDENCE_PATH" ] || [ -L "$KEY_EVIDENCE_PATH" ]; then
+    [ -f "$KEY_EVIDENCE_PATH" ] && [ ! -L "$KEY_EVIDENCE_PATH" ] \
+      && [ "$(cat "$KEY_EVIDENCE_PATH")" = "$DECISION_TEXT" ] \
+      || fail "recorded reconciliation evidence is unreadable or changed: $KEY_EVIDENCE_PATH"
+    [ -z "$3" ] || { [ -f "$binding" ] && [ ! -L "$binding" ] && [ "$(cat "$binding")" = "$3" ]; } \
+      || fail "staged evidence for key $2 was recorded against an earlier or unidentifiable opening of the key; it cannot close this call"
+    return 0
+  fi
+  if [ -n "$3" ]; then
+    tmp=$(umask 077; mktemp "$dir/.opening.XXXXXX") || fail "cannot stage the evidence opening"
+    if ! printf '%s\n' "$3" > "$tmp" || ! mv -- "$tmp" "$binding"; then
+      rm -f -- "$tmp"
+      fail "cannot record the evidence opening"
+    fi
+  fi
+  tmp=$(umask 077; mktemp "$dir/.evidence.XXXXXX") || fail "cannot stage reconciliation evidence"
+  if ! printf '%s\n' "$DECISION_TEXT" > "$tmp" || ! mv -- "$tmp" "$KEY_EVIDENCE_PATH"; then
+    rm -f -- "$tmp"
+    fail "cannot record reconciliation evidence"
+  fi
+}
+
+# This home's status-owned operational keys have no backlog row to close.
+# Captain-held and library-owned calls must keep using their existing owner.
+reconcile_close_key() {
+  local owner=${1:-} key='' evidence_file='' outcome='' file open line note limit probe id probe_rc append_rc=0
+  local ids migrated migrated_rc=0 opening
+  [ "$#" -ge 1 ] || { usage >&2; exit 2; }
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --key) shift; key=${1:-} ;;
+      --evidence-file) shift; evidence_file=${1:-} ;;
+      --verified-outcome) shift; outcome=${1:-} ;;
+      *) usage >&2; exit 2 ;;
+    esac
+    shift
+  done
+  fm_lease_forbid_branch "decision answer (captain-hold reconcile close)" --away-relocated
+  validate_slug owner-id "$owner"
+  validate_slug key "$key"
+  case "$owner" in .|..) fail "owner-id must name a local status stream" ;; esac
+  [ "${#owner}" -le 128 ] && [ "${#key}" -le 128 ] || fail "owner-id and key must be at most 128 characters"
+  [ -n "$outcome" ] || fail "--verified-outcome answered|moot is required; an unanswered call cannot close"
+  load_reconciliation_evidence "$evidence_file" "$outcome"
+  case "$key" in captain-hold-*) fail "key $key belongs to a captain-held task; reconcile that task in its owning home" ;; esac
+  note="reconciled: outcome=$outcome evidence-sha256=$DECISION_DIGEST"
+  _fm_decision_key_transition_allowed "$key" "$note" \
+    || fail "key $key is reserved for its owning library"
+  line="resolved [key=$key]: $note"
+  limit=$((FM_LINE_CAP_DEFAULT - $(status_stamp_width)))
+  fm_cap_line_var "$line" "$limit"
+  probe=$FM_LINE_CAP_LINE
+  [ "$probe" = "$line" ] || fail "key $key exceeds the status-line cap; nothing was closed"
+  acquire_task_control_lock "$owner"
+  file="$STATE/$owner.status"
+  [ -f "$file" ] && [ -r "$file" ] && [ ! -L "$file" ] \
+    || fail "owner $owner has no readable local regular status file"
+  require_tasks_axi
+  ids="$key $(legacy_hold_id "$owner" "$key")"
+  migrated=$(resolve_migrated_entry "$owner" "$key") || migrated_rc=$?
+  case "$migrated_rc" in
+    0) ids="$ids ${migrated%% *}" ;;
+    1) : ;;
+    *) fail "cannot establish whether key $key belongs to a migrated captain-held task; nothing was closed" ;;
+  esac
+  for id in $ids; do
+    probe_rc=0
+    FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+      "$0" open "$id" --distinguish-absent || probe_rc=$?
+    case "$probe_rc" in
+      0) fail "key $key belongs to captain-held task $id; reconcile that task instead" ;;
+      1|3) : ;;
+      *) fail "cannot establish whether key $key belongs to captain-held task $id; nothing was closed" ;;
+    esac
+  done
+  open=$(status_open_decisions "$file")
+  if status_event_recorded "$file" "$line"; then
+    ! _fm_open_set_has "$open" "$key" \
+      || fail "key $key was reopened; old evidence cannot resolve a new call"
+    record_key_evidence "$owner" "$key" ''
+    printf 'reconciled-key: %s %s (already closed)\nevidence: %s\n' "$owner" "$key" "$KEY_EVIDENCE_PATH"
+    return 0
+  fi
+  _fm_open_set_has "$open" "$key" \
+    || fail "key $key is not open in $owner; no matching evidence-backed close to replay"
+  opening=$(key_opening_line "$file" "$key")
+  [ -n "$opening" ] || fail "cannot establish the opening of key $key in $owner; nothing was closed"
+  record_key_evidence "$owner" "$key" "$opening"
+  fm_wake_status_append_self_announced "$STATE" "$file" "$line" || append_rc=$?
+  [ "$append_rc" -ne 2 ] || fail "could not append the reconciliation for $owner key $key; retry with the same evidence"
+  open=$(status_open_decisions "$file")
+  ! _fm_open_set_has "$open" "$key" \
+    || fail "key $key remains open in $owner; it may have reopened concurrently"
+  printf 'reconciled-key: %s %s\nevidence: %s\n' "$owner" "$key" "$KEY_EVIDENCE_PATH"
 }
 
 # The still-active outcome. The hold survives, so the call stays the captain's
