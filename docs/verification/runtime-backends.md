@@ -616,7 +616,8 @@ FM_TEST_SUMMARY total=1 failed=0 skipped_gate=0 duration_ms=563483
 
 The current behavior and privacy boundary are owned by [Jev guard](../configuration.md#jev-guard).
 Recorded native-hook observations from 2026-10-07 used Claude Code 2.1.293 and omp 18.8.1, with the guard vendored from ten-levels-of-jev commit `777adaf4`.
-They predate the firstmate-only egress boundary and later adapter restrictions; they do not establish current launch-time activation or project authorization.
+They predate the firstmate-only egress boundary and later adapter restrictions; they do not establish current launch-time activation, project authorization, replacement, outage policy or supervisor-source admission.
+In particular, observing a banner does not prove that untrusted output was withheld.
 
 Each host ran one real session in a scratch git project whose guard pointed at a loopback fake TypeSafe endpoint (`FM_TEST_SEAM=1` with `FM_JEV_GUARD_BASE_URL`) answering risky for `rm -rf` and injection text.
 Claude loaded the hooks from `.claude/settings.local.json` and ran `claude -p --permission-mode bypassPermissions --model sonnet`.
@@ -644,9 +645,106 @@ The installer changed `PI_DISABLE_LSPMUX` from an inherited `0` to process-local
 The service and remaining task-private compiler children were stopped after the proof; no other process was stopped.
 These guard-only observations establish native device transport and the bounded exception behavior, not current spawn activation, firstmate-scoped provider authorization, arbitrary LSP-server confinement, or freedom from the documented snapshot-to-dispatch race.
 
-[`tests/fm-jev-guard.test.sh`](../../tests/fm-jev-guard.test.sh) covers the current adapters, authorization and failure boundaries offline, not live host activation.
-A current live refresh must launch fresh Claude and omp workers through `fm-spawn.sh` in an authorized disposable lab with an isolated backend, exercise firstmate-scoped allow, block and banner paths, and verify that non-firstmate scopes reach neither provider.
-Repeat the live refresh after a Claude Code or omp upgrade; the scratch-project sessions above alone cannot refresh the current egress or spawn guarantees.
+### Current offline policy verification
+
+Verified on 2026-10-15 UTC with Node.js 26.11.1 and Bun 1.3.14:
+
+```sh
+bash tests/fm-jev-guard.test.sh
+```
+
+Observed output:
+
+```text
+ok - pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values
+ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+ok - OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence
+ok - Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node
+ok - separate Claude native hooks preserve only session-delivered exact bytes and screen foreign-session/changed content
+ok - actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+ok - actual stalled requests produce typed pre-tool denial and result replacement before the documented host deadline
+ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
+```
+
+These are controlled HTTP-fixture policy and executable-adapter results, not live model accuracy, native Claude replacement or deployed protection.
+The source exception is the [operator contract's Firstmate-channel consistency check](../configuration.md#jev-guard), with the role-file receipt trust limit, not producer authentication; a same-user process deliberately forging the recorded digest can pass.
+Maintained native refresh commands use this checkout's `ROOT`, synthetic publisher records and local scripted providers:
+
+```sh
+bash tests/fm-jev-guard-omp-live-e2e.test.sh
+FM_JEV_GUARD_CLAUDE_LIVE=1 bash tests/fm-jev-guard-claude-live-e2e.test.sh
+```
+
+Both belong to `live-harness-optin` and open with `tests/lib.sh`'s `fm_live_gate`.
+OMP is token-free and default-on when its dependencies are installed; Claude stays explicitly opt-in.
+Their own control variable or `FM_LIVE=1` forces execution and makes missing dependencies fail, while absent optional harnesses report an explicit skip, never a native pass.
+The fixtures import current-worktree guard source, consume actual native built-in read results in the next scripted model request, and keep their services and synthetic records private to the test.
+The shared launcher clears the worker-account owner's Claude provider/credential shed list before either harness starts, then supplies only the synthetic local provider identity.
+Native assertions distinguish policy flags from privacy/credential/provider outages using terminal decision, branch, error type, request-started state and the consumed notice; Claude's unique numbered Read result is compared with the complete source separately from its advisory.
+Verified on 2026-10-15 UTC against installed OMP 18.10.4 and Claude Code 2.1.300 using the maintained commands above with both guard-specific controls forced to `1`.
+Each host passed all 20 combinations of launch/inbox exact-byte positives and ordinary-copy/changed-byte negatives across normal, privacy, missing-credential, provider-outage and audit-outage conditions.
+Every case observed a native built-in read and its subsequent model request; Claude's actual read-hook payload retained the source bytes, and OMP audit notices preserved those bytes while reaching the next model context.
+Both model transports and Jev judgments were private loopback fixtures with synthetic credentials, zero live model/Jev calls, and cleanup of the fixture services.
+The portable guard and inbox suites also passed, including legacy-receipt negatives, launch-only activation, and staggered publication-clock recovery.
+The focused relaunch command covers the changed delivery and activation paths plus the file's mandatory lifecycle preamble, not the complete lifecycle suite.
+`bash tests/fm-control-relaunch.test.sh --jev-guard` passed the progress-note, survivor-announcement and legacy/current cutover scenarios on both host adapters; `bash tests/fm-typesafe-key-source.test.sh` also passed, including unavailable remote-bound credentials denying without egress.
+
+The CI repair refresh on 2026-10-16 UTC reran both maintained native entrypoints with their guard-specific controls forced to `1`, against OMP 18.10.4 and Claude Code 2.1.301.
+All 20 cases per host passed using this worktree's repaired short steering carrier; the focused relaunch command also passed survivor announcements and launch-only cutover. The publication/replay smoke observed 198-character carriers, exact payload and publisher-write digests, unchanged receipts on replay, numeric ordering and handled-record removal. These remain synthetic loopback and isolated lifecycle results, not production activation or an additional paid calibration trial.
+The dated native and CI-repair observations above precede integration onto `8221de43a082aef5d0368cfdfb9512810b0d71e5`; they remain historical evidence, not a native pass or reviewed-head continuity claim for the rebased source.
+The existing pipeline must revalidate from Review through its downstream phases and refresh current-head PR evidence before reporting completion.
+Integration-local verification passed `bash tests/fm-jev-guard.test.sh` and `bash tests/fm-busy-adapter-wiring.test.sh`, including the base's secondmate settings and Stop-owner paths.
+A separate synthetic CLI smoke ran the real `fm-spawn.sh` against an isolated transport fixture, consumed both generated UserPromptSubmit commands and observed busy, then consumed the combined Stop command and observed idle plus the turn-ended marker.
+These checks exercise generated hooks, not a native harness session; they do not refresh the historical native-host results above or replace downstream validation.
+
+The minimum-version regression in `tests/fm-jev-guard.test.sh` executes the tagged [OMP 18.1.20 result-consumer semantics](https://github.com/can1357/oh-my-pi/blob/v18.1.20/packages/coding-agent/src/extensibility/extensions/runner.ts#L1418-L1459) for `content`/`details`/`isError`, proving that the audit patch remains observable and preserves the original instruction bytes, details and error status; this is not native 18.1.20 execution.
+The maintained native commands above refresh the actual installed-host evidence, not that minimum-version emulation.
+
+### Accepted frozen live calibration
+
+The accepted Main-run trial used 200 synthetic paired episodes: 100 injection and 100 benign examples, with no Vernant or customer content.
+The family-separated split reserved 40 rows for calibration and 160 for held-out evaluation (80 injection and 80 benign); the authored families remain correlated, not an independent production sample.
+All nine threshold grid points were eligible, and the frozen tie-break selected clear at `p <= 0.20` and flag at `p >= 0.80` before held-out evaluation, without retuning.
+The baseline is the previous guard; the candidate is the frozen rebuilt policy.
+
+| Held-out label (denominator) | Baseline flag / clear | Candidate flag / clear / review |
+| --- | --- | --- |
+| Injection (80) | 74 / 6 | 75 / 0 / 5 |
+| Benign (80) | 14 / 66 | 0 / 77 / 3 |
+
+- Baseline flag precision: `74/88 = 84.09%`; recall: `74/80 = 92.5%`; benign flag rate: `14/80 = 17.5%`; classification error: `(6+14)/160 = 12.5%`.
+- Candidate flag precision: `75/75 = 100%`; strict flag recall: `75/80 = 93.75%`; cleared-injection rate: `0/80`; benign flag rate: `0/80`.
+  Review rate is `(5+3)/160 = 5%`; observed classification error among decided policy rows is `0/152`.
+  The eight abstentions are not correct classifications.
+  If review also stops an action, benign flag-or-review rate is `3/80 = 3.75%`, not zero benign interruption.
+- Operational API error rate: `0/580` TypeSafe `jev-1.13.0` calls/attempts, with zero errors or halts; this is a separate denominator from classification errors and abstentions.
+  The accepted run recorded 305,801 input and 21,360 output tokens.
+
+All 15 trusted held-out rows were fixture-preserved rather than candidate-model-tested, and all 14 baseline benign flags occurred among those rows.
+Candidate model-tested held-out denominators are therefore 80 injection and 65 benign: 62 benign clears and three reviews were model judgments; the other 15 benign clears were fixture policy.
+The apparent precision improvement is not solely evidence of better model discrimination and does not establish real publisher provenance.
+Native publisher/host consistency proofs are separate boundary exercises, not additional live classification accuracy.
+
+The accepted estimated total was USD 0.012843642, with a USD 4.78937088 reservation within the USD 5 cap.
+All costs were estimated without an account statement; unknown billed cost is not a reported charge.
+These are retained frozen aggregates, not a new paid trial or retuning; private corpus and raw exchanges are not published here.
+This injection trial does not calibrate shell/write questions, untested content sizes, another model/provider or deployed protection.
+
+### Deployment acceptance limits
+
+The [operator contract](../configuration.md#jev-guard) owns the current protection claim.
+Synthetic calibration fixtures do not authenticate real publisher identity, and source-fixture preservation cannot be counted as a successful live classification.
+The injection calibration does not validate shell/write judgment accuracy, large-output semantics, unrelated providers or other model versions.
+
+Current native deployment acceptance must exercise fresh Claude and omp workers through authorized isolated launch, including firstmate-only egress, inactive scopes, pre-tool refusal, omp result replacement, Claude advisory limits, provider/privacy/audit outages and the approved supervisor-read source positives and negatives.
+Repeat native validation after a Claude Code or omp upgrade; historical scratch sessions and portable fixtures alone cannot refresh those guarantees.
+The [operator-owned launch-only cutover contract](../configuration.md#jev-guard) applies independently of this verification.
+PR evidence must carry that cutover limit and the same-user digest-forgery limit, and must distinguish executed native versions from minimum-version consumer emulation and explicit capability skips.
 
 ## Claude primary feedback
 
@@ -1679,7 +1777,8 @@ tmux has no agy identity probe, so an agy pane on tmux still reads `unknown`; th
 
 ## Steering-inbox doorbell
 
-The steering channel's one behavioral assumption - a real worker agent follows the constant self-describing doorbell line (list the inbox, read and act on its records in numeric order, then `mv` each into `handled/`) - was verified on 2026-08-23 against every installed verified harness, on tmux 3.6a, macOS arm64, on an isolated private socket, driving the REAL `bin/fm-send.sh` end to end (durable record plus doorbell, with one mid-wait re-ring playing the watcher's role).
+On 2026-08-23, real workers followed the then-current drain-all doorbell on every installed verified harness, using tmux 3.6a, macOS arm64 and an isolated private socket, driving `bin/fm-send.sh` end to end with one mid-wait re-ring playing the watcher's role.
+That observation predates the current record-specific [inbox contract](../../bin/fm-task-inbox-lib.sh); it does not establish ordered per-record delivery or guard consistency admission.
 
 ```sh
 FM_SEND_INBOX_LIVE_E2E=1 tests/fm-send-inbox-doorbell-live-e2e.test.sh
@@ -1699,15 +1798,14 @@ ok - muse (Muse Code 0.2.1 (0.2.1-R1215.1)): the doorbell reached a real worker,
 ```
 
 All six installed harnesses honored the doorbell contract with real model turns: each listed the inbox named by the doorbell, read its record, executed the instruction inside it, and acknowledged with the atomic `mv`.
-Two findings from the run shaped the shipped behavior: an OpenCode vendor update modal swallowed the first doorbell and the single re-ring recovered it, which is exactly the watcher ladder's job; and grok 1.0.5's idle composer never classifies `empty` (a classifier drift owned by the [Composer classification matrix](#composer-classification-matrix) guard, whose refresh for grok 1.0.5 is still owed), which motivated the ring's advisory pre-check not to skip on ambiguity - a doorbell into an ambiguous composer is a recoverable constant line, while skipping on ambiguity would starve steering for any harness the classifier cannot positively identify.
+Two findings from the run shaped the shipped behavior: an OpenCode vendor update modal swallowed the first doorbell and the single re-ring recovered it, which is exactly the watcher ladder's job; and grok 1.0.5's idle composer never classifies `empty` (a classifier drift owned by the [Composer classification matrix](#composer-classification-matrix) guard, whose refresh for grok 1.0.5 is still owed), which motivated the ring's advisory pre-check not to skip on ambiguity - a doorbell into an ambiguous composer is recoverable, while skipping on ambiguity would starve steering for any harness the classifier cannot positively identify.
 The [inbox ring owner](../../bin/fm-task-inbox-lib.sh) defines the current advisory pre-check, draft-risk deferral, and own-doorbell retry contract.
 Kimi was not installed on the verification machine; its receive path is the same one-line-plus-shell contract, and the portable ladder and enqueue regressions in `tests/fm-task-inbox.test.sh` and `tests/fm-send-inbox.test.sh` cover every harness-independent half.
 This guard is the refresh command after any harness upgrade; it spends a small number of real tokens per installed harness, reports an absent harness explicitly, and refuses a run that verified nothing.
 
-The doorbell no longer prints the inbox's absolute path, so its length no longer grows with the home's depth.
-It names the inbox as `"$FM_TASK_INBOX"`, which `bin/fm-spawn.sh` exports into every launch as the absolute `state/<task>.inbox` path, followed by the short `<task>.inbox` name; the brief's full path remains the fallback for a worker launched without that export.
+The [inbox owner](../../bin/fm-task-inbox-lib.sh) defines the current environment-relative, record-specific doorbell shape.
 The guard now launches each worker with `FM_TASK_INBOX` exported and no brief, so the worker must resolve the inbox from the doorbell and its environment alone.
-It is the refresh command for that shape, which has not yet been recorded live here.
+It is the refresh command for the current shape, which has not yet been recorded with real model turns here; the [Jev guard native refresh](#jev-guard-native-tool-hooks) instead uses scripted loopback providers.
 The run below, on 2026-09-30 on tmux 3.6, Linux (WSL2), with the same command, covered the earlier brief-primed shape, whose doorbell named only the short `<task>.inbox` name and whose guard gave each worker the brief's steering-inbox sentence before the steer:
 
 ```text

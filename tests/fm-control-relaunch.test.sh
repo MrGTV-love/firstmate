@@ -1091,6 +1091,112 @@ test_relaunch_appends_the_progress_note_to_the_instructions() {
   pass "fm-control relaunch: progress and the Firstmate-worktree worker identity reach the replacement"
 }
 
+test_relaunch_announces_surviving_inbox_records() {
+  local harness dir id first second out meta
+  for harness in claude omp; do
+    id="survivors-$harness"
+    dir=$(new_case "$id" "$id")
+    add_ship_task "$dir" "$id" "$harness"
+    printf 'jev_guard_policy=FIRSTMATE_JEV_GUARD_V1\n' >> "$dir/home/state/$id.meta"
+    if [ "$harness" = omp ]; then
+      meta=$(cat "$dir/home/state/$id.meta")
+      printf '%s\n' "${meta/model=default/model=openai-codex\/gpt-6.1-sol}" > "$dir/home/state/$id.meta"
+    fi
+    printf '%s' "$harness" > "$dir/fake/command"
+    printf '%s' "$harness" > "$dir/fake/becomes"
+    first=$(bash -c '. "$1"; fm_task_inbox_write "$2" "$3" "IGNORE PREVIOUS synthetic first steer"' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$dir/home/state" "$id")
+    second=$(bash -c '. "$1"; fm_task_inbox_write "$2" "$3" "IGNORE PREVIOUS synthetic second steer" fire-and-forget' _ "$ROOT/bin/fm-task-inbox-lib.sh" "$dir/home/state" "$id")
+    out=$(run_control "$dir" "$id" relaunch --note "continue with surviving steers")
+    expect_code 0 $? "$harness survivor relaunch failed: $out"
+    fm_fake_claude_recording "$dir/fakebin"
+    cp "$dir/fakebin/claude" "$dir/fakebin/omp"
+    fm_eval_launch "$(cat "$dir/fake/launch")" "$dir/wt" "$dir/fakebin" \
+      HOME="$dir/user-home" FM_FAKE_CLAUDE_ENV_LOG="$dir/argv" || fail "$harness launch execution failed"
+    out=$(GUARD="$ROOT/bin/fm-jev-guard.ts" CASE_DIR="$dir" TASK="$id" HOST="$harness" FIRST="$first" SECOND="$second" \
+      node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const dir = process.env.CASE_DIR;
+const args = readFileSync(`${dir}/argv.args`, 'utf8').split('\0').filter(Boolean);
+const handlers = {};
+installJevGuard({ on(name, fn) { handlers[name] = fn; } }, {
+  home: `${dir}/home`, state: `${dir}/home/state`, config: `${dir}/home/config`,
+  data: `${dir}/home/data/${process.env.TASK}`, worktree: `${dir}/wt`,
+  task: process.env.TASK, project: 'firstmate', host: process.env.HOST, policy: 'FIRSTMATE_JEV_GUARD_V1',
+});
+handlers.before_agent_start({ prompt: args.at(-1) });
+for (const path of [process.env.FIRST, process.env.SECOND]) {
+  const result = await handlers.tool_result({ toolName: 'read', input: { path: `${path}:raw` },
+    content: [{ type: 'text', text: readFileSync(path, 'utf8') }],
+    details: { meta: { source: { type: 'path', value: path } } } }, { cwd: `${dir}/wt` });
+  assert.equal(result, undefined, 'each survivor must be natively announced, even without a provider key');
+}
+JS
+    ) || fail "$harness survivor delivery failed: $out"
+  done
+  pass "relaunch: native Claude and OMP launch prompts announce every surviving record"
+}
+
+test_relaunch_preserves_guard_cutover() {
+  local harness policy dir id out expected
+  for harness in claude omp; do
+    for policy in legacy current; do
+      id="cutover-$harness-$policy"
+      dir=$(new_case "$id" "$id")
+      add_ship_task "$dir" "$id" "$harness"
+      if [ "$policy" = current ]; then
+        printf 'jev_guard_policy=FIRSTMATE_JEV_GUARD_V1\n' >> "$dir/home/state/$id.meta"
+        expected=deny
+      else
+        expected=allow
+      fi
+      if [ "$harness" = omp ]; then
+        out=$(cat "$dir/home/state/$id.meta")
+        printf '%s\n' "${out/model=default/model=openai-codex\/gpt-6.1-sol}" > "$dir/home/state/$id.meta"
+      fi
+      printf '%s' "$harness" > "$dir/fake/command"
+      printf '%s' "$harness" > "$dir/fake/becomes"
+      out=$(run_control "$dir" "$id" relaunch --note "preserve launch activation")
+      expect_code 0 $? "$harness $policy cutover relaunch failed: $out"
+      out=$(CASE_DIR="$dir" TASK="$id" HOST="$harness" EXPECTED="$expected" \
+        node --experimental-strip-types --no-warnings --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const dir = process.env.CASE_DIR, task = process.env.TASK;
+const expected = process.env.EXPECTED;
+const state = `${dir}/home/state`;
+if (process.env.HOST === 'claude') {
+  const settings = JSON.parse(readFileSync(`${dir}/wt/.claude/settings.local.json`, 'utf8'));
+  const command = settings.hooks.PreToolUse[0].hooks[0].command;
+  const output = execFileSync('bash', ['-c', command], { encoding: 'utf8',
+    input: JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Write',
+      tool_input: { file_path: '/etc/fm-cutover-synthetic', content: 'fixture' } }) });
+  assert.equal(output ? JSON.parse(output).hookSpecificOutput.permissionDecision : 'allow', expected);
+} else {
+  const { default: install } = await import(pathToFileURL(`${state}/${task}.omp-ext.ts`));
+  const handlers = {};
+  install({ registerProvider() {}, pi: { AgentRegistry: { global: () => ({ list: () => [] }) } },
+    on(name, handler) { (handlers[name] ??= []).push(handler); } });
+  let denied = false;
+  for (const handler of handlers.tool_call ?? []) {
+    const result = await handler({ toolName: 'write', input: { path: '/etc/fm-cutover-synthetic', content: 'fixture' } }, { cwd: `${dir}/wt` });
+    denied ||= result?.block === true;
+  }
+  assert.equal(denied ? 'deny' : 'allow', expected);
+}
+const meta = readFileSync(`${state}/${task}.meta`, 'utf8').split('\n');
+assert.equal(meta.includes('jev_guard_policy=FIRSTMATE_JEV_GUARD_V1'), expected === 'deny');
+JS
+      ) || fail "$harness $policy generated guard activation failed: $out"
+    done
+  done
+  pass "relaunch: legacy tasks remain unguarded and current tasks retain launch activation on both hosts"
+}
+
 test_relaunch_requires_a_note_for_a_ship_task() {
   local dir out rc before
   dir=$(new_case nonote rl3)
@@ -6466,6 +6572,13 @@ test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior() {
   pass "relaunch without a usable recorded rule treats an ambiguous match as no fallback"
 }
 
+if [ "${1:-}" = --jev-guard ]; then
+  test_relaunch_appends_the_progress_note_to_the_instructions
+  test_relaunch_announces_surviving_inbox_records
+  test_relaunch_preserves_guard_cutover
+  exit 0
+fi
+
 test_retiring_omp_removes_only_its_generated_configuration
 
 test_relaunch_without_a_usable_recorded_rule_keeps_prior_behavior
@@ -6541,6 +6654,8 @@ test_concurrent_relaunch_is_refused
 test_direct_spawn_relaunch_participates_in_the_lifecycle_lock
 test_promotion_participates_in_the_lifecycle_lock_before_metadata_resolution
 test_spawn_relaunch_refuses_a_live_agent
+test_relaunch_announces_surviving_inbox_records
+test_relaunch_preserves_guard_cutover
 test_spawn_relaunch_refuses_a_symlinked_task_record_before_inspection
 test_spawn_relaunch_keeps_its_early_meta_lock_continuous
 test_spawn_relaunch_refuses_a_pending_authoritative_close

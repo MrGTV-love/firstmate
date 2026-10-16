@@ -96,7 +96,7 @@ It types a message once and retries Enter only until the composer clears.
 Only a positively identified omp foreground process receives the pre-retry refresh: after pending or unproven pending, a fresh empty or unreadable composer receives no further Enter. Identification uses tmux's foreground command and the existing foreground-process-group probe, and remains attached to the submission attempt.
 The submit primitive returns `empty` only after composer-clearance proof or one of the delivery-proof exceptions below.
 The [submit core](../bin/fm-tmux-lib.sh) owns how unconfirmed composer verdicts, including identified draft risk, propagate.
-An ordinary local `fm-send.sh` text steer and every remote text steer no longer ride this verified submit at all: they become durable steering-inbox records plus best-effort constant doorbell lines (`bin/fm-task-inbox-lib.sh`).
+Ordinary local `fm-send.sh` text steers and every remote text steer use the [steering-inbox contract](../bin/fm-task-inbox-lib.sh), not this verified typed-plane submit.
 The verdicts above are delivery-critical only for the local typed plane - harness-native invocations and explicit backend targets - where `fm-send.sh` still never retypes or assumes a confirmed submit for an unconfirmed verdict; its header owns the distinct delivered-unconfirmed exit status and operator response.
 
 [Watcher continuity](watcher-continuity.md#omp-restored-wake-recovery) owns omp editor recovery and its known limits; [architecture](architecture.md#event-driven-supervision) owns the parent no-draft boundary.

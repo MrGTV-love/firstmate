@@ -133,7 +133,7 @@ guard_decision() {
   out=$(printf '{"hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"rm -rf ./sandbox"}}' \
     | env -u TYPESAFE_API_KEY -u TYPESAFE_API_KEY_PRIVATE -u OPENROUTER_API_KEY FM_TEST_SEAM=1 \
         FM_JEV_GUARD_BASE_URL="http://127.0.0.1:$(cat "$TMP_ROOT/jev-port")/v1/systemone" \
-        "$ROOT/bin/fm-jev-guard-hook.sh" "$home" "$home/config" "$home/state" t1 "$TMP_ROOT/wt" "$home/data/t1" firstmate 2>"$err")
+        "$ROOT/bin/fm-jev-guard-hook.sh" "$home" "$home/config" "$home/state" t1 "$TMP_ROOT/wt" "$home/data/t1" firstmate FIRSTMATE_JEV_GUARD_V1 2>"$err")
   status=$?
   [ "$status" -eq 0 ] || fail "hook exited $status for $home"
   [ ! -s "$err" ] || fail "hook wrote stderr for $home: $(cat "$err")"
@@ -148,11 +148,13 @@ guard_decision "$LANE"
 [ "$decision" = deny ] || fail "jev-guard in a home without .env must reach the primary key"
 grep -qx 'Bearer primary-key' "$TMP_ROOT/transport" || fail "jev-guard did not send the primary key"
 guard_decision "$REMOTE"
-[ "$decision" = allow ] || fail "jev-guard in a remote-bound home must stay off"
+[ "$decision" = deny ] || fail "jev-guard without a remote-bound credential must require review"
 [ ! -s "$TMP_ROOT/transport" ] || fail "jev-guard in a remote-bound home must make no request"
+jq -se '.[-1].error_type == "CredentialUnavailableError" and .[-1].decision == "review" and .[-1].request_started == false' "$REMOTE/state/jev-guard.jsonl" >/dev/null \
+  || fail "remote-bound credential failure lost its named outage or attempted egress"
 kill "$FAKE_JEV_PID" 2>/dev/null
 wait "$FAKE_JEV_PID" 2>/dev/null
-pass "the jev-guard resolves the primary key and stays off without one"
+pass "the jev-guard resolves the primary key and denies unavailable remote-bound credentials without egress"
 
 # The jev-belay Stop-hook wrapper delivers the key to one process only.
 BELAY_ROOT="$PRIMARY/data/vendor/jev-belay"

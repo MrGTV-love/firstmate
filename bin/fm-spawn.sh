@@ -801,6 +801,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 PROJECTS="${FM_PROJECTS_OVERRIDE:-$FM_HOME/projects}"
 CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
+# shellcheck source=bin/fm-task-inbox-lib.sh
+. "$SCRIPT_DIR/fm-task-inbox-lib.sh"
 # shellcheck source=bin/fm-config-inherit-lib.sh
 . "$SCRIPT_DIR/fm-config-inherit-lib.sh"
 # shellcheck source=bin/fm-exclude-tools-lib.sh
@@ -5597,6 +5599,13 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_REPLACEMENT_STATE=$STATE_REAL
   RELAUNCH_REPLACEMENT_WT=$WT
 fi
+guard_policy=
+if [ "$KIND" != secondmate ]; then
+  guard_policy=FIRSTMATE_JEV_GUARD_V1
+  if [ "$RELAUNCH" -eq 1 ]; then
+    guard_policy=$(fm_meta_get "$RELAUNCH_META" jev_guard_policy)
+  fi
+fi
 # Arm the semantic busy-state contract (bin/fm-busy-lib.sh) for every
 # adapter with a verified semantic source, including a --secondmate launch.
 # The parent watcher reads this home's record; skipping the arm left a
@@ -5725,12 +5734,17 @@ BUSY_GEN=
     busy_cmd_prefix="$(shell_quote "$FM_ROOT/bin/fm-busy-event.sh") apply $(shell_quote "$STATE_REAL") $(shell_quote "$ID")"
     busy_suffix="--gen $(shell_quote "$BUSY_GEN") --source claude-hook"
     j_submit=$(json_escape "$busy_cmd_prefix busy $busy_suffix --event user-prompt-submit 2>/dev/null || true")
+    submit_entries="{\"type\":\"command\",\"command\":\"$j_submit\"}"
     j_stopfail=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event stop-failure 2>/dev/null || true")
     j_sessionend=$(json_escape "$busy_cmd_prefix idle $busy_suffix --event session-end 2>/dev/null || true")
     guard_entries=
     if [ "$KIND" != secondmate ]; then
-    j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data") $(shell_quote "$guard_project")")
-      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Bash|Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":30}]}],\"PostToolUse\":[{\"matcher\":\"^(Bash|Read)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":30}]}],"
+    j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data") $(shell_quote "$guard_project") $(shell_quote "$guard_policy")")
+      # Resolve host envelopes through the duration owner, retaining the existing
+      # fallback above the guard handler's own deadline.
+      j_guard_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-guard.claude-hook --fallback 30 --percentile 99 --margin 3) || exit 1
+      guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Bash|Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],\"PostToolUse\":[{\"matcher\":\"^(Bash|Read)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
+      submit_entries="$submit_entries,{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}"
     fi
     stop_entry=
     if [ "$KIND" = secondmate ] && grep -qF '.fm-busy-stop' "$WT/bin/fm-turnend-guard.sh" 2>/dev/null; then
@@ -5751,9 +5765,10 @@ BUSY_GEN=
       else
     j_stop=$(json_escape "FM_HOME=$(shell_quote "$FM_HOME") FM_CONFIG_OVERRIDE=$(shell_quote "$guard_config") $(shell_quote "$FM_ROOT/bin/fm-jev-belay-hook.sh"); belay_status=\$?; [ \"\$belay_status\" -ne 2 ] || exit 2; touch $(shell_quote "$TURNEND"); $busy_cmd_prefix idle $busy_suffix --event stop 2>/dev/null || true")
       fi
-      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\",\"timeout\":25}]}],"
+      j_stop_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-belay.claude-stop --fallback 25 --percentile 99 --margin 3) || exit 1
+      stop_entry="\"Stop\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stop\",\"timeout\":$j_stop_limit}]}],"
     fi
-    hooks_json="\"hooks\":{${guard_entries}\"UserPromptSubmit\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_submit\"}]}],${stop_entry}\"StopFailure\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stopfail\"}]}],\"SessionEnd\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_sessionend\"}]}]}"
+    hooks_json="\"hooks\":{${guard_entries}\"UserPromptSubmit\":[{\"hooks\":[${submit_entries}]}],${stop_entry}\"StopFailure\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_stopfail\"}]}],\"SessionEnd\":[{\"hooks\":[{\"type\":\"command\",\"command\":\"$j_sessionend\"}]}]}"
     if [ "$KIND" = secondmate ]; then
       session_keys='"feedbackDrafts":"off"'
       if [ "$KEEP_AI_TRAILERS" != 1 ]; then
@@ -5935,8 +5950,8 @@ EOF
     # omp 18.1.11). Lives in state/, cleaned by teardown.
     guard_context=$(jq -cn --arg home "$FM_HOME" --arg config "$guard_config" --arg state "$STATE_REAL" \
       --arg task "$ID" --arg worktree "$WT" --arg data "$guard_data" --arg project "$guard_project" \
-      --argjson noHelpers "$OMP_NO_HELPERS" \
-      '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project, noHelpers: ($noHelpers == 1)}') || exit 1
+      --argjson noHelpers "$OMP_NO_HELPERS" --arg policy "$guard_policy" \
+      '{home: $home, config: $config, state: $state, task: $task, worktree: $worktree, data: $data, project: $project, noHelpers: ($noHelpers == 1), policy: $policy}') || exit 1
     rm -f "$STATE/$ID.live-model"
     # Exact model and effort keys override ambient default or provider chains.
     # This per-task overlay travels to all local backends through --config.
@@ -6271,6 +6286,9 @@ preserve_relaunch_meta() {
   [ -z "${MODEL_STALE:-}" ] || echo "model_stale=$MODEL_STALE"
   echo "effort=${EFFORT:-default}"
   [ "$OMP_NO_HELPERS" = 0 ] || echo "omp_no_helpers=on"
+  if [ "$KIND" != secondmate ] && [ "$RELAUNCH" -eq 0 ]; then
+    echo "jev_guard_policy=$guard_policy"
+  fi
   [ -z "$SKILL_SELECTION_STATUS" ] || echo "skill_selection=$SKILL_SELECTION_STATUS"
   [ -z "$SKILL_SELECTION_REASON" ] || echo "skill_selection_reason=$SKILL_SELECTION_REASON"
   [ -z "$SKILL_SELECTION_PICKED" ] || echo "skill_selection_picked=$SKILL_SELECTION_PICKED"
@@ -6504,6 +6522,16 @@ if [ "$HARNESS" = rovo ]; then
   }
   LAUNCH=${LAUNCH//__ROVOCONFIGOVERRIDE__/$ROVOCONFIGOVERRIDE}
 fi
+inbox_doorbells=''
+if [ "$KIND" != secondmate ]; then
+  inbox_doorbells=$(fm_task_inbox_doorbells "$STATE" "$ID") || {
+    echo "error: could not announce surviving instruction records for $ID" >&2
+    exit 1
+  }
+  if [ -n "$inbox_doorbells" ]; then
+    printf '\n%s\n' "$inbox_doorbells" >> "$BRIEF" || exit 1
+  fi
+fi
 LAUNCH=${LAUNCH//__BRIEF__/$sq_brief}
 LAUNCH=${LAUNCH//__TURNEND__/$sq_turnend}
 LAUNCH=${LAUNCH//__PIEXT__/$sq_piext}
@@ -6533,11 +6561,14 @@ case "$LAUNCH" in
     secondmate) brief_opstate="$PROJ_ABS/state" ;;
     *) brief_opstate=$STATE ;;
   esac
-  brief_doorbell=$(FM_STATE_OVERRIDE="$brief_opstate" "$FM_ROOT/bin/fm-operational-input.sh" record launch-brief <"$BRIEF") || {
+  brief_doorbell=$(FM_TASK_ID="$ID" FM_STATE_OVERRIDE="$brief_opstate" "$FM_ROOT/bin/fm-operational-input.sh" record launch-brief <"$BRIEF") || {
     SPAWN_BRIEF_FAILURE_REASON="could not publish the launch brief as an operational-inbox record"
     echo "error: could not publish the launch brief for $ID as an operational-inbox record under $brief_opstate; $HARNESS strips the typed operational marker, so the worker was not launched" >&2
     exit 1
   }
+  if [ -n "$inbox_doorbells" ]; then
+    brief_doorbell+=$'\n'"$inbox_doorbells"
+  fi
   LAUNCH=${LAUNCH//__BRIEFDOORBELL__/"$(shell_quote "$brief_doorbell")"}
   ;;
 esac
@@ -6668,7 +6699,7 @@ if [ "$LAVISH_AXI_HOST_CONFIG_PRESENT" = 1 ]; then
   LAUNCH="export LAVISH_AXI_HOST=$(shell_quote "$LAVISH_AXI_HOST"); $LAUNCH"
 fi
 # Every launch also exports the absolute path of this task's steering inbox, so
-# the constant doorbell line (bin/fm-task-inbox-lib.sh) can name
+# the doorbell line (bin/fm-task-inbox-lib.sh) can name
 # "$FM_TASK_INBOX" instead of a path that grows with the home's depth. Like the
 # kill switch below it is an export statement, so it survives a compound raw
 # launch and the launch-env-allowlist `env -i` wrapper.

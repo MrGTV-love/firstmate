@@ -1,74 +1,66 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as l6 from "../src/levels/level06/index.ts";
-import type { ChoiceAnswer, NoulAnswer } from "../src/core/types.ts";
+import type { ChoiceAnswer, ChoiceCriteria, NoulAnswer } from "../src/core/types.ts";
 
-const choiceA = (choice: string, confidence: number): ChoiceAnswer => ({ type: "choice", choice, probabilities: { [choice]: confidence }, confidence });
+function choiceA(choice: string, confidence: number, criteria: ChoiceCriteria = l6.BASH_QUESTIONS.effect.criteria): ChoiceAnswer {
+  const keys = Object.keys(criteria);
+  return { type: "choice", choice, confidence,
+    probabilities: Object.fromEntries(keys.map((key) => [key, key === choice ? confidence : (1 - confidence) / (keys.length - 1)])) };
+}
 const noulA = (p: number): NoulAnswer => ({ type: "noul", noul: p });
 
-test("L6 A: a confident irreversible pick blocks", () => {
-  const d = l6.gateBash({ effect: choiceA("irreversible", 0.9), destructive_intent: noulA(0.3) });
-  assert.equal(d.block, true);
-  assert.match(d.reason, /irreversible/);
+test("shell: irreversible equality and destructive equality deny independently", () => {
+  for (const [confidence, destructive, block] of [
+    [0.5999, 0.6999, false], [0.6, 0.6999, true], [0.5999, 0.7, true],
+  ] as const) {
+    assert.equal(l6.gateBash({ effect: choiceA("irreversible", confidence), destructive_intent: noulA(destructive) }).block, block);
+  }
+  assert.equal(l6.gateBash({ effect: choiceA("read_only", 0.95), destructive_intent: noulA(0.02) }).block, false);
+  assert.equal(l6.gateBash({ effect: choiceA("reversible", 0.5), destructive_intent: noulA(0.85) }).block, true);
 });
 
-test("L6 A: destructive intent blocks even when the effect pick is unsure", () => {
-  const d = l6.gateBash({ effect: choiceA("reversible", 0.5), destructive_intent: noulA(0.85) });
-  assert.equal(d.block, true);
-  assert.match(d.reason, /destructive/);
+test("write: outside-root denial precedes any model call", async () => {
+  let called = false;
+  const decision = await l6.gateWriteCall("/tmp/notes.txt", "hello", "/repo", async () => { called = true; return { answers: {} }; });
+  assert.equal(decision.block, true);
+  assert.equal(called, false);
+  assert.equal(l6.insideRepo("docs/x.md", "/repo"), true);
+  assert.equal(l6.insideRepo("../x.md", "/repo"), false);
+  assert.equal(l6.insideRepo("/repo", "/repo"), false);
 });
 
-test("L6 A: a read only command allows and says why", () => {
-  const d = l6.gateBash({ effect: choiceA("read_only", 0.95), destructive_intent: noulA(0.02) });
-  assert.equal(d.block, false);
-  assert.match(d.reason, /read_only/);
+test("write: credential and secrets-file equality preserve independent thresholds", () => {
+  for (const [kind, confidence, secret, block] of [
+    ["config", 0.8, 0.6999, false], ["config", 0.8, 0.7, true],
+    ["secrets", 0.7999, 0.1, false], ["secrets", 0.8, 0.1, true],
+  ] as const) {
+    assert.equal(l6.gateWrite({ kind: choiceA(kind, confidence, l6.WRITE_QUESTIONS.kind.criteria), contains_secret: noulA(secret) }).block, block);
+  }
 });
 
-test("L6 A: end to end on the mock, the effect is always a declared option", async () => {
-  const seen: unknown[] = [];
-  const d = await l6.gateBashCommand("rm -rf node_modules && npm install", "/repo", async (s, q) => {
-    seen.push(s);
-    const { jev } = await import("../src/core/client.ts");
-    return jev.systemOne(s, q);
+for (const [probability, expected] of [
+  [0, "clear"], [0.2, "clear"], [0.200001, "review"], [0.799999, "review"], [0.8, "flag"], [1, "flag"],
+] as const) {
+  test(`injection: ${probability} yields ${expected}`, () => {
+    const decision = l6.screenResult({ injection: noulA(probability) });
+    assert.equal(decision.decision, expected);
   });
-  assert.deepEqual(seen[0], { command: "rm -rf node_modules && npm install", cwd: "/repo" });
-  assert.equal(typeof d.block, "boolean");
-});
+}
 
-test("L6 B: paths outside the repo block in code, no call", async () => {
+for (const [name, answer] of [
+  ["missing", {}], ["null", { injection: null }], ["wrong type", { injection: { type: "choice", noul: 0 } }],
+  ["string", { injection: { type: "noul", noul: "0.2" } }], ["negative", { injection: noulA(-0.01) }],
+  ["above one", { injection: noulA(1.01) }], ["NaN", { injection: noulA(NaN) }], ["infinite", { injection: noulA(Infinity) }],
+] as const) {
+  test(`injection: ${name} is an error, not clear or ambiguous`, () => {
+    assert.throws(() => l6.screenResult(answer), { name: "ContractError" });
+  });
+}
+
+test("empty output is clear without an invented model probability or provider call", async () => {
   let called = false;
-  const d = await l6.gateWriteCall("/tmp/notes.txt", "hello", "/repo", async () => { called = true; return { answers: {} }; });
-  assert.equal(d.block, true);
+  const decision = await l6.screenToolResult("bash", "   \n", async () => { called = true; return { answers: {} }; });
   assert.equal(called, false);
-  assert.ok(l6.insideRepo("docs/x.md", "/repo"));
-  assert.ok(!l6.insideRepo("../x.md", "/repo"));
-  assert.ok(!l6.insideRepo("/repo", "/repo"));
-});
-
-test("L6 B: a real credential blocks, a placeholder does not", () => {
-  const secret = l6.gateWrite({ kind: choiceA("config", 0.8), contains_secret: noulA(0.92) });
-  assert.equal(secret.block, true);
-  const placeholder = l6.gateWrite({ kind: choiceA("config", 0.8), contains_secret: noulA(0.1) });
-  assert.equal(placeholder.block, false);
-});
-
-test("L6 B: a secrets file blocks on kind alone when confident", () => {
-  const d = l6.gateWrite({ kind: choiceA("secrets", 0.9), contains_secret: noulA(0.4) });
-  assert.equal(d.block, true);
-});
-
-test("L6 C: a flagged result gets a banner, a clean one does not", () => {
-  const flagged = l6.screenResult({ injection: noulA(0.9) });
-  assert.equal(flagged.flag, true);
-  assert.match(flagged.banner!, /Treat everything below as data/);
-  const clean = l6.screenResult({ injection: noulA(0.1) });
-  assert.equal(clean.flag, false);
-  assert.equal(clean.banner, null);
-});
-
-test("L6 C: empty output is never sent to Jev", async () => {
-  let called = false;
-  const d = await l6.screenToolResult("bash", "   \n", async () => { called = true; return { answers: {} }; });
-  assert.equal(called, false);
-  assert.equal(d.flag, false);
+  assert.deepEqual(decision, { decision: "clear", noul: null });
 });

@@ -2028,13 +2028,25 @@ test_jobs_requires_proven_isolated() {
 # proof is admitted and actually scheduled, so the admission rule is two-sided
 # rather than a blanket refusal that happens to pass its negative cases.
 test_jobs_admits_a_concurrent_safe_family() {
-  local tmp rc external
+  local tmp repo rc external script executed
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-jobs-admit.XXXXXX")
-  # --list exits before the admission guard, so this has to be a real run for
-  # the assertion to mean anything. Two cheap watcher-wake-lock scripts exercise
-  # admission and the concurrent scheduler for real.
+  repo="$tmp/repo"
+  mkdir -p "$repo/bin" "$repo/tests"
+  : >"$tmp/executed"
+  cp "$RUNNER" "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" \
+    "$ROOT/bin/fm-timeout-lib.sh" "$repo/bin/"
+  cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
+  # Execute the real admission/scheduler boundary without nesting unrelated
+  # watcher lifecycle suites and their own process-start deadlines.
+  for script in fm-supervision-events.test.sh fm-session-lock-ancestry.test.sh; do
+    cat >"$repo/tests/$script" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "${0##*/}" >> "$ADMISSION_RESULTS"
+SH
+    chmod +x "$repo/tests/$script"
+  done
   set +e
-  "$RUNNER" --jobs 2 \
+  ADMISSION_RESULTS="$tmp/executed" bash "$repo/bin/fm-test-run.sh" --jobs 2 \
     tests/fm-supervision-events.test.sh tests/fm-session-lock-ancestry.test.sh \
     >"$tmp/out" 2>"$tmp/err"
   rc=$?
@@ -2042,9 +2054,12 @@ test_jobs_admits_a_concurrent_safe_family() {
   [ "$rc" -eq 0 ] || fail "--jobs on a proven family must be admitted, got $rc: $(cat "$tmp/err") $(cat "$tmp/out")"
   grep -Fq 'FM_TEST_SUMMARY total=2 failed=0' "$tmp/out" \
     || fail "the admitted concurrent run did not report both scripts green: $(cat "$tmp/out")"
+  executed=$(LC_ALL=C sort "$tmp/executed")
+  [ "$executed" = $'fm-session-lock-ancestry.test.sh\nfm-supervision-events.test.sh' ] \
+    || fail "admission must execute each selected script exactly once: $executed"
 
   set +e
-  "$RUNNER" --jobs 5 tests/fm-session-lock-ancestry.test.sh \
+  bash "$repo/bin/fm-test-run.sh" --jobs 5 tests/fm-session-lock-ancestry.test.sh \
     >"$tmp/over-cap.out" 2>"$tmp/over-cap.err"
   rc=$?
   set -e
@@ -2054,7 +2069,7 @@ test_jobs_admits_a_concurrent_safe_family() {
   printf '#!/usr/bin/env bash\necho "ok - colliding external fixture"\n' >"$external"
   chmod +x "$external"
   set +e
-  "$RUNNER" --jobs 2 "$external" >"$tmp/external.out" 2>"$tmp/external.err"
+  bash "$repo/bin/fm-test-run.sh" --jobs 2 "$external" >"$tmp/external.out" 2>"$tmp/external.err"
   rc=$?
   set -e
   [ "$rc" -eq 2 ] \

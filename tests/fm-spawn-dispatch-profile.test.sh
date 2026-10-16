@@ -368,6 +368,7 @@ test_unresolvable_relative_overrides_fail_loudly() {
   )
   status=$?
   expect_code 1 "$status" "spawn with an unresolvable relative home should fail"
+  assert_absent "$CASE_DIR/missing-home" "home validation must not create the rejected directory"
   assert_contains "$out" "FM_HOME directory cannot be resolved: missing-home" \
     "spawn did not name the unresolvable FM_HOME"
 
@@ -379,6 +380,7 @@ test_unresolvable_relative_overrides_fail_loudly() {
   )
   status=$?
   expect_code 1 "$status" "spawn with an unresolvable relative state override should fail"
+  assert_absent "$CASE_DIR/missing-state" "state validation must not create the rejected directory"
   assert_contains "$out" "FM_STATE_OVERRIDE directory cannot be resolved: missing-state" \
     "spawn did not name the unresolvable FM_STATE_OVERRIDE"
 
@@ -390,6 +392,7 @@ test_unresolvable_relative_overrides_fail_loudly() {
   )
   status=$?
   expect_code 1 "$status" "spawn with an unresolvable relative data override should fail"
+  assert_absent "$CASE_DIR/missing-data" "data validation must not create the rejected directory"
   assert_contains "$out" "FM_DATA_OVERRIDE directory cannot be resolved: missing-data" \
     "spawn did not name the unresolvable FM_DATA_OVERRIDE"
   pass "unresolvable relative spawn overrides fail with named diagnostics"

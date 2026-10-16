@@ -1,6 +1,6 @@
 // Native omp judge credentials are resolved privately by its supported !command
 // provider API. Only code/home paths enter configuration and argv, never a key.
-// docs/configuration.md "Jev guard" owns which workers receive a credential.
+// bin/fm-spawn.sh's header owns native judge credential eligibility.
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 

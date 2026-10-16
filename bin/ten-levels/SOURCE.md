@@ -1,6 +1,7 @@
 # Source
 
-This directory holds the Level 5 routers and level 6 jev-guard from disler's ten-levels-of-jev, vendored from upstream.
+This directory holds the Level 5 routers and Level 6 policies from disler's ten-levels-of-jev.
+Firstmate's worker guard uses those policies and the canonical client through `bin/fm-jev-guard.ts`.
 
 - Repository: https://github.com/disler/ten-levels-of-jev
 - Path: `apps/ten-levels` (the `LICENSE` file comes from the repository root)
@@ -8,22 +9,19 @@ This directory holds the Level 5 routers and level 6 jev-guard from disler's ten
 - Vendored: 2026-10-07
 - License: MIT, see `LICENSE` in this directory.
 
-The upstream paths under `apps/ten-levels` are kept, so every relative import resolves unchanged.
-
 ## Unmodified copies
 
-These files are byte-for-byte copies of the upstream files at the same paths:
+These files remain byte-for-byte copies at their upstream paths:
 
-- `extensions/jev-guard.ts`
-- `src/levels/level06/index.ts`, `bash-gate.ts`, `write-gate.ts` and `result-screen.ts`
 - `src/core/client.ts`, `helpers.ts`, `mock.ts` and `types.ts`
-- `tests/level06.test.ts`
+- `src/levels/level06/index.ts` and `bash-gate.ts`
 - `src/levels/level05/intent-router.ts` and `index.ts`
 - `tests/level05.test.ts`
 - `LICENSE`
 
-The questions, thresholds, block and banner wording, content trimming, the client's provider snapshot and retries, and the allow-on-error behavior all run as upstream wrote them.
-Firstmate supplies shorter client budgets through the upstream constructor options.
+The guard and `bin/fm-dispatch-level5.ts` import the same `src/core/client.ts`; neither owns a second transport.
+Provider snapshots, raw exchange retention, validation, retry behavior and cost certainty remain the canonical client's responsibility.
+The [operator contract](../../docs/configuration.md#jev-guard) owns the guard's budgets, egress and host limits.
 
 ## Changed copies: Level 5 agent and model routers
 
@@ -32,48 +30,35 @@ Level 5 was copied from the same pinned commit on 2026-10-14 (UTC).
 Their original route functions consume those objects unchanged.
 This is the only change in those copies: combining independent agent and model questions in one paid dispatch request requires access to the objects without invoking two separate route calls.
 Question wording, criteria, pure decisions, and thresholds remain upstream's.
-`bin/fm-dispatch-level5.ts` combines the objects with the existing rule question, uses the unchanged core client, and maps the pure decisions into the captain's approved candidates.
+`bin/fm-dispatch-level5.ts` combines the objects with the existing rule question, uses the unchanged core client, and maps the pure decisions into the approved candidates.
 
-## Changed copy: `extensions/report.ts`
+## Changed copies: Level 6 result policy and service
 
-Upstream's `report.ts` is the lab's side channel, so it is the one upstream file Firstmate changes.
-Each change and its reason:
+- `src/levels/level06/result-screen.ts` owns the frozen, calibrated injection Noul and pure clear/flag/review policy.
+  Invalid answers throw the canonical contract error, empty output invents no probability, and complete result text replaces prefix-only screening.
+  The [accepted frozen calibration summary](../../docs/verification/runtime-backends.md#accepted-frozen-live-calibration) owns measured denominators, abstentions, fixture exclusions and estimated-cost uncertainty.
+- `src/levels/level06/write-gate.ts` removes prefix-only content assessment and names the existing secrets-file threshold without changing valid shell/write questions or threshold behavior.
+- `tests/level06.test.ts` exercises equality boundaries, independent shell/write signals, invalid injection values and empty-output handling instead of pinning banner/reason wording or claiming mock semantic accuracy.
+- `extensions/report.ts` is Firstmate's per-installation service and minimized audit owner rather than the upstream lab side channel.
+  It snapshots and checks the complete request before key lookup, uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
+  Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input-derived text.
+  Durable-record failure is explicit rather than silently optional while active.
 
-- `extensions/report.ts`'s `jev` keeps upstream's single-provider TypeSafe client snapshot, memoized for the session; Firstmate's former OpenRouter fallback client is removed under the 2026-10-09 prohibition on OpenRouter fleet calls.
-  Unavailable TypeSafe follows upstream's existing no-key error behavior; it never tries another provider.
-  The constructor shortens the total request budget; [the operator contract](../../docs/configuration.md#jev-guard) owns current budgets and host limits.
-  `seam` reads test endpoint overrides only when `FM_TEST_SEAM=1`.
-- `extensions/report.ts`'s `withDecisionBudget` gives each complete handler a shared 25-second cancellation deadline.
-  `preflightTimeout` bounds synchronous key and policy preflight to the remaining handler budget.
-  `decide` passes the shared cancellation signal to the upstream client so a request cannot outlive its handler.
-  omp 18.8.1's supported `extensionHandlers.toolCallTimeoutMs` setting covers only tool calls, not result screening, so Firstmate bounds both paths without extending the host deadline.
-- `extensions/report.ts`'s `typesafeKey` reads the key through `bin/fm-typesafe-lib.sh` (`fm_typesafe_key`) when the client is first constructed because Firstmate keeps the worker environment free of keys.
-- `extensions/report.ts`'s `permitted` preflight enforces the captain data-egress decision 2026-10-08, withholding all other, missing or empty project scopes before resolving a credential.
-  A withheld request throws, so upstream's own error path allows the tool call while the outside-root write block remains deterministic.
-- `extensions/report.ts`'s `permitted` also checks authorized requests against `config/dispatch-never-send` through the existing `fm_typesafe_permitted` policy.
-  A worker's explicit no-helper posture withholds judgments before credential lookup while leaving the upstream deterministic safety checks unchanged; [the operator contract](../../docs/configuration.md#jev-guard) owns that behavior.
-- `extensions/report.ts`'s `configure` names the owning home, its config and state, the task and project because one shared code root serves many workers.
-- `extensions/report.ts`'s `report` sends events to the owning home's private `state/jev-guard.jsonl` instead of the lab's stderr stream, which has no reader in Firstmate.
-  The ledger deliberately selects decision metadata, answers and numeric usage, excluding commands, paths, request bodies, questions, reasons, banners, error messages and unknown request-derived fields.
-  [The operator contract](../../docs/configuration.md#jev-guard) owns ledger availability and the difference between omp session entries and Claude reporting.
-- `extensions/report.ts`'s `decide` records the answering provider in the `jev` event so direct-only routing remains observable.
+The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error handling are removed, not retained as a second runtime path.
 
 ## Firstmate glue outside this directory
 
-- `bin/fm-jev-guard.ts`'s `installJevGuard` installs the unchanged upstream extension for one worker and wraps both event handlers in the shared decision budget.
-  Its `writeRoot` selects the worktree, task-data or temporary root that holds the target, preserving intentional report and scratch writes.
-- `bin/fm-jev-guard.ts`'s edit-schema check blocks inputs without a string `path` and `new_string`, telling the agent to report that omp replace edit mode is required.
-  omp's default hashline schema differs from pi's, while replace mode matches the unchanged upstream gate without projecting or changing execution arguments.
-- `bin/fm-jev-guard.ts`'s path-spelling check enforces the [operator contract](../../docs/configuration.md#jev-guard) for plain file paths and its exact bounded native-device write exceptions.
-  Device admission returns before upstream file-root selection and judgment because LSP arguments and job cancellation are not file writes.
-  Other spellings block without a Jev call, requiring a plain absolute or worktree-relative path and a report if that is not possible.
-  The installer disables shared LSP multiplexing process-locally; the operator contract owns the allowed actions, realpath and snapshot checks, and residual native-server edit and snapshot-to-dispatch risks.
-  This allowlist prevents omp's rewritten file spellings from making the unchanged upstream lexical gate judge a different target without reimplementing host resolution or mutating execution arguments.
-- `bin/fm-jev-guard-claude.ts:31-48`: Claude has no pi extension API, so the adapter maps Claude's `PreToolUse` and `PostToolUse` payloads to the pi events the upstream handlers read (`file_path` to `path`, `tool_response` to text content).
-  `:37` turns an upstream block into a Claude `deny`.
-  `:47` delivers the banner as `additionalContext`, because a Claude hook cannot replace a built-in tool's output.
-- `bin/fm-jev-guard-hook.sh:15-19`: runs the TypeScript adapter with bun, or node with type stripping, so no build step is needed.
-- `bin/fm-spawn.sh`'s `guard_project` setup computes project scope from physical roots and carries it through `j_guard` and `guard_context` to the shared authorization boundary.
-  [The operator contract](../../docs/configuration.md#jev-guard) owns the allowed project and withholding behavior.
-- `bin/fm-spawn.sh`'s `j_guard` registration and generated `installJevGuard` call install the Claude hooks and omp worker extension without changing primary sessions.
-  Its omp launch sets `PI_EDIT_VARIANT=replace` only in ship and scout worker processes, leaving pane and primary settings unchanged.
+- `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
+  Its host response handling and one isolated Firstmate-channel consistency function consume the service and pure policies; no signing, alternate transport or tool proxy is introduced.
+  The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
+- `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.
+  Current Claude documentation describes built-in output replacement, but this adapter does not claim installed-host support or use it without verification.
+- `bin/fm-jev-guard-hook.sh` runs the adapter with Bun or Node type stripping and observes its process result so missing or crashed active runtimes require review rather than silently allowing required pre-tool decisions.
+  Only successful handler stdout is published; raw failure streams are withheld and the observed exit status is carried in a stable sanitized diagnostic.
+- `bin/fm-spawn.sh` remains the launch owner for physical project scope, per-task launch-only guard activation retained on relaunch, context, Claude hook registration, omp extension loading and process-local replace-edit mode.
+  Native omp prompt events and Claude's separate prompt/tool hooks bind exact source reads without copying raw prompts into the latter's task/session-local hash context.
+- The existing `bin/fm-operational-input.sh` publisher owns write-time consistency metadata; `bin/fm-task-inbox-lib.sh` reuses it and names the exact record in its bounded doorbell.
+  The [inbox owner's header](../fm-task-inbox-lib.sh) owns delivery and retry semantics.
+
+[`tests/fm-jev-guard.test.sh`](../../tests/fm-jev-guard.test.sh) exercises the public service and adapters with isolated synthetic HTTP fixtures.
+[Native verification](../../docs/verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes actual host delivery, controlled decision fixtures, live calibration and deployed acceptance.
