@@ -5599,6 +5599,7 @@ if [ "$RELAUNCH" -eq 1 ]; then
   RELAUNCH_REPLACEMENT_STATE=$STATE_REAL
   RELAUNCH_REPLACEMENT_WT=$WT
 fi
+guard_policy=
 if [ "$KIND" != secondmate ]; then
   guard_policy=FIRSTMATE_JEV_GUARD_V1
   if [ "$RELAUNCH" -eq 1 ]; then

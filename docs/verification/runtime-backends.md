@@ -696,6 +696,11 @@ The focused relaunch command covers the changed delivery and activation paths pl
 
 The CI repair refresh on 2026-10-16 UTC reran both maintained native entrypoints with their guard-specific controls forced to `1`, against OMP 18.10.4 and Claude Code 2.1.301.
 All 20 cases per host passed using this worktree's repaired short steering carrier; the focused relaunch command also passed survivor announcements and launch-only cutover. The publication/replay smoke observed 198-character carriers, exact payload and publisher-write digests, unchanged receipts on replay, numeric ordering and handled-record removal. These remain synthetic loopback and isolated lifecycle results, not production activation or an additional paid calibration trial.
+The dated native and CI-repair observations above precede integration onto `8221de43a082aef5d0368cfdfb9512810b0d71e5`; they remain historical evidence, not a native pass or reviewed-head continuity claim for the rebased source.
+The existing pipeline must revalidate from Review through its downstream phases and refresh current-head PR evidence before reporting completion.
+Integration-local verification passed `bash tests/fm-jev-guard.test.sh` and `bash tests/fm-busy-adapter-wiring.test.sh`, including the base's secondmate settings and Stop-owner paths.
+A separate synthetic CLI smoke ran the real `fm-spawn.sh` against an isolated transport fixture, consumed both generated UserPromptSubmit commands and observed busy, then consumed the combined Stop command and observed idle plus the turn-ended marker.
+These checks exercise generated hooks, not a native harness session; they do not refresh the historical native-host results above or replace downstream validation.
 
 The minimum-version regression in `tests/fm-jev-guard.test.sh` executes the tagged [OMP 18.1.20 result-consumer semantics](https://github.com/can1357/oh-my-pi/blob/v18.1.20/packages/coding-agent/src/extensibility/extensions/runner.ts#L1418-L1459) for `content`/`details`/`isError`, proving that the audit patch remains observable and preserves the original instruction bytes, details and error status; this is not native 18.1.20 execution.
 The maintained native commands above refresh the actual installed-host evidence, not that minimum-version emulation.
