@@ -13,6 +13,12 @@ export const GUARD_POLICY_VERSION = "FIRSTMATE_JEV_GUARD_V1";
 export const OUTAGE_POLICY = "REVIEW_ON_UNAVAILABLE_V1";
 export const GUARD_MODEL = "jev-1.13.0";
 export const MAX_REQUEST_BYTES = 16_384;
+/** Outage-only deny text; policy blocks keep the permanent BLOCK_NOTICE. */
+export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "
+  + "If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding.";
+const TRY_MS = 10_000;
+const MAX_TRIES = 2;
+const RETRYABLE_FAILURES: ReadonlySet<GuardFailureType> = new Set(["TimeoutError", "TypeError", "Error"]);
 const lib = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-typesafe-lib.sh");
 const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
 
@@ -24,12 +30,22 @@ export type GuardFailureType = "ContractError" | "QuestionValidationError" | "Ti
 export class GuardUnavailableError extends Error {
   readonly errorType: GuardFailureType;
   readonly requestStarted: boolean;
-  constructor(errorType: GuardFailureType, requestStarted = false, cause?: unknown) {
+  /** Provider tries and elapsed time; null when no request started. */
+  readonly attempts: number | null;
+  readonly elapsedMs: number | null;
+  constructor(errorType: GuardFailureType, requestStarted = false, cause?: unknown, timing?: { attempts: number; elapsedMs: number }) {
     super("Jev guard requires review.", { cause });
     this.name = errorType;
     this.errorType = errorType;
     this.requestStarted = requestStarted;
+    this.attempts = timing?.attempts ?? null;
+    this.elapsedMs = timing?.elapsedMs ?? null;
   }
+}
+
+/** Failure rows carry the guard's own try count and elapsed time, so a timeout can be told from an error. */
+export function failureTiming(error: unknown): { attempts: number | null; ms: number | null } {
+  return error instanceof GuardUnavailableError ? { attempts: error.attempts, ms: error.elapsedMs } : { attempts: null, ms: null };
 }
 
 /** Preserve known original types without copying exception text or arbitrary exception names. */
@@ -60,6 +76,9 @@ export interface GuardTerminal {
   branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency";
   error_type: GuardFailureType | null;
   request_started: boolean;
+  /** Set on failure rows, where no result carries meta. */
+  attempts?: number | null;
+  ms?: number | null;
   result?: SystemOneResult;
 }
 
@@ -78,6 +97,14 @@ export async function withDecisionBudget<T>(run: () => Promise<T>): Promise<T> {
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** One retry for an outage of a required judgment, only when a whole further try fits the handler budget. */
+function mayRetry(cause: unknown): boolean {
+  const budget = budgets.getStore();
+  if (budget?.signal.aborted) return false;
+  if (budget && budget.until - performance.now() < TRY_MS) return false;
+  return RETRYABLE_FAILURES.has(failureType(cause));
 }
 
 function preflightTimeout(): number {
@@ -122,6 +149,8 @@ export function createGuardService(context: GuardServiceContext): GuardService {
     host: context.host ?? "omp",
     async decide(state, questions) {
       let requestStarted = false;
+      let tries = 0;
+      let started = 0;
       try {
         if (!active) throw new GuardUnavailableError("InactiveGuardError");
         const body = { model: GUARD_MODEL, state, questions };
@@ -131,13 +160,22 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         const snapshot: unknown = JSON.parse(requestText);
         validateRequest(snapshot);
         permitted(requestText);
-        client ??= new JevClient({ provider: "typesafe", apiKey: typesafeKey(), model: GUARD_MODEL, timeoutMs: 10_000,
+        client ??= new JevClient({ provider: "typesafe", apiKey: typesafeKey(), model: GUARD_MODEL, timeoutMs: TRY_MS,
           baseUrl: process.env.FM_TEST_SEAM === "1" ? process.env.FM_JEV_GUARD_BASE_URL || undefined : undefined });
         requestStarted = true;
-        return await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
+        started = performance.now();
+        for (;;) {
+          tries++;
+          try {
+            return await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
+          } catch (cause) {
+            if (tries >= MAX_TRIES || !mayRetry(cause)) throw cause;
+          }
+        }
       } catch (cause) {
         if (cause instanceof GuardUnavailableError) throw cause;
-        throw new GuardUnavailableError(failureType(cause), requestStarted, cause);
+        throw new GuardUnavailableError(failureType(cause), requestStarted, cause,
+          requestStarted ? { attempts: tries, elapsedMs: Math.round(performance.now() - started) } : undefined);
       }
     },
     record(terminal) {
@@ -158,7 +196,7 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         error_type: terminal.error_type, request_started: terminal.request_started,
         provider: result?.meta.provider ?? (terminal.request_started ? "typesafe" : null),
         requested_model: terminal.request_started ? GUARD_MODEL : null, model: result?.model ?? null,
-        attempts: result?.meta.attempts ?? null, ms: result?.meta.elapsedMs ?? null,
+        attempts: result?.meta.attempts ?? terminal.attempts ?? null, ms: result?.meta.elapsedMs ?? terminal.ms ?? null,
         usage: result ? { input_tokens: result.usage.input_tokens, output_tokens: result.usage.output_tokens } : null,
         cost: result?.meta.cost ?? { amount: null, source: terminal.request_started ? "unknown" : "not_called" }, answers,
       };

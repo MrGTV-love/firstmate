@@ -9,7 +9,7 @@ import { readFileSync, realpathSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 import { ContractError, type SystemOneResult } from "./ten-levels/src/core/client.ts";
-import { createGuardService, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_POLICY, withDecisionBudget,
+import { createGuardService, failureTiming, failureType, GUARD_POLICY_VERSION, GuardUnavailableError, OUTAGE_NOTICE, OUTAGE_POLICY, withDecisionBudget,
   type GuardServiceContext, type GuardTerminal } from "./ten-levels/extensions/report.ts";
 import { BASH_QUESTIONS, BLOCK_NOTICE, gateBash, gateWrite, insideRepo, screenToolResult, WRITE_QUESTIONS } from "./ten-levels/src/levels/level06/index.ts";
 
@@ -187,7 +187,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
     const why = final.audit_error_type
       ? `Review required: AuditUnavailableError; judgment error_type=${final.error_type ?? "null"}.`
       : final.decision === "review" ? `Review required: ${final.error_type ?? "uncertain judgment"}.` : reason;
-    return { block: true, reason: `[jev-guard] ${why} ${OUTAGE_POLICY}. ${BLOCK_NOTICE}` };
+    return { block: true, reason: `[jev-guard] ${why} ${OUTAGE_POLICY}. ${terminal.decision === "review" ? OUTAGE_NOTICE : BLOCK_NOTICE}` };
   }
 
   function finishResult(terminal: GuardTerminal, consistentContent?: { type: "text"; text: string }[]): GuardResultPatch | undefined {
@@ -246,7 +246,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         enforcement: decision.block ? "pretool_deny" : "pretool_allow", request_started: true, result }, decision.reason);
     } catch (error) {
       return finishCall({ ...terminal, decision: "review", enforcement: "pretool_deny", branch: "outage", error_type: failureType(error),
-        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result });
+        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result, ...failureTiming(error) });
     }
   }));
 
@@ -278,7 +278,7 @@ export function installJevGuard(pi: GuardHost, c: JevGuardContext): void {
         branch: result ? "policy" : "empty", request_started: result !== undefined, result });
     } catch (error) {
       return finishResult({ ...terminal, decision: "review", enforcement, branch: "outage", error_type: failureType(error),
-        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result });
+        request_started: result !== undefined || (error instanceof GuardUnavailableError && error.requestStarted), result, ...failureTiming(error) });
     }
   }));
 }

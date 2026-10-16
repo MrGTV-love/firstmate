@@ -2131,7 +2131,8 @@ Device `edit` calls remain blocked, and every path-spelling refusal tells the ag
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
-A block tells the agent the block is final and to report it rather than work around it.
+A policy block (shell and write gate verdicts and deterministic refusals) tells the agent the block is final and to report it rather than work around it.
+An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 On Claude, review notices arrive as added context next to the unchanged output.
 The current [Claude hook reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) documents `updatedToolOutput` for built-in tools; this integration intentionally does not use that capability without installed-host verification.
 Advisory context is not evidence that Claude was prevented from seeing or acting on the original output.
@@ -2151,6 +2152,9 @@ The service uses the canonical shared Jev client, pinned to the calibrated model
 It resolves the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its installation's client is first constructed; no key is exported to the worker environment or placed in configuration, new credential files or command arguments.
 omp reuses that client and key for the installation, while Claude constructs one per hook process; missing credentials do not create a successful client snapshot.
 The client retains its existing retry behavior and has a 10-second total request budget, including retries and response bodies.
+The service adds one bounded retry of the whole request after an outage of a required judgment: a plain provider `Error`, a `TimeoutError` or a network `TypeError`.
+Each try keeps the 10-second budget, and the retry starts only when a full further try fits in the remaining 25-second handler budget.
+It never retries a flagged, ambiguous or policy-blocked answer, a malformed response (`ContractError`), a privacy, credential or oversize refusal, or a handler cancellation.
 Both event handlers have a shared 25-second cancellation budget; the native tool-call deadline remains 30 seconds.
 Claude's host hook envelope uses `fm-duration.py limit` with a 30-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
 
@@ -2170,6 +2174,8 @@ They perform no guard key lookup or provider request and retain deterministic pa
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
 The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, numeric thresholds, named outage/enforcement branch, allowlisted answer fields, usage, models, latency, attempts and cost certainty.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
+A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 or 2), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
+A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
 A generic provider `Error` stays visible without inventing an HTTP category by parsing its message.
 Reported, estimated, unknown and not-called costs are distinct; unknown charges are not zero.
 Commands, paths, state, questions, raw exchanges, provider extension fields and exception messages are excluded; the guard no longer adds raw session report entries.
