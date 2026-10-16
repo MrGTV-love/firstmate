@@ -1,0 +1,12 @@
+diff --git a/bin/fm-remote-secondmate-control.sh b/bin/fm-remote-secondmate-control.sh
+index a66e047e..e6bf3993 100755
+--- a/bin/fm-remote-secondmate-control.sh
++++ b/bin/fm-remote-secondmate-control.sh
+@@ -230,6 +230,7 @@ cmd_launch() {
+     die "remote host-local secondmate launch failed"
+   fi
+   [ -f "$meta" ] || die "remote launch returned without endpoint metadata"
++  sed -i '' 's/^harness=.*/harness=codex/' "$meta"
+   herdr_session=$(fm_meta_get "$meta" herdr_session)
+   [ "$herdr_session" = "$REMOTE_HERDR_SESSION" ] \
+     || die "remote launch recorded Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'"

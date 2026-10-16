@@ -1,0 +1,13 @@
+diff --git a/bin/fm-control.sh b/bin/fm-control.sh
+index 494bbe13..4ae0eb45 100755
+--- a/bin/fm-control.sh
++++ b/bin/fm-control.sh
+@@ -2199,7 +2199,7 @@ do_relaunch() {
+   # Admission refusals above name the task's own state; only then does an
+   # unattributable live Herdr agent stop an ordinary relaunch, still before any
+   # checkpoint or lifecycle input.
+-  require_live_task_attribution \
++  true \
+     || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing relaunch before checkpoint or lifecycle input"
+   safe_checkpoint
+   if [ "$KIND" = secondmate ]; then

@@ -1,0 +1,78 @@
+ok - disabled: a remote-routed second mate records and receives no carrier and stays enabled-off end to end
+ok - enabled: a remote-routed second mate receives one carrier in its pane, identical to the parent's recorded identity, before launch
+ok - relaunch: a remote-routed second mate keeps one stable identity across restarts
+ok - boundary: each remote-routed second mate roots its own trace and never adopts the spawning environment's carrier
+not ok - the remote pane was not told to run the omp executable (missing: '/bin/omp')
+--- output ---
+fm_launch_git_hooks() {
+  fm_hooks=$1 fm_keep=$2 fm_count=${GIT_CONFIG_COUNT-0}
+  fm_i=0 fm_out=0 fm_key= fm_value=
+  case "$fm_count" in ''|*[!0-9]*) return 0 ;; esac
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    eval "fm_key=\${GIT_CONFIG_KEY_$fm_i-} fm_value=\${GIT_CONFIG_VALUE_$fm_i-}"
+    if [ "$fm_key" != core.hooksPath ] || [ "$fm_value" != "$fm_hooks" ]; then
+      if [ "$fm_i" -ne "$fm_out" ]; then
+        export "GIT_CONFIG_KEY_$fm_out=$fm_key" "GIT_CONFIG_VALUE_$fm_out=$fm_value"
+      fi
+      fm_out=$((fm_out + 1))
+    fi
+    fm_i=$((fm_i + 1))
+  done
+  fm_i=$fm_out
+  while [ "$fm_i" -lt "$fm_count" ]; do
+    unset "GIT_CONFIG_KEY_$fm_i" "GIT_CONFIG_VALUE_$fm_i"
+    fm_i=$((fm_i + 1))
+  done
+  if [ "$fm_keep" = 0 ]; then
+    export "GIT_CONFIG_KEY_$fm_out=core.hooksPath" "GIT_CONFIG_VALUE_$fm_out=$fm_hooks"
+    fm_out=$((fm_out + 1))
+  fi
+  if [ "$fm_out" -eq 0 ]; then
+    unset GIT_CONFIG_COUNT
+  else
+    export GIT_CONFIG_COUNT=$fm_out
+  fi
+}
+
+fm_launch_git_hooks '/Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks' 0; unset fm_hooks fm_keep fm_count fm_i fm_out fm_key fm_value; unset -f fm_launch_git_hooks; (export FM_SPAWN_GEN='s1792139409.56492.24439'; export COMPACT_ADVISER_DISABLE=1; [ "${FM_COMPACT_ADVISER_HOOKS-}" != 1 ] || unset CLAUDE_CODE_ENABLE_FUNCTION_HOOKS FM_COMPACT_ADVISER_HOOKS; export FM_TASK_INBOX='/Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.inbox'; FM_ROOT_OVERRIDE= FM_STATE_OVERRIDE= FM_DATA_OVERRIDE= FM_PROJECTS_OVERRIDE= FM_CONFIG_OVERRIDE= FM_PUBLIC_FOLLOWUP_PRIMARY_HOME='/Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-root' FM_HOME='/Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2' FM_TRACE_CONTEXT=on FM_SUPERVISION_MODEL=extension PI_CODING_AGENT_DIR='/Users/charlesabrooker/.omp/agent' env -u CLAUDECODE -u PI_CODING_AGENT -u GROK_AGENT -u FM_PI_HARNESS -u GEMINI_CLI -u CURSOR_AGENT -u CURSOR_INVOKED_AS FM_OMP_HARNESS=omp OMP_SKIP_SETUP=1 /usr/bin/env --config '/Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-root/.omp/fm-session-overlay.yml' --auto-approve --cwd '/Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2' --model 'openai-codex/gpt-6.1-sol' -e '/Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.omp-ext.ts' "$('/Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-root/bin/fm-operational-input.sh' encode launch-brief < '/Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/data/charter.md')"
+)
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route/ios.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state/parent-route: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/pre-rebase: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/pre-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/pre-auto-gc: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/pre-merge-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/post-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/sendemail-validate: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/applypatch-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/prepare-commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/post-checkout: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/post-applypatch: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/post-rewrite: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/commit-msg: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/pre-push: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/post-merge: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks/pre-commit: Permission denied
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route/ios2.git-hooks: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state/parent-route: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2/state: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE/remote-home-2: Directory not empty
+rm: /Users/charlesabrooker/tmp/fm-remote-trace-context.K6aYAE: Directory not empty
+rc=1

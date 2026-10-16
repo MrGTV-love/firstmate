@@ -1,0 +1,13 @@
+diff --git a/bin/fm-remote-secondmate-control.sh b/bin/fm-remote-secondmate-control.sh
+index a66e047e..5ab5767b 100755
+--- a/bin/fm-remote-secondmate-control.sh
++++ b/bin/fm-remote-secondmate-control.sh
+@@ -261,7 +261,7 @@ cmd_relaunch() {
+   validate_id "$id"
+   validate_home "$id"
+   case "$harness" in
+-    claude|codex|opencode|pi|pi-signed|omp|grok|kimi|cursor) ;;
++    claude|codex|opencode|pi|pi-signed|grok|kimi|cursor) ;;
+     *) die "unverified remote secondmate harness: $harness" ;;
+   esac
+   case "$effort" in -|default|low|medium|high|xhigh|max|ultra) ;; *) die "invalid remote secondmate effort: $effort" ;; esac

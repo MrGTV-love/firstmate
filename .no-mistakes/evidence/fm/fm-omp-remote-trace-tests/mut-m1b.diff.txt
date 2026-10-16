@@ -1,0 +1,12 @@
+diff --git a/bin/fm-remote-secondmate-control.sh b/bin/fm-remote-secondmate-control.sh
+index a66e047e..4ab7e87d 100755
+--- a/bin/fm-remote-secondmate-control.sh
++++ b/bin/fm-remote-secondmate-control.sh
+@@ -234,6 +234,7 @@ cmd_launch() {
+   [ "$herdr_session" = "$REMOTE_HERDR_SESSION" ] \
+     || die "remote launch recorded Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'"
+   print_route "$id"
++  sed -i '' 's/^harness=.*/harness=codex/' "$meta"
+ }
+ 
+ # Restart the second-mate agent this host runs, by executing the ORDINARY local

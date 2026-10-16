@@ -1,0 +1,38 @@
+diff --git a/bin/fm-control.sh b/bin/fm-control.sh
+index 494bbe13..ac8b3046 100755
+--- a/bin/fm-control.sh
++++ b/bin/fm-control.sh
+@@ -1033,7 +1033,7 @@ busy_verdict() {
+ 
+ require_live_task_attribution() {
+   local state=${1:-} absence
+-  [ "$BACKEND" = herdr ] || return 0
++  return 0
+   [ -n "$state" ] || state=$(agent_state)
+   if [ "$state" = missing ]; then
+     absence=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T")
+diff --git a/bin/fm-remote-secondmate-control.sh b/bin/fm-remote-secondmate-control.sh
+index a66e047e..4ab7e87d 100755
+--- a/bin/fm-remote-secondmate-control.sh
++++ b/bin/fm-remote-secondmate-control.sh
+@@ -234,6 +234,7 @@ cmd_launch() {
+   [ "$herdr_session" = "$REMOTE_HERDR_SESSION" ] \
+     || die "remote launch recorded Herdr session '${herdr_session:-missing}', expected '$REMOTE_HERDR_SESSION'"
+   print_route "$id"
++  sed -i '' 's/^harness=.*/harness=codex/' "$meta"
+ }
+ 
+ # Restart the second-mate agent this host runs, by executing the ORDINARY local
+diff --git a/bin/fm-spawn.sh b/bin/fm-spawn.sh
+index 0b430545..dbcdea06 100755
+--- a/bin/fm-spawn.sh
++++ b/bin/fm-spawn.sh
+@@ -6653,7 +6653,7 @@ case "$HARNESS" in
+ pi | pi-signed) LAUNCH=${LAUNCH//__PIBIN__/"$(shell_quote "$PI_BIN")"} ;;
+ cursor) LAUNCH=${LAUNCH//__CURSORBIN__/"$(shell_quote "$CURSOR_BIN")"} ;;
+ gemini) LAUNCH=${LAUNCH//__GEMINISETTINGS__/"$(shell_quote "$STATE_REAL/$ID.gemini-settings.json")"} ;;
+-omp) LAUNCH=${LAUNCH//__OMPBIN__/"$(shell_quote "$OMP_BIN")"} ;;
++omp) LAUNCH=${LAUNCH//__OMPBIN__/"/usr/bin/env"} ;;
+ devin)
+   LAUNCH=${LAUNCH//__DEVINBIN__/"$(shell_quote "$DEVIN_BIN")"}
+   LAUNCH=${LAUNCH//__DEVINCONFIG__/"$(shell_quote "$STATE_REAL/$ID.devin-config.json")"}

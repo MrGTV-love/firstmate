@@ -1,0 +1,13 @@
+diff --git a/bin/fm-control.sh b/bin/fm-control.sh
+index 494bbe13..ac8b3046 100755
+--- a/bin/fm-control.sh
++++ b/bin/fm-control.sh
+@@ -1033,7 +1033,7 @@ busy_verdict() {
+ 
+ require_live_task_attribution() {
+   local state=${1:-} absence
+-  [ "$BACKEND" = herdr ] || return 0
++  return 0
+   [ -n "$state" ] || state=$(agent_state)
+   if [ "$state" = missing ]; then
+     absence=$(fm_control_endpoint_absence_verdict "$BACKEND" "$T")
