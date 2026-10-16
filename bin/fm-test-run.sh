@@ -927,6 +927,7 @@ tests/fm-remote-secondmate-parent-binding.test.sh 70489
 tests/fm-remote-secondmate-relaunch.test.sh 42555
 tests/fm-remote-secondmate-trace-context.test.sh 126590
 tests/fm-remote-transport-lanes.test.sh 75888
+tests/fm-review-agent-select.test.sh 14400
 tests/fm-rovo-harness.test.sh 16331
 tests/fm-rovo-signals-live-e2e.test.sh 425
 tests/fm-secondmate-harness.test.sh 202240
@@ -1702,6 +1703,7 @@ families_for_changed_path() {
       ;;
     bin/fm-dispatch-capacity*)
       printf '%s\n' "__script__:fm-dispatch-capacity.test.sh"
+      printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       printf '%s\n' "__script__:fm-omp-harness.test.sh"
@@ -1711,6 +1713,7 @@ families_for_changed_path() {
     bin/fm-quota-axi-lib.sh)
       printf '%s\n' session-bootstrap
       printf '%s\n' "__script__:fm-procevent-quota.test.sh"
+      printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
       ;;
@@ -1723,6 +1726,9 @@ families_for_changed_path() {
       ;;
     bin/fm-quota-choose.sh)
       printf '%s\n' "__script__:fm-quota-choose.test.sh"
+      ;;
+    bin/fm-review-agent-select.sh)
+      printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       ;;
     bin/fm-dispatch-resolve.sh|bin/fm-dispatch-level5.ts)
       printf '%s\n' "__script__:fm-dispatch-resolve.test.sh"
@@ -1753,6 +1759,7 @@ families_for_changed_path() {
       printf '%s\n' "__script__:fm-spawn-dispatch-profile.test.sh"
       printf '%s\n' "__script__:fm-worker-account.test.sh"
       printf '%s\n' "__script__:fm-control-relaunch.test.sh"
+      printf '%s\n' "__script__:fm-review-agent-select.test.sh"
       printf '%s\n' session-bootstrap
       ;;
     bin/fm-env-lib.sh)

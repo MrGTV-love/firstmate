@@ -58,6 +58,12 @@ export FM_TEST_SEAM=1
 # it back on against fixture catalogs.
 export FM_MODEL_FRESHNESS=0
 
+# The watcher's heartbeat launches the dry-run review-agent selector, which reads
+# live quota and omp. Suites that run a watcher against a home with dispatch rules
+# get a no-op instead; tests/fm-watch-triage.test.sh overrides it with a recorder.
+FM_REVIEW_AGENT_SELECT_BIN=$(command -v true)
+export FM_REVIEW_AGENT_SELECT_BIN
+
 # Stubbed commands are not production timing evidence. Never inherit an
 # operational home's ledger into fixtures; timing-specific cases explicitly
 # select an isolated file after sourcing this helper.
