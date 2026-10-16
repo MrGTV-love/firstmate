@@ -1901,7 +1901,9 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 - Deviation from the approved plan, with its codebase reason: the plan reads "add per-rule floors for equivalent rules", and `min_confidence` already existed per rule.
   The neutral `default` option cannot carry `min_confidence`, so a default pick at 0.51 stays under the global 0.6 however its equivalent rules are configured; pooling the support of identical outcomes is the only change that lets that split resolve without a floor on `default`.
 
-When the picked rule declares its own floor but its probability falls below it, the tool checks the other options:
+When the group holding the answer's `choice` does not clear its floor, a pooled group with more probability that clears its own floor replaces it before any runner-up is considered, and the output carries a `replaced:` line naming the answer `choice` with its probability and floor, and the pooled group that stands in.
+
+When the picked rule declares its own floor but its probability falls below it and no pooled group replaced it, the tool checks the other options:
 
 1. Find the most probable other option that clears its own floor: the rule's `min_confidence`, or 0.6 otherwise.
 2. Print a `fallback:` line naming both floors and resolve that rule as though it had been picked.
@@ -1946,7 +1948,7 @@ Every result above exits 0.
 **Result log**
 
 Every resolve that reaches a status appends one JSON line to `data/dispatch-resolve.jsonl`, so the rate of results that need firstmate's own intake can be measured as every status other than `clear`.
-A record holds a UTC timestamp `ts`, `status`, the picked option `rule`, the option whose profiles were used `selected`, the chosen `profile` (harness, model, effort) when clear, the numeric `confidence` and `floor` applied, the `pooled` probability when pooling cleared the floor, and a coarse `reason`.
+A record holds a UTC timestamp `ts`, `status`, the option Jev answered `choice`, the picked option `rule` (the `choice`, or the pooled group member that replaced it), the option whose profiles were used `selected`, the chosen `profile` (harness, model, effort) when clear, the numeric `confidence` and `floor` applied, the `pooled` probability when pooling cleared the floor, and a coarse `reason`.
 No brief text, request, API body, rule criterion, or credential is written, and a failed write never changes the result.
 Opt-out and withheld paths and exit-2 configuration errors have no status and write nothing.
 

@@ -79,6 +79,7 @@
 #   or raw API error bodies, which may echo sensitive input.
 #     routing: <Level 5 agent and model decisions, and any escalation>
 #     fallback: <runner-up rule or declared stand-in taken, and why>
+#     replaced: <the answer choice a pooled group replaced, with its probability and floor, and the group>
 #     pooled: <the options pooled with the pick, when pooling cleared its floor>
 #     reason: <why the status is not clear>
 #     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. pool=..
@@ -101,9 +102,10 @@
 #
 # Result log: every resolve that reaches a status appends one JSON line to
 #   data/dispatch-resolve.jsonl (FM_DATA_OVERRIDE moves its directory):
-#   ts (UTC), status, rule (the pick: the answer choice, or the most probable
-#   member of the pooled group that replaced it), selected (the option whose
-#   profiles were used), profile (harness/model/effort when clear),
+#   ts (UTC), status, choice (the option Jev answered), rule (the pick: that
+#   choice, or the most probable member of the pooled group that replaced it),
+#   selected (the option whose profiles were used), profile (harness/model/effort
+#   when clear),
 #   confidence, floor, pooled (the combined probability when pooling cleared
 #   the floor), and reason. The block rate is every status other than clear.
 #   Off paths and exit-2 usage or configuration errors have no status and write
@@ -166,7 +168,7 @@ log_result() {
     def text: if type == "string" and length > 0 then .[0:240] else null end;
     def profile: if type == "object" then {harness: (.harness | text), model: (.model | text), effort: (.effort | text)} else null end;
     {ts: (now | floor | todate), status: $status,
-     rule: ($r.rule | option), selected: ($r.selected | option),
+     choice: ($r.choice | option), rule: ($r.rule | option), selected: ($r.selected | option),
      profile: ($r.chosen.profile | profile),
      confidence: ($r.confidence | num), floor: ($r.floor | num),
      pooled: ($r.pooled.probability | num),
@@ -673,11 +675,15 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
   # Reported only when pooling is what let the group clear its floor: no member
   # reaches its own floor alone.
+  (if ($members | index($asked)) == null
+   then {replaced: {choice: $asked, probability: group_support($own.members), floor: group_floor($own.members),
+                    options: ([$picked] + ($members | map(select(. != $picked)))), pooled_probability: $pooled_p}}
+   else {} end) as $swap |
   (if ($fb.below | not) and $pooled_group and all($members[]; own_p(.) < confidence_floor(.))
    then {pooled: {probability: $pooled_p, floor: $picked_floor, options: ([$picked] + ($members | map(select(. != $picked))))}} else {} end) as $pool |
   {
     model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
-    rule: $picked, selected: $sel.source, floor: $picked_floor,
+    choice: $asked, rule: $picked, selected: $sel.source, floor: $picked_floor,
     dispatch_rule: (if $sel.source == null then null
       elif $sel.source == "default" then (if (($cfg.default_fallback // []) | length) > 0 then "default" else null end)
       elif ((rule_at($sel.source).fallback // []) | length) > 0 then $sel.source else null end),
@@ -687,6 +693,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
   }
   + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) probability \($fb.p) clears its floor \($fb.to_floor); \($picked) \($p_word) \($shown_p) is below its floor \($picked_floor)"} else {} end)
   + $pool
+  + $swap
   as $ev |
   if $r.route.escalate then $ev + {status: "escalate", reason: $r.route.escalate, candidates: ($answer_use | map(evaluate(.)))}
   elif $sel.invalid then $ev + {status: "error", reason: $sel.invalid}
@@ -784,6 +791,7 @@ TEXT=$(jq -r '
   "  probabilities: \([.probabilities | to_entries[] | "\(.key | flat)=\(.value | flat)"] | join(" "))",
   "  routing: \(.routing | tojson | flat)",
   (if .fallback then "  fallback: \(.fallback | flat)" else empty end),
+  (if .replaced then "  replaced: answer choice \(.replaced.choice | flat) (probability \(.replaced.probability | flat), floor \(.replaced.floor | flat)) did not clear; pooled group \([.replaced.options[] | flat] | join(" ")) (probability \(.replaced.pooled_probability | flat)) stands in" else empty end),
   (if .pooled then "  pooled: \([.pooled.options[] | flat] | join(" ")) select the same profiles, approval and floors; combined probability \(.pooled.probability | flat) clears floor \(.pooled.floor | flat)" else empty end),
   (if .reason then "  reason: \(.reason | flat)" else empty end),
   (if .note then "  note: \(.note | flat)" else empty end),
