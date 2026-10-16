@@ -80,7 +80,9 @@ Its selected row is "Exit and stop tasks", and its footer reads "Enter to confir
 A worker parked on it holds every later steering message behind it, so two supported answers exist.
 
 - **A finished task is stopped.**
-  `exit` chooses "Exit and stop tasks" only for a Claude ship or scout whose own state, read through [`bin/fm-crew-state.sh`](../bin/fm-crew-state.sh), is a terminal `done` or `failed`, and whose busy record showed no active turn before anything was sent.
+  `exit` chooses "Exit and stop tasks" only for a Claude ship or scout whose own state, read through [`bin/fm-crew-state.sh`](../bin/fm-crew-state.sh), is a terminal `done`, and whose busy record read `idle` before anything was sent.
+  An `unknown` busy record is never promoted to idle, so it refuses like a busy one.
+  A `failed` task is not finished: it is usually steered and retried, so its picker is released with `stay`.
   The composer proof is this exit's own: the picker opened after the exit proved the composer `empty` and typed `/exit`, so `/exit` is the only input it holds.
   The endpoint is read again immediately before the confirming Enter and must still classify the agent `alive`, and on Herdr it must still pass the [live task-attribution guard](#live-herdr-task-attribution); an ambiguous, unreadable, or missing read refuses with the picker left as it was.
   The screen is read again immediately before the confirming Enter, and the postcondition is the ordinary agent-gone proof.
@@ -92,7 +94,7 @@ A worker parked on it holds every later steering message behind it, so two suppo
   Closing the picker with `stay`, or with the stay key `exit` sends to a picker that was already open, cancels that exit, so the close removes the marker when it names the task's current busy generation and leaves a marker from any other generation alone.
   A cancelled exit therefore never suppresses the session-end auto-relaunch of an agent that keeps running.
 
-Every other case keeps the refusal and names how to close the picker: a task whose state is not done or failed, a state that cannot be read, a busy record showing a turn, a secondmate, any other harness, and `relaunch`'s own stop.
+Every other case keeps the refusal and names how to close the picker: a task whose state is not done, a state that cannot be read, a busy record that does not read idle (busy or unknown), a secondmate, any other harness, and `relaunch`'s own stop.
 The state read happens only while the picker is showing, is bounded by `FM_CONTROL_CREW_STATE_WAIT`, and skips the forge read.
 `stay` sends nothing on any screen that is not exactly the recognised picker, on any harness other than Claude, or to a stopped agent.
 It never sends Ctrl+C or Ctrl+D, which the picker is configured to treat as an exit request.

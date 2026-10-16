@@ -105,7 +105,7 @@
 #              running") opens when /exit meets a running background shell.
 #              exit answers it with "Exit and stop tasks" only for a claude
 #              ship or scout whose own state (fm-crew-state.sh) is a terminal
-#              done or failed, whose busy record showed no active turn before
+#              done, whose busy record read idle before
 #              anything was sent, and whose composer this same exit proved
 #              empty before typing /exit; the endpoint must still read alive
 #              (and, on Herdr, attributed to the task) when the key is sent,
@@ -1157,8 +1157,9 @@ dismiss_exit_picker() {
 # exit_picker_answerable <dialog-name> <pre-exit-busy-verdict>: 0 only when
 # exit may answer this dialog. It must be the recognised picker, on an exit
 # (relaunch answers nothing), for a claude ship or scout whose OWN state is a
-# terminal done or failed, with no active turn in its busy record as read
-# before this exit sent anything. The busy verdict is passed in rather than
+# terminal done, with a busy record that read idle before this exit sent
+# anything. Any other verdict, unknown included, refuses: unknown is never
+# promoted to idle. The busy verdict is passed in rather than
 # re-read, so a hook that records the /exit line itself as a turn cannot make a
 # finished task read as active. Sets EXIT_PICKER_WHY to the reason when it
 # returns 1.
@@ -1190,19 +1191,20 @@ exit_picker_answerable() {
   state=${line#state: }
   state=${state%% *}
   case "$line" in
-    'state: done '*|'state: failed '*) ;;
+    'state: done '*) ;;
     *)
       if [ "$rc" -ne 0 ] || [ -z "$line" ]; then
         EXIT_PICKER_WHY="its current state could not be read"
       else
-        EXIT_PICKER_WHY="its current state is $state, not done or failed"
+        EXIT_PICKER_WHY="its current state is $state, not done"
       fi
       return 1
       ;;
   esac
   case "$busy" in
-    busy*)
-      EXIT_PICKER_WHY="its busy record shows an active turn"
+    idle|idle\ *) ;;
+    *)
+      EXIT_PICKER_WHY="its busy record reads '$busy', not idle"
       return 1
       ;;
   esac
