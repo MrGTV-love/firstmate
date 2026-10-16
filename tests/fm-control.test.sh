@@ -1431,6 +1431,59 @@ test_stay_takes_no_options() {
   pass "fm-control stay: relaunch options are refused"
 }
 
+# arm_busy_gen <case-dir>: arm an idle busy generation for t1 and echo it, so
+# the exit marker has a real incarnation to bind to without a turn to interrupt.
+arm_busy_gen() {
+  local dir=$1 gen
+  gen=$("$ROOT/bin/fm-busy-event.sh" arm "$dir/home/state" t1 --state idle --source fm-spawn --event seed)
+  printf 'busy_gen=%s\n' "$gen" >> "$dir/home/state/t1.meta"
+  printf '%s\n' "$gen"
+}
+
+test_stay_cancels_the_exit_a_refused_exit_left_behind() {
+  local dir out rc gen
+  dir=$(picker_case stay-marker -)
+  gen=$(arm_busy_gen "$dir")
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "a live task's picker must refuse the exit"$'\n'"$out"
+  [ "$(cat "$dir/home/state/t1.control-exit")" = "gen=$gen" ] \
+    || fail "the refused exit should keep its deliberate-exit marker while the picker waits for a person"
+  out=$(run_control "$dir" t1 stay); rc=$?
+  expect_code 0 "$rc" "stay should close the picker the refused exit left open"$'\n'"$out"
+  [ "$(cat "$dir/fake/command")" = claude ] || fail "the agent must still be running"
+  [ ! -e "$dir/home/state/t1.control-exit" ] \
+    || fail "stay left the cancelled exit's deliberate-exit marker: $(cat "$dir/home/state/t1.control-exit")"
+  pass "fm-control stay: closing the picker a refused exit opened removes that exit's deliberate-exit marker"
+}
+
+test_stay_leaves_a_marker_from_another_generation() {
+  local dir out rc
+  dir=$(picker_case stay-other-gen -)
+  arm_busy_gen "$dir" >/dev/null
+  printf 'open' > "$dir/fake/picker"
+  printf 'gen=an-earlier-incarnation\n' > "$dir/home/state/t1.control-exit"
+  out=$(run_control "$dir" t1 stay); rc=$?
+  expect_code 0 "$rc" "stay on the recognised picker should succeed"$'\n'"$out"
+  [ "$(cat "$dir/home/state/t1.control-exit")" = 'gen=an-earlier-incarnation' ] \
+    || fail "stay must not clear a marker that names another busy generation"
+  pass "fm-control stay: a deliberate-exit marker from another generation is left alone"
+}
+
+test_exit_that_closes_an_open_picker_cancels_the_earlier_exit() {
+  local dir out rc gen
+  dir=$(picker_case open-marker 'state: done · source: run-step · run: r1')
+  gen=$(arm_busy_gen "$dir")
+  printf 'open' > "$dir/fake/picker"
+  printf 'gen=%s\n' "$gen" > "$dir/home/state/t1.control-exit"
+  printf '%s\n' '╭────────────────────╮' '│ half-typed note    │' '╰────────────────────╯' > "$dir/fake/pane"
+  out=$(FM_FAKE_NEVER_DIES=1 run_control "$dir" t1 exit); rc=$?
+  expect_code 1 "$rc" "text the picker was hiding must refuse the exit"$'\n'"$out"
+  [ "$(cat "$dir/fake/keys")" = Escape ] || fail "only Stay may be sent, got: $(tr '\n' ' ' < "$dir/fake/keys")"
+  [ ! -e "$dir/home/state/t1.control-exit" ] \
+    || fail "closing the open picker left the earlier exit's marker: $(cat "$dir/home/state/t1.control-exit")"
+  pass "fm-control exit: closing an already-open picker clears the marker of the exit it cancels"
+}
+
 test_idle_agent_is_not_interrupted() {
   local dir out rc gen
   dir=$(new_case idle)
@@ -1741,6 +1794,9 @@ test_stay_reports_a_picker_that_did_not_close
 test_stay_refuses_an_adapter_with_no_recognised_picker
 test_stay_refuses_when_no_agent_runs
 test_stay_takes_no_options
+test_stay_cancels_the_exit_a_refused_exit_left_behind
+test_stay_leaves_a_marker_from_another_generation
+test_exit_that_closes_an_open_picker_cancels_the_earlier_exit
 test_interrupt_without_acknowledgement_preserves_busy_state
 test_muse_interrupt_confirms_adapter_acknowledgement
 test_interrupt_revalidates_agent_after_acknowledgement_wait

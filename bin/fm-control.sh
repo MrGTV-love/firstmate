@@ -62,6 +62,7 @@
 # The exit verb writes state/<id>.control-exit, bound to the current busy generation, before it types the exit command.
 # A completed exit retires the busy record, so the session-end tick already skips it; the marker covers an exit whose command was delivered but whose agent did not stop within the exit wait.
 # bin/fm-session-end-relaunch-lib.sh owns how that marker is read.
+# Closing the background-task exit picker with Stay cancels the exit that opened it, so that close removes the marker when it names the current busy generation.
 #
 # Why this exists, and how it differs from fm-send.sh. bin/fm-send.sh is the
 # DATA plane: conversational text for the agent to read, always routing-marked
@@ -1105,10 +1106,34 @@ wait_exit_picker_closed() {  # <timeout>
   done
 }
 
+# control_exit_gen: the busy generation state/<id>.control-exit binds to, or -
+# when none is armed. The marker writer and the marker clearer share it, so
+# both name the same incarnation.
+control_exit_gen() {
+  local gen
+  gen=$(cat "$(fm_busy_gen_path "$STATE" "$ID")" 2>/dev/null || true)
+  printf '%s' "${gen:--}"
+}
+
+# clear_cancelled_exit_marker: the exit picker was closed with Stay, so the exit
+# whose /exit opened it is cancelled and its deliberate-exit marker is stale. It
+# is removed only when it names the current busy generation: a marker from
+# another incarnation is not this exit's to clear.
+clear_cancelled_exit_marker() {
+  local marker=$STATE/$ID.control-exit marker_gen
+  [ -f "$marker" ] && [ ! -L "$marker" ] || return 0
+  marker_gen=$(sed -n 's/^gen=//p' "$marker" | head -1)
+  [ "$marker_gen" = "$(control_exit_gen)" ] || return 0
+  rm -f -- "$marker" \
+    || die "task $ID's exit picker was closed, but its deliberate-exit marker $marker could not be removed"
+}
+
 # dismiss_exit_picker: choose Stay on the recognised picker with one key, then
 # prove the picker closed and the agent is still alive. Sends nothing, and dies,
 # unless the recognised picker is the visible screen: the same key could answer
 # another dialog, and any answer to an unrecognised one can write a decline.
+# Closing the picker cancels the exit that opened it, so a deliberate-exit
+# marker that exit left behind is cleared here for every caller.
 dismiss_exit_picker() {
   local key
   key=$(fm_control_exit_picker_stay_key "$HARNESS") || key=
@@ -1124,6 +1149,7 @@ dismiss_exit_picker() {
     || die "task $ID still shows the exit picker after one $key; nothing else was sent"
   [ "$(agent_state)" = alive ] \
     || die "task $ID's agent is not alive after the exit picker closed; closing it must not stop the agent, so inspect the endpoint before any other action"
+  clear_cancelled_exit_marker
 }
 
 # exit_picker_answerable <dialog-name> <pre-exit-busy-verdict>: 0 only when
@@ -1568,11 +1594,7 @@ do_exit() {
   # transaction dies before that retire. Relaunch calls this function too and
   # must not mark its own replacement stop as a deliberate exit.
   if [ "$VERB" = exit ]; then
-    local gen_file gen
-    gen_file=$(fm_busy_gen_path "$STATE" "$ID")
-    gen=$(cat "$gen_file" 2>/dev/null || true)
-    [ -n "$gen" ] || gen=-
-    printf 'gen=%s\n' "$gen" > "$STATE/$ID.control-exit" \
+    printf 'gen=%s\n' "$(control_exit_gen)" > "$STATE/$ID.control-exit" \
       || die "could not record that this exit of $ID was deliberate; nothing was typed"
   fi
   verdict=$(fm_backend_send_text_submit "$BACKEND" "$T" "$cmd" "$EXIT_RETRIES" "$POLL" 1.2 "$LABEL") \

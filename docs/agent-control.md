@@ -87,6 +87,9 @@ A worker parked on it holds every later steering message behind it, so two suppo
 - **A live task is released with `stay`.**
   `fm-control <task> stay` sends one Escape, only while the recognised picker is the visible screen, and then requires a readable viewport that no longer shows it and an endpoint that still classifies the agent alive.
   Escape is the picker's own cancel key and is bound to the same handler as its Stay row, so the agent keeps running and its composer is usable again.
+  A refused `exit` leaves the `state/<id>.control-exit` marker it wrote before typing `/exit`, so a person who answers the picker by hand still ends the session as deliberate.
+  Closing the picker with `stay`, or with the stay key `exit` sends to a picker that was already open, cancels that exit, so the close removes the marker when it names the task's current busy generation and leaves a marker from any other generation alone.
+  A cancelled exit therefore never suppresses the session-end auto-relaunch of an agent that keeps running.
 
 Every other case keeps the refusal and names how to close the picker: a task whose state is not done or failed, a state that cannot be read, a busy record showing a turn, a secondmate, any other harness, and `relaunch`'s own stop.
 The state read happens only while the picker is showing, is bounded by `FM_CONTROL_CREW_STATE_WAIT`, and skips the forge read.
