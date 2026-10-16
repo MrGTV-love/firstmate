@@ -104,9 +104,23 @@ exit 0
 SH
   cat > "$fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
+if [ "${1:-}" = lease ] && [ "${2:-}" = --help ]; then
+  # Capability query only: an installed Treehouse that predates the lease
+  # command rejects it as an unknown command.
+  if [ -n "${FM_FAKE_NO_LEASE:-}" ]; then
+    echo 'Error: unknown command "lease" for "treehouse"' >&2
+    exit 1
+  fi
+  printf 'Usage:\n  treehouse lease <name> [flags]\n\nFlags:\n      --lease-holder string   Optional label recorded as the lease holder\n'
+  exit 0
+fi
 printf 'treehouse %s\n' "$*" >> "$FM_FAKE_CALL_LOG"
 case "${1:-}" in
   lease)
+    if [ -n "${FM_FAKE_NO_LEASE:-}" ]; then
+      echo 'Error: unknown command "lease" for "treehouse"' >&2
+      exit 1
+    fi
     # The installed CLI resolves the pool from the working directory's
     # repository; model that through the repository's registered worktrees.
     [ "$#" -eq 4 ] && [ "$3" = --lease-holder ] && [ -n "$4" ] || exit 2
@@ -1456,6 +1470,65 @@ test_forced_child_return_waits_for_project_custody() {
   pass 'a forced child return queues for project custody after closure and returns the reserved slot'
 }
 
+# Whether forced cleanup may narrow project custody follows the installed
+# Treehouse: one with the lease command reserves each child's slot and runs
+# the child's slow Docker cleanup outside the lock, while one that predates it
+# cannot reserve anything, so every descendant lock stays held through that
+# cleanup and the return, exactly as for a slot whose state cannot be proved.
+test_forced_child_cleanup_follows_the_installed_treehouse_lease_support() {
+  local shape case_dir home slot child_home lock rc no_lease want_custody calls
+  for shape in capable leaseless; do
+    make_child_return_case "child-lease-support-$shape"
+    case_dir=$CHILD_CASE
+    home="$case_dir/home"
+    slot="$case_dir/pool/1/project"
+    child_home="$case_dir/retired-home"
+    lock=$(FM_HOME="$home" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' \
+      _ "$ROOT" "$case_dir/project")
+    cat > "$case_dir/fakebin/docker" <<'SH'
+#!/usr/bin/env bash
+if mkdir "$FM_SLOW_CASE/delay-owned" 2>/dev/null; then
+  if FM_HOME="$FM_SLOW_HOME" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_lock_try_acquire "$2" || exit 1; fm_lock_release "$2"' \
+      _ "$FM_SLOW_ROOT" "$FM_SLOW_LOCK"; then
+    printf 'free\n' > "$FM_SLOW_CASE/lock-at-docker"
+  else
+    printf 'held\n' > "$FM_SLOW_CASE/lock-at-docker"
+  fi
+fi
+exec docker-fixture "$@"
+SH
+    chmod +x "$case_dir/fakebin/docker"
+    no_lease=
+    want_custody=free
+    if [ "$shape" = leaseless ]; then
+      no_lease=1
+      want_custody=held
+    fi
+    rc=0
+    FM_SLOW_CASE="$case_dir" FM_SLOW_HOME="$home" FM_SLOW_ROOT="$ROOT" FM_SLOW_LOCK="$lock" \
+      FM_FAKE_NO_LEASE="$no_lease" \
+      FM_ROOT_OVERRIDE='' FM_HOME="$home" FM_STATE_OVERRIDE='' FM_DATA_OVERRIDE='' FM_CONFIG_OVERRIDE='' \
+      FM_FAKE_CALL_LOG="$case_dir/calls.log" PATH="$case_dir/fakebin:$PATH" \
+      "$TEARDOWN" retire --force --drop-file "$(fm_test_drop_file)" > "$case_dir/retire.out" 2>&1 || rc=$?
+    expect_code 0 "$rc" "$shape: forced cleanup must finish: $(cat "$case_dir/retire.out")"
+    assert_equals "$want_custody" "$(cat "$case_dir/lock-at-docker" 2>/dev/null)" \
+      "$shape: the project lock was in the wrong state during the child's Docker cleanup"
+    calls=$(cat "$case_dir/calls.log")
+    assert_contains "$calls" 'treehouse return' "$shape: the child slot was never returned"
+    if [ "$shape" = leaseless ]; then
+      assert_not_contains "$calls" 'treehouse lease 1 ' "$shape: cleanup tried a lease command the installed Treehouse lacks"
+    else
+      assert_contains "$calls" 'treehouse lease 1 --lease-holder child' "$shape: the child slot was never reserved"
+    fi
+    assert_absent "$child_home" "$shape: forced teardown kept the child home"
+    assert_absent "$home/state/retire.meta" "$shape: forced teardown kept the parent record"
+    jq -e '.worktrees[0].leased == false' "$case_dir/pool/treehouse-state.json" >/dev/null \
+      || fail "$shape: the child return left its slot leased"
+    [ ! -e "$lock" ] || fail "$shape: forced teardown left the project lock held"
+  done
+  pass 'forced child cleanup keeps project custody only when the installed Treehouse cannot reserve the slot'
+}
+
 # A child return the provider refuses leaves the slot this teardown durably
 # leased in place, with the child's record and the parent's pending-return
 # record, so a retry can return it. Raw removal would strand the lease for a
@@ -1884,6 +1957,7 @@ test_unreadable_holders_refuse_admission
 test_concurrent_spawns_cannot_both_take_the_last_place
 test_spawn_progresses_during_non_pool_teardown_phases
 test_forced_child_return_waits_for_project_custody
+test_forced_child_cleanup_follows_the_installed_treehouse_lease_support
 test_forced_child_return_failure_keeps_a_reserved_slot_for_the_retry
 test_forced_child_return_failure_without_a_reservation_falls_back_to_removal
 test_forced_mixed_children_keep_only_the_leased_slot_on_a_refused_return

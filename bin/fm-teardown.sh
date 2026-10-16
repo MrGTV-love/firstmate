@@ -211,10 +211,11 @@
 # delivery as the reassigned-slot cleanup above does, before its next
 # destructive step, refusing with its records in place when that proof fails.
 # A slot whose state is neither held nor unleased (recovered, conflicting,
-# unreadable, or needing jq), or an unleased slot with no treehouse installed
-# to lease it, cannot be reserved; teardown logs that state and keeps project
-# custody from the reservation point through the return with treehouse return
-# --force, as before the narrowing.
+# unreadable, or needing jq), or an unleased slot whose installed treehouse is
+# missing or has no lease command (probed once with treehouse lease --help),
+# cannot be reserved; teardown logs that state and keeps project custody from
+# the reservation point through the return with treehouse return --force, as
+# before the narrowing.
 # Pipeline conclusion, process reaping, endpoint closure, status retirement,
 # backlog completion and clone sync otherwise run outside project custody.
 # Successful landing proofs bind to immutable commits; final dirty/HEAD checks
@@ -744,6 +745,22 @@ teardown_release_project_lock() {
   TREEHOUSE_PROJECT_LOCK_HELD=0
 }
 
+# Whether the installed treehouse has the state-only lease command, probed
+# once: an older Treehouse reports an unknown command and a missing one
+# reports nothing, and neither can reserve a slot.
+TEARDOWN_TREEHOUSE_LEASE_SUPPORT=
+teardown_treehouse_supports_lease() {
+  local help
+  if [ -z "$TEARDOWN_TREEHOUSE_LEASE_SUPPORT" ]; then
+    TEARDOWN_TREEHOUSE_LEASE_SUPPORT=0
+    if help=$(treehouse lease --help 2>&1) \
+        && grep -Eq '(^|[^[:alnum:]_-])--lease-holder([^[:alnum:]_-]|$)' <<<"$help"; then
+      TEARDOWN_TREEHOUSE_LEASE_SUPPORT=1
+    fi
+  fi
+  [ "$TEARDOWN_TREEHOUSE_LEASE_SUPPORT" = 1 ]
+}
+
 # A process lease lapses when the worker exits. Reserve only this slot before
 # releasing project custody, so unrelated allocation can proceed during the
 # slow process and status phases without ever resetting this copy.
@@ -767,8 +784,8 @@ teardown_reserve_pool_slot() {  # <slot> [project] [task-id]
     TEARDOWN_SLOT_CUSTODY=project
     return 0
   fi
-  if ! command -v treehouse >/dev/null 2>&1; then
-    echo "warning: pool slot $slot is unleased and treehouse is not installed to reserve it; keeping project custody through its return instead" >&2
+  if ! teardown_treehouse_supports_lease; then
+    echo "warning: pool slot $slot is unleased and the installed treehouse is missing or has no lease command to reserve it; keeping project custody through its return instead" >&2
     TEARDOWN_SLOT_CUSTODY=project
     return 0
   fi

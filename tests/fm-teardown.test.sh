@@ -10613,8 +10613,19 @@ test_unverified_pool_reservation_preserves_processes() {
   case_dir=$NESTED_CASE
   printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$NESTED_SLOT" \
     > "$case_dir/pool/treehouse-state.json"
-  # The existing fixture provider acknowledges lease but never changes state.
-  # A successful command is not evidence that this slot became nonallocatable.
+  # This provider has the lease command and acknowledges it but never changes
+  # state. A successful command is not evidence that this slot became
+  # nonallocatable.
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
+  printf 'Usage:\n  treehouse lease <name> [flags]\n\nFlags:\n      --lease-holder string   Optional label recorded as the lease holder\n'
+  exit 0
+fi
+printf '%s\n' "\$*" >> "$case_dir/treehouse.log"
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
   teardown_fixture_start "$NESTED_COPY" KILL sleep 300
   pid=$TEARDOWN_FIXTURE_PID
   FM_HOME="$case_dir/home" run_teardown "$case_dir" --force --drop-file "$(fm_test_drop_file)" \
@@ -10748,9 +10759,23 @@ make_lease_modeling_pool_case() {  # <name> <state-json-or-empty> [kind]
   printf 'manual\n' > "$case_dir/config/backlog-backend"
   cat > "$case_dir/fakebin/treehouse" <<'SH'
 #!/usr/bin/env bash
+if [ "${1:-}" = lease ] && [ "${2:-}" = --help ]; then
+  # Capability query only: an installed Treehouse that predates the lease
+  # command rejects it as an unknown command.
+  if [ -n "${FM_POOL_NO_LEASE:-}" ]; then
+    echo 'Error: unknown command "lease" for "treehouse"' >&2
+    exit 1
+  fi
+  printf 'Usage:\n  treehouse lease <name> [flags]\n\nFlags:\n      --lease-holder string   Optional label recorded as the lease holder\n'
+  exit 0
+fi
 printf '%s\n' "$*" >> "$FM_POOL_CASE/treehouse.log"
 case "${1:-}" in
   lease)
+    if [ -n "${FM_POOL_NO_LEASE:-}" ]; then
+      echo 'Error: unknown command "lease" for "treehouse"' >&2
+      exit 1
+    fi
     [ "$#" -eq 4 ] && [ "$3" = --lease-holder ] || exit 2
     state=
     while IFS= read -r line; do
@@ -10861,6 +10886,67 @@ SH
     [ ! -e "$POOL_LOCK" ] || fail "$shape: teardown left the project lock held"
   done
   pass 'recovered, conflicting and unreadable slot states fall back to whole-cleanup project custody and return the slot'
+}
+
+# Whether teardown may narrow project custody follows the installed Treehouse:
+# one with the lease command reserves the unleased slot and closes the endpoint
+# outside the lock, while one that predates it cannot reserve anything, so the
+# endpoint closes and the slot is returned under whole-cleanup project custody
+# with no lease attempted, and the cleanup still finishes instead of refusing.
+test_teardown_follows_the_installed_treehouse_lease_support() {
+  local shape case_dir slot rc returns leases no_lease want_custody
+  for shape in capable leaseless; do
+    make_lease_modeling_pool_case "pool-lease-support-$shape" ''
+    case_dir=$POOL_CASE
+    slot=$POOL_SLOT
+    cat > "$case_dir/fakebin/tmux" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  list-windows)
+    [ -f "$FM_POOL_CASE/closed" ] || printf '%s\n' fm-task-x1
+    ;;
+  kill-window)
+    if FM_STATE_OVERRIDE="$FM_POOL_CASE/state" bash -c '. "$1/bin/fm-wake-lib.sh"; fm_lock_try_acquire "$2" || exit 1; fm_lock_release "$2"' \
+        _ "$FM_POOL_ROOT" "$FM_POOL_LOCK" 2>/dev/null; then
+      printf 'free\n' > "$FM_POOL_CASE/lock-at-close"
+    else
+      printf 'held\n' > "$FM_POOL_CASE/lock-at-close"
+    fi
+    : > "$FM_POOL_CASE/closed"
+    ;;
+esac
+exit 0
+SH
+    chmod +x "$case_dir/fakebin/tmux"
+    no_lease=
+    want_custody=free
+    if [ "$shape" = leaseless ]; then
+      no_lease=1
+      want_custody=held
+    fi
+    rc=0
+    FM_HOME="$case_dir/primary-home" FM_POOL_CASE="$case_dir" FM_POOL_ROOT="$ROOT" FM_POOL_LOCK="$POOL_LOCK" \
+      FM_POOL_NO_LEASE="$no_lease" \
+      run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || rc=$?
+    expect_code 0 "$rc" "$shape: teardown must finish: $(cat "$case_dir/stderr")"
+    assert_equals "$want_custody" "$(cat "$case_dir/lock-at-close" 2>/dev/null)" \
+      "$shape: the project lock was in the wrong state while the endpoint closed"
+    assert_absent "$case_dir/state/task-x1.meta" "$shape: teardown kept the task record"
+    assert_absent "${slot%/*}/.fm-slot-owner" "$shape: teardown kept the slot claim"
+    returns=$(grep -c "^return --force $slot\$" "$case_dir/treehouse.log" || true)
+    assert_equals 1 "$returns" "$shape: the slot must be returned exactly once"
+    leases=$(grep -c '^lease ' "$case_dir/treehouse.log" || true)
+    if [ "$shape" = leaseless ]; then
+      assert_equals 0 "$leases" "$shape: teardown tried a lease command the installed Treehouse lacks"
+      assert_grep 'no lease command' "$case_dir/stderr" "$shape: teardown did not say why it kept project custody"
+    else
+      assert_equals 1 "$leases" "$shape: the slot must be reserved exactly once"
+      assert_equals 1 "$(grep -c '^lease 1 --lease-holder task-x1$' "$case_dir/treehouse.log" || true)" \
+        "$shape: the slot was reserved for the wrong holder"
+    fi
+    [ ! -e "$POOL_LOCK" ] || fail "$shape: teardown left the project lock held"
+  done
+  pass 'an unleased pool slot is reserved only when the installed Treehouse has a lease command, else project custody covers the return'
 }
 
 # A finished, idle scout in a pool slot that the idle reaper selects, with an
@@ -11591,6 +11677,7 @@ test_waited_return_lock_error_is_not_reported_as_contention
 test_idle_reap_retries_a_closed_task_whose_return_stalled
 test_refusal_before_cleanup_takes_no_pool_reservation
 test_unprovable_pool_state_keeps_project_custody_through_return
+test_teardown_follows_the_installed_treehouse_lease_support
 test_idle_reap_return_waits_for_project_custody_after_closure
 test_pool_return_rechecks_work_after_waiting_for_project_custody
 test_unverified_pool_reservation_preserves_processes
