@@ -4,6 +4,7 @@
 #
 # Usage: fm-control.sh <task-id> interrupt
 #        fm-control.sh <task-id> exit
+#        fm-control.sh <task-id> stay
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
 #                                            (--note <text> | --note-file <path>)
@@ -99,6 +100,25 @@
 #              A surviving agent takes the ordinary interrupt-then-exit path.
 #              fm_control_endpoint_absence_verdict owns the backend evidence,
 #              including the tmux proof scoped to the recorded session and worktree.
+#              Claude's background-task exit picker ("Background work is
+#              running") opens when /exit meets a running background shell.
+#              exit answers it with "Exit and stop tasks" only for a claude
+#              ship or scout whose own state (fm-crew-state.sh) is a terminal
+#              done or failed, whose busy record showed no active turn before
+#              anything was sent, and whose composer this same exit proved
+#              empty before typing /exit; the postcondition is the ordinary
+#              agent-gone proof. A picker already open when exit begins is
+#              closed with the stay key first, then the composer is read again,
+#              so pending text still refuses. Every other case, including
+#              relaunch's own stop, refuses naming the dialog and sends no key.
+#              An unrecognised dialog is never answered: any answer to one can
+#              write a permanent decline.
+#   stay       Close Claude's background-task exit picker for a live task and
+#              leave the agent running: one Escape, sent only while the
+#              recognised picker is the visible screen. Postcondition: a
+#              readable viewport no longer shows the picker and the endpoint
+#              still classifies the agent alive. Refuses, sending nothing, on
+#              any other screen or harness.
 #   relaunch   Transactionally replace the running agent with a new one, in the
 #              SAME worktree - and the same endpoint whenever that endpoint
 #              still exists - on the same or a newly chosen
@@ -177,6 +197,8 @@
 #     classified state acts.
 #   - A composer that visibly holds pending text refuses before an exit command
 #     is typed, so existing text is preserved instead of being concatenated.
+#   - `exit` answers no dialog except the recognised exit picker above, and only
+#     under that proof; `relaunch` answers none.
 #
 # Environment knobs (all bounded waits, seconds):
 #   FM_CONTROL_POLL              poll interval for postcondition waits (0.5)
@@ -186,6 +208,10 @@
 #   FM_CONTROL_EXIT_WAIT         alive->dead wait after the exit command (30)
 #   FM_CONTROL_LAUNCH_WAIT       dead->alive wait after a relaunch (90)
 #   FM_CONTROL_EXIT_RETRIES      Enter retries for the exit command (3)
+#   FM_CONTROL_CREW_STATE_WAIT   bound on the finished-task state read exit makes
+#                                only when the exit picker is showing (20)
+#   FM_CREW_STATE_BIN            the state reader for that read (bin/fm-crew-state.sh);
+#                                tests stub it, as bin/fm-classify-lib.sh does
 set -eu
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -255,6 +281,8 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 . "$SCRIPT_DIR/fm-exclude-tools-lib.sh"
 # shellcheck source=bin/fm-dispatch-capacity-lib.sh
 . "$SCRIPT_DIR/fm-dispatch-capacity-lib.sh"
+# shellcheck source=bin/fm-timeout-lib.sh
+. "$SCRIPT_DIR/fm-timeout-lib.sh"
 
 POLL=${FM_CONTROL_POLL:-0.5}
 SETTLE_WAIT=${FM_CONTROL_SETTLE_WAIT:-5}
@@ -262,6 +290,8 @@ ARM_WAIT=${FM_CONTROL_ARM_WAIT:-1.5}
 EXIT_WAIT=${FM_CONTROL_EXIT_WAIT:-30}
 LAUNCH_WAIT=${FM_CONTROL_LAUNCH_WAIT:-90}
 EXIT_RETRIES=${FM_CONTROL_EXIT_RETRIES:-3}
+CREW_STATE_WAIT=${FM_CONTROL_CREW_STATE_WAIT:-20}
+CREW_STATE_BIN=${FM_CREW_STATE_BIN:-$SCRIPT_DIR/fm-crew-state.sh}
 
 die() {  # <message>
   echo "error: $1" >&2
@@ -975,6 +1005,9 @@ fm_control_harness_supported "$HARNESS" \
   || die "task $ID records harness '${RECORDED_HARNESS:-none}', which has no verified control mechanics; fm-control refuses to guess an interrupt key or exit command"
 
 fm_backend_validate "$BACKEND" || exit 1
+# The adapter brings in the composer library whose dialog recogniser the picker
+# answers read in this shell; a command substitution would drop it.
+fm_backend_source "$BACKEND" || die "could not load the $BACKEND backend adapter"
 
 if [ "$BACKEND" = herdr ]; then
   # shellcheck source=bin/fm-launch-proof-lib.sh
@@ -1039,10 +1072,162 @@ require_state_verified_backend() {  # <verb>
 }
 
 # refuse_blocking_prompt: the screen is a dialog a confirming Enter would
-# answer. Name it and stop. Do not type Escape or an option: both dismiss
-# or choose.
-refuse_blocking_prompt() {  # <dialog-name>
-  die "task $ID is blocked on a prompt: $1. Refusing to type Enter into it."
+# answer. Name it and stop, typing nothing: every key either dismisses or
+# chooses. The only answers are exit_picker_answerable's, under its own proof.
+refuse_blocking_prompt() {  # <dialog-name> [why-it-was-left]
+  die "task $ID is blocked on a prompt: $1. Refusing to type Enter into it.${2:+ $2}"
+}
+
+# exit_picker_visible: the visible viewport is, right now, exactly the
+# recognised Claude background-task exit picker. An unreadable viewport is a
+# no, so no key is ever sent on a screen that was not read.
+exit_picker_visible() {
+  local screen name
+  screen=$(fm_backend_visible_capture "$BACKEND" "$T" "$LABEL" 2>/dev/null) || return 1
+  name=$(fm_composer_blocking_dialog "$screen") || return 1
+  [ "$name" = "$FM_COMPOSER_DIALOG_CLAUDE_EXIT_PICKER" ]
+}
+
+# wait_exit_picker_closed <timeout>: poll until a READABLE, nonempty viewport no
+# longer shows the picker. An unreadable or blank read is not proof it closed.
+wait_exit_picker_closed() {  # <timeout>
+  local elapsed=0 step screen name
+  step=$(awk -v p="$POLL" 'BEGIN{printf "%s", (p < 0.1 ? p : 0.1)}')
+  while :; do
+    if screen=$(fm_backend_visible_capture "$BACKEND" "$T" "$LABEL" 2>/dev/null) \
+       && [ -n "$screen" ]; then
+      name=$(fm_composer_blocking_dialog "$screen") || name=
+      [ "$name" = "$FM_COMPOSER_DIALOG_CLAUDE_EXIT_PICKER" ] || return 0
+    fi
+    awk -v e="$elapsed" -v t="$1" 'BEGIN{exit !(e < t)}' || return 1
+    sleep "$step"
+    elapsed=$(awk -v e="$elapsed" -v p="$step" 'BEGIN{printf "%.3f", e + p}')
+  done
+}
+
+# dismiss_exit_picker: choose Stay on the recognised picker with one key, then
+# prove the picker closed and the agent is still alive. Sends nothing, and dies,
+# unless the recognised picker is the visible screen: the same key could answer
+# another dialog, and any answer to an unrecognised one can write a decline.
+dismiss_exit_picker() {
+  local key
+  key=$(fm_control_exit_picker_stay_key "$HARNESS") || key=
+  [ -n "$key" ] \
+    || die "task $ID runs $HARNESS, which has no recognised exit picker; nothing was sent"
+  fm_control_backend_supports_key "$BACKEND" "$key" \
+    || die "task $ID's $BACKEND backend cannot deliver $key; nothing was sent"
+  exit_picker_visible \
+    || die "task $ID does not show the recognised Claude background-task exit picker; nothing was sent, because the same key could answer a different dialog"
+  fm_backend_send_key "$BACKEND" "$T" "$key" "$LABEL" \
+    || die "the $key that closes the exit picker was not delivered to task $ID"
+  wait_exit_picker_closed "$SETTLE_WAIT" \
+    || die "task $ID still shows the exit picker after one $key; nothing else was sent"
+  [ "$(agent_state)" = alive ] \
+    || die "task $ID's agent is not alive after the exit picker closed; closing it must not stop the agent, so inspect the endpoint before any other action"
+}
+
+# exit_picker_answerable <dialog-name> <pre-exit-busy-verdict>: 0 only when
+# exit may answer this dialog. It must be the recognised picker, on an exit
+# (relaunch answers nothing), for a claude ship or scout whose OWN state is a
+# terminal done or failed, with no active turn in its busy record as read
+# before this exit sent anything. The busy verdict is passed in rather than
+# re-read, so a hook that records the /exit line itself as a turn cannot make a
+# finished task read as active. Sets EXIT_PICKER_WHY to the reason when it
+# returns 1.
+EXIT_PICKER_WHY=
+exit_picker_answerable() {
+  local dialog=$1 busy=$2 line rc=0 state
+  EXIT_PICKER_WHY=
+  if [ "$dialog" != "$FM_COMPOSER_DIALOG_CLAUDE_EXIT_PICKER" ]; then
+    EXIT_PICKER_WHY="it is not a dialog exit knows how to answer"
+    return 1
+  fi
+  if [ "$VERB" != exit ]; then
+    EXIT_PICKER_WHY="$VERB never answers it"
+    return 1
+  fi
+  if [ -z "$(fm_control_exit_picker_confirm_key "$HARNESS" 2>/dev/null)" ]; then
+    EXIT_PICKER_WHY="the $HARNESS adapter has no answer for it"
+    return 1
+  fi
+  case "$KIND" in
+    ship|scout) ;;
+    *)
+      EXIT_PICKER_WHY="a $KIND is never finished"
+      return 1
+      ;;
+  esac
+  line=$(fm_run_timed "$CREW_STATE_WAIT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+    FM_CREW_STATE_NO_FORGE=1 "$CREW_STATE_BIN" "$ID" 2>/dev/null) || rc=$?
+  state=${line#state: }
+  state=${state%% *}
+  case "$line" in
+    'state: done '*|'state: failed '*) ;;
+    *)
+      if [ "$rc" -ne 0 ] || [ -z "$line" ]; then
+        EXIT_PICKER_WHY="its current state could not be read"
+      else
+        EXIT_PICKER_WHY="its current state is $state, not done or failed"
+      fi
+      return 1
+      ;;
+  esac
+  case "$busy" in
+    busy*)
+      EXIT_PICKER_WHY="its busy record shows an active turn"
+      return 1
+      ;;
+  esac
+  return 0
+}
+
+# read_exit_composer_after_picker: read the composer again once the picker is
+# closed, until it reads empty or the settle wait ends, since Claude repaints it
+# a moment later. Sets EXIT_COMPOSER_STATE to the last verdict. A dialog on the
+# screen at any read refuses: the picker came back, or another dialog is up.
+EXIT_COMPOSER_STATE=unknown
+read_exit_composer_after_picker() {
+  local elapsed=0
+  while :; do
+    : > "$FM_COMPOSER_DIALOG_SINK" \
+      || die "task $ID's dialog check could not be recorded"
+    EXIT_COMPOSER_STATE=$(fm_backend_composer_state "$BACKEND" "$T" "$LABEL" 2>/dev/null) \
+      || EXIT_COMPOSER_STATE=unknown
+    if [ -s "$FM_COMPOSER_DIALOG_SINK" ]; then
+      refuse_blocking_prompt "$(cat "$FM_COMPOSER_DIALOG_SINK")" \
+        "The exit picker had just been closed, so nothing more was sent."
+    fi
+    [ "$EXIT_COMPOSER_STATE" != empty ] || return 0
+    awk -v e="$elapsed" -v t="$SETTLE_WAIT" 'BEGIN{exit !(e < t)}' || return 0
+    sleep "$POLL"
+    elapsed=$(awk -v e="$elapsed" -v p="$POLL" 'BEGIN{printf "%.3f", e + p}')
+  done
+}
+
+# refuse_exit_picker <dialog-name>: refuse a dialog exit_picker_answerable said
+# no to, naming why and the supported way to close it.
+refuse_exit_picker() {  # <dialog-name>
+  refuse_blocking_prompt "$1" "It was left as it was because ${EXIT_PICKER_WHY:-it is not answerable}. Run 'fm-control $ID stay' to close it and keep the agent running."
+}
+
+# confirm_exit_picker <dialog-name> <pre-exit-busy-verdict>: the picker opened
+# AFTER this exit proved the composer empty and typed /exit, so the only input
+# it holds is that command. Choose its selected row, "Exit and stop tasks", when
+# exit_picker_answerable says the task is finished; otherwise refuse. The screen
+# is read again immediately before the key so a changed screen gets nothing.
+confirm_exit_picker() {
+  local dialog=$1 busy=$2 key
+  exit_picker_answerable "$dialog" "$busy" || refuse_exit_picker "$dialog"
+  key=$(fm_control_exit_picker_confirm_key "$HARNESS")
+  fm_control_backend_supports_key "$BACKEND" "$key" \
+    || die "task $ID's $BACKEND backend cannot deliver $key; the exit picker was left as it was"
+  if ! exit_picker_visible; then
+    EXIT_PICKER_WHY="the screen changed before the key could be sent"
+    refuse_exit_picker "$dialog"
+  fi
+  fm_backend_send_key "$BACKEND" "$T" "$key" "$LABEL" \
+    || die "the $key that confirms the exit picker was not delivered to task $ID"
+  printf 'note: task %s finished, so exit chose "Exit and stop tasks" on the background-task exit picker\n' "$ID" >&2
 }
 
 # rendered_matches <ere>: whether any row of the visible viewport matches.
@@ -1270,7 +1455,7 @@ retire_busy_incarnation() {
 # do_exit: stop the running agent, preserving endpoint and worktree. Prints
 # `already-stopped`, `endpoint-gone`, or `stopped`.
 do_exit() {
-  local state cmd hazard verdict composer_state cancel absence interrupt_result=not-needed dialog
+  local state cmd hazard verdict composer_state cancel absence interrupt_result=not-needed dialog pre_busy
   require_state_verified_backend exit
   state=$(agent_state)
   case "$state" in
@@ -1318,7 +1503,10 @@ do_exit() {
   require_live_task_attribution alive \
     || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
   # A busy agent is interrupted first before the exit command is submitted.
-  case "$(busy_verdict)" in
+  # The verdict is kept: exit_picker_answerable reads it, and it must be the one
+  # taken before anything was sent.
+  pre_busy=$(busy_verdict)
+  case "$pre_busy" in
     busy*)
       cancel=$(deliver_interrupt) || return $?
       state=$(agent_state)
@@ -1347,7 +1535,16 @@ do_exit() {
   # rather than a function that subshell sourced.
   if [ -s "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
     dialog=$(cat "$FM_COMPOSER_DIALOG_SINK")
-    refuse_blocking_prompt "$dialog"
+    # A picker already open hides the composer, and the picker's own rows read
+    # as pending text, so nothing here proves the composer empty. A finished
+    # task gets the picker closed with Stay and the composer read again, so
+    # text it was hiding still refuses; any other task keeps the refusal.
+    EXIT_PICKER_WHY=
+    exit_picker_answerable "$dialog" "$pre_busy" || refuse_exit_picker "$dialog"
+    dismiss_exit_picker
+    printf 'note: task %s finished and was parked on the background-task exit picker; exit closed it with Stay and read the composer again\n' "$ID" >&2
+    read_exit_composer_after_picker
+    composer_state=$EXIT_COMPOSER_STATE
   fi
   case "$composer_state" in
     empty) ;;
@@ -1386,11 +1583,13 @@ do_exit() {
   fi
   # The submitting Enter can open the picker. The agent is still alive, and
   # another Enter would confirm the selected row. A dead agent may leave the
-  # same text behind; that is not a prompt still waiting.
+  # same text behind; that is not a prompt still waiting. The composer was
+  # proven empty above and /exit is the only thing typed since, so a finished
+  # task's picker is answered here and every other task's is refused.
   if [ -s "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
     dialog=$(cat "$FM_COMPOSER_DIALOG_SINK")
     if [ "$(agent_state)" != dead ]; then
-      refuse_blocking_prompt "$dialog"
+      confirm_exit_picker "$dialog" "$pre_busy"
     fi
   fi
   state=$(wait_agent_state "$EXIT_WAIT" dead) || {
@@ -1400,9 +1599,12 @@ do_exit() {
     : > "$FM_COMPOSER_DIALOG_SINK" || true
     fm_backend_composer_state "$BACKEND" "$T" "$LABEL" >/dev/null 2>&1 || true
     if [ -s "$FM_COMPOSER_DIALOG_SINK" ]; then
-      refuse_blocking_prompt "$(cat "$FM_COMPOSER_DIALOG_SINK")"
+      confirm_exit_picker "$(cat "$FM_COMPOSER_DIALOG_SINK")" "$pre_busy"
+      state=$(wait_agent_state "$EXIT_WAIT" dead) \
+        || die "exit-delivered $ID interrupt=$interrupt_result exit-command=delivered picker=exit-and-stop-tasks agent-state=$state exit=unconfirmed; the agent did not stop within ${EXIT_WAIT}s of the picker's confirming key"
+    else
+      die "exit-delivered $ID interrupt=$interrupt_result exit-command=delivered agent-state=$state exit=unconfirmed; the agent did not stop within ${EXIT_WAIT}s"
     fi
-    die "exit-delivered $ID interrupt=$interrupt_result exit-command=delivered agent-state=$state exit=unconfirmed; the agent did not stop within ${EXIT_WAIT}s"
   }
   # The incarnation is over: retire its busy wiring so no stale record or
   # orphaned generation survives the agent that produced it.
@@ -2071,6 +2273,22 @@ case "$VERB" in
   exit)
     result=$(do_exit)
     echo "$result $ID harness=$HARNESS backend=$BACKEND endpoint=$T worktree=$WT"
+    ;;
+  stay)
+    # Close the recognised exit picker and leave the agent running. The picker
+    # is read from the viewport, so the backend must have a viewport read and
+    # the recovery-grade classifier that proves the agent is still alive.
+    require_state_verified_backend stay
+    state=$(agent_state)
+    case "$state" in
+      alive) ;;
+      dead|missing) die "no agent is running at task $ID's recorded endpoint (state: $state); there is no exit picker to close" ;;
+      *) die "task $ID's endpoint reads '$state' rather than a positively classified state; refusing to send a key into an unattributed endpoint" ;;
+    esac
+    require_live_task_attribution alive \
+      || die "task $ID cannot positively attribute its live Herdr agent to this task; refusing lifecycle input"
+    dismiss_exit_picker
+    echo "stayed $ID harness=$HARNESS backend=$BACKEND endpoint=$T verified=picker-closed agent=alive"
     ;;
   relaunch)
     do_relaunch

@@ -2168,10 +2168,46 @@ That screen still classifies as pending, the same verdict as unsubmitted compose
 A second Enter would confirm the selected row.
 The recorded picker had its heading on its own line, the selected row alone on its row, and `Enter to confirm · Esc to cancel` as the last non-blank row.
 [`fm_composer_blocking_dialog`](../../bin/fm-composer-lib.sh) owns recognition, including refusal to treat quoted picker text as a dialog; [`bin/fm-backend.sh`](../../bin/fm-backend.sh) owns submit refusal and retry safety.
-The operator-facing exit contract is owned by [agent lifecycle control](../agent-control.md#verbs); `tests/fm-control.test.sh` covers picker refusal, late discovery after the exit wait, and a stopped agent whose pane retains the picker text.
+The operator-facing exit contract is owned by [agent lifecycle control](../agent-control.md#exit-and-the-background-task-picker); `tests/fm-control.test.sh` covers picker refusal, late discovery after the exit wait, and a stopped agent whose pane retains the picker text.
 The watcher does not read the picker: a pane parked on it keeps the ordinary stale triage.
 No recorded screen was available for a model-downgrade confirmation, an MCP approval, or a Claude exit confirmation other than this picker, so those dialogs are not covered.
 Refusing an Enter that would confirm a dialog restores an existing safety path, so it is not gated behind a flag.
+
+#### Answering the picker
+
+`fm-control exit` answers the picker for a finished task and `fm-control stay` closes it for a live one, both under the proof in [agent lifecycle control](../agent-control.md#exit-and-the-background-task-picker).
+The two keys, Enter on the selected "Exit and stop tasks" row and Escape, are chosen from the vendor's own bundled source, read on 2026-10-15 from the installed Claude Code 2.1.301.
+That is a source reading, not an observation of a live pane: no live Claude session was driven for these two keys, and nothing below was measured through a terminal.
+
+```sh
+B=$(readlink -f "$(type -P claude)")
+claude --version
+LC_ALL=C grep -a -o -b 'case"exit":{return M()}case"background":{return ee?.()}case"stay":{return L()}' "$B"
+LC_ALL=C grep -a -o -b 'function [A-Za-z]*(){[A-Za-z]*("stay"),[A-Za-z]*()}' "$B"
+LC_ALL=C grep -a -o -b 'Vo=ee?\[{label:"Move to background and exit",value:"background"}\]:\[\]' "$B"
+LC_ALL=C grep -a -o -b 'Qt=rt;qt=!0;' "$B"
+```
+
+```text
+2.1.301 (Claude Code)
+227583769:case"exit":{return M()}case"background":{return ee?.()}case"stay":{return L()}
+227583948:function rt(){Ee("stay"),L()}
+227585068:Vo=ee?[{label:"Move to background and exit",value:"background"}]:[]
+227584380:Qt=rt;qt=!0;
+```
+
+What those lines establish, in the component that renders "Background work is running":
+
+- The three rows map to the handlers `exit`, `background`, and `stay`, and `stay` calls the dialog's own cancel handler `L`.
+- The dialog's `onCancel`, the action its footer labels `Esc to cancel`, is `rt`, which records `stay` and then calls that same `L`, so cancelling and the Stay row are one action.
+- "Move to background and exit" is present only when the session supplies a background handler, so the option list can be two rows, and the answer keys do not depend on the row count.
+- The dialog is created with `exitOnCtrlCD` true, so Ctrl+C and Ctrl+D are exit requests and the control plane never sends them.
+- The recorded selected row is the first, "Exit and stop tasks", and the recogniser requires it, so a bare Enter confirms that row and no other.
+
+The names `L`, `rt`, `Qt`, and the offsets are minifier output of this build and will change; refresh the extraction after a Claude upgrade rather than pinning them.
+`tests/fm-control.test.sh` covers, against a stubbed session provider: a finished ship and scout stopped through the confirming Enter with the postcondition verified; refusal for working, parked, blocked, paused, unknown, and unreadable states, a busy record, a secondmate, another adapter, and `relaunch`; an already-open picker closed with Stay and the composer read again, with a hidden draft preserved; no key on an unrecognised dialog; and `stay` closing the picker, refusing any other screen, harness, or stopped agent, and reporting a picker that did not close.
+Those cases prove the control plane's decisions and key sequences, not what the real pane does with the keys.
+A live check needs a Claude session with a background shell running and its `/exit` typed; until one is recorded here, the keys' effect on a real pane stays a source-derived expectation.
 
 ### Prune and respawn
 

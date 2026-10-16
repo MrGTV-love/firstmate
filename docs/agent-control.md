@@ -18,7 +18,7 @@ The failure repeated across harnesses and homes, and the workaround (remember to
 
 `bin/fm-control-lib.sh` is the single executable owner of three capability tables, which have no side effects, so they can be read as a contract:
 
-- The **verb allowlist**: `interrupt`, `exit`, `relaunch`, `authorize-continuation`, `reassociate`.
+- The **verb allowlist**: `interrupt`, `exit`, `stay`, `relaunch`, `authorize-continuation`, `reassociate`.
   There is no arbitrary-text and no generic raw-key entry point.
   A caller either names an allowlisted verb or is refused.
 - **Per-harness mechanics**: the key that cancels a running turn, how many times it must be delivered, whether the composer needs clearing afterwards, the command that exits the agent, and which task kinds the adapter is verified to run.
@@ -37,6 +37,7 @@ A recorded `harness=` is not always an exact adapter name: a task launched from 
 | --- | --- | --- |
 | `interrupt` | Deliver the harness's verified interrupt sequence while leaving the agent running. | Delivery succeeds while the endpoint still exists and the agent is still alive where the backend can classify that; cancellation is confirmed only from an adapter-owned acknowledgement and otherwise reports `cancel=unconfirmed`. |
 | `exit` | Stop the agent, preserving the endpoint, the worktree, and every uncommitted change. | The backend's recovery-grade classifier reports the agent gone. Already-stopped is idempotent success. A `missing` endpoint goes through the shared [absence proof](#reclaiming-a-task-whose-endpoint-is-gone): proven gone reports `endpoint-gone`, a surviving idle pane reports `already-stopped`, and a surviving agent takes the ordinary interrupt-then-exit path. Unproven absence refuses. |
+| `stay` | Close Claude's background-task exit picker for a live task and leave the agent running; see [Exit and the background-task picker](#exit-and-the-background-task-picker). | A readable viewport no longer shows the recognised picker and the endpoint still classifies the agent alive. Any other screen, harness, or stopped agent refuses with nothing sent. |
 | `relaunch` | Replace the running agent with a new one in the same worktree by default (see the [missing-worktree exception](#relocating-a-task-whose-worktree-is-gone)) - and the same endpoint whenever that endpoint still exists - on the exact recorded adapter or an explicitly chosen harness, model, and effort. | The new agent is alive on the endpoint the task's record now names, and that record names the harness that is actually running. |
 | `authorize-continuation` | Clear a ship or scout's recorded reconciliation-only restriction without launching or messaging a worker. | Only `recovery=reconcile-only` is removed atomically; unrelated metadata, holds, and dependencies are preserved. |
 | `reassociate` | Re-point a ship or scout's record at the replacement copy its work moved to, without stopping, starting, or removing anything. | The record names the replacement copy and the copy it left as `prior_worktree=` (or `released_worktree=` for a pool slot it left); the old copy, the endpoint, and any pipeline run are untouched. See [Reassociating a task with a replacement copy](#reassociating-a-task-with-a-replacement-copy). |
@@ -58,9 +59,10 @@ omp sends no clear key; queued follow-ups can return to its composer, with watch
 `exit` reads the composer's state before typing the exit command and requires the exact `empty` verdict; a `pending` verdict refuses by naming the pending text, and any other verdict (`unknown`, `unknown-draft`, `pending-unproven`, or an unreadable read) refuses as not proven empty, matching the fail-safe contract every other consumer that can overwrite composer input follows.
 The [shared composer classifier and its shape catalogue](../bin/fm-composer-lib.sh) own continuation containment, draft-risk verdicts, extraction, and known limits; lifecycle callers cannot treat a nested prompt or frame as independent empty proof.
 The [inbox ring owner](../bin/fm-task-inbox-lib.sh) separately defines the advisory doorbell pre-check.
-`exit` also refuses, naming the dialog as `blocked on a prompt`, when the screen shows a recognised dialog that a further Enter would answer, whether the dialog was open before the exit command was typed or the submitting Enter opened it; it sends no Escape and chooses no option, so closing the dialog is left to the operator.
+`exit` also refuses, naming the dialog as `blocked on a prompt`, when the screen shows a recognised dialog that a further Enter would answer, whether the dialog was open before the exit command was typed or the submitting Enter opened it.
 A stopped agent whose pane still shows the dialog text is not refused.
 [`fm_composer_blocking_dialog`](../bin/fm-composer-lib.sh) owns the recognised set, which today is only Claude's background-task exit picker; [its verification record](verification/runtime-backends.md#claude-background-task-exit-picker) lists the dialogs that are not covered.
+The one answer `exit` gives a recognised dialog is the picker's, under the proof in the next section, and it never answers or dismisses a dialog it does not recognise, because any answer to one can write a permanent decline.
 
 **Teardown and discard are not verbs and will not become verbs.**
 `exit` stops an agent and preserves everything else.
@@ -70,6 +72,27 @@ Removing a worktree, closing an endpoint, or discarding work stays with [`bin/fm
 It is not deterministic across the verified adapters: codex, grok, gemini, and devin resume only from a session id printed at exit, opencode continues the most recent session for the cwd, and claude, pi, pi-signed, omp, kimi, and agy have no verified general pane-resume contract.
 `relaunch` uses the brief on disk - not a harness-private session - as the durable instruction when the backend can prove the old agent stopped and the composer is empty; Devin on Herdr and agy on tmux currently fail that composer check and refuse.
 A relaunch does take one session reference when the endpoint's own runtime recorded it - see [the relaunch transaction](#transactional-relaunch) - but that is a relaunch input, not a caller-facing verb.
+
+### Exit and the background-task picker
+
+Claude opens a "Background work is running" picker when `/exit` meets a running background shell.
+Its selected row is "Exit and stop tasks", and its footer reads "Enter to confirm · Esc to cancel".
+A worker parked on it holds every later steering message behind it, so two supported answers exist.
+
+- **A finished task is stopped.**
+  `exit` chooses "Exit and stop tasks" only for a Claude ship or scout whose own state, read through [`bin/fm-crew-state.sh`](../bin/fm-crew-state.sh), is a terminal `done` or `failed`, and whose busy record showed no active turn before anything was sent.
+  The composer proof is this exit's own: the picker opened after the exit proved the composer `empty` and typed `/exit`, so `/exit` is the only input it holds.
+  The screen is read again immediately before the confirming Enter, and the postcondition is the ordinary agent-gone proof.
+  A picker that was already open when `exit` began is first closed with the stay key and the composer is read again, so a draft the picker was hiding still refuses the exit and is preserved.
+- **A live task is released with `stay`.**
+  `fm-control <task> stay` sends one Escape, only while the recognised picker is the visible screen, and then requires a readable viewport that no longer shows it and an endpoint that still classifies the agent alive.
+  Escape is the picker's own cancel key and is bound to the same handler as its Stay row, so the agent keeps running and its composer is usable again.
+
+Every other case keeps the refusal and names how to close the picker: a task whose state is not done or failed, a state that cannot be read, a busy record showing a turn, a secondmate, any other harness, and `relaunch`'s own stop.
+The state read happens only while the picker is showing, is bounded by `FM_CONTROL_CREW_STATE_WAIT`, and skips the forge read.
+`stay` sends nothing on any screen that is not exactly the recognised picker, on any harness other than Claude, or to a stopped agent.
+It never sends Ctrl+C or Ctrl+D, which the picker is configured to treat as an exit request.
+The [verification record](verification/runtime-backends.md#claude-background-task-exit-picker) states what is measured and what is read from the vendor's source.
 
 ## Transactional relaunch
 
@@ -464,7 +487,7 @@ The runtime lifecycle verbs have the boundaries below; metadata-only authorizati
 - An ambiguous or unreadable endpoint state refuses.
   Only a positively classified state acts.
 - A live Herdr agent must pass the shared [live task-attribution guard](#live-herdr-task-attribution) before any lifecycle input or task checkpoint mutation.
-- `exit`'s composer-empty check, above, is itself a fail-closed boundary that `relaunch` inherits by stopping the old agent through `exit`.
+- `exit`'s composer-empty check, above, is itself a fail-closed boundary that `relaunch` inherits by stopping the old agent through `exit`; `relaunch` inherits the picker refusal too and never answers it.
 - `fm-spawn --relaunch` independently refuses unless the endpoint is positively agent-free - either a surviving `dead` endpoint or one proven gone by the shared absence proof - so a replacement can never join a live agent.
   An `alive`, `ambiguous`, or `unreadable` verdict refuses, as does any endpoint whose absence is unproven.
   It also requires the shell to be in the selected worktree: every backend but Orca (which owns its own task worktree with no current-path probe) gets one explicit `cd` to that path, then a pre-launch path read that refuses before any harness starts unless it confirms the endpoint is sitting in that copy.
@@ -486,7 +509,7 @@ The empirical basis for each adapter's value is the `harness-adapters` skill's v
 
 ## Verification
 
-- `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, and marker non-regression, all against a stubbed session provider.
+- `tests/fm-control.test.sh` - the adapter contract for its verified-harness lane (adapters outside the lane pin their control mechanics in their own harness suites), the backend capability matrix, exact-id scoping, the closed verb list, the busy, idle, dead, and idempotent lifecycle cases, the exit-picker answers and `stay`, and marker non-regression, all against a stubbed session provider.
 - `tests/fm-control-relaunch.test.sh` - the relaunch transaction, positive live Herdr ownership and no-pin refusals across every lifecycle verb, unmanaged native restore inspection and bounded copied-home diagnostics, identity preservation, harness switching, progress notes, checkpoint refusals, rollback, Herdr reclaim, sequential tmux-to-Herdr reclaim, tmux absence scoped to the recorded endpoint despite unrelated servers, refusal of other configured backends, conservative process-read refusals, and refusals on a live window, a worktree-holding agent, or unreadable evidence; missing-worktree relocation cases cover recorded-head containment, foreign harness-file preservation, failure-journal recovery, concurrent destination ownership, and unpublished pool-claim cleanup.
 - `tests/fm-launch-proof.test.sh` - versioned and legacy managed incarnation proof across supported harnesses, native restore and same-PID personal-session switches remaining unmanaged, and conservative foreground and process-environment refusals.
 - `tests/fm-control-herdr-smoke.test.sh` - the second state-verified backend against the real herdr binary, on an isolated throwaway lab session.
