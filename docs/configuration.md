@@ -79,7 +79,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Captain preferences and optional shared captain preferences.
 - Learnings, backlog, briefs, scout reports, and the optional per-task no-mistakes pipeline-spend ledger.
 - Host-local command durations in `command-durations.jsonl`, produced by `bin/fm-duration.py`; its header and help own timing calibration and repeated-timeout work publication.
-- The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; its header and the typed-resolution "Result log" own the fields and the measurement.
+- The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
 
 `state/` holds runtime records:
@@ -1687,7 +1687,7 @@ The resolver supplies the fixed neutral Choice option `No listed rule applies to
 - `approval` accepts only `"captain"` and means a task the rule matches is never dispatched from the tool's answer alone.
 
 `min_confidence` is a number from 0 through 1.
-The rule's own probability in the answer must reach it, replacing the resolver's global 0.6 floor on the answer's confidence.
+The rule's own probability in the answer, pooled with any option that selects the identical outcome (see "Confidence and fallback rules" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key)), must reach it, replacing the resolver's global 0.6 floor on the answer's confidence.
 Set it high when a wrong pick is costly and low when the rule is a safe runner-up.
 
 `task_horizon_minutes` is a positive number of minutes, 240 when absent: the runway a resolved candidate needs for one task, as described under "Candidate eligibility and evidence" in [typed dispatch resolution](#typed-dispatch-resolution-env-typesafe_api_key).
@@ -1888,8 +1888,8 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 
 **Confidence and fallback rules**
 
-- A rule that declares `min_confidence` is checked against that rule's own probability, whether it is the picked option or a runner-up, so a runner-up never needs weaker support than it would as the pick.
-- A picked rule without `min_confidence`, and the neutral option, keep the global 0.6 floor on the answer's confidence exactly as before, so a file with no declared floors behaves as it did.
+- A rule that declares `min_confidence` is checked against that rule's own probability, whether it is the picked option or a runner-up, so a runner-up never needs weaker support than it would as the pick; a pick's probability is also joined by its equivalent options, as below.
+- A picked rule without `min_confidence`, and the neutral option, keep the global 0.6 floor on the answer's confidence exactly as before, so a file with no declared floors and no equivalent options behaves as it did.
 - Options that select the identical outcome pool their probability: the same `use` profiles (in any order) after the session policy and class filter, `approval`, `floor`, `select`, and fallback list, with `when` and `min_confidence` ignored.
   The neutral option counts as a rule with the `default` array and no approval or floor.
   The pick is the group holding the answer's `choice`, which a group of one option makes the option itself.

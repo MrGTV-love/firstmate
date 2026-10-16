@@ -28,17 +28,14 @@
 #   model-router class filter inside the selected rule, the confidence floor
 #   (0.6 on the answer confidence, or a rule's declared `min_confidence` on that
 #   rule's probability, falling to the most probable other option that clears
-#   its own floor; options that select identical profiles, approval, floor,
-#   select and fallback pool their probabilities, because a split between them
-#   cannot be a wrong pick, and a pooled group with more probability than the
-#   answer choice group is the pick when that choice group falls below its
-#   floor and it clears its own; the neutral `default` cannot declare `min_confidence`, so pooling is
-#   how a default pick shares a rule's support), the rule's declared `approval`
-#   and `floor`, each profile's
-#   declared `provider` and `floor`, and the normalized quota composite over ONE
-#   compatible quota-axi --json snapshot and one OMP pool report. Proven
-#   exhaustion of every candidate activates the selected rule's declared
-#   model-matrix stand-in. The model never sees quota, catalogs, approvals,
+#   its own floor; options that select the identical outcome pool their
+#   probabilities, because a split between them cannot be a wrong pick, and
+#   that is how the neutral `default`, which cannot declare `min_confidence`,
+#   shares a rule's support), the rule's declared `approval` and `floor`, each
+#   profile's declared `provider` and `floor`, and the normalized quota
+#   composite over ONE compatible quota-axi --json snapshot and one OMP pool
+#   report. Proven exhaustion of every candidate activates the selected rule's
+#   declared model-matrix stand-in. The model never sees quota, catalogs, approvals,
 #   confidence floors, `why`, or `use`. With no rules, it returns a non-clear
 #   result so firstmate keeps using the existing intake.
 #   docs/configuration.md "Crew dispatch profiles" owns the declared fields and
@@ -101,17 +98,11 @@
 #   resolution failure, or missing jq), which is actionable, never selected around.
 #
 # Result log: every resolve that reaches a status appends one JSON line to
-#   data/dispatch-resolve.jsonl (FM_DATA_OVERRIDE moves its directory):
-#   ts (UTC), status, choice (the option Jev answered), rule (the pick: that
-#   choice, or the most probable member of the pooled group that replaced it),
-#   selected (the option whose profiles were used), profile (harness/model/effort
-#   when clear),
-#   confidence, floor, pooled (the combined probability when pooling cleared
-#   the floor), and reason. The block rate is every status other than clear.
-#   Off paths and exit-2 usage or configuration errors have no status and write
-#   nothing. No brief text, request, API body, or credential is ever written;
-#   a failed write is silent. docs/configuration.md "Typed dispatch resolution"
-#   owns the contract.
+#   data/dispatch-resolve.jsonl (FM_DATA_OVERRIDE moves its directory). Off paths
+#   and exit-2 usage or configuration errors have no status and write nothing.
+#   No brief text, request, API body, or credential is ever written; a failed
+#   write is silent. docs/configuration.md "Typed dispatch resolution" ("Result
+#   log") owns the fields and the block-rate measurement.
 #
 # Environment:
 #   TYPESAFE_API_KEY is the only resolver-specific environment setting.
