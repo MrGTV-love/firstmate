@@ -1706,7 +1706,7 @@ test_fresh_spawn_fetches_its_base_before_it_queues_for_the_project_lock() {
   queue_spawn_behind_a_holder prefetch-before-queue task-p
   case_dir=$QUEUED_CASE
   home="$case_dir/home"
-  gitdir=$(git -C "$case_dir/project" rev-parse --git-common-dir)
+  gitdir=$(git -C "$case_dir/project" rev-parse --path-format=absolute --git-common-dir)
   git -C "$case_dir/project" cat-file -e "$QUEUED_TIP^{commit}" 2>/dev/null \
     || { : > "$case_dir/release"; wait "$QUEUED_HOLDER" || true; wait "$QUEUED_ACTOR" || true; fail 'the queued spawn had not fetched origin base before it queued'; }
   assert_absent "$home/state/task-p.meta" 'the queued spawn published a record while another holder owned the lock'
