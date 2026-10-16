@@ -1,0 +1,40 @@
+{
+  "families": [
+    {
+      "count": 2,
+      "duration_ms": 29500,
+      "failed": 0,
+      "name": "live-harness-optin"
+    }
+  ],
+  "finished_at": "2026-10-16T02:36:23Z",
+  "run_id": "fm-test-run-1792118153952-83789",
+  "scripts": [
+    {
+      "duration_ms": 15923,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-jev-guard-omp-live-e2e.test.sh"
+    },
+    {
+      "duration_ms": 13577,
+      "exit": 0,
+      "expected_gate_skip": "live-capability",
+      "family": "live-harness-optin",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-jev-guard-claude-live-e2e.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-16T02:35:53Z",
+  "summary": {
+    "duration_ms": 29618,
+    "failed": 0,
+    "skipped_gate": 0,
+    "total": 2
+  }
+}

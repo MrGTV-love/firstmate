@@ -1,0 +1,76 @@
+{
+  "families": [
+    {
+      "count": 1,
+      "duration_ms": 5723,
+      "failed": 0,
+      "name": "pure-contract-unit"
+    },
+    {
+      "count": 1,
+      "duration_ms": 1712,
+      "failed": 1,
+      "name": "standalone"
+    },
+    {
+      "count": 1,
+      "duration_ms": 30396,
+      "failed": 0,
+      "name": "unclassified"
+    },
+    {
+      "count": 1,
+      "duration_ms": 110619,
+      "failed": 0,
+      "name": "watcher-wake-lock"
+    }
+  ],
+  "finished_at": "2026-10-16T02:38:49Z",
+  "run_id": "fm-test-run-1792118181338-1644",
+  "scripts": [
+    {
+      "duration_ms": 30396,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "unclassified",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-jev-guard.test.sh"
+    },
+    {
+      "duration_ms": 110619,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "watcher-wake-lock",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-task-inbox.test.sh"
+    },
+    {
+      "duration_ms": 5723,
+      "exit": 0,
+      "expected_gate_skip": "none",
+      "family": "pure-contract-unit",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-operational-input.test.sh"
+    },
+    {
+      "duration_ms": 1712,
+      "exit": 1,
+      "expected_gate_skip": "none",
+      "family": "standalone",
+      "gate_skip": false,
+      "gate_skip_reason": "",
+      "path": "tests/fm-busy-adapter-wiring.test.sh"
+    }
+  ],
+  "selection": "scripts;jobs=1",
+  "started_at": "2026-10-16T02:36:21Z",
+  "summary": {
+    "duration_ms": 148646,
+    "failed": 1,
+    "skipped_gate": 0,
+    "total": 4
+  }
+}

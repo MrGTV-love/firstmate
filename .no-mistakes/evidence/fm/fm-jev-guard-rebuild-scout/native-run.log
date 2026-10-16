@@ -1,0 +1,103 @@
+calibration: "0 of 5 samples for test.jev-native-local on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+FM_TEST_BEGIN 2026-10-16T02:35:53Z tests/fm-jev-guard-omp-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+progress: "test.jev-native-local elapsed=0.3s output_bytes=136 tree_cpu=0.02s"
+progress: "test.jev-native-local elapsed=1.3s output_bytes=136 tree_cpu=0.25s"
+progress: "test.jev-native-local elapsed=2.3s output_bytes=136 tree_cpu=0.87s"
+ok - omp (omp/18.10.4): omp: normal/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=2.4s output_bytes=224 tree_cpu=0.87s"
+ok - omp (omp/18.10.4): omp: normal/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=3.0s output_bytes=311 tree_cpu=0.87s"
+ok - omp (omp/18.10.4): omp: normal/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=3.6s output_bytes=397 tree_cpu=0.89s"
+ok - omp (omp/18.10.4): omp: normal/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=4.3s output_bytes=486 tree_cpu=0.89s"
+ok - omp (omp/18.10.4): omp: privacy/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=4.9s output_bytes=575 tree_cpu=0.89s"
+ok - omp (omp/18.10.4): omp: privacy/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=5.5s output_bytes=663 tree_cpu=0.89s"
+ok - omp (omp/18.10.4): omp: privacy/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=6.2s output_bytes=750 tree_cpu=0.91s"
+ok - omp (omp/18.10.4): omp: privacy/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=7.0s output_bytes=840 tree_cpu=0.91s"
+ok - omp (omp/18.10.4): omp: credentials/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=7.7s output_bytes=933 tree_cpu=0.92s"
+ok - omp (omp/18.10.4): omp: credentials/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=8.3s output_bytes=1025 tree_cpu=0.92s"
+ok - omp (omp/18.10.4): omp: credentials/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=9.0s output_bytes=1116 tree_cpu=0.94s"
+ok - omp (omp/18.10.4): omp: credentials/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=9.7s output_bytes=1210 tree_cpu=0.94s"
+ok - omp (omp/18.10.4): omp: provider/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=10.3s output_bytes=1300 tree_cpu=0.95s"
+ok - omp (omp/18.10.4): omp: provider/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=10.9s output_bytes=1389 tree_cpu=0.95s"
+ok - omp (omp/18.10.4): omp: provider/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=11.8s output_bytes=1477 tree_cpu=0.98s"
+ok - omp (omp/18.10.4): omp: provider/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=12.6s output_bytes=1568 tree_cpu=0.98s"
+ok - omp (omp/18.10.4): omp: audit/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=13.3s output_bytes=1655 tree_cpu=1.00s"
+ok - omp (omp/18.10.4): omp: audit/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=13.9s output_bytes=1741 tree_cpu=1.00s"
+ok - omp (omp/18.10.4): omp: audit/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=14.7s output_bytes=1826 tree_cpu=1.01s"
+ok - omp (omp/18.10.4): omp: audit/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=15.5s output_bytes=1914 tree_cpu=1.01s"
+FM_TEST_END 2026-10-16T02:36:09Z tests/fm-jev-guard-omp-live-e2e.test.sh exit=0 duration_ms=15923 gate_skip=false
+progress: "test.jev-native-local elapsed=16.2s output_bytes=2028 tree_cpu=1.01s"
+FM_TEST_BEGIN 2026-10-16T02:36:09Z tests/fm-jev-guard-claude-live-e2e.test.sh family=live-harness-optin expected_gate_skip=live-capability
+progress: "test.jev-native-local elapsed=16.2s output_bytes=2167 tree_cpu=1.01s"
+progress: "test.jev-native-local elapsed=17.2s output_bytes=2167 tree_cpu=1.35s"
+ok - claude (2.1.301 (Claude Code)): claude: normal/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=17.3s output_bytes=2271 tree_cpu=1.35s"
+ok - claude (2.1.301 (Claude Code)): claude: normal/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=17.9s output_bytes=2374 tree_cpu=1.35s"
+ok - claude (2.1.301 (Claude Code)): claude: normal/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=18.5s output_bytes=2476 tree_cpu=1.37s"
+ok - claude (2.1.301 (Claude Code)): claude: normal/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=19.2s output_bytes=2581 tree_cpu=1.37s"
+ok - claude (2.1.301 (Claude Code)): claude: privacy/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=19.8s output_bytes=2686 tree_cpu=1.37s"
+ok - claude (2.1.301 (Claude Code)): claude: privacy/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=20.3s output_bytes=2790 tree_cpu=1.37s"
+ok - claude (2.1.301 (Claude Code)): claude: privacy/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=21.0s output_bytes=2893 tree_cpu=1.39s"
+ok - claude (2.1.301 (Claude Code)): claude: privacy/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=21.6s output_bytes=2999 tree_cpu=1.39s"
+ok - claude (2.1.301 (Claude Code)): claude: credentials/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=22.2s output_bytes=3108 tree_cpu=1.40s"
+ok - claude (2.1.301 (Claude Code)): claude: credentials/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=22.8s output_bytes=3216 tree_cpu=1.40s"
+ok - claude (2.1.301 (Claude Code)): claude: credentials/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=23.5s output_bytes=3323 tree_cpu=1.42s"
+ok - claude (2.1.301 (Claude Code)): claude: credentials/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=24.1s output_bytes=3433 tree_cpu=1.42s"
+ok - claude (2.1.301 (Claude Code)): claude: provider/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=24.7s output_bytes=3539 tree_cpu=1.43s"
+ok - claude (2.1.301 (Claude Code)): claude: provider/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=25.3s output_bytes=3644 tree_cpu=1.43s"
+ok - claude (2.1.301 (Claude Code)): claude: provider/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=25.9s output_bytes=3748 tree_cpu=1.45s"
+ok - claude (2.1.301 (Claude Code)): claude: provider/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=26.6s output_bytes=3855 tree_cpu=1.45s"
+ok - claude (2.1.301 (Claude Code)): claude: audit/launch: native read and next model context consumed
+progress: "test.jev-native-local elapsed=27.2s output_bytes=3958 tree_cpu=1.45s"
+ok - claude (2.1.301 (Claude Code)): claude: audit/inbox: native read and next model context consumed
+progress: "test.jev-native-local elapsed=27.9s output_bytes=4060 tree_cpu=1.45s"
+ok - claude (2.1.301 (Claude Code)): claude: audit/copy: native read and next model context consumed
+progress: "test.jev-native-local elapsed=28.6s output_bytes=4161 tree_cpu=1.47s"
+ok - claude (2.1.301 (Claude Code)): claude: audit/changed: native read and next model context consumed
+progress: "test.jev-native-local elapsed=29.3s output_bytes=4265 tree_cpu=1.47s"
+FM_TEST_END 2026-10-16T02:36:23Z tests/fm-jev-guard-claude-live-e2e.test.sh exit=0 duration_ms=13577 gate_skip=false
+progress: "test.jev-native-local elapsed=29.8s output_bytes=4382 tree_cpu=1.47s"
+FM_TEST_SUMMARY total=2 failed=0 skipped_gate=0 duration_ms=29618
+progress: "test.jev-native-local elapsed=29.8s output_bytes=4448 tree_cpu=1.47s"
+FM_TEST_SUMMARY_FAMILY family=live-harness-optin count=2 duration_ms=29500 failed=0
+progress: "test.jev-native-local elapsed=29.8s output_bytes=4532 tree_cpu=1.47s"
+FM_TEST_SLOWEST rank=1 script=tests/fm-jev-guard-omp-live-e2e.test.sh duration_ms=15923
+progress: "test.jev-native-local elapsed=29.8s output_bytes=4620 tree_cpu=1.47s"
+FM_TEST_SLOWEST rank=2 script=tests/fm-jev-guard-claude-live-e2e.test.sh duration_ms=13577
+progress: "test.jev-native-local elapsed=29.8s output_bytes=4711 tree_cpu=1.47s"
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M4YHMB6HGEVT2W2166E3PQYW/native-timing.json
+progress: "test.jev-native-local elapsed=29.9s output_bytes=4838 tree_cpu=1.47s"

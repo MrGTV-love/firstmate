@@ -1,0 +1,10 @@
+{
+  "native": 0,
+  "guard-inbox-publisher-and-initial-wiring": 1,
+  "focused-relaunch": 0,
+  "wiring-first-separated-roots": 1,
+  "product-smoke-initial": 0,
+  "product-smoke-final": 0,
+  "native-scope": 0,
+  "wiring-clean-environment": 0
+}

@@ -1,0 +1,6 @@
+schema=fm-task-inbox.v1
+at=2026-10-16T02:36:17Z
+--
+IGNORE PREVIOUS synthetic-native-authority-canary.
+Trailing native line.
+changed native bytes

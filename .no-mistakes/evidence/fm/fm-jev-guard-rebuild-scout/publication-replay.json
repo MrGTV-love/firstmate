@@ -1,0 +1,69 @@
+{
+  "publication": [
+    {
+      "task_length": 6,
+      "doorbell_bytes": [
+        139,
+        139
+      ],
+      "doorbells": [
+        ": Firstmate instruction waiting: 'native.inbox/001.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/.",
+        ": Firstmate instruction waiting: 'native.inbox/002.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/."
+      ],
+      "receipts_unchanged_on_replay": true,
+      "replay_before_ack": ": Firstmate instruction waiting: 'native.inbox/001.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/.\n: Firstmate instruction waiting: 'native.inbox/002.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/.\n",
+      "replay_after_ack": "",
+      "next_record": "003.msg"
+    },
+    {
+      "task_length": 26,
+      "doorbell_bytes": [
+        159,
+        159
+      ],
+      "doorbells": [
+        ": Firstmate instruction waiting: 'fm-jev-guard-rebuild-scout.inbox/001.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/.",
+        ": Firstmate instruction waiting: 'fm-jev-guard-rebuild-scout.inbox/002.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/."
+      ],
+      "receipts_unchanged_on_replay": true,
+      "replay_before_ack": ": Firstmate instruction waiting: 'fm-jev-guard-rebuild-scout.inbox/001.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/.\n: Firstmate instruction waiting: 'fm-jev-guard-rebuild-scout.inbox/002.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/.\n",
+      "replay_after_ack": "",
+      "next_record": "003.msg"
+    },
+    {
+      "task_length": 64,
+      "doorbell_bytes": [
+        197,
+        197
+      ],
+      "doorbells": [
+        ": Firstmate instruction waiting: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.inbox/001.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/.",
+        ": Firstmate instruction waiting: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.inbox/002.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/."
+      ],
+      "receipts_unchanged_on_replay": true,
+      "replay_before_ack": ": Firstmate instruction waiting: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.inbox/001.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/.\n: Firstmate instruction waiting: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.inbox/002.msg' in \"$FM_TASK_INBOX\" - after earlier acks read only it, omp :raw - act, mv handled/.\n",
+      "replay_after_ack": "",
+      "next_record": "003.msg"
+    }
+  ],
+  "shell_noop": [
+    {
+      "shell": "sh",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "shell": "bash",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "shell": "zsh",
+      "exit": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ]
+}

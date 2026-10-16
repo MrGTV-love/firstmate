@@ -1,0 +1,280 @@
+calibration: "0 of 5 samples for test.jev-targeted-local on GTT-CB.local"
+fallback: "no destructive deadline; collect samples"
+FM_TEST_BEGIN 2026-10-16T02:36:21Z tests/fm-jev-guard.test.sh family=unclassified expected_gate_skip=none
+progress: "test.jev-targeted-local elapsed=0.1s output_bytes=106 tree_cpu=0.02s"
+ok - pure shell/write boundaries and calibrated injection equality, ambiguity, invalid and empty values
+progress: "test.jev-targeted-local elapsed=0.8s output_bytes=210 tree_cpu=0.02s"
+ok - Claude pre-tool shell/credential effects, allowed roots, removals and deterministic device refusal
+progress: "test.jev-targeted-local elapsed=1.5s output_bytes=314 tree_cpu=0.19s"
+progress: "test.jev-targeted-local elapsed=2.5s output_bytes=314 tree_cpu=0.24s"
+ok - active privacy/key/provider/contract failures require review; inactive scopes send nothing and keep path checks
+progress: "test.jev-targeted-local elapsed=2.5s output_bytes=431 tree_cpu=0.24s"
+ok - missing runtime requires active pre-tool review without activating unrelated projects
+progress: "test.jev-targeted-local elapsed=2.5s output_bytes=522 tree_cpu=0.24s"
+ok - launch-only activation leaves pre-cutover Claude hooks and OMP contexts unguarded without requests
+progress: "test.jev-targeted-local elapsed=3.0s output_bytes=626 tree_cpu=0.24s"
+ok - present Bun/Node crashes require active review with sanitized output and preserve inactive scope
+progress: "test.jev-targeted-local elapsed=3.4s output_bytes=728 tree_cpu=0.24s"
+ok - complete UTF-8 wire bound, full in-memory exchange, reported/unknown cost, session key snapshot and typed audit failure
+progress: "test.jev-targeted-local elapsed=3.7s output_bytes=853 tree_cpu=0.25s"
+ok - OMP clear/flag/review/quarantine, original typed failures, complete tails, ordinary-read screening, audit failure and inactive independence
+progress: "test.jev-targeted-local elapsed=4.2s output_bytes=998 tree_cpu=0.25s"
+ok - Claude retains advisory-only/no-protection results under bun and pre-tool enforcement under node
+progress: "test.jev-targeted-local elapsed=4.6s output_bytes=1100 tree_cpu=0.25s"
+ok - separate Claude native hooks preserve only session-delivered exact bytes and screen foreign-session/changed content
+progress: "test.jev-targeted-local elapsed=5.0s output_bytes=1221 tree_cpu=0.27s"
+progress: "test.jev-targeted-local elapsed=6.0s output_bytes=1221 tree_cpu=0.52s"
+progress: "test.jev-targeted-local elapsed=7.1s output_bytes=1221 tree_cpu=0.63s"
+progress: "test.jev-targeted-local elapsed=8.1s output_bytes=1221 tree_cpu=0.68s"
+progress: "test.jev-targeted-local elapsed=9.1s output_bytes=1221 tree_cpu=0.71s"
+ok - actual publishers bind host-delivered path/name/bytes; copies, changed bytes and unseen/foreign delivery screen; source survives outages
+progress: "test.jev-targeted-local elapsed=9.4s output_bytes=1363 tree_cpu=0.71s"
+ok - path/edit/device/root permissions survive active and explicitly inactive scopes without mutating arguments
+progress: "test.jev-targeted-local elapsed=9.8s output_bytes=1475 tree_cpu=0.71s"
+progress: "test.jev-targeted-local elapsed=10.8s output_bytes=1475 tree_cpu=0.90s"
+progress: "test.jev-targeted-local elapsed=11.9s output_bytes=1475 tree_cpu=0.91s"
+progress: "test.jev-targeted-local elapsed=20.3s output_bytes=1475 tree_cpu=0.92s"
+ok - actual stalled requests produce typed pre-tool denial and result replacement before the documented host deadline
+progress: "test.jev-targeted-local elapsed=30.0s output_bytes=1593 tree_cpu=0.92s"
+ok - private terminal audit keeps typed errors and cost certainty without payloads or provider extensions
+progress: "test.jev-targeted-local elapsed=30.1s output_bytes=1699 tree_cpu=0.92s"
+FM_TEST_END 2026-10-16T02:36:51Z tests/fm-jev-guard.test.sh exit=0 duration_ms=30396 gate_skip=false
+progress: "test.jev-targeted-local elapsed=30.5s output_bytes=1800 tree_cpu=0.92s"
+FM_TEST_BEGIN 2026-10-16T02:36:51Z tests/fm-task-inbox.test.sh family=watcher-wake-lock expected_gate_skip=none
+progress: "test.jev-targeted-local elapsed=30.5s output_bytes=1912 tree_cpu=0.92s"
+ok - inbox: a steer is written durably and round-trips byte-exact with a self-describing doorbell
+progress: "test.jev-targeted-local elapsed=31.1s output_bytes=2010 tree_cpu=0.98s"
+ok - inbox: a hostile-name doorbell executes as a no-op in bare shells
+progress: "test.jev-targeted-local elapsed=31.3s output_bytes=2081 tree_cpu=0.98s"
+ok - inbox: terminal-control inbox names are rejected without typing
+progress: "test.jev-targeted-local elapsed=31.8s output_bytes=2150 tree_cpu=0.98s"
+progress: "test.jev-targeted-local elapsed=32.8s output_bytes=2150 tree_cpu=1.02s"
+progress: "test.jev-targeted-local elapsed=33.9s output_bytes=2150 tree_cpu=1.04s"
+ok - inbox: the ring skips dead or missing endpoints and still rings live or unclassifiable endpoints
+progress: "test.jev-targeted-local elapsed=34.8s output_bytes=2252 tree_cpu=1.04s"
+progress: "test.jev-targeted-local elapsed=35.8s output_bytes=2252 tree_cpu=1.06s"
+progress: "test.jev-targeted-local elapsed=36.8s output_bytes=2252 tree_cpu=1.09s"
+progress: "test.jev-targeted-local elapsed=37.8s output_bytes=2252 tree_cpu=1.12s"
+progress: "test.jev-targeted-local elapsed=38.9s output_bytes=2252 tree_cpu=1.13s"
+ok - inbox: the ring submits its own stuck doorbell, skips other pending text, and retries a lost Enter once on both paths
+progress: "test.jev-targeted-local elapsed=38.9s output_bytes=2375 tree_cpu=1.13s"
+ok - inbox: the idempotent enqueue dedups an exact re-run onto the same record, handled or not
+progress: "test.jev-targeted-local elapsed=39.4s output_bytes=2470 tree_cpu=1.13s"
+ok - inbox: idempotent enqueue follows a record concurrently moved to handled
+progress: "test.jev-targeted-local elapsed=39.6s output_bytes=2548 tree_cpu=1.13s"
+ok - inbox: the handled mv is the idempotent ack and sequences are never reissued
+progress: "test.jev-targeted-local elapsed=40.1s output_bytes=2630 tree_cpu=1.14s"
+progress: "test.jev-targeted-local elapsed=41.1s output_bytes=2630 tree_cpu=1.25s"
+ok - inbox: concurrent writers serialize on the sequence lock and lose nothing
+progress: "test.jev-targeted-local elapsed=41.4s output_bytes=2709 tree_cpu=1.25s"
+ok - inbox: a writer retries when a competing lock vanishes after its failed claim
+progress: "test.jev-targeted-local elapsed=41.9s output_bytes=2792 tree_cpu=1.25s"
+ok - inbox: ladder bookkeeping ignores a concurrently removed inbox
+progress: "test.jev-targeted-local elapsed=42.1s output_bytes=2860 tree_cpu=1.25s"
+ok - inbox: fire-and-forget records stay durable and outside the ladder
+progress: "test.jev-targeted-local elapsed=42.4s output_bytes=2932 tree_cpu=1.26s"
+ok - inbox: a fire-and-forget record whose ring did not land is owed exactly one retry
+progress: "test.jev-targeted-local elapsed=43.2s output_bytes=3019 tree_cpu=1.26s"
+ok - inbox: without config/wait-no-turns a fire-and-forget retry mark stays quiet
+progress: "test.jev-targeted-local elapsed=43.4s output_bytes=3101 tree_cpu=1.26s"
+ok - inbox: the re-ring ladder paces by grace, escalates once, and resets on ack
+progress: "test.jev-targeted-local elapsed=44.1s output_bytes=3182 tree_cpu=1.27s"
+progress: "test.jev-targeted-local elapsed=45.1s output_bytes=3182 tree_cpu=1.55s"
+progress: "test.jev-targeted-local elapsed=46.1s output_bytes=3182 tree_cpu=1.59s"
+progress: "test.jev-targeted-local elapsed=47.2s output_bytes=3182 tree_cpu=1.60s"
+progress: "test.jev-targeted-local elapsed=48.2s output_bytes=3182 tree_cpu=1.69s"
+progress: "test.jev-targeted-local elapsed=49.2s output_bytes=3182 tree_cpu=1.71s"
+progress: "test.jev-targeted-local elapsed=50.3s output_bytes=3182 tree_cpu=1.76s"
+ok - watcher: an aged message with an ordinary unknown-idle composer re-rings quietly, and the ack silences it
+progress: "test.jev-targeted-local elapsed=50.9s output_bytes=3293 tree_cpu=1.76s"
+progress: "test.jev-targeted-local elapsed=51.9s output_bytes=3293 tree_cpu=1.98s"
+progress: "test.jev-targeted-local elapsed=52.9s output_bytes=3293 tree_cpu=2.01s"
+progress: "test.jev-targeted-local elapsed=53.9s output_bytes=3293 tree_cpu=2.05s"
+ok - watcher: a live idle task with draft risk defers without input, retains its record, and escalates once at the ladder budget
+progress: "test.jev-targeted-local elapsed=54.5s output_bytes=3422 tree_cpu=2.05s"
+progress: "test.jev-targeted-local elapsed=55.5s output_bytes=3422 tree_cpu=2.30s"
+progress: "test.jev-targeted-local elapsed=56.5s output_bytes=3422 tree_cpu=2.35s"
+progress: "test.jev-targeted-local elapsed=57.6s output_bytes=3422 tree_cpu=2.39s"
+ok - watcher: a live idle task with draft risk defers without input, retains its record, and escalates once at the ladder budget
+progress: "test.jev-targeted-local elapsed=58.5s output_bytes=3551 tree_cpu=2.39s"
+progress: "test.jev-targeted-local elapsed=59.5s output_bytes=3551 tree_cpu=2.52s"
+ok - watcher: busy deferrals survive restart, escalate once at the bound, and never type
+progress: "test.jev-targeted-local elapsed=59.9s output_bytes=3640 tree_cpu=2.52s"
+progress: "test.jev-targeted-local elapsed=60.9s output_bytes=3640 tree_cpu=2.63s"
+progress: "test.jev-targeted-local elapsed=62.0s output_bytes=3640 tree_cpu=2.66s"
+progress: "test.jev-targeted-local elapsed=63.0s output_bytes=3640 tree_cpu=2.71s"
+ok - watcher: delivery and acknowledgement reset the durable busy budget
+progress: "test.jev-targeted-local elapsed=63.5s output_bytes=3713 tree_cpu=2.71s"
+ok - watcher: unwritable busy bookkeeping surfaces without typing
+progress: "test.jev-targeted-local elapsed=64.3s output_bytes=3779 tree_cpu=2.71s"
+progress: "test.jev-targeted-local elapsed=65.4s output_bytes=3779 tree_cpu=2.82s"
+ok - watcher: idle successor surfaces once despite unremovable predecessor bookkeeping
+progress: "test.jev-targeted-local elapsed=66.1s output_bytes=3866 tree_cpu=2.82s"
+progress: "test.jev-targeted-local elapsed=67.1s output_bytes=3866 tree_cpu=2.92s"
+progress: "test.jev-targeted-local elapsed=68.1s output_bytes=3866 tree_cpu=3.00s"
+ok - watcher: busy successor surfaces once despite unremovable predecessor bookkeeping
+progress: "test.jev-targeted-local elapsed=68.2s output_bytes=3953 tree_cpu=3.00s"
+progress: "test.jev-targeted-local elapsed=69.2s output_bytes=3953 tree_cpu=3.11s"
+progress: "test.jev-targeted-local elapsed=70.2s output_bytes=3953 tree_cpu=3.22s"
+progress: "test.jev-targeted-local elapsed=71.3s output_bytes=3953 tree_cpu=3.25s"
+ok - watcher: persistent idle busy-reset failure escalates once and later instructions still deliver
+progress: "test.jev-targeted-local elapsed=71.4s output_bytes=4054 tree_cpu=3.25s"
+progress: "test.jev-targeted-local elapsed=72.4s output_bytes=4054 tree_cpu=3.35s"
+progress: "test.jev-targeted-local elapsed=73.5s output_bytes=4054 tree_cpu=3.46s"
+progress: "test.jev-targeted-local elapsed=74.5s output_bytes=4054 tree_cpu=3.49s"
+ok - watcher: persistent protected busy-reset failure escalates once and later instructions still deliver
+progress: "test.jev-targeted-local elapsed=74.9s output_bytes=4160 tree_cpu=3.49s"
+progress: "test.jev-targeted-local elapsed=75.9s output_bytes=4160 tree_cpu=3.57s"
+ok - watcher: busy limit '999999999999999999999999999999' escalates exactly once at 2
+progress: "test.jev-targeted-local elapsed=76.4s output_bytes=4246 tree_cpu=3.57s"
+progress: "test.jev-targeted-local elapsed=77.4s output_bytes=4246 tree_cpu=3.69s"
+ok - watcher: busy limit '1000000000' escalates exactly once at 2
+progress: "test.jev-targeted-local elapsed=77.6s output_bytes=4312 tree_cpu=3.69s"
+progress: "test.jev-targeted-local elapsed=78.6s output_bytes=4312 tree_cpu=3.80s"
+ok - watcher: busy limit '0' escalates exactly once at 2
+progress: "test.jev-targeted-local elapsed=78.9s output_bytes=4369 tree_cpu=3.80s"
+progress: "test.jev-targeted-local elapsed=79.9s output_bytes=4369 tree_cpu=3.93s"
+ok - watcher: busy limit '000' escalates exactly once at 2
+progress: "test.jev-targeted-local elapsed=80.3s output_bytes=4428 tree_cpu=3.93s"
+progress: "test.jev-targeted-local elapsed=81.3s output_bytes=4428 tree_cpu=4.04s"
+ok - watcher: busy limit '' escalates exactly once at 2
+progress: "test.jev-targeted-local elapsed=81.7s output_bytes=4484 tree_cpu=4.04s"
+progress: "test.jev-targeted-local elapsed=82.7s output_bytes=4484 tree_cpu=4.15s"
+ok - watcher: busy limit 'invalid' escalates exactly once at 2
+progress: "test.jev-targeted-local elapsed=83.0s output_bytes=4547 tree_cpu=4.15s"
+ok - watcher: busy limit '1' escalates exactly once at 1
+progress: "test.jev-targeted-local elapsed=83.9s output_bytes=4604 tree_cpu=4.16s"
+progress: "test.jev-targeted-local elapsed=84.9s output_bytes=4604 tree_cpu=4.21s"
+ok - watcher: busy limit '3' escalates exactly once at 3
+progress: "test.jev-targeted-local elapsed=85.5s output_bytes=4661 tree_cpu=4.21s"
+progress: "test.jev-targeted-local elapsed=86.5s output_bytes=4661 tree_cpu=4.31s"
+progress: "test.jev-targeted-local elapsed=87.5s output_bytes=4661 tree_cpu=4.33s"
+ok - watcher: unremovable obsolete busy state does not block or escalate a fire-and-forget retry
+progress: "test.jev-targeted-local elapsed=88.4s output_bytes=4758 tree_cpu=4.33s"
+progress: "test.jev-targeted-local elapsed=89.4s output_bytes=4758 tree_cpu=4.47s"
+progress: "test.jev-targeted-local elapsed=90.4s output_bytes=4758 tree_cpu=4.56s"
+progress: "test.jev-targeted-local elapsed=91.4s output_bytes=4758 tree_cpu=4.58s"
+ok - watcher: busy successor escalates once despite stale predecessor ring history
+progress: "test.jev-targeted-local elapsed=91.8s output_bytes=4841 tree_cpu=4.58s"
+progress: "test.jev-targeted-local elapsed=92.8s output_bytes=4841 tree_cpu=4.70s"
+progress: "test.jev-targeted-local elapsed=93.8s output_bytes=4841 tree_cpu=4.72s"
+progress: "test.jev-targeted-local elapsed=94.8s output_bytes=4841 tree_cpu=4.74s"
+ok - watcher: dead successor escalates once despite stale predecessor ring history
+progress: "test.jev-targeted-local elapsed=95.0s output_bytes=4924 tree_cpu=4.74s"
+progress: "test.jev-targeted-local elapsed=96.0s output_bytes=4924 tree_cpu=4.86s"
+progress: "test.jev-targeted-local elapsed=97.0s output_bytes=4924 tree_cpu=4.93s"
+ok - watcher: missing successor escalates once despite stale predecessor ring history
+progress: "test.jev-targeted-local elapsed=98.0s output_bytes=5010 tree_cpu=4.93s"
+progress: "test.jev-targeted-local elapsed=99.0s output_bytes=5010 tree_cpu=5.07s"
+progress: "test.jev-targeted-local elapsed=100.0s output_bytes=5010 tree_cpu=5.08s"
+progress: "test.jev-targeted-local elapsed=101.1s output_bytes=5010 tree_cpu=5.18s"
+ok - watcher: unwritable successor escalates once despite stale predecessor ring history
+progress: "test.jev-targeted-local elapsed=101.5s output_bytes=5099 tree_cpu=5.18s"
+progress: "test.jev-targeted-local elapsed=102.5s output_bytes=5099 tree_cpu=5.30s"
+ok - watcher: a non-busy protected delivery breaks the busy streak and preserves the attempt ladder
+progress: "test.jev-targeted-local elapsed=103.5s output_bytes=5199 tree_cpu=5.30s"
+progress: "test.jev-targeted-local elapsed=104.5s output_bytes=5199 tree_cpu=5.43s"
+ok - watcher: a non-busy failed delivery breaks the busy streak and preserves the attempt ladder
+progress: "test.jev-targeted-local elapsed=105.4s output_bytes=5296 tree_cpu=5.43s"
+progress: "test.jev-targeted-local elapsed=106.4s output_bytes=5296 tree_cpu=5.63s"
+progress: "test.jev-targeted-local elapsed=107.5s output_bytes=5296 tree_cpu=5.64s"
+progress: "test.jev-targeted-local elapsed=108.5s output_bytes=5296 tree_cpu=5.68s"
+progress: "test.jev-targeted-local elapsed=109.5s output_bytes=5296 tree_cpu=5.72s"
+ok - watcher: a healthy or empty inbox stays completely silent
+progress: "test.jev-targeted-local elapsed=109.6s output_bytes=5359 tree_cpu=5.72s"
+progress: "test.jev-targeted-local elapsed=110.6s output_bytes=5359 tree_cpu=6.06s"
+progress: "test.jev-targeted-local elapsed=111.6s output_bytes=5359 tree_cpu=6.09s"
+progress: "test.jev-targeted-local elapsed=112.6s output_bytes=5359 tree_cpu=6.11s"
+ok - watcher: acknowledgement silences an unwritable ladder without a stale wake
+progress: "test.jev-targeted-local elapsed=113.3s output_bytes=5440 tree_cpu=6.11s"
+progress: "test.jev-targeted-local elapsed=114.3s output_bytes=5440 tree_cpu=6.46s"
+progress: "test.jev-targeted-local elapsed=115.3s output_bytes=5440 tree_cpu=6.50s"
+ok - watcher: unwritable ladder bookkeeping surfaces a stale wake after the doorbell
+progress: "test.jev-targeted-local elapsed=115.9s output_bytes=5525 tree_cpu=6.50s"
+progress: "test.jev-targeted-local elapsed=116.9s output_bytes=5525 tree_cpu=6.83s"
+progress: "test.jev-targeted-local elapsed=118.0s output_bytes=5525 tree_cpu=6.87s"
+progress: "test.jev-targeted-local elapsed=119.0s output_bytes=5525 tree_cpu=6.89s"
+progress: "test.jev-targeted-local elapsed=120.0s output_bytes=5525 tree_cpu=6.98s"
+ok - watcher: a fire-and-forget record's owed retry rings exactly once and never escalates
+progress: "test.jev-targeted-local elapsed=120.8s output_bytes=5616 tree_cpu=6.98s"
+progress: "test.jev-targeted-local elapsed=121.8s output_bytes=5616 tree_cpu=7.09s"
+progress: "test.jev-targeted-local elapsed=122.8s output_bytes=5616 tree_cpu=7.12s"
+ok - watcher: a fire-and-forget retry waits out the worker's own decision, then rings once
+progress: "test.jev-targeted-local elapsed=123.3s output_bytes=5707 tree_cpu=7.12s"
+progress: "test.jev-targeted-local elapsed=124.3s output_bytes=5707 tree_cpu=7.25s"
+progress: "test.jev-targeted-local elapsed=125.4s output_bytes=5707 tree_cpu=7.26s"
+progress: "test.jev-targeted-local elapsed=126.4s output_bytes=5707 tree_cpu=7.37s"
+ok - watcher: spending a retry keeps a newer record's mark written during its ring
+progress: "test.jev-targeted-local elapsed=127.3s output_bytes=5790 tree_cpu=7.37s"
+ok - inbox: staggered retry records use their own publication clocks without superseding earlier recovery
+progress: "test.jev-targeted-local elapsed=128.2s output_bytes=5896 tree_cpu=7.37s"
+progress: "test.jev-targeted-local elapsed=129.3s output_bytes=5896 tree_cpu=7.49s"
+progress: "test.jev-targeted-local elapsed=130.3s output_bytes=5896 tree_cpu=7.51s"
+progress: "test.jev-targeted-local elapsed=131.3s output_bytes=5896 tree_cpu=7.63s"
+ok - watcher: multi-record skipped rings recover individually in acknowledgement order
+progress: "test.jev-targeted-local elapsed=132.1s output_bytes=5983 tree_cpu=7.63s"
+progress: "test.jev-targeted-local elapsed=133.1s output_bytes=5983 tree_cpu=7.99s"
+progress: "test.jev-targeted-local elapsed=134.1s output_bytes=5983 tree_cpu=8.03s"
+progress: "test.jev-targeted-local elapsed=135.2s output_bytes=5983 tree_cpu=8.05s"
+progress: "test.jev-targeted-local elapsed=136.2s output_bytes=5983 tree_cpu=8.06s"
+ok - watcher: a spent ring budget emits exactly one ordinary stale wake for recovery
+progress: "test.jev-targeted-local elapsed=137.2s output_bytes=6068 tree_cpu=8.06s"
+progress: "test.jev-targeted-local elapsed=138.2s output_bytes=6068 tree_cpu=8.40s"
+ok - watcher: a positively dead pane is never typed into and surfaces exactly one stale wake
+progress: "test.jev-targeted-local elapsed=138.9s output_bytes=6161 tree_cpu=8.40s"
+progress: "test.jev-targeted-local elapsed=139.9s output_bytes=6161 tree_cpu=8.76s"
+ok - watcher: dead-pane recovery overrides stale busy state
+progress: "test.jev-targeted-local elapsed=140.4s output_bytes=6221 tree_cpu=8.76s"
+FM_TEST_END 2026-10-16T02:38:42Z tests/fm-task-inbox.test.sh exit=0 duration_ms=110619 gate_skip=false
+progress: "test.jev-targeted-local elapsed=141.1s output_bytes=6324 tree_cpu=8.76s"
+FM_TEST_BEGIN 2026-10-16T02:38:42Z tests/fm-operational-input.test.sh family=pure-contract-unit expected_gate_skip=none
+progress: "test.jev-targeted-local elapsed=141.2s output_bytes=6444 tree_cpu=8.76s"
+ok - operational input: every current generic envelope retains its exact structured kind
+progress: "test.jev-targeted-local elapsed=141.6s output_bytes=6533 tree_cpu=8.76s"
+ok - operational input: the established from-firstmate carrier remains structurally typed and byte-compatible
+progress: "test.jev-targeted-local elapsed=141.6s output_bytes=6643 tree_cpu=8.76s"
+ok - operational input: untyped landed FIRSTMATE_OP transcripts are explicit legacy-operational input
+progress: "test.jev-targeted-local elapsed=141.7s output_bytes=6745 tree_cpu=8.76s"
+ok - operational input: historical prose compatibility is isolated from current parsing
+progress: "test.jev-targeted-local elapsed=141.7s output_bytes=6833 tree_cpu=8.76s"
+ok - operational input: quoted, ASCII-only, arbitrary-U+2063, altered-legacy, and label-only near misses stay genuine
+progress: "test.jev-targeted-local elapsed=141.7s output_bytes=6951 tree_cpu=8.76s"
+ok - operational input: the OpenCode adapter constructs through the canonical owner
+progress: "test.jev-targeted-local elapsed=141.8s output_bytes=7035 tree_cpu=8.76s"
+ok - operational input: current construction rejects legacy kinds and empty bodies
+progress: "test.jev-targeted-local elapsed=141.8s output_bytes=7118 tree_cpu=8.76s"
+ok - record-backed carrier: Claude-only selection, an ASCII doorbell naming an exact envelope record, home-bound open, and no recognition without the record
+progress: "test.jev-targeted-local elapsed=142.1s output_bytes=7275 tree_cpu=8.76s"
+progress: "test.jev-targeted-local elapsed=143.1s output_bytes=7275 tree_cpu=8.96s"
+progress: "test.jev-targeted-local elapsed=144.1s output_bytes=7275 tree_cpu=9.61s"
+progress: "test.jev-targeted-local elapsed=145.2s output_bytes=7275 tree_cpu=10.44s"
+progress: "test.jev-targeted-local elapsed=146.2s output_bytes=7275 tree_cpu=11.04s"
+ok - record pruning: expired records past one argument list are all pruned on a write
+progress: "test.jev-targeted-local elapsed=146.3s output_bytes=7361 tree_cpu=11.04s"
+FM_TEST_END 2026-10-16T02:38:48Z tests/fm-operational-input.test.sh exit=0 duration_ms=5723 gate_skip=false
+progress: "test.jev-targeted-local elapsed=146.9s output_bytes=7469 tree_cpu=11.04s"
+FM_TEST_BEGIN 2026-10-16T02:38:48Z tests/fm-busy-adapter-wiring.test.sh family=standalone expected_gate_skip=none
+progress: "test.jev-targeted-local elapsed=146.9s output_bytes=7583 tree_cpu=11.04s"
+progress: "test.jev-targeted-local elapsed=147.9s output_bytes=7583 tree_cpu=11.27s"
+not ok - claude secondmate spawn failed: error: secondmate home cannot be inside the firstmate repo: /Users/charlesabrooker/.no-mistakes/worktrees/eded895c05cf/01M4YHMB6HGEVT2W2166E3PQYW/.local-test-jev/tmp/fm-busy-adapter-wiring.4NbhFw/sm-claude/sm
+progress: "test.jev-targeted-local elapsed=148.1s output_bytes=7833 tree_cpu=11.27s"
+FM_TEST_END 2026-10-16T02:38:49Z tests/fm-busy-adapter-wiring.test.sh exit=1 duration_ms=1712 gate_skip=false
+progress: "test.jev-targeted-local elapsed=148.7s output_bytes=7943 tree_cpu=11.27s"
+FM_TEST_SUMMARY total=4 failed=1 skipped_gate=0 duration_ms=148646
+progress: "test.jev-targeted-local elapsed=148.7s output_bytes=8010 tree_cpu=11.27s"
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=1 duration_ms=5723 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=1712 failed=1
+progress: "test.jev-targeted-local elapsed=148.7s output_bytes=8168 tree_cpu=11.27s"
+FM_TEST_SUMMARY_FAMILY family=unclassified count=1 duration_ms=30396 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=1 duration_ms=110619 failed=0
+progress: "test.jev-targeted-local elapsed=148.7s output_bytes=8330 tree_cpu=11.27s"
+FM_TEST_SLOWEST rank=1 script=tests/fm-task-inbox.test.sh duration_ms=110619
+progress: "test.jev-targeted-local elapsed=148.7s output_bytes=8407 tree_cpu=11.27s"
+FM_TEST_SLOWEST rank=2 script=tests/fm-jev-guard.test.sh duration_ms=30396
+progress: "test.jev-targeted-local elapsed=148.7s output_bytes=8482 tree_cpu=11.27s"
+FM_TEST_SLOWEST rank=3 script=tests/fm-operational-input.test.sh duration_ms=5723
+progress: "test.jev-targeted-local elapsed=148.7s output_bytes=8564 tree_cpu=11.27s"
+FM_TEST_SLOWEST rank=4 script=tests/fm-busy-adapter-wiring.test.sh duration_ms=1712
+progress: "test.jev-targeted-local elapsed=148.7s output_bytes=8648 tree_cpu=11.27s"
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M4YHMB6HGEVT2W2166E3PQYW/targeted-timing.json
+progress: "test.jev-targeted-local elapsed=148.7s output_bytes=8777 tree_cpu=11.27s"
