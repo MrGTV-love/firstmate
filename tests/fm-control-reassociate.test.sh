@@ -926,7 +926,11 @@ test_shared_slot_cleanup_then_reassociate_preserves_all_copies() {
       out=$(run_case_teardown "$dir" "$id") || rc=$?
       expect_code 1 "$rc" "before reassociation, the parked record must not return a slot containing an unrecorded copy"$'\n'"$out"
       assert_contains "$out" "registered copy $nested that is not one of task $id's proven copies" 'the refusal must name the protected registered copy and its retiring task'
-      assert_contains "$out" "registered copy $slot/.claude/worktrees/$finished " 'the refusal must name the retired record'"'"'s leftover copy'
+      # The retired record's clean, landed leftover copy is now proved and left for
+      # release; only the copy teardown cannot prove is refused. Nothing moves yet.
+      assert_not_contains "$out" "registered copy $slot/.claude/worktrees/$finished " 'the refusal must not name the retired record'"'"'s proved leftover copy'
+      git -C "$dir/proj" worktree list --porcelain | cmp -s - "$dir/registrations-before" \
+        || fail 'the refusal removed a copy before reaching its proof'
       assert_contains "$out" "bin/fm-control.sh <owning-task> reassociate --worktree <copy>" 'the refusal must name reassociation for an owned copy'
       assert_contains "$out" 'git -C <copy> status --untracked-files=all' 'the refusal must name the manual inspection for an unowned copy'
       assert_contains "$out" "git -C $slot worktree remove <copy>" 'the refusal must name the manual removal for an unowned copy'

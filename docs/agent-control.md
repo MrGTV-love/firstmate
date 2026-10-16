@@ -257,13 +257,22 @@ A finished record whose copy is nested in the slot also uses record-only retirem
 Then reassociate the remaining task to its real nested or external copy with `bin/fm-control.sh <remaining-task> reassociate --worktree <copy> --note <why>`.
 The existing component-aware exclusivity proof still requires finished nested scout records to retire first when they overlap the old root, even if their copy is disjoint from the replacement.
 Do not retire an unfinished task to clear custody: it keeps its record and claim until its own delivery proof passes.
-Before any forced Treehouse return of a Git directory, whether or not it is a pool slot, teardown also checks that directory's Git worktree registrations and refuses a nested copy that is not one of the retiring task's proven copies, naming each such copy; `--force` does not waive that custody proof.
+Before any forced Treehouse return of a Git directory, whether or not it is a pool slot, teardown also checks that directory's Git worktree registrations and refuses a nested copy that is not one of the retiring task's proven copies, naming each such copy, unless the foreign-copy proof below releases it; `--force` does not waive that custody proof.
 A child-worktree removal that hits this refusal stops there, with no `rm -rf` fallback, and a path that cannot be canonicalized is refused the same way.
 The refusal prints the reassociate command with `FM_HOME=/path/to/owning-home`, because the owning task's record may live in a different home than the one running teardown.
 A secondmate home that is a pool slot, and each descendant secondmate home, gets the same check before any endpoint, child, or record is touched.
 When an active task record owns that copy's work, including the retiring task itself while its record still names the slot root, reassociate that task to the copy first.
-When no active record owns it, such as a finished record's nested copy left after records-only retirement or a worker's own `.claude/worktrees/` copy, inspect it by hand with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it by hand with a plain `git -C <slot> worktree remove <copy>` and rerun teardown.
-Teardown never disposes of such a copy itself.
+When no active record owns it, such as a finished record's nested copy left after records-only retirement or a worker's own `.claude/worktrees/` copy (Vernant's `start_task_worktree.py` creates and locks one), a ship teardown of the pool slot releases it itself once it proves all of these, in [`bin/fm-teardown-nested-lib.sh`](../bin/fm-teardown-nested-lib.sh):
+- No other active task record names the copy, even through a symlink alias, and no process runs in it.
+- No live process is the launcher named in its lock; a launcher pid that started after the lock file was written is a recycled pid and owns nothing.
+- It is a clean worktree root and holds no ignored file that exists nowhere else.
+- Its work is landed, strongest proof first: HEAD is an ancestor of the merged PR head, its tree equals the merged PR head or the squash commit, the ordinary landed-work test holds, or Vernant's `line_proof_for_path` holds for every changed path anchored at the squash commit.
+
+A copy locked by Vernant's creation lock is released and removed by Vernant's own driver, `scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup`, run from the slot; an unlocked copy is removed with a plain non-forced `git worktree remove`.
+Work that is none of the landed rungs is released only when `FM_TEARDOWN_DISPOSE_ANCHORED=1` (off by default): teardown first writes and verifies `refs/fm/anchor/<task>-<sha>` and still requires a clean copy, and the Vernant driver may still refuse such a copy.
+Teardown never forces a removal and never touches uncommitted or ignored files.
+A copy it cannot prove, a lock in any other format, a driver refusal, a half-removed copy, or a copy still registered afterwards refuses exactly as above, and `--force` waives none of it.
+To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.
 A surviving recorded PR follows only under the head-containment proof above.
 A durable lease added for this recovery stays on the slot after the remaining task moves to a copy outside it, so no record names the slot and teardown never returns it.
 Release it by hand only after inspecting every copy left in the slot with `git -C <slot> status --untracked-files=all` and `git -C <project> worktree list --porcelain`, and only when no record names the slot or a copy inside it and nothing there is unlanded: `(cd <project> && treehouse return <slot-path> --if-lease-holder <remaining-task> </dev/null)`, where the holder is the one passed to `treehouse lease`.
