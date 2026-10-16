@@ -617,7 +617,7 @@ Around those outcomes, it proves:
 - Default close and note refuse without a pending board request; a verified close needs the explicit attestation and evidence instead.
 - `test_verified_close_without_board_request` covers recorded-answer and moot outcomes, durable evidence, exact replay, and parent-publication recovery with no request.
 - `test_verified_close_retries_only_its_own_hold` covers an interrupted standalone close, original hold age, and refusal to reuse evidence across hold lifecycles.
-- `test_verified_closes_refuse_unanswered_or_unsupported_calls` covers active/unanswered outcomes, absent or empty evidence, reserved direct answers, and unfinished or non-held work.
+- `test_verified_closes_refuse_unanswered_or_unsupported_calls` covers active/unanswered outcomes, absent, empty, or reserved evidence, and unfinished or non-held work.
 - `test_operational_key_closes_with_durable_evidence_and_replay` covers full evidence retention, exact retry, changed evidence, reopened calls, and preservation of unrelated keys.
 - `test_operational_key_close_refusals_and_interrupted_append` covers captain-task and library ownership, required attestation, absent keys, and retry after evidence publication but before status append.
 - Each durable mutation applies only once across close, probe, and request-retirement failures.

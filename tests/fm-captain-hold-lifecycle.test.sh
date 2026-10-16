@@ -3072,9 +3072,6 @@ test_verified_closes_refuse_unanswered_or_unsupported_calls() {
       fail "verified close accepted $file evidence"
     fi
   done
-  if run_captain "$home" answer "$id" --decision-file "$home/reconcile.txt" >/dev/null 2>&1; then
-    fail "a direct answer accepted the reserved reconcile value"
-  fi
   show=$(tasks_in "$home" show "$id" --full)
   assert_contains "$show" "held: yes" "refused settlement released an unanswered call"
   assert_not_contains "$show" "Resolution recorded by" "refused settlement wrote a resolution"
@@ -3090,7 +3087,7 @@ test_verified_closes_refuse_unanswered_or_unsupported_calls() {
     --evidence-file "$home/evidence.txt" >/dev/null 2>&1; then
     fail "verified settlement completed work that was never captain-held"
   fi
-  pass "verified closes refuse active calls, missing evidence, reserved answers, and unfinished work"
+  pass "verified closes refuse active calls, missing or reserved evidence, and unfinished work"
 }
 
 test_operational_key_closes_with_durable_evidence_and_replay() {

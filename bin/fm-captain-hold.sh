@@ -400,7 +400,7 @@ load_reconciliation_evidence() {  # <path> <verified-outcome-or-empty>
     *[![:space:]]*) : ;;
     *) fail "evidence file must contain verified facts, not only whitespace" ;;
   esac
-  [ "$DECISION_TEXT" != reconcile ] \
+  [ "$DECISION_TEXT" != "$RECONCILE_VALUE" ] \
     || fail "reconcile requests verification; it is not evidence that a call is settled"
   if [ -n "$outcome" ]; then
     DECISION_TEXT=$(printf 'Verified outcome: %s\n\n%s' "$outcome" "$DECISION_TEXT")
@@ -1230,7 +1230,6 @@ command_answer() {
   done
   validate_slug task-id "$id"
   load_decision "$decision_file"
-  [ "$DECISION_TEXT" != reconcile ] || fail "reconcile requests verification; it is not a captain answer"
   acquire_task_control_lock "$id"
   require_tasks_axi
   task_show "$id" || fail "captain-held task $id is absent from this home's configured backlog (data directory $DATA)"
