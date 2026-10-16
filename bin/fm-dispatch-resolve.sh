@@ -28,7 +28,10 @@
 #   model-router class filter inside the selected rule, the confidence floor
 #   (0.6 on the answer confidence, or a rule's declared `min_confidence` on that
 #   rule's probability, falling to the most probable other option that clears
-#   its own floor), the rule's declared `approval` and `floor`, each profile's
+#   its own floor; options that select identical profiles, approval, floor,
+#   select and fallback pool their probabilities behind the pick, because a
+#   split between them cannot be a wrong pick), the rule's declared `approval`
+#   and `floor`, each profile's
 #   declared `provider` and `floor`, and the normalized quota composite over ONE
 #   compatible quota-axi --json snapshot and one OMP pool report. Proven
 #   exhaustion of every candidate activates the selected rule's declared
@@ -73,6 +76,7 @@
 #   or raw API error bodies, which may echo sensitive input.
 #     routing: <Level 5 agent and model decisions, and any escalation>
 #     fallback: <runner-up rule or declared stand-in taken, and why>
+#     pooled: <the options pooled behind the pick, when pooling cleared its floor>
 #     reason: <why the status is not clear>
 #     candidate: <harness>:<model> provider=.. scope=.. remaining=..% spendPriority=.. runway=.. pool=..
 #       quota_score=.. parts=.. weights=.. common=.. bounds=..
@@ -91,6 +95,17 @@
 #   Exit 2 only for a usage or configuration error (unreadable brief, an
 #   existing unreadable rules file, malformed rules, model-index/profile
 #   resolution failure, or missing jq), which is actionable, never selected around.
+#
+# Result log: every resolve that reaches a status appends one JSON line to
+#   data/dispatch-resolve.jsonl (FM_DATA_OVERRIDE moves its directory):
+#   ts (UTC), status, rule (the option the model picked), selected (the option
+#   whose profiles were used), profile (harness/model/effort when clear),
+#   confidence, floor, pooled (the combined probability when pooling cleared
+#   the floor), and reason. The block rate is every status other than clear.
+#   Off paths and exit-2 usage or configuration errors have no status and write
+#   nothing. No brief text, request, API body, or credential is ever written;
+#   a failed write is silent. docs/configuration.md "Typed dispatch resolution"
+#   owns the contract.
 #
 # Environment:
 #   TYPESAFE_API_KEY is the only resolver-specific environment setting.
@@ -127,9 +142,38 @@ CONFIG="${FM_CONFIG_OVERRIDE:-$FM_HOME/config}"
 
 CONFIDENCE_FLOOR=0.6
 TS_INPUT_USD_PER_MILLION=0.042
+RESOLVE_LOG="${FM_DATA_OVERRIDE:-$FM_HOME/data}/dispatch-resolve.jsonl"
+
+# Append one record per finished resolve to the private result log, so the
+# block rate (every status other than clear) can be measured. Arguments: status,
+# reason, and the resolution result JSON when there is one. A record holds only
+# the status, the matched option names, the chosen profile, the numeric
+# confidence and floor, a coarse reason, and a UTC timestamp; every value comes
+# from validated answer fields or local configuration, never from the brief,
+# the request, an API body, or a credential. A failed write is silent and never
+# changes the result.
+log_result() {
+  local line
+  command -v jq >/dev/null 2>&1 || return 0
+  [ ! -L "$RESOLVE_LOG" ] || return 0
+  line=$(jq -cn --arg status "$1" --arg reason "$2" --argjson r "${3:-null}" '
+    def option: if type == "string" and test("\\A(rule_[0-9]+|default)\\z") then . else null end;
+    def num: if type == "number" then . else null end;
+    def text: if type == "string" and length > 0 then .[0:240] else null end;
+    def profile: if type == "object" then {harness: (.harness | text), model: (.model | text), effort: (.effort | text)} else null end;
+    {ts: (now | floor | todate), status: $status,
+     rule: ($r.rule | option), selected: ($r.selected | option),
+     profile: ($r.chosen.profile | profile),
+     confidence: ($r.confidence | num), floor: ($r.floor | num),
+     pooled: ($r.pooled.probability | num),
+     reason: ($reason | text)}' 2>/dev/null) || return 0
+  mkdir -p "${RESOLVE_LOG%/*}" 2>/dev/null || return 0
+  printf '%s\n' "$line" >> "$RESOLVE_LOG" 2>/dev/null || true
+}
 
 die() { printf 'error: %s\n' "$1" >&2; exit 2; }
 no_rules() {
+  log_result escalate 'no rules to match'
   printf 'dispatch-resolve:\n  status: escalate\n  reason: no rules to match\n'
   exit 0
 }
@@ -309,6 +353,7 @@ emit_telemetry() {
 emit_error() {
   local reason=$1
   echo "dispatch-resolve: error ($reason)" >&2
+  log_result error "$reason"
   printf 'dispatch-resolve:\n  status: error\n  reason: %s\n' "$reason"
   emit_telemetry
   exit 0
@@ -546,16 +591,40 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     else null end;
   def declared_confidence($c): rule_at($c) as $x | $x != null and ($x | has("min_confidence"));
   def confidence_floor($c): if declared_confidence($c) then rule_at($c).min_confidence else ($floor | tonumber) end;
+  # The dispatch outcome one option selects: everything $sel below reads from a
+  # rule (or from the default array), minus the `when` text the model chose by.
+  # Two options with equal outcomes are one decision, so a split between them
+  # cannot be a wrong pick. Profile order never changes the ranking.
+  def outcome($c):
+    if $c == "default" then
+      {use: (profiles($cfg.default // null) | map(tojson) | sort), filtered: ($cfg.default_filtered // []),
+       approval: null, floor: null, select: null, fallback: ($cfg.default_fallback // [])}
+    else
+      rule_at($c) as $x |
+      if $x == null then null
+      else {use: (profiles($x.use) | map(tojson) | sort), filtered: ($x.filtered // []), approval: ($x.approval // null),
+            floor: ($x.floor // null), select: ($x.select // null), fallback: ($x.fallback // [])} end
+    end;
   ($a.choice) as $picked |
   (confidence_floor($picked)) as $picked_floor |
+  (outcome($picked)) as $picked_outcome |
+  ([$a.probabilities | to_entries[] | select(.key != $picked and $picked_outcome != null and outcome(.key) == $picked_outcome)]) as $twins |
+  # The support the floor tests for the pick: the answer confidence (or the
+  # own probability of a pick that declares a floor) plus the probability of
+  # every option that selects the same outcome.
+  (if declared_confidence($picked) then $a.probabilities[$picked] else $a.confidence end) as $own_p |
+  ([(($own_p + ([$twins[].value] | add // 0)) * 1000000000 | round) / 1000000000, 1] | min) as $pooled_p |
   # A declared floor is checked against the probability of that option whether
   # it is the pick or a runner-up, so a runner-up never needs weaker support
-  # than it would as the pick. Only a rule that declares its own floor falls
-  # through to a runner-up, so a file with no declared floors keeps the single
-  # global floor on the answer confidence exactly.
+  # than it would as the pick. Options that select the identical outcome pool
+  # their probability behind the pick, so only a split between different
+  # outcomes counts as a low-confidence pick. Only a rule that declares its own
+  # floor falls through to a runner-up, so a file with no declared floors and no
+  # equivalent options keeps the single global floor on the answer confidence
+  # exactly.
   (if declared_confidence($picked) | not then
-     (if $a.confidence >= $picked_floor then {below: false} else {below: true, global: true} end)
-   elif $a.probabilities[$picked] >= $picked_floor then {below: false}
+     (if $pooled_p >= $picked_floor then {below: false} else {below: true, global: true} end)
+   elif $pooled_p >= $picked_floor then {below: false}
    else
      ([$a.probabilities | to_entries[] | select(.key != $picked and .value >= confidence_floor(.key))]
        | sort_by(-.value)) as $ok |
@@ -581,9 +650,13 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
      then $default_sel + {note: "rule \($choice) floor \($rule.floor.scope) below \($rule.floor.min_percent)%: fall through to default"}
    else {source: $choice, use: profiles($rule.use), filtered: ($rule.filtered // []), note: "rule matched"} end) as $sel |
   def when_of($c): (if rule_at($c) == null then $none_criterion else rule_at($c).when end | .[0:60]);
+  # Reported only when pooling is what let the pick clear its floor.
+  (if ($fb.below | not) and ($twins | length) > 0 and
+      $own_p < $picked_floor
+   then {pooled: {probability: $pooled_p, floor: $picked_floor, options: ([$picked] + [$twins[].key])}} else {} end) as $pool |
   {
     model: ($r.model | jev_model_id), latency_ms: $lat, tokens: ($r.usage // null),
-    rule: $picked,
+    rule: $picked, selected: $sel.source, floor: $picked_floor,
     dispatch_rule: (if $sel.source == null then null
       elif $sel.source == "default" then (if (($cfg.default_fallback // []) | length) > 0 then "default" else null end)
       elif ((rule_at($sel.source).fallback // []) | length) > 0 then $sel.source else null end),
@@ -592,6 +665,7 @@ RESULT=$(jq -n --arg floor "$CONFIDENCE_FLOOR" --argjson lat "$LAT_MS" --arg non
     confidence: $a.confidence, probabilities: $a.probabilities, routing: $r.route
   }
   + (if $fb.to then {fallback: "\($choice) (\(when_of($choice))) probability \($fb.p) clears its floor \($fb.to_floor); \($picked) probability \($a.probabilities[$picked]) is below its floor \($picked_floor)"} else {} end)
+  + $pool
   as $ev |
   if $r.route.escalate then $ev + {status: "escalate", reason: $r.route.escalate, candidates: ($answer_use | map(evaluate(.)))}
   elif $sel.invalid then $ev + {status: "error", reason: $sel.invalid}
@@ -689,6 +763,7 @@ TEXT=$(jq -r '
   "  probabilities: \([.probabilities | to_entries[] | "\(.key | flat)=\(.value | flat)"] | join(" "))",
   "  routing: \(.routing | tojson | flat)",
   (if .fallback then "  fallback: \(.fallback | flat)" else empty end),
+  (if .pooled then "  pooled: \([.pooled.options[] | flat] | join(" ")) select the same profiles, approval and floors; combined probability \(.pooled.probability | flat) clears floor \(.pooled.floor | flat)" else empty end),
   (if .reason then "  reason: \(.reason | flat)" else empty end),
   (if .note then "  note: \(.note | flat)" else empty end),
   (.candidates[]? | "  candidate: \(.profile.harness | flat):\(show(.profile.model))"
@@ -705,6 +780,7 @@ TEXT=$(jq -r '
       + (if .chosen.profile.model then " --model \(.chosen.profile.model | shell_arg)" else "" end)
       + (if .chosen.profile.effort then " --effort \(.chosen.profile.effort | shell_arg)" else "" end)
       + (if .dispatch_rule then " --dispatch-rule \(.dispatch_rule | shell_arg) --dispatch-route \(.dispatch_route | shell_arg)" else "" end) else empty end)' <<<"$RESULT") || emit_error "output rendering failed"
+log_result "$(jq -r '.status' <<<"$RESULT")" "$(jq -r '.reason // ""' <<<"$RESULT")" "$RESULT"
 printf '%s\n' "$TEXT"
 emit_telemetry
 exit 0

@@ -79,6 +79,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Captain preferences and optional shared captain preferences.
 - Learnings, backlog, briefs, scout reports, and the optional per-task no-mistakes pipeline-spend ledger.
 - Host-local command durations in `command-durations.jsonl`, produced by `bin/fm-duration.py`; its header and help own timing calibration and repeated-timeout work publication.
+- The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; its header and the typed-resolution "Result log" own the fields and the measurement.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
 
 `state/` holds runtime records:
@@ -1889,6 +1890,11 @@ The resolver checks `quota-axi --version` before taking its one JSON snapshot; a
 
 - A rule that declares `min_confidence` is checked against that rule's own probability, whether it is the picked option or a runner-up, so a runner-up never needs weaker support than it would as the pick.
 - A picked rule without `min_confidence`, and the neutral option, keep the global 0.6 floor on the answer's confidence exactly as before, so a file with no declared floors behaves as it did.
+- Options that select the identical outcome pool their probability behind the pick: the same `use` profiles (in any order) after the session policy and class filter, `approval`, `floor`, `select`, and fallback list, with `when` and `min_confidence` ignored.
+  The neutral option counts as a rule with the `default` array and no approval or floor.
+  The pick clears its floor when its own support (the answer confidence, or its probability when it declares `min_confidence`) plus the probability of every such option reaches it, so a 0.51/0.49 split between rules that dispatch identically resolves, and the output carries a `pooled:` line naming the pooled options.
+  The same split between different profiles, approval, or floor is a real low-confidence pick and stays `ambiguous`.
+  A runner-up is still checked on its own probability.
 
 When the picked rule declares its own floor but its probability falls below it, the tool checks the other options:
 
@@ -1931,6 +1937,13 @@ Every result above exits 0.
 - Only a usage or configuration error exits 2: an unreadable brief, an existing but unreadable or malformed canonical rules file, a [model-index resolution failure](#fleet-model-index-configmodel-indexjson), or missing `jq`, each reported and never selected around.
 - The resolver runs its TypeScript adapter with `bun` when installed, otherwise `node` with type stripping; missing both is a normal structured `error` outcome with exit 0 so firstmate uses its existing routing.
 - Resolver diagnostics report stage timing and usage/cost evidence; the [script header](../bin/fm-dispatch-resolve.sh) owns their fields, measurement boundaries, cost estimate, and response-metadata privacy safeguards.
+
+**Result log**
+
+Every resolve that reaches a status appends one JSON line to `data/dispatch-resolve.jsonl`, so the rate of results that need firstmate's own intake can be measured as every status other than `clear`.
+A record holds a UTC timestamp `ts`, `status`, the picked option `rule`, the option whose profiles were used `selected`, the chosen `profile` (harness, model, effort) when clear, the numeric `confidence` and `floor` applied, the `pooled` probability when pooling cleared the floor, and a coarse `reason`.
+No brief text, request, API body, rule criterion, or credential is written, and a failed write never changes the result.
+Opt-out and withheld paths and exit-2 configuration errors have no status and write nothing.
 
 **Firstmate retains the dispatch decision**
 

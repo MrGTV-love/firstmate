@@ -91,6 +91,7 @@ ok - configuration errors exit 2 before any network call
 ok - typed intake resolves roles before quota ranking and detects concrete duplicates
 ok - typed intake checks the chosen id against the pinned worker account's catalog
 ok - chosen Codex and Pi entries never use supervisor catalogs and retain authoritative export retirement checks
+ok - equivalent options pool behind the pick, and each resolve appends one private result record
 # all fm-dispatch-resolve tests passed
 ```
 
@@ -119,6 +120,9 @@ It proves resolution uses the rules snapshot Jev received even when the file is 
 It proves absent, default-only, and empty-rules files return `no rules to match` without a model or quota request, a broken rules-file symlink exits 2 as unreadable, and Agy, explicit-provider Gemini, and the documented example configuration resolve.
 It proves the fixed 0.6 floor is inclusive and returns `ambiguous` with candidate evidence below it.
 It proves a declared `min_confidence` is checked against the rule's own probability as the pick and as a runner-up, including a runner-up exactly at its floor, and that a file without declared floors keeps the global floor on confidence unchanged.
+It proves that a 0.51/0.49 split between rules, or between a rule and the neutral option, that select identical profiles, approval, floor, `select`, and fallback resolves with a `pooled:` line, while the same split between different profiles, between identical profiles with different approval or floor, or with a combined probability still below the floor stays `ambiguous`.
+It proves a declared `min_confidence` is met by the pooled probability of the pick.
+It proves each resolve that reaches a status appends exactly one `data/dispatch-resolve.jsonl` record, one for each of `clear`, `ambiguous`, `escalate` (an approval-gated rule and an absent rules file), and `error`, in a fixed field set, and that no brief text, rule criterion, or credential is written.
 It proves an unverifiable rule floor (a missing scope, a provider absent from the snapshot, or the OMP Codex pool) escalates rather than falling through to the default array.
 It proves declared providers, known and unverifiable profile floors, nonnumeric `spendPriority`, partial providers, unknown exact-model rows, missing applicable rows, and limiting provider-wide bounds produce the candidate evidence and eligibility the contract states.
 It proves a default choice resolves among the default profiles, equal quota evidence escalates as a genuine tie in either array order, and nothing rankable escalates.
