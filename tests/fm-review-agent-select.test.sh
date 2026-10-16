@@ -76,6 +76,11 @@ select_run() {  # <args...>; sets OUT, CODE; stderr in $ERR
     bash "$SELECT" "$@" 2>"$ERR") && CODE=0 || CODE=$?
 }
 EXTRA_ENV=(FM_SELECT_TEST=1)
+select_json() {  # <args...>; runs with --log and sets OUT to the record that run appended
+  rm -f "$LOG"
+  select_run --dry-run --log "$@"
+  OUT=$(tail -n 1 "$LOG" 2>/dev/null)
+}
 selected_model() { jq -r '.selected.model // "none"' <<<"$OUT"; }
 
 # ---- healthy pool: the highest known spendPriority wins, the pool is disclosed ----
@@ -87,12 +92,14 @@ cat > "$NM_DIR/config.yaml" <<'YAML'
 agent: [claude, acp:omp]   # the live order
 agent_path_override:
   claude: /somewhere/claude-wrapper
-# agent_config:
-#   "acp:omp":
-#     model: commented/out
 YAML
 before=$(cksum < "$NM_DIR/config.yaml")
-select_run --dry-run --json
+select_run --dry-run
+expect_code 0 "$CODE" 'a run without --log selects'
+assert_contains "$OUT" '  selected: claude:claude-sonnet-5-5[1m] effort=high agent=claude tier=primary' 'text names the choice'
+assert_contains "$OUT" '  current: agent=[claude, acp:omp]' 'text names the live agent order'
+assert_absent "$LOG" 'no log without --log'
+select_json
 expect_code 0 "$CODE" 'healthy pool selects'
 assert_equals claude-sonnet-5-5\[1m\] "$(selected_model)" 'known spendPriority beats an unranked pool'
 assert_equals selected "$(jq -r .status <<<"$OUT")" 'status is selected'
@@ -102,62 +109,13 @@ assert_contains "$(jq -r .reason <<<"$OUT")" 'unranked, disclosed: omp:openai-co
 assert_equals 2 "$(jq '.candidates | length' <<<"$OUT")" 'every use candidate is accounted for'
 assert_equals false "$(jq '[.candidates[] | select(.tier == "fallback")] | length > 0' <<<"$OUT")" 'no fallback is evaluated without proven exhaustion'
 assert_equals '[claude, acp:omp]' "$(jq -r .current.agent <<<"$OUT")" 'the live agent order is read'
-assert_equals '{}' "$(jq -c .current.models <<<"$OUT")" 'a commented-out agent_config is not read as a pin'
 assert_equals "$before" "$(cksum < "$NM_DIR/config.yaml")" 'the no-mistakes config is never written'
-assert_absent "$LOG" 'no log without --log'
-cat > "$NM_DIR/config.yaml" <<'YAML'
-agent: [claude, acp:omp]
-agent_config:
-  claude:
-    model: claude-opus-5-5
-    effort: high
-  "acp:omp":
-    model: openai-codex/gpt-6.1-sol   # pinned
-other_key: value
-YAML
-before=$(cksum < "$NM_DIR/config.yaml")
-select_run --dry-run --json
-expect_code 0 "$CODE" 'a live agent_config does not change the choice'
-assert_equals '{"claude":"claude-opus-5-5","acp:omp":"openai-codex/gpt-6.1-sol"}' "$(jq -c .current.models <<<"$OUT")" \
-  'each live pin is attributed to its own agent, including a quoted key with a colon'
-select_run --dry-run
-expect_code 0 "$CODE" 'text output selects'
-assert_contains "$OUT" '  selected: claude:claude-sonnet-5-5[1m] effort=high agent=claude tier=primary' 'text names the choice'
-assert_contains "$OUT" '  current: agent=[claude, acp:omp] models={"claude":"claude-opus-5-5","acp:omp":"openai-codex/gpt-6.1-sol"}' 'text names the live pins'
-assert_not_contains "$OUT" 'would-write' 'text offers no config block'
-cat > "$NM_DIR/config.yaml" <<'YAML'
-agent: [claude, acp:omp]
-agent_config:
-  # a comment between the header and the first agent
-  claude:
-    effort: high
-    model: claude-opus-5-5
-  "acp:omp":   # live pin
-    env:
-      FOO: bar
-      model: not-a-pin
-    args:
-      - --fast
-    model: openai-codex/gpt-6.1-sol   # pinned
-  'quoted':
-    model: 'single-quoted-model'
-agent_path_override:
-  quoted: /somewhere
-other_section:
-  nested:
-    model: not-an-agent-pin
-YAML
-before=$(cksum < "$NM_DIR/config.yaml")
-select_run --dry-run --json
-expect_code 0 "$CODE" 'an awkward agent_config does not change the choice'
-assert_equals '{"claude":"claude-opus-5-5","acp:omp":"openai-codex/gpt-6.1-sol","quoted":"single-quoted-model"}' "$(jq -c .current.models <<<"$OUT")" \
-  'a commented key line, a nested block before model, single quotes, and a later section do not move a pin to another agent'
 pass 'a healthy pool selects the highest known spendPriority and discloses the pool'
 
 # ---- quota-tight pool: a short runway fails the gate, the measured pool is used ----
 write_quota "[$(row all_models 5 "$SHORT" 0.1)]"
 write_pool 12
-select_run --dry-run --json
+select_json
 expect_code 0 "$CODE" 'tight pool still selects'
 assert_equals openai-codex/gpt-6.1-sol "$(selected_model)" 'a candidate whose runway is shorter than the horizon is not selected'
 claude_reason=$(jq -r '.candidates[] | select(.harness == "claude") | .reason' <<<"$OUT")
@@ -167,14 +125,14 @@ assert_equals false "$(jq '.candidates[] | select(.harness == "claude") | .exhau
 assert_equals acp:omp "$(jq -r .selected.agent <<<"$OUT")" 'the selected pool runs as the omp review agent'
 assert_equals 12 "$(jq '.candidates[] | select(.harness == "omp") | .pct' <<<"$OUT")" 'pool headroom is the best usable account'
 write_pool 4
-select_run --dry-run --json
+select_json
 assert_equals openai-codex/gpt-6.1-sol "$(selected_model)" 'a thin but usable pool is still measured headroom'
 pass 'a quota-tight pool moves off the candidate whose runway cannot finish the task'
 
 # ---- one account out: the pool stays usable on the surviving account ----------------
 write_quota "[$(row all_models 0 "$EXHAUSTED" 0)]"
 write_pool 0 35
-select_run --dry-run --json
+select_json
 expect_code 0 "$CODE" 'one account out still selects'
 assert_equals openai-codex/gpt-6.1-sol "$(selected_model)" 'the surviving account serves the pool'
 assert_equals true "$(jq '.candidates[] | select(.harness == "claude") | .exhausted' <<<"$OUT")" 'exhausted_now is proven exhaustion'
@@ -184,14 +142,14 @@ assert_equals false "$(jq '[.candidates[] | select(.tier == "fallback")] | lengt
 
 # ---- every account out: only proven exhaustion of all use candidates opens the fallback ----
 write_pool 0 0
-select_run --dry-run --json
+select_json
 expect_code 0 "$CODE" 'proven exhaustion uses the declared fallback'
 assert_equals deepseek/deepseek-v4-flash "$(selected_model)" 'the declared fallback is selected'
 assert_equals fallback "$(jq -r .selected.tier <<<"$OUT")" 'the tier is reported'
 assert_contains "$(jq -r .reason <<<"$OUT")" 'proven exhausted' 'the reason states proven exhaustion'
 assert_equals acp:omp "$(jq -r .selected.agent <<<"$OUT")" 'the fallback runs as the omp review agent'
 write_rules "$DEFAULT_USE"
-select_run --dry-run --json
+select_json
 expect_code 1 "$CODE" 'exhaustion with no declared fallback does not select'
 assert_equals escalate "$(jq -r .status <<<"$OUT")" 'no fallback escalates'
 assert_contains "$(jq -r .reason <<<"$OUT")" 'the rule declares no fallback' 'the reason names the missing fallback'
@@ -203,7 +161,7 @@ pass 'one account out keeps the pool; every account out opens only the declared 
 : > "$QUOTA"
 jq -n '{schemaVersion: 5, providers: []}' > "$QUOTA"
 write_pool 0 0
-select_run --dry-run --json
+select_json
 expect_code 1 "$CODE" 'unmeasured claude with an exhausted pool escalates'
 assert_equals escalate "$(jq -r .status <<<"$OUT")" 'no measured headroom escalates'
 assert_equals false "$(jq '[.candidates[] | select(.tier == "fallback")] | length > 0' <<<"$OUT")" 'unknown is not proven exhaustion, so the fallback stays closed'
@@ -214,12 +172,12 @@ pass 'unmeasured quota escalates instead of selecting around'
 write_rules "[$SONNET,$OPUS]"
 write_pool 50
 write_quota "[$(row all_models 90 "$THROUGH" 1.0),$(row model:opus 90 "$THROUGH" 0.4)]"
-select_run --dry-run --json
+select_json
 expect_code 0 "$CODE" 'ranked pair selects'
 assert_equals claude-sonnet-5-5\[1m\] "$(selected_model)" 'the more constraining row sets each candidate scalar'
 assert_equals 0.4 "$(jq '.candidates[] | select(.model == "opus") | .spendPriority' <<<"$OUT")" 'the limiting scalar is reported'
 write_quota "[$(row all_models 90 "$THROUGH" 1.0)]"
-select_run --dry-run --json
+select_json
 expect_code 1 "$CODE" 'a tie does not select'
 assert_equals tie "$(jq -r .status <<<"$OUT")" 'equal scalars are a tie'
 assert_equals null "$(jq -c .selected <<<"$OUT")" 'a tie names no winner'
@@ -231,20 +189,20 @@ pass 'known scalars rank by their limiting row and a tie is reported, never brok
 write_rules "[$(jq -c '. + {floor: {scope: "all_models", min_percent: 50}}' <<<"$SONNET"),$SOL]"
 write_quota "[$(row all_models 40 "$THROUGH" 2.0)]"
 write_pool 30
-select_run --dry-run --json
+select_json
 assert_equals openai-codex/gpt-6.1-sol "$(selected_model)" 'a profile floor below its minimum removes the candidate'
 assert_contains "$(jq -r '.candidates[] | select(.harness == "claude") | .reason' <<<"$OUT")" 'profile floor all_models below 50%' 'the floor refusal is named'
 SOL_FLOOR=$(jq -c '. + {floor: {scope: "all_models", min_percent: 50}}' <<<"$SOL")
 write_rules "[$SOL_FLOOR,$SONNET]"
 write_quota "[$(row all_models 94 "$THROUGH" 1.5)]"
 write_pool 30
-select_run --dry-run --json
+select_json
 expect_code 0 "$CODE" 'a floored pool with headroom still selects the ranked candidate'
 assert_equals claude-sonnet-5-5\[1m\] "$(selected_model)" 'a floored pool has no scalar and does not outrank a known one'
 assert_equals true "$(jq '.candidates[] | select(.harness == "omp") | .eligible' <<<"$OUT")" 'a floor the pool cannot verify keeps a usable pool eligible'
 assert_contains "$(jq -r .reason <<<"$OUT")" 'unranked, disclosed: omp:openai-codex/gpt-6.1-sol' 'the floored pool is disclosed beside the winner'
 write_pool 0 0
-select_run --dry-run --json
+select_json
 expect_code 0 "$CODE" 'an exhausted floored pool does not block the ranked candidate'
 assert_equals claude-sonnet-5-5\[1m\] "$(selected_model)" 'the ranked candidate is selected'
 assert_equals false "$(jq '.candidates[] | select(.harness == "omp") | .eligible' <<<"$OUT")" 'an exhausted pool is not eligible even when its floor is unverifiable'
@@ -254,7 +212,7 @@ write_rules "$DEFAULT_USE" "[$DEEPSEEK]"
 write_pool 30
 printf 'omp-or-tc\n' > "$HOME_DIR/config/session-launch-policy"
 write_quota "[$(row all_models 94 "$THROUGH" 1.5)]"
-select_run --dry-run --json
+select_json
 assert_equals openai-codex/gpt-6.1-sol "$(selected_model)" 'the session launch policy removes a harness it refuses'
 assert_contains "$(jq -r '.candidates[] | select(.harness == "claude") | .reason' <<<"$OUT")" 'session launch policy refuses harness claude' 'the policy refusal is named'
 rm -f "$HOME_DIR/config/session-launch-policy"
@@ -268,15 +226,15 @@ printf '%s\n' '{"version":1,"roles":{"review":{"claude":{"model":"claude-sonnet-
 printf '%s\n' '{"models":[{"id":"some-other-model"}]}' > "$CATALOGS/claude.json"
 printf '%s\n' '{"models":[{"id":"openai-codex/gpt-6.1-sol"}]}' > "$CATALOGS/omp.json"
 EXTRA_ENV=(FM_MODEL_CATALOG_DIR="$CATALOGS")
-select_run --dry-run --json
+select_json
 expect_code 0 "$CODE" 'catalog refusal still selects another candidate'
 assert_equals openai-codex/gpt-6.1-sol "$(selected_model)" 'an id absent from its catalog is not selected'
 assert_contains "$(jq -r '.candidates[] | select(.harness == "claude") | .reason' <<<"$OUT")" 'model index refuses claude claude-sonnet-5-5[1m]' 'the catalog refusal is named'
 printf '%s\n' '{"models":[{"id":"claude-sonnet-5-5[1m]"}]}' > "$CATALOGS/claude.json"
-select_run --dry-run --json
+select_json
 assert_equals claude-sonnet-5-5\[1m\] "$(selected_model)" 'a catalog id keeps the candidate'
 printf '%s\n' '{"version":1,"roles":{},"retired":["claude-sonnet-5-5"]}' > "$HOME_DIR/config/model-index.json"
-select_run --dry-run --json
+select_run --dry-run
 expect_code 2 "$CODE" 'a retired id in the rules is a configuration error'
 assert_equals '' "$OUT" 'a retired id selects nothing'
 assert_contains "$(cat "$ERR")" 'model index/profile resolution failed' 'the retirement error is named'
@@ -296,7 +254,7 @@ assert_error() {  # <label> <stderr needle> <args...>
 write_rules "$DEFAULT_USE" "[$DEEPSEEK]"
 write_quota "[$(row all_models 94 "$THROUGH" 1.5)]"
 write_pool 52
-assert_error 'a run without --dry-run' 'pass --dry-run' --json
+assert_error 'a run without --dry-run' 'pass --dry-run' --log
 assert_error 'an unknown flag' 'unknown argument' --dry-run --frobnicate
 printf '%s\n' '{"rules": [' > "$RULES"
 assert_error 'rules that are not JSON' 'malformed rules file' --dry-run
@@ -338,7 +296,7 @@ write_pool 52
 rm -f "$LOG"
 select_run --dry-run --log
 expect_code 0 "$CODE" 'a logged run selects'
-select_run --dry-run --log --json
+select_run --dry-run --log
 write_quota "[$(row all_models 5 "$SHORT" 0.1)]"
 select_run --dry-run --log
 printf '%s\n' '{"rules": [' > "$RULES"
@@ -360,39 +318,6 @@ assert_equals '' "$extra" 'the log is the only file written to state'
 assert_equals "$before" "$(cksum < "$NM_DIR/config.yaml")" 'the no-mistakes config is still untouched'
 assert_present "$NM_DIR/config.yaml" 'the live config is still present'
 pass 'every logged run appends one record and nothing else is written'
-
-# ---- single flight: only a live selector run defers a new one ---------------------------
-write_rules "$DEFAULT_USE" "[$DEEPSEEK]"
-write_quota "[$(row all_models 94 "$THROUGH" 1.5)]"
-PIDFILE="$HOME_DIR/state/.review-agent-select.pid"
-rm -f "$LOG"
-sleep 30 &
-holder=$!
-printf '%s\n' "$holder" > "$PIDFILE"
-select_run --dry-run --log
-expect_code 0 "$CODE" 'a marker for an unrelated live pid does not block'
-assert_equals 1 "$(wc -l < "$LOG" | tr -d ' ')" 'an unrelated live pid is not an in-flight run'
-assert_absent "$PIDFILE" 'the marker is removed when its run ends'
-kill "$holder" 2>/dev/null
-wait "$holder" 2>/dev/null
-cat > "$TMP_ROOT/fm-review-agent-select-holder.sh" <<'SH'
-#!/usr/bin/env bash
-trap 'kill "$child" 2>/dev/null; exit 0' TERM
-sleep 30 & child=$!
-wait
-SH
-bash "$TMP_ROOT/fm-review-agent-select-holder.sh" &
-holder=$!
-printf '%s\n' "$holder" > "$PIDFILE"
-select_run --dry-run --log
-expect_code 0 "$CODE" 'a run in flight defers quietly'
-assert_equals '' "$OUT" 'a deferred run prints nothing'
-assert_equals 1 "$(wc -l < "$LOG" | tr -d ' ')" 'a deferred run appends nothing'
-assert_equals "$holder" "$(cat "$PIDFILE")" 'a deferred run leaves the owner marker alone'
-kill "$holder" 2>/dev/null
-wait "$holder" 2>/dev/null
-rm -f "$PIDFILE"
-pass 'the single-flight marker only defers to a real selector run'
 
 # ---- help -----------------------------------------------------------------------------
 select_run --help

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # fm-review-agent-select.sh - dry-run choice of the no-mistakes review agent.
 #
-# Usage: fm-review-agent-select.sh --dry-run [--log] [--json]
+# Usage: fm-review-agent-select.sh --dry-run [--log]
 #
 # Stage one of dynamic review-agent selection. It answers one question from live
 # evidence: which candidate of the review rule would firstmate pick for the next
@@ -35,22 +35,21 @@
 # Headroom comes from one `quota-axi --json` snapshot and, for omp
 # openai-codex/ routes, one `omp usage` pooled report; each is read once.
 #
-# Output (stdout, TOON-style block; --json prints the whole result object):
+# Output (stdout, TOON-style block):
 #   review-agent-select: dry-run (nothing written)
 #     status: selected | escalate | tie
 #     selected: <harness>:<model> effort=.. agent=.. tier=primary|fallback
 #     reason: <why>
 #     candidate: <harness>:<model> provider=.. tier=.. ... -> eligible | not eligible
-#     current: the live no-mistakes agent order and per-agent models, read only
+#     current: the live no-mistakes agent order, read only
 # Exit status: 0 selected; 1 no selection (escalate or tie); 2 a usage,
 # configuration, or evidence error, which is never selected around.
 #
 # --log appends one JSON line (fm-review-agent-select.v1) to
 # state/review-agent-select.jsonl for every run, errors included, so a day of
-# heartbeat runs can be compared with real quota and real failures. A second run
-# started while one is in flight exits quietly. bin/fm-watch.sh runs this from
-# the heartbeat tick; docs/configuration.md "Review-agent selection" owns the
-# record fields.
+# heartbeat runs can be compared with real quota and real failures.
+# bin/fm-watch.sh runs this from the heartbeat tick; docs/configuration.md
+# "Review-agent selection" owns the record fields.
 #
 # Environment: FM_HOME, FM_STATE_OVERRIDE and FM_CONFIG_OVERRIDE resolve the
 # home like the other bin/ scripts; NO_MISTAKES_HOME names the no-mistakes home
@@ -66,7 +65,6 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 NM_HOME="${NO_MISTAKES_HOME:-${HOME:-}/.no-mistakes}"
 RULES_PATH="$CONFIG/crew-dispatch.json"
 LOG_FILE="$STATE/review-agent-select.jsonl"
-PID_FILE="$STATE/.review-agent-select.pid"
 REVIEW_WHEN_PREFIX='Isolated independent quality review'
 DEFAULT_HORIZON_MINUTES=240
 
@@ -83,12 +81,11 @@ usage() {
   awk 'NR == 1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "${BASH_SOURCE[0]}"
 }
 
-DRY_RUN=0 LOG=0 AS_JSON=0
+DRY_RUN=0 LOG=0
 RUN_AT=$(date +%s)
 TMP=''
 cleanup() {
   [ -z "$TMP" ] || rm -rf "$TMP"
-  [ "${OWN_PID_FILE:-0}" != 1 ] || rm -f "$PID_FILE"
 }
 trap cleanup EXIT
 
@@ -106,7 +103,6 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
     --log) LOG=1; shift ;;
-    --json) AS_JSON=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) fail "unknown argument: $1 (see --help)" ;;
   esac
@@ -118,18 +114,6 @@ TMP=$(mktemp -d) || fail 'mktemp failed'
 
 if [ "$LOG" = 1 ]; then
   [ -d "$STATE" ] || fail "state directory not found: $STATE"
-  if [ -r "$PID_FILE" ]; then
-    other=$(cat "$PID_FILE" 2>/dev/null || true)
-    case "$other" in
-      ''|*[!0-9]*) ;;
-      *)
-        if kill -0 "$other" 2>/dev/null \
-          && ps -p "$other" -o command= 2>/dev/null | grep -q 'fm-review-agent-select'; then
-          exit 0
-        fi ;;
-    esac
-  fi
-  printf '%s\n' "$$" > "$PID_FILE" 2>/dev/null && OWN_PID_FILE=1
 fi
 
 # ---- configuration: malformed input is an error, never a candidate to skip -----
@@ -415,31 +399,8 @@ fi
 CURRENT=$(
   f="$NM_HOME/config.yaml"
   if [ -r "$f" ]; then
-    awk -v sq="'" '
-      function unquote(s) { gsub("[\"" sq "]", "", s); return s }
-      in_cfg && /^[^ \t#]/ { in_cfg = 0 }
-      /^agent:/ { v = $0; sub(/^agent:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); print "agent\t" v; next }
-      /^agent_config:/ { in_cfg = 1; base = -1; name = ""; next }
-      !in_cfg || /^[ \t]*(#.*)?$/ { next }
-      {
-        line = $0; sub(/[ \t]+#.*$/, "", line)
-        match(line, /^[ \t]*/); ind = RLENGTH
-        if (base < 0) base = ind
-        if (ind == base) {
-          name = ""; child = -1
-          if (line ~ /:[ \t]*$/) { name = line; sub(/^[ \t]+/, "", name); sub(/:[ \t]*$/, "", name); name = unquote(name) }
-        } else if (name != "") {
-          if (child < 0) child = ind
-          if (ind == child && line ~ /^[ \t]+model:/) {
-            v = line; sub(/^[ \t]+model:[ \t]*/, "", v)
-            print "model\t" name "\t" unquote(v)
-          }
-        }
-      }
-    ' "$f" 2>/dev/null | jq -Rsc '
-      split("\n") | map(select(length > 0) | split("\t")) |
-      {agent: ([.[] | select(.[0] == "agent") | .[1]] | first // null),
-       models: ([.[] | select(.[0] == "model") | {(.[1]): .[2]}] | add // {})}'
+    awk '/^agent:/ { v = $0; sub(/^agent:[ \t]*/, "", v); sub(/[ \t]+#.*$/, "", v); print v; exit }' "$f" 2>/dev/null \
+      | jq -Rsc '{agent: (split("\n") | map(select(length > 0)) | first // null)}'
   else
     printf 'null\n'
   fi
@@ -511,24 +472,19 @@ if [ "$LOG" = 1 ]; then
     || fail "could not append to $LOG_FILE"
 fi
 
-if [ "$AS_JSON" = 1 ]; then
-  printf '%s\n' "$RESULT"
-else
-  jq -r '
-    def flat: tostring | gsub("[\t\r\n]"; " ");
-    def show($v): ($v // "-") | flat;
-    "review-agent-select: dry-run (nothing written)",
-    "  status: \(.status | flat)",
-    "  rule: \(.rule | flat) (\(.when | flat))   horizon_minutes: \(.horizon_minutes)",
-    (if .selected then "  selected: \(.selected.harness | flat):\(.selected.model | flat) effort=\(show(.selected.effort)) agent=\(.selected.agent | flat) tier=\(.selected.tier)" else empty end),
-    "  reason: \(.reason | flat)",
-    "  current: " + (if .current == null then "no readable no-mistakes config"
-       else "agent=\(show(.current.agent)) models=\(.current.models | tojson | flat)" end),
-    (.candidates[] | "  candidate: \(.harness | flat):\(.model | flat)  provider=\(show(.provider))  tier=\(.tier)"
-       + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))"
-          else "  spendPriority=\(show(.spendPriority))" end)
-       + "  -> " + (if .eligible then "eligible" else "not eligible" end) + ": \(.reason | flat)"
-       + (if (.uncertainty | length) > 0 then " [uncertain: \(.uncertainty | join("; ") | flat)]" else "" end))' <<<"$RESULT"
-fi
+jq -r '
+  def flat: tostring | gsub("[\t\r\n]"; " ");
+  def show($v): ($v // "-") | flat;
+  "review-agent-select: dry-run (nothing written)",
+  "  status: \(.status | flat)",
+  "  rule: \(.rule | flat) (\(.when | flat))   horizon_minutes: \(.horizon_minutes)",
+  (if .selected then "  selected: \(.selected.harness | flat):\(.selected.model | flat) effort=\(show(.selected.effort)) agent=\(.selected.agent | flat) tier=\(.selected.tier)" else empty end),
+  "  reason: \(.reason | flat)",
+  "  current: " + (if .current == null then "no readable no-mistakes config" else "agent=\(show(.current.agent))" end),
+  (.candidates[] | "  candidate: \(.harness | flat):\(.model | flat)  provider=\(show(.provider))  tier=\(.tier)"
+     + (if .scope then "  scope=\(.scope | flat)  remaining=\(show(.pct))%  spendPriority=\(show(.spendPriority))  runway=\(show(.runway))"
+        else "  spendPriority=\(show(.spendPriority))" end)
+     + "  -> " + (if .eligible then "eligible" else "not eligible" end) + ": \(.reason | flat)"
+     + (if (.uncertainty | length) > 0 then " [uncertain: \(.uncertainty | join("; ") | flat)]" else "" end))' <<<"$RESULT"
 
 [ "$STATUS" = selected ]
