@@ -1,0 +1,156 @@
+
+=== S1 BEFORE the fix (base commit fac61f9b): archived answered call is refused ===
+  archive holds the call: 2 line(s); backlog holds it: 0
+  $ fm-captain-hold.sh verify sample-scout -> exit 1
+      | fm-captain-hold: no captain-held task sample-archived-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s1-base/data); the nearest legacy identity sample-scout-decision-sample-archived-call also resolves to nothing
+  RESULT: as expected - base refuses the archived answered call (the reported bug)
+  $ fm-captain-hold.sh complete sample-scout --none -> exit 1
+      | fm-captain-hold: no captain-held task sample-archived-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s1-base/data); the nearest legacy identity sample-scout-decision-sample-archived-call also resolves to nothing
+  RESULT: as expected - base complete --none refuses too
+
+=== S2 AFTER the fix (target commit): same fixture, gate resolves the archived answer ===
+  $ fm-captain-hold.sh verify sample-scout -> exit 0
+      | verified: sample-scout captain-call inventory
+  RESULT: as expected - verify resolves the archived answered call
+  $ fm-captain-hold.sh complete sample-scout --none -> exit 0
+      | complete: sample-scout captain-call inventory reviewed (sample-archived-call) [answered and archived: sample-archived-call]
+  RESULT: as expected - complete --none passes and discloses the archive
+  meta: decision_keys=sample-archived-call
+
+=== S3 scout teardown gate follows the archived answer ===
+  $ fm-teardown.sh t-scout (key = archived UNANSWERED call) -> exit 1
+      | fm-captain-hold: captain-held task t-unanswered is archived without a recorded captain answer
+      | REFUSED: scout task t-scout has not passed the captain-call completion gate.
+      | Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+  RESULT: as expected - teardown blocked, scout record kept
+  $ fm-teardown.sh t-scout (key = archived ANSWERED call) -> exit 0
+      | WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+      | teardown t-scout complete (window firstmate:fm-t-scout, worktree /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s3-teardown/projects/t-scout)
+      | Backlog: t-scout is closed in /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s3-teardown/data/backlog.md. Run bin/fm-tasks-axi.sh ready for dependency-cleared candidates, check date gates, and dispatch only work whose blockers are gone and date is due.
+  RESULT: as expected - teardown retired the scout
+
+=== S4 adversarial: archived call closed with no captain answer is refused ===
+  $ fm-captain-hold.sh complete s4-scout --none -> exit 1
+      | fm-captain-hold: captain-held task sample-no-answer is archived without a recorded captain answer
+  RESULT: as expected - refused: archived without a recorded captain answer
+
+=== S5 adversarial: call closed only by reconcile evidence stays refused ===
+  archive has Reconciliation evidence: 1; Captain decision lines: 0
+  $ fm-captain-hold.sh complete s5-scout --none -> exit 1
+      | fm-captain-hold: captain-held task sample-moot is archived with only reconciliation evidence, not a recorded captain answer; resolve the entry by hand
+  RESULT: as expected - refused: only reconciliation evidence
+
+=== S6 adversarial: archived row that merely quotes the record markers is refused ===
+  $ fm-captain-hold.sh complete s6-scout --none -> exit 1
+      | fm-captain-hold: captain-held task sample-forged is archived without a recorded captain answer
+  RESULT: as expected - refused: quoting markers is no record
+
+=== S7 adversarial: call held for a different origin is refused ===
+  $ fm-captain-hold.sh complete s7-scout --none -> exit 1
+      | fm-captain-hold: captain-held task sample-other-origin was held for origin some-other-scout, not s7-scout; hold a task for s7-scout or list the right one
+  RESULT: as expected - refused: held for another origin
+
+=== S8 adversarial: neighbour id (prefix of an archived id) does not resolve ===
+  $ fm-captain-hold.sh complete s8-scout --none -> exit 1
+      | fm-captain-hold: no captain-held task sample-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s8/data); the nearest legacy identity s8-scout-decision-sample-call also resolves to nothing
+  RESULT: as expected - refused: only the exact archived id counts
+  $ fm-captain-hold.sh complete s8-scout --none -> exit 0
+      | complete: s8-scout captain-call inventory reviewed (sample-call-two) [answered and archived: sample-call-two]
+  RESULT: as expected - exact id passes
+
+=== S9 adversarial: id archived twice in one file - the NEWEST record decides ===
+  archive rows for the id: 2
+  $ fm-captain-hold.sh complete s9-scout --none -> exit 1
+      | fm-captain-hold: captain-held task sample-twice is archived without a recorded captain answer
+  RESULT: as expected - older answered, newer unanswered => refused
+  archive rows for the id: 2
+  $ fm-captain-hold.sh complete s9-scout --none -> exit 0
+      | complete: s9-scout captain-call inventory reviewed (sample-twice) [answered and archived: sample-twice]
+  RESULT: as expected - older unanswered, newer answered => passes
+
+=== S10 archive path in .tasks.toml: absolute path, hash in path, spaced header ===
+  call is in the absolute-path archive: 2
+  $ fm-captain-hold.sh complete s10-scout --none -> exit 0
+      | complete: s10-scout captain-call inventory reviewed (sample-abs) [answered and archived: sample-abs]
+  RESULT: as expected - absolute archive path resolves
+  archive file: closed#later.md 
+  $ fm-captain-hold.sh complete s10-scout --none -> exit 0
+      | complete: s10-scout captain-call inventory reviewed (sample-hash) [answered and archived: sample-hash]
+  RESULT: as expected - archive = "data/closed#later.md" names the whole file
+  call is in data/spaced.md: 2
+  $ fm-captain-hold.sh complete s10-scout --none -> exit 0
+      | complete: s10-scout captain-call inventory reviewed (sample-spaced) [answered and archived: sample-spaced]
+  RESULT: as expected - [ markdown ] header is honoured
+
+=== S11 adversarial: settings the gate must refuse (answered row sits in the file the setting names) ===
+  -- form: inline
+  $ fm-captain-hold.sh complete s11-scout --none -> exit 2
+      | fm-captain-hold: the done archive setting in /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s11-inline/.tasks.toml uses syntax the gate cannot read exactly; resolve the archived call by hand
+  RESULT: as expected - inline setting refused
+  -- form: quoted-header
+  $ fm-captain-hold.sh complete s11-scout --none -> exit 2
+      | fm-captain-hold: the done archive setting in /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s11-quoted-header/.tasks.toml uses syntax the gate cannot read exactly; resolve the archived call by hand
+  RESULT: as expected - quoted-header setting refused
+  -- form: dotted
+  $ fm-captain-hold.sh complete s11-scout --none -> exit 2
+      | fm-captain-hold: error: "Invalid config line: expected `key = value`"
+  RESULT: as expected - dotted setting refused
+  -- form: duplicate-tables
+  $ fm-captain-hold.sh complete s11-scout --none -> exit 2
+      | fm-captain-hold: the done archive setting in /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s11-duplicate-tables/.tasks.toml uses syntax the gate cannot read exactly; resolve the archived call by hand
+  RESULT: as expected - duplicate-tables setting refused
+  -- form: escape
+  $ fm-captain-hold.sh complete s11-scout --none -> exit 2
+      | fm-captain-hold: the done archive setting in /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s11-escape/.tasks.toml uses syntax the gate cannot read exactly; resolve the archived call by hand
+  RESULT: as expected - escape setting refused
+  -- form: triple-quote
+  $ fm-captain-hold.sh complete s11-scout --none -> exit 2
+      | fm-captain-hold: the done archive setting in /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s11-triple-quote/.tasks.toml uses syntax the gate cannot read exactly; resolve the archived call by hand
+  RESULT: as expected - triple-quote setting refused
+  -- form: non-string
+  $ fm-captain-hold.sh complete s11-scout --none -> exit 2
+      | fm-captain-hold: error: markdown.archive must be a quoted string
+  RESULT: as expected - non-string setting refused
+  -- form: empty
+  $ fm-captain-hold.sh complete s11-scout --none -> exit 2
+      | fm-captain-hold: error: markdown.archive must not be empty
+  RESULT: as expected - empty setting refused
+
+=== S12 adversarial: archive path set only in user-level ~/.tasks-axi/config.toml stays refused ===
+  call archived at: backlog.md note-archive.md s12-scout user-archive.md 
+  $ fm-captain-hold.sh complete s12-scout --none -> exit 2
+      | fm-captain-hold: the done archive path is set outside this home's .tasks.toml, in /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/userhome-s12/.tasks-axi/config.toml, and is not read; resolve the archived call by hand
+  RESULT: as expected - refused: user-level archive path is not read
+
+=== S13 adversarial: no tomllib / no python3 gets its own reason, not the syntax message ===
+  $ [python3 = stub-notomllib] fm-captain-hold.sh complete s13-scout --none -> exit 2
+      | fm-captain-hold: reading the done archive setting in /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s13/.tasks.toml needs python3 with tomllib (3.11 or newer); resolve the archived call by hand
+  RESULT: as expected - own tomllib reason (stub-notomllib)
+  $ [python3 = stub-failpy] fm-captain-hold.sh complete s13-scout --none -> exit 2
+      | fm-captain-hold: reading the done archive setting in /Users/charlesabrooker/tmp/fm-lab.Y7VXkS/homes/s13/.tasks.toml needs python3 with tomllib (3.11 or newer); resolve the archived call by hand
+  RESULT: as expected - own tomllib reason (stub-failpy)
+  $ fm-captain-hold.sh complete s13-scout --none -> exit 0
+      | complete: s13-scout captain-call inventory reviewed (sample-nopy) [answered and archived: sample-nopy]
+  RESULT: as expected - same call passes again with real python3
+
+=== S14 live rows unchanged: a still-open captain call is not satisfied by the archive path ===
+  $ fm-captain-hold.sh complete s14-scout --none -> exit 0
+      | complete: s14-scout captain-call inventory reviewed (sample-open)
+  RESULT: as expected - BASE: an open live hold is a durable record, so the inventory passes
+  $ fm-captain-hold.sh complete s14-scout --none -> exit 0
+      | complete: s14-scout captain-call inventory reviewed (sample-open)
+  RESULT: as expected - HEAD: same open live hold, same result, no archive disclosure
+  $ fm-captain-hold.sh complete s14-scout --none -> exit 0
+      | complete: s14-scout captain-call inventory reviewed (sample-open2)
+  RESULT: as expected - live closed (not yet archived) answered call passes with NO archive disclosure
+
+=== S15 legacy short key resolves to an archived <origin>-decision-<key> row (answered passes, unanswered refuses) ===
+  archived legacy ids: s15-scout-decision-pick-one s15-scout-decision-keep-two 
+  $ fm-captain-hold.sh complete s15-scout --none -> exit 0
+      | complete: s15-scout captain-call inventory reviewed (pick-one) [answered and archived: s15-scout-decision-pick-one]
+  RESULT: as expected - short key pick-one -> archived s15-scout-decision-pick-one (answered)
+  $ fm-captain-hold.sh complete s15-scout --none -> exit 1
+      | fm-captain-hold: captain-held task s15-scout-decision-keep-two is archived without a recorded captain answer
+  RESULT: as expected - short key keep-two -> archived legacy row without an answer
+
+=== SUMMARY: expected=34 unexpected=0 ===

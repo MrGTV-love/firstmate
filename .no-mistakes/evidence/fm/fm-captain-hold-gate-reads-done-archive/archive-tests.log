@@ -17,6 +17,9 @@ ok - a stale default archive cannot stand in for an archive path the gate does n
 ok - a hash inside the quoted archive path is read as part of the path
 ok - a single-quoted archive path with a hash is read whole
 ok - a trailing comment after the archive path still works
-ok - an archive setting the gate cannot read exactly refuses
+ok - a spaced [ markdown ] table header redirects the archive the gate reads
+ok - the archive setting reader parses every TOML spelling and refuses what does not parse
+ok - an archive named by an inline table, a quoted header or a dotted key refuses
+ok - an archive setting that does not parse as one string refuses
+ok - a missing python3 or tomllib refuses with its own reason
 ok - captain-hold lifecycle leaves no runner or watchdog processes
-bash tests/fm-captain-hold-lifecycle.test.sh                      70.40s user 58.60s system 91% cpu 2:20.52 total
