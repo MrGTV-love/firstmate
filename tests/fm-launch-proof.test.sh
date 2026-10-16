@@ -192,6 +192,62 @@ test_launch_proof_recorded_native_identity() {
   stop_probe
   pass 'recorded generation binds the positively identified live PID across harnesses, shells and helpers'
 
+  # Herdr lists the foreground first and the process table is read after it, so a
+  # short-lived non-agent child (cat) can be listed yet gone from the table.
+  start_probe expected
+  proof_meta claude env-v1
+  CAT='{"pid":3,"name":"cat","argv0":"cat","argv":["cat"]}'
+  OTHER='{"pid":5,"name":"omp","argv0":"omp","argv":["omp"]}'
+  SHELL_LEADER='{"pid":999,"name":"bash","argv0":"sh","argv":["sh"]}'
+  foreground() { # <group> <extra-process-json>...  (the pinned agent is always listed)
+    local group=$1 extra
+    shift
+    extra=$(printf '%s\n' "$@" | jq -sc '.')
+    INFO=$(jq -nc --argjson pid "$PID" --arg cwd "$WORKTREE" --argjson group "$group" --argjson extra "$extra" '
+      {result:{type:"pane_process_info",process_info:{pane_id:"w1:p1",foreground_process_group_id:$group,
+        foreground_processes:([{argv:["node","/installed/agent.js"],pid:$pid,cwd:$cwd}] + $extra)}}}')
+  }
+  attributed() { # <message>: the unique agent pid, not merely any verdict
+    local got
+    got=$(fm_launch_proof_herdr_pid "$META") || fail "$1"
+    [ "$got" = "$PID" ] || fail "$1: attributed $got instead of the agent $PID"
+  }
+  unattributed() { # <message>
+    ! fm_launch_proof_herdr_pid "$META" >/dev/null || fail "$1"
+  }
+  foreground "$PID" "$CAT"
+  PARENTS=$(printf '%s 1\n3 %s\n' "$PID" "$PID")
+  attributed 'a normal pane with a present non-agent child must still attribute the agent'
+  PARENTS=$(printf '%s 1\n' "$PID")
+  attributed 'a non-agent child gone from the process table must not fail attribution'
+  assert_proof managed 'a vanished non-agent child must leave the pinned agent managed'
+  foreground "$PID" "$CAT" '{"pid":4,"name":"cat","argv0":"cat","argv":["cat"]}'
+  attributed 'several vanished non-agent children must not fail attribution'
+  foreground 999 "$SHELL_LEADER" "$CAT"
+  PARENTS=$(printf '999 1\n%s 999\n' "$PID")
+  attributed 'a vanished child beside a launcher shell must not hide the pinned agent'
+  foreground "$PID" "$CAT"
+  PARENTS=$(printf '4242 1\n3 %s\n' "$PID")
+  unattributed 'an agent gone from the process table must not hand attribution to its child'
+  PARENTS=$(printf '4242 1\n')
+  unattributed 'an agent and its child both gone from the process table must still refuse attribution'
+  assert_proof unknown 'an unattributable agent must stay unknown'
+  foreground 999 "$SHELL_LEADER" "$CAT"
+  PARENTS=$(printf '999 1\n3 %s\n' "$PID")
+  unattributed 'a launcher-shell agent gone from the process table must not hand attribution to its child'
+  PARENTS=$(printf '999 1\n')
+  unattributed 'a launcher-shell agent and its child both gone must still refuse attribution'
+  PARENTS=$(printf '999 1\n%s 77\n' "$PID")
+  unattributed 'an agent whose chain to the group leader is broken must still refuse attribution'
+  foreground 999 "$SHELL_LEADER" "$OTHER"
+  PARENTS=$(printf '999 1\n%s 999\n5 999\n' "$PID")
+  unattributed 'two agent candidates must still refuse attribution'
+  foreground 999 "$SHELL_LEADER" "$OTHER" "$CAT"
+  unattributed 'a vanished child must not make two agent candidates unique'
+  PARENTS=
+  stop_probe
+  pass 'a non-agent child that vanished between the two process reads no longer fails agent attribution'
+
   start_probe ''
   BRIEF="$(fm_brief_worker_role "$FM_HOME/state" t "$ROOT")"$'\n\nTask assigned by Firstmate.'
   fm_operational_input_encode launch-brief "$BRIEF" MESSAGE

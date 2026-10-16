@@ -176,6 +176,7 @@ The staged launch runs in a subshell of the destination pane shell, preserving i
 An enabled `config/launch-env-allowlist` still selects the existing cleared-environment POSIX-sh boundary.
 `tests/fm-spawn-herdr-launch-shell.test.sh` exercises these shell and environment boundaries through staged launch delivery.
 The unique ancestor-most non-shell process in the foreground group supplies the live PID; kernel ancestry excludes launcher shells and helper workers.
+A process that Herdr lists but the later process table lacks has already exited and is dropped; a vanished agent, a broken chain, or two agents still read `unknown`.
 The kernel environment read from that PID must contain a nonempty `FM_SPAWN_GEN` exactly matching the recorded `spawn_gen`.
 That matching live pin proves the launch incarnation, including interpreter-based harnesses and older records without a launch-proof field.
 For omp, the existing worker extension or local-secondmate watcher must also record the current session file and live PID for that task.
