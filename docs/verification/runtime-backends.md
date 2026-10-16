@@ -694,6 +694,9 @@ The portable guard and inbox suites also passed, including legacy-receipt negati
 The focused relaunch command covers the changed delivery and activation paths plus the file's mandatory lifecycle preamble, not the complete lifecycle suite.
 `bash tests/fm-control-relaunch.test.sh --jev-guard` passed the progress-note, survivor-announcement and legacy/current cutover scenarios on both host adapters; `bash tests/fm-typesafe-key-source.test.sh` also passed, including unavailable remote-bound credentials denying without egress.
 
+The CI repair refresh on 2026-10-16 UTC reran both maintained native entrypoints with their guard-specific controls forced to `1`, against OMP 18.10.4 and Claude Code 2.1.301.
+All 20 cases per host passed using this worktree's repaired short steering carrier; the focused relaunch command also passed survivor announcements and launch-only cutover. The publication/replay smoke observed 198-character carriers, exact payload and publisher-write digests, unchanged receipts on replay, numeric ordering and handled-record removal. These remain synthetic loopback and isolated lifecycle results, not production activation or an additional paid calibration trial.
+
 The minimum-version regression in `tests/fm-jev-guard.test.sh` executes the tagged [OMP 18.1.20 result-consumer semantics](https://github.com/can1357/oh-my-pi/blob/v18.1.20/packages/coding-agent/src/extensibility/extensions/runner.ts#L1418-L1459) for `content`/`details`/`isError`, proving that the audit patch remains observable and preserves the original instruction bytes, details and error status; this is not native 18.1.20 execution.
 The maintained native commands above refresh the actual installed-host evidence, not that minimum-version emulation.
 

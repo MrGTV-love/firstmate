@@ -579,7 +579,7 @@ for (const host of ['omp', 'claude']) {
     const currentBell = lib('fm_task_inbox_doorbell_line', legacy);
     if (format === 'old-carrier') {
       const { createHash } = await import('node:crypto');
-      const oldBell = currentBell.replace('read only this record in numeric order after earlier doorbells and acknowledgements', 'read and act on each message in numeric order');
+      const oldBell = currentBell.split(' - ')[0] + ' - omp full-file read: append :raw - read and act on each message in numeric order, then act and mv it into handled/.';
       writeFileSync(receiptPath, JSON.stringify({ ...JSON.parse(receipt), doorbell_sha256: createHash('sha256').update(oldBell).digest('hex') }));
     }
     const expectedReceipt = format === 'pre-receipt' ? undefined : readFileSync(receiptPath, 'utf8');

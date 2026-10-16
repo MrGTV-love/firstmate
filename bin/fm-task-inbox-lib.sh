@@ -352,7 +352,7 @@ fm_task_inbox_doorbell_line() {  # <record-path>
     ''|*[![:print:]]*) return 1 ;;
   esac
   quoted=$(printf '%s' "$name" | sed "s/'/'\\\\''/g")
-  printf ": Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your '%s' steering inbox, record '%s' - omp full-file read: append :raw - read only this record in numeric order after earlier doorbells and acknowledgements, then act and mv it into handled/." \
+  printf ": Firstmate instruction waiting: list \"\$FM_TASK_INBOX\"/*.msg in your '%s' steering inbox, record '%s' - read only this record in numeric order after acks - omp :raw - act, mv to handled/." \
     "$quoted" "$record"
 }
 

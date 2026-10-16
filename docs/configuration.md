@@ -53,6 +53,7 @@ Before `fm-brief.sh`, `fm-spawn.sh`, or `fm-afk-launch.sh` saves a path or passe
 - Reject an unresolvable relative directory and name the offending variable.
 
 `fm-spawn.sh` additionally rejects control bytes in those raw directory inputs before shell or filesystem normalization can change which path the backlog gate checks.
+Spawn validates all three directory inputs before loading the inbox library that initializes its state directory, so a rejected relative path is never created by that import.
 Lifecycle access to a backlog, task record, or pending-close record must resolve within its configured data or state root, and a final-component symlink is refused even when its target remains within that root.
 
 Bootstrap applies the same relative `FM_HOME` resolution only when embedding that home in the generated Relay poll shim.
@@ -2038,6 +2039,7 @@ Consistent instructions bypass model/privacy/credential outages; an audit failur
 On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
 Claude keeps its distinct advisory `additionalContext`, containing neither the source text nor its path.
 The [steering-inbox owner](../bin/fm-task-inbox-lib.sh) defines record-specific delivery, ordered survivor announcements, checkpoint handling and publication-clock retry scheduling.
+Its shared carrier keeps the inbox reference independent of home depth and carries the exact record, acknowledgement ordering and omp `:raw` hint in the existing short-line budget; publication, sends, retries and survivor replay all use that same formatter.
 Native launch prompts carry the survivor doorbells separately from Claude's record-backed launch carrier, so the guard sees each binding without reading that carrier first; announcement never repairs a legacy receipt.
 This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
 Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
