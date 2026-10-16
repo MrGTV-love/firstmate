@@ -7470,6 +7470,167 @@ test_scout_teardown_gate_follows_the_archived_answer() {
   pass "scout teardown passes an archived answered call and blocks an archived unanswered one"
 }
 
+# Closes a done captain row whose body is <body-file>, then archives it.
+archive_a_done_row_with_body() {  # <home> <id> <body-file>
+  local home=$1 id=$2 body=$3
+  tasks_in "$home" add "$id" "Done row $id" --kind captain --repo sample \
+    --body-file "$body" >/dev/null || fail "could not create the fixture row $id"
+  tasks_in "$home" "done" "$id" >/dev/null || fail "could not close the fixture row $id"
+  push_through_retention "$home" "retention-filler-$(printf '%s' "$id" | cksum | cut -d' ' -f1)"
+}
+
+# Both completion entrypoints must refuse <id>; the refusal text must contain <reason>.
+assert_gate_refuses_archived() {  # <home> <scout> <id> <reason>
+  local home=$1 scout=$2 id=$3 reason=$4 out rc=0
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+  out=$(run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "verify accepted archived call $id: $out"
+  assert_contains "$out" "$reason" "the verify refusal for $id does not give the reason: $out"
+  rc=0
+  out=$(run_captain "$home" complete "$scout" --none 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "complete --none accepted archived call $id: $out"
+  assert_contains "$out" "$reason" "the complete refusal for $id does not give the reason: $out"
+}
+
+test_archived_evidence_only_close_refuses() {
+  local home scout id archive
+  home=$(make_home archived-evidence-only)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-evidence-scout
+  id=sample-archived-moot-call
+  archive="$home/data/done-archive.md"
+  tasks_in "$home" add "$scout" "The investigation" --kind scout --repo sample >/dev/null \
+    || fail "could not create the evidence-only origin"
+  run_captain "$home" hold "$id" --title "Captain call $id" --reason "captain must decide $id" \
+    --repo sample --origin "$scout" >/dev/null || fail "could not hold $id"
+  request_reconciles "$home" archive-evidence-source "$id" || fail "could not request the reconciliation"
+  printf 'Nothing is pending. No captain answer was given.\n' > "$home/evidence-$id.txt"
+  run_captain "$home" reconcile close "$id" --evidence-file "$home/evidence-$id.txt" \
+    --verified-outcome moot >/dev/null || fail "could not close $id on evidence"
+  push_through_retention "$home" retention-filler-evidence
+  assert_grep "$id" "$archive" "the evidence-closed call is not in the archive fixture"
+  assert_grep "Reconciliation evidence:" "$archive" "the archived call lost its evidence record"
+  assert_no_grep "Captain decision:" "$archive" "the evidence-closed fixture carries an answer record"
+  assert_gate_refuses_archived "$home" "$scout" "$id" "only reconciliation evidence, not a recorded captain answer"
+  pass "a call closed only by reconcile evidence and then archived still refuses"
+}
+
+test_archived_row_quoting_the_record_markers_refuses() {
+  local home scout n digest
+  home=$(make_home archived-quoted-markers)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-quote-scout
+  digest=$(printf '%064d' 7 | tr 0 a)
+  # One line that quotes both markers in order.
+  printf 'Notes: the "Resolution recorded by fm-captain-hold." line and a "Captain decision:" line.\n' \
+    > "$home/quote-inline.txt"
+  # The whole shape, but not at line starts.
+  printf 'Quoted record:\n  > Resolution recorded by fm-captain-hold.\n> Decision digest: %s\n> Resolution mode: answered\n>\n> Captain decision:\n> Go.\n' \
+    "$digest" > "$home/quote-indented.txt"
+  # The whole shape with no answer text under the label.
+  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: answered\n\nCaptain decision:\n\n' \
+    "$digest" > "$home/quote-empty.txt"
+  # A mode that is not a recorded answer.
+  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: wished\n\nCaptain decision:\nGo.\n' \
+    "$digest" > "$home/quote-mode.txt"
+  # An older genuine answer under a newer evidence-only record: the newest record decides.
+  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: reconciled\n\nReconciliation evidence:\nMoot.\n\nResolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: answered\n\nCaptain decision:\nGo.\n' \
+    "$digest" "$digest" > "$home/quote-stacked.txt"
+  for n in inline indented empty mode stacked; do
+    archive_a_done_row_with_body "$home" "sample-quoted-$n" "$home/quote-$n.txt"
+    assert_grep "sample-quoted-$n" "$home/data/done-archive.md" "the quoted-marker row $n is not archived"
+  done
+  push_through_retention "$home" retention-filler-quoted-last
+  for n in inline indented empty mode; do
+    assert_gate_refuses_archived "$home" "$scout" "sample-quoted-$n" "archived without a recorded captain answer"
+  done
+  assert_gate_refuses_archived "$home" "$scout" sample-quoted-stacked "only reconciliation evidence"
+  pass "an archived body that only quotes or imitates the record markers still refuses"
+}
+
+test_archived_released_work_item_resolves_through_the_gate() {
+  local home scout id
+  home=$(make_home archived-released)
+  set_archive_retention "$home" data/done-archive.md
+  scout=sample-archive-release-scout
+  id=sample-archived-released-work
+  run_captain "$home" hold "$id" --title "Gated work $id" --reason "captain go needed" \
+    --repo sample --origin "$scout" >/dev/null || fail "could not hold $id"
+  printf 'Proceed as planned.\n' > "$home/release-$id.txt"
+  run_captain "$home" answer "$id" --decision-file "$home/release-$id.txt" --release >/dev/null \
+    || fail "could not release $id"
+  tasks_in "$home" "done" "$id" >/dev/null || fail "could not finish the released work item"
+  push_through_retention "$home" retention-filler-released
+  assert_grep "Resolution mode: released" "$home/data/done-archive.md" \
+    "the archived work item lost its release record"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+  run_captain "$home" verify "$scout" >/dev/null 2>&1 \
+    || fail "verify refused a released work item that retention archived"
+  run_captain "$home" complete "$scout" --none 2>&1 | grep -q "answered and archived: $id" \
+    || fail "complete did not attest the archived released work item"
+  pass "a call answered through the release path still resolves after it is archived"
+}
+
+# The home's .tasks.toml names no archive and ~/.tasks-axi/config.toml does.
+use_user_level_archive() {  # <home> <user-home> <archive-path>
+  local home=$1 userhome=$2 archive=$3
+  printf '%s\n' 'backend = "markdown"' '' '[markdown]' 'path = "data/backlog.md"' \
+    'done_keep = 1' > "$home/.tasks.toml"
+  mkdir -p "$userhome/.tasks-axi"
+  printf '[markdown]\narchive = "%s"\n' "$archive" > "$userhome/.tasks-axi/config.toml"
+}
+
+test_user_level_only_archive_path_refuses() {
+  local home userhome scout id out rc=0
+  home=$(make_home archived-user-level-only)
+  userhome="$home/userhome"
+  scout=sample-archive-userlevel-scout
+  id=sample-archived-userlevel-call
+  use_user_level_archive "$home" "$userhome" "$home/data/user-archive.md"
+  printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: answered\n\nCaptain decision:\nGo.\n' \
+    "$(printf '%064d' 3 | tr 0 b)" > "$home/answered-body.txt"
+  HOME="$userhome" archive_a_done_row_with_body "$home" "$id" "$home/answered-body.txt"
+  assert_grep "$id" "$home/data/user-archive.md" "retention did not follow the user-level archive"
+  assert_absent "$home/data/done-archive.md" "the fixture wrote the default archive"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+  out=$(HOME="$userhome" run_captain "$home" verify "$scout" 2>&1) || rc=$?
+  [ "$rc" -ne 0 ] || fail "verify accepted a call archived through a user-level archive path: $out"
+  assert_contains "$out" "set outside this home's .tasks.toml" \
+    "the refusal does not say the archive path is set outside .tasks.toml: $out"
+  assert_contains "$out" "is not read" "the refusal does not say the archive is not read: $out"
+  pass "an archive path set only in the user-level config refuses"
+}
+
+test_stale_default_archive_does_not_stand_in_for_the_user_level_archive() {
+  local home userhome scout id first second
+  home=$(make_home archived-stale-default)
+  userhome="$home/userhome"
+  scout=sample-archive-stale-scout
+  id=sample-archived-stale-call
+  # First life: answered, then archived into the default archive file.
+  set_archive_retention "$home" data/done-archive.md
+  archive_an_answered_call "$home" "$id" "$scout"
+  assert_grep "Captain decision:" "$home/data/done-archive.md" "the stale answered row is not in the default archive"
+  # Later the archive moves to a user-level path, and the same id closes again unanswered.
+  use_user_level_archive "$home" "$userhome" "$home/data/user-archive.md"
+  tasks_in "$home" add "$id" "Closed again with no answer" --kind captain --repo sample >/dev/null \
+    || fail "could not recreate $id"
+  HOME="$userhome" tasks_in "$home" "done" "$id" >/dev/null || fail "could not close the new $id"
+  HOME="$userhome" push_through_retention "$home" retention-filler-stale-second
+  assert_grep "$id" "$home/data/user-archive.md" "retention did not archive the newer row at the user-level path"
+  write_scout_with_attested_inventory "$home" "$scout" "$id"
+
+  first=0
+  HOME="$userhome" run_captain "$home" verify "$scout" >"$home/stale.out" 2>&1 || first=$?
+  [ "$first" -ne 0 ] || fail "verify passed from the stale default archive: $(cat "$home/stale.out")"
+  assert_grep "set outside this home's .tasks.toml" "$home/stale.out" \
+    "the stale-default refusal does not name the unread archive path"
+  second=0
+  HOME="$userhome" run_captain "$home" complete "$scout" --none >"$home/stale-complete.out" 2>&1 || second=$?
+  [ "$second" -ne 0 ] || fail "complete --none passed from the stale default archive"
+  pass "a stale default archive cannot stand in for an archive path the gate does not read"
+}
+
 tests=(
 test_sweep_retires_only_finished_board_listeners
 test_sweep_stops_a_live_listener_of_a_finished_board
@@ -7570,6 +7731,11 @@ test_call_absent_from_backlog_and_archive_keeps_its_refusal
 test_archived_call_held_for_another_origin_refuses
 test_live_rows_resolve_exactly_as_before_the_archive_lookup
 test_scout_teardown_gate_follows_the_archived_answer
+test_archived_evidence_only_close_refuses
+test_archived_row_quoting_the_record_markers_refuses
+test_archived_released_work_item_resolves_through_the_gate
+test_user_level_only_archive_path_refuses
+test_stale_default_archive_does_not_stand_in_for_the_user_level_archive
 )
 if [ "$#" -gt 0 ]; then
   for requested in "$@"; do

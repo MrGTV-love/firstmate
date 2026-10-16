@@ -218,8 +218,13 @@
 # beside the backlog when unset), because backlog retention moves a closed
 # call there. tasks-axi has no supported read for archived rows, so the archive
 # file is parsed directly. An archived row is accepted, with `archive` as its
-# attestation evidence, only when its body carries a recorded captain answer,
-# and it then faces the same origin checks as a live row.
+# attestation evidence, only when its newest resolution record is the captain's
+# recorded answer (the full record the answer path writes, with a non-empty
+# `Captain decision:` text), and it then faces the same origin checks as a live
+# row. A call closed only by `reconcile close` evidence, or a body that merely
+# quotes the record markers, is refused. When the home's `.tasks.toml` names no
+# archive but `~/.tasks-axi/config.toml` does, that path is not read and the
+# lookup refuses instead of falling back to the default archive file.
 #
 # `open` is the read-only predicate a mechanical closer asks before it may
 # retire a task's row: is this task still an open captain call? Exit 0 means it
@@ -878,7 +883,8 @@ resolve_migrated_entry() {  # <origin-or-empty> <entry>
 # as `- [x] <id> - <title> ...` and whose body lines are indented two spaces.
 # tasks-axi has no read for archived rows, so the gate parses that file. The
 # file is named by `.tasks.toml`'s `[markdown] archive` key, resolved against
-# the backlog root, and sits beside the backlog when the key is unset.
+# the backlog root, and sits beside the backlog when the key is unset. An archive
+# path set only in ~/.tasks-axi/config.toml is not read: the lookup refuses.
 
 ARCHIVE_ROW_BODY=
 
@@ -909,7 +915,7 @@ captain_markdown_archive_setting() {  # <toml-file>
 # archive does not (or does not exist), and 2 with the reason on stderr when the
 # archive cannot be read. The newest row wins when an id was archived twice.
 archive_row_lookup() {  # <resolved-data-dir> <id>
-  local data=$1 id=$2 root archive found
+  local data=$1 id=$2 root archive outside found
   ARCHIVE_ROW_BODY=
   root=$(fm_backlog_root "$data") || {
     printf 'fm-captain-hold: the configured data directory cannot be resolved for an archive lookup: %s\n' \
@@ -917,6 +923,18 @@ archive_row_lookup() {  # <resolved-data-dir> <id>
     return 2
   }
   archive=$(captain_markdown_archive_setting "$root/.tasks.toml")
+  if [ -z "$archive" ] && [ -n "${HOME:-}" ]; then
+    # tasks-axi takes the archive from ~/.tasks-axi/config.toml when the home's
+    # .tasks.toml names none. That path is not read here, and the default file
+    # beside the backlog may be an older archive, so naming it would pass a
+    # stale answer for a row that was archived somewhere else.
+    outside=$(captain_markdown_archive_setting "$HOME/.tasks-axi/config.toml")
+    if [ -n "$outside" ]; then
+      printf 'fm-captain-hold: the done archive path is set outside this home'\''s .tasks.toml, in %s/.tasks-axi/config.toml, and is not read; resolve the archived call by hand\n' \
+        "$HOME" >&2
+      return 2
+    fi
+  fi
   case "$archive" in
     '') archive="$data/done-archive.md" ;;
     /*) ;;
@@ -949,6 +967,57 @@ archive_row_lookup() {  # <resolved-data-dir> <id>
   return 2
 }
 
+# Whether an archived body's newest resolution record is the captain's recorded
+# answer: the exact record the answer path writes, with every line anchored at
+# its line start and a non-empty answer text under `Captain decision:`. The
+# retired fm-decision-hold leader counts only with its own full shape. A record
+# of mode `reconciled` is evidence, never an answer, and prose that merely
+# quotes the marker strings is no record. Returns 0 for an answer, 4 for an
+# evidence-only record, 1 for anything else. Only archived rows use this check;
+# body_has_resolution_record keeps its broader meaning for live rows.
+archived_answer_state() {  # <dedented-archived-body>
+  local state
+  state=$(printf '%s\n' "$1" | LC_ALL=C awk '
+    function verdict(v) { print v; decided = 1; exit }
+    BEGIN { st = 0; decided = 0 }
+    st == 0 {
+      if ($0 == "Resolution recorded by fm-captain-hold.") { retired = 0; st = 1 }
+      else if ($0 == "Resolution recorded by fm-decision-hold.") { retired = 1; st = 1 }
+      next
+    }
+    st == 1 {
+      if (substr($0, 1, 17) == "Decision digest: " && length($0) == 17 + 64 \
+          && substr($0, 18) ~ /^[0-9a-f]+$/) { st = (retired ? 2 : 3); next }
+      verdict("none")
+    }
+    st == 2 {
+      if (substr($0, 1, 19) == "Routed identities: " && length($0) > 19) { st = 3; next }
+      verdict("none")
+    }
+    st == 3 {
+      if ($0 == "Resolution mode: reconciled") verdict("evidence")
+      if ($0 == "Resolution mode: answered" || $0 == "Resolution mode: released" \
+          || $0 == "Resolution mode: repaired" || $0 == "Resolution mode: routed") { st = 4; next }
+      verdict("none")
+    }
+    st == 4 {
+      if (!retired && !holdset && substr($0, 1, 19) == "Resolves hold set: " && length($0) > 19) {
+        holdset = 1; next
+      }
+      if ($0 == "") { st = 5; next }
+      verdict("none")
+    }
+    st == 5 { if ($0 == "Captain decision:") { st = 6; next } verdict("none") }
+    st == 6 { if ($0 ~ /[^[:space:]]/) verdict("answer"); verdict("none") }
+    END { if (!decided) print "none" }
+  ') || return 1
+  case "$state" in
+    answer) return 0 ;;
+    evidence) return 4 ;;
+  esac
+  return 1
+}
+
 # Resolve an entry that no live row carries to the closed call backlog retention
 # archived. Prints "<id> archive" and returns 0 when an archived row carries a
 # recorded captain answer, returns 1 when the archive holds no such row (or the
@@ -970,11 +1039,20 @@ resolve_archived_entry() {  # <origin-or-empty> <entry>
     archive_row_lookup "$data" "$candidate" || rc=$?
     case "$rc" in
       0)
-        if body_has_resolution_record "$ARCHIVE_ROW_BODY"; then
-          printf '%s archive' "$candidate"
-          return 0
-        fi
-        printf 'fm-captain-hold: captain-held task %s is archived without a recorded captain answer\n' "$candidate" >&2
+        rc=0
+        archived_answer_state "$ARCHIVE_ROW_BODY" || rc=$?
+        case "$rc" in
+          0)
+            printf '%s archive' "$candidate"
+            return 0
+            ;;
+          4)
+            printf 'fm-captain-hold: captain-held task %s is archived with only reconciliation evidence, not a recorded captain answer; resolve the entry by hand\n' "$candidate" >&2
+            ;;
+          *)
+            printf 'fm-captain-hold: captain-held task %s is archived without a recorded captain answer\n' "$candidate" >&2
+            ;;
+        esac
         return 3
         ;;
       2) return 2 ;;
@@ -1158,8 +1236,8 @@ verify_entry_durable() {  # <origin-or-empty> <entry>; prints "<id> <how> <origi
     # origin it was held for is read from it; its identity is the archived id.
     archive_row_lookup "$(fm_backlog_data_absolute "$DATA")" "$id" \
       || fail "archived task $id could not be read again after it resolved"
-    body_has_resolution_record "$ARCHIVE_ROW_BODY" \
-      || fail "captain-held task $id is neither held for the captain nor closed with a recorded captain answer"
+    archived_answer_state "$ARCHIVE_ROW_BODY" \
+      || fail "captain-held task $id is archived without a recorded captain answer"
     validate_slug backend-task-id "$id"
     stored=$(body_hold_origin "$ARCHIVE_ROW_BODY")
   else
