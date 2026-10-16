@@ -104,6 +104,9 @@
 #          reads or writes another home; the fleet snapshot's classifier and
 #          bin/fm-secondmate-reconcile.sh's nudge stay as backstops. Replayed
 #          transitions and restored In-flight rows print BOOTSTRAP_INFO facts.
+#          A recorded close whose teardown still owes a pool slot return
+#          (bin/fm-teardown.sh's header owns that record) is left for the
+#          teardown retry and reported as a BACKLOG_RECONCILE line.
 #          The `code-root <file>` variant is a detect-only local check that runs
 #          even in a read-only session; detect_code_root_backlog_fork owns what
 #          it reports.
