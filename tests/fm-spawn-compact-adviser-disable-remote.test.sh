@@ -11,6 +11,10 @@
 # herdr CLI, so what the remote pane received is observable, and then execute
 # that received command with a probe harness to read back the environment the
 # remote agent would have started with.
+#
+# The same chain also pins that omp is a verified remote harness: every hop of
+# it keeps its own verified-harness list, so a harness missing from one hop is
+# refused only there.
 set -u
 
 # shellcheck source=tests/lib.sh
@@ -54,6 +58,17 @@ cat > "$REMOTE_ROOT/bin/tmux" <<'SH'
 exit 0
 SH
 chmod +x "$REMOTE_ROOT/bin/tmux"
+# The remote host's omp answers the version gate and the model catalog; the
+# launch itself is only recorded by the Herdr fixture.
+cat > "$REMOTE_ROOT/bin/omp" <<'SH'
+#!/usr/bin/env bash
+case "${1:-}" in
+  --version) printf 'omp/18.1.20\n' ;;
+  models) printf '%s\n' '{"models":[{"provider":"openai-codex","id":"gpt-6.1-sol","selector":"openai-codex/gpt-6.1-sol"}]}' ;;
+esac
+exit 0
+SH
+chmod +x "$REMOTE_ROOT/bin/omp"
 install_remote_herdr_fixture "$REMOTE_ROOT" "$HERDR_STATE" "$HERDR_LOG" \
   "$TMP_ROOT/herdr-send-fail" "$TMP_ROOT/herdr.sock"
 # Claude trust must use a disposable account home even though the remote
@@ -293,5 +308,43 @@ sync/current-sol
 sync/configured
 CASES
 pass "remote readiness and sync mutations preserve roles, stand-ins, indexed literals, and configured models with their inherited pair"
+
+# --- omp is a verified remote harness at every hop ---------------------------
+# The parent spawn, the host-local launch, and the host-local relaunch each keep
+# a verified-harness list. omp must pass all three with its model and effort
+# intact, and an unverified name must still be refused at each.
+rm -f "$PARENT/config/model-index.json" "$PARENT/config/crew-dispatch.json" \
+  "$PARENT/config/compact-adviser" "$PARENT/config/launch-env-allowlist"
+reset_remote_herdr_fixture "$HERDR_STATE"
+: > "$HERDR_LOG"
+OUT=$(remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate --harness omp \
+  --model openai-codex/gpt-6.1-sol --effort high 2>&1) \
+  || fail "a remote second mate on omp was refused: $OUT"
+assert_grep 'harness=omp' "$PARENT/state/ios.meta" "remote metadata did not record the omp harness"
+assert_grep 'model=openai-codex/gpt-6.1-sol' "$PARENT/state/ios.meta" "remote metadata lost the omp model"
+assert_grep 'effort=high' "$PARENT/state/ios.meta" "remote metadata lost the omp effort"
+LAUNCH=$(remote_launch_command) || fail "the remote pane received no omp launch command"
+assert_contains "$LAUNCH" 'FM_OMP_HARNESS=omp' "the remote pane did not receive an omp launch"
+assert_contains "$LAUNCH" "--model 'openai-codex/gpt-6.1-sol'" "the remote omp launch command lost the selected model"
+assert_contains "$LAUNCH" "--thinking 'high'" "the remote omp launch command lost the selected effort"
+pass "a remote second mate on omp is accepted and its launch command carries the model and effort"
+
+if OUT=$(remote_env "$ROOT/bin/fm-spawn.sh" ios --secondmate --harness notaharness 2>&1); then
+  fail "the parent spawn accepted an unverified remote harness: $OUT"
+fi
+assert_contains "$OUT" 'remote secondmate spawn requires a verified harness adapter' \
+  "the parent spawn did not name the verified-adapter refusal"
+for VERB in launch relaunch; do
+  if [ "$VERB" = launch ]; then ARGS=(launch ios notaharness - - herdr); else ARGS=(relaunch ios notaharness - -); fi
+  if OUT=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh "${ARGS[@]}" 2>&1); then
+    fail "the host-local $VERB accepted an unverified harness: $OUT"
+  fi
+  assert_contains "$OUT" 'unverified remote secondmate harness' \
+    "the host-local $VERB did not refuse an unverified harness"
+done
+OUT=$(remote_env "$ROOT/bin/fm-on.sh" ios fm-remote-secondmate-control.sh relaunch ios omp - - 2>&1) || true
+assert_not_contains "$OUT" 'unverified remote secondmate harness' \
+  "the host-local relaunch refused omp as an unverified harness"
+pass "an unverified remote harness name is still refused at the parent spawn and both host-local verbs"
 
 echo "ALL TESTS PASSED"
