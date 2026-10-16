@@ -1296,6 +1296,7 @@ test_exit_refuses_the_picker_when_the_busy_record_is_unknown() {
 # queue_steer <case-dir> <text>: enqueue one steer for t1 through the inbox
 # library's own writer and echo the record path.
 queue_steer() {  # <case-dir> <text>
+  # shellcheck disable=SC2016 # The child shell expands its own positional parameters.
   env FM_HOME="$1/home" FM_STATE_OVERRIDE="$1/home/state" \
     bash -c '. "$1"; fm_task_inbox_write "$2" t1 "$3"' _ \
     "$ROOT/bin/fm-task-inbox-lib.sh" "$1/home/state" "$2"
