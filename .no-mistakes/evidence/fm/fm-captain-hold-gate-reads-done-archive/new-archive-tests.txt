@@ -1,0 +1,8 @@
+ok - the completion gate resolves an answered call that retention archived
+ok - the archive lookup follows the archive path in .tasks.toml
+ok - an archived call with no recorded captain answer still refuses
+ok - a call absent from the backlog and the archive keeps the existing refusal
+ok - an archived call held for another origin still refuses
+ok - live held and live closed rows resolve exactly as before
+ok - scout teardown passes an archived answered call and blocks an archived unanswered one
+ok - captain-hold lifecycle leaves no runner or watchdog processes

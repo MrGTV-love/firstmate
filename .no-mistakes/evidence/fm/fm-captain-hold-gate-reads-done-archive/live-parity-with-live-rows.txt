@@ -1,0 +1,16 @@
+##### P1 live closed row (still inside retention), no origin recorded
+backlog has call: 1; archive exists: no
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.CDBvo9/p1 complete noorigin-scout --none
+complete: noorigin-scout captain-call inventory reviewed (noorigin-call) [no recorded origin on: noorigin-call; not checked against noorigin-scout]
+[exit 0]
+
+##### P2 live closed row held for another origin
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.CDBvo9/p2 complete my-scout --none
+fm-captain-hold: captain-held task other-call was held for origin other-scout, not my-scout; hold a task for my-scout or list the right one
+[exit 1]
+
+##### P3 live closed row, no recorded answer
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.CDBvo9/p3 complete bare-scout --none
+fm-captain-hold: captain-held task bare-call is neither held for the captain nor closed with a recorded captain answer
+[exit 1]
+

@@ -1,0 +1,23 @@
+=== test_archived_answered_call_resolves_through_the_gate
+not ok - verify refused an answered call that retention archived: fm-captain-hold: no captain-held task sample-archived-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-captain-hold.9PZdKE/archived-answered/data); the nearest legacy identity sample-archive-scout-decision-sample-archived-call also resolves to nothing
+=== test_archive_is_read_from_the_configured_path
+not ok - verify did not read the archive named by .tasks.toml: fm-captain-hold: no captain-held task sample-custom-archive-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-captain-hold.bqPsOG/archived-custom-path/data); the nearest legacy identity sample-archive-path-scout-decision-sample-custom-archive-call also resolves to nothing
+=== test_scout_teardown_gate_follows_the_archived_answer
+not ok - teardown refused a scout whose only call is archived and answered: WARNING: watcher still down (same stale episode; last beat: never, grace 300s) - full banner already printed this episode.
+fm-captain-hold: no captain-held task sample-archive-teardown-answered and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-captain-hold.KR7KwT/archived-teardown/data); the nearest legacy identity sample-archive-teardown-scout-decision-sample-archive-teardown-answered also resolves to nothing
+REFUSED: scout task sample-archive-teardown-scout has not passed the captain-call completion gate.
+Inventory its report and any visual review through bin/fm-captain-hold.sh before teardown.
+=== test_archived_call_without_a_recorded_answer_refuses
+not ok - the refusal does not say the archived call has no recorded answer (missing: 'archived without a recorded captain answer')
+--- output ---
+fm-captain-hold: no captain-held task sample-archived-no-answer and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-captain-hold.RblqWm/archived-unanswered/data); the nearest legacy identity sample-archive-unanswered-scout-decision-sample-archived-no-answer also resolves to nothing
+=== test_call_absent_from_backlog_and_archive_keeps_its_refusal
+ok - a call absent from the backlog and the archive keeps the existing refusal
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+=== test_archived_call_held_for_another_origin_refuses
+not ok - the archived call skipped the origin mismatch check (missing: 'was held for origin sample-someone-elses-scout, not sample-archive-origin-scout')
+--- output ---
+fm-captain-hold: no captain-held task sample-archived-other-origin and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-captain-hold.mOCDRx/archived-other-origin/data); the nearest legacy identity sample-archive-origin-scout-decision-sample-archived-other-origin also resolves to nothing
+=== test_live_rows_resolve_exactly_as_before_the_archive_lookup
+ok - live held and live closed rows resolve exactly as before
+ok - captain-hold lifecycle leaves no runner or watchdog processes

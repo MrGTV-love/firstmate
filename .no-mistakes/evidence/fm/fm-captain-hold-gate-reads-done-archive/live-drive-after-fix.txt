@@ -1,0 +1,99 @@
+##### S1: answered call archived by retention -> complete --none passes
+--- backlog has call? 0   archive has call? 1
+--- archive excerpt:
+
+## Archived 2026-10-16
+- [x] vernant-call-1 - Call vernant-call-1 (repo: sample) (kind: captain) (done 2026-10-16) (hold: fm-hold-v1:Y2FwdGFpbiBtdXN0IGRlY2lkZSB2ZXJuYW50LWNhbGwtMQ==) (hold-kind: captain)
+  Resolution recorded by fm-captain-hold.
+  Decision digest: 4a2211c17c92454cfc32db2a133843dc49371477596d0a9bd4ba7a6eee48e88e
+  Resolution mode: answered
+  Resolves hold set: 2026-10-16T12:10:37Z
+
+  Captain decision:
+  Captain: remove the owner calls.
+
+  Captain hold origin: vernant-scout
+
+  Origin: vernant-scout
+
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s1 complete vernant-scout --none
+complete: vernant-scout captain-call inventory reviewed (vernant-call-1) [answered and archived: vernant-call-1]
+[exit 0]
+
+--- meta after:
+decisions_reviewed=1
+decision_keys=vernant-call-1
+
+##### S2: same call, explicit task-id form
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s1 complete vernant-scout vernant-call-1
+complete: vernant-scout captain-call inventory reviewed (vernant-call-1) [answered and archived: vernant-call-1]
+[exit 0]
+
+
+##### S3: archived call with NO recorded answer -> refuse
+1
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s3 complete bare-scout --none
+fm-captain-hold: captain-held task bare-call is archived without a recorded captain answer
+[exit 1]
+
+
+##### S4: archived call answered for ANOTHER origin -> refuse
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s4 complete my-scout --none
+fm-captain-hold: captain-held task other-call was held for origin other-scout, not my-scout; hold a task for my-scout or list the right one
+[exit 1]
+
+
+##### S5: id archived twice - newest row wins (old answered, new unanswered)
+--- rows for twice-call in archive: 2
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s5 complete twice-scout --none
+fm-captain-hold: captain-held task twice-call is archived without a recorded captain answer
+[exit 1]
+
+
+##### S6: id prefix must not match (call-1 vs call-10)
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s6 complete pfx-scout --none
+fm-captain-hold: no captain-held task call-1 and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s6/data); the nearest legacy identity pfx-scout-decision-call-1 also resolves to nothing
+[exit 1]
+
+
+##### S7: unreadable archive -> refuse with reason, not a silent pass
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s7 complete unread-scout --none
+fm-captain-hold: the done archive at /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s7/data/done-archive.md cannot be read
+[exit 2]
+
+
+##### S8: archive path is a directory -> refuse with reason
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s8 complete dir-scout --none
+fm-captain-hold: the done archive at /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s8/data/done-archive.md cannot be read
+[exit 2]
+
+
+##### S9: archive key unset in .tasks.toml -> default beside backlog
+backlog.md
+done-archive.md
+note-archive.md
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s9 complete def-scout --none
+complete: def-scout captain-call inventory reviewed (def-call) [answered and archived: def-call]
+[exit 0]
+
+
+##### S10: archive key in another toml section must not be used
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s10 complete sect-scout --none
+fm-captain-hold: no captain-held task sect-call and no migrated hold for it in this home's configured backlog (data directory /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s10/data); the nearest legacy identity sect-scout-decision-sect-call also resolves to nothing
+[exit 1]
+
+
+##### S11: 'open' predicate and 'answer' do NOT use the archive (live-only meaning kept)
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s11 open open-call
+[exit 1]
+
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s11 open open-call --distinguish-absent
+[exit 3]
+
+
+##### S12: archived-closed call without hold origin line + origin check with unrecorded origin
+$ cap /Users/charlesabrooker/tmp/fm-livedrive.N7K14m/s12 complete noorigin-scout --none
+complete: noorigin-scout captain-call inventory reviewed (noorigin-call) [answered and archived: noorigin-call] [no recorded origin on: noorigin-call; not checked against noorigin-scout]
+[exit 0]
+
+DONE

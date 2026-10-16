@@ -1,0 +1,26 @@
+ok - bound sweep keys share exact and legacy answer precedence without cross-source cache leakage
+ok - sweeps reuse migration note and prefix precedence and keep ambiguous or unreadable identities
+ok - new, active, and released holds require the origin first with and without deferral
+ok - historical self-inventories name a workable repair that preserves sibling entries
+ok - completion and verification compare backend identities for entries and current or stored origins
+ok - complete refuses the origin as its own captain-call inventory
+ok - complete refuses an entry held for another origin and flags one with none recorded
+ok - resolved findings and decision-like prose do not create captain-held tasks
+ok - terminal single-owner stale status decisions do not block empty inventory
+ok - completed default and done releases replay and recover failed publication without rewriting history
+ok - repeated default and done answers preserve prior holds and resolve the current parent decision
+ok - ambiguous legacy default and done releases require explicit closure without rewriting history
+ok - legacy reconcile replaces earlier choices before either intake is selected
+ok - reconcile closes a moot call with evidence and keeps an active one open with a note
+ok - skipped on markdown-only tasks-axi: close-key against a beads-migrated hold
+ok - legacy identities, metadata, bindings, and the shim keep working
+ok - completion and verification validate origins before constructing paths
+ok - a status resolution over a still-open captain-held task is signalled, not closed
+ok - skipped on markdown-only tasks-axi: verify against a beads-migrated hold
+ok - skipped on markdown-only tasks-axi: verify against a prefix-migrated hold
+ok - skipped on markdown-only tasks-axi: prefer a marker-noted row over a prefix namesake
+ok - skipped on markdown-only tasks-axi: complete against a beads-migrated hold
+ok - skipped on markdown-only tasks-axi: verify an unresolvable beads legacy id
+ok - skipped on markdown-only tasks-axi: verify a derived pre-collapse key
+ok - live held and live closed rows resolve exactly as before
+ok - captain-hold lifecycle leaves no runner or watchdog processes
