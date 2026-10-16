@@ -253,10 +253,10 @@ The guards are wired into these scripts:
 | `fm-send.sh`, the runtime lifecycle verbs of `fm-control.sh`, and `fm-teardown.sh` | Overlap, lease-checked, with claim serialization retained through the mutation. |
 | `fm-control.sh authorize-continuation` | Follows the main-only [instruction-owner recovery policy](agent-control.md#recovering-an-exited-instruction-owner) in every posture. |
 | `fm-control.sh reassociate` | Main-only in every posture, like continuation authorization ([Reassociating a task with a replacement copy](agent-control.md#reassociating-a-task-with-a-replacement-copy)). |
-| `fm-pr-merge.sh`, `fm-merge-local.sh`, `fm-spawn.sh`, `fm-send.sh --resolve-key` for a decision key, and `fm-teardown.sh` for a second mate | Main-owned while attended; branch refused. |
+| `fm-pr-merge.sh`, `fm-merge-local.sh`, `fm-spawn.sh`, `fm-send.sh --resolve-key` for a decision key, `fm-captain-hold.sh reconcile close --verified-outcome` and `reconcile close-key`, and `fm-teardown.sh` for a second mate | Main-owned while attended; branch refused. |
 
 A relaunch through `fm-control` stays branch-legal recovery in both postures.
-Under the away-posture record, the PR merge, a fresh spawn, and a decision answer relocate to the branch behind each script's own gate.
+Under the away-posture record, the PR merge, a fresh spawn, and a decision answer (including an evidence-backed captain-hold close) relocate to the branch behind each script's own gate.
 Local-only landing and second-mate retirement never do ("Postures" below).
 
 ### Autonomy

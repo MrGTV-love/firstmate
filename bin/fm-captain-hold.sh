@@ -142,6 +142,11 @@
 # resolved event is appended. Exact replay is a no-op, changed evidence cannot
 # rewrite a closed key, and the same evidence cannot close a reopened key.
 # Neither this command nor a reconcile selection supplies a missing answer.
+# Both verified-outcome paths are decision answers under the supervision
+# role partition (contract: bin/fm-lease-lib.sh): main-owned while attended,
+# refused for the supervision branch, and relocated to it only under the
+# away-posture record, as for fm-send --resolve-key. The board-request path
+# of `close` and `answer` are not part of that guard.
 # docs/captain-hold-lifecycle.md owns the mechanism; the skill owns policy.
 #
 # A channel's ONLY job is to turn whatever it received into those keyed lines
@@ -280,6 +285,9 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # shellcheck source=bin/fm-parent-channel-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-parent-channel-lib.sh"
+# shellcheck source=bin/fm-lease-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-lease-lib.sh"
 
 PARENT_HOLD_PUBLISHED=0
 publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
@@ -1785,6 +1793,9 @@ reconcile_close() {
     esac
     shift
   done
+  if [ -n "$verified_outcome" ]; then
+    fm_lease_forbid_branch "decision answer (captain-hold reconcile close)" --away-relocated
+  fi
   validate_slug task-id "$id"
   load_reconciliation_evidence "$evidence_file" "$verified_outcome"
   acquire_task_control_lock "$id"
@@ -1888,6 +1899,7 @@ reconcile_close_key() {
     esac
     shift
   done
+  fm_lease_forbid_branch "decision answer (captain-hold reconcile close)" --away-relocated
   validate_slug owner-id "$owner"
   validate_slug key "$key"
   case "$owner" in .|..) fail "owner-id must name a local status stream" ;; esac

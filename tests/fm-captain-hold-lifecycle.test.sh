@@ -3090,6 +3090,101 @@ test_verified_closes_refuse_unanswered_or_unsupported_calls() {
   pass "verified closes refuse active calls, missing or reserved evidence, and unfinished work"
 }
 
+# Closing a call on evidence alone is a decision answer, so the two standalone
+# paths take the supervision role partition fm-send --resolve-key takes: main
+# owns them while attended, the branch is refused, and only the away-posture
+# record relocates them. The board-requested close and `answer` stay outside it.
+test_standalone_closes_follow_the_supervision_role_partition() {
+  local home out rc show before open held
+  home=$(make_home role-partition)
+  printf 'kind=secondmate\n' > "$home/state/lane.meta"
+  printf 'needs-decision [key=call-a]: first operational call\nneeds-decision [key=call-b]: second operational call\n' \
+    > "$home/state/lane.status"
+  for held in sample-held-a sample-held-b; do
+    run_captain "$home" hold "$held" --title "Held $held" --reason "answers recorded elsewhere" >/dev/null \
+      || fail "could not hold the partition fixture $held"
+  done
+  tasks_in "$home" add sample-board-call "Captain call: moot board question?" --repo sample >/dev/null
+  run_captain "$home" hold sample-board-call --reason "moot board question?" >/dev/null
+  request_reconciles "$home" partition-src sample-board-call || fail "could not file the board reconcile request"
+  printf 'Verified source captured.txt: the recorded answers settle this call.\n' > "$home/evidence.txt"
+  before=$(cat "$home/state/lane.status")
+
+  set +e
+  out=$(FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close sample-held-a \
+    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -eq 6 ] || fail "an attended branch closed a captain call on evidence (rc=$rc): $out"
+  assert_contains "$out" "decision answer (captain-hold reconcile close) refused" \
+    "the verified close refusal lost its partition action label: $out"
+  show=$(tasks_in "$home" show sample-held-a --full)
+  assert_contains "$show" "held: yes" "the refused verified close released the call"
+  assert_not_contains "$show" "Resolution recorded by" "the refused verified close wrote a resolution"
+
+  set +e
+  out=$(FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close-key lane --key call-a \
+    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1)
+  rc=$?
+  set -e
+  [ "$rc" -eq 6 ] || fail "an attended branch closed an operational key on evidence (rc=$rc): $out"
+  assert_contains "$out" "decision answer (captain-hold reconcile close) refused" \
+    "the key close refusal lost its partition action label: $out"
+  [ "$(cat "$home/state/lane.status")" = "$before" ] || fail "the refused key close appended a status event"
+  assert_absent "$home/state/reconcile-evidence" "the refused key close persisted evidence"
+
+  # The board-requested close is the existing path and takes no partition guard.
+  FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close sample-board-call \
+    --evidence-file "$home/evidence.txt" >/dev/null || fail "the board-requested close was refused for the branch"
+  assert_contains "$(tasks_in "$home" show sample-board-call --full)" "state: done" \
+    "the board-requested close did not complete"
+
+  # The away-posture record relocates both paths, as it does for fm-send.
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+    "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "away entry failed"
+  out=$(FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close sample-held-a \
+    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1) \
+    || fail "the relocated branch could not close the call on evidence: $out"
+  assert_contains "$out" "main is parked" "the relocated verified close did not announce itself"
+  assert_contains "$(tasks_in "$home" show sample-held-a --full)" "state: done" \
+    "the relocated verified close did not complete"
+  out=$(FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close-key lane --key call-a \
+    --verified-outcome answered --evidence-file "$home/evidence.txt" 2>&1) \
+    || fail "the relocated branch could not close the operational key on evidence: $out"
+  assert_contains "$out" "main is parked" "the relocated key close did not announce itself"
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/lane.status")
+  assert_not_contains "$open" "call-a" "the relocated key close left the key open"
+  assert_contains "$open" "call-b" "the relocated key close closed an unrelated key"
+
+  # An archived record is absence: the attended refusal returns for the branch.
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+    "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
+  set +e
+  FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close sample-held-b \
+    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1
+  rc=$?
+  set -e
+  [ "$rc" -eq 6 ] || fail "an archived away record still relocated the verified close (rc=$rc)"
+  set +e
+  FM_SUPERVISION_ACTOR=branch run_captain "$home" reconcile close-key lane --key call-b \
+    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null 2>&1
+  rc=$?
+  set -e
+  [ "$rc" -eq 6 ] || fail "an archived away record still relocated the key close (rc=$rc)"
+
+  # Main never meets the partition, attended or not.
+  run_captain "$home" reconcile close sample-held-b --verified-outcome answered \
+    --evidence-file "$home/evidence.txt" >/dev/null || fail "main could not close the call on evidence"
+  assert_contains "$(tasks_in "$home" show sample-held-b --full)" "state: done" \
+    "main's verified close did not complete"
+  FM_SUPERVISION_ACTOR=main run_captain "$home" reconcile close-key lane --key call-b \
+    --verified-outcome answered --evidence-file "$home/evidence.txt" >/dev/null \
+    || fail "main could not close the operational key on evidence"
+  open=$(bash -c '. "$1/bin/fm-status-decision-lib.sh"; status_open_decisions "$2"' _ "$ROOT" "$home/state/lane.status")
+  [ -z "$open" ] || fail "main's key close left decisions open: $open"
+  pass "standalone evidence closes refuse the attended branch, relocate under the away record, and leave main and the board path unchanged"
+}
+
 test_operational_key_closes_with_durable_evidence_and_replay() {
   local home key outcome out evidence before open
   home=$(make_home operational-key-close)
@@ -6870,6 +6965,7 @@ test_verified_close_retries_only_its_own_hold
 test_verified_closes_refuse_unanswered_or_unsupported_calls
 test_operational_key_closes_with_durable_evidence_and_replay
 test_operational_key_close_refusals_and_interrupted_append
+test_standalone_closes_follow_the_supervision_role_partition
 test_unbound_source_closes_no_hold
 test_legacy_identities_keep_working
 test_board_answer_reaches_the_keyed_answer_intake

@@ -318,6 +318,8 @@ The standalone paths use the same owner, not a synthetic reconcile request or a 
 For a captain-held task, the explicit verified outcome is incorporated into the evidence digest and written in the existing reconciled resolution block.
 The close uses the same task control lock, body archival, retained-artifact handling, parent publication, and checked request retirement as board reconciliation.
 Worker-owned unfinished work is not completed by this operator path.
+Both standalone paths are decision answers under the [supervision role partition](pi-supervision-branch.md#consistency): main-owned while attended, refused for the supervision branch, and relocated to it only under the away-posture record.
+The board-request `reconcile close`, `answer`, and `answers` are not part of that guard.
 A matching closed-task retry can finish parent publication and retirement even when no pending board request remains.
 A retry of an interrupted close against an open task must match its recorded hold-set association; old evidence cannot settle a newer hold.
 A still-active note retains its existing request requirement.
