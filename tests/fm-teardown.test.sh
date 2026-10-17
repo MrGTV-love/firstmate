@@ -11003,6 +11003,218 @@ test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place() {
   pass "a driver refusal or a lock that is not Vernant's leaves the foreign copy, the slot and the record in place"
 }
 
+# make_own_locked_copy_case <name> <enclosing|reverse> [launcher-pid]: the foreign
+# copy case with the copy recorded as the task's own. enclosing records the copy as
+# worktree= and the slot as prior_worktree=; reverse records the slot as worktree=
+# and the copy as prior_worktree=. A launcher pid locks the copy as Vernant's
+# start_task_worktree.py does. Sets the FOREIGN_* variables and snapshots Treehouse's
+# state and the slot claim.
+make_own_locked_copy_case() {
+  make_foreign_copy_case "$1" ${3:+"$3"}
+  if [ "$2" = enclosing ]; then
+    fm_write_meta "$FOREIGN_CASE/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$FOREIGN_COPY" "branch=fm/task-x1-v2" "project=$FOREIGN_CASE/project" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+      "prior_worktree=$FOREIGN_SLOT"
+  else
+    fm_write_meta "$FOREIGN_CASE/state/task-x1.meta" \
+      "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
+      "worktree=$FOREIGN_SLOT" "branch=fm/task-x1" "project=$FOREIGN_CASE/project" \
+      "kind=ship" "mode=no-mistakes" "spawn_gen=teardown-test-task-x1" \
+      "prior_worktree=$FOREIGN_COPY"
+  fi
+  cp "$FOREIGN_CASE/pool/treehouse-state.json" "$FOREIGN_CASE/treehouse-state.before"
+  cp "$FOREIGN_CASE/pool/1/.fm-slot-owner" "$FOREIGN_CASE/slot-owner.before"
+}
+
+# A refused teardown of an own copy changed nothing: the copy is still locked and
+# registered, its branch, the task record, the slot claim and Treehouse's lease are
+# intact, and no pool return ran.
+assert_own_locked_copy_untouched() {  # <label>
+  local case_dir=$FOREIGN_CASE
+  assert_foreign_copy_untouched "$1"
+  git -C "$case_dir/project" worktree list --porcelain | grep -F "worktree $FOREIGN_COPY" >/dev/null \
+    || fail "$1: the copy is no longer registered"
+  git -C "$case_dir/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+    || fail "$1: the copy is no longer locked"
+  cmp -s "$case_dir/treehouse-state.before" "$case_dir/pool/treehouse-state.json" \
+    || fail "$1: Treehouse's lease record changed"
+  cmp -s "$case_dir/slot-owner.before" "$case_dir/pool/1/.fm-slot-owner" \
+    || fail "$1: the slot claim changed"
+}
+
+test_locked_own_nested_copy_is_released_by_the_closeout_driver() {
+  local rc shape head
+  for shape in enclosing reverse; do
+    dead_launcher_pid
+    make_own_locked_copy_case "own-locked-$shape" "$shape" "$FOREIGN_DEAD_PID"
+    head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "own-locked-$shape: a landed, clean, Vernant-locked own copy must be released: $(cat "$FOREIGN_CASE/stderr")"
+    assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+      "own-locked-$shape: the driver was not run once from the slot with the copy and the execute flag"
+    assert_absent "$FOREIGN_COPY" "own-locked-$shape: the copy survived"
+    git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -F "worktree $FOREIGN_COPY" >/dev/null \
+      && fail "own-locked-$shape: the copy is still registered"
+    assert_equals "$head" "$(git -C "$FOREIGN_CASE/project" rev-parse refs/heads/fm/task-x1-v2)" \
+      "own-locked-$shape: the copy's branch moved"
+    assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "own-locked-$shape: the slot was not returned"
+    assert_absent "$FOREIGN_CASE/state/task-x1.meta" "own-locked-$shape: the task record survived"
+    assert_absent "$FOREIGN_CASE/pool/1/.fm-slot-owner" "own-locked-$shape: the slot claim survived the task"
+  done
+  pass "a landed, clean own nested copy locked by Vernant is released through the closeout driver, removed, and the slot is returned"
+}
+
+test_locked_own_nested_copy_with_a_recycled_launcher_pid_is_released() {
+  local rc pid admin
+  sleep 300 &
+  pid=$!
+  make_own_locked_copy_case own-locked-recycled enclosing "$pid"
+  admin=$(git -C "$FOREIGN_COPY" rev-parse --absolute-git-dir)
+  # The lock file is older than the process, so the pid cannot be its launcher.
+  fm_touch_epoch "$(( $(date +%s) - 3600 ))" "$admin/locked"
+  run_foreign_teardown rc
+  kill -0 "$pid" 2>/dev/null || fail "own-recycled: teardown ended the unrelated process that holds the recycled pid"
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  expect_code 0 "$rc" "own-recycled: a live but recycled launcher pid must not block release: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+    "own-recycled: the driver was not run once"
+  assert_absent "$FOREIGN_COPY" "own-recycled: the copy survived"
+  assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "own-recycled: the slot was not returned"
+  pass "an own copy whose lock names a pid that started after the lock was written is released by the same driver path"
+}
+
+test_live_launcher_outside_the_task_keeps_its_locked_own_copy() {
+  local rc pid
+  sleep 300 &
+  pid=$!
+  sleep 3
+  make_own_locked_copy_case own-locked-live-launcher enclosing "$pid"
+  run_foreign_teardown rc
+  kill "$pid" 2>/dev/null || true
+  wait "$pid" 2>/dev/null || true
+  expect_code 1 "$rc" "own-live-launcher: a launcher outside the task that predates its lock must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "creation-lock launcher process $pid may still be running" "$FOREIGN_CASE/stderr" \
+    "own-live-launcher: the refusal did not name the launcher"
+  assert_own_locked_copy_untouched own-live-launcher
+  pass "a live lock launcher outside the task keeps a locked own copy and is named by pid"
+}
+
+test_locked_own_nested_copy_that_is_not_proved_is_refused() {
+  local rc shape exclude
+  for shape in unlanded dirty ignored human-lock; do
+    dead_launcher_pid
+    make_own_locked_copy_case "own-locked-$shape" enclosing "$FOREIGN_DEAD_PID"
+    case "$shape" in
+      unlanded)
+        printf 'unlanded\n' > "$FOREIGN_COPY/unlanded.txt"
+        git -C "$FOREIGN_COPY" add unlanded.txt
+        git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unlanded own work'
+        ;;
+      dirty)
+        printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
+        ;;
+      ignored)
+        exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+        printf 'unique.dat\n' >> "$exclude"
+        printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+        ;;
+      human-lock)
+        git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
+        git -C "$FOREIGN_CASE/project" worktree lock --reason 'held by a human' "$FOREIGN_COPY"
+        ;;
+    esac
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "own-locked-$shape: a locked own copy that is not proved must be refused: $(cat "$FOREIGN_CASE/stderr")"
+    case "$shape" in
+      ignored)
+        assert_grep "holds ignored files that exist nowhere else: unique.dat" "$FOREIGN_CASE/stderr" \
+          "own-locked-$shape: the refusal did not name the ignored payload"
+        assert_present "$FOREIGN_COPY/unique.dat" "own-locked-$shape: the ignored file was lost"
+        ;;
+      human-lock)
+        assert_grep "locked by something other than Vernant's creation lock (held by a human)" "$FOREIGN_CASE/stderr" \
+          "own-locked-$shape: the refusal did not name the foreign lock"
+        ;;
+      dirty) assert_present "$FOREIGN_COPY/untracked.txt" "own-locked-$shape: the file was lost" ;;
+    esac
+    assert_own_locked_copy_untouched "own-locked-$shape"
+    assert_equals "" "$(git -C "$FOREIGN_CASE/project" for-each-ref 'refs/fm/anchor/*')" \
+      "own-locked-$shape: an anchor was written for a copy that was refused"
+  done
+  pass "a locked own copy with unlanded commits, unsaved or unique ignored files, or a lock that is not Vernant's is refused and nothing changes"
+}
+
+test_locked_own_nested_copy_stays_when_a_foreign_copy_is_refused() {
+  local rc second
+  dead_launcher_pid
+  make_own_locked_copy_case own-locked-foreign-refused enclosing "$FOREIGN_DEAD_PID"
+  second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
+  fm_write_meta "$FOREIGN_CASE/state/other.meta" "kind=ship" "worktree=$second"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "own-foreign-refused: a foreign copy another record owns must refuse the slot: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "task other's active record names it as its worktree" "$FOREIGN_CASE/stderr" \
+    "own-foreign-refused: the refusal did not name the owning record"
+  assert_grep "contains registered copy $second" "$FOREIGN_CASE/stderr" "own-foreign-refused: the refusal changed"
+  assert_present "$second/.git" "own-foreign-refused: the foreign copy was removed"
+  assert_own_locked_copy_untouched own-foreign-refused
+  pass "a foreign copy that is still refused keeps the locked own copy, the slot and the record in place"
+}
+
+test_locked_own_nested_copy_is_released_before_the_project_lock_wait() {
+  local rc lock
+  dead_launcher_pid
+  make_own_locked_copy_case own-lock-order enclosing "$FOREIGN_DEAD_PID"
+  lock=$(FM_HOME="$FOREIGN_CASE/home" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+    bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$FOREIGN_CASE/project") \
+    || fail "own-lock-order: cannot resolve the shared Treehouse project lock"
+  cat > "$FOREIGN_CASE/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$FOREIGN_CASE/treehouse.log"
+case "\${1:-}" in
+  return) if [ -d "$lock" ]; then echo held; else echo free; fi >> "$FOREIGN_CASE/return.lock-state" ;;
+esac
+exit 0
+SH
+  run_foreign_teardown rc FM_STUB_LOCK="$lock"
+  expect_code 0 "$rc" "own-lock-order: a landed Vernant-locked own copy must be released: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "held" "$(cat "$FOREIGN_CASE/return.lock-state" 2>/dev/null || true)" \
+    "own-lock-order: the slot return did not run under the shared project lock, so the probe proves nothing"
+  assert_equals "free" "$(cat "$FOREIGN_CASE/closeout.lock-state" 2>/dev/null || true)" \
+    "own-lock-order: the closeout driver ran while the shared project lock was held"
+  assert_absent "$FOREIGN_COPY" "own-lock-order: the copy survived"
+  pass "the closeout driver releases a locked own copy before the shared project lock is taken, and the slot return still runs under it"
+}
+
+test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records() {
+  local rc shape
+  for shape in enclosing reverse; do
+    dead_launcher_pid
+    make_own_locked_copy_case "own-driver-refuses-$shape" "$shape" "$FOREIGN_DEAD_PID"
+    run_foreign_teardown rc FM_STUB_CLOSEOUT=refuse
+    expect_code 1 "$rc" "own-driver-refuses-$shape: a driver refusal must refuse the teardown: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "Vernant's closeout driver did not release own nested copy $FOREIGN_COPY (exit 3)" "$FOREIGN_CASE/stderr" \
+      "own-driver-refuses-$shape: the driver refusal was not reported"
+    assert_grep 'stub_refusal' "$FOREIGN_CASE/stderr" "own-driver-refuses-$shape: the driver's reason was not reported"
+    assert_present "$FOREIGN_CASE/closeout.log" "own-driver-refuses-$shape: the driver was not asked"
+    assert_present "$FOREIGN_COPY/.git" "own-driver-refuses-$shape: the copy was removed"
+    git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -F "worktree $FOREIGN_COPY" >/dev/null \
+      || fail "own-driver-refuses-$shape: the copy is no longer registered"
+    git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -A4 -F "worktree $FOREIGN_COPY" | grep -q '^locked' \
+      || fail "own-driver-refuses-$shape: the copy is no longer locked"
+    assert_absent "$FOREIGN_CASE/treehouse.log" "own-driver-refuses-$shape: the pool slot was returned"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "own-driver-refuses-$shape: the task record was removed"
+    cmp -s "$FOREIGN_CASE/treehouse-state.before" "$FOREIGN_CASE/pool/treehouse-state.json" \
+      || fail "own-driver-refuses-$shape: Treehouse's lease record changed"
+    cmp -s "$FOREIGN_CASE/slot-owner.before" "$FOREIGN_CASE/pool/1/.fm-slot-owner" \
+      || fail "own-driver-refuses-$shape: the slot claim changed"
+  done
+  pass "a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place"
+}
+
 test_cleanup_roots_preserve_foreign_copy_git_storage() {
   local root field location case_dir target copy state common rc
   for root in home worktree tasktmp; do
@@ -12580,6 +12792,13 @@ test_foreign_copy_is_released_before_the_project_lock_wait
 test_closeout_uses_the_slots_default_interpreter
 test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place
 test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place
+test_locked_own_nested_copy_is_released_by_the_closeout_driver
+test_locked_own_nested_copy_with_a_recycled_launcher_pid_is_released
+test_live_launcher_outside_the_task_keeps_its_locked_own_copy
+test_locked_own_nested_copy_that_is_not_proved_is_refused
+test_locked_own_nested_copy_stays_when_a_foreign_copy_is_refused
+test_locked_own_nested_copy_is_released_before_the_project_lock_wait
+test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot
 test_shared_nested_copy_concludes_only_its_own_runtime
 test_nested_slot_stale_lock_cleanup_reproves_the_slot
