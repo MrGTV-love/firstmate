@@ -447,6 +447,33 @@ test_supervision_groups_share_coverage_and_changed_selection() {
   pass "both triage groups retain watcher coverage and direct/transitive changed selection"
 }
 
+test_captain_hold_groups_share_helper_changed_selection() {
+  local tmp repo listed listed_alone script group
+  local -a groups=(archive cleanup keyed-answers lifecycle reconcile sweep)
+  tmp=$(fm_test_tmproot fm-test-run-captain-hold-selection)
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  for group in "${groups[@]}"; do
+    printf '#!/usr/bin/env bash\n# fm-captain-hold-lifecycle-helpers.sh\n' >"$repo/tests/fm-captain-hold-$group.test.sh"
+    chmod +x "$repo/tests/fm-captain-hold-$group.test.sh"
+  done
+  printf '# helpers\n' >"$repo/tests/fm-captain-hold-lifecycle-helpers.sh"
+  git -C "$repo" add tests
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm captain-hold-selection-fixture
+  printf '\n' >>"$repo/tests/fm-captain-hold-lifecycle-helpers.sh"
+  listed=$(cd "$repo" && bin/fm-test-run.sh --list --changed --base HEAD) \
+    || fail "the captain-hold helper change failed selection"
+  for group in "${groups[@]}"; do
+    script=fm-captain-hold-$group.test.sh
+    assert_contains "$listed" "tests/$script" "the shared helper change selects $script"
+    listed_alone=$(cd "$repo" && bin/fm-test-run.sh --list "tests/$script")
+    [ "$listed_alone" = "tests/$script" ] || fail "$script must be independently selectable: $listed_alone"
+  done
+  assert_not_contains "$listed" "tests/fm-pr-merge.test.sh" "the helper change must not widen to unrelated suites"
+  rm -rf "$tmp"
+  pass "every captain-hold group is independently selectable and the shared helper selects all of them"
+}
+
 test_changed_task_copy_lib_selects_retained_and_secondmate() {
   local tmp repo listed path family expected
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-allocation.XXXXXX")
@@ -2754,6 +2781,7 @@ test_changed_task_copy_lib_selects_retained_and_secondmate
 test_changed_dependency_selection_and_unmapped_failure
 test_changed_wake_classifier_selects_both_consumers
 test_supervision_groups_share_coverage_and_changed_selection
+test_captain_hold_groups_share_helper_changed_selection
 test_changed_fleet_snapshot_selects_only_its_exact_ledger_consumer
 test_changed_watch_helpers_select_runnable_consumers
 test_changed_spawn_selects_picker_without_broadening_siblings

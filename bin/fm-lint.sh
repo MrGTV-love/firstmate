@@ -1265,7 +1265,13 @@ tests/fm-calm-claude-mod-plugin.test.sh	716
 tests/fm-calm-claude-mod.test.sh	969
 tests/fm-calm-pi-extension.test.sh	3072
 tests/fm-calm-pi-queue-retention-live-e2e.test.sh	718
-tests/fm-captain-hold-lifecycle.test.sh	12745
+tests/fm-captain-hold-archive.test.sh	1324
+tests/fm-captain-hold-cleanup.test.sh	2765
+tests/fm-captain-hold-keyed-answers.test.sh	1806
+tests/fm-captain-hold-lifecycle-helpers.sh	438
+tests/fm-captain-hold-lifecycle.test.sh	2388
+tests/fm-captain-hold-reconcile.test.sh	2543
+tests/fm-captain-hold-sweep.test.sh	1481
 tests/fm-cd-pretool-check.test.sh	1067
 tests/fm-check-unregister.test.sh	868
 tests/fm-ci-workflow.test.sh	867

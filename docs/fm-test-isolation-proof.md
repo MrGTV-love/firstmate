@@ -25,7 +25,12 @@ This record owns concurrent isolation evidence for the portable parallel candida
 - `tests/fm-arm-pretool-check.test.sh`
 - `tests/fm-backend-herdr.test.sh`
 - `tests/fm-brief.test.sh`
+- `tests/fm-captain-hold-archive.test.sh`
+- `tests/fm-captain-hold-cleanup.test.sh`
+- `tests/fm-captain-hold-keyed-answers.test.sh`
 - `tests/fm-captain-hold-lifecycle.test.sh`
+- `tests/fm-captain-hold-reconcile.test.sh`
+- `tests/fm-captain-hold-sweep.test.sh`
 - `tests/fm-cd-pretool-check.test.sh`
 - `tests/fm-composer-ghost.test.sh`
 - `tests/fm-composer-lib.test.sh`
@@ -46,6 +51,15 @@ This record owns concurrent isolation evidence for the portable parallel candida
 - `tests/fm-tmux-submit-busy.test.sh`
 - `tests/fm-transition-lib.test.sh`
 - `tests/fm-x-mode.test.sh`
+
+## Captain-hold split re-check
+
+The portable set above gained five paths on 2026-10-17 when `tests/fm-captain-hold-lifecycle.test.sh` was split into six independently runnable files that share `tests/fm-captain-hold-lifecycle-helpers.sh`.
+The machine-readable result and the tables below are the 2026-08-20 run of the 24-path set, where the single captain-hold row measures the former combined file.
+The 29-path set was re-run with `bin/fm-test-isolation-proof.sh --jobs 4` on a heavily loaded macOS host.
+All six captain-hold files and 21 other candidates exited 0 under four-way concurrency.
+Two candidates did not exit 0 for reasons unrelated to concurrency: `tests/fm-pi-primary-types.test.sh` gate-skipped because `tsc` is not installed on that host, and `tests/fm-pr-merge.test.sh` fails its `forgejo-merges` case on that host both alone and on an unmodified checkout.
+That run is therefore not a clean 29-path pass and does not replace the archived result; the six files share the former file's fixtures and temporary-root discipline, and a clean run on a host with the Pi prerequisite refreshes this record.
 
 ## Durations
 
