@@ -1,0 +1,3 @@
+not ok - --worktree naming a missing copy beside --also: the refusal lost its reason (missing: 'error: task joint-args-a: --worktree '/Users/charlesabrooker/tmp/fm-control-reassociate.SKLm70/joint-args/nowhere' is not an existing directory')
+--- output ---
+error: task joint-args-a: --worktree'/Users/charlesabrooker/tmp/fm-control-reassociate.SKLm70/joint-args/nowhere' is not an existing directory

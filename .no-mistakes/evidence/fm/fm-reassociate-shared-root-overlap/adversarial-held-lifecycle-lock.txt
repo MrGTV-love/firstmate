@@ -1,0 +1,12 @@
+== C. another process holds task lk-b's lifecycle lock
+  rc=1  error: task lk-b: another lifecycle action is already running for task lk-b
+  lk-a.meta unchanged: YES
+  lk-b.meta unchanged: YES
+  briefs unchanged: YES
+  copies, branches, claim, endpoint unchanged: YES
+  lifecycle lock for lk-a left behind: no
+  meta locks left behind: 0
+== D. after the holder is gone, the same call succeeds
+  rc=0
+  reassociated lk-a worktree=/Users/charlesabrooker/tmp/fm-control-reassociate.RuqFpm/lk/pool/139/repo/.claude/worktrees/l
+  reassociated lk-b worktree=/Users/charlesabrooker/tmp/fm-control-reassociate.RuqFpm/lk/pool/139/repo/.claude/worktrees/l

@@ -1,0 +1,17 @@
+== A. third live record on the root, only two named: must refuse naming the third, change nothing
+  rc=1
+  error: task tri-a: the replacement copy /Users/charlesabrooker/tmp/fm-control-reassociate.QY6tz9/tri/pool/139/repo/.claude/worktrees/tri-a is also task tri-c's recorded worktree, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh tri-a; bin/fm-crew-state.sh tri-c) before reassociating, or name t
+  records/briefs/copies/endpoints unchanged: YES
+== B. all three named: one call re-points all three
+  rc=0
+  reassociated tri-a worktree=/Users/charlesabrooker/tmp/fm-control-reassociate.QY6tz9/tri/pool/139/repo/.claude/worktrees/tri-a branch=fm/tri-a-v2 prior=/Users/charlesabrooker/tmp/fm-control-reassociat
+  reassociated tri-b worktree=/Users/charlesabrooker/tmp/fm-control-reassociate.QY6tz9/tri/pool/139/repo/.claude/worktrees/tri-b branch=fm/tri-b-v2 prior=/Users/charlesabrooker/tmp/fm-control-reassociat
+  reassociated tri-c worktree=/Users/charlesabrooker/tmp/fm-control-reassociate.QY6tz9/tri/pool/139/repo/.claude/worktrees/tri-c branch=fm/tri-c-v2 prior=/Users/charlesabrooker/tmp/fm-control-reassociat
+  tri-a: worktree=<ROOT>/.claude/worktrees/tri-a branch=fm/tri-a-v2 prior_worktree=<ROOT> 
+  tri-b: worktree=<ROOT>/.claude/worktrees/tri-b branch=fm/tri-b-v2 prior_worktree=<ROOT> 
+  tri-c: worktree=<ROOT>/.claude/worktrees/tri-c branch=fm/tri-c-v2 prior_worktree=<ROOT> 
+  no staging leftovers: YES
+== C. another process holds the second task's lifecycle lock: must refuse, change nothing, release its own locks
+  rc=1  error: task lk-b: another lifecycle action is already running for task lk-b
+diff: /Users/charlesabrooker/tmp/fm-control-reassociate.QY6tz9/lk/home/state/.control-lk-b.lock.owner.TmCW3F: Directory loop detected
+not ok - held lock refusal: the task record or other state changed

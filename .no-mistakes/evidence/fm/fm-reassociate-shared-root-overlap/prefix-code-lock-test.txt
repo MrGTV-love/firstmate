@@ -1,0 +1,1 @@
+not ok - command-task-first: the call did not hold the record lock of: joint-a-locks-command-task-first while it proved and anchored the copies

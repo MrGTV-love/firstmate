@@ -1,0 +1,2 @@
+ok - a joint reassociation holds every named record's lock while it proves and anchors the copies, and releases each one
+ok - malformed --also arguments refuse before any record is read or changed

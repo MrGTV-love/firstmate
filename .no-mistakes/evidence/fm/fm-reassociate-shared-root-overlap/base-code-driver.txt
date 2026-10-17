@@ -1,0 +1,23 @@
+== fixture: shared slot root /Users/charlesabrooker/tmp/fm-control-reassociate.Djidos/vernant/pool/139/repo; each task's real copy nested under it
+  vernant-provision-adopt-existing-branch: worktree=/Users/charlesabrooker/tmp/fm-control-reassociate.Djidos/vernant/pool/139/repo branch=fm/vernant-provision-adopt-existing-branch 
+  vernant-b2b-recovery-coupling: worktree=/Users/charlesabrooker/tmp/fm-control-reassociate.Djidos/vernant/pool/139/repo branch=fm/vernant-b2b-recovery-coupling 
+
+== 1. one task alone (the captain's reported refusal)
+$ fm-control vernant-provision-adopt-existing-branch reassociate --worktree <its copy> --note ...  -> rc=1
+  error: the replacement copy /Users/charlesabrooker/tmp/fm-control-reassociate.Djidos/vernant/pool/139/repo/.claude/worktrees/vernant-provision-adopt-existing-branch is also task vernant-b2b-recovery-coupling's recorded worktree, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh vernant-provision-adopt-existing-branch; bin/fm-crew-state.sh vernant-b2b-recovery-coupling) before reassociating
+$ fm-control vernant-b2b-recovery-coupling reassociate --worktree <its copy> --note ...  -> rc=1
+  error: the replacement copy /Users/charlesabrooker/tmp/fm-control-reassociate.Djidos/vernant/pool/139/repo/.claude/worktrees/vernant-b2b-recovery-coupling is also task vernant-provision-adopt-existing-branch's recorded worktree, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh vernant-b2b-recovery-coupling; bin/fm-crew-state.sh vernant-provision-adopt-existing-branch) before reassociating
+
+== 2. both together with --also
+$ fm-control vernant-provision-adopt-existing-branch reassociate --worktree <a> --also vernant-b2b-recovery-coupling=<b> --note ...  -> rc=1
+  error: unexpected argument '--also'
+  vernant-provision-adopt-existing-branch: worktree=/Users/charlesabrooker/tmp/fm-control-reassociate.Djidos/vernant/pool/139/repo branch=fm/vernant-provision-adopt-existing-branch 
+  vernant-b2b-recovery-coupling: worktree=/Users/charlesabrooker/tmp/fm-control-reassociate.Djidos/vernant/pool/139/repo branch=fm/vernant-b2b-recovery-coupling 
+  claim: 
+  brief a Ship branch line: Ship branch: fm/vernant-provision-adopt-existing-branch
+  brief b Ship branch line: Ship branch: fm/vernant-b2b-recovery-coupling
+  copies byte-identical before/after: YES (3243705784 1177)
+  endpoint calls: 0 bytes
+
+== 3. repeat the same call
+  rc=1  error: unexpected argument '--also'
