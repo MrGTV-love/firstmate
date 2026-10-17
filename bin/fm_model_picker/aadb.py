@@ -265,12 +265,14 @@ def build_observations(raw):
     or absent, never fuzzy."""
     from . import chartdiff, collect, embedded
 
-    models, obs = {}, {}
+    models, obs, newest = {}, {}, {}
 
-    def add_model(attrs):
+    def add_model(attrs, observed_at):
         key = attrs["slug"]
-        models.setdefault(key, {"slug": key, "name": attrs["name"], "creator": attrs["creator"],
-                                "deprecated": int(attrs["deprecated"]), "release_date": attrs["release_date"]})
+        if key not in models or observed_at > newest[key]:
+            models[key] = {"slug": key, "name": attrs["name"], "creator": attrs["creator"],
+                           "deprecated": int(attrs["deprecated"]), "release_date": attrs["release_date"]}
+            newest[key] = observed_at
         return key
 
     def add(model, cid, label, source, observed_at, value, raw=None, ci=None, unit=None, scale=None,
@@ -282,7 +284,8 @@ def build_observations(raw):
 
     for lst in raw["compare"].values():
         for r in lst:
-            key, ts = add_model(r["attrs"]), r["observed_at"]
+            ts = r["observed_at"]
+            key = add_model(r["attrs"], ts)
             for label, cell in r["table"].items():
                 value, unit = collect.parse_cell(cell)
                 add(key, collect.canon_metric_id(label), label, "comparison-table", ts, value, raw=cell, unit=unit)
@@ -293,7 +296,7 @@ def build_observations(raw):
     by_name = {(m["creator"], m["name"]): k for k, m in models.items()}
     for slug, e in raw["evals"].items():
         for o in e["window"]:
-            key = add_model(embedded.model_attrs(o))
+            key = add_model(embedded.model_attrs(o), e["ts"])
             by_name[(o["creator"]["name"], o["name"])] = key
             for cid, v in embedded.model_series(o).items():
                 spec = embedded.SERIES_MAP[cid]

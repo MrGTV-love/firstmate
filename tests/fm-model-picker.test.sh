@@ -5,8 +5,9 @@
 # chart-diff verdict on an empty compared set, a clean error when the network is off, unit
 # cells stored as numbers with a unit, a verdict that goes UNTRUSTED when the matrix is rebuilt
 # without chart-diff, coverage that follows the cache and never an older database, a payload slug
-# that cannot name a file outside projection/, and which network requests and exit code each
-# flag and each outage produce against a scripted site.
+# that cannot name a file outside projection/, a model whose attributes come from its newest page,
+# a fetched page that does not parse never replacing the last good copy, and which network
+# requests and exit code each flag and each outage produce against a scripted site.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -319,20 +320,32 @@ from fm_model_picker import collect
 root, flags = sys.argv[1], sys.argv[2:]
 collect.configure(root)
 mode = os.environ.get("SITE", "")
-slugs = ["m-a", "m-b", "m-new"] + ([f"x-{i:02d}" for i in range(17)] if mode in ("outage", "scattered") else [])
+slugs = ["m-a", "m-b"] if mode == "maintenance" else ["m-a", "m-b", "m-new"] + ([f"x-{i:02d}" for i in range(17)] if mode in ("outage", "scattered") else [])
 SITEMAP = "<urlset>" + "".join(f"<url><loc>{collect.BASE}/models/{s}</loc></url>" for s in slugs) + "</urlset>"
 CATALOG = "<html>" + "".join(
     '{"slug":"%s","name":"%s","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}' % (s, s.upper())
     for s in ("m-a", "m-b")) + "</html>"
 
 
+DOWN = "<html><body>Down for maintenance</body></html>"
+EVAL_PAGE = "<html><table><tr><td>1</td><td>Acme</td><td>M-A</td><td>1500</td></tr></table></html>"
+
+
 def site(path):
+    if ((mode == "maintenance" and path.startswith("/models/comparisons/"))
+            or (mode == "evals-blank" and path.startswith("/evaluations/"))
+            or (mode == "sitemap-blank" and path == "/sitemap.xml")):
+        return DOWN
     if path == "/sitemap.xml":
         return SITEMAP
     if path == "/models/comparisons":
         return CATALOG
+    if path.startswith("/models/comparisons/") and mode == "wrong-models":
+        return collect._fake_page([collect._fake_obj("m-zzz"), collect._fake_obj("m-yyy")])
     if path.startswith("/models/comparisons/"):
         return collect._fake_page([collect._fake_obj(n, intelligenceIndex=30.0) for n in path[len("/models/comparisons/"):].split("-vs-")])
+    if path.startswith("/evaluations/"):
+        return EVAL_PAGE
     return "<html></html>"
 
 
@@ -344,7 +357,7 @@ def put(path, text):
 
 
 for slug in collect.EVAL_SLUGS:
-    put("/evaluations/" + slug, "<html></html>")
+    put("/evaluations/" + slug, EVAL_PAGE)
 for slug in collect.COHORT:
     put("/models/" + slug, "<html></html>")
 put("/sitemap.xml", SITEMAP)
@@ -381,6 +394,8 @@ def opener(req, timeout=None):
             or (mode == "evals-down" and path.startswith("/evaluations/"))
             or (mode == "cohort-down" and path.startswith("/models/") and not path.startswith("/models/comparisons"))):
         raise urllib.error.HTTPError(req.full_url, 500, "x", email.message.Message(), None)
+    if mode == "unsupported" and path.startswith("/models/comparisons/m-new"):
+        raise urllib.error.HTTPError(req.full_url, 404, "x", email.message.Message(), None)
     if mode == "dropped" and path == "/models/comparisons/m-new" and not dropped:
         dropped.append(path)
         return Resp(http.client.IncompleteRead(b"par"))
@@ -512,6 +527,81 @@ test_failure_record_lives_in_snapshot_only() {
   pass "model picker: the sweep's failure record lives in snapshot.json and the database carries no slug_status table"
 }
 
+test_unparseable_compare_page_keeps_last_good_copy() {
+  local data=$TMP_ROOT/rejected
+  FLAG_ROOT=$data
+  flag_run --sweep --replay --db
+  assert_contains "$OUT" "EXIT 0" "day 1: a good sweep"
+  assert_present "$data/projection/m-a.json" "day 1 projects m-a"
+  SITE=maintenance flag_run --sweep --replay --stale-after-hours 1 --db
+  assert_contains "$OUT" "EXIT 4" "day 2: a 200 page that does not parse does not exit 0"
+  assert_contains "$OUT" "ERR INCOMPLETE" "the incomplete run says so on stderr"
+  assert_contains "$OUT" "ERR   /models/comparisons/m-a-vs-m-b: page rejected: no table" "the rejected page is named with its reason"
+  assert_equals "0" "$(grep -c 'Down for maintenance' "$data/raw/models_comparisons_m-a-vs-m-b.html" || true)" "the cached copy is still the last good page"
+  assert_equals "2026-01-01T00:00:00Z" "$(cat "$data/raw/models_comparisons_m-a-vs-m-b.html.ts")" "and keeps its real fetch time"
+  assert_present "$data/projection/m-a.json" "the old projection files stay"
+  assert_present "$data/projection/m-b.json" "the old projection files stay"
+  assert_equals "failure|no table" "$(python3 -I -c 'import json, sys; s = json.load(open(sys.argv[1]))["slug_status"]["m-a"]; print(s["status"] + "|" + s["reason"])' "$data/snapshot.json")" "the failure record is written"
+  FLAG_ROOT=$TMP_ROOT/wrong-models
+  SITE=wrong-models flag_run --sweep --replay
+  assert_contains "$OUT" "EXIT 4" "a page that holds other models than the URL names does not exit 0"
+  assert_contains "$OUT" "ERR   /models/comparisons/m-new: page rejected: identity mismatch" "the identity mismatch is named"
+  assert_absent "$FLAG_DATA/raw/models_comparisons_m-new.html" "a page with the wrong models never enters the cache"
+  assert_contains "$(cat "$FLAG_DATA/snapshot.json")" "identity mismatch" "the snapshot records the identity mismatch"
+  unset FLAG_ROOT
+  pass "model picker: a compare page that does not parse is rejected, exits 4, and leaves the last good copy and projections"
+}
+
+test_unsupported_slug_404_is_not_incomplete() {
+  SITE=unsupported flag_run --sweep --replay
+  assert_contains "$OUT" "EXIT 0" "an unsupported slug (404 alone and paired with an anchor) is a recorded reason, not a failure"
+  assert_not_contains "$OUT" "ERR" "and prints no incomplete notice"
+  assert_contains "$(cat "$FLAG_DATA/snapshot.json")" "unsupported slug (404 alone and paired with an anchor)" "the reason is recorded"
+  pass "model picker: an unsupported-slug 404 still exits 0"
+}
+
+test_unparseable_eval_page_and_sitemap_are_rejected() {
+  SITE=evals-blank flag_run --evals-only
+  assert_contains "$OUT" "EXIT 4" "evaluation pages that load with no table or payload do not exit 0"
+  assert_equals "33" "$(printf '%s\n' "$OUT" | grep -c -- '^ERR .*/evaluations/.*: page rejected: no table or payload$' || true)" "every rejected evaluation page is named"
+  assert_equals "0" "$(grep -c 'Down for maintenance' "$FLAG_DATA/raw/evaluations_aa-3d.html" || true)" "the cached evaluation page is still the last good copy"
+  assert_equals "2026-01-01T00:00:00Z" "$(cat "$FLAG_DATA/raw/evaluations_aa-3d.html.ts")" "and keeps its real fetch time"
+  SITE=sitemap-blank flag_run --sweep
+  assert_contains "$OUT" "EXIT 2" "a sitemap that does not parse ends the run"
+  assert_contains "$OUT" "ERR error: /sitemap.xml: page rejected: no <loc> entries" "and says why"
+  assert_equals "0" "$(grep -c 'Down for maintenance' "$FLAG_DATA/raw/sitemap.xml.html" || true)" "the cached sitemap is still the last good copy"
+  pass "model picker: an evaluation page or sitemap that does not parse is rejected and never replaces the cache"
+}
+
+test_newest_page_decides_model_attributes() {
+  local data=$TMP_ROOT/newest db
+  mkdir -p "$data/raw"
+  python3 -I - "$data/raw" <<'PY'
+import json, sys
+from pathlib import Path
+raw = Path(sys.argv[1])
+def put(names, deprecated, released, ts):
+    objs = [{"id": "id-" + s, "slug": s, "name": s.upper(), "creator": {"name": "Acme", "slug": "acme"}, "intelligenceIndex": 10,
+             "deprecated": deprecated if s == "m-a" else False, "releaseDate": released} for s in names]
+    head = "".join(f"<th>Acme {o['name']}</th>" for o in objs)
+    cells = "".join("<td>10</td>" for _ in objs)
+    page = (f"<html><table><thead><tr><th></th>{head}</tr></thead><tbody><tr><td>Intelligence Index</td>{cells}</tr></tbody></table><script>"
+            + json.dumps({"models": objs}, separators=(",", ":")).replace('"', '\\"') + "</script></html>")
+    stem = "-vs-".join(names)
+    (raw / f"models_comparisons_{stem}.html").write_text(page)
+    (raw / f"models_comparisons_{stem}.html.ts").write_text(ts)
+put(["m-a", "m-b"], False, "2026-01-01", "2026-10-14T10:00:00Z")
+put(["m-a", "m-c"], True, "2026-02-02", "2026-10-15T10:00:00Z")
+PY
+  run "$data" --db
+  expect_code 0 "$CODE" "--db over two cached pages for one model"
+  db=$data/aa.sqlite
+  assert_equals "1|2026-02-02" "$(sql "$db" "select deprecated, release_date from models where slug='m-a'")" "the newer page decides a model's deprecated flag and release date"
+  assert_equals "0|2026-01-01" "$(sql "$db" "select deprecated, release_date from models where slug='m-b'")" "a model on one page keeps that page's attributes"
+  assert_equals "true 2026-02-02" "$(python3 -I -c 'import json, sys; d = json.load(open(sys.argv[1])); print(str(d["deprecated"]).lower(), d["release_date"])' "$data/projection/m-a.json")" "the projection carries the newest attributes"
+  pass "model picker: a model's attributes come from its newest cached page"
+}
+
 test_dropped_connection_is_retried() {
   SITE=dropped flag_run --sweep --replay
   assert_equals "REQ /models/comparisons/m-new
@@ -535,3 +625,7 @@ test_incomplete_acquisition_exits_4_after_writing_outputs
 test_dropped_connection_is_retried
 test_scattered_fetch_failures_exit_4
 test_failure_record_lives_in_snapshot_only
+test_unparseable_compare_page_keeps_last_good_copy
+test_unsupported_slug_404_is_not_incomplete
+test_unparseable_eval_page_and_sitemap_are_rejected
+test_newest_page_decides_model_attributes
