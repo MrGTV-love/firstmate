@@ -1,0 +1,5 @@
+E rc=1 reap-line: REFUSED: foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.2osbae/live-E/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.2osbae/live-E/pool/1/project: its HEAD aa4f410b43a3 is not proved landed.
+ok - E: reaper first_refusal_line = REFUSED: foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.2osbae/live-E/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.2osbae/live-E/pool/1/project: its HEAD aa4f410b43a3 is not proved landed.
+F second run rc=1
+error: teardown refused: task record is not a regular file at /Users/charlesabrooker/tmp/fm-teardown-tests.2osbae/live-F/state/task-x1.meta
+ok - F: second teardown after success rc=1

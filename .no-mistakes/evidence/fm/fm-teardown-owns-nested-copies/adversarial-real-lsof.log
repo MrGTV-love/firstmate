@@ -1,0 +1,12 @@
+A rc=0
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.FIioG0/live-A/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.FIioG0/live-A/pool/1/project
+ok - A: real lsof, finished task, dead launcher: Vernant-locked landed copy released via driver and slot returned
+B rc=1 pid=12715
+REFUSED: foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.FIioG0/live-B/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.FIioG0/live-B/pool/1/project: process 12715 is running in it.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.FIioG0/live-B/pool/1/project contains registered copy /Users/charlesabrooker/tmp/fm-teardown-tests.FIioG0/live-B/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-teardown-tests.FIioG0/live-B/pool/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-teardown-tests.FIioG0/live-B/pool/1/project, never by forcing the removal). Re-run this teardown afterwards.
+ok - B: real lsof, unrelated live process in copy: refused by pid, process not signalled, copy+slot untouched
+C rc=1
+REFUSED: discarding assigned work requires --drop-file with the captain's own words (1..8192 bytes).
+not ok - C: reason
+bash $SCR/live.test.sh live_A_real_lsof_idle_locked_copy_released       4.14s user 8.01s system 78% cpu 15.449 total

@@ -1,0 +1,11 @@
+C rc=1
+REFUSED: foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.8Q5bAC/live-C/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.8Q5bAC/live-C/pool/1/project: its HEAD 81d9dba512f3 is not proved landed.
+REFUSED: pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.8Q5bAC/live-C/pool/1/project contains registered copy /Users/charlesabrooker/tmp/fm-teardown-tests.8Q5bAC/live-C/pool/1/project/.claude/worktrees/fc-one that is not one of task task-x1's proven copies; its record and lease must stay in place, even with --force.
+Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C /Users/charlesabrooker/tmp/fm-teardown-tests.8Q5bAC/live-C/pool/1/project worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from /Users/charlesabrooker/tmp/fm-teardown-tests.8Q5bAC/live-C/pool/1/project, never by forcing the removal). Re-run this teardown afterwards.
+ok - C: --force does not waive the landed proof; copy kept with written reason
+D rc=0 agent=51231 child=51241
+teardown: removed landed foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.8Q5bAC/live-D/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.8Q5bAC/live-D/pool/1/project
+ok - D: real lsof, task's own session + child inside Vernant-locked copy: both ended (audited), copy released, slot returned
+E rc=0 reap-line: 
+not ok - E: refuse: expected exit 1, got 0
+bash $SCR/live.test.sh live_C_force_does_not_waive_unlanded  live_E_reap_line  6.21s user 11.10s system 68% cpu 25.437 total

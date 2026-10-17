@@ -1,0 +1,20 @@
+ok - a landed copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - an unlocked landed foreign copy is removed with a plain git worktree remove and the slot is returned
+ok - an unlanded foreign copy is refused with a written reason and nothing changes
+ok - the reaper's first refusal line for a foreign copy that stays is the copy's own written reason
+ok - uncommitted and unique ignored files make a foreign copy refuse
+ok - a foreign copy that another active record names through a symlink alias is refused
+ok - a half-removed registered foreign copy refuses with the same custody refusal and nothing changes
+ok - a live pid that started after the creation lock was written is a recycled pid and does not own the copy
+ok - a live launcher that started before its creation lock keeps its foreign copy
+ok - a lock launcher that is the task's own session, or a descendant the cwd sweep cannot reach, is ended by retire and released with the slot
+ok - a live lock launcher outside the task's session, or one that outlives retire's signal, keeps its foreign copy and is named by pid
+ok - a foreign copy with a process outside the task running in it is refused and the process is left alone
+ok - a task-own process running inside a foreign copy is ended by retire and the copy is released, and one that outlives the signal keeps the copy by pid
+ok - a slot's foreign copies are all proved before any is removed, and then all are released
+ok - a foreign copy nested in another foreign copy is removed before the copy that holds it
+ok - the closeout driver runs before the shared project lock is taken, and the slot return still runs under it
+ok - without FM_TEARDOWN_VERNANT_PYTHON the driver runs under the slot's own .venv interpreter
+ok - a Vernant-locked copy refuses and stays when its closeout driver or interpreter is missing
+ok - a driver refusal or a lock that is not Vernant's leaves the foreign copy, the slot and the record in place
+bash tests/fm-teardown.test.sh   test_unlanded_foreign_copy_is_refused         27.40s user 52.41s system 59% cpu 2:14.27 total
