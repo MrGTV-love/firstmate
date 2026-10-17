@@ -1,0 +1,149 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M54QQ12ZCXFBNK1PBHS0KPN3/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-17T11:01:56Z tests/fm-captain-hold-archive.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-17T11:01:56Z tests/fm-captain-hold-cleanup.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-17T11:01:56Z tests/fm-captain-hold-keyed-answers.test.sh family=pure-contract-unit expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-17T11:01:56Z tests/fm-captain-hold-lifecycle.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - the completion gate resolves an answered call that retention archived
+ok - the archive lookup follows the archive path in .tasks.toml
+ok - an archived call with no recorded captain answer still refuses
+ok - a call absent from the backlog and the archive keeps the existing refusal
+ok - an archived call held for another origin still refuses
+ok - live held and live closed rows resolve exactly as before
+ok - scout teardown passes an archived answered call and blocks an archived unanswered one
+ok - a call closed only by reconcile evidence and then archived still refuses
+ok - an archived body that only quotes or imitates the record markers still refuses
+ok - archived records of the retired decision hold, declined and mode-less included, resolve
+ok - an archived retired record that is evidence-only, empty, or malformed still refuses
+ok - an archived answer whose text starts with blank lines resolves
+ok - an archived record with only blank lines after the label still refuses
+ok - a call answered through the release path still resolves after it is archived
+ok - an archive path set only in the user-level config refuses
+ok - a stale default archive cannot stand in for an archive path the gate does not read
+ok - a hash inside the quoted archive path is read as part of the path
+ok - a single-quoted archive path with a hash is read whole
+ok - a trailing comment after the archive path still works
+ok - a spaced [ markdown ] table header redirects the archive the gate reads
+ok - the archive setting reader parses every TOML spelling and refuses what does not parse
+ok - an archive named by an inline table, a quoted header or a dotted key refuses
+ok - an archive setting that does not parse as one string refuses
+ok - a missing python3 or tomllib refuses with its own reason
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+FM_TEST_END 2026-10-17T11:07:11Z tests/fm-captain-hold-archive.test.sh exit=0 duration_ms=315094 gate_skip=false
+FM_TEST_BEGIN 2026-10-17T11:07:12Z tests/fm-captain-hold-reconcile.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - a bound channel's captured answers close their captain-held tasks at answer time
+ok - a keyed answer releases a live work item and still closes a question
+ok - wait_for_test_file waits on the file or the exit, with one seconds ceiling
+ok - default and done keyed answers choose their mode after cleanup releases the lock
+ok - interrupted default and done releases close finished work while explicit mode checks stay strict
+ok - completed default and done releases replay and recover failed publication without rewriting history
+ok - stale default, done and release replays preserve a concurrent hold until a fresh answer
+ok - repeated default and done answers preserve prior holds and resolve the current parent decision
+ok - ambiguous legacy default and done releases require explicit closure without rewriting history
+ok - unversioned deck shapes with extra fields still route as the captain's answer
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+FM_TEST_END 2026-10-17T11:07:42Z tests/fm-captain-hold-keyed-answers.test.sh exit=0 duration_ms=346188 gate_skip=false
+FM_TEST_BEGIN 2026-10-17T11:07:43Z tests/fm-captain-hold-sweep.test.sh family=pure-contract-unit expected_gate_skip=none
+ok - marked hold reasons round-trip through public reads, fleet, startup, and return without changing other fields
+ok - new, active, and released holds require the origin first with and without deferral
+ok - historical self-inventories name a workable repair that preserves sibling entries
+ok - completion and verification compare backend identities for entries and current or stored origins
+ok - complete refuses the origin as its own captain-call inventory
+ok - complete refuses an entry held for another origin and flags one with none recorded
+ok - report-only unresolved captain call is reproduced and completion refuses before loss
+ok - internal retention and read-only admission preserve active captain drop classification
+ok - both body-decoding paths work without the allow_nonref default
+ok - cleanup preserves every byte of a retained body's non-ASCII characters
+ok - the completion gate attests captain-held inventory and transfers open status decisions
+ok - answer records the captain's words, closes idempotently, and releases routed work
+ok - release frees held work with the captain's words recorded and the body preserved
+ok - captain holds become visible only after their hold-set timestamp is durable
+ok - an interrupted answer preserves its hold age until close retry
+ok - a deferred captain call leaves the live Captain's Call until its date and stays answerable
+ok - an out-of-band close is recordable with the captain's word and nothing else
+ok - ended visual review follows the same captain-hold completion owner
+ok - resolved findings and decision-like prose do not create captain-held tasks
+ok - terminal single-owner stale status decisions do not block empty inventory
+ok - main-home and secondmate-home captain calls remain correctly routed
+ok - a secondmate home publishes each hold occurrence and its answer on the parent channel
+ok - secondmate resolutions publish before retiring durable retry triggers
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+FM_TEST_END 2026-10-17T11:08:47Z tests/fm-captain-hold-lifecycle.test.sh exit=0 duration_ms=411546 gate_skip=false
+ok - cleanup leaves a captain-held work item open with its deliverable, and only an answer closes it
+ok - release and scout report retention distinguish deliveries from rejected merge answers
+ok - an interrupted cleanup keeps the captain call recoverable and session start retains it
+ok - cleanup replay closes answered work and preserves the report after direct or keyed answers
+warning: re-init: ignored --initial-branch=main
+ok - an answer before cleanup replay notes the retained Gerrit change
+ok - an unusable pending-close record names its reason instead of a bare refusal
+ok - an unsupported relocated report does not wedge the captain's answer
+ok - an unsupported relocated report does not wedge the captain's answer
+ok - an unsupported relocated report does not wedge the captain's answer
+ok - cleanup retains captain calls in the configured backlog
+warning: re-init: ignored --initial-branch=main
+ok - cleanup keeps a captain-held Gerrit task open and records its change URL
+warning: re-init: ignored --initial-branch=main
+ok - merge approval releases before zero-retention cleanup records completion
+ok - the PR merge entrypoint refuses a captain-held task before merging
+ok - the local merge entrypoint refuses a captain-held task before merging
+ok - the PR merge entrypoint separates an unreadable authority record from an absent one
+ok - the local merge entrypoint separates an unreadable authority record from an absent one
+ok - merge entrypoints reject unsafe identities and absent state before locking
+ok - merge entrypoints refuse a replacement incarnation after waiting for cleanup
+ok - merge entrypoints own task state before forced cleanup can retire it
+ok - a released merge passes the guarded entrypoint and remains recently landed
+ok - cleanup refuses a ship row when its captain hold cannot be read
+ok - skipped on markdown-only tasks-axi: verify against a beads-migrated hold
+ok - skipped on markdown-only tasks-axi: verify against a prefix-migrated hold
+ok - skipped on markdown-only tasks-axi: prefer a marker-noted row over a prefix namesake
+ok - skipped on markdown-only tasks-axi: complete against a beads-migrated hold
+ok - skipped on markdown-only tasks-axi: verify an unresolvable beads legacy id
+ok - skipped on markdown-only tasks-axi: verify a derived pre-collapse key
+ok - captain-hold mutations address the beads backend without a markdown override
+ok - skipped on markdown-only tasks-axi: captain-hold create under due.required without types.custom
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+FM_TEST_END 2026-10-17T11:09:24Z tests/fm-captain-hold-cleanup.test.sh exit=0 duration_ms=448583 gate_skip=false
+ok - legacy reconcile replaces earlier choices before either intake is selected
+ok - only a bound captured source creates reconcile requests
+ok - normal answers and their replays retire reconcile requests
+ok - reconcile closes a moot call with evidence and keeps an active one open with a note
+ok - reconcile outcomes apply durable mutations once across partial failures
+ok - verified recorded-answer and moot closes work without board requests and replay parent publication
+ok - standalone close retries preserve hold age and cannot replay across hold lifecycles
+ok - an interrupted close retries only as an exact replay and resolves the hold's original parent key
+ok - the close retry matrix accepts only exact replays and the first close of a new opening, and never closes a newer or unidentifiable one
+ok - verified closes refuse active calls, missing or reserved evidence, and unfinished work
+ok - skipped on markdown-only tasks-axi: close-key against a beads-migrated hold
+ok - status-only operational closes preserve evidence, unrelated calls, and reopened-key replay safety
+ok - operational closes enforce ownership and attestation, recover after an interrupted append, and refuse staged evidence once the call reopened
+ok - standalone evidence closes refuse the attended branch, relocate under the away record, and leave main and the board path unchanged
+ok - a channel source with no decision binding closes nothing
+ok - legacy identities, metadata, bindings, and the shim keep working
+ok - a board answer reaches the keyed-answer intake and wakes firstmate
+ok - the chat channel feeds the same keyed-answer intake a captured review does
+ok - completion and verification validate origins before constructing paths
+ok - a status resolution over a still-open captain-held task is signalled, not closed
+ok - a captain call with no routed work, a verified transfer, an open decision, and an answered call all stay silent
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+FM_TEST_END 2026-10-17T11:12:42Z tests/fm-captain-hold-reconcile.test.sh exit=0 duration_ms=329958 gate_skip=false
+ok - the sweep retires finished boards and keeps every board that could still carry an answer
+ok - the sweep stops the resident poll of a finished board's live listener
+ok - deleted boards retain standing, feedback, ownership and captured-result protections
+ok - filesystem permission errors keep ended, sessionless and idle board listeners
+ok - stale sweeps preserve replacement generations and newly captured rounds
+ok - recent acknowledgements keep only their own listeners in literal home paths
+ok - unknown inbox evidence keeps listeners at sweep and locked retirement boundaries
+ok - unknown and dynamic card discovery keeps ended, sessionless and idle listeners
+ok - bound sweep keys share exact and legacy answer precedence without cross-source cache leakage
+ok - sweeps reuse migration note and prefix precedence and keep ambiguous or unreadable identities
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+FM_TEST_END 2026-10-17T11:15:46Z tests/fm-captain-hold-sweep.test.sh exit=0 duration_ms=483512 gate_skip=false
+FM_TEST_SUMMARY total=6 failed=0 skipped_gate=0 duration_ms=831878
+FM_TEST_SUMMARY_FAMILY family=pure-contract-unit count=6 duration_ms=2334881 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-captain-hold-sweep.test.sh duration_ms=483512
+FM_TEST_SLOWEST rank=2 script=tests/fm-captain-hold-cleanup.test.sh duration_ms=448583
+FM_TEST_SLOWEST rank=3 script=tests/fm-captain-hold-lifecycle.test.sh duration_ms=411546
+FM_TEST_SLOWEST rank=4 script=tests/fm-captain-hold-keyed-answers.test.sh duration_ms=346188
+FM_TEST_SLOWEST rank=5 script=tests/fm-captain-hold-reconcile.test.sh duration_ms=329958
+FM_TEST_SLOWEST rank=6 script=tests/fm-captain-hold-archive.test.sh duration_ms=315094
+fm-test-run: wrote timing artifact: /Users/charlesabrooker/.no-mistakes/evidence/01M54QQ12ZCXFBNK1PBHS0KPN3/captain-hold-split-timing.json
+exit=0

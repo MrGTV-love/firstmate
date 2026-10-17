@@ -1,0 +1,6 @@
+== all cells good (expect ok, exit 0)
+ok - adversarial matrix allgood passed
+exit=0
+== one cell bad (expect not ok naming cell b, exit nonzero, no 'passed' line)
+not ok - adversarial matrix failures: cell 'bad_cell b': cell b saw the regression not ok - synthetic cell failure b 
+exit=1

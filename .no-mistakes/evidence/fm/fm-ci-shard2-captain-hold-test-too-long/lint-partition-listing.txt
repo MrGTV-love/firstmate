@@ -1,0 +1,14 @@
+== partition 1of3
+bin/fm-captain-hold.sh
+tests/fm-captain-hold-cleanup.test.sh
+tests/fm-captain-hold-keyed-answers.test.sh
+tests/fm-captain-hold-lifecycle-helpers.sh
+tests/fm-captain-hold-sweep.test.sh
+== partition 2of3
+tests/fm-captain-hold-lifecycle.test.sh
+== partition 3of3
+tests/fm-captain-hold-archive.test.sh
+tests/fm-captain-hold-reconcile.test.sh
+== union count of captain-hold roots (expect 7, each once)
+8
+ duplicate roots across partitions:        0

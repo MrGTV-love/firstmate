@@ -1,0 +1,8 @@
+## select one case by name in owning file (sweep)
+ok - unknown inbox evidence keeps listeners at sweep and locked retirement boundaries
+ok - captain-hold lifecycle leaves no runner or watchdog processes
+rc=0
+## a case owned by a different file is refused
+not ok - unknown captain hold lifecycle test: test_release_frees_held_work
+rc=
+wrong-file case exit=1
