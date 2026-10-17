@@ -369,6 +369,7 @@ case_answers_are_classified_by_what_they_say() {
     expect fin 'a ci log of a run the caller names as finished' logs 0 'CI checks passed' 01RUN
     expect none 'a ci log of a run still in flight' logs 0 'CI checks running' ''
     expect none 'an empty ci log' logs 0 '' 01RUN
+    expect none 'an aborted run' status 0 "$(run_toon "$d" 01RUN aborted aborted)"
     expect none 'a run still in flight' status 0 "$(run_toon "$d" 01RUN running)"
     expect none 'a terminal status with no outcome yet' status 0 "$(run_toon "$d" 01RUN completed)"
     expect none 'an outcome that can still change' status 0 "$(run_toon "$d" 01RUN completed checks-passed)"

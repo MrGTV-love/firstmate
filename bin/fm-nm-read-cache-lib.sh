@@ -27,11 +27,11 @@
 # An entry holds a header (magic, finished run id, worktree, branch) and then
 # the call's stdout byte for byte. Only a successful call is stored.
 #
-# What counts as finished: a run of this branch that is completed, failed,
-# cancelled or aborted. A status or id-addressed read must also carry a settled
-# outcome (passed, passed-with-override, passed-with-skips, failed, cancelled or
-# aborted), because an outcome that can still change (checks-passed becomes
-# passed at the merge) keeps the run live; the ci log is kept only for the run
+# What counts as finished: a run of this branch that is completed, failed or
+# cancelled. A status or id-addressed read must also carry a settled outcome
+# (passed, passed-with-override, passed-with-skips, failed or cancelled),
+# because an outcome that can still change (checks-passed becomes passed at the
+# merge) keeps the run live; the ci log is kept only for the run
 # its caller names as finished; the choice entry only for a completed, failed or
 # cancelled selection. A finished run's answer cannot change, so it is kept
 # until the run id changes:
@@ -79,7 +79,7 @@ fm_nmc_init() {
   FM_NMC_WT=$3
   FM_NMC_BRANCH=$4
   FM_NMC_TIMEOUT=$5
-  case "${FM_CREW_STATE_NM_CACHE:-on}" in off|OFF|0|false|no) return 0 ;; esac
+  case "${FM_CREW_STATE_NM_CACHE:-on}" in off) return 0 ;; esac
   [ -n "$3" ] && [ -n "$4" ] && [ -d "$1" ] && [ -w "$1" ] || return 0
   case "$2" in ''|*[!A-Za-z0-9._-]*) return 0 ;; esac
   FM_NMC_DIR="$1/.nm-read-cache-$2"
@@ -126,7 +126,7 @@ fm_nmc_fin_valid() {  # <run-id>
     FM_NMC_FIN_OK=1
     out=$(fm_nmc_db_newest_run "$1") || out=''
     case "$out" in
-      "$1 completed"|"$1 failed"|"$1 cancelled"|"$1 aborted") FM_NMC_FIN_OK=0 ;;
+      "$1 completed"|"$1 failed"|"$1 cancelled") FM_NMC_FIN_OK=0 ;;
     esac
   fi
   return "$FM_NMC_FIN_OK"
@@ -211,9 +211,9 @@ fm_nmc_classify() {  # <kind> <exit-status> <stdout> [hint]
   fm_nm_strip_quotes_to status "$status"
   fm_nm_field_to outcome "$body" outcome || return 1
   fm_nm_strip_quotes_to outcome "$outcome"
-  case "$status" in completed|failed|cancelled|aborted) ;; *) return 1 ;; esac
+  case "$status" in completed|failed|cancelled) ;; *) return 1 ;; esac
   case "$outcome" in
-    passed|passed-with-override|passed-with-skips|failed|cancelled|aborted) ;;
+    passed|passed-with-override|passed-with-skips|failed|cancelled) ;;
     *) return 1 ;;
   esac
   fm_nmc_valid_id "$id" || return 1
