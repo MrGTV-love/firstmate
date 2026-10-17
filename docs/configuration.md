@@ -13,6 +13,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
+| Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
@@ -865,6 +866,28 @@ Explicit reopening or successful new-work start or dispatch retires the previous
 Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
 A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
 A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
+
+## Model-picker benchmark data (FM_MODEL_PICKER_DATA)
+
+[`bin/fm-model-picker.sh`](../bin/fm-model-picker.sh) collects Artificial Analysis benchmark data for the model picker.
+Its header owns the flags, the long-run guidance, and the exit codes; the code is `bin/fm_model_picker/`.
+The data root is `FM_MODEL_PICKER_DATA`, otherwise `model-picker/` under the home's data directory (`FM_DATA_OVERRIDE`, else `$FM_HOME/data`).
+The whole root is private and gitignored with `data/`.
+
+| Path under the data root | Contents |
+| --- | --- |
+| `raw/` | Cached pages with a `.ts` sidecar holding each page's real fetch time, `rendered/*.txt` chart captures, and `_http_404.jsonl`, the memory of 404s that later runs never re-request |
+| `snapshot.json` | Aggregate of the latest acquisition run, including each model slug's values-or-reason status; its stored coverage, if any, is never read |
+| `aa.sqlite` | `dispatch_log` and `outcomes` first, then `models`, `metrics`, `observations`, `reconcile_runs`, and `slug_status` |
+| `coverage.md` | Per-series coverage, recomputed from raw rows on every run |
+| `reconcile.md` and `verdict.json` | The chart-diff report and its machine-readable verdict |
+| `projection/<slug>.json` | One wire-format projection per catalog model, written last |
+
+`dispatch_log` carries the handoff columns plus `mode` (`shadow` or `live`) and `rule_worker`, `rule_validator`, and `rule_effort`, so one row holds both the picker's pick and the current dispatch rule's choice.
+A matrix rebuild never touches `dispatch_log` or `outcomes`.
+The matrix is a pure function of the cache, so a rebuild gives the same row counts.
+A consumer must not read the matrix while `verdict.json` says `UNTRUSTED`.
+Run `bin/fm-model-picker.sh --selftest` for the fixture suite; [`tests/fm-model-picker.test.sh`](../tests/fm-model-picker.test.sh) covers the executable.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 
@@ -3413,6 +3436,7 @@ FM_POLL=15              # seconds between watcher poll cycles
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
+FM_MODEL_PICKER_DATA=    # data root of the model-picker benchmark collector; unset means model-picker/ under the data directory (see "Model-picker benchmark data")
 FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
 FM_REVIEW_AGENT_SELECT_BIN=   # test seam: the dry-run selector the watcher's heartbeat launches instead of bin/fm-review-agent-select.sh
 FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-session sweeps (bin/fm-idle-session-reap.sh); 0 turns the sweep off without changing its deadline; an unscheduled home waits one full interval, and watcher handoffs retain the deadline; invalid values use 900

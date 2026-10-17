@@ -18,6 +18,7 @@ The shared no-mistakes gate lifecycle boundary is summarized in [architecture.md
 | `fm-home-summary-refresh.sh` | Atomically publish this home's structured summary ledger                         |
 | `fm-fleet-ledger.sh`     | Append the opt-in fleet activity ledger's records ([contract](fleet-ledger.md))      |
 | [`fm-open-loops.sh`](../bin/fm-open-loops.sh) | Reconcile this home's recorded obligations ([ledger contract](configuration.md#open-work-ledger-configopen-loopsjson)) |
+| [`fm-model-picker.sh`](../bin/fm-model-picker.sh) | Collect Artificial Analysis benchmarks for the model picker, with calibration tables ([data layout](configuration.md#model-picker-benchmark-data-fm_model_picker_data)) |
 | `fm-fleet-view.sh`       | Render the fleet snapshot as a human Markdown view                                   |
 | `fm-bearings-snapshot.sh` | Project the bounded remote-ledger fleet snapshot to compact TOON; `--include-prs` adds live GitHub enrichment |
 | `fm-bearings-board.sh`   | Build and arm the stable interactive `/bearings lavish` fleet board                  |
