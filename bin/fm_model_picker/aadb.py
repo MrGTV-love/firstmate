@@ -228,7 +228,10 @@ def load_raw():
     evals, skipped_evals = {}, []
     for slug in collect.EVAL_SLUGS:
         try:
-            f = collect.fetch_page("/evaluations/" + slug, network=False)
+            f = collect.fetch_page("/evaluations/" + slug, "evaluation", None, network=False)
+        except collect.Rejected as e:
+            skipped_evals.append({"slug": slug, "reason": str(e.why)})
+            continue
         except collect.FetchError:
             skipped_evals.append({"slug": slug, "reason": "evaluation page not in cache"})
             continue

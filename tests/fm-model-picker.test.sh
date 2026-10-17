@@ -224,7 +224,7 @@ seed_discovery() {  # <data-dir>: a cached sitemap and selector catalog naming m
   printf '%s' '<html>{"slug":"m-a","name":"M-A","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}{"slug":"m-b","name":"M-B","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}</html>' >"$1/raw/models_comparisons.html"
 }
 
-seed_blank_pages() {  # <data-dir>: a cached evaluation page and cohort model page for every page an acquisition run asks for
+seed_pages() {  # <data-dir>: a cached evaluation page and cohort model page for every page an acquisition run asks for
   PYTHONPATH="$ROOT/bin" PYTHONDONTWRITEBYTECODE=1 python3 -c '
 import sys
 from pathlib import Path
@@ -233,7 +233,8 @@ collect.configure(sys.argv[1])
 for path in ["/evaluations/" + s for s in collect.EVAL_SLUGS] + ["/models/" + s for s in collect.COHORT]:
     f = collect.cache_file(path)
     f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text("<html></html>")
+    f.write_text("<html><table><tr><td>1</td><td>Acme</td><td>M-A</td><td>1500</td></tr></table></html>" if "/evaluations/" in path
+                 else "<html>58 Artificial Analysis Intelligence Index 95 Output tokens per second \x241.50 Cost per Intelligence Index task In \x243.00Out \x2415.00</html>")
     Path(str(f) + ".ts").write_text("2026-10-15T20:00:00Z")
 ' "$1"
 }
@@ -242,7 +243,7 @@ test_rebuild_without_chartdiff_is_untrusted() {
   local data=$TMP_ROOT/stale
   seed_cache "$data"
   seed_discovery "$data"
-  seed_blank_pages "$data"
+  seed_pages "$data"
   run "$data" --sweep --embedded-only --chartdiff
   expect_code 0 "$CODE" "day 1: sweep with chart-diff"
   assert_contains "$OUT" "chart-diff: TRUSTED" "day 1 is judged"
@@ -282,7 +283,7 @@ PY
 test_coverage_follows_the_cache_not_the_database() {
   local data=$TMP_ROOT/cov
   seed_cache "$data"
-  seed_blank_pages "$data"
+  seed_pages "$data"
   run "$data" --db
   expect_code 0 "$CODE" "day 1: the database is built"
   assert_grep "| gpqadiamond | embedded | 1 | captured |" "$data/coverage.md" "day 1 coverage counts the cached models"
@@ -329,13 +330,18 @@ CATALOG = "<html>" + "".join(
 
 DOWN = "<html><body>Down for maintenance</body></html>"
 EVAL_PAGE = "<html><table><tr><td>1</td><td>Acme</td><td>M-A</td><td>1500</td></tr></table></html>"
+COHORT_PAGE = "<html>58 Artificial Analysis Intelligence Index 95 Output tokens per second $1.50 Cost per Intelligence Index task In $3.00Out $15.00</html>"
 
 
 def site(path):
     if ((mode == "maintenance" and path.startswith("/models/comparisons/"))
             or (mode == "evals-blank" and path.startswith("/evaluations/"))
-            or (mode == "sitemap-blank" and path == "/sitemap.xml")):
+            or (mode == "sitemap-blank" and path == "/sitemap.xml")
+            or (mode == "catalog-blank" and path == "/models/comparisons")
+            or (mode == "cohort-blank" and path.startswith("/models/") and not path.startswith("/models/comparisons"))):
         return DOWN
+    if mode == "refetch-other" and path == "/models/comparisons/m-a-vs-m-b":
+        return collect._fake_page([collect._fake_obj("m-x", intelligenceIndex=30.0), collect._fake_obj("m-y", intelligenceIndex=30.0)])
     if path == "/sitemap.xml":
         return SITEMAP
     if path == "/models/comparisons":
@@ -346,7 +352,7 @@ def site(path):
         return collect._fake_page([collect._fake_obj(n, intelligenceIndex=30.0) for n in path[len("/models/comparisons/"):].split("-vs-")])
     if path.startswith("/evaluations/"):
         return EVAL_PAGE
-    return "<html></html>"
+    return COHORT_PAGE
 
 
 def put(path, text):
@@ -359,10 +365,16 @@ def put(path, text):
 for slug in collect.EVAL_SLUGS:
     put("/evaluations/" + slug, EVAL_PAGE)
 for slug in collect.COHORT:
-    put("/models/" + slug, "<html></html>")
+    put("/models/" + slug, COHORT_PAGE)
 put("/sitemap.xml", SITEMAP)
 put("/models/comparisons", CATALOG)
 put("/models/comparisons/m-a-vs-m-b", collect._fake_page([collect._fake_obj(n, intelligenceIndex=30.0) for n in ("m-a", "m-b")]))
+if mode == "refetch-other":
+    put("/models/comparisons/m-c-vs-m-d", collect._fake_page([collect._fake_obj(n, intelligenceIndex=30.0) for n in ("m-c", "m-d")]))
+    bad = collect.cache_file("/models/comparisons/m-a-vs-m-b")
+    bad.write_text(bad.read_text(encoding="utf-8").replace("<td>30</td>", "<td>99</td>"), encoding="utf-8")
+if os.environ.get("DROP"):
+    collect.cache_file(os.environ["DROP"]).unlink()
 
 requested = []
 
@@ -567,10 +579,20 @@ test_unparseable_eval_page_and_sitemap_are_rejected() {
   assert_equals "0" "$(grep -c 'Down for maintenance' "$FLAG_DATA/raw/evaluations_aa-3d.html" || true)" "the cached evaluation page is still the last good copy"
   assert_equals "2026-01-01T00:00:00Z" "$(cat "$FLAG_DATA/raw/evaluations_aa-3d.html.ts")" "and keeps its real fetch time"
   SITE=sitemap-blank flag_run --sweep
-  assert_contains "$OUT" "EXIT 2" "a sitemap that does not parse ends the run"
-  assert_contains "$OUT" "ERR error: /sitemap.xml: page rejected: no <loc> entries" "and says why"
+  assert_contains "$OUT" "EXIT 4" "a sitemap that does not parse does not exit 0"
+  assert_contains "$OUT" "ERR   /sitemap.xml: page rejected: no <loc> entries" "the rejected sitemap is named"
   assert_equals "0" "$(grep -c 'Down for maintenance' "$FLAG_DATA/raw/sitemap.xml.html" || true)" "the cached sitemap is still the last good copy"
-  pass "model picker: an evaluation page or sitemap that does not parse is rejected and never replaces the cache"
+  assert_equals "2026-01-01T00:00:00Z" "$(cat "$FLAG_DATA/raw/sitemap.xml.html.ts")" "and keeps its real fetch time"
+  assert_contains "$(cat "$FLAG_DATA/snapshot.json")" '"m-new"' "the sweep went on with the last good sitemap"
+  SITE=catalog-blank flag_run --sweep
+  assert_contains "$OUT" "EXIT 4" "a selector catalog that does not parse does not exit 0"
+  assert_contains "$OUT" "ERR   /models/comparisons: page rejected: no model catalog" "the rejected catalog is named"
+  assert_equals "0" "$(grep -c 'Down for maintenance' "$FLAG_DATA/raw/models_comparisons.html" || true)" "the cached catalog is still the last good copy"
+  assert_equals "2026-01-01T00:00:00Z" "$(cat "$FLAG_DATA/raw/models_comparisons.html.ts")" "and keeps its real fetch time"
+  DROP=/sitemap.xml SITE=sitemap-blank flag_run --sweep
+  assert_contains "$OUT" "EXIT 2" "with no good sitemap to fall back on the run ends"
+  assert_contains "$OUT" "ERR error: /sitemap.xml: page rejected: no <loc> entries" "and says why"
+  pass "model picker: an evaluation page, sitemap or catalog that does not parse is rejected and never replaces the cache"
 }
 
 test_newest_page_decides_model_attributes() {
@@ -602,6 +624,68 @@ PY
   pass "model picker: a model's attributes come from its newest cached page"
 }
 
+snapshot_model() {  # <data-dir> <slug>: the cohort facts held for a model in snapshot.json
+  python3 -I -c 'import json, sys; print(json.dumps(json.load(open(sys.argv[1]))["models"].get(sys.argv[2]), sort_keys=True))' "$1/snapshot.json" "$2"
+}
+
+test_unparseable_cohort_page_is_rejected() {
+  local data=$TMP_ROOT/cohort before
+  FLAG_ROOT=$data
+  flag_run --replay --models m-zz
+  assert_contains "$OUT" "EXIT 0" "day 1: a model page that parses"
+  before=$(snapshot_model "$data" m-zz)
+  assert_contains "$before" '"intelligence_index": 58.0' "day 1 stores the model's facts"
+  rm -f "$data/raw/models_m-zz.html" "$data/raw/models_m-zz.html.ts"
+  SITE=cohort-blank flag_run --replay --models m-zz
+  assert_contains "$OUT" "EXIT 4" "day 2: a 200 model page with no model facts does not exit 0"
+  assert_contains "$OUT" "ERR   /models/m-zz: page rejected: no model facts" "the rejected model page is named"
+  assert_absent "$data/raw/models_m-zz.html" "a rejected model page never enters the cache"
+  assert_equals "$before" "$(snapshot_model "$data" m-zz)" "the previous facts stay in snapshot.json, not an empty record"
+  FLAG_ROOT=$TMP_ROOT/cohort-fresh
+  SITE=cohort-blank flag_run --replay --models m-yy
+  assert_contains "$OUT" "EXIT 4" "a model page that never parsed does not exit 0"
+  assert_equals "null" "$(snapshot_model "$FLAG_DATA" m-yy)" "and no empty record is stored for it"
+  unset FLAG_ROOT
+  pass "model picker: a cohort model page that does not parse is rejected, exits 4, and leaves the previous facts"
+}
+
+test_chartdiff_refetch_must_return_the_same_models() {
+  SITE=refetch-other flag_run --chartdiff
+  assert_contains "$OUT" "REQ /models/comparisons/m-a-vs-m-b" "the disagreeing page is re-fetched once"
+  assert_equals "1" "$(requests_matching '^REQ /models/comparisons/m-a-vs-m-b$')" "and only once"
+  assert_contains "$OUT" "EXIT 3" "a re-fetch that returns other models does not make the verdict TRUSTED"
+  assert_contains "$(cat "$FLAG_DATA/verdict.json")" '"verdict": "UNTRUSTED"' "the verdict stays UNTRUSTED"
+  assert_equals "1" "$(grep -c '<td>99</td>' "$FLAG_DATA/raw/models_comparisons_m-a-vs-m-b.html" || true)" "the old page stays in the cache"
+  assert_equals "0" "$(grep -c 'M-X' "$FLAG_DATA/raw/models_comparisons_m-a-vs-m-b.html" || true)" "and the page for other models never enters it"
+  assert_equals "2026-01-01T00:00:00Z" "$(cat "$FLAG_DATA/raw/models_comparisons_m-a-vs-m-b.html.ts")" "with its real fetch time"
+  assert_contains "$(cat "$FLAG_DATA/reconcile.md")" "shown value differs from payload" "the mismatch is still listed"
+  assert_present "$FLAG_DATA/projection/m-a.json" "m-a stays in the matrix"
+  pass "model picker: a chart-diff re-fetch must return the models the page names, else the mismatch stands"
+}
+
+test_page_that_earlier_ingested_and_is_now_quarantined_exits_4() {
+  local data=$TMP_ROOT/regressed
+  seed_cache "$data"
+  add_pair "$data" m-c m-d
+  run "$data" --db
+  expect_code 0 "$CODE" "day 1: every cached page ingests"
+  assert_contains "$OUT" "[db] cached compare pages quarantined: 0" "the count is reported on every run"
+  sed -i.bak 's|Acme M-A|Acme M-Z|' "$data/raw/models_comparisons_m-a-vs-m-b.html"
+  run "$data" --db
+  expect_code 4 "$CODE" "day 2: a page that stamped rows yesterday no longer ingests"
+  assert_contains "$OUT" "[db] cached compare pages quarantined: 1: models_comparisons_m-a-vs-m-b.html (quarantined: header 0 'Acme M-Z' != payload 'Acme M-A')" "the count line names the file and why"
+  assert_contains "$ERR" "INCOMPLETE" "the run says it is incomplete"
+  assert_contains "$ERR" "models_comparisons_m-a-vs-m-b.html stamped rows in the previous matrix and no longer ingests" "and names the page"
+  assert_absent "$data/projection/m-a.json" "its models left the matrix"
+  assert_present "$data/projection/m-c.json" "the pages that still ingest stay"
+  seed_cache "$TMP_ROOT/never"
+  sed -i.bak 's|Acme M-A|Acme M-Z|' "$TMP_ROOT/never/raw/models_comparisons_m-a-vs-m-b.html"
+  run "$TMP_ROOT/never" --db
+  expect_code 0 "$CODE" "a page that never ingested is reported, not a regression"
+  assert_contains "$OUT" "[db] cached compare pages quarantined: 1: models_comparisons_m-a-vs-m-b.html" "and still counted"
+  pass "model picker: a cached page that earlier ingested and now does not exits 4 with a count line"
+}
+
 test_dropped_connection_is_retried() {
   SITE=dropped flag_run --sweep --replay
   assert_equals "REQ /models/comparisons/m-new
@@ -629,3 +713,6 @@ test_unparseable_compare_page_keeps_last_good_copy
 test_unsupported_slug_404_is_not_incomplete
 test_unparseable_eval_page_and_sitemap_are_rejected
 test_newest_page_decides_model_attributes
+test_unparseable_cohort_page_is_rejected
+test_chartdiff_refetch_must_return_the_same_models
+test_page_that_earlier_ingested_and_is_now_quarantined_exits_4

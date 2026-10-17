@@ -168,13 +168,13 @@ def _retry_after(err):
         return 0.0
 
 
-def fetch_page(path, refresh=False, network=True, skip_legacy=False, requested=None):
+def fetch_page(path, kind, requested, refresh=False, network=True, skip_legacy=False):
     """Cache-first. refresh=True revalidates; network=False raises on a cache miss.
     Every source keeps its original fetch timestamp - a run never redates stale data.
     A remembered 404 makes no network call. DELAY follows every network attempt.
-    A fetched body replaces the cached copy only when page_problem accepts it; a body that does
-    not parse raises Rejected and leaves the last good copy and its .ts untouched. `requested` is
-    the exact slug set a compare page must hold."""
+    Every body it returns, fetched or cached, passed page_problem for `kind`; a body that does
+    not parse raises Rejected, and a fetched one leaves the last good copy and its .ts untouched.
+    `requested` is the exact slug set a compare page must hold (None for every other kind)."""
     new = cache_file(path)
     legacy = RAW / (_legacy_stem(path)[:180] + ".html")
     found = [c for c in ([] if skip_legacy else [legacy]) + [new] if c.exists()]
@@ -182,8 +182,12 @@ def fetch_page(path, refresh=False, network=True, skip_legacy=False, requested=N
         cache = found[0]
         ts_file = Path(str(cache) + ".ts")
         ts = ts_file.read_text(encoding="utf-8").strip() if ts_file.exists() else "unknown"
+        text = cache.read_text(encoding="utf-8", errors="replace")
+        why = page_problem(kind, path, text, ts, requested)
+        if why is not None:
+            raise Rejected(path, why)
         FETCH_TS[path] = ts
-        return Fetched(cache.read_text(encoding="utf-8", errors="replace"), ts, True)
+        return Fetched(text, ts, True)
     if path in load_404s():
         raise FetchError(path, 404, "remembered 404")
     if not network:
@@ -197,7 +201,7 @@ def fetch_page(path, refresh=False, network=True, skip_legacy=False, requested=N
             with _urlopen(req, timeout=60) as resp:
                 data = resp.read().decode("utf-8", errors="replace")
             now = utc_now()
-            why = page_problem(path, data, now, requested)
+            why = page_problem(kind, path, data, now, requested)
             if why is None:
                 RAW.mkdir(parents=True, exist_ok=True)
                 tmp = new.with_name(new.name + ".tmp")
@@ -505,17 +509,30 @@ def discover(refresh=True, network=True):
     """Dynamic per-run model universe from BOTH sources: the site's sitemap and the compare
     page's embedded selector catalog. Never a baked URL. Preserves EXACT URL path identifiers
     (dots, case, digits: 'qwen2.5-32b-instruct', 'QwQ-32B-Preview' are valid model IDs).
-    Returns the sorted slugs, the catalog, and the catalog's creator slugs."""
-    xml = fetch_page("/sitemap.xml", refresh=refresh, network=network).text
+    Returns the sorted slugs, the catalog, the catalog's creator slugs, and the pages that were rejected
+    (the last good copy was read instead; with none, the rejection ends the run)."""
+    incomplete = []
+
+    def page(path, kind):
+        try:
+            return fetch_page(path, kind, None, refresh=refresh, network=network).text
+        except Rejected as e:
+            incomplete.append(str(e))
+            try:
+                return fetch_page(path, kind, None, network=False).text
+            except FetchError:
+                raise e
+
+    xml = page("/sitemap.xml", "sitemap")
     slugs = set()
     for u in re.findall(r"<loc>([^<]+)</loc>", xml):
         m = re.search(r"/models/([^/?#]+)/?$", u)
         if m and m.group(1) not in MODEL_NON_SLUGS:
             slugs.add(m.group(1))
-    page = fetch_page("/models/comparisons", refresh=refresh, network=network).text
-    catalog = extract_model_catalog(page)
+    selector = page("/models/comparisons", "catalog")
+    catalog = extract_model_catalog(selector)
     slugs |= set(catalog)
-    return {"slugs": sorted(slugs), "catalog": catalog, "creators": extract_creator_slugs(page)}
+    return {"slugs": sorted(slugs), "catalog": catalog, "creators": extract_creator_slugs(selector), "incomplete": incomplete}
 
 
 def extract_creator_slugs(page):
@@ -593,22 +610,26 @@ def ingest_compare_page(text, ts, path, requested=None):
     return rows, None
 
 
-def page_problem(path, text, ts, requested=None):
-    """None when a fetched body is fit to enter the cache, else the reason it is not: the same
-    rules the readers apply. Compare page: table, payload, header and (given `requested`) exact
-    identity. Evaluation page: a table or a payload. Sitemap: <loc> entries. Selector catalog:
-    models. Any other page has no rule."""
-    if path.startswith("/models/comparisons/"):
+def page_problem(kind, path, text, ts, requested):
+    """None when a body is fit to be a cached page of this kind, else the reason it is not. The
+    one judge: fetch_page applies it to every body it returns. Compare page (kind "compare"):
+    table, payload, matching header and exactly the `requested` slugs. Evaluation page: a table
+    or a payload. Sitemap: <loc> entries. Selector catalog: models. Cohort model page: model facts."""
+    if kind == "compare":
+        if requested is None:
+            raise TypeError("a compare page is judged against the slugs requested for it")
         return ingest_compare_page(text, ts, path, requested)[1]
-    if path.startswith("/evaluations/"):
+    if kind == "evaluation":
         if extract_tables(text) or embedded.extract_array(text, embedded.EVAL_MARKER)[0] is not None:
             return None
         return "no table or payload"
-    if path == "/sitemap.xml":
+    if kind == "sitemap":
         return None if "<loc>" in text else "no <loc> entries"
-    if path == "/models/comparisons":
+    if kind == "catalog":
         return None if extract_model_catalog(text) else "no model catalog"
-    return None
+    if kind == "cohort":
+        return None if parse_model_page(text) else "no model facts"
+    raise ValueError(f"unknown page kind {kind!r}")
 
 
 def _name_stem(file):
@@ -638,7 +659,7 @@ def ingest_cached_pages(stale_after_hours=None, now=None):
         requested = _name_stem(f).split("-vs-") if len(f.name) - len(".html") <= 150 else None
         page_rows, why = ingest_compare_page(f.read_text(encoding="utf-8", errors="replace"), ts, f.name, requested)
         if page_rows is None:
-            quarantined.append({"file": f.name, "reason": why})
+            quarantined.append({"file": f.name, "reason": why, "fetched_at": ts})
             continue
         for slug, row in page_rows.items():
             rows.setdefault(slug, []).append(row)
@@ -685,7 +706,7 @@ def sweep_comparisons(slugs, catalog=None, creator_slugs=(), network=True, stale
         if done % 20 == 0:
             log(f"[sweep] pass 1: {done} requests, {len(pending)} queued, {len(failures)} failures", flush=True)
         try:
-            fetched = fetch_page(path, refresh=True, network=network, requested=set(ask))
+            fetched = fetch_page(path, "compare", set(ask), refresh=True, network=network)
         except Rejected as e:
             streak = 0
             for s in targets:
@@ -904,6 +925,8 @@ def run_fetch_selftest():
 
     saved = (HERE, RAW, NEG_FILE, _sleep, _urlopen)
     sleeps, calls, script = [], [], []
+    ok = lambda n: f"{n} Artificial Analysis Intelligence Index"
+    down = "<html>Down for maintenance</html>"
 
     class Resp:
         def __init__(self, body):
@@ -940,91 +963,119 @@ def run_fetch_selftest():
             short = cache_file("/models/comparisons/a-vs-b")
             assert short.name == "models_comparisons_a-vs-b.html", short.name
             slug = "x" * 60
-            long_a = "/models/comparisons/" + "-vs-".join([slug] * 3 + ["alpha"])
-            long_b = "/models/comparisons/" + "-vs-".join([slug] * 3 + ["bravo"])
+            slugs_a = [slug + str(i) for i in range(3)] + ["alpha"]
+            long_a = "/models/comparisons/" + "-vs-".join(slugs_a)
+            long_b = "/models/comparisons/" + "-vs-".join(slugs_a[:3] + ["bravo"])
             assert len(_legacy_stem(long_a)) > 180
             assert _legacy_stem(long_a)[:180] == _legacy_stem(long_b)[:180]
             assert cache_file(long_a) != cache_file(long_b), "long names must not collide"
             assert len(cache_file(long_a).name) <= 150 + 11 + 5
             RAW.mkdir(parents=True, exist_ok=True)
-            (RAW / (_legacy_stem(long_a)[:180] + ".html")).write_text("legacy", encoding="utf-8")
-            hit = fetch_page(long_a, network=False)
-            assert hit.cached and hit.text == "legacy" and hit.ts == "unknown", "legacy name stays readable"
-            body = _fake_page([_fake_obj("m-p"), _fake_obj("m-q")])
-            script[:] = ["<html>maintenance</html>"]
+            want_a = set(slugs_a)
+            legacy_body = _fake_page([_fake_obj(x) for x in slugs_a])
+            (RAW / (_legacy_stem(long_a)[:180] + ".html")).write_text(legacy_body, encoding="utf-8")
+            hit = fetch_page(long_a, "compare", want_a, network=False)
+            assert hit.cached and hit.text == legacy_body and hit.ts == "unknown", "legacy name stays readable"
+            body = _fake_page([_fake_obj(x, intelligenceIndex=1.0) for x in slugs_a])
+            script[:] = [down]
             try:
-                fetch_page(long_a, skip_legacy=True, refresh=True)
+                fetch_page(long_a, "compare", want_a, skip_legacy=True, refresh=True)
                 raise AssertionError("a page that does not parse must be rejected")
             except Rejected as e:
                 assert e.why == "no table" and "page rejected: no table" in str(e)
             assert not cache_file(long_a).exists(), "a rejected body never enters the cache"
             script[:] = [body]
-            fresh = fetch_page(long_a, skip_legacy=True, refresh=True)
+            fresh = fetch_page(long_a, "compare", want_a, skip_legacy=True, refresh=True)
             assert fresh.text == body and not fresh.cached and cache_file(long_a).exists()
             assert Path(str(cache_file(long_a)) + ".ts").read_text(encoding="utf-8") == fresh.ts
-            again = fetch_page(long_a, skip_legacy=True)
+            again = fetch_page(long_a, "compare", want_a, skip_legacy=True)
             assert again.cached and again.ts == fresh.ts, "a cache hit keeps the real fetch time"
-            script[:] = ["<html>maintenance</html>"]
             try:
-                fetch_page(long_a, skip_legacy=True, refresh=True)
-                raise AssertionError("a refetch that does not parse must be rejected")
-            except Rejected:
+                page_problem("compare", long_a, body, fresh.ts, None)
+                raise AssertionError("a compare page cannot be judged without its requested slugs")
+            except TypeError:
                 pass
-            kept = fetch_page(long_a, skip_legacy=True)
-            assert kept.text == body and kept.ts == fresh.ts, "a rejected refetch keeps the last good copy and its fetch time"
+            samples = {
+                "compare": ("/models/comparisons/m-p-vs-m-q", {"m-p", "m-q"}, _fake_page([_fake_obj("m-p"), _fake_obj("m-q")]),
+                            _fake_page([_fake_obj("m-x"), _fake_obj("m-y")])),
+                "evaluation": ("/evaluations/sample", None, "<table><tr><td>1</td><td>Acme</td><td>M</td><td>5</td></tr></table>", None),
+                "sitemap": ("/sitemap.xml", None, "<urlset><loc>https://artificialanalysis.ai/models/m-p</loc></urlset>", None),
+                "catalog": ("/models/comparisons", None, '{"slug":"m-p","name":"M-P","deprecated":false,"releaseDate":"2026-01-01"}', None),
+                "cohort": ("/models/sample", None, ok(58), None),
+            }
+            for kind, (path, want, good, wrong) in samples.items():
+                script[:] = [good]
+                assert fetch_page(path, kind, want, refresh=True).text == good, f"{kind}: a matching body is accepted"
+                sidecar = Path(str(cache_file(path)) + ".ts")
+                sidecar.write_text("2020-01-01T00:00:00Z", encoding="utf-8")
+                for bad in [down] + ([wrong] if wrong else []):
+                    script[:] = [bad]
+                    try:
+                        fetch_page(path, kind, want, refresh=True)
+                        raise AssertionError(f"{kind}: a 200 body that does not match must be rejected")
+                    except Rejected:
+                        pass
+                    assert cache_file(path).read_text(encoding="utf-8") == good, f"{kind}: a rejected body keeps the last good copy"
+                    assert sidecar.read_text(encoding="utf-8") == "2020-01-01T00:00:00Z", f"{kind}: and its fetch time"
+                cache_file(path).write_text(down, encoding="utf-8")
+                try:
+                    fetch_page(path, kind, want)
+                    raise AssertionError(f"{kind}: a cached copy that no longer parses must be rejected on read")
+                except Rejected:
+                    pass
             sleeps.clear(), calls.clear()
             script[:] = [(404, None)]
             try:
-                fetch_page("/models/gone")
+                fetch_page("/models/gone", "cohort", None)
                 raise AssertionError("404 must raise")
             except FetchError as e:
                 assert e.status == 404
             assert sleeps == [DELAY], f"spacing follows a 404: {sleeps}"
             try:
-                fetch_page("/models/gone")
+                fetch_page("/models/gone", "cohort", None)
                 raise AssertionError("remembered 404 must raise")
             except FetchError as e:
                 assert e.status == 404
             assert len(calls) == 1, f"a remembered 404 makes no network call: {calls}"
             assert load_404s()["/models/gone"]["status"] == 404
             sleeps.clear(), calls.clear()
-            script[:] = [(500, None), (429, 7), "ok"]
-            assert fetch_page("/models/flaky").text == "ok"
+            script[:] = [(500, None), (429, 7), ok(59)]
+            assert fetch_page("/models/flaky", "cohort", None).text == ok(59)
             assert sleeps == [DELAY, 2, DELAY, 7, DELAY], f"backoff and Retry-After: {sleeps}"
             sleeps.clear(), calls.clear()
             script[:] = [(503, None)] * 3
             try:
-                fetch_page("/models/down")
+                fetch_page("/models/down", "cohort", None)
                 raise AssertionError("exhausted retries must raise")
             except FetchError as e:
                 assert e.status == 503 and len(calls) == 3
             assert sleeps == [DELAY, 2, DELAY, 4, DELAY], sleeps
             sleeps.clear(), calls.clear()
-            script[:] = [http.client.BadStatusLine("garbage"), http.client.IncompleteRead(b"par"), "recovered"]
-            assert fetch_page("/models/dropped").text == "recovered", "a dropped connection is retried"
+            script[:] = [http.client.BadStatusLine("garbage"), http.client.IncompleteRead(b"par"), ok(60)]
+            assert fetch_page("/models/dropped", "cohort", None).text == ok(60), "a dropped connection is retried"
             assert sleeps == [DELAY, 2, DELAY, 4, DELAY], f"backoff follows a dropped connection: {sleeps}"
             calls.clear()
             script[:] = [http.client.IncompleteRead(b"par")] * 3
             try:
-                fetch_page("/models/dropping")
+                fetch_page("/models/dropping", "cohort", None)
                 raise AssertionError("exhausted retries must raise")
             except FetchError as e:
                 assert e.status is None and len(calls) == 3, "a dropped connection ends as a FetchError, not a traceback"
             calls.clear()
             script[:] = [(403, None)]
             try:
-                fetch_page("/models/denied")
+                fetch_page("/models/denied", "cohort", None)
                 raise AssertionError("403 must raise")
             except FetchError as e:
                 assert e.status == 403 and len(calls) == 1, "other 4xx is not retried"
             RAW.mkdir(parents=True, exist_ok=True)
             NEG_FILE.write_text(json.dumps({"url": "/models/old-404", "at": "2020-01-01T00:00:00Z", "status": 404}) + "\n", encoding="utf-8")
             calls.clear()
-            script[:] = ["now exists"]
+            script[:] = [ok(61)]
             g["NEG_MAX_AGE"] = 3600
-            assert fetch_page("/models/old-404").text == "now exists" and len(calls) == 1, "an old 404 memory is ignored"
+            assert fetch_page("/models/old-404", "cohort", None).text == ok(61) and len(calls) == 1, "an old 404 memory is ignored"
             try:
-                fetch_page("/models/never-fetched", network=False)
+                fetch_page("/models/never-fetched", "cohort", None, network=False)
                 raise AssertionError("network off must raise on a miss")
             except FetchError as e:
                 assert e.status is None and len(calls) == 1
@@ -1170,7 +1221,7 @@ def acquire_evals(snapshot, live, network):
     failed = []
     for slug in EVAL_SLUGS:
         try:
-            page = fetch_page("/evaluations/" + slug, refresh=live, network=network).text
+            page = fetch_page("/evaluations/" + slug, "evaluation", None, refresh=live, network=network).text
         except FetchError as e:
             snapshot["reconciliation"].append({"slug": slug, "note": f"fetch failed: {e}"})
             failed.append(str(e))
@@ -1221,12 +1272,15 @@ def acquire_evals(snapshot, live, network):
 
 
 def acquire_cohort(snapshot, slugs, network):
-    """Model-page economics for the working cohort (cache-first). Returns the fetch failures."""
+    """Model-page economics for the working cohort (cache-first). Returns the fetch failures. A page
+    that does not parse is a failure that leaves the model's previous facts in place."""
     failed = []
     for slug in slugs:
         try:
-            snapshot["models"][slug] = parse_model_page(fetch_page("/models/" + slug, network=network).text)
+            snapshot["models"][slug] = parse_model_page(fetch_page("/models/" + slug, "cohort", None, network=network).text)
             print(f"[model] {slug}: {snapshot['models'][slug]}", flush=True)
+        except Rejected as e:
+            failed.append(str(e))
         except FetchError as e:
             snapshot["models"][slug] = {"error": str(e)}
             failed.append(str(e))
@@ -1240,6 +1294,7 @@ def run_sweep(snapshot, live, network, stale_after_hours):
           f"{'live' if live else 'cache-first' if network else 'cache only'})", flush=True)
     result = sweep_comparisons(found["slugs"], found["catalog"], found["creators"], network=network,
                                stale_after_hours=stale_after_hours)
+    result["incomplete"] = found["incomplete"] + result["incomplete"]
     values, fails = exit_check(set(found["slugs"]), result["status"])
     rows = result["rows"]
     snapshot.update({
@@ -1283,14 +1338,33 @@ def write_verdict(ran_at, line, **fields):
         {"ran_at": ran_at, "verdict": line.split(" ", 1)[0], "line": line, **fields}, indent=1) + "\n")
 
 
-def build_db():
+def report_unread(raw, earlier, incomplete):
+    """Name the cached pages the loaders dropped. A compare page whose fetch time stamped rows in
+    the previous matrix (`earlier`) and no longer ingests drops its models from the new matrix, so it
+    makes the run incomplete."""
+    dropped = raw["quarantined"]
+    why = lambda x: x["reason"] if isinstance(x["reason"], str) else x["reason"]["reason"]
+    print(f"[db] cached compare pages quarantined: {len(dropped)}"
+          + (": " + ", ".join(f"{x['file']} ({why(x)})" for x in dropped) if dropped else ""), flush=True)
+    if raw["skipped_evals"]:
+        print(f"[db] evaluation pages not read: {len(raw['skipped_evals'])}: "
+              + ", ".join(f"{x['slug']} ({x['reason']})" for x in raw["skipped_evals"]), flush=True)
+    for x in dropped:
+        if x["fetched_at"] in earlier:
+            incomplete.append(f"cached compare page {x['file']} stamped rows in the previous matrix and no longer ingests: {why(x)}")
+
+
+def build_db(incomplete):
     """Rebuild aa.sqlite from raw evidence, recompute coverage, write the projections last.
     verdict.json goes UNTRUSTED first: only the chart-diff that follows a rebuild can restore it."""
     write_verdict(utc_now(), "UNTRUSTED (matrix rebuilt without chart-diff)", reason="matrix rebuilt without chart-diff")
     conn = aadb.open_db(HERE / "aa.sqlite")
-    result = aadb.migrate(conn)
+    earlier = {r[0] for r in conn.execute("SELECT DISTINCT observed_at FROM observations WHERE source IN ('comparison-table', 'embedded')")}
+    raw = aadb.load_raw()
+    result = aadb.migrate(conn, raw=raw)
     print(f"[db] {HERE / 'aa.sqlite'}: {result['models']} models, {result['metrics']} metrics, "
           f"{sum(result['loaded'].values())} observations; row counts per source match the counts read", flush=True)
+    report_unread(raw, earlier, incomplete)
     report_coverage(result["view"])
     return conn
 
@@ -1393,12 +1467,12 @@ def main(argv=None):
     if args.chartdiff:
         def factory():
             nonlocal conn
-            conn = build_db()
+            conn = build_db(incomplete)
             return conn
 
         code = run_chart_diff(factory, network and not args.replay)
     elif args.db:
-        conn = build_db()
+        conn = build_db(incomplete)
         print("verdict.json is UNTRUSTED: matrix rebuilt without chart-diff; run --chartdiff to judge it", flush=True)
     if conn is not None:
         n = aadb.write_projections(conn, HERE / "projection")

@@ -871,10 +871,11 @@ A reopen used only to retain an unanswered captain question preserves the finish
 
 [`bin/fm-model-picker.sh`](../bin/fm-model-picker.sh) collects Artificial Analysis benchmark data for the model picker.
 Its header owns the flags, the long-run guidance, and the exit codes; the code is `bin/fm_model_picker/`.
-A fetched page enters `raw/` only if it parses: a comparison page needs a table, a payload, a matching header, and the requested slugs; an evaluation page needs a table or a payload; the sitemap needs `<loc>` entries; the selector catalog needs models.
-A page that does not parse is rejected, and the last good copy and its fetch time stay.
-Exit 4 means the outputs were written but acquisition was incomplete: an evaluation page or a cohort model page could not be fetched or did not parse (a 404 and, under `--embedded-only`, a cache miss both count), a comparison page failed with an error other than 404 or did not parse (a 404 there is a recorded unsupported slug), or the sweep stopped after 3 straight fetch failures.
-A sitemap or selector catalog that does not parse ends the run with exit 2.
+A page enters `raw/` only if it parses, and a cached page is read only if it still parses.
+One rule judges the five page kinds: a comparison page needs a table, a payload, a matching header, and exactly the requested slugs (the chart-diff re-fetch included); an evaluation page needs a table or a payload; the sitemap needs `<loc>` entries; the selector catalog needs models; a cohort model page needs model facts.
+A page that does not parse is rejected, and the last good copy and its fetch time stay; a rejected sitemap or catalog is read from that copy, and with none the run ends with exit 2.
+Every `--db` and `--chartdiff` run prints how many cached comparison pages were quarantined, with their file names.
+Exit 4 means the outputs were written but the run was incomplete: an evaluation page or a cohort model page could not be fetched or did not parse (a 404 and, under `--embedded-only`, a cache miss both count), a comparison page failed with an error other than 404 or did not parse (a 404 there is a recorded unsupported slug), a sitemap or selector catalog was rejected, the sweep stopped after 3 straight fetch failures, or a cached comparison page that stamped rows in the previous `aa.sqlite` no longer ingests.
 The data root is `FM_MODEL_PICKER_DATA`, otherwise `model-picker/` under the home's data directory (`FM_DATA_OVERRIDE`, else `$FM_HOME/data`).
 The whole root is private and gitignored with `data/`.
 

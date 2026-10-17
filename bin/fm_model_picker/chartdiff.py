@@ -290,14 +290,15 @@ GUESSES = ("omniscience-non-hallucination-rate", "mlcraa")
 
 
 def _page_path(kind, name, raw):
-    """URL path of a page that produced a mismatch, rebuilt from exact slugs (not from a file name)."""
+    """(URL path, page kind, requested slugs) of a page that produced a mismatch, rebuilt from exact
+    slugs (not from a file name); path is None when the page is not known."""
     if kind == "eval":
-        return "/evaluations/" + name
+        return "/evaluations/" + name, "evaluation", None
     for lst in raw["compare"].values():
         for r in lst:
             if r["page"] == name:
-                return "/models/comparisons/" + "-vs-".join(r["batch"])
-    return None
+                return "/models/comparisons/" + "-vs-".join(r["batch"]), "compare", set(r["batch"])
+    return None, None, None
 
 
 def run_chartdiff(network=True, log=print):
@@ -312,11 +313,11 @@ def run_chartdiff(network=True, log=print):
     refetched = []
     if pages and network:
         for kind, name in pages:
-            path = _page_path(kind, name, raw)
+            path, page_kind, requested = _page_path(kind, name, raw)
             if path is None:
                 continue
             try:
-                collect.fetch_page(path, refresh=True, skip_legacy=True)
+                collect.fetch_page(path, page_kind, requested, refresh=True, skip_legacy=True)
                 refetched.append(path)
             except collect.FetchError as e:
                 log(f"[chartdiff] re-fetch failed: {e}")

@@ -23,16 +23,20 @@
 # --chartdiff       compare table, payload and rendered-chart values; re-fetch each disagreeing page once; rebuild
 #                   aa.sqlite; write reconcile.md and verdict.json. Exit 3 when the verdict is UNTRUSTED.
 # Order when combined: acquisition, chart-diff, database. Long runs go through bin/fm-proc-budget.sh.
-# A fetched page enters raw/ only if it parses: a comparison page needs a table, a payload, a matching header and the
-#   requested slugs; an evaluation page a table or a payload; the sitemap <loc> entries; the selector catalog models.
-#   A page that does not is rejected and the last good copy and its fetch time stay.
+# A page enters raw/ only if it parses, and a cached page is read only if it still parses. Five kinds are judged by one
+#   rule: a comparison page needs a table, a payload, a matching header and exactly the requested slugs (the chart-diff
+#   re-fetch too); an evaluation page a table or a payload; the sitemap <loc> entries; the selector catalog models; a
+#   cohort model page model facts. A page that does not parse is rejected: the last good copy and its fetch time stay.
+#   A rejected sitemap or catalog is read from that copy; with none, the run ends (exit 2).
+# Every --db and --chartdiff run prints how many cached comparison pages were quarantined, with their file names.
 # Exit codes: 0 done. 1 a slug has neither values nor a recorded reason. 2 a fetch failed where the run cannot go on
-#   (error: on stderr), including a sitemap or selector catalog that does not parse. 3 the chart-diff verdict is
-#   UNTRUSTED. 4 the outputs were written but acquisition was incomplete (INCOMPLETE: on stderr): an evaluation page or a
-#   cohort model page could not be fetched or did not parse (a 404 and, under --embedded-only, a cache miss both count);
-#   a comparison page failed with an error other than 404 or did not parse (a 404 there is a recorded unsupported slug,
-#   and --embedded-only leaves comparison pages unfetched on purpose); or the sweep stopped after 3 straight fetch
-#   failures. A run that is also UNTRUSTED exits 3.
+#   (error: on stderr), including a sitemap or selector catalog that was rejected with no good copy. 3 the chart-diff
+#   verdict is UNTRUSTED. 4 the outputs were written but the run was incomplete (INCOMPLETE: on stderr): an evaluation
+#   page or a cohort model page could not be fetched or did not parse (a 404 and, under --embedded-only, a cache miss both
+#   count); a comparison page failed with an error other than 404 or did not parse (a 404 there is a recorded unsupported
+#   slug, and --embedded-only leaves comparison pages unfetched on purpose); a sitemap or catalog was rejected; the sweep
+#   stopped after 3 straight fetch failures; or a cached comparison page that stamped rows in the previous aa.sqlite no
+#   longer ingests. A run that is also UNTRUSTED exits 3.
 # Data root: FM_MODEL_PICKER_DATA, else <FM_HOME or code root>/data/model-picker (FM_DATA_OVERRIDE selects another
 # data directory). It holds raw/ (cache and fetch times), snapshot.json, coverage.md, reconcile.md, verdict.json,
 # aa.sqlite and projection/. docs/configuration.md owns the layout. The code is bin/fm_model_picker/.
