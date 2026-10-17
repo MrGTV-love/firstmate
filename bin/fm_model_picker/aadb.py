@@ -6,7 +6,7 @@ shadow mode writes to them before any live pick. They carry the handoff columns 
 extra shadow columns (mode, rule_worker, rule_validator, rule_effort) so one row holds both
 the picker's pick and the current dispatch rule's choice.
 
-The benchmark matrix (models, metrics, observations, reconcile_runs, slug_status) is loaded
+The benchmark matrix (models, metrics, observations, reconcile_runs) is loaded
 by `migrate` from raw evidence only; every derived aggregate is recomputed, never imported.
 """
 import calendar
@@ -203,10 +203,6 @@ DDL_MATRIX = [
         checked INTEGER NOT NULL, agreements INTEGER NOT NULL, mismatches INTEGER NOT NULL,
         status TEXT NOT NULL CHECK (status IN ('agree', 'mismatch', 'resolved', 'quarantined', 'not-compared')),
         notes TEXT)""",
-    """CREATE TABLE IF NOT EXISTS slug_status (
-        slug TEXT PRIMARY KEY,
-        status TEXT NOT NULL CHECK (status IN ('values', 'failure')),
-        reason TEXT NOT NULL DEFAULT '', at TEXT)""",
     "CREATE INDEX IF NOT EXISTS observations_by_metric ON observations (metric_id, model_id)",
 ]
 SOURCES = ("comparison-table", "embedded", "eval-leaderboard", "rendered-chart")
@@ -378,7 +374,7 @@ def metric_defs(observations):
     return defs
 
 
-def migrate(conn, raw=None, slug_status=None, log=print):
+def migrate(conn, raw=None, log=print):
     """Rebuild the benchmark matrix from raw evidence in one transaction. The matrix is a pure
     function of the cache, so a rerun gives identical row counts. The calibration tables are
     never touched. Returns the counts read and loaded, per source."""
@@ -405,12 +401,6 @@ def migrate(conn, raw=None, slug_status=None, log=print):
                 "VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (ids[o["model"]], mids[(o["cid"], o["label"])], o["variant"], o["observed_at"], o["value"], o["source"],
                  o["ci"], o["raw"], o["partial"], o["derived"]))
-        if slug_status is not None:
-            conn.execute("DELETE FROM slug_status")
-            now = utc_now()
-            for slug, s in sorted(slug_status.items()):
-                conn.execute("INSERT INTO slug_status (slug, status, reason, at) VALUES (?,?,?,?)",
-                             (slug, s["status"], s.get("reason", ""), now))
     read, loaded = {}, {r[0]: r[1] for r in conn.execute("SELECT source, COUNT(*) FROM observations GROUP BY source")}
     for o in obs:
         read[o["source"]] = read.get(o["source"], 0) + 1
@@ -491,12 +481,12 @@ def matrix_selftest():
         conn = open_db(Path(tmp) / "aa.sqlite")
         did = log_dispatch(conn, mode="shadow", chosen_worker="w", jev_raw_payload="raw")
         quiet = lambda *a, **k: None
-        first = migrate(conn, raw=raw, slug_status={"m-a": {"status": "values", "reason": ""}, "m-x": {"status": "failure", "reason": "not a model"}}, log=quiet)
+        first = migrate(conn, raw=raw, log=quiet)
         again = migrate(conn, raw=raw, log=quiet)
         assert first["loaded"] == again["loaded"] and first["models"] == again["models"], "a rerun must give the same row counts"
         assert conn.execute("SELECT jev_raw_payload FROM dispatch_log WHERE id=?", (did,)).fetchone()[0] == "raw", "migration never touches calibration rows"
         assert conn.execute("SELECT COUNT(*) FROM models WHERE slug IS NULL").fetchone()[0] == 1, "an unmatched leaderboard name is slugless, not fuzzy-matched"
-        assert conn.execute("SELECT COUNT(*) FROM slug_status").fetchone()[0] == 2, "an omitted slug_status leaves the table alone"
+        assert conn.execute("SELECT COUNT(*) FROM sqlite_master WHERE name='slug_status'").fetchone()[0] == 0, "the sweep's failure record lives in snapshot.json, not the database"
         assert first["read"]["rendered-chart"] == 1 and first["read"]["eval-leaderboard"] == 2
         est = conn.execute("SELECT o.ci FROM observations o JOIN metrics x ON x.id=o.metric_id WHERE x.canonical_id='intelligence-index' AND o.source='embedded'").fetchone()[0]
         assert est == "estimated", "the payload's estimated flag is kept"

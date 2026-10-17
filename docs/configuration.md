@@ -877,8 +877,8 @@ The whole root is private and gitignored with `data/`.
 | Path under the data root | Contents |
 | --- | --- |
 | `raw/` | Cached pages with a `.ts` sidecar holding each page's real fetch time, `rendered/*.txt` chart captures, and `_http_404.jsonl`, the memory of 404s that later runs never re-request |
-| `snapshot.json` | Aggregate of the latest acquisition run, including each model slug's values-or-reason status; its stored coverage, if any, is never read |
-| `aa.sqlite` | `dispatch_log` and `outcomes` first, then `models`, `metrics`, `observations`, `reconcile_runs`, and `slug_status` |
+| `snapshot.json` | Aggregate of the latest acquisition run, including each model slug's values-or-reason status (`slug_status`, `sweep_failures`), which is its only home; its stored coverage, if any, is never read |
+| `aa.sqlite` | `dispatch_log` and `outcomes` first, then `models`, `metrics`, `observations`, and `reconcile_runs` |
 | `coverage.md` | Per-series coverage, recomputed from the raw cache on every run (never from `aa.sqlite` or `snapshot.json`) |
 | `reconcile.md` and `verdict.json` | The chart-diff report and its machine-readable verdict |
 | `projection/<slug>.json` | One wire-format projection per catalog model, written last |

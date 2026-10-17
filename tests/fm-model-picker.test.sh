@@ -60,7 +60,7 @@ test_calibration_first_and_preserved() {
   expect_code 0 "$CODE" "--db on an empty root"
   db=$data/aa.sqlite
   tables=$(sql "$db" "select name from sqlite_master where type='table' and name not like 'sqlite_%' order by rowid" | paste -sd, -)
-  assert_equals "dispatch_log,outcomes,models,metrics,observations,reconcile_runs,slug_status" "$tables" "calibration tables are created before the matrix"
+  assert_equals "dispatch_log,outcomes,models,metrics,observations,reconcile_runs" "$tables" "calibration tables are created before the matrix"
   assert_contains "$(sql "$db" "select name from pragma_table_info('dispatch_log')" | paste -sd, -)" "mode,task_type,work_type,complexity_score,chosen_worker,chosen_validator,effort,rule_worker,rule_validator,rule_effort,jev_raw_payload" "dispatch_log carries the shadow columns"
   PYTHONPATH="$ROOT/bin" PYTHONDONTWRITEBYTECODE=1 python3 -c '
 import sys
@@ -319,7 +319,7 @@ from fm_model_picker import collect
 root, flags = sys.argv[1], sys.argv[2:]
 collect.configure(root)
 mode = os.environ.get("SITE", "")
-slugs = ["m-a", "m-b", "m-new"] + ([f"x-{i:02d}" for i in range(17)] if mode == "outage" else [])
+slugs = ["m-a", "m-b", "m-new"] + ([f"x-{i:02d}" for i in range(17)] if mode in ("outage", "scattered") else [])
 SITEMAP = "<urlset>" + "".join(f"<url><loc>{collect.BASE}/models/{s}</loc></url>" for s in slugs) + "</urlset>"
 CATALOG = "<html>" + "".join(
     '{"slug":"%s","name":"%s","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}' % (s, s.upper())
@@ -376,7 +376,9 @@ dropped = []
 def opener(req, timeout=None):
     path = req.full_url[len(collect.BASE):]
     requested.append(path)
-    if ((mode == "outage" and path.startswith("/models/comparisons/")) or (mode == "evals-down" and path.startswith("/evaluations/"))
+    if ((mode == "outage" and path.startswith("/models/comparisons/"))
+            or (mode == "scattered" and path.startswith("/models/comparisons/") and "x-09" not in path)
+            or (mode == "evals-down" and path.startswith("/evaluations/"))
             or (mode == "cohort-down" and path.startswith("/models/") and not path.startswith("/models/comparisons"))):
         raise urllib.error.HTTPError(req.full_url, 500, "x", email.message.Message(), None)
     if mode == "dropped" and path == "/models/comparisons/m-new" and not dropped:
@@ -399,7 +401,7 @@ PY
 )
 
 flag_run() {  # <flags...>: a fresh seeded data root, a scripted site; sets OUT to the REQ lines and the EXIT line
-  local data=$TMP_ROOT/flags-$((++FLAG_N))
+  local data=${FLAG_ROOT:-$TMP_ROOT/flags-$((++FLAG_N))}
   CODE=0
   OUT=$(SITE=${SITE:-} PYTHONPATH="$ROOT/bin" PYTHONDONTWRITEBYTECODE=1 python3 -c "$FLAG_PY" "$data" "$@") || CODE=$?
   expect_code 0 "$CODE" "flag run: $*"
@@ -473,6 +475,43 @@ test_incomplete_acquisition_exits_4_after_writing_outputs() {
   pass "model picker: an acquisition that fetched less than it set out to exits 4 once its outputs are written"
 }
 
+test_scattered_fetch_failures_exit_4() {
+  SITE=scattered flag_run --sweep --replay --db
+  assert_contains "$OUT" "EXIT 4" "failed batches between successes do not exit 0"
+  assert_equals "3" "$(requests_matching '^ERR   /models/comparisons/.*: HTTP 500$')" "every failed batch is named once"
+  assert_contains "$OUT" "ERR   /models/comparisons/x-04-vs-x-05-vs-x-06-vs-x-07-vs-x-08: HTTP 500" "the failed page is named"
+  assert_not_contains "$OUT" "sweep stopped" "the streak never reached three, so this is not a stopped sweep"
+  assert_contains "$(cat "$FLAG_DATA/snapshot.json")" '"stopped": null' "the snapshot says the sweep ran to the end"
+  assert_contains "$(cat "$FLAG_DATA/snapshot.json")" "fetch failed: /models/comparisons/x-14-vs-x-15-vs-x-16: HTTP 500" "the snapshot records the slug-level reason"
+  assert_present "$FLAG_DATA/aa.sqlite" "the database was still built"
+  assert_present "$FLAG_DATA/projection/m-a.json" "the projections were still written"
+  flag_run --sweep --embedded-only
+  assert_equals "EXIT 0" "$OUT" "a sweep that fetches nothing on purpose is not incomplete"
+  pass "model picker: scattered fetch failures exit 4, a cache-only sweep exits 0"
+}
+
+snapshot_failures() {  # <data-dir>: the sweep's failure record held in snapshot.json
+  python3 -I -c 'import json, sys; s = json.load(open(sys.argv[1])); print(json.dumps([s["slug_status"], s["sweep_failures"], s["sweep"]], sort_keys=True))' "$1/snapshot.json"
+}
+
+test_failure_record_lives_in_snapshot_only() {
+  local data=$TMP_ROOT/failure-record before
+  FLAG_ROOT=$data
+  SITE=outage flag_run --sweep --replay
+  assert_contains "$OUT" "EXIT 4" "the outage sweep is incomplete"
+  before=$(snapshot_failures "$data")
+  assert_contains "$before" "not fetched: sweep stopped after 3 consecutive fetch failures" "the sweep recorded why slugs have no values"
+  flag_run --replay
+  assert_contains "$OUT" "EXIT 0" "a plain replay reads the cache"
+  assert_equals "$before" "$(snapshot_failures "$data")" "a plain replay carries the sweep's failures forward unchanged"
+  flag_run --db
+  assert_contains "$OUT" "EXIT 0" "--db rebuilds the matrix"
+  assert_equals "0" "$(sql "$data/aa.sqlite" "select count(*) from sqlite_master where name='slug_status'")" "the database holds no slug_status table"
+  assert_equals "$before" "$(snapshot_failures "$data")" "--db leaves the sweep's failures, with their original values, in snapshot.json"
+  unset FLAG_ROOT
+  pass "model picker: the sweep's failure record lives in snapshot.json and the database carries no slug_status table"
+}
+
 test_dropped_connection_is_retried() {
   SITE=dropped flag_run --sweep --replay
   assert_equals "REQ /models/comparisons/m-new
@@ -494,3 +533,5 @@ test_coverage_follows_the_cache_not_the_database
 test_unsafe_payload_slug_is_rejected
 test_incomplete_acquisition_exits_4_after_writing_outputs
 test_dropped_connection_is_retried
+test_scattered_fetch_failures_exit_4
+test_failure_record_lives_in_snapshot_only

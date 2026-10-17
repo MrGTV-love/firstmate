@@ -670,6 +670,7 @@ def sweep_comparisons(slugs, catalog=None, creator_slugs=(), network=True, stale
     pending = [_item(todo[i:i + 5]) for i in range(0, len(todo), 5)]
     done = streak = 0
     stopped = None
+    fetch_failures = []
     while pending:
         item = pending.pop(0)
         ask, targets = item["ask"], item["targets"]
@@ -694,6 +695,8 @@ def sweep_comparisons(slugs, catalog=None, creator_slugs=(), network=True, stale
                 continue
             for s in targets:
                 failures[s] = f"fetch failed: {e}" if network else "not fetched: network use is off"
+            if network:
+                fetch_failures.append(str(e))
             streak = streak + 1 if network else 0
             if streak >= 3:
                 stopped = f"sweep stopped after {streak} consecutive fetch failures (last: {e})"
@@ -727,7 +730,7 @@ def sweep_comparisons(slugs, catalog=None, creator_slugs=(), network=True, stale
               "failures": sum(1 for v in status.values() if v["status"] == "failure"),
               "non_models": len(non_models), "requests": done}
     return {"rows": {s: rows[s] for s in rows if s in set(slugs)}, "status": status, "skipped": skipped,
-            "quarantined": quarantined, "counts": counts, "stopped": stopped}
+            "quarantined": quarantined, "counts": counts, "stopped": stopped, "fetch_failures": fetch_failures}
 
 
 def exit_check(universe, status):
@@ -1126,6 +1129,7 @@ def run_sweep_selftest():
             assert "paired with an anchor" in again["status"]["m-gone"]["reason"], "remembered 404s prove an unsupported slug with no network"
             offline = sweep_comparisons(["m-q"], catalog={"m-q": {}}, network=False, log=lambda *a, **k: None)
             assert offline["status"]["m-q"]["reason"].startswith("not fetched"), "network off records a reason, not silence"
+            assert offline["fetch_failures"] == [] and res["fetch_failures"] == [], "a 404 and a cache-only sweep are not fetch failures"
     finally:
         configure(saved[0])
         g["_sleep"], g["_urlopen"] = saved[3], saved[4]
@@ -1258,12 +1262,12 @@ def write_verdict(ran_at, line, **fields):
         {"ran_at": ran_at, "verdict": line.split(" ", 1)[0], "line": line, **fields}, indent=1) + "\n")
 
 
-def build_db(slug_status):
+def build_db():
     """Rebuild aa.sqlite from raw evidence, recompute coverage, write the projections last.
     verdict.json goes UNTRUSTED first: only the chart-diff that follows a rebuild can restore it."""
     write_verdict(utc_now(), "UNTRUSTED (matrix rebuilt without chart-diff)", reason="matrix rebuilt without chart-diff")
     conn = aadb.open_db(HERE / "aa.sqlite")
-    result = aadb.migrate(conn, slug_status=slug_status)
+    result = aadb.migrate(conn)
     print(f"[db] {HERE / 'aa.sqlite'}: {result['models']} models, {result['metrics']} metrics, "
           f"{sum(result['loaded'].values())} observations; row counts per source match the counts read", flush=True)
     report_coverage(result["view"])
@@ -1343,7 +1347,6 @@ def main(argv=None):
             prev = json.loads(snap_file.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
             prev = {}
-    slug_status = prev.get("slug_status")
     incomplete = []
     if acquire:
         snapshot = {"collected_at": utc_now(), "source": BASE, "evals": {}, "models": prev.get("models", {}),
@@ -1354,7 +1357,7 @@ def main(argv=None):
             incomplete += acquire_cohort(snapshot, [s for s in args.models.split(",") if s] or COHORT, network)
         if sweeping:
             swept = run_sweep(snapshot, live, network, args.stale_after_hours)
-            slug_status = snapshot["slug_status"]
+            incomplete += swept["fetch_failures"]
             if swept["stopped"]:
                 incomplete.append(swept["stopped"])
         else:
@@ -1369,12 +1372,12 @@ def main(argv=None):
     if args.chartdiff:
         def factory():
             nonlocal conn
-            conn = build_db(slug_status)
+            conn = build_db()
             return conn
 
         code = run_chart_diff(factory, network and not args.replay)
     elif args.db:
-        conn = build_db(slug_status)
+        conn = build_db()
         print("verdict.json is UNTRUSTED: matrix rebuilt without chart-diff; run --chartdiff to judge it", flush=True)
     if conn is not None:
         n = aadb.write_projections(conn, HERE / "projection")
