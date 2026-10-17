@@ -2039,7 +2039,7 @@ test_launch_environment_inherited_by_secondmate
 test_launch_environment_inheritance_preserves_on_source_errors
 
 test_worker_launch_delivers_role_scope() {
-  local rec id out launch kind prompt envelope encoded brief_kind brief content first_line role_line task_line inbox
+  local rec id out launch kind prompt envelope encoded brief_kind brief content first_line role_line task_line inbox token
   for brief_kind in heading legacy scaffold; do
   for kind in no-mistakes direct-PR local-only scout; do
     [ "$brief_kind" = heading ] && [ "$kind" != no-mistakes ] && continue
@@ -2061,6 +2061,9 @@ test_worker_launch_delivers_role_scope() {
       content=$(cat "$brief")
       content=${content//'{TASK}'/brief for $id}
       content=${content//'{FIRSTMATE_SPEC}'/Exercise the spawn behavior under test.}
+      for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+        content=${content//"$token"/Filled for the test.}
+      done
       printf '%s\n' "$content" > "$brief"
     fi
     cp "$HOME_DIR/data/$id/brief.md" "$CASE_DIR/brief-before"

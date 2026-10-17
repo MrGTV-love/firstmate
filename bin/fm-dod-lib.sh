@@ -116,6 +116,17 @@
 # session does not register the skill, such as one in another project's
 # worktree, cannot, so the role also names the file as the fallback to read;
 # the Claude launch grants the skills directory that holds it.
+# The task-specific Definition of Done is the second half of a ship or scout
+# brief's completion contract: fm_task_dod_block prints the two sections
+# bin/fm-brief.sh scaffolds after the delivery contract above ("## Definition Of
+# Done (task)" with five placeholders Firstmate fills from the captain's intent,
+# and the fixed "## How You're Graded"), and fm_brief_task_dod_problem is the
+# check bin/fm-spawn.sh refuses a leftover placeholder with. A brief whose
+# "DoD file: <absolute path>" line names an existing file that passes the same
+# placeholder check is the one narrow escape; a secondmate charter never reaches
+# the check because it carries no such sections. A brief with no such section at
+# all (scaffolded before it existed) is not refused here: the supervision
+# sweep reports a missing or placeholder section instead of inventing criteria.
 # fm_ship_rule_one owns the mode-specific first ship safety rule shared by an
 # ordinary ship brief and the durable contract written during scout promotion.
 # It takes the same optional forge and base arguments as fm_dod_block, because
@@ -259,6 +270,95 @@ fm_brief_task_placeholders_present() {  # <file>
   [ "$(printf '%s' "$intent" | tr -d '[:space:]')" = '{TASK}' ] && return 0
   [ "$(printf '%s' "$spec" | tr -d '[:space:]')" = '{FIRSTMATE_SPEC}' ] && return 0
   return 1
+}
+
+# The task Definition of Done placeholders, in scaffold order, as
+# "<token>|<section it sits in>" pairs.
+FM_TASK_DOD_SECTION_TITLE='## Definition Of Done (task)'
+FM_TASK_DOD_PLACEHOLDERS=(
+  "{DOD_CAPABILITY}|$FM_TASK_DOD_SECTION_TITLE"
+  "{DOD_MANDATORY_ITEMS}|### Mandatory items"
+  "{DOD_SUPPORTING_ITEMS}|### Supporting items"
+  "{DOD_HARD_GATES}|### Hard gates"
+  "{DOD_HONESTY_RULE}|### Honesty rule"
+)
+
+fm_task_dod_block() {
+  cat <<'EOF'
+## Definition Of Done (task)
+These are the criteria this task is graded against.
+Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
+If the criteria live in a finished file instead, a line `DoD file: <absolute path>` in this section points to it; read that file before you start.
+
+Capability in plain words: {DOD_CAPABILITY}
+
+### Mandatory items
+Each item has Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader).
+{DOD_MANDATORY_ITEMS}
+
+### Supporting items
+{DOD_SUPPORTING_ITEMS}
+
+### Hard gates
+{DOD_HARD_GATES}
+
+### Honesty rule
+{DOD_HONESTY_RULE}
+
+## How You're Graded
+- A session that did not build this work grades it, against the items above and the evidence places they name.
+- Mandatory items are pass or fail and release-blocking. One failed mandatory item fails the task.
+- Supporting items earn partial credit and never offset a failed mandatory item.
+- A crossed hard gate fails the task. Stop and report it.
+- Your `done:` status line is a signal to start checking, not a pass. Credit comes from the evidence, never from a claim.
+EOF
+}
+
+# Print the absolute path of the brief's first "DoD file: <absolute path>" line.
+fm_brief_dod_file_path() {  # <file>
+  sed -n 's/^DoD file: \(\/.*\)$/\1/p' "$1" | head -n 1
+}
+
+# Print the first leftover placeholder as "<section> still holds <token>" in
+# text and return 0 when the file carries one; return 1 when it carries none.
+fm_dod_text_placeholder() {  # <text>
+  local pair token section
+  for pair in "${FM_TASK_DOD_PLACEHOLDERS[@]}"; do
+    token=${pair%%|*}
+    section=${pair#*|}
+    case $1 in
+      *"$token"*)
+        printf '%s still holds %s\n' "$section" "$token"
+        return 0 ;;
+    esac
+  done
+  return 1
+}
+
+# Print what keeps a ship or scout brief's task Definition of Done from being
+# usable and return 0; return 1 and print nothing when it is usable or absent.
+fm_brief_task_dod_problem() {  # <brief>
+  local brief=$1 dod_file body found
+  [ -f "$brief" ] || return 1
+  dod_file=$(fm_brief_dod_file_path "$brief")
+  if [ -n "$dod_file" ]; then
+    if [ ! -f "$dod_file" ] || [ ! -r "$dod_file" ]; then
+      printf 'DoD file %s is not a readable file\n' "$dod_file"
+      return 0
+    fi
+    if [ -z "$(tr -d '[:space:]' < "$dod_file")" ]; then
+      printf 'DoD file %s is empty\n' "$dod_file"
+      return 0
+    fi
+    if found=$(fm_dod_text_placeholder "$(cat "$dod_file")"); then
+      printf 'DoD file %s: %s\n' "$dod_file" "$found"
+      return 0
+    fi
+    return 1
+  fi
+  fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE" || return 1
+  body=$(fm_brief_heading_body "$brief" "$FM_TASK_DOD_SECTION_TITLE")
+  fm_dod_text_placeholder "$body"
 }
 
 fm_brief_intent_overlay() {  # <captain-intent>

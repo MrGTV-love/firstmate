@@ -272,6 +272,7 @@ if [ -n "$HOST_SNIPPET" ]; then
   printf '%s\n' '- Supervision host: on; it takes away-posture wakes and, where the dialog mirror is verified, eligible attended wakes itself, and hands the rest to you (protocol at the end of this block).'
 fi
 ordinary_wake_line
+printf '%s\n' '- Completion check: when you judge whether a ship or scout is finished, read its brief'\''s "## Definition Of Done (task)" and "## How You'\''re Graded" sections; a done: line only starts that check. Report a missing or placeholder section, never invent criteria.'
 printf '\n'
 render_snippet
 printf '\n'

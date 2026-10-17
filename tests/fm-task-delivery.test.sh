@@ -52,12 +52,19 @@ write_brief() {  # <home> <id> [<recorded-mode>]
   } > "$home/data/$id/brief.md"
 }
 
-fill_brief_subsections() {  # <file> <intent> <spec>
+fill_task_subsections() {  # <file> <intent> <spec>
   local file=$1 intent=$2 spec=$3 content
   content=$(cat "$file")
   content=${content//'{TASK}'/$intent}
   content=${content//'{FIRSTMATE_SPEC}'/$spec}
   printf '%s\n' "$content" > "$file"
+}
+
+# Fills the Task subsections and the task Definition of Done, so a spawn gets
+# past every brief-content refusal.
+fill_brief_subsections() {  # <file> <intent> <spec>
+  fill_task_subsections "$@"
+  fill_whole_dod "$1"
 }
 
 run_spawn() {  # <home> <fakebin> <spawn-args...>
@@ -68,6 +75,97 @@ run_spawn() {  # <home> <fakebin> <spawn-args...>
     FM_PROJECTS_OVERRIDE="$TMP_ROOT/projects-unused" FM_CONFIG_OVERRIDE="$home/config" \
     FM_SPAWN_NO_GUARD=1 FM_BACKEND=tmux PATH="$fakebin:$PATH" \
     "$SPAWN" "$@" 2>&1
+}
+
+fill_dod_placeholder() {  # <file> <token> <text>
+  local file=$1 token=$2 text=$3 content
+  content=$(cat "$file")
+  content=${content//"$token"/$text}
+  printf '%s\n' "$content" > "$file"
+}
+
+fill_whole_dod() {  # <file>
+  local token
+  for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+    fill_dod_placeholder "$1" "$token" "Filled for the test."
+  done
+}
+
+# A ship or scout spawn refuses a leftover task Definition of Done placeholder,
+# naming the section and the placeholder; a filled brief proceeds, and a
+# "DoD file:" line naming a finished criteria file is the one escape.
+test_spawn_requires_a_finished_task_definition_of_done() {
+  local rec home proj fakebin out id brief dod
+  rec=$(make_home dodgate)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  refusal="unfinished task Definition of Done"
+
+  id=dod-ship-unfilled
+  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail "ship brief should scaffold"
+  brief="$home/data/$id/brief.md"
+  fill_task_subsections "$brief" "Fix the thing." "Keep it small."
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" "$refusal" "an unfilled task Definition of Done was not refused"
+  assert_contains "$out" "## Definition Of Done (task) still holds {DOD_CAPABILITY}" "the refusal did not name the section and placeholder"
+  assert_absent "$home/state/$id.meta" "a refused spawn wrote task metadata"
+
+  fill_dod_placeholder "$brief" '{DOD_CAPABILITY}' "The thing works."
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" "### Mandatory items still holds {DOD_MANDATORY_ITEMS}" "a half-filled brief was not refused at the next placeholder"
+
+  fill_whole_dod "$brief"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_not_contains "$out" "$refusal" "a fully filled task Definition of Done was refused"
+
+  id=dod-scout-unfilled
+  FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 || fail "scout brief should scaffold"
+  brief="$home/data/$id/brief.md"
+  fill_task_subsections "$brief" "Find the cause." "Report only."
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
+  assert_contains "$out" "## Definition Of Done (task) still holds {DOD_CAPABILITY}" "an unfilled scout Definition of Done was not refused"
+  fill_whole_dod "$brief"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
+  assert_not_contains "$out" "$refusal" "a filled scout Definition of Done was refused"
+
+  # Briefs scaffolded before the sections existed carry none and still spawn.
+  id=dod-legacy
+  write_brief "$home" "$id" direct-PR
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_not_contains "$out" "$refusal" "a brief with no task Definition of Done section was refused"
+  pass "fm-spawn: a leftover task Definition of Done placeholder is refused, a filled one proceeds"
+}
+
+# The escape: a "DoD file:" line naming an existing finished file replaces the
+# brief's own sections; a missing, empty, or unfinished file is still refused.
+test_spawn_accepts_a_dod_file_that_passes_the_same_check() {
+  local rec home proj fakebin out id brief refusal="unfinished task Definition of Done"
+  rec=$(make_home dodfile)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  id=dod-file
+  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail "ship brief should scaffold"
+  brief="$home/data/$id/brief.md"
+  fill_task_subsections "$brief" "Fix the thing." "Keep it small."
+
+  printf 'DoD file: %s\n' "$home/data/$id/nope.md" >> "$brief"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" "DoD file $home/data/$id/nope.md is not a readable file" "a missing DoD file was not refused"
+
+  printf 'Criteria.\n\n- Mandatory item with {DOD_HARD_GATES} left in.\n' > "$home/data/$id/nope.md"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" "$home/data/$id/nope.md: ### Hard gates still holds {DOD_HARD_GATES}" "a DoD file with a placeholder was not refused"
+
+  : > "$home/data/$id/nope.md"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" "DoD file $home/data/$id/nope.md is empty" "an empty DoD file was not refused"
+
+  printf 'Mandatory: the thing works.\n' > "$home/data/$id/nope.md"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_not_contains "$out" "$refusal" "a finished DoD file was refused though the brief's own placeholders remain"
+  pass "fm-spawn: a DoD file line naming a finished criteria file is the only Definition of Done escape"
 }
 
 # A ship spawn must stop when its delivery contract was never decided or cannot be
@@ -370,15 +468,18 @@ STUB
 
     # Compare the public outputs of both real generation paths. The promoted
     # payload ends at its Definition of done, as does an ordinary generated
-    # brief, so identical suffixes prove both workers receive the same contract.
+    # brief before its task Definition of Done sections, so identical suffixes prove both workers receive the same contract.
     rm "$home/data/$id/brief.md"
     FM_HOME="$home" "$BRIEF" "$id" fixture-project --mode "$mode" >/dev/null 2>&1 \
       || fail "$mode: ordinary ship brief generation should succeed"
     brief_dod="$TMP_ROOT/promote-dod/brief-dod-$id"
     delivered_dod="$TMP_ROOT/promote-dod/delivered-dod-$id"
-    awk '/^# Definition of done$/ { emit=1 } emit' "$home/data/$id/brief.md" > "$brief_dod"
+    awk '/^## Definition Of Done \(task\)$/ { emit=0 } /^# Definition of done$/ { emit=1 } emit' "$home/data/$id/brief.md" > "$brief_dod"
     awk '/^# Definition of done$/ { emit=1 } emit' "$payload" > "$delivered_dod"
-    cmp -s "$brief_dod" "$delivered_dod" \
+    # The brief's DoD slice keeps the blank line that separates it from the next section.
+    printf '%s\n' "$(cat "$brief_dod")" > "$brief_dod.trim"
+    printf '%s\n' "$(cat "$delivered_dod")" > "$delivered_dod.trim"
+    cmp -s "$brief_dod.trim" "$delivered_dod.trim" \
       || fail "$mode: promotion and ordinary brief generation delivered different Definitions of done"
   done
 
@@ -1522,9 +1623,11 @@ STUB
   rm "$home/data/$id/brief.md"
   FM_HOME="$home" "$BRIEF" "$id" proj --mode no-mistakes --forge gerrit >/dev/null 2>&1 \
     || fail "ordinary gerrit ship brief generation should succeed"
-  awk '/^# Definition of done$/ { emit=1 } emit' "$home/data/$id/brief.md" > "$TMP_ROOT/forge-promote/brief-dod"
+  awk '/^## Definition Of Done \(task\)$/ { emit=0 } /^# Definition of done$/ { emit=1 } emit' "$home/data/$id/brief.md" > "$TMP_ROOT/forge-promote/brief-dod"
   awk '/^# Definition of done$/ { emit=1 } emit' "$payload" > "$TMP_ROOT/forge-promote/delivered-dod"
-  cmp -s "$TMP_ROOT/forge-promote/brief-dod" "$TMP_ROOT/forge-promote/delivered-dod" \
+  printf '%s\n' "$(cat "$TMP_ROOT/forge-promote/brief-dod")" > "$TMP_ROOT/forge-promote/brief-dod.trim"
+  printf '%s\n' "$(cat "$TMP_ROOT/forge-promote/delivered-dod")" > "$TMP_ROOT/forge-promote/delivered-dod.trim"
+  cmp -s "$TMP_ROOT/forge-promote/brief-dod.trim" "$TMP_ROOT/forge-promote/delivered-dod.trim" \
     || fail "promotion and ordinary brief generation delivered different gerrit contracts"
   pass "fm-promote: a promoted worker receives the project's registered forge contract with no flag to remember"
 }
@@ -1711,5 +1814,7 @@ test_spawn_refuses_a_registry_forge_it_cannot_read
 test_promotion_carries_the_forge_binding
 test_forge_forgejo_rides_the_same_binding
 test_spawn_and_promote_require_filled_task_subsections
+test_spawn_requires_a_finished_task_definition_of_done
+test_spawn_accepts_a_dod_file_that_passes_the_same_check
 test_project_mode_resolves_branch_prefix
 echo "# all fm-task-delivery tests passed"

@@ -1356,6 +1356,16 @@ When the file is absent, worker launches do not add a board address and retain t
 Malformed or unreadable values refuse the launch before the worker starts.
 The address selects the existing shared server; it does not authorize starting or stopping the server, and the Lavish startup crash remains a vendor-tool concern.
 
+## Task Definition of Done (ship and scout briefs)
+
+Every ship and scout brief that `bin/fm-brief.sh` scaffolds ends its delivery contract with two more sections: `## Definition Of Done (task)` and the fixed `## How You're Graded`.
+Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items (each with Source, Expected, Verify, Edge/negative, Evidence place, and Authority of agent, gate, or grader), supporting items, hard gates, and the honesty rule.
+The grading section says a session that did not build the work grades it, that mandatory items are pass or fail while supporting items never offset a failed mandatory one, and that a `done:` status line only starts the checking.
+`bin/fm-spawn.sh` refuses a ship or scout whose brief still holds one of those placeholders, naming the section and the placeholder.
+The one escape is a `DoD file: <absolute path>` line naming an existing, non-empty file with no placeholder left; secondmate charters carry neither section and are never checked.
+A brief with no such section at all is not refused, and the supervision sweep reports it instead of inventing criteria.
+`bin/fm-dod-lib.sh` owns the scaffold text and the check.
+
 ## Home brief include (config/brief-include.md)
 
 The optional local, gitignored `config/brief-include.md` adds standing worker instructions to every ship and scout brief.

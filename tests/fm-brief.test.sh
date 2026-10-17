@@ -1113,6 +1113,45 @@ test_scout_and_secondmate_scaffold() {
   pass "fm-brief: scout and secondmate code paths still scaffold well-formed briefs"
 }
 
+# Every ship and scout brief carries the task Definition of Done placeholders
+# and the fixed grading section after its delivery contract; a secondmate
+# charter carries neither.
+test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections() {
+  local home id brief token contract task graded
+  home="$TMP_ROOT/dod-home"
+  write_registry "$home"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" dod-ship-nm some-proj --mode no-mistakes >/dev/null 2>&1 || fail "ship scaffold failed"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" dod-ship-dp some-proj --mode direct-PR >/dev/null 2>&1 || fail "direct-PR scaffold failed"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" dod-ship-lo some-proj --mode local-only >/dev/null 2>&1 || fail "local-only scaffold failed"
+  FM_HOME="$home" "$ROOT/bin/fm-brief.sh" dod-scout some-proj --scout >/dev/null 2>&1 || fail "scout scaffold failed"
+  for id in dod-ship-nm dod-ship-dp dod-ship-lo dod-scout; do
+    brief="$home/data/$id/brief.md"
+    grep -qxF "## Definition Of Done (task)" "$brief" || fail "$id: brief missing the task Definition of Done section"
+    grep -qxF "## How You're Graded" "$brief" || fail "$id: brief missing the grading section"
+    for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
+      assert_grep "$token" "$brief" "$id: brief missing the $token placeholder"
+    done
+    assert_grep "Source, Expected, Verify, Edge/negative, Evidence place, and Authority (agent, gate, or grader)" "$brief" \
+      "$id: brief missing the mandatory item shape"
+    assert_grep "A session that did not build this work grades it" "$brief" "$id: brief does not name who grades"
+    assert_grep "Mandatory items are pass or fail and release-blocking" "$brief" "$id: brief missing the mandatory rule"
+    assert_grep "Supporting items earn partial credit and never offset a failed mandatory item" "$brief" \
+      "$id: brief missing the supporting rule"
+    assert_grep 'Your `done:` status line is a signal to start checking, not a pass' "$brief" \
+      "$id: brief does not say what a done: line means"
+    contract=$(grep -nxF '# Definition of done' "$brief" | head -n 1 | cut -d: -f1)
+    task=$(grep -nxF '## Definition Of Done (task)' "$brief" | head -n 1 | cut -d: -f1)
+    graded=$(grep -nxF "## How You're Graded" "$brief" | head -n 1 | cut -d: -f1)
+    [ -n "$contract" ] && [ -n "$task" ] && [ -n "$graded" ] && [ "$contract" -lt "$task" ] && [ "$task" -lt "$graded" ] \
+      || fail "$id: the task sections must follow the delivery-contract Definition of done in order (lines: $contract $task $graded)"
+  done
+  FM_SECONDMATE_CHARTER='Supervise the alpha domain.' \
+    FM_HOME="$home" "$ROOT/bin/fm-brief.sh" dod-sm --secondmate alpha >/dev/null 2>&1 || fail "charter scaffold failed"
+  assert_no_grep "Definition Of Done (task)" "$home/data/dod-sm/brief.md" "secondmate charter must not carry the task Definition of Done"
+  assert_no_grep "How You're Graded" "$home/data/dod-sm/brief.md" "secondmate charter must not carry the grading section"
+  pass "fm-brief: ship and scout briefs carry the task Definition of Done and grading sections, charters do not"
+}
+
 # Contract: a waiting worker spends no turns. A decision wait ends the turn, an
 # external wait sleeps in one blocking shell command, a background long command
 # is reattached rather than stopped, and a waiting worker neither polls its inbox
@@ -1751,6 +1790,7 @@ test_pause_verb_override_renders_all_brief_scaffolds
 test_ship_and_scout_teach_validation_round_pause
 test_scout_and_secondmate_load_decision_hold_policy
 test_scout_and_secondmate_scaffold
+test_ship_and_scout_briefs_carry_the_task_dod_and_grading_sections
 test_scout_lavish_line_follows_presentation_floor
 test_workers_wait_without_spending_turns
 test_wait_no_turns_absent_keeps_the_previous_brief
