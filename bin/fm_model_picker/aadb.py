@@ -467,17 +467,6 @@ def write_projections(conn, outdir):
     return len(written)
 
 
-def rows_from_db(conn):
-    """(models, observations) rebuilt from the database, in the shape coverage_view reads."""
-    models = {r["id"]: {"slug": r["slug"], "name": r["name"], "creator": r["creator"]}
-              for r in conn.execute("SELECT id, slug, name, creator FROM models")}
-    obs = [{"model": r["model_id"], "source": r["source"], "label": r["label"], "raw": r["raw"],
-            "value": r["value"], "partial": r["partial"]}
-           for r in conn.execute("SELECT o.model_id, o.source, x.label, o.raw, o.value, o.partial "
-                                 "FROM observations o JOIN metrics x ON x.id = o.metric_id")]
-    return models, obs
-
-
 def matrix_selftest():
     """Load synthetic raw evidence: counts per source match, a rerun is identical, the
     calibration rows survive, an unmatched leaderboard name stays slugless, coverage is
@@ -489,8 +478,8 @@ def matrix_selftest():
         return {"id": "i-" + slug, "slug": slug, "name": name, "shortName": short, "creator": {"name": "Acme", "slug": "acme"}, **extra}
 
     a, b = obj("m-a", "Alpha (Max)", "Alpha (max)", gpqa=0.5, intelligenceIndex=57.6, intelligenceIndexIsEstimated=True), obj("m-b", "Beta", "Beta", gpqa=None)
-    row = {"attrs": {**__import__("fm_model_picker.embedded", fromlist=["x"]).model_attrs(a)}, "series": {"gpqadiamond": 0.5, "intelligence-index": 57.6},
-           "table": {"Intelligence Index": "58*", "License": "Open", "Output Speed": "95 tokens/s", "Reasoning Tokens per Task": "84k", "Cost per Task": "$5.98"}, "observed_at": "2026-10-15T10:00:00Z", "page": "p", "batch": ["m-a"]}
+    row = {"attrs": {**__import__("fm_model_picker.embedded", fromlist=["x"]).model_attrs(a)}, "series": {"gpqadiamond": 0.5, "intelligence-index": 57.6, "priceper1mtokens": 1.5},
+           "table": {"Intelligence Index": "58*", "License": "Open", "Output Speed": "95 tokens/s", "Reasoning Tokens per Task": "84k", "Cost per Task": "$5.98", "Price per 1M Tokens": "$1.50"}, "observed_at": "2026-10-15T10:00:00Z", "page": "p", "batch": ["m-a"]}
     board = {"Alpha (Max)": {"value": 1800.0, "raw": "1800", "ci": "-5 / +5", "rank": 1, "creator": "Acme"},
              "Ghost (Max)": {"value": 1700.0, "raw": "1700", "ci": None, "rank": 2, "creator": "Nowhere"}}
     page = {"ts": "2026-10-15T12:00:00Z", "leaderboard": board, "table_rows": [], "window": [a, b], "window_why": None, "rejects": [],
@@ -517,6 +506,7 @@ def matrix_selftest():
             "SELECT x.label, x.unit, x.scale, o.value FROM observations o JOIN metrics x ON x.id=o.metric_id WHERE o.source='comparison-table'")}
         assert units["Output Speed"] == ("tokens/s", "quantity", 95.0) and units["Reasoning Tokens per Task"] == ("count", "quantity", 84000.0), units
         assert units["Cost per Task"] == ("usd", "quantity", 5.98) and units["License"][2] is None, units
+        assert units["Price per 1M Tokens"] == ("usd", "quantity", 1.5) and scale["Price per 1M Tokens"] == "quantity", "the dollar family reads usd + quantity"
         cov, missing = collect.compute_coverage(first["view"], ["gpqa-diamond", "aa-briefcase"])
         assert cov["gpqadiamond"]["models"] == 1 and cov["gpqadiamond"]["sources"] >= {"embedded", "chart-window"}
         assert cov["aa-briefcase-elo"]["models"] == 2 and "aa-briefcase-elo" not in missing, "leaderboard rows count, matched or not"
@@ -524,8 +514,6 @@ def matrix_selftest():
         doc = json.loads((Path(tmp) / "proj" / "m-a.json").read_text(encoding="utf-8"))
         assert n == 1 and doc["metrics"]["gpqadiamond"]["observed_at"] == "2026-10-15T13:00:00Z" and doc["metrics"]["gpqadiamond"]["source"] == "embedded"
         assert doc["metrics"]["intelligence-index"]["estimated"] is True and not (Path(tmp) / "proj" / "Ghost.json").exists()
-        m2, o2 = rows_from_db(conn)
-        assert collect.compute_coverage(coverage_view(m2, o2), ["gpqa-diamond", "aa-briefcase"])[0]["gpqadiamond"]["models"] == 1, "coverage rebuilds from the database"
         conn.close()
 
 

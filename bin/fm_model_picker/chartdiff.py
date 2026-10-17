@@ -395,7 +395,7 @@ def selftest():
     read 'not compared', rounding follows the shown digits, labels resolve exactly or not at all."""
     assert agrees(0.8566, "85.7%", "fraction") and not agrees(0.8566, "85.6%", "fraction")
     assert agrees(0.8566, "86%", "fraction") and not agrees(0.8566, "85%", "fraction")
-    assert agrees(1.69925, "$1.6993", "raw") and agrees(57.62, "58", "raw") and not agrees(57.62, "57", "raw")
+    assert agrees(1.69925, "$1.6993", "quantity") and agrees(57.62, "58", "raw") and not agrees(57.62, "57", "raw")
     assert agrees(0.25, "75%", "fraction", derived=True) is True, "a derived series is judged as 1 minus the stored value"
     assert not agrees(0.25, "25%", "fraction", derived=True)
     assert not agrees(57.62, "58%", "raw") and not agrees(0.5, "50", "fraction"), "percent and raw scales never mix"

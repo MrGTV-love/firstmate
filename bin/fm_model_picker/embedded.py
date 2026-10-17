@@ -12,13 +12,16 @@ SERIES_MAP is the single list of embedded fields that become metric series. A nu
 writes no row: a missing value is never a zero.
 """
 import json
+import re
 
 COMPARE_MARKER = '"models":[{"id":"'
 EVAL_MARKER = '"initialModels":[{"id":"'
+SLUG_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 
 # canonical id, embedded field path, label, unit, scale, derived, comparison-table row label,
 # evaluation page slug. scale "fraction" means the payload stores 0..1 and charts show percent;
-# the raw value is stored and the scale is recorded in metrics. cid values must equal
+# "quantity" is a dollar amount in its unit; "raw" is an index-point or Elo number. The stored
+# value is the payload value and the scale is recorded in metrics. cid values must equal
 # collect.canon_metric_id(label) so the three paths land on one series
 # (collect.run_selftest asserts it).
 _S = [
@@ -61,10 +64,10 @@ _S = [
     ("openness-index", "opennessIndex", "Artificial Analysis Openness Index", "points", "raw", False, None, "artificial-analysis-openness-index"),
     ("aa3d", "aa3dElo", "AA-3D", "elo", "raw", False, None, "aa-3d"),
     # economics (comparison-table rows)
-    ("priceper1mtokens", "price1mBlended7To2To1", "Price per 1M Tokens", "usd", "raw", False, "Price per 1M Tokens", None),
-    ("inputpriceper1mtokens", "price1mInputTokens", "Input Price per 1M Tokens", "usd", "raw", False, "Input Price per 1M Tokens", None),
-    ("outputpriceper1mtokens", "price1mOutputTokens", "Output Price per 1M Tokens", "usd", "raw", False, "Output Price per 1M Tokens", None),
-    ("cachehitpriceper1mtokens", "cacheHitPrice", "Cache Hit Price per 1M Tokens", "usd", "raw", False, "Cache Hit Price per 1M Tokens", None),
+    ("priceper1mtokens", "price1mBlended7To2To1", "Price per 1M Tokens", "usd", "quantity", False, "Price per 1M Tokens", None),
+    ("inputpriceper1mtokens", "price1mInputTokens", "Input Price per 1M Tokens", "usd", "quantity", False, "Input Price per 1M Tokens", None),
+    ("outputpriceper1mtokens", "price1mOutputTokens", "Output Price per 1M Tokens", "usd", "quantity", False, "Output Price per 1M Tokens", None),
+    ("cachehitpriceper1mtokens", "cacheHitPrice", "Cache Hit Price per 1M Tokens", "usd", "quantity", False, "Cache Hit Price per 1M Tokens", None),
 ]
 SERIES_MAP = {
     s[0]: {"cid": s[0], "field": s[1], "label": s[2], "unit": s[3], "scale": s[4], "derived": s[5],
@@ -97,8 +100,8 @@ def extract_array(page, marker):
 
 
 def check_objects(arr):
-    """Split into (accepted objects, rejects). Each accepted object has a string slug, a
-    string name and a creator.name; anything else is rejected with its reason."""
+    """Split into (accepted objects, rejects). Each accepted object has a plain-word slug (it
+    becomes a file name), a string name and a creator.name; anything else is rejected with its reason."""
     ok, rejects, seen = [], [], set()
     for i, o in enumerate(arr):
         slug = o.get("slug") if isinstance(o, dict) else None
@@ -106,6 +109,8 @@ def check_objects(arr):
             rejects.append({"index": i, "reason": "payload entry is not an object"})
         elif not isinstance(slug, str) or not slug:
             rejects.append({"index": i, "reason": "missing slug"})
+        elif not SLUG_RE.fullmatch(slug):
+            rejects.append({"index": i, "slug": slug, "reason": "slug is not a plain word of letters, digits, '.', '_' and '-'"})
         elif not isinstance(o.get("name"), str) or not o["name"]:
             rejects.append({"index": i, "slug": slug, "reason": "missing name"})
         elif not isinstance(o.get("creator"), dict) or not isinstance(o["creator"].get("name"), str) or not o["creator"]["name"]:
@@ -220,6 +225,11 @@ def selftest():
     good, rejects = check_objects(models + [{"slug": "x"}, obj("", "n"), obj("dup", "D"), obj("dup", "D2"),
                                               {"slug": "nc", "name": "N", "creator": {}}, "str"])
     assert [o["slug"] for o in good] == ["m-a", "m-b", "dup"] and len(rejects) == 5, rejects
+    plain = ["qwen2.5-32b-instruct", "QwQ-32B-Preview", "m_a", "0x"]
+    unsafe = ["a/b", "../x", ".hidden", "-x", "a b", "a\n", "x/../y", "a\\b", "caf\u00e9"]
+    taken, refused = check_objects([obj(s, "N") for s in plain + unsafe])
+    assert [o["slug"] for o in taken] == plain, "plain-word slugs are accepted"
+    assert len(refused) == len(unsafe) and all("slug" in r["reason"] for r in refused), "a slug that is not a plain word is rejected with a reason"
     assert check_header(good, ["Acme Model A (Max)", "Acme Model B"]) is None
     assert check_header(good, ["Acme Model A (Max)"]) is None, "payload may list more models than the table"
     assert "!=" in check_header(good, ["Acme Model B", "Acme Model A (Max)"]), "order is part of identity"

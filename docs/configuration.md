@@ -879,7 +879,7 @@ The whole root is private and gitignored with `data/`.
 | `raw/` | Cached pages with a `.ts` sidecar holding each page's real fetch time, `rendered/*.txt` chart captures, and `_http_404.jsonl`, the memory of 404s that later runs never re-request |
 | `snapshot.json` | Aggregate of the latest acquisition run, including each model slug's values-or-reason status; its stored coverage, if any, is never read |
 | `aa.sqlite` | `dispatch_log` and `outcomes` first, then `models`, `metrics`, `observations`, `reconcile_runs`, and `slug_status` |
-| `coverage.md` | Per-series coverage, recomputed from raw rows on every run |
+| `coverage.md` | Per-series coverage, recomputed from the raw cache on every run (never from `aa.sqlite` or `snapshot.json`) |
 | `reconcile.md` and `verdict.json` | The chart-diff report and its machine-readable verdict |
 | `projection/<slug>.json` | One wire-format projection per catalog model, written last |
 
@@ -891,7 +891,8 @@ Every rebuild of `aa.sqlite` first rewrites `verdict.json` as `UNTRUSTED` with t
 
 A table cell's unit comes from the cell: `$5.98` is `usd`, `95 tokens/s` is `tokens/s`, `10.19s` and `250ms` are `s`, `128k tokens ~192 A4 pages` is `tokens`, and a percent is a `fraction`.
 A bare `37k`, `260M`, `37B`, or `1.6T` is expanded to a plain count (`count`); the metric label says what is counted.
-`metrics.scale` is `fraction` for percent cells, `text` when no cell holds a number, `quantity` when the cells hold numbers in a unit, and `raw` for a bare number with no unit; a scale the source states keeps the source's word.
+`metrics.scale` is `fraction` for percent cells, `text` when no cell holds a number, `quantity` when the cells hold numbers in a unit, and `raw` for a bare number with no unit.
+Every dollar metric (`usd`) reads `quantity`; the index-point and Elo series (`points`, `elo`) are stated `raw` by their source and keep it.
 Text rows (`Reasoning`, `Open Source (Weights)`, `License`, the modalities, `Release Date`, `Knowledge Cutoff`) stay in `aa.sqlite` with no value and are not in the projections.
 
 In a projection, `as_of` is the newest `observed_at` across the model's metrics, so it says when the model last got any new data and not that every metric is that fresh.

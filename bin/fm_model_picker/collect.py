@@ -15,6 +15,7 @@ The operational wrapper is bin/fm-model-picker.sh (its header owns the CLI).
 Data root: FM_MODEL_PICKER_DATA, else <data dir>/model-picker (docs/configuration.md).
 """
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -202,7 +203,7 @@ def fetch_page(path, refresh=False, network=True, skip_legacy=False):
             if e.code != 429 and e.code < 500:
                 raise last
             wait = max(wait, _retry_after(e))
-        except (urllib.error.URLError, OSError) as e:
+        except (urllib.error.URLError, http.client.HTTPException, OSError) as e:
             _sleep(DELAY)
             last = FetchError(path, None, str(e))
         if attempt + 1 < ATTEMPTS:
@@ -901,6 +902,8 @@ def run_fetch_selftest():
             self.body = body
 
         def read(self):
+            if isinstance(self.body, Exception):
+                raise self.body
             return self.body.encode("utf-8")
 
         def __enter__(self):
@@ -917,6 +920,8 @@ def run_fetch_selftest():
             if step[1]:
                 hdrs["Retry-After"] = str(step[1])
             raise urllib.error.HTTPError(req.full_url, step[0], "x", hdrs, None)
+        if isinstance(step, http.client.BadStatusLine):
+            raise step
         return Resp(step)
 
     g = globals()
@@ -970,6 +975,17 @@ def run_fetch_selftest():
             except FetchError as e:
                 assert e.status == 503 and len(calls) == 3
             assert sleeps == [DELAY, 2, DELAY, 4, DELAY], sleeps
+            sleeps.clear(), calls.clear()
+            script[:] = [http.client.BadStatusLine("garbage"), http.client.IncompleteRead(b"par"), "recovered"]
+            assert fetch_page("/models/dropped").text == "recovered", "a dropped connection is retried"
+            assert sleeps == [DELAY, 2, DELAY, 4, DELAY], f"backoff follows a dropped connection: {sleeps}"
+            calls.clear()
+            script[:] = [http.client.IncompleteRead(b"par")] * 3
+            try:
+                fetch_page("/models/dropping")
+                raise AssertionError("exhausted retries must raise")
+            except FetchError as e:
+                assert e.status is None and len(calls) == 3, "a dropped connection ends as a FetchError, not a traceback"
             calls.clear()
             script[:] = [(403, None)]
             try:
@@ -1126,11 +1142,13 @@ def _atomic_write(path, text):
 def acquire_evals(snapshot, live, network):
     """Evaluation pages: leaderboard table, rendered second path, per-page reconciliation."""
     rendered_dir = RAW / "rendered"
+    failed = []
     for slug in EVAL_SLUGS:
         try:
             page = fetch_page("/evaluations/" + slug, refresh=live, network=network).text
         except FetchError as e:
             snapshot["reconciliation"].append({"slug": slug, "note": f"fetch failed: {e}"})
+            failed.append(str(e))
             continue
         tables = extract_tables(page)
         labels = extract_chart_labels(page)
@@ -1174,16 +1192,20 @@ def acquire_evals(snapshot, live, network):
     for e in snapshot["evals"].values():
         names_all.update((e.get("rendered", {}) or {}).get("rows", {}).keys())
     snapshot["validated_unique_models"] = len(names_all)
+    return failed
 
 
 def acquire_cohort(snapshot, slugs, network):
-    """Model-page economics for the working cohort (cache-first)."""
+    """Model-page economics for the working cohort (cache-first). Returns the fetch failures."""
+    failed = []
     for slug in slugs:
         try:
             snapshot["models"][slug] = parse_model_page(fetch_page("/models/" + slug, network=network).text)
             print(f"[model] {slug}: {snapshot['models'][slug]}", flush=True)
         except FetchError as e:
             snapshot["models"][slug] = {"error": str(e)}
+            failed.append(str(e))
+    return failed
 
 
 def run_sweep(snapshot, live, network, stale_after_hours):
@@ -1225,17 +1247,9 @@ def report_coverage(view):
 
 
 def coverage_only():
-    """coverage.md from the database when it exists, else from the cache. No acquisition."""
-    db = HERE / "aa.sqlite"
-    if db.exists():
-        conn = aadb.connect(db)
-        models, obs = aadb.rows_from_db(conn)
-        conn.close()
-        print(f"coverage input: {db} ({len(obs)} observations)", flush=True)
-    else:
-        raw = aadb.load_raw()
-        models, obs = aadb.build_observations(raw)
-        print(f"coverage input: raw cache ({len(obs)} observations; no database yet)", flush=True)
+    """coverage.md from the raw cache alone. No acquisition, and never from a stored database or snapshot."""
+    models, obs = aadb.build_observations(aadb.load_raw())
+    print(f"coverage input: raw cache ({len(obs)} observations)", flush=True)
     report_coverage(aadb.coverage_view(models, obs))
 
 
@@ -1281,7 +1295,7 @@ def parse_args(argv):
         epilog="Data root: FM_MODEL_PICKER_DATA, else <FM_HOME>/data/model-picker.")
     flags = {
         "--selftest": "run the fixture suite (no network)",
-        "--coverage-only": "rebuild coverage.md from the database or cache, no acquisition",
+        "--coverage-only": "rebuild coverage.md from the cache, no acquisition",
         "--evals-only": "acquire evaluation pages only (no model-page cohort, no sweep); revalidated unless --replay",
         "--sweep": "sweep the discovered model universe (network only for slugs without values)",
         "--replay": "cache-first everywhere: no revalidation; with --chartdiff, no live re-fetch of disagreeing pages",
@@ -1330,16 +1344,19 @@ def main(argv=None):
         except json.JSONDecodeError:
             prev = {}
     slug_status = prev.get("slug_status")
+    incomplete = []
     if acquire:
         snapshot = {"collected_at": utc_now(), "source": BASE, "evals": {}, "models": prev.get("models", {}),
                     "reconciliation": [], "quarantine": {},
                     "run_mode": "cache-only" if not network else "live-revalidated" if live else "cache-replay"}
-        acquire_evals(snapshot, live, network)
+        incomplete += acquire_evals(snapshot, live, network)
         if not args.evals_only:
-            acquire_cohort(snapshot, [s for s in args.models.split(",") if s] or COHORT, network)
+            incomplete += acquire_cohort(snapshot, [s for s in args.models.split(",") if s] or COHORT, network)
         if sweeping:
-            run_sweep(snapshot, live, network, args.stale_after_hours)
+            swept = run_sweep(snapshot, live, network, args.stale_after_hours)
             slug_status = snapshot["slug_status"]
+            if swept["stopped"]:
+                incomplete.append(swept["stopped"])
         else:
             for key in ("universe", "catalog", "slug_status", "comparisons", "embedded", "sweep_failures", "sweep", "sweep_models"):
                 if key in prev:
@@ -1365,6 +1382,11 @@ def main(argv=None):
         conn.close()
     elif acquire:
         coverage_only()
+    if incomplete:
+        print(f"INCOMPLETE: outputs were written, but {len(incomplete)} acquisition problems left them not fully fresh:", file=sys.stderr)
+        for why in incomplete:
+            print(f"  {why}", file=sys.stderr)
+        return code or 4
     return code
 
 

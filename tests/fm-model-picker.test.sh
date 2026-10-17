@@ -4,7 +4,9 @@
 # exact-slug ingest from a seeded cache (banned route and unknown-age pages ignored), the
 # chart-diff verdict on an empty compared set, a clean error when the network is off, unit
 # cells stored as numbers with a unit, a verdict that goes UNTRUSTED when the matrix is rebuilt
-# without chart-diff, and which network requests each flag makes against a scripted site.
+# without chart-diff, coverage that follows the cache and never an older database, a payload slug
+# that cannot name a file outside projection/, and which network requests and exit code each
+# flag and each outage produce against a scripted site.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -145,10 +147,15 @@ seed_units() {  # <data-dir>: one compare page whose table rows carry every unit
 import json, sys
 from pathlib import Path
 raw = Path(sys.argv[1])
-objs = [{"id": "id-" + s, "slug": s, "name": s.upper(), "creator": {"name": "Acme", "slug": "acme"}, "intelligenceIndex": i}
-        for s, i in (("m-a", 50.4), ("m-b", 40.2))]
+objs = [{"id": "id-" + s, "slug": s, "name": s.upper(), "creator": {"name": "Acme", "slug": "acme"}, "intelligenceIndex": i,
+         "price1mBlended7To2To1": blended, "price1mInputTokens": inp, "price1mOutputTokens": out, "cacheHitPrice": cache}
+        for s, i, blended, inp, out, cache in (("m-a", 50.4, 2.5, 3.0, 15.0, 0.3), ("m-b", 40.2, 1.25, 1.0, 5.0, 0.1))]
 rows = [
     ("Intelligence Index", "50", "40"),
+    ("Price per 1M Tokens", "$2.50", "$1.25"),
+    ("Input Price per 1M Tokens", "$3.00", "$1.00"),
+    ("Output Price per 1M Tokens", "$15.00", "$5.00"),
+    ("Cache Hit Price per 1M Tokens", "$0.30", "$0.10"),
     ("Reasoning Tokens per Task", "37k", "84k"),
     ("Output Tokens to Run Intelligence Index", "260M", "8M"),
     ("Output Speed", "95 tokens/s", "121 tokens/s"),
@@ -190,6 +197,7 @@ test_unit_cells_are_stored_as_numbers() {
   assert_equals "tokens|quantity|128000.0,1000000.0" "$(metric_row "$db" "Context Window")" "a context-window cell reads its tokens"
   assert_equals "usd|quantity|0.02,5.98" "$(metric_row "$db" "Cost per Task")" "a dollar cell has a unit"
   assert_equals "usd|quantity|0.0,8708.0" "$(metric_row "$db" "Cost to Run Intelligence Index")" "dollars with a thousands comma"
+  assert_equals "usd|quantity|1.25,2.5" "$(metric_row "$db" "Price per 1M Tokens")" "a price series states the same scale as a cost cell"
   assert_equals "points|raw|40.0,50.0" "$(metric_row "$db" "Intelligence Index")" "a bare number takes the unit its source series states"
   assert_equals "None|text|None" "$(metric_row "$db" "Reasoning")" "a text row has no unit, a text scale and no value"
   assert_equals "None|text|None" "$(metric_row "$db" "Release Date")" "a date row has no unit, a text scale and no value"
@@ -202,7 +210,10 @@ for cid in ("reasoningtokenspertask", "outputspeed", "timetofirsttoken", "costpe
     assert m[cid]["value"] is not None and m[cid]["unit"] and m[cid]["scale"] == "quantity", (cid, m[cid])
 assert m["reasoningtokenspertask"]["value"] == 84000.0 and m["reasoningtokenspertask"]["unit"] == "count"
 assert m["timetofirsttoken"]["unit"] == "s" and m["outputspeed"]["unit"] == "tokens/s" and m["costpertask"]["unit"] == "usd"
-' "$data/projection/m-b.json" || fail "the projection carries the unit-bearing metrics and no text rows"
+usd = {cid: v["scale"] for cid, v in m.items() if v["unit"] == "usd"}
+assert usd == {"priceper1mtokens": "quantity", "inputpriceper1mtokens": "quantity", "outputpriceper1mtokens": "quantity",
+               "cachehitpriceper1mtokens": "quantity", "costpertask": "quantity", "costtorunintelligenceindex": "quantity"}, usd
+' "$data/projection/m-b.json" || fail "the projection carries the unit-bearing metrics, every dollar metric as quantity, and no text rows"
   pass "model picker: unit-bearing cells are stored as numbers with a unit; text rows stay out of the projections"
 }
 
@@ -212,10 +223,25 @@ seed_discovery() {  # <data-dir>: a cached sitemap and selector catalog naming m
   printf '%s' '<html>{"slug":"m-a","name":"M-A","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}{"slug":"m-b","name":"M-B","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}</html>' >"$1/raw/models_comparisons.html"
 }
 
+seed_blank_pages() {  # <data-dir>: a cached evaluation page and cohort model page for every page an acquisition run asks for
+  PYTHONPATH="$ROOT/bin" PYTHONDONTWRITEBYTECODE=1 python3 -c '
+import sys
+from pathlib import Path
+from fm_model_picker import collect
+collect.configure(sys.argv[1])
+for path in ["/evaluations/" + s for s in collect.EVAL_SLUGS] + ["/models/" + s for s in collect.COHORT]:
+    f = collect.cache_file(path)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text("<html></html>")
+    Path(str(f) + ".ts").write_text("2026-10-15T20:00:00Z")
+' "$1"
+}
+
 test_rebuild_without_chartdiff_is_untrusted() {
   local data=$TMP_ROOT/stale
   seed_cache "$data"
   seed_discovery "$data"
+  seed_blank_pages "$data"
   run "$data" --sweep --embedded-only --chartdiff
   expect_code 0 "$CODE" "day 1: sweep with chart-diff"
   assert_contains "$OUT" "chart-diff: TRUSTED" "day 1 is judged"
@@ -236,15 +262,65 @@ test_rebuild_without_chartdiff_is_untrusted() {
   pass "model picker: a matrix rebuilt without chart-diff turns a TRUSTED verdict UNTRUSTED until chart-diff runs"
 }
 
+add_pair() {  # <data-dir> <slug> <slug>: a cached compare page for two models that both carry gpqa
+  python3 -I - "$1/raw" "$2" "$3" <<'PY'
+import json, sys
+from pathlib import Path
+raw, a, b = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+objs = [{"id": "id-" + s, "slug": s, "name": s.upper(), "creator": {"name": "Acme", "slug": "acme"}, "intelligenceIndex": 10, "gpqa": 0.5}
+        for s in (a, b)]
+head = "".join(f"<th>Acme {o['name']}</th>" for o in objs)
+cells = "".join("<td>10</td>" for _ in objs)
+page = (f"<html><table><thead><tr><th></th>{head}</tr></thead><tbody><tr><td>Intelligence Index</td>{cells}</tr></tbody></table><script>"
+        + json.dumps({"models": objs}, separators=(",", ":")).replace('"', '\\"') + "</script></html>")
+(raw / f"models_comparisons_{a}-vs-{b}.html").write_text(page)
+(raw / f"models_comparisons_{a}-vs-{b}.html.ts").write_text("2026-10-15T21:00:00Z")
+PY
+}
+
+test_coverage_follows_the_cache_not_the_database() {
+  local data=$TMP_ROOT/cov
+  seed_cache "$data"
+  seed_blank_pages "$data"
+  run "$data" --db
+  expect_code 0 "$CODE" "day 1: the database is built"
+  assert_grep "| gpqadiamond | embedded | 1 | captured |" "$data/coverage.md" "day 1 coverage counts the cached models"
+  add_pair "$data" m-c m-d
+  run "$data" --evals-only --replay
+  expect_code 0 "$CODE" "day 2: acquisition without a database rebuild"
+  assert_grep "| gpqadiamond | embedded | 3 | captured |" "$data/coverage.md" "an acquisition run recomputes coverage from the cache, not from the day-1 database"
+  add_pair "$data" m-e m-f
+  run "$data" --coverage-only
+  expect_code 0 "$CODE" "--coverage-only"
+  assert_grep "| gpqadiamond | embedded | 5 | captured |" "$data/coverage.md" "--coverage-only never reads an older database"
+  assert_equals "2" "$(sql "$data/aa.sqlite" "select count(*) from models")" "neither run rebuilt the database"
+  pass "model picker: coverage.md follows the cache, never an older database"
+}
+
+test_unsafe_payload_slug_is_rejected() {
+  local data=$TMP_ROOT/slug
+  mkdir -p "$data/raw"
+  printf '%s' '<html>"initialModels":[{"id":"i1","slug":"m-ok","name":"M-OK","creator":{"name":"Acme","slug":"acme"},"gpqa":0.5},{"id":"i2","slug":"../escape","name":"ESC","creator":{"name":"Acme","slug":"acme"},"gpqa":0.4}]</html>' >"$data/raw/evaluations_gpqa-diamond.html"
+  printf '2026-10-15T20:00:00Z' >"$data/raw/evaluations_gpqa-diamond.html.ts"
+  run "$data" --db
+  expect_code 0 "$CODE" "--db with an unsafe slug in a payload"
+  assert_absent "$data/escape.json" "a payload slug never names a file outside projection/"
+  assert_present "$data/projection/m-ok.json" "the plain-word model in the same payload is kept"
+  assert_equals "m-ok" "$(sql "$data/aa.sqlite" "select group_concat(slug) from models")" "the unsafe slug is not a model"
+  pass "model picker: a payload slug that is not a plain word is rejected, not written as a file name"
+}
+
 FLAG_N=0
 FLAG_PY=$(cat <<'PY'
-import contextlib, io, sys
+import contextlib, email.message, http.client, io, os, sys, urllib.error
 from pathlib import Path
 from fm_model_picker import collect
 
 root, flags = sys.argv[1], sys.argv[2:]
 collect.configure(root)
-SITEMAP = "<urlset>" + "".join(f"<url><loc>{collect.BASE}/models/{s}</loc></url>" for s in ("m-a", "m-b", "m-new")) + "</urlset>"
+mode = os.environ.get("SITE", "")
+slugs = ["m-a", "m-b", "m-new"] + ([f"x-{i:02d}" for i in range(17)] if mode == "outage" else [])
+SITEMAP = "<urlset>" + "".join(f"<url><loc>{collect.BASE}/models/{s}</loc></url>" for s in slugs) + "</urlset>"
 CATALOG = "<html>" + "".join(
     '{"slug":"%s","name":"%s","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}' % (s, s.upper())
     for s in ("m-a", "m-b")) + "</html>"
@@ -283,6 +359,8 @@ class Resp:
         self.body = body
 
     def read(self):
+        if isinstance(self.body, Exception):
+            raise self.body
         return self.body.encode("utf-8")
 
     def __enter__(self):
@@ -292,18 +370,30 @@ class Resp:
         return False
 
 
+dropped = []
+
+
 def opener(req, timeout=None):
     path = req.full_url[len(collect.BASE):]
     requested.append(path)
+    if ((mode == "outage" and path.startswith("/models/comparisons/")) or (mode == "evals-down" and path.startswith("/evaluations/"))
+            or (mode == "cohort-down" and path.startswith("/models/") and not path.startswith("/models/comparisons"))):
+        raise urllib.error.HTTPError(req.full_url, 500, "x", email.message.Message(), None)
+    if mode == "dropped" and path == "/models/comparisons/m-new" and not dropped:
+        dropped.append(path)
+        return Resp(http.client.IncompleteRead(b"par"))
     return Resp(site(path))
 
 
 collect._urlopen, collect._sleep = opener, lambda seconds: None
 sys.argv = ["fm-model-picker", *flags]
-with contextlib.redirect_stdout(io.StringIO()):
+err = io.StringIO()
+with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
     code = collect.cli()
 for path in requested:
     print("REQ", path)
+for line in err.getvalue().splitlines():
+    print("ERR", line)
 print("EXIT", code)
 PY
 )
@@ -311,7 +401,7 @@ PY
 flag_run() {  # <flags...>: a fresh seeded data root, a scripted site; sets OUT to the REQ lines and the EXIT line
   local data=$TMP_ROOT/flags-$((++FLAG_N))
   CODE=0
-  OUT=$(PYTHONPATH="$ROOT/bin" PYTHONDONTWRITEBYTECODE=1 python3 -c "$FLAG_PY" "$data" "$@") || CODE=$?
+  OUT=$(SITE=${SITE:-} PYTHONPATH="$ROOT/bin" PYTHONDONTWRITEBYTECODE=1 python3 -c "$FLAG_PY" "$data" "$@") || CODE=$?
   expect_code 0 "$CODE" "flag run: $*"
   FLAG_DATA=$data
 }
@@ -361,6 +451,36 @@ EXIT 0" "$OUT" "--models replaces the cohort, and a cohort page is fetched only 
   pass "model picker: each flag makes the network requests its header promises"
 }
 
+test_incomplete_acquisition_exits_4_after_writing_outputs() {
+  SITE=outage flag_run --sweep --replay --db
+  assert_contains "$OUT" "EXIT 4" "a sweep that stops after three straight failures does not exit 0"
+  assert_contains "$OUT" "ERR INCOMPLETE" "the incomplete run says so on stderr"
+  assert_contains "$OUT" "sweep stopped after 3 consecutive fetch failures" "and says why"
+  assert_contains "$(cat "$FLAG_DATA/snapshot.json")" "sweep stopped after 3 consecutive fetch failures" "the snapshot records the stop"
+  assert_present "$FLAG_DATA/aa.sqlite" "the database was still built"
+  assert_present "$FLAG_DATA/projection/m-a.json" "the projections were still written"
+  assert_present "$FLAG_DATA/coverage.md" "coverage.md was still written"
+  SITE=evals-down flag_run --evals-only
+  assert_contains "$OUT" "EXIT 4" "evaluation pages that cannot be fetched do not exit 0"
+  assert_equals "33" "$(printf '%s\n' "$OUT" | grep -c -- '^ERR .*/evaluations/' || true)" "every failed evaluation page is named"
+  assert_present "$FLAG_DATA/snapshot.json" "the snapshot was still written"
+  SITE=cohort-down flag_run --replay --models m-zz
+  assert_contains "$OUT" "EXIT 4" "a model page that cannot be fetched does not exit 0"
+  assert_contains "$OUT" "ERR   /models/m-zz" "the failed model page is named"
+  flag_run --replay
+  assert_contains "$OUT" "EXIT 0" "a complete acquisition exits 0"
+  assert_not_contains "$OUT" "ERR" "and prints no incomplete notice"
+  pass "model picker: an acquisition that fetched less than it set out to exits 4 once its outputs are written"
+}
+
+test_dropped_connection_is_retried() {
+  SITE=dropped flag_run --sweep --replay
+  assert_equals "REQ /models/comparisons/m-new
+REQ /models/comparisons/m-new
+EXIT 0" "$OUT" "a connection that drops mid-read is retried and the sweep goes on"
+  pass "model picker: a dropped connection is retried, not a traceback"
+}
+
 test_selftest_and_help
 test_data_root_resolution
 test_calibration_first_and_preserved
@@ -370,3 +490,7 @@ test_network_off_is_a_clean_error
 test_unit_cells_are_stored_as_numbers
 test_rebuild_without_chartdiff_is_untrusted
 test_flags_decide_which_requests_are_made
+test_coverage_follows_the_cache_not_the_database
+test_unsafe_payload_slug_is_rejected
+test_incomplete_acquisition_exits_4_after_writing_outputs
+test_dropped_connection_is_retried
