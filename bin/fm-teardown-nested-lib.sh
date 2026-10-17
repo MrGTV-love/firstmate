@@ -12,12 +12,14 @@
 #
 # A copy is released only when every proof holds, and each proof fails closed:
 #   - it is a clean worktree root and holds no ignored file unique to it;
-#   - no other active task record names it, no process runs in it, and no live
-#     process outside this teardown's own is its lock launcher (a process this
-#     teardown retires, or a descendant of one, is not counted, and a pid that
-#     started after the lock file was written is recycled and owns nothing; the
-#     retire phase signals such a descendant, and a launcher that outlives that
-#     signal and a short wait refuses the release, named by its pid);
+#   - no other active task record names it, no process outside this teardown's
+#     own runs in it, and no live process outside this teardown's own is its
+#     lock launcher (a process this teardown retires, or a descendant of one, is
+#     not counted, and a pid that started after the lock file was written is
+#     recycled and owns nothing; the retire phase signals such a process with
+#     TERM when it is a launcher with its own cwd outside every swept root or a
+#     process running in the copy, and one that outlives that signal and a short
+#     wait refuses the release, named by its pid);
 #   - its work is landed by the existing landed-work rule (teardown_landed).
 # A copy whose work is not proved landed stays, and teardown names why.
 # A copy locked by Vernant's creation lock is released and removed by Vernant's
@@ -44,10 +46,13 @@
 
 # One entry per proved copy.
 TEARDOWN_FOREIGN_COPIES=()
-# One "pid<TAB>birth identity<TAB>cwd" entry per live launcher proved to be this
-# teardown's own; cwd is that of the own process it runs under.
-TEARDOWN_FOREIGN_LAUNCHERS=()
+# One "pid<TAB>birth identity<TAB>cwd" entry per live lock launcher or process
+# running in a copy that was proved to be this teardown's own; cwd is that of the
+# own process it was chosen through.
+TEARDOWN_FOREIGN_PROCS=()
 TEARDOWN_OWN_CWD=
+TEARDOWN_OWN_SCAN=
+TEARDOWN_OWN_SCANNED=0
 TEARDOWN_FOREIGN_WHY=
 TEARDOWN_FOREIGN_LOCK=
 TEARDOWN_FOREIGN_LOCK_FILE=
@@ -133,31 +138,51 @@ teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
   [ "$age" -ge $(( now - mtime - 2 )) ]
 }
 
-# Is <pid> a process this teardown ends itself: one whose cwd is exactly a root
-# the retire phase sweeps (the task's copy, the returned slot, a nested copy of
-# the task, its scratch directory), or a descendant of one by parent chain? Sets
-# TEARDOWN_OWN_CWD to the cwd of that process. A scan that fails says no, so the
-# launcher then counts as live.
-teardown_pid_is_task_own() {  # <pid>
-  local pid=$1 root out owned="" owned_pid owned_path hops=0
-  TEARDOWN_OWN_CWD=
+# Reads into TEARDOWN_OWN_SCAN the "pid<TAB>cwd" lines of the processes whose cwd
+# is exactly a root the retire phase sweeps (the task's copy, the returned slot,
+# a nested copy of the task, its scratch directory). Fails when a scan fails.
+teardown_own_scan() {
+  local root out owned_pid owned_path
+  TEARDOWN_OWN_SCAN=
+  TEARDOWN_OWN_SCANNED=0
   for root in "$WT" "$TEARDOWN_RETURN_SLOT" "$TASK_TMP" \
       ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     [ -n "$root" ] && [ -d "$root" ] || continue
     root=$(cd "$root" && pwd -P) || return 1
     out=$(pids_with_cwd_under "$root") || return 1
     while IFS=$'\t' read -r owned_pid owned_path; do
-      [ "$owned_path" != "$root" ] || owned+="$owned_pid"$'\t'"$owned_path"$'\n'
+      [ "$owned_path" != "$root" ] || TEARDOWN_OWN_SCAN+="$owned_pid"$'\t'"$owned_path"$'\n'
     done <<< "$out"
   done
+  TEARDOWN_OWN_SCANNED=1
+}
+
+# Is <pid> a process this teardown ends itself: one in TEARDOWN_OWN_SCAN, or a
+# descendant of one by parent chain? Sets TEARDOWN_OWN_CWD to the cwd of the
+# process it was found through. A scan that fails says no, so the process then
+# counts as foreign. Callers reset TEARDOWN_OWN_SCANNED to read the process table
+# afresh.
+teardown_pid_is_task_own() {  # <pid>
+  local pid=$1 owned_pid owned_path hops=0
+  TEARDOWN_OWN_CWD=
+  [ "$TEARDOWN_OWN_SCANNED" = 1 ] || teardown_own_scan || return 1
   while [ -n "$pid" ] && [ "$pid" -gt 1 ] && [ "$hops" -lt 64 ]; do
     while IFS=$'\t' read -r owned_pid owned_path; do
       [ "$owned_pid" != "$pid" ] || { TEARDOWN_OWN_CWD=$owned_path; return 0; }
-    done <<< "$owned"
+    done <<< "$TEARDOWN_OWN_SCAN"
     pid=$(LC_ALL=C ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]') || return 1
     hops=$((hops + 1))
   done
   return 1
+}
+
+# Records live own process <pid>, just found by teardown_pid_is_task_own, for the
+# retire phase to signal.
+teardown_foreign_proc_record() {  # <pid>
+  local identity
+  if identity=$(task_process_identity "$1"); then
+    TEARDOWN_FOREIGN_PROCS+=("$1"$'\t'"$identity"$'\t'"$TEARDOWN_OWN_CWD")
+  fi
 }
 
 # Ignored files no commit holds. Symlinks, caches, virtual environments and
@@ -181,7 +206,8 @@ teardown_foreign_unique_ignored() {  # <copy>
 # teardown own <copy>? Returns 1 with TEARDOWN_FOREIGN_WHY set when so or when
 # that cannot be told.
 teardown_foreign_copy_unowned() {  # <copy>
-  local copy=$1 rc=0 pids pid identity
+  local copy=$1 rc=0 pids pid
+  TEARDOWN_OWN_SCANNED=0
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
   fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
   case "$rc" in
@@ -199,10 +225,14 @@ teardown_foreign_copy_unowned() {  # <copy>
     TEARDOWN_FOREIGN_WHY="a scan for processes running in it failed"
     return 1
   fi
-  if [ -n "$pids" ]; then
-    TEARDOWN_FOREIGN_WHY="process ${pids%%$'\t'*} is running in it"
-    return 1
-  fi
+  while IFS=$'\t' read -r pid _; do
+    [ -n "$pid" ] || continue
+    if ! teardown_pid_is_task_own "$pid"; then
+      TEARDOWN_FOREIGN_WHY="process $pid is running in it"
+      return 1
+    fi
+    teardown_foreign_proc_record "$pid"
+  done <<< "$pids"
   rc=0
   teardown_copy_lock_file "$copy" || rc=$?
   case "$rc" in
@@ -216,9 +246,7 @@ teardown_foreign_copy_unowned() {  # <copy>
           TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running"
           return 1
         fi
-        if identity=$(task_process_identity "$pid"); then
-          TEARDOWN_FOREIGN_LAUNCHERS+=("$pid"$'\t'"$identity"$'\t'"$TEARDOWN_OWN_CWD")
-        fi
+        teardown_foreign_proc_record "$pid"
       fi
       ;;
     1) ;;
@@ -259,7 +287,7 @@ teardown_foreign_copy_prove() {  # <copy>
 teardown_foreign_copies_prove() {  # <slot>
   local slot=$1 copy known allowed
   TEARDOWN_FOREIGN_COPIES=()
-  TEARDOWN_FOREIGN_LAUNCHERS=()
+  TEARDOWN_FOREIGN_PROCS=()
   teardown_slot_registered_copies "$slot" || return 0
   slot=$(fm_task_copy_canonical_dir "$slot") || return 0
   for copy in ${TEARDOWN_SLOT_COPIES[@]+"${TEARDOWN_SLOT_COPIES[@]}"}; do
@@ -276,16 +304,18 @@ teardown_foreign_copies_prove() {  # <slot>
   done
 }
 
-# Signals the live lock launchers proved to run under this teardown's own
-# processes, which the cwd sweep does not reach when their own cwd lies outside
-# every swept root, and waits briefly for them to exit. Each signal is audited
-# first, as the sweep's are. A launcher that outlives the wait is not escalated:
-# the release proof then refuses it by pid.
-teardown_foreign_launchers_retire() {
+# Signals the live lock launchers and the processes running in a copy that were
+# proved to be this teardown's own, which the cwd sweep does not reach (a
+# launcher's cwd may lie outside every swept root, and the sweep refuses a
+# process inside a nested copy), and waits briefly for them to exit. Each signal
+# is audited first, as the sweep's are. A process that outlives the wait is not
+# escalated: the sweep or the release proof then refuses it by pid.
+teardown_foreign_procs_retire() {
   local record pid identity cwd i
   local -a signalled_pids=() signalled_identities=()
-  for record in ${TEARDOWN_FOREIGN_LAUNCHERS[@]+"${TEARDOWN_FOREIGN_LAUNCHERS[@]}"}; do
+  for record in ${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]}"}; do
     IFS=$'\t' read -r pid identity cwd <<< "$record"
+    case " ${signalled_pids[*]-} " in *" $pid "*) continue ;; esac
     task_process_identity_matches "$pid" "$identity" || continue
     TASK_SCAN_PIDS=("$pid")
     TASK_PID_CWDS=("$cwd")
@@ -293,7 +323,7 @@ teardown_foreign_launchers_retire() {
       :
     else
       [ "$?" -ne 2 ] || continue
-      echo "REFUSED: cannot durably record creation-lock launcher process $pid identity for $ID; preserving the worktree without signalling it." >&2
+      echo "REFUSED: cannot durably record process $pid identity for $ID; preserving the worktree without signalling it." >&2
       return 1
     fi
     task_process_identity_matches "$pid" "$identity" || continue

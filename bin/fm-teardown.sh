@@ -188,14 +188,17 @@
 # no record of this task names is a foreign copy (Vernant's
 # start_task_worktree.py creates and locks one at <slot>/.claude/worktrees/<name>),
 # and teardown releases it only after it proves all of: no other active task
-# record names it; no process runs in it and no live process outside this
-# teardown is its lock launcher (a process teardown itself retires, or a
-# descendant of one, is not counted, and a launcher pid that started after the
-# lock file was written is a recycled pid and owns nothing; retire signals such a
-# descendant, and a launcher that outlives that signal and a short wait refuses
-# the release, named by its pid); it is a clean worktree root with no ignored
-# file unique to it; and its work is landed by the existing landed-work rule. A
-# copy whose work is not proved landed stays, with the reason written.
+# record names it; no process outside this teardown runs in it and no live
+# process outside this teardown is its lock launcher (a process teardown itself
+# retires, or a descendant of one, is not counted, and a launcher pid that
+# started after the lock file was written is a recycled pid and owns nothing;
+# retire signals with TERM such a launcher whose cwd is outside every swept root
+# and such a process running in the copy, and one that outlives that signal and
+# a short wait refuses the release, named by its pid; no KILL is sent and a
+# process that is not teardown's own is never signalled); it is a clean worktree
+# root with no ignored file unique to it; and its work is landed by the existing
+# landed-work rule. A copy whose work is not proved landed stays, with the
+# reason written.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
@@ -470,17 +473,18 @@
 #     eligible for signalling. Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
-#     One exception: a creation-lock launcher of a foreign nested copy that
-#     teardown chose by ancestry (it descends by parent chain from a process whose
-#     cwd is exactly a scan root) may have any cwd and is signalled with TERM only,
-#     after this sweep.
+#     One exception: a creation-lock launcher of a foreign nested copy, or a
+#     process running in that copy, that teardown chose by ancestry (it is, or
+#     descends by parent chain from, a process whose cwd is exactly a scan root)
+#     may have any cwd and is signalled with TERM only, before this sweep, which
+#     would otherwise refuse the process inside the copy.
 #     A missing lsof refuses too: without the scan no target can be audited, so
 #     no unaudited process or process-group signal is ever sent.
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
 #     row: epoch, signal, pid, birth identity, command line,
 #     start time, cwd, matched open path (cwd descriptor), all shell-escaped
-#     with printf %q. For a launcher chosen by ancestry both cwd columns name the
-#     ancestor's cwd, not the launcher's own. This audit survives task-record
+#     with printf %q. For a process chosen by ancestry both cwd columns name the
+#     ancestor's cwd, not its own. This audit survives task-record
 #     retirement and records signal intent, not proof of delivery: an immediate
 #     birth-identity recheck can still skip the signal. Failed command/start collection skips the target
 #     only when a changed birth identity or kernel ESRCH proves it replaced or
@@ -4104,8 +4108,8 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       for root in "${swept[@]}"; do
         retire_task_private_nm_launch_agents "$root" || exit 1
       done
+      teardown_foreign_procs_retire || exit 1
       reap_task_worktree_processes worktree "${swept[@]}" "$TASK_TMP" || exit 1
-      teardown_foreign_launchers_retire || exit 1
       ;;
     return)
       if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; then

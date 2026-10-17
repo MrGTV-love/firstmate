@@ -263,9 +263,9 @@ The refusal prints the reassociate command with `FM_HOME=/path/to/owning-home`, 
 A secondmate home that is a pool slot, and each descendant secondmate home, gets the same check before any endpoint, child, or record is touched.
 When an active task record owns that copy's work, including the retiring task itself while its record still names the slot root, reassociate that task to the copy first.
 When no active record owns it, such as a finished record's nested copy left after records-only retirement or a worker's own `.claude/worktrees/` copy (Vernant's `start_task_worktree.py` creates and locks one), a ship teardown of the pool slot releases it itself once it proves all of these, in [`bin/fm-teardown-nested-lib.sh`](../bin/fm-teardown-nested-lib.sh):
-- No other active task record names the copy, even through a symlink alias, and no process runs in it.
-- No live process outside this teardown is the launcher named in its lock; a process teardown itself retires (one running in the task's copy, the slot, or the task's scratch directory) or a descendant of one is not counted, and a launcher pid that started after the lock file was written is a recycled pid and owns nothing.
-- Retire signals such a descendant launcher with TERM, recording the signal like the others, and waits briefly; a launcher that is still alive then keeps the copy, and the refusal names its pid.
+- No other active task record names the copy, even through a symlink alias.
+- No process outside this teardown runs in the copy, and no live process outside this teardown is the launcher named in its lock. A process teardown itself retires (one whose cwd is exactly the task's worktree, the slot, a nested copy of the task, or the task's scratch directory) or a descendant of one is not counted. A launcher pid that started after the lock file was written is a recycled pid and owns nothing.
+- Retire signals with TERM, recording each signal like the others, a launcher counted that way whose cwd is outside those directories and a process running in the copy that is counted that way, and waits briefly. One that is still alive then keeps the copy, and the refusal names its pid. Retire sends no KILL and signals no process that is not teardown's own.
 - It is a clean worktree root and holds no ignored file that exists nowhere else.
 - Its work is landed by the ordinary landed-work test.
 

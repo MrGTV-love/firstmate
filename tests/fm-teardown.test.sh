@@ -10704,7 +10704,7 @@ test_live_launcher_keeps_its_foreign_copy() {
 # slot while it lives, as lsof reports a process by its cwd.
 start_foreign_session_case() {
   local shape=$2 pidfile i
-  local child_script='my $child = fork(); if (!$child) { $SIG{TERM} = "IGNORE" if $ARGV[1]; chdir "/"; exec "sleep", "300"; } open my $fh, ">", $ARGV[0]; print $fh $child; close $fh; sleep 300;'
+  local child_script='my $child = fork(); if (!$child) { $SIG{TERM} = "IGNORE" if $ARGV[1]; chdir "/"; exec "sleep", "300"; } $SIG{CHLD} = "IGNORE"; open my $fh, ">", $ARGV[0]; print $fh $child; close $fh; sleep 300;'
   make_foreign_copy_case "$1"
   pidfile=$FOREIGN_CASE/launcher-pid
   case "$shape" in
@@ -10797,11 +10797,56 @@ exit 1
 SH
   run_foreign_teardown rc
   kill -0 "$pid" 2>/dev/null || fail "process-inside: teardown stopped the process running in the foreign copy"
-  expect_code 1 "$rc" "process-inside: a copy with a process running in it must be refused: $(cat "$FOREIGN_CASE/stderr")"
+  expect_code 1 "$rc" "process-inside: a copy with a process outside the task running in it must be refused: $(cat "$FOREIGN_CASE/stderr")"
   assert_grep "process $pid is running in it" "$FOREIGN_CASE/stderr" "process-inside: the refusal did not name the process"
   assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "process-inside: the refusal changed"
   assert_foreign_copy_untouched process-inside
-  pass "a foreign copy with a process running in it is refused and the process is left alone"
+  pass "a foreign copy with a process outside the task running in it is refused and the process is left alone"
+}
+
+# A process running in a foreign copy keeps it unless it is the task's own: here
+# it descends from the task's session, whose cwd is the slot. Retire ends it
+# before the sweep, which refuses any process inside a nested copy; one that
+# ignores TERM keeps the copy and the session, and is named by pid.
+test_task_own_process_inside_foreign_copy_is_ended_and_released() {
+  local rc shape agent child pidfile i
+  local script='my $child = fork(); if (!$child) { $SIG{TERM} = "IGNORE" if $ARGV[2]; chdir $ARGV[1]; exec "sleep", "300"; } $SIG{CHLD} = "IGNORE"; open my $fh, ">", $ARGV[0]; print $fh $child; close $fh; sleep 300;'
+  for shape in own stubborn; do
+    make_foreign_copy_case "foreign-incopy-$shape"
+    pidfile=$FOREIGN_CASE/child-pid
+    teardown_fixture_start "$FOREIGN_SLOT" KILL perl -e "$script" "$pidfile" "$FOREIGN_COPY" "$([ "$shape" = stubborn ] && echo 1 || true)"
+    agent=$TEARDOWN_FIXTURE_PID
+    for i in $(seq 100); do [ -s "$pidfile" ] && break; sleep 0.05; done
+    child=$(cat "$pidfile")
+    cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*)
+    if kill -0 $agent 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $agent '$FOREIGN_SLOT'; fi
+    if kill -0 $child 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $child '$FOREIGN_COPY'; fi
+    exit 0 ;;
+esac
+exit 1
+SH
+    run_foreign_teardown rc
+    if [ "$shape" = own ]; then
+      expect_code 0 "$rc" "incopy-own: the task's own process inside the copy must not block release: $(cat "$FOREIGN_CASE/stderr")"
+      kill -0 "$child" 2>/dev/null && fail "incopy-own: the process inside the copy survived teardown"
+      kill -0 "$agent" 2>/dev/null && fail "incopy-own: the task's session survived teardown"
+      assert_grep "	TERM	$child	" "$FOREIGN_CASE/state/task-x1.teardown-processes" \
+        "incopy-own: the signal to the process inside the copy was not recorded"
+      assert_absent "$FOREIGN_COPY" "incopy-own: the copy survived"
+      assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "incopy-own: the slot was not returned"
+    else
+      kill -0 "$child" 2>/dev/null || fail "incopy-stubborn: the process inside the copy did not ignore TERM"
+      kill -0 "$agent" 2>/dev/null || fail "incopy-stubborn: the task's session was signalled although the sweep refused"
+      kill -KILL "$child" "$agent" 2>/dev/null || true
+      expect_code 1 "$rc" "incopy-stubborn: a process that outlives the signal must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "process $child" "$FOREIGN_CASE/stderr" "incopy-stubborn: the refusal did not name the process"
+      assert_foreign_copy_untouched incopy-stubborn
+    fi
+  done
+  pass "a task-own process running inside a foreign copy is ended by retire and the copy is released, and one that outlives the signal keeps the copy by pid"
 }
 
 test_two_foreign_copies_are_released_together_or_not_at_all() {
@@ -12504,6 +12549,7 @@ test_live_launcher_keeps_its_foreign_copy
 test_task_own_session_as_lock_launcher_does_not_block_release
 test_unrelated_or_stubborn_lock_launcher_keeps_its_foreign_copy
 test_process_in_foreign_copy_keeps_it
+test_task_own_process_inside_foreign_copy_is_ended_and_released
 test_two_foreign_copies_are_released_together_or_not_at_all
 test_foreign_copy_nested_in_another_is_removed_first
 test_foreign_copy_is_released_before_the_project_lock_wait
