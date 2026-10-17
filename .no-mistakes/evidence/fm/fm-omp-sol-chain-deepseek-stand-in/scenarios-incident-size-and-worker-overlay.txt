@@ -1,0 +1,27 @@
+S1 NEW overlay, retry-after 444100 s (incident size), maxDelayMs 300000
+    codex requests: 1 | flash requests: 12 | pro requests: 0 | equal requests: 0 | rc=0
+    record: model=deepseek/deepseek-v4-flash 
+    output: Working...
+S1 RESULT: PASS
+S1-control OLD empty-chain overlay, same incident
+    codex requests: 2 | flash requests: 0 | pro requests: 0 | equal requests: 0 | rc=1
+    record: model=openai-codex/gpt-6.1-sol error=You have hit your ChatGPT usage limit (pro plan). retry-after-ms=444100000 
+    output: Working... You have hit your ChatGPT usage limit (pro plan). retry-after-ms=444100000
+S1-control RESULT: REPRODUCES INCIDENT (no stand-in, run stops)
+S2 worker on Sol WITH a dispatch stand-in [deepseek/deepseek-v4-flash:high] (per-task overlay after the tracked one), incident-size wait
+{"default":[],"openai-codex/gpt-6.1-sol":["deepseek/deepseek-v4-flash:high"],"openai-codex/gpt-6.1-sol:high":["deepseek/deepseek-v4-flash:high"],"deepseek/deepseek-v4-flash":[],"deepseek/deepseek-v4-flash:high":[]}
+    codex requests: 3 | flash requests: 12 | pro requests: 0 | equal requests: 0 | rc=0
+    record: model=deepseek/deepseek-v4-flash 
+    output: Working...
+S2 RESULT: PASS
+S3 worker on Sol with NO eligible stand-in (per-task chain empty, replaces the tracked Sol entry)
+{"default":[],"openai-codex/gpt-6.1-sol":[],"openai-codex/gpt-6.1-sol:high":[]}
+    codex requests: 4 | flash requests: 0 | pro requests: 0 | equal requests: 0 | rc=1
+    record: model=openai-codex/gpt-6.1-sol error=You have hit your ChatGPT usage limit (pro plan). retry-after-ms=444100000 
+    output: Working... You have hit your ChatGPT usage limit (pro plan). retry-after-ms=444100000
+S3 RESULT: per-task empty chain replaces the tracked entry, run stops (matches the docs)
+S4 adversarial: a Sol session must never reach an OpenRouter route or the global chain's Pro even when Flash itself is out
+    codex requests: 5 | flash requests: 0 | pro requests: 0 | equal requests: 0 | rc=1
+    record: model=deepseek/deepseek-v4-flash error=Retry budget exhausted after 2 retries: ECONNREFUSED: Unable to connect. Is the computer able to access the url? 
+    output: Working... Retry budget exhausted after 2 retries: ECONNREFUSED: Unable to connect. Is the computer able to access the url?
+S4 RESULT: PASS (no hop to Pro or the equal route)

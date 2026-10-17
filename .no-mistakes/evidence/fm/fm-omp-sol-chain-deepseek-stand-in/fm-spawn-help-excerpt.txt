@@ -1,0 +1,11 @@
+310-  shape, plan mode off, prewalk off, and the non-interactive usage-reserve
+311-  policy for the one session only (--auto-approve alone owns approval,
+312:  forcing tools.approvalMode: yolo for the session). It also chains the Sol
+313-  model to direct DeepSeek Flash, so a Sol session whose provider fails, a
+314-  usage window that is out included, moves to the stand-in at once (a worker's
+315-  per-task state/<id>.omp-fallback.yml replaces that entry for its own model),
+316-  and it pins omp's own return to the recorded model once the primary serves
+317-  again.
+318-  Each session publishes the model it is serving through
+319-  bin/fm-omp-live-model.ts (a crewmate or scout from its per-task extension, a
+320-  secondmate from the home's tracked extension), and bin/fm-crew-state.sh

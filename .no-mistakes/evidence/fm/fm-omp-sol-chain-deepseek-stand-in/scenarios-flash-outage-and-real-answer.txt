@@ -1,0 +1,10 @@
+S4 adversarial: Flash itself is also out; the Sol session must not hop to the global chain's Pro or the lab equal route
+    codex requests: 1 | flash requests: 1 | pro requests: 0 | equal requests: 0 | rc=1
+    record: model=deepseek/deepseek-v4-flash error=429 The usage limit has been reached retry-after-ms=444100000 The usage limit has been reached (type=usage_limit_reached) 
+    output: Working... 429 The usage limit has been reached retry-after-ms=444100000 The usage limit has been reached (type=usage_limit_reached)
+S4 RESULT: PASS (reached Flash, stopped there, no hop to Pro or equal)
+S5 Flash serves a real chat-completions answer after Sol's window is out; the session finishes the prompt on Flash
+    flash chat server saw: /v1/chat/completions deepseek-v4-flash,
+    rc=0 record: model=deepseek/deepseek-v4-flash 
+    output: Working... FLASH-ANSWER
+S5 RESULT: PASS (answer text came from Flash)
