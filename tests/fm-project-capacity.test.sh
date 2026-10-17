@@ -712,6 +712,9 @@ project_queue_actor() {  # <case-dir> <operation> [release-marker] [hold-secs] [
       i=0
       while [ ! -e "$4" ]; do
         i=$((i + 1)); [ "$i" -lt 4000 ] || exit 1
+        if [ "${FM_TEST_HOLDER_PROGRESS:-0}" = 1 ] && [ $((i % 20)) -eq 0 ]; then
+          touch "$2/actor.lock/role"
+        fi
         sleep 0.05
       done
     fi
@@ -827,6 +830,26 @@ test_project_queue_slow_holder_never_admits_a_later_waiter_first() {
   assert_contains "$(cat "$case_dir/w2.out")" 'fm-project-lock: stall limit reached' "the later waiter did not refuse at the same holder's stall"
   assert_equals holder "$(cat "$case_dir/order")" "a later waiter went ahead of a refused earlier one"
   pass "a stalled holder refuses its waiters together, so a later waiter never goes ahead of an earlier one"
+}
+
+test_project_queue_does_not_expire_a_productive_holder() {
+  local case_dir holder waiter rc=0
+  case_dir=$(make_case queue-holder-progress)
+  FM_TEST_HOLDER_PROGRESS=1 project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  holder=$!
+  wait_actor_output "$case_dir/order" holder
+  FM_PROJECT_LOCK_SERVICE_SECS=4 FM_PROJECT_LOCK_POLL_SECS=0.1 \
+    project_queue_actor "$case_dir" waiter > "$case_dir/waiter.out" 2>&1 &
+  waiter=$!
+  wait_actor_output "$case_dir/waiter.out" 'fm-project-lock: waiting'
+  sleep 7
+  : > "$case_dir/release"
+  wait "$holder" || fail 'productive holder could not release its lock'
+  wait "$waiter" || rc=$?
+  expect_code 0 "$rc" "a progressing holder was treated as stalled merely because of its age: $(cat "$case_dir/waiter.out")"
+  assert_equals "$(printf 'holder\nwaiter')" "$(cat "$case_dir/order")" "the waiter bypassed its productive holder"
+  assert_equals 0 "$(queued_tickets "$case_dir/actor.lock")" "productive wait left a ticket behind"
+  pass "a holder with ongoing progress can exceed the idle allowance without canceling queued work"
 }
 
 # Each 6-second hold is well inside a 20-second allowance, but the last waiter
@@ -1966,6 +1989,7 @@ test_mixed_operations_keep_fifo_even_with_a_slow_waiter
 test_same_home_spawn_for_another_project_is_not_refused_while_one_waits
 test_project_queue_recovers_dead_waiter_and_holder
 test_project_queue_timeout_preserves_live_holder
+test_project_queue_does_not_expire_a_productive_holder
 test_project_queue_slow_holder_never_admits_a_later_waiter_first
 test_project_queue_progress_never_reaches_the_stall_limit
 test_nonwaiting_admission_never_jumps_a_queued_waiter

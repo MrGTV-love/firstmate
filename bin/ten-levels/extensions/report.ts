@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { setTimeout as sleep } from "node:timers/promises";
 import { ContractError, JevClient, type SystemOneResult } from "../src/core/client.ts";
 import { QuestionValidationError, validateRequest, type Questions, type State } from "../src/core/types.ts";
 import { BASH_THRESHOLDS, SCREEN_THRESHOLDS, WRITE_THRESHOLDS } from "../src/levels/level06/index.ts";
@@ -20,8 +21,12 @@ export const CHUNK_OVERLAP_BYTES = 1_024;
 /** Outage-only deny text; policy blocks keep the permanent BLOCK_NOTICE. */
 export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "
   + "If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding.";
-const TRY_MS = 10_000;
-const MAX_TRIES = 2;
+// Answered-call p99 was 276 ms at load 10-11 and 2,235 ms at load 36-72.
+// max(90 seconds, 10 * observed p99) leaves a loaded host room to answer.
+const TRY_MS = 90_000;
+const MAX_TRIES = 3;
+const DECISION_MS = 300_000;
+const RETRY_BACKOFF_MS = 1_000;
 const RETRYABLE_FAILURES: ReadonlySet<GuardFailureType> = new Set(["TimeoutError", "TypeError", "Error"]);
 const lib = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-typesafe-lib.sh");
 const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
@@ -112,19 +117,19 @@ export interface GuardService {
 
 export async function withDecisionBudget<T>(run: () => Promise<T>): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), 25_000);
+  const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), DECISION_MS);
   try {
-    return await budgets.run({ until: performance.now() + 25_000, signal: controller.signal }, run);
+    return await budgets.run({ until: performance.now() + DECISION_MS, signal: controller.signal }, run);
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** One retry for an outage of a required judgment, only when a whole further try fits the handler budget. */
-function mayRetry(cause: unknown): boolean {
+/** Retry an outage only when both backoff and a whole further try fit the handler budget. */
+function mayRetry(cause: unknown, backoff: number): boolean {
   const budget = budgets.getStore();
   if (budget?.signal.aborted) return false;
-  if (budget && budget.until - performance.now() < TRY_MS) return false;
+  if (budget && budget.until - performance.now() < TRY_MS + backoff) return false;
   return RETRYABLE_FAILURES.has(failureType(cause));
 }
 
@@ -158,7 +163,7 @@ export function splitForRoom(text: string, room: number, overlap = CHUNK_OVERLAP
 function preflightTimeout(): number {
   const budget = budgets.getStore();
   budget?.signal.throwIfAborted();
-  const remaining = budget ? Math.ceil(budget.until - performance.now()) : 25_000;
+  const remaining = budget ? Math.ceil(budget.until - performance.now()) : DECISION_MS;
   if (remaining <= 0) throw new DOMException("Jev handler timed out.", "TimeoutError");
   return remaining;
 }
@@ -217,7 +222,9 @@ export function createGuardService(context: GuardServiceContext): GuardService {
           try {
             return await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
           } catch (cause) {
-            if (tries >= MAX_TRIES || !mayRetry(cause)) throw cause;
+            const backoff = RETRY_BACKOFF_MS * tries;
+            if (tries >= MAX_TRIES || !mayRetry(cause, backoff)) throw cause;
+            await sleep(backoff, undefined, { signal: budgets.getStore()?.signal });
           }
         }
       } catch (cause) {

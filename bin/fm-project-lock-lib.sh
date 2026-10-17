@@ -13,12 +13,12 @@
 # this is a PID-owned directory lock, not the git-file/lsof lock in fm-lock-lib.
 # No live holder is removed, including at a refusal.
 #
-# The wait has no fixed deadline; it refuses only on a stall. A stall is the
-# current holder keeping the lock for one service allowance, measured from
-# that holder's acquisition, or, with no holder, the queue head staying
-# unchanged for one allowance. Every waiter measures the same holder from the
-# same acquisition time, so a later ticket cannot outlast an earlier one behind
-# it, and a queue that keeps progressing never refuses however long it is.
+# The wait has no fixed deadline; it refuses only on a stall. Progress means
+# the holder or queue head changes, the holder updates its role record, or its
+# process tree consumes another CPU second (including reaped children).
+# A slow holder that keeps working never expires merely because of its age.
+# Missing process telemetry is uncertainty, not proof of a stalled holder.
+# A dead holder is recovered by the existing identity-bound lock owner.
 #
 # fm_project_lock_try <project-lock> <operation>
 # One nonwaiting attempt for callers that already hold other locks (recursive
@@ -40,75 +40,21 @@
 # to <project-lock>.holds before releasing, so later allowance derivations can
 # use production hold observations.
 #
-# The default service allowance is 490 seconds, the stall limit for one hold:
-# the sum of the counted steps below that spawn or teardown run while holding
-# the lock, doubled for a 100% margin. It is not a bound on every hold; the
-# holds and repetitions it does not cover are listed after the sum.
-# Poll budgets and bounds, from bin/fm-spawn.sh: the treehouse get entry wait at
-# its ceiling, 120s (60 x 1s, extended to 120s of wall clock while a get runs);
-# the worker path check, 20 x 0.5s, 10s; and the skill pick bound
-# SKILL_SELECTION_BOUND, 30s. From bin/fm-teardown.sh: NM_TEARDOWN_TIMEOUT,
-# 10s per call, up to five calls across task conclusion and private launch-agent
-# retirement, 50s; the index.lock return retries, 3 waits of
-# TREEHOUSE_RETURN_LOCK_RETRY_WAIT_SECS, 3s, plus up to four more returns at
-# the measured return time below; the launch-agent bootout poll in
-# retire_task_private_nm_launch_agents, 19 x 0.25s, 4.75s; and one
-# leaked-process reaping sleep, 1s. Harness
-# readiness and delivery polls run after the spawn releases the lock and are
-# not counted.
-# measured: one run each, in disposable clones (evidence: the
-# fm-project-lock-fair-wait task data, real-provider-measurement/ and
-# real-network-measurement/).
-#   2026-10-13T01:02:48Z, load 51-57 on 18 CPUs, Treehouse v2.3.1-fm.e58947de,
-#   isolated pool: `treehouse get --lease` 8.924s, `treehouse return --force`
-#   1.628s (bin/fm-teardown.sh's Treehouse return).
-#   2026-10-13T02:35:42Z, load 10-11 on 18 CPUs, git 2.54.0, gh 2.101.0:
-#   bin/fm-spawn.sh freshen_spawn_worktree_base fetches `git fetch origin`
-#   3.972s, `git remote set-head origin --auto` 0.542s, default-branch fetch
-#   0.511s; bin/fm-teardown.sh `gh-axi pr list` 1.092s,
-#   `git fetch origin refs/pull/<n>/head` 0.486s, `gh pr view` 0.599s
-#   and 0.505s, counted twice. A fresh spawn now runs its default-branch
-#   discovery and fetch before it queues; its locked refresh is local-only. The
-#   sum below keeps those network costs as an upper bound, which only a slot
-#   that does not share the project's objects still pays under the lock.
-# The previous sum, 128.764s, counted the treehouse get entry wait at 60s and
-# NM_TEARDOWN_TIMEOUT once, and left out the return retries, bootout poll and
-# reaping sleep. Counting the get entry wait at its 120s ceiling instead of 60s
-# gives 128.764 + 60 = 188.764s. Adding four more NM_TEARDOWN_TIMEOUT calls
-# (40s), the retry waits (3s), four more returns (4 x 1.628 = 6.512s), the
-# bootout poll (4.75s) and the reaping sleep (1s) gives
-# 188.764 + 40 + 3 + 6.512 + 4.75 + 1 = 244.026s, rounded up to 245s, doubled
-# to 490s (370s when the get entry wait was counted at 60s). The network
-# samples ran at lower load than the 2026-10-12 incident (about 91); the margin
-# covers that. No production hold had been logged to the .holds record below
-# when this was set; once it has, the allowance must also cover the largest
-# logged hold times the same margin.
-# Not covered or undercounted (none measured):
-#   - home seeding (bin/fm-home-seed.sh) holds the Firstmate project's lock
-#     across unbounded clones and no-mistakes setup; seeding is rare;
-#   - an Orca spawn with declared capacity holds it across unbounded Orca
-#     worktree and terminal creation; Orca is not used in this fleet;
-#   - teardown runs conclude_task_no_mistakes_run and
-#     retire_task_private_nm_launch_agents once per swept root
-#     in bin/fm-teardown.sh, so a copy nested in a pool slot repeats four
-#     NM_TEARDOWN_TIMEOUT calls and the bootout poll per extra root, which the
-#     sum counts once;
-#   - the leaked-process reaping sleep runs in up to max_passes=3 passes in
-#     bin/fm-teardown.sh, 3s, which the sum counts as 1s;
-#   - fm_task_docker_cleanup in bin/fm-teardown.sh runs unbounded;
-#   - forced recursive secondmate teardown holds every descendant project lock
-#     acquired by preflight_descendant_treehouse_slots through
-#     cleanup_firstmate_home_children when a descendant slot's Treehouse state
-#     can be neither proved held nor leased, so that hold grows with the child
-#     count.
-# A hold that outlasts the allowance makes waiters refuse at the stall limit.
-# FM_PROJECT_LOCK_SERVICE_SECS overrides it with a positive integer for a newly
-# measured environment or bounded fixture.
-# FM_PROJECT_LOCK_POLL_SECS changes sampling only (default 1 second; a positive
-# decimal number of seconds).
-# Progress is printed immediately and each quarter service allowance (122s
-# by default, minimum 1s for fixture overrides), naming the
-# current holder's operation/PID or the earlier waiter whose turn is reserved.
+# The default service allowance is 600 seconds without observed progress, not
+# a deadline on one hold. The historical 490-second hold-age bound below
+# undercounted slow acquisition and unbounded work; it no longer ends a wait.
+# These historical measurements explain why hold age is not a stall signal.
+# The former derivation combined bounded spawn/return steps, but omitted or
+# undercounted home seeding, Orca creation, nested teardown and Docker cleanup.
+# Historical samples were only 8.924s for a get at load 51-57 and a handful
+# of network operations at load 10-11; they did not establish a maximum hold.
+# FM_PROJECT_LOCK_SERVICE_SECS overrides the idle allowance with a positive
+# integer for an explicitly chosen environment or bounded fixture.
+# FM_PROJECT_LOCK_POLL_SECS changes admission sampling only (default 1 second;
+# a positive decimal number). Process progress is sampled every 15 seconds,
+# or a quarter allowance for short fixtures, never more often than once a second.
+# Progress is printed immediately and each minute (each second for allowances
+# below four seconds), naming the current operation/PID or reserved queue head.
 # A refusal returns nonzero with an "fm-project-lock:" line naming its class
 # (invalid input, registration failure, filesystem error, sampling error, stall
 # limit); FM_PROJECT_LOCK_ERROR is empty after a stall-limit refusal and names
@@ -197,10 +143,38 @@ fm_project_lock_describe() {  # <lock> <head>
   FM_PROJECT_LOCK_DESC="next turn ${label:-unlabelled waiter} (PID ${pid:-unknown})"
 }
 
+# Cumulative centiseconds for a holder and its live descendants. ps -S also
+# includes reaped child CPU, so short-lived helpers do not erase real progress.
+# A sampling failure returns nonzero and cannot establish a stalled holder.
+fm_project_lock_cpu() {  # <holder-pid>
+  (
+    set -o pipefail
+    LC_ALL=C ps -S -axo pid=,ppid=,time= | LC_ALL=C awk -v root="$1" '
+      {
+        children[$2] = children[$2] " " $1
+        n = split($3, clock, "-"); seconds = n > 1 ? clock[1] * 86400 : 0
+        n = split(clock[n], parts, ":"); elapsed = 0
+        for (i = 1; i <= n; i++) elapsed = elapsed * 60 + parts[i]
+        cpu[$1] = seconds + elapsed
+      }
+      END {
+        if (!(root in cpu)) exit 1
+        queue[1] = root; end = 1
+        for (start = 1; start <= end; start++) {
+          pid = queue[start]; total += cpu[pid]
+          n = split(children[pid], child, " ")
+          for (i = 1; i <= n; i++) if (child[i] != "") queue[++end] = child[i]
+        }
+        printf "%.0f\n", total * 100
+      }'
+  )
+}
+
 fm_project_lock_acquire() {  # <lock> <operation>
-  local lock=$1 operation=$2 service=${FM_PROJECT_LOCK_SERVICE_SECS:-490}
+  local lock=$1 operation=$2 service=${FM_PROJECT_LOCK_SERVICE_SECS:-600}
   local poll=${FM_PROJECT_LOCK_POLL_SECS:-1} number='^[0-9]+([.][0-9]+)?$' zero='^0*([.]0*)?$'
-  local ticket head='' holder='' key last_key='' since=0 stalled=0 mtime now
+  local ticket head='' holder='' key last_key='' since=0 stalled=0 mtime last_mtime=''
+  local cpu='' last_cpu='' next_sample=0 sample_interval
   local next_message message_interval rc=1
   FM_PROJECT_LOCK_ERROR=
   case "$service" in
@@ -214,8 +188,11 @@ fm_project_lock_acquire() {  # <lock> <operation>
     echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR for $operation" >&2
     return 1
   fi
-  message_interval=$((service / 4))
-  [ "$message_interval" -gt 0 ] || message_interval=1
+  message_interval=60
+  [ "$service" -ge 4 ] || message_interval=1
+  sample_interval=$((service / 4))
+  [ "$sample_interval" -le 15 ] || sample_interval=15
+  [ "$sample_interval" -gt 0 ] || sample_interval=1
   if ! fm_project_lock_register "$lock" "$service" "$operation"; then
     echo "fm-project-lock: $FM_PROJECT_LOCK_ERROR; $operation was not queued" >&2
     return 1
@@ -243,9 +220,29 @@ fm_project_lock_acquire() {  # <lock> <operation>
     if [ "$key" != "$last_key" ]; then
       last_key=$key
       since=$SECONDS
-      if [ -n "$holder" ] && mtime=$(fm_path_mtime "$lock/role"); then
-        fm_epoch_seconds_to now
-        [ "$now" -lt "$mtime" ] || since=$((SECONDS - (now - mtime)))
+      last_cpu=''
+      last_mtime=''
+      next_sample=$SECONDS
+    fi
+    if [ -n "$holder" ] && [ "$SECONDS" -ge "$next_sample" ]; then
+      next_sample=$((SECONDS + sample_interval))
+      if cpu=$(fm_project_lock_cpu "$holder"); then
+        if [ -z "$last_cpu" ]; then
+          last_cpu=$cpu
+        elif [ "$cpu" -ge $((last_cpu + 100)) ]; then
+          since=$SECONDS
+          last_cpu=$cpu
+        fi
+      else
+        # An unavailable sample cannot distinguish work from a dead service.
+        # Existing owner recovery still handles a holder whose death is proved.
+        since=$SECONDS
+      fi
+      if mtime=$(fm_path_mtime "$lock/role"); then
+        if [ -n "$last_mtime" ] && [ "$mtime" != "$last_mtime" ]; then
+          since=$SECONDS
+        fi
+        last_mtime=$mtime
       fi
     fi
     stalled=$((SECONDS - since))

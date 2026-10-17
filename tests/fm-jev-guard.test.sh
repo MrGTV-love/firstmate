@@ -46,7 +46,9 @@ const server = createServer((req, res) => {
     const usage = { input_tokens: 3, output_tokens: 1, extra: 'provider-private-canary' };
     if (text.includes('reported-cost')) usage.cost = 0.001;
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ model: 'jev-fake', answers, usage, extra: 'provider-private-canary' }));
+    const reply = () => res.end(JSON.stringify({ model: 'jev-fake', answers, usage, extra: 'provider-private-canary' }));
+    if (text.includes('late-answer')) setTimeout(reply, 31000);
+    else reply();
   });
 });
 server.listen(0, '127.0.0.1', () => writeFileSync(portFile, String(server.address().port)));
@@ -131,7 +133,7 @@ test_outages_and_scope() {
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"fail500"}')"
   denied "$out" || fail "TypeSafe failure did not require review"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "TypeSafe failure fell back or did not make exactly one bounded retry of HTTP 500"
+  [ "$(requests)" -eq $((before + 3)) ] || fail "TypeSafe failure fell back or did not stop after three tries of HTTP 500"
   jq -se 'all(.[]; .path == "/v1/systemone")' "$REQUESTS" >/dev/null || fail "guard used another provider"
   for project in vernant other ""; do
     before=$(requests)
@@ -162,12 +164,12 @@ test_bounded_retry() {
   [ "$(requests)" -eq $((before + 2)) ] || fail "outage then success did not use exactly two tries"
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"fail500 again"}')"
-  denied "$out" || fail "two outages allowed a required judgment"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "persistent outage did not stop after one retry"
+  denied "$out" || fail "three outages allowed a required judgment"
+  [ "$(requests)" -eq $((before + 3)) ] || fail "persistent outage did not stop after two retries"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   [[ "$reason" == *"could not run"* && "$reason" == *"same call once more"* ]] || fail "outage deny text lost the retry guidance: $reason"
   [[ "$reason" != *"block is final"* ]] || fail "outage deny text still says the block is final: $reason"
-  jq -se '.[-1] | .error_type == "Error" and .request_started == true and .attempts == 2 and (.ms | type == "number")' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "failure row lost attempts and ms"
+  jq -se '.[-1] | .error_type == "Error" and .request_started == true and .attempts == 3 and (.ms | type == "number")' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "failure row lost attempts and ms"
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
   denied "$out" || fail "policy block was not denied"
@@ -203,7 +205,7 @@ test_bounded_retry() {
   [ "$(requests)" -eq $((before + 1)) ] || fail "ambiguous result was retried"
   claude_hook "$(post Bash '{"stdout":"probability=0.9 flagged-canary","stderr":""}')"
   [ "$(requests)" -eq $((before + 2)) ] || fail "flagged result was retried"
-  pass "one bounded retry: outage then success allows, repeated outage gets retry text, policy and contract results are not retried"
+  pass "bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried"
 }
 
 test_missing_runtime() {
@@ -515,21 +517,39 @@ installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: 
 async function beforeHostDeadline(name, event) {
   let timer;
   try {
-    return await Promise.race([handlers[name](event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('documented 30-second host deadline exceeded')), 30000); })]);
+    return await Promise.race([handlers[name](event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('330-second hook envelope exceeded')), 330000); })]);
   } finally { clearTimeout(timer); }
 }
-const pre = await beforeHostDeadline('tool_call', { toolName: 'bash', input: { command: 'stall-direct' } });
+const started = performance.now();
+const [slowCall, slowResult, pre, post] = await Promise.all([
+  beforeHostDeadline('tool_call', { toolName: 'bash', input: { command: 'late-answer' } }),
+  beforeHostDeadline('tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer' }] }),
+  beforeHostDeadline('tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }),
+  beforeHostDeadline('tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }),
+]);
+assert.equal(slowCall, undefined, 'a judge answer arriving after 30 seconds must allow the call');
+assert.equal(slowResult, undefined, 'a clear late answer must preserve the tool output');
 assert.equal(pre.block, true);
 assert.match(pre.reason, /TimeoutError/);
-assert.match(pre.reason, /same call once more/);
-const lastRow = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-const stalled = lastRow();
-assert.equal(stalled.attempts, 2, 'a stalled request gets one retry');
-assert.ok(stalled.ms >= 19000 && stalled.ms < 25000, `both 10-second tries fit the 25-second handler budget: ${stalled.ms}`);
-const post = await beforeHostDeadline('tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] });
+assert.match(pre.reason, /REVIEW_ON_UNAVAILABLE_V1/);
 assert.equal(post.isError, true);
 assert.match(post.content[0].text, /TimeoutError/);
+assert.match(post.content[0].text, /REVIEW_ON_UNAVAILABLE_V1/);
 assert.equal(JSON.stringify(post).includes('private-output-canary'), false);
+const rows = readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').map(JSON.parse).filter(row => row.task === 'deadline');
+const late = rows.filter(row => row.branch === 'policy');
+assert.equal(late.length, 2);
+for (const row of late) {
+  assert.equal(row.error_type, null);
+  assert.ok(row.ms >= 30000, `the late answer was actually waited for: ${row.ms}`);
+}
+const stalled = rows.filter(row => row.branch === 'outage');
+assert.equal(stalled.length, 2);
+for (const row of stalled) {
+  assert.equal(row.attempts, 3, 'a dead judge receives all three full tries');
+  assert.ok(row.ms >= 270000 && row.ms < 300000, `three 90-second tries and backoff stay inside the decision budget: ${row.ms}`);
+}
+assert.ok(performance.now() - started >= 270000, 'outage cannot be reported at the old latency deadline');
 console.log('deadlines-ok');
 JS
 ) || fail "handler deadlines: $out"
@@ -892,12 +912,12 @@ for (const span of ['m'.repeat(1000), '😀'.repeat(250)]) {
   assert.equal(cutThrough, 1000, 'the cut fell through the span at every offset but one');
 }
 
-// Pieces run together, so the deadlines of one request still hold: a stalled piece ends in a typed denial inside the 25-second handler budget.
+// Pieces share one handler budget: a dead judge gets all three tries, then requires review.
 const stalled = splice('stall-direct');
 const started = performance.now();
 const [stalledWrite, stalledResult] = await Promise.all([write(stalled), result(stalled + 'private-output-canary')]);
 const elapsed = performance.now() - started;
-assert.ok(elapsed >= 19000 && elapsed < 25000, `handler time ${elapsed}`);
+assert.ok(elapsed >= 270000 && elapsed < 300000, `handler time ${elapsed}`);
 assert.equal(stalledWrite.block, true);
 assert.match(stalledWrite.reason, /TimeoutError/);
 assert.equal(stalledResult.isError, true);
@@ -905,8 +925,8 @@ assert.equal(JSON.stringify(stalledResult).includes('private-output-canary'), fa
 for (const stalledRow of rows(2)) {
   assert.equal(stalledRow.error_type, 'TimeoutError');
   assert.equal(stalledRow.request_started, true);
-  assert.equal(stalledRow.attempts, stalledRow.chunks + 1, 'one try for each answered piece and two for the stalled piece');
-  assert.ok(stalledRow.ms >= 19000 && stalledRow.ms < 25000, `row time ${stalledRow.ms}`);
+  assert.equal(stalledRow.attempts, stalledRow.chunks + 2, 'one try for each answered piece and three for the stalled piece');
+  assert.ok(stalledRow.ms >= 270000 && stalledRow.ms < 300000, `row time ${stalledRow.ms}`);
   assert.ok(stalledRow.chunks >= 3);
 }
 console.log('oversize-ok');

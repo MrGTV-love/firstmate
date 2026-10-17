@@ -574,9 +574,9 @@ A throwaway public-spawn before/after smoke reproduced the caller-origin contami
 
 ## Treehouse get entry wait
 
-The [control-plane contract](../agent-control.md#reassociating-a-task-with-a-replacement-copy) owns the fresh-spawn `treehouse get` wait: its 60-poll base window and its 120-second ceiling while the pane's foreground still shows the get running.
-The ceiling is a chosen bound.
-These runs are background for it, not a guarantee, so this record keeps their conditions and raw seconds without a rerun command.
+The [control-plane contract](../agent-control.md#reassociating-a-task-with-a-replacement-copy) owns the progress-based fresh-spawn `treehouse get` wait.
+The earlier 60-poll base window and 120-second ceiling were chosen bounds, not measured worst cases, and no longer end an acquisition.
+These historical runs are background, not a guarantee, so this record keeps their conditions and raw seconds without a rerun command.
 
 All runs were on 2026-10-16 on an 18-core host, in a disposable repository of 2000 files with its own scratch pool, tmux 3.5a, and `treehouse` v3.1.2-fm.c704ea2.
 "Get" means `treehouse get` run interactively in a tmux pane, timed until the pane's current path is the new worktree.
@@ -608,7 +608,8 @@ What it leaves unproven:
 - What the starts refused on 2026-10-16 waited on. The longest wait in the table, 34.797 seconds, would have fit inside the 60-poll base window they were refused under.
 - How long a get takes on the Studio's Vernant pool under its real load. No run here used it. Only its `treehouse status --json` was timed there, read-only: 31.2 and 34.3 seconds at load 27 to 36 on a pool of 128 records.
 
-`tests/fm-spawn-acquisition-cleanup.test.sh` pins the wait's windows and refusal wording, and `tests/fm-backend-herdr.test.sh` pins the Herdr foreground read.
+`tests/fm-spawn-acquisition-cleanup.test.sh` exercises late acquisition and abort cleanup with a private terminal and a fake process-leased get.
+`tests/fm-spawn-worktree-settle.test.sh` covers no-progress refusal, ongoing output progress and the absolute extreme with a scaled clock.
 
 ## TeamClaude launcher
 

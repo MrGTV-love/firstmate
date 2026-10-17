@@ -43,7 +43,8 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
   It snapshots and checks the complete request before key lookup, plans an oversized payload as overlapping pieces that each fit the request ceiling (`plan`), refuses one that no complete cover fits, uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
   Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input-derived text.
   Durable-record failure is explicit rather than silently optional while active.
-  It also makes one bounded retry of an outage of a required judgment inside the handler budget, owns the outage-only deny text that replaces the permanent block notice, and records its own tries and elapsed time on failure rows that hold no provider answer.
+  It also allows up to three 90-second tries of an outage of a required judgment, with cancellable one-second then two-second backoff inside one 300-second handler budget, owns the unchanged outage-only deny text that replaces the permanent block notice, and records its own tries and elapsed time on failure rows that hold no provider answer.
+  These Firstmate-only timing changes leave the upstream client, questions, thresholds, screened inputs and `REVIEW_ON_UNAVAILABLE_V1` outage semantics unchanged; the operator contract above owns the measurement and enclosing host limits.
 
 The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error handling are removed, not retained as a second runtime path.
 

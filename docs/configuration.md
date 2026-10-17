@@ -2192,7 +2192,7 @@ Every request, including its pinned model and questions, must fit the code-owned
 A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling, never as a prefix standing in for the whole.
 Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so any span of up to 1,000 JSON-escaped bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
 A payload that would need more than 16 pieces, about 230 KB of text, still requires review before anything is sent, and the never-send policy checks the whole payload before the first piece leaves.
-The pieces run together under the same 10-second and 25-second budgets and the same thresholds, and a payload passes only when every piece passes.
+The pieces run together under the same per-try and handler budgets described below and the same thresholds, and a payload passes only when every piece passes.
 A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
 A policy verdict on one piece outranks an outage on another.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
@@ -2200,12 +2200,15 @@ The complete request is checked against the [never-send policy](#typed-dispatch-
 The service uses the canonical shared Jev client, pinned to the calibrated model, with TypeSafe direct only and no provider fallback.
 It resolves the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its installation's client is first constructed; no key is exported to the worker environment or placed in configuration, new credential files or command arguments.
 omp reuses that client and key for the installation, while Claude constructs one per hook process; missing credentials do not create a successful client snapshot.
-The client retains its existing retry behavior and has a 10-second total request budget, including retries and response bodies.
-The service adds one bounded retry of the whole request after an outage of a required judgment: a plain provider `Error`, a `TimeoutError` or a network `TypeError`.
-Each try keeps the 10-second budget, and the retry starts only when a full further try fits in the remaining 25-second handler budget.
+The client retains its existing retry behavior and has a 90-second total budget per service try, including its internal retries and response bodies.
+The service allows up to three tries of a required judgment after a plain provider `Error`, a `TimeoutError` or a network `TypeError`, with one-second then two-second cancellable backoff.
+A retry starts only when its backoff and a complete further try fit in the remaining shared 300-second handler budget.
 It never retries a flagged, ambiguous or policy-blocked answer, a malformed response (`ContractError`), a privacy, credential or oversize refusal, or a handler cancellation.
-Both event handlers have a shared 25-second cancellation budget; the native tool-call deadline remains 30 seconds.
-Claude's host hook envelope uses `fm-duration.py limit` with a 30-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
+The 90-second floor exceeds ten times the observed answered-call p99 at both documented lower load (276 ms, 55 calls) and high load (2,235 ms, 178 calls); answered-call measurements are censored by the previous timeout and do not establish the latency of unanswered calls.
+Claude's host hook envelope uses `fm-duration.py limit` with a 330-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
+Active Firstmate omp workers receive a task-local `extensionHandlers.toolCallTimeoutMs: 330000` overlay, leaving other workers and user settings unchanged.
+Installed omp 18.12.0 documents a separate 30-second budget for most other handlers, including result delivery, and exposes no corresponding result-handler setting.
+A host with that result-handler ceiling still needs runtime support before it can wait for the full guard budget on tool output; increasing the pre-tool setting does not establish result protection beyond that ceiling.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
 While active, required pre-tool judgments that fail, are too large to cover within the request bound, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
@@ -2223,7 +2226,7 @@ They perform no guard key lookup or provider request and retain deterministic pa
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
 The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, numeric thresholds, named outage/enforcement branch, allowlisted answer fields, usage, models, latency, attempts and cost certainty.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
-A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 or 2), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
+A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
 A payload screened in pieces records `chunks` (the piece count; 1 for a single request, 0 when none was sent), the usage and tries of every answered piece added together, and the longest elapsed time, with a failed piece's own tries added to the total.
 When several pieces answered, the cost is their sum and counts as reported only when every one of them reported its cost; otherwise it is unknown.

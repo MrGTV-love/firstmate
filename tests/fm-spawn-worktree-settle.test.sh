@@ -26,6 +26,13 @@ set -u
 
 SPAWN="$ROOT/bin/fm-spawn.sh"
 TMP_ROOT=$(fm_test_tmproot fm-spawn-worktree-settle)
+# Scale only the acquisition's one-second sleeps; fixture commands keep real time.
+cat > "$TMP_ROOT/clock.sh" <<'SH'
+sleep() {
+  if [ "${1:-}" = 1 ]; then SECONDS=$((SECONDS + 60)); fi
+  command sleep "$@"
+}
+SH
 
 # make_settle_fakebin <dir> builds a fake tmux whose `#{pane_current_path}`
 # query returns FM_FAKE_PANE_STALE for the first FM_FAKE_PANE_STALE_READS
@@ -54,6 +61,11 @@ case "$*" in
 esac
 case "${1:-}" in
   display-message) printf 'firstmate\n'; exit 0 ;;
+  capture-pane)
+    if [ "${FM_FAKE_OUTPUT_PROGRESS:-0}" = 1 ]; then
+      printf 'fetch progress %s\n' "$(cat "$FM_FAKE_PANE_COUNTFILE")"
+    fi
+    exit 0 ;;
   list-windows) exit 0 ;;
   has-session|new-session|new-window|kill-window) exit 0 ;;
   send-keys) exit 0 ;;
@@ -107,7 +119,7 @@ run_settle_spawn() {
   HOME="$HOME_DIR/user-home" FM_ROOT_OVERRIDE='' FM_HOME="$HOME_DIR" \
     FM_STATE_OVERRIDE="$HOME_DIR/state" FM_DATA_OVERRIDE="$HOME_DIR/data" \
     FM_PROJECTS_OVERRIDE="$HOME_DIR/projects" FM_CONFIG_OVERRIDE="$HOME_DIR/config" \
-    FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" \
+    FM_SPAWN_NO_GUARD=1 TMUX="fake,1,0" BASH_ENV="$TMP_ROOT/clock.sh" \
     FM_FAKE_PANE_PATH="$WT_DIR" FM_FAKE_PANE_STALE="$STALE_DIR" \
     FM_FAKE_PANE_STALE_READS="$STALE_READS" FM_FAKE_PANE_COUNTFILE="$COUNTFILE" \
     PATH="$FAKEBIN_DIR:$PATH" \
@@ -221,9 +233,37 @@ test_primary_checkout_that_never_settles_fails_at_the_deadline() {
   pass "a pane stuck on the primary checkout fails loudly at the deadline"
 }
 
+test_slow_progressing_get_survives_old_window() {
+  local rec id out status
+  id=settle-slow-progress-z5
+  rec=$(make_primary_case settle-slow-progress "$id" 12)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(FM_FAKE_OUTPUT_PROGRESS=1 run_settle_spawn "$id")
+  status=$?
+  expect_code 0 "$status" "a get with output progress was refused: $out"
+  assert_grep "worktree=$WT_DIR" "$HOME_DIR/state/$id.meta" "slow get did not publish its isolated copy"
+  pass "a get with changing output keeps waiting beyond ten minutes of scaled total time"
+}
+
+test_progress_cannot_outlast_absolute_extreme() {
+  local rec id out status
+  id=settle-runaway-z6
+  rec=$(make_primary_case settle-runaway "$id" 100000)
+  read_settle_record "$rec"
+  fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+  out=$(FM_FAKE_OUTPUT_PROGRESS=1 run_settle_spawn "$id")
+  status=$?
+  [ "$status" -ne 0 ] || fail "endlessly changing output bypassed the absolute extreme"
+  [ ! -e "$HOME_DIR/state/$id.meta" ] || fail "runaway acquisition published metadata"
+  pass "output activity cannot keep an acquisition alive beyond the absolute extreme"
+}
+
 test_single_stale_first_read_is_not_accepted
 test_already_settled_pane_costs_one_confirm_read
 test_transient_primary_checkout_is_not_accepted
 test_primary_checkout_that_never_settles_fails_at_the_deadline
+test_slow_progressing_get_survives_old_window
+test_progress_cannot_outlast_absolute_extreme
 
 echo "# all fm-spawn-worktree-settle tests passed"
