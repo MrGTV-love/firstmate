@@ -5729,7 +5729,7 @@ test_term_stops_a_watcher_blocked_inside_a_poll() {
 # is the real watcher's beacon file advancing while its step-3 marker is still set.
 
 test_pending_reply_pass_keeps_the_beacon_fresh() {
-  local dir state fakebin out pid i task corr home marker stamp stamps= distinct=0 start elapsed
+  local dir state fakebin out pid i task corr home marker stamp stamps='' distinct=0 start elapsed
   dir=$(make_case pending-reply-pass-beacon); state="$dir/state"; fakebin="$dir/fakebin"
   out="$dir/watch.out"; marker="$state/.prelude-progress"
   # Every capture the pass makes takes one second while step 3 is running, as a

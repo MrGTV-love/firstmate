@@ -2348,14 +2348,13 @@ test_wrong_home_scan_matches_the_per_line_reference() {
   state="$home/state"
   sm_home="$TMP_ROOT/sm-scan-home-$RANDOM"
   mkdir -p "$sm_home/state"
-  export FM_PENDING_REPLY_NOW=8100
-  corr=$(fm_pending_reply_create "$home" "$state" "hibit" "report to parent")
-  fm_pending_reply_mark_delivered "$state" "$corr"
+  corr=$(FM_PENDING_REPLY_NOW=8100 fm_pending_reply_create "$home" "$state" "hibit" "report to parent")
+  FM_PENDING_REPLY_NOW=8100 fm_pending_reply_mark_delivered "$state" "$corr"
   printf 'working\n\ndone [corr=%s]: first\nxcorr=%s\nworking\ncorr=%sff\n(corr=%s) second\nblocked: pending-reply-missed corr=%s\ncorr=%s' \
     "$corr" "$corr" "$corr" "$corr" "$corr" "$corr" > "$sm_home/state/hibit.status"
   printf 'x\ny\n\n\ndone corr=%s other file\n' "$corr" > "$sm_home/state/other.status"
   printf 'nothing here\n' > "$sm_home/state/quiet.status"
-  want= want_hits=0
+  want='' want_hits=0
   for status in "$sm_home"/state/*.status; do
     base=$(fm_pending_reply_sighting_encode "$status" 0) || continue
     base=${base%:0}
@@ -2365,7 +2364,7 @@ test_wrong_home_scan_matches_the_per_line_reference() {
     done
   done
   [ "$want_hits" = 4 ] || fail "wrong-home fixture should hold four reports, reference found $want_hits"
-  fm_pending_reply_detect_wrong_home "$state" "$corr" "$sm_home" || fail "wrong-home detect failed"
+  FM_PENDING_REPLY_NOW=8100 fm_pending_reply_detect_wrong_home "$state" "$corr" "$sm_home" || fail "wrong-home detect failed"
   rec=$(fm_pending_reply_path "$state" "$corr")
   sightings=$(fm_pending_reply_get "$rec" wrong_home_sightings)
   [ "$sightings" = "$want" ] \
@@ -2411,14 +2410,12 @@ test_tick_beats_between_records() {
     local home state tasks i task corr beats caller_subshell
     home=$(setup_parent tick-beat)
     state="$home/state"
-    # shellcheck disable=SC2030,SC2031
-    export FM_PENDING_REPLY_NOW=10200
     tasks=12
     i=0
     while [ "$i" -lt "$tasks" ]; do
       task="beat$i"
-      corr=$(fm_pending_reply_create "$home" "$state" "$task" "open request $i")
-      fm_pending_reply_mark_delivered "$state" "$corr"
+      corr=$(FM_PENDING_REPLY_NOW=10200 fm_pending_reply_create "$home" "$state" "$task" "open request $i")
+      FM_PENDING_REPLY_NOW=10200 fm_pending_reply_mark_delivered "$state" "$corr"
       make_big_status "$state/$task.status" 400 200 "ffffffffffffff$(printf '%02x' "$i")"
       i=$((i + 1))
     done
@@ -2429,7 +2426,7 @@ test_tick_beats_between_records() {
       printf '%s\n' "$BASH_SUBSHELL" >> "$beats"
     }
     caller_subshell=$BASH_SUBSHELL
-    fm_pending_reply_tick "$state" || fail "tick failed"
+    FM_PENDING_REPLY_NOW=10200 fm_pending_reply_tick "$state" || fail "tick failed"
     [ "$(wc -l < "$beats" | tr -d ' ')" -ge "$tasks" ] \
       || fail "the tick beat $(wc -l < "$beats" | tr -d ' ') times for $tasks open records"
     [ "$(sort -u "$beats")" = "$caller_subshell" ] \
