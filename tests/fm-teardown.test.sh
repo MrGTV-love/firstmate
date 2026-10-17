@@ -10613,6 +10613,27 @@ test_unlanded_foreign_copy_is_refused() {
   pass "an unlanded foreign copy is refused with a written reason and nothing changes"
 }
 
+# bin/fm-idle-session-reap.sh keeps only the first output line that names a
+# refusal as the written reason. For a foreign copy that stays, that line must be
+# the copy's own reason, not the generic custody refusal that follows it. The
+# reaper's own first_refusal_line runs on the real teardown's refusal output.
+test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal() {
+  local rc line
+  make_foreign_copy_case foreign-reap-reason
+  printf 'unlanded\n' > "$FOREIGN_COPY/unlanded.txt"
+  git -C "$FOREIGN_COPY" add unlanded.txt
+  git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unlanded foreign work'
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "reap-reason: an unlanded copy must be refused: $(cat "$FOREIGN_CASE/stderr")"
+  eval "$(sed -n '/^first_refusal_line() {/,/^}/p' "$ROOT/bin/fm-idle-session-reap.sh")"
+  line=$(first_refusal_line "$(cat "$FOREIGN_CASE/stdout" "$FOREIGN_CASE/stderr")")
+  case "$line" in
+    "REFUSED: foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: its HEAD "*" is not proved landed.") ;;
+    *) fail "reap-reason: the reaper would record '$line' instead of the copy's own reason" ;;
+  esac
+  pass "the reaper's first refusal line for a foreign copy that stays is the copy's own written reason"
+}
+
 test_foreign_copy_with_unsaved_or_unique_files_is_refused() {
   local rc shape exclude
   for shape in dirty ignored; do
@@ -12541,6 +12562,7 @@ test_reverse_nested_prior_outside_claude_tears_down
 test_locked_own_copy_is_released_by_the_closeout_driver
 test_unlocked_landed_foreign_copy_is_removed_without_the_driver
 test_unlanded_foreign_copy_is_refused
+test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal
 test_foreign_copy_with_unsaved_or_unique_files_is_refused
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused
 test_half_removed_foreign_copy_is_refused_as_before

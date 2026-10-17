@@ -300,7 +300,7 @@ teardown_foreign_copies_prove() {  # <slot>
     if teardown_foreign_copy_prove "$copy"; then
       TEARDOWN_FOREIGN_COPIES+=("$copy")
     else
-      echo "notice: foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY." >&2
+      echo "REFUSED: foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY." >&2
     fi
   done
 }
