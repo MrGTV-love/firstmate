@@ -310,10 +310,12 @@
 #   .omp/fm-session-overlay.yml through --config. That overlay pins composer
 #   shape, plan mode off, prewalk off, and the non-interactive usage-reserve
 #   policy for the one session only (--auto-approve alone owns approval,
-#   forcing tools.approvalMode: yolo for the session). It also empties the Sol
-#   model's fallback chain, so a failing Sol run stops and reports through the
-#   live-model record instead of moving to a weaker model, and it pins omp's own
-#   return to the recorded model once the primary serves again.
+#   forcing tools.approvalMode: yolo for the session). It also chains the Sol
+#   model to direct DeepSeek Flash, so a Sol session whose provider fails, a
+#   usage window that is out included, moves to the stand-in at once (a worker's
+#   per-task state/<id>.omp-fallback.yml replaces that entry for its own model),
+#   and it pins omp's own return to the recorded model once the primary serves
+#   again.
 #   Each session publishes the model it is serving through
 #   bin/fm-omp-live-model.ts (a crewmate or scout from its per-task extension, a
 #   secondmate from the home's tracked extension), and bin/fm-crew-state.sh

@@ -34,7 +34,7 @@
 #       compared only when the launch recorded an explicit provider/id.
 #   run-error: <message>
 #       the session's last run ended in an error that no retry or fallback
-#       recovered, so a session that stopped rather than downgrade says so.
+#       recovered, so a session that stopped on an error says so.
 #   model-stale: <model> on <harness> is older than <newer> in the <harness> catalog
 #       any harness: the launch was told, at spawn, that a newer model of the
 #       same family was in its catalog (bin/fm-model-freshness.sh owns the rule).

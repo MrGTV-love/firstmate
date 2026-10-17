@@ -1723,8 +1723,16 @@ A recorded rule still contains the task's profile when typed resolution raised i
 A recorded identifier that no longer exists, or no longer contains the task's profile, counts as absent.
 A task that switched to a stand-in stays on it until it is launched again from the matrix.
 Without an identifier, identical matching lists apply, and differing matching lists permit no fallback.
-OMP workers receive a later per-task configuration overlay with exact model-and-effort chains, preventing ambient chains from weakening the task.
+OMP workers receive a later per-task configuration overlay, `state/<id>.omp-fallback.yml`, with exact model-and-effort chains, preventing ambient chains from weakening the task.
 Those chains contain only the order-preserving eligible native prefix; the first supported cross-harness destination ends the prefix and leaves the transition to recovery.
+The tracked session overlay `.omp/fm-session-overlay.yml` chains `openai-codex/gpt-6.1-sol` to direct `deepseek/deepseek-v4-flash:high` for every omp launch, so a Sol session moves to the stand-in on any eligible provider error, a quota-out included, and `retry.fallbackRevertPolicy: cooldown-expiry` returns it to Sol once the suppression window ends.
+A worker's per-task chain replaces that entry for its own model, and is empty when the rule names no eligible native stand-in.
+Dispatch-time selection and the overlay chain are separate mechanisms.
+Dispatch-time selection keeps the strongest-reasoning class, and a tight choice with no supported equal-class stand-in stops and is reported.
+The overlay chain is a run-time provider-error fallback inside one session, not a dispatch decision, and it is a standing exception to that rule for omp Sol sessions.
+Its destination is the direct `deepseek` provider only, never an API-billed router such as OpenRouter.
+A lane that fell back runs on a lower reasoning class until omp returns it to Sol when the suppression window ends, or until the lane is launched again.
+Narrowing the exception means editing the one chain key, `retry.fallbackChains."openai-codex/gpt-6.1-sol"`, in `.omp/fm-session-overlay.yml`.
 Native OMP account rotation precedes model fallback, and successful native model switches publish the serving selector.
 An idle terminal quota error after native rotation is handled by the existing bounded recovery scan through `fm-control.sh relaunch`, retaining its pause, captain-call, generation, and work-preservation guards.
 Launch and successful replacement append the selected route to task status.
