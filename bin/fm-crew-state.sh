@@ -175,8 +175,8 @@
 #
 # Read-only for the task, its worktree and the pipeline. Its one write is the
 # disposable per-task read cache under state/, which keeps the no-mistakes reads
-# a watcher, snapshot or sweep repeats from being made again (the contract and
-# its expiry rules are owned by bin/fm-nm-read-cache-lib.sh; FM_CREW_STATE_NM_CACHE=off
+# of a finished run from being made again; every other read is made fresh (the
+# contract is owned by bin/fm-nm-read-cache-lib.sh; FM_CREW_STATE_NM_CACHE=off
 # reads everything fresh). Always exits 0 on a successful read regardless
 # of state; exit 2 only on a usage error (no id).
 set -u
@@ -417,13 +417,17 @@ crew_busy_verdict() {  # <target>
 }
 
 # --- no-mistakes run lookup (authoritative when a run matches this branch) --
-# trim, strip_quotes, nm_field's TOON parse, and the attribution helpers below
-# are thin wrappers over the ONE owner in bin/fm-nm-run-lib.sh, shared with
-# fm-teardown.sh's pre-teardown run abort. Every bounded no-mistakes call below
-# goes through bin/fm-nm-read-cache-lib.sh, whose header owns the cache.
+# trim, strip_quotes, the bounded nm_run call, nm_field's TOON parse, and the
+# attribution helpers below are thin wrappers over the ONE owner in
+# bin/fm-nm-run-lib.sh, shared with fm-teardown.sh's pre-teardown run abort.
+# The status, overview, id-addressed run and ci log reads go through
+# bin/fm-nm-read-cache-lib.sh, whose header owns the cache of finished runs.
 
 trim() { fm_nm_trim "$@"; }
 strip_quotes() { fm_nm_strip_quotes "$@"; }
+nm_run() {  # <args...>
+  fm_nm_run "$WT" "$NM_TIMEOUT" "$@"
+}
 
 # Scalar value of a TOON key in the captured run output ($RUN_OUT).
 RUN_OUT=""
@@ -899,7 +903,7 @@ nm_daemon_answered_down() {
 nm_daemon_probe() {
   local rc=0
   [ -n "$NM_DAEMON_ANSWER" ] && return 0
-  fm_nmc_read_to NM_DAEMON_OUT daemon daemon '' daemon status || rc=$?
+  fm_nm_run_checked "$WT" "$NM_TIMEOUT" daemon status >/dev/null || rc=$?
   case "$rc" in
     0)   NM_DAEMON_ANSWER=up ;;
     124) NM_DAEMON_ANSWER=unanswered ;;
@@ -991,23 +995,21 @@ nm_ci_checks_state() {
 # The same reader checks for conflicting run records when the AXI overview
 # cannot identify this branch's run.
 nm_runs_list() {
-  fm_nmc_read "runs-$FM_CREW_STATE_RUNS_LIMIT" runs '' runs --limit "$FM_CREW_STATE_RUNS_LIMIT" || true
+  nm_run runs --limit "$FM_CREW_STATE_RUNS_LIMIT"
 }
 
 # The overview and the verdict fm_nm_select_run draws from it, read together so
-# a finished run's pair is served from the cache. Sets run_overview_present
+# a finished run's verdict is served from the cache. Sets run_overview_present
 # (the overview printed something), overview_ok (the call succeeded) and
-# run_choice, exactly the values the two separate calls produced.
+# run_choice, exactly the values the two separate calls produced. Only a
+# finished run's verdict is stored, so a cached one always has both flags set.
 nm_read_choice() {
-  local flags
   if fm_nmc_lookup choice; then
-    flags=${FM_NMC_BODY%%$'\n'*}
-    run_choice=${FM_NMC_BODY#*$'\n'}
-    overview_ok=${flags% *}
-    run_overview_present=${flags#* }
+    run_choice=$FM_NMC_BODY
+    overview_ok=1
+    run_overview_present=1
     return 0
   fi
-  fm_nmc_begin || :
   overview_ok=1
   run_overview=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" axi) || overview_ok=0
   run_overview_present=1
@@ -1017,9 +1019,9 @@ nm_read_choice() {
   else
     run_overview_present=0
   fi
-  fm_nmc_classify_choice "$run_choice" "$overview_ok" "$run_overview_present"
-  fm_nmc_put choice "$FM_NMC_CLASS" "$FM_NMC_FIN" 0 "$overview_ok $run_overview_present"$'\n'"$run_choice"
-  fm_nmc_end
+  if fm_nmc_classify_choice "$run_choice" "$overview_ok" "$run_overview_present"; then
+    fm_nmc_put choice "$FM_NMC_FIN" "$run_choice"
+  fi
 }
 
 # CREW_BRANCH is empty at detached HEAD (a just-spawned crew, or a scout's
