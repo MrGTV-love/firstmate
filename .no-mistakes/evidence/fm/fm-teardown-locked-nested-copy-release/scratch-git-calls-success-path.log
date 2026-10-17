@@ -1,0 +1,119 @@
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project remote get-url origin
+TEARDOWN|hash-object --stdin
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/code-root rev-parse --is-inside-work-tree
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project remote get-url origin
+TEARDOWN|hash-object --stdin
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project status --porcelain --untracked-files=all --ignore-submodules=none
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --verify --quiet HEAD^{commit}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project for-each-ref --points-at d1f3b6f4d1f5bbd58cbd2ac814c007b1e94f16d0 --format=%(refname) refs/fm/anchor/task-x1-*
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --short d1f3b6f4d1f5bbd58cbd2ac814c007b1e94f16d0
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --verify --quiet refs/fm/anchor/task-x1-d1f3b6f
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --verify HEAD^{commit}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project symbolic-ref --quiet --short refs/remotes/origin/HEAD
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project remote get-url origin
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --quiet --verify refs/remotes/origin/main^{tree}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project merge-tree --write-tree refs/remotes/origin/main d1f3b6f4d1f5bbd58cbd2ac814c007b1e94f16d0
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --absolute-git-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one ls-files --others --ignored --exclude-standard --directory -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --absolute-git-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --is-inside-work-tree
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one status --porcelain --untracked-files=all
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one log --oneline HEAD --not --remotes --
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --abbrev-ref HEAD
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --verify HEAD^{commit}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project symbolic-ref --quiet --short refs/remotes/origin/HEAD
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one remote get-url origin
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one fetch --quiet origin +refs/heads/main:refs/remotes/origin/main
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --quiet --verify refs/remotes/origin/main^{tree}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one merge-tree --write-tree refs/remotes/origin/main d1f3b6f4d1f5bbd58cbd2ac814c007b1e94f16d0
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one symbolic-ref --quiet --short HEAD
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project symbolic-ref --quiet --short HEAD
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project worktree list --porcelain
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project worktree list --porcelain
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project worktree list --porcelain
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one worktree list --porcelain
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project worktree list --porcelain
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project for-each-ref --format=%(refname) %(objectname) refs/heads/archive/task-x1-submitted-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f] refs/heads/archive/task-x1-pipeline-[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project status --porcelain --untracked-files=all --ignore-submodules=none
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --verify --quiet HEAD^{commit}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project for-each-ref --points-at d1f3b6f4d1f5bbd58cbd2ac814c007b1e94f16d0 --format=%(refname) refs/fm/anchor/task-x1-*
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --short d1f3b6f4d1f5bbd58cbd2ac814c007b1e94f16d0
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --verify --quiet refs/fm/anchor/task-x1-d1f3b6f
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --verify HEAD^{commit}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --absolute-git-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one ls-files --others --ignored --exclude-standard --directory -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --absolute-git-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --is-inside-work-tree
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one status --porcelain --untracked-files=all
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one log --oneline HEAD --not --remotes --
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --verify HEAD^{commit}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --absolute-git-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one ls-files --others --ignored --exclude-standard --directory -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --absolute-git-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --absolute-git-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one rev-parse --absolute-git-dir
+OTHER|worktree unlock /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one
+OTHER|worktree remove /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project/.claude/worktrees/fc-one
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --show-toplevel
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project status --porcelain --untracked-files=all --ignore-submodules=none
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --verify --quiet HEAD^{commit}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project for-each-ref --points-at d1f3b6f4d1f5bbd58cbd2ac814c007b1e94f16d0 --format=%(refname) refs/fm/anchor/task-x1-*
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --short d1f3b6f4d1f5bbd58cbd2ac814c007b1e94f16d0
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --verify --quiet refs/fm/anchor/task-x1-d1f3b6f
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --verify HEAD^{commit}
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --abbrev-ref HEAD
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project checkout --detach -q
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project branch -D fm/task-x1
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --path-format=absolute --git-common-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --git-dir
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project worktree list --porcelain -z
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project rev-parse --is-inside-work-tree
+TEARDOWN|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/pool/1/project status --porcelain --untracked-files=all
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/code-root rev-parse --is-inside-work-tree
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --show-toplevel
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project remote get-url origin
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project fetch origin --prune --quiet
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project worktree list --porcelain
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project symbolic-ref --quiet --short HEAD
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project for-each-ref --format=%(refname:short) %(upstream:track) refs/heads
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project symbolic-ref --quiet --short refs/remotes/origin/HEAD
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --verify --quiet origin/main^{commit}
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project symbolic-ref --short HEAD
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project status --porcelain
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse --verify --quiet main^{commit}
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse main
+OTHER|-C /Users/charlesabrooker/tmp/fm-teardown-tests.R5hoN3/scratch-no-force/project rev-parse origin/main

@@ -1,0 +1,2 @@
+OTHER|worktree unlock <case>/pool/1/project/.claude/worktrees/fc-one
+OTHER|worktree remove <case>/pool/1/project/.claude/worktrees/fc-one

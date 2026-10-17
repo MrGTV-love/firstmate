@@ -1,0 +1,20 @@
+ok - teardown of a reassociated record keeps the non-pool current copy and every prior copy untouched
+ok - teardown of a record whose old slot was released keeps the non-pool current copy
+ok - own prior copies refuse only a pool return that cannot prove them landed; a prior that is or encloses the slot does not block it, with or without --force
+ok - the reverse nested shape with a prior copy outside .claude/ proves and removes it, then returns the slot
+ok - a landed copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - an unlocked landed foreign copy is removed with a plain git worktree remove and the slot is returned
+ok - an unlanded foreign copy is refused with a written reason and nothing changes
+ok - uncommitted and unique ignored files make a foreign copy refuse
+ok - a half-removed registered foreign copy refuses with the same custody refusal and nothing changes
+ok - a live pid that started after the creation lock was written is a recycled pid and does not own the copy
+ok - a live launcher that started before its creation lock keeps its foreign copy
+ok - a slot's foreign copies are all proved before any is removed, and then all are released
+ok - a foreign copy nested in another foreign copy is removed before the copy that holds it
+ok - the closeout driver runs before the shared project lock is taken, and the slot return still runs under it
+ok - a driver refusal or a lock that is not Vernant's leaves the foreign copy, the slot and the record in place
+ok - returning the enclosing slot aborts its parked run and retires its launch agent before the return
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands
+ok - a refusal at the slot proof, the retire step, either proof before removal or the return is safe to re-run with a plain teardown
+ok - the post-lock proof does not refuse over nested copies teardown itself already removed
+exit=0

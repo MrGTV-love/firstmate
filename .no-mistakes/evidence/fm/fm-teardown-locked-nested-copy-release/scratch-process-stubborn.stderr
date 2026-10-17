@@ -1,0 +1,3 @@
+teardown: reaping leaked worktree process(es) for task-x1: 51341
+teardown: force-killing leaked worktree process(es) for task-x1: 51341
+teardown: removed landed own nested copy /Users/charlesabrooker/tmp/fm-teardown-tests.2sLm7i/scratch-proc-stubborn/pool/1/project/.claude/worktrees/fc-one from pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.2sLm7i/scratch-proc-stubborn/pool/1/project

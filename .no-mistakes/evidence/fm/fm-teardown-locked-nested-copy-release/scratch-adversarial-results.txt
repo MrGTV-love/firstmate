@@ -1,0 +1,8 @@
+ok - scratch: on the success path teardown never unlocks and never forces the locked own copy; only the driver does
+ok - scratch: teardown --force still refuses a locked own copy that holds a unique ignored file, and loses nothing
+ok - scratch: a driver that exits 0 without removing the copy makes teardown refuse and keep the slot, lease and record
+not ok - scratch-proc: teardown stopped the outside process
+scratch-proc-plain: rc=0 process_alive_after=0 copy_present=0
+scratch-proc-stubborn: rc=0 process_alive_after=0 copy_present=0
+ok - scratch: a process in a locked own copy is either ended before release or keeps the copy; the copy is never removed while it lives
+ok - scratch: an unlocked own copy is still removed without the driver

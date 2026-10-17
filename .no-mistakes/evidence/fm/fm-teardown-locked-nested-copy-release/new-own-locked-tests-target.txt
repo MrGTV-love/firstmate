@@ -1,0 +1,8 @@
+ok - a landed, clean own nested copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - an own copy whose lock names a pid that started after the lock was written is released by the same driver path
+ok - a live lock launcher outside the task keeps a locked own copy and is named by pid
+ok - a locked own copy with unlanded commits, unsaved or unique ignored files, or a lock that is not Vernant's is refused and nothing changes
+ok - a foreign copy that is still refused keeps the locked own copy, the slot and the record in place
+ok - the closeout driver releases a locked own copy before the shared project lock is taken, and the slot return still runs under it
+ok - a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place
+bash tests/fm-teardown.test.sh         13.05s user 23.61s system 23% cpu 2:35.89 total

@@ -1,0 +1,5 @@
+scratch-forcedrop-ignored: rc=1 copy_present=1 driver_ran=0
+REFUSED: own nested copy <tmp>/scratch-forcedrop-ignored/pool/1/project/.claude/worktrees/fc-one stays in pool slot <tmp>/scratch-forcedrop-ignored/pool/1/project: it holds ignored files that exist nowhere else: unique.dat.
+scratch-forcedrop-human-lock: rc=1 copy_present=1 driver_ran=0
+REFUSED: own nested copy <tmp>/scratch-forcedrop-human-lock/pool/1/project/.claude/worktrees/fc-one stays in pool slot <tmp>/scratch-forcedrop-human-lock/pool/1/project: it is locked by something other than Vernant's creation lock (held by a human).
+ok - scratch: force+drop-file outcome recorded
