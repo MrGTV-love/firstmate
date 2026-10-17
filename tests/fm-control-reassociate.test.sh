@@ -498,7 +498,7 @@ test_refusals_change_nothing() {
     "$id" reassociate --worktree "$dir/othercopy" --note n
   expect_refusal "$dir" "the copy already recorded" "nothing to reassociate" 1 \
     "$id" reassociate --worktree "$dir/old" --note n
-  expect_refusal "$dir" "a missing path" "is not an existing directory" 1 \
+  expect_refusal "$dir" "a missing path" "error: --worktree '$dir/nowhere' is not an existing directory" 1 \
     "$id" reassociate --worktree "$dir/nowhere" --note n
 
   fm_write_meta "$dir/home/state/other.meta" "window=fmses:fm-other" "worktree=$new" "project=$dir/proj" "kind=ship"
@@ -1927,8 +1927,10 @@ test_joint_options_are_checked_before_anything_is_read() {
     "$id-a" reassociate --worktree "$na" --note n --also "$id-a=$nb"
   expect_refusal "$dir" "--also naming a task twice" "twice" 1 \
     "$id-a" reassociate --worktree "$na" --note n --also "$id-b=$nb" --also "$id-b=$nb"
-  expect_refusal "$dir" "--also naming a missing copy" "is not an existing directory" 1 \
+  expect_refusal "$dir" "--also naming a missing copy" "error: task $id-b: --also $id-b='$dir/nowhere' is not an existing directory" 1 \
     "$id-a" reassociate --worktree "$na" --note n --also "$id-b=$dir/nowhere"
+  expect_refusal "$dir" "--worktree naming a missing copy beside --also" "error: task $id-a: --worktree '$dir/nowhere' is not an existing directory" 1 \
+    "$id-a" reassociate --worktree "$dir/nowhere" --note n --also "$id-b=$nb"
   expect_refusal "$dir" "--also on another verb" "applies to 'reassociate' only" 1 \
     "$id-a" relaunch --worktree "$na" --note n --also "$id-b=$nb"
   expect_refusal "$dir" "--also without --worktree" "requires --worktree" 1 \
@@ -1986,6 +1988,88 @@ SH
   pass "a failed write in a joint reassociation leaves both records, both instructions files, and the slot claim exactly as they were"
 }
 
+# meta_lock_is_held <case-dir> <id>: a live process other than this shell holds
+# the task record's lock, observed through the lock library fm-control uses.
+meta_lock_is_held() {  # <case-dir> <id>
+  (
+    # shellcheck source=/dev/null
+    . "$ROOT/bin/fm-wake-lib.sh"
+    if fm_lock_try_acquire "$1/home/state/.meta-$2.lock"; then
+      fm_lock_release "$1/home/state/.meta-$2.lock"
+      exit 1
+    fi
+    [ "${FM_LOCK_BUSY:-0}" = 1 ]
+  )
+}
+
+# The call proves and anchors both copies, then writes both records, so every
+# record it names must be locked for that whole span: a writer of either record
+# that slipped in would have its change overwritten by the staged copy.
+test_joint_reassociation_holds_every_records_meta_lock() {
+  local shape ida idb dir slot na nb real_git pid i rc id first second lost out
+  real_git=$(command -v git)
+  for shape in command-task-first command-task-second; do
+    ida="joint-a-locks-$shape"
+    idb="joint-b-locks-$shape"
+    dir=$(new_joint_case "locks-$shape" "$ida" "$idb" absent)
+    slot=$(joint_slot "$dir")
+    na="$slot/.claude/worktrees/$ida"
+    nb="$slot/.claude/worktrees/$idb"
+    first=$ida
+    second=$idb
+    if [ "$shape" = command-task-second ]; then
+      first=$idb
+      second=$ida
+    fi
+    cat > "$dir/fakebin/git" <<EOF
+#!/usr/bin/env bash
+if [ "\${3:-}" = update-ref ]; then
+  case "\${4:-}" in
+    refs/fm/anchor/*)
+      : > "$dir/paused"
+      for ((i=0; i < 2000; i++)); do
+        [ ! -e "$dir/release" ] || break
+        sleep 0.01
+      done
+      [ -e "$dir/release" ] || exit 1
+      ;;
+  esac
+fi
+exec "$real_git" "\$@"
+EOF
+    chmod +x "$dir/fakebin/git"
+    if [ "$shape" = command-task-second ]; then
+      run_control "$dir" "$first" reassociate --worktree "$nb" --also "$second=$na" --note "Both leave the root." > "$dir/call.out" &
+    else
+      run_control "$dir" "$first" reassociate --worktree "$na" --also "$second=$nb" --note "Both leave the root." > "$dir/call.out" &
+    fi
+    pid=$!
+    for ((i=0; i < 2000; i++)); do
+      [ ! -e "$dir/paused" ] || break
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.01
+    done
+    lost=
+    if [ -e "$dir/paused" ]; then
+      for id in "$ida" "$idb"; do
+        meta_lock_is_held "$dir" "$id" || lost="$lost $id"
+      done
+    fi
+    : > "$dir/release"
+    rc=0
+    wait "$pid" || rc=$?
+    out=$(cat "$dir/call.out")
+    [ -e "$dir/paused" ] || fail "$shape: the call never reached its anchoring"$'\n'"$out"
+    expect_code 0 "$rc" "$shape: the joint call failed"$'\n'"$out"
+    [ -z "$lost" ] || fail "$shape: the call did not hold the record lock of:$lost while it proved and anchored the copies"
+    for id in "$ida" "$idb"; do
+      ! meta_lock_is_held "$dir" "$id" || fail "$shape: the call left task $id's record lock held"
+      [ ! -e "$dir/home/state/.meta-$id.lock" ] || fail "$shape: the call left task $id's record lock behind"
+    done
+  done
+  pass "a joint reassociation holds every named record's lock while it proves and anchors the copies, and releases each one"
+}
+
 test_shared_root_without_pr_proves_its_own_branch
 test_non_github_pr_reassociation_refuses
 test_recovered_shared_slot_has_no_nonforcing_lease_remedy
@@ -2025,3 +2109,4 @@ test_two_live_records_on_one_slot_root_are_repointed_together
 test_joint_reassociation_refuses_on_a_missing_proof_and_changes_nothing
 test_joint_options_are_checked_before_anything_is_read
 test_joint_failure_rolls_both_records_back
+test_joint_reassociation_holds_every_records_meta_lock

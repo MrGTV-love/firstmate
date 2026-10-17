@@ -1167,13 +1167,14 @@ do_reassociate() {
   for ((m=0; m<${#RA_IDS[@]}; m++)); do
     reassociate_select "$m"
     copy=$(fm_task_copy_canonical_dir "${RA_REQUEST[m]}") \
-      || die "$([ "$m" = 0 ] && printf -- '--worktree' || printf -- '--also %s=' "${RA_IDS[m]}")'${RA_REQUEST[m]}' is not an existing directory"
+      || die "$([ "$m" = 0 ] && printf -- '--worktree ' || printf -- '--also %s=' "${RA_IDS[m]}")'${RA_REQUEST[m]}' is not an existing directory"
     RA_NEWWT[m]=$copy
   done
 
   # Each --also task is held exactly as the command's task is: the supervision
   # lease guard, then its lifecycle lock.
   for ((m=1; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
     x=${RA_IDS[m]}
     [ -f "${RA_METAS[m]}" ] \
       || die "no task '$x' in $STATE (fm-control resolves an exact task id only)"
@@ -1189,11 +1190,13 @@ do_reassociate() {
 
   # Read only what decides the lock set; everything is re-read under the locks.
   for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
     RA_PREWT[m]=$(fm_meta_get "${RA_METAS[m]}" worktree)
     RA_PREPROJECT[m]=$(fm_meta_get "${RA_METAS[m]}" project)
     [ "${RA_PREPROJECT[m]}" = "${RA_PREPROJECT[0]}" ] \
       || die "tasks ${RA_IDS[0]} and ${RA_IDS[m]} record different projects; one reassociation re-points tasks of a single project; nothing was changed"
   done
+  reassociate_select 0
   CONTROL_PROJECT_LOCK=$(fm_treehouse_project_lock_path "${RA_PREPROJECT[0]}") \
     || die "cannot resolve the shared Treehouse project lock for ${RA_PREPROJECT[0]}; nothing was changed"
   fm_project_lock_try "$CONTROL_PROJECT_LOCK" "reassociate $ID" \
