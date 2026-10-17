@@ -2146,7 +2146,7 @@ For authorized screening, shell state contains the command and working directory
 These fields can contain worker prompt or instruction text, so guard calls can send that text to TypeSafe; the guard does not intentionally send the whole conversation or system prompt.
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
 A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling, never as a prefix standing in for the whole.
-Each piece repeats the last 1,024 escaped bytes of the piece before it, so any span of up to 1,000 bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
+Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so any span of up to 1,000 JSON-escaped bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
 A payload that would need more than 16 pieces, about 230 KB of text, still requires review before anything is sent, and the never-send policy checks the whole payload before the first piece leaves.
 The pieces run together under the same 10-second and 25-second budgets and the same thresholds, and a payload passes only when every piece passes.
 A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
@@ -2164,7 +2164,7 @@ Both event handlers have a shared 25-second cancellation budget; the native tool
 Claude's host hook envelope uses `fm-duration.py limit` with a 30-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
-While active, required pre-tool judgments that fail, exceed the request bound, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
+While active, required pre-tool judgments that fail, are too large to cover within the request bound, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
 On omp, flagged, ambiguous or unavailable result judgments replace the untrusted content and details with a review notice and an error result before the receiving model sees the result.
 Non-text results that cannot be assessed also require review rather than an unexamined pass.
 Claude receives only the explicit advisory notice, not a quarantine claim.
@@ -2182,6 +2182,7 @@ Every record includes `error_type`, explicitly null for success or intentional i
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 or 2), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
 A payload screened in pieces records `chunks` (the piece count; 1 for a single request, 0 when none was sent), the usage and tries of every answered piece added together, and the longest elapsed time, with a failed piece's own tries added to the total.
+When several pieces answered, the cost is their sum and counts as reported only when every one of them reported its cost; otherwise it is unknown.
 A generic provider `Error` stays visible without inventing an HTTP category by parsing its message.
 Reported, estimated, unknown and not-called costs are distinct; unknown charges are not zero.
 Commands, paths, state, questions, raw exchanges, provider extension fields and exception messages are excluded; the guard no longer adds raw session report entries.

@@ -15,7 +15,7 @@ export const GUARD_MODEL = "jev-1.13.0";
 export const MAX_REQUEST_BYTES = 16_384;
 /** A payload over the ceiling is screened as overlapping pieces, each one a complete request that fits it. */
 export const MAX_CHUNKS = 16;
-/** A span up to 1,000 bytes always lies whole inside one piece; a longer one can be cut, and each half is still screened. */
+/** A span up to 1,000 JSON-escaped bytes always lies whole inside one piece; a longer one can be cut, and each half is still screened. */
 export const CHUNK_OVERLAP_BYTES = 1_024;
 /** Outage-only deny text; policy blocks keep the permanent BLOCK_NOTICE. */
 export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "

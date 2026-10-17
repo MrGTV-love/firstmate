@@ -32,7 +32,7 @@ export function screenResult(answers: unknown): ScreenDecision {
   return { decision, noul: probability };
 }
 
-/** The complete text is assessed; the Firstmate service rejects oversized serialized requests. */
+/** The text it is handed is assessed whole; the Firstmate glue hands an oversized result over in pieces that each fit the request ceiling. */
 export async function screenToolResult(tool: string, content: string, decide: Decide = (s, q) => jev.systemOne(s, q)): Promise<ScreenDecision> {
   if (!content.trim()) return { decision: "clear", noul: null };
   const { answers } = await decide({ tool, source_role: "tool_result", content }, SCREEN_QUESTIONS);
