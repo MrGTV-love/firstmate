@@ -215,6 +215,11 @@
 # the final project-lock wait, so the driver never runs while the lock is held,
 # except when teardown keeps project custody through the return. A lock in any
 # other format, a driver refusal, or a copy still registered afterwards refuses.
+# The task's own nested copy that Vernant's creation lock holds takes the same
+# driver route instead of a forced removal, before the final project-lock wait
+# like a foreign copy, after the clean and landed proof and the same ignored-file,
+# record, process and launcher proofs; an own copy that is not locked is removed
+# as before.
 # Every other case, including a half-removed copy, refuses as before; --force
 # never waives these proofs. The by-hand route is in docs/agent-control.md.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
@@ -4097,6 +4102,9 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
         [ -d "$copy" ] || [ "$copy" = "$TEARDOWN_RETURN_SLOT" ] || continue
         teardown_own_copy_disposable "$copy" || return 1
       done
+      # An own copy Vernant's creation lock holds is released by its driver, so it
+      # also needs the release proofs a foreign copy gets.
+      [ -z "$TEARDOWN_RETURN_SLOT" ] || teardown_own_locked_copies_prove || return 1
       ;;
     retire)
       # Fix 1, Fix 3 and Fix 2 of the script header, on every swept root.
@@ -4126,7 +4134,13 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       fi
       if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; then
         [ ! -d "$WT" ] || require_worktree_teardown_safety
+        teardown_own_locked_copies_release || exit 1
         for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+          known=0
+          for root in ${TEARDOWN_OWN_RELEASED[@]+"${TEARDOWN_OWN_RELEASED[@]}"}; do
+            [ "$root" != "$copy" ] || known=1
+          done
+          [ "$known" = 0 ] || continue
           git -C "$PROJ" worktree remove --force "$copy" >/dev/null 2>&1 || {
             echo "error: could not remove $ID's nested copy $copy before returning pool slot $TEARDOWN_RETURN_SLOT; teardown aborted" >&2
             exit 1
@@ -5849,6 +5863,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
     teardown_nested_slot reprove || exit 1
     teardown_foreign_copies_release || exit 1
     [ ! -d "$WT" ] || require_worktree_teardown_safety
+    teardown_own_locked_copies_release || exit 1
   fi
   [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] || teardown_acquire_project_lock wait || exit $?
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = shared ]; then

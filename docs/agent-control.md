@@ -271,11 +271,14 @@ When no active record owns it, such as a finished record's nested copy left afte
 
 A copy locked by Vernant's creation lock is released and removed by Vernant's own driver, `scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup`, run from the slot; an unlocked copy is removed with a plain non-forced `git worktree remove`.
 A copy whose work is not proved landed stays, and teardown writes the reason.
+The task's own nested copy that Vernant's creation lock holds takes the same driver route in place of a forced removal, once it also passes the record, process, launcher and ignored-file proofs above; an own copy that is not locked is removed as before.
 Removal deletes the copy's checkout and the allow-listed ignored files in it (symlinks, virtual environments, `node_modules` and tool caches, `.DS_Store`, Firstmate's hook files, and anything ignored under its `.claude` and `.opencode` trees); it loses no commit, because the work is landed, and no tracked change, because the clean proof refuses one.
 The clean proof skips untracked files under `.claude` only; the ignored-file proof skips ignored files under `.claude` and `.opencode`; plain `git worktree remove` still refuses a copy that holds an untracked file.
 On the pool-slot route the release runs before the final project-lock wait, so the driver never runs while the lock is held, except when teardown keeps project custody through the return.
 A copy it cannot prove, a lock in any other format, a driver refusal, a half-removed copy, or a copy still registered afterwards refuses exactly as above, and `--force` waives none of it.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.
+The log test lists the commits of a squash-merged branch whose remote branch was deleted as unpushed, so judge those copies by their merged PR and the closeout driver's landing check, not by that list alone.
+A plain `git worktree remove` refuses a locked copy, and neither `--force` nor unlocking by hand is the supported route.
 A surviving recorded PR follows only under the head-containment proof above.
 A durable lease added for this recovery stays on the slot after the remaining task moves to a copy outside it, so no record names the slot and teardown never returns it.
 Release it by hand only after inspecting every copy left in the slot with `git -C <slot> status --untracked-files=all` and `git -C <project> worktree list --porcelain`, and only when no record names the slot or a copy inside it and nothing there is unlanded: `(cd <project> && treehouse return <slot-path> --if-lease-holder <remaining-task> </dev/null)`, where the holder is the one passed to `treehouse lease`.
@@ -327,6 +330,7 @@ A task's own prior copies are not competing custody against the cleanup of its o
 2. **Retire, on every swept root.** Before any destructive step, teardown concludes a parked no-mistakes run, retires a task-private launch agent, and reaps leaked processes on the current copy, the slot and each nested copy, each as its own root.
 3. **Execute.** Teardown checks dirt and HEAD again with the project lock held, reusing only landing proofs tied to those same immutable commits; it refuses before removing anything if a new landing proof would be needed.
    Then it removes the nested copy (its branch stays), detaches the slot, returns it, drops the claim and removes the task record before releasing the project lock.
+   A nested copy that Vernant's creation lock holds is released by the closeout driver under the release rule above, never by a forced removal; a driver refusal stops teardown with the copy, the slot claim, Treehouse's lease and the task record in place.
    If the return removes a stale `index.lock`, the slot is checked once more before the reset.
 
 The teardown header owns the state-only slot reservation and lock boundaries; process cleanup, endpoint closure, backlog completion and clone synchronization are outside those ordinary pool critical sections.

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034 # TEARDOWN_FOREIGN_* are output globals for bin/fm-teardown.sh.
-# Foreign nested copies in the pool slot a teardown returns.
+# Foreign nested copies in the pool slot a teardown returns, and the task's own
+# nested copies that Vernant's creation lock holds.
 #
 # A foreign copy is a registered worktree strictly inside the slot that no
 # record of the retiring task names. Vernant's start_task_worktree.py creates
@@ -23,6 +24,14 @@
 #     teardown's own is never signalled and refuses at once, named by its pid;
 #   - its work is landed by the existing landed-work rule (teardown_landed).
 # A copy whose work is not proved landed stays, and teardown names why.
+# The task's own nested copies (the record's worktree= and prior_worktree= copies
+# inside the slot) were already proved clean and landed or anchored by the
+# caller. One of them that Vernant's creation lock holds is released the same
+# way, never by forcing the removal: it must also hold no ignored file unique to
+# it, no process outside this teardown may run in it or be its live lock
+# launcher, and no other active record may name it; the driver then verifies the
+# landing again and refuses what it cannot prove. An own copy that is not locked
+# is removed as before.
 # A copy locked by Vernant's creation lock is released and removed by Vernant's
 # own driver (closeout_pr.py --cleanup-worktree <copy> --execute-cleanup, run
 # from the slot with FM_TEARDOWN_VERNANT_PYTHON or <slot>/.venv/bin/python). An
@@ -47,6 +56,8 @@
 
 # One entry per proved copy.
 TEARDOWN_FOREIGN_COPIES=()
+# Own nested copies teardown_own_locked_copies_release has removed already.
+TEARDOWN_OWN_RELEASED=()
 # One "pid<TAB>birth identity<TAB>cwd" entry per live lock launcher or process
 # running in a copy that was proved to be this teardown's own; cwd is that of the
 # own process it was chosen through.
@@ -433,4 +444,85 @@ teardown_foreign_copies_release() {
     teardown_foreign_copy_dispose "$slot" "$copy" || return 1
   done
   TEARDOWN_FOREIGN_COPIES=()
+}
+
+# Proves the task's own nested copies that Vernant's creation lock holds, or
+# returns 1 after printing a refusal naming the copy and what could not be
+# proved. Writes nothing. The caller has already proved each own copy clean and
+# landed or anchored; this adds what a lock-releasing removal needs. A copy that
+# is not locked, or whose lock state cannot be read, is left to the plain removal.
+# Run it after teardown_foreign_copies_prove, which resets
+# TEARDOWN_FOREIGN_PROCS, so the live launchers it records reach the retire phase.
+teardown_own_locked_copies_prove() {
+  local copy rc unique
+  for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
+    [ -d "$copy" ] || continue
+    rc=0
+    teardown_copy_lock_file "$copy" || rc=$?
+    [ "$rc" = 0 ] || continue
+    TEARDOWN_FOREIGN_WHY=
+    if ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
+      TEARDOWN_FOREIGN_WHY="it is locked by something other than Vernant's creation lock (${TEARDOWN_FOREIGN_LOCK:-no reason given})"
+    else
+      unique=$(teardown_foreign_unique_ignored "$copy") || unique=
+      if [ -n "$unique" ]; then
+        TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
+      else
+        teardown_foreign_copy_unowned "$copy" || true
+      fi
+    fi
+    if [ -n "$TEARDOWN_FOREIGN_WHY" ]; then
+      echo "REFUSED: own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-}: $TEARDOWN_FOREIGN_WHY." >&2
+      return 1
+    fi
+  done
+}
+
+# Releases and removes one proved own nested copy that Vernant's creation lock
+# holds. Returns 1 after printing a refusal.
+teardown_own_copy_dispose() {  # <slot> <copy>
+  local slot=$1 copy=$2 rc=0
+  teardown_copy_lock_file "$copy" || rc=$?
+  if [ "$rc" != 0 ] || ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
+    echo "REFUSED: own nested copy $copy is not locked by Vernant's creation lock any more; it was not removed." >&2
+    return 1
+  fi
+  rc=0
+  teardown_run_closeout "$slot" "$copy" || rc=$?
+  if [ "$rc" != 0 ]; then
+    echo "REFUSED: Vernant's closeout driver did not release own nested copy $copy (exit $rc): ${TEARDOWN_CLOSEOUT_OUT:0:600}" >&2
+    return 1
+  fi
+  if teardown_foreign_copy_present "$slot" "$copy"; then
+    echo "REFUSED: own nested copy $copy is still present or registered after its release; the pool slot was not returned." >&2
+    return 1
+  fi
+  echo "teardown: removed landed own nested copy $copy from pool slot $slot" >&2
+}
+
+# Releases every own nested copy of the task that Vernant's creation lock holds.
+# All are proved again first, so nothing is removed when one is no longer
+# provable, and a copy nested in another goes first (reverse path order). An own
+# copy that is not locked is left to the plain removal in bin/fm-teardown.sh.
+# Like the foreign copies, it runs before the final project-lock wait.
+teardown_own_locked_copies_release() {
+  local slot=$TEARDOWN_RETURN_SLOT copy rc
+  local -a ordered=()
+  [ -n "$slot" ] && [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ] || return 0
+  slot=$(fm_task_copy_canonical_dir "$slot") || return 1
+  teardown_own_locked_copies_prove || {
+    echo "REFUSED: an own nested copy in pool slot $slot is no longer provable; nothing was removed." >&2
+    return 1
+  }
+  while IFS= read -r copy; do
+    ordered+=("$copy")
+  done < <(printf '%s\n' "${TEARDOWN_NESTED_COPIES[@]}" | LC_ALL=C sort -r)
+  for copy in "${ordered[@]}"; do
+    [ -d "$copy" ] || continue
+    rc=0
+    teardown_copy_lock_file "$copy" || rc=$?
+    [ "$rc" = 0 ] || continue
+    teardown_own_copy_dispose "$slot" "$copy" || return 1
+    TEARDOWN_OWN_RELEASED+=("$copy")
+  done
 }
