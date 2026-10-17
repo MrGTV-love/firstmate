@@ -205,10 +205,14 @@
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, and anything ignored under its .claude and
 # .opencode trees); it loses no commit, because the work is landed, and no
-# uncommitted change, because the copy is clean. A lock in any other format, a
-# driver refusal, or a copy still registered afterwards refuses. Every other
-# case, including a half-removed copy, refuses as before; --force never waives
-# these proofs. The by-hand route is in docs/agent-control.md.
+# uncommitted change outside those trees, because the copy is clean there. The
+# clean proof skips untracked files under .claude and .opencode, and plain git
+# worktree remove still refuses a copy that holds one. On the pool-slot route
+# the release runs before the final project-lock wait, so the driver never runs
+# while the lock is held. A lock in any other format, a driver refusal, or a copy
+# still registered afterwards refuses. Every other case, including a
+# half-removed copy, refuses as before; --force never waives these proofs. The
+# by-hand route is in docs/agent-control.md.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -5830,6 +5834,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = return ]; then
     TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
     teardown_nested_slot reprove || exit 1
+    teardown_foreign_copies_release || exit 1
     [ ! -d "$WT" ] || require_worktree_teardown_safety
   fi
   [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] || teardown_acquire_project_lock wait || exit $?

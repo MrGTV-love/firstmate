@@ -10495,6 +10495,8 @@ SH
 # stands in for Vernant's driver: it logs its directory and arguments, and with
 # FM_STUB_CLOSEOUT=ok unlocks and plainly removes only a copy under the scratch
 # root, as the real driver's cleanup does; any other value refuses with exit 3.
+# With FM_STUB_LOCK naming the shared project lock, it also records in
+# closeout.lock-state whether that lock is held while it runs.
 # vernant-python, the interpreter run_foreign_teardown names, runs it as a shell
 # script.
 make_foreign_copy_case() {
@@ -10517,6 +10519,9 @@ make_foreign_copy_case() {
   mkdir -p "$NESTED_SLOT/scripts/git-stability"
   cat > "$NESTED_SLOT/scripts/git-stability/closeout_pr.py" <<SH
 printf '%s|%s\n' "\$PWD" "\$*" >> "$case_dir/closeout.log"
+if [ -n "\${FM_STUB_LOCK:-}" ]; then
+  if [ -d "\$FM_STUB_LOCK" ]; then echo held; else echo free; fi >> "$case_dir/closeout.lock-state"
+fi
 if [ "\${FM_STUB_CLOSEOUT:-ok}" != ok ]; then
   echo '{"allowed": false, "reason": "stub_refusal"}'
   exit 3
@@ -10826,6 +10831,31 @@ test_two_foreign_copies_are_released_together_or_not_at_all() {
     || fail "two-copies: the second copy's branch was deleted"
   assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "two-copies: the slot was not returned"
   pass "a slot's foreign copies are all proved before any is removed, and then all are released"
+}
+
+test_foreign_copy_is_released_before_the_project_lock_wait() {
+  local rc lock
+  dead_launcher_pid
+  make_foreign_copy_case foreign-lock-order "$FOREIGN_DEAD_PID"
+  lock=$(FM_HOME="$FOREIGN_CASE/home" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+    bash -c '. "$1/bin/fm-wake-lib.sh"; fm_treehouse_project_lock_path "$2"' _ "$ROOT" "$FOREIGN_CASE/project") \
+    || fail "lock-order: cannot resolve the shared Treehouse project lock"
+  cat > "$FOREIGN_CASE/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >> "$FOREIGN_CASE/treehouse.log"
+case "\${1:-}" in
+  return) if [ -d "$lock" ]; then echo held; else echo free; fi >> "$FOREIGN_CASE/return.lock-state" ;;
+esac
+exit 0
+SH
+  run_foreign_teardown rc FM_STUB_LOCK="$lock"
+  expect_code 0 "$rc" "lock-order: a landed Vernant-locked copy must be released: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "held" "$(cat "$FOREIGN_CASE/return.lock-state" 2>/dev/null || true)" \
+    "lock-order: the slot return did not run under the shared project lock, so the probe proves nothing"
+  assert_equals "free" "$(cat "$FOREIGN_CASE/closeout.lock-state" 2>/dev/null || true)" \
+    "lock-order: the closeout driver ran while the shared project lock was held"
+  assert_absent "$FOREIGN_COPY" "lock-order: the copy survived"
+  pass "the closeout driver runs before the shared project lock is taken, and the slot return still runs under it"
 }
 
 test_closeout_uses_the_slots_default_interpreter() {
@@ -12476,6 +12506,7 @@ test_unrelated_or_stubborn_lock_launcher_keeps_its_foreign_copy
 test_process_in_foreign_copy_keeps_it
 test_two_foreign_copies_are_released_together_or_not_at_all
 test_foreign_copy_nested_in_another_is_removed_first
+test_foreign_copy_is_released_before_the_project_lock_wait
 test_closeout_uses_the_slots_default_interpreter
 test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place
 test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place
