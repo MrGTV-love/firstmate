@@ -93,6 +93,8 @@ fi
 if [ "\$MODE" = late ] || [ "\$MODE" = laterexit ]; then
   # Take longer than the old 60-poll window: wait for 75 one-second polls.
   while [ "\$(wc -l < "\$TICKS")" -lt 75 ]; do /bin/sleep 0.02; done
+  # Reach the worktree while the poll that follows is still reading the pane's foreground.
+  [ "\$MODE" != late ] || /bin/sleep 0.6
 fi
 if [ "\$MODE" = earlyexit ]; then
   while [ "\$(wc -l < "\$TICKS" 2>/dev/null || echo 0)" -lt 1 ]; do /bin/sleep 0.02; done
@@ -141,6 +143,16 @@ if [ "$BACKEND" = tmux ]; then
   "$REAL_TMUX" set-option -g default-command '/bin/bash --noprofile --norc'
   "$REAL_TMUX" set-environment -g PATH "$FAKEBIN:$PATH"
   "$REAL_TMUX" set-environment -g HISTFILE "$HISTFILE"
+  # A busy host makes the foreground read slow: FM_TEST_TTY_STALL seconds on the
+  # pane tty lookup, once 75 polls have passed.
+  cat > "$FAKEBIN/tmux" <<SH
+#!/usr/bin/env bash
+if [ -n "\${FM_TEST_TTY_STALL:-}" ] && [ "\$(wc -l < "\$FM_TEST_TICK_FILE")" -ge 75 ]; then
+  case "\$*" in *'#{pane_tty}'*) /bin/sleep "\$FM_TEST_TTY_STALL" ;; esac
+fi
+exec '$REAL_TMUX' "\$@"
+SH
+  chmod +x "$FAKEBIN/tmux"
 else
   HERDR_LAB_SESSION=$("$HERDR_LAB_HELPER" name fm-spawn-isolation-timeout-leaks-pool-slot) || fail "cannot name Herdr lab"
   "$HERDR_LAB_HELPER" provision "$HERDR_LAB_SESSION" || fail "cannot provision Herdr lab"
@@ -217,9 +229,11 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   [ "$MODE" != late ] || DEST=$LATE
   GET_MODE=$MODE
   TICK_SECONDS=
+  TTY_STALL=
   case "$MODE" in
     clock) GET_MODE=slow; TICK_SECONDS=3 ;;
     gone) GET_MODE=exits; TICK_SECONDS=3 ;;
+    late) TTY_STALL=1.5 ;;
   esac
   TICKS="$CASE/ticks"
   : > "$TICKS"
@@ -227,11 +241,12 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
     "$GET_MODE" "$LEASE" "$PIDFILE" "$ALLOW" "$ARRIVED" "$DEST" "$TICKS" > "$TMP_ROOT/get-config"
   fm_test_spawn_brief "$FM_HOME" "$ID" 'Refused acquisition must release its process lease.'
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$CASE/claude" PATH="$FAKEBIN:$PATH" \
-    FM_TEST_TICK_FILE="$TICKS" FM_TEST_TICK_SECONDS="$TICK_SECONDS" BASH_ENV="$TMP_ROOT/clock.sh" \
+    FM_TEST_TICK_FILE="$TICKS" FM_TEST_TICK_SECONDS="$TICK_SECONDS" FM_TEST_TTY_STALL="$TTY_STALL" BASH_ENV="$TMP_ROOT/clock.sh" \
     bash "$ROOT/bin/fm-spawn.sh" "$ID" "$PROJECT" --backend "$BACKEND" --harness "$HARNESS" --allow-api-key --mode no-mistakes --yolo off 2>&1)
   rc=$?
   if [ "$MODE" = late ]; then
-    # A get that outlasts the old 60-poll window while still running is waited for.
+    # A get that outlasts the old 60-poll window while still running is waited for,
+    # even when it reaches its worktree while the poll is still reading the foreground.
     expect_code 0 "$rc" "a get still running past the old window was refused: $out"
     [ "$(wc -l < "$TICKS")" -ge 75 ] || fail "late get was not held past the old window: $(wc -l < "$TICKS") polls"
     [ -e "$LEASE" ] || fail 'late acquisition released its slot'

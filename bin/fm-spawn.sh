@@ -5544,6 +5544,12 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   tick=0
   while :; do
     tick=$((tick + 1))
+    # Read the foreground before the path. `treehouse get` moves the pane into
+    # the worktree and then hands the foreground to its subshell, so an idle read
+    # taken after a stale path read could come from a get that arrived in
+    # between, and would end the wait on a path that is already out of date.
+    # Read first, an idle foreground means the path read that follows is final.
+    state=$(spawn_get_state "$WT_TARGET")
     p=$(spawn_current_path "$WT_TARGET" || true)
     [ -z "$p" ] || last_seen="$p"
     if [ -n "$p" ] && fm_task_copy_isolated "$p" "$PROJ_ABS"; then
@@ -5557,7 +5563,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     else
       candidate=""
       [ -z "$p" ] || last_reason=$FM_TASK_COPY_REASON
-      case "$(spawn_get_state "$WT_TARGET")" in
+      case "$state" in
         running) acquire_limit=$acquire_ceiling ;;
         idle) acquire_limit=$acquire_base ;;
       esac
