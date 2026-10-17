@@ -703,7 +703,24 @@ The installer changed `PI_DISABLE_LSPMUX` from an inherited `0` to process-local
 The service and remaining task-private compiler children were stopped after the proof; no other process was stopped.
 These guard-only observations establish native device transport and the bounded exception behavior, not current spawn activation, firstmate-scoped provider authorization, arbitrary LSP-server confinement, or freedom from the documented snapshot-to-dispatch race.
 
-### Current offline policy verification
+### 2026-10-17 latency and result-delivery verification
+
+Installed omp 18.12.0 was exercised with the current guard extension, native built-in `read`, a scripted loopback model, and a synthetic judge whose flag arrived after 31 seconds.
+With the proposed shared 300-second budget, the host logged `handler timed out after 30000ms` and delivered the original untrusted output to the next model request; increasing the pre-tool timeout did not protect results.
+With omp's separate 25-second guard budget and two tries capped at 12 seconds, the same 31-second judge scenario returned `TimeoutError` after 24,504 ms of provider time, replaced the output, and completed the native session in 28.205 seconds without a host handler timeout.
+The original canary was absent from the next model request, and the existing TypeSafe health record received one exhausted-guard observation.
+No omp timeout configuration override was needed.
+
+Two additional native omp sessions consumed an answered 0.50 band result and a 0.99 flag on a real home-data read.
+The band case retained the original text plus an advisory, with a `review` / `policy` / `result_pass` audit row; the trusted case retained the original text with `clear` / `trusted_read` / `result_pass` and the original null error type.
+These sessions completed in 3.763 and 3.416 seconds respectively.
+Claude Code 2.1.302 consumed the delayed flag after 31,037 ms with the 330-second hook envelope, preserved the answered policy judgment rather than an outage, and delivered its advisory alongside the original text in the next model request.
+All providers and credentials in these native measurements were synthetic and local; each proof stopped its own fixture and proxy.
+The [operator contract](../configuration.md#jev-guard) owns the distinct host budgets, advisory band, trusted-read boundary, cooldown and unchanged pre-tool outage denial.
+These observations establish actual host delivery of controlled judgments, not live-model accuracy or production activation.
+Both maintained native entrypoints also passed their 20-case matrices on these installed versions, covering exact channel consistency, untracked copy withholding/advisory, newly trusted changed home-state reads, privacy, missing credentials, provider outage and audit outage.
+
+### Offline policy verification before trusted-read handling
 
 Verified on 2026-10-15 UTC with Node.js 26.11.1 and Bun 1.3.14:
 
@@ -730,7 +747,7 @@ ok - private terminal audit keeps typed errors and cost certainty without payloa
 ```
 
 These are controlled HTTP-fixture policy and executable-adapter results, not live model accuracy, native Claude replacement or deployed protection.
-The source exception is the [operator contract's Firstmate-channel consistency check](../configuration.md#jev-guard), with the role-file receipt trust limit, not producer authentication; a same-user process deliberately forging the recorded digest can pass.
+At that time, the source exception was the [operator contract's Firstmate-channel consistency check](../configuration.md#jev-guard), with the role-file receipt trust limit, not producer authentication; a same-user process deliberately forging the recorded digest can pass.
 Maintained native refresh commands use this checkout's `ROOT`, synthetic publisher records and local scripted providers:
 
 ```sh

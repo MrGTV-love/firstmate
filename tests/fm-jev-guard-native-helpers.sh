@@ -15,7 +15,7 @@ fm_jev_native_run() {
   version=$("$backend" --version 2>&1) || fail "$backend: version unavailable: $version"
   local subject="$backend ($version)"
   local lab
-  lab=$(mktemp -d "$ROOT/.fm-jev-native.XXXXXX") || fail "$subject: scratch directory unavailable"
+  lab=$(mktemp -d "${TMPDIR:-/tmp}/fm-jev-native.XXXXXX") || fail "$subject: scratch directory unavailable"
   chmod 700 "$lab"
   export FM_JEV_NATIVE_LAB="$lab" FM_JEV_NATIVE_ROOT="$ROOT"
   # shellcheck disable=SC2329 # Registered by the EXIT trap below.
@@ -72,7 +72,7 @@ YML
 tee "$FM_JEV_NATIVE_LAB/native-hook.json" | "$FM_JEV_NATIVE_ROOT/bin/fm-jev-guard-hook.sh" "$FM_JEV_NATIVE_LAB/home" "$FM_JEV_NATIVE_LAB/home/config" "$FM_JEV_NATIVE_LAB/home/state" native "$FM_JEV_NATIVE_LAB/worktree" "$FM_JEV_NATIVE_LAB/home/data" firstmate FIRSTMATE_JEV_GUARD_V1
 SH
   chmod +x "$lab/hook.sh"
-  jq -n --arg command "bash '$lab/hook.sh'" '{hooks:{UserPromptSubmit:[{hooks:[{type:"command",command:$command,timeout:30}]}],PostToolUse:[{matcher:"Read",hooks:[{type:"command",command:$command,timeout:30}]}]}}' > "$lab/settings.json"
+  jq -n --arg command "bash '$lab/hook.sh'" '{hooks:{UserPromptSubmit:[{hooks:[{type:"command",command:$command,timeout:330}]}],PostToolUse:[{matcher:"Read",hooks:[{type:"command",command:$command,timeout:330}]}]}}' > "$lab/settings.json"
   jq -n --arg key synthetic-local-only '{hasCompletedOnboarding:true,customApiKeyResponses:{approved:[$key],rejected:[]}}' > "$lab/claude/.claude.json"
   for phase in normal privacy credentials provider audit; do
     for kind in launch inbox copy changed; do

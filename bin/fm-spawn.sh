@@ -6166,9 +6166,6 @@ EOF
     native_find=off
     [ "$guard_project" != firstmate ] || [ "$OMP_NO_HELPERS" = 1 ] || native_find=on
     native_helpers='{}'
-    if [ "$guard_project" = firstmate ] && [ "$OMP_NO_HELPERS" = 0 ]; then
-      native_helpers='{"extensionHandlers":{"toolCallTimeoutMs":330000}}'
-    fi
     if [ "$OMP_NO_HELPERS" = 0 ]; then
       native_helper_role=$MODEL
       case "$native_helper_role" in '' | default) native_helper_role=pi/default ;; esac

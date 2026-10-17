@@ -186,6 +186,27 @@ health "$HOME_C3" 402 probe >/dev/null
 assert_equals 1 "$(wakes "$HOME_C3")" "the credits alert is still deduplicated afterwards"
 pass "unreachable and timeout stay internal below the threshold and alert once at it"
 
+# Guard budget exhaustion is counted independently of ordinary probe misses.
+HOME_G=$(new_home guard-outages)
+health "$HOME_G" 000 record 000 jev-guard >/dev/null
+health "$HOME_G" 000 record 000 jev-guard >/dev/null
+assert_equals 0 "$(wakes "$HOME_G")" "two exhausted guard budgets do not alert"
+health "$HOME_G" 000 record 000 unrelated >/dev/null
+assert_equals 0 "$(wakes "$HOME_G")" "other consumer transport codes do not become guard outages"
+health "$HOME_G" 000 record 000 jev-guard >/dev/null
+assert_equals 1 "$(wakes "$HOME_G" typesafe-health-unreachable)" "three exhausted budgets in fifteen minutes alert"
+health "$HOME_G" 000 record 000 jev-guard >/dev/null
+assert_equals 1 "$(wakes "$HOME_G")" "repeated guard outages remain deduplicated"
+health "$HOME_G" 200 record 200 dispatch-resolve >/dev/null
+assert_equals 1 "$(wakes "$HOME_G" typesafe-health-recovered)" "normal health recovery clears a guard alert"
+HOME_G2=$(new_home guard-old-outages)
+health "$HOME_G2" 000 record 000 jev-guard >/dev/null
+old=$(( $(date +%s) - 901 ))
+printf 'guard_outages=%s %s\n' "$old" "$old" >> "$HOME_G2/state/.typesafe-health"
+health "$HOME_G2" 000 record 000 jev-guard >/dev/null
+assert_equals 0 "$(wakes "$HOME_G2")" "outages older than fifteen minutes cannot trigger the guard alert"
+pass "guard exhaustion alerts after three recent budgets, ignores expired history, deduplicates and recovers through the health channel"
+
 # ---- consumer reports: at once, with no probe ----------------------------------
 HOME_D=$(new_home consumer)
 before=$(curl_calls)

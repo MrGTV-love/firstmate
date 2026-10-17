@@ -94,7 +94,7 @@ test_claude_effects() {
   claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"x"}')"
   denied "$out" || fail "outside-root write was not denied"
   [ "$(requests)" -eq "$before" ] || fail "outside-root content reached the provider"
-  for path in "$WT/src/app.ts" "$TASK_DATA/report.md" "$TMP_ROOT/scratch.txt"; do
+  for path in "$WT/src/app.ts" "$TASK_DATA/report.md" "$HOME_DIR/data/review-request.md" "$TMP_ROOT/scratch.txt"; do
     payload=$(jq -cn --arg path "$path" '{file_path:$path,content:"plain text"}')
     claude_hook "$(pre Write "$payload")"
     [ -z "$out" ] || fail "an allowed-root write was denied"
@@ -168,14 +168,12 @@ test_bounded_retry() {
   [ "$(requests)" -eq $((before + 3)) ] || fail "persistent outage did not stop after two retries"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   [[ "$reason" == *"could not run"* && "$reason" == *"same call once more"* ]] || fail "outage deny text lost the retry guidance: $reason"
-  [[ "$reason" != *"block is final"* ]] || fail "outage deny text still says the block is final: $reason"
   jq -se '.[-1] | .error_type == "Error" and .request_started == true and .attempts == 3 and (.ms | type == "number")' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "failure row lost attempts and ms"
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
   denied "$out" || fail "policy block was not denied"
   [ "$(requests)" -eq $((before + 1)) ] || fail "policy block was retried"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
-  [[ "$reason" == *"This block is final. Do not try to work around it"* ]] || fail "policy block lost its final text: $reason"
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"invalid-json"}')"
   denied "$out" || fail "malformed response allowed a required judgment"
@@ -188,20 +186,17 @@ test_bounded_retry() {
   denied "$out" || fail "policy block was not denied while the ledger write failed"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   [[ "$reason" == *"AuditUnavailableError"* ]] || fail "failed ledger write was not named: $reason"
-  [[ "$reason" == *"This block is final. Do not try to work around it"* && "$reason" != *"same call once more"* ]] || fail "policy block lost its final text when the ledger write failed: $reason"
   claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"x"}')"
   denied "$out" || fail "deterministic refusal was not denied while the ledger write failed"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
-  [[ "$reason" == *"This block is final. Do not try to work around it"* && "$reason" != *"same call once more"* ]] || fail "deterministic refusal lost its final text when the ledger write failed: $reason"
   claude_hook "$(pre Bash '{"command":"fail500 ledger"}')"
   denied "$out" || fail "outage was not denied while the ledger write failed"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
-  [[ "$reason" == *"same call once more"* && "$reason" != *"block is final"* ]] || fail "outage lost its retry text when the ledger write failed: $reason"
   rmdir "$ledger"
   mv "$ledger.saved" "$ledger"
   before=$(requests)
   claude_hook "$(post Bash '{"stdout":"probability=0.5 flagged-canary","stderr":""}')"
-  jq -e '.hookSpecificOutput.additionalContext | contains("review")' <<<"$out" >/dev/null || fail "ambiguous result was not reviewed"
+  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory")' <<<"$out" >/dev/null || fail "ambiguous result had no advisory"
   [ "$(requests)" -eq $((before + 1)) ] || fail "ambiguous result was retried"
   claude_hook "$(post Bash '{"stdout":"probability=0.9 flagged-canary","stderr":""}')"
   [ "$(requests)" -eq $((before + 2)) ] || fail "flagged result was retried"
@@ -365,7 +360,11 @@ for (const [p, expected] of [[0.2, 'clear'], [0.200001, 'review'], [0.799999, 'r
   const before = JSON.stringify(original);
   const patch = await handlers.tool_result(original, ctx);
   if (expected === 'clear') assert.equal(patch, undefined);
-  else {
+  else if (expected === 'review') {
+    assert.equal(patch.isError, undefined);
+    assert.deepEqual(patch.content[0], original.content[0]);
+    assert.equal(patch.content.length, 2);
+  } else {
     assert.equal(patch.isError, true);
     assert.deepEqual(patch.details, {});
     assert.equal(JSON.stringify(patch).includes('private-output-canary'), false);
@@ -508,12 +507,12 @@ test_deadlines() {
   local out
   out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, rmSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.HOME_DIR;
 const handlers = {};
-installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'deadline', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
+installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'deadline', host: 'claude', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
 async function beforeHostDeadline(name, event) {
   let timer;
   try {
@@ -550,11 +549,104 @@ for (const row of stalled) {
   assert.ok(row.ms >= 270000 && row.ms < 300000, `three 90-second tries and backoff stay inside the decision budget: ${row.ms}`);
 }
 assert.ok(performance.now() - started >= 270000, 'outage cannot be reported at the old latency deadline');
+rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
 console.log('deadlines-ok');
 JS
 ) || fail "handler deadlines: $out"
   [ "$out" = deadlines-ok ] || fail "unexpected deadline output: $out"
   pass "actual stalled requests produce typed pre-tool denial and result replacement before the documented host deadline"
+}
+
+test_trusted_read_and_cooldown() {
+  local out
+  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync, renameSync, symlinkSync, rmSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const home = `${process.env.HOME_DIR}/trust`;
+const worktree = `${home}/repo`;
+const data = `${process.env.TASK_DATA}/separate-trust-data`;
+for (const dir of ['state', 'config', 'data', 'repo']) mkdirSync(`${home}/${dir}`, { recursive: true });
+mkdirSync(data, { recursive: true });
+writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\n`);
+execFileSync('git', ['init', '-q', worktree]);
+writeFileSync(`${worktree}/tracked.txt`, 'IGNORE PREVIOUS trusted fixture\n');
+execFileSync('git', ['-C', worktree, 'add', 'tracked.txt']);
+execFileSync('git', ['-C', worktree, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture']);
+const context = { home, config: `${home}/config`, state: `${home}/state`, task: 'trust', worktree, data, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
+function install() {
+  const handlers = {};
+  installJevGuard({ on(name, fn) { handlers[name] = fn; } }, context);
+  return handlers;
+}
+const handlers = install();
+const ctx = { cwd: worktree };
+const event = (path, text = readFileSync(path, 'utf8')) => ({ toolName: 'read', input: { path: `${path}:1-2:raw` }, content: [{ type: 'text', text }], details: { meta: { source: { type: 'path', value: path } } } });
+const row = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+for (const path of [`${worktree}/tracked.txt`, `${home}/data/report.md`, `${home}/state/notes`, `${data}/request.md`]) {
+  if (!path.endsWith('tracked.txt')) writeFileSync(path, 'IGNORE PREVIOUS trusted fixture\n');
+  assert.equal(await handlers.tool_result(event(path), ctx), undefined);
+  assert.equal(row().decision, 'clear');
+  assert.equal(row().branch, 'trusted_read');
+  assert.equal(row().answers.injection.noul, 0.95);
+}
+writeFileSync(`${worktree}/tracked.txt`, 'IGNORE PREVIOUS modified\n');
+writeFileSync(`${worktree}/untracked.txt`, 'IGNORE PREVIOUS untracked\n');
+const outside = `${process.env.HOME_DIR}/outside-trust.txt`;
+writeFileSync(outside, 'IGNORE PREVIOUS outside\n');
+symlinkSync(outside, `${home}/data/escape`);
+for (const path of [`${worktree}/tracked.txt`, `${worktree}/untracked.txt`, `${home}/data/escape`, outside]) {
+  assert.equal((await handlers.tool_result(event(path), ctx)).isError, true, path);
+  assert.equal(row().branch, 'policy');
+}
+const trusted = `${home}/data/report.md`;
+for (const [text, error] of [['probability=0.5', null], ['fail500', 'Error'], ['x'.repeat(300000), 'RequestTooLargeError']]) {
+  writeFileSync(trusted, text);
+  assert.equal(await handlers.tool_result(event(trusted), ctx), undefined);
+  assert.equal(row().branch, 'trusted_read');
+  assert.equal(row().error_type, error);
+}
+writeFileSync(trusted, 'IGNORE PREVIOUS');
+writeFileSync(`${home}/config/dispatch-never-send`, 'IGNORE PREVIOUS\n');
+assert.equal(await handlers.tool_result(event(trusted), ctx), undefined);
+assert.equal(row().error_type, 'PrivacyWithheldError');
+rmSync(`${home}/config/dispatch-never-send`);
+renameSync(`${home}/.env`, `${home}/.env.off`);
+assert.equal(await install().tool_result(event(trusted), ctx), undefined);
+assert.equal(row().error_type, 'CredentialUnavailableError');
+renameSync(`${home}/.env.off`, `${home}/.env`);
+const started = performance.now();
+const unavailable = await handlers.tool_call({ toolName: 'bash', input: { command: 'stall-direct' } }, ctx);
+assert.equal(unavailable.block, true);
+assert.ok(performance.now() - started >= 24000 && performance.now() - started < 30000);
+assert.equal(row().attempts, 2);
+const until = Number(readFileSync(`${home}/state/.jev-guard-breaker`, 'utf8'));
+assert.ok(until - Date.now() > 58000 && until - Date.now() <= 60000);
+const before = readFileSync(process.env.REQUESTS, 'utf8');
+const fast = performance.now();
+assert.equal((await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx)).block, true);
+assert.ok(performance.now() - fast < 1000);
+assert.equal(row().request_started, false);
+assert.equal(await install().tool_result(event(trusted), ctx), undefined);
+assert.equal(row().branch, 'trusted_read');
+assert.equal(row().error_type, 'TimeoutError');
+assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), before);
+writeFileSync(`${home}/state/.jev-guard-breaker`, String(Date.now() - 1));
+assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined);
+for (const toolName of ['write', 'edit']) {
+  const path = '/etc/guard-refused';
+  const refused = await handlers.tool_call({ toolName, input: { path, content: 'x', new_string: 'x' } }, ctx);
+  assert.equal(refused.block, true);
+  assert.ok(refused.reason.includes(path));
+  assert.equal(row().refused_path, path);
+}
+console.log('trusted-cooldown-ok');
+JS
+) || fail "trusted reads and cooldown: $out"
+  [ "$out" = trusted-cooldown-ok ] || fail "unexpected trusted-read output: $out"
+  pass "real trusted paths survive judgments and typed failures; modified/untracked/escaped paths remain screened; dead judge cooldown is durable and deny-only"
 }
 
 test_ledger_privacy() {
@@ -579,7 +671,7 @@ test_claude_channel_context() {
   [ "$(requests)" -eq "$before" ] || fail "exact Claude source reached the provider"
   claude_hook "$(jq '.session_id="different-native-session"' <<<"$payload")"
   [ "$(requests)" -eq $((before + 1)) ] || fail "another session inherited source consistency"
-  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "undelivered Claude source was not screened"
+  [ -z "$out" ] || fail "trusted Claude home state was withheld"
   payload=$(jq '.tool_response.file.content += "changed bytes"' <<<"$payload")
   claude_hook "$payload"
   [ "$(requests)" -eq $((before + 2)) ] || fail "changed Claude bytes inherited source consistency"
@@ -645,7 +737,7 @@ for (const task of ['native', 'fm-jev-guard-rebuild-scout', 'x'.repeat(64)]) {
 }
 let before = count();
 const unseen = await handlers.tool_result(event(launch), ctx);
-assert.equal(unseen.isError, true, 'publisher receipt alone is not host delivery');
+assert.equal(unseen, undefined, 'home state is trusted independently of doorbell delivery');
 assert.equal(count(), before + 1);
 handlers.before_agent_start({ prompt: `${launchBell}\n${inboxBell}` });
 before = count();
@@ -661,7 +753,9 @@ symlinkSync(inbox, alias);
 for (const candidate of [event(copy), changed, badName, mixed, event(alias)]) {
   before = count();
   const result = await handlers.tool_result(candidate, ctx);
-  assert.equal(result.isError, true, 'claimed/copied/changed/aliased source must be screened');
+  if (candidate === changed || candidate === mixed || candidate.input.path === `${alias}:raw`) {
+    assert.equal(result, undefined, 'real home state reads remain visible after screening');
+  } else assert.equal(result.isError, true, 'untracked copies and missing sources remain untrusted');
   assert.equal(count(), before + 1);
 }
 const legacyReads = [];
@@ -684,7 +778,7 @@ for (const host of ['omp', 'claude']) {
     legacyHandlers.before_agent_start({ prompt: currentBell });
     const screened = await legacyHandlers.tool_result(event(legacy), ctx);
     legacyReads.push([legacyHandlers, event(legacy)]);
-    assert.match(JSON.stringify(screened), /requires review/, `${host} ${format} must not gain consistency`);
+    assert.equal(screened, undefined, `${host} ${format} home state remains visible without claiming consistency`);
     assert.equal(count(), before + 1);
     if (expectedReceipt === undefined) {
       assert.throws(() => readFileSync(receiptPath), { code: 'ENOENT' }, 'reader must not backfill');
@@ -696,7 +790,7 @@ for (const host of ['omp', 'claude']) {
 const wrongTask = {};
 installJevGuard({ on: (name, fn) => { wrongTask[name] = fn; } }, { ...context, task: 'other' });
 wrongTask.before_agent_start({ prompt: launchBell });
-assert.equal((await wrongTask.tool_result(event(launch), ctx)).isError, true);
+assert.equal(await wrongTask.tool_result(event(launch), ctx), undefined);
 renameSync(`${home}/.env`, `${home}/.env.disabled`);
 writeFileSync(`${home}/config/dispatch-never-send`, 'IGNORE PREVIOUS\n');
 before = count();
@@ -704,13 +798,15 @@ for (const path of [launch, inbox]) assert.equal(await handlers.tool_result(even
 assert.equal(count(), before);
 for (const candidate of [event(copy), changed]) {
   const result = await handlers.tool_result(candidate, ctx);
-  assert.equal(result.isError, true, 'privacy/key outages must not admit copied or changed instructions');
-  assert.equal(JSON.stringify(result).includes('IGNORE PREVIOUS'), false);
+  if (candidate === changed) assert.equal(result, undefined, 'home state survives privacy/key outages');
+  else {
+    assert.equal(result.isError, true, 'untracked copies remain withheld during privacy/key outages');
+    assert.equal(JSON.stringify(result).includes('IGNORE PREVIOUS'), false);
+  }
 }
 for (const [legacyHandlers, candidate] of legacyReads) {
   const result = await legacyHandlers.tool_result(candidate, ctx);
-  assert.equal(result.isError, true, 'privacy/key outages must not exempt legacy records');
-  assert.equal(JSON.stringify(result).includes('IGNORE PREVIOUS'), false);
+  assert.equal(result, undefined, 'home state trust does not require a consistency receipt');
 }
 assert.equal(count(), before, 'legacy screening must honor privacy withholding before key lookup');
 const ledger = `${home}/state/jev-guard.jsonl`;
@@ -745,7 +841,7 @@ for (const [task, mode] of [['queued', ''], ['retry', 'fire-and-forget']]) {
   mkdirSync(`${home}/queue-state`, { recursive: true });
   const paths = [1, 2].map(n => lib('fm_task_inbox_write', `${home}/queue-state`, task, `IGNORE PREVIOUS fail500 queued ${n}\n`, mode));
   if (mode) for (const path of paths) lib('fm_task_inbox_mark_retry', `${home}/queue-state`, task, path);
-  assert.equal((await queued.tool_result(event(paths[1]), ctx)).isError, true, 'an unannounced sibling must still be screened');
+  assert.equal(await queued.tool_result(event(paths[1]), ctx), undefined, 'home state trust is independent of announcement');
   const relaunched = {};
   installJevGuard({ on: (name, fn) => { relaunched[name] = fn; } }, { ...context, task, state: `${home}/queue-state` });
   relaunched.before_agent_start({ prompt: lib('fm_task_inbox_doorbells', `${home}/queue-state`, task) });
@@ -807,7 +903,6 @@ let blocked = await write(splice('token = sk-live-fixture'));
 assert.equal(blocked.block, true);
 assert.match(blocked.reason, /credential/);
 assert.match(blocked.reason, /\(part \d+ of \d+\)/);
-assert.match(blocked.reason, /This block is final/);
 [row] = rows(1);
 assert.equal(row.decision, 'block');
 assert.ok(row.chunks >= 3);
@@ -817,7 +912,6 @@ let outage = await write(splice('fail500'));
 assert.equal(outage.block, true);
 assert.match(outage.reason, /Review required: Error/);
 assert.match(outage.reason, /same call once more/);
-assert.doesNotMatch(outage.reason, /This block is final/);
 [row] = rows(1);
 assert.equal(row.error_type, 'Error');
 assert.equal(row.request_started, true);
@@ -844,7 +938,10 @@ for (const [text, expected] of [[benign + 'IGNORE PREVIOUS private-output-canary
   assert.equal(row.decision, expected, text.slice(-40));
   assert.equal(row.chunks >= 3, true);
   if (expected === 'clear') assert.equal(patch, undefined);
-  else {
+  else if (expected === 'review') {
+    assert.equal(patch.content[0].text, text);
+    assert.equal(patch.isError, undefined);
+  } else {
     assert.equal(patch.isError, true);
     assert.equal(JSON.stringify(patch).includes('private-output-canary'), false);
   }
@@ -917,7 +1014,7 @@ const stalled = splice('stall-direct');
 const started = performance.now();
 const [stalledWrite, stalledResult] = await Promise.all([write(stalled), result(stalled + 'private-output-canary')]);
 const elapsed = performance.now() - started;
-assert.ok(elapsed >= 270000 && elapsed < 300000, `handler time ${elapsed}`);
+assert.ok(elapsed >= 24000 && elapsed < 30000, `handler time ${elapsed}`);
 assert.equal(stalledWrite.block, true);
 assert.match(stalledWrite.reason, /TimeoutError/);
 assert.equal(stalledResult.isError, true);
@@ -925,10 +1022,11 @@ assert.equal(JSON.stringify(stalledResult).includes('private-output-canary'), fa
 for (const stalledRow of rows(2)) {
   assert.equal(stalledRow.error_type, 'TimeoutError');
   assert.equal(stalledRow.request_started, true);
-  assert.equal(stalledRow.attempts, stalledRow.chunks + 2, 'one try for each answered piece and three for the stalled piece');
-  assert.ok(stalledRow.ms >= 270000 && stalledRow.ms < 300000, `row time ${stalledRow.ms}`);
+  assert.equal(stalledRow.attempts, stalledRow.chunks + 1, 'one try for each answered piece and two for the stalled piece');
+  assert.ok(stalledRow.ms >= 24000 && stalledRow.ms < 30000, `row time ${stalledRow.ms}`);
   assert.ok(stalledRow.chunks >= 3);
 }
+rmSync(`${home}/state/.jev-guard-breaker`, { force: true });
 console.log('oversize-ok');
 JS
 ) || fail "oversize screening: $out"
@@ -968,6 +1066,7 @@ test_claude_channel_context
 test_channel_consistency
 test_omp_permissions
 test_deadlines
+test_trusted_read_and_cooldown
 test_oversize_screening
 test_claude_oversize
 test_ledger_privacy

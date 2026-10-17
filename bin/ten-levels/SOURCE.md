@@ -41,18 +41,22 @@ Question wording, criteria, pure decisions, and thresholds remain upstream's.
 - `tests/level06.test.ts` exercises equality boundaries, independent shell/write signals, invalid injection values and empty-output handling instead of pinning banner/reason wording or claiming mock semantic accuracy.
 - `extensions/report.ts` is Firstmate's per-installation service and minimized audit owner rather than the upstream lab side channel.
   It snapshots and checks the complete request before key lookup, plans an oversized payload as overlapping pieces that each fit the request ceiling (`plan`), refuses one that no complete cover fits, uses the existing TypeSafe key/privacy owners, keeps the complete successful client result through policy evaluation, and normalizes error types without logging exception payloads.
-  Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input-derived text.
+  Its shared cancellation scope bounds both handlers, and its terminal-record API deliberately excludes raw exchanges, arbitrary provider fields and input text except the specifically refused write/edit path.
   Durable-record failure is explicit rather than silently optional while active.
-  It also allows up to three 90-second tries of an outage of a required judgment, with cancellable one-second then two-second backoff inside one 300-second handler budget, owns the unchanged outage-only deny text that replaces the permanent block notice, and records its own tries and elapsed time on failure rows that hold no provider answer.
-  These Firstmate-only timing changes leave the upstream client, questions, thresholds, screened inputs and `REVIEW_ON_UNAVAILABLE_V1` outage semantics unchanged; the operator contract above owns the measurement and enclosing host limits.
+  It allows Claude up to three 90-second tries with cancellable one-second then two-second backoff inside a 300-second decision budget, but keeps omp at two 12-second tries with 500 ms backoff inside 25 seconds because its native result handler times out at 30 seconds and forwards the original output.
+  It retains outage-only deny guidance, records its own tries and elapsed time on failures, persists a 60-second judge cooldown after budget exhaustion, and reports those exhausted budgets through the existing TypeSafe health channel, which alerts after three within 15 minutes.
+  These Firstmate-only changes leave the upstream client, questions, thresholds, egress checks and `REVIEW_ON_UNAVAILABLE_V1` pre-tool denial unchanged; the operator contract above owns measurements and enclosing host limits.
 
 The obsolete `extensions/jev-guard.ts` lab hook wrapper and its permissive error handling are removed, not retained as a second runtime path.
 
 ## Firstmate glue outside this directory
 
 - `bin/fm-jev-guard.ts` is the single worker event entry point and applies deterministic input/root/device checks before model screening.
-  It judges every piece of an oversized payload with the unchanged level 6 policies and passes the payload only when every piece passes.
-  Its host response handling and one isolated Firstmate-channel consistency function consume the service and pure policies; no signing, alternate transport or tool proxy is introduced.
+  It judges every piece of an oversized payload with the unchanged level 6 policies; shell/write payloads pass only when every piece passes, while result handling applies the explicit advisory and trusted-read rules below.
+  Its host response handling preserves answered middle-band results with an advisory and audit row, and preserves native reads of real home data/state, task data, or tracked own-worktree files whose blob equals `HEAD`, recording `clear` / `trusted_read` with the original error type.
+  Untrusted flags at or above 0.80 remain withheld on omp; shell/write outages still deny, and neither source trust nor advisory handling bypasses egress checks.
+  Write/edit refusals record the target path and direct the worker to request an authorized correction, and allowed write roots include the owning home's data directory.
+  The existing isolated Firstmate-channel consistency function remains distinct; no signing, alternate transport or tool proxy is introduced.
   The [operator contract](../../docs/configuration.md#jev-guard) owns host-specific result handling, the role-file receipt trust limit (including same-user digest forgery), named outage behavior and explicit no-protection claim; consistency is never producer authentication.
 - `bin/fm-jev-guard-claude.ts` forwards actual input/call identity, maps pre-tool refusal to Claude denial, and maps result notices only to advisory `additionalContext`.
   Current Claude documentation describes built-in output replacement, but this adapter does not claim installed-host support or use it without verification.

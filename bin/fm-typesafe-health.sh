@@ -27,7 +27,10 @@
 #   seconds (bin/fm-watch.sh typesafe_health_tick; there is no daemon).
 #   bin/fm-dispatch-resolve.sh and bin/fm-skill-pick.sh call `record` the moment
 #   they see 402, 401, or 403, so the alert does not wait for the next probe.
-#   A 200 recorded by a consumer clears an alert; any other code is ignored.
+#   A 200 recorded by a consumer clears an alert; any other code is ignored,
+#   except `record 000 jev-guard`: a full guard budget exhausted, not a skipped
+#   cooldown call. Three observations within 15 minutes alert through this same
+#   health channel; expired history and repeated alerted failures stay silent.
 #
 # Only the primary home alerts. A home with a .fm-secondmate-parent record or a
 #   .fm-secondmate-home marker uses the primary home's key (fm_typesafe_key), so
@@ -82,7 +85,7 @@ fi
 # Ordinary dispatches report a 200 or a code the probe owns on every call, so the
 # no-op cases leave before the wake library is even loaded.
 if [ "$MODE" = record ]; then
-  case "$2" in 200|402|401|403) ;; *) exit 0 ;; esac
+  case "$2:${3:-}" in 200:*|402:*|401:*|403:*|000:jev-guard) ;; *) exit 0 ;; esac
   [ "$2" != 200 ] || [ -f "${FM_STATE_OVERRIDE:-$FM_HOME/state}/.typesafe-health" ] || exit 0
 fi
 
@@ -100,11 +103,11 @@ case "$UNREACHABLE_PROBES" in
 esac
 CONSUMERS="worker dispatch resolution, worker skill picking, compact-adviser judgments (no automatic compaction), the Level 6 jev-guard, and the belay Stop hook"
 
-S_STATUS=ok S_SINCE='' S_ALERTED='' S_ALERTED_SINCE='' S_COUNT=0 S_LAST_OK='' S_LAST_PROBE='' S_SOURCE='' S_DETAIL=''
+S_STATUS=ok S_SINCE='' S_ALERTED='' S_ALERTED_SINCE='' S_COUNT=0 S_LAST_OK='' S_LAST_PROBE='' S_SOURCE='' S_DETAIL='' S_GUARD_OUTAGES=''
 
 load_state() {
   local key value
-  S_STATUS=ok S_SINCE='' S_ALERTED='' S_ALERTED_SINCE='' S_COUNT=0 S_LAST_OK='' S_LAST_PROBE='' S_SOURCE='' S_DETAIL=''
+  S_STATUS=ok S_SINCE='' S_ALERTED='' S_ALERTED_SINCE='' S_COUNT=0 S_LAST_OK='' S_LAST_PROBE='' S_SOURCE='' S_DETAIL='' S_GUARD_OUTAGES=''
   [ -f "$HEALTH_FILE" ] && [ ! -L "$HEALTH_FILE" ] || return 0
   while IFS='=' read -r key value; do
     case "$key" in
@@ -117,6 +120,7 @@ load_state() {
       last_probe) S_LAST_PROBE=$value ;;
       last_source) S_SOURCE=$value ;;
       last_detail) S_DETAIL=$value ;;
+      guard_outages) S_GUARD_OUTAGES=$value ;;
     esac
   done < "$HEALTH_FILE"
   case "$S_STATUS" in ok|credits|auth|unreachable) ;; *) S_STATUS=ok ;; esac
@@ -131,6 +135,7 @@ write_state() {
       "$S_STATUS" "$S_SINCE" "$S_ALERTED" "$S_ALERTED_SINCE" "$S_COUNT"
     printf 'last_ok=%s\nlast_probe=%s\nlast_source=%s\nlast_detail=%s\n' \
       "$S_LAST_OK" "$S_LAST_PROBE" "$S_SOURCE" "$S_DETAIL"
+    printf 'guard_outages=%s\n' "$S_GUARD_OUTAGES"
   } > "$tmp" || { rm -f -- "$tmp"; return 1; }
   mv -f -- "$tmp" "$HEALTH_FILE" || { rm -f -- "$tmp"; return 1; }
 }
@@ -169,10 +174,18 @@ alert_payload() {  # <class> <since> <count>
 # observe <class> <detail> <source> - apply one observation under the state lock.
 # class is ok, credits, auth, or unreachable; detail is a fixed phrase or code.
 observe() {
-  local class=$1 detail=$2 source=$3 now rc=0 payload
+  local class=$1 detail=$2 source=$3 now rc=0 payload stamp recent='' guard_count=0
   fm_epoch_seconds_to now
   fm_lock_acquire_wait_max "$HEALTH_LOCK" 10 || return 1
   load_state
+  if [ "$source" = jev-guard ] && [ "$class" = unreachable ]; then
+    for stamp in $S_GUARD_OUTAGES; do
+      case "$stamp" in ''|*[!0-9]*) continue ;; esac
+      if [ "$stamp" -ge "$((now - 900))" ]; then recent="${recent:+$recent }$stamp"; guard_count=$((guard_count + 1)); fi
+    done
+    S_GUARD_OUTAGES="${recent:+$recent }$now"
+    guard_count=$((guard_count + 1))
+  fi
   case "$class" in
     ok)
       # A consumer's 200 with no recorded history changes nothing, so a healthy
@@ -201,7 +214,11 @@ observe() {
         unreachable)
           # A failure the captain was already told about is never replaced by a
           # vaguer one, and an unreachable alert is not repeated.
-          if [ "$S_COUNT" -ge "$UNREACHABLE_PROBES" ] && [ -z "$S_ALERTED" ]; then
+          if [ "$source" = jev-guard ]; then
+            if [ "$guard_count" -ge 3 ] && [ -z "$S_ALERTED" ]; then
+              payload="check: typesafe-health: Jev guard exhausted $guard_count judgment budgets in the last 15 minutes. Required shell and write reviews are denied during outages; untrusted flagged or unavailable results are withheld. A 60-second judge cooldown avoids repeated waits. Investigate judge availability; no automatic protection bypass is enabled."
+            fi
+          elif [ "$S_COUNT" -ge "$UNREACHABLE_PROBES" ] && [ -z "$S_ALERTED" ]; then
             payload=$(alert_payload unreachable "$S_SINCE" "$S_COUNT")
           fi ;;
       esac
@@ -251,6 +268,7 @@ run_record() {
   case "$source" in *[!a-z0-9-]*|'') source=consumer ;; esac
   case "$code" in
     200|402|401|403) ;;
+    000) [ "$source" = jev-guard ] || return 0 ;;
     *) return 0 ;;
   esac
   classify_http "$code"
