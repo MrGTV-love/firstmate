@@ -1,0 +1,3 @@
+ok - the pending-reply pass beats between records (8 beacon updates in 18s)
+ok - driver done
+bash "$D/run-one.sh" "$PWD"  10.52s user 15.49s system 80% cpu 32.501 total

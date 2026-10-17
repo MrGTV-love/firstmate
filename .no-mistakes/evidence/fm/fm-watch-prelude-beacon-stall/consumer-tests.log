@@ -1,0 +1,138 @@
+ledger: "/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M54E49342YR2MR9KYC7XFSKQ/data/command-durations.jsonl is checkout-local and not durable: FM_DURATION_HOME is unset"
+FM_TEST_BEGIN 2026-10-17T08:17:48Z tests/fm-remote-reply.test.sh family=secondmate expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-17T08:17:48Z tests/fm-secondmate-reconcile.test.sh family=secondmate expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-17T08:17:48Z tests/fm-backlog-handoff.test.sh family=secondmate expected_gate_skip=none
+FM_TEST_BEGIN 2026-10-17T08:17:48Z tests/fm-send-secondmate-marker.test.sh family=secondmate expected_gate_skip=none
+ok - fm-send: a kind=secondmate target gets the from-firstmate marker and corr prepended
+ok - fm-send: an exact kind=secondmate task id is marked with corr exactly once
+ok - fm-send: exact-id and stable-label kind=ship selectors are sent unmarked
+ok - fm-send: explicit endpoints stay unmarked with or without local metadata
+ok - fm-send: the --key path carries no marker (no literal text is typed)
+ok - fm-send: the marker is '[fm-from-firstmate]' + terminal-safe U+2063, while direct captain text stays unmarked
+ok - fm-marker: from-firstmate transformation is idempotent
+ok - fm-send: marked secondmate payload preserves trailing newline bytes in its record
+FM_TEST_END 2026-10-17T08:18:17Z tests/fm-send-secondmate-marker.test.sh exit=0 duration_ms=28176 gate_skip=false
+ok - reconcile requests stop oversized streams at the capture bound
+ok - reconcile requests require exactly one snapshot document
+ok - reconcile requests coalesce per target and retire independently after delivery
+ok - Bearings records locally, returns before a delayed remote queue, and supervision delivers later
+ok - a home in mismatch is asked once, and later recaps stay silent
+ok - a mismatch outliving the cooldown earns one re-nudge, then goes quiet again
+ok - the cooldown begins when delivery finishes
+ok - the cooldown window is four hours
+ok - the cooldown is per home, not fleet-wide
+ok - the reconcile ask expects no reply and stays out of a ladder that still rings ordinary steers
+ok - only a backlog-vs-metadata mismatch produces an ask
+ok - the parent asks and changes nothing inside the mate's home
+ok - a failed ask starts no cooldown, so the next run retries it
+ok - busy reconcile lifecycle locks never block the digest or start cooldown
+ok - simultaneous recaps still ask the mate only once
+ok - a delayed snapshot asks for a current check instead of prescribing a stale repair
+ok - a stale snapshot cannot ask or silence a replacement mate
+ok - teardown retires the cooldown before a replacement can inherit it
+ok - a legitimately markerless persistent remote secondmate is nudged once per window
+ok - a stale remote-route snapshot cannot ask or silence a replacement mate
+ok - a route replacement between reconcile and fm-send cannot receive a stale ask
+ok - a row with neither a spawn generation nor a host fails loudly instead of vanishing
+FM_TEST_END 2026-10-17T08:19:41Z tests/fm-secondmate-reconcile.test.sh exit=0 duration_ms=112178 gate_skip=false
+ok - a routed handoff wakes once and a successful rerun stays idempotent
+ok - a cwd .tasks.toml for another backend does not redirect a markdown handoff
+ok - a failed receiver wake is loud and retries from an already-present handoff
+ok - a failed advisory doorbell leaves the inbox delivery successful and idempotent
+ok - concurrent reconciliation treats enqueue as delivery despite a failed advisory ring
+tests/fm-backlog-handoff.test.sh: line 263: 23628 Killed: 9               FM_REAL_TASKS_AXI="$real_tasks" PATH="$fakebin:$PATH" FM_HOME="$home" "$ROOT/bin/fm-backlog-handoff.sh" design crash-item > "$TMP_ROOT/move-crash.out" 2>&1
+ok - a post-move crash preserves wake intent for an idempotent retry
+tests/fm-backlog-handoff.test.sh: line 339: 46866 Killed: 9               FM_REAL_TASKS_AXI="$real_tasks" PATH="$fakebin:$PATH" FM_HOME="$home" "$ROOT/bin/fm-backlog-handoff.sh" design pre-move-crash > "$TMP_ROOT/pre-move-crash.out" 2>&1
+ok - a pre-move crash wakes only after retry makes the item durable
+tests/fm-backlog-handoff.test.sh: line 414: 71927 Killed: 9               PATH="$fakebin:$PATH" FM_REAL_RM="$real_rm" FM_CONFIRM_CRASH_ONCE="$TMP_ROOT/confirm-crash.once" FM_CONFIRM_WAKE_MARKER="$home/state/.backlog-handoff-design.wake-pending" FM_HOME="$home" "$ROOT/bin/fm-backlog-handoff.sh" design confirm-crash > "$TMP_ROOT/confirm-crash.out" 2>&1
+ok - a post-confirmation crash reconciles once without suppressing a later handoff wake
+ok - an unresolved delivery attempt refuses an immediate duplicate wake
+ok - concurrent local handoffs serialize each durable move with its wake
+ok - local teardown waits for the routed move and receiver wake
+ok - failed local home removal preserves its wake and a retry retires both
+ok - body followed by another item moves intact with no source orphans
+ok - body followed by section heading moves intact; section stays
+ok - multi-paragraph body with internal blank lines moves whole and is idempotent
+ok - body as last lines of the file moves intact
+ok - EOF body before a seeded destination section keeps its boundary
+ok - untouched EOF line preserves its original terminator
+ok - body-carrying handoff is idempotent: re-run changes nothing
+ok - noncanonical one-space and tab continuations refuse without changes
+ok - indented ## Intent / ## Acceptance are body, not section boundaries
+ok - registry home parses when summary has parentheses before (home: ...)
+ok - registry entry without (home: ...) fails cleanly with has no home
+ok - handoff reports a moved item whose public commitment still binds this home
+ok - handoff says nothing about public commitments in a relay-free home
+ALL TESTS PASSED
+FM_TEST_END 2026-10-17T08:20:22Z tests/fm-backlog-handoff.test.sh exit=0 duration_ms=154004 gate_skip=false
+ok - default delta reader waits 0.5 seconds then delivers a non-destructive complete-line delta
+ok - override delta reader waits 0.07 seconds then delivers a non-destructive complete-line delta
+ok - a blocking non-destructive remote delta reaches durable process-event capture
+ok - a captured delta is applied, acknowledged, and re-armed without a handler
+ok - ingest appends one validated line, fetches its document, and advances the cursor
+ok - replayed capture has one deduplicated append and one durable handling identity
+ok - later generations cannot invalidate an unacknowledged ingested result
+ok - the remote status and decision model mirrors and the cursor advances
+ok - a remote mate's new decision folds open exactly as a local mate's does
+ok - a replayed mirrored delta is idempotent in both the stream and the cursor
+ok - transported control bytes are normalized in place and never stop the stream
+ok - payload protocol-field names cannot collide with transport metadata
+ok - NUL bytes are normalized in place before shell line processing
+ok - local document storage failures remain retryable until delivery succeeds
+ok - a structured pointer must end at its token boundary
+ok - adjacent pointers are fetched while malformed tokens remain unchanged
+ok - a rejected candidate never gives the following text a false leading boundary
+ok - nested remote reports relay while an undeliverable foreign pointer fails open
+ok - the reported incident raises no standing decision and still delivers the report
+ok - an undeliverable structured offer fails open with one note and never a decision
+ok - a remote refusal surfaces its own reason without opening a decision
+ok - a failed pointer extraction never commits a partial delta
+ok - a failed mirror write never drops status content or advances the cursor
+ok - source-line identity survives commit failure and cursor-loss recapture
+ok - a mirrored reserved-key line cannot squat or clear the parent's own decision
+ok - a reply that arrives after escalation resolves it and clears the open decision
+ok - a remote reply listener stays owned across empty waits and a delta
+ok - a failed remote read exits instead of relistening
+ok - persistent ingestion failure leaves exactly one durable capture
+ok - a preempted reply poll reports a closed window without publishing channel freshness
+ok - a preempted reply poll keeps its listener and reconcile launches nothing
+ok - a quiet reply window publishes the caught-up watermark the reply guard reads
+ok - a cursor-loss whole-log recapture is acknowledged quietly with no duplicate wake
+ok - truncation is detected, escalated once, and not silently rebased
+ok - a repeated continuity break after an operator resolve appends nothing
+ok - remote reply retirement quiesces and refuses unhandled captured results
+ok - a later continuity break after repair and re-advance opens the decision again
+ok - an old-format continuity line does not swallow the next break
+ok - a later continuity break after the cursor moves without retirement opens the decision again
+ok - a continuity break after retirement and an identical restore opens the decision once
+ok - a failed cursor removal does not increase the retirement count
+ok - a retirement that stops after removing the cursor leaves the old count
+ALL TESTS PASSED
+FM_TEST_END 2026-10-17T08:26:28Z tests/fm-remote-reply.test.sh exit=0 duration_ms=519452 gate_skip=false
+FM_TEST_BEGIN 2026-10-17T08:26:28Z tests/fm-classify-corr-token.test.sh family=standalone expected_gate_skip=none
+ok - captain regex overrides preserve timed and legacy relevance and event bytes
+ok - malformed event times stay ordinary line bytes without hiding the event
+ok - malformed event times never open or close a decision
+ok - optional event time preserves parsing and legacy unknown time
+ok - a correlation token between the verb and the key breaks neither opening nor closing
+ok - the token is read through before the key, after it, doubled, bracketed, and unkeyed
+ok - the untokened opener/closer pair behaves exactly as before
+ok - prose, malformed, wrong-length and unknown name=value tokens stay non-transitions
+ok - a token-first line cannot impersonate any opening or closing verb
+ok - untokened captain-relevance, pause, terminal-verb and captain-held verdicts are unchanged
+ok - captain-relevance, terminal-verb, pause and captain-held all read through the token
+ok - the daemon and crew-state verb case arms read through the token
+ok - reading through the token does not weaken the reserved-key namespace rule
+ok - the cursor-backed fold and the whole-file fold agree on every correlated transition
+ok - a cursor persisted under the previous reading is discarded and refolded
+ok - both real correlation-token writers produce lines this classifier reads through
+FM_TEST_END 2026-10-17T08:27:00Z tests/fm-classify-corr-token.test.sh exit=0 duration_ms=31806 gate_skip=false
+FM_TEST_SUMMARY total=5 failed=0 skipped_gate=0 duration_ms=553470
+FM_TEST_SUMMARY_FAMILY family=secondmate count=4 duration_ms=813810 failed=0
+FM_TEST_SUMMARY_FAMILY family=standalone count=1 duration_ms=31806 failed=0
+FM_TEST_SLOWEST rank=1 script=tests/fm-remote-reply.test.sh duration_ms=519452
+FM_TEST_SLOWEST rank=2 script=tests/fm-backlog-handoff.test.sh duration_ms=154004
+FM_TEST_SLOWEST rank=3 script=tests/fm-secondmate-reconcile.test.sh duration_ms=112178
+FM_TEST_SLOWEST rank=4 script=tests/fm-classify-corr-token.test.sh duration_ms=31806
+FM_TEST_SLOWEST rank=5 script=tests/fm-send-secondmate-marker.test.sh duration_ms=28176
+bin/fm-test-run.sh tests/fm-remote-reply.test.sh      180.23s user 408.89s system 106% cpu 9:14.12 total

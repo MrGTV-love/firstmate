@@ -1,0 +1,2 @@
+not ok - the beacon moved 1 time(s) during a 39s pending-reply pass; a pass longer than the grace looks like a dead watcher
+bash "$D/run-one.sh" "$PWD"  12.45s user 27.00s system 81% cpu 48.554 total
