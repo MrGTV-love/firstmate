@@ -1730,19 +1730,24 @@ Additional isolated live validation on 2026-10-09, with omp 18.8.1 on Herdr 0.9.
 After the bounded wait, the extension submitted the wake alone, omp consumed the queued follow-up, and the editor retained exactly the unsent draft.
 The before-change extension also reproduced the stranded older-wiring wake: it remained above the draft until the live check timed out; the changed extension delivered it and left exactly the draft.
 
-### 2026-10-09 omp fallback chain
+### 2026-10-16 omp fallback chain
 
-Verified on 2026-10-09 on macOS arm64 against omp 18.8.7, with the built-in `openai-codex` and `deepseek` providers pointed at scripted local servers through an isolated agent directory's `models.yml`, so no model tokens were spent.
-The agent directory's `config.yml` carries the operator's Sol chain as it stands, `openai-codex/gpt-6.1-sol` to `deepseek/deepseek-v4-pro`, and one other chain, `deepseek/deepseek-v4-pro` to a lab-only route.
+Verified on 2026-10-16 on macOS arm64 against omp 18.11.0, with the built-in `openai-codex` and `deepseek` providers pointed at scripted local servers through an isolated agent directory's `models.yml`, so no model tokens were spent.
+The agent directory's `config.yml` carries the operator's Sol chain as it stood on 2026-10-09, `openai-codex/gpt-6.1-sol` to `deepseek/deepseek-v4-pro`, and one other chain, `deepseek/deepseek-v4-pro` to a lab-only route.
 The guard drives `omp -p` with the tracked session overlay `.omp/fm-session-overlay.yml`, the overlay every Firstmate-launched omp session carries.
 
 - **The incident reproduces without the overlay.**
   With the primary refusing, the global chain moved the session on to the weak model, which answered.
-  That is how a lane recorded on Sol ended on `deepseek-v4-flash` on 2026-10-09: the primary hit its usage limit, then the equal refused for credits.
-- **The overlay empties the Sol chain.**
-  With the overlay, the weak model received no request, the run exited non-zero with the primary's rate-limit error, and the live-model record named the recorded model and carried the error.
-  omp merges `--config` overlays key by key and replaces an array whole, so the overlay's empty Sol entry replaced the global Sol chain and left every other chain alone: with the overlay, a session on the other chain's model still moved to that chain's route when its model refused.
-  Fleet agents run on no OpenRouter route, so the equal is not a chain hop; a stand-in is chosen at dispatch or relaunch.
+  That is how a lane recorded on Sol ended on `deepseek-v4-flash` through OpenRouter on 2026-10-09: the primary hit its usage limit, then the equal refused for credits.
+- **The overlay chains Sol to direct DeepSeek Flash.**
+  With a scripted `usage_limit_reached` answer and a retry-after of one hour, far above `retry.maxDelayMs`, the session moved to `deepseek/deepseek-v4-flash`, the run succeeded, and the live-model record followed the session to the stand-in.
+  An empty Sol chain stopped the same run at the wait cap with the provider's usage-limit error, which is how the lanes stopped on 2026-10-16 when both Codex accounts were out.
+  omp merges `--config` overlays key by key and replaces an array whole, so the overlay's Sol entry replaced the global Sol chain: the global chain's weak model received no request, and a session on the other chain's model still moved to that chain's route when its model refused with a usage limit.
+  A per-task overlay keyed by the exact model still replaces the Sol entry for a worker.
+- **`retry.fallbackOn: usage-limit` scopes the switch to quota-class errors.**
+  omp classes a `usage_limit_reached` body and a 402 credit refusal as quota-class, so both moved the session to the stand-in.
+  A 500 from a provider that still has quota was retried on Sol and then stopped with the provider's error and the record carried it, where the same chain without the key moved the session to the stand-in.
+  The key is global to the session, not per chain, so the other chain's model also moves only on a quota-class error.
 - **omp returns to the recorded model by itself.**
   `retry.fallbackRevertPolicy: cooldown-expiry` restores the original selector at the next prompt once its suppression window ends; it never steps back to an intermediate route, and a primary that is out of quota for days stays suppressed for days.
   The guard layers a lab-only chain after the tracked overlay (a later `--config` wins) so a fallback can happen at all.
@@ -1759,11 +1764,12 @@ FM_OMP_FALLBACK_LIVE=1 tests/fm-omp-fallback-chain-live-e2e.test.sh
 ```
 
 ```text
-ok - omp (omp/18.8.7): control - the global Sol chain alone still falls to the weak model
-ok - omp (omp/18.8.7): the overlay empties the Sol chain, the run stops with the provider error, and the record carries it
-ok - omp (omp/18.8.7): the overlay leaves another model's global chain in place
-ok - omp (omp/18.8.7): with the overlay a fallen-back session returns to its recorded model at the next prompt even under a global fallbackRevertPolicy: never
-ok - omp (omp/18.8.7): control - without the overlay a global fallbackRevertPolicy: never keeps the session on the fallback
+ok - omp (omp/18.11.0): control - the global Sol chain alone still falls to the weak model
+ok - omp (omp/18.11.0): the overlay moves a Sol session whose usage window is out to DeepSeek Flash, and the record follows
+ok - omp (omp/18.11.0): the overlay keeps a Sol session on its recorded model on a non-quota error, and the record carries the error
+ok - omp (omp/18.11.0): the overlay leaves another model's global chain in place
+ok - omp (omp/18.11.0): with the overlay a fallen-back session returns to its recorded model at the next prompt even under a global fallbackRevertPolicy: never
+ok - omp (omp/18.11.0): control - without the overlay a global fallbackRevertPolicy: never keeps the session on the fallback
 ```
 
 ### 2026-10-10 agy composer through Herdr
