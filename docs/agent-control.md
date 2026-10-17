@@ -245,11 +245,11 @@ It proves every named record before it writes anything, with the checks listed a
 Every refusal names the task it belongs to and the proof that is missing, and a refusal changes no record, no instructions file, no claim, and no copy.
 The named tasks may overlap one another only through the root they leave: each task's current copy may be that root and each replacement copy may sit inside it, but replacement copies never overlap one another, and nothing else a named task records may overlap another named task's copies.
 Every other record is checked as in a single reassociation, so a third live record on the root refuses, naming itself, until it is named with `--also` as well.
-Each named task's current copy, root, and prior copies must be clean, and each HEAD is anchored under that task's own id before any record changes.
-A claim on the slot by any named task is kept, and an unclaimed slot is claimed for the command's task.
+Each head is anchored under that task's own id, and only after every named record's copies have been checked.
+A named task whose replacement copy lies inside the root keeps its slot claim, and one whose replacement copy lies outside releases it, as in a single reassociation; a root left without a claim is claimed for the first named task whose replacement copy lies inside it.
 The claims, the instructions files, and then the records are published together, and a failed write restores every record, instructions file, and claim already published, so no named task is left half moved; the anchors stay.
-Afterwards each task is an ordinary nested record that names the root as `prior_worktree=`, exactly as a single reassociation leaves it.
-Because each record then names the root as preserved custody, ordinary `bin/fm-teardown.sh` of either task refuses while the other still does, since that custody overlaps the cleanup target; teardown has no route for a pair of nested records and this reassociation does not add one.
+A task whose replacement copy is nested in the root ends as an ordinary nested record that names the root as `prior_worktree=`, exactly as a single reassociation leaves it; a task that moved outside the root names it as `released_worktree=`.
+Because each nested record then names the root as preserved custody, ordinary `bin/fm-teardown.sh` of one of them refuses while another still does, since that custody overlaps the cleanup target; teardown has no route for a group of nested records and this reassociation does not add one.
 
 When finished and parked ordinary tasks both record the same pool slot root, reassociation cannot go first: the other root record overlaps the replacement copy and may still claim the slot.
 Before retiring a record that still holds the slot's Firstmate claim, or any record when the slot carries no claim, Treehouse's state must durably lease the slot under the existing [`fm_task_copy_pool_slot_held`](../bin/fm-task-copy-lib.sh) proof.
