@@ -27,25 +27,24 @@ retry:
   # `confirm` pops a dialog when a usage window runs low; `auto` lets omp fall
   # through the fallback chain without a keystroke.
   usageReservePolicy: auto
-  # A Sol session whose usage window is out moves at once to direct DeepSeek
-  # Flash, the approved stand-in, and never to an OpenRouter route. With both
-  # Codex accounts out there is no credential to rotate to, and without a
-  # chain omp stops at its wait cap instead (a usage window of several days
-  # exceeds retry.maxDelayMs) and the lane sits dead. omp merges overlays key by
-  # key and replaces an array whole, so this entry replaces the global Sol
-  # chain and leaves every other chain as the operator set it. A per-task
-  # overlay still replaces it for a worker. `usage-limit` limits every switch
-  # to quota-class errors, so an error burst from a provider that still has
-  # quota retries on Sol and then stops with the provider's error; the
-  # session's live-model record (bin/fm-omp-live-model.ts) carries that stop
-  # to the supervisor. omp reads this key for every chain, so another model's
-  # global chain also moves only on a quota-class error.
-  fallbackOn: usage-limit
+  # A Sol session whose provider fails moves at once to direct DeepSeek Flash,
+  # the approved stand-in, and never to an OpenRouter route. With both Codex
+  # accounts out there is no credential to rotate to, and without a chain omp
+  # stops at its wait cap instead (a usage window of several days exceeds
+  # retry.maxDelayMs) and the lane sits dead. The switch happens on any eligible
+  # provider error, not only on a quota-out. omp merges overlays key by key and
+  # replaces an array whole, so this entry replaces the global Sol chain and
+  # leaves every other chain as the operator set it. A worker's per-task
+  # overlay (state/<id>.omp-fallback.yml, bin/fm-spawn.sh) loads after this one
+  # and replaces the entry for the worker's own model. The session's live-model
+  # record (bin/fm-omp-live-model.ts) follows the session to the stand-in.
   fallbackChains:
     openai-codex/gpt-6.1-sol:
       - deepseek/deepseek-v4-flash:high
-  # omp's own way back to the recorded model, for every chain that remains: the
-  # next prompt after the primary's suppression window ends restores it.
+  # omp's own way back to the recorded model, for every chain including the Sol
+  # one above: the next prompt after the primary's suppression window ends
+  # restores it, so a Sol session that moved to Flash returns to Sol once its
+  # window is over.
   # `never` would leave a session on its fallback until someone changes the
   # model by hand.
   fallbackRevertPolicy: cooldown-expiry

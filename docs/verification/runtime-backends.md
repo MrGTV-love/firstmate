@@ -1742,15 +1742,13 @@ The guard drives `omp -p` with the tracked session overlay `.omp/fm-session-over
 - **The overlay chains Sol to direct DeepSeek Flash.**
   With a scripted `usage_limit_reached` answer and a retry-after of one hour, far above `retry.maxDelayMs`, the session moved to `deepseek/deepseek-v4-flash`, the run succeeded, and the live-model record followed the session to the stand-in.
   An empty Sol chain stopped the same run at the wait cap with the provider's usage-limit error, which is how the lanes stopped on 2026-10-16 when both Codex accounts were out.
-  omp merges `--config` overlays key by key and replaces an array whole, so the overlay's Sol entry replaced the global Sol chain: the global chain's weak model received no request, and a session on the other chain's model still moved to that chain's route when its model refused with a usage limit.
-  A per-task overlay keyed by the exact model still replaces the Sol entry for a worker.
-- **`retry.fallbackOn: usage-limit` scopes the switch to quota-class errors.**
-  omp classes a `usage_limit_reached` body and a 402 credit refusal as quota-class, so both moved the session to the stand-in.
-  A 500 from a provider that still has quota was retried on Sol and then stopped with the provider's error and the record carried it, where the same chain without the key moved the session to the stand-in.
-  The key is global to the session, not per chain, so the other chain's model also moves only on a quota-class error.
+  omp merges `--config` overlays key by key and replaces an array whole, so the overlay's Sol entry replaced the global Sol chain: the global chain's weak model received no request, and a session on the other chain's model still moved to that chain's route when its model refused.
+  A worker's per-task overlay, `state/<id>.omp-fallback.yml`, loads after the tracked overlay and replaces the Sol entry for the worker's own model.
+- **A 500 moves the session too.**
+  A 500 from a provider that still has quota was retried on Sol, then the session moved to the stand-in and the record followed it, so the chain applies on any eligible provider error, not only on a quota-out.
 - **omp returns to the recorded model by itself.**
   `retry.fallbackRevertPolicy: cooldown-expiry` restores the original selector at the next prompt once its suppression window ends; it never steps back to an intermediate route, and a primary that is out of quota for days stays suppressed for days.
-  The guard layers a lab-only chain after the tracked overlay (a later `--config` wins) so a fallback can happen at all.
+  The guard layers a lab-only chain after the tracked overlay (a later `--config` wins) so the fallback route answers slowly enough for the primary's window to end.
   A refusal classed as a concurrency limit is suppressed for 5 seconds, so the guard's second prompt ran on the primary again and the record followed.
   The overlay pins the policy, because a global `never` left the same session on its fallback in the control run.
 - **A provider's own short `retry-after` never reaches the chain.**
@@ -1766,7 +1764,7 @@ FM_OMP_FALLBACK_LIVE=1 tests/fm-omp-fallback-chain-live-e2e.test.sh
 ```text
 ok - omp (omp/18.11.0): control - the global Sol chain alone still falls to the weak model
 ok - omp (omp/18.11.0): the overlay moves a Sol session whose usage window is out to DeepSeek Flash, and the record follows
-ok - omp (omp/18.11.0): the overlay keeps a Sol session on its recorded model on a non-quota error, and the record carries the error
+ok - omp (omp/18.11.0): the overlay moves a Sol session whose provider answers 500 to DeepSeek Flash, and the record follows
 ok - omp (omp/18.11.0): the overlay leaves another model's global chain in place
 ok - omp (omp/18.11.0): with the overlay a fallen-back session returns to its recorded model at the next prompt even under a global fallbackRevertPolicy: never
 ok - omp (omp/18.11.0): control - without the overlay a global fallbackRevertPolicy: never keeps the session on the fallback

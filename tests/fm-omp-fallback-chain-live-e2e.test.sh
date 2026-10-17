@@ -9,24 +9,24 @@
 # and it stayed there. The tracked overlay then emptied the Sol chain, and on
 # 2026-10-16 both Codex accounts hit their weekly limit: with no credential to
 # rotate to and no chain, omp stopped at its wait cap and the lanes sat dead.
-# The tracked overlay now chains Sol to direct DeepSeek Flash and limits every
-# switch to usage-limit class errors. This guard drives the INSTALLED omp
-# against scripted local providers that stand in for the real routes (the
-# built-in openai-codex and deepseek providers are pointed at them through the
-# isolated agent directory's models.yml), so it spends no model tokens, and
-# requires through the tracked session overlay that Firstmate launches omp with:
+# The tracked overlay now chains Sol to direct DeepSeek Flash. This guard drives
+# the INSTALLED omp against scripted local providers that stand in for the real
+# routes (the built-in openai-codex and deepseek providers are pointed at them
+# through the isolated agent directory's models.yml), so it spends no model
+# tokens, and requires through the tracked session overlay that Firstmate
+# launches omp with:
 #   1. control: the global chain alone still reaches the weak model, so the lab
 #      reproduces the incident and the next checks cannot pass vacuously;
-#   2. the overlay moves a Sol session whose usage window is out to DeepSeek
-#      Flash and to nothing else: the global chain's weak model receives no
-#      request, the run succeeds, and the live-model record follows the session
-#      to the stand-in (bin/fm-omp-live-model.ts); a 500 burst from a provider
-#      that still has quota stays on Sol and stops with the provider's error;
-#      another model's global chain still falls back under the overlay;
-#   3. return: for a chain that remains (the lab layers one on after the tracked
-#      overlay), omp's own revert restores the recorded model at the next prompt
-#      after the primary's suppression window ends, even when the global config
-#      says `fallbackRevertPolicy: never`, and the record follows;
+#   2. the overlay moves a Sol session to DeepSeek Flash and to nothing else,
+#      both when its usage window is out and when its provider answers 500: the
+#      global chain's weak model receives no request, the run succeeds, and the
+#      live-model record follows the session to the stand-in
+#      (bin/fm-omp-live-model.ts); another model's global chain still falls back
+#      under the overlay;
+#   3. return: for a lab-only chain layered on after the tracked overlay, omp's
+#      own revert restores the recorded model at the next prompt after the
+#      primary's suppression window ends, even when the global config says
+#      `fallbackRevertPolicy: never`, and the record follows;
 #   4. control: without the overlay, `never` leaves the session on the fallback.
 # It fails naming omp and `omp --version`. Refresh docs/verification/runtime-backends.md
 # ("omp fallback chain") from its output after any omp upgrade.
@@ -170,8 +170,8 @@ YML
   printf '%s\n' "$dir"
 }
 
-# A chain that remains after the tracked overlay, layered on after it the way a
-# later --config wins: the primary falls to a lab-only equal route.
+# A lab-only chain, layered on after the tracked overlay the way a later --config
+# wins: the primary falls to a lab-only equal route.
 cat > "$LAB/lab-chain.yml" <<YML
 retry:
   fallbackChains:
@@ -208,46 +208,36 @@ run_omp "$AGENT" none "say hi"
   || fail "$SUBJECT: without the overlay the global chain no longer reaches the weak model, so the lab does not reproduce the incident (weak saw: $(tr '\n' ' ' < "$LAB/weak.log")); output: $OUT"
 pass "$SUBJECT: control - the global Sol chain alone still falls to the weak model"
 
-# The Sol usage window is out for days, the way the ChatGPT backend reports it.
 # The overlay's chain replaces the global one, so the stand-in is Flash and the
-# global chain's Pro receives nothing.
-serve codex usage 3600
-AGENT=$(agent_dir chain never 300000)
-: > "$LAB/weak.log"; : > "$LAB/equal.log"
-run_omp "$AGENT" "$OVERLAY" "say hi"
-[ "$(requests codex)" -ge 1 ] \
-  || fail "$SUBJECT: with the overlay the Sol session never tried its recorded model; output: $OUT"
-[ "$(grep -c '^deepseek-v4-flash$' "$LAB/weak.log")" -ge 1 ] \
-  || fail "$SUBJECT: with the overlay a Sol session whose usage window is out never reached DeepSeek Flash (weak saw: $(tr '\n' ' ' < "$LAB/weak.log")); output: $OUT"
-[ "$(grep -c '^deepseek-v4-pro$' "$LAB/weak.log")" -eq 0 ] \
-  || fail "$SUBJECT: with the overlay the Sol session reached the global chain's weak model: $(tr '\n' ' ' < "$LAB/weak.log")"
-[ "$(requests equal)" -eq 0 ] || fail "$SUBJECT: with the overlay the Sol session left its recorded model for another route"
-[ "$RC" -eq 0 ] || fail "$SUBJECT: with the stand-in answering the run must succeed, but it exited $RC: $OUT"
-record_has "model=deepseek/deepseek-v4-flash" \
-  || fail "$SUBJECT: the live-model record did not follow the session to the stand-in: $(cat "$LAB/record" 2>/dev/null)"
-pass "$SUBJECT: the overlay moves a Sol session whose usage window is out to DeepSeek Flash, and the record follows"
+# global chain's Pro receives nothing. $1 names the failure for the messages.
+expect_stand_in() {  # <failure>
+  AGENT=$(agent_dir chain never 300000)
+  : > "$LAB/weak.log"; : > "$LAB/equal.log"
+  run_omp "$AGENT" "$OVERLAY" "say hi"
+  [ "$(requests codex)" -ge 1 ] \
+    || fail "$SUBJECT: with the overlay the Sol session never tried its recorded model; output: $OUT"
+  [ "$(grep -c '^deepseek-v4-flash$' "$LAB/weak.log")" -ge 1 ] \
+    || fail "$SUBJECT: with the overlay a Sol session whose $1 never reached DeepSeek Flash (weak saw: $(tr '\n' ' ' < "$LAB/weak.log")); output: $OUT"
+  [ "$(grep -c '^deepseek-v4-pro$' "$LAB/weak.log")" -eq 0 ] \
+    || fail "$SUBJECT: with the overlay the Sol session reached the global chain's weak model: $(tr '\n' ' ' < "$LAB/weak.log")"
+  [ "$(requests equal)" -eq 0 ] || fail "$SUBJECT: with the overlay the Sol session left its recorded model for another route"
+  [ "$RC" -eq 0 ] || fail "$SUBJECT: with the stand-in answering the run must succeed, but it exited $RC: $OUT"
+  record_has "model=deepseek/deepseek-v4-flash" \
+    || fail "$SUBJECT: the live-model record did not follow the session to the stand-in: $(cat "$LAB/record" 2>/dev/null)"
+  pass "$SUBJECT: the overlay moves a Sol session whose $1 to DeepSeek Flash, and the record follows"
+}
 
-# An error burst from a provider that still has quota is not a quota error: the
-# session stays on Sol, retries it, and stops with the provider's error.
+# The Sol usage window is out for days, the way the ChatGPT backend reports it.
+serve codex usage 3600
+expect_stand_in "usage window is out"
+
+# An error burst from a provider that still has quota moves the session too.
 serve codex error
-AGENT=$(agent_dir chain never 300000)
-: > "$LAB/weak.log"
-run_omp "$AGENT" "$OVERLAY" "say hi"
-[ "$(requests codex)" -ge 1 ] \
-  || fail "$SUBJECT: with the overlay the Sol session never tried its recorded model; output: $OUT"
-[ "$(requests weak)" -eq 0 ] \
-  || fail "$SUBJECT: with the overlay a Sol session left its recorded model on a non-quota error: $(tr '\n' ' ' < "$LAB/weak.log")"
-[ "$RC" -ne 0 ] || fail "$SUBJECT: with the recorded model failing the run must stop with an error, but it exited 0: $OUT"
-case "$OUT" in *"error while processing your request"*) ;; *) fail "$SUBJECT: the stopped run did not report the provider's error: $OUT" ;; esac
-record_has "model=openai-codex/gpt-6.1-sol" \
-  || fail "$SUBJECT: the live-model record does not name the recorded model that stopped: $(cat "$LAB/record" 2>/dev/null)"
-record_has "error=" \
-  || fail "$SUBJECT: the live-model record does not carry the unrecovered run error: $(cat "$LAB/record" 2>/dev/null)"
-pass "$SUBJECT: the overlay keeps a Sol session on its recorded model on a non-quota error, and the record carries the error"
+expect_stand_in "provider answers 500"
 
 # The overlay replaces only the Sol chain: the global chain of another model
-# still reaches its fallback under it, on a quota-class error.
-serve weak usage 3600
+# still reaches its fallback under it.
+serve weak limit 3600
 AGENT=$(agent_dir other never 300000)
 MODEL=deepseek/deepseek-v4-pro run_omp "$AGENT" "$OVERLAY" "say hi"
 [ "$(requests weak)" -ge 1 ] || fail "$SUBJECT: the other model's session never tried its recorded model; output: $OUT"
