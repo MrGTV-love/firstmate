@@ -7,6 +7,7 @@
 #        fm-control.sh <task-id> stay
 #        fm-control.sh <task-id> authorize-continuation
 #        fm-control.sh <task-id> reassociate --worktree <replacement-copy>
+#                                            [--also <other-task>=<its-replacement-copy>]...
 #                                            (--note <text> | --note-file <path>)
 # Reassociation holds the task control lock, so it makes one nonwaiting
 # bin/fm-project-lock-lib.sh attempt that never jumps a queued waiter.
@@ -52,6 +53,12 @@
 # For duplicate slot-root records, first retire the finished records with
 # plain fm-teardown; it preserves the slot and releases only their own claim,
 # then reassociate the remaining record to its real copy.
+# Live records that share one slot root, each with its own copy nested in it,
+# cannot go one at a time, so --also re-points them in the same call: every
+# named task is locked, every record is proved against its own copy, head,
+# branch, and PR head before anything is written, the records overlap each
+# other only through the root they leave, and a failed write restores every
+# record, instructions file, and slot claim already published.
 # docs/agent-control.md "Reassociating a task with a replacement
 # copy" owns every refusal and what each reader of the record does after it.
 # --worktree <path> is shared by two verbs and parsed once: relaunch accepts a
@@ -299,8 +306,11 @@ EXIT_RETRIES=${FM_CONTROL_EXIT_RETRIES:-3}
 CREW_STATE_WAIT=${FM_CONTROL_CREW_STATE_WAIT:-20}
 CREW_STATE_BIN=${FM_CREW_STATE_BIN:-$SCRIPT_DIR/fm-crew-state.sh}
 
+# DIE_PREFIX names the task a refusal belongs to while one call handles several
+# (reassociate --also); it is empty otherwise.
+DIE_PREFIX=
 die() {  # <message>
-  echo "error: $1" >&2
+  echo "error: ${DIE_PREFIX}$1" >&2
   exit 1
 }
 
@@ -312,12 +322,16 @@ CONTROL_META_TMP=
 CONTROL_PROJECT_LOCK=
 CONTROL_PROJECT_LOCK_HELD=0
 REASSOCIATE_ACTIVE=0
+# The extra locks reassociate --also holds for its other tasks.
+RA_CONTROL_LOCKS=()
+RA_META_LOCKS=()
+RA_GUARD_LOCKS=()
 RELAUNCH_ACTIVE=0
 RELAUNCH_PHASE=start
 RELAUNCH_PAIR_DIR=
 
 control_cleanup() {
-  local status=$?
+  local status=$? extra_lock
   if [ "$RELAUNCH_ACTIVE" = 1 ] \
      && declare -F relaunch_rollback >/dev/null 2>&1; then
     relaunch_rollback || true
@@ -332,6 +346,9 @@ control_cleanup() {
     CONTROL_META_LOCK_HELD=0
     fm_lock_release "$CONTROL_META_LOCK" || true
   fi
+  for extra_lock in ${RA_META_LOCKS[@]+"${RA_META_LOCKS[@]}"}; do
+    fm_lock_release "$extra_lock" || true
+  done
   # Remove the dialog file while the lock is still held: once it is released,
   # the next lifecycle command for this task writes the same path.
   if [ -n "${FM_COMPOSER_DIALOG_SINK:-}" ]; then
@@ -345,6 +362,9 @@ control_cleanup() {
     CONTROL_LOCK_HELD=0
     fm_lock_release "$CONTROL_LOCK" || true
   fi
+  for extra_lock in ${RA_CONTROL_LOCKS[@]+"${RA_CONTROL_LOCKS[@]}"} ${RA_GUARD_LOCKS[@]+"${RA_GUARD_LOCKS[@]}"}; do
+    fm_lock_release "$extra_lock" || true
+  done
   if declare -F fm_lease_guard_release >/dev/null 2>&1; then
     fm_lease_guard_release || true
   fi
@@ -385,6 +405,26 @@ RELOCATE_TO=
 RELOCATE_SET=0
 control_want_value=
 RECOVER_LAUNCH=0
+ALSO_IDS=()
+ALSO_COPIES=()
+# --also <task-id>=<replacement-copy>: another task reassociate re-points in the same call.
+parse_also() {  # <value>
+  local value=$1 also_id also_copy existing
+  case "$value" in
+    *=*) ;;
+    *) die "--also requires <task-id>=<replacement-copy>, got '$value'" ;;
+  esac
+  also_id=${value%%=*}
+  also_copy=${value#*=}
+  fm_task_id_creation_valid "$also_id" || die "--also '$also_id' is not a valid task id"
+  [ -n "$also_copy" ] || die "--also $also_id= requires a replacement copy"
+  [ "$also_id" != "$RAW_ID" ] || die "--also names task $also_id, which the command already re-points"
+  for existing in ${ALSO_IDS[@]+"${ALSO_IDS[@]}"}; do
+    [ "$existing" != "$also_id" ] || die "--also names task $also_id twice"
+  done
+  ALSO_IDS+=("$also_id")
+  ALSO_COPIES+=("$also_copy")
+}
 for control_arg in "$@"; do
   if [ -n "$control_want_value" ]; then
     case "$control_arg" in
@@ -396,6 +436,7 @@ for control_arg in "$@"; do
       effort) NEW_EFFORT=$control_arg; EFFORT_SET=1 ;;
       note) NOTE=$control_arg; NOTE_SET=1 ;;
       worktree) RELOCATE_TO=$control_arg; RELOCATE_SET=1 ;;
+      also) parse_also "$control_arg" ;;
       note_file)
         [ -f "$control_arg" ] || die "--note-file '$control_arg' is not a readable file"
         NOTE=$(cat "$control_arg")
@@ -414,6 +455,8 @@ for control_arg in "$@"; do
     --effort=*) NEW_EFFORT=${control_arg#--effort=}; EFFORT_SET=1 ;;
     --worktree) control_want_value=worktree ;;
     --worktree=*) RELOCATE_TO=${control_arg#--worktree=}; RELOCATE_SET=1 ;;
+    --also) control_want_value=also ;;
+    --also=*) parse_also "${control_arg#--also=}" ;;
     --note) control_want_value=note ;;
     --note=*) NOTE=${control_arg#--note=}; NOTE_SET=1 ;;
     --note-file) control_want_value=note_file ;;
@@ -433,8 +476,10 @@ if [ -n "$control_want_value" ]; then
   die "--$control_want_value requires a value"
 fi
 
+[ "${#ALSO_IDS[@]}" = 0 ] || [ "$VERB" = reassociate ] \
+  || die "--also applies to 'reassociate' only"
 if [ "$VERB" = reassociate ]; then
-  # reassociate takes --worktree and --note; every other relaunch option stays refused.
+  # reassociate takes --worktree, --also, and --note; every other relaunch option stays refused.
   [ "$HARNESS_SET" = 0 ] && [ "$MODEL_SET" = 0 ] && [ "$EFFORT_SET" = 0 ] && [ "$CLAUDE_DEBUG" = 0 ] && [ "$RECOVER_LAUNCH" = 0 ] && [ "$RECONCILE_ONLY" = 0 ] \
     || die "--harness, --model, --effort, --claude-debug, --recover-launch, and --reconcile-only apply to 'relaunch' only"
 elif [ "$VERB" != relaunch ]; then
@@ -538,35 +583,78 @@ fi
 # --- reassociate: re-point the record at a replacement copy -----------------
 #
 # Nothing here stops, starts, deletes, resets, or returns anything.
+#
+# One call re-points the command's task or, with --also, several tasks whose
+# records leave one shared slot root, each at its own replacement copy, under
+# one set of locks. Every record is proved before anything is written, and
+# every write is undone if a later one fails. The per-record state lives in the
+# parallel RA_* arrays below, indexed by record: index 0 is the command's task.
 
-REASSOCIATE_BRIEF=
-REASSOCIATE_BRIEF_BACKUP=
-REASSOCIATE_BRIEF_PUBLISHED=0
-REASSOCIATE_BRIEF_TMP=
+RA_IDS=()
+RA_METAS=()
+RA_REQUEST=()
+RA_NEWWT=()
+RA_PREWT=()
+RA_PREPROJECT=()
+RA_BRIEFS=()
+RA_PROJECT=()
+RA_OLDWT=()
+RA_OLDREAL=()
+RA_OLDSTATE=()
+RA_NEWBRANCH=()
+RA_OLDBRANCH=()
+RA_SETBRANCH=()
+RA_BRANCHCOUNT=()
+RA_OLDRELEASED=()
+RA_SLOTRESULT=()
+RA_ANCHOR=()
+RA_LEFT=()
+RA_NEWSLOTS=()
+RA_OWN=()
+RA_PROOFS=()
+RA_BRIEF_TMPS=()
+RA_BRIEF_BACKUPS=()
+RA_BRIEF_PUBLISHED=()
+RA_META_TMPS=()
+RA_META_BACKUPS=()
+RA_META_PUBLISHED=()
 REASSOCIATE_OWNER_PATHS=()
 REASSOCIATE_OWNER_BACKUPS=()
+REASSOCIATE_CLAIMED=0
 
-# Undo whatever this attempt published before it failed: the brief and every
-# slot claim this attempt wrote or released come back as they were. The record
-# itself is published last, so a failure never leaves it re-pointed.
+# Undo whatever this attempt published before it failed: every record's
+# instructions, record, and slot claim come back as they were. Records are
+# published last, so a failure before them never leaves one re-pointed.
 reassociate_rollback() {
   local i marker backup
-  [ -z "$REASSOCIATE_BRIEF_TMP" ] || rm -f -- "$REASSOCIATE_BRIEF_TMP"
-  if [ "$REASSOCIATE_BRIEF_PUBLISHED" = 1 ] && [ -n "$REASSOCIATE_BRIEF_BACKUP" ]; then
-    if mv -f -- "$REASSOCIATE_BRIEF_BACKUP" "$REASSOCIATE_BRIEF" 2>/dev/null; then
-      REASSOCIATE_BRIEF_BACKUP=
-    else
-      echo "error: task $ID's instructions could not be restored after the failed reassociation; the prior copy is at $REASSOCIATE_BRIEF_BACKUP" >&2
+  for ((i=${#RA_IDS[@]} - 1; i >= 0; i--)); do
+    [ -z "${RA_META_TMPS[i]:-}" ] || rm -f -- "${RA_META_TMPS[i]}"
+    [ -z "${RA_BRIEF_TMPS[i]:-}" ] || rm -f -- "${RA_BRIEF_TMPS[i]}"
+    if [ "${RA_META_PUBLISHED[i]:-0}" = 1 ]; then
+      if fm_backlog_atomic_transition publish "${RA_META_BACKUPS[i]}" "${RA_METAS[i]}" "task record" "$STATE"; then
+        RA_META_BACKUPS[i]=
+      else
+        echo "error: task ${RA_IDS[i]}'s record could not be restored after the failed reassociation; the prior record is at ${RA_META_BACKUPS[i]}" >&2
+      fi
+    elif [ -n "${RA_META_BACKUPS[i]:-}" ]; then
+      rm -f -- "${RA_META_BACKUPS[i]}"
     fi
-  elif [ -n "$REASSOCIATE_BRIEF_BACKUP" ]; then
-    rm -f -- "$REASSOCIATE_BRIEF_BACKUP"
-  fi
+    if [ "${RA_BRIEF_PUBLISHED[i]:-0}" = 1 ] && [ -n "${RA_BRIEF_BACKUPS[i]:-}" ]; then
+      if mv -f -- "${RA_BRIEF_BACKUPS[i]}" "${RA_BRIEFS[i]}" 2>/dev/null; then
+        RA_BRIEF_BACKUPS[i]=
+      else
+        echo "error: task ${RA_IDS[i]}'s instructions could not be restored after the failed reassociation; the prior copy is at ${RA_BRIEF_BACKUPS[i]}" >&2
+      fi
+    elif [ -n "${RA_BRIEF_BACKUPS[i]:-}" ]; then
+      rm -f -- "${RA_BRIEF_BACKUPS[i]}"
+    fi
+  done
   for ((i=${#REASSOCIATE_OWNER_PATHS[@]} - 1; i >= 0; i--)); do
-    marker=${REASSOCIATE_OWNER_PATHS[$i]}
-    backup=${REASSOCIATE_OWNER_BACKUPS[$i]}
+    marker=${REASSOCIATE_OWNER_PATHS[i]}
+    backup=${REASSOCIATE_OWNER_BACKUPS[i]}
     if [ -n "$backup" ]; then
       mv -f -- "$backup" "$marker" \
-        || echo "error: task $ID's slot claim could not be restored from $backup" >&2
+        || echo "error: a slot claim could not be restored from $backup" >&2
     else
       rm -f -- "$marker"
     fi
@@ -575,15 +663,28 @@ reassociate_rollback() {
 
 # Refuse when another task record names <path>, since then the copy has no
 # single owner and re-pointing either record would make two tasks' cleanup
-# reach the same bytes.
+# reach the same bytes. The records re-pointed together in this call are
+# checked against each other by reassociate_group_check instead.
 reassociate_require_sole_record() {  # <path> <label>
   local path=$1 label=$2 rc=0
-  fm_task_copy_other_record "$META" "$STATE" "$path" || rc=$?
+  fm_task_copy_other_record "$META" "$STATE" "$path" ${RA_METAS[@]+"${RA_METAS[@]}"} || rc=$?
   case "$rc" in
-    0) die "the $label $path is also task $FM_TASK_COPY_OTHER_ID's recorded $FM_TASK_COPY_OTHER_FIELD, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh $ID; bin/fm-crew-state.sh $FM_TASK_COPY_OTHER_ID) before reassociating" ;;
+    0) die "the $label $path is also task $FM_TASK_COPY_OTHER_ID's recorded $FM_TASK_COPY_OTHER_FIELD, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh $ID; bin/fm-crew-state.sh $FM_TASK_COPY_OTHER_ID) before reassociating, or name that task with --also if it leaves this copy too" ;;
     1) return 0 ;;
     *) die "could not prove that no other task record names the $label $path; nothing was changed" ;;
   esac
+}
+
+# Whether the pool slot claim just read belongs to another task re-pointed in
+# this same call, so the claim is not a foreign one.
+reassociate_slot_owner_is_sibling() {
+  local id
+  for id in ${RA_IDS[@]+"${RA_IDS[@]}"}; do
+    [ "$id" != "$ID" ] && [ "$id" = "$FM_TREEHOUSE_SLOT_OWNER_ID" ] || continue
+    [ -z "$FM_TREEHOUSE_SLOT_OWNER_HOME" ] || [ "$FM_TREEHOUSE_SLOT_OWNER_HOME" -ef "$FM_HOME" ] || return 1
+    return 0
+  done
+  return 1
 }
 
 # Refuse a pool slot whose owner claim does not leave it provably this task's.
@@ -595,6 +696,10 @@ reassociate_require_slot_claim() {  # <path> <label>
   case "$FM_TREEHOUSE_SLOT_OWNER" in
     mine|absent) return 0 ;;
     other)
+      if reassociate_slot_owner_is_sibling; then
+        REASSOCIATE_SLOT_STATE=sibling
+        return 0
+      fi
       die "the $label $path is a pool slot claimed by task $FM_TREEHOUSE_SLOT_OWNER_ID${FM_TREEHOUSE_SLOT_OWNER_HOME:+ (home $FM_TREEHOUSE_SLOT_OWNER_HOME)}, so it is not provably task $ID's; nothing was changed"
       ;;
   esac
@@ -603,17 +708,22 @@ reassociate_require_slot_claim() {  # <path> <label>
 }
 
 # Claim the replacement copy's pool slot for this task, or release this task's
-# claim on a pool slot it leaves, after saving the claim for rollback.
+# claim on a pool slot it leaves, after saving the claim for rollback. A claim
+# held by another task re-pointed in this call stays that task's to keep or
+# release.
 reassociate_publish_slot_claim() {  # <slot> <claim|release>
   local slot=$1 action=$2 marker backup="" home=$FM_HOME
   marker=$(fm_treehouse_slot_owner_marker "$slot") || die "cannot resolve pool slot claim for $slot"
+  fm_treehouse_slot_owner_state "$slot" "$ID"
+  if [ "$FM_TREEHOUSE_SLOT_OWNER" = other ] && reassociate_slot_owner_is_sibling; then
+    return 0
+  fi
   if [ -f "$marker" ]; then
     backup=$(mktemp "$DATA/$ID/.slot-owner.prior.XXXXXX") || die "could not preserve pool slot claim for $slot"
     cp -p -- "$marker" "$backup" || { rm -f -- "$backup"; die "could not preserve pool slot claim for $slot"; }
   fi
   REASSOCIATE_OWNER_PATHS+=("$marker")
   REASSOCIATE_OWNER_BACKUPS+=("$backup")
-  fm_treehouse_slot_owner_state "$slot" "$ID"
   if [ "$action" = release ]; then
     fm_treehouse_slot_owner_release "$slot" "$ID"
     fm_treehouse_slot_owner_state "$slot" "$ID"
@@ -622,6 +732,7 @@ reassociate_publish_slot_claim() {  # <slot> <claim|release>
     return 0
   fi
   [ "$FM_TREEHOUSE_SLOT_OWNER" != mine ] || home=$FM_TREEHOUSE_SLOT_OWNER_HOME
+  [ "$FM_TREEHOUSE_SLOT_OWNER" != absent ] || REASSOCIATE_CLAIMED=1
   fm_treehouse_slot_owner_claim "$slot" "$ID" "$home" \
     || die "could not claim pool slot $slot for task $ID; nothing was changed"
 }
@@ -665,31 +776,32 @@ reassociate_require_pr_head() {  # <pr-url> <replacement-copy> <project>
   done
 }
 
-do_reassociate() {
-  local pre_wt pre_project old_wt project kind kind_count branch_count old_branch new_wt new_branch=""
-  local old_real="" old_state=present slot_result=none pr stamp line prior prior_real slot backup
-  local set_branch=0 brief_branch_other=0 old_released=0
-  local registered anchor="" write rc label brief_text meta_text
-  local -a priors_kept=() left_slots=() new_slots=() own_copies=() proofs=() proved=()
+# Make record <m> the current record: the globals every check and refusal reads.
+reassociate_select() {  # <record-index>
+  ID=${RA_IDS[$1]}
+  META=${RA_METAS[$1]}
+  DIE_PREFIX=
+  [ "${#RA_IDS[@]}" -le 1 ] || DIE_PREFIX="task $ID: "
+}
 
-  [ "$RELOCATE_SET" = 1 ] \
-    || die "reassociate requires --worktree <replacement copy>"
-  [ "$NOTE_SET" = 1 ] && [ -n "$NOTE" ] \
-    || die "reassociate requires --note (or --note-file) saying why the work moved; it is recorded in the task's instructions"
+# One list per line, so a record's slot and copy lists survive in RA_* arrays.
+reassociate_list() {
+  local item
+  for item in "$@"; do
+    printf '%s\n' "$item"
+  done
+}
 
-  # Read only what decides the lock set; everything is re-read under the locks.
-  pre_wt=$(fm_meta_get "$META" worktree)
-  pre_project=$(fm_meta_get "$META" project)
-  new_wt=$(fm_task_copy_canonical_dir "$RELOCATE_TO") \
-    || die "--worktree '$RELOCATE_TO' is not an existing directory"
-  CONTROL_PROJECT_LOCK=$(fm_treehouse_project_lock_path "$pre_project") \
-    || die "cannot resolve the shared Treehouse project lock for $pre_project; nothing was changed"
-  fm_project_lock_try "$CONTROL_PROJECT_LOCK" "reassociate $ID" \
-    || die "another task copy allocation, return, or reassociation is in progress for $pre_project; refusing to race it, nothing was changed"
-  CONTROL_PROJECT_LOCK_HELD=1
-  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || exit 1
-  fm_lock_acquire_wait "$CONTROL_META_LOCK"
-  CONTROL_META_LOCK_HELD=1
+# Validate record <m> against the world and work out which pool slots it
+# claims and leaves and which of its copies a reset could reach. Writes nothing.
+reassociate_check() {  # <record-index>
+  local m=$1 old_wt project kind kind_count branch_count old_branch new_wt new_branch="" pr
+  local old_real="" old_state=present slot_result=none old_released=0 set_branch=0 brief_branch_other=0
+  local line slot registered prior_real j brief
+  local -a left_slots=() new_slots=() own_copies=() proofs=()
+  reassociate_select "$m"
+  new_wt=${RA_NEWWT[m]}
+  brief="$DATA/$ID/brief.md"
 
   fm_backlog_record_present "$META" "task record" "$STATE" \
     || die "$FM_BACKLOG_TRANSITION_ERROR"
@@ -700,7 +812,7 @@ do_reassociate() {
     || die "task $ID runs on Orca, whose recorded orca_worktree_id binds the copy Orca created; re-pointing worktree= would leave Orca and the record naming different copies"
   old_wt=$(fm_backend_meta_exact_value "$META" worktree)
   project=$(fm_backend_meta_exact_value "$META" project)
-  [ "$old_wt" = "$pre_wt" ] && [ "$project" = "$pre_project" ] \
+  [ "$old_wt" = "${RA_PREWT[m]}" ] && [ "$project" = "${RA_PREPROJECT[m]}" ] \
     || die "task $ID's record changed while reassociation acquired its locks; nothing was changed"
   [ -d "$project" ] \
     || die "task $ID's recorded project $project is not a directory; nothing was changed"
@@ -726,9 +838,9 @@ do_reassociate() {
       || die "task $ID has an unfinished relaunch transaction at $STATE/$ID.control-relaunch; reconcile it before reassociating"
   fi
 
-  REASSOCIATE_BRIEF="$DATA/$ID/brief.md"
-  [ -f "$REASSOCIATE_BRIEF" ] && [ ! -L "$REASSOCIATE_BRIEF" ] \
-    || die "task $ID has no regular instructions file at $REASSOCIATE_BRIEF; the replacement copy must be recorded there for any future worker, so nothing was changed"
+  RA_BRIEFS[m]=$brief
+  [ -f "$brief" ] && [ ! -L "$brief" ] \
+    || die "task $ID has no regular instructions file at $brief; the replacement copy must be recorded there for any future worker, so nothing was changed"
 
   # The replacement copy: an isolated worktree of this project's repository.
   fm_task_copy_isolated "$new_wt" "$project" \
@@ -764,9 +876,11 @@ do_reassociate() {
         "Ship branch: $old_branch") ;;
         "Ship branch: "*) brief_branch_other=$((brief_branch_other + 1)) ;;
       esac
-    done < "$REASSOCIATE_BRIEF"
+    done < "$brief"
     [ "$brief_branch_other" = 0 ] \
       || die "task $ID's instructions name a Ship branch other than its recorded branch $old_branch; reconcile the two before reassociating"
+    RA_OLDBRANCH[m]=$old_branch
+    RA_BRANCHCOUNT[m]=${branch_count:-0}
   fi
 
   reassociate_require_pr_head "$pr" "$new_wt" "$project"
@@ -789,6 +903,7 @@ do_reassociate() {
       new_slots+=("$slot")
       case "$REASSOCIATE_SLOT_STATE" in
         mine) [ "$slot_result" = claimed ] || slot_result=kept ;;
+        sibling) [ "$slot_result" = claimed ] || slot_result=kept ;;
         absent) slot_result=claimed ;;
       esac
     elif [ -n "$old_real" ] && fm_task_copy_paths_overlap "$slot" "$old_real"; then
@@ -819,7 +934,7 @@ do_reassociate() {
   # slot - must be clean and is anchored at refs/fm/anchor/<task>-<sha>
   # (bin/fm-task-copy-lib.sh fm_task_copy_preserve). The task's own copies
   # nested in one of them are proved or preserved on their own, so they are not
-  # its dirt. All are proved before any anchor is written.
+  # its dirt; so are the copies of the tasks re-pointed together with it.
   own_copies=("$new_wt")
   [ -z "$old_real" ] || own_copies+=("$old_real")
   while IFS= read -r line || [ -n "$line" ]; do
@@ -830,6 +945,18 @@ do_reassociate() {
         ;;
     esac
   done < "$META"
+  for ((j=0; j<${#RA_IDS[@]}; j++)); do
+    [ "$j" != "$m" ] || continue
+    own_copies+=("${RA_NEWWT[j]}")
+    while IFS= read -r line || [ -n "$line" ]; do
+      case "$line" in
+        prior_worktree=?*)
+          prior_real=$(fm_task_copy_canonical_dir "${line#prior_worktree=}") || continue
+          own_copies+=("$prior_real")
+          ;;
+      esac
+    done < "${RA_METAS[j]}"
+  done
   for slot in ${left_slots[@]+"${left_slots[@]}"}; do
     [ ! -d "$slot" ] || proofs+=("$slot")
     while IFS= read -r prior_real; do
@@ -837,37 +964,114 @@ do_reassociate() {
     done < <(fm_task_copy_priors_inside "$META" "$slot")
   done
   [ -z "$old_real" ] || proofs=("$old_real" ${proofs[@]+"${proofs[@]}"})
-  for write in 0 1; do
-    proved=()
-    for slot in ${proofs[@]+"${proofs[@]}"}; do
-      rc=0
-      for prior in ${proved[@]+"${proved[@]}"}; do
-        [ "$prior" != "$slot" ] || rc=1
-      done
-      [ "$rc" = 0 ] || continue
-      proved+=("$slot")
-      label="current copy $slot"
-      [ "$slot" = "$old_real" ] || label="copy $slot, which this reassociation releases to the pool,"
-      fm_task_copy_preserve "$project" "$ID" "$slot" "$write" "${own_copies[@]}" || rc=$?
-      case "$rc" in
-        0|2) ;;
-        *)
-          die "$label $FM_TASK_COPY_REASON; commit or carry its work over, or reassociate the task back to it, before reassociating; nothing was changed${FM_TASK_COPY_DIRTY:+:
-$FM_TASK_COPY_DIRTY}"
-          ;;
-      esac
-      [ "$slot" != "$old_real" ] || anchor=$FM_TASK_COPY_ANCHOR
+
+  RA_PROJECT[m]=$project
+  RA_OLDWT[m]=$old_wt
+  RA_OLDREAL[m]=$old_real
+  RA_OLDSTATE[m]=$old_state
+  RA_NEWBRANCH[m]=$new_branch
+  RA_SETBRANCH[m]=$set_branch
+  RA_OLDRELEASED[m]=$old_released
+  RA_SLOTRESULT[m]=$slot_result
+  RA_LEFT[m]=$(reassociate_list ${left_slots[@]+"${left_slots[@]}"})
+  RA_NEWSLOTS[m]=$(reassociate_list ${new_slots[@]+"${new_slots[@]}"})
+  RA_OWN[m]=$(reassociate_list "${own_copies[@]}")
+  RA_PROOFS[m]=$(reassociate_list ${proofs[@]+"${proofs[@]}"})
+}
+
+# Records re-pointed together may share one slot root and nothing else: each
+# one's current copy may be the root the others' current copies are, and each
+# replacement copy may sit inside that root, but no copy may be another
+# record's replacement, and no replacement may overlap anything else another
+# record names. Anything else would leave two tasks with the same bytes.
+reassociate_group_check() {
+  local i j k line field path real target label
+  for ((i=0; i<${#RA_IDS[@]}; i++)); do
+    for ((j=0; j<${#RA_IDS[@]}; j++)); do
+      [ "$i" != "$j" ] || continue
+      reassociate_select "$i"
+      if [ "$i" -lt "$j" ] && fm_task_copy_paths_overlap "${RA_NEWWT[i]}" "${RA_NEWWT[j]}"; then
+        die "task ${RA_IDS[i]}'s replacement copy ${RA_NEWWT[i]} and task ${RA_IDS[j]}'s replacement copy ${RA_NEWWT[j]} overlap, so neither task would own its copy alone; give each task its own copy; nothing was changed"
+      fi
+      while IFS= read -r line; do
+        field=${line%% *}
+        path=${line#* }
+        [ -n "$path" ] || continue
+        real=$(fm_task_copy_canonical_dir "$path") || continue
+        for k in new old; do
+          if [ "$k" = new ]; then
+            target=${RA_NEWWT[i]}
+            label="replacement copy"
+          else
+            target=${RA_OLDREAL[i]}
+            label="current copy"
+          fi
+          [ -n "$target" ] || continue
+          fm_task_copy_paths_overlap "$real" "$target" || continue
+          # The one overlap that is not a second owner: the root both records
+          # leave, which is this record's current copy.
+          if [ -n "${RA_OLDREAL[i]}" ] && [ "$real" = "${RA_OLDREAL[i]}" ]; then
+            [ "$k" = old ] && continue
+            case "$target" in "$real"/*) continue ;; esac
+          fi
+          die "the $label $target is also task ${RA_IDS[j]}'s recorded $field, so it has no single owner; reconcile whichever record is wrong (bin/fm-crew-state.sh ${RA_IDS[i]}; bin/fm-crew-state.sh ${RA_IDS[j]}) before reassociating"
+        done
+      done < <(fm_task_copy_record_paths "${RA_METAS[j]}")
     done
   done
+}
 
-  # Stage every write before publishing any of them.
-  REASSOCIATE_ACTIVE=1
-  stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-  REASSOCIATE_BRIEF_TMP=$(mktemp "$DATA/$ID/.brief.reassociate.XXXXXX") \
+# One proof pass over record <m>: every copy a reset could reach is clean, and
+# its HEAD is anchored (written only in the write pass).
+reassociate_prove() {  # <record-index> <write 0|1>
+  local m=$1 write=$2 slot prior rc label old_real
+  local -a own_copies=() proofs=() proved=()
+  old_real=${RA_OLDREAL[m]}
+  reassociate_select "$m"
+  while IFS= read -r slot; do
+    [ -z "$slot" ] || own_copies+=("$slot")
+  done <<< "${RA_OWN[m]}"
+  while IFS= read -r slot; do
+    [ -z "$slot" ] || proofs+=("$slot")
+  done <<< "${RA_PROOFS[m]}"
+  for slot in ${proofs[@]+"${proofs[@]}"}; do
+    rc=0
+    for prior in ${proved[@]+"${proved[@]}"}; do
+      [ "$prior" != "$slot" ] || rc=1
+    done
+    [ "$rc" = 0 ] || continue
+    proved+=("$slot")
+    label="current copy $slot"
+    [ "$slot" = "$old_real" ] || label="copy $slot, which this reassociation releases to the pool,"
+    fm_task_copy_preserve "${RA_PROJECT[m]}" "$ID" "$slot" "$write" "${own_copies[@]}" || rc=$?
+    case "$rc" in
+      0|2) ;;
+      *)
+        die "$label $FM_TASK_COPY_REASON; commit or carry its work over, or reassociate the task back to it, before reassociating; nothing was changed${FM_TASK_COPY_DIRTY:+:
+$FM_TASK_COPY_DIRTY}"
+        ;;
+    esac
+    [ "$slot" != "$old_real" ] || RA_ANCHOR[m]=$FM_TASK_COPY_ANCHOR
+  done
+}
+
+# Stage record <m>'s new instructions and record next to the originals.
+reassociate_stage() {  # <record-index> <timestamp>
+  local m=$1 stamp=$2 line prior prior_real slot brief_text meta_text
+  local new_wt=${RA_NEWWT[m]} new_branch=${RA_NEWBRANCH[m]} old_wt=${RA_OLDWT[m]} old_real=${RA_OLDREAL[m]}
+  local set_branch=${RA_SETBRANCH[m]} old_branch=${RA_OLDBRANCH[m]:-} old_released=${RA_OLDRELEASED[m]}
+  local anchor=${RA_ANCHOR[m]:-} branch_count=${RA_BRANCHCOUNT[m]:-0}
+  local -a priors_kept=() left_slots=()
+  reassociate_select "$m"
+  while IFS= read -r slot; do
+    [ -z "$slot" ] || left_slots+=("$slot")
+  done <<< "${RA_LEFT[m]}"
+
+  RA_BRIEF_TMPS[m]=$(mktemp "$DATA/$ID/.brief.reassociate.XXXXXX") \
     || die "could not stage task $ID's instructions"
   # Each staged write is checked, and each source is read whole first, so a
   # failed read or write refuses instead of publishing a truncated file.
-  brief_text=$(cat -- "$REASSOCIATE_BRIEF" && printf .) \
+  brief_text=$(cat -- "${RA_BRIEFS[m]}" && printf .) \
     || die "could not read task $ID's instructions; nothing was changed"
   brief_text=${brief_text%.}
   (
@@ -885,13 +1089,13 @@ $FM_TASK_COPY_DIRTY}"
       || prior="It replaces $old_wt, whose pool slot was released for reuse${anchor:+; its commits are preserved at $anchor}."
     printf '%s\n' "" "## Copy reassociation ($stamp)" "" \
       "This task's work moved to a replacement local copy." "$line" "$prior" "" "$NOTE"
-  ) > "$REASSOCIATE_BRIEF_TMP" || die "could not stage task $ID's instructions"
+  ) > "${RA_BRIEF_TMPS[m]}" || die "could not stage task $ID's instructions"
 
   # Which recorded prior copies survive: one that IS the replacement copy is
   # dropped (moving the task back undoes that hop), and the current copy joins
   # them unless the record already names it. A copy inside a pool slot this hop
   # releases is recorded as released_worktree= instead: history, not custody.
-  CONTROL_META_TMP=$(mktemp "$STATE/.$ID.meta.reassociate.XXXXXX") \
+  RA_META_TMPS[m]=$(mktemp "$STATE/.$ID.meta.reassociate.XXXXXX") \
     || die "could not stage task $ID's record"
   meta_text=$(cat -- "$META" && printf .) \
     || die "could not read task $ID's record; nothing was changed"
@@ -927,7 +1131,7 @@ $FM_TASK_COPY_DIRTY}"
         *) printf '%s\n' "$line" || exit 1 ;;
       esac
     done < <(printf '%s' "$meta_text")
-    if [ "$set_branch" = 1 ] && [ "${branch_count:-0}" = 0 ]; then
+    if [ "$set_branch" = 1 ] && [ "$branch_count" = 0 ]; then
       printf 'branch=%s\n' "$new_branch" || exit 1
     fi
     line=${old_real:-$old_wt}
@@ -939,37 +1143,163 @@ $FM_TASK_COPY_DIRTY}"
       [ "$prior" != "$line" ] || line=
     done
     [ -z "$line" ] || printf 'prior_worktree=%s\n' "$old_wt" || exit 1
-  ) > "$CONTROL_META_TMP" || die "could not stage task $ID's record"
+  ) > "${RA_META_TMPS[m]}" || die "could not stage task $ID's record"
+}
 
-  # Publish: the slot claims, then the instructions, then the record last, so
-  # every earlier failure rolls back to the record that was there.
-  for slot in ${left_slots[@]+"${left_slots[@]}"}; do
-    reassociate_publish_slot_claim "$slot" release
+do_reassociate() {
+  local m x slot stamp copy backup guard_keep
+  local -a left_slots=()
+
+  [ "$RELOCATE_SET" = 1 ] \
+    || die "reassociate requires --worktree <replacement copy>"
+  [ "$NOTE_SET" = 1 ] && [ -n "$NOTE" ] \
+    || die "reassociate requires --note (or --note-file) saying why the work moved; it is recorded in the task's instructions"
+
+  # The command's task is record 0; each --also task follows it.
+  RA_IDS=("$ID")
+  RA_METAS=("$META")
+  RA_REQUEST=("$RELOCATE_TO")
+  for ((m=0; m<${#ALSO_IDS[@]}; m++)); do
+    RA_IDS+=("${ALSO_IDS[$m]}")
+    RA_METAS+=("$STATE/${ALSO_IDS[$m]}.meta")
+    RA_REQUEST+=("${ALSO_COPIES[$m]}")
   done
-  for slot in ${new_slots[@]+"${new_slots[@]}"}; do
-    reassociate_publish_slot_claim "$slot" claim
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
+    copy=$(fm_task_copy_canonical_dir "${RA_REQUEST[m]}") \
+      || die "$([ "$m" = 0 ] && printf -- '--worktree ' || printf -- '--also %s=' "${RA_IDS[m]}")'${RA_REQUEST[m]}' is not an existing directory"
+    RA_NEWWT[m]=$copy
   done
-  REASSOCIATE_BRIEF_BACKUP=$(mktemp "$DATA/$ID/.brief.prior.XXXXXX") \
-    || die "could not preserve task $ID's instructions"
-  cp -p "$REASSOCIATE_BRIEF" "$REASSOCIATE_BRIEF_BACKUP" \
-    || die "could not preserve task $ID's instructions"
-  mv -f -- "$REASSOCIATE_BRIEF_TMP" "$REASSOCIATE_BRIEF" \
-    || die "could not publish task $ID's instructions"
-  REASSOCIATE_BRIEF_TMP=
-  REASSOCIATE_BRIEF_PUBLISHED=1
-  fm_backlog_atomic_transition publish "$CONTROL_META_TMP" "$META" "task record" "$STATE" \
-    || die "$FM_BACKLOG_TRANSITION_ERROR"
-  CONTROL_META_TMP=
-  # Committed: nothing below may roll the record back.
+
+  # Each --also task is held exactly as the command's task is: the supervision
+  # lease guard, then its lifecycle lock.
+  for ((m=1; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
+    x=${RA_IDS[m]}
+    [ -f "${RA_METAS[m]}" ] \
+      || die "no task '$x' in $STATE (fm-control resolves an exact task id only)"
+    guard_keep=$FM_LEASE_GUARD_LOCK
+    FM_LEASE_GUARD_LOCK=
+    fm_lease_guard "$x" "task copy reassociation (fm-control)"
+    [ -z "$FM_LEASE_GUARD_LOCK" ] || RA_GUARD_LOCKS+=("$FM_LEASE_GUARD_LOCK")
+    FM_LEASE_GUARD_LOCK=$guard_keep
+    fm_lock_try_acquire "$STATE/.control-$x.lock" \
+      || die "another lifecycle action is already running for task $x"
+    RA_CONTROL_LOCKS+=("$STATE/.control-$x.lock")
+  done
+
+  # Read only what decides the lock set; everything is re-read under the locks.
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
+    RA_PREWT[m]=$(fm_meta_get "${RA_METAS[m]}" worktree)
+    RA_PREPROJECT[m]=$(fm_meta_get "${RA_METAS[m]}" project)
+    [ "${RA_PREPROJECT[m]}" = "${RA_PREPROJECT[0]}" ] \
+      || die "tasks ${RA_IDS[0]} and ${RA_IDS[m]} record different projects; one reassociation re-points tasks of a single project; nothing was changed"
+  done
+  reassociate_select 0
+  CONTROL_PROJECT_LOCK=$(fm_treehouse_project_lock_path "${RA_PREPROJECT[0]}") \
+    || die "cannot resolve the shared Treehouse project lock for ${RA_PREPROJECT[0]}; nothing was changed"
+  fm_project_lock_try "$CONTROL_PROJECT_LOCK" "reassociate $ID" \
+    || die "another task copy allocation, return, or reassociation is in progress for ${RA_PREPROJECT[0]}; refusing to race it, nothing was changed"
+  CONTROL_PROJECT_LOCK_HELD=1
+  CONTROL_META_LOCK=$(fm_meta_lock_path "$META") || exit 1
+  fm_lock_acquire_wait "$CONTROL_META_LOCK"
+  CONTROL_META_LOCK_HELD=1
+  for ((m=1; m<${#RA_IDS[@]}; m++)); do
+    x=$(fm_meta_lock_path "${RA_METAS[m]}") || exit 1
+    fm_lock_acquire_wait "$x"
+    RA_META_LOCKS+=("$x")
+  done
+
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_check "$m"
+  done
+  if [ "${#RA_IDS[@]}" -gt 1 ]; then
+    reassociate_group_check
+  fi
+
+  # Every copy of every record is checked before any anchor is written.
+  for x in 0 1; do
+    for ((m=0; m<${#RA_IDS[@]}; m++)); do
+      reassociate_prove "$m" "$x"
+    done
+  done
+
+  # Stage every write before publishing any of them.
+  REASSOCIATE_ACTIVE=1
+  stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_stage "$m" "$stamp"
+  done
+
+  # Publish: the slot claims, then the instructions, then the records last, so
+  # every earlier failure rolls back to the records that were there. Each
+  # record is saved first, so a record that fails after another published
+  # restores that one too. Every release comes before any claim, so a slot one
+  # record leaves while another keeps it ends claimed by the one that keeps it.
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
+    RA_META_BACKUPS[m]=$(mktemp "$STATE/.$ID.meta.prior.XXXXXX") \
+      || die "could not preserve task $ID's record"
+    cp -p -- "$META" "${RA_META_BACKUPS[m]}" \
+      || die "could not preserve task $ID's record"
+  done
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
+    while IFS= read -r slot; do
+      [ -z "$slot" ] || reassociate_publish_slot_claim "$slot" release
+    done <<< "${RA_LEFT[m]}"
+  done
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
+    REASSOCIATE_CLAIMED=0
+    while IFS= read -r slot; do
+      [ -z "$slot" ] || reassociate_publish_slot_claim "$slot" claim
+    done <<< "${RA_NEWSLOTS[m]}"
+    # A slot another record of this call already claimed is kept, not claimed.
+    if [ "${RA_SLOTRESULT[m]}" = claimed ] && [ "$REASSOCIATE_CLAIMED" = 0 ]; then
+      RA_SLOTRESULT[m]=kept
+    fi
+  done
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
+    RA_BRIEF_BACKUPS[m]=$(mktemp "$DATA/$ID/.brief.prior.XXXXXX") \
+      || die "could not preserve task $ID's instructions"
+    cp -p "${RA_BRIEFS[m]}" "${RA_BRIEF_BACKUPS[m]}" \
+      || die "could not preserve task $ID's instructions"
+    mv -f -- "${RA_BRIEF_TMPS[m]}" "${RA_BRIEFS[m]}" \
+      || die "could not publish task $ID's instructions"
+    RA_BRIEF_TMPS[m]=
+    RA_BRIEF_PUBLISHED[m]=1
+  done
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    reassociate_select "$m"
+    fm_backlog_atomic_transition publish "${RA_META_TMPS[m]}" "$META" "task record" "$STATE" \
+      || die "$FM_BACKLOG_TRANSITION_ERROR"
+    RA_META_TMPS[m]=
+    RA_META_PUBLISHED[m]=1
+  done
+  # Committed: nothing below may roll a record back. A published record's
+  # backup is spent, and its rollback flag is cleared so a late failure cannot
+  # restore it.
   REASSOCIATE_ACTIVE=0
   for backup in ${REASSOCIATE_OWNER_BACKUPS[@]+"${REASSOCIATE_OWNER_BACKUPS[@]}"}; do
     [ -z "$backup" ] || rm -f -- "$backup"
   done
   REASSOCIATE_OWNER_PATHS=()
   REASSOCIATE_OWNER_BACKUPS=()
-  rm -f -- "$REASSOCIATE_BRIEF_BACKUP"
-  REASSOCIATE_BRIEF_BACKUP=
-  echo "reassociated $ID worktree=$new_wt${new_branch:+ branch=$new_branch} prior=$old_wt$([ "$old_state" = present ] || printf ' prior_state=%s' "$old_state") slot=$slot_result${left_slots[*]+ released_slot=${left_slots[*]}}"
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    rm -f -- "${RA_BRIEF_BACKUPS[m]}" "${RA_META_BACKUPS[m]}"
+    RA_BRIEF_BACKUPS[m]=
+    RA_META_BACKUPS[m]=
+  done
+  for ((m=0; m<${#RA_IDS[@]}; m++)); do
+    left_slots=()
+    while IFS= read -r slot; do
+      [ -z "$slot" ] || left_slots+=("$slot")
+    done <<< "${RA_LEFT[m]}"
+    echo "reassociated ${RA_IDS[m]} worktree=${RA_NEWWT[m]}${RA_NEWBRANCH[m]:+ branch=${RA_NEWBRANCH[m]}} prior=${RA_OLDWT[m]}$([ "${RA_OLDSTATE[m]}" = present ] || printf ' prior_state=%s' "${RA_OLDSTATE[m]}") slot=${RA_SLOTRESULT[m]}${left_slots[*]+ released_slot=${left_slots[*]}}"
+  done
 }
 
 if [ "$VERB" = reassociate ]; then

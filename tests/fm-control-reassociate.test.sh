@@ -30,6 +30,10 @@
 #      work, including a branch in an external locked copy.
 #   9. A recorded PR survives reassociation only when Git proves that the
 #      replacement contains its recorded and reachable forge heads.
+#  10. Two live records that both name one slot root, each with its own copy
+#      nested in it, are re-pointed together by one --also call, each proved
+#      against its own copy; a missing proof, a foreign copy or claim, or a
+#      failed write changes neither record.
 set -u
 
 # shellcheck source=tests/fixtures.sh disable=SC1091
@@ -494,7 +498,7 @@ test_refusals_change_nothing() {
     "$id" reassociate --worktree "$dir/othercopy" --note n
   expect_refusal "$dir" "the copy already recorded" "nothing to reassociate" 1 \
     "$id" reassociate --worktree "$dir/old" --note n
-  expect_refusal "$dir" "a missing path" "is not an existing directory" 1 \
+  expect_refusal "$dir" "a missing path" "error: --worktree '$dir/nowhere' is not an existing directory" 1 \
     "$id" reassociate --worktree "$dir/nowhere" --note n
 
   fm_write_meta "$dir/home/state/other.meta" "window=fmses:fm-other" "worktree=$new" "project=$dir/proj" "kind=ship"
@@ -1651,6 +1655,421 @@ EOF
   pass 'recorded PR reassociation accepts equal/descendant tips and refuses missing, unrelated, advanced or malformed head proof'
 }
 
+# --- two live records on one shared slot root --------------------------------
+#
+# A pool slot root that two live ship records both name, with each task's real
+# copy nested inside it, cannot be left by either record alone: each replacement
+# copy is inside the root the other record still names. One call re-points both.
+
+# joint_slot <case-dir> -> the shared slot root.
+joint_slot() {  # <case-dir>
+  (cd "$1/pool/139/repo" && pwd -P)
+}
+
+# new_joint_case <name> <id-a> <id-b> [absent|a|b] -> case dir: two live ship
+# records that both name one pool slot root, each task's own copy nested in it
+# with unlanded commits, the root carrying a commit of its own, and the slot's
+# claim held by nobody, task a, or task b.
+new_joint_case() {  # <name> <id-a> <id-b> [absent|a|b]
+  local name=$1 ida=$2 idb=$3 claim=${4:-absent} dir slot id nested n
+  dir=$(new_case "$name" "$ida")
+  slot=$(add_pool_slot "$dir" 139 "fm/$name-slot-root")
+  printf '{"worktrees":[{"name":"139","path":"%s","leased":true,"lease_holder":"parked"}]}\n' "$slot" > "$dir/pool/treehouse-state.json"
+  git -C "$slot" commit -q --allow-empty -m "slot root work"
+  mkdir -p "$slot/.claude/worktrees" "$dir/home/data/$idb"
+  for id in "$ida" "$idb"; do
+    nested="$slot/.claude/worktrees/$id"
+    add_copy "$dir" "$nested" "fm/$id-v2"
+    for n in 1 2; do
+      printf 'unlanded %s %s\n' "$id" "$n" > "$nested/work-$n.txt"
+      git -C "$nested" add "work-$n.txt"
+      git -C "$nested" commit -qm "$id unlanded commit $n"
+    done
+    fm_write_meta "$dir/home/state/$id.meta" "window=fmses:fm-$id" "endpoint_task_id=$id" \
+      "worktree=$slot" "project=$dir/proj" "harness=claude" "kind=ship" "mode=no-mistakes" \
+      "yolo=off" "branch=fm/$id" "model=default" "effort=default" "spawn_gen=joint-$id"
+    printf '%s\n' "# Task" "## Captain's intent" "Exercise joint reassociation for $id." "" \
+      "# Definition of done" "Delivery contract: mode=no-mistakes" "Ship branch: fm/$id" \
+      > "$dir/home/data/$id/brief.md"
+  done
+  case "$claim" in
+    a) printf 'task=%s\nhome=%s\n' "$ida" "$dir/home" > "$dir/pool/139/.fm-slot-owner" ;;
+    b) printf 'task=%s\nhome=%s\n' "$idb" "$dir/home" > "$dir/pool/139/.fm-slot-owner" ;;
+  esac
+  printf '%s\n' "$dir"
+}
+
+# joint_note_state <case-dir> <ida> <idb>: fingerprints of everything a joint
+# call must never change, to compare with joint_assert_copies_unchanged.
+joint_note_state() {  # <case-dir> <id-a> <id-b>
+  local dir=$1 slot
+  slot=$(joint_slot "$dir")
+  copy_fingerprint "$slot" > "$dir/slot-before"
+  copy_fingerprint "$slot/.claude/worktrees/$2" > "$dir/nested-a-before"
+  copy_fingerprint "$slot/.claude/worktrees/$3" > "$dir/nested-b-before"
+  git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ > "$dir/branches-before"
+  git -C "$dir/proj" worktree list --porcelain > "$dir/registrations-before"
+  cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
+  rm -f "$dir/claim-before"
+  [ ! -f "$dir/pool/139/.fm-slot-owner" ] || cp "$dir/pool/139/.fm-slot-owner" "$dir/claim-before"
+}
+
+joint_assert_copies_unchanged() {  # <case-dir> <id-a> <id-b> <message>
+  local dir=$1 slot msg=$4
+  slot=$(joint_slot "$dir")
+  copy_fingerprint "$slot" | cmp -s - "$dir/slot-before" || fail "$msg: the shared slot root changed"
+  copy_fingerprint "$slot/.claude/worktrees/$2" | cmp -s - "$dir/nested-a-before" || fail "$msg: task $2's copy changed"
+  copy_fingerprint "$slot/.claude/worktrees/$3" | cmp -s - "$dir/nested-b-before" || fail "$msg: task $3's copy changed"
+  git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ | cmp -s - "$dir/branches-before" \
+    || fail "$msg: branches changed"
+  git -C "$dir/proj" worktree list --porcelain | cmp -s - "$dir/registrations-before" \
+    || fail "$msg: copy registrations changed"
+  cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$msg: Treehouse's lease changed"
+  if [ -f "$dir/claim-before" ]; then
+    cmp -s "$dir/claim-before" "$dir/pool/139/.fm-slot-owner" || fail "$msg: the slot claim changed"
+  fi
+  [ ! -s "$dir/fake/endpoint-calls" ] || fail "$msg: an endpoint was touched"
+}
+
+# joint_leftovers <case-dir>: staging and recovery files a finished call must not leave.
+joint_leftovers() {  # <case-dir>
+  find "$1/home/state" "$1/home/data" \( -name '.*.meta.reassociate.*' -o -name '.*.meta.prior.*' \
+    -o -name '.brief.reassociate.*' -o -name '.brief.prior.*' -o -name '.slot-owner.prior.*' \) 2>/dev/null
+}
+
+test_two_live_records_on_one_slot_root_are_repointed_together() {
+  local shape claim ida idb dir slot na nb out rc=0 id nested other expect_claim first anchors
+  for shape in unclaimed claimed-by-first claimed-by-second named-in-reverse; do
+    ida="joint-a-$shape"
+    idb="joint-b-$shape"
+    claim=absent
+    first=$ida
+    case "$shape" in
+      claimed-by-first) claim=a ;;
+      claimed-by-second) claim=b ;;
+      named-in-reverse) first=$idb ;;
+    esac
+    dir=$(new_joint_case "joint-$shape" "$ida" "$idb" "$claim")
+    slot=$(joint_slot "$dir")
+    na="$slot/.claude/worktrees/$ida"
+    nb="$slot/.claude/worktrees/$idb"
+
+    # The refusal this fixture exists to reproduce: neither record can go first.
+    for id in "$ida" "$idb"; do
+      nested="$slot/.claude/worktrees/$id"
+      other=$idb; [ "$id" = "$idb" ] && other=$ida
+      expect_refusal "$dir" "$shape: $id alone, while $other still names the slot root" \
+        "is also task $other's recorded worktree" 1 \
+        "$id" reassociate --worktree "$nested" --note "one at a time"
+    done
+
+    joint_note_state "$dir" "$ida" "$idb"
+    snapshot_case "$dir"
+    if [ "$shape" = named-in-reverse ]; then
+      out=$(run_control "$dir" "$idb" reassociate --worktree "$nb" --also "$ida=$na" --note "Both tasks leave the shared root.") || rc=$?
+    else
+      out=$(run_control "$dir" "$ida" reassociate --worktree "$na" --also "$idb=$nb" --note "Both tasks leave the shared root.") || rc=$?
+    fi
+    rc=${rc:-0}
+    expect_code 0 "$rc" "$shape: one call must re-point both records"$'\n'"$out"
+    assert_contains "$out" "reassociated $ida worktree=$na branch=fm/$ida-v2 prior=$slot slot=" "$shape: task a's re-point was not reported"
+    assert_contains "$out" "reassociated $idb worktree=$nb branch=fm/$idb-v2 prior=$slot slot=" "$shape: task b's re-point was not reported"
+    for id in "$ida" "$idb"; do
+      nested="$slot/.claude/worktrees/$id"
+      assert_equals "$nested" "$(meta_field "$dir" "$id" worktree)" "$shape: $id's record does not name its own copy"
+      assert_equals "fm/$id-v2" "$(meta_field "$dir" "$id" branch)" "$shape: $id's branch did not follow its copy"
+      assert_equals "$slot" "$(meta_field "$dir" "$id" prior_worktree)" "$shape: $id does not keep the shared root as preserved custody"
+      assert_equals "" "$(meta_field "$dir" "$id" released_worktree)" "$shape: $id released a root another copy still lives in"
+      assert_line "Ship branch: fm/$id-v2" "$dir/home/data/$id/brief.md" "$shape: $id's instructions kept the old Ship branch"
+      assert_no_line "Ship branch: fm/$id" "$dir/home/data/$id/brief.md" "$shape: $id's instructions still name the old branch"
+      assert_contains "$(cat "$dir/home/data/$id/brief.md")" "Work only in $nested, on branch fm/$id-v2." "$shape: $id's instructions do not name its copy"
+      assert_contains "$(cat "$dir/home/data/$id/brief.md")" "Both tasks leave the shared root." "$shape: $id's instructions lost the note"
+      anchors=$(git -C "$dir/proj" for-each-ref --points-at "$(git -C "$slot" rev-parse HEAD)" --format='%(refname)' "refs/fm/anchor/$id-*")
+      [ -n "$anchors" ] || fail "$shape: the shared root's commit is not anchored for $id"
+    done
+    case "$claim" in
+      b) expect_claim=$idb ;;
+      a) expect_claim=$ida ;;
+      *) expect_claim=$first ;;
+    esac
+    assert_line "task=$expect_claim" "$dir/pool/139/.fm-slot-owner" "$shape: the shared slot is not claimed by $expect_claim"
+    joint_assert_copies_unchanged "$dir" "$ida" "$idb" "$shape"
+    [ -z "$(joint_leftovers "$dir")" ] || fail "$shape: the call left staging files: $(joint_leftovers "$dir")"
+
+    # Repeating the call has nothing left to do, and changes nothing.
+    snapshot_case "$dir"
+    if [ "$shape" = named-in-reverse ]; then
+      expect_refusal "$dir" "$shape: repeating the call" "nothing to reassociate" 1 \
+        "$idb" reassociate --worktree "$nb" --also "$ida=$na" --note again
+    else
+      expect_refusal "$dir" "$shape: repeating the call" "nothing to reassociate" 1 \
+        "$ida" reassociate --worktree "$na" --also "$idb=$nb" --note again
+    fi
+    rc=0
+  done
+  pass "one call re-points two live records that share a slot root, each at its own nested copy, and neither order alone could"
+}
+
+# Every refusal names the exact missing proof and the task it belongs to, and
+# changes neither record, neither instructions file, no claim, and no copy.
+test_joint_reassociation_refuses_on_a_missing_proof_and_changes_nothing() {
+  local shape ida idb dir slot na nb want who head out rc=0 other
+  local -a args
+  for shape in second-pr-head first-pr-head second-detached dirty-root third-on-root third-on-copy \
+    foreign-claim same-copy copy-inside-copy other-project mixed-roots missing-brief unknown-task; do
+    ida="joint-a-$shape"
+    idb="joint-b-$shape"
+    dir=$(new_joint_case "refuse-$shape" "$ida" "$idb" absent)
+    slot=$(joint_slot "$dir")
+    na="$slot/.claude/worktrees/$ida"
+    nb="$slot/.claude/worktrees/$idb"
+    args=(reassociate --worktree "$na" --also "$idb=$nb" --note "Both leave the root.")
+    who=$idb
+    case "$shape" in
+      second-pr-head)
+        head=$(git -C "$dir/old" rev-parse HEAD)
+        printf 'pr=https://github.com/example/repo/pull/7\npr_head=%s\n' "$head" >> "$dir/home/state/$idb.meta"
+        want="does not contain PR head $head"
+        ;;
+      first-pr-head)
+        head=$(git -C "$dir/old" rev-parse HEAD)
+        printf 'pr=https://github.com/example/repo/pull/7\npr_head=%s\n' "$head" >> "$dir/home/state/$ida.meta"
+        want="does not contain PR head $head"
+        who=$ida
+        ;;
+      second-detached)
+        git -C "$nb" checkout --quiet --detach
+        want="has a detached HEAD"
+        ;;
+      dirty-root)
+        printf 'tracked-looking edit\n' > "$slot/dirty.txt"
+        want="has uncommitted or untracked-unignored changes"
+        who=$ida
+        ;;
+      third-on-root)
+        fm_write_meta "$dir/home/state/third.meta" "window=fmses:fm-third" "worktree=$slot" "project=$dir/proj" "kind=ship"
+        want="is also task third's recorded worktree"
+        who=$ida
+        ;;
+      third-on-copy)
+        fm_write_meta "$dir/home/state/third.meta" "window=fmses:fm-third" "worktree=$nb" "project=$dir/proj" "kind=ship"
+        want="is also task third's recorded worktree"
+        who=$ida
+        ;;
+      foreign-claim)
+        printf 'task=someone-else\nhome=%s\n' "$dir/home" > "$dir/pool/139/.fm-slot-owner"
+        want="claimed by task someone-else"
+        who=$ida
+        ;;
+      same-copy)
+        args=(reassociate --worktree "$na" --also "$idb=$na" --note "Both leave the root.")
+        want="overlap"
+        who=$ida
+        ;;
+      copy-inside-copy)
+        git -C "$dir/proj" worktree add --quiet -b "fm/$idb-inner" "$na/inner"
+        args=(reassociate --worktree "$na" --also "$idb=$na/inner" --note "Both leave the root.")
+        want="overlap"
+        who=$ida
+        ;;
+      other-project)
+        fm_git_worktree "$dir/otherproj" "$dir/otherproj-copy" "fm/$idb"
+        sed -i.bak "s|^project=.*|project=$dir/otherproj|" "$dir/home/state/$idb.meta"
+        rm -f "$dir/home/state/$idb.meta.bak"
+        want="record different projects"
+        ;;
+      mixed-roots)
+        add_copy "$dir" "$dir/old-b" "fm/$idb"
+        sed -i.bak "s|^worktree=.*|worktree=$dir/old-b|" "$dir/home/state/$idb.meta"
+        rm -f "$dir/home/state/$idb.meta.bak"
+        want="is also task $ida's recorded worktree"
+        ;;
+      missing-brief)
+        rm -f "$dir/home/data/$idb/brief.md"
+        want="has no regular instructions file"
+        ;;
+      unknown-task)
+        args=(reassociate --worktree "$na" --also "nobody=$nb" --note "Both leave the root.")
+        want="no task 'nobody' in"
+        who=
+        ;;
+    esac
+    joint_note_state "$dir" "$ida" "$idb"
+    expect_refusal "$dir" "$shape" "$want" 1 "$ida" "${args[@]}"
+    if [ -n "$who" ]; then
+      out=$(run_control "$dir" "$ida" "${args[@]}") || rc=$?
+      assert_contains "$out" "error: task $who: " "$shape: the refusal does not name the task it belongs to"
+    fi
+    joint_assert_copies_unchanged "$dir" "$ida" "$idb" "$shape"
+    [ -z "$(joint_leftovers "$dir")" ] || fail "$shape: the refusal left staging files: $(joint_leftovers "$dir")"
+    other=$(find "$dir/home/state" -maxdepth 1 -name '.control-*.lock' 2>/dev/null)
+    [ -z "$other" ] || fail "$shape: the refusal left a lifecycle lock: $other"
+  done
+  pass "a joint reassociation refuses on a missing proof, a foreign copy or claim, or an overlap, names the task, and changes nothing"
+}
+
+test_joint_options_are_checked_before_anything_is_read() {
+  local id=joint-args dir slot na nb
+  dir=$(new_joint_case joint-args "$id-a" "$id-b" absent)
+  slot=$(joint_slot "$dir")
+  na="$slot/.claude/worktrees/$id-a"
+  nb="$slot/.claude/worktrees/$id-b"
+  joint_note_state "$dir" "$id-a" "$id-b"
+  expect_refusal "$dir" "--also without a value" "requires a value" 1 \
+    "$id-a" reassociate --worktree "$na" --note n --also
+  expect_refusal "$dir" "--also without a copy" "requires <task-id>=<replacement-copy>" 1 \
+    "$id-a" reassociate --worktree "$na" --note n --also "$id-b"
+  expect_refusal "$dir" "--also with an empty copy" "requires a replacement copy" 1 \
+    "$id-a" reassociate --worktree "$na" --note n --also "$id-b="
+  expect_refusal "$dir" "--also naming an invalid task" "is not a valid task id" 1 \
+    "$id-a" reassociate --worktree "$na" --note n --also "../x=$nb"
+  expect_refusal "$dir" "--also naming the command's own task" "which the command already re-points" 1 \
+    "$id-a" reassociate --worktree "$na" --note n --also "$id-a=$nb"
+  expect_refusal "$dir" "--also naming a task twice" "twice" 1 \
+    "$id-a" reassociate --worktree "$na" --note n --also "$id-b=$nb" --also "$id-b=$nb"
+  expect_refusal "$dir" "--also naming a missing copy" "error: task $id-b: --also $id-b='$dir/nowhere' is not an existing directory" 1 \
+    "$id-a" reassociate --worktree "$na" --note n --also "$id-b=$dir/nowhere"
+  expect_refusal "$dir" "--worktree naming a missing copy beside --also" "error: task $id-a: --worktree '$dir/nowhere' is not an existing directory" 1 \
+    "$id-a" reassociate --worktree "$dir/nowhere" --note n --also "$id-b=$nb"
+  expect_refusal "$dir" "--also on another verb" "applies to 'reassociate' only" 1 \
+    "$id-a" relaunch --worktree "$na" --note n --also "$id-b=$nb"
+  expect_refusal "$dir" "--also without --worktree" "requires --worktree" 1 \
+    "$id-a" reassociate --note n --also "$id-b=$nb"
+  expect_refusal "$dir" "--also without --note" "requires --note" 1 \
+    "$id-a" reassociate --worktree "$na" --also "$id-b=$nb"
+  joint_assert_copies_unchanged "$dir" "$id-a" "$id-b" "malformed --also"
+  pass "malformed --also arguments refuse before any record is read or changed"
+}
+
+# A failed write anywhere in a joint call restores every record, instructions
+# file, and slot claim that call had already published, in both records.
+test_joint_failure_rolls_both_records_back() {
+  local shape claim ida idb dir slot na nb out rc real_mv pattern
+  real_mv=$(command -v mv)
+  for shape in second-record first-record second-instructions first-instructions second-record-claimed; do
+    ida="joint-a-$shape"
+    idb="joint-b-$shape"
+    claim=absent
+    pattern=
+    case "$shape" in
+      second-record) pattern="*/.$idb.meta.reassociate.*" ;;
+      first-record) pattern="*/.$ida.meta.reassociate.*" ;;
+      second-instructions) pattern="*/data/$idb/.brief.reassociate.*" ;;
+      first-instructions) pattern="*/data/$ida/.brief.reassociate.*" ;;
+      second-record-claimed) pattern="*/.$idb.meta.reassociate.*"; claim=a ;;
+    esac
+    dir=$(new_joint_case "rollback-$shape" "$ida" "$idb" "$claim")
+    slot=$(joint_slot "$dir")
+    na="$slot/.claude/worktrees/$ida"
+    nb="$slot/.claude/worktrees/$idb"
+    cat > "$dir/fakebin/mv" <<SH
+#!/usr/bin/env bash
+for arg in "\$@"; do
+  case "\$arg" in
+    $pattern) exit 1 ;;
+  esac
+done
+exec "$real_mv" "\$@"
+SH
+    chmod +x "$dir/fakebin/mv"
+    joint_note_state "$dir" "$ida" "$idb"
+    snapshot_case "$dir"
+    rc=0
+    out=$(run_control "$dir" "$ida" reassociate --worktree "$na" --also "$idb=$nb" --note "Both leave the root.") || rc=$?
+    expect_code 1 "$rc" "$shape: a failed write must refuse"$'\n'"$out"
+    assert_case_unchanged "$dir" "$shape: after the rollback"
+    cmp -s "$dir/before/state/$ida.meta" "$dir/home/state/$ida.meta" || fail "$shape: task a's record changed"
+    cmp -s "$dir/before/state/$idb.meta" "$dir/home/state/$idb.meta" || fail "$shape: task b's record changed"
+    cmp -s "$dir/before/data/$ida/brief.md" "$dir/home/data/$ida/brief.md" || fail "$shape: task a's instructions changed"
+    cmp -s "$dir/before/data/$idb/brief.md" "$dir/home/data/$idb/brief.md" || fail "$shape: task b's instructions changed"
+    joint_assert_copies_unchanged "$dir" "$ida" "$idb" "$shape"
+    [ -z "$(joint_leftovers "$dir")" ] || fail "$shape: the rollback left files behind: $(joint_leftovers "$dir")"
+  done
+  pass "a failed write in a joint reassociation leaves both records, both instructions files, and the slot claim exactly as they were"
+}
+
+# meta_lock_is_held <case-dir> <id>: a live process other than this shell holds
+# the task record's lock, observed through the lock library fm-control uses.
+meta_lock_is_held() {  # <case-dir> <id>
+  (
+    # shellcheck source=/dev/null
+    . "$ROOT/bin/fm-wake-lib.sh"
+    if fm_lock_try_acquire "$1/home/state/.meta-$2.lock"; then
+      fm_lock_release "$1/home/state/.meta-$2.lock"
+      exit 1
+    fi
+    [ "${FM_LOCK_BUSY:-0}" = 1 ]
+  )
+}
+
+# The call proves and anchors both copies, then writes both records, so every
+# record it names must be locked for that whole span: a writer of either record
+# that slipped in would have its change overwritten by the staged copy.
+test_joint_reassociation_holds_every_records_meta_lock() {
+  local shape ida idb dir slot na nb real_git pid i rc id first second lost out
+  real_git=$(command -v git)
+  for shape in command-task-first command-task-second; do
+    ida="joint-a-locks-$shape"
+    idb="joint-b-locks-$shape"
+    dir=$(new_joint_case "locks-$shape" "$ida" "$idb" absent)
+    slot=$(joint_slot "$dir")
+    na="$slot/.claude/worktrees/$ida"
+    nb="$slot/.claude/worktrees/$idb"
+    first=$ida
+    second=$idb
+    if [ "$shape" = command-task-second ]; then
+      first=$idb
+      second=$ida
+    fi
+    cat > "$dir/fakebin/git" <<EOF
+#!/usr/bin/env bash
+if [ "\${3:-}" = update-ref ]; then
+  case "\${4:-}" in
+    refs/fm/anchor/*)
+      : > "$dir/paused"
+      for ((i=0; i < 2000; i++)); do
+        [ ! -e "$dir/release" ] || break
+        sleep 0.01
+      done
+      [ -e "$dir/release" ] || exit 1
+      ;;
+  esac
+fi
+exec "$real_git" "\$@"
+EOF
+    chmod +x "$dir/fakebin/git"
+    if [ "$shape" = command-task-second ]; then
+      run_control "$dir" "$first" reassociate --worktree "$nb" --also "$second=$na" --note "Both leave the root." > "$dir/call.out" &
+    else
+      run_control "$dir" "$first" reassociate --worktree "$na" --also "$second=$nb" --note "Both leave the root." > "$dir/call.out" &
+    fi
+    pid=$!
+    for ((i=0; i < 2000; i++)); do
+      [ ! -e "$dir/paused" ] || break
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.01
+    done
+    lost=
+    if [ -e "$dir/paused" ]; then
+      for id in "$ida" "$idb"; do
+        meta_lock_is_held "$dir" "$id" || lost="$lost $id"
+      done
+    fi
+    : > "$dir/release"
+    rc=0
+    wait "$pid" || rc=$?
+    out=$(cat "$dir/call.out")
+    [ -e "$dir/paused" ] || fail "$shape: the call never reached its anchoring"$'\n'"$out"
+    expect_code 0 "$rc" "$shape: the joint call failed"$'\n'"$out"
+    [ -z "$lost" ] || fail "$shape: the call did not hold the record lock of:$lost while it proved and anchored the copies"
+    for id in "$ida" "$idb"; do
+      ! meta_lock_is_held "$dir" "$id" || fail "$shape: the call left task $id's record lock held"
+      [ ! -e "$dir/home/state/.meta-$id.lock" ] || fail "$shape: the call left task $id's record lock behind"
+    done
+  done
+  pass "a joint reassociation holds every named record's lock while it proves and anchors the copies, and releases each one"
+}
+
 test_shared_root_without_pr_proves_its_own_branch
 test_non_github_pr_reassociation_refuses
 test_recovered_shared_slot_has_no_nonforcing_lease_remedy
@@ -1686,3 +2105,8 @@ test_anchor_failure_refuses_record_publication
 test_non_pool_reassociation_serializes_copy_ownership
 test_subordinate_reassociation_preserves_ancestor_priors
 test_same_origin_different_ref_store_refuses_without_changes
+test_two_live_records_on_one_slot_root_are_repointed_together
+test_joint_reassociation_refuses_on_a_missing_proof_and_changes_nothing
+test_joint_options_are_checked_before_anything_is_read
+test_joint_failure_rolls_both_records_back
+test_joint_reassociation_holds_every_records_meta_lock
