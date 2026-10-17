@@ -3776,7 +3776,6 @@ require_cleanup_copy_clearance() {
         # it no longer owns the root, so naming it as prior_worktree= does not
         # keep this task from removing its own copy (the proof is
         # fm_task_copy_prior_root_released's).
-        FM_TASK_COPY_ROOT_HOLDER=
         if [ "$overlaps" = 1 ] && [ "$field" = prior_worktree ] && [ "$own" = 0 ] \
            && [ "$KIND" != secondmate ] && [ "$record_meta" = "$META" ] \
            && [ "$canonical" = "$(fm_task_copy_canonical_dir "$WT" 2>/dev/null)" ] \
@@ -3787,7 +3786,6 @@ require_cleanup_copy_clearance() {
         if [ "$overlaps" = 1 ] \
            && ! fm_task_copy_ancestor_current "$other_meta" "$record_state" "$field" "$copy_real" "$canonical"; then
           echo "REFUSED: task $record_id's cleanup target $canonical is also task $(basename "$other_meta" .meta)'s recorded $field ($copy_real); preserved $field custody overlaps it, so nothing was changed - not even with --force." >&2
-          [ -z "$FM_TASK_COPY_ROOT_HOLDER" ] || echo "Task $(basename "$other_meta" .meta) has left that root for its own copy, but task $FM_TASK_COPY_ROOT_HOLDER still names it as its $FM_TASK_COPY_ROOT_HOLDER_FIELD, so the root is not released." >&2
           return 1
         fi
         if ! copy_common=$(git -C "$copy_real" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \

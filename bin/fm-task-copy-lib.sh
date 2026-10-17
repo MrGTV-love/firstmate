@@ -381,15 +381,9 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
 #     or home=; a copy of some record inside <root> belongs to that record.
 # <state-dir>... are the local Firstmate state directories to scan, as
 # fm_local_firstmate_state_dirs produced them. <root> and <target> are canonical.
-# When a record that still names the root is what keeps it from being released,
-# FM_TASK_COPY_ROOT_HOLDER and FM_TASK_COPY_ROOT_HOLDER_FIELD name it.
-FM_TASK_COPY_ROOT_HOLDER=
-FM_TASK_COPY_ROOT_HOLDER_FIELD=
 fm_task_copy_prior_root_released() {  # <other-meta> <root> <target> <retiring-meta> <state-dir>...
   local other=$1 root=$2 target=$3 retiring=$4 kind project wt state_dir meta field path real line named
   shift 4
-  FM_TASK_COPY_ROOT_HOLDER=
-  FM_TASK_COPY_ROOT_HOLDER_FIELD=
   case "$target" in "$root"/*) ;; *) return 1 ;; esac
   kind=$(fm_meta_get "$other" kind)
   case "${kind:-ship}" in ship|scout) ;; *) return 1 ;; esac
@@ -416,8 +410,6 @@ fm_task_copy_prior_root_released() {  # <other-meta> <root> <target> <retiring-m
         real=$(fm_task_copy_canonical_dir "$path") || continue
         fm_task_copy_paths_overlap "$real" "$root" || continue
         case "$real" in "$root"/*) continue ;; esac
-        FM_TASK_COPY_ROOT_HOLDER=$(basename "$meta" .meta)
-        FM_TASK_COPY_ROOT_HOLDER_FIELD=$field
         return 1
       done
     done
