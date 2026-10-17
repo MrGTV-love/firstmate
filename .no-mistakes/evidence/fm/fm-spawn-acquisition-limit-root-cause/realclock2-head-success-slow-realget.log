@@ -1,0 +1,11 @@
+### realclock2-head-success-slow-realget  03:22:35 load=71.66 61.48 54.19
+REALCLOCK success: rc=0 elapsed 18s polls=       1
+ok - tmux successful launch retains its slot
+REALCLOCK slow: rc=1 elapsed 125s polls=      77
+REALCLOCK slow: refused after 78 polls, elapsed 125s
+ok - tmux slow refusal returns its slot and ends its get subshell
+HOLDER: real pool lock /Users/charlesabrooker/tmp/fm-spawn-acquisition.8EqDXt/pool/.treehouse/project-87908b/treehouse-state.lock held until tick 65
+REALCLOCK realget: rc=0 elapsed 103s polls=      66
+REALGET rc=0 polls=      66
+ok - tmux real treehouse get held past the old 60-poll window is accepted
+exit=0  end 03:26:51

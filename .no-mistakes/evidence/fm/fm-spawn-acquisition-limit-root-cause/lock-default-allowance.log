@@ -1,0 +1,7 @@
+=== holder aged 400s; waiter uses the default allowance
+fm-project-lock: waiting for waiter-op; current holder holder-op (PID 1261); 89s left before the stall limit
+(timeout rc=124; 124 means the waiter was still waiting when killed)
+=== holder aged 500s; waiter uses the default allowance
+fm-project-lock: stall limit reached for waiter-op: current holder holder-op (PID 1261) made no progress for 500s (allowance 490s); no live holder was removed
+waiter rc=1
+(timeout rc=0; 124 means the waiter was still waiting when killed)

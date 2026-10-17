@@ -1,0 +1,6 @@
+### realclock-head-late-spawning-slow-realget  03:03:05 load=27.77 35.44 36.78
+REALCLOCK late: rc=0 elapsed 108s polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+REALCLOCK spawning: rc=1 elapsed 68s polls=      59
+tests/fm-spawn-acquisition-cleanup.test.sh: line 361: protected_lease: unbound variable
+exit=1  end 03:06:07

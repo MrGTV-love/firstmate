@@ -1,0 +1,12 @@
+### head48d6-acquisition-tmux-run3  03:00:06 load=41.81 41.28 38.74
+ok - tmux successful launch retains its slot
+ok - tmux slow refusal returns its slot and ends its get subshell
+ok - tmux spawning refusal returns its slot and ends its get subshell
+ok - tmux foreign refusal returns its slot and ends its get subshell
+ok - tmux dirty refusal returns its slot and ends its get subshell
+ok - tmux a get that outlasts the old 60-poll window is accepted
+ok - tmux laterexit refusal returns its slot and ends its get subshell
+ok - tmux earlyexit refusal returns its slot and ends its get subshell
+ok - tmux clock refusal returns its slot and ends its get subshell
+ok - tmux gone refusal returns its slot and ends its get subshell
+exit=0  end 03:02:01

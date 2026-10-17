@@ -1,0 +1,36 @@
+--- run 1 load=43.90 41.49 35.33
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 2 load=46.23 42.14 35.70
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 3 load=42.12 41.43 35.56
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 4 load=51.37 43.47 36.42
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 5 load=54.83 44.90 37.10
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 6 load=49.14 44.10 36.95
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 7 load=45.95 43.69 36.97
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 8 load=41.19 42.73 36.78
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 9 load=37.02 41.63 36.55
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 10 load=30.11 39.64 36.02
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 11 load=27.97 38.08 35.57
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- run 12 load=26.32 36.59 35.10
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted

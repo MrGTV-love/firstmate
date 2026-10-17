@@ -1,0 +1,5 @@
+### head48d6-acquisition-herdr-e2e  03:14:08 load=57.72 56.46 47.62
+not ok - clean acquisition did not launch: warning: /Users/charlesabrooker/tmp/fm-spawn-acquisition.OrEBYd/home/data/get-cleanup-success-66378/launch-brief.md records no ship branch; defaulting to legacy branch fm/get-cleanup-success-66378
+warning: /Users/charlesabrooker/tmp/fm-spawn-acquisition.OrEBYd/home/data/get-cleanup-success-66378/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: treehouse get did not enter an isolated worktree after 60 polls (window 60s) (last seen '/Users/charlesabrooker/tmp/fm-spawn-acquisition.OrEBYd/project': it is the project checkout itself; spawning project '/Users/charlesabrooker/tmp/fm-spawn-acquisition.OrEBYd/project'); aborting acquisition: expected exit 0, got 1
+exit=1  end 03:14:58

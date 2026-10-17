@@ -1,0 +1,9 @@
+### realclock-base-88539cca-realget  03:06:07 load=29.14 34.10 36.04
+HOLDER: real pool lock /Users/charlesabrooker/tmp/fm-spawn-acquisition.fiVKd4/pool/.treehouse/project-8b8bab/treehouse-state.lock held until tick 75
+REALCLOCK realget: rc=1 elapsed 87s polls=      60
+REALGET rc=1 polls=      60
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/Users/charlesabrooker/tmp/fm-spawn-acquisition.fiVKd4/project': it is the project checkout itself; spawning project '/Users/charlesabrooker/tmp/fm-spawn-acquisition.fiVKd4/project'
+not ok - real treehouse get held past the old window was refused: warning: /Users/charlesabrooker/tmp/fm-spawn-acquisition.fiVKd4/home/data/get-cleanup-realget-68782/launch-brief.md records no ship branch; defaulting to legacy branch fm/get-cleanup-realget-68782
+warning: /Users/charlesabrooker/tmp/fm-spawn-acquisition.fiVKd4/home/data/get-cleanup-realget-68782/launch-brief.md records no delivery contract line (scaffolded before ship briefs recorded one); launching on the explicit --mode no-mistakes - confirm its definition of done matches
+error: treehouse get did not enter an isolated worktree within 60s (last seen '/Users/charlesabrooker/tmp/fm-spawn-acquisition.fiVKd4/project': it is the project checkout itself; spawning project '/Users/charlesabrooker/tmp/fm-spawn-acquisition.fiVKd4/project'); aborting acquisition: expected exit 0, got 1
+exit=1  end 03:12:27

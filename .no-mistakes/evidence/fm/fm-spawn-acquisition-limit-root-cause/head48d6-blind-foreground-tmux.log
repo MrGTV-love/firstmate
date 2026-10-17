@@ -1,0 +1,4 @@
+### head48d6-blind-foreground-tmux  03:32:54 load=58.78 58.06 55.17
+ok - tmux successful launch retains its slot
+ok - tmux blind refusal returns its slot and ends its get subshell
+exit=0  end 03:33:15

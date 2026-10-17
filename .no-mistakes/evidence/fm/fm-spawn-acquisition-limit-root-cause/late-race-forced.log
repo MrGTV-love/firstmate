@@ -1,0 +1,12 @@
+--- forced run 1
+LATE rc=1 arrived=yes polls=      75
+REFUSAL: error: treehouse get did not enter an isolated worktree after 76 polls (window 60s) (last seen '/Users/charlesabrooker/tmp/fm-spawn-acquisition.5g8sxM/project':
+not ok - late refused: expected exit 0, got 1
+--- forced run 2
+LATE rc=1 arrived=yes polls=      75
+REFUSAL: error: treehouse get did not enter an isolated worktree after 76 polls (window 60s) (last seen '/Users/charlesabrooker/tmp/fm-spawn-acquisition.oJkRII/project':
+not ok - late refused: expected exit 0, got 1
+--- forced run 3
+LATE rc=1 arrived=yes polls=      75
+REFUSAL: error: treehouse get did not enter an isolated worktree after 76 polls (window 60s) (last seen '/Users/charlesabrooker/tmp/fm-spawn-acquisition.BLAdfc/project':
+not ok - late refused: expected exit 0, got 1

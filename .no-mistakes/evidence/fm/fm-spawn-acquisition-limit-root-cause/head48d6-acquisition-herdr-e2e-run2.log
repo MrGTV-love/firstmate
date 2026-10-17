@@ -1,0 +1,15 @@
+### head48d6-acquisition-herdr-e2e-run2  03:26:51 load=41.88 54.67 53.47
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr contention keeps both acquisition leases past the former cleanup timeout
+ok - herdr contention releases only the refused acquisition after projected launch
+ok - herdr successful launch retains its slot
+ok - herdr slow refusal returns its slot and ends its get subshell
+ok - herdr spawning refusal returns its slot and ends its get subshell
+ok - herdr foreign refusal returns its slot and ends its get subshell
+ok - herdr dirty refusal returns its slot and ends its get subshell
+ok - herdr projected refusal terminates under custody and never queues later generic closure
+exit=0  end 03:32:37

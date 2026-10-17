@@ -1,0 +1,9 @@
+--- control run 1 (same slow state read, get finishes with no delay)
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- control run 2 (same slow state read, get finishes with no delay)
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
+--- control run 3 (same slow state read, get finishes with no delay)
+LATE rc=0 arrived=yes polls=      76
+ok - tmux a get that outlasts the old 60-poll window is accepted
