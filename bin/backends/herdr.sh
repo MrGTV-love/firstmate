@@ -3093,6 +3093,23 @@ fm_backend_herdr_current_path() {  # <target>
     | jq -r '.result.pane.foreground_cwd // empty' 2>/dev/null
 }
 
+# fm_backend_herdr_foreground_args: the command line of every foreground
+# process of <target>'s pane, one per line, from `pane process-info`, or nothing
+# on any error or when the response describes a different pane. fm-spawn.sh's
+# `treehouse get` wait reads it to tell a get that is still running from a pane
+# that is back at a shell prompt; the response shape is the one
+# fm_backend_herdr_pane_process_state_sample parses.
+fm_backend_herdr_foreground_args() {  # <target>
+  local info
+  fm_backend_herdr_target_ready "$1" || return 0
+  info=$(fm_backend_herdr_cli "$FM_BACKEND_HERDR_SESSION" pane process-info --pane "$FM_BACKEND_HERDR_PANE" 2>/dev/null) || return 0
+  printf '%s' "$info" | jq -r --arg pane "$FM_BACKEND_HERDR_PANE" '
+    select(.result.type == "pane_process_info" and .result.process_info.pane_id == $pane)
+    | .result.process_info.foreground_processes[]?
+    | (.cmdline // ((.argv // []) | join(" ")) // .name // empty)
+    | select(type == "string" and length > 0)' 2>/dev/null
+}
+
 # fm_backend_herdr_send_text_line: send one line of TEXT then submit,
 # ATOMICALLY - mirrors tmux's `send-keys -t T text Enter`. Used for the fixed
 # spawn-time commands (treehouse get, the GOTMPDIR export). `pane run` types

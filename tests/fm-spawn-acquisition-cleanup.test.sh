@@ -2,6 +2,7 @@
 # Exercise the real spawn entrypoint and terminal with a fake process-leased get.
 # The herdr argument uses a generated, guarded lab session; the default uses private tmux.
 # FM_TEST_ACQUISITION_CASES=contention runs the successful sibling and contention only.
+# The late, exits and ceiling cases read the pane's foreground process and run on tmux only.
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -63,6 +64,9 @@ FAKEBIN=$(fm_fakebin "$TMP_ROOT/fake")
 # Speed caller sleeps except marked real cleanup waits; acquisition uses /bin/sleep.
 cat > "$FAKEBIN/sleep" <<'SH'
 #!/usr/bin/env bash
+if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_TICK_FILE:-}" ]; then
+  echo tick >> "$FM_TEST_TICK_FILE"
+fi
 if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_POLL_READY:-}" ]; then
   while [ ! -e "$FM_TEST_POLL_READY" ]; do /bin/sleep 0.02; done
 fi
@@ -86,6 +90,16 @@ touch "\$LEASE"
 if [ "\$MODE" = slow ]; then
   while [ ! -e "\$ALLOW" ]; do /bin/sleep 0.02; done
 fi
+if [ "\$MODE" = late ]; then
+  # Take longer than the old 60-poll window: wait for 75 one-second polls.
+  : > "\$TICKS"
+  while [ "\$(wc -l < "\$TICKS")" -lt 75 ]; do /bin/sleep 0.02; done
+fi
+if [ "\$MODE" = exits ]; then
+  rm -f "\$LEASE"
+  echo 'treehouse: simulated failure' >&2
+  exit 1
+fi
 cd "\$DEST" || exit 1
 touch "\$ARRIVED"
 HISTFILE='$TMP_ROOT/get-history' /bin/bash --noprofile --norc -i
@@ -106,6 +120,8 @@ DIRTY="$TMP_ROOT/dirty"
 fm_git_init_commit "$DIRTY"
 CLEAN="$TMP_ROOT/clean"
 fm_git_init_commit "$CLEAN"
+LATE="$TMP_ROOT/late"
+fm_git_init_commit "$LATE"
 # An ordinary caller checkout must not lend its origin to acquired origin-less copies.
 CALLER="$TMP_ROOT/caller"
 fm_git_init_commit "$CALLER"
@@ -170,8 +186,12 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
   export HERDR_PANE_ID HERDR_SOCKET_PATH
 fi
 
-for MODE in success slow spawning foreign dirty; do
+# The fixed 60-poll bound is what the original cases exercise; the foreground-aware
+# cases below raise it per run.
+export FM_SPAWN_ACQUIRE_CEILING=60
+for MODE in success slow spawning foreign dirty late exits ceiling; do
   [ "${FM_TEST_ACQUISITION_CASES:-all}" != contention ] || [ "$MODE" = success ] || continue
+  case "$MODE" in late|exits|ceiling) [ "$BACKEND" = tmux ] || continue ;; esac
   ID="get-cleanup-$MODE-$$"
   CASE="$TMP_ROOT/case-$MODE"
   mkdir -p "$CASE"
@@ -185,12 +205,30 @@ for MODE in success slow spawning foreign dirty; do
   [ "$MODE" != dirty ] || DEST=$DIRTY
   [ "$MODE" != foreign ] || HARNESS=claude
   [ "$MODE" != success ] || DEST=$CLEAN
-  printf 'MODE=%q\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\n' \
-    "$MODE" "$LEASE" "$PIDFILE" "$ALLOW" "$ARRIVED" "$DEST" > "$TMP_ROOT/get-config"
+  [ "$MODE" != late ] || DEST=$LATE
+  GET_MODE=$MODE
+  CEILING=60
+  case "$MODE" in
+    ceiling) GET_MODE=slow; CEILING=90 ;;
+    late) CEILING=120 ;;
+  esac
+  TICKS="$CASE/ticks"
+  : > "$TICKS"
+  printf 'MODE=%q\nLEASE=%q\nPIDFILE=%q\nALLOW=%q\nARRIVED=%q\nDEST=%q\nTICKS=%q\n' \
+    "$GET_MODE" "$LEASE" "$PIDFILE" "$ALLOW" "$ARRIVED" "$DEST" "$TICKS" > "$TMP_ROOT/get-config"
   fm_test_spawn_brief "$FM_HOME" "$ID" 'Refused acquisition must release its process lease.'
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$CASE/claude" PATH="$FAKEBIN:$PATH" \
+    FM_TEST_TICK_FILE="$TICKS" FM_SPAWN_ACQUIRE_CEILING="$CEILING" \
     bash "$ROOT/bin/fm-spawn.sh" "$ID" "$PROJECT" --backend "$BACKEND" --harness "$HARNESS" --allow-api-key --mode no-mistakes --yolo off 2>&1)
   rc=$?
+  if [ "$MODE" = late ]; then
+    # A get that outlasts the old 60-poll window while still running is waited for.
+    expect_code 0 "$rc" "a get still running past the old window was refused: $out"
+    [ "$(wc -l < "$TICKS")" -ge 75 ] || fail "late get was not held past the old window: $(wc -l < "$TICKS") polls"
+    [ -e "$LEASE" ] || fail 'late acquisition released its slot'
+    pass "$BACKEND a get that outlasts the old 60-poll window is accepted"
+    continue
+  fi
   if [ "$MODE" = success ]; then
     expect_code 0 "$rc" "clean acquisition did not launch: $out"
     [ -e "$LEASE" ] || fail 'successful spawn released its acquisition lease'
@@ -201,7 +239,18 @@ for MODE in success slow spawning foreign dirty; do
   fi
   [ "$rc" -ne 0 ] || fail "$MODE spawn unexpectedly launched: $out"
   case "$MODE" in
-    slow|spawning) assert_contains "$out" 'did not enter an isolated worktree within 60s' 'missing deadline refusal' ;;
+    slow) assert_contains "$out" 'did not enter an isolated worktree within 60s' 'missing deadline refusal' ;;
+    # A get that opened its shell in the project is gone from the foreground, so
+    # the refusal may arrive before the window ends; both refusals share the prefix.
+    spawning) assert_contains "$out" 'did not enter an isolated worktree' 'missing isolation refusal' ;;
+    exits)
+      assert_contains "$out" 'did not enter an isolated worktree: it stopped running' 'missing stopped-get refusal'
+      [ "$(wc -l < "$TICKS")" -lt 20 ] || fail "a get that exited was waited on for $(wc -l < "$TICKS") polls: $out"
+      ;;
+    ceiling)
+      assert_contains "$out" 'did not enter an isolated worktree within 90s' 'missing ceiling refusal'
+      [ "$(wc -l < "$TICKS")" -ge 75 ] || fail "a running get was abandoned after $(wc -l < "$TICKS") polls: $out"
+      ;;
     foreign) assert_contains "$out" 'could not pre-register Claude workspace trust' 'missing foreign-copy refusal' ;;
     dirty) assert_contains "$out" 'not clean' 'missing post-acquisition refusal' ;;
   esac
@@ -215,7 +264,9 @@ for MODE in success slow spawning foreign dirty; do
   [ ! -e "$LEASE" ] || fail "$MODE acquisition retained its slot after refusal: $out"
   pid=$(cat "$PIDFILE")
   ! kill -0 "$pid" 2>/dev/null || fail "$MODE left get subshell $pid alive"
-  [ "$MODE" != slow ] || [ ! -e "$ARRIVED" ] || fail 'get completed after the deadline and stranded its slot'
+  if [ "$MODE" = slow ] || [ "$MODE" = ceiling ]; then
+    [ ! -e "$ARRIVED" ] || fail 'get completed after the deadline and stranded its slot'
+  fi
   if [ "$BACKEND" = tmux ]; then
     tmux_windows=$("$REAL_TMUX" list-windows -t firstmate -F '#{window_name}') || fail 'spawn destroyed unrelated session'
     assert_not_contains "$tmux_windows" "fm-$ID" 'refused attempt pane remained'

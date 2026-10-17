@@ -3927,6 +3927,34 @@ test_current_path_reads_cwd() {
   pass "fm_backend_herdr_current_path: reads pane foreground_cwd (the live running process), not the frozen creation-time cwd"
 }
 
+test_foreground_args_read_the_pane_process_view() {
+  local dir log resp fb out
+  dir="$TMP_ROOT/fg-args"; mkdir -p "$dir/responses"; log="$dir/log"; resp="$dir/responses"; : > "$log"
+  fb=$(make_herdr_fakebin "$dir")
+  # A pane whose foreground group holds a running `treehouse get` and its git child.
+  printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":10,"foreground_process_group_id":20,"foreground_processes":[{"pid":20,"name":"treehouse","argv":["treehouse","get"],"cmdline":"treehouse get"},{"pid":21,"name":"git","argv":["git","status"]}]}}}\n' > "$resp/1.out"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_foreground_args default:w1:p2' "$ROOT" )
+  [ "$out" = $'treehouse get\ngit status' ] || fail "foreground_args should list each foreground command line, got '$out'"
+  assert_contains "$(cat "$log")" $'\x1f''pane'$'\x1f''process-info'$'\x1f''--pane'$'\x1f''w1:p2' "foreground_args did not read pane process-info"
+  # Back at a shell prompt: only the shell is listed.
+  printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p2","shell_pid":10,"foreground_process_group_id":10,"foreground_processes":[{"pid":10,"name":"zsh","argv":["-zsh"],"cmdline":"-zsh"}]}}}\n' > "$resp/2.out"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_foreground_args default:w1:p2' "$ROOT" )
+  [ "$out" = "-zsh" ] || fail "foreground_args should list the shell alone at a prompt, got '$out'"
+  # A response describing a different pane is not evidence about this one.
+  printf '{"result":{"type":"pane_process_info","process_info":{"pane_id":"w1:p9","shell_pid":10,"foreground_process_group_id":20,"foreground_processes":[{"pid":20,"name":"treehouse","cmdline":"treehouse get"}]}}}\n' > "$resp/3.out"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_foreground_args default:w1:p2' "$ROOT" )
+  [ -z "$out" ] || fail "foreground_args must read nothing for a response about another pane, got '$out'"
+  # A failed read is nothing, never a guess.
+  printf '1\n' > "$resp/4.exit"
+  out=$( PATH="$fb:$PATH" FM_HERDR_LOG="$log" FM_HERDR_RESPONSES="$resp" \
+    bash -c '. "$0/bin/backends/herdr.sh"; fm_backend_herdr_foreground_args default:w1:p2' "$ROOT" )
+  [ -z "$out" ] || fail "foreground_args must read nothing when process-info fails, got '$out'"
+  pass "fm_backend_herdr_foreground_args: lists the pane's foreground command lines and reads nothing on a wrong pane or a failure"
+}
+
 # --- busy_state (semantic agent state) ---------------------------------------
 
 test_busy_state_working_maps_to_busy() {
@@ -6448,6 +6476,7 @@ test_capture_preserves_pane_read_failure
 test_send_key_normalizes_and_targets_pane
 test_kill_is_best_effort
 test_current_path_reads_cwd
+test_foreground_args_read_the_pane_process_view
 test_busy_state_working_maps_to_busy
 test_busy_state_done_and_blocked_map_to_idle
 test_busy_state_unknown_on_no_agent
