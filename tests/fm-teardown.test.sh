@@ -10725,6 +10725,7 @@ test_live_launcher_keeps_its_foreign_copy() {
 # slot while it lives, as lsof reports a process by its cwd.
 start_foreign_session_case() {
   local shape=$2 pidfile i
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
   local child_script='my $child = fork(); if (!$child) { $SIG{TERM} = "IGNORE" if $ARGV[1]; chdir "/"; exec "sleep", "300"; } $SIG{CHLD} = "IGNORE"; open my $fh, ">", $ARGV[0]; print $fh $child; close $fh; sleep 300;'
   make_foreign_copy_case "$1"
   pidfile=$FOREIGN_CASE/launcher-pid
@@ -10831,6 +10832,7 @@ SH
 # ignores TERM keeps the copy and the session, and is named by pid.
 test_task_own_process_inside_foreign_copy_is_ended_and_released() {
   local rc shape agent child pidfile i
+  # shellcheck disable=SC2016 # perl, not the shell, expands these variables.
   local script='my $child = fork(); if (!$child) { $SIG{TERM} = "IGNORE" if $ARGV[2]; chdir $ARGV[1]; exec "sleep", "300"; } $SIG{CHLD} = "IGNORE"; open my $fh, ">", $ARGV[0]; print $fh $child; close $fh; sleep 300;'
   for shape in own stubborn; do
     make_foreign_copy_case "foreign-incopy-$shape"
