@@ -271,9 +271,9 @@ When no active record owns it, such as a finished record's nested copy left afte
 
 A copy locked by Vernant's creation lock is released and removed by Vernant's own driver, `scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup`, run from the slot; an unlocked copy is removed with a plain non-forced `git worktree remove`.
 A copy whose work is not proved landed stays, and teardown writes the reason.
-Removal deletes the copy's checkout and the allow-listed ignored files in it (symlinks, virtual environments, `node_modules` and tool caches, `.DS_Store`, Firstmate's hook files, and anything ignored under its `.claude` and `.opencode` trees); it loses no commit, because the work is landed, and no uncommitted change outside those trees, because the copy is clean there.
-The clean proof skips untracked files under `.claude` and `.opencode`, and plain `git worktree remove` still refuses a copy that holds one.
-On the pool-slot route the release runs before the final project-lock wait, so the driver never runs while the lock is held.
+Removal deletes the copy's checkout and the allow-listed ignored files in it (symlinks, virtual environments, `node_modules` and tool caches, `.DS_Store`, Firstmate's hook files, and anything ignored under its `.claude` and `.opencode` trees); it loses no commit, because the work is landed, and no tracked change, because the clean proof refuses one.
+The clean proof skips untracked files under `.claude` only; the ignored-file proof skips ignored files under `.claude` and `.opencode`; plain `git worktree remove` still refuses a copy that holds an untracked file.
+On the pool-slot route the release runs before the final project-lock wait, so the driver never runs while the lock is held, except when teardown keeps project custody through the return.
 A copy it cannot prove, a lock in any other format, a driver refusal, a half-removed copy, or a copy still registered afterwards refuses exactly as above, and `--force` waives none of it.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.
 A surviving recorded PR follows only under the head-containment proof above.

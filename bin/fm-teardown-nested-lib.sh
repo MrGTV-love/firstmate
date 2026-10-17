@@ -29,11 +29,12 @@
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, and anything ignored under its .claude and
 # .opencode trees); it loses no commit, because the work is landed, and no
-# uncommitted change outside those trees, because the copy is clean there. The
-# clean proof skips untracked files under .claude and .opencode, and plain git
-# worktree remove still refuses a copy that holds one. On the pool-slot route the
-# release runs before the final project-lock wait, so the driver never runs
-# while the lock is held.
+# tracked change, because the clean proof refuses one. The clean proof skips
+# untracked files under .claude only; the ignored-file proof skips ignored files
+# under .claude and .opencode; plain git worktree remove still refuses a copy
+# that holds an untracked file. On the pool-slot route the release runs before
+# the final project-lock wait, so the driver never runs while the lock is held,
+# except when teardown keeps project custody through the return.
 #
 # Requires bin/fm-task-copy-lib.sh and bin/fm-lock-lib.sh to be sourced first,
 # and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, META, STATE, WT,

@@ -205,14 +205,15 @@
 # in it (symlinks, virtual environments, node_modules and tool caches,
 # .DS_Store, Firstmate's hook files, and anything ignored under its .claude and
 # .opencode trees); it loses no commit, because the work is landed, and no
-# uncommitted change outside those trees, because the copy is clean there. The
-# clean proof skips untracked files under .claude and .opencode, and plain git
-# worktree remove still refuses a copy that holds one. On the pool-slot route
-# the release runs before the final project-lock wait, so the driver never runs
-# while the lock is held. A lock in any other format, a driver refusal, or a copy
-# still registered afterwards refuses. Every other case, including a
-# half-removed copy, refuses as before; --force never waives these proofs. The
-# by-hand route is in docs/agent-control.md.
+# tracked change, because the clean proof refuses one. The clean proof skips
+# untracked files under .claude only; the ignored-file proof skips ignored files
+# under .claude and .opencode; plain git worktree remove still refuses a copy
+# that holds an untracked file. On the pool-slot route the release runs before
+# the final project-lock wait, so the driver never runs while the lock is held,
+# except when teardown keeps project custody through the return. A lock in any
+# other format, a driver refusal, or a copy still registered afterwards refuses.
+# Every other case, including a half-removed copy, refuses as before; --force
+# never waives these proofs. The by-hand route is in docs/agent-control.md.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -469,14 +470,19 @@
 #     eligible for signalling. Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
+#     One exception: a creation-lock launcher of a foreign nested copy that
+#     teardown chose by ancestry (it descends by parent chain from a process whose
+#     cwd is exactly a scan root) may have any cwd and is signalled with TERM only,
+#     after this sweep.
 #     A missing lsof refuses too: without the scan no target can be audited, so
 #     no unaudited process or process-group signal is ever sent.
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
 #     row: epoch, signal, pid, birth identity, command line,
 #     start time, cwd, matched open path (cwd descriptor), all shell-escaped
-#     with printf %q. This audit survives task-record retirement and records
-#     signal intent, not proof of delivery: an immediate birth-identity recheck
-#     can still skip the signal. Failed command/start collection skips the target
+#     with printf %q. For a launcher chosen by ancestry both cwd columns name the
+#     ancestor's cwd, not the launcher's own. This audit survives task-record
+#     retirement and records signal intent, not proof of delivery: an immediate
+#     birth-identity recheck can still skip the signal. Failed command/start collection skips the target
 #     only when a changed birth identity or kernel ESRCH proves it replaced or
 #     vanished; a live matching target or uncertain result refuses, as do authorization
 #     and write failures. Idempotent: nothing left to find is a silent no-op.
