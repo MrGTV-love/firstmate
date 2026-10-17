@@ -304,8 +304,11 @@ fm_task_copy_ancestor_current() {
 
 # Whether a task record in this home or any locally registered Firstmate home
 # names a canonical copy overlapping <path> in worktree=, home=, or
-# prior_worktree=. The current record is excluded. Returns 0 on overlap, setting
-# FM_TASK_COPY_OTHER_ID and FM_TASK_COPY_OTHER_FIELD;
+# prior_worktree=. The current record is excluded, and so is every optional
+# <skip-meta> record: bin/fm-control.sh reassociate passes the records it
+# re-points together in one call, and checks those against each other itself.
+# Returns 0 on overlap, setting FM_TASK_COPY_OTHER_ID and
+# FM_TASK_COPY_OTHER_FIELD;
 # 1 for no overlap or a missing path; 2 when the scan cannot be completed.
 #
 # Identity, not spelling: the same record reached through a differently
@@ -314,9 +317,10 @@ fm_task_copy_ancestor_current() {
 # too.
 FM_TASK_COPY_OTHER_ID=
 FM_TASK_COPY_OTHER_FIELD=
-fm_task_copy_other_record() {  # <record-meta> <record-state> <path>
+fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta>...]
   local record_meta=$1 record_state=$2 path=$3
-  local target state_dir other_meta line field other_path other_real
+  local target state_dir other_meta line field other_path other_real skip
+  shift 3
   FM_TASK_COPY_OTHER_ID=
   FM_TASK_COPY_OTHER_FIELD=
   target=$(fm_task_copy_canonical_dir "$path") || return 1
@@ -328,6 +332,9 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path>
     for other_meta in "$state_dir"/*.meta; do
       [ -f "$other_meta" ] && [ ! -L "$other_meta" ] || continue
       [ "${other_meta##*/}" = "${record_meta##*/}" ] && [ "$other_meta" -ef "$record_meta" ] && continue
+      for skip in "$@"; do
+        [ "${other_meta##*/}" = "${skip##*/}" ] && [ "$other_meta" -ef "$skip" ] && continue 2
+      done
       while IFS= read -r line || [ -n "$line" ]; do
         field=${line%% *}
         other_path=${line#* }
