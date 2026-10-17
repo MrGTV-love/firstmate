@@ -90,7 +90,8 @@
 #   -h,--help        usage
 #
 # Output contract: `fm-bearings.v1`. No locks or reports; the underlying snapshot's
-# parent-side remote-ledger cache refresh is the only default fleet-state mutation.
+# observational cache writes (its header owns which) are the only default fleet-state
+# mutation.
 set -u
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
