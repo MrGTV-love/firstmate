@@ -673,7 +673,7 @@ At that moment the branch reports any refusal instead of concluding there is "no
 - A `blocked:` key stays ordinary steering.
 - The record relocates the answer.
 
-`tests/fm-captain-hold-lifecycle.test.sh` covers the same partition for `fm-captain-hold.sh reconcile close --verified-outcome` and `reconcile close-key`; [its case list](captain-hold-lifecycle.md#reconcile-coverage) lives with the lifecycle verification record.
+`tests/fm-captain-hold-reconcile.test.sh` covers the same partition for `fm-captain-hold.sh reconcile close --verified-outcome` and `reconcile close-key`; [its case list](captain-hold-lifecycle.md#reconcile-coverage) lives with the lifecycle verification record.
 
 For the away posture:
 

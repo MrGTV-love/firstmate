@@ -70,6 +70,41 @@ Its scheduling regressions also check stored parallel lane order and preserve se
 These checks do not detect a script outgrowing an existing hint or establish measured job headroom.
 Refresh `portable_parallel_weight_hints` with the slowest completed `duration_ms` per script from several green CI runs' `fm-test-timing-portable-parallel-*` artifacts whenever the parallel set gains scripts or a member grows materially.
 
+The parallel hints were refreshed on 2026-10-17 from the `fm-test-timing-portable-parallel-*` artifacts of eight green main runs: [38904559722](https://github.com/MrGTV-love/firstmate/actions/runs/38904559722), [38957463780](https://github.com/MrGTV-love/firstmate/actions/runs/38957463780), [38979006411](https://github.com/MrGTV-love/firstmate/actions/runs/38979006411), [38979776735](https://github.com/MrGTV-love/firstmate/actions/runs/38979776735), [38990827989](https://github.com/MrGTV-love/firstmate/actions/runs/38990827989), [39001838488](https://github.com/MrGTV-love/firstmate/actions/runs/39001838488), [39010291930](https://github.com/MrGTV-love/firstmate/actions/runs/39010291930), [39013019461](https://github.com/MrGTV-love/firstmate/actions/runs/39013019461).
+Each retained member carries its slowest successful (`exit=0`, `gate_skip=false`) `duration_ms` across those runs.
+The refresh moved `tests/fm-lint.test.sh` from 252498 ms to 737853 ms, `tests/fm-composer-lib.test.sh` from 9521 ms to 218757 ms, and `tests/fm-test-run.test.sh` from 156781 ms to 304481 ms.
+Stale hints of that size made the two lanes look balanced while one carried over 1.2 times the other's real work.
+The six captain-hold group hints below are not slowest-run samples because the groups did not exist in those runs.
+
+## Captain-hold groups
+
+The former combined `tests/fm-captain-hold-lifecycle.test.sh` measured between 773304 ms and 1259266 ms in those eight runs against a 343658 ms hint.
+No lane packing could place a single 21-minute member beside the other shard-2 members inside a 30-minute job.
+Its 116 cases now run exactly once across six independently runnable files, each under about 5 minutes of measured CI work:
+
+| File | Area |
+|---|---|
+| `tests/fm-captain-hold-lifecycle.test.sh` | holds, origins, inventories, the completion gate, recorded answers, deferral, and the secondmate parent channel |
+| `tests/fm-captain-hold-sweep.test.sh` | the finished-board sweep and bound captain keys at the sweep |
+| `tests/fm-captain-hold-keyed-answers.test.sh` | the keyed-answer intake, default and done releases, and replay after interruption |
+| `tests/fm-captain-hold-reconcile.test.sh` | reconcile requests, verified closes, operational-key closes, legacy identities, and record divergence |
+| `tests/fm-captain-hold-cleanup.test.sh` | cleanup of captain-held rows, relocated backlogs, merge entrypoints, and the beads backend |
+| `tests/fm-captain-hold-archive.test.sh` | the done-archive lookup, the archive-setting reader, and its refusals |
+
+All six source the unchanged definitions and fixture setup in `tests/fm-captain-hold-lifecycle-helpers.sh`; each invocation has its own temporary root, registered cleanup, and final process inspection, so the final `ok -` line appears once per file.
+A helper used by one group lives beside that group's cases, and a helper used by several lives in the shared file.
+Selecting one case by name still works in the file that owns it.
+`tests/fm-test-run.test.sh`, in `test_captain_hold_groups_share_helper_changed_selection`, requires every group to be independently selectable and a change to the shared helpers to select all six.
+The six files stay in the proven-isolated set and the parallel lanes; `bin/fm-test-isolation-proof.sh` lists them and [fm-test-isolation-proof.md](fm-test-isolation-proof.md) records the concurrent proof.
+
+The group hints (143236, 173175, 199013, 247202, 257148, and 264427 ms) come from the timestamped case completions in the job log of [run 39006546434](https://github.com/MrGTV-love/firstmate/actions/runs/39006546434), attempt 2, where the combined file finished in 1284127 ms.
+Successive timestamp differences between `ok -` reports assign every interval to its case, and the 31.7 s final cleanup interval is shared across the groups in proportion to their case time.
+This replays observed CI work and is not a measurement of independently launched groups; refresh the six hints from their own timing artifacts after CI exercises the split.
+
+Five cases run their independent matrix cells at once through `run_cells_in_parallel`, the way the retry matrix already did: the origin-first matrix, and the keyed-release cases for interrupted releases, completed releases, repeated answers, and legacy releases.
+Each cell builds its own homes under unique names, and a failing cell fails the case with the tail of its log.
+No case body, assertion, or `ok -` line was shortened or removed.
+
 ## Portable serial remainder
 
 `portable-serial` includes every `tests/*.test.sh` that is neither proven-isolated nor `real-herdr-gated`.
@@ -173,6 +208,7 @@ Portable shards, each portable serial shard, and the Herdr lane upload runner-ge
 
 `bin/fm-lint.sh` owns three canonical CI partitions, each attempting full source-aware ShellCheck analysis and running workflow validation and backend-purity checks.
 Its `fm_lint_partition_weight_hints` table contains the slowest successful per-root duration from the two partitions' `partition-N.roots.tsv` sidecars in the same three main runs used by the latest serial refresh.
+The seven captain-hold roots have no lint measurement of their own yet: their rows divide the former combined file's 12745 ms in proportion to each file's bytes, so refresh them from the next three main runs' sidecars.
 The telemetry records ShellCheck 0.11.0 on Linux x86_64, Ubuntu 24, image `20261004.327.1`.
 Longest-processing-time packing uses those durations, not direct file bytes: equal byte totals previously carried 1240 and 1781 seconds of measured lint work in run 38312847224.
 The script header owns missing-root fallback and partition syntax; local worker balancing and its telemetry weight fields still use direct bytes.

@@ -522,7 +522,8 @@ It then finishes any still-recorded dependency-edge cleanup without rewriting th
 
 ## Verification record
 
-The focused end-to-end regression suite is `tests/fm-captain-hold-lifecycle.test.sh`, using only synthetic identities and decision text.
+The focused end-to-end regression suites are the six `tests/fm-captain-hold-*.test.sh` files, using only synthetic identities and decision text.
+The [captain-hold groups](fm-test-portable-shards.md#captain-hold-groups) table names the file that owns each area, and every case named below runs in exactly one of them.
 It proves the behaviors below.
 The suite does not test the accepted merge-to-cleanup re-hold window or asynchronous queued-forge landing because those events occur after the locally serialized merge command has returned.
 
@@ -580,7 +581,7 @@ The suite does not test the accepted merge-to-cleanup re-hold window or asynchro
 
 ### Answers, stamps, and deferral
 
-- [`tests/fm-captain-hold-lifecycle.test.sh`](../tests/fm-captain-hold-lifecycle.test.sh) covers bound-channel answer-time resolution and the intake's invalid-key and incompatible-replay refusals.
+- [`tests/fm-captain-hold-keyed-answers.test.sh`](../tests/fm-captain-hold-keyed-answers.test.sh) covers bound-channel answer-time resolution and the intake's invalid-key and incompatible-replay refusals.
   Its `test_keyed_answer_releases_a_live_work_item` and `test_keyed_answer_waits_for_cleanup_before_selecting_its_mode` cover [automatic mode selection](#answer-time-resolution).
   `test_interrupted_keyed_release_closes_after_teardown` and `test_completed_keyed_release_replays_after_publication_failure` cover interrupted and completed release recovery.
   `test_stale_keyed_replay_preserves_a_concurrent_hold` covers replay invalidated by a concurrent hold.
@@ -703,7 +704,7 @@ Projection regressions live in two suites:
 The exact commands and their summarized outputs are recorded in the shipping PR's evidence.
 To refresh this record, run:
 
-- The four suites above: `tests/fm-captain-hold-lifecycle.test.sh`, `tests/fm-classify-decision-key.test.sh`, `tests/fm-fleet-snapshot-view.test.sh`, and `tests/fm-bearings-snapshot.test.sh`.
+- The captain-hold suites above (`tests/fm-captain-hold-*.test.sh`), `tests/fm-classify-decision-key.test.sh`, `tests/fm-fleet-snapshot-view.test.sh`, and `tests/fm-bearings-snapshot.test.sh`.
 - `tests/fm-send-resolve-key.test.sh`, `tests/fm-bearings-board.test.sh`, and `tests/fm-procevent.test.sh`.
 - `bin/fm-lint.sh`.
 
