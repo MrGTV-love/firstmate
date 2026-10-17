@@ -13,6 +13,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
 | Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
+| Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
 | Persistent secondmates | [Secondmate routes](#secondmate-routes-datasecondmatesmd) |
 | Per-run overrides and tuning | [Environment variables](#environment-variables) |
 
@@ -83,6 +84,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Host-local command durations in `command-durations.jsonl`, produced by `bin/fm-duration.py`; its header and help own timing calibration and repeated-timeout work publication.
 - The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
+- The model picker's benchmark cache, database, and projections under `data/model-picker/`, produced by `bin/fm-model-picker.sh`; [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) owns its layout and the `FM_MODEL_PICKER_DATA` relocation.
 
 `state/` holds runtime records:
 
@@ -865,6 +867,40 @@ Explicit reopening or successful new-work start or dispatch retires the previous
 Completion and new-work entry points retain control-then-meta custody through admission, mutation, readback, and rollback; public hold, unhold, update, and edit use the same custody to serialize hold and body changes against those transitions.
 A failed start or reopen restores the active drop only when the initial state differs from its requested target (`in_flight` for start, `queued` for reopen) and authoritative readback proves the state, held, blocked, and hold-kind fields unchanged; committed or unreadable outcomes preserve the historical words without restoring the active classification and retain the original nonzero status.
 A reopen used only to retain an unanswered captain question preserves the finished-work provenance and does not authorize new work.
+
+## Model-picker benchmark data (FM_MODEL_PICKER_DATA)
+
+[`bin/fm-model-picker.sh`](../bin/fm-model-picker.sh) collects Artificial Analysis benchmark data for the model picker.
+Its header and `--help` own the flags, the long-run guidance, the rule that decides which pages enter `raw/`, the quarantine report, what the chart-diff verdict line counts, and the exit codes; the code is `bin/fm_model_picker/`.
+A leaderboard row keeps `ci` only when the table's fifth column is headed CI or interval, or the value cell itself carries the interval; on other pages that column is another metric and `ci` is empty.
+The data root is `FM_MODEL_PICKER_DATA`, otherwise `model-picker/` under the home's data directory (`FM_DATA_OVERRIDE`, else `$FM_HOME/data`).
+At its default location the whole root is private and gitignored with `data/`.
+
+| Path under the data root | Contents |
+| --- | --- |
+| `raw/` | Cached pages with a `.ts` sidecar holding each page's real fetch time, `rendered/*.txt` chart captures, and `_http_404.jsonl`, the memory of 404s with one line per URL; a run does not re-request a remembered 404 unless `--stale-after-hours` has aged it out |
+| `snapshot.json` | Aggregate of the latest acquisition run, including each model slug's values-or-reason status (`slug_status`, `sweep_failures`), which is its only home; its stored coverage, if any, is never read |
+| `aa.sqlite` | `dispatch_log` and `outcomes` first, then `models`, `metrics`, `observations`, and `reconcile_runs` |
+| `coverage.md` | Per-series coverage, recomputed from the raw cache on every run (never from `aa.sqlite` or `snapshot.json`) |
+| `reconcile.md` and `verdict.json` | The chart-diff report and its machine-readable verdict |
+| `projection/<slug>.json` | One wire-format projection per catalog model, written last |
+
+`dispatch_log` carries the handoff columns plus `mode` (`shadow` or `live`) and `rule_worker`, `rule_validator`, and `rule_effort`, so one row holds both the picker's pick and the current dispatch rule's choice.
+A matrix rebuild never touches `dispatch_log` or `outcomes`.
+The matrix is a pure function of the cache, so a rebuild gives the same row counts.
+A consumer must not read the matrix while `verdict.json` says `UNTRUSTED`.
+Every rebuild of `aa.sqlite` first rewrites `verdict.json` as `UNTRUSTED` with the reason `matrix rebuilt without chart-diff` and the time; only the chart-diff that follows a rebuild (`--chartdiff`) writes a real verdict again.
+
+A table cell's unit comes from the cell: `$5.98` is `usd`, `95 tokens/s` is `tokens/s`, `10.19s` and `250ms` are `s`, `128k tokens ~192 A4 pages` is `tokens`, and a percent is a `fraction`.
+A bare `37k`, `260M`, `37B`, or `1.6T` is expanded to a plain count (`count`); the metric label says what is counted.
+`metrics.scale` is `fraction` for percent cells, `text` when no cell holds a number, `quantity` when the cells hold numbers in a unit, and `raw` for a bare number with no unit.
+Every dollar metric (`usd`) reads `quantity`; the index-point and Elo series (`points`, `elo`) are stated `raw` by their source and keep it.
+Text rows (`Reasoning`, `Open Source (Weights)`, `License`, the modalities, `Release Date`, `Knowledge Cutoff`) stay in `aa.sqlite` with no value and are not in the projections.
+
+In a projection, `as_of` is the newest `observed_at` across the model's metrics, so it says when the model last got any new data and not that every metric is that fresh.
+Each metric's own `observed_at` is authoritative for freshness.
+For each canonical metric the newest observation wins, and a tie goes to the embedded full-precision value; a rounded eval-leaderboard value (`1803`) can therefore win over a full-precision value (`1802.99`) when it is newer.
+Run `bin/fm-model-picker.sh --selftest` for the fixture suite; [`tests/fm-model-picker.test.sh`](../tests/fm-model-picker.test.sh) covers the executable.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)
 
@@ -3395,6 +3431,7 @@ FM_STATE_OVERRIDE=       # alternate state dir, mainly for tests
 FM_DATA_OVERRIDE=        # alternate data dir, mainly for tests
 FM_PROJECTS_OVERRIDE=    # alternate projects dir, mainly for tests
 FM_CONFIG_OVERRIDE=      # alternate config dir, mainly for tests
+FM_MODEL_PICKER_DATA=    # data root of the model-picker benchmark collector; unset means model-picker/ under the data directory (see "Model-picker benchmark data")
 FM_PROC_ROOT_OVERRIDE=   # alternate /proc root for Linux process-identity reads in fm-wake-lib.sh and fm-teardown.sh, mainly for tests
 FM_BACKEND=             # optional runtime backend override for new spawns; tmux/herdr/zellij/orca/cmux support ship/scout spawns, codex-app is not accepted
 FM_TRACE_CONTEXT=       # optional trace-context override; see "Trace context propagation"
