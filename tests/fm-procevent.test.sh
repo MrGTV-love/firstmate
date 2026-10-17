@@ -5987,6 +5987,31 @@ for interval in 08 010; do
 done
 pass "a zero-prefixed decimal interval starts its listener and halves as decimal"
 
+# --- the default detection interval ------------------------------------------
+# With no setting the guard looks every 60 seconds (two reads, 30 seconds apart),
+# and an explicit setting still wins.
+# shellcheck disable=SC2016
+default_check=$(env -u FM_PROCEVENT_OWNER_CHECK_SECONDS bash -c '
+  . "$1/bin/fm-pr-lib.sh"; . "$1/bin/fm-wake-lib.sh"; . "$1/bin/fm-procevent-lib.sh"
+  fm_procevent_owner_check_seconds' _ "$ROOT")
+[ "$default_check" = 60 ] || fail "the default owner-check interval must be 60 seconds, got '$default_check'"
+HDEFAULT="$TMP_ROOT/default-interval"; new_home "$HDEFAULT"
+pe_register "$HDEFAULT" lavish default-interval \
+  -- "$QUIET_STUB" "$HDEFAULT/poll" >/dev/null
+env -u FM_PROCEVENT_OWNER_CHECK_SECONDS PATH="$INTERVAL_BIN:$PATH" INTERVAL_SLEEP_LOG="$HDEFAULT/sleeps" \
+  FM_HOME="$HDEFAULT" "$ROOT/bin/fm-procevent.sh" reconcile >/dev/null
+wait_for "$HDEFAULT/poll.descendant" \
+  || fail "the default interval prevented the listener from starting"
+for _ in $(seq 1 100); do
+  grep -qx 30 "$HDEFAULT/sleeps" 2>/dev/null && break
+  sleep 0.1
+done
+grep -qx 30 "$HDEFAULT/sleeps" \
+  || fail "the guard did not sleep half of the default 60-second interval: $(tr '\n' ' ' < "$HDEFAULT/sleeps" 2>/dev/null)"
+pe "$HDEFAULT" retire default-interval >/dev/null \
+  || fail "retiring the default-interval listener reported failure"
+pass "the owner guard defaults to a 60-second detection interval, read as two 30-second halves"
+
 # --- one unreadable read still does not end a live runner --------------------
 #
 # The bound above was tightened by moving the guard's two reads closer together,

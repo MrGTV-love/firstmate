@@ -309,7 +309,11 @@ fi
 # markers, while bin/fm-wake-lib.sh owns their wake-facing routing, the legacy
 # turn-ended signature, annotation staleness checks, and guarded bookkeeping writes.
 
-POLL=${FM_POLL:-15}                   # seconds between cycles
+# Seconds between cycles. FM_POLL wins; otherwise fm_watch_poll_seconds
+# (bin/fm-wake-lib.sh) picks the home's config/watch-poll override, else 30 for a
+# secondmate home and 15 for every other home. Only how often the loop looks
+# changes, never which events it can detect.
+POLL=${FM_POLL:-$(fm_watch_poll_seconds "$FM_HOME" "$CONFIG")}
 # Only the main poll shell publishes progress: between stages and fleet items,
 # and while it actively waits on a deadline-bounded check. No independent timer
 # can keep a blocked or stopped poll loop looking healthy. The terminal wait
@@ -380,6 +384,16 @@ case "$TYPESAFE_HEALTH_INTERVAL" in
 esac
 TYPESAFE_HEALTH_BIN=${FM_TYPESAFE_HEALTH_BIN:-$SCRIPT_DIR/fm-typesafe-health.sh}
 TYPESAFE_HEALTH_NEXT=
+# Automatic retirement of finished or dead Lavish listeners (the --auto mode of
+# bin/fm-procevent-lavish.sh sweep, which owns the rules and the record of why);
+# docs/configuration.md "Process-to-event sources" owns the cadence.
+LAVISH_AUTO_RETIRE_INTERVAL=${FM_LAVISH_AUTO_RETIRE_INTERVAL:-900}
+case "$LAVISH_AUTO_RETIRE_INTERVAL" in
+  ''|*[!0-9]*) LAVISH_AUTO_RETIRE_INTERVAL=900 ;;
+  *) LAVISH_AUTO_RETIRE_INTERVAL=$((10#$LAVISH_AUTO_RETIRE_INTERVAL)) ;;
+esac
+LAVISH_AUTO_RETIRE_BIN=${FM_LAVISH_AUTO_RETIRE_BIN:-$SCRIPT_DIR/fm-procevent-lavish.sh}
+LAVISH_AUTO_RETIRE_NEXT=
 SIGNAL_GRACE=${FM_SIGNAL_GRACE:-30}   # seconds to linger after a signal so trailing
                                       # signals (a status write, then the same turn's
                                       # turn-end hook) coalesce into one wake
@@ -2779,6 +2793,43 @@ typesafe_health_tick() {
   TYPESAFE_HEALTH_PID=$!
 }
 
+# The Lavish sweep is detached and single-flight like the sweeps above: it reads
+# the session store and may stop listeners, and a missed tick loses nothing
+# because the next one re-reads the same facts. Only the home's own sources are
+# considered, and a refused or failed sweep never stops the poll.
+LAVISH_AUTO_RETIRE_PID=
+lavish_auto_retire_tick() {
+  local now
+  [ "$LAVISH_AUTO_RETIRE_INTERVAL" -gt 0 ] || return 0
+  fm_epoch_seconds_to now
+  if [ -z "$LAVISH_AUTO_RETIRE_NEXT" ]; then
+    if [ -r "$STATE/.lavish-auto-retire-next" ]; then
+      IFS= read -r LAVISH_AUTO_RETIRE_NEXT < "$STATE/.lavish-auto-retire-next" || true
+    fi
+    case "$LAVISH_AUTO_RETIRE_NEXT" in
+      ''|*[!0-9]*) LAVISH_AUTO_RETIRE_NEXT= ;;
+      *) LAVISH_AUTO_RETIRE_NEXT=$((10#$LAVISH_AUTO_RETIRE_NEXT)) ;;
+    esac
+  fi
+  if [ -z "$LAVISH_AUTO_RETIRE_NEXT" ]; then
+    LAVISH_AUTO_RETIRE_NEXT=$((now + LAVISH_AUTO_RETIRE_INTERVAL))
+    printf '%s\n' "$LAVISH_AUTO_RETIRE_NEXT" > "$STATE/.lavish-auto-retire-next"
+    return 0
+  fi
+  [ "$now" -ge "$LAVISH_AUTO_RETIRE_NEXT" ] || return 0
+  LAVISH_AUTO_RETIRE_NEXT=$((now + LAVISH_AUTO_RETIRE_INTERVAL))
+  printf '%s\n' "$LAVISH_AUTO_RETIRE_NEXT" > "$STATE/.lavish-auto-retire-next"
+  if [ -n "$LAVISH_AUTO_RETIRE_PID" ]; then
+    if kill -0 "$LAVISH_AUTO_RETIRE_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$LAVISH_AUTO_RETIRE_PID" 2>/dev/null || true
+    LAVISH_AUTO_RETIRE_PID=
+  fi
+  FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" "$LAVISH_AUTO_RETIRE_BIN" sweep --auto </dev/null >/dev/null 2>&1 &
+  LAVISH_AUTO_RETIRE_PID=$!
+}
+
 # Surface the ledger so overdue work cannot be dropped silently. A newly overdue row
 # wakes firstmate at once; an unchanged overdue set repeats only every
 # OPEN_LOOPS_RESURFACE seconds; a ledger the helper stopped publishing is its own wake.
@@ -3104,6 +3155,7 @@ prelude_phase() {
   watcher_beat
   idle_reap_tick
   typesafe_health_tick
+  lavish_auto_retire_tick
 
   # Bearings publishes reconcile asks as local one-shot request files and
   # returns before any mate delivery. Supervision owns their later delivery;

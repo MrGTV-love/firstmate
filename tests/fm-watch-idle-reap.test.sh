@@ -2,7 +2,11 @@
 # Watcher integration for the finished-session sweep (bin/fm-idle-session-reap.sh):
 # the poll loop starts the sweep detached at FM_IDLE_REAP_INTERVAL, the first sweep
 # waits a full interval, 0 turns it off, and a sweep that fails or hangs never
-# stops the poll or wakes firstmate.
+# stops the poll or wakes firstmate. The Lavish listener sweep
+# (bin/fm-procevent-lavish.sh sweep --auto, FM_LAVISH_AUTO_RETIRE_INTERVAL) is the
+# same detached single-flight shape and is covered by the same cases. The watcher's
+# poll interval by home role (fm_watch_poll_seconds in bin/fm-wake-lib.sh) is
+# covered at the end.
 set -u
 
 # shellcheck source=tests/wake-helpers.sh
@@ -28,12 +32,12 @@ stop_owned_watcher() {  # <pid> [hung-sweep-pid]
   wait_for_exit "$1" 100 || true
 }
 
-# A stand-in sweep that records each call: its subcommand, the home and state it was
+# A stand-in sweep that records each call: its arguments, the home and state it was
 # given, and its own pid (a behavior may exec into a sleeper to stay alive).
 install_sweep() {  # <fakebin> <behavior>
   cat > "$1/fake-sweep" <<SH
 #!/usr/bin/env bash
-printf '%s|%s|%s|%s\n' "\${1:-}" "\${FM_HOME:-}" "\${FM_STATE_OVERRIDE:-}" "\$\$" >> "\$FM_STATE_OVERRIDE/.sweep-calls"
+printf '%s|%s|%s|%s\n' "\$*" "\${FM_HOME:-}" "\${FM_STATE_OVERRIDE:-}" "\$\$" >> "\$FM_STATE_OVERRIDE/.sweep-calls"
 $2
 SH
   chmod +x "$1/fake-sweep"
@@ -316,6 +320,223 @@ test_hung_sweep_is_never_doubled() {
   pass "a sweep still running is never started twice, and the poll keeps running"
 }
 
+# --- the Lavish listener sweep ----------------------------------------------------
+# The same detached single-flight shape; the retirement rules are covered by
+# tests/fm-captain-hold-sweep.test.sh.
+test_lavish_sweep_runs_detached_on_its_interval_in_auto_mode() {
+  local dir state fakebin out pid
+  dir=$(make_case lavish-auto-runs); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_sweep "$fakebin" 'exit 0'
+  start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_INTERVAL=1 FM_LAVISH_AUTO_RETIRE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
+  pid=$!
+  fm_test_wait_until 30 sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the watcher never started the Lavish sweep"; }
+  fm_test_wait_until 30 sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "the Lavish sweep did not repeat on its interval"; }
+  case "$(head -n 1 "$state/.sweep-calls")" in
+    "sweep --auto|$dir|$state|"*) ;;
+    *) stop_owned_watcher "$pid"; fail "the Lavish sweep is started as 'sweep --auto' with this home: $(head -n 1 "$state/.sweep-calls")" ;;
+  esac
+  is_live_non_zombie "$pid" || fail "a finished Lavish sweep must not stop the watcher"
+  [ ! -s "$state/.wake-queue" ] || { stop_owned_watcher "$pid"; fail "a routine Lavish sweep must not wake firstmate: $(cat "$state/.wake-queue")"; }
+  stop_owned_watcher "$pid"
+  pass "the poll loop starts the automatic Lavish sweep detached, on its interval, for this home, without a wake"
+}
+
+test_lavish_sweep_first_run_waits_and_zero_turns_it_off() {
+  local dir state fakebin out pid
+  dir=$(make_case lavish-auto-first); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_sweep "$fakebin" 'exit 0'
+  start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_INTERVAL=3600 FM_LAVISH_AUTO_RETIRE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
+  pid=$!
+  sleep 4
+  is_live_non_zombie "$pid" || fail "the watcher stopped early"
+  if sweep_called "$state"; then
+    stop_owned_watcher "$pid"
+    fail "a fresh watcher must not run the Lavish sweep before one interval has passed"
+  fi
+  fm_test_wait_until 30 test -e "$state/.lavish-auto-retire-next" \
+    || { stop_owned_watcher "$pid"; fail "the first Lavish sweep deadline is recorded so a restart keeps it"; }
+  stop_owned_watcher "$pid"
+  dir=$(make_case lavish-auto-off); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_sweep "$fakebin" 'exit 0'
+  start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
+  pid=$!
+  sleep 4
+  is_live_non_zombie "$pid" || fail "the watcher stopped early"
+  if sweep_called "$state"; then
+    stop_owned_watcher "$pid"
+    fail "FM_LAVISH_AUTO_RETIRE_INTERVAL=0 must turn the Lavish sweep off"
+  fi
+  stop_owned_watcher "$pid"
+  pass "the first Lavish sweep waits one full interval, and FM_LAVISH_AUTO_RETIRE_INTERVAL=0 turns it off"
+}
+
+test_lavish_sweep_failing_or_hung_never_stops_the_poll() {
+  local dir state fakebin out pid hung
+  dir=$(make_case lavish-auto-fail); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_sweep "$fakebin" 'echo "boom" >&2; exit 1'
+  start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_INTERVAL=1 FM_LAVISH_AUTO_RETIRE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
+  pid=$!
+  fm_test_wait_until 30 sweep_repeated "$state" || { stop_owned_watcher "$pid"; fail "a failing Lavish sweep must be retried on the next interval"; }
+  is_live_non_zombie "$pid" || fail "a failing Lavish sweep must not stop the watcher"
+  [ ! -s "$state/.wake-queue" ] || { stop_owned_watcher "$pid"; fail "a failing Lavish sweep must not wake firstmate by itself"; }
+  stop_owned_watcher "$pid"
+  dir=$(make_case lavish-auto-hung); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"
+  install_sweep "$fakebin" 'exec sleep 30'
+  start_watcher "$state" "$fakebin" "$out" FM_IDLE_REAP_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_INTERVAL=1 FM_LAVISH_AUTO_RETIRE_BIN="$fakebin/fake-sweep" FM_HOME="$dir"
+  pid=$!
+  fm_test_wait_until 30 sweep_called "$state" || { stop_owned_watcher "$pid"; fail "the hung Lavish sweep case never started a sweep"; }
+  sleep 4
+  hung=$(head -n 1 "$state/.sweep-calls" | cut -d'|' -f4)
+  if [ "$(sweep_calls "$state")" != 1 ]; then
+    stop_owned_watcher "$pid" "$hung"
+    fail "a Lavish sweep still running must not be started a second time"
+  fi
+  is_live_non_zombie "$pid" || fail "a hung Lavish sweep must not stop the watcher"
+  stop_owned_watcher "$pid" "$hung"
+  pass "a failing Lavish sweep is retried quietly and a hung one is never doubled, and the poll keeps running"
+}
+
+# --- the poll interval by home role -----------------------------------------------
+# A secondmate home polls every 30 seconds, every other home every 15, config/watch-poll
+# overrides a home, and FM_POLL still wins. The cadences are observed through a recording
+# `sleep` so the effective interval is read from the running watcher, not from its source.
+
+# A genuine secondmate home carries the identity marker (bin/fm-primary-scope-lib.sh).
+poll_mark_secondmate() {  # <home>
+  printf 'sm-test\n' > "$1/.fm-secondmate-home"
+}
+
+# The interval the library picks for that home.
+poll_resolve() {  # <home> [config-dir]
+  bash -c '. "$1/bin/fm-wake-lib.sh"; fm_watch_poll_seconds "${@:2}"' _ "$ROOT" "$@"
+}
+
+# A `sleep` that logs the interval it was asked for, then sleeps for real.
+poll_install_recording_sleep() {  # <fakebin> <log>
+  cat > "$1/sleep" <<SH
+#!/bin/sh
+printf '%s\n' "\$1" >> '$2'
+exec /bin/sleep "\$@"
+SH
+  chmod +x "$1/sleep"
+}
+
+# A watcher with every other cadence off and no FM_POLL, so only the resolved interval matters.
+poll_start_watcher() {  # <home> <state> <fakebin> <out> [extra env...]
+  local home=$1 state=$2 fakebin=$3 out=$4
+  shift 4
+  PATH="$fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$state" FM_SIGNAL_GRACE=1 \
+    FM_CHECK_INTERVAL=99999999 FM_HEARTBEAT=99999999 FM_HOME_SUMMARY_INTERVAL=99999999 \
+    FM_OPEN_LOOPS_INTERVAL=99999999 FM_SECONDMATE_LIVENESS_SECS=99999999 \
+    FM_IDLE_REAP_INTERVAL=0 FM_LAVISH_AUTO_RETIRE_INTERVAL=0 FM_TYPESAFE_HEALTH_INTERVAL=0 \
+    env "$@" "$WATCH" > "$out" 2> "$out.err" &
+}
+
+poll_logged() { grep -qx "$2" "$1" 2>/dev/null; }
+
+test_poll_resolution_by_home_role() {
+  local dir sm
+  dir=$(make_case poll-primary); sm=$(make_case poll-secondmate)
+  poll_mark_secondmate "$sm"
+  [ "$(poll_resolve "$dir")" = 15 ] || fail "a primary home must poll every 15 seconds, got $(poll_resolve "$dir")"
+  [ "$(poll_resolve "$sm")" = 30 ] || fail "a secondmate home must poll every 30 seconds, got $(poll_resolve "$sm")"
+  ln -s "$sm/.fm-secondmate-home" "$dir/.fm-secondmate-home"
+  [ "$(poll_resolve "$dir")" = 15 ] || fail "a symlinked marker is not a genuine secondmate marker"
+  pass "primary homes poll every 15 seconds and secondmate homes every 30"
+}
+
+test_poll_config_override() {
+  local dir sm value
+  dir=$(make_case poll-config-primary); sm=$(make_case poll-config-secondmate)
+  poll_mark_secondmate "$sm"
+  mkdir -p "$dir/config" "$sm/config"
+  printf '45\n' > "$dir/config/watch-poll"
+  printf '  8 \n' > "$sm/config/watch-poll"
+  [ "$(poll_resolve "$dir")" = 45 ] || fail "config/watch-poll must override a primary home, got $(poll_resolve "$dir")"
+  [ "$(poll_resolve "$sm")" = 8 ] || fail "config/watch-poll must override a secondmate home, got $(poll_resolve "$sm")"
+  printf '09' > "$dir/config/watch-poll"
+  [ "$(poll_resolve "$dir")" = 9 ] || fail "a zero-padded value must read as decimal, got $(poll_resolve "$dir")"
+  printf '240\n' > "$dir/config/watch-poll"
+  [ "$(poll_resolve "$dir")" = 240 ] || fail "the 240 ceiling itself must be accepted"
+  [ "$(poll_resolve "$dir" "$dir/elsewhere")" = 15 ] || fail "an explicit config dir without the file must fall back to the role default"
+  for value in 0 241 -5 abc 1.5 ''; do
+    printf '%s\n' "$value" > "$sm/config/watch-poll"
+    [ "$(poll_resolve "$sm")" = 30 ] || fail "invalid config/watch-poll '$value' must be ignored for the role default, got $(poll_resolve "$sm")"
+  done
+  rm -f "$sm/config/watch-poll"
+  printf '77\n' > "$dir/real-poll"
+  ln -s "$dir/real-poll" "$sm/config/watch-poll"
+  [ "$(poll_resolve "$sm")" = 30 ] || fail "a symlinked config/watch-poll must be ignored"
+  pass "config/watch-poll overrides a home within 1..240 and bad values fall back to the role default"
+}
+
+test_poll_watcher_uses_the_resolved_interval() {
+  local dir state fakebin out log pid
+  dir=$(make_case poll-watcher-secondmate); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; log="$dir/sleeps"
+  poll_mark_secondmate "$dir"
+  poll_install_recording_sleep "$fakebin" "$log"
+  poll_start_watcher "$dir" "$state" "$fakebin" "$out"
+  pid=$!
+  fm_test_wait_until 60 poll_logged "$log" 30 || { stop_owned_watcher "$pid"; fail "a secondmate-home watcher must sleep 30 seconds between cycles: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
+  stop_owned_watcher "$pid"
+  poll_logged "$log" 15 && fail "a secondmate-home watcher must not use the 15-second interval"
+  dir=$(make_case poll-watcher-primary); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; log="$dir/sleeps"
+  poll_install_recording_sleep "$fakebin" "$log"
+  poll_start_watcher "$dir" "$state" "$fakebin" "$out"
+  pid=$!
+  fm_test_wait_until 60 poll_logged "$log" 15 || { stop_owned_watcher "$pid"; fail "a primary-home watcher must sleep 15 seconds between cycles: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
+  stop_owned_watcher "$pid"
+  poll_logged "$log" 30 && fail "a primary-home watcher must not use the 30-second interval"
+  dir=$(make_case poll-watcher-config); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; log="$dir/sleeps"
+  poll_mark_secondmate "$dir"; mkdir -p "$dir/config"; printf '41\n' > "$dir/config/watch-poll"
+  poll_install_recording_sleep "$fakebin" "$log"
+  poll_start_watcher "$dir" "$state" "$fakebin" "$out"
+  pid=$!
+  fm_test_wait_until 60 poll_logged "$log" 41 || { stop_owned_watcher "$pid"; fail "config/watch-poll must set the watcher interval: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
+  stop_owned_watcher "$pid"
+  dir=$(make_case poll-watcher-env); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; log="$dir/sleeps"
+  poll_mark_secondmate "$dir"; mkdir -p "$dir/config"; printf '41\n' > "$dir/config/watch-poll"
+  poll_install_recording_sleep "$fakebin" "$log"
+  poll_start_watcher "$dir" "$state" "$fakebin" "$out" FM_POLL=7
+  pid=$!
+  fm_test_wait_until 60 poll_logged "$log" 7 || { stop_owned_watcher "$pid"; fail "FM_POLL must beat config/watch-poll: $(tr '\n' ' ' < "$log" 2>/dev/null)"; }
+  stop_owned_watcher "$pid"
+  poll_logged "$log" 41 && fail "config/watch-poll must not be used while FM_POLL is set"
+  pass "a running watcher sleeps the resolved interval: role default, config override, FM_POLL first"
+}
+
+# A longer interval only delays the look; it must not lose the event. The home polls every
+# 4 seconds (a secondmate home whose config/watch-poll overrides its 30-second default), the
+# status is written once the watcher is asleep in its first wait, so the earliest it can be
+# noticed is the end of that wait, and it must be noticed by the next look.
+test_poll_status_change_noticed_within_one_longer_interval() {
+  local dir state fakebin out log pid status_file written noticed waited
+  dir=$(make_case poll-notice); state="$dir/state"; fakebin="$dir/fakebin"; out="$dir/watch.out"; log="$dir/sleeps"
+  status_file="$state/task.status"
+  poll_mark_secondmate "$dir"
+  mkdir -p "$dir/config"; printf '4\n' > "$dir/config/watch-poll"
+  poll_install_recording_sleep "$fakebin" "$log"
+  poll_start_watcher "$dir" "$state" "$fakebin" "$out"
+  pid=$!
+  fm_test_wait_until 60 poll_logged "$log" 4 || { stop_owned_watcher "$pid"; fail "the watcher never reached its first interval wait"; }
+  printf 'blocked: needs a decision\n' > "$status_file"
+  written=$(date +%s)
+  waited=0
+  while [ "$waited" -lt 400 ] && is_live_non_zombie "$pid"; do
+    sleep 0.1
+    waited=$((waited + 1))
+  done
+  noticed=$(date +%s)
+  if is_live_non_zombie "$pid"; then
+    stop_owned_watcher "$pid"
+    fail "a status change was not noticed within 40 seconds in a 4-second home"
+  fi
+  wait "$pid" 2>/dev/null || true
+  grep -F "signal: $status_file" "$out" >/dev/null || fail "the watcher exited without reporting the status change: $(cat "$out" "$out.err")"
+  [ $((noticed - written)) -ge 1 ] || fail "the change was noticed after $((noticed - written))s, before the longer interval could have ended"
+  pass "a status change is noticed within one longer interval ($((noticed - written))s after the write, 4s interval)"
+}
+
 test_sweep_runs_detached_on_its_interval_with_the_home
 test_stock_lab_watcher_reaps_through_real_teardown || exit $?
 test_first_sweep_waits_a_full_interval
@@ -323,3 +544,10 @@ test_zero_interval_disables_the_sweep
 test_failing_sweep_never_stops_the_poll
 test_hung_sweep_is_never_doubled
 test_successive_watchers_preserve_the_cleanup_deadline
+test_lavish_sweep_runs_detached_on_its_interval_in_auto_mode
+test_lavish_sweep_first_run_waits_and_zero_turns_it_off
+test_lavish_sweep_failing_or_hung_never_stops_the_poll
+test_poll_resolution_by_home_role
+test_poll_config_override
+test_poll_watcher_uses_the_resolved_interval
+test_poll_status_change_noticed_within_one_longer_interval

@@ -444,6 +444,13 @@ fm_test_drop_file() {
 }
 fm_test_drop_file >/dev/null
 
+# The per-key test slot gate (bin/fm-duration.py) is host-wide by default, so a
+# fixture that runs a test.* key must never take or wait on a real slot.
+if [ -z "${FM_TEST_SLOT_DIR:-}" ]; then
+  FM_TEST_SLOT_DIR=$(fm_test_tmproot fm-test-slots)
+  export FM_TEST_SLOT_DIR
+fi
+
 export FM_OPEN_LOOPS_BIN=${FM_OPEN_LOOPS_BIN:-/usr/bin/true}
 
 # Process-event source claims are machine-wide by default, so every suite gets a

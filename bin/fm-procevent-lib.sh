@@ -201,7 +201,11 @@ fm_procevent_owner_lease_seconds() {
 }
 
 # Detection-interval semantics: docs/configuration.md, Process-to-event sources.
-FM_PROCEVENT_OWNER_CHECK_DEFAULT_SECONDS=15
+# The default favors fewer looks: each look starts about 15 processes
+# (cmd_owner_watchdog in bin/fm-procevent.sh), and with dozens of armed sources
+# the looks dominate process creation. Detection stays bounded by one interval.
+# measured: value=60 date=2026-10-17 host=Mac-Studio.local margin=10 (the 600-second owner lease default is ten intervals)
+FM_PROCEVENT_OWNER_CHECK_DEFAULT_SECONDS=60
 FM_PROCEVENT_OWNER_CHECK_MIN_SECONDS=1
 FM_PROCEVENT_OWNER_CHECK_MAX_SECONDS=3600
 

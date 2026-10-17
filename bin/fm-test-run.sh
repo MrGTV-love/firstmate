@@ -137,6 +137,16 @@
 # 0 denotes degraded work with no CPU-pass concurrency limit.
 # Without python3 or the pool tool beside it, scripts run without a CPU pass.
 #
+# Each executed script also takes one slot of its test.<script> key from the
+# host-wide per-key gate (python3 bin/fm-duration.py gate), outside the CPU pass
+# and the per-script bound, so the same heavy suite started in several worktrees
+# runs at most FM_TEST_KEY_SLOTS (default 2) copies at a time. A waiter prints
+# which key it waits on and who holds the slots on the CPU-pass log descriptor,
+# gives up after FM_TEST_SLOT_WAIT_SECONDS and then runs without a slot; a nested
+# run of a key already held (FM_TEST_SLOT_HELD) takes none. bin/fm-duration.py's
+# header owns the protocol. FM_TEST_KEY_SLOTS=0, or no python3 or helper beside
+# this script, runs scripts without a slot.
+#
 # When the sibling bin/fm-proc-budget.sh is present and executable, every
 # executed script runs through it; its header owns the process-budget contract.
 # The budget is taken when the script starts, after any pass wait. If the budget
@@ -2656,6 +2666,11 @@ elif ! command -v python3 >/dev/null 2>&1; then
   CPU_PASS_ACTIVE=0
   log "running without CPU passes: python3 not found"
 fi
+TEST_SLOT_ACTIVE=1
+if [ "${FM_TEST_KEY_SLOTS-}" = 0 ] || [ ! -r "$ROOT/bin/fm-duration.py" ] \
+  || ! command -v python3 >/dev/null 2>&1; then
+  TEST_SLOT_ACTIVE=0
+fi
 PROC_BUDGET_ACTIVE=1
 if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ]; then
   PROC_BUDGET_ACTIVE=0
@@ -2871,6 +2886,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
       --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
+  fi
+  if [ "$TEST_SLOT_ACTIVE" -eq 1 ]; then
+    # Outermost: a waiter holds neither a CPU pass nor any part of the bound.
+    cmd=(python3 "$ROOT/bin/fm-duration.py" gate --log-fd "$CPU_PASS_LOG_FD" \
+      "test.$script" -- "${cmd[@]}")
   fi
   set +e
   if [ "$stream" -eq 1 ]; then

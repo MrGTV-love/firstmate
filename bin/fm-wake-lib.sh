@@ -14,6 +14,8 @@ FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
 . "$FM_WAKE_LIB_DIR/fm-path-lib.sh"
 # shellcheck source=bin/fm-secondmate-parent-lib.sh
 . "$FM_WAKE_LIB_DIR/fm-secondmate-parent-lib.sh"
+# shellcheck source=bin/fm-primary-scope-lib.sh
+. "$FM_WAKE_LIB_DIR/fm-primary-scope-lib.sh"
 # Resolved once at source time: fm_pid_identity and fm_path_mtime run inside 0.2s
 # confirm and 0.5s attach polls, and forking uname per call is a measurable cost on
 # the platform (Git Bash/MSYS) that already pays the highest fork price.
@@ -156,6 +158,42 @@ fm_poll_derived_grace() {
   derived=$((poll + margin))
   [ "$derived" -ge 300 ] || derived=300
   printf '%s\n' "$derived"
+}
+
+# fm_watch_poll_seconds [home] [config-dir]
+# The watcher's poll interval when FM_POLL is unset (bin/fm-watch.sh applies
+# FM_POLL first). A home's own config/watch-poll file wins when its first line
+# is whole seconds from 1 to 240; an unreadable or out-of-range file is ignored
+# rather than trusted. Otherwise a secondmate home polls every 30 seconds and
+# every other home every 15. The 240 ceiling keeps poll + 60 under the 300-second
+# guard-grace floor, so fm_poll_derived_grace (which cannot see this file) still
+# derives the same grace in the guard, the arm and the watcher.
+# docs/configuration.md "Watcher poll interval by home role" is the owner.
+FM_WATCH_POLL_PRIMARY=15
+FM_WATCH_POLL_SECONDMATE=30
+FM_WATCH_POLL_CONFIG_MAX=240
+fm_watch_poll_seconds() {
+  local home=${1:-$FM_HOME} config=${2:-} value=
+  [ -n "$config" ] || config="$home/config"
+  if [ -f "$config/watch-poll" ] && [ ! -L "$config/watch-poll" ]; then
+    IFS= read -r value < "$config/watch-poll" 2>/dev/null || true
+    value=${value//[[:space:]]/}
+    case "$value" in
+      ''|*[!0-9]*) ;;
+      *)
+        value=$((10#$value))
+        if [ "$value" -ge 1 ] && [ "$value" -le "$FM_WATCH_POLL_CONFIG_MAX" ]; then
+          printf '%s\n' "$value"
+          return 0
+        fi
+        ;;
+    esac
+  fi
+  if fm_root_is_secondmate_home "$home"; then
+    printf '%s\n' "$FM_WATCH_POLL_SECONDMATE"
+  else
+    printf '%s\n' "$FM_WATCH_POLL_PRIMARY"
+  fi
 }
 
 # fm_watcher_stall_bound [poll-seconds]

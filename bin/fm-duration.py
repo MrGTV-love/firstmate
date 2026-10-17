@@ -5,6 +5,8 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py record-batch < KEY<TAB>MS<TAB>EXIT<TAB>CALIBRATION<TAB>LOAD_START<TAB>LOAD_END<TAB>TIMED_OUT lines
        fm-duration.py limit KEY [--percentile 95|99] [--margin N] [--fallback SECONDS]
        fm-duration.py run KEY -- COMMAND [ARGS...]
+       fm-duration.py gate [--log-fd N] KEY -- COMMAND [ARGS...]
+       fm-duration.py slots KEY
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
@@ -76,6 +78,34 @@ It also exports a task-local FM_DURATION_CALIBRATION_FILE: self-instrumented
 commands write 0 there to exclude a warm/partial run, or 1 for eligible work.
 The runner propagates the classification to its own sample and removes the file.
 
+Per-key slot gate. A test.* key admits at most FM_TEST_KEY_SLOTS concurrent
+copies (default 2; 0 turns the gate off; whole numbers up to 16) host-wide, so
+the same heavy suite started in several worktrees takes turns instead of
+multiplying its process churn. run takes a slot before it starts its clock, so
+the wait is in neither the recorded sample nor the measured ceiling; gate does
+the same for a caller that does not use run (bin/fm-test-run.sh wraps each
+script in it) and runs COMMAND with this process's stdio. Slots are exclusive
+non-blocking flock files in a per-key directory under FM_TEST_SLOT_DIR, else
+$HOME/.cache/fm-test-slots, created mode 0700 and owned by the caller. The
+kernel releases a flock on every exit, SIGKILL included, so no lock directory
+needs repair and a killed run frees its slot at once; the lock is held by this
+process alone and never inherited by COMMAND, so a test's own leftover daemon
+can never hold a slot for good. Each holder writes a record of its pid, its
+process start time, its working directory and its start epoch; a waiter's
+notice names the key it waits on and each holder, and flags a record whose pid
+is gone or whose start time changed, so a reused pid is never taken for the
+holder. A waiter prints
+its first notice after 2 seconds and another every 60, waits at most
+FM_TEST_SLOT_WAIT_SECONDS (default 7200, the longest fm-teardown run measured in
+the last 24 hours was 6884), and then runs without a slot and says so: the gate
+shapes throughput and is not a safety boundary, so it never blocks a test for
+good and never stops one when the slot directory is unusable. A command run
+under a slot exports FM_TEST_SLOT_HELD (the keys it holds, tab separated), so the
+same key nested inside it takes no second slot. A malformed FM_TEST_KEY_SLOTS or
+FM_TEST_SLOT_WAIT_SECONDS refuses the command by name (exit 125 from gate).
+slots prints one key's directory, its limit and each holder; it changes nothing.
+docs/configuration.md "Test slots per key" owns the sizing rationale.
+
 A timeout is a real limit that stopped a command, reported by the owner of that
 limit (run's ceiling, fm_run_timed, the lint root bound, the per-script bound,
 or record --timed-out); an exit code of 124 or 137 alone never counts. The second timeout for a
@@ -119,6 +149,7 @@ import signal
 import shlex
 import selectors
 import sqlite3
+import stat
 import struct
 import subprocess
 import sys
@@ -514,6 +545,204 @@ def calibration_scratch():
     yield None
 
 
+SLOT_PREFIX = 'test.'
+SLOT_DEFAULT = 2  # sizing: docs/configuration.md "Test slots per key"
+SLOT_MAX = 16
+# measured: value=7200 date=2026-10-17 host=Mac-Studio.local margin=1.05 (longest fm-teardown run in the last 24 hours was 6884 s)
+SLOT_WAIT_DEFAULT_SECONDS = 7200
+SLOT_FIRST_NOTICE = 2.0
+SLOT_NOTICE_EVERY = 60.0
+SLOT_HELD_ENV = 'FM_TEST_SLOT_HELD'
+
+
+def slot_limit():
+    value = os.environ.get('FM_TEST_KEY_SLOTS', '')
+    if not value:
+        return SLOT_DEFAULT
+    if not (value.isascii() and value.isdecimal()) or int(value) > SLOT_MAX:
+        raise ValueError(f'FM_TEST_KEY_SLOTS={value!r} must be a whole number from 0 (off) to {SLOT_MAX}')
+    return int(value)
+
+
+def slot_wait():
+    value = os.environ.get('FM_TEST_SLOT_WAIT_SECONDS', '')
+    if not value:
+        return SLOT_WAIT_DEFAULT_SECONDS
+    if not (value.isascii() and value.isdecimal()) or int(value) < 1:
+        raise ValueError(f'FM_TEST_SLOT_WAIT_SECONDS={value!r} must be a whole number of seconds of at least 1')
+    return int(value)
+
+
+def slot_directory(key):
+    """The per-key slot directory; created private and checked owned by the caller."""
+    explicit = os.environ.get('FM_TEST_SLOT_DIR')
+    if explicit:
+        root = absolute('FM_TEST_SLOT_DIR', explicit)
+    elif os.environ.get('HOME'):
+        root = Path(os.environ['HOME']) / '.cache' / 'fm-test-slots'
+    else:
+        raise OSError('HOME and FM_TEST_SLOT_DIR are both unset')
+    name = re.sub(r'[^A-Za-z0-9._-]', '_', key)[:80] + '-' + hashlib.sha1(key.encode()).hexdigest()[:10]
+    directory = root / name
+    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
+    info = directory.lstat()
+    if not stat.S_ISDIR(info.st_mode):
+        raise OSError(f'{directory} is not a directory')
+    if hasattr(os, 'getuid') and info.st_uid != os.getuid():
+        raise OSError(f'{directory} is owned by another user')
+    return directory
+
+
+def process_start(pid):
+    """A process's start time as ps prints it, or '' when no such process exists."""
+    result = subprocess.run(['ps', '-o', 'lstart=', '-p', str(pid)], capture_output=True, text=True,
+                            env=dict(os.environ, LC_ALL='C'))
+    return ' '.join(result.stdout.split()) if result.returncode == 0 else ''
+
+
+def slot_holders(directory, limit):
+    """(index, record text) for each slot whose lock is held, probed without keeping any."""
+    held = []
+    for index in range(limit):
+        path = directory / f'slot-{index}.lock'
+        try:
+            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+        except OSError:
+            continue
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                try:
+                    record = json.loads(path.read_text() or '{}')
+                except (OSError, ValueError):
+                    record = {}
+                held.append((index, describe_holder(record)))
+        finally:
+            os.close(fd)
+    return held
+
+
+def describe_holder(record):
+    pid = record.get('pid')
+    if not isinstance(pid, int) or not record.get('start'):
+        return 'holder unknown'
+    stale = process_start(pid) != record['start']
+    age = max(0, int(time.time() - record.get('since', time.time())))
+    state = 'record does not match a live process (pid gone or reused)' if stale else 'alive'
+    return f'pid={pid} {state} held {age}s cwd={record.get("cwd", "?")}'
+
+
+def slot_log(log_fd, message):
+    try:
+        os.write(log_fd, ('fm-duration: ' + message + '\n').encode('utf-8', 'replace'))
+    except OSError:
+        pass
+
+
+def acquire_slot(key, log_fd=2):
+    """An open fd holding one of the key's slots, or None when this key takes none."""
+    if not key.startswith(SLOT_PREFIX):
+        return None
+    limit = slot_limit()
+    wait = slot_wait()
+    if limit == 0 or key in os.environ.get(SLOT_HELD_ENV, '').split('\t'):
+        return None
+    try:
+        directory = slot_directory(key)
+    except (OSError, ValueError) as error:
+        slot_log(log_fd, f'running {key} without a slot: {error}')
+        return None
+    started = time.monotonic()
+    next_notice = started + SLOT_FIRST_NOTICE
+    delay = 0.05
+    while True:
+        for index in range(limit):
+            path = directory / f'slot-{index}.lock'
+            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except OSError:
+                os.close(fd)
+                continue
+            record = dict(pid=os.getpid(), start=process_start(os.getpid()), since=int(time.time()), key=key, cwd=os.getcwd())
+            try:
+                os.ftruncate(fd, 0)
+                os.pwrite(fd, json.dumps(record).encode(), 0)
+            except OSError:
+                pass  # The record is for display only; the lock is the slot.
+            held = [item for item in os.environ.get(SLOT_HELD_ENV, '').split('\t') if item]
+            os.environ[SLOT_HELD_ENV] = '\t'.join(held + [key])
+            waited = int(time.monotonic() - started)
+            if waited >= SLOT_FIRST_NOTICE:
+                slot_log(log_fd, f'got a slot of {key} after {waited}s')
+            return fd
+        now = time.monotonic()
+        expired = now - started >= wait
+        if now >= next_notice or (expired and next_notice == started + SLOT_FIRST_NOTICE):
+            holders = '; '.join(text for _, text in slot_holders(directory, limit)) or 'holders unknown'
+            slot_log(log_fd, f'waiting {int(now - started)}s for a free slot of {key} (limit {limit}, FM_TEST_KEY_SLOTS; gives up after {wait}s); holders: {holders}')
+            next_notice = now + SLOT_NOTICE_EVERY
+        if expired:
+            slot_log(log_fd, f'waited {int(now - started)}s for a free slot of {key} (limit {limit}); running it without a slot')
+            return None
+        time.sleep(min(delay, max(0.0, wait - (now - started))))
+        delay = min(2.0, delay * 2)
+
+
+def release_slot(fd):
+    if fd is not None:
+        os.close(fd)
+
+
+def gate(key, command, log_fd):
+    """Run COMMAND while holding one of KEY's slots; exit with its status."""
+    try:
+        fd = acquire_slot(key, log_fd)
+    except ValueError as error:
+        slot_log(log_fd, str(error))
+        return 125
+    except KeyboardInterrupt:
+        return 130
+    ignored = {}
+    def restore_defaults():
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            signal.signal(sig, signal.SIG_DFL)
+    try:
+        # A group signal reaches COMMAND directly; this process keeps the slot until it exits.
+        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+            ignored[sig] = signal.signal(sig, signal.SIG_IGN)
+        try:
+            child = subprocess.Popen(command, close_fds=True, preexec_fn=restore_defaults)
+        except FileNotFoundError:
+            slot_log(log_fd, f'command not found: {command[0]}')
+            return 127
+        except PermissionError:
+            slot_log(log_fd, f'command not executable: {command[0]}')
+            return 126
+        code = child.wait()
+        return 128 - code if code < 0 else code
+    finally:
+        for sig, handler in ignored.items():
+            signal.signal(sig, handler)
+        release_slot(fd)
+
+
+def show_slots(key):
+    limit = slot_limit()
+    scalar('key', key)
+    scalar('limit', limit)
+    if not key.startswith(SLOT_PREFIX) or limit == 0:
+        scalar('gate', 'off for this key')
+        return
+    directory = slot_directory(key)
+    scalar('directory', str(directory))
+    held = slot_holders(directory, limit)
+    print(f'held[{len(held)}]{{slot,holder}}:')
+    for index, text in held:
+        print(f'  {index},{json.dumps(text)}')
+
+
 def run(key, command, calibration_file):
     if os.name != 'posix':
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
@@ -777,6 +1006,10 @@ def main():
     lim.add_argument('--margin', type=float, default=3); lim.add_argument('--fallback', type=nonnegative, default=0)
     runner = commands.add_parser('run')
     runner.add_argument('key'); runner.add_argument('command', nargs=argparse.REMAINDER)
+    gater = commands.add_parser('gate')
+    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('command', nargs=argparse.REMAINDER)
+    slots = commands.add_parser('slots')
+    slots.add_argument('key')
     nm = commands.add_parser('import-nm')
     nm.add_argument('database'); nm.add_argument('run_id')
     timeout = commands.add_parser('timeout')
@@ -808,8 +1041,25 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('run requires -- COMMAND')
-        with calibration_scratch() as calibration_file:
-            return run(args.key, command, calibration_file)
+        try:
+            slot = acquire_slot(args.key)
+        except ValueError as error:
+            scalar('error', str(error))
+            return 125
+        except KeyboardInterrupt:
+            return 130
+        try:
+            with calibration_scratch() as calibration_file:
+                return run(args.key, command, calibration_file)
+        finally:
+            release_slot(slot)
+    elif args.action == 'gate':
+        command = args.command[1:] if args.command[:1] == ['--'] else args.command
+        if not command:
+            parser.error('gate requires -- COMMAND')
+        return gate(args.key, command, args.log_fd)
+    elif args.action == 'slots':
+        show_slots(args.key)
     return 0
 
 

@@ -19,6 +19,7 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+import time
 
 root = Path(os.environ['FM_DURATION_TEST_ROOT'])
 tmp = Path(os.environ['FM_DURATION_TEST_TMP'])
@@ -210,6 +211,23 @@ suite_rows = [(r['key'], r['exit'], r['timed_out']) for r in rows() if r.get('ke
 assert suite_rows == [('test.tests/fm-self124.test.sh', 124, False), ('test.tests/fm-hang.test.sh', 124, True)] * 2, suite_rows
 events = [r['key'] for r in rows() if r.get('event') == 'timeout' and r.get('key', '').startswith('test.tests/fm-')]
 assert events == ['test.tests/fm-hang.test.sh'] * 2, events
+
+# bin/fm-test-run.sh takes the same per-key slot around every script it runs: with the key's
+# only slot held elsewhere it names the key and the holder, and a bounded wait still runs it.
+(runrepo / 'tests/fm-slot.test.sh').write_text('echo slot-script-ran\n')
+slot_run_env = dict(env, FM_TEST_SLOT_DIR=str(tmp / 'runner-slots'), FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='3')
+slot_holder = subprocess.Popen([sys.executable, str(helper), 'gate', 'test.tests/fm-slot.test.sh', '--', 'sleep', '20'], env=slot_run_env, cwd=runrepo)
+for _ in range(100):
+    if 'held[1]' in subprocess.run([sys.executable, str(helper), 'slots', 'test.tests/fm-slot.test.sh'], env=slot_run_env, cwd=runrepo, capture_output=True, text=True).stdout:
+        break
+    subprocess.run(['sleep', '0.1'])
+slot_run = subprocess.run([str(runrepo / 'bin/fm-test-run.sh'), 'tests/fm-slot.test.sh'], env=slot_run_env, cwd=runrepo, capture_output=True, text=True, timeout=120)
+slot_holder.kill()
+slot_holder.communicate()
+assert slot_run.returncode == 0 and 'slot-script-ran' in slot_run.stdout, slot_run
+assert 'waiting' in slot_run.stderr and 'test.tests/fm-slot.test.sh' in slot_run.stderr and f'pid={slot_holder.pid}' in slot_run.stderr, slot_run.stderr
+assert 'running it without a slot' in slot_run.stderr, slot_run.stderr
+print('ok - the test runner waits on a held per-key slot, names the holder, and runs once the bounded wait ends')
 
 # A stop sends TERM and waits for the leader: its own TERM cleanup of a child in
 # a separate process group runs and leaves no survivor. The leader reports
@@ -574,5 +592,112 @@ cli('check-literals','--base','HEAD',expected=1,tool=guard)
 (repo / 'bin/fm-duration-existing-limits.tsv').write_text('# moved\nbin/example.sh\t30\tbound=$(fm_duration_limit "key.$h" 30)\n')
 cli('check-literals','--base','HEAD',tool=guard)
 print('ok - sample-count limits, retention, progress, leader exit, outer ceiling, pipeline imports and literal guard')
+
+# Per-key slot gate: at most FM_TEST_KEY_SLOTS concurrent copies of one test.* key, a clear
+# waiter notice, release on every exit path, a bounded wait, and no gate for other keys.
+slot_dir = tmp / 'slots'
+slot_env = dict(env, FM_TEST_SLOT_DIR=str(slot_dir), FM_TEST_KEY_SLOTS='2')
+hold_code = ('import os,pathlib,sys\n'
+             'pathlib.Path(sys.argv[2]).write_text(str(os.getpid()))\n'
+             'print("started", flush=True)\n'
+             'p = pathlib.Path(sys.argv[1])\n'
+             'while not p.exists(): pass\n'
+             'print("finished", flush=True)')
+
+
+def hold(key, name, extra=None, tool_args=('run',)):
+    """Start `fm-duration.py run KEY` around a command that waits for a release file."""
+    release, pidfile = tmp / f'{name}.release', tmp / f'{name}.pid'
+    job = subprocess.Popen([sys.executable, str(helper), *tool_args, key, '--', sys.executable, '-c', hold_code, str(release), str(pidfile)],
+                           env=dict(slot_env, **(extra or {})), cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    return job, release, pidfile
+
+
+def finish(job, release):
+    release.touch()
+    return job.communicate(timeout=60)
+
+
+first, first_release, first_pid = hold('test.slot.key', 'slot-a')
+second, second_release, _ = hold('test.slot.key', 'slot-b')
+assert first.stdout.readline() == 'started\n' and second.stdout.readline() == 'started\n', 'two copies fit the default limit of two'
+third_launched = time.monotonic()
+third, third_release, _ = hold('test.slot.key', 'slot-c')
+notice = third.stderr.readline()
+assert 'waiting' in notice and 'test.slot.key' in notice and f'pid={first.pid}' in notice and f'pid={second.pid}' in notice, notice
+assert 'limit 2' in notice and 'FM_TEST_KEY_SLOTS' in notice, notice
+shown = subprocess.run([sys.executable, str(helper), 'slots', 'test.slot.key'], env=slot_env, cwd=workrepo, capture_output=True, text=True).stdout
+assert 'held[2]' in shown and f'pid={first.pid} alive' in shown, shown
+assert third.poll() is None, 'a third copy must wait, not run beside the other two'
+finish(first, first_release)
+assert third.stdout.readline() == 'started\n', 'a released slot goes to the waiter'
+third_waited = time.monotonic() - third_launched
+finish(second, second_release)
+third_out, third_err = finish(third, third_release)
+assert 'got a slot of test.slot.key' in third_err and third_out == 'finished\n', third_err
+third_total = time.monotonic() - third_launched
+third_sample = [r for r in rows() if r['key'] == 'test.slot.key' and 'event' not in r][-1]
+assert third_waited >= 2 and third_sample['duration_ms'] / 1000 <= third_total - third_waited + 1.5, (third_waited, third_total, third_sample)
+
+# Other keys take no slot, and the gate can be turned off.
+free = [hold('consumer.slot.key', f'free-{i}', dict(FM_TEST_KEY_SLOTS='1')) for i in range(2)]
+assert all(job.stdout.readline() == 'started\n' for job, _, _ in free), 'only test.* keys are gated'
+for job, release, _ in free:
+    finish(job, release)
+off = [hold('test.slot.off', f'off-{i}', dict(FM_TEST_KEY_SLOTS='0')) for i in range(3)]
+assert all(job.stdout.readline() == 'started\n' for job, _, _ in off), 'FM_TEST_KEY_SLOTS=0 turns the gate off'
+for job, release, _ in off:
+    finish(job, release)
+
+# A killed holder frees its slot at once: the kernel drops the lock with the process.
+one = dict(FM_TEST_KEY_SLOTS='1')
+victim, victim_release, victim_pid = hold('test.slot.kill', 'kill-a', one)
+assert victim.stdout.readline() == 'started\n'
+waiter, waiter_release, _ = hold('test.slot.kill', 'kill-b', one)
+assert 'waiting' in waiter.stderr.readline()
+victim.kill()
+victim.communicate()
+assert waiter.stdout.readline() == 'started\n', 'a SIGKILLed holder must release its slot'
+os.kill(int(victim_pid.read_text()), signal.SIGKILL)
+finish(waiter, waiter_release)
+
+# A bounded wait ends, says so, and runs the command; a record that names a gone pid is flagged.
+stale_holder = subprocess.Popen([sys.executable, '-c', (
+    'import fcntl,json,os,sys,time\n'
+    'sys.path.insert(0, sys.argv[1])\n'
+    'import importlib.util as u\n'
+    's = u.spec_from_file_location("d", sys.argv[2]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
+    'directory = d.slot_directory("test.slot.stale")\n'
+    'fd = os.open(directory / "slot-0.lock", os.O_RDWR | os.O_CREAT, 0o600)\n'
+    'fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n'
+    'os.write(fd, json.dumps(dict(pid=999999, start="Thu Jan  1 00:00:00 1970", since=int(time.time()), cwd="/gone")).encode())\n'
+    'print("held", flush=True)\n'
+    'time.sleep(60)'), str(root), str(helper)], env=slot_env, stdout=subprocess.PIPE, text=True)
+assert stale_holder.stdout.readline() == 'held\n'
+bounded = subprocess.run([sys.executable, str(helper), 'run', 'test.slot.stale', '--', sys.executable, '-c', 'print("ran anyway")'],
+                         env=dict(slot_env, FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='3'), cwd=workrepo, capture_output=True, text=True, timeout=60)
+stale_holder.kill()
+stale_holder.communicate()
+assert bounded.returncode == 0 and bounded.stdout == 'ran anyway\n', bounded
+assert 'does not match a live process' in bounded.stderr and 'cwd=/gone' in bounded.stderr, bounded.stderr
+assert 'waited' in bounded.stderr and 'running it without a slot' in bounded.stderr, bounded.stderr
+
+# The same key nested inside a held slot takes no second slot, so a limit of one cannot deadlock.
+nested = subprocess.run([sys.executable, str(helper), 'run', 'test.slot.nest', '--', sys.executable, str(helper), 'run', 'test.slot.nest', '--', 'true'],
+                        env=dict(slot_env, FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='30'), cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert nested.returncode == 0 and 'waiting' not in nested.stderr, nested
+
+# gate runs a command under a slot with its exit status and output; bad settings are refused by name.
+gated = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.gate', '--', 'bash', '-c', 'echo out; echo err >&2; exit 7'],
+                       env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert gated.returncode == 7 and gated.stdout == 'out\n' and gated.stderr == 'err\n', gated
+missing = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.gate', '--', str(tmp / 'no-such-command')], env=slot_env, cwd=workrepo, capture_output=True, text=True)
+assert missing.returncode == 127, missing
+for variable, value in (('FM_TEST_KEY_SLOTS', 'many'), ('FM_TEST_KEY_SLOTS', '17'), ('FM_TEST_SLOT_WAIT_SECONDS', '0')):
+    refused = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.gate', '--', 'true'], env=dict(slot_env, **{variable: value}), cwd=workrepo, capture_output=True, text=True)
+    assert refused.returncode == 125 and variable in refused.stderr, (variable, value, refused)
+    refused = subprocess.run([sys.executable, str(helper), 'run', 'test.slot.gate', '--', 'true'], env=dict(slot_env, **{variable: value}), cwd=workrepo, capture_output=True, text=True)
+    assert refused.returncode == 125 and variable in refused.stdout, (variable, value, refused)
+print('ok - a test.* key admits at most the configured copies, names its holders while waiting, frees a killed holder, and stays out of the sample')
 PY
 pass "measured command behavior"
