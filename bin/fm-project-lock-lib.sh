@@ -40,12 +40,13 @@
 # to <project-lock>.holds before releasing, so later allowance derivations can
 # use production hold observations.
 #
-# The default service allowance is 370 seconds, the stall limit for one hold:
+# The default service allowance is 490 seconds, the stall limit for one hold:
 # the sum of the counted steps below that spawn or teardown run while holding
 # the lock, doubled for a 100% margin. It is not a bound on every hold; the
 # holds and repetitions it does not cover are listed after the sum.
-# Poll budgets and bounds, from bin/fm-spawn.sh: the treehouse get entry wait,
-# 60 x 1s, 60s; the worker path check, 20 x 0.5s, 10s; and the skill pick bound
+# Poll budgets and bounds, from bin/fm-spawn.sh: the treehouse get entry wait at
+# its ceiling, 120s (60 x 1s, extended to 120s of wall clock while a get runs);
+# the worker path check, 20 x 0.5s, 10s; and the skill pick bound
 # SKILL_SELECTION_BOUND, 30s. From bin/fm-teardown.sh: NM_TEARDOWN_TIMEOUT,
 # 10s per call, up to five calls across task conclusion and private launch-agent
 # retirement, 50s; the index.lock return retries, 3 waits of
@@ -70,15 +71,18 @@
 #   discovery and fetch before it queues; its locked refresh is local-only. The
 #   sum below keeps those network costs as an upper bound, which only a slot
 #   that does not share the project's objects still pays under the lock.
-# The previous sum, 128.764s, counted NM_TEARDOWN_TIMEOUT once and left out
-# the return retries, bootout poll and reaping sleep. Adding four more
-# NM_TEARDOWN_TIMEOUT calls (40s), the retry waits (3s), four more returns
-# (4 x 1.628 = 6.512s), the bootout poll (4.75s) and the reaping sleep (1s)
-# gives 128.764 + 40 + 3 + 6.512 + 4.75 + 1 = 184.026s, rounded up to 185s,
-# doubled to 370s. The network samples ran at lower load than the 2026-10-12
-# incident (about 91); the margin covers that. No production hold had been
-# logged to the .holds record below when this was set; once it has, the
-# allowance must also cover the largest logged hold times the same margin.
+# The previous sum, 128.764s, counted the treehouse get entry wait at 60s and
+# NM_TEARDOWN_TIMEOUT once, and left out the return retries, bootout poll and
+# reaping sleep. Counting the get entry wait at its 120s ceiling instead of 60s
+# gives 128.764 + 60 = 188.764s. Adding four more NM_TEARDOWN_TIMEOUT calls
+# (40s), the retry waits (3s), four more returns (4 x 1.628 = 6.512s), the
+# bootout poll (4.75s) and the reaping sleep (1s) gives
+# 188.764 + 40 + 3 + 6.512 + 4.75 + 1 = 244.026s, rounded up to 245s, doubled
+# to 490s (370s when the get entry wait was counted at 60s). The network
+# samples ran at lower load than the 2026-10-12 incident (about 91); the margin
+# covers that. No production hold had been logged to the .holds record below
+# when this was set; once it has, the allowance must also cover the largest
+# logged hold times the same margin.
 # Not covered or undercounted (none measured):
 #   - home seeding (bin/fm-home-seed.sh) holds the Firstmate project's lock
 #     across unbounded clones and no-mistakes setup; seeding is rare;
@@ -102,7 +106,7 @@
 # measured environment or bounded fixture.
 # FM_PROJECT_LOCK_POLL_SECS changes sampling only (default 1 second; a positive
 # decimal number of seconds).
-# Progress is printed immediately and each quarter service allowance (92s
+# Progress is printed immediately and each quarter service allowance (122s
 # by default, minimum 1s for fixture overrides), naming the
 # current holder's operation/PID or the earlier waiter whose turn is reserved.
 # A refusal returns nonzero with an "fm-project-lock:" line naming its class
@@ -194,7 +198,7 @@ fm_project_lock_describe() {  # <lock> <head>
 }
 
 fm_project_lock_acquire() {  # <lock> <operation>
-  local lock=$1 operation=$2 service=${FM_PROJECT_LOCK_SERVICE_SECS:-370}
+  local lock=$1 operation=$2 service=${FM_PROJECT_LOCK_SERVICE_SECS:-490}
   local poll=${FM_PROJECT_LOCK_POLL_SECS:-1} number='^[0-9]+([.][0-9]+)?$' zero='^0*([.]0*)?$'
   local ticket head='' holder='' key last_key='' since=0 stalled=0 mtime now
   local next_message message_interval rc=1

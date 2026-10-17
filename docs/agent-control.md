@@ -362,6 +362,19 @@ This check scans every local home it can read: a registered local home or regist
 A slot is recognized by the rule teardown uses: Treehouse's `<pool>/<slot>/<repo>` layout beside its pool state file, sharing the project's Git common directory.
 A slot a task merely left holds no record's current copy, so it never blocks allocation.
 
+After sending `treehouse get`, a fresh spawn polls the pane until two reads agree on an isolated worktree of the project.
+The base window is 60 polls, one second apart.
+While the pane's foreground process shows `treehouse get` still running (tmux and Herdr), the spawn extends the wait to a ceiling of 120 seconds of wall clock, so the worst case stays bounded.
+A read that cannot tell keeps the window the previous read chose; a read that shows only shells sets the base window again.
+When the foreground cannot be read, as on zellij and cmux, the wait stays at the 60 polls.
+A refusal says how many polls it waited and the window in force when the wait ended, as in `after 60 polls (window 60s)` or `after 120 polls (window 120s)`, and names the last path seen, why it was rejected, and the spawning project.
+A get that runs past 60 polls and then stops ends with the base window again, so its refusal reads, for example, `after 76 polls (window 60s)`: the poll count is what was waited, and the window is the one in force at the end.
+
+The 120 seconds is a chosen bound, not a measured value.
+It leaves wide headroom over every `treehouse get` wait measured so far, and it waits out a slow get without removing its cause.
+The [measurement record](verification/runtime-backends.md#treehouse-get-entry-wait) holds those runs and lists what they leave unproven.
+`bin/fm-project-lock-lib.sh` counts it as the `treehouse get` entry term when it sizes the project-lock stall allowance, because a fresh spawn holds that lock through the wait.
+
 Standalone PR registration locks its task-copy snapshot before retirement recovery, guard execution, or any forge request, and refuses publication if the recorded worktree or branch changed while the PR was being checked.
 
 ### Reclaiming a task whose endpoint is gone
@@ -475,7 +488,7 @@ Uncommitted changes in the vanished copy are not recoverable, and the progress n
 **Why the caller prepares the copy.**
 The alternative is for `fm-spawn` to allocate a pool slot and check the branch out itself.
 It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration or force the checkout, and both change repository administration that every lane's worktrees share.
-It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a 60-second isolation poll and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
+It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a foreground-aware isolation poll and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
 The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
 The caller prepares the copy with `git worktree add -f <path> <branch>`, never after `git worktree prune`: the forced add keeps the vanished copy's registration, whose reflog may be the task's only recorded head.
 If that registration is already gone and no other head survives, the refusal asks for a known commit as evidence: one `pr_head=<sha>` line in the task record for a task with no recorded `pr=`, or the three control journal lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` for a task with one.

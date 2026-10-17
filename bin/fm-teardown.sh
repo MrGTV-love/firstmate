@@ -274,7 +274,7 @@
 # and the next sweep retries. Once processes or endpoints may be gone, the
 # reaper's return stage and every forced child return wait in that FIFO queue
 # instead, each waited admission bounded per holder by the same stall
-# allowance as every other waiter (370s, measured in
+# allowance as every other waiter (490s, derived in
 # bin/fm-project-lock-lib.sh). The wait has no total bound of its own; the
 # reaper's 600s teardown limit ends an overlong teardown, which keeps its
 # durable record and is retried by the next sweep without a refusal memo.

@@ -56,6 +56,9 @@
 #   that overlay. docs/configuration.md "Worker skill selection" owns selection,
 #   supported brief transports, and recorded outcomes. The picker is bounded
 #   at 30 seconds and never stops a launch.
+#   A fresh spawn's `treehouse get` wait is foreground-aware: docs/agent-control.md
+#   owns its window and ceiling, and docs/verification/runtime-backends.md
+#   "Treehouse get entry wait" records the measurements behind them.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only] [--worktree <path>]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
@@ -5004,6 +5007,35 @@ spawn_current_path() { # <target>
   cmux) fm_backend_cmux_current_path "$1" "$W" ;;
   esac
 }
+# What the pane's foreground says about the `treehouse get` just typed into it:
+# running (any foreground process is `treehouse get`), idle (only shells), or
+# unknown (the backend cannot say, the read failed, or a non-shell helper is
+# the only thing listed). zellij and cmux expose no foreground process, so they
+# always read unknown and keep the base wait.
+spawn_get_state() { # <target>
+  local lines line first shells=0 other=0
+  case "$BACKEND" in
+  tmux) lines=$(fm_backend_tmux_foreground_args "$1") ;;
+  herdr) lines=$(fm_backend_herdr_foreground_args "$1") ;;
+  *) lines='' ;;
+  esac
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    if [[ "$line" =~ (^|[/[:space:]])treehouse[[:space:]]+get([[:space:]]|$) ]]; then
+      printf 'running'
+      return 0
+    fi
+    first=${line%%[[:space:]]*}
+    if [ "$(fm_agent_process_classify_name "$first")" = shell ]; then
+      shells=$((shells + 1))
+    else
+      other=1
+    fi
+  done <<FOREGROUND
+$lines
+FOREGROUND
+  if [ "$other" = 0 ] && [ "$shells" -gt 0 ]; then printf 'idle'; else printf 'unknown'; fi
+}
 spawn_send_literal() { # <target> <text>
   case "$BACKEND" in
   tmux) fm_backend_tmux_send_literal "$1" "$2" ;;
@@ -5492,10 +5524,32 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # misconfiguration would need machinery this path does not want - so the
   # refusal has to be self-explaining instead: carry the last path seen and the
   # reason it was rejected, and report both at the deadline.
+  #
+  # The window is not one fixed length. A start can wait on `treehouse get` for
+  # far longer than the pane read costs: a get begun while a pool-wide
+  # `treehouse status --json` ran reached its worktree about when that status
+  # finished (docs/verification/runtime-backends.md "Treehouse get entry wait"
+  # holds the measurements and what they leave unproven). So the base window is
+  # 60 reads, and while the pane's foreground shows `treehouse get` still
+  # running the wait extends to a 120 second wall-clock ceiling, chosen rather
+  # than measured. A read that cannot tell keeps the window the previous read
+  # chose; a read that shows only shells sets the base window again.
+  acquire_base=60
+  acquire_ceiling=120
+  acquire_start=$SECONDS
+  acquire_limit=$acquire_base
   candidate=""
   last_seen=""
   last_reason="the pane reported no path"
-  for _ in $(seq 1 60); do
+  tick=0
+  while :; do
+    tick=$((tick + 1))
+    # Read the foreground before the path. `treehouse get` moves the pane into
+    # the worktree and then hands the foreground to its subshell, so an idle read
+    # taken after a stale path read could come from a get that arrived in
+    # between, and would end the wait on a path that is already out of date.
+    # Read first, an idle foreground means the path read that follows is final.
+    state=$(spawn_get_state "$WT_TARGET")
     p=$(spawn_current_path "$WT_TARGET" || true)
     [ -z "$p" ] || last_seen="$p"
     if [ -n "$p" ] && fm_task_copy_isolated "$p" "$PROJ_ABS"; then
@@ -5509,11 +5563,17 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     else
       candidate=""
       [ -z "$p" ] || last_reason=$FM_TASK_COPY_REASON
+      case "$state" in
+        running) acquire_limit=$acquire_ceiling ;;
+        idle) acquire_limit=$acquire_base ;;
+      esac
     fi
+    [ "$tick" -lt "$acquire_limit" ] || break
+    [ "$acquire_limit" = "$acquire_base" ] || [ $((SECONDS - acquire_start)) -lt "$acquire_limit" ] || break
     sleep 1
   done
   if [ -z "$WT" ]; then
-    echo "error: treehouse get did not enter an isolated worktree within 60s (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); aborting acquisition" >&2
+    echo "error: treehouse get did not enter an isolated worktree after ${tick} polls (window ${acquire_limit}s) (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); aborting acquisition" >&2
     exit 1
   fi
 
