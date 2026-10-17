@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034 # TEARDOWN_FOREIGN_* are output globals for bin/fm-teardown.sh.
-# Foreign nested copies in the pool slot a teardown returns.
+# Foreign nested copies in the pool slot a teardown returns, and the task's own
+# nested copies that Vernant's creation lock holds.
 #
 # A foreign copy is a registered worktree strictly inside the slot that no
 # record of the retiring task names. Vernant's start_task_worktree.py creates
