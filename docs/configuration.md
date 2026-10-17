@@ -871,12 +871,13 @@ A reopen used only to retain an unanswered captain question preserves the finish
 
 [`bin/fm-model-picker.sh`](../bin/fm-model-picker.sh) collects Artificial Analysis benchmark data for the model picker.
 Its header owns the flags, the long-run guidance, and the exit codes; the code is `bin/fm_model_picker/`.
+Exit 4 means the outputs were written but acquisition was incomplete: an evaluation page or a cohort model page could not be fetched (a 404 and, under `--embedded-only`, a cache miss both count), a comparison page failed with an error other than 404 (a 404 there is a recorded unsupported slug), or the sweep stopped after 3 straight fetch failures.
 The data root is `FM_MODEL_PICKER_DATA`, otherwise `model-picker/` under the home's data directory (`FM_DATA_OVERRIDE`, else `$FM_HOME/data`).
 The whole root is private and gitignored with `data/`.
 
 | Path under the data root | Contents |
 | --- | --- |
-| `raw/` | Cached pages with a `.ts` sidecar holding each page's real fetch time, `rendered/*.txt` chart captures, and `_http_404.jsonl`, the memory of 404s that later runs never re-request |
+| `raw/` | Cached pages with a `.ts` sidecar holding each page's real fetch time, `rendered/*.txt` chart captures, and `_http_404.jsonl`, the memory of 404s; a run does not re-request a remembered 404 unless `--stale-after-hours` has aged it out |
 | `snapshot.json` | Aggregate of the latest acquisition run, including each model slug's values-or-reason status (`slug_status`, `sweep_failures`), which is its only home; its stored coverage, if any, is never read |
 | `aa.sqlite` | `dispatch_log` and `outcomes` first, then `models`, `metrics`, `observations`, and `reconcile_runs` |
 | `coverage.md` | Per-series coverage, recomputed from the raw cache on every run (never from `aa.sqlite` or `snapshot.json`) |

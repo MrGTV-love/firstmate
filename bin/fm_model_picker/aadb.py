@@ -114,13 +114,6 @@ def record_validator(conn, dispatch_id, verdict, disagreement):
     _update(conn, dispatch_id, validator_verdict=verdict, validator_disagreement=_flag(disagreement))
 
 
-def record_review(conn, dispatch_id, rework=None, captain_acceptance=None):
-    """Rework count and the captain's acceptance, once known. None leaves a column as is."""
-    cols = {k: v for k, v in (("rework", rework), ("captain_acceptance", captain_acceptance)) if v is not None}
-    if cols:
-        _update(conn, dispatch_id, **cols)
-
-
 def record_outcome(conn, dispatch_id, quality=None, rework=None, time_s=None, accepted=None, notes=None):
     """One outcome per dispatch. An unknown dispatch_id raises sqlite3.IntegrityError."""
     conn.execute(
@@ -140,7 +133,7 @@ def calibration_selftest():
         chosen_worker="gpt-6-1-sol", chosen_validator="claude-opus-5-5", effort="high",
         rule_worker="claude-sonnet-5-5", rule_validator="gpt-6-1-sol", rule_effort="medium",
         jev_raw_payload=raw, jev_candidate_version="jev-1.13.0", gates={"eligible": 4},
-        pareto_pruned=["a", "b"], spend_priority={"gpt-6-1-sol": 2}, snapshot_age=3600.0)
+        pareto_pruned=["a", "b"], spend_priority={"gpt-6-1-sol": 2}, snapshot_age=3600.0, rework=1, captain_acceptance="accepted")
     row = conn.execute("SELECT * FROM dispatch_log WHERE id=?", (did,)).fetchone()
     assert row["jev_raw_payload"] == raw, "raw payload must survive unchanged"
     assert row["mode"] == "shadow" and row["rule_worker"] == "claude-sonnet-5-5" and row["rule_effort"] == "medium"
@@ -149,7 +142,6 @@ def calibration_selftest():
     bid = log_dispatch(conn, mode="live", jev_raw_payload=blob)
     assert conn.execute("SELECT jev_raw_payload FROM dispatch_log WHERE id=?", (bid,)).fetchone()[0] == blob
     record_validator(conn, did, "agree", False)
-    record_review(conn, did, rework=1, captain_acceptance="accepted")
     row = conn.execute("SELECT * FROM dispatch_log WHERE id=?", (did,)).fetchone()
     assert (row["validator_verdict"], row["validator_disagreement"], row["rework"], row["captain_acceptance"]) == ("agree", "no", 1, "accepted")
     record_outcome(conn, did, quality=0.9, rework=1, time_s=840.0, accepted=True, notes="ok")

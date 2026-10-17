@@ -24,15 +24,16 @@
 #                   aa.sqlite; write reconcile.md and verdict.json. Exit 3 when the verdict is UNTRUSTED.
 # Order when combined: acquisition, chart-diff, database. Long runs go through bin/fm-proc-budget.sh.
 # Exit codes: 0 done. 1 a slug has neither values nor a recorded reason. 2 a fetch failed where the run cannot go on
-#   (error: on stderr). 3 the chart-diff verdict is UNTRUSTED. 4 the outputs were written but acquisition was incomplete:
-#   a comparison, evaluation or model page could not be fetched (a 404 is not a failure; --embedded-only fetches nothing
-#   on purpose and is not one), or the sweep stopped after 3 straight fetch failures (INCOMPLETE: on stderr). A run that
-#   is also UNTRUSTED exits 3.
+#   (error: on stderr). 3 the chart-diff verdict is UNTRUSTED. 4 the outputs were written but acquisition was incomplete
+#   (INCOMPLETE: on stderr): an evaluation page or a cohort model page could not be fetched (a 404 and, under --embedded-only,
+#   a cache miss both count); a comparison page failed with an error other than 404 (a 404 there is a recorded unsupported
+#   slug, and --embedded-only leaves comparison pages unfetched on purpose); or the sweep stopped after 3 straight fetch
+#   failures. A run that is also UNTRUSTED exits 3.
 # Data root: FM_MODEL_PICKER_DATA, else <FM_HOME or code root>/data/model-picker (FM_DATA_OVERRIDE selects another
 # data directory). It holds raw/ (cache and fetch times), snapshot.json, coverage.md, reconcile.md, verdict.json,
 # aa.sqlite and projection/. docs/configuration.md owns the layout. The code is bin/fm_model_picker/.
 # Calibration: dispatch_log and outcomes are created first in aa.sqlite (bin/fm_model_picker/aadb.py: log_dispatch,
-# record_validator, record_review, record_outcome). The matrix rebuild never touches them.
+# record_validator, record_outcome). The matrix rebuild never touches them.
 set -eu
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 case "${1:-}" in
