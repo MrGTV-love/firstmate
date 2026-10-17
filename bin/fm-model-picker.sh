@@ -21,7 +21,9 @@
 #                   In a projection, as_of is the newest observed_at across its metrics; each metric's own observed_at is
 #                   authoritative for freshness; a rounded eval-leaderboard value can win over a full-precision value when newer.
 # --chartdiff       compare table, payload and rendered-chart values; re-fetch each disagreeing page once; rebuild
-#                   aa.sqlite; write reconcile.md and verdict.json. Exit 3 when the verdict is UNTRUSTED.
+#                   aa.sqlite; write reconcile.md and verdict.json. Exit 3 when the verdict is UNTRUSTED. The verdict line
+#                   says how many metrics and how many evaluation leaderboard cells it did not compare, so TRUSTED is never
+#                   read as complete; verdict.json carries the second count as leaderboard_not_compared.
 # Order when combined: acquisition, chart-diff, database. Long runs go through bin/fm-proc-budget.sh.
 # A page enters raw/ only if it parses, and a cached page is read only if it still parses. Five kinds are judged by one
 #   rule: a comparison page needs a table, a payload, a matching header and exactly the requested slugs (the chart-diff

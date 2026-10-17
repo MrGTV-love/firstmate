@@ -61,7 +61,7 @@ _S = [
     ("math500", "math500", "MATH-500", "fraction", "fraction", False, None, "math-500"),
     ("mmlupro", "mmluPro", "MMLU-Pro", "fraction", "fraction", False, None, "mmlu-pro"),
     ("globalmmlulite", "globalMmluLiteScore", "Global-MMLU-Lite", "fraction", "fraction", False, None, "global-mmlu-lite"),
-    ("openness-index", "opennessIndex", "Artificial Analysis Openness Index", "points", "raw", False, None, "artificial-analysis-openness-index"),
+    ("openness-index", "opennessIndex|openness.opennessIndex", "Artificial Analysis Openness Index", "points", "raw", False, None, "artificial-analysis-openness-index"),
     ("aa3d", "aa3dElo", "AA-3D", "elo", "raw", False, None, "aa-3d"),
     # economics (comparison-table rows)
     ("priceper1mtokens", "price1mBlended7To2To1", "Price per 1M Tokens", "usd", "quantity", False, "Price per 1M Tokens", None),
@@ -241,6 +241,9 @@ def selftest():
     assert abs(s["omniscience-non-hallucination-rate"] - 0.75) < 1e-12, "derived series is 1 minus the field"
     assert s["aa-briefcase-rubric"] == 0.5 and s["aa-briefcase-analytical-elo"] == 1500.5
     assert model_series(models[1]) == {"itbenchaa": 0.4}, "alternate field spelling is read"
+    nested = model_series(obj("z", "Z", openness={"opennessIndex": 70.5}))
+    assert nested == {"openness-index": 70.5} and SERIES_MAP["openness-index"]["unit"] == "points", "a compare payload keeps the openness index nested"
+    assert model_series(obj("z", "Z", opennessIndex=71.0, openness={"opennessIndex": 70.5})) == {"openness-index": 71.0}, "the flat field of an evaluation payload still wins"
     assert model_series(obj("z", "Z", gpqa=0)) == {"gpqadiamond": 0}, "a real zero is a value"
     assert model_series(obj("z", "Z", gpqa=True)) == {}, "booleans are not values"
     ok = parse_compare_page('"models":' + dump(models), ["Acme Model A (Max)", "Acme Model B"])

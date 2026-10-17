@@ -6,7 +6,8 @@
 # cells stored as numbers with a unit, a verdict that goes UNTRUSTED when the matrix is rebuilt
 # without chart-diff, coverage that follows the cache and never an older database, a payload slug
 # that cannot name a file outside projection/, a model whose attributes come from its newest page,
-# a fetched page that does not parse never replacing the last good copy, and which network
+# a fetched page that does not parse never replacing the last good copy, a verdict that names the
+# leaderboard cells it did not compare, one 404 line per URL, and which network
 # requests and exit code each flag and each outage produce against a scripted site.
 set -eu
 # shellcheck source=tests/lib.sh
@@ -149,7 +150,8 @@ import json, sys
 from pathlib import Path
 raw = Path(sys.argv[1])
 objs = [{"id": "id-" + s, "slug": s, "name": s.upper(), "creator": {"name": "Acme", "slug": "acme"}, "intelligenceIndex": i,
-         "price1mBlended7To2To1": blended, "price1mInputTokens": inp, "price1mOutputTokens": out, "cacheHitPrice": cache}
+         "price1mBlended7To2To1": blended, "price1mInputTokens": inp, "price1mOutputTokens": out, "cacheHitPrice": cache,
+         "openness": {"opennessIndex": 70.5}}
         for s, i, blended, inp, out, cache in (("m-a", 50.4, 2.5, 3.0, 15.0, 0.3), ("m-b", 40.2, 1.25, 1.0, 5.0, 0.1))]
 rows = [
     ("Intelligence Index", "50", "40"),
@@ -211,6 +213,7 @@ for cid in ("reasoningtokenspertask", "outputspeed", "timetofirsttoken", "costpe
     assert m[cid]["value"] is not None and m[cid]["unit"] and m[cid]["scale"] == "quantity", (cid, m[cid])
 assert m["reasoningtokenspertask"]["value"] == 84000.0 and m["reasoningtokenspertask"]["unit"] == "count"
 assert m["timetofirsttoken"]["unit"] == "s" and m["outputspeed"]["unit"] == "tokens/s" and m["costpertask"]["unit"] == "usd"
+assert m["openness-index"]["value"] == 70.5 and m["openness-index"]["unit"] == "points" and m["openness-index"]["source"] == "embedded", m["openness-index"]
 usd = {cid: v["scale"] for cid, v in m.items() if v["unit"] == "usd"}
 assert usd == {"priceper1mtokens": "quantity", "inputpriceper1mtokens": "quantity", "outputpriceper1mtokens": "quantity",
                "cachehitpriceper1mtokens": "quantity", "costpertask": "quantity", "costtorunintelligenceindex": "quantity"}, usd
@@ -406,7 +409,7 @@ def opener(req, timeout=None):
             or (mode == "evals-down" and path.startswith("/evaluations/"))
             or (mode == "cohort-down" and path.startswith("/models/") and not path.startswith("/models/comparisons"))):
         raise urllib.error.HTTPError(req.full_url, 500, "x", email.message.Message(), None)
-    if mode == "unsupported" and path.startswith("/models/comparisons/m-new"):
+    if mode == "unsupported" and path.startswith("/models/comparisons/") and "m-new" in path:
         raise urllib.error.HTTPError(req.full_url, 404, "x", email.message.Message(), None)
     if mode == "dropped" and path == "/models/comparisons/m-new" and not dropped:
         dropped.append(path)
@@ -686,6 +689,43 @@ test_page_that_earlier_ingested_and_is_now_quarantined_exits_4() {
   pass "model picker: a cached page that earlier ingested and now does not exits 4 with a count line"
 }
 
+test_verdict_names_leaderboard_cells_it_did_not_compare() {
+  local data=$TMP_ROOT/leaderboard db
+  mkdir -p "$data/raw"
+  printf '%s' '<html><table><thead><tr><th></th><th>Creator</th><th>Name</th><th>Elo</th><th>CI</th><th>Release Date</th></tr></thead><tbody><tr><td>1</td><td>Acme</td><td>M-A</td><td>1500</td><td>-1 / +1</td><td>Sep 2026</td></tr><tr><td>2</td><td>Acme</td><td>Outside-1</td><td>1400</td><td>-2 / +2</td><td>Sep 2026</td></tr><tr><td>3</td><td>Acme</td><td>Outside-2</td><td>1300</td><td>-3 / +3</td><td>Sep 2026</td></tr></tbody></table>"initialModels":[{"id":"i1","slug":"m-a","name":"M-A","creator":{"name":"Acme","slug":"acme"},"briefcaseBreakdown":{"overall":{"elo":1500}}}]</html>' >"$data/raw/evaluations_aa-briefcase.html"
+  printf '%s' '<html><table><thead><tr><th></th><th>Creator</th><th>Model</th><th>Openness Index</th><th>Intelligence Index</th></tr></thead><tbody><tr><td>1</td><td>Acme</td><td>Open-1</td><td>88.89</td><td>11.50</td></tr><tr><td>2</td><td>Acme</td><td>Open-2</td><td>70.00</td><td>9.00</td></tr></tbody></table></html>' >"$data/raw/evaluations_artificial-analysis-openness-index.html"
+  printf '2026-10-15T20:00:00Z' >"$data/raw/evaluations_aa-briefcase.html.ts"
+  printf '2026-10-15T20:00:00Z' >"$data/raw/evaluations_artificial-analysis-openness-index.html.ts"
+  run "$data" --chartdiff --replay
+  expect_code 0 "$CODE" "chart-diff over leaderboards with cells outside the chart window"
+  assert_contains "$OUT" "chart-diff: TRUSTED (0 mismatches in 1 compared values, " "the one cell inside the window is compared"
+  assert_contains "$OUT" ", 4 leaderboard cells not compared)" "the verdict line names the cells it did not compare"
+  assert_contains "$(cat "$data/verdict.json")" '"leaderboard_not_compared": 4' "verdict.json carries the count"
+  assert_grep "Evaluation leaderboard cells outside the chart window (stored, not compared): 4" "$data/reconcile.md" "reconcile.md lists the same count"
+  db=$data/aa.sqlite
+  assert_equals "-1 / +1|-2 / +2|-3 / +3" "$(sql "$db" "select group_concat(o.ci, '|') from (select o.ci from observations o join metrics x on x.id=o.metric_id where x.label='eval-leaderboard:aa-briefcase' order by o.ci) o")" "a CI column keeps its intervals"
+  assert_equals "2|0" "$(sql "$db" "select count(*), count(o.ci) from observations o join metrics x on x.id=o.metric_id where x.label='eval-leaderboard:artificial-analysis-openness-index'")" "a fifth column that is another metric is not stored as an interval"
+  pass "model picker: the verdict names the leaderboard cells it did not compare; ci holds intervals only"
+}
+
+test_daily_runs_keep_one_404_line_per_url() {
+  local data=$TMP_ROOT/four04 first
+  FLAG_ROOT=$data
+  SITE=unsupported flag_run --sweep --replay --stale-after-hours 1
+  assert_contains "$OUT" "EXIT 0" "day 1: the unsupported slug is a recorded reason"
+  first=$(wc -l <"$data/raw/_http_404.jsonl" | tr -d ' ')
+  assert_equals "4" "$first" "the batch, the pair, the slug alone and the slug paired with an anchor are remembered once each"
+  sed -i.bak 's|"at": "[^"]*"|"at": "2020-01-01T00:00:00Z"|' "$data/raw/_http_404.jsonl"
+  SITE=unsupported flag_run --sweep --replay --stale-after-hours 1
+  assert_contains "$OUT" "EXIT 0" "day 2: the aged memories are asked about again"
+  assert_equals "1" "$(requests_matching '^REQ /models/comparisons/m-new$')" "the slug alone was requested again"
+  assert_equals "1" "$(requests_matching '^REQ /models/comparisons/m-new-vs-claude-opus-5-5$')" "and paired with an anchor"
+  assert_equals "$first" "$(wc -l <"$data/raw/_http_404.jsonl" | tr -d ' ')" "and the file still holds one line per URL"
+  assert_equals "2" "$(grep -c '2020-01-01' "$data/raw/_http_404.jsonl" || true)" "the two re-asked URLs carry the new time, the others keep theirs"
+  unset FLAG_ROOT
+  pass "model picker: repeated 404s keep one line per URL"
+}
+
 test_dropped_connection_is_retried() {
   SITE=dropped flag_run --sweep --replay
   assert_equals "REQ /models/comparisons/m-new
@@ -716,3 +756,5 @@ test_newest_page_decides_model_attributes
 test_unparseable_cohort_page_is_rejected
 test_chartdiff_refetch_must_return_the_same_models
 test_page_that_earlier_ingested_and_is_now_quarantined_exits_4
+test_verdict_names_leaderboard_cells_it_did_not_compare
+test_daily_runs_keep_one_404_line_per_url

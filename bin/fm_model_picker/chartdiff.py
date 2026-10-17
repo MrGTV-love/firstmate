@@ -157,7 +157,7 @@ def rendered_observations(eval_slug, e):
 
 def _new(cid, path_a, path_b):
     return {"metric": cid, "path_a": path_a, "path_b": path_b, "checked": 0, "agreements": 0,
-            "mismatches": [], "notes": [], "pages": set(), "status": "not-compared", "before": None}
+            "mismatches": [], "notes": [], "pages": set(), "status": "not-compared", "before": None, "outside": 0}
 
 
 def _tally(res, ok, **example):
@@ -213,6 +213,7 @@ def compare_all(raw):
                 b = embedded.series_value(o, spec)
                 _tally(res, b is not None and agrees(b, rec["raw"], spec["scale"], spec["derived"]),
                        slug=o["slug"], page=("eval", eslug), a=rec["raw"], b=b, why="leaderboard value differs from payload")
+            res["outside"] += outside
             if outside:
                 res["notes"].append(f"{eslug}: {outside} leaderboard rows are outside the chart window (not compared)")
         r = e.get("rendered")
@@ -268,15 +269,20 @@ def not_compared(results, raw):
     return out, sorted(l for l in labels if l not in mapped)
 
 
+def leaderboard_not_compared(results):
+    """Evaluation leaderboard cells with no payload object in the page's chart window: stored, never compared."""
+    return sum(r["outside"] for r in results.values())
+
+
 def verdict(results, nc_series):
     checked = sum(r["checked"] for r in results.values())
     mism = sum(len(r["mismatches"]) for r in results.values())
-    m = len(nc_series)
+    left = f"{len(nc_series)} metrics not compared, {leaderboard_not_compared(results)} leaderboard cells not compared"
     if checked == 0:
-        return f"UNTRUSTED (nothing was compared, {m} metrics not compared)"
+        return f"UNTRUSTED (nothing was compared, {left})"
     if mism:
-        return f"UNTRUSTED ({mism} mismatches, {m} metrics not compared)"
-    return f"TRUSTED (0 mismatches in {checked} compared values, {m} metrics not compared)"
+        return f"UNTRUSTED ({mism} mismatches, {left})"
+    return f"TRUSTED (0 mismatches in {checked} compared values, {left})"
 
 
 def describe(checked, mismatches):
@@ -380,6 +386,7 @@ def write_report(path, results, raw, verdict_line, nc, refetched, ran_at):
         lines.append("None in the compared set.")
     lines += ["", f"Pages re-fetched once for mismatches: {len(refetched)}", "", "## Not compared", "",
               "Series with no path pairing: " + (", ".join(nc_series) or "none"), "",
+              f"Evaluation leaderboard cells outside the chart window (stored, not compared): {leaderboard_not_compared(results)}", "",
               "Comparison-table rows with no payload counterpart (shown values are stored, not cross-checked): " + (", ".join(nc_labels) or "none"), "",
               "## Evaluation pages", "", "| page | leaderboard rows | payload window | chart sections | compared values |", "|---|---|---|---|---|"]
     for eslug, e in sorted(raw["evals"].items()):
@@ -434,7 +441,12 @@ def selftest():
     empty = compare_all({"compare": {}, "evals": {}, "skipped": [], "quarantined": [], "skipped_evals": []})
     assert empty == {} and verdict(empty, ["gpqadiamond"]).startswith("UNTRUSTED (nothing was compared"), "an empty compared set is never a clean verdict"
     assert verdict(res, []).startswith("TRUSTED (0 mismatches in 3 compared values")
-    assert verdict(compare_all(wrong), ["x"]) == "UNTRUSTED (3 mismatches, 1 metrics not compared)"
+    assert verdict(compare_all(wrong), ["x"]) == "UNTRUSTED (3 mismatches, 1 metrics not compared, 0 leaderboard cells not compared)"
+    board = {f"Model {i}": {"raw": "1500", "value": 1500.0, "creator": "Acme", "ci": None, "rank": i} for i in range(1, 6)}
+    elo_obj = {"slug": "m1", "name": "Model 1", "creator": {"name": "Acme"}, "briefcaseBreakdown": {"overall": {"elo": 1500}}}
+    outside = compare_all({"compare": {}, "evals": {"aa-briefcase": {"ts": "t", "leaderboard": board, "window": [elo_obj], "rendered": None}},
+                           "skipped": [], "quarantined": [], "skipped_evals": []})
+    assert leaderboard_not_compared(outside) == 4 and verdict(outside, []) == "TRUSTED (0 mismatches in 1 compared values, 0 metrics not compared, 4 leaderboard cells not compared)", "the verdict names the leaderboard cells it did not compare"
     row = {"attrs": {"estimated": ["intelligence-index"]}, "series": {"intelligence-index": 6.8, "scicode": 0.5}, "page": "p", "batch": ["a"],
            "table": {"Intelligence Index": "7*", "SciCode": "50%"}, "observed_at": "t"}
     star = compare_all({"compare": {"a": [row]}, "evals": {}, "skipped": [], "quarantined": [], "skipped_evals": []})

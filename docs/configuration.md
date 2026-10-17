@@ -875,13 +875,15 @@ A page enters `raw/` only if it parses, and a cached page is read only if it sti
 One rule judges the five page kinds: a comparison page needs a table, a payload, a matching header, and exactly the requested slugs (the chart-diff re-fetch included); an evaluation page needs a table or a payload; the sitemap needs `<loc>` entries; the selector catalog needs models; a cohort model page needs model facts.
 A page that does not parse is rejected, and the last good copy and its fetch time stay; a rejected sitemap or catalog is read from that copy, and with none the run ends with exit 2.
 Every `--db` and `--chartdiff` run prints how many cached comparison pages were quarantined, with their file names.
+The chart-diff verdict line states how many metrics and how many evaluation leaderboard cells it did not compare (cells for models outside a page's chart window are stored, not checked), so `TRUSTED` is never read as complete; `verdict.json` holds the cell count as `leaderboard_not_compared`.
+A leaderboard row keeps `ci` only when the table's fifth column is headed CI or interval, or the value cell itself carries the interval; on other pages that column is another metric and `ci` is empty.
 Exit 4 means the outputs were written but the run was incomplete: an evaluation page or a cohort model page could not be fetched or did not parse (a 404 and, under `--embedded-only`, a cache miss both count), a comparison page failed with an error other than 404 or did not parse (a 404 there is a recorded unsupported slug), a sitemap or selector catalog was rejected, the sweep stopped after 3 straight fetch failures, or a cached comparison page that stamped rows in the previous `aa.sqlite` no longer ingests.
 The data root is `FM_MODEL_PICKER_DATA`, otherwise `model-picker/` under the home's data directory (`FM_DATA_OVERRIDE`, else `$FM_HOME/data`).
 The whole root is private and gitignored with `data/`.
 
 | Path under the data root | Contents |
 | --- | --- |
-| `raw/` | Cached pages with a `.ts` sidecar holding each page's real fetch time, `rendered/*.txt` chart captures, and `_http_404.jsonl`, the memory of 404s; a run does not re-request a remembered 404 unless `--stale-after-hours` has aged it out |
+| `raw/` | Cached pages with a `.ts` sidecar holding each page's real fetch time, `rendered/*.txt` chart captures, and `_http_404.jsonl`, the memory of 404s with one line per URL; a run does not re-request a remembered 404 unless `--stale-after-hours` has aged it out |
 | `snapshot.json` | Aggregate of the latest acquisition run, including each model slug's values-or-reason status (`slug_status`, `sweep_failures`), which is its only home; its stored coverage, if any, is never read |
 | `aa.sqlite` | `dispatch_log` and `outcomes` first, then `models`, `metrics`, `observations`, and `reconcile_runs` |
 | `coverage.md` | Per-series coverage, recomputed from the raw cache on every run (never from `aa.sqlite` or `snapshot.json`) |

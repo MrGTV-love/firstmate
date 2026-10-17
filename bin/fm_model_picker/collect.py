@@ -139,26 +139,50 @@ def cache_file(path):
     return RAW / (name + ".html")
 
 
+_NEG = {"file": None, "records": {}}
+
+
+def _neg_records():
+    """Every remembered 404, the newest record per URL. NEG_FILE is read once per process, and
+    again only when NEG_FILE changes; remember_404 keeps the memory and the file in step."""
+    if _NEG["file"] != NEG_FILE:
+        records = {}
+        if NEG_FILE.exists():
+            for line in NEG_FILE.read_text(encoding="utf-8").splitlines():
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(rec, dict) and rec.get("url") and (rec["url"] not in records or str(rec.get("at")) >= str(records[rec["url"]].get("at"))):
+                    records[rec["url"]] = rec
+        _NEG["file"], _NEG["records"] = NEG_FILE, records
+    return _NEG["records"]
+
+
+def _neg_fresh(rec, now=None):
+    try:
+        age = aadb.snapshot_age_seconds(rec.get("at"), now)
+    except (ValueError, TypeError):
+        return False
+    return NEG_MAX_AGE is None or (age is not None and age <= NEG_MAX_AGE)
+
+
 def load_404s(now=None):
     """Remembered 404s. With NEG_MAX_AGE set, an older memory is ignored so a page the site
     later adds is requested again."""
-    out = {}
-    if NEG_FILE.exists():
-        for line in NEG_FILE.read_text(encoding="utf-8").splitlines():
-            try:
-                rec = json.loads(line)
-                age = aadb.snapshot_age_seconds(rec.get("at"), now)
-            except (json.JSONDecodeError, ValueError, AttributeError, TypeError):
-                continue
-            if isinstance(rec, dict) and rec.get("url") and (NEG_MAX_AGE is None or (age is not None and age <= NEG_MAX_AGE)):
-                out[rec["url"]] = rec
-    return out
+    return {url: rec for url, rec in _neg_records().items() if _neg_fresh(rec, now)}
+
+
+def remembered_404(path, now=None):
+    rec = _neg_records().get(path)
+    return rec is not None and _neg_fresh(rec, now)
 
 
 def remember_404(path, at):
-    RAW.mkdir(parents=True, exist_ok=True)
-    with NEG_FILE.open("a", encoding="utf-8") as fh:
-        fh.write(json.dumps({"url": path, "at": at, "status": 404}) + "\n")
+    """One record per URL: a repeated 404 replaces its line, so the file never grows with repeats."""
+    records = _neg_records()
+    records[path] = {"url": path, "at": at, "status": 404}
+    _atomic_write(NEG_FILE, "".join(json.dumps(rec) + "\n" for rec in records.values()))
 
 
 def _retry_after(err):
@@ -188,7 +212,7 @@ def fetch_page(path, kind, requested, refresh=False, network=True, skip_legacy=F
             raise Rejected(path, why)
         FETCH_TS[path] = ts
         return Fetched(text, ts, True)
-    if path in load_404s():
+    if remembered_404(path):
         raise FetchError(path, 404, "remembered 404")
     if not network:
         raise CacheMiss(path)
@@ -287,19 +311,21 @@ LEAD_NUM_RE = re.compile(r"^[−\-]?[\d,]+(?:\.\d+)?%?")
 
 def parse_leaderboard(rows):
     """Parse a leaderboard table: [rank, creator, name, value, CI, date] shape. A table whose
-    header has no 'Creator' column (AA-3D: rank, range, model, Elo) carries no creator. A value
-    cell with trailing text ('1197 +/-33 95% interval ...') keeps its leading number as the
-    value and the rest as the interval."""
+    header has no 'Creator' column (AA-3D: rank, range, model, Elo) carries no creator. The fifth
+    column is the interval only when its header says CI or interval (on other pages it is another
+    metric and ci is None). A value cell with trailing text ('1197 +/-33 95% interval ...') keeps
+    its leading number as the value and the rest as the interval."""
     out = {}
     header = rows[0] if rows else []
     creator_col = len(header) > 1 and header[1].strip().lower() == "creator"
+    ci_col = len(header) > 4 and re.search(r"\bci\b|interval", header[4], re.I) is not None
     for cells in rows[1:]:  # skip header
         if len(cells) >= 4 and cells[0].isdigit():
             name = cells[2]
             m = LEAD_NUM_RE.match(cells[3].strip())
             tok = m.group(0) if m else cells[3]
             rest = cells[3].strip()[len(tok):].strip() if m else ""
-            ci = cells[4] if len(cells) > 4 else (rest or None)
+            ci = cells[4] if ci_col and len(cells) > 4 else (rest or None)
             rec = {"raw": tok, "ci": ci, "rank": int(cells[0]), "creator": cells[1] if creator_col else None}
             raw_val = tok.replace("−", "-").replace(",", "")
             try:
@@ -915,6 +941,14 @@ def run_selftest():
         assert parse_cell(cell) == want, f"{cell!r}: {parse_cell(cell)} != {want}"
     for text in ("Yes", "Supports: text and image", "September 2026", "Apache 2.0", "128k tokens/s", "5min"):
         assert parse_cell(text) == (None, None), f"{text!r} holds no number the rules know"
+    cols = [["", "Creator", "Model", "Openness Index", "Intelligence Index"], ["1", "Acme", "M-A", "88.89", "11.50"], ["2", "Acme", "M-B", "70.00", "9.00"]]
+    assert all(r["ci"] is None for r in parse_leaderboard(cols).values()), "a fifth column that is another metric is not an interval"
+    harvey = [["", "Creator", "Name", "Hallucination-Gated All-Pass Rate", "Criterion Pass Rate"], ["1", "Acme", "M-A", "13.1%", "95.5%"]]
+    assert parse_leaderboard(harvey)["M-A"]["ci"] is None and parse_leaderboard(harvey)["M-A"]["value"] == 0.131, "a pass rate is not an interval"
+    briefcase = [["", "Creator", "Name", "Elo", "CI", "Release Date"], ["1", "Acme", "M-A", "1817", "-11 / +13", "Sep 2026"]]
+    assert parse_leaderboard(briefcase)["M-A"]["ci"] == "-11 / +13", "a CI column keeps its interval"
+    range_table = [["", "Range", "Model", "Elo"], ["1", "1-3", "M-A", "1197 \u00b133 95% interval 1163 to 1230"]]
+    assert parse_leaderboard(range_table)["M-A"]["value"] == 1197.0 and "95% interval" in parse_leaderboard(range_table)["M-A"]["ci"], "trailing text of the value cell stays the interval"
     print("selftest: ok — all-wrong sources yield mismatches; two-model ingest complete; numeric-row headers rejected; thead structural; identity fails closed; coverage is count-based with aliases; unit cells parse")
 
 
@@ -1038,6 +1072,14 @@ def run_fetch_selftest():
                 assert e.status == 404
             assert len(calls) == 1, f"a remembered 404 makes no network call: {calls}"
             assert load_404s()["/models/gone"]["status"] == 404
+            remember_404("/models/gone", "2026-10-16T00:00:00Z")
+            remember_404("/models/gone", "2026-10-17T00:00:00Z")
+            lines = NEG_FILE.read_text(encoding="utf-8").splitlines()
+            assert sum(1 for x in lines if '"/models/gone"' in x) == 1 and json.loads(next(x for x in lines if '"/models/gone"' in x))["at"] == "2026-10-17T00:00:00Z", "a repeated 404 replaces its line"
+            kept = load_404s()
+            NEG_FILE.write_text("", encoding="utf-8")
+            assert load_404s() == kept, "NEG_FILE is read once per process, not on every fetch"
+            remember_404("/models/gone", "2026-10-17T00:00:00Z")
             sleeps.clear(), calls.clear()
             script[:] = [(500, None), (429, 7), ok(59)]
             assert fetch_page("/models/flaky", "cohort", None).text == ok(59)
@@ -1069,7 +1111,7 @@ def run_fetch_selftest():
             except FetchError as e:
                 assert e.status == 403 and len(calls) == 1, "other 4xx is not retried"
             RAW.mkdir(parents=True, exist_ok=True)
-            NEG_FILE.write_text(json.dumps({"url": "/models/old-404", "at": "2020-01-01T00:00:00Z", "status": 404}) + "\n", encoding="utf-8")
+            remember_404("/models/old-404", "2020-01-01T00:00:00Z")
             calls.clear()
             script[:] = [ok(61)]
             g["NEG_MAX_AGE"] = 3600
@@ -1379,7 +1421,8 @@ def run_chart_diff(conn_factory, network):
     chartdiff.write_report(HERE / "reconcile.md", results, raw, verdict_line, nc, refetched, ran_at)
     checked = sum(r["checked"] for r in results.values())
     mism = sum(len(r["mismatches"]) for r in results.values())
-    write_verdict(ran_at, verdict_line, checked=checked, mismatches=mism, not_compared=nc[0], pages_refetched=len(refetched))
+    write_verdict(ran_at, verdict_line, checked=checked, mismatches=mism, not_compared=nc[0],
+                  leaderboard_not_compared=chartdiff.leaderboard_not_compared(results), pages_refetched=len(refetched))
     print(f"chart-diff: {verdict_line}; {checked} values compared across {len(results)} metric/path pairings; "
           f"{len(refetched)} pages re-fetched once for mismatches", flush=True)
     print(f"reconcile.md and verdict.json written under {HERE}", flush=True)
