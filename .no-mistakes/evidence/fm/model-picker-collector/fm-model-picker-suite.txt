@@ -1,0 +1,25 @@
+ok - model picker: fixture suite runs through the wrapper and writes nothing
+ok - model picker: data root follows FM_MODEL_PICKER_DATA, then the data directory, then FM_HOME
+ok - model picker: calibration tables come first and survive a matrix rebuild
+ok - model picker: seeded cache ingests by exact slug; a wrong table value blocks trust
+ok - model picker: an empty compared set reads not compared and stays UNTRUSTED
+ok - model picker: network off with an empty cache is a clean error
+ok - model picker: unit-bearing cells are stored as numbers with a unit; text rows stay out of the projections
+ok - model picker: a matrix rebuilt without chart-diff turns a TRUSTED verdict UNTRUSTED until chart-diff runs
+ok - model picker: each flag makes the network requests its header promises
+ok - model picker: coverage.md follows the cache, never an older database
+ok - model picker: a payload slug that is not a plain word is rejected, not written as a file name
+ok - model picker: an acquisition that fetched less than it set out to exits 4 once its outputs are written
+ok - model picker: a dropped connection is retried, not a traceback
+ok - model picker: scattered fetch failures exit 4, a cache-only sweep exits 0
+ok - model picker: the sweep's failure record lives in snapshot.json and the database carries no slug_status table
+ok - model picker: a compare page that does not parse is rejected, exits 4, and leaves the last good copy and projections
+ok - model picker: an unsupported-slug 404 still exits 0
+ok - model picker: an evaluation page, sitemap or catalog that does not parse is rejected and never replaces the cache
+ok - model picker: a model's attributes come from its newest cached page
+ok - model picker: a cohort model page that does not parse is rejected, exits 4, and leaves the previous facts
+ok - model picker: a chart-diff re-fetch must return the models the page names, else the mismatch stands
+ok - model picker: a cached page that earlier ingested and now does not exits 4 with a count line
+ok - model picker: the verdict names the leaderboard cells it did not compare; ci holds intervals only
+ok - model picker: repeated 404s keep one line per URL
+bash tests/fm-model-picker.test.sh  5.44s user 6.34s system 43% cpu 27.045 total

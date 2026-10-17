@@ -1,0 +1,38 @@
+snapshot.json written (live-revalidated); coverage and reconcile are recomputed from raw rows, not stored here
+coverage input: raw cache (0 observations)
+coverage (compute_coverage on raw rows): 37 tracked series, 0 with observations (0 partial: chart window only), 37 not yet captured: aa-briefcase-analytical-elo, aa-briefcase-elo, aa-briefcase-rubric, aa-lcr, aa3d, aaanalystagent, aime2025, apexagentsaa, automationbench-aa, critpt, enterpriseopsgymaa, frontiercode, gdppdf, gdpval-aa-elo, globalmmlulite, gpqadiamond, harveylabaa, humanityslastexam, ifbench, intelligence-index, itbenchaa, livecodebench, math500, mlcraa, mmlupro, mmmupro, omniscience-accuracy, omniscience-index, omniscience-non-hallucination-rate, openness-index, scicode, tau2bench, tau3banking, terminal-bench-4-0, terminalbench21, terminalbenchhard, terminalbenchscience
+INCOMPLETE: outputs were written, but 33 acquisition problems left them not fully fresh:
+  /evaluations/artificial-analysis-intelligence-index: <urlopen error [Errno 61] Connection refused>
+  /evaluations/artificial-analysis-openness-index: <urlopen error [Errno 61] Connection refused>
+  /evaluations/aa-briefcase: <urlopen error [Errno 61] Connection refused>
+  /evaluations/gdpval-aa: <urlopen error [Errno 61] Connection refused>
+  /evaluations/aa-3d: <urlopen error [Errno 61] Connection refused>
+  /evaluations/apex-agents-aa: <urlopen error [Errno 61] Connection refused>
+  /evaluations/aa-analyst-agent: <urlopen error [Errno 61] Connection refused>
+  /evaluations/automationbench-aa: <urlopen error [Errno 61] Connection refused>
+  /evaluations/harvey-lab-aa: <urlopen error [Errno 61] Connection refused>
+  /evaluations/gdp-pdf: <urlopen error [Errno 61] Connection refused>
+  /evaluations/enterprise-ops-gym-aa: <urlopen error [Errno 61] Connection refused>
+  /evaluations/terminalbench-4-0: <urlopen error [Errno 61] Connection refused>
+  /evaluations/terminal-bench-science: <urlopen error [Errno 61] Connection refused>
+  /evaluations/frontiercode: <urlopen error [Errno 61] Connection refused>
+  /evaluations/artificial-analysis-long-context-reasoning: <urlopen error [Errno 61] Connection refused>
+  /evaluations/omniscience: <urlopen error [Errno 61] Connection refused>
+  /evaluations/scicode: <urlopen error [Errno 61] Connection refused>
+  /evaluations/humanitys-last-exam: <urlopen error [Errno 61] Connection refused>
+  /evaluations/critpt: <urlopen error [Errno 61] Connection refused>
+  /evaluations/gpqa-diamond: <urlopen error [Errno 61] Connection refused>
+  /evaluations/itbench-aa: <urlopen error [Errno 61] Connection refused>
+  /evaluations/mmmu-pro: <urlopen error [Errno 61] Connection refused>
+  /evaluations/ifbench: <urlopen error [Errno 61] Connection refused>
+  /evaluations/mlcr-aa: <urlopen error [Errno 61] Connection refused>
+  /evaluations/tau3-banking: <urlopen error [Errno 61] Connection refused>
+  /evaluations/terminalbench-2-1: <urlopen error [Errno 61] Connection refused>
+  /evaluations/terminalbench-hard: <urlopen error [Errno 61] Connection refused>
+  /evaluations/tau2-bench: <urlopen error [Errno 61] Connection refused>
+  /evaluations/mmlu-pro: <urlopen error [Errno 61] Connection refused>
+  /evaluations/livecodebench: <urlopen error [Errno 61] Connection refused>
+  /evaluations/math-500: <urlopen error [Errno 61] Connection refused>
+  /evaluations/aime-2025: <urlopen error [Errno 61] Connection refused>
+  /evaluations/global-mmlu-lite: <urlopen error [Errno 61] Connection refused>
+outage(empty) exit=4

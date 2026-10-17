@@ -1,0 +1,10 @@
+[db] comparison-table: read 0, loaded 0
+[db] embedded: read 15100, loaded 15100
+[db] eval-leaderboard: read 902, loaded 902
+[db] rendered-chart: read 0, loaded 0
+[db] /Users/charlesabrooker/tmp/fm-mp.7OsQf8/live/aa.sqlite: 510 models, 43 metrics, 16002 observations; row counts per source match the counts read
+[db] cached compare pages quarantined: 0
+coverage (compute_coverage on raw rows): 40 tracked series, 38 with observations (33 partial: chart window only), 2 not yet captured: omniscience-accuracy, omniscience-non-hallucination-rate
+verdict.json is UNTRUSTED: matrix rebuilt without chart-diff; run --chartdiff to judge it
+[db] 121 per-candidate JSON projections written under /Users/charlesabrooker/tmp/fm-mp.7OsQf8/live/projection
+db exit=0

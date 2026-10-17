@@ -1,0 +1,37 @@
+[eval] artificial-analysis-intelligence-index: table=0 rendered_sections=0
+[eval] artificial-analysis-openness-index: table=326 rendered_sections=0
+[eval] aa-briefcase: table=231 rendered_sections=0
+[eval] gdpval-aa: table=296 rendered_sections=0
+[eval] aa-3d: table=22 rendered_sections=0
+[eval] apex-agents-aa: table=0 rendered_sections=0
+[eval] aa-analyst-agent: table=0 rendered_sections=0
+[eval] automationbench-aa: table=0 rendered_sections=0
+[eval] harvey-lab-aa: table=27 rendered_sections=0
+[eval] gdp-pdf: table=0 rendered_sections=0
+[eval] enterprise-ops-gym-aa: table=0 rendered_sections=0
+[eval] terminalbench-4-0: table=0 rendered_sections=0
+[eval] terminal-bench-science: table=0 rendered_sections=0
+[eval] frontiercode: table=0 rendered_sections=0
+[eval] artificial-analysis-long-context-reasoning: table=0 rendered_sections=0
+[eval] omniscience: table=0 rendered_sections=0
+[eval] scicode: table=0 rendered_sections=0
+[eval] humanitys-last-exam: table=0 rendered_sections=0
+[eval] critpt: table=0 rendered_sections=0
+[eval] gpqa-diamond: table=0 rendered_sections=0
+[eval] itbench-aa: table=0 rendered_sections=0
+[eval] mmmu-pro: table=0 rendered_sections=0
+[eval] ifbench: table=0 rendered_sections=0
+[eval] mlcr-aa: table=0 rendered_sections=0
+[eval] tau3-banking: table=0 rendered_sections=0
+[eval] terminalbench-2-1: table=0 rendered_sections=0
+[eval] terminalbench-hard: table=0 rendered_sections=0
+[eval] tau2-bench: table=0 rendered_sections=0
+[eval] mmlu-pro: table=0 rendered_sections=0
+[eval] livecodebench: table=0 rendered_sections=0
+[eval] math-500: table=0 rendered_sections=0
+[eval] aime-2025: table=0 rendered_sections=0
+[eval] global-mmlu-lite: table=0 rendered_sections=0
+snapshot.json written (live-revalidated); coverage and reconcile are recomputed from raw rows, not stored here
+coverage input: raw cache (16002 observations)
+coverage (compute_coverage on raw rows): 40 tracked series, 38 with observations (33 partial: chart window only), 2 not yet captured: omniscience-accuracy, omniscience-non-hallucination-rate
+FM_MODEL_PICKER_DATA=$T/live bin/fm-proc-budget.sh -- bin/fm-model-picker.sh   0.78s user 0.15s system 2% cpu 41.210 total
