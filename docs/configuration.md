@@ -84,6 +84,7 @@ Each effective `FM_HOME` contains private operational directories.
 - Host-local command durations in `command-durations.jsonl`, produced by `bin/fm-duration.py`; its header and help own timing calibration and repeated-timeout work publication.
 - The typed dispatch resolver's result log `dispatch-resolve.jsonl`, produced by `bin/fm-dispatch-resolve.sh`; the typed-resolution "Result log" owns its fields and the measurement.
 - Explicitly installed content-addressed extension packages under `data/extensions/packages/`.
+- The model picker's benchmark cache, database, and projections under `data/model-picker/`, produced by `bin/fm-model-picker.sh`; [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) owns its layout and the `FM_MODEL_PICKER_DATA` relocation.
 
 `state/` holds runtime records:
 
@@ -870,16 +871,10 @@ A reopen used only to retain an unanswered captain question preserves the finish
 ## Model-picker benchmark data (FM_MODEL_PICKER_DATA)
 
 [`bin/fm-model-picker.sh`](../bin/fm-model-picker.sh) collects Artificial Analysis benchmark data for the model picker.
-Its header owns the flags, the long-run guidance, and the exit codes; the code is `bin/fm_model_picker/`.
-A page enters `raw/` only if it parses, and a cached page is read only if it still parses.
-One rule judges the five page kinds: a comparison page needs a table, a payload, a matching header, and exactly the requested slugs (the chart-diff re-fetch included); an evaluation page needs a table or a payload; the sitemap needs `<loc>` entries; the selector catalog needs models; a cohort model page needs model facts.
-A page that does not parse is rejected, and the last good copy and its fetch time stay; a rejected sitemap or catalog is read from that copy, and with none the run ends with exit 2.
-Every `--db` and `--chartdiff` run prints how many cached comparison pages were quarantined, with their file names.
-The chart-diff verdict line states how many metrics and how many evaluation leaderboard cells it did not compare (cells for models outside a page's chart window are stored, not checked), so `TRUSTED` is never read as complete; `verdict.json` holds the cell count as `leaderboard_not_compared`.
+Its header and `--help` own the flags, the long-run guidance, the rule that decides which pages enter `raw/`, the quarantine report, what the chart-diff verdict line counts, and the exit codes; the code is `bin/fm_model_picker/`.
 A leaderboard row keeps `ci` only when the table's fifth column is headed CI or interval, or the value cell itself carries the interval; on other pages that column is another metric and `ci` is empty.
-Exit 4 means the outputs were written but the run was incomplete: an evaluation page or a cohort model page could not be fetched or did not parse (a 404 and, under `--embedded-only`, a cache miss both count), a comparison page failed with an error other than 404 or did not parse (a 404 there is a recorded unsupported slug), a sitemap or selector catalog was rejected, the sweep stopped after 3 straight fetch failures, or a cached comparison page that stamped rows in the previous `aa.sqlite` no longer ingests.
 The data root is `FM_MODEL_PICKER_DATA`, otherwise `model-picker/` under the home's data directory (`FM_DATA_OVERRIDE`, else `$FM_HOME/data`).
-The whole root is private and gitignored with `data/`.
+At its default location the whole root is private and gitignored with `data/`.
 
 | Path under the data root | Contents |
 | --- | --- |
@@ -3429,6 +3424,7 @@ FM_STATE_OVERRIDE=       # alternate state dir, mainly for tests
 FM_DATA_OVERRIDE=        # alternate data dir, mainly for tests
 FM_PROJECTS_OVERRIDE=    # alternate projects dir, mainly for tests
 FM_CONFIG_OVERRIDE=      # alternate config dir, mainly for tests
+FM_MODEL_PICKER_DATA=    # data root of the model-picker benchmark collector; unset means model-picker/ under the data directory (see "Model-picker benchmark data")
 FM_PROC_ROOT_OVERRIDE=   # alternate /proc root for Linux process-identity reads in fm-wake-lib.sh and fm-teardown.sh, mainly for tests
 FM_BACKEND=             # optional runtime backend override for new spawns; tmux/herdr/zellij/orca/cmux support ship/scout spawns, codex-app is not accepted
 FM_TRACE_CONTEXT=       # optional trace-context override; see "Trace context propagation"
@@ -3454,7 +3450,6 @@ FM_POLL=15              # seconds between watcher poll cycles
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600
-FM_MODEL_PICKER_DATA=    # data root of the model-picker benchmark collector; unset means model-picker/ under the data directory (see "Model-picker benchmark data")
 FM_OPEN_LOOPS_BIN=   # test seam: the reconciler the watcher launches instead of bin/fm-open-loops.sh
 FM_REVIEW_AGENT_SELECT_BIN=   # test seam: the dry-run selector the watcher's heartbeat launches instead of bin/fm-review-agent-select.sh
 FM_IDLE_REAP_INTERVAL=900   # seconds between the watcher's detached finished-session sweeps (bin/fm-idle-session-reap.sh); 0 turns the sweep off without changing its deadline; an unscheduled home waits one full interval, and watcher handoffs retain the deadline; invalid values use 900
