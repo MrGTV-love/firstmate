@@ -130,7 +130,7 @@ function mayRetry(cause: unknown): boolean {
 
 /**
  * Cuts `text` into at most MAX_CHUNKS pieces whose JSON-escaped size is at most `room` bytes.
- * Each piece starts up to `overlap` escaped bytes before the previous one ended and ends after a line break when one is near the end,
+ * Each piece starts up to `overlap` escaped bytes before the previous one ended,
  * so every span of up to `overlap` minus one character's escape width lies whole inside some piece. Returns null when no complete cover fits.
  */
 export function splitForRoom(text: string, room: number, overlap = CHUNK_OVERLAP_BYTES): string[] | null {
@@ -142,23 +142,15 @@ export function splitForRoom(text: string, room: number, overlap = CHUNK_OVERLAP
   for (;;) {
     let end = start;
     let used = 0;
-    let floor = -1;
-    while (end < points.length && used + sizes[end] <= room) {
-      if (floor < 0 && used >= room * 0.75) floor = end;
-      used += sizes[end++];
-    }
+    while (end < points.length && used + sizes[end] <= room) used += sizes[end++];
     if (end === points.length) {
       pieces.push(points.slice(start).join(""));
       return pieces;
     }
-    let cut = end;
-    for (let i = end; i > floor; i--) {
-      if (points[i - 1] === "\n") { cut = i; break; }
-    }
-    pieces.push(points.slice(start, cut).join(""));
+    pieces.push(points.slice(start, end).join(""));
     if (pieces.length >= MAX_CHUNKS) return null;
     let back = 0;
-    start = cut;
+    start = end;
     while (start > 0 && back + sizes[start - 1] <= overlap) back += sizes[--start];
   }
 }

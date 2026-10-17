@@ -2146,7 +2146,7 @@ For authorized screening, shell state contains the command and working directory
 These fields can contain worker prompt or instruction text, so guard calls can send that text to TypeSafe; the guard does not intentionally send the whole conversation or system prompt.
 Every request, including its pinned model and questions, must fit the code-owned UTF-8 byte ceiling of 16,384 bytes.
 A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling, never as a prefix standing in for the whole.
-Each piece ends after a line break when one is near its end and repeats the last 1,024 escaped bytes of the piece before it, so any span of up to 1,000 bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
+Each piece repeats the last 1,024 escaped bytes of the piece before it, so any span of up to 1,000 bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
 A payload that would need more than 16 pieces, about 230 KB of text, still requires review before anything is sent, and the never-send policy checks the whole payload before the first piece leaves.
 The pieces run together under the same 10-second and 25-second budgets and the same thresholds, and a payload passes only when every piece passes.
 A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.

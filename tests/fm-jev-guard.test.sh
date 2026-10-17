@@ -867,7 +867,6 @@ try {
 const room = MAX_REQUEST_BYTES - 900;
 const samples = {
   tokens: Array.from({ length: 6000 }, (_, i) => `<${i}>`).join(''),
-  lines: Array.from({ length: 6000 }, (_, i) => `<${i}>${i % 40 === 39 ? '\n' : ''}`).join(''),
   escapes: Array.from({ length: 5000 }, (_, i) => `é"\\<${i}>\t`).join(''),
   astral: Array.from({ length: 5000 }, (_, i) => `😀<${i}>`).join(''),
 };
@@ -879,6 +878,19 @@ for (const [name, text] of Object.entries(samples)) {
   assert.ok(pieces.every(piece => !/[\ud800-\udfff]/.test(piece.replace(/[\ud800-\udbff][\udc00-\udfff]/g, ''))), `${name}: a surrogate pair was split`);
 }
 assert.equal(splitForRoom('x', 100), null, 'no room beyond the overlap means no complete cover');
+
+// A span of 1,000 bytes lies whole inside one piece wherever the cut falls, including a cut through the middle of it.
+const tight = 2 * CHUNK_OVERLAP_BYTES + 64;
+for (const span of ['m'.repeat(1000), '😀'.repeat(250)]) {
+  let cutThrough = 0;
+  for (let at = tight - 1000; at <= tight; at++) {
+    const pieces = splitForRoom('a'.repeat(at) + span + 'b'.repeat(50), tight);
+    assert.equal(pieces.length, 2, `span at ${at}`);
+    assert.ok(pieces.some(piece => piece.includes(span)), `a 1,000-byte span at ${at} was cut`);
+    if (!pieces[0].includes(span)) cutThrough++;
+  }
+  assert.equal(cutThrough, 1000, 'the cut fell through the span at every offset but one');
+}
 
 // Pieces run together, so the deadlines of one request still hold: a stalled piece ends in a typed denial inside the 25-second handler budget.
 const stalled = splice('stall-direct');
