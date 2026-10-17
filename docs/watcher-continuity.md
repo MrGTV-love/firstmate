@@ -516,7 +516,7 @@ The file is size-capped through `FM_WATCH_CYCLE_LOG_MAX_BYTES` and `FM_WATCH_CYC
 ### Grace, beacon, and stop signals
 
 The default 300-second grace is unchanged.
-Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection.
+Only the main watcher shell touches `state/.last-watcher-beat`, at cycle boundaries, between poll stages and fleet items, between pending-reply records, and while actively waiting for a deadline-bounded custom or PR check or reboot-recovery inspection.
 Those intermediate touches are throttled to at most once per `min(15, grace / 3)` seconds, with a one-second floor.
 The main shell enforces each capture deadline even if its timeout controller stops responding.
 Home-summary publication runs separately so its inventory-sized work does not delay the main poll.

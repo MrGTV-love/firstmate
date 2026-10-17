@@ -50,8 +50,14 @@ _fm_pending_test_source_library() {
   . "$ROOT/bin/fm-pending-reply-lib.sh"
 }
 
+_fm_pending_test_source_timing() {
+  # shellcheck source=bin/fm-timing-lib.sh
+  . "$ROOT/bin/fm-timing-lib.sh"
+}
+
 _fm_pending_test_source_marker "$@"
 _fm_pending_test_source_library "$@"
+_fm_pending_test_source_timing "$@"
 
 SEND="$ROOT/bin/fm-send.sh"
 REPORT="$ROOT/bin/fm-secondmate-report.sh"
@@ -2224,6 +2230,214 @@ test_same_kind_escalation_reopens_after_operator_close() {
   pass "a same-kind escalation after an operator close opens the decision again"
 }
 
+# --- status scan cost -------------------------------------------------------
+#
+# The watcher's pending-reply pass scans a task's whole status log for each open
+# record, and a log can reach megabytes. The scan used to run the whole-word
+# check in a bash read loop whose command substitution forked once per line, so
+# one scan of a 4,852-line log took 12.5 s at load 33 and a pass over a few dozen
+# records outran the watcher's liveness grace. These tests hold the copy of that
+# per-line scan below as the oracle for what a status line resolves.
+
+reference_text_has_corr() {  # <text> <corr_id>
+  local text=$1 corr=$2 re
+  re="(^|[^[:alnum:]_])$(fm_pending_reply_corr_token "$corr")([^[:alnum:]_]|\$)"
+  [[ $text =~ $re ]]
+}
+
+reference_line_resolves() {  # <line> <corr_id>
+  local line=$1 corr=$2
+  [ -n "$line" ] && [ -n "$corr" ] || return 1
+  case "$line" in
+    *pending-reply-missed*) return 1 ;;
+  esac
+  reference_text_has_corr "$line" "$corr"
+}
+
+reference_find_resolve_line() {  # <status-file> <corr_id>
+  local status_file=$1 corr=$2 line
+  [ -f "$status_file" ] || return 0
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -n "$line" ] || continue
+    if reference_line_resolves "$line" "$corr"; then
+      printf '%s' "$line"
+      return 0
+    fi
+  done < "$status_file"
+  return 0
+}
+
+# Physical line numbers of every line the reference check resolves, space-joined.
+reference_resolving_line_numbers() {  # <status-file> <corr_id>
+  local status_file=$1 corr=$2 line line_no=0 found=
+  while IFS= read -r line || [ -n "$line" ]; do
+    line_no=$((line_no + 1))
+    reference_line_resolves "$line" "$corr" || continue
+    found="$found $line_no"
+  done < "$status_file"
+  printf '%s' "${found# }"
+}
+
+# A status log of <lines> lines, <width> bytes each, with a correlation token on
+# every 50th line and the target token on the last line.
+make_big_status() {  # <file> <lines> <width> <corr_id>
+  awk -v n="$2" -v w="$3" -v corr="$4" 'BEGIN {
+    pad = sprintf("%" w "s", ""); gsub(/ /, "x", pad)
+    for (i = 1; i <= n; i++) {
+      if (i % 50 == 0) printf "working [at=%d]: step %d corr=%016x noted %s\n", i, i, i + 4096, pad
+      else printf "working [at=%d]: step %d %s\n", i, i, pad
+    }
+    printf "done [at=%d]: finished corr=%s\n", n + 1, corr
+  }' > "$1"
+}
+
+SCAN_CASES=0
+assert_scan_matches_reference() {  # <status-file> <corr_id> <label>
+  local want got want_rc got_rc
+  want=$(reference_find_resolve_line "$1" "$2"; printf '.'); want_rc=$?
+  got=$(fm_pending_reply_find_resolve_line "$1" "$2"; printf '.'); got_rc=$?
+  [ "$got" = "$want" ] && [ "$got_rc" = "$want_rc" ] \
+    || fail "status scan differs from the per-line reference for $3: want '${want%.}' ($want_rc), got '${got%.}' ($got_rc)"
+  SCAN_CASES=$((SCAN_CASES + 1))
+}
+
+test_status_scan_matches_the_per_line_reference() {
+  local dir corr label content odd
+  dir="$TMP_ROOT/scan-equivalence"; mkdir -p "$dir"
+  corr=0123456789abcdef
+  SCAN_CASES=0
+  # label|status text; @C@ is the correlation id and the escapes are printf %b.
+  while IFS='|' read -r label content; do
+    printf '%b' "${content//@C@/$corr}" > "$dir/$label.status"
+    assert_scan_matches_reference "$dir/$label.status" "$corr" "$label"
+  done <<'EOF'
+plain|done [corr=@C@]: ok\n
+word-prefix|xcorr=@C@\n
+underscore-prefix|_corr=@C@\n
+hex-suffix|corr=@C@ff\n
+underscore-suffix|corr=@C@_\n
+line-start|corr=@C@ done\n
+line-end|done corr=@C@\n
+tab-bounded|done\tcorr=@C@\t.\n
+uppercase-id|corr=0123456789ABCDEF\n
+escalation-line|blocked [key=x]: pending-reply-missed: task=t corr=@C@\n
+blank-lines-first|\n\n[corr=@C@]\n
+no-trailing-newline|working\ndone corr=@C@
+crlf|done corr=@C@\r\n
+first-of-two|a corr=@C@ first\nb corr=@C@ second\n
+decoys-then-match|xcorr=@C@\nacorr=@C@\ncorr=@C@x\nreal (corr=@C@)\n
+other-id|done corr=fedcba9876543210\n
+non-utf8-bytes|\0377\0376 corr=@C@ \0200\n
+empty-file|
+EOF
+  assert_scan_matches_reference "$dir/absent.status" "$corr" "a missing file"
+  assert_scan_matches_reference "$dir/plain.status" "" "an empty id"
+  # An id with regex syntax is not a literal token: it keeps the regex meaning
+  # the per-line check always gave it.
+  printf 'corr=axb\ncorr=a.b\ncorr=cd\ncorr=aaa\n' > "$dir/odd.status"
+  for odd in 'a.b' 'ab|cd' 'a+' 'a[x]b' 'corr'; do
+    assert_scan_matches_reference "$dir/odd.status" "$odd" "the id '$odd'"
+  done
+  [ "$SCAN_CASES" -ge 24 ] || fail "status scan equivalence ran only $SCAN_CASES cases"
+  pass "the status scan resolves exactly the lines the per-line scan resolved"
+}
+
+test_wrong_home_scan_matches_the_per_line_reference() {
+  local home state sm_home corr rec status base want want_hits sightings line_no
+  home=$(setup_parent wrong-home-scan)
+  state="$home/state"
+  sm_home="$TMP_ROOT/sm-scan-home-$RANDOM"
+  mkdir -p "$sm_home/state"
+  export FM_PENDING_REPLY_NOW=8100
+  corr=$(fm_pending_reply_create "$home" "$state" "hibit" "report to parent")
+  fm_pending_reply_mark_delivered "$state" "$corr"
+  printf 'working\n\ndone [corr=%s]: first\nxcorr=%s\nworking\ncorr=%sff\n(corr=%s) second\nblocked: pending-reply-missed corr=%s\ncorr=%s' \
+    "$corr" "$corr" "$corr" "$corr" "$corr" "$corr" > "$sm_home/state/hibit.status"
+  printf 'x\ny\n\n\ndone corr=%s other file\n' "$corr" > "$sm_home/state/other.status"
+  printf 'nothing here\n' > "$sm_home/state/quiet.status"
+  want= want_hits=0
+  for status in "$sm_home"/state/*.status; do
+    base=$(fm_pending_reply_sighting_encode "$status" 0) || continue
+    base=${base%:0}
+    for line_no in $(reference_resolving_line_numbers "$status" "$corr"); do
+      want="${want:+$want,}$base:$line_no"
+      want_hits=$((want_hits + 1))
+    done
+  done
+  [ "$want_hits" = 4 ] || fail "wrong-home fixture should hold four reports, reference found $want_hits"
+  fm_pending_reply_detect_wrong_home "$state" "$corr" "$sm_home" || fail "wrong-home detect failed"
+  rec=$(fm_pending_reply_path "$state" "$corr")
+  sightings=$(fm_pending_reply_get "$rec" wrong_home_sightings)
+  [ "$sightings" = "$want" ] \
+    || fail "wrong-home sightings differ from the per-line reference: want '$want', got '$sightings'"
+  [ "$(fm_pending_reply_get "$rec" wrong_home_hits)" = "$want_hits" ] \
+    || fail "wrong-home hit count differs from the per-line reference"
+  pass "the wrong-home scan reports exactly the lines and line numbers the per-line scan did"
+}
+
+test_status_scan_is_cheap_on_a_large_log() {
+  local dir corr file want got ref_start ref_ms new_ms best i t0 t1
+  dir="$TMP_ROOT/scan-cost"; mkdir -p "$dir"
+  corr=0123456789abcdef
+  file="$dir/big.status"
+  make_big_status "$file" 2000 300 "$corr"
+  [ "$(wc -l < "$file" | tr -d ' ')" = 2001 ] || fail "large status fixture is incomplete"
+  ref_start=$(fm_timing_now_ms)
+  want=$(reference_find_resolve_line "$file" "$corr")
+  ref_ms=$(( $(fm_timing_now_ms) - ref_start ))
+  best=
+  i=0
+  while [ "$i" -lt 3 ]; do
+    t0=$(fm_timing_now_ms)
+    got=$(fm_pending_reply_find_resolve_line "$file" "$corr")
+    t1=$(fm_timing_now_ms)
+    new_ms=$((t1 - t0))
+    if [ -z "$best" ] || [ "$new_ms" -lt "$best" ]; then best=$new_ms; fi
+    i=$((i + 1))
+  done
+  [ "$got" = "$want" ] || fail "large-log scan found '$got', the per-line reference found '$want'"
+  case "$got" in *"corr=$corr") ;; *) fail "large-log scan missed the last line: '$got'" ;; esac
+  # Both timings come from this host at this moment, so host load cancels out.
+  [ $((best * 8)) -lt "$ref_ms" ] \
+    || fail "a 2,000-line status scan took ${best} ms against ${ref_ms} ms for the per-line scan"
+  pass "a large status log scans at least eight times faster than the per-line scan (${best} ms against ${ref_ms} ms)"
+}
+
+# The tick is the long pass in the watcher prelude. It runs in the watcher's main
+# shell, so it must refresh the liveness beacon between records or a pass that
+# outruns the grace looks like a dead watcher (the 23:31 and 23:47 stops).
+test_tick_beats_between_records() {
+  (
+    local home state tasks i task corr beats caller_subshell
+    home=$(setup_parent tick-beat)
+    state="$home/state"
+    # shellcheck disable=SC2030,SC2031
+    export FM_PENDING_REPLY_NOW=10200
+    tasks=12
+    i=0
+    while [ "$i" -lt "$tasks" ]; do
+      task="beat$i"
+      corr=$(fm_pending_reply_create "$home" "$state" "$task" "open request $i")
+      fm_pending_reply_mark_delivered "$state" "$corr"
+      make_big_status "$state/$task.status" 400 200 "ffffffffffffff$(printf '%02x' "$i")"
+      i=$((i + 1))
+    done
+    beats="$home/beats.log"
+    : > "$beats"
+    # shellcheck disable=SC2329
+    watcher_beat() {
+      printf '%s\n' "$BASH_SUBSHELL" >> "$beats"
+    }
+    caller_subshell=$BASH_SUBSHELL
+    fm_pending_reply_tick "$state" || fail "tick failed"
+    [ "$(wc -l < "$beats" | tr -d ' ')" -ge "$tasks" ] \
+      || fail "the tick beat $(wc -l < "$beats" | tr -d ' ') times for $tasks open records"
+    [ "$(sort -u "$beats")" = "$caller_subshell" ] \
+      || fail "the tick beat from a nested shell, where the watcher's beat is a no-op: $(sort -u "$beats" | tr '\n' ' ')"
+  ) || fail "tick beacon regression failed"
+  pass "the tick refreshes the watcher beacon once per record from its own shell"
+}
+
 # --- run --------------------------------------------------------------------
 
 test_normal_correlated_reply_resolves_once
@@ -2276,5 +2490,9 @@ test_remote_parent_replies_is_not_wrong_home
 test_local_parent_replies_is_wrong_home_evidence
 test_escalated_undelivered_correlation_stays_retryable
 test_same_kind_escalation_reopens_after_operator_close
+test_status_scan_matches_the_per_line_reference
+test_wrong_home_scan_matches_the_per_line_reference
+test_status_scan_is_cheap_on_a_large_log
+test_tick_beats_between_records
 
 printf 'ok - all pending-reply tests passed\n'

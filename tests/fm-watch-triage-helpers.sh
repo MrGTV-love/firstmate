@@ -5719,6 +5719,72 @@ test_term_stops_a_watcher_blocked_inside_a_poll() {
   pass "a stuck pane capture goes stale; TERM stops its watcher and runs cleanup"
 }
 
+# --- the pending-reply pass keeps the beacon fresh --------------------------
+# Incident: the watcher's pending-reply pass (prelude step 3) walked dozens of
+# open records, each scanning a megabyte status log with a fork per line, and
+# beat only between prelude steps. Two watchers published their start beat, then
+# nothing for the whole pass, and the watchdog stopped each as stale. The pass
+# must beat between records so a slow one is told apart from a stuck one. A beat
+# from anywhere but the watcher's main shell is silently dropped, so the proof
+# is the real watcher's beacon file advancing while its step-3 marker is still set.
+
+test_pending_reply_pass_keeps_the_beacon_fresh() {
+  local dir state fakebin out pid i task corr home marker stamp stamps= distinct=0 start elapsed
+  dir=$(make_case pending-reply-pass-beacon); state="$dir/state"; fakebin="$dir/fakebin"
+  out="$dir/watch.out"; marker="$state/.prelude-progress"
+  # Every capture the pass makes takes one second while step 3 is running, as a
+  # slow backend or a loaded host would make it.
+  mv "$fakebin/tmux" "$fakebin/tmux.real"
+  cat > "$fakebin/tmux" <<SH
+#!/usr/bin/env bash
+if [ "\$(cat "$marker" 2>/dev/null)" = 3 ]; then
+  command sleep 1
+fi
+exec "$fakebin/tmux.real" "\$@"
+SH
+  chmod +x "$fakebin/tmux"
+  i=0
+  while [ "$i" -lt 8 ]; do
+    task="beat$i"
+    home="$dir/home-$task"; mkdir -p "$home/state"
+    fm_write_secondmate_meta "$state/$task.meta" "$home" "test:fm-$task"
+    corr=$(FM_PENDING_REPLY_NOW=1000 bash -c '. "$1"; fm_pending_reply_create "$2" "$3" "$4" "open request"' \
+      _ "$ROOT/bin/fm-pending-reply-lib.sh" "$dir" "$state" "$task")
+    FM_PENDING_REPLY_NOW=1000 bash -c '. "$1"; fm_pending_reply_mark_delivered "$2" "$3"' \
+      _ "$ROOT/bin/fm-pending-reply-lib.sh" "$state" "$corr" || fail "could not deliver the fixture request"
+    # A 1,500-line status log that never carries this request's token.
+    awk -v n=1500 'BEGIN { pad = sprintf("%200s", ""); gsub(/ /, "x", pad)
+      for (i = 1; i <= n; i++) printf "working [at=%d]: step %d %s\n", i, i, pad }' > "$state/$task.status"
+    printf '%s' "$(seen_sig "$state/$task.status")" > "$state/.seen-${task}_status"
+    i=$((i + 1))
+  done
+  watch_bg "$state" "$fakebin" "$out" env FM_GUARD_GRACE=6 FM_PENDING_REPLY_GRACE_SECS=999999
+  pid=$!
+  i=0
+  while [ "$(cat "$marker" 2>/dev/null)" != 3 ] && [ "$i" -lt 300 ]; do
+    is_live_non_zombie "$pid" || break
+    sleep 0.1
+    i=$((i + 1))
+  done
+  [ "$(cat "$marker" 2>/dev/null)" = 3 ] || { reap "$pid"; fail "the watcher never reached the pending-reply pass: $(cat "$out")"; }
+  start=$SECONDS
+  while [ "$(cat "$marker" 2>/dev/null)" = 3 ] && is_live_non_zombie "$pid" && [ "$((SECONDS - start))" -lt 90 ]; do
+    stamp=$(file_mtime "$state/.last-watcher-beat")
+    case " $stamps " in
+      *" $stamp "*) ;;
+      *) stamps="$stamps $stamp"; distinct=$((distinct + 1)) ;;
+    esac
+    sleep 0.2
+  done
+  elapsed=$((SECONDS - start))
+  reap "$pid"
+  [ "$elapsed" -ge 4 ] || fail "the pending-reply pass took ${elapsed}s, too short to show whether it beats"
+  [ "$distinct" -ge 3 ] \
+    || fail "the beacon moved $distinct time(s) during a ${elapsed}s pending-reply pass; a pass longer than the grace looks like a dead watcher"
+  ack_stopped_cycle "$state" || fail "could not acknowledge the stop of the watcher"
+  pass "the pending-reply pass beats between records (${distinct} beacon updates in ${elapsed}s)"
+}
+
 # --- held downtime-marker lock must not wedge a TERM'd watcher -------------
 # fm-watch-triage-r1 flake (serial-1 CI): the EXIT cleanup publishes the
 # downtime marker under .watcher-down.lock through an unbounded acquire, so a

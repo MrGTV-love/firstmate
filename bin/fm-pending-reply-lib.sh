@@ -132,6 +132,7 @@ _FM_PENDING_REPLY_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/n
 
 FM_PENDING_REPLY_SCHEMA='fm-pending-reply.v1'
 FM_PENDING_REPLY_CORR_RE='corr=[A-Fa-f0-9]{16}'
+FM_PENDING_REPLY_CORR_PREFIX='corr='
 FM_PENDING_REPLY_GRACE_DEFAULT=120
 
 # Keep each import at its caller's dynamic scope and run its initialization on
@@ -191,7 +192,7 @@ fm_pending_reply_new_id() {
 }
 
 fm_pending_reply_corr_token() {  # <corr_id>
-  printf 'corr=%s' "$1"
+  printf '%s%s' "$FM_PENDING_REPLY_CORR_PREFIX" "$1"
 }
 
 # Extract the first corr=<16hex> token from free text, or empty.
@@ -202,9 +203,11 @@ fm_pending_reply_extract_corr() {  # <text>
 
 # 0 if <text> carries the exact correlation token for <corr_id>, as a whole
 # word: xcorr=<id> or corr=<id>ff is a different token, not this one.
+# The token is spelled from the prefix instead of fm_pending_reply_corr_token:
+# a command substitution here would fork once per status line scanned.
 fm_pending_reply_text_has_corr() {  # <text> <corr_id>
   local text=$1 corr=$2 re
-  re="(^|[^[:alnum:]_])$(fm_pending_reply_corr_token "$corr")([^[:alnum:]_]|\$)"
+  re="(^|[^[:alnum:]_])${FM_PENDING_REPLY_CORR_PREFIX}${corr}([^[:alnum:]_]|\$)"
   [[ $text =~ $re ]]
 }
 
@@ -600,17 +603,34 @@ fm_pending_reply_line_resolves() {  # <line> <corr_id>
   fm_pending_reply_text_has_corr "$line" "$corr"
 }
 
+# Print "<line-number>:<line>" for each line of a status file that can carry
+# <corr_id>'s token, in file order. One grep replaces a bash read loop that ran
+# the whole-word check, and so forked, on every line of a status file that can
+# be megabytes; the callers still run that exact check on each candidate line.
+# A literal token is the only thing the check can match when the id is made of
+# word characters, as every real correlation id is. Any other id may carry regex
+# syntax, so it keeps every line as a candidate.
+_fm_pending_reply_corr_candidates() {  # <status-file> <corr_id>
+  local status_file=$1 corr=$2
+  case "$corr" in
+    '') return 0 ;;
+    *[!A-Za-z0-9_]*) LC_ALL=C grep -na '' -- "$status_file" 2>/dev/null ;;
+    *) LC_ALL=C grep -naF -- "${FM_PENDING_REPLY_CORR_PREFIX}${corr}" "$status_file" 2>/dev/null ;;
+  esac
+  return 0
+}
+
 # Scan a status file for a correlated resolve. Prints the matching line or empty.
 fm_pending_reply_find_resolve_line() {  # <status-file> <corr_id>
-  local status_file=$1 corr=$2 line
+  local status_file=$1 corr=$2 candidate line
   [ -f "$status_file" ] || return 0
-  while IFS= read -r line || [ -n "$line" ]; do
-    [ -n "$line" ] || continue
+  while IFS= read -r candidate; do
+    line=${candidate#*:}
     if fm_pending_reply_line_resolves "$line" "$corr"; then
       printf '%s' "$line"
       return 0
     fi
-  done < "$status_file"
+  done < <(_fm_pending_reply_corr_candidates "$status_file" "$corr")
   return 0
 }
 
@@ -1349,7 +1369,7 @@ _fm_pending_reply_maybe_escalate_locked() {  # <state-dir> <corr_id>
 # parent-replies.status is its parent channel, not a stranded self-home file.
 fm_pending_reply_detect_wrong_home() {  # <state-dir> <corr_id> <secondmate-home>
   local state=$1 corr=$2 sm_home=$3
-  local rec delivered hits first sightings snapshot previous status_file line line_no sighting_base sighting_id phase changed=0
+  local rec delivered hits first sightings snapshot previous status_file candidate line line_no sighting_base sighting_id phase changed=0
   local remote_parent_channel=0
   rec=$(fm_pending_reply_path "$state" "$corr")
   [ -f "$rec" ] || return 1
@@ -1380,9 +1400,9 @@ fm_pending_reply_detect_wrong_home() {  # <state-dir> <corr_id> <secondmate-home
     fi
     sighting_base=$(fm_pending_reply_sighting_encode "$status_file" 0) || continue
     sighting_base=${sighting_base%:0}
-    line_no=0
-    while IFS= read -r line || [ -n "$line" ]; do
-      line_no=$((line_no + 1))
+    while IFS= read -r candidate; do
+      line_no=${candidate%%:*}
+      line=${candidate#*:}
       fm_pending_reply_line_resolves "$line" "$corr" || continue
       sighting_id="$sighting_base:$line_no"
       [ -n "$first" ] || first=$sighting_id
@@ -1396,7 +1416,7 @@ fm_pending_reply_detect_wrong_home() {  # <state-dir> <corr_id> <secondmate-home
       fi
       hits=$((hits + 1))
       changed=1
-    done < "$status_file"
+    done < <(_fm_pending_reply_corr_candidates "$status_file" "$corr")
   done
   if [ -n "$first" ] && [ -z "$(fm_pending_reply_get "$rec" wrong_home_first_sighting)" ]; then
     fm_pending_reply_set "$rec" wrong_home_first_sighting "$first" || return 1
@@ -1529,6 +1549,15 @@ _fm_pending_reply_select_needing_work() {  # <record-path>...
   '
 }
 
+# The watcher runs the tick from its main shell, where watcher_beat keeps the
+# liveness beacon fresh between records so a long pass is not mistaken for a
+# stalled watcher. Every other caller defines no watcher_beat and this is a no-op.
+_fm_pending_reply_beat() {
+  if declare -F watcher_beat >/dev/null 2>&1; then
+    watcher_beat
+  fi
+}
+
 # Scan every pending record for this parent state. Safe to call every poll.
 # Never scrapes secondmate conversation; uses only parent status, backend busy
 # state, and optional secondmate-home wrong-home path checks. Records are
@@ -1558,6 +1587,7 @@ fm_pending_reply_tick() {  # <state-dir>
     selected+=("$rec")
   done < <(_fm_pending_reply_select_needing_work ${records[@]+"${records[@]}"})
   for rec in ${selected[@]+"${selected[@]}"}; do
+    _fm_pending_reply_beat
     # Records are replaced atomically. Read one snapshot with builtins instead
     # of spawning a field-reader pipeline for every retained completed reply.
     corr='' task_id='' phase='' escalated='' closed=''
