@@ -2,7 +2,7 @@
 # Exercise the real spawn entrypoint and terminal with a fake process-leased get.
 # The herdr argument uses a generated, guarded lab session; the default uses private tmux.
 # FM_TEST_ACQUISITION_CASES=contention runs the successful sibling and contention only.
-# The late, laterexit, clock and gone cases read the pane's foreground process and run on tmux only.
+# The late, laterexit, earlyexit, clock and gone cases read the pane's foreground process and run on tmux only.
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -94,7 +94,10 @@ if [ "\$MODE" = late ] || [ "\$MODE" = laterexit ]; then
   # Take longer than the old 60-poll window: wait for 75 one-second polls.
   while [ "\$(wc -l < "\$TICKS")" -lt 75 ]; do /bin/sleep 0.02; done
 fi
-if [ "\$MODE" = exits ] || [ "\$MODE" = laterexit ]; then
+if [ "\$MODE" = earlyexit ]; then
+  while [ "\$(wc -l < "\$TICKS" 2>/dev/null || echo 0)" -lt 1 ]; do /bin/sleep 0.02; done
+fi
+if [ "\$MODE" = exits ] || [ "\$MODE" = laterexit ] || [ "\$MODE" = earlyexit ]; then
   rm -f "\$LEASE"
   echo 'treehouse: simulated failure' >&2
   exit 1
@@ -195,9 +198,9 @@ sleep() {
   command sleep "$@"
 }
 SH
-for MODE in success slow spawning foreign dirty late laterexit clock gone; do
+for MODE in success slow spawning foreign dirty late laterexit earlyexit clock gone; do
   [ "${FM_TEST_ACQUISITION_CASES:-all}" != contention ] || [ "$MODE" = success ] || continue
-  case "$MODE" in late|laterexit|clock|gone) [ "$BACKEND" = tmux ] || continue ;; esac
+  case "$MODE" in late|laterexit|earlyexit|clock|gone) [ "$BACKEND" = tmux ] || continue ;; esac
   ID="get-cleanup-$MODE-$$"
   CASE="$TMP_ROOT/case-$MODE"
   mkdir -p "$CASE"
@@ -245,28 +248,33 @@ for MODE in success slow spawning foreign dirty late laterexit clock gone; do
   fi
   [ "$rc" -ne 0 ] || fail "$MODE spawn unexpectedly launched: $out"
   case "$MODE" in
-    slow)
-      assert_contains "$out" 'did not enter an isolated worktree within 120s' 'missing deadline refusal'
-      [ "$(wc -l < "$TICKS")" -ge 100 ] || fail "a running get was abandoned after $(wc -l < "$TICKS") polls: $out"
+    slow) assert_contains "$out" 'did not enter an isolated worktree after 120 polls (window 120s)' 'missing ceiling refusal' ;;
+    # Whether or not a read catches the get alive, the loop ends on the 60th poll in the base window.
+    spawning) assert_contains "$out" 'did not enter an isolated worktree after 60 polls (window 60s)' 'missing deadline refusal' ;;
+    earlyexit)
+      # The get is alive for the first poll, then exits with the pane still in the
+      # project: the extension never carries past the get, so the base window ends the wait.
+      assert_contains "$out" 'did not enter an isolated worktree after 60 polls (window 60s)' 'missing deadline refusal'
       ;;
-    spawning) assert_contains "$out" 'did not enter an isolated worktree within 60s' 'missing deadline refusal' ;;
     laterexit)
       # The get ran past the 60-poll window, then exited with the pane still in the
-      # project: the refusal names the extended window the wait reached.
-      assert_contains "$out" 'did not enter an isolated worktree within 120s' 'missing extended-window refusal'
-      [ "$(wc -l < "$TICKS")" -ge 75 ] || fail "a get that ran 75 polls was abandoned after $(wc -l < "$TICKS") polls: $out"
+      # project: the refusal counts the polls waited and names the base window that applied last.
+      [[ $out =~ did\ not\ enter\ an\ isolated\ worktree\ after\ ([0-9]+)\ polls\ \(window\ 60s\) ]] \
+        || fail "missing refusal naming the base window after the get stopped: $out"
+      [ "${BASH_REMATCH[1]}" -ge 75 ] && [ "${BASH_REMATCH[1]}" -lt 120 ] \
+        || fail "a get that ran 75 polls was refused after ${BASH_REMATCH[1]} polls: $out"
       ;;
     clock)
       # 3 s per poll reaches the 120 s wall-clock ceiling near poll 40, well before the 120th.
-      assert_contains "$out" 'did not enter an isolated worktree within 120s' 'missing ceiling refusal'
-      [ "$(wc -l < "$TICKS")" -ge 30 ] && [ "$(wc -l < "$TICKS")" -lt 60 ] \
-        || fail "wall-clock ceiling ended the extended wait after $(wc -l < "$TICKS") polls: $out"
+      [[ $out =~ did\ not\ enter\ an\ isolated\ worktree\ after\ ([0-9]+)\ polls\ \(window\ 120s\) ]] \
+        || fail "missing ceiling refusal: $out"
+      [ "${BASH_REMATCH[1]}" -ge 30 ] && [ "${BASH_REMATCH[1]}" -lt 60 ] \
+        || fail "wall-clock ceiling ended the extended wait after ${BASH_REMATCH[1]} polls: $out"
       ;;
     gone)
       # The get exited and the pane sits at a shell in the project: the 60-poll base
       # window runs to its end however long each poll took on the clock.
-      assert_contains "$out" 'did not enter an isolated worktree within 60s' 'missing deadline refusal'
-      [ "$(wc -l < "$TICKS")" -ge 55 ] || fail "base window was cut after $(wc -l < "$TICKS") polls: $out"
+      assert_contains "$out" 'did not enter an isolated worktree after 60 polls (window 60s)' 'missing deadline refusal'
       ;;
     foreign) assert_contains "$out" 'could not pre-register Claude workspace trust' 'missing foreign-copy refusal' ;;
     dirty) assert_contains "$out" 'not clean' 'missing post-acquisition refusal' ;;
@@ -387,11 +395,11 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
     || fail 'contention B projected under the wrong exact parent workspace'
   touch "$A_POLL_READY"
   for _ in $(seq 1 3000); do
-    grep -Fq 'did not enter an isolated worktree within 120s' "$A_OUT" && break
+    grep -Fq 'did not enter an isolated worktree after 120 polls (window 120s)' "$A_OUT" && break
     kill -0 "$A_SPAWN_PID" 2>/dev/null || break
     /bin/sleep 0.02
   done
-  assert_contains "$(cat "$A_OUT")" 'did not enter an isolated worktree within 120s' 'contention A missed the isolation refusal'
+  assert_contains "$(cat "$A_OUT")" 'did not enter an isolated worktree after 120 polls (window 120s)' 'contention A missed the isolation refusal'
   touch "$A_CLEANUP_WATCH"
   for _ in $(seq 1 1000); do
     [ ! -e "$A_CLEANUP_WAIT" ] || break

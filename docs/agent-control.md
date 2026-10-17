@@ -367,7 +367,8 @@ The base window is 60 polls, one second apart.
 While the pane's foreground process shows `treehouse get` still running (tmux and Herdr), the spawn extends the wait to a ceiling of 120 seconds of wall clock, so the worst case stays bounded.
 A read that cannot tell keeps the window the previous read chose; a read that shows only shells sets the base window again.
 When the foreground cannot be read, as on zellij and cmux, the wait stays at the 60 polls.
-A refusal says `within 60s` or `within 120s`, the longest window the wait reached, and names the last path seen, why it was rejected, and the spawning project.
+A refusal says how many polls it waited and the window in force when the wait ended, as in `after 60 polls (window 60s)` or `after 120 polls (window 120s)`, and names the last path seen, why it was rejected, and the spawning project.
+A get that runs past 60 polls and then stops ends with the base window again, so its refusal reads, for example, `after 76 polls (window 60s)`: the poll count is what was waited, and the window is the one in force at the end.
 
 The 120 seconds is a chosen bound, not a measured value.
 It is about 1.6 times the 73.15 seconds at which the 2026-10-16 start was refused and about 3.4 times the longest wait in the table below.
