@@ -3514,6 +3514,7 @@ FM_CREW_STATE_RUNS_LIMIT=200  # plain runs-ledger rows scanned for fallback attr
 FM_CREW_STATE_NM_CACHE=on   # off makes every no-mistakes read inside fm-crew-state.sh fresh; the per-task read cache's contract is owned by bin/fm-nm-read-cache-lib.sh
 FM_CREW_STATE_NM_CACHE_TTL=30   # seconds a live run's cached answer stays in force, 1..300; a newer state/<id>.status or state/<id>.progress drops it sooner, and a finished run's answer is kept until its run id changes
 FM_CREW_STATE_NM_CACHE_FAIL_TTL=3   # seconds a failed, timed-out or unknown answer is replayed as the failure it was, 0..30; 0 caches none
+FM_CREW_STATE_NM_CACHE_NOW=   # test override for the read cache's clock, in epoch seconds; leave unset in operation
 FM_TEARDOWN_NM_RUNS_LIMIT=200  # recent no-mistakes run rows scanned to prove an unresolved-head parked run belongs to teardown's task
 FM_TEARDOWN_VERNANT_PYTHON=     # interpreter for Vernant's closeout driver; default <slot>/.venv/bin/python, and the driver step is skipped (and its copy refuses) when it is absent
 FM_CREW_STATE_BIN=bin/fm-crew-state.sh   # test override for the current-state reader used by watcher triage: the working/paused classification, and the wedge timer's parked-gate wait evidence; `fm-control exit` reads it too for the finished-task check on Claude's exit picker

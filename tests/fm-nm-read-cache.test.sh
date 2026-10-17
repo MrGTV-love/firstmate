@@ -145,10 +145,12 @@ calls() {  # <case-dir> -> number of no-mistakes calls so far
   printf '%s\n' "${n//[[:space:]]/}"
 }
 
-# One crew-state read through <crew-state script>, with the case's fakes.
+# One crew-state read through <crew-state script>, with the case's fakes. The
+# cache's clock reads CLOCK, which a case advances instead of sleeping.
+CLOCK=1800000000
 read_state() {  # <case-dir> <crew-state-script>
   FM_FAKE_NM_DIR="$1/nmfake" NM_HOME="$1/nm" PATH="$1/fakebin:$PATH" \
-    FM_STATE_OVERRIDE="$1/state" "$2" cached 2>/dev/null
+    FM_CREW_STATE_NM_CACHE_NOW=$CLOCK FM_STATE_OVERRIDE="$1/state" "$2" cached 2>/dev/null
 }
 
 # Age the status log so an entry written now is strictly newer than it.
@@ -212,10 +214,13 @@ case_live_entry_expires() {  # <crew-state script> <name>
   d=$(new_case "$2")
   age_status_log "$d"
   serve_run "$d" 01RUN running
-  FM_CREW_STATE_NM_CACHE_TTL=2 read_state "$d" "$1" >/dev/null
+  read_state "$d" "$1" >/dev/null
   before=$(calls "$d")
-  sleep 3
-  FM_CREW_STATE_NM_CACHE_TTL=2 read_state "$d" "$1" >/dev/null
+  CLOCK=$(( CLOCK + 29 ))
+  read_state "$d" "$1" >/dev/null
+  assert_equals "$before" "$(calls "$d")" 'a live entry inside its time limit is kept'
+  CLOCK=$(( CLOCK + 1 ))
+  read_state "$d" "$1" >/dev/null
   assert_equals "$(( before * 2 ))" "$(calls "$d")" 'a live entry past its time limit is read again'
   pass "$2: a live entry expires after its time limit"
 }
@@ -227,10 +232,10 @@ case_finished_run_is_kept_until_the_id_changes() {  # <crew-state script> <name>
   d=$(new_case "$2")
   age_status_log "$d"
   serve_run "$d" 01RUN completed passed
-  out1=$(FM_CREW_STATE_NM_CACHE_TTL=1 read_state "$d" "$1")
+  out1=$(read_state "$d" "$1")
   first=$(calls "$d")
-  sleep 2
-  out2=$(FM_CREW_STATE_NM_CACHE_TTL=1 read_state "$d" "$1")
+  CLOCK=$(( CLOCK + 100000 ))
+  out2=$(read_state "$d" "$1")
   assert_contains "$out1" 'state: done' 'a passed run reads as done'
   assert_equals 3 "$first" 'a cold finished read makes the three calls'
   assert_equals "$first" "$(calls "$d")" 'a finished run is not read again, even past the live time limit'
@@ -241,7 +246,7 @@ case_finished_run_is_kept_until_the_id_changes() {  # <crew-state script> <name>
   printf 'count: 2 of 2 total\nruns[2]{id,branch,status,head,pr}:\n  "01NEW",%s,running,%s,""\n  "01RUN",%s,completed,%s,""\n' \
     "$BRANCH" "$(cut -c1-8 "$d/head")" "$BRANCH" "$(cut -c1-8 "$d/head")" > "$d/nmfake/overview"
   db_set_runs "$d" 01RUN:completed:1 01NEW:running:2
-  out3=$(FM_CREW_STATE_NM_CACHE_TTL=1 read_state "$d" "$1")
+  out3=$(read_state "$d" "$1")
   assert_contains "$out3" 'state: working' 'a new run on the branch is read, not the finished one'
   assert_contains "$out3" '01NEW' 'the new run is named'
   pass "$2: a finished run is cached until a newer run replaces it"
@@ -268,15 +273,16 @@ case_failure_is_not_served_as_success() {  # <crew-state script> <name>
   age_status_log "$d"
   serve_run "$d" 01RUN running
   printf 1 > "$d/nmfake/run-01RUN.rc"
-  out1=$(FM_CREW_STATE_NM_CACHE_FAIL_TTL=5 read_state "$d" "$1")
+  out1=$(read_state "$d" "$1")
   first=$(calls "$d")
-  out2=$(FM_CREW_STATE_NM_CACHE_FAIL_TTL=5 read_state "$d" "$1")
+  CLOCK=$(( CLOCK + 2 ))
+  out2=$(read_state "$d" "$1")
   assert_contains "$out1" 'state: unknown' 'a failed id read reads as unknown'
   assert_equals "$first" "$(calls "$d")" 'a failure is replayed inside the failure window'
   assert_equals "$out1" "$out2" 'the replay is still a failure'
   rm -f "$d/nmfake/run-01RUN.rc"
-  sleep 6
-  out3=$(FM_CREW_STATE_NM_CACHE_FAIL_TTL=5 read_state "$d" "$1")
+  CLOCK=$(( CLOCK + 1 ))
+  out3=$(read_state "$d" "$1")
   assert_contains "$out3" 'state: working' 'once the failure window closes the recovered answer is used'
   assert_equals "$(( first + 1 ))" "$(calls "$d")" 'only the failed call is repeated'
   pass "$2: a failure is replayed as a failure, briefly, and never outlives its window"
@@ -301,13 +307,14 @@ case_unknown_inventory_is_not_kept_long() {  # <crew-state script> <name>
   age_status_log "$d"
   serve_run "$d" 01RUN running
   printf 'count: 2 of 2 total\nruns[2]{id,branch,status,head,pr}:\n  "01RUN",%s,running,%s,""\n' "$BRANCH" "$(cut -c1-8 "$d/head")" > "$d/nmfake/overview"
-  out1=$(FM_CREW_STATE_NM_CACHE_FAIL_TTL=5 read_state "$d" "$1")
+  out1=$(read_state "$d" "$1")
   assert_contains "$out1" 'state: unknown' 'an unreadable inventory reads as unknown'
   serve_run "$d" 01RUN running
-  out2=$(FM_CREW_STATE_NM_CACHE_FAIL_TTL=5 read_state "$d" "$1")
+  CLOCK=$(( CLOCK + 2 ))
+  out2=$(read_state "$d" "$1")
   assert_contains "$out2" 'state: unknown' 'the unknown verdict is replayed inside the failure window'
-  sleep 6
-  out3=$(FM_CREW_STATE_NM_CACHE_FAIL_TTL=5 read_state "$d" "$1")
+  CLOCK=$(( CLOCK + 1 ))
+  out3=$(read_state "$d" "$1")
   assert_contains "$out3" 'state: working' 'the repaired inventory is read once the window closes'
   pass "$2: an unknown inventory verdict lives only for the failure window"
 }
@@ -423,10 +430,13 @@ case_down_daemon_is_not_kept_long() {
   printf 'abcdef0123456789abcdef0123456789abcdef01\n' > "$d/head"
   serve_run "$d" 01RUN running
   printf 1 > "$d/nmfake/daemon.rc"
-  FM_CREW_STATE_NM_CACHE_FAIL_TTL=5 read_state "$d" "$CREW_STATE" >/dev/null
+  read_state "$d" "$CREW_STATE" >/dev/null
   first=$(grep -c '^daemon status$' "$d/nmfake/calls.log")
-  sleep 6
-  FM_CREW_STATE_NM_CACHE_FAIL_TTL=5 read_state "$d" "$CREW_STATE" >/dev/null
+  CLOCK=$(( CLOCK + 2 ))
+  read_state "$d" "$CREW_STATE" >/dev/null
+  assert_equals "$first" "$(grep -c '^daemon status$' "$d/nmfake/calls.log")" 'a down answer is replayed inside the failure window'
+  CLOCK=$(( CLOCK + 1 ))
+  read_state "$d" "$CREW_STATE" >/dev/null
   assert_equals "$(( first + 1 ))" "$(grep -c '^daemon status$' "$d/nmfake/calls.log")" 'a down answer is asked again once the failure window closes'
   pass 'a down daemon answer lives only for the failure window'
 }
@@ -436,9 +446,15 @@ case_down_daemon_is_not_kept_long() {
 # A copy of bin/ whose cache library ends with <override>: a later definition
 # wins, so the named predicate is defeated without matching any source text.
 make_mutant() {  # <name> <override>
-  local m="$TMP_ROOT/mutants/$1"
-  mkdir -p "$m"
-  cp -R "$ROOT/bin" "$m/bin"
+  local m="$TMP_ROOT/mutants/$1" f
+  mkdir -p "$m/bin"
+  # Every other script is linked, not copied: a script finds its siblings through
+  # the directory it was started from, so the linked copy loads the mutated library.
+  for f in "$ROOT/bin"/*; do
+    ln -s "$f" "$m/bin/${f##*/}"
+  done
+  rm -f "$m/bin/fm-nm-read-cache-lib.sh"
+  cp "$ROOT/bin/fm-nm-read-cache-lib.sh" "$m/bin/fm-nm-read-cache-lib.sh"
   printf '\n%s\n' "$2" >> "$m/bin/fm-nm-read-cache-lib.sh"
   printf '%s\n' "$m/bin/fm-crew-state.sh"
 }

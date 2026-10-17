@@ -30,6 +30,8 @@ Three supplemental hints come from completed successful shards of the partial [r
 All three shard summaries report `failed=0`, and each measured row reports `exit=0` and `gate_skip=false`.
 `tests/fm-review-agent-select.test.sh` has a serial hint of 14400 ms that is a local macOS arm64 sample, not a CI measurement: one successful `bin/fm-duration.py run` invocation on 2026-10-15 UTC; replace it with completed healthy CI measurements when available.
 `tests/fm-duration.test.sh` has a serial hint of 7990 ms that is a local macOS arm64 sample, not a CI measurement: one successful `bin/fm-test-run.sh --jobs 2` invocation on 2026-10-13 UTC (`exit=0`, `gate_skip=false`), because no CI serial shard has run the new suite yet; replace it with completed healthy CI measurements when available.
+`tests/fm-nm-read-cache.test.sh` has a serial hint of 22000 ms that is a local macOS arm64 sample, not a CI measurement: one successful `bin/fm-duration.py run` of the suite on 2026-10-17 UTC (`exit=0`, tree CPU 19 s, 161 s wall on a host at load 90), rounded up to the headroom the packing guard leaves, because no CI serial shard has run the new suite yet; replace it with completed healthy CI measurements when available.
+The existing fourteen serial shards were full (`serial_max_ms=1199961` before this suite), so the suite brought a fifteenth serial shard (`serial_shards=15 serial_max_ms=1121528`); this is a dated packing check on 2026-10-17, not a CI duration.
 The new `tests/fm-omp-wake-restore-live-e2e.test.sh` hint is its successful 51 ms record from portable serial shard 3 of [run 37663635202](https://github.com/MrGTV-love/firstmate/actions/runs/37663635202) on 2026-10-07.
 That shard completed with zero failures; the live test took its opt-in capability skip, so this hint models ordinary portable CI gate evaluation, not live wake-recovery runtime.
 The Jev native guard hints come from successful portable gate evaluations in [run 38679288718](https://github.com/MrGTV-love/firstmate/actions/runs/38679288718), attempt 1: the `pull_request` event records head `2b6268384a91da03d02631250a4e3154f5d2ef4d` and base `3dac70173544419de0d828dbaab4e205008495b1`, and checkout tested merge `a278da0cd2732a7b130055510dfe4fcea8b579a2`.
@@ -42,7 +44,7 @@ It refreshes the members whose successful measurement grew by more than 30 secon
 It adds the twelve unhinted serial members that completed successfully: claude-nested-home-live-e2e, contributions-read-saved, fleet-snapshot-contribution-cleanup, fleet-snapshot-fleet-cost, fleet-snapshot-rolling-window, jev-guard, omp-fallback-chain-live-e2e, omp-reboot-live-e2e, omp-task-session-live-e2e, orphan-safety, pi-watch-loader-live, and spawn-claude-start-confirm.
 The failed wake-queue invocation of run 38082072235 and the cancelled shard's unfinished backend-zellij invocation are excluded; other weights are unchanged.
 The former combined watch-triage suite exceeded the 1200000 ms packing target; its execution lists are now independently runnable signal/delivery and stale/wait groups, described below.
-The runner and workflow matrix use fourteen serial shards with the unchanged packing target and execution timeouts.
+The runner and workflow matrix use fifteen serial shards with the unchanged packing target and execution timeouts.
 The capacity suite's 56263 ms hint is the successful Ubuntu `FM_TEST_END` baseline from upstream [run 37739997864, serial shard 9](https://github.com/kunchenguid/firstmate/actions/runs/37739997864/job/113188261544). It is not a measurement of this integration repair: the local repaired run passed the live-worker teardown but later failed the next spawn's existing backlog-read bound, so its duration is excluded.
 In particular, run 36664663190's serial 5 finished in 22m15s with an assertion failure, not a timeout; treating that as a healthy whole-lane sample would hide the failure.
 Collect successful per-script measurements for every member before calculating a split.
@@ -245,7 +247,7 @@ macOS cannot exercise the CI address-space limit; required-bounds coverage must 
 
 The longer-term performance objective remains a complete green run under fifteen minutes including start delay; a passing packing model does not establish that latency.
 The immediate packing target is the runner's modeled script budget, not a claim that more shards alone can make an indivisible script faster.
-The layout uses twenty long-lived Linux jobs (fourteen serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
+The layout uses twenty-one long-lived Linux jobs (fifteen serial, two parallel, Herdr, three lint), plus short checks and macOS; insufficient shared account capacity can erase the packing gain.
 Compare complete before/after runs, preserve cancelled and partial-run evidence, and measure a representative normal-run sample before claiming a P95 improvement.
 The workflow retains per-PR supersession without cancelling main pushes or changing the compliance workflow's event semantics.
 

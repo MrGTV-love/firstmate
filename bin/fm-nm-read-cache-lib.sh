@@ -87,11 +87,22 @@ FM_NMC_WELLFORMED_RE=$'(^|\n)(run|other_branch_run|other_branch_active_run|curre
 FM_NMC_OWN_RUN_RE=$'(^|\n)run:'
 FM_NMC_FOREIGN_RE=$'(^|\n)other_branch_(active_)?run:'
 
+# printf's %(...)T is a bash 4.2 builtin; stock macOS Bash 3.2 still forks date.
 if [ "${BASH_VERSINFO[0]}" -gt 4 ] || { [ "${BASH_VERSINFO[0]}" -eq 4 ] && [ "${BASH_VERSINFO[1]}" -ge 2 ]; }; then
-  fm_nmc_now_to() { printf -v "$1" '%(%s)T' -1; }
+  fm_nmc_clock_to() { printf -v "$1" '%(%s)T' -1; }
 else
-  fm_nmc_now_to() { printf -v "$1" '%s' "$(date +%s)"; }
+  fm_nmc_clock_to() { printf -v "$1" '%s' "$(date +%s)"; }
 fi
+
+# The clock every entry age is measured on. FM_CREW_STATE_NM_CACHE_NOW (epoch
+# seconds) replaces it for tests, so expiry is tested without sleeping; the
+# invalidation test compares file mtimes and does not use this clock.
+fm_nmc_now_to() {  # <out-var>
+  case "${FM_CREW_STATE_NM_CACHE_NOW:-}" in
+    ''|*[!0-9]*) fm_nmc_clock_to "$1" ;;
+    *) printf -v "$1" '%s' "$FM_CREW_STATE_NM_CACHE_NOW" ;;
+  esac
+}
 
 # <state-dir> <task-id> <worktree> <branch> <timeout-secs>
 # Always records the worktree and bound so an uncached read still runs; enables
