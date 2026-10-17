@@ -1,0 +1,2 @@
+node:1: command not found: _nvm_lazy_load
+{"trials":300,"nulls":0,"multiPiece":263,"violations":0,"firstViolations":[]}

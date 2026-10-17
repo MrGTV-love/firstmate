@@ -1,0 +1,14 @@
+== boundary 1: exact request ceiling (16384 bytes), plain ASCII content
+largest content still sent as ONE request: 15563 bytes
+  at 15563: allow requests=1 chunks=1 maxbytes=16384
+  at 15564: allow requests=2 chunks=2 maxbytes=16384
+
+== boundary 2: piece-count limit (16 pieces) on plain ASCII
+largest content screened: 233648 bytes
+  at 233648: allow requests=16 chunks=16 err=- maxbytes=16384
+  at 233649: DENY requests=0 chunks=0 err=RequestTooLargeError (requests sent must be 0)
+
+== adversarial: 15-byte credential 'sk-live-fixture' slid across the first cut, ASCII + escape-heavy + astral filler
+  ascii filler: first piece = 15563 chars; token inserted at 81 offsets around the cut; slipped through: 0
+  quotes filler: first piece = 7781 chars; token inserted at 81 offsets around the cut; slipped through: 0
+  astral filler: first piece = 3890 chars; token inserted at 81 offsets around the cut; slipped through: 0
