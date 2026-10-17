@@ -184,9 +184,39 @@
 # worktree registrations must contain no nested
 # copy outside this task's individually proven copies; otherwise teardown
 # refuses, even with --force, and names each such copy. If an active record
-# owns that copy's work, reassociate that task to it first. If none does,
-# inspect the copy by hand, confirm it holds no unlanded work, and remove it by
-# hand with a plain git worktree remove; docs/agent-control.md owns that route.
+# owns that copy's work, reassociate that task to it first. A nested copy that
+# no record of this task names is a foreign copy (Vernant's
+# start_task_worktree.py creates and locks one at <slot>/.claude/worktrees/<name>),
+# and teardown releases it only after it proves all of: no other active task
+# record names it; no process outside this teardown runs in it and no live
+# process outside this teardown is its lock launcher (a process is teardown's
+# own when it, or an ancestor by parent chain, has a cwd exactly at a root retire
+# sweeps, and a launcher pid that started after the lock file was written is a
+# recycled pid and owns nothing); retire sends TERM to each such launcher and
+# each such process running in the copy, waits a bounded time, and sends no KILL,
+# and one still alive refuses the release, named by its pid, while a process
+# that is not teardown's own is never signalled and refuses at once, named by its
+# pid; it is a clean worktree root with no ignored file unique to it; and its
+# work is landed by the existing landed-work rule. A copy whose work is not
+# proved landed stays, with the reason written.
+# A copy locked by Vernant's creation lock (vernant-session-active
+# owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
+# driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
+# --execute-cleanup, run from the slot (FM_TEARDOWN_VERNANT_PYTHON names the
+# interpreter); an unlocked copy is removed with a plain non-forced git worktree
+# remove. Removal deletes the copy's checkout and the allow-listed ignored files
+# in it (symlinks, virtual environments, node_modules and tool caches,
+# .DS_Store, Firstmate's hook files, and anything ignored under its .claude and
+# .opencode trees); it loses no commit, because the work is landed, and no
+# tracked change, because the clean proof refuses one. The clean proof skips
+# untracked files under .claude only; the ignored-file proof skips ignored files
+# under .claude and .opencode; plain git worktree remove still refuses a copy
+# that holds an untracked file. On the pool-slot route the release runs before
+# the final project-lock wait, so the driver never runs while the lock is held,
+# except when teardown keeps project custody through the return. A lock in any
+# other format, a driver refusal, or a copy still registered afterwards refuses.
+# Every other case, including a half-removed copy, refuses as before; --force
+# never waives these proofs. The by-hand route is in docs/agent-control.md.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
@@ -443,14 +473,23 @@
 #     eligible for signalling. Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
+#     One exception: before this sweep, retire sends TERM to a creation-lock
+#     launcher of a foreign nested copy and to a process running in that copy,
+#     each only when the ancestry test proved it teardown's own (it is, or
+#     descends by parent chain from, a process whose cwd is exactly a scan root),
+#     whatever its own cwd. It waits a bounded time and sends no KILL; one still
+#     alive refuses, named by its pid, and a process that fails the test is never
+#     signalled and refuses.
 #     A missing lsof refuses too: without the scan no target can be audited, so
 #     no unaudited process or process-group signal is ever sent.
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
 #     row: epoch, signal, pid, birth identity, command line,
 #     start time, cwd, matched open path (cwd descriptor), all shell-escaped
-#     with printf %q. This audit survives task-record retirement and records
-#     signal intent, not proof of delivery: an immediate birth-identity recheck
-#     can still skip the signal. Failed command/start collection skips the target
+#     with printf %q. For such a process both cwd columns name the cwd of the
+#     process it was proved through, the process itself or the ancestor it
+#     descends from, not necessarily its own. This audit survives task-record
+#     retirement and records signal intent, not proof of delivery: an immediate
+#     birth-identity recheck can still skip the signal. Failed command/start collection skips the target
 #     only when a changed birth identity or kernel ESRCH proves it replaced or
 #     vanished; a live matching target or uncertain result refuses, as do authorization
 #     and write failures. Idempotent: nothing left to find is a silent no-op.
@@ -580,6 +619,7 @@ for _teardown_source in \
   fm-wake-lib.sh \
   fm-project-lock-lib.sh \
   fm-path-lib.sh \
+  fm-teardown-nested-lib.sh \
   fm-lease-lib.sh
 do
   teardown_require_source "$SCRIPT_DIR/$_teardown_source"
@@ -649,6 +689,8 @@ fm_backlog_directory_present "$STATE" "state directory" || {
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
 . "$SCRIPT_DIR/fm-task-copy-lib.sh"
+# shellcheck source=bin/fm-teardown-nested-lib.sh
+. "$SCRIPT_DIR/fm-teardown-nested-lib.sh"
 # Supervision lease guard: post-landing cleanup is overlap territory between
 # the two Pi supervision actors; refuse while the OTHER actor holds this
 # task's live lease (contract: bin/fm-lease-lib.sh; no-op in homes without
@@ -2631,7 +2673,7 @@ require_registered_slot_copies() {  # <task> <slot> [<proven-copy>...]
   done < "$inventory"
   rm -f "$inventory"
   if [ "$refused" = 1 ]; then
-    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy>. Re-run this teardown afterwards." >&2
+    echo "Each listed copy may hold unlanded work. If an active task record owns a listed copy's work, reassociate that task to it first with FM_HOME=/path/to/owning-home bin/fm-control.sh <owning-task> reassociate --worktree <copy> --note <why>. If no active record owns a listed copy, inspect it by hand with git -C <copy> status --untracked-files=all and git -C <copy> log --oneline HEAD --not --remotes, confirm nothing there is unlanded, then remove it by hand with git -C $slot worktree remove <copy> (a copy locked by Vernant's creation lock is released by running scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup from $slot, never by forcing the removal). Re-run this teardown afterwards." >&2
     return 1
   fi
 }
@@ -3973,7 +4015,7 @@ teardown_own_copy_disposable() {  # <canonical-copy>
 # teardown_treehouse_return runs it with no arguments. The nested copy is
 # already removed by then.
 teardown_nested_slot_reprove_after_lock() {
-  TEARDOWN_PROOF_OUTCOME="the slot was not returned and keeps its contents, but earlier cleanup steps already ran, including removing the nested copy; --force does not waive this proof"
+  TEARDOWN_PROOF_OUTCOME="the slot was not returned, but earlier cleanup steps already ran, including removing its nested and foreign copies; --force does not waive this proof"
   teardown_nested_slot reprove
 }
 
@@ -4045,8 +4087,12 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       teardown_landed "$PROJ" "refs/heads/$branch" "$branch"
       ;;
     reprove)
+      # Foreign copies the library proves are allowed here; an unprovable one is
+      # named by the library and refused by the custody check below.
+      [ -z "$TEARDOWN_RETURN_SLOT" ] || teardown_foreign_copies_prove "$TEARDOWN_RETURN_SLOT"
       [ -z "$TEARDOWN_RETURN_SLOT" ] || require_registered_slot_copies "$ID" "$TEARDOWN_RETURN_SLOT" \
-        ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} || return 1
+        ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"} \
+        ${TEARDOWN_FOREIGN_COPIES[@]+"${TEARDOWN_FOREIGN_COPIES[@]}"} || return 1
       for copy in ${TEARDOWN_PROOF_COPIES[@]+"${TEARDOWN_PROOF_COPIES[@]}"}; do
         [ -d "$copy" ] || [ "$copy" = "$TEARDOWN_RETURN_SLOT" ] || continue
         teardown_own_copy_disposable "$copy" || return 1
@@ -4065,12 +4111,20 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       for root in "${swept[@]}"; do
         retire_task_private_nm_launch_agents "$root" || exit 1
       done
+      teardown_foreign_procs_retire || exit 1
       reap_task_worktree_processes worktree "${swept[@]}" "$TASK_TMP" || exit 1
       ;;
     return)
       if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; then
         TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
         teardown_nested_slot reprove || exit 1
+      fi
+      # Foreign copies are released before anything else is removed, each proved
+      # again first; a refusal leaves the slot as it is.
+      if [ "${#TEARDOWN_FOREIGN_COPIES[@]}" -gt 0 ]; then
+        teardown_foreign_copies_release || exit 1
+      fi
+      if [ -n "$TEARDOWN_ENCLOSING_SLOT" ] || [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ]; then
         [ ! -d "$WT" ] || require_worktree_teardown_safety
         for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
           git -C "$PROJ" worktree remove --force "$copy" >/dev/null 2>&1 || {
@@ -5793,6 +5847,7 @@ if [ -n "$TEARDOWN_DEFERRED_POOL_CLEANUP" ]; then
   if [ "$TEARDOWN_DEFERRED_POOL_CLEANUP" = return ]; then
     TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
     teardown_nested_slot reprove || exit 1
+    teardown_foreign_copies_release || exit 1
     [ ! -d "$WT" ] || require_worktree_teardown_safety
   fi
   [ "$TREEHOUSE_PROJECT_LOCK_HELD" = 1 ] || teardown_acquire_project_lock wait || exit $?
