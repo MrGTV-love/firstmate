@@ -1741,11 +1741,11 @@ The guard drives `omp -p` with the tracked session overlay `.omp/fm-session-over
   That is how a lane recorded on Sol ended on `deepseek-v4-flash` through OpenRouter on 2026-10-09: the primary hit its usage limit, then the equal refused for credits.
 - **The overlay chains Sol to direct DeepSeek Flash.**
   With a scripted `usage_limit_reached` answer and a retry-after of one hour, far above `retry.maxDelayMs`, the session moved to `deepseek/deepseek-v4-flash`, the run succeeded, and the live-model record followed the session to the stand-in.
-  An empty Sol chain stopped the same run at the wait cap with the provider's usage-limit error, which is how the lanes stopped on 2026-10-16 when both Codex accounts were out.
+  The guard requires a request to reach Flash, so an empty Sol chain fails it.
+  The stop an empty chain caused in production on 2026-10-16, when both Codex accounts were out, is not exercised by the guard: omp stopped at its wait cap, `retry.maxDelayMs`, with the provider's usage-limit error.
   omp merges `--config` overlays key by key and replaces an array whole, so the overlay's Sol entry replaced the global Sol chain: the global chain's weak model received no request, and a session on the other chain's model still moved to that chain's route when its model refused.
-  A worker's per-task overlay, `state/<id>.omp-fallback.yml`, loads after the tracked overlay and replaces the Sol entry for the worker's own model.
 - **A 500 moves the session too.**
-  A 500 from a provider that still has quota was retried on Sol, then the session moved to the stand-in and the record followed it, so the chain applies on any eligible provider error, not only on a quota-out.
+  A 500 from a provider that still has quota also moved the session to the stand-in and the record followed it, so the chain applies on any eligible provider error, not only on a quota-out.
 - **omp returns to the recorded model by itself.**
   `retry.fallbackRevertPolicy: cooldown-expiry` restores the original selector at the next prompt once its suppression window ends; it never steps back to an intermediate route, and a primary that is out of quota for days stays suppressed for days.
   The guard layers a lab-only chain after the tracked overlay (a later `--config` wins) so the fallback route answers slowly enough for the primary's window to end.
