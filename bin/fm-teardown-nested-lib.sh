@@ -14,12 +14,13 @@
 #   - it is a clean worktree root and holds no ignored file unique to it;
 #   - no other active task record names it, no process outside this teardown's
 #     own runs in it, and no live process outside this teardown's own is its
-#     lock launcher (a process this teardown retires, or a descendant of one, is
-#     not counted, and a pid that started after the lock file was written is
-#     recycled and owns nothing; the retire phase signals such a process with
-#     TERM when it is a launcher with its own cwd outside every swept root or a
-#     process running in the copy, and one that outlives that signal and a short
-#     wait refuses the release, named by its pid);
+#     lock launcher (a process is this teardown's own when it, or an ancestor by
+#     parent chain, has a cwd exactly at a root retire sweeps, and a pid that
+#     started after the lock file was written is recycled and owns nothing). The
+#     retire phase sends TERM to each such launcher and each such process running
+#     in the copy, waits a bounded time, and sends no KILL; one still alive
+#     refuses the release, named by its pid. A process that is not this
+#     teardown's own is never signalled and refuses at once, named by its pid;
 #   - its work is landed by the existing landed-work rule (teardown_landed).
 # A copy whose work is not proved landed stays, and teardown names why.
 # A copy locked by Vernant's creation lock is released and removed by Vernant's
@@ -304,12 +305,15 @@ teardown_foreign_copies_prove() {  # <slot>
   done
 }
 
-# Signals the live lock launchers and the processes running in a copy that were
-# proved to be this teardown's own, which the cwd sweep does not reach (a
-# launcher's cwd may lie outside every swept root, and the sweep refuses a
-# process inside a nested copy), and waits briefly for them to exit. Each signal
-# is audited first, as the sweep's are. A process that outlives the wait is not
-# escalated: the sweep or the release proof then refuses it by pid.
+# Sends TERM, once and whatever its cwd, to each live lock launcher and each
+# process running in a copy that teardown_pid_is_task_own proved to be this
+# teardown's own, and waits briefly for them to exit. It runs before the cwd
+# sweep, which refuses a process inside a nested copy and does not reach a
+# descendant whose cwd lies outside its roots. Each signal is audited first, as
+# the sweep's are; a recorded process that has gone or no longer has its recorded
+# birth identity is skipped. No KILL is sent: a process still alive after the
+# wait is refused by pid, by the sweep when it is in the copy and by the release
+# proof otherwise.
 teardown_foreign_procs_retire() {
   local record pid identity cwd i
   local -a signalled_pids=() signalled_identities=()

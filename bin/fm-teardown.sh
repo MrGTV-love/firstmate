@@ -189,16 +189,16 @@
 # start_task_worktree.py creates and locks one at <slot>/.claude/worktrees/<name>),
 # and teardown releases it only after it proves all of: no other active task
 # record names it; no process outside this teardown runs in it and no live
-# process outside this teardown is its lock launcher (a process teardown itself
-# retires, or a descendant of one, is not counted, and a launcher pid that
-# started after the lock file was written is a recycled pid and owns nothing;
-# retire signals with TERM such a launcher whose cwd is outside every swept root
-# and such a process running in the copy, and one that outlives that signal and
-# a short wait refuses the release, named by its pid; no KILL is sent and a
-# process that is not teardown's own is never signalled); it is a clean worktree
-# root with no ignored file unique to it; and its work is landed by the existing
-# landed-work rule. A copy whose work is not proved landed stays, with the
-# reason written.
+# process outside this teardown is its lock launcher (a process is teardown's
+# own when it, or an ancestor by parent chain, has a cwd exactly at a root retire
+# sweeps, and a launcher pid that started after the lock file was written is a
+# recycled pid and owns nothing); retire sends TERM to each such launcher and
+# each such process running in the copy, waits a bounded time, and sends no KILL,
+# and one still alive refuses the release, named by its pid, while a process
+# that is not teardown's own is never signalled and refuses at once, named by its
+# pid; it is a clean worktree root with no ignored file unique to it; and its
+# work is landed by the existing landed-work rule. A copy whose work is not
+# proved landed stays, with the reason written.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
@@ -473,18 +473,21 @@
 #     eligible for signalling. Every other descendant cwd, existing or deleted,
 #     refuses with its pid, birth identity, matched path and scan root, because
 #     a damaged sibling lane cannot be distinguished from an own-tree directory.
-#     One exception: a creation-lock launcher of a foreign nested copy, or a
-#     process running in that copy, that teardown chose by ancestry (it is, or
-#     descends by parent chain from, a process whose cwd is exactly a scan root)
-#     may have any cwd and is signalled with TERM only, before this sweep, which
-#     would otherwise refuse the process inside the copy.
+#     One exception: before this sweep, retire sends TERM to a creation-lock
+#     launcher of a foreign nested copy and to a process running in that copy,
+#     each only when the ancestry test proved it teardown's own (it is, or
+#     descends by parent chain from, a process whose cwd is exactly a scan root),
+#     whatever its own cwd. It waits a bounded time and sends no KILL; one still
+#     alive refuses, named by its pid, and a process that fails the test is never
+#     signalled and refuses.
 #     A missing lsof refuses too: without the scan no target can be audited, so
 #     no unaudited process or process-group signal is ever sent.
 #     Before each signal, state/<id>.teardown-processes records one tab-separated
 #     row: epoch, signal, pid, birth identity, command line,
 #     start time, cwd, matched open path (cwd descriptor), all shell-escaped
-#     with printf %q. For a process chosen by ancestry both cwd columns name the
-#     ancestor's cwd, not its own. This audit survives task-record
+#     with printf %q. For such a process both cwd columns name the cwd of the
+#     process it was proved through, the process itself or the ancestor it
+#     descends from, not necessarily its own. This audit survives task-record
 #     retirement and records signal intent, not proof of delivery: an immediate
 #     birth-identity recheck can still skip the signal. Failed command/start collection skips the target
 #     only when a changed birth identity or kernel ESRCH proves it replaced or
