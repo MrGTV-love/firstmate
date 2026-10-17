@@ -359,7 +359,7 @@ A nested current copy whose enclosing slot the task does not claim is left in pl
 When other live ordinary records have each left the same slot root for their own copies nested in it and name the root as `prior_worktree=`, which is the shape a joint reassociation leaves, `teardown_nested_slot` takes the peer-slot route in place of returning the slot.
 [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh)'s `fm_task_copy_prior_root_released` is the one owner of when such a record's prior custody no longer holds the root.
 It requires that the retiring task itself names the root as `prior_worktree=`, and that the other record is a ship or scout of the same project, not an Orca task, whose current copy lies inside the root and apart from the retiring task's copy, while no other record still names the root or a directory enclosing it as `worktree=` or `home=`.
-Any other overlap keeps the prior-custody refusal, and a refusal names the record that still holds the root.
+Any other overlap keeps the prior-custody refusal.
 The route removes only the retiring task's own current copy, under the same proofs as above: the ordinary dirty and landed-work test, the process and launcher proofs, and for a copy that Vernant's creation lock holds the closeout driver run from the root.
 It reserves, reaps, scans, detaches and returns nothing slot-wide, leaves Treehouse's lease and every other record and copy untouched, and passes the slot claim to the first remaining peer when it was this task's, so the last task out finds the slot its own.
 A claim that already names a peer stays as it is.

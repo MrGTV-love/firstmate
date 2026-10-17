@@ -2224,7 +2224,7 @@ test_teardown_after_a_joint_reassociation_refuses_what_it_cannot_prove() {
       third-on-root)
         joint_land "$na"
         fm_write_meta "$dir/home/state/third.meta" "window=fmses:fm-third" "worktree=$slot" "project=$dir/proj" "kind=ship"
-        want="task third still names it as its worktree, so the root is not released"
+        want="preserved prior_worktree custody overlaps it"
         ;;
       third-prior-elsewhere)
         joint_land "$na"
