@@ -2,7 +2,7 @@
 # Exercise the real spawn entrypoint and terminal with a fake process-leased get.
 # The herdr argument uses a generated, guarded lab session; the default uses private tmux.
 # FM_TEST_ACQUISITION_CASES=contention runs the successful sibling and contention only.
-# The late, clock and gone cases read the pane's foreground process and run on tmux only.
+# The late, laterexit, clock and gone cases read the pane's foreground process and run on tmux only.
 set -u
 # shellcheck source=tests/fixtures.sh
 . "$(dirname "${BASH_SOURCE[0]}")/fixtures.sh"
@@ -90,12 +90,11 @@ touch "\$LEASE"
 if [ "\$MODE" = slow ]; then
   while [ ! -e "\$ALLOW" ]; do /bin/sleep 0.02; done
 fi
-if [ "\$MODE" = late ]; then
+if [ "\$MODE" = late ] || [ "\$MODE" = laterexit ]; then
   # Take longer than the old 60-poll window: wait for 75 one-second polls.
-  : > "\$TICKS"
   while [ "\$(wc -l < "\$TICKS")" -lt 75 ]; do /bin/sleep 0.02; done
 fi
-if [ "\$MODE" = exits ]; then
+if [ "\$MODE" = exits ] || [ "\$MODE" = laterexit ]; then
   rm -f "\$LEASE"
   echo 'treehouse: simulated failure' >&2
   exit 1
@@ -196,9 +195,9 @@ sleep() {
   command sleep "$@"
 }
 SH
-for MODE in success slow spawning foreign dirty late clock gone; do
+for MODE in success slow spawning foreign dirty late laterexit clock gone; do
   [ "${FM_TEST_ACQUISITION_CASES:-all}" != contention ] || [ "$MODE" = success ] || continue
-  case "$MODE" in late|clock|gone) [ "$BACKEND" = tmux ] || continue ;; esac
+  case "$MODE" in late|laterexit|clock|gone) [ "$BACKEND" = tmux ] || continue ;; esac
   ID="get-cleanup-$MODE-$$"
   CASE="$TMP_ROOT/case-$MODE"
   mkdir -p "$CASE"
@@ -251,6 +250,12 @@ for MODE in success slow spawning foreign dirty late clock gone; do
       [ "$(wc -l < "$TICKS")" -ge 100 ] || fail "a running get was abandoned after $(wc -l < "$TICKS") polls: $out"
       ;;
     spawning) assert_contains "$out" 'did not enter an isolated worktree within 60s' 'missing deadline refusal' ;;
+    laterexit)
+      # The get ran past the 60-poll window, then exited with the pane still in the
+      # project: the refusal names the extended window the wait reached.
+      assert_contains "$out" 'did not enter an isolated worktree within 120s' 'missing extended-window refusal'
+      [ "$(wc -l < "$TICKS")" -ge 75 ] || fail "a get that ran 75 polls was abandoned after $(wc -l < "$TICKS") polls: $out"
+      ;;
     clock)
       # 3 s per poll reaches the 120 s wall-clock ceiling near poll 40, well before the 120th.
       assert_contains "$out" 'did not enter an isolated worktree within 120s' 'missing ceiling refusal'

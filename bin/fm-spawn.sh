@@ -5538,6 +5538,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   acquire_ceiling=120
   acquire_start=$SECONDS
   acquire_limit=$acquire_base
+  acquire_peak=$acquire_base
   candidate=""
   last_seen=""
   last_reason="the pane reported no path"
@@ -5558,7 +5559,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
       candidate=""
       [ -z "$p" ] || last_reason=$FM_TASK_COPY_REASON
       case "$(spawn_get_state "$WT_TARGET")" in
-        running) acquire_limit=$acquire_ceiling ;;
+        running) acquire_limit=$acquire_ceiling; acquire_peak=$acquire_ceiling ;;
         idle) acquire_limit=$acquire_base ;;
       esac
     fi
@@ -5567,7 +5568,7 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     sleep 1
   done
   if [ -z "$WT" ]; then
-    echo "error: treehouse get did not enter an isolated worktree within ${acquire_limit}s (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); aborting acquisition" >&2
+    echo "error: treehouse get did not enter an isolated worktree within ${acquire_peak}s (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); aborting acquisition" >&2
     exit 1
   fi
 
