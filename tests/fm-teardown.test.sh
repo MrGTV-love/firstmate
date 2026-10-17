@@ -10584,13 +10584,12 @@ test_unlocked_landed_foreign_copy_is_removed_without_the_driver() {
   pass "an unlocked landed foreign copy is removed with a plain git worktree remove and the slot is returned"
 }
 
-test_unlanded_foreign_copy_is_refused_unless_anchored_by_switch() {
-  local rc anchor head
+test_unlanded_foreign_copy_is_refused() {
+  local rc
   make_foreign_copy_case foreign-unlanded
   printf 'unlanded\n' > "$FOREIGN_COPY/unlanded.txt"
   git -C "$FOREIGN_COPY" add unlanded.txt
   git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unlanded foreign work'
-  head=$(git -C "$FOREIGN_COPY" rev-parse HEAD)
   run_foreign_teardown rc
   expect_code 1 "$rc" "foreign-unlanded: an unlanded copy must be refused: $(cat "$FOREIGN_CASE/stderr")"
   assert_grep "contains registered copy $FOREIGN_COPY that is not one of task task-x1's proven copies" "$FOREIGN_CASE/stderr" \
@@ -10598,17 +10597,11 @@ test_unlanded_foreign_copy_is_refused_unless_anchored_by_switch() {
   assert_grep "is not proved landed" "$FOREIGN_CASE/stderr" "foreign-unlanded: the refusal did not say what was unproven"
   assert_foreign_copy_untouched foreign-unlanded
   assert_equals "" "$(git -C "$FOREIGN_CASE/project" for-each-ref 'refs/fm/anchor/*')" \
-    "foreign-unlanded: an anchor was written with the switch off"
-  # The switch anchors the commit first, then disposes of the clean copy.
-  run_foreign_teardown rc FM_TEARDOWN_DISPOSE_ANCHORED=1
-  expect_code 0 "$rc" "foreign-unlanded: the switch must anchor and dispose: $(cat "$FOREIGN_CASE/stderr")"
-  anchor=$(git -C "$FOREIGN_CASE/project" for-each-ref --format='%(refname) %(objectname)' 'refs/fm/anchor/task-x1-*')
-  assert_equals "refs/fm/anchor/task-x1-${head:0:7} $head" "$anchor" "foreign-unlanded: the anchor is missing or wrong"
-  assert_absent "$FOREIGN_COPY" "foreign-unlanded: the anchored copy survived"
-  pass "an unlanded foreign copy refuses by default and is anchored then removed only behind the switch"
+    "foreign-unlanded: an anchor was written for a copy that was refused"
+  pass "an unlanded foreign copy is refused with a written reason and nothing changes"
 }
 
-test_foreign_copy_with_unsaved_or_unique_files_is_refused_even_with_the_switch() {
+test_foreign_copy_with_unsaved_or_unique_files_is_refused() {
   local rc shape exclude
   for shape in dirty ignored; do
     make_foreign_copy_case "foreign-$shape"
@@ -10619,16 +10612,14 @@ test_foreign_copy_with_unsaved_or_unique_files_is_refused_even_with_the_switch()
       printf 'unique.dat\n' >> "$exclude"
       printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
     fi
-    run_foreign_teardown rc FM_TEARDOWN_DISPOSE_ANCHORED=1
+    run_foreign_teardown rc
     expect_code 1 "$rc" "foreign-$shape: a copy with files only it holds must be refused: $(cat "$FOREIGN_CASE/stderr")"
     assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "foreign-$shape: the refusal changed"
     assert_foreign_copy_untouched "foreign-$shape"
     assert_present "$FOREIGN_COPY/$([ "$shape" = dirty ] && echo untracked.txt || echo unique.dat)" \
       "foreign-$shape: the file was lost"
-    assert_equals "" "$(git -C "$FOREIGN_CASE/project" for-each-ref 'refs/fm/anchor/*')" \
-      "foreign-$shape: an anchor was written for a copy that could not be disposed"
   done
-  pass "uncommitted and unique ignored files make a foreign copy refuse, with or without the switch"
+  pass "uncommitted and unique ignored files make a foreign copy refuse"
 }
 
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused() {
@@ -10690,6 +10681,114 @@ test_live_launcher_keeps_its_foreign_copy() {
     "live-launcher: the refusal did not name the launcher"
   assert_foreign_copy_untouched live-launcher
   pass "a live launcher that started before its creation lock keeps its foreign copy"
+}
+
+# The creation lock names a launcher pid. Teardown itself ends the task's own
+# session, so a launcher that is that session, or runs under it, must not hold
+# the copy; a live process outside it still does, even while the session runs.
+test_task_own_session_as_lock_launcher_does_not_block_release() {
+  local rc shape agent launcher pidfile i child_script
+  child_script='my $child = fork(); if (!$child) { chdir "/"; exec "sleep", "300"; } $SIG{TERM} = sub { kill "TERM", $child; waitpid $child, 0; exit 0 }; open my $fh, ">", $ARGV[0]; print $fh $child; close $fh; sleep 300;'
+  for shape in agent child unrelated; do
+    make_foreign_copy_case "foreign-own-$shape"
+    pidfile=$FOREIGN_CASE/launcher-pid
+    case "$shape" in
+      child)
+        teardown_fixture_start "$FOREIGN_SLOT" KILL perl -e "$child_script" "$pidfile"
+        agent=$TEARDOWN_FIXTURE_PID
+        for i in $(seq 100); do [ -s "$pidfile" ] && break; sleep 0.05; done
+        launcher=$(cat "$pidfile")
+        ;;
+      *)
+        teardown_fixture_start "$FOREIGN_SLOT" KILL sleep 300
+        agent=$TEARDOWN_FIXTURE_PID
+        launcher=$agent
+        if [ "$shape" = unrelated ]; then
+          sleep 300 &
+          launcher=$!
+        fi
+        ;;
+    esac
+    sleep 1
+    git -C "$FOREIGN_CASE/project" worktree lock \
+      --reason "vernant-session-active owner=launcher:$launcher launcher=$launcher" "$FOREIGN_COPY"
+    cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*) if kill -0 $agent 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $agent '$FOREIGN_SLOT'; fi; exit 0 ;;
+esac
+exit 1
+SH
+    run_foreign_teardown rc
+    if [ "$shape" = unrelated ]; then
+      kill -0 "$agent" 2>/dev/null || fail "own-$shape: a refused teardown stopped the task's session"
+      kill "$launcher" 2>/dev/null || true
+      wait "$launcher" 2>/dev/null || true
+      expect_code 1 "$rc" "own-$shape: an unrelated live launcher must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
+      assert_grep "creation-lock launcher process $launcher may still be running" "$FOREIGN_CASE/stderr" \
+        "own-$shape: the refusal did not name the launcher"
+      assert_foreign_copy_untouched "own-$shape"
+    else
+      expect_code 0 "$rc" "own-$shape: the task's own session as launcher must not block release: $(cat "$FOREIGN_CASE/stderr")"
+      kill -0 "$agent" 2>/dev/null && fail "own-$shape: the task's session survived teardown"
+      assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+        "own-$shape: the driver was not run once"
+      assert_absent "$FOREIGN_COPY" "own-$shape: the copy survived"
+      assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "own-$shape: the slot was not returned"
+    fi
+    [ "$shape" != child ] || kill "$launcher" 2>/dev/null || true
+  done
+  pass "a lock launcher that is the task's own session or runs under it is released with the slot, and an unrelated live launcher still keeps the copy"
+}
+
+test_process_in_foreign_copy_keeps_it() {
+  local rc pid
+  make_foreign_copy_case foreign-process-inside
+  teardown_fixture_start "$FOREIGN_COPY" KILL sleep 300
+  pid=$TEARDOWN_FIXTURE_PID
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*) if kill -0 $pid 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi; exit 0 ;;
+esac
+exit 1
+SH
+  run_foreign_teardown rc
+  kill -0 "$pid" 2>/dev/null || fail "process-inside: teardown stopped the process running in the foreign copy"
+  expect_code 1 "$rc" "process-inside: a copy with a process running in it must be refused: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "process $pid is running in it" "$FOREIGN_CASE/stderr" "process-inside: the refusal did not name the process"
+  assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "process-inside: the refusal changed"
+  assert_foreign_copy_untouched process-inside
+  pass "a foreign copy with a process running in it is refused and the process is left alone"
+}
+
+test_two_foreign_copies_are_released_together_or_not_at_all() {
+  local rc second
+  dead_launcher_pid
+  make_foreign_copy_case foreign-two-copies "$FOREIGN_DEAD_PID"
+  second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/task-x1-v3 "$second" main
+  printf 'edit\n' > "$second/untracked.txt"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "two-copies: one unprovable copy must refuse the slot: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "contains registered copy $second" "$FOREIGN_CASE/stderr" "two-copies: the refusal did not name the unprovable copy"
+  assert_present "$second/untracked.txt" "two-copies: the unprovable copy lost its file"
+  assert_foreign_copy_untouched two-copies
+  rm -f "$second/untracked.txt"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "two-copies: two landed copies must both be released: $(cat "$FOREIGN_CASE/stderr")"
+  assert_absent "$FOREIGN_COPY" "two-copies: the locked copy survived"
+  assert_absent "$second" "two-copies: the unlocked copy survived"
+  assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+    "two-copies: only the locked copy goes through the driver, once"
+  assert_grep "removed landed foreign copy $FOREIGN_COPY from pool slot $FOREIGN_SLOT" "$FOREIGN_CASE/stderr" \
+    "two-copies: the locked copy's removal was not reported"
+  assert_grep "removed landed foreign copy $second from pool slot $FOREIGN_SLOT" "$FOREIGN_CASE/stderr" \
+    "two-copies: the unlocked copy's removal was not reported"
+  git -C "$FOREIGN_CASE/project" rev-parse --verify --quiet refs/heads/fm/task-x1-v3 >/dev/null \
+    || fail "two-copies: the second copy's branch was deleted"
+  assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "two-copies: the slot was not returned"
+  pass "a slot's foreign copies are all proved before any is removed, and then all are released"
 }
 
 test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place() {
@@ -12278,12 +12377,15 @@ test_own_prior_copies_block_only_an_unproven_pool_return
 test_reverse_nested_prior_outside_claude_tears_down
 test_locked_own_copy_is_released_by_the_closeout_driver
 test_unlocked_landed_foreign_copy_is_removed_without_the_driver
-test_unlanded_foreign_copy_is_refused_unless_anchored_by_switch
-test_foreign_copy_with_unsaved_or_unique_files_is_refused_even_with_the_switch
+test_unlanded_foreign_copy_is_refused
+test_foreign_copy_with_unsaved_or_unique_files_is_refused
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused
 test_half_removed_foreign_copy_is_refused_as_before
 test_recycled_launcher_pid_does_not_own_a_foreign_copy
 test_live_launcher_keeps_its_foreign_copy
+test_task_own_session_as_lock_launcher_does_not_block_release
+test_process_in_foreign_copy_keeps_it
+test_two_foreign_copies_are_released_together_or_not_at_all
 test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot
 test_shared_nested_copy_concludes_only_its_own_runtime

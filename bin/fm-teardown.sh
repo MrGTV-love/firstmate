@@ -188,25 +188,25 @@
 # no record of this task names is a foreign copy (Vernant's
 # start_task_worktree.py creates and locks one at <slot>/.claude/worktrees/<name>),
 # and teardown releases it only after it proves all of: no other active task
-# record names it; no process runs in it and no live process is its lock
-# launcher (a launcher pid that started after the lock file was written is a
-# recycled pid and owns nothing); it is a clean worktree root with no ignored
-# file unique to it; and its work is landed, strongest proof first: HEAD is an
-# ancestor of the merged PR head, its tree equals the merged PR head or the
-# squash commit, the existing landed-work rule holds, or Vernant's
-# line_proof_for_path holds for every changed path anchored at the squash
-# commit. Work that is none of those is released only when
-# FM_TEARDOWN_DISPOSE_ANCHORED=1, off by default: teardown then writes and
-# verifies refs/fm/anchor/<task>-<sha> first and still requires a clean copy.
+# record names it; no process runs in it and no live process outside this
+# teardown is its lock launcher (a process teardown itself retires, or a
+# descendant of one, is not counted, and a launcher pid that started after the
+# lock file was written is a recycled pid and owns nothing); it is a clean
+# worktree root with no ignored file unique to it; and its work is landed by the
+# existing landed-work rule. A copy whose work is not proved landed stays, with
+# the reason written.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
 # --execute-cleanup, run from the slot (FM_TEARDOWN_CLOSEOUT names another
 # executable; FM_TEARDOWN_VERNANT_PYTHON names the interpreter); an unlocked copy
-# is removed with a plain non-forced git worktree remove. A lock in any other
-# format, a driver refusal, or a copy still registered afterwards refuses. Every
-# other case, including a half-removed copy, refuses as before; --force never
-# waives these proofs. The by-hand route is in docs/agent-control.md.
+# is removed with a plain non-forced git worktree remove. Removal deletes the
+# copy's checkout and the allow-listed ignored files in it (virtual
+# environments, caches, hook files); it loses no commit, because the work is
+# landed, and no uncommitted change, because the copy is clean. A lock in any
+# other format, a driver refusal, or a copy still registered afterwards refuses.
+# Every other case, including a half-removed copy, refuses as before; --force
+# never waives these proofs. The by-hand route is in docs/agent-control.md.
 # Why Treehouse's own state cannot answer this for crewmate slots, and why the
 # claim file sits on top of it, is owned by bin/fm-wake-lib.sh's slot-owner
 # claim comment.
