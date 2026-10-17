@@ -572,6 +572,44 @@ The CI repair also passed `tests/fm-spawn-pool-base-freshen.test.sh` and `tests/
 Real-Herdr verification used Herdr 0.9.1 in an ephemeral, short-path test namespace with a private default server; generated lab teardown retained the default-session tripwire.
 A throwaway public-spawn before/after smoke reproduced the caller-origin contamination on the original code and proved the corrected origin-less launch made no fetch.
 
+## Treehouse get entry wait
+
+The [control-plane contract](../agent-control.md#reassociating-a-task-with-a-replacement-copy) owns the fresh-spawn `treehouse get` wait: its 60-poll base window and its 120-second ceiling while the pane's foreground still shows the get running.
+The ceiling is a chosen bound.
+These runs are background for it, not a guarantee, so this record keeps their conditions and raw seconds without a rerun command.
+
+All runs were on 2026-10-16 on an 18-core host, in a disposable repository of 2000 files with its own scratch pool, tmux 3.5a, and `treehouse` v3.1.2-fm.c704ea2.
+"Get" means `treehouse get` run interactively in a tmux pane, timed until the pane's current path is the new worktree.
+Load is the one-minute load average when the run began.
+
+| Load | Pool slots | Command and condition | Raw seconds |
+|---|---|---|---|
+| 23.62 | up to 128 | get, nothing else running | 0.617, 0.779, 0.949, 0.884 |
+| 43.95 (30 CPU spinners) | up to 128 | get, nothing else running | 2.400, 1.436, 1.823, 0.825 |
+| 23.04 | 150 | get, nothing else running | 0.991, 0.657, 0.787 |
+| 22.92 | 150 | get begun while one `treehouse status --json` ran | 34.797, 19.094, 18.107 |
+| 22.92 | 150 | the `treehouse status --json` those three gets overlapped | 35.397, 20.128, 18.998 |
+| 22.97 | 150 | 8 gets begun at once, 16 samples, sorted | 1.169, 1.453, 2.111, 2.387, 3.005, 3.829, 4.453, 4.572, 5.122, 5.830, 7.148, 7.948, 8.035, 8.208, 8.485, 9.185 |
+| 23.62 | up to 128 | `treehouse status --json`, nothing else running | 14.149, 15.260, 11.273, 11.368 |
+| 43.95 (30 CPU spinners) | up to 128 | `treehouse status --json`, nothing else running | 15.583, 23.389, 16.079, 19.095 |
+| 11.72 to 68.34 | 16, 64 and up to 128 | the pane path read alone, 36 reads | 0.030 to 0.217 |
+
+The longest queue wait is 34.797 seconds, the first overlapped get.
+The pool sizes of 16, 64 and 128 are the sizes requested; the pool state file showed 80 slots when that grid ended, so "up to 128" is the honest reading.
+The 150-slot pool was verified from its state file.
+
+What the table shows:
+- A get with nothing else running reached its worktree in 0.617 to 2.400 seconds.
+- A get begun while a pool-wide `treehouse status --json` ran reached it in 18.107 to 34.797 seconds, about when that status finished.
+- The pane read took at most 0.217 seconds, so the poll itself is not the slow part in these runs.
+
+What it leaves unproven:
+- Why the overlapped get waited. The runs show the delay, not whether `treehouse get` waits on a lock the status holds or runs a scan of its own.
+- What the starts refused on 2026-10-16 waited on. The longest wait in the table, 34.797 seconds, would have fit inside the 60-poll base window they were refused under.
+- How long a get takes on the Studio's Vernant pool under its real load. No run here used it. Only its `treehouse status --json` was timed there, read-only: 31.2 and 34.3 seconds at load 27 to 36 on a pool of 128 records.
+
+`tests/fm-spawn-acquisition-cleanup.test.sh` pins the wait's windows and refusal wording, and `tests/fm-backend-herdr.test.sh` pins the Herdr foreground read.
+
 ## TeamClaude launcher
 
 Verified 2026-09-29 on TeamClaude 1.1.21-affinity.0 with its proxy running in its default forward-proxy mode.

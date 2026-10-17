@@ -56,11 +56,9 @@
 #   that overlay. docs/configuration.md "Worker skill selection" owns selection,
 #   supported brief transports, and recorded outcomes. The picker is bounded
 #   at 30 seconds and never stops a launch.
-#   A fresh spawn's `treehouse get` wait is 60 polls, one second apart. While the
-#   pane's foreground still shows `treehouse get` running (tmux and herdr), the
-#   wait extends to a 120 second wall-clock ceiling; a pane whose foreground
-#   cannot be read keeps the 60 polls. docs/agent-control.md owns the rule and
-#   its measurements.
+#   A fresh spawn's `treehouse get` wait is foreground-aware: docs/agent-control.md
+#   owns its window and ceiling, and docs/verification/runtime-backends.md
+#   "Treehouse get entry wait" records the measurements behind them.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only] [--worktree <path>]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
@@ -5528,12 +5526,12 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # The window is not one fixed length. A start can wait on `treehouse get` for
   # far longer than the pane read costs: a get begun while a pool-wide
   # `treehouse status --json` ran reached its worktree about when that status
-  # finished (docs/agent-control.md holds the measurements and what they leave
-  # unproven). So the base window is 60 reads, and while the pane's foreground
-  # shows `treehouse get` still running the wait extends to a 120 second
-  # wall-clock ceiling, chosen rather than measured. A read that cannot tell keeps
-  # the window the previous read chose; a read that shows only shells sets the
-  # base window again.
+  # finished (docs/verification/runtime-backends.md "Treehouse get entry wait"
+  # holds the measurements and what they leave unproven). So the base window is
+  # 60 reads, and while the pane's foreground shows `treehouse get` still
+  # running the wait extends to a 120 second wall-clock ceiling, chosen rather
+  # than measured. A read that cannot tell keeps the window the previous read
+  # chose; a read that shows only shells sets the base window again.
   acquire_base=60
   acquire_ceiling=120
   acquire_start=$SECONDS
