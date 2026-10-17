@@ -283,6 +283,8 @@ printf 'run:\n  id: "01RUN"\n  branch: $BRANCH\n  status: completed\n\nline  thr
 SH
   chmod +x "$fb/no-mistakes"
   : > "$d/calls.log"
+  # The fake PATH and NM_HOME are intentionally scoped to this subshell.
+  # shellcheck disable=SC2030
   (
     # shellcheck source=/dev/null
     . "$ROOT/bin/fm-nm-read-cache-lib.sh"
@@ -308,6 +310,8 @@ printf 'partial\n'
 exit 7
 SH
   : > "$d/calls.log"
+  # The first subshell's PATH and NM_HOME do not carry over; this one sets its own.
+  # shellcheck disable=SC2031
   (
     # shellcheck source=/dev/null
     . "$ROOT/bin/fm-nm-read-cache-lib.sh"
