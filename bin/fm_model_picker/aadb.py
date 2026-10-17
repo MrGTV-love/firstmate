@@ -230,7 +230,7 @@ def open_db(path):
     init_db(conn)
     return conn
 
-def load_raw(include_rendered=True):
+def load_raw():
     """Read raw evidence only: the cached compare pages (exact payload + table), the cached
     evaluation pages (leaderboard table + chart-window payload) and the rendered captures.
     Derived aggregates are never read; every one is recomputed from these."""
@@ -254,7 +254,7 @@ def load_raw(include_rendered=True):
              "table_rows": tables[0]["rows"] if tables else [], "window": window, "window_why": why, "rejects": rejects,
              "rendered": None}
         rfile = collect.RAW / "rendered" / (slug + ".txt")
-        if include_rendered and rfile.exists():
+        if rfile.exists():
             text = rfile.read_text(encoding="utf-8", errors="replace")
             e["rendered"] = {"at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(rfile.stat().st_mtime)),
                              "rows": collect.parse_rendered_sections(text)["rows"],
@@ -296,7 +296,8 @@ def build_observations(raw):
         for r in lst:
             key, ts = add_model(r["attrs"]), r["observed_at"]
             for label, cell in r["table"].items():
-                add(key, collect.canon_metric_id(label), label, "comparison-table", ts, collect.parse_val(cell), raw=cell)
+                value, unit = collect.parse_cell(cell)
+                add(key, collect.canon_metric_id(label), label, "comparison-table", ts, value, raw=cell, unit=unit)
             for cid, v in r["series"].items():
                 spec = embedded.SERIES_MAP[cid]
                 add(key, cid, spec["label"], "embedded", ts, v, unit=spec["unit"], scale=spec["scale"],
@@ -355,8 +356,10 @@ def coverage_view(models, observations):
 
 
 def metric_defs(observations):
-    """(canonical id, label) -> unit, scale and version. A scale the source states wins;
-    otherwise it is read from the shown cells: all percent -> fraction, no numbers -> text."""
+    """(canonical id, label) -> unit, scale and version. The unit is the first one a cell or the
+    source states. A scale the source states wins; otherwise it is read from the shown cells:
+    no numbers -> text, all percent -> fraction, a number with a unit -> quantity (the value is
+    in that unit, a k/M/B/T suffix already expanded), else raw."""
     from . import collect
 
     defs = {}
@@ -368,8 +371,9 @@ def metric_defs(observations):
             d["cells"].append(o["raw"])
     for (cid, label), d in defs.items():
         if not d["scale"]:
-            nums = [c for c in d["cells"] if collect.parse_val(c) is not None]
-            d["scale"] = "text" if not nums else "fraction" if all(c.rstrip("*").endswith("%") for c in nums) else "raw"
+            nums = [c for c in d["cells"] if collect.parse_cell(c)[0] is not None]
+            d["scale"] = ("text" if not nums else "fraction" if all(c.rstrip("*").endswith("%") for c in nums)
+                          else "quantity" if d["unit"] else "raw")
         d["version"] = _version(label)
     return defs
 
@@ -423,7 +427,11 @@ def migrate(conn, raw=None, slug_status=None, log=print):
 
 def write_projections(conn, outdir):
     """One JSON projection per catalog model (the picker's wire format), written last. For each
-    canonical metric the newest numeric observation wins; ties prefer embedded full precision."""
+    canonical metric the newest numeric observation wins; ties prefer embedded full precision.
+    Freshness: `as_of` is the newest observed_at across the model's metrics, so it says when the
+    model last got any new data, not that every metric is that fresh. Each metric's own
+    `observed_at` is authoritative for freshness. A rounded eval-leaderboard value (1803) can win
+    over a full-precision embedded value (1802.99) when it is newer."""
     import os
 
     out = Path(outdir)
@@ -482,7 +490,7 @@ def matrix_selftest():
 
     a, b = obj("m-a", "Alpha (Max)", "Alpha (max)", gpqa=0.5, intelligenceIndex=57.6, intelligenceIndexIsEstimated=True), obj("m-b", "Beta", "Beta", gpqa=None)
     row = {"attrs": {**__import__("fm_model_picker.embedded", fromlist=["x"]).model_attrs(a)}, "series": {"gpqadiamond": 0.5, "intelligence-index": 57.6},
-           "table": {"Intelligence Index": "58*", "License": "Open"}, "observed_at": "2026-10-15T10:00:00Z", "page": "p", "batch": ["m-a"]}
+           "table": {"Intelligence Index": "58*", "License": "Open", "Output Speed": "95 tokens/s", "Reasoning Tokens per Task": "84k", "Cost per Task": "$5.98"}, "observed_at": "2026-10-15T10:00:00Z", "page": "p", "batch": ["m-a"]}
     board = {"Alpha (Max)": {"value": 1800.0, "raw": "1800", "ci": "-5 / +5", "rank": 1, "creator": "Acme"},
              "Ghost (Max)": {"value": 1700.0, "raw": "1700", "ci": None, "rank": 2, "creator": "Nowhere"}}
     page = {"ts": "2026-10-15T12:00:00Z", "leaderboard": board, "table_rows": [], "window": [a, b], "window_why": None, "rejects": [],
@@ -505,6 +513,10 @@ def matrix_selftest():
         assert est == "estimated", "the payload's estimated flag is kept"
         scale = {r[0]: r[1] for r in conn.execute("SELECT label, scale FROM metrics")}
         assert scale["License"] == "text" and scale["Intelligence Index"] == "raw" and scale["GPQA Diamond"] == "fraction", scale
+        units = {r[0]: (r[1], r[2], r[3]) for r in conn.execute(
+            "SELECT x.label, x.unit, x.scale, o.value FROM observations o JOIN metrics x ON x.id=o.metric_id WHERE o.source='comparison-table'")}
+        assert units["Output Speed"] == ("tokens/s", "quantity", 95.0) and units["Reasoning Tokens per Task"] == ("count", "quantity", 84000.0), units
+        assert units["Cost per Task"] == ("usd", "quantity", 5.98) and units["License"][2] is None, units
         cov, missing = collect.compute_coverage(first["view"], ["gpqa-diamond", "aa-briefcase"])
         assert cov["gpqadiamond"]["models"] == 1 and cov["gpqadiamond"]["sources"] >= {"embedded", "chart-window"}
         assert cov["aa-briefcase-elo"]["models"] == 2 and "aa-briefcase-elo" not in missing, "leaderboard rows count, matched or not"

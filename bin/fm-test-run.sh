@@ -862,7 +862,7 @@ tests/fm-mem-guard.test.sh 505
 tests/fm-model-freshness.test.sh 28096
 tests/fm-model-index-live-e2e.test.sh 1253
 tests/fm-model-index.test.sh 100613
-tests/fm-model-picker.test.sh 7000
+tests/fm-model-picker.test.sh 9000
 tests/fm-muse-harness.test.sh 46548
 tests/fm-muse-signals-live-e2e.test.sh 406
 tests/fm-nm-test-contract.test.sh 853

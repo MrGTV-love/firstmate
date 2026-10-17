@@ -5,17 +5,21 @@
 #                            [--stale-after-hours N]] [--db] [--chartdiff]
 # --selftest        fixture suite (calibration tables, embedded parser, fetch layer, sweep, matrix load, chart-diff); no network.
 # --coverage-only   rebuild coverage.md from aa.sqlite, else from the cache; no acquisition.
-# (no flags)        evaluation pages and the model-page cohort into snapshot.json.
-# --evals-only      evaluation pages only.
+# (no flags)        revalidate the evaluation pages (unless --replay) and read the model-page cohort from the cache, with the
+#                   network only on a miss, into snapshot.json.
+# --evals-only      the evaluation pages only; revalidated unless --replay.
 # --sweep           discover the model universe from the sitemap and selector catalog and give every slug values or a
 #                   recorded reason. Cache first; the network is used only for slugs without values (batches of 5, 0.8 s
-#                   after every attempt, one fetch at a time). Without --replay it also revalidates discovery and
-#                   evaluation pages. Exits non-zero if any slug has neither values nor a reason.
+#                   after every attempt, one fetch at a time). Without --replay it also revalidates the sitemap and the
+#                   selector catalog. Exits non-zero if any slug has neither values nor a reason.
 # --stale-after-hours N   with --sweep, treat cached compare pages older than N hours as missing and ignore remembered 404s older than N hours
 #                   (a daily run passes 24; without it nothing expires).
 # --replay          cache-first everywhere: no revalidation; with --chartdiff, no live re-fetch (a mismatch stays a mismatch).
 # --embedded-only   --sweep from the cache alone: no network at all.
-# --db              rebuild aa.sqlite from raw evidence and write projection/<slug>.json per catalog model.
+# --db              rebuild aa.sqlite from raw evidence and write projection/<slug>.json per catalog model. A rebuild sets
+#                   verdict.json to UNTRUSTED (matrix rebuilt without chart-diff); only --chartdiff restores a verdict.
+#                   In a projection, as_of is the newest observed_at across its metrics; each metric's own observed_at is
+#                   authoritative for freshness; a rounded eval-leaderboard value can win over a full-precision value when newer.
 # --chartdiff       compare table, payload and rendered-chart values; re-fetch each disagreeing page once; rebuild
 #                   aa.sqlite; write reconcile.md and verdict.json. Exit 3 when the verdict is UNTRUSTED.
 # Order when combined: acquisition, chart-diff, database. Long runs go through bin/fm-proc-budget.sh.

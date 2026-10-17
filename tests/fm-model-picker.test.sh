@@ -2,7 +2,9 @@
 # Model-picker collector behavior through bin/fm-model-picker.sh: the fixture suite, the
 # data-root contract, calibration tables created first and never touched by a matrix rebuild,
 # exact-slug ingest from a seeded cache (banned route and unknown-age pages ignored), the
-# chart-diff verdict on an empty compared set, and a clean error when the network is off.
+# chart-diff verdict on an empty compared set, a clean error when the network is off, unit
+# cells stored as numbers with a unit, a verdict that goes UNTRUSTED when the matrix is rebuilt
+# without chart-diff, and which network requests each flag makes against a scripted site.
 set -eu
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
@@ -137,9 +139,234 @@ test_network_off_is_a_clean_error() {
   pass "model picker: network off with an empty cache is a clean error"
 }
 
+seed_units() {  # <data-dir>: one compare page whose table rows carry every unit family
+  mkdir -p "$1/raw"
+  python3 -I - "$1/raw" <<'PY'
+import json, sys
+from pathlib import Path
+raw = Path(sys.argv[1])
+objs = [{"id": "id-" + s, "slug": s, "name": s.upper(), "creator": {"name": "Acme", "slug": "acme"}, "intelligenceIndex": i}
+        for s, i in (("m-a", 50.4), ("m-b", 40.2))]
+rows = [
+    ("Intelligence Index", "50", "40"),
+    ("Reasoning Tokens per Task", "37k", "84k"),
+    ("Output Tokens to Run Intelligence Index", "260M", "8M"),
+    ("Output Speed", "95 tokens/s", "121 tokens/s"),
+    ("Time to First Token", "10.19s", "250ms"),
+    ("Context Window", "128k tokens ~192 A4 pages of size 12 Arial font", "1000k tokens ~1,500 A4 pages of size 12 Arial font"),
+    ("Total parameters", "1.6T", "37B"),
+    ("Active parameters", "3.6B", "3B"),
+    ("Cost per Task", "$5.98", "$0.02"),
+    ("Cost to Run Intelligence Index", "$8,708", "$0"),
+    ("Reasoning", "Yes", "No"),
+    ("Release Date", "September 2026", "April 2026"),
+]
+head = "".join(f"<th>Acme {o['name']}</th>" for o in objs)
+body = "".join(f"<tr><td>{r[0]}</td><td>{r[1]}</td><td>{r[2]}</td></tr>" for r in rows)
+page = (f"<html><table><thead><tr><th></th>{head}</tr></thead><tbody>{body}</tbody></table><script>"
+        + json.dumps({"models": objs}, separators=(",", ":")).replace('"', '\\"') + "</script></html>")
+(raw / "models_comparisons_m-a-vs-m-b.html").write_text(page)
+(raw / "models_comparisons_m-a-vs-m-b.html.ts").write_text("2026-10-15T20:00:00Z")
+PY
+}
+
+metric_row() {  # <db> <label>: unit|scale|values of one comparison-table metric
+  sql "$1" "select x.unit, x.scale, group_concat(o.value, ',') from (select * from observations order by value) o join metrics x on x.id=o.metric_id where o.source='comparison-table' and x.label='$2' group by x.id"
+}
+
+test_unit_cells_are_stored_as_numbers() {
+  local data=$TMP_ROOT/units db
+  seed_units "$data"
+  run "$data" --db
+  expect_code 0 "$CODE" "--db on unit-bearing cells"
+  db=$data/aa.sqlite
+  assert_equals "0" "$(sql "$db" "select count(*) from observations o join metrics x on x.id=o.metric_id where x.label='Reasoning Tokens per Task' and o.value is null")" "k-suffixed token cells are not NULL"
+  assert_equals "count|quantity|37000.0,84000.0" "$(metric_row "$db" "Reasoning Tokens per Task")" "k suffix expands to a count"
+  assert_equals "count|quantity|8000000.0,260000000.0" "$(metric_row "$db" "Output Tokens to Run Intelligence Index")" "M suffix expands to a count"
+  assert_equals "count|quantity|3000000000.0,3600000000.0" "$(metric_row "$db" "Active parameters")" "B suffix expands to a count"
+  assert_equals "count|quantity|37000000000.0,1600000000000.0" "$(metric_row "$db" "Total parameters")" "B and T suffixes share one unit"
+  assert_equals "tokens/s|quantity|95.0,121.0" "$(metric_row "$db" "Output Speed")" "tokens/s is a unit"
+  assert_equals "s|quantity|0.25,10.19" "$(metric_row "$db" "Time to First Token")" "s and ms are both seconds"
+  assert_equals "tokens|quantity|128000.0,1000000.0" "$(metric_row "$db" "Context Window")" "a context-window cell reads its tokens"
+  assert_equals "usd|quantity|0.02,5.98" "$(metric_row "$db" "Cost per Task")" "a dollar cell has a unit"
+  assert_equals "usd|quantity|0.0,8708.0" "$(metric_row "$db" "Cost to Run Intelligence Index")" "dollars with a thousands comma"
+  assert_equals "points|raw|40.0,50.0" "$(metric_row "$db" "Intelligence Index")" "a bare number takes the unit its source series states"
+  assert_equals "None|text|None" "$(metric_row "$db" "Reasoning")" "a text row has no unit, a text scale and no value"
+  assert_equals "None|text|None" "$(metric_row "$db" "Release Date")" "a date row has no unit, a text scale and no value"
+  assert_equals "4" "$(sql "$db" "select count(*) from observations o join metrics x on x.id=o.metric_id where x.label in ('Reasoning', 'Release Date') and o.value is null and o.raw is not null")" "the text cells stay in the matrix as raw text"
+  python3 -I -c '
+import json, sys
+m = json.load(open(sys.argv[1]))["metrics"]
+assert "reasoning" not in m and "releasedate" not in m, sorted(m)
+for cid in ("reasoningtokenspertask", "outputspeed", "timetofirsttoken", "costpertask", "contextwindow", "totalparameters"):
+    assert m[cid]["value"] is not None and m[cid]["unit"] and m[cid]["scale"] == "quantity", (cid, m[cid])
+assert m["reasoningtokenspertask"]["value"] == 84000.0 and m["reasoningtokenspertask"]["unit"] == "count"
+assert m["timetofirsttoken"]["unit"] == "s" and m["outputspeed"]["unit"] == "tokens/s" and m["costpertask"]["unit"] == "usd"
+' "$data/projection/m-b.json" || fail "the projection carries the unit-bearing metrics and no text rows"
+  pass "model picker: unit-bearing cells are stored as numbers with a unit; text rows stay out of the projections"
+}
+
+seed_discovery() {  # <data-dir>: a cached sitemap and selector catalog naming m-a and m-b
+  mkdir -p "$1/raw"
+  printf '%s' '<urlset><url><loc>https://artificialanalysis.ai/models/m-a</loc></url><url><loc>https://artificialanalysis.ai/models/m-b</loc></url></urlset>' >"$1/raw/sitemap.xml.html"
+  printf '%s' '<html>{"slug":"m-a","name":"M-A","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}{"slug":"m-b","name":"M-B","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}</html>' >"$1/raw/models_comparisons.html"
+}
+
+test_rebuild_without_chartdiff_is_untrusted() {
+  local data=$TMP_ROOT/stale
+  seed_cache "$data"
+  seed_discovery "$data"
+  run "$data" --sweep --embedded-only --chartdiff
+  expect_code 0 "$CODE" "day 1: sweep with chart-diff"
+  assert_contains "$OUT" "chart-diff: TRUSTED" "day 1 is judged"
+  assert_contains "$(cat "$data/verdict.json")" '"verdict": "TRUSTED"' "day 1 verdict is TRUSTED"
+  sed -i.bak 's|<td>50</td>|<td>99</td>|' "$data/raw/models_comparisons_m-a-vs-m-b.html"
+  run "$data" --sweep --embedded-only --db
+  expect_code 0 "$CODE" "day 2: sweep and database rebuild without chart-diff"
+  assert_contains "$(cat "$data/verdict.json")" '"verdict": "UNTRUSTED"' "a rebuild without chart-diff cannot keep yesterday's TRUSTED"
+  assert_contains "$(cat "$data/verdict.json")" '"reason": "matrix rebuilt without chart-diff"' "the verdict names why"
+  assert_contains "$(cat "$data/verdict.json")" '"ran_at": "20' "the verdict carries the time"
+  assert_contains "$OUT" "verdict.json is UNTRUSTED" "the rebuild says so"
+  run "$data" --db
+  assert_contains "$(cat "$data/verdict.json")" '"verdict": "UNTRUSTED"' "a plain --db rebuild is UNTRUSTED too"
+  sed -i.bak 's|<td>99</td>|<td>50</td>|' "$data/raw/models_comparisons_m-a-vs-m-b.html"
+  run "$data" --chartdiff --replay
+  expect_code 0 "$CODE" "day 3: chart-diff over the rebuilt matrix"
+  assert_contains "$(cat "$data/verdict.json")" '"verdict": "TRUSTED"' "only chart-diff restores a verdict"
+  pass "model picker: a matrix rebuilt without chart-diff turns a TRUSTED verdict UNTRUSTED until chart-diff runs"
+}
+
+FLAG_N=0
+FLAG_PY=$(cat <<'PY'
+import contextlib, io, sys
+from pathlib import Path
+from fm_model_picker import collect
+
+root, flags = sys.argv[1], sys.argv[2:]
+collect.configure(root)
+SITEMAP = "<urlset>" + "".join(f"<url><loc>{collect.BASE}/models/{s}</loc></url>" for s in ("m-a", "m-b", "m-new")) + "</urlset>"
+CATALOG = "<html>" + "".join(
+    '{"slug":"%s","name":"%s","deprecated":false,"releaseDate":"2026-01-01","creator":{"slug":"acme","name":"Acme"}}' % (s, s.upper())
+    for s in ("m-a", "m-b")) + "</html>"
+
+
+def site(path):
+    if path == "/sitemap.xml":
+        return SITEMAP
+    if path == "/models/comparisons":
+        return CATALOG
+    if path.startswith("/models/comparisons/"):
+        return collect._fake_page([collect._fake_obj(n, intelligenceIndex=30.0) for n in path[len("/models/comparisons/"):].split("-vs-")])
+    return "<html></html>"
+
+
+def put(path, text):
+    f = collect.cache_file(path)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(text, encoding="utf-8")
+    Path(str(f) + ".ts").write_text("2026-01-01T00:00:00Z", encoding="utf-8")
+
+
+for slug in collect.EVAL_SLUGS:
+    put("/evaluations/" + slug, "<html></html>")
+for slug in collect.COHORT:
+    put("/models/" + slug, "<html></html>")
+put("/sitemap.xml", SITEMAP)
+put("/models/comparisons", CATALOG)
+put("/models/comparisons/m-a-vs-m-b", collect._fake_page([collect._fake_obj(n, intelligenceIndex=30.0) for n in ("m-a", "m-b")]))
+
+requested = []
+
+
+class Resp:
+    def __init__(self, body):
+        self.body = body
+
+    def read(self):
+        return self.body.encode("utf-8")
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def opener(req, timeout=None):
+    path = req.full_url[len(collect.BASE):]
+    requested.append(path)
+    return Resp(site(path))
+
+
+collect._urlopen, collect._sleep = opener, lambda seconds: None
+sys.argv = ["fm-model-picker", *flags]
+with contextlib.redirect_stdout(io.StringIO()):
+    code = collect.cli()
+for path in requested:
+    print("REQ", path)
+print("EXIT", code)
+PY
+)
+
+flag_run() {  # <flags...>: a fresh seeded data root, a scripted site; sets OUT to the REQ lines and the EXIT line
+  local data=$TMP_ROOT/flags-$((++FLAG_N))
+  CODE=0
+  OUT=$(PYTHONPATH="$ROOT/bin" PYTHONDONTWRITEBYTECODE=1 python3 -c "$FLAG_PY" "$data" "$@") || CODE=$?
+  expect_code 0 "$CODE" "flag run: $*"
+  FLAG_DATA=$data
+}
+
+requests_matching() {  # <grep pattern>: how many requests of the last flag run match
+  printf '%s\n' "$OUT" | grep -c -- "$1" || true
+}
+
+test_flags_decide_which_requests_are_made() {
+  flag_run
+  assert_equals "33" "$(requests_matching '^REQ /evaluations/')" "no flags: every evaluation page is revalidated"
+  assert_equals "0" "$(requests_matching '^REQ /models/')" "no flags: cached cohort model pages are not revalidated"
+  assert_equals "0" "$(requests_matching '^REQ /sitemap.xml')" "no flags: no sweep"
+  flag_run --evals-only
+  assert_equals "33" "$(requests_matching '^REQ /evaluations/')" "--evals-only revalidates the evaluation pages"
+  assert_equals "33" "$(requests_matching '^REQ')" "--evals-only skips the cohort and the sweep"
+  flag_run --replay
+  assert_equals "0" "$(requests_matching '^REQ')" "--replay: no revalidation"
+  flag_run --evals-only --replay
+  assert_equals "0" "$(requests_matching '^REQ')" "--evals-only --replay reads the cache"
+  flag_run --sweep
+  assert_equals "33" "$(requests_matching '^REQ /evaluations/')" "--sweep revalidates the evaluation pages"
+  assert_equals "1" "$(requests_matching '^REQ /sitemap.xml$')" "--sweep revalidates the sitemap"
+  assert_equals "1" "$(requests_matching '^REQ /models/comparisons$')" "--sweep revalidates the selector catalog"
+  assert_equals "1" "$(requests_matching '^REQ /models/comparisons/m-new$')" "--sweep fetches the slug without values"
+  assert_equals "0" "$(requests_matching '^REQ /models/comparisons/m-a')" "--sweep leaves cached slugs alone"
+  flag_run --sweep --replay
+  assert_equals "REQ /models/comparisons/m-new
+EXIT 0" "$OUT" "--sweep --replay: the network is used only for the slug without values"
+  flag_run --sweep --embedded-only
+  assert_equals "EXIT 0" "$OUT" "--embedded-only makes no request"
+  assert_contains "$(cat "$FLAG_DATA/snapshot.json")" "not fetched: network use is off" "--embedded-only records why the slug has no values"
+  flag_run --sweep --replay --stale-after-hours 1
+  assert_equals "1" "$(requests_matching '^REQ /models/comparisons/m-a-vs-m-b-vs-m-new$')" "--stale-after-hours re-fetches a cached compare page older than the limit"
+  flag_run --replay --models m-zz
+  assert_equals "REQ /models/m-zz
+EXIT 0" "$OUT" "--models replaces the cohort, and a cohort page is fetched only on a cache miss"
+  flag_run --coverage-only
+  assert_equals "EXIT 0" "$OUT" "--coverage-only makes no request"
+  assert_present "$FLAG_DATA/coverage.md" "--coverage-only writes coverage.md"
+  flag_run --db
+  assert_equals "EXIT 0" "$OUT" "--db makes no request"
+  assert_present "$FLAG_DATA/aa.sqlite" "--db writes the database"
+  flag_run --chartdiff
+  assert_equals "EXIT 0" "$OUT" "--chartdiff re-fetches nothing when the paths agree"
+  assert_contains "$(cat "$FLAG_DATA/verdict.json")" '"verdict": "TRUSTED"' "--chartdiff writes the verdict"
+  pass "model picker: each flag makes the network requests its header promises"
+}
+
 test_selftest_and_help
 test_data_root_resolution
 test_calibration_first_and_preserved
 test_seeded_cache_ingest
 test_empty_compared_set_is_not_zero_disagreements
 test_network_off_is_a_clean_error
+test_unit_cells_are_stored_as_numbers
+test_rebuild_without_chartdiff_is_untrusted
+test_flags_decide_which_requests_are_made

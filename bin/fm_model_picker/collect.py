@@ -23,6 +23,7 @@ import time
 import urllib.error
 import urllib.request
 import html as htmllib
+from decimal import Decimal
 from pathlib import Path
 
 from . import aadb, chartdiff, embedded
@@ -102,11 +103,11 @@ class CacheMiss(FetchError):
 
 
 class Fetched:
-    """One page: its text, its real fetch time ('unknown' without a sidecar), whether it
-    came from cache, and whether it came from a legacy name cut at 180 characters."""
+    """One page: its text, its real fetch time ('unknown' without a sidecar), and whether it
+    came from cache."""
 
-    def __init__(self, text, ts, cached, truncated=False):
-        self.text, self.ts, self.cached, self.truncated = text, ts, cached, truncated
+    def __init__(self, text, ts, cached):
+        self.text, self.ts, self.cached = text, ts, cached
 
 
 def utc_now():
@@ -170,8 +171,7 @@ def fetch_page(path, refresh=False, network=True, skip_legacy=False):
         ts_file = Path(str(cache) + ".ts")
         ts = ts_file.read_text(encoding="utf-8").strip() if ts_file.exists() else "unknown"
         FETCH_TS[path] = ts
-        return Fetched(cache.read_text(encoding="utf-8", errors="replace"), ts, True,
-                       cache == legacy and len(_legacy_stem(path)) > 180)
+        return Fetched(cache.read_text(encoding="utf-8", errors="replace"), ts, True)
     if path in load_404s():
         raise FetchError(path, 404, "remembered 404")
     if not network:
@@ -320,6 +320,34 @@ def parse_val(raw):
         return float(v.rstrip("%")) / (100 if raw.endswith("%") else 1)
     except ValueError:
         return None
+
+
+_NUM = r"(?P<n>\d[\d,]*(?:\.\d+)?)"
+MAGNITUDE = {"k": Decimal(10) ** 3, "M": Decimal(10) ** 6, "B": Decimal(10) ** 9, "T": Decimal(10) ** 12}
+# (unit, cell pattern, factor): the cell states the unit; a k/M/B/T suffix sets the factor itself.
+CELL_RULES = (
+    ("usd", re.compile(rf"\${_NUM}$"), Decimal(1)),
+    ("tokens/s", re.compile(rf"{_NUM} tokens/s$"), Decimal(1)),
+    ("s", re.compile(rf"{_NUM}s$"), Decimal(1)),
+    ("s", re.compile(rf"{_NUM}ms$"), Decimal("0.001")),
+    ("tokens", re.compile(rf"{_NUM}(?P<mag>[kMBT]) tokens(?:\s|$)"), Decimal(1)),
+    ("count", re.compile(rf"{_NUM}(?P<mag>[kMBT])$"), Decimal(1)),
+)
+
+
+def parse_cell(raw):
+    """(value, unit) of a shown table cell; (None, None) when it holds no number. The unit comes
+    from the cell: '$5.98' usd, '95 tokens/s', '10.19s' and '250ms' (stored in s), '128k tokens
+    ~192 A4 pages' tokens, a percent fraction. A bare '37k', '260M' or '37B' is expanded to a
+    plain count (the label says what is counted). A bare number has no unit."""
+    cell = raw.strip().rstrip("*")
+    for unit, rx, factor in CELL_RULES:
+        m = rx.match(cell)
+        if m:
+            mag = m.groupdict().get("mag")
+            return float(Decimal(m["n"].replace(",", "")) * (MAGNITUDE[mag] if mag else factor)), unit
+    value = parse_val(cell)
+    return value, ("fraction" if value is not None and cell.endswith("%") else None)
 
 
 def norm_name(name: str):
@@ -849,7 +877,15 @@ def run_selftest():
     ct, mt = compute_coverage(twice, ["math-500"])
     assert ct["intelligence-index"]["models"] == 2 and not ct["intelligence-index"]["partial"], ct
     assert ct["math500"]["models"] == 1 and ct["math500"]["partial"] and "math500" not in mt, "window-only series is partial, not missing"
-    print("selftest: ok — all-wrong sources yield mismatches; two-model ingest complete; numeric-row headers rejected; thead structural; identity fails closed; coverage is count-based with aliases")
+    for cell, want in (("37k", (37000.0, "count")), ("1.6T", (1.6e12, "count")), ("260M", (2.6e8, "count")), ("3.6B", (3.6e9, "count")),
+                       ("128k tokens ~192 A4 pages of size 12 Arial font", (128000.0, "tokens")),
+                       ("95 tokens/s", (95.0, "tokens/s")), ("10.19s", (10.19, "s")), ("250ms", (0.25, "s")),
+                       ("$8,708", (8708.0, "usd")), ("$5.98", (5.98, "usd")), ("85.7%", (0.857, "fraction")),
+                       ("514", (514.0, None)), ("58*", (58.0, None))):
+        assert parse_cell(cell) == want, f"{cell!r}: {parse_cell(cell)} != {want}"
+    for text in ("Yes", "Supports: text and image", "September 2026", "Apache 2.0", "128k tokens/s", "5min"):
+        assert parse_cell(text) == (None, None), f"{text!r} holds no number the rules know"
+    print("selftest: ok — all-wrong sources yield mismatches; two-model ingest complete; numeric-row headers rejected; thead structural; identity fails closed; coverage is count-based with aliases; unit cells parse")
 
 
 def run_fetch_selftest():
@@ -900,7 +936,7 @@ def run_fetch_selftest():
             RAW.mkdir(parents=True, exist_ok=True)
             (RAW / (_legacy_stem(long_a)[:180] + ".html")).write_text("legacy", encoding="utf-8")
             hit = fetch_page(long_a, network=False)
-            assert hit.cached and hit.truncated and hit.text == "legacy" and hit.ts == "unknown", "legacy name stays readable"
+            assert hit.cached and hit.text == "legacy" and hit.ts == "unknown", "legacy name stays readable"
             script[:] = ["fresh"]
             fresh = fetch_page(long_a, skip_legacy=True, refresh=True)
             assert fresh.text == "fresh" and not fresh.cached and cache_file(long_a).exists()
@@ -1203,8 +1239,15 @@ def coverage_only():
     report_coverage(aadb.coverage_view(models, obs))
 
 
+def write_verdict(ran_at, line, **fields):
+    _atomic_write(HERE / "verdict.json", json.dumps(
+        {"ran_at": ran_at, "verdict": line.split(" ", 1)[0], "line": line, **fields}, indent=1) + "\n")
+
+
 def build_db(slug_status):
-    """Rebuild aa.sqlite from raw evidence, recompute coverage, write the projections last."""
+    """Rebuild aa.sqlite from raw evidence, recompute coverage, write the projections last.
+    verdict.json goes UNTRUSTED first: only the chart-diff that follows a rebuild can restore it."""
+    write_verdict(utc_now(), "UNTRUSTED (matrix rebuilt without chart-diff)", reason="matrix rebuilt without chart-diff")
     conn = aadb.open_db(HERE / "aa.sqlite")
     result = aadb.migrate(conn, slug_status=slug_status)
     print(f"[db] {HERE / 'aa.sqlite'}: {result['models']} models, {result['metrics']} metrics, "
@@ -1223,9 +1266,7 @@ def run_chart_diff(conn_factory, network):
     chartdiff.write_report(HERE / "reconcile.md", results, raw, verdict_line, nc, refetched, ran_at)
     checked = sum(r["checked"] for r in results.values())
     mism = sum(len(r["mismatches"]) for r in results.values())
-    _atomic_write(HERE / "verdict.json", json.dumps(
-        {"ran_at": ran_at, "verdict": verdict_line.split(" ", 1)[0], "line": verdict_line, "checked": checked,
-         "mismatches": mism, "not_compared": nc[0], "pages_refetched": len(refetched)}, indent=1) + "\n")
+    write_verdict(ran_at, verdict_line, checked=checked, mismatches=mism, not_compared=nc[0], pages_refetched=len(refetched))
     print(f"chart-diff: {verdict_line}; {checked} values compared across {len(results)} metric/path pairings; "
           f"{len(refetched)} pages re-fetched once for mismatches", flush=True)
     print(f"reconcile.md and verdict.json written under {HERE}", flush=True)
@@ -1241,8 +1282,8 @@ def parse_args(argv):
     flags = {
         "--selftest": "run the fixture suite (no network)",
         "--coverage-only": "rebuild coverage.md from the database or cache, no acquisition",
-        "--evals-only": "acquire evaluation pages only (no model-page cohort, no sweep)",
-        "--sweep": "sweep the discovered model universe (cache-first; network only for slugs without values)",
+        "--evals-only": "acquire evaluation pages only (no model-page cohort, no sweep); revalidated unless --replay",
+        "--sweep": "sweep the discovered model universe (network only for slugs without values)",
         "--replay": "cache-first everywhere: no revalidation; with --chartdiff, no live re-fetch of disagreeing pages",
         "--embedded-only": "sweep from the cache alone: no network at all",
         "--db": "rebuild aa.sqlite from raw evidence and write the per-candidate projections",
@@ -1280,7 +1321,7 @@ def main(argv=None):
     sweeping = args.sweep or args.embedded_only
     acquire = sweeping or args.evals_only or not (args.db or args.chartdiff)
     network = not args.embedded_only
-    live = acquire and not args.replay and not args.embedded_only and sweeping
+    live = not args.replay and not args.embedded_only
     snap_file = HERE / "snapshot.json"
     prev = {}
     if snap_file.exists():
@@ -1317,6 +1358,7 @@ def main(argv=None):
         code = run_chart_diff(factory, network and not args.replay)
     elif args.db:
         conn = build_db(slug_status)
+        print("verdict.json is UNTRUSTED: matrix rebuilt without chart-diff; run --chartdiff to judge it", flush=True)
     if conn is not None:
         n = aadb.write_projections(conn, HERE / "projection")
         print(f"[db] {n} per-candidate JSON projections written under {HERE / 'projection'}", flush=True)

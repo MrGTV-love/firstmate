@@ -887,6 +887,16 @@ The whole root is private and gitignored with `data/`.
 A matrix rebuild never touches `dispatch_log` or `outcomes`.
 The matrix is a pure function of the cache, so a rebuild gives the same row counts.
 A consumer must not read the matrix while `verdict.json` says `UNTRUSTED`.
+Every rebuild of `aa.sqlite` first rewrites `verdict.json` as `UNTRUSTED` with the reason `matrix rebuilt without chart-diff` and the time; only the chart-diff that follows a rebuild (`--chartdiff`) writes a real verdict again.
+
+A table cell's unit comes from the cell: `$5.98` is `usd`, `95 tokens/s` is `tokens/s`, `10.19s` and `250ms` are `s`, `128k tokens ~192 A4 pages` is `tokens`, and a percent is a `fraction`.
+A bare `37k`, `260M`, `37B`, or `1.6T` is expanded to a plain count (`count`); the metric label says what is counted.
+`metrics.scale` is `fraction` for percent cells, `text` when no cell holds a number, `quantity` when the cells hold numbers in a unit, and `raw` for a bare number with no unit; a scale the source states keeps the source's word.
+Text rows (`Reasoning`, `Open Source (Weights)`, `License`, the modalities, `Release Date`, `Knowledge Cutoff`) stay in `aa.sqlite` with no value and are not in the projections.
+
+In a projection, `as_of` is the newest `observed_at` across the model's metrics, so it says when the model last got any new data and not that every metric is that fresh.
+Each metric's own `observed_at` is authoritative for freshness.
+For each canonical metric the newest observation wins, and a tie goes to the embedded full-precision value; a rounded eval-leaderboard value (`1803`) can therefore win over a full-precision value (`1802.99`) when it is newer.
 Run `bin/fm-model-picker.sh --selftest` for the fixture suite; [`tests/fm-model-picker.test.sh`](../tests/fm-model-picker.test.sh) covers the executable.
 
 ## Turn-end pane-churn absorb (config/turnend-churn-absorb)

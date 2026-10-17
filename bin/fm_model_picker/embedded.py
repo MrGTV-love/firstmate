@@ -177,9 +177,7 @@ def model_series(obj):
 def model_attrs(obj):
     """The catalog fields stored on the models table."""
     return {"slug": obj["slug"], "name": obj["name"], "creator": obj["creator"]["name"],
-            "creator_slug": obj["creator"].get("slug") or "",
             "deprecated": bool(obj.get("deprecated")), "release_date": obj.get("releaseDate") or "",
-            "short_name": obj.get("shortName") or "",
             "estimated": [cid for cid, flag in ESTIMATED_FLAGS.items() if obj.get(flag) is True]}
 
 
