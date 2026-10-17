@@ -1,0 +1,23 @@
+ok - a shared-slot claim release survives an endpoint refusal and session start, and the sharer then finishes normally
+ok - a finished task on a dirty reassigned slot retires only its own records and endpoint, preserving claimant work and processes
+ok - a task on a reassigned slot with no merged PR and an unlanded own branch refuses and keeps its records
+ok - a slot claim decides slot administration while the retiring copy decides runtime retirement, for every claimant and copy shape
+ok - teardown of a reassociated record keeps the non-pool current copy and every prior copy untouched
+ok - teardown of a reassociated record still refuses unlanded work in the current copy
+ok - teardown of a record whose old slot was released keeps the non-pool current copy
+ok - teardown refuses to return a pool slot another record preserves as a prior copy
+ok - own prior copies refuse only a pool return that cannot prove them landed; a prior that is or encloses the slot does not block it, with or without --force
+ok - the reverse nested shape with a prior copy outside .claude/ proves and removes it, then returns the slot
+ok - a slot's foreign copies are all proved before any is removed, and then all are released
+ok - a landed, clean own nested copy locked by Vernant is released through the closeout driver, removed, and the slot is returned
+ok - a locked own copy with unlanded commits, unsaved or unique ignored files, or a lock that is not Vernant's is refused and nothing changes
+ok - a foreign copy that is still refused keeps the locked own copy, the slot and the record in place
+ok - a closeout driver refusal leaves a locked own copy, the slot claim, the lease and the task record in place
+ok - returning the enclosing slot aborts its parked run and retires its launch agent before the return
+ok - shared nested cleanup concludes an owned run, retires its launch agent and reaps its process, preserving the parked root, foreign runs and late work
+ok - a stale-lock cleanup in the enclosing slot proves it again before the reset, with or without --force
+ok - a plain re-run after the post-lock refusal proves the enclosing slot again and returns it once its work lands
+ok - a refusal at the slot proof, the retire step, either proof before removal or the return is safe to re-run with a plain teardown
+ok - the post-lock proof does not refuse over nested copies teardown itself already removed
+ok - ordinary subordinate cleanup admits validated ancestors but preserves their priors and Git storage
+exit=0

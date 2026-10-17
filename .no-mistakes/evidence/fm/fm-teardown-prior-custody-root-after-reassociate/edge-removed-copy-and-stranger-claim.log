@@ -1,0 +1,2 @@
+ok - a rerun finishes a teardown whose copy is already removed, refuses an unlanded one, and a slot reassigned to a stranger keeps its copies
+exit=0

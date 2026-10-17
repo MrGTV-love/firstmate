@@ -1,0 +1,12 @@
+=== BASE bin: test_teardown_after_a_joint_reassociation_removes_only_the_tasks_own_copy
+not ok - a-ab: the first task's teardown must remove its own copy
+REFUSED: task peer-a-a-ab's cleanup target /Users/charlesabrooker/tmp/fm-control-reassociate.qm0hcp/peer-a-ab/pool/139/repo/.claude/worktrees/peer-a-a-ab is also task peer-b-a-ab's recorded prior_worktree (/Users/charlesabrooker/tmp/fm-control-reassociate.qm0hcp/peer-a-ab/pool/139/repo); preserved prior_worktree custody overlaps it, so nothing was changed - not even with --force.: expected exit 0, got 1
+rc=
+=== BASE bin: test_teardown_after_a_joint_reassociation_releases_a_vernant_locked_copy_through_the_driver
+not ok - released: a landed locked copy must be released
+REFUSED: task locked-a-released's cleanup target /Users/charlesabrooker/tmp/fm-control-reassociate.DYEmZU/teardown-locked-released/pool/139/repo/.claude/worktrees/locked-a-released is also task locked-b-released's recorded prior_worktree (/Users/charlesabrooker/tmp/fm-control-reassociate.DYEmZU/teardown-locked-released/pool/139/repo); preserved prior_worktree custody overlaps it, so nothing was changed - not even with --force.: expected exit 0, got 1
+rc=
+=== BASE bin: test_teardown_after_a_joint_reassociation_finishes_a_removed_copy_and_leaves_a_reassigned_slot
+not ok - copy-already-removed: a rerun must finish
+REFUSED: task edge-a-copy-already-removed's cleanup target /Users/charlesabrooker/tmp/fm-control-reassociate.EViY3H/teardown-edge-copy-already-removed/pool/139/repo is also task edge-b-copy-already-removed's recorded prior_worktree (/Users/charlesabrooker/tmp/fm-control-reassociate.EViY3H/teardown-edge-copy-already-removed/pool/139/repo); preserved prior_worktree custody overlaps it, so nothing was changed - not even with --force.: expected exit 0, got 1
+rc=
