@@ -1,0 +1,31 @@
+=== S8a live run with ci step running: ci log read fresh every call; turning green is seen at once ===
+[x4 reads] verdict: state: working · source: run-step · validating (running) · run: 01RUN
+ci-log calls: 4 (expect 4)
+ls: /Users/charlesabrooker/tmp/fm-nmlive.HaxOsN/cases/s8a/state/.nm-read-cache-cached: No such file or directory 
+[after CI went green] state: done · source: run-step · checks green: PR ready for review (still monitoring for merge/close): https://example.invalid/o/r/pull/9 · run: 01RUN
+
+=== S8b finished run (failed, held-green shape): ci log read once, then served ===
+[base x5] verdict: state: failed · source: run-step · run failed · run: 01RUN
+[base] total nm calls: 20; ci-log calls: 5; git scans: 10
+[target x5] verdict: state: failed · source: run-step · run failed · run: 01RUN
+[target] total nm calls: 4; ci-log calls: 1; git scans: 2
+[target] cache entries: choice ci-01RUN run-01RUN status 
+
+=== S9 off switch: exact word 'off' disables; OFF/0/false/no do NOT (cache stays on) ===
+FM_CREW_STATE_NM_CACHE=off -> calls over 3 reads: 9; cache dir: absent
+FM_CREW_STATE_NM_CACHE=OFF -> calls over 3 reads: 3; cache dir: present
+FM_CREW_STATE_NM_CACHE=0 -> calls over 3 reads: 3; cache dir: present
+FM_CREW_STATE_NM_CACHE=false -> calls over 3 reads: 3; cache dir: present
+FM_CREW_STATE_NM_CACHE=no -> calls over 3 reads: 3; cache dir: present
+FM_CREW_STATE_NM_CACHE=on -> calls over 3 reads: 3; cache dir: present
+
+=== S10 reused task id on another worktree/branch must not read the old cache ===
+old: finished, cache entries: choice run-01RUN status 
+new task read: state: working · source: run-step · validating (running) · run: 02NEW
+
+=== S11 corrupt/truncated/garbage cache entries are ignored, not trusted ===
+garbage entries -> new calls: 3; same verdict: yes
+empty entry -> verdict same: yes
+
+=== S12 unwritable state dir: read still works ===
+verdict: state: done · source: run-step · run passed: PR state unknown (no PR identity) · run: 01RUN ; calls=3

@@ -1,0 +1,2 @@
+ok - teardown closes its own backlog item before reporting success
+bash tests/fm-teardown.test.sh test_teardown_closes_the_backlog_item_itself  2.82s user 6.21s system 68% cpu 13.131 total

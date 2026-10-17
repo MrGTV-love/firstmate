@@ -1,0 +1,37 @@
+=== S1 finished run x10 reads: base vs target ===
+[base] verdict: state: done · source: run-step · run passed: PR state unknown (no PR identity) · run: 01RUN
+[base] no-mistakes calls over 10 reads: 30; git status scans: 20
+[target] verdict: state: done · source: run-step · run passed: PR state unknown (no PR identity) · run: 01RUN
+[target] no-mistakes calls over 10 reads: 3; git status scans: 2
+[target] cache dir:
+total 24
+drwxr-xr-x  5 charlesabrooker  staff  160 Oct 17 17:21 .
+drwxr-xr-x  5 charlesabrooker  staff  160 Oct 17 17:21 ..
+-rw-r--r--  1 charlesabrooker  staff  115 Oct 17 17:21 choice
+-rw-r--r--  1 charlesabrooker  staff  237 Oct 17 17:21 run-01RUN
+-rw-r--r--  1 charlesabrooker  staff  237 Oct 17 17:21 status
+
+=== S2 live run x10 reads: must be fresh every time (target) ===
+[base] verdict: state: working · source: run-step · validating (running) · run: 01RUN
+[base] calls over 10 live reads: 30; git scans: 20; cache dir exists: no
+[target] verdict: state: working · source: run-step · validating (running) · run: 01RUN
+[target] calls over 10 live reads: 30; git scans: 20; cache dir exists: no
+
+=== S3 live run becomes finished mid-flight (run parks then completes): next read must see it ===
+state: working · source: run-step · validating (running) · run: 01RUN
+live reads: calls=6
+after completion: state: done · source: run-step · run passed: PR state unknown (no PR identity) · run: 01RUN
+re-read after completion: new calls=0
+
+=== S4 newer run replaces finished one ===
+state: done · source: run-step · run passed: PR state unknown (no PR identity) · run: 01RUN
+finished reads calls=3
+after new run: state: working · source: run-step · validating (running) · run: 01NEW
+cache dir contents: choice run-01RUN status 
+
+=== S5 failed read is never replayed (status rc=1 / timeout rc=124) ===
+fail reads: state: unknown · source: run-step · selected run unreadable; run ids: 01RUN | state: unknown · source: run-step · selected run unreadable; run ids: 01RUN ; calls=4; cache entries: choice status 
+recovered: state: done · source: run-step · run passed: PR state unknown (no PR identity) · run: 01RUN
+
+=== S6 status database missing: finished entry not trusted ===
+calls on read with no database: 2 (expect 2: bare status+overview re-read; run-id entry stays)
