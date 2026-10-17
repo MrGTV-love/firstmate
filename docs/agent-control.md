@@ -265,12 +265,13 @@ When an active task record owns that copy's work, including the retiring task it
 When no active record owns it, such as a finished record's nested copy left after records-only retirement or a worker's own `.claude/worktrees/` copy (Vernant's `start_task_worktree.py` creates and locks one), a ship teardown of the pool slot releases it itself once it proves all of these, in [`bin/fm-teardown-nested-lib.sh`](../bin/fm-teardown-nested-lib.sh):
 - No other active task record names the copy, even through a symlink alias, and no process runs in it.
 - No live process outside this teardown is the launcher named in its lock; a process teardown itself retires (one running in the task's copy, the slot, or the task's scratch directory) or a descendant of one is not counted, and a launcher pid that started after the lock file was written is a recycled pid and owns nothing.
+- Retire signals such a descendant launcher with TERM, recording the signal like the others, and waits briefly; a launcher that is still alive then keeps the copy, and the refusal names its pid.
 - It is a clean worktree root and holds no ignored file that exists nowhere else.
 - Its work is landed by the ordinary landed-work test.
 
 A copy locked by Vernant's creation lock is released and removed by Vernant's own driver, `scripts/git-stability/closeout_pr.py --cleanup-worktree <copy> --execute-cleanup`, run from the slot; an unlocked copy is removed with a plain non-forced `git worktree remove`.
 A copy whose work is not proved landed stays, and teardown writes the reason.
-Removal deletes the copy's checkout and the allow-listed ignored files in it (virtual environments, caches, Firstmate's hook files); it loses no commit, because the work is landed, and no uncommitted change, because the copy is clean.
+Removal deletes the copy's checkout and the allow-listed ignored files in it (symlinks, virtual environments, `node_modules` and tool caches, `.DS_Store`, Firstmate's hook files, and anything ignored under its `.claude` and `.opencode` trees); it loses no commit, because the work is landed, and no uncommitted change, because the copy is clean.
 A copy it cannot prove, a lock in any other format, a driver refusal, a half-removed copy, or a copy still registered afterwards refuses exactly as above, and `--force` waives none of it.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.
 A surviving recorded PR follows only under the head-containment proof above.

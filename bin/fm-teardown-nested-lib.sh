@@ -15,26 +15,34 @@
 #   - no other active task record names it, no process runs in it, and no live
 #     process outside this teardown's own is its lock launcher (a process this
 #     teardown retires, or a descendant of one, is not counted, and a pid that
-#     started after the lock file was written is recycled and owns nothing);
+#     started after the lock file was written is recycled and owns nothing; the
+#     retire phase signals such a descendant, and a launcher that outlives that
+#     signal and a short wait refuses the release, named by its pid);
 #   - its work is landed by the existing landed-work rule (teardown_landed).
 # A copy whose work is not proved landed stays, and teardown names why.
 # A copy locked by Vernant's creation lock is released and removed by Vernant's
 # own driver (closeout_pr.py --cleanup-worktree <copy> --execute-cleanup, run
-# from the slot; FM_TEARDOWN_CLOSEOUT names another executable and
-# FM_TEARDOWN_VERNANT_PYTHON the interpreter). An unlocked copy is removed with a
-# plain non-forced git worktree remove. A lock in any other format, a driver
-# refusal, or a copy still registered afterwards refuses. Removal deletes the
-# copy's checkout and the allow-listed ignored files in it (virtual
-# environments, caches, Firstmate's hook files); it loses no commit, because the
-# work is landed, and no uncommitted change, because the copy is clean.
+# from the slot with FM_TEARDOWN_VERNANT_PYTHON or <slot>/.venv/bin/python). An
+# unlocked copy is removed with a plain non-forced git worktree remove. A lock in
+# any other format, a driver refusal, or a copy still registered afterwards
+# refuses. Removal deletes the copy's checkout and the allow-listed ignored files
+# in it (symlinks, virtual environments, node_modules and tool caches,
+# .DS_Store, Firstmate's hook files, and anything ignored under its .claude and
+# .opencode trees); it loses no commit, because the work is landed, and no
+# uncommitted change, because the copy is clean.
 #
 # Requires bin/fm-task-copy-lib.sh and bin/fm-lock-lib.sh to be sourced first,
 # and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, META, STATE, WT,
 # TASK_TMP, TEARDOWN_NESTED_COPIES, TEARDOWN_RETURN_SLOT) and functions
-# (teardown_landed, pids_with_cwd_under) it uses.
+# (teardown_landed, pids_with_cwd_under, task_process_identity,
+# task_process_identity_matches, task_record_process_signal) it uses.
 
 # One entry per proved copy.
 TEARDOWN_FOREIGN_COPIES=()
+# One "pid<TAB>birth identity<TAB>cwd" entry per live launcher proved to be this
+# teardown's own; cwd is that of the own process it runs under.
+TEARDOWN_FOREIGN_LAUNCHERS=()
+TEARDOWN_OWN_CWD=
 TEARDOWN_FOREIGN_WHY=
 TEARDOWN_FOREIGN_LOCK=
 TEARDOWN_FOREIGN_LOCK_FILE=
@@ -122,21 +130,25 @@ teardown_lock_launcher_may_be_live() {  # <pid> <lock-file>
 
 # Is <pid> a process this teardown ends itself: one whose cwd is exactly a root
 # the retire phase sweeps (the task's copy, the returned slot, a nested copy of
-# the task, its scratch directory), or a descendant of one? A scan that fails
-# says no, so the launcher then counts as live.
+# the task, its scratch directory), or a descendant of one by parent chain? Sets
+# TEARDOWN_OWN_CWD to the cwd of that process. A scan that fails says no, so the
+# launcher then counts as live.
 teardown_pid_is_task_own() {  # <pid>
   local pid=$1 root out owned="" owned_pid owned_path hops=0
+  TEARDOWN_OWN_CWD=
   for root in "$WT" "$TEARDOWN_RETURN_SLOT" "$TASK_TMP" \
       ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     [ -n "$root" ] && [ -d "$root" ] || continue
     root=$(cd "$root" && pwd -P) || return 1
     out=$(pids_with_cwd_under "$root") || return 1
     while IFS=$'\t' read -r owned_pid owned_path; do
-      [ "$owned_path" != "$root" ] || owned="$owned $owned_pid "
+      [ "$owned_path" != "$root" ] || owned+="$owned_pid"$'\t'"$owned_path"$'\n'
     done <<< "$out"
   done
   while [ -n "$pid" ] && [ "$pid" -gt 1 ] && [ "$hops" -lt 64 ]; do
-    case "$owned" in *" $pid "*) return 0 ;; esac
+    while IFS=$'\t' read -r owned_pid owned_path; do
+      [ "$owned_pid" != "$pid" ] || { TEARDOWN_OWN_CWD=$owned_path; return 0; }
+    done <<< "$owned"
     pid=$(LC_ALL=C ps -o ppid= -p "$pid" 2>/dev/null | tr -d '[:space:]') || return 1
     hops=$((hops + 1))
   done
@@ -164,7 +176,7 @@ teardown_foreign_unique_ignored() {  # <copy>
 # teardown own <copy>? Returns 1 with TEARDOWN_FOREIGN_WHY set when so or when
 # that cannot be told.
 teardown_foreign_copy_unowned() {  # <copy>
-  local copy=$1 rc=0 pids pid
+  local copy=$1 rc=0 pids pid identity
   # shellcheck disable=SC2153 # STATE is bin/fm-teardown.sh's global, not a typo of a local.
   fm_task_copy_other_record "$META" "$STATE" "$copy" || rc=$?
   case "$rc" in
@@ -194,10 +206,14 @@ teardown_foreign_copy_unowned() {  # <copy>
         TEARDOWN_FOREIGN_WHY="it is locked by something other than Vernant's creation lock (${TEARDOWN_FOREIGN_LOCK:-no reason given})"
         return 1
       fi
-      if teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE" \
-         && ! teardown_pid_is_task_own "$pid"; then
-        TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running"
-        return 1
+      if teardown_lock_launcher_may_be_live "$pid" "$TEARDOWN_FOREIGN_LOCK_FILE"; then
+        if ! teardown_pid_is_task_own "$pid"; then
+          TEARDOWN_FOREIGN_WHY="its creation-lock launcher process $pid may still be running"
+          return 1
+        fi
+        if identity=$(task_process_identity "$pid"); then
+          TEARDOWN_FOREIGN_LAUNCHERS+=("$pid"$'\t'"$identity"$'\t'"$TEARDOWN_OWN_CWD")
+        fi
       fi
       ;;
     1) ;;
@@ -238,6 +254,7 @@ teardown_foreign_copy_prove() {  # <copy>
 teardown_foreign_copies_prove() {  # <slot>
   local slot=$1 copy known allowed
   TEARDOWN_FOREIGN_COPIES=()
+  TEARDOWN_FOREIGN_LAUNCHERS=()
   teardown_slot_registered_copies "$slot" || return 0
   slot=$(fm_task_copy_canonical_dir "$slot") || return 0
   for copy in ${TEARDOWN_SLOT_COPIES[@]+"${TEARDOWN_SLOT_COPIES[@]}"}; do
@@ -254,16 +271,49 @@ teardown_foreign_copies_prove() {  # <slot>
   done
 }
 
+# Signals the live lock launchers proved to run under this teardown's own
+# processes, which the cwd sweep does not reach when their own cwd lies outside
+# every swept root, and waits briefly for them to exit. Each signal is audited
+# first, as the sweep's are. A launcher that outlives the wait is not escalated:
+# the release proof then refuses it by pid.
+teardown_foreign_launchers_retire() {
+  local record pid identity cwd i
+  local -a signalled_pids=() signalled_identities=()
+  for record in ${TEARDOWN_FOREIGN_LAUNCHERS[@]+"${TEARDOWN_FOREIGN_LAUNCHERS[@]}"}; do
+    IFS=$'\t' read -r pid identity cwd <<< "$record"
+    task_process_identity_matches "$pid" "$identity" || continue
+    TASK_SCAN_PIDS=("$pid")
+    TASK_PID_CWDS=("$cwd")
+    if task_record_process_signal "$pid" "$identity" TERM; then
+      :
+    else
+      [ "$?" -ne 2 ] || continue
+      echo "REFUSED: cannot durably record creation-lock launcher process $pid identity for $ID; preserving the worktree without signalling it." >&2
+      return 1
+    fi
+    task_process_identity_matches "$pid" "$identity" || continue
+    kill -TERM "$pid" 2>/dev/null || true
+    signalled_pids+=("$pid")
+    signalled_identities+=("$identity")
+  done
+  [ "${#signalled_pids[@]}" -gt 0 ] || return 0
+  for _ in $(seq 1 30); do
+    for i in "${!signalled_pids[@]}"; do
+      if task_process_identity_matches "${signalled_pids[$i]}" "${signalled_identities[$i]}"; then
+        sleep 0.1
+        continue 2
+      fi
+    done
+    return 0
+  done
+}
+
 # Runs Vernant's closeout driver on <copy>: it releases its own creation lock
 # and removes the copy. Output lands in TEARDOWN_CLOSEOUT_OUT. Exit 0 means the
 # driver allowed and ran the cleanup.
 teardown_run_closeout() {  # <slot> <copy>
   local slot=$1 copy=$2 driver py rc=0
   TEARDOWN_CLOSEOUT_OUT=
-  if [ -n "${FM_TEARDOWN_CLOSEOUT:-}" ]; then
-    TEARDOWN_CLOSEOUT_OUT=$( cd "$slot" && "$FM_TEARDOWN_CLOSEOUT" --cleanup-worktree "$copy" --execute-cleanup 2>&1 ) || rc=$?
-    return "$rc"
-  fi
   driver=$slot/scripts/git-stability/closeout_pr.py
   py=${FM_TEARDOWN_VERNANT_PYTHON:-$slot/.venv/bin/python}
   if [ ! -f "$driver" ] || [ ! -x "$py" ]; then
@@ -323,18 +373,24 @@ teardown_foreign_copy_dispose() {  # <slot> <copy>
 
 # Releases every proved foreign copy of TEARDOWN_RETURN_SLOT. Each copy is
 # proved again first, so a process or edit that appeared since is caught, and all
-# are proved before any is changed.
+# are proved before any is changed. A copy nested in another is removed first,
+# which reverse path order guarantees: an enclosing path is a prefix of the
+# paths inside it.
 teardown_foreign_copies_release() {
   local slot=$TEARDOWN_RETURN_SLOT copy
-  [ -n "$slot" ] || return 0
+  local -a ordered=()
+  [ -n "$slot" ] && [ "${#TEARDOWN_FOREIGN_COPIES[@]}" -gt 0 ] || return 0
   slot=$(fm_task_copy_canonical_dir "$slot") || return 1
-  for copy in ${TEARDOWN_FOREIGN_COPIES[@]+"${TEARDOWN_FOREIGN_COPIES[@]}"}; do
+  for copy in "${TEARDOWN_FOREIGN_COPIES[@]}"; do
     if ! teardown_foreign_copy_prove "$copy"; then
       echo "REFUSED: foreign copy $copy in pool slot $slot is no longer provable: $TEARDOWN_FOREIGN_WHY; nothing was removed." >&2
       return 1
     fi
   done
-  for copy in ${TEARDOWN_FOREIGN_COPIES[@]+"${TEARDOWN_FOREIGN_COPIES[@]}"}; do
+  while IFS= read -r copy; do
+    ordered+=("$copy")
+  done < <(printf '%s\n' "${TEARDOWN_FOREIGN_COPIES[@]}" | LC_ALL=C sort -r)
+  for copy in "${ordered[@]}"; do
     teardown_foreign_copy_dispose "$slot" "$copy" || return 1
   done
   TEARDOWN_FOREIGN_COPIES=()

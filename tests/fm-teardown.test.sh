@@ -10490,12 +10490,15 @@ SH
 # a clean copy nested in it at .claude/worktrees/fc-one that no record of the
 # task names, at the landed main on branch fm/task-x1-v2. A launcher pid locks
 # the copy as Vernant's start_task_worktree.py does. Sets FOREIGN_CASE,
-# FOREIGN_SLOT and FOREIGN_COPY. closeout-stub stands in for Vernant's
-# closeout_pr.py: it logs its directory and arguments, and with
+# FOREIGN_SLOT and FOREIGN_COPY. The slot holds a stub scripts/git-stability/
+# closeout_pr.py (kept out of the slot's status through info/exclude) that
+# stands in for Vernant's driver: it logs its directory and arguments, and with
 # FM_STUB_CLOSEOUT=ok unlocks and plainly removes only a copy under the scratch
 # root, as the real driver's cleanup does; any other value refuses with exit 3.
+# vernant-python, the interpreter run_foreign_teardown names, runs it as a shell
+# script.
 make_foreign_copy_case() {
-  local case_dir tmp_real
+  local case_dir tmp_real exclude
   make_nested_slot_case "$1" reverse .claude/worktrees/fc-one
   case_dir=$NESTED_CASE
   FOREIGN_CASE=$case_dir
@@ -10509,8 +10512,10 @@ make_foreign_copy_case() {
     --reason "vernant-session-active owner=launcher:$2 launcher=$2" "$NESTED_COPY"
   add_lsof_no_holder "$case_dir"
   tmp_real=$(cd "$TMP_ROOT" && pwd -P)
-  cat > "$case_dir/closeout-stub" <<SH
-#!/usr/bin/env bash
+  exclude=$(git -C "$NESTED_SLOT" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '%s\n' scripts/ .venv/ >> "$exclude"
+  mkdir -p "$NESTED_SLOT/scripts/git-stability"
+  cat > "$NESTED_SLOT/scripts/git-stability/closeout_pr.py" <<SH
 printf '%s|%s\n' "\$PWD" "\$*" >> "$case_dir/closeout.log"
 if [ "\${FM_STUB_CLOSEOUT:-ok}" != ok ]; then
   echo '{"allowed": false, "reason": "stub_refusal"}'
@@ -10519,7 +10524,8 @@ fi
 case "\$2" in "$tmp_real"/*) ;; *) echo "stub refuses a path outside the scratch root" >&2; exit 4 ;; esac
 git worktree unlock "\$2" && git worktree remove "\$2"
 SH
-  chmod +x "$case_dir/closeout-stub"
+  printf '#!/usr/bin/env bash\nexec bash "$@"\n' > "$case_dir/vernant-python"
+  chmod +x "$case_dir/vernant-python"
 }
 
 # A pid that exited, so a creation lock naming it has no live launcher.
@@ -10530,11 +10536,12 @@ dead_launcher_pid() {
 }
 
 # run_foreign_teardown <rc-var> [VAR=value...]: runs the case's teardown with
-# the closeout stub and the given environment; stdout and stderr land in the case.
+# the stub interpreter and the given environment, which may replace it; stdout
+# and stderr land in the case.
 run_foreign_teardown() {
   local rc_var=$1 case_dir=$FOREIGN_CASE status=0
   shift
-  env "$@" FM_HOME="$case_dir/home" FM_TEARDOWN_CLOSEOUT="$case_dir/closeout-stub" \
+  env FM_TEARDOWN_VERNANT_PYTHON="$case_dir/vernant-python" "$@" FM_HOME="$case_dir/home" \
     FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
     FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
     NM_HOME="$case_dir/nm" PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
@@ -10683,62 +10690,92 @@ test_live_launcher_keeps_its_foreign_copy() {
   pass "a live launcher that started before its creation lock keeps its foreign copy"
 }
 
-# The creation lock names a launcher pid. Teardown itself ends the task's own
-# session, so a launcher that is that session, or runs under it, must not hold
-# the copy; a live process outside it still does, even while the session runs.
-test_task_own_session_as_lock_launcher_does_not_block_release() {
-  local rc shape agent launcher pidfile i child_script
-  child_script='my $child = fork(); if (!$child) { chdir "/"; exec "sleep", "300"; } $SIG{TERM} = sub { kill "TERM", $child; waitpid $child, 0; exit 0 }; open my $fh, ">", $ARGV[0]; print $fh $child; close $fh; sleep 300;'
-  for shape in agent child unrelated; do
-    make_foreign_copy_case "foreign-own-$shape"
-    pidfile=$FOREIGN_CASE/launcher-pid
-    case "$shape" in
-      child)
-        teardown_fixture_start "$FOREIGN_SLOT" KILL perl -e "$child_script" "$pidfile"
-        agent=$TEARDOWN_FIXTURE_PID
-        for i in $(seq 100); do [ -s "$pidfile" ] && break; sleep 0.05; done
-        launcher=$(cat "$pidfile")
-        ;;
-      *)
-        teardown_fixture_start "$FOREIGN_SLOT" KILL sleep 300
-        agent=$TEARDOWN_FIXTURE_PID
-        launcher=$agent
-        if [ "$shape" = unrelated ]; then
-          sleep 300 &
-          launcher=$!
-        fi
-        ;;
-    esac
-    sleep 1
-    git -C "$FOREIGN_CASE/project" worktree lock \
-      --reason "vernant-session-active owner=launcher:$launcher launcher=$launcher" "$FOREIGN_COPY"
-    cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+# start_foreign_session_case <name> <shape>: a foreign-copy case whose task
+# session runs in the slot and whose creation lock names a launcher. shape agent:
+# the launcher is the session itself; child: a descendant of the session whose
+# cwd is /; stubborn: that descendant, ignoring TERM; unrelated: a process outside
+# the session. The session is not told to take its descendant down. Sets
+# FOREIGN_AGENT and FOREIGN_LAUNCHER. The stub lsof reports the session in the
+# slot while it lives, as lsof reports a process by its cwd.
+start_foreign_session_case() {
+  local shape=$2 pidfile i
+  local child_script='my $child = fork(); if (!$child) { $SIG{TERM} = "IGNORE" if $ARGV[1]; chdir "/"; exec "sleep", "300"; } open my $fh, ">", $ARGV[0]; print $fh $child; close $fh; sleep 300;'
+  make_foreign_copy_case "$1"
+  pidfile=$FOREIGN_CASE/launcher-pid
+  case "$shape" in
+    child|stubborn)
+      teardown_fixture_start "$FOREIGN_SLOT" KILL perl -e "$child_script" "$pidfile" "$([ "$shape" = stubborn ] && echo 1 || true)"
+      FOREIGN_AGENT=$TEARDOWN_FIXTURE_PID
+      for i in $(seq 100); do [ -s "$pidfile" ] && break; sleep 0.05; done
+      FOREIGN_LAUNCHER=$(cat "$pidfile")
+      ;;
+    *)
+      teardown_fixture_start "$FOREIGN_SLOT" KILL sleep 300
+      FOREIGN_AGENT=$TEARDOWN_FIXTURE_PID
+      FOREIGN_LAUNCHER=$FOREIGN_AGENT
+      if [ "$shape" = unrelated ]; then
+        sleep 300 &
+        FOREIGN_LAUNCHER=$!
+      fi
+      ;;
+  esac
+  sleep 1
+  git -C "$FOREIGN_CASE/project" worktree lock \
+    --reason "vernant-session-active owner=launcher:$FOREIGN_LAUNCHER launcher=$FOREIGN_LAUNCHER" "$FOREIGN_COPY"
+  cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
 #!/usr/bin/env bash
 case " \$* " in
-  *" -d cwd "*) if kill -0 $agent 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $agent '$FOREIGN_SLOT'; fi; exit 0 ;;
+  *" -d cwd "*) if kill -0 $FOREIGN_AGENT 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $FOREIGN_AGENT '$FOREIGN_SLOT'; fi; exit 0 ;;
 esac
 exit 1
 SH
+}
+
+# The creation lock names a launcher pid. Teardown itself ends the task's own
+# session, so a launcher that is that session, or runs under it, must not hold
+# the copy: retire signals the descendant that the cwd sweep cannot reach.
+test_task_own_session_as_lock_launcher_does_not_block_release() {
+  local rc shape
+  for shape in agent child; do
+    start_foreign_session_case "foreign-own-$shape" "$shape"
+    run_foreign_teardown rc
+    kill "$FOREIGN_LAUNCHER" 2>/dev/null && fail "own-$shape: the launcher survived teardown"
+    expect_code 0 "$rc" "own-$shape: the task's own session as launcher must not block release: $(cat "$FOREIGN_CASE/stderr")"
+    kill -0 "$FOREIGN_AGENT" 2>/dev/null && fail "own-$shape: the task's session survived teardown"
+    assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+      "own-$shape: the driver was not run once"
+    assert_absent "$FOREIGN_COPY" "own-$shape: the copy survived"
+    assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "own-$shape: the slot was not returned"
+    if [ "$shape" = child ]; then
+      assert_grep "	TERM	$FOREIGN_LAUNCHER	" "$FOREIGN_CASE/state/task-x1.teardown-processes" \
+        "own-$shape: the descendant launcher's signal was not recorded"
+    fi
+  done
+  pass "a lock launcher that is the task's own session, or a descendant the cwd sweep cannot reach, is ended by retire and released with the slot"
+}
+
+# A live launcher outside the task's session keeps its copy untouched. One inside
+# it that survives the signal and the bounded wait keeps it too, named by pid,
+# after the session itself was ended.
+test_unrelated_or_stubborn_lock_launcher_keeps_its_foreign_copy() {
+  local rc shape
+  for shape in unrelated stubborn; do
+    start_foreign_session_case "foreign-held-$shape" "$shape"
     run_foreign_teardown rc
     if [ "$shape" = unrelated ]; then
-      kill -0 "$agent" 2>/dev/null || fail "own-$shape: a refused teardown stopped the task's session"
-      kill "$launcher" 2>/dev/null || true
-      wait "$launcher" 2>/dev/null || true
-      expect_code 1 "$rc" "own-$shape: an unrelated live launcher must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
-      assert_grep "creation-lock launcher process $launcher may still be running" "$FOREIGN_CASE/stderr" \
-        "own-$shape: the refusal did not name the launcher"
-      assert_foreign_copy_untouched "own-$shape"
+      kill -0 "$FOREIGN_AGENT" 2>/dev/null || fail "held-$shape: a refused teardown stopped the task's session"
     else
-      expect_code 0 "$rc" "own-$shape: the task's own session as launcher must not block release: $(cat "$FOREIGN_CASE/stderr")"
-      kill -0 "$agent" 2>/dev/null && fail "own-$shape: the task's session survived teardown"
-      assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
-        "own-$shape: the driver was not run once"
-      assert_absent "$FOREIGN_COPY" "own-$shape: the copy survived"
-      assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "own-$shape: the slot was not returned"
+      kill -0 "$FOREIGN_AGENT" 2>/dev/null && fail "held-$shape: the task's session survived retire"
+      kill -0 "$FOREIGN_LAUNCHER" 2>/dev/null || fail "held-$shape: the launcher did not ignore TERM"
     fi
-    [ "$shape" != child ] || kill "$launcher" 2>/dev/null || true
+    kill -KILL "$FOREIGN_LAUNCHER" 2>/dev/null || true
+    wait "$FOREIGN_LAUNCHER" 2>/dev/null || true
+    expect_code 1 "$rc" "held-$shape: a live launcher must keep the copy: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "creation-lock launcher process $FOREIGN_LAUNCHER may still be running" "$FOREIGN_CASE/stderr" \
+      "held-$shape: the refusal did not name the launcher"
+    assert_foreign_copy_untouched "held-$shape"
   done
-  pass "a lock launcher that is the task's own session or runs under it is released with the slot, and an unrelated live launcher still keeps the copy"
+  pass "a live lock launcher outside the task's session, or one that outlives retire's signal, keeps its foreign copy and is named by pid"
 }
 
 test_process_in_foreign_copy_keeps_it() {
@@ -10789,6 +10826,57 @@ test_two_foreign_copies_are_released_together_or_not_at_all() {
     || fail "two-copies: the second copy's branch was deleted"
   assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "two-copies: the slot was not returned"
   pass "a slot's foreign copies are all proved before any is removed, and then all are released"
+}
+
+test_closeout_uses_the_slots_default_interpreter() {
+  local rc
+  dead_launcher_pid
+  make_foreign_copy_case foreign-default-python "$FOREIGN_DEAD_PID"
+  mkdir -p "$FOREIGN_SLOT/.venv/bin"
+  cp "$FOREIGN_CASE/vernant-python" "$FOREIGN_SLOT/.venv/bin/python"
+  run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON=
+  expect_code 0 "$rc" "default-python: the slot's own interpreter must run the driver: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+    "default-python: the driver was not run once from the slot with the copy and the execute flag"
+  assert_absent "$FOREIGN_COPY" "default-python: the copy survived"
+  pass "without FM_TEARDOWN_VERNANT_PYTHON the driver runs under the slot's own .venv interpreter"
+}
+
+test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place() {
+  local rc shape
+  for shape in driver interpreter; do
+    dead_launcher_pid
+    make_foreign_copy_case "foreign-missing-$shape" "$FOREIGN_DEAD_PID"
+    if [ "$shape" = driver ]; then
+      rm -f "$FOREIGN_SLOT/scripts/git-stability/closeout_pr.py"
+      run_foreign_teardown rc
+    else
+      run_foreign_teardown rc FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/no-such-python"
+    fi
+    expect_code 1 "$rc" "missing-$shape: a locked copy with no driver to release it must refuse: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "did not release foreign copy $FOREIGN_COPY (exit 127)" "$FOREIGN_CASE/stderr" \
+      "missing-$shape: the refusal did not report the unavailable driver"
+    assert_grep "is not available" "$FOREIGN_CASE/stderr" "missing-$shape: the refusal did not say what was missing"
+    assert_foreign_copy_untouched "missing-$shape"
+  done
+  pass "a Vernant-locked copy refuses and stays when its closeout driver or interpreter is missing"
+}
+
+test_foreign_copy_nested_in_another_is_removed_first() {
+  local rc inner
+  make_foreign_copy_case foreign-nested-in-foreign
+  inner=$FOREIGN_COPY/.claude/worktrees/fc-inner
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/task-x1-v3 "$inner" main
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "nested-in-foreign: a copy inside another foreign copy must not block the removal: $(cat "$FOREIGN_CASE/stderr")"
+  assert_absent "$inner" "nested-in-foreign: the inner copy survived"
+  assert_absent "$FOREIGN_COPY" "nested-in-foreign: the outer copy survived"
+  assert_grep "removed landed foreign copy $inner from pool slot $FOREIGN_SLOT" "$FOREIGN_CASE/stderr" \
+    "nested-in-foreign: the inner copy's removal was not reported"
+  assert_grep "removed landed foreign copy $FOREIGN_COPY from pool slot $FOREIGN_SLOT" "$FOREIGN_CASE/stderr" \
+    "nested-in-foreign: the outer copy's removal was not reported"
+  assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "nested-in-foreign: the slot was not returned"
+  pass "a foreign copy nested in another foreign copy is removed before the copy that holds it"
 }
 
 test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place() {
@@ -12384,8 +12472,12 @@ test_half_removed_foreign_copy_is_refused_as_before
 test_recycled_launcher_pid_does_not_own_a_foreign_copy
 test_live_launcher_keeps_its_foreign_copy
 test_task_own_session_as_lock_launcher_does_not_block_release
+test_unrelated_or_stubborn_lock_launcher_keeps_its_foreign_copy
 test_process_in_foreign_copy_keeps_it
 test_two_foreign_copies_are_released_together_or_not_at_all
+test_foreign_copy_nested_in_another_is_removed_first
+test_closeout_uses_the_slots_default_interpreter
+test_missing_closeout_driver_or_interpreter_leaves_the_copy_in_place
 test_closeout_refusal_and_foreign_locks_leave_the_copy_in_place
 test_nested_slot_return_concludes_runs_and_agents_on_the_slot
 test_shared_nested_copy_concludes_only_its_own_runtime
