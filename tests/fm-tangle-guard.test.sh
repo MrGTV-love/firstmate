@@ -166,7 +166,15 @@ test_spawn_isolation_abort() {
   proj=$(make_repo "$TMP_ROOT/spawn-proj")
   fakebin=$(make_spawn_fakebin "$TMP_ROOT/spawn-fake")
   # The assertions concern identity, not how long an unchanged cwd is polled.
+  # The no-progress limit counts shell seconds, so the abort cases advance that
+  # clock a minute per poll instead of waiting the real ten minutes.
   fm_test_fake_sleep_noop "$fakebin"
+  cat > "$TMP_ROOT/clock.sh" <<'SH'
+sleep() {
+  if [ "${1:-}" = 1 ]; then SECONDS=$((SECONDS + 60)); fi
+  command sleep "$@"
+}
+SH
   # A genuine isolated linked worktree of the project, detached on the default.
   git -C "$proj" worktree add -q --detach "$TMP_ROOT/spawn-wt" >/dev/null 2>&1
   # The non-git case must BE non-git wherever this suite runs. A directory under
@@ -183,7 +191,7 @@ test_spawn_isolation_abort() {
   # a path like this is never adopted and the refusal comes from the poll's own
   # deadline, naming the path and why it was rejected. The assertions pin which
   # cause fired, not the operator wording that explains it.
-  out=$(GIT_CEILING_DIRECTORIES="$TMP_ROOT/spawn-notgit-root" \
+  out=$(GIT_CEILING_DIRECTORIES="$TMP_ROOT/spawn-notgit-root" BASH_ENV="$TMP_ROOT/clock.sh" \
     run_spawn "$home" abort-notgit-dd4 "$proj" "$TMP_ROOT/spawn-notgit-root/plain" "$fakebin"); status=$?
   expect_code 1 "$status" "spawn into a non-worktree dir should abort"
   assert_contains "$out" "did not enter an isolated worktree" "non-worktree spawn lacked the isolation error"
@@ -191,7 +199,7 @@ test_spawn_isolation_abort() {
   assert_absent "$home/state/abort-notgit-dd4.meta" "aborted spawn must not record meta"
 
   # Abort: the pane resolves INTO the primary checkout (a subdir of PROJ_ABS).
-  out=$(run_spawn "$home" abort-primary-ee5 "$proj" "$proj/sub" "$fakebin"); status=$?
+  out=$(BASH_ENV="$TMP_ROOT/clock.sh" run_spawn "$home" abort-primary-ee5 "$proj" "$proj/sub" "$fakebin"); status=$?
   expect_code 1 "$status" "spawn landing inside the primary checkout should abort"
   assert_contains "$out" "did not enter an isolated worktree" "primary-checkout spawn lacked the isolation error"
   assert_contains "$out" "not a worktree root" "primary-checkout spawn did not say why the path was rejected"
