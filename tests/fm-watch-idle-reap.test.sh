@@ -445,6 +445,22 @@ test_poll_resolution_by_home_role() {
   pass "primary homes poll every 15 seconds and secondmate homes every 30"
 }
 
+test_wake_lib_sources_without_the_primary_scope_lib() {
+  local dir lib out
+  dir=$(make_case poll-lib-alone); lib="$dir/lib/bin"
+  mkdir -p "$lib"
+  cp "$ROOT/bin/fm-wake-lib.sh" "$ROOT/bin/fm-path-lib.sh" "$ROOT/bin/fm-secondmate-parent-lib.sh" "$lib/"
+  out=$(FM_STATE_OVERRIDE="$dir/state" FM_HOME="$dir" bash -c 'set -eu; . "$1/fm-wake-lib.sh"; printf sourced' _ "$lib" 2>&1) \
+    || fail "fm-wake-lib.sh must source under set -eu without fm-primary-scope-lib.sh: $out"
+  [ "$out" = sourced ] || fail "sourcing fm-wake-lib.sh alone printed unexpected output: $out"
+  cp "$ROOT/bin/fm-primary-scope-lib.sh" "$lib/"
+  poll_mark_secondmate "$dir"
+  out=$(FM_STATE_OVERRIDE="$dir/state" FM_HOME="$dir" bash -c 'set -eu; . "$1/fm-wake-lib.sh"; fm_watch_poll_seconds' _ "$lib" 2>&1) \
+    || fail "fm_watch_poll_seconds failed with the primary-scope library beside the wake library: $out"
+  [ "$out" = 30 ] || fail "fm_watch_poll_seconds must resolve a secondmate home to 30 once the library is beside it, got: $out"
+  pass "fm-wake-lib.sh sources alone under set -eu and loads the primary-scope library only to resolve the poll"
+}
+
 test_poll_config_override() {
   local dir sm value
   dir=$(make_case poll-config-primary); sm=$(make_case poll-config-secondmate)
@@ -548,6 +564,7 @@ test_lavish_sweep_runs_detached_on_its_interval_in_auto_mode
 test_lavish_sweep_first_run_waits_and_zero_turns_it_off
 test_lavish_sweep_failing_or_hung_never_stops_the_poll
 test_poll_resolution_by_home_role
+test_wake_lib_sources_without_the_primary_scope_lib
 test_poll_config_override
 test_poll_watcher_uses_the_resolved_interval
 test_poll_status_change_noticed_within_one_longer_interval

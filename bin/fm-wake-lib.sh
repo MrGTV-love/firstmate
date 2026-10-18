@@ -14,8 +14,6 @@ FM_LOCK_STALE_AFTER="${FM_LOCK_STALE_AFTER:-2}"
 . "$FM_WAKE_LIB_DIR/fm-path-lib.sh"
 # shellcheck source=bin/fm-secondmate-parent-lib.sh
 . "$FM_WAKE_LIB_DIR/fm-secondmate-parent-lib.sh"
-# shellcheck source=bin/fm-primary-scope-lib.sh
-. "$FM_WAKE_LIB_DIR/fm-primary-scope-lib.sh"
 # Resolved once at source time: fm_pid_identity and fm_path_mtime run inside 0.2s
 # confirm and 0.5s attach polls, and forking uname per call is a measurable cost on
 # the platform (Git Bash/MSYS) that already pays the highest fork price.
@@ -189,6 +187,10 @@ fm_watch_poll_seconds() {
         ;;
     esac
   fi
+  command -v fm_root_is_secondmate_home >/dev/null 2>&1 || {
+    # shellcheck source=bin/fm-primary-scope-lib.sh
+    . "$FM_WAKE_LIB_DIR/fm-primary-scope-lib.sh"
+  }
   if fm_root_is_secondmate_home "$home"; then
     printf '%s\n' "$FM_WATCH_POLL_SECONDMATE"
   else
