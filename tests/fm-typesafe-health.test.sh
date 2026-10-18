@@ -206,6 +206,14 @@ health "$HOME_D2" 000 record 000 jev-guard >/dev/null
 health "$HOME_D2" 000 record 000 jev-guard >/dev/null
 assert_absent "$HOME_D2/state/.typesafe-health" "codes the probe owns are ignored from consumers"
 assert_equals 0 "$(wakes "$HOME_D2")" "ignored codes raise nothing"
+HOME_D3=$(new_home consumer-ignored-with-state)
+health "$HOME_D3" timeout probe >/dev/null
+recorded=$(cat "$HOME_D3/state/.typesafe-health")
+for consumer in jev-guard dispatch-resolve skill-pick; do
+  for _ in 1 2 3; do health "$HOME_D3" 000 record 000 "$consumer" >/dev/null; done
+done
+assert_equals "$recorded" "$(cat "$HOME_D3/state/.typesafe-health")" "consumer transport codes leave the probe's recorded state untouched"
+assert_equals 0 "$(wakes "$HOME_D3")" "consumer transport codes raise no alert beside probe state"
 health "$HOME_D2" 200 record 12 >/dev/null; rc=$?
 expect_code 2 "$rc" "a malformed code is a usage error"
 health "$HOME_D2" 200 bogus >/dev/null; rc=$?
