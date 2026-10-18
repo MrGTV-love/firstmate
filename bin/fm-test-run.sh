@@ -254,9 +254,10 @@ PORTABLE_SERIAL_SHARDS=15
 # Rounded above the current CI mean, including the capability-skipped scripts.
 PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 
-# Packing target, not an execution timeout: leave at least ten minutes of the
-# normal CI tier for setup and runtime variance. --check-coverage refuses a
-# modeled serial shard above this target; refresh hints or rebalance instead.
+# Packing target, not an execution timeout: it stays far inside the 60-minute
+# normal CI tier so setup and runtime variance on a loaded runner never reach
+# the job cap. --check-coverage refuses a modeled serial shard above this
+# target; refresh hints or rebalance instead.
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
@@ -2860,6 +2861,27 @@ slot_wait_ms() {  # <out>
   printf '%s\n' "$waited"
 }
 
+# Runs <script> with its combined output in <out> (<stream> 1 also echoes it
+# live) and, when the script is a clean gate skip, marks the progress runner's
+# sample as not calibration-eligible, as a skipped run never was. The progress
+# runner re-declares this function and detect_gate_skip in its child shell, so
+# the script alone writes <out> and the runner's own telemetry stays out of it.
+# shellcheck disable=SC2329 # Run only from the child shell run_script_bounded builds.
+run_guarded_script() {  # <script> <out> <stream>
+  local rc
+  if [ "$3" -eq 1 ]; then
+    bash "$1" 2>&1 | tee "$2"
+    rc=${PIPESTATUS[0]}
+  else
+    bash "$1" >"$2" 2>&1
+    rc=$?
+  fi
+  if [ "$rc" -eq 0 ] && [ -n "${FM_DURATION_CALIBRATION_FILE:-}" ] && detect_gate_skip "$2"; then
+    printf '0\n' >"$FM_DURATION_CALIBRATION_FILE"
+  fi
+  return "$rc"
+}
+
 # Run <script>, capturing output to <out>. <stream> 1 also echoes it live.
 # <id> only has to be unique within this run. When PER_SCRIPT_TIMEOUT_SECS is
 # positive, a script that outruns it is terminated and reported as exit 124: a
@@ -2882,7 +2904,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   fi
   local -a cmd
   : "$id"
-  if [ "$stream" -eq 1 ]; then
+  if [ "$PROGRESS_GUARD" -eq 1 ]; then
+    # Expansion is intentionally deferred to the child bash passed to -c.
+    # shellcheck disable=SC2016
+    cmd=(bash -c "$(declare -f detect_gate_skip run_guarded_script)"'; run_guarded_script "$@"' _ "$script" "$out" "$stream")
+  elif [ "$stream" -eq 1 ]; then
     # Expansion is intentionally deferred to the child bash passed to -c.
     # shellcheck disable=SC2016
     cmd=(bash -c 'bash "$1" 2>&1 | tee "$2"; exit "${PIPESTATUS[0]}"' _ "$script" "$out")
@@ -2921,7 +2947,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       --wait-file "$out.slotwait" "test.$script" -- "${cmd[@]}")
   fi
   set +e
-  if [ "$stream" -eq 1 ]; then
+  if [ "$stream" -eq 1 ] || [ "$PROGRESS_GUARD" -eq 1 ]; then
     "${cmd[@]}"
   else
     "${cmd[@]}" >"$out" 2>&1

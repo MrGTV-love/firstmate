@@ -10691,6 +10691,94 @@ test_foreign_copy_regenerable_ignored_files_need_no_preservation() {
   pass "regenerable ignored caches are allow-listed and need no preservation or refusal"
 }
 
+test_foreign_copy_preserves_durable_tac_state_before_removal() {
+  local shape rc exclude preserved
+  for shape in nested whole; do
+    make_foreign_copy_case "foreign-tac-$shape"
+    exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+    if [ "$shape" = nested ]; then
+      printf '.tac/loop-state/\n.tac/tmp/\n' >> "$exclude"
+    else
+      printf '.tac/\n' >> "$exclude"
+    fi
+    mkdir -p "$FOREIGN_COPY/.tac/loop-state" "$FOREIGN_COPY/.tac/tmp"
+    printf 'durable cursor\n' > "$FOREIGN_COPY/.tac/loop-state/cursor"
+    printf 'scratch\n' > "$FOREIGN_COPY/.tac/tmp/work"
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "foreign-tac-$shape: durable .tac state must be preserved, not refuse: $(cat "$FOREIGN_CASE/stderr")"
+    assert_absent "$FOREIGN_COPY" "foreign-tac-$shape: the copy survived"
+    preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -path '*/.tac/loop-state/cursor' -type f 2>/dev/null | head -n 1)
+    [ -n "$preserved" ] || fail "foreign-tac-$shape: .tac/loop-state was removed without being preserved"
+    assert_equals "durable cursor" "$(cat "$preserved")" "foreign-tac-$shape: the preserved .tac state changed"
+    if [ "$shape" = nested ]; then
+      [ -z "$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -path '*/.tac/tmp/*' -type f 2>/dev/null)" ] \
+        || fail "foreign-tac-$shape: regenerable .tac/tmp was needlessly preserved"
+    fi
+  done
+  pass "durable .tac state is preserved with the copy retired, while .tac/tmp stays regenerable"
+}
+
+test_foreign_copy_is_not_removed_when_its_ignored_files_cannot_be_listed() {
+  local rc exclude
+  make_foreign_copy_case foreign-unlistable
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+  cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" ls-files "*" --ignored "*) echo "fatal: simulated listing failure" >&2; exit 128 ;;
+esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/git"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "foreign-unlistable: a copy whose ignored files cannot be listed must be refused: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "could not be preserved" "$FOREIGN_CASE/stderr" "foreign-unlistable: the refusal did not say why"
+  assert_foreign_copy_untouched foreign-unlistable
+  assert_present "$FOREIGN_COPY/unique.dat" "foreign-unlistable: the ignored file was lost"
+  pass "a foreign copy whose ignored files cannot be listed is refused, not treated as having nothing to preserve"
+}
+
+test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
+  local shape rc exclude hash dest real_cp
+  real_cp=$(command -v cp)
+  for shape in failed-copy replaced; do
+    make_foreign_copy_case "foreign-backup-$shape"
+    exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+    printf 'unique.dat\n' >> "$exclude"
+    printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+    hash=$(printf '%s' "$(cd "$FOREIGN_COPY" && pwd -P)" | shasum -a 256 | awk '{print $1}')
+    dest="$FOREIGN_CASE/data/task-x1/nested-copy-preserved/$hash"
+    mkdir -p "$dest"
+    printf 'earlier backup\n' > "$dest/unique.dat"
+    printf 'earlier manifest\n' > "$dest/SHA256SUMS"
+    if [ "$shape" = failed-copy ]; then
+      cat > "$FOREIGN_CASE/fakebin/cp" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *nested-copy-preserved*) echo "cp: simulated copy failure" >&2; exit 1 ;;
+esac
+exec "$real_cp" "\$@"
+SH
+      chmod +x "$FOREIGN_CASE/fakebin/cp"
+    fi
+    run_foreign_teardown rc
+    if [ "$shape" = failed-copy ]; then
+      expect_code 1 "$rc" "foreign-backup-$shape: a failed preserve must refuse: $(cat "$FOREIGN_CASE/stderr")"
+      assert_foreign_copy_untouched "foreign-backup-$shape"
+      assert_equals "earlier backup" "$(cat "$dest/unique.dat")" "foreign-backup-$shape: the earlier preserved copy was destroyed by a failed replacement"
+      assert_equals "earlier manifest" "$(cat "$dest/SHA256SUMS")" "foreign-backup-$shape: the earlier manifest was destroyed by a failed replacement"
+    else
+      expect_code 0 "$rc" "foreign-backup-$shape: a verified replacement must release the copy: $(cat "$FOREIGN_CASE/stderr")"
+      assert_equals "only here" "$(cat "$dest/unique.dat")" "foreign-backup-$shape: the earlier preserved copy was not replaced"
+      assert_grep "$(shasum -a 256 "$dest/unique.dat" | awk '{print $1}')  unique.dat" "$dest/SHA256SUMS" \
+        "foreign-backup-$shape: the manifest does not describe the replacement"
+    fi
+  done
+  pass "an earlier preserved copy survives a failed replacement and is replaced only by a verified one"
+}
+
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused() {
   local rc
   make_foreign_copy_case foreign-alias-lease
@@ -12827,6 +12915,9 @@ test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal
 test_foreign_copy_with_unsaved_files_is_refused
 test_foreign_copy_preserves_unique_ignored_files_before_removal
 test_foreign_copy_regenerable_ignored_files_need_no_preservation
+test_foreign_copy_preserves_durable_tac_state_before_removal
+test_foreign_copy_is_not_removed_when_its_ignored_files_cannot_be_listed
+test_earlier_preserved_copy_survives_until_its_replacement_is_verified
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused
 test_half_removed_foreign_copy_is_refused_as_before
 test_recycled_launcher_pid_does_not_own_a_foreign_copy

@@ -982,6 +982,56 @@ SH
   pass "changed defaults to bounded automatic scheduling with serial override"
 }
 
+# The progress guard wraps every automatic --changed script, and a parallel
+# worker captures that wrapper's stderr beside the script's. The guard's own
+# lines (calibration notes and heartbeats) must never reach the script's captured
+# output: gate-skip detection reads that output's first line, so a skip printed
+# after any of them, as a script slow to print on a loaded host does, would be a
+# silent green. A gate-skipped run also stays out of calibration, as it always
+# has. tests/fm-daemon.test.sh runs in the concurrent phase of this fixture.
+test_changed_progress_guard_keeps_delayed_gate_skip_and_calibration_hygiene() {
+  local tmp repo rc
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-guard-skip.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  cat >"$repo/tests/fm-daemon.test.sh" <<'SH'
+#!/usr/bin/env bash
+sleep 3
+echo "skip: herdr not found"
+SH
+  git -C "$repo" add .
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
+  printf '\n' >>"$repo/bin/shared-probe-lib.sh"
+
+  set +e
+  (cd "$repo" && FM_DURATION_FILE="$tmp/durations.jsonl" \
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "a delayed gate skip must still pass the run, got $rc: $(cat "$tmp/out" "$tmp/err")"
+  grep -Eq '^FM_TEST_END .+ tests/fm-daemon\.test\.sh exit=0 .*gate_skip=true' "$tmp/out" \
+    || fail "a gate skip printed after the guard's own lines was counted as a plain pass: $(cat "$tmp/out")"
+  assert_contains "$(cat "$tmp/out")" "skipped_gate=1" "the delayed gate skip was not counted in the summary"
+  assert_contains "$(cat "$tmp/err")" "gate skip: tests/fm-daemon.test.sh: herdr not found" \
+    "the delayed gate skip's reason was lost"
+  if grep -Eq '^(progress|calibration|fallback):' "$tmp/out"; then
+    fail "the progress guard's own lines reached the replayed script output: $(cat "$tmp/out")"
+  fi
+  python3 - "$tmp/durations.jsonl" <<'PY' || fail "gate-skipped and ordinary guarded runs were not recorded as calibration hygiene requires: $(cat "$tmp/durations.jsonl" 2>&1)"
+import json, sys
+rows = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8") if line.strip()]
+by_key = {}
+for row in rows:
+    by_key.setdefault(row["key"], []).append(row)
+skip = by_key.get("test.tests/fm-daemon.test.sh", [])
+assert len(skip) == 1 and skip[0]["exit"] == 0 and skip[0]["calibration"] is False, skip
+ordinary = by_key.get("test.tests/fm-pi-watch-extension.test.sh", [])
+assert len(ordinary) == 1 and ordinary[0]["calibration"] is True, ordinary
+PY
+  rm -rf "$tmp"
+  pass "the changed progress guard keeps a delayed gate skip a gate skip and out of calibration"
+}
+
 test_windows_posix_mode_emulation_does_not_fail_parallel_runs() {
   local tmp repo fakebin real_stat out rc
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-windows-modes.XXXXXX")
@@ -1771,7 +1821,7 @@ test_portable_serial_hint_coverage_is_reported_and_bounded() {
   budget=$(printf '%s\n' "$out" | sed -n 's/.*serial_budget_ms=\([0-9][0-9]*\).*/\1/p')
   [ -n "$max" ] && [ -n "$budget" ] \
     || fail "coverage summary must carry serial packing and budget: $out"
-  [ "$budget" -eq 1200000 ] || fail "packing must leave ten minutes of the normal CI tier"
+  [ "$budget" -eq 1200000 ] || fail "serial packing target must stay at twenty minutes, got ${budget}ms"
   [ "$max" -gt 0 ] && [ "$max" -le "$budget" ] \
     || fail "largest serial shard packs ${max}ms above the ${budget}ms target"
   pass "coverage guard bounds the unmeasured share and serial packing within twenty minutes"
@@ -2780,6 +2830,7 @@ test_changed_spawn_selects_picker_without_broadening_siblings
 test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
 test_changed_uses_bounded_automatic_concurrency
+test_changed_progress_guard_keeps_delayed_gate_skip_and_calibration_hygiene
 test_windows_posix_mode_emulation_does_not_fail_parallel_runs
 test_script_list_uses_bounded_automatic_concurrency
 test_family_proofs_run_in_separate_concurrent_phases

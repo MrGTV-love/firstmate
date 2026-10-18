@@ -162,10 +162,11 @@ stalled = override_run('stall', ['sleep', '30'], FM_DURATION_NO_PROGRESS_SECS='2
 assert stalled.returncode == 124 and 'no_progress' in stalled.stderr, (stalled.returncode, stalled.stderr)
 assert any(r.get('event') == 'timeout' and r['key'] == 'stall' for r in rows())
 
-# CPU growth is progress even with no output, so a busy command outlives both
-# its measured advisory and the shorter stall bound.
-busy = override_run('busy.cpu', [sys.executable, '-c', 'import time\nend = time.monotonic() + 3\nwhile time.monotonic() < end: pass'],
-                    FM_DURATION_NO_PROGRESS_SECS='2', FM_DURATION_ABSOLUTE_SECS='30')
+# CPU growth is progress even with no output, so a busy command outlives the stall
+# bound. The bound is several times the one-second CPU-time granularity of Linux
+# ps, so a loaded host that gives the loop under half a core still shows growth.
+busy = override_run('busy.cpu', [sys.executable, '-c', 'import time\nend = time.monotonic() + 10\nwhile time.monotonic() < end: pass'],
+                    FM_DURATION_NO_PROGRESS_SECS='5', FM_DURATION_ABSOLUTE_SECS='60')
 assert busy.returncode == 0, busy.stderr
 assert not any(r.get('event') == 'timeout' and r['key'] == 'busy.cpu' for r in rows())
 

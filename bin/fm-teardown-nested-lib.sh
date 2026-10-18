@@ -207,43 +207,42 @@ teardown_foreign_proc_record() {  # <pid>
 # regenerable build output are derived machinery and are skipped; every other
 # entry is printed for teardown_preserve_ignored to copy.
 teardown_preservable_ignored() {  # <copy>
-  local copy=$1 entry name
-  while IFS= read -r -d '' entry; do
-    entry=${entry%/}
-    [ ! -L "$copy/$entry" ] || continue
-    name=${entry##*/}
-    case "$entry" in .claude|.claude/*|.opencode|.opencode/*) continue ;; esac
-    case "$entry" in scripts/hooks/_conformance_manifest.json) continue ;; esac
-    case "$name" in
-      .venv|venv|node_modules|__pycache__|.pytest_cache|.ruff_cache|.mypy_cache|.DS_Store|.fm-grok-turnend|.fm-kimi-turnend) continue ;;
-      .import_linter_cache|.next|graphify-out|*.tsbuildinfo) continue ;;
-    esac
-    case "$entry" in .tac|.tac/*) continue ;; esac
-    printf '%s\n' "$entry"
-  done < <(git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z 2>/dev/null)
-}
-
-# Prints the SHA-256 of file <path>, or fails when no hashing tool is available.
-teardown_ignored_sha256() {  # <path>
-  local path=$1 hash
-  if command -v shasum >/dev/null 2>&1; then
-    hash=$(shasum -a 256 "$path" 2>/dev/null | awk '{print $1}')
-  elif command -v sha256sum >/dev/null 2>&1; then
-    hash=$(sha256sum "$path" 2>/dev/null | awk '{print $1}')
-  else
-    return 1
+  local copy=$1 listing entry name child rc=0
+  listing=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
+  git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z >"$listing" 2>/dev/null || rc=$?
+  if [ "$rc" = 0 ]; then
+    while IFS= read -r -d '' entry; do
+      entry=${entry%/}
+      [ ! -L "$copy/$entry" ] || continue
+      name=${entry##*/}
+      case "$entry" in .claude|.claude/*|.opencode|.opencode/*) continue ;; esac
+      case "$entry" in scripts/hooks/_conformance_manifest.json|.tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) continue ;; esac
+      if [ "$entry" = .tac ] && [ -d "$copy/.tac" ]; then
+        for child in "$copy/.tac"/* "$copy/.tac"/.[!.]*; do
+          { [ -e "$child" ] && [ ! -L "$child" ]; } || continue
+          case "${child##*/}" in tmp|uv-cache) ;; *) printf '%s\n' ".tac/${child##*/}" ;; esac
+        done
+        continue
+      fi
+      case "$name" in
+        .venv|venv|node_modules|__pycache__|.pytest_cache|.ruff_cache|.mypy_cache|.DS_Store|.fm-grok-turnend|.fm-kimi-turnend) continue ;;
+        .import_linter_cache|.next|graphify-out|*.tsbuildinfo) continue ;;
+      esac
+      printf '%s\n' "$entry"
+    done <"$listing"
   fi
-  case "$hash" in ''|*[!0-9a-f]*) return 1 ;; esac
-  printf '%s\n' "$hash"
+  rm -f "$listing"
+  return "$rc"
 }
 
-# Prints the SHA-256 of standard input, or fails as teardown_ignored_sha256 does.
-teardown_ignored_sha256_stdin() {
+# Prints the SHA-256 of file <path>, or of standard input when no path is given.
+# Fails when no hashing tool is available or it yields no digest.
+teardown_ignored_sha256() {  # [<path>]
   local hash
   if command -v shasum >/dev/null 2>&1; then
-    hash=$(shasum -a 256 | awk '{print $1}')
+    hash=$(shasum -a 256 ${1:+"$1"} 2>/dev/null | awk '{print $1}')
   elif command -v sha256sum >/dev/null 2>&1; then
-    hash=$(sha256sum | awk '{print $1}')
+    hash=$(sha256sum ${1:+"$1"} 2>/dev/null | awk '{print $1}')
   else
     return 1
   fi
@@ -253,42 +252,36 @@ teardown_ignored_sha256_stdin() {
 
 # Copies every preservable ignored entry of <copy> into
 # $DATA/$ID/nested-copy-preserved/<copy-path-sha256> and records each file's
-# SHA-256 in its SHA256SUMS. Returns 1 when anything cannot be copied or hashed,
-# and the caller then refuses the copy rather than removing unpreserved content.
+# SHA-256 in its SHA256SUMS. The new copy is built in a staging directory and
+# replaces an earlier preserve of the same copy only after every entry is copied
+# and hashed, so a failed run never costs the earlier one. Returns 1 when
+# anything cannot be listed, copied or hashed, and the caller then refuses the
+# copy rather than removing unpreserved content.
 teardown_preserve_ignored() {  # <copy>
-  local copy=$1 root dest list entry file hash
-  local -a entries=()
-  list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
-  if ! teardown_preservable_ignored "$copy" > "$list"; then
-    rm -f "$list"
-    return 1
-  fi
-  while IFS= read -r entry; do
-    [ -z "$entry" ] || entries+=("$entry")
-  done < "$list"
-  rm -f "$list"
-  [ "${#entries[@]}" -gt 0 ] || return 0
-  hash=$(printf '%s' "$copy" | teardown_ignored_sha256_stdin) || return 1
+  local copy=$1 root dest stage entries entry file hash
+  entries=$(teardown_preservable_ignored "$copy") || return 1
+  [ -n "$entries" ] || return 0
+  hash=$(printf '%s' "$copy" | teardown_ignored_sha256) || return 1
   root="$DATA/$ID/nested-copy-preserved"
   dest="$root/$hash"
-  mkdir -p "$dest" || return 1
-  printf '%s\n' "$copy" > "$dest/copy-path" || return 1
-  : > "$dest/SHA256SUMS" || return 1
-  for entry in "${entries[@]}"; do
-    case "$entry" in ''|/*|..|../*|*/..|*/../*) return 1 ;; esac
-    rm -rf "${dest:?}/$entry" || return 1
-    mkdir -p "$(dirname "$dest/$entry")" || return 1
-    cp -RPp "$copy/$entry" "$dest/$entry" || return 1
-    if [ -d "$dest/$entry" ] && [ ! -L "$dest/$entry" ]; then
-      while IFS= read -r -d '' file; do
-        hash=$(teardown_ignored_sha256 "$file") || return 1
-        printf '%s  %s\n' "$hash" "${file#"$dest/"}" >> "$dest/SHA256SUMS" || return 1
-      done < <(find "$dest/$entry" -type f -print0)
-    else
-      hash=$(teardown_ignored_sha256 "$dest/$entry") || return 1
-      printf '%s  %s\n' "$hash" "$entry" >> "$dest/SHA256SUMS" || return 1
-    fi
-  done
+  stage="$root/.staging-$hash"
+  rm -rf "$stage" || return 1
+  mkdir -p "$stage" || return 1
+  printf '%s\n' "$copy" > "$stage/copy-path" || return 1
+  : > "$stage/SHA256SUMS" || return 1
+  while IFS= read -r entry; do
+    [ -n "$entry" ] || continue
+    case "$entry" in /*|..|../*|*/..|*/../*) return 1 ;; esac
+    rm -rf "${stage:?}/$entry" || return 1
+    mkdir -p "$(dirname "$stage/$entry")" || return 1
+    cp -RPp "$copy/$entry" "$stage/$entry" || return 1
+  done <<< "$entries"
+  while IFS= read -r -d '' file; do
+    hash=$(teardown_ignored_sha256 "$file") || return 1
+    printf '%s  %s\n' "$hash" "${file#"$stage/"}" >> "$stage/SHA256SUMS" || return 1
+  done < <(find "$stage" -type f ! -path "$stage/copy-path" ! -path "$stage/SHA256SUMS" -print0)
+  rm -rf "$dest" || return 1
+  mv "$stage" "$dest" || return 1
   echo "teardown: preserved ignored files from $copy in $dest" >&2
 }
 
@@ -348,11 +341,9 @@ teardown_foreign_copy_unowned() {  # <copy>
 }
 
 # Proves foreign copy <copy>, or returns 1 with TEARDOWN_FOREIGN_WHY naming what
-# could not be proved. A half-removed or unreadable copy fails the first check.
-# The landed-work rule gets an empty branch name so it never adopts this copy's
-# PR as the task's recorded one. Once the copy is proved landed, its ignored
-# files are preserved in the task's data directory; only when that fails does the
-# copy refuse.
+# could not be proved. Writes nothing. A half-removed or unreadable copy fails
+# the first check. The landed-work rule gets an empty branch name so it never
+# adopts this copy's PR as the task's recorded one.
 teardown_foreign_copy_prove() {  # <copy>
   local copy=$1 rc=0
   TEARDOWN_FOREIGN_WHY=
@@ -366,10 +357,6 @@ teardown_foreign_copy_prove() {  # <copy>
     TEARDOWN_FOREIGN_WHY="its HEAD ${FM_TASK_COPY_HEAD:0:12} is not proved landed"
     return 1
   fi
-  teardown_preserve_ignored "$copy" || {
-    TEARDOWN_FOREIGN_WHY="its ignored files could not be preserved in $DATA/$ID/nested-copy-preserved"
-    return 1
-  }
 }
 
 # Proves every foreign copy in <slot> and records the provable ones in
@@ -464,10 +451,14 @@ teardown_foreign_copy_present() {  # <slot> <copy>
   return 1
 }
 
-# Releases and removes one proved foreign copy. Returns 1 after printing a
-# refusal.
+# Preserves the ignored files of one proved foreign copy, then releases and
+# removes it. Returns 1 after printing a refusal.
 teardown_foreign_copy_dispose() {  # <slot> <copy>
   local slot=$1 copy=$2 rc=0
+  teardown_preserve_ignored "$copy" || {
+    echo "REFUSED: the ignored files of foreign copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." >&2
+    return 1
+  }
   teardown_copy_lock_file "$copy" || rc=$?
   case "$rc" in
     0)
@@ -548,9 +539,6 @@ teardown_own_locked_copies_prove() {
       FM_TASK_COPY_RELEASED_PRIOR_RETIRING=$META
       teardown_foreign_copy_unowned "$copy" || true
       FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
-      if [ -z "$TEARDOWN_FOREIGN_WHY" ] && ! teardown_preserve_ignored "$copy"; then
-        TEARDOWN_FOREIGN_WHY="its ignored files could not be preserved in $DATA/$ID/nested-copy-preserved"
-      fi
     fi
     if [ -n "$TEARDOWN_FOREIGN_WHY" ]; then
       echo "REFUSED: own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}: $TEARDOWN_FOREIGN_WHY." >&2
@@ -559,8 +547,9 @@ teardown_own_locked_copies_prove() {
   done
 }
 
-# Releases and removes one proved own nested copy that Vernant's creation lock
-# holds. Returns 1 after printing a refusal.
+# Preserves the ignored files of one proved own nested copy that Vernant's
+# creation lock holds, then releases and removes it. Returns 1 after printing a
+# refusal.
 teardown_own_copy_dispose() {  # <slot> <copy>
   local slot=$1 copy=$2 rc=0
   teardown_copy_lock_file "$copy" || rc=$?
@@ -568,6 +557,10 @@ teardown_own_copy_dispose() {  # <slot> <copy>
     echo "REFUSED: own nested copy $copy is not locked by Vernant's creation lock any more; it was not removed." >&2
     return 1
   fi
+  teardown_preserve_ignored "$copy" || {
+    echo "REFUSED: the ignored files of own nested copy $copy could not be preserved in $DATA/$ID/nested-copy-preserved; it was not removed." >&2
+    return 1
+  }
   rc=0
   teardown_run_closeout "$slot" "$copy" || rc=$?
   if [ "$rc" != 0 ]; then
