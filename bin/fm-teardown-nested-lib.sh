@@ -29,9 +29,9 @@
 # files that exist nowhere else or by a HEAD that is not proved landed is HELD:
 # when every refused copy in the slot is of that class and the task's own copy
 # already passed the landed-work proof, bin/fm-teardown.sh closes the task and
-# leaves the slot, its lease and every foreign copy exactly as they were
-# (teardown_held_copies_record appends each one to data/held-foreign-copies.log
-# once the close is final).
+# reserves the slot under a durable lease, defers its return and leaves every
+# foreign copy exactly as it was (teardown_held_copies_record appends each one to
+# data/held-foreign-copies.log once the close is final).
 # Nothing here ever removes or alters a held copy, and --force never holds one.
 # The task's own nested copies (the record's worktree= and prior_worktree= copies
 # inside the slot) were already proved clean and landed or anchored by the

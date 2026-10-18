@@ -4035,11 +4035,13 @@ TEARDOWN_PEER_HOMES=()
 
 # Held slots. A task whose own copy passed the landed-work proof closes even when
 # foreign copies in its slot hold ignored files or commits that exist nowhere
-# else (bin/fm-teardown-nested-lib.sh owns which copies are held). The slot, its
-# lease and its claim, and every foreign copy, stay exactly as they were, and only
-# the task's own nested copies the proof covers go. teardown_nested_slot sets
-# TEARDOWN_HELD_SLOT to that slot while all of this holds and recomputes it at
-# each reprove.
+# else (bin/fm-teardown-nested-lib.sh owns which copies are held). The slot is
+# reserved under a durable lease exactly as an ordinary return reserves it, but
+# never returned; its claim and every foreign copy stay exactly as they were, and
+# only the task's own nested copies the proof covers go. A held close that cannot
+# prove that durable lease refuses before it removes anything. teardown_nested_slot
+# sets TEARDOWN_HELD_SLOT to that slot while all of this holds and recomputes it
+# at each reprove.
 TEARDOWN_HELD_SLOT=
 # Reproves the slot and refuses when the route it was on changed meanwhile: a
 # held close never turns into a slot return, and an ordinary one never into a
@@ -4066,7 +4068,7 @@ teardown_held_copies_report() {
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
     echo "notice: held foreign copy ${entry%%$'\t'*} stays in pool slot $TEARDOWN_HELD_SLOT: ${entry#*$'\t'}."
   done
-  echo "notice: pool slot $TEARDOWN_HELD_SLOT stays leased and claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it, so ask the supervisor."
+  echo "notice: pool slot $TEARDOWN_HELD_SLOT is reserved under a durable lease and stays claimed, and nothing returns it automatically; a held copy is removed only on the owner's word naming it, so ask the supervisor."
   if teardown_held_copies_record; then
     echo "notice: each held copy is also listed in $record."
   else
@@ -4308,9 +4310,9 @@ teardown_nested_slot() {  # prove | landed | retire | reprove | return
       ;;
     return)
       if [ -n "$TEARDOWN_PEER_SLOT" ] || [ -n "$TEARDOWN_HELD_SLOT" ]; then
-        # Only this task's own copy goes; the slot, its lease and every peer's
-        # or held foreign copy stay, and the claim moves to a peer when it was
-        # this task's. A held slot keeps its claim as it stands.
+        # Only this task's own copy goes; the slot and every peer's or held
+        # foreign copy stay, and the claim moves to a peer when it was this
+        # task's. A held slot keeps its claim as it stands.
         TEARDOWN_PROOF_OUTCOME="earlier cleanup steps already ran, but nothing was removed and the slot keeps its contents; --force does not waive this proof"
         teardown_reprove_same_route || exit 1
         [ ! -d "$WT" ] || require_worktree_teardown_safety
@@ -5711,9 +5713,11 @@ fi
 # not by task-worktree cleanup.
 # Every refusal above leaves the slot as it found it. Reserve it under fresh
 # project custody only now, immediately before the first destructive step. A peer
-# or held slot is never reserved, because nothing slot-wide is returned.
-if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$TEARDOWN_PEER_SLOT" ] \
-    && [ -z "$TEARDOWN_HELD_SLOT" ]; then
+# slot is never reserved, because nothing slot-wide is returned. A held slot is
+# reserved the same way and must end up durably leased, because it is never
+# returned and a later treehouse get could otherwise reset it over the foreign
+# copies it holds.
+if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$TEARDOWN_PEER_SLOT" ]; then
   teardown_acquire_project_lock || exit $?
   if ! TEARDOWN_RESERVED_SLOT=$(teardown_live_slot_path); then
     TEARDOWN_RESERVED_SLOT=$(teardown_record_enclosing_slot "$META" "$PROJ" "$WT") || exit 1
@@ -5728,7 +5732,11 @@ if [ "$TREEHOUSE_SLOT_LOCK_REQUIRED" = 1 ] && teardown_owns_worktree && [ -z "$T
   fi
   if [ -n "$TEARDOWN_RESERVED_SLOT" ]; then
     require_exclusive_worktree_slot_record "$META" "$ID" "$STATE" "$TEARDOWN_RESERVED_SLOT" || exit 1
-    teardown_reserve_pool_slot "$TEARDOWN_RESERVED_SLOT" || exit 1
+    if ! teardown_reserve_pool_slot "$TEARDOWN_RESERVED_SLOT" \
+        || { [ -n "$TEARDOWN_HELD_SLOT" ] && [ "$TEARDOWN_SLOT_CUSTODY" != lease ]; }; then
+      [ -z "$TEARDOWN_HELD_SLOT" ] || echo "REFUSED: pool slot $TEARDOWN_RESERVED_SLOT could not be durably leased, and a held close never leaves a pool slot without a durable lease, since a later treehouse get could reset it over the foreign copies it holds; nothing was removed." >&2
+      exit 1
+    fi
     teardown_mark_return_pending "$TEARDOWN_RESERVED_SLOT" || exit 1
   fi
   [ "$TEARDOWN_SLOT_CUSTODY" = project ] || teardown_release_project_lock || exit 1
@@ -6152,7 +6160,7 @@ elif [ "$TEARDOWN_LEGACY_ACCEPTED" = 1 ]; then
 elif [ "$TEARDOWN_SLOT_SHARED" = 1 ]; then
   echo "teardown $ID complete (window ${T:-none}; shared pool slot $TEARDOWN_SHARED_SLOT and every copy inside it left untouched; only this task's own slot claim, if present, released)"
 elif [ -n "$TEARDOWN_HELD_SLOT" ] && teardown_owns_worktree; then
-  echo "teardown $ID complete (window ${T:-none}; the task's own work is landed and its record is closed, but pool slot $TEARDOWN_HELD_SLOT stays leased, unreturned, with every foreign copy in it exactly as it was)"
+  echo "teardown $ID complete (window ${T:-none}; the task's own work is landed and its record is closed, but pool slot $TEARDOWN_HELD_SLOT is reserved under a durable lease and unreturned, with every foreign copy in it exactly as it was)"
 elif [ -n "$TEARDOWN_PEER_SLOT" ] && teardown_owns_worktree; then
   echo "teardown $ID complete (window ${T:-none}; nested reassociated worktree $WT removed; pool slot $TEARDOWN_PEER_SLOT left in place, since task ${TEARDOWN_PEER_IDS[*]} still works in it)"
 elif [ -n "$TEARDOWN_ENCLOSING_SLOT" ] && teardown_owns_worktree; then
@@ -6166,7 +6174,7 @@ elif teardown_owns_worktree; then
 else
   echo "teardown $ID complete (window ${T:-none}; pool slot $WT left to task $TEARDOWN_SLOT_REASSIGNED_TO${TEARDOWN_SLOT_REASSIGNED_HOME:+ (home $TEARDOWN_SLOT_REASSIGNED_HOME)}, which it was reassigned to)"
 fi
-[ -z "$TEARDOWN_HELD_SLOT" ] || teardown_held_copies_report
+[ -z "$TEARDOWN_HELD_SLOT" ] || ! teardown_owns_worktree || teardown_held_copies_report
 for teardown_prior_copy in ${TEARDOWN_PRIOR_COPIES[@]+"${TEARDOWN_PRIOR_COPIES[@]}"}; do
   echo "notice: $ID's prior copy $teardown_prior_copy (from a reassociation) was left untouched; return or remove it only after confirming its contents are landed or unwanted"
 done

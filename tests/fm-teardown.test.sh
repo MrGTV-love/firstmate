@@ -10674,16 +10674,21 @@ held_snapshot() {
   git -C "$case_dir/project" worktree list --porcelain > "$case_dir/registrations-before"
 }
 
-# held_assert_untouched <label> <case> <copy>...: the copies are byte-identical
-# and registered, and the slot is still leased, claimed and unreturned.
+# held_assert_copies_untouched <label> <case> <copy>...: the copies are
+# byte-identical and registered, and the slot is still claimed and unreturned.
+# held_assert_untouched adds that Treehouse's lease record is unchanged.
 held_assert_untouched() {
+  local label=$1 case_dir=$2
+  held_assert_copies_untouched "$@"
+  cmp -s "$case_dir/lease-before" "$case_dir/pool/treehouse-state.json" || fail "$label: the slot's lease changed"
+}
+held_assert_copies_untouched() {
   local label=$1 case_dir=$2 copy
   shift 2
   for copy in "$@"; do
     held_fingerprint "$copy" | cmp -s - "$case_dir/held-before.$(basename "$copy")" \
       || fail "$label: the foreign copy $copy changed"
   done
-  cmp -s "$case_dir/lease-before" "$case_dir/pool/treehouse-state.json" || fail "$label: the slot's lease changed"
   cmp -s "$case_dir/claim-before" "$case_dir/pool/1/.fm-slot-owner" || fail "$label: the slot's claim changed"
   git -C "$case_dir/project" worktree list --porcelain | cmp -s - "$case_dir/registrations-before" \
     || fail "$label: copy registrations changed"
@@ -10723,7 +10728,7 @@ test_task_closes_beside_a_foreign_copy_with_unique_ignored_files() {
   assert_grep "held foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: it holds ignored files that exist nowhere else: unique.dat." \
     "$FOREIGN_CASE/stdout" "held-ignored: the output did not list the held copy and its reason: $(cat "$FOREIGN_CASE/stdout")"
   assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-ignored: the record is not one line"
-  pass "a task whose own copy landed closes beside a foreign copy with unique ignored files, which stays byte-identical, with the slot still leased"
+  pass "a task whose own copy landed closes beside a foreign copy with unique ignored files, which stays byte-identical, with the slot still reserved"
 }
 
 test_task_closes_beside_a_foreign_copy_with_unpushed_commits() {
@@ -10741,7 +10746,7 @@ test_task_closes_beside_a_foreign_copy_with_unpushed_commits() {
   assert_grep "held foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: its HEAD " "$FOREIGN_CASE/stdout" \
     "held-unlanded: the output did not list the held copy and its reason"
   assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-unlanded: the record is not one line"
-  pass "a task whose own copy landed closes beside a foreign copy with commits on no remote, which stays byte-identical, with the slot still leased"
+  pass "a task whose own copy landed closes beside a foreign copy with commits on no remote, which stays byte-identical, with the slot still reserved"
 }
 
 test_held_copy_record_has_one_exact_line_per_copy() {
@@ -10972,6 +10977,113 @@ SH
   pass "a stale-lock cleanup refuses when the slot gained a copy holding unique files, instead of turning the close into a held close"
 }
 
+# held_plain_get_slot <case-dir>: the case's slot holds only the process lease a
+# plain treehouse get records (leased=false), with a Treehouse stand-in that
+# models lease and return. Its lease command fails while <case-dir>/lease-fails
+# exists, and reports no lease command while <case-dir>/no-lease-command exists.
+# Lease calls land in lease.log and returns in treehouse.log.
+held_plain_get_slot() {
+  local case_dir=$1
+  printf '{"worktrees":[{"name":"1","path":"%s","leased":false}]}\n' "$FOREIGN_SLOT" > "$case_dir/pool/treehouse-state.json"
+  cat > "$case_dir/fakebin/treehouse" <<SH
+#!/usr/bin/env bash
+state="$case_dir/pool/treehouse-state.json"
+if [ "\${1:-}" = lease ] && [ "\${2:-}" = --help ]; then
+  [ ! -e "$case_dir/no-lease-command" ] || { echo 'Error: unknown command "lease" for "treehouse"' >&2; exit 1; }
+  printf 'Usage:\n  treehouse lease <name> [flags]\n\nFlags:\n      --lease-holder string   Optional label recorded as the lease holder\n'
+  exit 0
+fi
+case "\${1:-}" in
+  lease)
+    printf '%s\n' "\$*" >> "$case_dir/lease.log"
+    [ ! -e "$case_dir/lease-fails" ] || { echo "Error: the lease could not be recorded" >&2; exit 1; }
+    jq --arg name "\$2" --arg holder "\$4" '(.worktrees[] | select(.name == \$name)) |= (.leased = true | .lease_holder = \$holder)' \\
+      "\$state" > "\$state.next" && mv "\$state.next" "\$state"
+    ;;
+  return) printf '%s\n' "\$*" >> "$case_dir/treehouse.log" ;;
+esac
+exit 0
+SH
+  chmod +x "$case_dir/fakebin/treehouse"
+}
+
+test_a_held_close_reserves_a_plain_get_slot_durably() {
+  local rc shape held
+  for shape in slot-root own-nested; do
+    if [ "$shape" = slot-root ]; then
+      make_held_case "held-plain-get-$shape"
+      held=$FOREIGN_COPY
+    else
+      make_own_locked_copy_case "held-plain-get-$shape" enclosing
+      printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+      seed_backlog_in_flight "$FOREIGN_CASE"
+      held=$FOREIGN_SLOT/.claude/worktrees/fc-two
+      git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$held" main
+    fi
+    held_foreign_ignored "$held"
+    held_plain_get_slot "$FOREIGN_CASE"
+    jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
+      || fail "held-plain-get-$shape: the fixture slot is not a plain-get slot"
+    held_snapshot "$FOREIGN_CASE" "$held"
+    run_foreign_teardown rc
+    expect_code 0 "$rc" "held-plain-get-$shape: a landed task must close beside a held copy in a plain-get slot: $(cat "$FOREIGN_CASE/stderr")"
+    held_assert_closed "held-plain-get-$shape"
+    jq -e '.worktrees[0].leased == true and .worktrees[0].lease_holder == "task-x1"' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
+      || fail "held-plain-get-$shape: the slot is not durably leased after the close: $(cat "$FOREIGN_CASE/pool/treehouse-state.json")"
+    assert_equals "lease 1 --lease-holder task-x1" "$(cat "$FOREIGN_CASE/lease.log")" \
+      "held-plain-get-$shape: the slot was not reserved exactly once"
+    if [ "$shape" = slot-root ]; then
+      held_assert_copies_untouched "held-plain-get-$shape" "$FOREIGN_CASE" "$held"
+    else
+      assert_absent "$FOREIGN_COPY" "held-plain-get-$shape: the task's own nested copy survived"
+      held_fingerprint "$held" | cmp -s - "$FOREIGN_CASE/held-before.$(basename "$held")" \
+        || fail "held-plain-get-$shape: the foreign copy changed"
+      cmp -s "$FOREIGN_CASE/claim-before" "$FOREIGN_CASE/pool/1/.fm-slot-owner" || fail "held-plain-get-$shape: the slot's claim changed"
+      git -C "$FOREIGN_CASE/project" worktree list --porcelain | grep -F "worktree $held" >/dev/null \
+        || fail "held-plain-get-$shape: the foreign copy is no longer registered"
+      assert_absent "$FOREIGN_CASE/treehouse.log" "held-plain-get-$shape: the pool slot was returned"
+      assert_absent "$FOREIGN_CASE/closeout.log" "held-plain-get-$shape: the closeout driver ran"
+    fi
+    assert_present "$held/unique.dat" "held-plain-get-$shape: the foreign copy's unique file is gone"
+    assert_grep "is reserved under a durable lease and stays claimed" "$FOREIGN_CASE/stdout" \
+      "held-plain-get-$shape: the output did not say the slot is reserved"
+  done
+  pass "a held close reserves a plain-get slot under a durable lease before it removes anything and leaves the held copy byte-identical"
+}
+
+test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased() {
+  local rc mode held reason
+  for mode in lease-fails no-lease-command; do
+    make_own_locked_copy_case "held-no-lease-$mode" enclosing
+    printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+    seed_backlog_in_flight "$FOREIGN_CASE"
+    held=$FOREIGN_SLOT/.claude/worktrees/fc-two
+    git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$held" main
+    held_foreign_ignored "$held"
+    held_plain_get_slot "$FOREIGN_CASE"
+    : > "$FOREIGN_CASE/$mode"
+    held_snapshot "$FOREIGN_CASE" "$held"
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "held-no-lease-$mode: a held close must refuse when the slot cannot be durably leased: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "REFUSED: pool slot $FOREIGN_SLOT could not be durably leased" "$FOREIGN_CASE/stderr" \
+      "held-no-lease-$mode: the refusal did not name the slot: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "nothing was removed" "$FOREIGN_CASE/stderr" "held-no-lease-$mode: the refusal did not say nothing was removed"
+    case "$mode" in
+      lease-fails) reason="Error: the lease could not be recorded" ;;
+      no-lease-command) reason="has no lease command to reserve it" ;;
+    esac
+    assert_grep "$reason" "$FOREIGN_CASE/stderr" "held-no-lease-$mode: the refusal did not say why the lease failed"
+    assert_present "$FOREIGN_COPY" "held-no-lease-$mode: the task's own nested copy was removed"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-no-lease-$mode: the task record was removed"
+    [ "$(backlog_row_state "$FOREIGN_CASE")" != done ] || fail "held-no-lease-$mode: the backlog item was closed by a refused close"
+    assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-no-lease-$mode: a refused close wrote a held-copy record"
+    jq -e '.worktrees[0].leased == false' "$FOREIGN_CASE/pool/treehouse-state.json" >/dev/null \
+      || fail "held-no-lease-$mode: the slot's lease record changed"
+    held_assert_untouched "held-no-lease-$mode" "$FOREIGN_CASE" "$held"
+  done
+  pass "a held close refuses before it removes anything when the slot cannot be durably leased, and says why"
+}
+
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
   local rc second
   make_held_case held-notice
@@ -10988,8 +11100,8 @@ test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
     "held-notice: the output did not list the first held copy"
   assert_grep "held foreign copy $second stays in pool slot $FOREIGN_SLOT: " "$FOREIGN_CASE/stdout" \
     "held-notice: the output did not list the second held copy"
-  assert_grep "pool slot $FOREIGN_SLOT stays leased and claimed, and nothing returns it automatically" "$FOREIGN_CASE/stdout" \
-    "held-notice: the output did not say the slot stays leased and claimed with no automatic return"
+  assert_grep "pool slot $FOREIGN_SLOT is reserved under a durable lease and stays claimed, and nothing returns it automatically" "$FOREIGN_CASE/stdout" \
+    "held-notice: the output did not say the slot is reserved under a durable lease and stays claimed with no automatic return"
   assert_grep "a held copy is removed only on the owner's word naming it, so ask the supervisor" "$FOREIGN_CASE/stdout" \
     "held-notice: the output did not say how a held copy is removed"
   assert_grep "each held copy is also listed in $FOREIGN_CASE/data/held-foreign-copies.log" "$FOREIGN_CASE/stdout" \
@@ -10997,7 +11109,7 @@ test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
   assert_no_grep "reaper" "$FOREIGN_CASE/stdout" "held-notice: the output promises a reaper run"
   assert_no_grep "named drop" "$FOREIGN_CASE/stdout" "held-notice: the output promises a named drop"
   assert_no_grep "reaper" "$FOREIGN_CASE/stderr" "held-notice: the error output promises a reaper run"
-  pass "a held close lists every held copy, says the slot stays leased and claimed, and promises no cleanup that does not exist"
+  pass "a held close lists every held copy, says the slot is reserved under a durable lease and stays claimed, and promises no cleanup that does not exist"
 }
 
 test_a_held_close_that_a_later_step_refuses_writes_no_record_line() {
@@ -13291,6 +13403,8 @@ test_a_held_close_removes_only_the_tasks_own_nested_copy
 test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal
 test_an_ordinary_close_never_turns_into_a_held_close_during_the_project_lock_wait
 test_a_stale_lock_cleanup_never_turns_an_ordinary_close_into_a_held_close
+test_a_held_close_reserves_a_plain_get_slot_durably
+test_a_held_close_refuses_when_the_slot_cannot_be_durably_leased
 test_the_held_close_notice_promises_no_cleanup_that_does_not_exist
 test_a_held_close_that_a_later_step_refuses_writes_no_record_line
 test_a_held_copy_record_that_cannot_be_written_warns_and_the_close_completes
