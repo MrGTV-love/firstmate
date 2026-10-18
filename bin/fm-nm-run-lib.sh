@@ -492,11 +492,12 @@ fm_nm_run_is_parked() {  # <toon-output>
 # caller's to license, and fm-crew-state.sh pairs it with an explicit
 # daemon-down probe for exactly that reason.
 # All four accepted words reach here on BOTH surfaces. The overview table
-# fm_nm_select_run validates carries a narrower column
-# (pending|running|completed|failed|cancelled|ci_monitor_interrupted, its unknown_status check), but that column is not
-# what this predicate reads: the selected-run route re-reads the run by id and
-# passes that DETAIL object, whose own vocabulary check admits `fixing` and `ci`
-# as live, and the legacy bare-status route passes the same detail shape.
+# fm_nm_select_run validates carries a narrower column (pending|running|
+# completed|failed|cancelled|ci_monitor_interrupted, its unknown_status check),
+# but that column is not what this predicate reads: the selected-run route
+# re-reads the run by id and passes that DETAIL object, whose own vocabulary
+# check admits `fixing` and `ci` as live, and the legacy bare-status route
+# passes the same detail shape.
 # Dropping them would report a fix round or a ci wait as idle, which is the
 # misreport this predicate exists to prevent.
 fm_nm_run_is_executing() {  # <toon-output>

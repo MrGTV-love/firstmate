@@ -151,12 +151,13 @@
 #      the observed disposition and the PR (nm_interrupted_run_is_finished). It
 #      takes precedence over the worker's own declarations like every
 #      attributed run. Any other step state, no recorded PR, or a closed,
-#      missing, unreadable, or skipped forge read keeps each route's reading
-#      from before the status was mapped: the id-addressed route reads unknown
-#      (unrecognized run status), the outcome arm reads unknown (outcome:
-#      ci-monitor-interrupted), and the status-only arm, which read working,
-#      now reads unknown (status: ci_monitor_interrupted) like the other two,
-#      because the run is terminal and a terminal run is never working. In the
+#      missing, unreadable, or skipped forge read reads unknown on every route:
+#      the id-addressed route (unrecognized run status), the outcome arm
+#      (outcome: ci-monitor-interrupted), and the status-only arm (status:
+#      ci_monitor_interrupted). The first two keep the reading they had before
+#      the status was mapped; the status-only arm read working then and now
+#      agrees with them, because the run is terminal and a terminal run is
+#      never working. In the
 #      coarse runs-ledger fallback (no steps table, no ci log), a terminal
 #      FAILED record whose daemon an explicit probe proves down reads unknown,
 #      never failed: an instrument failure must not read as work failure
