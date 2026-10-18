@@ -1780,8 +1780,9 @@ A malformed file refuses the run and names its line.
 The sweep measures one copy at a time with `nice -n 20 du -sk`.
 It caches each size by copy path and mtime and measures it again after `cache-max-age` seconds, because a copy's root mtime does not move when a file deep inside grows.
 While the 1-minute load average is above `load-limit`, or cannot be read, it runs no `du`: the listing, the classes and `--apply` still run, and only fresh cached sizes are used.
-Such a run prints and records one line, `scan skipped: load N above limit M`.
-`check` records it and stays quiet, and raises one wake once every run for 6 hours has skipped.
+A report or `--apply` run prints one line, `scan skipped: load N above limit M`, or `scan skipped: load cannot be read, limit M` when the load is unreadable.
+`--apply` and `check` also record it, and `check` stays quiet.
+`--apply` and `check` raise one wake once every run for 6 hours has skipped.
 When a budget goes over, the run raises exactly one wake, naming each budget that just went over, its total, and its five largest copies with their class.
 It raises no second wake while the same budget stays over, and a budget that drops under and goes over again wakes again.
 A scan that `check` had to cut short counts only what it measured, so an unmeasured copy can delay a wake and never cause one.
@@ -3672,10 +3673,10 @@ FM_MAIL_CHECK_BUDGET=15   # seconds allowed for one standing mail poll; valid 5.
 FM_MAIL_POLL_MAX_WAKES=20   # per-poll wake cap for a mail poll; valid 1..200, keeps a flood from flooding firstmate
 FM_MAIL_TIMEOUT=20   # mail-plane IMAP/SMTP socket timeout in seconds; invalid or non-positive values become 20
 FM_TOOL_UPDATE_INTERVAL=900   # seconds between watched-tool probe sweeps; 0 probes on every run, other values must be 60..86400
-FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
 FM_TOOL_UPDATE_PROBE_SECS=5   # 1..30 seconds allowed for one version or git probe
 FM_TOOL_UPDATE_BUDGET_SECS=20   # 1..120 seconds allowed for a whole watched-tool sweep; cut to fit FM_CHECK_TIMEOUT, and the cut is reported
 FM_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sweep budget still uses real time
+FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
 FM_PROCEVENT_MAX_OUTPUT_BYTES=1048576   # bound on one captured process-to-event result
 FM_PROCEVENT_CLAIM_ROOT=                # machine-wide source claim root; default $XDG_STATE_HOME/firstmate/procevent-claims
 FM_PROCEVENT_OWNER_LEASE_SECONDS=600    # how long a source runner keeps going with no activity in its owning home; 1..86400

@@ -54,9 +54,8 @@
 #                      reaper's rule) or its content already in the default
 #                      branch (bin/fm-task-copy-lib.sh's landed rule, the one
 #                      bin/fm-teardown.sh uses), no process inside, no record.
-# HELD-LOCKED is the only class beyond the five the task named; a locked copy
-# cannot be removed by a plain `git worktree remove`, so calling it live or
-# orphaned would mislead.
+# HELD-LOCKED is its own class: a locked copy cannot be removed by a plain
+# `git worktree remove`, so calling it live or orphaned would mislead.
 #
 # --apply removes only REAPABLE-PROVEN copies, one at a time, deepest path first,
 # each re-proved just before its own removal, by a plain `git worktree remove`
@@ -65,8 +64,8 @@
 # reported, and the run exits 1; it is not retried. Each removal appends one line
 # to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
 # in the same run is removed by the next run; a second run otherwise finds
-# nothing left to remove. Without --apply nothing is changed except that no cache or record is
-# written either: report mode reads the size cache and writes nothing.
+# nothing left to remove. Report mode (no flag) reads the size cache and writes
+# nothing; `check` writes only the size cache and the budget record.
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
 # only hold a copy back, never release one.
@@ -78,9 +77,9 @@
 # is subtracted from its enclosing copy so no byte is counted twice.
 # While the 1-minute load average exceeds load-limit (default 90), or cannot be
 # read, no du runs: the listing, the classes and --apply still run, only fresh
-# cached sizes are used, and the run prints and records one line, "scan skipped:
-# load N above limit M". `check` records it and stays quiet, and raises one wake
-# once every run for 6 hours has skipped.
+# cached sizes are used, and a report or --apply run prints one line, "scan
+# skipped: load N above limit M". --apply and `check` also record it, `check`
+# stays quiet, and either raises one wake once every run for 6 hours has skipped.
 #
 # Budgets. config/copy-budget (docs/configuration.md owns the format) holds a
 # GiB budget per pool root and per container (a pool slot, or a Firstmate home).
