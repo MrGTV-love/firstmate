@@ -80,7 +80,7 @@ Its selected row is "Exit and stop tasks", and its footer reads "Enter to confir
 A worker parked on it holds every later steering message behind it, so two supported answers exist.
 
 - **A finished task is stopped.**
-  `exit` chooses "Exit and stop tasks" only for a Claude ship or scout whose own state, read through [`bin/fm-crew-state.sh`](../bin/fm-crew-state.sh), is a terminal `done`, and whose busy record read `idle` before anything was sent.
+  `exit` chooses "Exit and stop tasks" only for a Claude ship or scout whose own state, read successfully through [`bin/fm-crew-state.sh`](../bin/fm-crew-state.sh), is a terminal `done`, and whose busy record read `idle` before anything was sent.
   An `unknown` busy record is never promoted to idle, so it refuses like a busy one.
   A task whose steering inbox still holds an unhandled record also refuses, because a parked picker blocks the doorbell and stopping the task would leave that steering unread; release it with `stay` first, let it read and acknowledge the steering, then `exit`.
   A `failed` task is not finished: it is usually steered and retried, so its picker is released with `stay`.

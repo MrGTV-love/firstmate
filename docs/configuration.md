@@ -1411,8 +1411,8 @@ A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still
 The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
 A placeholder counts only where the scaffold puts it: a line holding the placeholder alone, or the end of the `Capability in plain words:` line.
 A filled section may quote a placeholder inside a sentence.
-The one escape is a `DoD file: <absolute path>` line inside that section naming an existing, non-empty file with no placeholder left.
-A `DoD file:` line anywhere else in the brief is ignored.
+The one escape is an unfenced `DoD file: <absolute path>` line inside that section naming an existing, non-empty file with no placeholder left.
+A `DoD file:` line in a fenced example or anywhere else in the brief is ignored.
 A relaunch (`bin/fm-spawn.sh --relaunch`) never runs the check, so a criteria file that moves later cannot block it.
 Secondmate charters carry neither section and are never checked.
 A fresh spawn of a brief with no such section at all is not refused: it prints one warning line on stderr that names the missing section and the task id, and carries on.

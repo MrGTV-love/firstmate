@@ -17,9 +17,15 @@
 # Explicit openai/* and openrouter/* routes bill APIs, regardless of catalog
 # availability or model-index membership. Never resolve or call those models.
 fm_omp_api_billing_route_check() {
-  case "$1" in
+  local provider=${1%%/*}
+  [ "${1#*/}" != "$1" ] || return 0
+  # omp trims both the whole selector and the provider before resolving it.
+  # Normalize only this comparison; never rewrite the caller's launch argument.
+  provider="${provider#"${provider%%[![:space:]]*}"}"
+  provider="${provider%"${provider##*[![:space:]]}"}"
+  case "$provider/" in
     [oO][pP][eE][nN][aA][iI]/* | [oO][pP][eE][nN][rR][oO][uU][tT][eE][rR]/*)
-      echo "error: omp ${1%%/*}/* routes use API billing; select --model openai-codex/<gpt-model> instead" >&2
+      echo "error: omp $provider/* routes use API billing; select --model openai-codex/<gpt-model> instead" >&2
       return 1
       ;;
   esac
@@ -30,7 +36,9 @@ fm_omp_api_billing_route_check() {
 # Read only the active global config, using omp's OMP_PROFILE precedence over
 # PI_CODING_AGENT_DIR and HOME. Report default, vision, tiny and fallback chain
 # keys/targets without emitting arbitrary config values, secrets or parser
-# exceptions. Neither omp Settings nor a provider is invoked; no config changes.
+# exceptions. Selector/provider padding is trimmed at comparison time, and
+# every comma-separated ordered role pattern is inspected.
+# Neither omp Settings nor a provider is invoked; no config changes.
 # Missing config is silent; an existing unreadable config is diagnostic, not a
 # clean bill of health. Output is shared by bootstrap and remote doctor.
 fm_omp_api_billing_config_diagnostics() {
@@ -56,12 +64,16 @@ begin
   findings = []
   report = lambda do |field, value|
     next unless value.is_a?(String)
-    provider = value.partition("/").first.downcase
+    provider = value.partition("/").first.strip.downcase
     if value.include?("/") && %w[openai openrouter].include?(provider)
       findings << "#{field} uses #{provider}/* (API billing); use openai-codex/<gpt-model> instead"
     end
   end
-  %w[default vision tiny].each { |role| report.call("modelRoles.#{role}", roles[role]) }
+  %w[default vision tiny].each do |role|
+    value = roles[role]
+    next unless value.is_a?(String)
+    value.split(",").each { |pattern| report.call("modelRoles.#{role}", pattern.strip) }
+  end
   chains.each_with_index do |(key, targets), index|
     raise TypeError unless targets.is_a?(Array)
     report.call("retry.fallbackChains key[#{index}]", key)

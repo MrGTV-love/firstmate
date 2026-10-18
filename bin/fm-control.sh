@@ -1522,16 +1522,16 @@ exit_picker_answerable() {
   esac
   line=$(fm_run_timed "$CREW_STATE_WAIT" env FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
     FM_CREW_STATE_NO_FORGE=1 "$CREW_STATE_BIN" "$ID" 2>/dev/null) || rc=$?
+  if [ "$rc" -ne 0 ] || [ -z "$line" ]; then
+    EXIT_PICKER_WHY="its current state could not be read"
+    return 1
+  fi
   state=${line#state: }
   state=${state%% *}
   case "$line" in
     'state: done '*) ;;
     *)
-      if [ "$rc" -ne 0 ] || [ -z "$line" ]; then
-        EXIT_PICKER_WHY="its current state could not be read"
-      else
-        EXIT_PICKER_WHY="its current state is $state, not done"
-      fi
+      EXIT_PICKER_WHY="its current state is $state, not done"
       return 1
       ;;
   esac
