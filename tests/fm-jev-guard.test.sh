@@ -5,6 +5,8 @@ set -u
 # shellcheck source=tests/lib.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 unset TYPESAFE_API_KEY TYPESAFE_API_KEY_PRIVATE OPENROUTER_API_KEY JEV_BACKEND JEV_LEVEL_CONFIG
+unset FM_FRICTION_EVENT_ID FM_FRICTION_ATTEMPT_ID FM_FRICTION_OPERATION_ID FM_FRICTION_EPISODE_ID
+export FM_FRICTION_EXECUTION_KIND=test
 TMP_ROOT=$(fm_test_tmproot fm-jev-guard)
 NODE_TS=(node --experimental-strip-types --no-warnings)
 KEY=fm-jev-guard-test-key
@@ -1031,12 +1033,52 @@ for (const content of ['x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1), 'é'.repe
   const tooBig = await write(content);
   assert.equal(tooBig.block, true);
   assert.match(tooBig.reason, /RequestTooLargeError/);
+  assert.match(tooBig.reason, /guard=FM-JEV-SIZE rule=complete-screening-budget/);
+  for (const budget of [MAX_CHUNKS, MAX_REQUEST_BYTES, CHUNK_OVERLAP_BYTES]) assert.ok(tooBig.reason.includes(String(budget)));
+  assert.match(tooBig.reason, /same write tool.*separate files.*below 150,000 characters/);
+  assert.doesNotMatch(tooBig.reason, /same call once more/, 'size failure must not prescribe a useless identical retry');
   [row] = rows(1);
   assert.equal(row.error_type, 'RequestTooLargeError');
   assert.equal(row.request_started, false);
 }
 assert.equal((await result('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1))).isError, true);
 assert.equal(sent().length, before, 'an uncoverable payload must not send any piece');
+const frictionPath = `${home}/state/friction.jsonl`;
+const friction = () => readFileSync(frictionPath, 'utf8').trim().split('\n').map(JSON.parse);
+const { createHash } = await import('node:crypto');
+const taskDigest = 'sha256:' + createHash('sha256').update('oversize').digest('hex');
+const sizeEvents = friction().filter(r => r.guard_id === 'FM-JEV-SIZE' && r.task_id === taskDigest);
+assert.equal(sizeEvents.length, 3, 'two write denials and one result denial produce one event each');
+for (const r of sizeEvents) {
+  assert.equal(r.schema, 'fm-friction.v1');
+  assert.equal(r.rule_id, 'complete-screening-budget');
+  assert.equal(r.execution_kind, 'test');
+  assert.equal(r.outcome, 'blocked');
+  assert.equal(r.adjudication, 'unknown');
+  assert.match(r.subject.identity, /^sha256:[a-f0-9]{64}$/);
+}
+assert.equal(JSON.stringify(sizeEvents).includes(home), false, 'bridge must not retain input paths');
+// Execute the supported route through the same write guard, then materialize
+// each admitted part as the host would. No oversized prefix is admitted.
+for (let n = 0; n < 2; n++) {
+  const content = `part-${n}\n` + 'x'.repeat(149000);
+  const patch = await handlers.tool_call({ toolName: 'write', input: { path: `report-part-${n}.txt`, content } }, ctx);
+  assert.equal(patch, undefined, 'bounded benign report part should complete');
+  writeFileSync(`${process.env.WT}/report-part-${n}.txt`, content);
+  assert.equal(readFileSync(`${process.env.WT}/report-part-${n}.txt`, 'utf8'), content);
+}
+// Optional friction storage cannot change admission or replace mandatory Jev audit.
+const { renameSync, mkdirSync } = await import('node:fs');
+renameSync(frictionPath, `${frictionPath}.saved`);
+mkdirSync(frictionPath);
+const telemetryFailure = await write('x'.repeat(MAX_CHUNKS * MAX_REQUEST_BYTES + 1));
+assert.equal(telemetryFailure.block, true);
+assert.match(telemetryFailure.reason, /complete-screening-budget/);
+assert.doesNotMatch(telemetryFailure.reason, /AuditUnavailableError/);
+assert.equal(await write('ordinary bounded report'), undefined);
+rmSync(frictionPath, { recursive: true });
+renameSync(`${frictionPath}.saved`, frictionPath);
+before = sent().length;
 
 // The never-send policy covers the whole payload before the first piece leaves.
 writeFileSync(`${home}/config/dispatch-never-send`, 'never-send-canary-value\n');
@@ -1097,7 +1139,6 @@ assert.ok(stalledRow.chunks >= 3);
 console.log('oversize-ok');
 JS
 ) || fail "oversize screening: $out"
-  [ "$out" = oversize-ok ] || fail "unexpected oversize output: $out"
   pass "oversized payloads are screened in complete pieces: benign allowed, any blocked or unscreenable piece blocks, uncoverable and never-send payloads send nothing, deadlines hold"
 }
 
@@ -1117,23 +1158,33 @@ test_claude_oversize() {
   [ -z "$out" ] || fail "an oversized benign Claude result produced an advisory"
   claude_hook "$(post Bash "$(jq -cn --rawfile s "$bad" '{stdout:$s,stderr:""}')")"
   jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "a flagged late piece of an oversized Claude result produced no advisory"
-  pass "Claude hooks screen oversized writes and results in pieces end to end"
+  before=$(requests)
+  out=$(WT="$WT" node -e 'process.stdout.write(JSON.stringify({hook_event_name:"PreToolUse",cwd:process.env.WT,tool_name:"Write",tool_input:{file_path:process.env.WT+"/huge.txt",content:"x".repeat(262145)},tool_use_id:"size-refusal"}))' \
+    | "$ROOT/bin/fm-jev-guard-hook.sh" "$HOME_DIR" "$HOME_DIR/config" "$HOME_DIR/state" t1 "$WT" "$TASK_DATA" firstmate FIRSTMATE_JEV_GUARD_V1) \
+    || fail 'Claude size refusal changed its hook exit contract'
+  denied "$out" || fail 'Claude admitted an uncoverable payload'
+  jq -e '.hookSpecificOutput.permissionDecisionReason | contains("guard=FM-JEV-SIZE rule=complete-screening-budget")' <<<"$out" >/dev/null \
+    || fail 'Claude hook lost the typed size refusal'
+  [ "$(requests)" = "$before" ] || fail 'Claude sent an uncoverable prefix'
+  pass "Claude hooks retain JSON/exit contracts, screen bounded writes, and refuse uncoverable size with the typed completing route"
 }
 
-test_claude_effects
-test_outages_and_scope
-test_bounded_retry
-test_missing_runtime
-test_launch_cutover
-test_crashing_runtime
-test_service_contract
-test_result_and_audit_policy
-test_claude_result_advisory
-test_claude_channel_context
-test_channel_consistency
-test_omp_permissions
-test_deadlines
-test_trusted_reads_and_independent_judgment
-test_oversize_screening
-test_claude_oversize
-test_ledger_privacy
+jev_test_cases=(
+  test_claude_effects test_outages_and_scope test_bounded_retry test_missing_runtime
+  test_launch_cutover test_crashing_runtime test_service_contract test_result_and_audit_policy
+  test_claude_result_advisory test_claude_channel_context test_channel_consistency
+  test_omp_permissions test_deadlines test_trusted_reads_and_independent_judgment
+  test_oversize_screening test_claude_oversize test_ledger_privacy
+)
+# Like the teardown suite, accept only registered case names for focused runs.
+for requested in "$@"; do
+  found=0
+  for test_case in "${jev_test_cases[@]}"; do [ "$requested" != "$test_case" ] || found=1; done
+  [ "$found" = 1 ] || { printf 'Unknown test case: %s\n' "$requested" >&2; exit 2; }
+done
+for test_case in "${jev_test_cases[@]}"; do
+  if [ "$#" = 0 ]; then "$test_case"; continue; fi
+  for requested in "$@"; do
+    if [ "$requested" = "$test_case" ]; then "$test_case"; break; fi
+  done
+done

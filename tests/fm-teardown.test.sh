@@ -80,7 +80,8 @@ set -u
 . "$ROOT/tests/git-lock-helpers.sh"
 fm_git_identity fmtest fmtest@example.invalid
 # Each fixture chooses its own home, never the invoking session's live home.
-unset FM_HOME
+unset FM_HOME FM_FRICTION_EVENT_ID FM_FRICTION_ATTEMPT_ID FM_FRICTION_OPERATION_ID FM_FRICTION_EPISODE_ID
+export FM_FRICTION_EXECUTION_KIND=test
 
 TEARDOWN="$ROOT/bin/fm-teardown.sh"
 PR_CHECK="$ROOT/bin/fm-pr-check.sh"
@@ -10601,6 +10602,7 @@ make_foreign_copy_case() {
   FOREIGN_CASE=$case_dir
   FOREIGN_SLOT=$NESTED_SLOT
   FOREIGN_COPY=$NESTED_COPY
+  mkdir -p "$case_dir/home"
   fm_write_meta "$case_dir/state/task-x1.meta" \
     "window=firstmate:fm-task-x1" "endpoint_task_id=task-x1" \
     "worktree=$NESTED_SLOT" "branch=fm/task-x1" "project=$case_dir/project" \
@@ -10685,7 +10687,7 @@ test_unlocked_landed_foreign_copy_is_removed_without_the_driver() {
   make_foreign_copy_case foreign-landed-unlocked
   run_foreign_teardown rc
   expect_code 0 "$rc" "foreign-landed: an unlocked landed copy must be removed: $(cat "$FOREIGN_CASE/stderr")"
-  assert_absent "$FOREIGN_COPY" "foreign-landed: the copy survived"
+  assert_absent "$FOREIGN_COPY" "foreign-landed: the copy survived; stdout=$(cat "$FOREIGN_CASE/stdout"); stderr=$(cat "$FOREIGN_CASE/stderr")"
   assert_absent "$FOREIGN_CASE/closeout.log" "foreign-landed: the driver ran for an unlocked copy"
   assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "foreign-landed: the slot was not returned"
   pass "an unlocked landed foreign copy is removed with a plain git worktree remove and the slot is returned"
@@ -10722,10 +10724,12 @@ test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal() {
   expect_code 1 "$rc" "reap-reason: an unlanded copy must be refused: $(cat "$FOREIGN_CASE/stderr")"
   eval "$(sed -n '/^first_refusal_line() {/,/^}/p' "$ROOT/bin/fm-idle-session-reap.sh")"
   line=$(first_refusal_line "$(cat "$FOREIGN_CASE/stdout" "$FOREIGN_CASE/stderr")")
-  case "$line" in
-    "REFUSED: foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: its HEAD "*" is not proved landed.") ;;
-    *) fail "reap-reason: the reaper would record '$line' instead of the copy's own reason" ;;
-  esac
+  # Preserve the actual typed refusal as the reaper's reason rather than pinning
+  # presentation wording; it must name the specific missing landing proof.
+  [[ "$line" == *"rule=copy-landed"* && "$line" == *"$FOREIGN_COPY"* ]] \
+    || fail "reaper discarded the per-copy predicate: $line"
+  jq -e 'select(.rule_id == "copy-landed" and .outcome == "blocked")' \
+    "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail "missing typed landing refusal"
   pass "the reaper's first refusal line for a foreign copy that stays is the copy's own written reason"
 }
 
@@ -10829,6 +10833,80 @@ SH
   assert_foreign_copy_untouched foreign-unlistable
   assert_present "$FOREIGN_COPY/unique.dat" "foreign-unlistable: the ignored file was lost"
   pass "a foreign copy whose ignored files cannot be listed is refused, not treated as having nothing to preserve"
+}
+
+test_typed_preservation_exit_completes_cleanup() {
+  local rc exclude route line preserved ownership
+  for ownership in foreign own; do
+  route=
+  if [ "$ownership" = own ]; then
+    dead_launcher_pid
+    make_own_locked_copy_case typed-own-preservation-route enclosing "$FOREIGN_DEAD_PID"
+  else
+    make_foreign_copy_case typed-preservation-route
+  fi
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'unique retained bytes\n' > "$FOREIGN_COPY/unique.dat"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$FOREIGN_CASE/fakebin/cp"
+  chmod +x "$FOREIGN_CASE/fakebin/cp"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "failed preservation must keep refusing"
+  assert_foreign_copy_untouched typed-preservation-route
+  assert_equals 'unique retained bytes' "$(cat "$FOREIGN_COPY/unique.dat")" 'unproven ignored bytes changed'
+  jq -es 'length == 1 and .[0].schema == "fm-friction.v1" and .[0].rule_id == "ignored-bytes-preserved" and .[0].exit_kind == "machine" and .[0].execution_kind == "test"' \
+    "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'preservation refusal was absent or counted twice'
+  while IFS= read -r line; do
+    case "$line" in 'completing-command: '*) route=${line#completing-command: } ;; esac
+  done < "$FOREIGN_CASE/stderr"
+  [ -n "$route" ] || fail 'preservation refusal omitted its executable completing command'
+  # Restore storage, then execute the printed route through the real teardown
+  # graph with only this fixture's external-tool and home-layout environment.
+  rm "$FOREIGN_CASE/fakebin/cp"
+  rc=0
+  env FM_TEARDOWN_VERNANT_PYTHON="$FOREIGN_CASE/vernant-python" \
+    FM_ROOT_OVERRIDE="$FOREIGN_CASE/code-root" FM_STATE_OVERRIDE="$FOREIGN_CASE/state" \
+    FM_DATA_OVERRIDE="$FOREIGN_CASE/data" FM_CONFIG_OVERRIDE="$FOREIGN_CASE/config" \
+    NM_HOME="$FOREIGN_CASE/nm" PATH="$FOREIGN_CASE/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
+    bash -c "$route" > "$FOREIGN_CASE/completed.stdout" 2> "$FOREIGN_CASE/completed.stderr" || rc=$?
+  expect_code 0 "$rc" "printed route failed after storage restored: $(cat "$FOREIGN_CASE/completed.stderr")"
+  assert_absent "$FOREIGN_COPY" 'printed route did not retire copy'
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" 'printed route did not close task'
+  preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f)
+  assert_equals 'unique retained bytes' "$(cat "$preserved")" 'completing route lost ignored bytes'
+  jq -es 'length == 1' "$FOREIGN_CASE/home/state/friction.jsonl" >/dev/null || fail 'success fabricated another policy refusal'
+  done
+  pass 'own and foreign typed preservation refusals retain unique bytes and their printed commands complete cleanup after storage repair'
+}
+
+test_teardown_usage_and_inspection_errors_are_not_policy_events() {
+  local rc
+  make_foreign_copy_case typed-non-policy
+  rc=0
+  FM_HOME="$FOREIGN_CASE/home" "$TEARDOWN" > "$FOREIGN_CASE/usage.out" 2> "$FOREIGN_CASE/usage.err" || rc=$?
+  expect_code 2 "$rc" 'usage exit changed'
+  assert_absent "$FOREIGN_CASE/home/state/friction.jsonl" 'usage error recorded a policy event'
+  cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in *" worktree list "*) exit 128 ;; esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/git"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" 'Git inspection failure changed exit'
+  assert_foreign_copy_untouched typed-non-policy
+  assert_absent "$FOREIGN_CASE/home/state/friction.jsonl" 'inspection failure recorded a policy event'
+  cat > "$FOREIGN_CASE/fakebin/git" <<SH
+#!/usr/bin/env bash
+case "\$1:\${2:-}:\${3:-}" in "-C:$FOREIGN_COPY:status") exit 128 ;; esac
+exec "$REAL_GIT_FOR_TEST" "\$@"
+SH
+  chmod +x "$FOREIGN_CASE/fakebin/git"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" 'nested-copy status inspection failure changed exit'
+  assert_foreign_copy_untouched typed-non-policy
+  assert_absent "$FOREIGN_CASE/home/state/friction.jsonl" 'nested-copy status error recorded a policy event'
+  pass 'teardown usage and transient Git inspection errors retain exits without policy events'
 }
 
 test_earlier_preserved_copy_survives_until_its_replacement_is_verified() {
@@ -13011,6 +13089,8 @@ test_foreign_copy_preserves_unique_ignored_files_before_removal
 test_foreign_copy_regenerable_ignored_files_need_no_preservation
 test_foreign_copy_preserves_durable_tac_state_before_removal
 test_foreign_copy_is_not_removed_when_its_ignored_files_cannot_be_listed
+test_typed_preservation_exit_completes_cleanup
+test_teardown_usage_and_inspection_errors_are_not_policy_events
 test_earlier_preserved_copy_survives_until_its_replacement_is_verified
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused
 test_half_removed_foreign_copy_is_refused_as_before

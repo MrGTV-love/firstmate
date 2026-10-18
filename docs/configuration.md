@@ -113,6 +113,47 @@ Each effective `FM_HOME` contains private operational directories.
 Firstmate reads these clones, but changes them only through the narrow guarded and concrete captain-approved exceptions in `AGENTS.md`.
 Untracked files and directories whose names begin with `scratchpad` are also gitignored, so temporary scratch does not make porcelain-based secondmate sync guards treat a home as dirty.
 
+### Friction ledger
+
+The pilot refusal instrument records teardown nested-copy/preservation predicates and Jev size refusals in the explicit owning `FM_HOME/state/friction.jsonl`.
+It does not establish a false-block rate or adjudicate whether a refusal was legitimate.
+Usage, queue contention and transient inspection failures alone are not policy events.
+The shell [refusal envelope](../bin/fm-refuse-lib.sh) prints `REFUSED: guard=<stable-id> rule=<predicate-id> missing=<actual missing proof>`, followed by `completing-command: <supported command>` or a literal `human-only-exit: <new question>` line.
+The caller retains its existing exit code; a telemetry failure never adds a refusal, changes that code, or changes hook JSON or the Claude Stop exit-2 contract.
+The teardown completing command re-enters its existing proof and automatic ignored-byte preservation path without force after readable source and writable preservation storage are restored.
+Unknown landing, lock ownership or retained disposition remains an explicit question, not permission to discard work.
+Jev's size message names the existing request/overlap budget and same-write-tool report-splitting route without changing screening or admission.
+
+The single [writer](../bin/fm-friction-ledger.py) accepts one complete JSON event on stdin or constructs a blocked event through its `refusal` interface; its header and `--help` own exact invocation mechanics.
+Only an explicit absolute `FM_HOME` selects the ledger; cwd and `FM_STATE_OVERRIDE` do not redirect it.
+The `fm-friction.v1` schema has exactly these fields:
+
+```json
+{"schema":"fm-friction.v1","event_id":"unique-event","at":"2026-10-18T00:00:00.000Z","guard_id":"stable-owner","rule_id":"specific-predicate","guard_revision":"unknown","task_id":"unknown","actor":"unknown","execution_kind":"live","subject":{"kind":"nested-copy","identity":"unknown","head":"unknown"},"attempt_id":"one-attempt","operation_id":"one-intended-action","episode_id":"one-continuous-block","outcome":"blocked","reason":"typed-reason","exit_printed":true,"exit_kind":"machine","proof_digest":"unknown","theater":"unknown","new_information":"unknown","first_block_at":"2026-10-18T00:00:00.000Z","elapsed_ms":null,"adjudication":"unknown"}
+```
+
+Identifiers, `actor`, `reason`, `subject.kind` and `new_information` are bounded typed tokens, never free-form descriptions.
+Source revision, task identity, subject identity/content head and accepted-proof identity are `sha256:<64 lowercase hex>` digests or `unknown`.
+The shell constructor hashes subject and task context and the enforcing source file, leaving unobserved head/proof identity unknown.
+`at` and non-null `first_block_at` are UTC timestamps ending in `Z`; `elapsed_ms` is a nonnegative integer measurement or null, never an inferred duration.
+`outcome` is `blocked`, `worked-around`, `bypassed`, `retried`, `retry-succeeded`, `completed`, `abandoned` or `escalated`.
+`execution_kind` is `live` or `test`; `exit_kind` is `machine`, `human-only` or `none`, with boolean `exit_printed` true exactly when an exit is printed.
+`theater` is `yes`, `no` or `unknown`; `adjudication` is `legitimate-false-block`, `harm-caught`, `policy-changed` or `unknown`.
+The pilot leaves adjudication, theater and fact delta unknown rather than inventing evidence.
+A retry is a new attempt/event under the same operation/episode; a terminal event appends its measured elapsed time without rewriting the blocked event.
+`FM_FRICTION_EVENT_ID`, `FM_FRICTION_ATTEMPT_ID`, `FM_FRICTION_OPERATION_ID` and `FM_FRICTION_EPISODE_ID` supply existing correlation identities when available; otherwise the constructor generates a fresh event/attempt identity, without guessing continuity across invocations.
+`FM_FRICTION_EXECUTION_KIND=test` separates fixtures, and `FM_FRICTION_ACTOR` supplies a known typed role; absent actor information remains unknown.
+Commands, completing questions, tool output, credentials, raw paths and customer content are never ledger fields.
+
+Records are bounded to 8,192 encoded bytes and published with one append operation under an exclusive local file lock, with bounded contention handling.
+A repeated `event_id` is recognized without appending again, independently of notification deduplication.
+History is append-only and is never automatically rotated, truncated or deleted.
+A short/crashed append leaves its existing bytes intact; subsequent writes diagnose the incomplete history rather than appending to a corrupt tail or looping on it.
+Preserve that history for reconciliation, then retry optional telemetry with the same event identity after storage/permission/contention repair; generated event identities are included in failure diagnostics, while callers already hold explicitly supplied identities.
+An omitted event remains missing evidence, not a guarded-operation failure.
+The optional friction writer is separate from Jev's existing mandatory audit: that audit's `AuditUnavailableError` behavior is unchanged.
+[`tests/fm-friction-ledger.test.sh`](../tests/fm-friction-ledger.test.sh), [`tests/fm-teardown.test.sh`](../tests/fm-teardown.test.sh) and [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercise publication failures, completing routes and unchanged harmful-case refusal.
+
 ### Format and lifecycle references
 
 - `bin/fm-spawn.sh` owns the base task-metadata fields it emits, while the runtime-backend section below owns backend-specific fields and selector interpretation.

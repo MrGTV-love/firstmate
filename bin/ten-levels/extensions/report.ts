@@ -18,6 +18,11 @@ export const MAX_REQUEST_BYTES = 16_384;
 export const MAX_CHUNKS = 16;
 /** A span up to 1,000 JSON-escaped bytes always lies whole inside one piece; a longer one can be cut, and each half is still screened. */
 export const CHUNK_OVERLAP_BYTES = 1_024;
+/** Presentation only: these are the existing screening limits, not a new admission rule. */
+export const SIZE_REFUSAL_NOTICE = `REFUSED: guard=FM-JEV-SIZE rule=complete-screening-budget missing=complete payload coverage within ${MAX_CHUNKS} requests of ${MAX_REQUEST_BYTES} UTF-8 bytes each, including model, questions and JSON framing, with ${CHUNK_OVERLAP_BYTES} JSON-escaped bytes of overlap. `
+  + `The ${MAX_CHUNKS * MAX_REQUEST_BYTES}-character coarse precheck is not a usable content budget: UTF-8, escaping, framing and overlap also consume room. `
+  + "Supported completing route for report writes: use the same write tool to split the report across separate files, each below 150,000 characters per write, and smaller again if encoded bytes still exceed the screening budget. Every write must fit and is screened completely. "
+  + "This is size-budget compliance only, not permission to split or reroute a prohibited action. For a shell call or unsplittable operation, human-only-exit: what authorized smaller operation preserves the intended effect within this budget?";
 /** Outage-only deny guidance; the worker adapter owns policy-refusal next steps. */
 export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "
   + "If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding.";
@@ -306,6 +311,20 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });
       } catch (cause) {
         throw new GuardUnavailableError("AuditUnavailableError", terminal.request_started, cause);
+      }
+      // Mirror only the named size refusal, never raw inputs or a second judgment.
+      // This optional bridge must not acquire the mandatory Jev audit's semantics.
+      if (active && terminal.error_type === "RequestTooLargeError") {
+        try {
+          execFileSync("python3", [resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-friction-ledger.py"),
+            "refusal", "FM-JEV-SIZE", "complete-screening-budget", `${terminal.hook}-${terminal.tool}`,
+            `${context.task}:${terminal.hook}:${terminal.tool}`, terminal.tool === "write" || terminal.tool === "edit" ? "machine" : "human-only",
+            context.task, fileURLToPath(import.meta.url)], {
+            env: { ...process.env, FM_HOME: context.home, FM_FRICTION_ACTOR: "worker" }, stdio: ["ignore", "ignore", "inherit"], timeout: preflightTimeout(),
+          });
+        } catch {
+          console.error("fm-friction: size telemetry unavailable; guarded result unchanged; retry telemetry later with the same event identity");
+        }
       }
     },
   };
