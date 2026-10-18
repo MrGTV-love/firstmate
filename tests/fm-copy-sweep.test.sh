@@ -83,6 +83,18 @@ case " $* " in
   *" status "*)
     [ -z "${FAKE_GIT_SLEEP_STATUS:-}" ] || sleep "$FAKE_GIT_SLEEP_STATUS"
     ;;
+  *" rev-parse --git-dir "*)
+    [ -z "${FAKE_GIT_SLEEP_ENUM:-}" ] || sleep "$FAKE_GIT_SLEEP_ENUM"
+    ;;
+  *" rev-parse --show-toplevel "*)
+    [ -z "${FAKE_GIT_SLEEP_HOME:-}" ] || sleep "$FAKE_GIT_SLEEP_HOME"
+    ;;
+  *" ls-files "*)
+    if [ -n "${FAKE_GIT_FAIL_LSFILES:-}" ]; then
+      echo "fatal: injected ls-files failure" >&2
+      exit 128
+    fi
+    ;;
 esac
 exec "$FAKE_REAL_GIT" "$@"
 EOF
@@ -491,7 +503,7 @@ test_budget_wake_names_budget_total_and_five_largest_and_fires_once() {
   local lines
   make_budget_world budget 1 2 3 4 5 6 7
   printf 'default-pool off\ncontainer %s 10\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  run_sweep check
+  FM_CHECK_TIMEOUT=300 run_sweep check
   [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
   lines=$(printf '%s\n' "$OUT" | grep -c '^copy-sweep:')
   [ "$lines" = 1 ] || fail "expected exactly one wake line, got $lines: $OUT"
@@ -744,10 +756,121 @@ test_a_zero_padded_or_odd_check_timeout_is_normalized() {
   pass "a zero-padded or non-numeric FM_CHECK_TIMEOUT no longer aborts the check"
 }
 
+# Ignored entries the teardown library does not call regenerable machinery must
+# hold a copy; a listing that fails must hold it too, never read as "none".
+test_ignored_files_that_exist_nowhere_else_hold_a_copy() {
+  make_world ignored
+  printf '.env\nlocal-data/\nnode_modules/\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+  add_copy keepenv
+  printf 'SECRET=1\n' > "$(copy_path keepenv)/.env"
+  add_copy keepdir
+  mkdir -p "$(copy_path keepdir)/local-data"
+  printf 'rows\n' > "$(copy_path keepdir)/local-data/rows.csv"
+  add_copy reapnm
+  mkdir -p "$(copy_path reapnm)/node_modules/pkg"
+  printf 'x\n' > "$(copy_path reapnm)/node_modules/pkg/index.js"
+  run_sweep
+  [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  assert_class keepenv HELD-DIRTY
+  assert_class keepdir HELD-DIRTY
+  assert_class reapnm REAPABLE-PROVEN
+  assert_contains "$OUT" "it holds ignored files that exist nowhere else: .env" "the report did not name the ignored file"
+  assert_not_contains "$OUT" "command not found" "a helper the sweep calls is undefined"
+  take_snapshots before keepenv keepdir
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_not_contains "$OUT" "command not found" "a helper the sweep calls is undefined"
+  [ -f "$(copy_path keepenv)/.env" ] || fail "apply deleted an ignored file that exists nowhere else"
+  [ -f "$(copy_path keepdir)/local-data/rows.csv" ] || fail "apply deleted an ignored directory that exists nowhere else"
+  take_snapshots after keepenv keepdir
+  assert_untouched keepenv keepdir
+  [ ! -e "$(copy_path reapnm)" ] || fail "a copy holding only regenerable ignored machinery was not reaped"
+  add_copy again
+  FAKE_GIT_FAIL_LSFILES=1 run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_class again ORPHAN-NO-RECORD
+  assert_contains "$OUT" "its ignored files cannot be listed" "the report did not say the listing failed"
+  [ -d "$(copy_path again)" ] || fail "a copy whose ignored files could not be listed was removed"
+  pass "a copy holding an ignored file that exists nowhere else is kept, regenerable machinery is reaped, and a failed listing holds the copy"
+}
+
+add_big_dirty_copy() {  # <name>: a dirty 10 GiB copy in the current $SLOT
+  add_copy "$1"
+  printf 'dirty\n' > "$(copy_path "$1")/untracked.txt"
+  printf '%s\t%s\n' "$(copy_path "$1")" $((10 * GIB)) >> "$W/du-table"
+}
+
+add_pool_slot() {  # <n>: pool<n> with one slot whose clone holds a dirty 10 GiB copy c<n>
+  local saved=$SLOT
+  SLOT="$TH/pool$1/1/repo"
+  mkdir -p "$TH/pool$1/1"
+  fm_git_init_commit "$SLOT"
+  fm_git_add_origin "$SLOT" "$W/origin$1.git"
+  git -C "$SLOT" fetch -q origin
+  printf '{"worktrees":[{"name":"1","path":"%s"}]}\n' "$SLOT" > "$TH/pool$1/treehouse-state.json"
+  add_big_dirty_copy "c$1"
+  SLOT=$saved
+}
+
+slot_of() { printf '%s/pool%s/1/repo\n' "$TH" "$1"; }
+
+test_a_slow_enumeration_still_prints_the_wake_for_the_clones_it_reached() {
+  local n examined
+  make_world slowenum
+  printf 'default-pool off\ndefault-container 5\ninterval 0\ncache-max-age 0\n' > "$HOMED/config/copy-budget"
+  add_big_dirty_copy c1
+  for n in 2 3 4 5 6 7 8; do add_pool_slot "$n"; done
+  FAKE_GIT_SLEEP_ENUM=2 FM_CHECK_TIMEOUT=16 run_sweep check
+  [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
+  assert_contains "$OUT" "container $(slot_of 1) is over its budget: 10.00 GiB against 5 GiB" "the wake did not name the first clone it reached"
+  assert_not_contains "$OUT" "container $(slot_of 8) is over" "the wake named a clone the cut run never reached"
+  assert_no_grep "last_scan" "$HOMED/state/copy-sweep.record" "a run cut during enumeration was recorded as complete"
+  examined=$(grep -c 'rev-parse --git-dir' "$W/git.log")
+  [ "$examined" -ge 1 ] && [ "$examined" -lt 8 ] || fail "a check cut during enumeration should examine some but not all 8 clones, examined $examined"
+  pass "a check whose enumeration is slow stops looking for clones at its time bound and still prints the wake for the clones it reached"
+}
+
+test_a_slow_home_project_enumeration_is_cut_at_the_time_bound() {
+  local n examined
+  make_world slowhome
+  for n in 1 2 3 4 5 6; do fm_git_init_commit "$HOMED/projects/p$n"; done
+  FAKE_GIT_SLEEP_HOME=2 FM_CHECK_TIMEOUT=11 run_sweep check
+  [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
+  examined=$(grep -c 'rev-parse --show-toplevel' "$W/git.log")
+  [ "$examined" -ge 1 ] && [ "$examined" -lt 6 ] || fail "a check cut during the home project scan should examine some but not all 6 clones, examined $examined"
+  assert_no_grep "last_scan" "$HOMED/state/copy-sweep.record" "a run cut during enumeration was recorded as complete"
+  pass "a check stops looking at a home's project clones at its time bound"
+}
+
+test_a_cut_check_keeps_the_standing_budgets_it_did_not_reach() {
+  local n rows record
+  make_world cutrecord
+  printf 'default-pool off\ndefault-container 5\ninterval 0\ncache-max-age 0\nload-limit 40\n' > "$HOMED/config/copy-budget"
+  add_big_dirty_copy c1
+  for n in 2 3 4 5 6; do add_pool_slot "$n"; done
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  [ "$(grep -c . "$HOMED/state/.wake-queue")" = 1 ] || fail "apply should queue one wake for the six budgets"
+  FAKE_GIT_SLEEP_ENUM=2 FM_CHECK_TIMEOUT=11 run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "a cut check woke for a standing condition: $RC $OUT"
+  record=$(cat "$HOMED/state/copy-sweep.record")
+  assert_contains "$record" "over"$'\t'"container:$(slot_of 6)" "a cut check forgot a standing budget it did not reach"
+  run_sweep --apply
+  [ "$(grep -c . "$HOMED/state/.wake-queue")" = 1 ] || fail "a cut check made the next apply wake again for a standing budget"
+  FAKE_LOAD=99 FAKE_GIT_SLEEP_ENUM=2 FM_CHECK_TIMEOUT=11 run_sweep check
+  FAKE_LOAD=99 FAKE_GIT_SLEEP_ENUM=2 FM_CHECK_TIMEOUT=11 run_sweep check
+  rows=$(grep -c "^skip"$'\t' "$HOMED/state/copy-sweep.record")
+  [ "$rows" = 1 ] || fail "the record should hold one skip line: $(cat "$HOMED/state/copy-sweep.record")"
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "skip"$'\t'"0"$'\t'"scan skipped: load 99 above limit 40" "cut runs advanced the streak of skipped runs"
+  FAKE_LOAD=99 FM_CHECK_TIMEOUT=90 run_sweep check
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "skip"$'\t'"1"$'\t' "a complete skipped run did not count"
+  pass "a cut check keeps the standing budgets it did not reach and does not count toward the streak of skipped runs"
+}
+
 test_check_classifies_only_the_copies_it_names() {
   make_budget_world lazy 9 8 1 1 1 1 1
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  run_sweep check
+  FM_CHECK_TIMEOUT=300 run_sweep check
   assert_contains "$OUT" "$(copy_path c1) 9.00 GiB HELD-DIRTY" "the named copy was not classified"
   assert_no_grep "UNCLASSIFIED" <(printf '%s\n' "$OUT") "a named copy was left unclassified with time to spare"
   [ "$(grep -c 'status' "$W/git.log")" = 5 ] || fail "check should classify exactly the five copies it names, ran git status $(grep -c 'status' "$W/git.log") times"
@@ -877,6 +1000,10 @@ run_case test_a_lane_home_is_judged_as_that_home_would_judge_it
 run_case test_an_outer_copy_holding_a_dirty_inner_copy_is_kept
 run_case test_an_outer_copy_is_reaped_after_its_inner_copy_is_gone
 run_case test_a_zero_padded_or_odd_check_timeout_is_normalized
+run_case test_ignored_files_that_exist_nowhere_else_hold_a_copy
+run_case test_a_slow_enumeration_still_prints_the_wake_for_the_clones_it_reached
+run_case test_a_slow_home_project_enumeration_is_cut_at_the_time_bound
+run_case test_a_cut_check_keeps_the_standing_budgets_it_did_not_reach
 run_case test_check_classifies_only_the_copies_it_names
 run_case test_check_respects_its_interval
 run_case test_check_never_removes

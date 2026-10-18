@@ -29,7 +29,10 @@
 #                      the owner are the repair.
 #   HELD-LOCKED        a worktree lock holds it. Vernant's creation lock is never
 #                      released by anything but Vernant's closeout driver, so
-#                      this sweep can never remove such a copy and never unlocks.
+#                      --apply never removes such a copy and never unlocks. The
+#                      sweep only names its bytes in a wake; the teardown path
+#                      (bin/fm-teardown-nested-lib.sh) is what releases a locked
+#                      copy, through Vernant's closeout driver.
 #   HELD-LIVE-TASK     an active task record in any local home names it (or a
 #                      path inside or around it, except a registered secondmate's
 #                      own home chain), a process has its working directory
@@ -98,14 +101,18 @@
 # FM_CHECK_INTERVAL cadence, at most once per `interval` seconds of scanning;
 # no extra daemon or scheduler is installed. `check` never removes anything. The
 # watcher kills a check that outlives FM_CHECK_TIMEOUT and keeps nothing, so
-# `check` bounds its whole scan by that timeout minus five seconds: each du runs
-# under the time left and is cut when it cannot finish, a cut copy stays
-# unmeasured until a later poll, or a direct run, measures it into the cache, and
+# `check` bounds its whole run by that timeout minus five seconds. It scans each
+# clone as it finds it and stops looking for clones once that time is spent, so
+# on a host with many clones it covers the first clones it reaches and a later
+# poll starts from the same place: partial coverage, which the size cache widens
+# a little on every poll. A cut run writes no completed-scan mark, its wake names
+# only what it measured, and a budget it did not reach keeps its place in the
+# record. Each du runs under the time left and is cut when it cannot finish, and
 # `check` classifies only the copies it names in a wake (the rest read
 # UNCLASSIFIED). Every git and lsof call of those classifications runs under the
-# time left too, so a copy whose classification cannot finish reads UNCLASSIFIED
-# and the wake is still printed in time. A first scan of large copies is
-# therefore warmed by the hourly `--apply` run, which has no time bound.
+# time left too, so a copy whose classification cannot finish reads UNCLASSIFIED.
+# The bound holds to within the work of one clone. The hourly `--apply` run has
+# no time bound, covers every clone, and warms the cache for large copies.
 #
 # Exit status: 0 done, 1 a removal or write failed, 2 bad call or bad config.
 # tests/fm-copy-sweep.test.sh is the regression entry point.
@@ -303,6 +310,8 @@ load_allows_sizing() {
 # One "pool<TAB>container<TAB>clone" line per clone to inspect.
 CLONES=
 NOTES=
+SCAN_MODE=
+ROWS=
 
 add_note() {
   NOTES="$NOTES$1"$'\n'
@@ -310,6 +319,20 @@ add_note() {
 
 clone_seen() {  # <canonical-clone>
   printf '%s' "$CLONES" | awk -F '\t' -v c="$1" '$3 == c { found = 1 } END { exit !found }'
+}
+
+# True, with SCAN_CUT set, once check's time bound is spent. A run with no
+# deadline never is.
+scan_out_of_time() {
+  [ "$SCAN_DEADLINE" -gt 0 ] && [ "$(date +%s)" -ge "$SCAN_DEADLINE" ] || return 1
+  SCAN_CUT=1
+}
+
+# Records one clone and scans it at once, so a check that runs out of time has
+# measured every clone it reached.
+emit_clone() {  # <pool> <container> <clone>
+  CLONES="$CLONES$1"$'\t'"$2"$'\t'"$3"$'\n'
+  scan_clone "$1" "$2" "$3" </dev/null
 }
 
 enumerate_clones() {
@@ -329,11 +352,12 @@ enumerate_clones() {
     fi
     while IFS= read -r path; do
       [ -n "$path" ] || continue
+      scan_out_of_time && break 2
       clone=$(fm_task_copy_canonical_dir "$path") || continue
       case "$clone" in "$pool_dir"/*) ;; *) continue ;; esac
       git -C "$clone" rev-parse --git-dir >/dev/null 2>&1 || continue
       clone_seen "$clone" && continue
-      CLONES="$CLONES$pool_dir"$'\t'"$clone"$'\t'"$clone"$'\n'
+      emit_clone "$pool_dir" "$clone" "$clone"
     done <<< "$entry"
   done
   fm_local_firstmate_state_dirs "$STATE" tolerant
@@ -344,11 +368,12 @@ enumerate_clones() {
     home=$(fm_task_copy_canonical_dir "${state_dir%/*}") || continue
     for path in "$home"/projects/*; do
       [ -d "$path" ] || continue
+      scan_out_of_time && break 2
       clone=$(fm_task_copy_canonical_dir "$path") || continue
       top=$(git -C "$clone" rev-parse --show-toplevel 2>/dev/null) || continue
       [ "$(fm_task_copy_canonical_dir "$top")" = "$clone" ] || continue
       clone_seen "$clone" && continue
-      CLONES="$CLONES-"$'\t'"$home"$'\t'"$clone"$'\n'
+      emit_clone - "$home" "$clone"
     done
   done
 }
@@ -554,7 +579,11 @@ classify() {  # <copy> <clone> <pool> <container>
       return 0
     fi
   done
-  unique=$(teardown_foreign_unique_ignored "$copy") || unique=
+  if ! unique=$(teardown_preservable_ignored "$copy"); then
+    CLASS=ORPHAN-NO-RECORD
+    REASON="its ignored files cannot be listed, so none is ruled out"
+    return 0
+  fi
   if [ -n "$unique" ]; then
     CLASS=HELD-DIRTY
     REASON="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
@@ -664,31 +693,33 @@ net_sizes() {
     }'
 }
 
+scan_clone() {  # <pool> <container> <clone>
+  local pool=$1 container=$2 clone=$3 copy
+  # A dedicated descriptor keeps every command inside the loop off its input.
+  while IFS= read -r copy <&4; do
+    [ -n "$copy" ] || continue
+    if [ "$SCAN_MODE" = check ]; then
+      CLASS=UNCLASSIFIED
+      REASON="check does not classify; run bin/fm-copy-sweep.sh for the class"
+    else
+      classify "$copy" "$clone" "$pool" "$container"
+    fi
+    measure_copy "$copy"
+    ROWS="$ROWS$container"$'\t'"$pool"$'\t'"$clone"$'\t'"$copy"$'\t'"$CLASS"$'\t'"${SIZE_KIB:--}"$'\t'"$(printf '%s' "$REASON" | tr '\t\n' '  ')"$'\n'
+  done 4< <(list_nested "$clone" | LC_ALL=C sort -u)
+}
+
 scan() {  # <mode>
-  local pool container clone copy rows=
   CACHE_NEW=
   CACHE_NOW=$(now_epoch)
   SCAN_CUT=0
-  enumerate_clones
+  SCAN_MODE=$1
+  ROWS=
   # check measures every copy but classifies only the ones it names in a wake,
   # so its time goes to the sizes the budget needs.
   [ "$1" = check ] || scan_processes
-  # Dedicated descriptors keep every command inside the loops off their input.
-  while IFS=$'\t' read -r pool container clone <&3; do
-    [ -n "$clone" ] || continue
-    while IFS= read -r copy <&4; do
-      [ -n "$copy" ] || continue
-      if [ "$1" = check ]; then
-        CLASS=UNCLASSIFIED
-        REASON="check does not classify; run bin/fm-copy-sweep.sh for the class"
-      else
-        classify "$copy" "$clone" "$pool" "$container"
-      fi
-      measure_copy "$copy"
-      rows="$rows$container"$'\t'"$pool"$'\t'"$clone"$'\t'"$copy"$'\t'"$CLASS"$'\t'"${SIZE_KIB:--}"$'\t'"$(printf '%s' "$REASON" | tr '\t\n' '  ')"$'\n'
-    done 4< <(list_nested "$clone" | LC_ALL=C sort -u)
-  done 3<<< "$CLONES"
-  COPIES=$(printf '%s' "$rows" | net_sizes)
+  enumerate_clones
+  COPIES=$(printf '%s' "$ROWS" | net_sizes)
 }
 
 # --- removal -----------------------------------------------------------------
@@ -837,7 +868,8 @@ evaluate_skip() {
   [ -n "$SKIP_LINE" ] || return 0
   runs=$REC_SKIP_RUNS
   case "$runs" in ''|*[!0-9]*) runs=0 ;; esac
-  SKIP_RUNS_NOW=$((runs + 1))
+  SKIP_RUNS_NOW=$runs
+  [ "$SCAN_CUT" = 1 ] || SKIP_RUNS_NOW=$((runs + 1))
   [ "$SKIP_RUNS_NOW" -ge "$SKIP_WAKE_RUNS" ] || return 0
   OVER_NOW="${OVER_NOW}skip:load"$'\n'
   ! printf '%s' "$REC_OVER" | grep -qxF skip:load || return 0
@@ -884,9 +916,10 @@ write_atomic() {  # <destination> <content>
 }
 
 # Publishes the record: the budgets over now, plus the ones a cut scan could not
-# prove under, so a half-measured scan never forgets a standing condition.
+# prove under or never reached, so a half-measured scan never forgets a standing
+# condition.
 write_record() {  # <last-scan> <error>
-  local key content
+  local key content field
   content="$RECORD_SCHEMA_LINE"$'\n'
   [ -z "$1" ] || content="$content"$'last_scan\t'"$1"$'\n'
   while IFS= read -r key; do
@@ -897,6 +930,13 @@ write_record() {  # <last-scan> <error>
     [ -n "$key" ] || continue
     printf '%s' "$REC_OVER" | grep -qxF "$key" && content="$content"$'over\t'"$key"$'\n'
   done <<< "$UNKNOWN_NOW"
+  if [ "$SCAN_CUT" = 1 ]; then
+    while IFS= read -r key; do
+      case "$key" in pool:*) field=2 ;; container:*) field=1 ;; *) continue ;; esac
+      printf '%s\n' "$COPIES" | awk -F '\t' -v f="$field" -v k="${key#*:}" '$f == k { found = 1 } END { exit !found }' && continue
+      content="$content"$'over\t'"$key"$'\n'
+    done <<< "$REC_OVER"
+  fi
   [ -z "$SKIP_RUNS_NOW" ] || content="$content"$'skip\t'"$SKIP_RUNS_NOW"$'\t'"$SKIP_LINE"$'\n'
   [ -z "$2" ] || content="$content"$'error\t'"$2"$'\n'
   write_atomic "$RECORD" "$content"

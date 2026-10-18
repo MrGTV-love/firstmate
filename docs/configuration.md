@@ -1737,7 +1737,8 @@ Each copy gets one class:
 It never forces, deletes recursively, unlocks, or cleans.
 A removal git refuses leaves the copy, is reported, and exits 1.
 Each removal appends one line to `data/copy-sweep.log`.
-A copy under Vernant's creation lock (`HELD-LOCKED`) is released only by Vernant's own closeout driver, so the sweep can never remove one.
+A worktree lock holds a copy out of `--apply`: the sweep never removes or unlocks a `HELD-LOCKED` copy, and names its bytes in the wake.
+A copy under Vernant's creation lock is released only by Vernant's own closeout driver, and the teardown path is what releases locked copies through it.
 A copy that holds another registered copy is held until that inner copy is gone, because removing the outer copy would delete the inner one.
 The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothing and lists every copy with its class and reason.
 
@@ -1750,9 +1751,13 @@ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
 ```
 
 `bin/fm-copy-sweep.sh arm` also binds a report-only `check` to the watcher's existing slow-check cadence, so a home without the hourly job still gets the budget wake.
-`check` scans at most once per `interval` and stays inside the watcher's per-check timeout: it cuts a size measurement it cannot finish, resumes from its size cache on the next poll, and classifies only the copies its wake names.
-A classification it cannot finish in time leaves that copy `UNCLASSIFIED`, so the wake is always printed.
-The hourly `--apply` run has no such bound and warms the cache for large copies.
+`check` scans at most once per `interval` and stays inside the watcher's per-check timeout, to within the work of one clone.
+It scans each clone as it finds it and stops looking for clones once its time is spent, so on a host with many clones it covers the first clones it reaches, and the next poll starts from the same place.
+That partial coverage widens a little on every poll, because the size cache lets a later poll reach further.
+A cut run records no completed scan, its wake names only what it measured, and a budget it did not reach keeps its place in the record.
+`check` cuts a size measurement it cannot finish, and classifies only the copies its wake names.
+A classification it cannot finish in time leaves that copy `UNCLASSIFIED`.
+The hourly `--apply` run has no such bound, covers every clone, and warms the cache for large copies.
 `bin/fm-copy-sweep.sh disarm` removes the binding.
 
 ### Budgets
