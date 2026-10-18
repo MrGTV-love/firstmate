@@ -173,7 +173,7 @@ test_fast_tier_shares_one_short_tripwire() {
   pass "fast tier jobs share one $fast minute tripwire"
 }
 
-# Normal tier: every test or lint lane shares ONE fixed 30-minute budget,
+# Normal tier: every test or lint lane shares ONE fixed 60-minute budget,
 # above the fast tier. That budget is a hang tripwire, not a packing estimate.
 test_normal_tier_shares_one_budget() {
   local fast normal
@@ -183,8 +183,8 @@ test_normal_tier_shares_one_budget() {
   normal=$(tier_timeout normal $NORMAL_TIER_JOBS) || exit 1
   [ "$normal" -gt "$fast" ] \
     || fail "normal tier ($normal) must exceed the fast tier ($fast)"
-  [ "$normal" = 30 ] \
-    || fail "normal tier must be the single 30-minute shared budget, got $normal"
+  [ "$normal" = 60 ] \
+    || fail "normal tier must be the single 60-minute shared budget, got $normal"
   pass "normal tier jobs share one $normal minute budget"
 }
 
@@ -199,8 +199,8 @@ test_heavy_tier_keeps_a_step_tripwire_under_a_job_backstop() {
   heavy=$(tier_timeout heavy $HEAVY_TIER_JOBS) || exit 1
   [ "$heavy" -gt "$normal" ] \
     || fail "heavy tier backstop ($heavy) must exceed the normal tier ($normal)"
-  [ "$heavy" -ge 60 ] && [ "$heavy" -le 75 ] \
-    || fail "heavy tier backstop must stay a 60-75 minute last resort, got $heavy"
+  [ "$heavy" -ge 90 ] && [ "$heavy" -le 120 ] \
+    || fail "heavy tier backstop must stay a 90-120 minute last resort, got $heavy"
   step=$(ruby -ryaml -e '
 steps = YAML.load_file(ARGV[0]).fetch("jobs").fetch(ARGV[1]).fetch("steps")
 index = steps.index { |s| s["id"] == "run-real-herdr-family" }

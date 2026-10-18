@@ -78,11 +78,12 @@
 #                   terminate a script that runs longer than N seconds, raised
 #                   to its measured test.<script> p99 x 3 from bin/fm-duration.py
 #                   when that is larger, and record it as exit 124 (0
-#                   disables, the default). The
-#                   --changed applies 1500s automatically, above the current
-#                   slowest CI hint with margin; exceeding it becomes a bounded
-#                   failure, not proof of a hang. --max-wall-ms is checked
-#                   after the run and so cannot catch a hang on its own.
+#                   disables, the default). Plain --changed instead applies a
+#                   progress guard with no fixed duration: a script stops only
+#                   after 15 minutes with no output and no process-tree CPU
+#                   progress, or at 6 hours, so a healthy but slow suite keeps
+#                   running and only a wedged one fails. --max-wall-ms is
+#                   checked after the run and so cannot catch a hang on its own.
 #                   HUP, INT and TERM remove this runner's scratch directory
 #                   before it exits; configured per-script bounds remain authoritative.
 #   --max-wall-ms N fail the run when its measured invocation wall clock exceeds
@@ -238,17 +239,12 @@ JOBS_EXPLICIT=0
 JOBS_MAX=8
 MAX_WALL_MS=
 PER_SCRIPT_TIMEOUT_SECS=0
-# Bound applied automatically on the automatic --changed path, derived from
-# measured healthy runtimes with margin rather than picked: the original
-# loaded watch-triage baseline was about 1075s, with roughly 1.4x headroom.
-# That suite subsequently outgrew the packing target and is now two independent
-# execution groups; its growth is not permission to increase this bound.
-# The unchanged 1500s stays under the 30-minute normal CI tier so a wedged
-# script fails here, with its output, before the job cap cancels the lane.
-# It is a guard, not a speed control: a HUNG script becomes a
-# bounded failure instead of an unbounded suite, which is the shape that
-# silently outruns a caller's invocation budget.
-CHANGED_DEFAULT_TIMEOUT_SECS=1500
+# Plain --changed applies a progress guard instead of a fixed per-script
+# duration. bin/fm-duration.py run owns the rule: a script is stopped only
+# after 15 minutes with no output and no process-tree CPU progress, or at 6
+# hours absolute, so a slow but working suite keeps its time while a genuinely
+# wedged one still fails locally with its output.
+PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
@@ -2607,7 +2603,7 @@ done
 AUTO_CONCURRENCY=0
 if { [ "$MODE" = changed ] || [ "$MODE" = scripts ]; } && [ "$JOBS_EXPLICIT" -eq 0 ]; then
   if [ "$MODE" = changed ] && [ "${#SCRIPTS[@]}" -gt 0 ] && [ "$PER_SCRIPT_TIMEOUT_SECS" -eq 0 ]; then
-    PER_SCRIPT_TIMEOUT_SECS=$CHANGED_DEFAULT_TIMEOUT_SECS
+    PROGRESS_GUARD=1
   fi
   auto_admissible=0
   for s in "${SCRIPTS[@]}"; do
@@ -2731,6 +2727,10 @@ fi
 if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
   [ -r "$ROOT/bin/fm-timeout-lib.sh" ] || die "per-script timeout helper not found: bin/fm-timeout-lib.sh"
 fi
+if [ "$PROGRESS_GUARD" -eq 1 ]; then
+  [ -r "$ROOT/bin/fm-duration.py" ] || die "automatic --changed progress guard helper not found: bin/fm-duration.py"
+  command -v python3 >/dev/null 2>&1 || die "automatic --changed progress guard needs python3"
+fi
 
 RUN_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run.XXXXXX")
 RECORDS="$RUN_TMP/records.tsv"
@@ -2825,7 +2825,7 @@ record_script_result() {
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" >>"$RECORDS"
-  if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1; then
+  if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1 && [ ! -e "$out.guarded" ]; then
     if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
       timed_out=1
     fi
@@ -2904,6 +2904,12 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       started=$(ms); fm_run_timed "$@"; rc=$?
       [ "$rc" -ne 124 ] || [ $(($(ms) - started)) -lt $(($1 * 1000)) ] || : >"$expired"
       exit "$rc"' _ "$ROOT/bin/fm-timeout-lib.sh" "$out.expired" "$script_seconds" "${cmd[@]}")
+  fi
+  if [ "$PROGRESS_GUARD" -eq 1 ]; then
+    # The progress runner owns this script's sample and any no-progress stop, so
+    # <out>.guarded tells record_script_result not to record the same run twice.
+    : >"$out.guarded"
+    cmd=(python3 "$ROOT/bin/fm-duration.py" run "test.$script" -- "${cmd[@]}")
   fi
   if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \

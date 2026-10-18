@@ -109,7 +109,7 @@ sentinel = tmp / 'corrupt-ran'
 unread = subprocess.run([sys.executable, str(helper), 'run', 'corrupt.run', '--', 'bash', '-c', 'echo ran > "$1"; echo child-out', '_', str(sentinel)],
                         env=dict(env, FM_DURATION_FILE=str(corrupt)), cwd=workrepo, capture_output=True, text=True)
 assert unread.returncode == 0 and unread.stdout == 'child-out\n' and sentinel.read_text() == 'ran\n', unread
-assert 'calibration_error' in unread.stderr and 'no deadline' in unread.stderr, unread
+assert 'calibration_error' in unread.stderr and 'no measured advisory' in unread.stderr, unread
 
 batch = subprocess.run([sys.executable, str(helper), 'record-batch'], env=env, cwd=workrepo, input='batch.a\t100\t0\t1\t1.5\t2.5\t0\nbatch.b\t200\t3\t0\t\t\t0\n', capture_output=True, text=True)
 assert batch.returncode == 0, batch
@@ -141,14 +141,42 @@ cancel.terminate()
 cancel_out, cancel_err = cancel.communicate()
 assert cancel.returncode == 143 and cancel_out == '', (cancel.returncode, cancel_out, cancel_err)
 
-# A calibrated outer ceiling, derived from measured-table fixtures, really
-# terminates an ongoing command rather than just returning from a read wait.
-write_rows([sample('outer', 1) for _ in range(5)])
-cli('run', 'outer', '--', sys.executable, '-c', 'while True: pass', expected=124)
-assert any(r.get('event') == 'timeout' and r['key'] == 'outer' for r in rows())
+# A measured p99 x 3 is an advisory, not a kill: healthy slow work that keeps
+# making progress runs to completion and the excess is reported.
+write_rows([sample('advisory', 1000) for _ in range(5)])
+slow = cli('run', 'advisory', '--', sys.executable, '-c', 'import time; time.sleep(4)')
+assert 'slower_than_usual' in slow.stderr and 'measured_ceiling=' in slow.stderr, slow.stderr
+assert rows()[-1]['key'] == 'advisory' and rows()[-1]['exit'] == 0
+assert not any(r.get('event') == 'timeout' and r['key'] == 'advisory' for r in rows())
+
+
+def override_run(key, command, **extra):
+    return subprocess.run([sys.executable, str(helper), 'run', key, '--', *command],
+                          env=dict(env, **extra), cwd=workrepo, capture_output=True, text=True)
+
+
+# The only extreme that stops a silent command is a real stall: no output and
+# no process-tree CPU growth for the no-progress bound.
+write_rows([sample('stall', 1) for _ in range(5)])
+stalled = override_run('stall', ['sleep', '30'], FM_DURATION_NO_PROGRESS_SECS='2')
+assert stalled.returncode == 124 and 'no_progress' in stalled.stderr, (stalled.returncode, stalled.stderr)
+assert any(r.get('event') == 'timeout' and r['key'] == 'stall' for r in rows())
+
+# CPU growth is progress even with no output, so a busy command outlives both
+# its measured advisory and the shorter stall bound.
+busy = override_run('busy.cpu', [sys.executable, '-c', 'import time\nend = time.monotonic() + 3\nwhile time.monotonic() < end: pass'],
+                    FM_DURATION_NO_PROGRESS_SECS='2', FM_DURATION_ABSOLUTE_SECS='30')
+assert busy.returncode == 0, busy.stderr
+assert not any(r.get('event') == 'timeout' and r['key'] == 'busy.cpu' for r in rows())
+
+# The absolute wall-clock limit is the other extreme, and it stops even a
+# command that is still producing output.
+absolute = override_run('absolute', ['bash', '-c', 'while true; do echo tick; done'], FM_DURATION_ABSOLUTE_SECS='2')
+assert absolute.returncode == 124 and 'absolute_limit' in absolute.stderr, (absolute.returncode, absolute.stderr)
+assert any(r.get('event') == 'timeout' and r['key'] == 'absolute' for r in rows())
 
 # The leader's exit is the result even while a descendant still holds its
-# streams: no wait for the descendant and no false ceiling expiry.
+# streams: no wait for the descendant and no false stop.
 write_rows([sample('orphan', 20000) for _ in range(5)])
 for key in ('orphan', 'orphan.cold'):
     gate = tmp / (key + '.fifo')
@@ -525,13 +553,16 @@ if shutil.which('tasks-axi'):
     print('ok - repeated-timeout work routes to the registered project, else to firstmate')
 
 # The recovery command printed when run() cannot record keeps timeout provenance only
-# when the runner's own ceiling expired, and replaying it records exactly one occurrence.
+# when the runner's own progress rule stopped the command, and replaying it records
+# exactly one occurrence.
 def recovery(key, leader_tail, samples):
     table = tmp / (key + '.jsonl')
     table.write_text('')
     write_rows([sample(key, 1000) for _ in range(samples)], table)
     swap = 'mv "$L" "$L.bak"; mkdir "$L"; ' + leader_tail
-    failed = subprocess.run([sys.executable, str(helper), 'run', key, '--', 'bash', '-c', swap, '_'], env=dict(env, FM_DURATION_FILE=str(table), L=str(table)), cwd=workrepo, capture_output=True, text=True)
+    failed = subprocess.run([sys.executable, str(helper), 'run', key, '--', 'bash', '-c', swap, '_'],
+                            env=dict(env, FM_DURATION_FILE=str(table), L=str(table), FM_DURATION_NO_PROGRESS_SECS='2'),
+                            cwd=workrepo, capture_output=True, text=True)
     assert 'recording_error' in failed.stderr, failed
     line = next(l for l in failed.stderr.splitlines() if l.startswith('help: '))
     printed = json.loads(line[len('help: '):]).split('; command result preserved')[0]
@@ -546,7 +577,7 @@ def recovery(key, leader_tail, samples):
     assert {r.get('repo') for r in recorded if r['key'] == key} == {REPO}, recorded
     return failed, shlex.split(printed), [r for r in recorded if r['key'] == key and r.get('sample_id')], [r for r in recorded if r.get('event') == 'timeout']
 
-failed, command, sample_rows, timeouts = recovery('recover.ceiling', 'while :; do sleep 1; done', 5)
+failed, command, sample_rows, timeouts = recovery('recover.ceiling', 'sleep 30', 5)
 assert failed.returncode == 124 and '--timed-out' in command, command
 assert len(sample_rows) == 1 and sample_rows[0]['exit'] == 124 and len(timeouts) == 1, (sample_rows, timeouts)
 failed, command, sample_rows, timeouts = recovery('recover.exit124', 'exit 124', 0)
@@ -613,7 +644,7 @@ source.write_text('#!/bin/bash\nEXISTING_TIMEOUT=15\nbound=$(fm_duration_limit "
 cli('check-literals','--base','HEAD',expected=1,tool=guard)
 (repo / 'bin/fm-duration-existing-limits.tsv').write_text('# moved\nbin/example.sh\t30\tbound=$(fm_duration_limit "key.$h" 30)\n')
 cli('check-literals','--base','HEAD',tool=guard)
-print('ok - sample-count limits, retention, progress, leader exit, outer ceiling, pipeline imports and literal guard')
+print('ok - sample-count limits, retention, progress, leader exit, progress stops, pipeline imports and literal guard')
 
 # Per-key slot gate: at most FM_TEST_KEY_SLOTS concurrent copies of one test.* key, a clear
 # waiter notice, release on every exit path, a bounded wait, and no gate for other keys.

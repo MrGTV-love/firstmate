@@ -12,7 +12,9 @@
 # bin/fm-teardown.sh's header owns the rule; this file owns the mechanics.
 #
 # A copy is released only when every proof holds, and each proof fails closed:
-#   - it is a clean worktree root and holds no ignored file unique to it;
+#   - it is a clean worktree root, and each ignored file it holds is either
+#     regenerable machinery (listed in teardown_preservable_ignored) or copied
+#     with its SHA-256 into $DATA/$ID/nested-copy-preserved before removal;
 #   - no other active task record names it, no process outside this teardown's
 #     own runs in it, and no live process outside this teardown's own is its
 #     lock launcher (a process is this teardown's own when it, or an ancestor by
@@ -27,11 +29,11 @@
 # The task's own nested copies (the record's worktree= and prior_worktree= copies
 # inside the slot) were already proved clean and landed or anchored by the
 # caller. One of them that Vernant's creation lock holds is released the same
-# way, never by forcing the removal: it must also hold no ignored file unique to
-# it, no process outside this teardown may run in it or be its live lock
-# launcher, and no other active record may name it; the driver then verifies the
-# landing again and refuses what it cannot prove. An own copy that is not locked
-# is removed as before.
+# way, never by forcing the removal: its ignored files are preserved as above,
+# no process outside this teardown may run in it or be its live lock launcher,
+# and no other active record may name it; the driver then verifies the landing
+# again and refuses what it cannot prove. An own copy that is not locked is
+# removed as before.
 # A copy locked by Vernant's creation lock is released and removed by Vernant's
 # own driver (closeout_pr.py --cleanup-worktree <copy> --execute-cleanup, run
 # from the slot with FM_TEARDOWN_VERNANT_PYTHON or <slot>/.venv/bin/python). An
@@ -39,9 +41,11 @@
 # any other format, a driver refusal, or a copy still registered afterwards
 # refuses. Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
-# .DS_Store, Firstmate's hook files, and anything ignored under its .claude and
-# .opencode trees); it loses no commit, because the work is landed, and no
-# tracked change, because the clean proof refuses one. The clean proof skips
+# .DS_Store, Firstmate's hook files, regenerable build caches, and anything
+# ignored under its .claude and .opencode trees); it loses no commit, because
+# the work is landed, and no tracked change, because the clean proof refuses one.
+# Any other ignored entry is copied to the task's data directory before removal.
+# The clean proof skips
 # untracked files under .claude only; the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before
@@ -49,8 +53,9 @@
 # except when teardown keeps project custody through the return.
 #
 # Requires bin/fm-task-copy-lib.sh and bin/fm-lock-lib.sh to be sourced first,
-# and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, META, STATE, WT,
-# TASK_TMP, TEARDOWN_NESTED_COPIES, TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT) and functions
+# and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, DATA, META,
+# STATE, WT, TASK_TMP, TEARDOWN_NESTED_COPIES, TEARDOWN_RETURN_SLOT,
+# TEARDOWN_PEER_SLOT) and functions
 # (teardown_landed, pids_with_cwd_under, task_process_identity,
 # task_process_identity_matches, task_record_process_signal) it uses.
 
@@ -197,21 +202,94 @@ teardown_foreign_proc_record() {  # <pid>
   fi
 }
 
-# Ignored files no commit holds. Symlinks, caches, virtual environments and
-# Firstmate's own hook files are derived machinery; anything else is the copy's
-# own, dies with it, and so refuses.
-teardown_foreign_unique_ignored() {  # <copy>
+# Ignored entries no commit holds that must be preserved before removal.
+# Symlinks, caches, virtual environments, Firstmate's own hook files, and
+# regenerable build output are derived machinery and are skipped; every other
+# entry is printed for teardown_preserve_ignored to copy.
+teardown_preservable_ignored() {  # <copy>
   local copy=$1 entry name
   while IFS= read -r -d '' entry; do
     entry=${entry%/}
     [ ! -L "$copy/$entry" ] || continue
     name=${entry##*/}
     case "$entry" in .claude|.claude/*|.opencode|.opencode/*) continue ;; esac
+    case "$entry" in scripts/hooks/_conformance_manifest.json) continue ;; esac
     case "$name" in
       .venv|venv|node_modules|__pycache__|.pytest_cache|.ruff_cache|.mypy_cache|.DS_Store|.fm-grok-turnend|.fm-kimi-turnend) continue ;;
+      .import_linter_cache|.next|graphify-out|*.tsbuildinfo) continue ;;
     esac
+    case "$entry" in .tac|.tac/*) continue ;; esac
     printf '%s\n' "$entry"
   done < <(git -C "$copy" ls-files --others --ignored --exclude-standard --directory -z 2>/dev/null)
+}
+
+# Prints the SHA-256 of file <path>, or fails when no hashing tool is available.
+teardown_ignored_sha256() {  # <path>
+  local path=$1 hash
+  if command -v shasum >/dev/null 2>&1; then
+    hash=$(shasum -a 256 "$path" 2>/dev/null | awk '{print $1}')
+  elif command -v sha256sum >/dev/null 2>&1; then
+    hash=$(sha256sum "$path" 2>/dev/null | awk '{print $1}')
+  else
+    return 1
+  fi
+  case "$hash" in ''|*[!0-9a-f]*) return 1 ;; esac
+  printf '%s\n' "$hash"
+}
+
+# Prints the SHA-256 of standard input, or fails as teardown_ignored_sha256 does.
+teardown_ignored_sha256_stdin() {
+  local hash
+  if command -v shasum >/dev/null 2>&1; then
+    hash=$(shasum -a 256 | awk '{print $1}')
+  elif command -v sha256sum >/dev/null 2>&1; then
+    hash=$(sha256sum | awk '{print $1}')
+  else
+    return 1
+  fi
+  case "$hash" in ''|*[!0-9a-f]*) return 1 ;; esac
+  printf '%s\n' "$hash"
+}
+
+# Copies every preservable ignored entry of <copy> into
+# $DATA/$ID/nested-copy-preserved/<copy-path-sha256> and records each file's
+# SHA-256 in its SHA256SUMS. Returns 1 when anything cannot be copied or hashed,
+# and the caller then refuses the copy rather than removing unpreserved content.
+teardown_preserve_ignored() {  # <copy>
+  local copy=$1 root dest list entry file hash
+  local -a entries=()
+  list=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-ignored.XXXXXX") || return 1
+  if ! teardown_preservable_ignored "$copy" > "$list"; then
+    rm -f "$list"
+    return 1
+  fi
+  while IFS= read -r entry; do
+    [ -z "$entry" ] || entries+=("$entry")
+  done < "$list"
+  rm -f "$list"
+  [ "${#entries[@]}" -gt 0 ] || return 0
+  hash=$(printf '%s' "$copy" | teardown_ignored_sha256_stdin) || return 1
+  root="$DATA/$ID/nested-copy-preserved"
+  dest="$root/$hash"
+  mkdir -p "$dest" || return 1
+  printf '%s\n' "$copy" > "$dest/copy-path" || return 1
+  : > "$dest/SHA256SUMS" || return 1
+  for entry in "${entries[@]}"; do
+    case "$entry" in ''|/*|..|../*|*/..|*/../*) return 1 ;; esac
+    rm -rf "${dest:?}/$entry" || return 1
+    mkdir -p "$(dirname "$dest/$entry")" || return 1
+    cp -RPp "$copy/$entry" "$dest/$entry" || return 1
+    if [ -d "$dest/$entry" ] && [ ! -L "$dest/$entry" ]; then
+      while IFS= read -r -d '' file; do
+        hash=$(teardown_ignored_sha256 "$file") || return 1
+        printf '%s  %s\n' "$hash" "${file#"$dest/"}" >> "$dest/SHA256SUMS" || return 1
+      done < <(find "$dest/$entry" -type f -print0)
+    else
+      hash=$(teardown_ignored_sha256 "$dest/$entry") || return 1
+      printf '%s  %s\n' "$hash" "$entry" >> "$dest/SHA256SUMS" || return 1
+    fi
+  done
+  echo "teardown: preserved ignored files from $copy in $dest" >&2
 }
 
 # Does an active record, a running process, or a live lock launcher outside this
@@ -270,20 +348,17 @@ teardown_foreign_copy_unowned() {  # <copy>
 }
 
 # Proves foreign copy <copy>, or returns 1 with TEARDOWN_FOREIGN_WHY naming what
-# could not be proved. Writes nothing. A half-removed or unreadable copy fails
-# the first check. The landed-work rule gets an empty branch name so it never
-# adopts this copy's PR as the task's recorded one.
+# could not be proved. A half-removed or unreadable copy fails the first check.
+# The landed-work rule gets an empty branch name so it never adopts this copy's
+# PR as the task's recorded one. Once the copy is proved landed, its ignored
+# files are preserved in the task's data directory; only when that fails does the
+# copy refuse.
 teardown_foreign_copy_prove() {  # <copy>
-  local copy=$1 rc=0 unique
+  local copy=$1 rc=0
   TEARDOWN_FOREIGN_WHY=
   fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 || rc=$?
   if [ "$rc" = 1 ]; then
     TEARDOWN_FOREIGN_WHY="it $FM_TASK_COPY_REASON"
-    return 1
-  fi
-  unique=$(teardown_foreign_unique_ignored "$copy") || unique=
-  if [ -n "$unique" ]; then
-    TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
     return 1
   fi
   teardown_foreign_copy_unowned "$copy" || return 1
@@ -291,6 +366,10 @@ teardown_foreign_copy_prove() {  # <copy>
     TEARDOWN_FOREIGN_WHY="its HEAD ${FM_TASK_COPY_HEAD:0:12} is not proved landed"
     return 1
   fi
+  teardown_preserve_ignored "$copy" || {
+    TEARDOWN_FOREIGN_WHY="its ignored files could not be preserved in $DATA/$ID/nested-copy-preserved"
+    return 1
+  }
 }
 
 # Proves every foreign copy in <slot> and records the provable ones in
@@ -454,7 +533,7 @@ teardown_foreign_copies_release() {
 # Run it after teardown_foreign_copies_prove, which resets
 # TEARDOWN_FOREIGN_PROCS, so the live launchers it records reach the retire phase.
 teardown_own_locked_copies_prove() {
-  local copy rc unique
+  local copy rc
   for copy in ${TEARDOWN_NESTED_COPIES[@]+"${TEARDOWN_NESTED_COPIES[@]}"}; do
     [ -d "$copy" ] || continue
     rc=0
@@ -464,15 +543,13 @@ teardown_own_locked_copies_prove() {
     if ! teardown_vernant_lock_pid "$TEARDOWN_FOREIGN_LOCK" >/dev/null; then
       TEARDOWN_FOREIGN_WHY="it is locked by something other than Vernant's creation lock (${TEARDOWN_FOREIGN_LOCK:-no reason given})"
     else
-      unique=$(teardown_foreign_unique_ignored "$copy") || unique=
-      if [ -n "$unique" ]; then
-        TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
-      else
-        # A peer reassociated off this slot into its own copy is not another
-        # record naming the copy through the root it left.
-        FM_TASK_COPY_RELEASED_PRIOR_RETIRING=$META
-        teardown_foreign_copy_unowned "$copy" || true
-        FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
+      # A peer reassociated off this slot into its own copy is not another
+      # record naming the copy through the root it left.
+      FM_TASK_COPY_RELEASED_PRIOR_RETIRING=$META
+      teardown_foreign_copy_unowned "$copy" || true
+      FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
+      if [ -z "$TEARDOWN_FOREIGN_WHY" ] && ! teardown_preserve_ignored "$copy"; then
+        TEARDOWN_FOREIGN_WHY="its ignored files could not be preserved in $DATA/$ID/nested-copy-preserved"
       fi
     fi
     if [ -n "$TEARDOWN_FOREIGN_WHY" ]; then

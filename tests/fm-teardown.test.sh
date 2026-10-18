@@ -10638,25 +10638,57 @@ test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal() {
   pass "the reaper's first refusal line for a foreign copy that stays is the copy's own written reason"
 }
 
-test_foreign_copy_with_unsaved_or_unique_files_is_refused() {
-  local rc shape exclude
-  for shape in dirty ignored; do
-    make_foreign_copy_case "foreign-$shape"
-    if [ "$shape" = dirty ]; then
-      printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
-    else
-      exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
-      printf 'unique.dat\n' >> "$exclude"
-      printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
-    fi
-    run_foreign_teardown rc
-    expect_code 1 "$rc" "foreign-$shape: a copy with files only it holds must be refused: $(cat "$FOREIGN_CASE/stderr")"
-    assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "foreign-$shape: the refusal changed"
-    assert_foreign_copy_untouched "foreign-$shape"
-    assert_present "$FOREIGN_COPY/$([ "$shape" = dirty ] && echo untracked.txt || echo unique.dat)" \
-      "foreign-$shape: the file was lost"
-  done
-  pass "uncommitted and unique ignored files make a foreign copy refuse"
+test_foreign_copy_with_unsaved_files_is_refused() {
+  local rc
+  make_foreign_copy_case foreign-dirty
+  printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "foreign-dirty: a copy with uncommitted files must be refused: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "foreign-dirty: the refusal changed"
+  assert_foreign_copy_untouched foreign-dirty
+  assert_present "$FOREIGN_COPY/untracked.txt" "foreign-dirty: the file was lost"
+  pass "uncommitted files make a foreign copy refuse"
+}
+
+test_foreign_copy_preserves_unique_ignored_files_before_removal() {
+  local rc exclude preserved sums hash
+  make_foreign_copy_case foreign-ignored
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "foreign-ignored: a unique ignored file must be preserved, not refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_absent "$FOREIGN_COPY" "foreign-ignored: the copy survived"
+  assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "foreign-ignored: the slot was not returned"
+  preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f 2>/dev/null | head -n 1)
+  [ -n "$preserved" ] || fail "foreign-ignored: the ignored file was not preserved in the task data directory"
+  assert_equals "only here" "$(cat "$preserved")" "foreign-ignored: the preserved file changed"
+  sums="$(dirname "$preserved")/SHA256SUMS"
+  assert_present "$sums" "foreign-ignored: no SHA-256 manifest was written"
+  hash=$(shasum -a 256 "$preserved" | awk '{print $1}')
+  assert_grep "$hash  unique.dat" "$sums" "foreign-ignored: the manifest does not record the preserved content"
+  pass "a foreign copy's unique ignored file is preserved with its SHA-256 and the copy is retired"
+}
+
+test_foreign_copy_regenerable_ignored_files_need_no_preservation() {
+  local rc exclude
+  make_foreign_copy_case foreign-regenerable
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '.next/\n*.tsbuildinfo\n.import_linter_cache/\n.tac/tmp/\n.tac/uv-cache/\ngraphify-out/\n' >> "$exclude"
+  mkdir -p "$FOREIGN_COPY/.next/cache" "$FOREIGN_COPY/.import_linter_cache" "$FOREIGN_COPY/.tac/tmp" "$FOREIGN_COPY/.tac/uv-cache" "$FOREIGN_COPY/graphify-out"
+  printf 'built\n' > "$FOREIGN_COPY/.next/cache/chunk"
+  printf '{}\n' > "$FOREIGN_COPY/app.tsbuildinfo"
+  printf 'cache\n' > "$FOREIGN_COPY/.import_linter_cache/result"
+  printf 'tmp\n' > "$FOREIGN_COPY/.tac/tmp/work"
+  printf 'cache\n' > "$FOREIGN_COPY/.tac/uv-cache/archive"
+  printf 'graph\n' > "$FOREIGN_COPY/graphify-out/graph.json"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "foreign-regenerable: regenerable caches must not block retirement: $(cat "$FOREIGN_CASE/stderr")"
+  assert_absent "$FOREIGN_COPY" "foreign-regenerable: the copy survived"
+  assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "foreign-regenerable: the slot was not returned"
+  [ ! -e "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" ] \
+    || fail "foreign-regenerable: regenerable caches were needlessly preserved"
+  pass "regenerable ignored caches are allow-listed and need no preservation or refusal"
 }
 
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused() {
@@ -11107,8 +11139,8 @@ test_live_launcher_outside_the_task_keeps_its_locked_own_copy() {
 }
 
 test_locked_own_nested_copy_that_is_not_proved_is_refused() {
-  local rc shape exclude
-  for shape in unlanded dirty ignored human-lock; do
+  local rc shape
+  for shape in unlanded dirty human-lock; do
     dead_launcher_pid
     make_own_locked_copy_case "own-locked-$shape" enclosing "$FOREIGN_DEAD_PID"
     case "$shape" in
@@ -11120,11 +11152,6 @@ test_locked_own_nested_copy_that_is_not_proved_is_refused() {
       dirty)
         printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
         ;;
-      ignored)
-        exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
-        printf 'unique.dat\n' >> "$exclude"
-        printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
-        ;;
       human-lock)
         git -C "$FOREIGN_CASE/project" worktree unlock "$FOREIGN_COPY"
         git -C "$FOREIGN_CASE/project" worktree lock --reason 'held by a human' "$FOREIGN_COPY"
@@ -11133,11 +11160,6 @@ test_locked_own_nested_copy_that_is_not_proved_is_refused() {
     run_foreign_teardown rc
     expect_code 1 "$rc" "own-locked-$shape: a locked own copy that is not proved must be refused: $(cat "$FOREIGN_CASE/stderr")"
     case "$shape" in
-      ignored)
-        assert_grep "holds ignored files that exist nowhere else: unique.dat" "$FOREIGN_CASE/stderr" \
-          "own-locked-$shape: the refusal did not name the ignored payload"
-        assert_present "$FOREIGN_COPY/unique.dat" "own-locked-$shape: the ignored file was lost"
-        ;;
       human-lock)
         assert_grep "locked by something other than Vernant's creation lock (held by a human)" "$FOREIGN_CASE/stderr" \
           "own-locked-$shape: the refusal did not name the foreign lock"
@@ -11148,7 +11170,28 @@ test_locked_own_nested_copy_that_is_not_proved_is_refused() {
     assert_equals "" "$(git -C "$FOREIGN_CASE/project" for-each-ref 'refs/fm/anchor/*')" \
       "own-locked-$shape: an anchor was written for a copy that was refused"
   done
-  pass "a locked own copy with unlanded commits, unsaved or unique ignored files, or a lock that is not Vernant's is refused and nothing changes"
+  pass "a locked own copy with unlanded commits, unsaved files, or a lock that is not Vernant's is refused and nothing changes"
+}
+
+test_locked_own_nested_copy_with_unique_ignored_file_is_preserved_and_released() {
+  local rc exclude preserved hash sums
+  dead_launcher_pid
+  make_own_locked_copy_case own-locked-ignored enclosing "$FOREIGN_DEAD_PID"
+  exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
+  printf 'unique.dat\n' >> "$exclude"
+  printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "own-locked-ignored: a unique ignored file must be preserved rather than refuse: $(cat "$FOREIGN_CASE/stderr")"
+  assert_absent "$FOREIGN_COPY" "own-locked-ignored: the copy survived"
+  assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "own-locked-ignored: the slot was not returned"
+  preserved=$(find "$FOREIGN_CASE/data/task-x1/nested-copy-preserved" -name unique.dat -type f 2>/dev/null | head -n 1)
+  [ -n "$preserved" ] || fail "own-locked-ignored: the ignored file was not preserved in the task data directory"
+  assert_equals "only here" "$(cat "$preserved")" "own-locked-ignored: the preserved file changed"
+  sums="$(dirname "$preserved")/SHA256SUMS"
+  assert_present "$sums" "own-locked-ignored: no SHA-256 manifest was written"
+  hash=$(shasum -a 256 "$preserved" | awk '{print $1}')
+  assert_grep "$hash  unique.dat" "$sums" "own-locked-ignored: the manifest does not record the preserved content"
+  pass "a locked own copy's unique ignored file is preserved with its SHA-256 and the copy is released"
 }
 
 test_locked_own_nested_copy_stays_when_a_foreign_copy_is_refused() {
@@ -12781,7 +12824,9 @@ test_locked_own_copy_is_released_by_the_closeout_driver
 test_unlocked_landed_foreign_copy_is_removed_without_the_driver
 test_unlanded_foreign_copy_is_refused
 test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal
-test_foreign_copy_with_unsaved_or_unique_files_is_refused
+test_foreign_copy_with_unsaved_files_is_refused
+test_foreign_copy_preserves_unique_ignored_files_before_removal
+test_foreign_copy_regenerable_ignored_files_need_no_preservation
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused
 test_half_removed_foreign_copy_is_refused_as_before
 test_recycled_launcher_pid_does_not_own_a_foreign_copy
@@ -12800,6 +12845,7 @@ test_locked_own_nested_copy_is_released_by_the_closeout_driver
 test_locked_own_nested_copy_with_a_recycled_launcher_pid_is_released
 test_live_launcher_outside_the_task_keeps_its_locked_own_copy
 test_locked_own_nested_copy_that_is_not_proved_is_refused
+test_locked_own_nested_copy_with_unique_ignored_file_is_preserved_and_released
 test_locked_own_nested_copy_stays_when_a_foreign_copy_is_refused
 test_locked_own_nested_copy_is_released_before_the_project_lock_wait
 test_closeout_driver_refusal_leaves_a_locked_own_copy_and_its_records

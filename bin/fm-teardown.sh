@@ -210,9 +210,10 @@
 # each such process running in the copy, waits a bounded time, and sends no KILL,
 # and one still alive refuses the release, named by its pid, while a process
 # that is not teardown's own is never signalled and refuses at once, named by its
-# pid; it is a clean worktree root with no ignored file unique to it; and its
-# work is landed by the existing landed-work rule. A copy whose work is not
-# proved landed stays, with the reason written.
+# pid; it is a clean worktree root, and each ignored file it holds is either
+# regenerable machinery or copied with its SHA-256 into the task's data
+# directory before removal; and its work is landed by the existing landed-work
+# rule. A copy whose work is not proved landed stays, with the reason written.
 # A copy locked by Vernant's creation lock (vernant-session-active
 # owner=launcher:<pid> launcher=<pid>) is released and removed by Vernant's own
 # driver, scripts/git-stability/closeout_pr.py --cleanup-worktree <copy>
@@ -220,9 +221,11 @@
 # interpreter); an unlocked copy is removed with a plain non-forced git worktree
 # remove. Removal deletes the copy's checkout and the allow-listed ignored files
 # in it (symlinks, virtual environments, node_modules and tool caches,
-# .DS_Store, Firstmate's hook files, and anything ignored under its .claude and
-# .opencode trees); it loses no commit, because the work is landed, and no
-# tracked change, because the clean proof refuses one. The clean proof skips
+# .DS_Store, Firstmate's hook files, regenerable build caches, and anything
+# ignored under its .claude and .opencode trees); any other ignored entry is
+# preserved first in data/<task>/nested-copy-preserved with its SHA-256. It loses
+# no commit, because the work is landed, and no tracked change, because the clean
+# proof refuses one. The clean proof skips
 # untracked files under .claude only; the ignored-file proof skips ignored files
 # under .claude and .opencode; plain git worktree remove still refuses a copy
 # that holds an untracked file. On the pool-slot route the release runs before

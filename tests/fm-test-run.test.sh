@@ -110,7 +110,7 @@ init_changed_fixture_repo() {
   local repo=$1 script
   mkdir -p "$repo/bin" "$repo/tests"
   cp "$RUNNER" "$repo/bin/fm-test-run.sh"
-  cp "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
+  cp "$ROOT/bin/fm-duration.py" "$ROOT/bin/fm-cpu-pass.sh" "$ROOT/bin/fm-cpu-pass.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
   chmod +x "$repo/bin/fm-test-run.sh"
   for script in \
@@ -954,17 +954,12 @@ PY
   timeout_script=tests/fm-calm-pi-extension.test.sh
   mkdir -p "$timeout_repo/bin" "$timeout_repo/tests"
   cp "$RUNNER" "$timeout_repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-duration.py" "$timeout_repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$timeout_repo/tests/"
-  cat >"$timeout_repo/bin/fm-timeout-lib.sh" <<'SH'
-fm_run_timed() {
-  [ "$1" -eq 1500 ] || return 99
-  return 124
-}
-SH
   cat >"$timeout_repo/$timeout_script" <<'SH'
 #!/usr/bin/env bash
-touch should-not-run
-echo "not ok - automatic timeout helper was bypassed"
+echo "not ok - automatic progress guard was bypassed"
+sleep 30
 SH
   chmod +x "$timeout_repo/bin/fm-test-run.sh" "$timeout_repo/$timeout_script"
   git -C "$timeout_repo" init -q
@@ -972,14 +967,16 @@ SH
   git -C "$timeout_repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
   printf '\n' >>"$timeout_repo/$timeout_script"
   set +e
-  (cd "$timeout_repo" && bin/fm-test-run.sh --changed --base HEAD) \
+  (cd "$timeout_repo" && FM_DURATION_NO_PROGRESS_SECS=2 FM_DURATION_FILE="$tmp/timeout-durations.jsonl" \
+    bin/fm-test-run.sh --changed --base HEAD) \
     >"$tmp/timeout.out" 2>"$tmp/timeout.err"
   rc=$?
   set -e
-  [ "$rc" -eq 1 ] || fail "single-script automatic timeout must fail the run, got $rc"
+  [ "$rc" -eq 1 ] || fail "a script that stops making progress must fail the run, got $rc: $(cat "$tmp/timeout.out" "$tmp/timeout.err")"
   grep -Eq '^FM_TEST_END .+ tests/fm-calm-pi-extension\.test\.sh exit=124 ' "$tmp/timeout.out" \
-    || fail "single unproven changed script did not receive the automatic timeout: $(cat "$tmp/timeout.out")"
-  [ ! -e "$timeout_repo/should-not-run" ] || fail "automatic timeout helper did not own the single changed script"
+    || fail "single unproven changed script did not receive the automatic progress guard: $(cat "$tmp/timeout.out")"
+  assert_contains "$(cat "$tmp/timeout.err")" "no_progress" \
+    "the progress guard did not report why the changed script was stopped"
 
   rm -rf "$tmp"
   pass "changed defaults to bounded automatic scheduling with serial override"
@@ -2449,30 +2446,26 @@ SH
 }
 
 # The duration regression this guard exists for: a suite whose scripts are all
-# green but whose wall clock outgrew its caller's invocation budget. The caller
-# gets killed mid-run and retries invisibly, so an over-budget run has to be a
-# failure, not a note in the log.
+# green but whose wall clock outgrew a fixed per-script bound. A healthy slow
+# suite keeps working and its output keeps it alive; only silence is stopped.
 # tests/fm-watch-triage.test.sh finishes in about 434s alone and about 698s
-# under CI load, so the automatic --changed bound must leave a slow but healthy
-# watcher-wake-lock script room while still bounding a genuinely hung one
-# (upstream issue #3869). The stub records the bound the runner hands it.
-test_changed_bound_gives_slow_watcher_suites_headroom() {
-  local tmp repo script bound rc
+# under CI load, so the automatic --changed guard must leave progress alone
+# while still stopping a genuinely hung script (upstream issue #3869).
+test_changed_progress_guard_gives_slow_watcher_suites_headroom() {
+  local tmp repo script rc
   tmp=$(mktemp -d)
   repo="$tmp/repo"
   script=tests/fm-watch-triage.test.sh
   mkdir -p "$repo/bin" "$repo/tests"
   cp "$RUNNER" "$repo/bin/fm-test-run.sh"
+  cp "$ROOT/bin/fm-duration.py" "$repo/bin/"
   cp "$ROOT/tests/git-config-helpers.sh" "$repo/tests/"
-  cat >"$repo/bin/fm-timeout-lib.sh" <<'SH'
-fm_run_timed() {
-  printf '%s\n' "$1" >bound-secs
-  shift
-  "$@"
-}
-SH
   cat >"$repo/$script" <<'SH'
 #!/usr/bin/env bash
+for tick in 1 2 3 4; do
+  echo "tick $tick"
+  sleep 1
+done
 echo "ok - healthy but slow watcher suite"
 SH
   chmod +x "$repo/bin/fm-test-run.sh" "$repo/$script"
@@ -2481,16 +2474,15 @@ SH
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
   printf '\n' >>"$repo/$script"
   set +e
-  (cd "$repo" && bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
+  (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=2 FM_DURATION_FILE="$tmp/durations.jsonl" \
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
   rc=$?
   set -e
-  [ "$rc" -eq 0 ] || fail "healthy changed watcher script must pass, got $rc: $(cat "$tmp/out" "$tmp/err")"
-  [ -s "$repo/bound-secs" ] || fail "changed watcher script did not run under the automatic bound: $(cat "$tmp/out")"
-  bound=$(cat "$repo/bound-secs")
-  [ "$bound" -ge 1500 ] \
-    || fail "automatic --changed bound for $script must be at least 1500s, got ${bound}s"
+  [ "$rc" -eq 0 ] || fail "healthy progressing changed script must pass, got $rc: $(cat "$tmp/out" "$tmp/err")"
+  grep -Eq '^FM_TEST_END .+ tests/fm-watch-triage\.test\.sh exit=0 ' "$tmp/out" \
+    || fail "the slow changed watcher script did not finish green: $(cat "$tmp/out")"
   rm -rf "$tmp"
-  pass "the automatic --changed bound gives the slow watcher suite at least 1500s"
+  pass "the automatic --changed progress guard lets a slow suite that keeps producing output finish"
 }
 
 test_max_wall_ms_is_a_result_not_advice() {
@@ -2690,7 +2682,7 @@ SH
 
 test_herdr_ci_family_run_has_a_step_timeout() {
   # The required Herdr lane's hang tripwire is the family-run *step* bound, not
-  # the 75-minute job cap. Parse the workflow as YAML so nested `with.name`
+  # the 120-minute job cap. Parse the workflow as YAML so nested `with.name`
   # artifact keys cannot masquerade as the step contract.
   command -v ruby >/dev/null 2>&1 \
     || fail "ruby is required to parse .github/workflows/ci.yml as YAML"
@@ -2713,13 +2705,13 @@ puts JSON.generate(
     || fail "could not read job timeout from parsed workflow"
   step_timeout=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["step_timeout"])' <<<"$json") \
     || fail "could not read step timeout from parsed workflow"
-  [ "$job_timeout" = 75 ] \
-    || fail "tests-herdr job backstop must stay 75 minutes, got $job_timeout"
+  [ "$job_timeout" = 120 ] \
+    || fail "tests-herdr job backstop must stay 120 minutes, got $job_timeout"
   [ "$step_timeout" = 20 ] \
     || fail "family-run step timeout must be 20 minutes, got $step_timeout"
   [ "$step_timeout" -lt "$job_timeout" ] \
     || fail "family-run step timeout must be below the job backstop"
-  pass "Herdr CI family-run step times out at 20 min under a 75 min job backstop"
+  pass "Herdr CI family-run step times out at 20 min under a 120 min job backstop"
 }
 
 test_aggregate_json() {
@@ -2822,7 +2814,7 @@ test_concurrent_runs_are_ordered_longest_first
 test_per_script_timeout_bounds_a_hang
 test_runner_reaps_stubs_a_killed_script_left_behind
 test_each_script_runs_under_a_process_budget
-test_changed_bound_gives_slow_watcher_suites_headroom
+test_changed_progress_guard_gives_slow_watcher_suites_headroom
 test_max_wall_ms_is_a_result_not_advice
 test_jobs_parallel_scheduler_and_failure_propagation
 test_herdr_ci_family_run_has_a_step_timeout
