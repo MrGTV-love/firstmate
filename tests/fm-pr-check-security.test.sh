@@ -1161,6 +1161,31 @@ test_static_poll_contract() {
   pass "static poll is silent except for one merged line and remains watcher-bounded"
 }
 
+# A merge that happens elsewhere reaches the watcher through the merge poll. The
+# poll's outcome arms the pool-copy prune (bin/fm-merge-prune.sh); the watcher
+# does not run it inside the lock it holds. The tick is off here so nothing
+# attempts a teardown against the fixture.
+test_watcher_merged_poll_arms_the_pool_copy_prune() {
+  local dir rc
+  dir=$(make_case merge-prune-poll-arms)
+  write_task_meta "$dir"
+  write_poll_meta "$dir/home/state" task-a https://github.com/o/r/pull/1
+  fm_pr_poll_prepare "$dir/home/state" task-a github https://github.com/o/r/pull/1 github.com o/r 1 "$POLL" \
+    || fail "could not prepare authenticated watcher poll"
+  fm_pr_poll_publish_prepared || fail "could not publish authenticated watcher poll"
+  rm -f "$dir/home/state/.last-check"
+  set +e
+  FM_MERGE_PRUNE=1 FM_MERGE_PRUNE_INTERVAL=0 FM_TEST_GH_STATE=MERGED \
+    run_watcher_bounded "$dir/home" "$dir/fakebin" > "$dir/watch.out" 2> "$dir/watch.err"
+  rc=$?
+  set -e
+  [ "$rc" -eq 0 ] || fail "watcher did not surface merged poll: $(cat "$dir/watch.err")"
+  [ -f "$dir/home/state/task-a.merge-prune" ] || fail "the merged poll did not arm the pool-copy prune"
+  grep -qx 'pr=https://github.com/o/r/pull/1' "$dir/home/state/task-a.merge-prune" \
+    || fail "the armed record does not name the merged PR: $(cat "$dir/home/state/task-a.merge-prune")"
+  pass "a merge seen by the poll arms the pool-copy prune without running it under the poll's lock"
+}
+
 test_atomic_interruption_leaves_no_partial_artifact() {
   local dir rc
   dir=$(make_case interrupted-write)
@@ -3772,6 +3797,7 @@ test_registration_identity_revalidation
 test_valid_recording_and_merge_derivation
 test_rejected_metacharacter_bytes_are_inert
 test_static_poll_contract
+test_watcher_merged_poll_arms_the_pool_copy_prune
 test_atomic_interruption_leaves_no_partial_artifact
 test_concurrent_watcher_sees_only_complete_publication
 test_poll_publication_refuses_unsafe_destinations
