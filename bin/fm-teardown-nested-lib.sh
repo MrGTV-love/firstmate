@@ -297,17 +297,17 @@ teardown_copy_inside_own_nested() {  # <copy>
 # worktree root and no record, no process outside this teardown and no live
 # launcher owns it, so the one reason it stays is work only it holds. The
 # ownership proof runs again here for the ignored-files case, whose reason is
-# judged before it; a copy any process runs in is never
-# held, so retire never signals a process inside a copy that stays. A copy inside
-# an own nested copy is never held. The reason text is kept, and a path that would
-# break the one-line record is not held.
+# judged before it; when that proof fails, its reason replaces the ignored-files
+# one, so the refusal names what really owns the copy. A copy any process runs in
+# is never held, so retire never signals a process inside a copy that stays. A
+# copy inside an own nested copy is never held, and neither is a path that would
+# break the one-line record.
 teardown_foreign_copy_holdable() {  # <copy>
   local copy=$1 why=$TEARDOWN_FOREIGN_WHY procs=$TEARDOWN_FOREIGN_PROCS_BASE rc=0
   case "$FORCE:$KIND" in --force:*|*:secondmate) return 1 ;; esac
   ! teardown_copy_inside_own_nested "$copy" || return 1
   case "$copy$why$ID$TEARDOWN_RETURN_SLOT" in *$'\t'*|*$'\n'*) return 1 ;; esac
   teardown_foreign_copy_unowned "$copy" || rc=1
-  TEARDOWN_FOREIGN_WHY=$why
   if [ "${#TEARDOWN_FOREIGN_PROCS[@]}" -gt "$procs" ]; then
     TEARDOWN_FOREIGN_PROCS=(${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]:0:$procs}"})
     return 1

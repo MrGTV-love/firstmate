@@ -305,6 +305,7 @@ These notices follow whichever completion line the close prints, including the l
 A foreign copy that lies inside one of the task's own nested copies is never held, because removing the own copy would take it along.
 When such a copy cannot be released, or when one that can be released lies there beside a copy that would be held, the whole close refuses as it does without this rule.
 A foreign copy that is also dirty, named by another record, running a process, or locked by anything other than a Vernant creation lock whose launcher is gone still refuses the whole close, and so does an own copy that is dirty or unlanded, or any other refusal of the ordinary close.
+The refusal names that blocker, such as the owning record or the running process, and not the unique ignored files the copy also holds.
 `--force` never holds a foreign copy.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.
 The log test lists the commits of a squash-merged branch whose remote branch was deleted as unpushed, so judge those copies by their merged PR and the closeout driver's landing check, not by that list alone.

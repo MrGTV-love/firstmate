@@ -10815,43 +10815,46 @@ test_a_held_close_removes_only_the_tasks_own_nested_copy() {
 }
 
 test_a_foreign_copy_inside_the_own_nested_copy_is_never_left_to_the_removal() {
-  local rc shape locked pid inner second target
+  local rc own shape locked pid inner second target label
   local -a watch
-  for shape in held-inside provable-inside; do
-    for locked in plain locked; do
-      pid=
-      if [ "$locked" = locked ]; then
-        dead_launcher_pid
-        pid=$FOREIGN_DEAD_PID
-      fi
-      make_own_locked_copy_case "held-inside-$shape-$locked" enclosing "$pid"
-      printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
-      seed_backlog_in_flight "$FOREIGN_CASE"
-      inner=$FOREIGN_COPY/.claude/worktrees/fc-inner
-      second=$FOREIGN_SLOT/.claude/worktrees/fc-two
-      git -C "$FOREIGN_CASE/project" worktree add -q -b fm/inner-lane "$inner" main
-      if [ "$shape" = held-inside ]; then
-        held_foreign_ignored "$inner"
-        target=$inner
-        watch=("$inner")
-      else
-        git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
-        held_foreign_ignored "$second"
-        target=$second
-        watch=("$inner" "$second")
-      fi
-      held_snapshot "$FOREIGN_CASE" "${watch[@]}"
-      run_foreign_teardown rc
-      expect_code 1 "$rc" "held-inside-$shape-$locked: removing the own copy would take a foreign copy with it, so the close must refuse: $(cat "$FOREIGN_CASE/stderr")"
-      assert_grep "contains registered copy $target" "$FOREIGN_CASE/stderr" "held-inside-$shape-$locked: the refusal did not name the copy that stays"
-      assert_present "$FOREIGN_COPY" "held-inside-$shape-$locked: the own nested copy was removed"
-      assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-inside-$shape-$locked: the task record was removed"
-      assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-inside-$shape-$locked: a refused close wrote a held-copy record"
-      git -C "$FOREIGN_CASE/project" rev-parse --verify --quiet refs/heads/fm/task-x1-v2 >/dev/null \
-        || fail "held-inside-$shape-$locked: the own copy's branch was deleted"
-      assert_present "$inner/.git" "held-inside-$shape-$locked: the foreign copy inside the own copy is gone"
-      [ "$shape" != held-inside ] || assert_present "$inner/unique.dat" "held-inside-$shape-$locked: the foreign copy's unique file is gone"
-      held_assert_untouched "held-inside-$shape-$locked" "$FOREIGN_CASE" "${watch[@]}"
+  for own in enclosing reverse; do
+    for shape in held-inside provable-inside; do
+      for locked in plain locked; do
+        label="held-inside-$own-$shape-$locked"
+        pid=
+        if [ "$locked" = locked ]; then
+          dead_launcher_pid
+          pid=$FOREIGN_DEAD_PID
+        fi
+        make_own_locked_copy_case "$label" "$own" "$pid"
+        printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+        seed_backlog_in_flight "$FOREIGN_CASE"
+        inner=$FOREIGN_COPY/.claude/worktrees/fc-inner
+        second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+        git -C "$FOREIGN_CASE/project" worktree add -q -b fm/inner-lane "$inner" main
+        if [ "$shape" = held-inside ]; then
+          held_foreign_ignored "$inner"
+          target=$inner
+          watch=("$inner")
+        else
+          git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
+          held_foreign_ignored "$second"
+          target=$second
+          watch=("$inner" "$second")
+        fi
+        held_snapshot "$FOREIGN_CASE" "${watch[@]}"
+        run_foreign_teardown rc
+        expect_code 1 "$rc" "$label: removing the own copy would take a foreign copy with it, so the close must refuse: $(cat "$FOREIGN_CASE/stderr")"
+        assert_grep "contains registered copy $target" "$FOREIGN_CASE/stderr" "$label: the refusal did not name the copy that stays"
+        assert_present "$FOREIGN_COPY" "$label: the own nested copy was removed"
+        assert_present "$FOREIGN_CASE/state/task-x1.meta" "$label: the task record was removed"
+        assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "$label: a refused close wrote a held-copy record"
+        git -C "$FOREIGN_CASE/project" rev-parse --verify --quiet refs/heads/fm/task-x1-v2 >/dev/null \
+          || fail "$label: the own copy's branch was deleted"
+        assert_present "$inner/.git" "$label: the foreign copy inside the own copy is gone"
+        assert_present "$target/unique.dat" "$label: the foreign copy's unique file is gone"
+        held_assert_untouched "$label" "$FOREIGN_CASE" "${watch[@]}"
+      done
     done
   done
   pass "a foreign copy inside the own nested copy is never held or swept away: the close refuses and every copy, the slot, its lease and claim stay as they were"
@@ -11089,16 +11092,23 @@ test_a_foreign_copy_does_not_excuse_an_own_copy_that_is_not_landed() {
 }
 
 test_a_foreign_copy_that_cannot_be_held_still_refuses_the_whole_close() {
-  local rc shape pid
+  local rc shape pid reason
   for shape in dirty-and-ignored ignored-with-record ignored-with-process; do
     make_held_case "held-mixed-$shape"
     held_foreign_ignored "$FOREIGN_COPY"
     case "$shape" in
-      dirty-and-ignored) printf 'edit\n' > "$FOREIGN_COPY/untracked.txt" ;;
-      ignored-with-record) fm_write_meta "$FOREIGN_CASE/state/other.meta" "kind=ship" "worktree=$FOREIGN_COPY" ;;
+      dirty-and-ignored)
+        printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
+        reason="it has uncommitted or untracked-unignored changes"
+        ;;
+      ignored-with-record)
+        fm_write_meta "$FOREIGN_CASE/state/other.meta" "kind=ship" "worktree=$FOREIGN_COPY"
+        reason="task other's active record names it as its worktree"
+        ;;
       ignored-with-process)
         teardown_fixture_start "$FOREIGN_COPY" KILL sleep 300
         pid=$TEARDOWN_FIXTURE_PID
+        reason="process $pid is running in it"
         cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
 #!/usr/bin/env bash
 case " \$* " in
@@ -11112,6 +11122,10 @@ SH
     run_foreign_teardown rc
     expect_code 1 "$rc" "held-mixed-$shape: a copy that is not only held back by unique work must refuse: $(cat "$FOREIGN_CASE/stderr")"
     assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "held-mixed-$shape: the refusal changed"
+    assert_grep "REFUSED: foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: $reason" "$FOREIGN_CASE/stderr" \
+      "held-mixed-$shape: the refusal did not name what really blocks the copy: $(cat "$FOREIGN_CASE/stderr")"
+    assert_no_grep "holds ignored files that exist nowhere else" "$FOREIGN_CASE/stderr" \
+      "held-mixed-$shape: the refusal names the ignored files instead of what really blocks the copy"
     assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-mixed-$shape: the task record was removed"
     assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-mixed-$shape: a refused close wrote a held-copy record"
     held_assert_untouched "held-mixed-$shape" "$FOREIGN_CASE" "$FOREIGN_COPY"
