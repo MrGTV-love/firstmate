@@ -138,14 +138,36 @@ case "$mode" in
   ineligible) echo "REFUSED: automatic reap ineligible: active: busy state busy" >&2; exit 1 ;;
   lifecycle) echo "error: another lifecycle action is already running for task $1; nothing was changed" >&2; exit 1 ;;
   pipeline) echo "REFUSED: no-mistakes run for $1 is still parked after axi abort" >&2; exit 1 ;;
-  false-positive)
+  false-positive|ship-not-landed|foreign-head|foreign-ignored|own-ignored|closeout-own)
+    # The known landing refusals, in the words of bin/fm-teardown.sh and
+    # bin/fm-teardown-nested-lib.sh; they stop once the copy is gone.
     if [ -e "$copy" ]; then
-      echo "REFUSED: closeout driver: exact tree not covered by the merged PR" >&2
+      case "$mode" in
+        false-positive) echo "REFUSED: Vernant's closeout driver did not release foreign copy $copy/.claude/worktrees/n1 (exit 1): exact tree not covered by the merged PR" >&2 ;;
+        closeout-own) echo "REFUSED: Vernant's closeout driver did not release own nested copy $copy/.claude/worktrees/n1 (exit 1): exact tree not covered by the merged PR" >&2 ;;
+        ship-not-landed)
+          echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
+          echo "Land its PR, or get the captain's own words to drop it and pass --force --drop-file." >&2
+          ;;
+        foreign-head) echo "REFUSED: foreign copy $copy/.claude/worktrees/n1 stays in pool slot $copy: its HEAD 0123456789ab is not proved landed." >&2 ;;
+        foreign-ignored) echo "REFUSED: foreign copy $copy/.claude/worktrees/n1 stays in pool slot $copy: it holds ignored files that exist nowhere else: a.local b.local." >&2 ;;
+        own-ignored) echo "REFUSED: own nested copy $copy/.claude/worktrees/n1 stays in pool slot $copy: it holds ignored files that exist nowhere else: a.local." >&2 ;;
+      esac
       exit 1
     fi
     done_ok "$1"
     ;;
-  refuse-always) echo "REFUSED: $1 has work that has not landed" >&2; exit 1 ;;
+  # Refusals that are not landing refusals, in the words of bin/fm-teardown.sh.
+  leaked-worktree) echo "REFUSED: leaked worktree processes for $1 remain after 3 reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2; exit 1 ;;
+  leaked-tasktmp) echo "REFUSED: leaked tasktmp processes for $1 remain after 3 reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2; exit 1 ;;
+  launchd-loaded) echo "REFUSED: no-mistakes launch agent com.example.nm.$1 (rooted in $1's copy) is still loaded after launchctl bootout; preserving the worktree and /tmp/agent.plist." >&2; exit 1 ;;
+  ownership-unproven) echo "REFUSED: process 4242 (identity unavailable) matched path $copy/.claude/worktrees/n1 beneath scan root $copy, whose ownership by $1 is not proven; preserving it and task $1 without signalling." >&2; exit 1 ;;
+  unknown-new) echo "REFUSED: a refusal text that teardown did not have when this list was written" >&2; exit 1 ;;
+  mixed)
+    echo "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion." >&2
+    echo "REFUSED: leaked worktree processes for $1 remain after 3 reap attempts; preserving the worktree/tasktmp for manual inspection or retry." >&2
+    exit 1
+    ;;
 esac
 SH
   cat > "$W/bin/control-stub" <<'SH'
@@ -497,6 +519,45 @@ scn_pipeline_refusal_never_falls_back() {
   [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
   return 0
 }
+
+# Only teardown's known landing refusals let the fallback prove the copy and
+# remove it; the copy here is clean, pushed and unused, so it goes.
+scn_landing_refusal_is_settled() {  # <stub mode>
+  make_world
+  printf '%s\n' "$1" > "$W/stub.mode"
+  go
+  [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "the landing refusal '$1' was not settled by the fallback: $(rec_field t1 reason)" || return 1
+  [ "$(wake_count)" = 0 ] || why "a settled landing refusal raised a wake" || return 1
+  return 0
+}
+
+# Every other refusal keeps the copy at once, though the copy would pass every
+# proof: the worker is not even stopped, nothing is destroyed, one wake names
+# the refusal, and later attempts stay silent.
+scn_other_refusal_keeps_the_copy() {  # <stub mode> <text the wake must name>
+  make_world
+  printf '%s\n' "$1" > "$W/stub.mode"
+  go; go; go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the refusal '$1' was overridden by the fallback" || return 1
+  [ ! -s "$W/control.log" ] || why "the worker was stopped although the refusal '$1' bars the fallback" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q -- "$2" || why "the wake does not name the copy and '$2'" || return 1
+  [ "$(rec_field t1 state)" = retained ] || why "the record is not retained" || return 1
+  return 0
+}
+
+scn_ship_not_landed_is_settled() { scn_landing_refusal_is_settled ship-not-landed; }
+scn_foreign_head_is_settled() { scn_landing_refusal_is_settled foreign-head; }
+scn_foreign_ignored_is_settled() { scn_landing_refusal_is_settled foreign-ignored; }
+scn_own_ignored_is_settled() { scn_landing_refusal_is_settled own-ignored; }
+scn_landing_refusal_via_closeout_foreign() { scn_landing_refusal_is_settled false-positive; }
+scn_closeout_own_is_settled() { scn_landing_refusal_is_settled closeout-own; }
+scn_leaked_worktree_keeps_the_copy() { scn_other_refusal_keeps_the_copy leaked-worktree 'leaked worktree processes'; }
+scn_leaked_tasktmp_keeps_the_copy() { scn_other_refusal_keeps_the_copy leaked-tasktmp 'leaked tasktmp processes'; }
+scn_launchd_loaded_keeps_the_copy() { scn_other_refusal_keeps_the_copy launchd-loaded 'still loaded after launchctl bootout'; }
+scn_ownership_unproven_keeps_the_copy() { scn_other_refusal_keeps_the_copy ownership-unproven 'ownership by t1 is not proven'; }
+scn_unknown_refusal_keeps_the_copy() { scn_other_refusal_keeps_the_copy unknown-new 'did not have when this list was written'; }
+scn_mixed_refusals_keep_the_copy() { scn_other_refusal_keeps_the_copy mixed 'ship deliverable is not landed'; }
 
 scn_destroy_failure_keeps_the_copy_with_one_wake() {
   make_world
@@ -922,6 +983,17 @@ test_fallback_keeps_a_non_pool_copy() { assert_scenario scn_non_pool_copy_is_kep
 test_fallback_accepts_the_merged_pr_head() { assert_scenario scn_pr_head_proves_a_squash_merged_commit "a commit proved landed by the merged PR head does not keep the copy"; }
 test_fallback_ignores_a_search_indexer() { assert_scenario scn_search_indexer_does_not_keep_the_copy "a system search indexer (Spotlight) reading the copy does not keep it; any other process does"; }
 test_fallback_never_overrides_a_live_pipeline_refusal() { assert_scenario scn_pipeline_refusal_never_falls_back "a refusal about a live pipeline is retained, never overridden"; }
+test_fallback_settles_a_ship_deliverable_not_landed_refusal() { assert_scenario scn_ship_not_landed_is_settled "the ship-deliverable-not-landed refusal is settled by the fallback"; }
+test_fallback_settles_a_foreign_copy_head_not_landed_refusal() { assert_scenario scn_foreign_head_is_settled "a foreign nested copy whose HEAD is not proved landed is settled by the fallback"; }
+test_fallback_settles_a_foreign_copy_ignored_files_refusal() { assert_scenario scn_foreign_ignored_is_settled "a foreign nested copy holding ignored files is settled by the fallback"; }
+test_fallback_settles_an_own_nested_copy_ignored_files_refusal() { assert_scenario scn_own_ignored_is_settled "an own nested copy holding ignored files is settled by the fallback"; }
+test_fallback_settles_an_own_nested_copy_closeout_refusal() { assert_scenario scn_closeout_own_is_settled "a closeout driver's exact-tree refusal for an own nested copy is settled by the fallback"; }
+test_fallback_keeps_the_copy_on_leaked_worktree_processes() { assert_scenario scn_leaked_worktree_keeps_the_copy "a leaked worktree process refusal keeps the copy with one wake and no fallback"; }
+test_fallback_keeps_the_copy_on_leaked_tasktmp_processes() { assert_scenario scn_leaked_tasktmp_keeps_the_copy "a leaked task tmp process refusal keeps the copy with one wake and no fallback"; }
+test_fallback_keeps_the_copy_while_a_launch_agent_is_loaded() { assert_scenario scn_launchd_loaded_keeps_the_copy "a launch agent that is still loaded after launchctl bootout keeps the copy with one wake and no fallback"; }
+test_fallback_keeps_the_copy_when_process_ownership_is_not_proven() { assert_scenario scn_ownership_unproven_keeps_the_copy "a process whose ownership is not proven keeps the copy with one wake and no fallback"; }
+test_fallback_keeps_the_copy_on_an_unknown_refusal() { assert_scenario scn_unknown_refusal_keeps_the_copy "an unknown new refusal text keeps the copy with one wake and no fallback"; }
+test_fallback_keeps_the_copy_when_any_refusal_line_is_not_a_landing_refusal() { assert_scenario scn_mixed_refusals_keep_the_copy "a landing refusal printed together with a non-landing refusal keeps the copy"; }
 test_fallback_destroy_failure_keeps_the_copy() { assert_scenario scn_destroy_failure_keeps_the_copy_with_one_wake "a destroy the tool refuses keeps the copy with one wake"; }
 test_retained_copy_is_reaped_quietly_when_the_cause_clears() { assert_scenario scn_retained_copy_is_reaped_when_the_cause_clears "a retained copy is reaped on the quiet retry once its cause clears"; }
 test_long_retained_reason_is_logged_once() { assert_scenario scn_long_reason_is_logged_once "a retained reason longer than the saved 300 characters is logged and woken once, not at every retry"; }
@@ -986,7 +1058,18 @@ test_unsafe_mutations_are_caught() {
   expect_caught no-nested-check $lib '    FM_MP_NESTED+=("$dir")' '    :' scn_nested_unpushed_commit_keeps_the_slot "nested-copy proof"
   expect_caught unique-is-scratch $lib '  if fm_mp_scratch_name "$name"; then' '  if true; then' scn_unique_ignored_file_is_kept "unique-ignored-file proof"
   expect_caught no-pool-check $lib '    "$root"/*/*/*) return 0 ;;' '    *) return 0 ;;' scn_non_pool_copy_is_kept "pool-copy proof"
-  expect_caught pipeline-not-barred $orch '    *"no-mistakes run"*|*"held for the captain"*|*"leaked process"*) return 0 ;;' '    *"never-matches"*) return 0 ;;' scn_pipeline_refusal_never_falls_back "live-pipeline bar"
+  expect_caught allow-leaked-worktree $orch '      *) return 1 ;;' '      *"leaked worktree processes"*) seen=1 ;;
+      *) return 1 ;;' scn_leaked_worktree_keeps_the_copy "leaked-worktree refusal"
+  expect_caught allow-leaked-tasktmp $orch '      *) return 1 ;;' '      *"leaked tasktmp processes"*) seen=1 ;;
+      *) return 1 ;;' scn_leaked_tasktmp_keeps_the_copy "leaked-tasktmp refusal"
+  expect_caught allow-launchd-loaded $orch '      *) return 1 ;;' '      *"still loaded after launchctl bootout"*) seen=1 ;;
+      *) return 1 ;;' scn_launchd_loaded_keeps_the_copy "launch-agent refusal"
+  expect_caught allow-ownership-unproven $orch '      *) return 1 ;;' '      *"whose ownership by"*) seen=1 ;;
+      *) return 1 ;;' scn_ownership_unproven_keeps_the_copy "process-ownership refusal"
+  expect_caught allow-pipeline $orch '      *) return 1 ;;' '      *"no-mistakes run"*) seen=1 ;;
+      *) return 1 ;;' scn_pipeline_refusal_never_falls_back "live-pipeline refusal"
+  expect_caught allow-unknown-text $orch '      *) return 1 ;;' '      *) seen=1 ;;' scn_unknown_refusal_keeps_the_copy "unknown refusal text"
+  expect_caught allow-when-any-line-is-landing $orch '      *) return 1 ;;' '      *) ;;' scn_mixed_refusals_keep_the_copy "every-line rule"
   expect_caught pane-exempts-any-process $lib '  [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1' '  :' scn_pane_build_keeps_the_copy "shell-only pane exemption"
   expect_caught pane-exempts-busy-shell $lib '      if (child) exit 1' '      if (0) exit 1' scn_pane_busy_shell_keeps_the_copy "idle-shell-only pane exemption"
   expect_caught pane-exempts-any-shell $lib '        if (p == pane) exit 0' '        if (1) exit 0' scn_stray_shell_keeps_the_copy "pane-ancestry pane exemption"
@@ -1003,7 +1086,7 @@ test_unsafe_mutations_are_caught() {
 }
 
 test_over_strict_mutations_are_caught() {
-  local lib=fm-merge-prune-lib.sh reap=fm-idle-reap-lib.sh
+  local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
   expect_caught no-scratch-names $lib '  if fm_mp_scratch_name "$name"; then' '  if false; then' scn_scratch_copy_is_removed "scratch patterns"
   expect_caught no-claude-scratch $lib '    .claude/*|.opencode|.opencode/*) return 0 ;;' '    .opencode|.opencode/*) return 0 ;;' scn_scratch_copy_is_removed ".claude scratch rule"
   expect_caught no-tac-scratch $lib '    .tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) return 0 ;;' '    .tac/NEVER) return 0 ;;' scn_scratch_copy_is_removed ".tac scratch rule"
@@ -1013,6 +1096,12 @@ test_over_strict_mutations_are_caught() {
   expect_caught exit-never-accepted $reap '  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1' '  return 1' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "stopped-worker acceptance"
   expect_caught empty-checksums-fail $lib '  [ ! -s "$dest/SHA256SUMS" ] || (cd "$dest"' '  (cd "$dest"' scn_empty_preserve_paths_do_not_keep_the_copy "empty-manifest rule"
   expect_caught long-reason-relogs fm-merge-prune.sh '  [ "$R_STATE" = retained ] && [ "$R_REASON" = "$(clean_detail "$reason")" ] && changed=0' '  [ "$R_STATE" = retained ] && [ "$R_REASON" = "$reason" ] && changed=0' scn_long_reason_is_logged_once "saved-reason comparison"
+  expect_caught ship-not-landed-not-allowed $orch '      "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.") seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_ship_not_landed_is_settled "ship-deliverable landing refusal"
+  expect_caught foreign-head-not-allowed $orch '      "REFUSED: foreign copy "*" stays in pool slot "*": its HEAD "*" is not proved landed.") seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_foreign_head_is_settled "foreign-copy HEAD refusal"
+  expect_caught foreign-ignored-not-allowed $orch '      "REFUSED: foreign copy "*" stays in pool slot "*": it holds ignored files that exist nowhere else: "*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_foreign_ignored_is_settled "foreign-copy ignored-files refusal"
+  expect_caught own-ignored-not-allowed $orch '      "REFUSED: own nested copy "*" stays in pool slot "*": it holds ignored files that exist nowhere else: "*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_own_ignored_is_settled "own-nested-copy ignored-files refusal"
+  expect_caught closeout-foreign-not-allowed $orch '      "REFUSED: Vernant'"'"'s closeout driver did not release foreign copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_landing_refusal_via_closeout_foreign "foreign-copy closeout refusal"
+  expect_caught closeout-own-not-allowed $orch '      "REFUSED: Vernant'"'"'s closeout driver did not release own nested copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;' '      "REFUSED: never") seen=1 ;;' scn_closeout_own_is_settled "own-nested-copy closeout refusal"
   expect_caught no-checksums $lib '      shasum -a 256 -- "$file" || exit 1' '      :' scn_scratch_copy_is_removed "checksum manifest"
   expect_caught indexer-counts-as-use $lib '    if fm_mp_indexer_pid "$pid"; then' '    if false; then' scn_search_indexer_does_not_keep_the_copy "search-indexer exemption"
   expect_caught pr-head-ignored $lib '  [ -z "$prsha" ] || extra=("$prsha")' '  extra=()' scn_pr_head_proves_a_squash_merged_commit "merged-PR-head proof"
@@ -1060,7 +1149,7 @@ printf '%s\n' "$*" >> "$STUB_LOG"
 # A case may make teardown refuse the way the 2026-10-18 closeout driver did, so
 # the fallback alone decides.
 if [ -e "$REFUSE_FLAG" ]; then
-  echo "REFUSED: closeout driver: exact tree not covered by the merged PR" >&2
+  echo "REFUSED: Vernant's closeout driver did not release foreign copy /pool/1/repo/.claude/worktrees/n1 (exit 1): exact tree not covered by the merged PR" >&2
   exit 1
 fi
 exec "$ROOT/bin/fm-teardown.sh" "$@"
@@ -1267,6 +1356,17 @@ ALL_TESTS=(
   test_fallback_accepts_the_merged_pr_head
   test_fallback_ignores_a_search_indexer
   test_fallback_never_overrides_a_live_pipeline_refusal
+  test_fallback_settles_a_ship_deliverable_not_landed_refusal
+  test_fallback_settles_a_foreign_copy_head_not_landed_refusal
+  test_fallback_settles_a_foreign_copy_ignored_files_refusal
+  test_fallback_settles_an_own_nested_copy_ignored_files_refusal
+  test_fallback_settles_an_own_nested_copy_closeout_refusal
+  test_fallback_keeps_the_copy_on_leaked_worktree_processes
+  test_fallback_keeps_the_copy_on_leaked_tasktmp_processes
+  test_fallback_keeps_the_copy_while_a_launch_agent_is_loaded
+  test_fallback_keeps_the_copy_when_process_ownership_is_not_proven
+  test_fallback_keeps_the_copy_on_an_unknown_refusal
+  test_fallback_keeps_the_copy_when_any_refusal_line_is_not_a_landing_refusal
   test_fallback_destroy_failure_keeps_the_copy
   test_retained_copy_is_reaped_quietly_when_the_cause_clears
   test_long_retained_reason_is_logged_once

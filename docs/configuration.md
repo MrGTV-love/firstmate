@@ -702,8 +702,11 @@ That covers the task lease or project lock held by another actor, a teardown tha
 The retry waits 60 seconds, then doubles up to 3600 seconds.
 One wake is raised if the task is still not pruned after 24 attempts.
 
-Any other teardown refusal may be a false positive, such as a closeout driver that reports a tree as not covered, an orphan nested copy with no task record, or ignored scratch files.
-Only then the fallback re-proves the copy from the live disk, by the criteria of the owner's `treehouse-reap-clean` reaper.
+Only a known landing refusal of teardown may be a false positive.
+Those are the ship deliverable reported as not landed (work not on a remote, or a squash merge), a closeout driver that reports the exact tree as not covered, an orphan nested copy whose HEAD is not proved landed, and ignored files that exist nowhere else.
+Every refusal line of the teardown output must be one of them.
+Every other refusal keeps the copy and raises one wake, with no fallback: a leaked process, a launch agent that is still loaded, a process whose ownership is not proven, a live pipeline, a captain call, and any refusal text that is not on that list.
+Only a known landing refusal makes the fallback re-prove the copy from the live disk, by the criteria of the owner's `treehouse-reap-clean` reaper.
 The copy and every nested copy inside it, each checked one by one, must pass all of these:
 
 - It is a pool copy under the pool root (`TREEHOUSE_ROOT`, default `$HOME/.treehouse`).
@@ -729,7 +732,7 @@ That second teardown asks the same automatic-reap admission check, which in this
 The ordinary finished-session sweep keeps its classification unchanged.
 It never uses `--force`, `--include-unlanded`, or `--include-in-use`.
 
-Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy outside the pool, a pool slot that another task has claimed, a refusal about a live pipeline or a captain call, or a destroy that fails.
+Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy outside the pool, a pool slot that another task has claimed, a teardown refusal that is not a known landing refusal, or a destroy that fails.
 It is never forced or discarded.
 Exactly one wake names the copy and the reason, and the record is retried silently every six hours in case the cause clears.
 Each outcome is one line in `data/<id>/merge-prune.log`; the prune never writes to the task's status file.
