@@ -8,7 +8,7 @@ export AUDIT_ROOT="$ROOT" AUDIT_TMP="$TMP_ROOT"
 node --experimental-strip-types --experimental-test-module-mocks --no-warnings --input-type=module <<'JS' || fail 'guard settlement/audit regression'
 import assert from 'node:assert/strict';
 import { mock, test } from 'node:test';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const reportUrl = pathToFileURL(`${process.env.AUDIT_ROOT}/bin/ten-levels/extensions/report.ts`).href;
 const report = await import(reportUrl);
@@ -115,6 +115,38 @@ await test('result: an all-blank result plans no screening and sends nothing', a
   assert.equal(r.planned_chunks, 0);
   assert.equal(r.cost.source, 'not_called');
   assert.equal(r.cost.incomplete, false);
+});
+// The guard adds no retry accounting of its own: a retried success is exactly what the client reported.
+await test('real decide: a guard-retried success keeps the client result and a complete reported cost', async () => {
+  // Stub only the client boundary: the real preflight, retry loop and recorder run with no network or model request.
+  const { JevClient } = await import(new URL('../src/core/client.ts', reportUrl));
+  writeFileSync(`${state}/.env`, 'TYPESAFE_API_KEY=offline-audit-fixture\n');
+  const final = answer();
+  const { attempts, elapsedMs } = final.meta;
+  let calls = 0;
+  const client = mock.method(JevClient.prototype, 'systemOne', async () => {
+    if (++calls === 1) throw new Error('offline transient failure');
+    return final;
+  });
+  try {
+    const result = await service.decide({ content: 'ordinary fixture' }, SCREEN_QUESTIONS);
+    assert.equal(calls, 2, 'the real service retried the failed client call');
+    assert.equal(result.meta.attempts, attempts, 'attempts stay the final client metadata');
+    assert.equal(result.meta.elapsedMs, elapsedMs, 'elapsed time stays the final client metadata, without the retry backoff');
+    service.record({ hook: 'tool_result', tool: 'bash', decision: 'clear', enforcement: 'result_pass', branch: 'policy',
+      error_type: null, request_started: true, result });
+    const r = row();
+    assert.equal(r.attempts, attempts);
+    assert.equal(r.ms, elapsedMs);
+    assert.equal(r.chunks, 1);
+    assert.equal(r.planned_chunks, 1);
+    assert.equal(r.cost.incomplete, false, 'a retried success whose answer reported its cost is a complete charge');
+    assert.equal(r.cost.source, 'reported');
+    assert.equal(r.cost.amount, 0.001);
+    assert.equal(r.cost.reported_amount, 0.001);
+  } finally {
+    client.mock.restore();
+  }
 });
 // A policy verdict still outranks an outage, but must not discard its spend.
 await test('policy verdict precedence never discards failed spend', async () => {
