@@ -297,6 +297,37 @@ exiting = subprocess.run([sys.executable, str(eperm_clock), str(helper), 'run', 
 assert exiting.returncode == 124 and 'Operation not permitted' not in exiting.stdout + exiting.stderr, (exiting.returncode, exiting.stdout, exiting.stderr)
 assert any(r.get('event') == 'timeout' and r['key'] == 'cleanup.exiting' for r in rows())
 
+# After the leader is reaped, the final sweep signals a group whose last member
+# is still exiting. Darwin answers that with EPERM and ps lists the member as
+# ?E. A member that is exiting can never run again, so the run keeps its
+# result. A member that is still live is not accepted as gone.
+sweep_clock = tmp / 'eperm-sweep-run.py'
+sweep_clock.write_text("""import os, runpy, signal, subprocess, sys
+real_killpg, real_run = os.killpg, subprocess.run
+state = {'landed': False, 'pgid': None}
+def killpg(pgid, sig):
+    if sig == signal.SIGKILL:
+        if state['landed']:
+            state['pgid'] = pgid
+            raise PermissionError(1, 'Operation not permitted')
+        state['landed'] = True
+    return real_killpg(pgid, sig)
+def run(args, *rest, **options):
+    if list(args[:3]) == ['ps', '-axo', 'pgid=,stat=']:
+        member = os.environ['FM_TEST_MEMBER_STAT']
+        return subprocess.CompletedProcess(args, 0, f"{os.getpgrp()} S\\n{state['pgid']} {member}\\n", '')
+    return real_run(args, *rest, **options)
+os.killpg, subprocess.run = killpg, run
+sys.argv = sys.argv[1:]
+runpy.run_path(sys.argv[0], run_name='__main__')
+""")
+for key, member, code in (('cleanup.sweep', '?E', 124), ('cleanup.sweep.live', 'S', 1)):
+    swept = subprocess.run([sys.executable, str(sweep_clock), str(helper), 'run', key, '--', sys.executable, '-c', ignores_term],
+                           env=dict(env, FM_DURATION_NO_PROGRESS_SECS='1', FM_TEST_MEMBER_STAT=member), cwd=workrepo, capture_output=True, text=True)
+    assert swept.returncode == code, (key, swept.returncode, swept.stdout, swept.stderr)
+    assert ('Operation not permitted' in swept.stdout + swept.stderr) == (code == 1), (key, swept.stdout, swept.stderr)
+    assert any(r.get('event') == 'timeout' and r['key'] == key for r in rows()) == (code == 124)
+
 # The leader's exit is the result even while a descendant still holds its
 # streams: no wait for the descendant and no false stop.
 write_rows([sample('orphan', 20000) for _ in range(5)])

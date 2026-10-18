@@ -544,9 +544,10 @@ def signal_group(child, sig):
     except ProcessLookupError:
         pass  # The owned group has already gone.
     except PermissionError:
-        # A repeated cleanup signal returned EPERM after cancellation on
-        # Darwin. Accept completion only after the leader is reaped AND the
-        # kernel inventory proves that no live group member remains.
+        # Darwin answers a signal to a group whose members are all exiting
+        # with EPERM. Accept completion only after the leader is reaped AND
+        # the kernel inventory proves that every remaining group member is a
+        # zombie or is exiting (flag E); neither can run again.
         if child.poll() is None:
             raise
         inventory = subprocess.run(['ps', '-axo', 'pgid=,stat='], capture_output=True, text=True)
@@ -556,7 +557,7 @@ def signal_group(child, sig):
             fields = line.split()
             if len(fields) != 2:
                 raise ValueError('cannot verify completed process group')
-            if fields[0] == str(child.pid) and not fields[1].startswith(('Z', 'X')):
+            if fields[0] == str(child.pid) and not (fields[1].startswith(('Z', 'X')) or 'E' in fields[1]):
                 raise
 
 
