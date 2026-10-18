@@ -278,24 +278,24 @@ test_flag_off_writes_nothing() {
 # filed, closed, and answered are the lifecycle records the fleet's own scripts
 # write at the moment each event happens; docs/fleet-ledger.md owns the fields.
 test_lifecycle_records_carry_exactly_their_fields() {
-  local commit=0123456789abcdef0123456789abcdef01234567 pr=https://github.com/acme/sample/pull/7 rows out
+  local pr=https://github.com/acme/sample/pull/7 rows out
   make_case on-lifecycle-records on
   in_home "$ROOT/bin/fm-fleet-ledger.sh" filed item-1 sample ship 2 || fail "filed was not recorded"
   in_home "$ROOT/bin/fm-fleet-ledger.sh" filed item-2 "" "" "" || fail "filed with absent fields was not recorded"
-  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 merged_pr "$pr" "$commit" || fail "closed was not recorded"
-  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-2 drop_file "" "" || fail "closed without a PR was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 merged_pr "$pr" || fail "closed was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-2 drop_file "" || fail "closed without a PR was not recorded"
   in_home "$ROOT/bin/fm-fleet-ledger.sh" answered item-1 send needs-pick || fail "answered (send) was not recorded"
-  in_home "$ROOT/bin/fm-fleet-ledger.sh" answered item-1 hold item-1 "the Lavish review page" || fail "answered (hold) was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" answered item-1 hold item-1 "the captured result item-1 sequence 4" || fail "answered (hold) was not recorded"
   in_home "$ROOT/bin/fm-fleet-ledger.sh" answered item-1 hold item-1 "" || fail "answered (hold, no source) was not recorded"
   rows=$(ledger_rows 'del(.v, .ts, .at)')
   assert_equals "$(cat <<EOF
 {"event":"task.filed","task":"item-1","repo":"sample","kind":"ship","priority":2}
 {"event":"task.filed","task":"item-2","repo":null,"kind":null,"priority":null}
-{"event":"task.closed","task":"item-1","evidence":"merged_pr","pr":"$pr","commit":"$commit"}
-{"event":"task.closed","task":"item-2","evidence":"drop_file","pr":null,"commit":null}
+{"event":"task.closed","task":"item-1","evidence":"merged_pr","pr":"$pr"}
+{"event":"task.closed","task":"item-2","evidence":"drop_file","pr":null}
 {"event":"task.answered","task":"item-1","via":"send","key":"needs-pick","answered_by":"main"}
 {"event":"task.answered","task":"item-1","via":"hold","key":"item-1","answered_by":"page"}
-{"event":"task.answered","task":"item-1","via":"hold","key":"item-1","answered_by":"unknown"}
+{"event":"task.answered","task":"item-1","via":"hold","key":"item-1","answered_by":"main"}
 EOF
 )" "$rows" "lifecycle records"
   jq -e -s 'all(.[]; .v == 1 and (.ts | type) == "number" and .at == (.ts | todate))' \
@@ -309,12 +309,33 @@ EOF
   }
   expect_ledger_usage_error filed item-1 sample ship
   expect_ledger_usage_error closed item-1 merged_pr
-  expect_ledger_usage_error closed item-1 "" "" ""
+  expect_ledger_usage_error closed item-1 "" ""
+  expect_ledger_usage_error closed item-1 merged_pr "$pr" ""
   expect_ledger_usage_error answered item-1 hold k
   expect_ledger_usage_error answered item-1 send
   assert_equals 7 "$(wc -l < "$HOME_DIR/state/fleet-ledger.jsonl" | tr -d ' ')" "records after refused calls"
-  out=$(in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-3 report "" "" 2>&1) || fail "closed with a report failed: $out"
+  out=$(in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-3 report "" 2>&1) || fail "closed with a report failed: $out"
   pass "flag on: filed, closed, and answered write exactly their fields, one line each, with ts and at the same instant"
+}
+
+# A close that the direct teardown, its replay, and a proven `done` can each
+# reach is one record per task, evidence, and PR.
+test_closed_is_recorded_once_per_task_evidence_and_pr() {
+  local pr=https://github.com/acme/sample/pull/7 other=https://github.com/acme/sample/pull/9 rows
+  make_case on-closed-once on
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 merged_pr "$pr" || fail "closed was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 merged_pr "$pr" || fail "a repeated close failed"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 merged_pr "$other" || fail "a close on another PR failed"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 drop_file "" || fail "a close on other evidence failed"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 drop_file "" || fail "a repeated drop close failed"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-2 merged_pr "$pr" || fail "a close of another task failed"
+  rows=$(jq -r '[.event, .task, .evidence, (.pr // "-")] | join(" ")' "$HOME_DIR/state/fleet-ledger.jsonl")
+  assert_equals "$(printf '%s\n' \
+    "task.closed item-1 merged_pr $pr" \
+    "task.closed item-1 merged_pr $other" \
+    "task.closed item-1 drop_file -" \
+    "task.closed item-2 merged_pr $pr")" "$rows" "closed records after repeats"
+  pass "closed: a repeat of the same task, evidence, and PR writes nothing; any difference writes a record"
 }
 
 test_answered_by_is_derived_from_home_role_and_source() {
@@ -328,30 +349,42 @@ test_answered_by_is_derived_from_home_role_and_source() {
     assert_equals "$want" "$by" "answered_by for: $*"
   }
   record main answered t send k1
+  record main answered t hold k1 ""
+  # The away daemon's flag file is not the away record; only the record counts.
   : > "$HOME_DIR/state/.afk"
+  record main answered t send k1b
+  rm -f "$HOME_DIR/state/.afk"
+  in_home "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "away entry failed"
   record main-afk answered t send k2
   record main-afk answered t hold k2 "a firstmate answer sent to t"
-  rm -f "$HOME_DIR/state/.afk"
-  record page answered t hold k3 "the Lavish review page"
-  record page answered t hold k3 "a captured result t sequence 1"
-  record chat answered t hold k4 "the captain's chat"
-  record policy answered t hold k5 "a standing policy"
-  record unknown answered t hold k6 "something else entirely"
-  record unknown answered t hold k7 ""
+  record main-afk answered t hold k2 ""
+  in_home "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
+  FM_AFK_MODE=quiet in_home "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "quiet entry failed"
+  record main answered t send k2q
+  in_home "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "quiet archive failed"
+  record page answered t hold k3 "the captured result t sequence 1"
+  record unknown answered t hold k3 "The Captured Result t sequence 1"
+  record unknown answered t hold k4 "the captain's chat"
+  record unknown answered t hold k5 "a standing policy"
+  record unknown answered t hold k6 "the Lavish review page"
+  record unknown answered t hold k6 "a dashboard of outstanding discard cards"
+  record unknown answered t hold k7 "reconciled"
   printf 'mate-1\n' > "$HOME_DIR/.fm-secondmate-home"
   record secondmate answered t send k8
   record secondmate answered t hold k9 "a firstmate answer sent to t"
+  record secondmate answered t hold k9 ""
   rm -f "$HOME_DIR/.fm-secondmate-home"
   ln -s /nonexistent "$HOME_DIR/.fm-secondmate-home"
   record unknown answered t send k10
-  pass "answered_by is derived from the home role and the recorded source, and is unknown when neither says"
+  record unknown answered t hold k10 ""
+  pass "answered_by is derived from the home role and two exact source prefixes, and is unknown when neither says"
 }
 
 test_flag_off_and_unwritable_ledger_for_the_new_records() {
   local out rc=0 leftovers
   make_case off-lifecycle-records off
   in_home "$ROOT/bin/fm-fleet-ledger.sh" filed item-1 sample ship 2 || fail "filed with the flag absent failed"
-  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 report "" "" || fail "closed with the flag absent failed"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 report "" || fail "closed with the flag absent failed"
   in_home "$ROOT/bin/fm-fleet-ledger.sh" answered item-1 send k || fail "answered with the flag absent failed"
   leftovers=$(cd "$HOME_DIR/state" && find . -name '*fleet-ledger*')
   assert_equals "" "$leftovers" "ledger files with the flag absent"
@@ -376,5 +409,6 @@ test_worker_status_line_lands_when_the_ledger_fails
 test_worker_status_line_with_the_flag_absent
 test_flag_off_writes_nothing
 test_lifecycle_records_carry_exactly_their_fields
+test_closed_is_recorded_once_per_task_evidence_and_pr
 test_answered_by_is_derived_from_home_role_and_source
 test_flag_off_and_unwritable_ledger_for_the_new_records

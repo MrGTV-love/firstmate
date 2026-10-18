@@ -921,23 +921,31 @@ test_resolve_key_records_task_answered() {
 
   run_send "$fb" "$home" "$log" t1 --resolve-key api-shape "go with REST"; rc=$?
   expect_code 0 "$rc" "an answer send should succeed with the ledger on"
-  : > "$home/state/.afk"
+  FM_HOME="$home" "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "away entry failed"
   run_send "$fb" "$home" "$log" t1 --resolve-key db-choice "postgres"; rc=$?
   expect_code 0 "$rc" "an answer send under the away record should succeed"
+  FM_HOME="$home" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
+  printf 'needs-decision [key=cache-choice]: pick a cache\n' >> "$home/state/t1.status"
+  FM_HOME="$home" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "quiet entry failed"
+  : > "$home/state/.afk"
+  run_send "$fb" "$home" "$log" t1 --resolve-key cache-choice "redis"; rc=$?
+  expect_code 0 "$rc" "an answer send under a quiet record should succeed"
   rm -f "$home/state/.afk"
+  FM_HOME="$home" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "quiet archive failed"
   printf 'mate-1\n' > "$home/.fm-secondmate-home"
   run_send "$fb" "$home" "$log" t1 --resolve-key port-choice "9090" >/dev/null 2>&1; rc=$?
   rm -f "$home/.fm-secondmate-home"
   rows=$(jq -c 'select(.event == "task.answered") | [.task, .via, .key, .answered_by, (.at | test("Z$"))]' "$home/state/fleet-ledger.jsonl")
-  assert_equals "$(printf '%s\n' '["t1","send","api-shape","main",true]' '["t1","send","db-choice","main-afk",true]')" \
-    "$(printf '%s\n' "$rows" | head -2)" "task.answered records for main and away answers"
-  assert_equals 3 "$(printf '%s\n' "$rows" | wc -l | tr -d ' ')" "task.answered records after three answers"
+  assert_equals "$(printf '%s\n' '["t1","send","api-shape","main",true]' '["t1","send","db-choice","main-afk",true]' \
+    '["t1","send","cache-choice","main",true]')" \
+    "$(printf '%s\n' "$rows" | head -3)" "task.answered records for main, away, and quiet (present captain) answers"
+  assert_equals 4 "$(printf '%s\n' "$rows" | wc -l | tr -d ' ')" "task.answered records after four answers"
   assert_contains "$(printf '%s\n' "$rows" | tail -1)" '"port-choice","secondmate"' "a secondmate home's answer was not recorded as such"
 
   # A key that is not open is refused before anything is sent or recorded.
   run_send "$fb" "$home" "$log" t1 --resolve-key not-open "nope"; rc=$?
   expect_code 1 "$rc" "a mistyped key must still refuse"
-  assert_equals 3 "$(jq -c 'select(.event == "task.answered")' "$home/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')" \
+  assert_equals 4 "$(jq -c 'select(.event == "task.answered")' "$home/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')" \
     "a refused send must record nothing"
   pass "fm-send --resolve-key: one task.answered per closed key, answered_by derived from the home's role, nothing on a refusal"
 }

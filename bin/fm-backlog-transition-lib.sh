@@ -81,6 +81,8 @@ FM_BACKLOG_ROW_HOLD_KIND=
 # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
 FM_BACKLOG_CLOSE_REPLAY_RESULT=
 
+_FM_BACKLOG_TRANSITION_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Bounded execution is fm-timeout-lib.sh's alone; source it rather than
 # re-deriving a deadline here. It is stateless, so the memoisation reason this
 # library does not source fm-tasks-axi-lib.sh does not apply.
@@ -1345,11 +1347,33 @@ fm_backlog_close_marker_clear() {  # <state-dir> <id>
   fm_backlog_close_marker_remove "$marker" "$1"
 }
 
+# Opt-in fleet activity ledger (docs/fleet-ledger.md): record a close that just
+# landed. <done-arg>... are the arguments the close handed to `tasks-axi done`,
+# which name the evidence: a report, a merged PR, the captain's drop, a local
+# main landing, or none. The ledger writes a repeat of the same close once, so
+# the direct teardown, its replay, and a proven `done` can each call this. A
+# failed write never changes the caller's result.
+fm_backlog_ledger_closed() {  # <state-dir> <config-dir> <id> [<done-arg>...]
+  local state=$1 config=$2 id=$3 evidence pr=''
+  shift 3
+  [ -n "$config" ] && [ -e "$config/fleet-ledger" ] || return 0
+  case "${1:-}:${2:-}" in
+    --report:*) evidence=report ;;
+    --pr:*) evidence=merged_pr; pr=$2 ;;
+    --note:dropped) evidence=drop_file ;;
+    --note:*) evidence=local_main ;;
+    *) evidence=none ;;
+  esac
+  FM_STATE_OVERRIDE=$state FM_CONFIG_OVERRIDE=$config \
+    "$_FM_BACKLOG_TRANSITION_LIB_DIR/fm-fleet-ledger.sh" closed "$id" "$evidence" "$pr" || true
+}
+
 # Replay one recorded close or retention. Returns 0 when the row is closed (or
 # retained), the marker is stale, or an answer already closed a retained row,
 # and 1 when marker validation or recovery fails. Validation completes before
-# any meta or backlog mutation.
-fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data-dir>
+# any meta or backlog mutation. A close that lands is recorded in the fleet
+# ledger when the optional <config-dir> is given.
+fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data-dir> [<config-dir>]
   local state=$1 marker=$2 marker_name expected_id
   local id data marker_spawn_gen meta meta_spawn_gen row_state cleanup_incomplete mode
   local args=() mode_flags=()
@@ -1421,6 +1445,7 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
       fi
       if fm_backlog_atomic_transition close '' "$marker" "$data" "$id" "$state" \
           "${args[@]+"${args[@]}"}"; then
+        fm_backlog_ledger_closed "$state" "${4:-}" "$id" "${args[@]+"${args[@]}"}"
         if [ "$cleanup_incomplete" = 1 ]; then
           FM_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
         else
@@ -1444,10 +1469,13 @@ fm_backlog_close_marker_replay() {  # <state-dir> <marker-path> <authorized-data
       else
         FM_BACKLOG_CLOSE_REPLAY_RESULT=retained
       fi
-    elif [ "$cleanup_incomplete" = 1 ]; then
-      FM_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
     else
-      FM_BACKLOG_CLOSE_REPLAY_RESULT=closed
+      fm_backlog_ledger_closed "$state" "${4:-}" "$id" "${args[@]+"${args[@]}"}"
+      if [ "$cleanup_incomplete" = 1 ]; then
+        FM_BACKLOG_CLOSE_REPLAY_RESULT=closed_incomplete
+      else
+        FM_BACKLOG_CLOSE_REPLAY_RESULT=closed
+      fi
     fi
     return 0
   fi

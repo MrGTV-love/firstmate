@@ -17,10 +17,13 @@
 #                                merge-time re-record from bin/fm-pr-merge.sh)
 #   bin/fm-merge-outcome-lib.sh  merged ... pr (a recorded PR merge)
 #   bin/fm-merge-local.sh        merged ... local (a local-only landing)
-#   bin/fm-teardown.sh           cleaned_up, closed (a completed backlog close)
+#   bin/fm-teardown.sh           cleaned_up
+#   bin/fm-backlog-transition-lib.sh  closed (a landed backlog close: teardown,
+#                                its replay, and a proven `done`)
 #   bin/fm-tasks-axi.sh          filed (an `add` that created a new item)
 #   bin/fm-send.sh               answered ... send (a --resolve-key close)
-#   bin/fm-captain-hold.sh       answered ... hold (a recorded captain answer)
+#   bin/fm-captain-hold.sh       filed (a captain-hold item it created),
+#                                answered ... hold (an answer or a reconciliation)
 #
 # Usage:
 #   fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model>
@@ -29,7 +32,7 @@
 #   fm-fleet-ledger.sh merged <task> local
 #   fm-fleet-ledger.sh cleaned_up <task>
 #   fm-fleet-ledger.sh filed <task> <repo> <kind> <priority>
-#   fm-fleet-ledger.sh closed <task> <evidence> <pr> <commit>
+#   fm-fleet-ledger.sh closed <task> <evidence> <pr>
 #   fm-fleet-ledger.sh answered <task> send <key>
 #   fm-fleet-ledger.sh answered <task> hold <key> <source>
 #   fm-fleet-ledger.sh capture
@@ -56,7 +59,9 @@
 # an empty argument is recorded as null. They add an `at` member (the same
 # instant as `ts`, as ISO 8601 UTC) and capture nothing. `answered` derives its
 # answered_by value itself (bin/fm-answered-by-lib.sh) from this home's role
-# and, for a hold, the recorded <source> text; no caller types it.
+# and, for a hold, the recorded <source> text; no caller types it. closed writes
+# nothing when the ledger already holds a task.closed for the same task,
+# evidence, and pr, so a close that more than one path reaches is recorded once.
 # Every write holds state/.fleet-ledger.lock.
 #
 # Environment: FM_HOME, FM_STATE_OVERRIDE, and FM_CONFIG_OVERRIDE resolve the
@@ -78,7 +83,7 @@ LOCK="$STATE/.fleet-ledger.lock"
 TEXT_MAX_CHARS=2000
 
 usage() {
-  echo "usage: fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model> | pr_ready <task> <url> | merged <task> pr <url> | merged <task> local | cleaned_up <task> | filed <task> <repo> <kind> <priority> | closed <task> <evidence> <pr> <commit> | answered <task> send <key> | answered <task> hold <key> <source> | capture | appended <config> <state>/<task>.status" >&2
+  echo "usage: fm-fleet-ledger.sh dispatched <task> <kind> <project> <harness> <model> | pr_ready <task> <url> | merged <task> pr <url> | merged <task> local | cleaned_up <task> | filed <task> <repo> <kind> <priority> | closed <task> <evidence> <pr> | answered <task> send <key> | answered <task> hold <key> <source> | capture | appended <config> <state>/<task>.status" >&2
   exit 2
 }
 
@@ -96,7 +101,7 @@ case "$cmd" in
     ;;
   cleaned_up) { [ "$#" -eq 2 ] && task_ok "$2"; } || usage ;;
   filed) { [ "$#" -eq 5 ] && task_ok "$2"; } || usage ;;
-  closed) { [ "$#" -eq 5 ] && task_ok "$2" && [ -n "$3" ]; } || usage ;;
+  closed) { [ "$#" -eq 4 ] && task_ok "$2" && [ -n "$3" ]; } || usage ;;
   answered)
     task_ok "${2:-}" || usage
     case "$#:${3:-}" in 4:send) ;; 5:hold) ;; *) usage ;; esac
@@ -179,6 +184,15 @@ append() {
   printf '%s\n' "$line" 2>/dev/null >> "$LEDGER"
 }
 
+# Whether the ledger already holds this close; the caller holds the lock.
+closed_recorded() { # <task> <evidence> <pr>
+  [ -f "$LEDGER" ] || return 1
+  # shellcheck disable=SC2016 # $task, $evidence, and $pr here are jq variables.
+  jq -en --arg task "$1" --arg evidence "$2" --arg pr "$3" \
+    'any(inputs; .event == "task.closed" and .task == $task and .evidence == $evidence
+      and .pr == (if $pr == "" then null else $pr end))' "$LEDGER" >/dev/null 2>&1
+}
+
 # The status-line grammar belongs to bin/fm-status-decision-lib.sh; this only projects it.
 append_status() { # <task> <status-line>
   local task=$1 line=$2 verb key text
@@ -259,9 +273,9 @@ case "$cmd" in
       --arg repo "$3" --arg kind "$4" --arg priority "$5" || rc=1
     ;;
   closed)
-    LEDGER_AT=1 append task.closed "$2" \
-      '{evidence: $evidence, pr: ($pr | n), commit: ($commit | n)}' \
-      --arg evidence "$3" --arg pr "$4" --arg commit "$5" || rc=1
+    closed_recorded "$2" "$3" "$4" \
+      || LEDGER_AT=1 append task.closed "$2" '{evidence: $evidence, pr: ($pr | n)}' \
+        --arg evidence "$3" --arg pr "$4" || rc=1
     ;;
   answered)
     by=$(fm_answered_by "$FM_HOME" "$STATE" "$3" "${5:-}")

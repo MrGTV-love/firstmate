@@ -217,6 +217,7 @@ Replay classification, parent publication, and reconcile-request retirement shar
 A released-row snapshot invalidated by a concurrent hold is skipped without resolving that hold or retiring its reconcile request.
 
 `--source` is provenance text recorded in the durable decision, never a behavior switch, and the command carries no per-channel branch.
+It only labels the record's `Answered by:` line, from two exact prefixes that `bin/fm-answered-by-lib.sh` owns; the label changes nothing else.
 
 ### Source bindings
 

@@ -1639,9 +1639,6 @@ if [ "${FM_TEARDOWN_GUARD_DONE:-0}" != 1 ]; then
 fi
 HOME_PATH=$(grep '^home=' "$META" | cut -d= -f2- || true)
 PR_URL=$(grep '^pr=' "$META" | tail -1 | cut -d= -f2- || true)
-# The merge commit is recorded only when the task record carries one; the
-# task.closed ledger record reads it here because the record is gone by then.
-TEARDOWN_MERGE_COMMIT=$(grep '^merge_commit=' "$META" | tail -1 | cut -d= -f2- || true)
 # tasktmp is recorded by fm-spawn for tasks that set up a per-task temp root
 # (/tmp/fm-<id>/); absent for tasks spawned before that change, so tolerate empty.
 TASK_TMP=$(grep '^tasktmp=' "$META" | cut -d= -f2- || true)
@@ -6086,17 +6083,10 @@ fm_lock_release "$META_LOCK"
 META_LOCK_HELD=0
 # Opt-in fleet activity ledger (docs/fleet-ledger.md): the item is now Done, so
 # record when it closed and on what evidence. A retained (captain-held) item
-# returned to Queued, and a pending close the next session start replays, are
-# not completions here and write nothing. A failed write never changes teardown.
-if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = close ] && [ -e "$CONFIG/fleet-ledger" ]; then
-  case "${BACKLOG_DONE_ARGS[0]:-}:${BACKLOG_DONE_ARGS[1]:-}" in
-    --report:*) teardown_evidence=report ;;
-    --pr:*) teardown_evidence=merged_pr ;;
-    --note:dropped) teardown_evidence=drop_file ;;
-    --note:*) teardown_evidence=local_main ;;
-    *) teardown_evidence=none ;;
-  esac
-  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" closed "$ID" "$teardown_evidence" "$PR_URL" "$TEARDOWN_MERGE_COMMIT" || true
+# returned to Queued is not a completion and writes nothing. A close the next
+# session start replays is recorded there instead (bin/fm-backlog-transition-lib.sh).
+if [ "$BACKLOG_CLOSED" = 1 ] && [ "$BACKLOG_TRANSITION" = close ]; then
+  fm_backlog_ledger_closed "$STATE" "$CONFIG" "$ID" "${BACKLOG_DONE_ARGS[@]+"${BACKLOG_DONE_ARGS[@]}"}"
 fi
 rm -f "$STATE/$ID.teardown-return-pending"
 if [ "$KIND" != scout ] && [ "$KIND" != secondmate ] && [ "$MODE" != local-only ] \

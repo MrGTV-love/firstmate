@@ -2170,6 +2170,39 @@ test_recovery_backfills_a_recorded_link_on_an_already_done_item() {
   pass "recovery backfills recorded links onto already Done items"
 }
 
+# The opt-in fleet ledger (docs/fleet-ledger.md): a close that session start
+# replays is recorded once, whether the row was still open or already Done.
+test_recovery_records_a_replayed_close_in_the_fleet_ledger() {
+  local case_dir home id other marker out rows pr=https://github.com/example/repo/pull/14
+  id=atomic-heal-ledger-b9
+  other=atomic-heal-ledger-local-b9
+  case_dir=$(make_home heal-ledger)
+  home=$(home_of "$case_dir")
+  : > "$home/config/fleet-ledger"
+  add_item "$case_dir" "$id"
+  start_item "$case_dir" "$id"
+  add_item "$case_dir" "$other"
+  start_item "$case_dir" "$other"
+  marker="$home/state/$id.backlog-close"
+  printf 'id=%s\ndata=%s\nspawn_gen=spawn-heal-ledger\narg=--pr\narg=%s\n' "$id" "$home/data" "$pr" > "$marker"
+  printf 'id=%s\ndata=%s\nspawn_gen=spawn-heal-ledger-local\narg=--note\narg=local%%20main\n' \
+    "$other" "$home/data" > "$home/state/$other.backlog-close"
+
+  out=$(run_bootstrap "$case_dir")
+  [ "$(row_state "$case_dir" "$id")" = done ] || fail "session start left the recorded close open: $out"
+  rows=$(jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr, (.at | test("Z$"))]' "$home/state/fleet-ledger.jsonl")
+  assert_equals "$(printf '%s\n' "[\"$id\",\"merged_pr\",\"$pr\",true]" "[\"$other\",\"local_main\",null,true]")" \
+    "$(printf '%s\n' "$rows" | sort)" "task.closed records after a replayed close"
+
+  # The same close arriving again for the now Done row changes nothing in the ledger.
+  printf 'id=%s\ndata=%s\nspawn_gen=spawn-heal-ledger\narg=--pr\narg=%s\n' "$id" "$home/data" "$pr" > "$marker"
+  out=$(run_bootstrap "$case_dir")
+  assert_absent "$marker" "the repeated close marker survived session start: $out"
+  assert_equals 2 "$(jq -c 'select(.event == "task.closed")' "$home/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')" \
+    "task.closed records after the same close was replayed twice"
+  pass "ledger on: a close that session start replays records one task.closed, however often it arrives"
+}
+
 test_recovery_preserves_a_close_when_the_backlog_cannot_be_read() {
   local case_dir id out
   id=atomic-heal-read-error-b10
@@ -3464,6 +3497,7 @@ test_recovery_ignores_a_symlinked_worker_record
 test_recovery_replays_a_close_an_interrupted_cleanup_left_open
 test_recovery_replays_a_gerrit_close_with_its_change_url_as_a_note
 test_recovery_backfills_a_recorded_link_on_an_already_done_item
+test_recovery_records_a_replayed_close_in_the_fleet_ledger
 test_recovery_preserves_a_close_when_the_backlog_cannot_be_read
 test_recovery_retry_preserves_incomplete_cleanup_warning
 test_recovery_finishes_a_close_for_the_same_meta_incarnation

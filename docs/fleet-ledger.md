@@ -35,9 +35,9 @@ Readers must ignore members and events they do not recognize, so later versions 
 | `task.pr_ready`    | `pr`                                           | Firstmate records the task's PR as ready for review. |
 | `task.merged`      | `via` (`"pr"` or `"local"`), plus `pr` when `via` is `"pr"` | The task's PR merge is recorded, or its local-only branch landed. |
 | `task.cleaned_up`  | none                                           | The task's worker and local copy were removed. |
-| `task.filed`       | `at`, `repo`, `kind`, `priority`               | `bin/fm-tasks-axi.sh add` created a backlog item. |
-| `task.closed`      | `at`, `evidence`, `pr`, `commit`               | `bin/fm-teardown.sh` completed a task and its backlog item moved to Done. |
-| `task.answered`    | `at`, `via`, `key`, `answered_by`              | A decision was answered: `fm-send.sh --resolve-key` closed it, or `fm-captain-hold.sh` recorded an answer. |
+| `task.filed`       | `at`, `repo`, `kind`, `priority`               | `bin/fm-tasks-axi.sh add` or `bin/fm-captain-hold.sh hold` created a backlog item. |
+| `task.closed`      | `at`, `evidence`, `pr`                         | A task's backlog item moved to Done on proof of its deliverable, through `bin/fm-teardown.sh`, the next session start's replay of a close teardown recorded, or `bin/fm-tasks-axi.sh done`. |
+| `task.answered`    | `at`, `via`, `key`, `answered_by`              | A decision was resolved: `fm-send.sh --resolve-key` closed it, or `fm-captain-hold.sh` recorded an answer or a reconciliation. |
 
 `task.dispatched` members: `kind` is `ship`, `scout`, or `secondmate`; `project` is the project directory name, or `null` for a remote second mate; `harness` names the agent tool; `model` is the requested model, or `null` for the tool's default.
 
@@ -53,19 +53,20 @@ Each also carries `at`, the same instant as `ts` in ISO 8601 UTC, such as `2026-
 An absent value is `null`.
 
 `task.filed` members: `task` is the item id, including an id that `--mint` created; `repo`, `kind`, and `priority` are the values `tasks-axi` stored for the item (`priority` is a number), or `null` when the item has none.
+A captain-hold item that `fm-captain-hold.sh hold` creates is recorded with `kind` `captain` and no `priority`.
 An `add` of an id that already exists changes nothing, so `tasks-axi` reports it as already present and no record is written.
 
 `task.closed` members: `evidence` is what the close used, one of `merged_pr` (the recorded PR), `local_main` (a local-only landing), `report` (a scout's report), `drop_file` (the captain's recorded drop), or `none`.
-`pr` is the task's recorded PR URL, and `commit` is the task record's `merge_commit` value; each is `null` when the task record has none.
-No script writes `merge_commit` to the task record today, so `commit` is `null` until one does.
-The record is written once, after the backlog item is Done.
-A refused teardown, a repeated teardown, a captain-held item that returns to Queued, and a pending close that the next session start replays write none.
+`pr` is the merged PR URL when `evidence` is `merged_pr`, and `null` otherwise.
+The record is written once, after the backlog item is Done: a close is written once for each task, evidence, and `pr`, however many of the three paths reach it.
+A refused teardown, a captain-held item that returns to Queued, and a `fm-tasks-axi.sh done` of an item that was already Done write none.
 
 `task.answered` members: `via` is `send` when `fm-send.sh --resolve-key` closed a status-log decision, or `hold` when `fm-captain-hold.sh` recorded an answer for a captain-held task; `key` is the decision key (for `hold`, the task id).
 `answered_by` is derived by the script and never typed.
-For `send`, and for a `hold` whose recorded source is a firstmate send, it is the role of the home that sent it: `main`, `main-afk` while the away posture record exists, or `secondmate`.
-For any other `hold`, it is read from the recorded source text: `page` for a review page, board, or card, `chat` for the chat, and `policy` for a standing policy or rule.
-Anything else, including a missing source or an unreadable home identity, is the literal `unknown`.
+For `send`, it is the role of the home that sent it: `main`, `main-afk` while an away record exists (`bin/fm-afk-contract.sh`), or `secondmate`.
+A `hold` answered directly with `fm-captain-hold.sh answer --decision-file` takes the role of the home that ran the command, and so does one whose recorded source starts `a firstmate answer sent to `.
+A `hold` whose recorded source starts `the captured result ` is `page`.
+Anything else, including any other recorded source, a hold closed by `fm-captain-hold.sh reconcile close` (evidence closed it, so nobody answered), and an unreadable home identity, is the literal `unknown`.
 A replay of an answer that was already recorded writes none.
 `bin/fm-captain-hold.sh` also writes the time and the answerer into the hold's "Resolution recorded" block as `Resolved at: <ISO 8601 UTC>` and `Answered by: <value>` lines, directly after the `Resolution mode:` line and any `Resolves hold set:` line, whether or not the ledger is on.
 A replayed answer keeps the first block, so it keeps the first time; a reconciliation block carries the time but no `Answered by:` line, because evidence is not an answer.
@@ -73,15 +74,15 @@ A replayed answer keeps the first block, so it keeps the first time; a reconcili
 Example:
 
 ```json
-{"v":1,"ts":1790120000,"at":"2026-09-23T23:33:20Z","event":"task.filed","task":"fix-login","repo":"webapp","kind":"ship","priority":2}
+{"v":1,"ts":1790120000,"at":"2026-09-22T23:33:20Z","event":"task.filed","task":"fix-login","repo":"webapp","kind":"ship","priority":2}
 {"v":1,"ts":1790132857,"event":"task.dispatched","task":"fix-login","kind":"ship","project":"webapp","harness":"claude","model":null}
 {"v":1,"ts":1790132870,"event":"task.status","task":"fix-login","state":"working","key":null,"text":" bug reproduced"}
 {"v":1,"ts":1790133400,"event":"task.status","task":"fix-login","state":"done","key":null,"text":" PR https://github.com/acme/webapp/pull/7 checks green"}
 {"v":1,"ts":1790133410,"event":"task.pr_ready","task":"fix-login","pr":"https://github.com/acme/webapp/pull/7"}
-{"v":1,"ts":1790133700,"at":"2026-09-24T03:08:20Z","event":"task.answered","task":"fix-login","via":"send","key":"api-shape","answered_by":"main"}
+{"v":1,"ts":1790133700,"at":"2026-09-23T03:21:40Z","event":"task.answered","task":"fix-login","via":"send","key":"api-shape","answered_by":"main"}
 {"v":1,"ts":1790133900,"event":"task.merged","task":"fix-login","via":"pr","pr":"https://github.com/acme/webapp/pull/7"}
 {"v":1,"ts":1790133960,"event":"task.cleaned_up","task":"fix-login"}
-{"v":1,"ts":1790133961,"at":"2026-09-24T03:19:21Z","event":"task.closed","task":"fix-login","evidence":"merged_pr","pr":"https://github.com/acme/webapp/pull/7","commit":null}
+{"v":1,"ts":1790133961,"at":"2026-09-23T03:26:01Z","event":"task.closed","task":"fix-login","evidence":"merged_pr","pr":"https://github.com/acme/webapp/pull/7"}
 ```
 
 ## Limits

@@ -1106,28 +1106,28 @@ test_teardown_closes_the_backlog_item_itself() {
 # appends one task.closed record naming the evidence the close used.
 ledger_closed_rows() {  # <case-dir>
   [ -f "$1/state/fleet-ledger.jsonl" ] || return 0
-  jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr, .commit, (.at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))]' \
+  jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr, (.at | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))]' \
     "$1/state/fleet-ledger.jsonl"
 }
 
 test_teardown_records_task_closed_once() {
-  local case_dir rc=0 commit=0123456789abcdef0123456789abcdef01234567
+  local case_dir rc=0
   case_dir=$(make_case ledger-closed)
   write_meta "$case_dir" no-mistakes ship
-  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' "merge_commit=$commit" >> "$case_dir/state/task-x1.meta"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
   : > "$case_dir/config/fleet-ledger"
 
   run_teardown "$case_dir" > "$case_dir/stdout" 2> "$case_dir/stderr" || fail "teardown failed with the ledger on: $(cat "$case_dir/stderr")"
   [ "$(backlog_row_state "$case_dir")" = done ] || fail "the backlog item was not closed"
-  assert_equals "[\"task-x1\",\"merged_pr\",\"https://github.com/example/repo/pull/7\",\"$commit\",true]" \
+  assert_equals '["task-x1","merged_pr","https://github.com/example/repo/pull/7",true]' \
     "$(ledger_closed_rows "$case_dir")" "task.closed record"
 
   # A second teardown finds no task record and closes nothing.
   run_teardown "$case_dir" > /dev/null 2>&1 || rc=$?
   [ "$rc" -ne 0 ] || fail "a repeated teardown unexpectedly succeeded"
   assert_equals 1 "$(ledger_closed_rows "$case_dir" | wc -l | tr -d ' ')" "task.closed records after a repeated teardown"
-  pass "ledger on: a completed teardown records one task.closed with the PR and merge commit, and a repeat records none"
+  pass "ledger on: a completed teardown records one task.closed with the PR, and a repeat records none"
 }
 
 test_teardown_closed_record_names_each_evidence_kind() {
@@ -1140,7 +1140,7 @@ test_teardown_closed_record_names_each_evidence_kind() {
   seed_backlog_in_flight "$case_dir"
   : > "$case_dir/config/fleet-ledger"
   run_teardown "$case_dir" > /dev/null 2> "$case_dir/stderr" || fail "local-only teardown failed: $(cat "$case_dir/stderr")"
-  assert_equals '["task-x1","local_main",null,null,true]' "$(ledger_closed_rows "$case_dir")" "local-only task.closed record"
+  assert_equals '["task-x1","local_main",null,true]' "$(ledger_closed_rows "$case_dir")" "local-only task.closed record"
 
   # A captain's drop is recorded as the drop file.
   case_dir=$(make_case ledger-closed-drop)
@@ -1151,7 +1151,7 @@ test_teardown_closed_record_names_each_evidence_kind() {
   printf 'Drop it, the plan changed.\n' > "$case_dir/drop.txt"
   run_teardown "$case_dir" --force --drop-file "$case_dir/drop.txt" > /dev/null 2> "$case_dir/stderr" \
     || fail "forced drop teardown failed: $(cat "$case_dir/stderr")"
-  assert_equals '["task-x1","drop_file",null,null,true]' "$(ledger_closed_rows "$case_dir")" "dropped task.closed record"
+  assert_equals '["task-x1","drop_file",null,true]' "$(ledger_closed_rows "$case_dir")" "dropped task.closed record"
   pass "ledger on: the closed record names local main and a captain's drop as its evidence"
 }
 

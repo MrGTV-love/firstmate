@@ -101,7 +101,9 @@
 # publication and pending reconcile-request retirement. The command exits nonzero when any key was
 # skipped. `--source` is provenance text recorded in the
 # durable decision, never a behavior switch: this command has no per-channel
-# branch and no knowledge of chat, review decks, or any transport.
+# branch and no knowledge of chat, review decks, or any transport. It only
+# labels the record's `Answered by:` line, from two exact prefixes that
+# bin/fm-answered-by-lib.sh owns; the label changes nothing else.
 # Legacy input: an optional positional origin (or a stored concrete-origin
 # binding) makes a key that names no task fall back to the old
 # `<origin>-decision-<key>` identity, so an in-flight pre-collapse channel
@@ -681,13 +683,23 @@ decision_source() {
 }
 
 # Opt-in fleet activity ledger (docs/fleet-ledger.md): one task.answered record
-# for a newly recorded answer. A replay never reaches here, and a failed write
-# never changes the answer.
-ledger_hold_answered() {  # <task-id>
+# for a newly resolved hold. <source> defaults to the decision file's own; a
+# reconciliation passes `reconciled`, because evidence and not a person closed
+# it. A replay never reaches here, and a failed write never changes the result.
+ledger_hold_answered() {  # <task-id> [<source>]
   local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
   [ -e "$config/fleet-ledger" ] || return 0
   FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$config \
-    "$SCRIPT_DIR/fm-fleet-ledger.sh" answered "$1" hold "$1" "$(decision_source)" || true
+    "$SCRIPT_DIR/fm-fleet-ledger.sh" answered "$1" hold "$1" "${2-$(decision_source)}" || true
+}
+
+# The same ledger's task.filed record for a captain-hold item this command just
+# created; tasks-axi stores no priority for it.
+ledger_hold_filed() {  # <task-id> <repo>
+  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  [ -e "$config/fleet-ledger" ] || return 0
+  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$config \
+    "$SCRIPT_DIR/fm-fleet-ledger.sh" filed "$1" "$2" captain '' || true
 }
 
 # The record's label is what keeps an evidence-backed reconciliation from
@@ -1439,6 +1451,7 @@ command_hold() {
       BD_DUE_REQUIRED=false tasks_axi add "$id" "$title" --kind captain --repo "$repo" >/dev/null \
         || fail "could not create task $id"
     fi
+    ledger_hold_filed "$id" "$repo"
   fi
   # Publish the timestamp before the captain-hold annotation. A concurrent
   # snapshot may see the harmless stamp by itself, but can never see a newly
@@ -2247,6 +2260,7 @@ reconcile_close() {
   task_show_or_fail "$id" "task $id disappeared after closing"
   body_has_resolution_record "$(show_field "$show" body)" \
     || fail "captain-held task $id did not retain its durable resolution record"
+  ledger_hold_answered "$id" reconciled
   publish_parent_hold "$id" "$occurrence" resolved reconciled
   [ "$PARENT_HOLD_PUBLISHED" = 1 ] \
     || fail "could not publish the reconciled captain-held task $id to its parent"
