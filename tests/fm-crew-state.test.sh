@@ -787,11 +787,11 @@ steps[9]{step,status,findings,duration_ms}:
 EOF
 }
 
-# The 2026-10-18 vernant-d3-analytics-b8-pr2-writer shape, as the real CLI prints
-# it: the daemon restarted under the merge poll and marked the run
-# ci_monitor_interrupted (outcome ci-monitor-interrupted), every substantive step
-# completed, the interrupted ci monitor is recorded as a skipped step, and the
-# PR remains open. <lint-status> and <pr> vary the negative cases.
+# The 2026-10-18 vernant-d3-analytics-b8-pr2-writer shape: the daemon restarted
+# under the merge poll and marked the run ci_monitor_interrupted (outcome
+# ci-monitor-interrupted), all fourteen steps are on the table, every one
+# completed except the interrupted ci monitor, which is recorded skipped, and the
+# PR is recorded. <lint-status> and <pr> vary the negative cases.
 run_ci_monitor_interrupted() {  # <branch> [lint-status] [pr-url]
   local lint=${2:-completed} pr=${3-https://github.com/o/r/pull/3434}
   cat <<EOF
@@ -802,20 +802,30 @@ run:
   head: "${FM_FAKE_RUN_HEAD:-abc1234}"
   pr: "$pr"
   findings: none
-  steps[11]{step,status,findings,duration_ms}:
-    intent,completed,0,68
-    rebase,completed,0,2370
-    review,completed,0,4744600
-    gate.review.retain-review,completed,0,1215
-    test,completed,1,939610
-    document,completed,0,199555
-    lint,$lint,0,1126
-    push,completed,0,58450
-    pr,completed,0,84273
-    ci,skipped,0,0
+steps[14]{step,status,findings,duration_ms}:
+  intent,completed,0,68
+  rebase,completed,0,2370
+  gate.rebase.push-checks-start,completed,0,1190
+  review,completed,0,4744600
+  gate.review.push-checks-review,completed,0,1201
+  gate.review.retain-review,completed,0,1215
+  test,completed,1,939610
+  gate.test.push-checks-test,completed,0,1177
+  document,completed,0,199555
+  gate.document.retain-document,completed,0,1208
+  lint,$lint,0,1126
+  push,completed,0,58450
+  pr,completed,0,84273
+  ci,skipped,0,0
 outcome: ci-monitor-interrupted
 error: ci monitor interrupted by daemon restart; PR remains open
 EOF
+}
+
+# The same run with no outcome or error line: only the top-level status word
+# says it ended, which is what the reader got in the 2026-10-18 incident.
+run_ci_monitor_interrupted_status_only() {  # <branch> [lint-status] [pr-url]
+  run_ci_monitor_interrupted "$@" | sed '/^outcome:/d;/^error:/d'
 }
 
 run_ci_monitoring() {  # <branch>
@@ -2108,85 +2118,145 @@ daemon shutting down"
   pass "a second failed step disqualifies the orphaned-monitor reclassification"
 }
 
-# The interrupted monitor is a finished run, not an unknown live state, when
-# every step completed and the run records its PR - on the bare status surface...
-test_ci_monitor_interrupted_with_all_steps_completed_reads_done() {
-  reset_fakes
-  local d; d=$(new_case ci-interrupted-done)
+# One ci_monitor_interrupted run read through each route that can reach it:
+# outcome (the bare `axi status` with an outcome line), status-only (the bare
+# `axi status` with no outcome line, the 2026-10-18 incident shape) and
+# inventory (the run is picked from the runs table and re-read by id). Prints
+# the crew-state line; the forge fakes are set by the caller.
+read_ci_monitor_interrupted() {  # <route> <case-name> <lint-status> <pr-url> [step-edit-from step-edit-to]
+  local route=$1 name=$2 lint=$3 pr=$4 d short status
+  d=$(new_case "ci-interrupted-$name-$route")
   make_repo_on_branch "$d/wt" fm/feat-cimi
   make_fakebin "$d" >/dev/null
   fm_write_meta "$d/state/feat-cimi.meta" "window=fm:fm-feat-cimi" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi)"
-  local out; out=$(run_crew_state "$d" feat-cimi)
-  assert_contains "$out" "state: done" "interrupted ci monitor after every step completed reads done"
-  assert_contains "$out" "source: run-step" "the attributed run is the source"
-  assert_contains "$out" "ci monitor interrupted after all steps completed" "the line says why in plain words"
-  assert_contains "$out" "https://github.com/o/r/pull/3434" "the recorded PR is surfaced"
-  assert_not_contains "$out" "state: unknown" "a finished run must not read unknown"
-  pass "ci_monitor_interrupted with every step completed and a PR reads done"
-}
-
-# ...and through the run inventory the real CLI prints, whose status column
-# carries the same word and whose selected run is re-read by id.
-test_ci_monitor_interrupted_through_the_run_inventory_reads_done() {
-  reset_fakes
-  local d short out; d=$(new_case ci-interrupted-inventory)
-  make_repo_on_branch "$d/wt" fm/feat-cimi2
-  make_fakebin "$d" >/dev/null
-  fm_write_meta "$d/state/feat-cimi2.meta" "window=fm:fm-feat-cimi2" "worktree=$d/wt" "kind=ship"
-  short=$(git -C "$d/wt" rev-parse --short=8 HEAD)
-  FM_FAKE_AXI_HOME="count: 1 of 1 total
+  case "$route" in
+    status-only) status=$(run_ci_monitor_interrupted_status_only fm/feat-cimi "$lint" "$pr") ;;
+    *) status=$(run_ci_monitor_interrupted fm/feat-cimi "$lint" "$pr") ;;
+  esac
+  [ -z "${5:-}" ] || status=${status/"$5"/"$6"}
+  FM_FAKE_AXI_STATUS=$status
+  if [ "$route" = inventory ]; then
+    short=$(git -C "$d/wt" rev-parse --short=8 HEAD)
+    FM_FAKE_AXI_HOME="count: 1 of 1 total
 runs[1]{id,branch,status,head,pr}:
-  \"01RUN\",fm/feat-cimi2,ci_monitor_interrupted,$short,\"https://github.com/o/r/pull/3434\""
-  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi2)"
-  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
-  out=$(run_crew_state "$d" feat-cimi2)
-  assert_contains "$out" "state: done" "the selected interrupted run reads done"
-  assert_contains "$out" "source: run-step" "the selected run is the source"
-  assert_contains "$out" "run: 01RUN" "the selected run id is named"
-  assert_not_contains "$out" "state: unknown" "the inventory status word is recognized"
-  pass "ci_monitor_interrupted through the run inventory reads done"
+  \"01RUN\",fm/feat-cimi,ci_monitor_interrupted,$short,\"$pr\""
+    FM_FAKE_AXI_STATUS_RUN=$status
+  fi
+  run_crew_state "$d" feat-cimi
 }
 
-# Negative: a step that is not completed (or explicitly skipped) never reads
-# finished, and the line is exactly what it was before the status was mapped.
+# The pre-change reading of an interrupted run that is not finished: the
+# inventory route had no recognized status, the outcome arm kept the outcome
+# word, and the status-only arm now agrees with them instead of reading working.
+ci_monitor_interrupted_unfinished_line() {  # <route>
+  case "$1" in
+    outcome) printf 'state: unknown · source: run-step · outcome: ci-monitor-interrupted' ;;
+    status-only) printf 'state: unknown · source: run-step · status: ci_monitor_interrupted' ;;
+    inventory) printf 'state: unknown · source: run-step · unrecognized run status; run ids: 01RUN; last reported run id: 01RUN' ;;
+  esac
+}
+
+# The interrupted monitor is a finished run, not an unknown live state, when
+# every step completed (the monitor itself skipped), the run records its PR and
+# the forge shows that PR open or merged - on every route, naming what the forge
+# said.
+test_ci_monitor_interrupted_with_all_steps_completed_reads_done() {
+  local route disposition failures=0
+  for route in outcome status-only inventory; do
+    for disposition in merged open; do
+      (
+        reset_fakes
+        local out
+        if [ "$disposition" = open ]; then
+          FM_FAKE_PR_STATE=OPEN
+          FM_FAKE_PR_MERGED=false
+        fi
+        out=$(read_ci_monitor_interrupted "$route" "finished-$disposition" completed https://github.com/o/r/pull/3434)
+        assert_contains "$out" "state: done" "$route/$disposition: a finished interrupted run reads done: $out"
+        assert_contains "$out" "source: run-step" "$route/$disposition: the attributed run is the source"
+        assert_contains "$out" "ci monitor interrupted after all steps completed: PR $disposition" "$route/$disposition: the line states the observed disposition"
+        assert_contains "$out" "https://github.com/o/r/pull/3434" "$route/$disposition: the recorded PR is surfaced"
+        assert_not_contains "$out" "state: unknown" "$route/$disposition: a finished run must not read unknown"
+        if [ "$route" = inventory ]; then
+          assert_contains "$out" "run: 01RUN" "$route/$disposition: the selected run id is named"
+        fi
+        pass "$route/$disposition: ci_monitor_interrupted with every step completed reads done"
+      ) || failures=$((failures + 1))
+    done
+  done
+  [ "$failures" -eq 0 ] || fail "$failures finished interrupted-run regressions"
+}
+
+# Negative: the PR must be seen open or merged. A closed PR, an unreadable PR,
+# a PR with no readable identity and a skipped forge read each keep the
+# pre-change line on every route.
+test_ci_monitor_interrupted_without_a_live_pr_stays_unknown() {
+  local route disposition failures=0
+  for route in outcome status-only inventory; do
+    for disposition in closed unreadable no-identity skipped; do
+      (
+        reset_fakes
+        local out pr=https://github.com/o/r/pull/3434
+        case "$disposition" in
+          closed) FM_FAKE_PR_STATE=CLOSED; FM_FAKE_PR_MERGED=false ;;
+          unreadable) FM_FAKE_PR_READ_FAIL=1 ;;
+          no-identity) pr=not-a-pull-request-url ;;
+        esac
+        if [ "$disposition" = skipped ]; then
+          out=$(FM_CREW_STATE_NO_FORGE=1 read_ci_monitor_interrupted "$route" "pr-$disposition" completed "$pr")
+        else
+          out=$(read_ci_monitor_interrupted "$route" "pr-$disposition" completed "$pr")
+        fi
+        assert_equals "$(ci_monitor_interrupted_unfinished_line "$route")" "$out" \
+          "$route/$disposition: a PR the forge does not show open or merged keeps the pre-change line"
+        pass "$route/$disposition: ci_monitor_interrupted with no live PR does not read done"
+      ) || failures=$((failures + 1))
+    done
+  done
+  [ "$failures" -eq 0 ] || fail "$failures interrupted-run PR disposition regressions"
+}
+
+# Negative: a step that is not completed never reads finished, and the only
+# step allowed to be skipped is the interrupted ci monitor itself: a skipped
+# intent or rebase (or any other skipped step) is not the daemon-restart shape.
 test_ci_monitor_interrupted_with_an_unfinished_step_stays_unknown() {
-  reset_fakes
-  local d short out; d=$(new_case ci-interrupted-unfinished)
-  make_repo_on_branch "$d/wt" fm/feat-cimi3
-  make_fakebin "$d" >/dev/null
-  fm_write_meta "$d/state/feat-cimi3.meta" "window=fm:fm-feat-cimi3" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi3 pending)"
-  out=$(run_crew_state "$d" feat-cimi3)
-  assert_equals "state: unknown · source: run-step · outcome: ci-monitor-interrupted" "$out" \
-    "bare surface: an unfinished lint step keeps the pre-change line"
-  short=$(git -C "$d/wt" rev-parse --short=8 HEAD)
-  FM_FAKE_AXI_HOME="count: 1 of 1 total
-runs[1]{id,branch,status,head,pr}:
-  \"01RUN\",fm/feat-cimi3,ci_monitor_interrupted,$short,\"https://github.com/o/r/pull/3434\""
-  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
-  out=$(run_crew_state "$d" feat-cimi3)
-  assert_equals "state: unknown · source: run-step · unrecognized run status; run ids: 01RUN; last reported run id: 01RUN" "$out" \
-    "inventory surface: an unfinished lint step keeps the pre-change line"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi3 failed)"
-  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
-  out=$(run_crew_state "$d" feat-cimi3)
-  assert_not_contains "$out" "state: done" "a failed step never reads finished"
-  pass "ci_monitor_interrupted with an unfinished step does not read done"
+  local route variant failures=0
+  for route in outcome status-only inventory; do
+    for variant in lint-pending lint-failed lint-skipped intent-skipped rebase-skipped; do
+      (
+        reset_fakes
+        local out lint=completed from='' to=''
+        case "$variant" in
+          lint-pending) lint=pending ;;
+          lint-failed) lint=failed ;;
+          lint-skipped) lint=skipped ;;
+          intent-skipped) from='intent,completed' to='intent,skipped' ;;
+          rebase-skipped) from='rebase,completed' to='rebase,skipped' ;;
+        esac
+        out=$(read_ci_monitor_interrupted "$route" "step-$variant" "$lint" https://github.com/o/r/pull/3434 "$from" "$to")
+        assert_equals "$(ci_monitor_interrupted_unfinished_line "$route")" "$out" \
+          "$route/$variant: an unfinished or wrongly skipped step keeps the pre-change line"
+        pass "$route/$variant: ci_monitor_interrupted with a non-completed step does not read done"
+      ) || failures=$((failures + 1))
+    done
+  done
+  [ "$failures" -eq 0 ] || fail "$failures interrupted-run step regressions"
 }
 
 # Negative: no recorded PR means nothing was ready or landed.
 test_ci_monitor_interrupted_without_a_recorded_pr_stays_unknown() {
-  reset_fakes
-  local d out; d=$(new_case ci-interrupted-no-pr)
-  make_repo_on_branch "$d/wt" fm/feat-cimi4
-  make_fakebin "$d" >/dev/null
-  fm_write_meta "$d/state/feat-cimi4.meta" "window=fm:fm-feat-cimi4" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi4 completed "")"
-  out=$(run_crew_state "$d" feat-cimi4)
-  assert_equals "state: unknown · source: run-step · outcome: ci-monitor-interrupted" "$out" \
-    "a run with no recorded PR keeps the pre-change line"
-  pass "ci_monitor_interrupted with no recorded PR does not read done"
+  local route failures=0
+  for route in outcome status-only inventory; do
+    (
+      reset_fakes
+      local out
+      out=$(read_ci_monitor_interrupted "$route" no-pr completed "")
+      assert_equals "$(ci_monitor_interrupted_unfinished_line "$route")" "$out" \
+        "$route: a run with no recorded PR keeps the pre-change line"
+      pass "$route: ci_monitor_interrupted with no recorded PR does not read done"
+    ) || failures=$((failures + 1))
+  done
+  [ "$failures" -eq 0 ] || fail "$failures interrupted-run no-PR regressions"
 }
 
 # Precedence: the attributed run outranks the worker's own declarations, however
@@ -2197,7 +2267,7 @@ test_ci_monitor_interrupted_outranks_a_stale_worker_declaration() {
   make_repo_on_branch "$d/wt" fm/feat-cimi5
   make_fakebin "$d" >/dev/null
   fm_write_meta "$d/state/feat-cimi5.meta" "window=fm:fm-feat-cimi5" "worktree=$d/wt" "kind=ship"
-  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi5)"
+  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted_status_only fm/feat-cimi5)"
   printf 'blocked [at=1]: waiting on review answer\n' > "$d/state/feat-cimi5.status"
   out=$(run_crew_state "$d" feat-cimi5)
   assert_contains "$out" "state: done" "a stale blocked declaration does not hide the finished run"
@@ -5947,7 +6017,7 @@ test_terminal_failed_ci_orphan_status_only_reads_done
 test_terminal_failed_ci_genuine_red_stays_failed
 test_terminal_failed_ci_orphan_second_failed_step_stays_failed
 test_ci_monitor_interrupted_with_all_steps_completed_reads_done
-test_ci_monitor_interrupted_through_the_run_inventory_reads_done
+test_ci_monitor_interrupted_without_a_live_pr_stays_unknown
 test_ci_monitor_interrupted_with_an_unfinished_step_stays_unknown
 test_ci_monitor_interrupted_without_a_recorded_pr_stays_unknown
 test_ci_monitor_interrupted_outranks_a_stale_worker_declaration

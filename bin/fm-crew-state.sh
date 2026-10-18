@@ -144,14 +144,19 @@
 #      convert the absence of that decision into a failure verdict
 #      (nm_reclassify_failed_run_as_held_green). A run whose daemon marked it
 #      ci_monitor_interrupted (outcome ci-monitor-interrupted; the shared daemon
-#      restarted under the merge poll and the PR remains open or landed) reads
-#      done, naming the PR, only when its steps[] table has every step completed
-#      (an explicit skip of intent, rebase or the interrupted ci monitor is
-#      allowed), the pr step completed, and the run records a PR
-#      (nm_interrupted_run_is_finished); it takes precedence over the worker's
-#      own declarations like every attributed run. Any other step state, or no
-#      recorded PR, keeps the reading it had before the status was mapped
-#      (unknown). In the
+#      restarted under the merge poll) reads done only when its steps[] table
+#      has every step completed (only the interrupted ci monitor may be
+#      recorded skipped), the pr step completed, the run records a PR, and the
+#      bounded forge read confirms that PR is open or merged; the detail names
+#      the observed disposition and the PR (nm_interrupted_run_is_finished). It
+#      takes precedence over the worker's own declarations like every
+#      attributed run. Any other step state, no recorded PR, or a closed,
+#      missing, unreadable, or skipped forge read keeps each route's reading
+#      from before the status was mapped: the id-addressed route reads unknown
+#      (unrecognized run status), the outcome arm reads unknown (outcome:
+#      ci-monitor-interrupted), and the status-only arm, which read working,
+#      now reads unknown (status: ci_monitor_interrupted) like the other two,
+#      because the run is terminal and a terminal run is never working. In the
 #      coarse runs-ledger fallback (no steps table, no ci log), a terminal
 #      FAILED record whose daemon an explicit probe proves down reads unknown,
 #      never failed: an instrument failure must not read as work failure
@@ -888,15 +893,21 @@ nm_reclassify_failed_run_as_held_green() {
   return 0
 }
 
-# 0 when a run the daemon marked ci_monitor_interrupted finished every substantive
-# step and recorded its pull request: the steps[] table has every step completed
-# (an explicit skip of intent, rebase or the ci monitor itself is allowed - the
-# interrupted monitor is always recorded as a skipped ci step), the pr step
-# completed, and the run names a PR. Any other non-completed step, a missing
-# steps table, or no recorded PR leaves the original classification. This is the
-# daemon-restart shape (2026-10-18 vernant-d3-analytics-b8-pr2-writer): the work
-# was ready or already landed when the monitor stopped, so the run is finished,
-# not an unknown live state.
+# 0 when a run the daemon marked ci_monitor_interrupted finished every step and
+# its pull request is still live: the steps[] table has every step completed
+# except the ci monitor itself, which the daemon records as skipped when it
+# interrupts it (stored runs 01M55RW68N1QX2Q95N3FCWBBZJ, 01M55W15802GQYR8GJEXYEV49M
+# and 01M56X7RST95SNK8VGQF5KH73D: all fourteen steps, only ci skipped), the pr
+# step completed, the run names a PR, and the bounded forge read (passed_pr_detail,
+# as in nm_reclassify_failed_run_as_held_green) shows that PR open or merged. Any
+# other step state, a missing steps table, no recorded PR, or a closed, missing,
+# unreadable, or skipped forge read leaves the original classification. This is
+# the daemon-restart shape (2026-10-18 vernant-d3-analytics-b8-pr2-writer): the
+# work was ready or already landed when the monitor stopped, so the run is
+# finished, not an unknown live state. The forge read is kept in
+# NM_INTERRUPTED_PR so the id-addressed gate and the outcome or status arm that
+# follows it share one read.
+NM_INTERRUPTED_PR=""
 nm_interrupted_run_is_finished() {
   local rows row rest step status saw_pr_completed=0
   rows=$(nm_steps_rows)
@@ -909,26 +920,26 @@ nm_interrupted_run_is_finished() {
     status=$(strip_quotes "$(trim "${rest%%,*}")")
     case "$status" in
       completed) [ "$step" != pr ] || saw_pr_completed=1 ;;
-      skipped)
-        case "$step" in intent|rebase|ci) ;; *) return 1 ;; esac
-        ;;
+      skipped) [ "$step" = ci ] || return 1 ;;
       *) return 1 ;;
     esac
   done <<EOF
 $rows
 EOF
-  [ "$saw_pr_completed" = 1 ]
+  [ "$saw_pr_completed" = 1 ] || return 1
+  [ -n "$NM_INTERRUPTED_PR" ] || NM_INTERRUPTED_PR=$(passed_pr_detail)
+  case "$NM_INTERRUPTED_PR" in
+    "run passed: PR open"|"run passed: PR merged") ;;
+    *) return 1 ;;
+  esac
 }
 
 # Apply the finished reading for a ci_monitor_interrupted run. The state line
-# says so in plain words and carries the recorded PR URL.
+# says so in plain words and carries the observed PR disposition and URL.
 nm_reclassify_interrupted_run_as_finished() {
   nm_interrupted_run_is_finished || return 1
-  local pr_url
   RUN_STATE="done"
-  RUN_DETAIL="ci monitor interrupted after all steps completed: PR ready or landed"
-  pr_url=$(strip_quotes "$(nm_field pr)")
-  [ -z "$pr_url" ] || RUN_DETAIL="$RUN_DETAIL: $pr_url"
+  RUN_DETAIL="ci monitor interrupted after all steps completed: PR ${NM_INTERRUPTED_PR#run passed: PR }: $(strip_quotes "$(nm_field pr)")"
   return 0
 }
 
@@ -1336,9 +1347,9 @@ if [ "$HAVE_RUN" = 1 ]; then
           fi ;;
         ci_monitor_interrupted)
           if nm_reclassify_interrupted_run_as_finished; then :; else
-            RUN_STATE=working; RUN_DETAIL="run active ($status)"
+            RUN_STATE=unknown; RUN_DETAIL="status: $status"
           fi ;;
-        "")             RUN_STATE=working; RUN_DETAIL="run active" ;;
+        "")           RUN_STATE=working; RUN_DETAIL="run active" ;;
         *)              RUN_STATE=working; RUN_DETAIL="run active ($status)" ;;
       esac
       if [ "$RUN_STATE" = working ]; then
