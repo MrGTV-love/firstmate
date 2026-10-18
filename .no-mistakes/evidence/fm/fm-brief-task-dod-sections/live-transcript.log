@@ -1,0 +1,93 @@
+
+======== S1: ship brief ends with task DoD + How You're Graded (headings, then secondmate charter has none) ========
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s1-ship/brief.md (ship, mode=direct-PR; replace {TASK} and {FIRSTMATE_SPEC})
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s1-scout/brief.md (scout; replace {TASK} and {FIRSTMATE_SPEC})
+/Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s1-ship/brief.md:122:# Definition of done
+/Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s1-ship/brief.md:135:## Definition Of Done (task)
+/Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s1-ship/brief.md:155:## How You're Graded
+/Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s1-scout/brief.md:109:# Definition of done
+/Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s1-scout/brief.md:117:## Definition Of Done (task)
+/Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s1-scout/brief.md:137:## How You're Graded
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s1-second/brief.md (secondmate charter; replace {TASK})
+secondmate charter matches for task DoD sections: 0
+
+======== S2: fresh spawn of an UNFILLED scaffold is refused, names section + placeholder, creates no metadata ========
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+error: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s2/brief.md has an unfinished task Definition of Done (## Definition Of Done (task) still holds {DOD_CAPABILITY}); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+[exit=1]
+meta exists: no
+launch-brief.md rendered after refusal: no
+
+======== S3: half-filled brief is refused at the NEXT placeholder; fully filled brief passes the DoD gate ========
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+error: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s2/brief.md has an unfinished task Definition of Done (### Mandatory items still holds {DOD_MANDATORY_ITEMS}); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+[exit=1]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+notice: s2 ships mode=direct-PR while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+[exit=1]
+launch-brief.md rendered past the gate: YES
+
+======== S4: scout brief unfilled refused, filled passes ========
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+error: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s4/brief.md has an unfinished task Definition of Done (## Definition Of Done (task) still holds {DOD_CAPABILITY}); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+[exit=1]
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+[exit=1]
+launch-brief.md rendered past the gate: YES
+
+======== S5 (adversarial): a '## M1' heading inside Mandatory items must NOT hide later placeholders ========
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+error: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s5/brief.md has an unfinished task Definition of Done (### Supporting items still holds {DOD_SUPPORTING_ITEMS}); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+[exit=1]
+
+======== S6 (adversarial): a finished section that QUOTES a token inside a sentence is accepted ========
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+notice: s6 ships mode=direct-PR while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+[exit=1]
+launch-brief.md rendered past the gate: YES
+
+======== S7: DoD file escape - missing / empty / unfinished file refused; finished file accepted ========
+-- file missing
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+error: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s7/brief.md has an unfinished task Definition of Done (DoD file /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s7/criteria.md is not a readable file); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+[exit=1]
+-- file empty
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+error: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s7/brief.md has an unfinished task Definition of Done (DoD file /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s7/criteria.md is empty); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+[exit=1]
+-- file with placeholder
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+error: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s7/brief.md has an unfinished task Definition of Done (DoD file /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s7/criteria.md: ### Hard gates still holds {DOD_HARD_GATES}); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+[exit=1]
+-- finished file
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+notice: s7 ships mode=direct-PR while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+[exit=1]
+launch-brief.md rendered past the gate: YES
+
+======== S8 (adversarial): 'DoD file:' lines OUTSIDE the task section (intent, fenced text, after grading) are ignored ========
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+error: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s8/brief.md has an unfinished task Definition of Done (## Definition Of Done (task) still holds {DOD_CAPABILITY}); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md "Task Definition of Done")
+[exit=1]
+
+======== S9: brief with NO task DoD section: one warning naming section + task, spawn carries on ========
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+warning: task s9: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s9/brief.md has no ## Definition Of Done (task) section, so nothing grades this task; spawning anyway
+warning: /Users/charlesabrooker/tmp/fm-lab.4IZZvf/data/s9/launch-brief.md records no ship branch; defaulting to legacy branch fm/s9
+notice: s9 ships mode=direct-PR while the standing posture for proj is no-mistakes - less rigor than the captain's standing posture; proceed only on a current explicit captain instruction or an intake judgment you can state
+[exit=1]
+warning line count: 1
+launch-brief.md rendered past the gate: YES
+
+======== S10: supervision-instruction output names the grading sections and the DoD-file rule (per harness) ========
+claude: rc-lines=57 completion-line=1 dodfile-rule=1
+codex: rc-lines=28 completion-line=1 dodfile-rule=1
+cursor: rc-lines=43 completion-line=1 dodfile-rule=1
+opencode: rc-lines=29 completion-line=1 dodfile-rule=1
+grok: rc-lines=51 completion-line=1 dodfile-rule=1
+omp: rc-lines=42 completion-line=1 dodfile-rule=1
+-- the rendered line (claude):
+- Completion check: when you judge whether a ship or scout is finished, read its brief's "## Definition Of Done (task)" and "## How You're Graded" sections; a done: line only starts that check. When the Definition Of Done section carries a "DoD file: <absolute path>" line, that file holds the criteria: read it as the criteria and do not report the section's placeholders. Report a missing or placeholder section, never invent criteria.
+-- repair-line mode and read-only mode still render without error:
+--repair-line rc=0
+--read-only 1 rc=0

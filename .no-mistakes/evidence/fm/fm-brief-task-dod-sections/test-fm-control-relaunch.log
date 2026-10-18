@@ -1,0 +1,21 @@
+ok - bounded ticks inspect one recorded unmanaged launch, rotate past drafts, and wrap without mutation
+ok - bounded recovery wakes once per unmanaged restored-agent identity and again only when it changes
+ok - bounded recovery persists inspection cursor before interruption and only inspects the next unmanaged launch
+ok - fm-control removes the dialog file after exit and after relaunch
+ok - fm-control exit removes the dialog file before it releases the control lock
+ok - held replacement admission refuses before touching the live owner
+ok - exited-owner recovery preserves commits, files, instructions, and real holds/dependencies without continuation authority
+ok - automatic, direct, and ordinary replacement inherit recovery until explicit clearance, then remain ordinary
+ok - reconciliation-only admission refuses live owners, queued work, fresh dispatch, and absent backlog authority
+ok - all supported worker harnesses share pre-stop blocked replacement admission
+ok - Herdr shares pre-stop held admission and recovery-only exited-owner preservation
+ok - continuation authorization refuses missing, foreign, dead, worker, and attended/away branch authority without side effects
+ok - continuation clearance accepts no relaunch options, arbitrary text, or non-allowlisted verbs
+ok - held and dependency-blocked continuation authorization refuses ordinary admission and preserves every byte
+ok - continuation authorization requires current automatic backlog, local unambiguous recovery records, and no pending close
+ok - unblocked ship/scout clearance changes only recovery, sends no endpoint input, and permits later live/exited ordinary relaunch
+ok - continuation-first lifecycle/meta locking excludes both control and direct replacement through admission and publication
+control replacement did not reach its readiness barrier
+not ok - could not stage control replacement during launch preparation
+bash tests/$t.test.sh  71.48s user 135.00s system 34% cpu 9:57.52 total
+exit=1

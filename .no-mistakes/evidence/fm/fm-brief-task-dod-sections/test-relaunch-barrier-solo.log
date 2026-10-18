@@ -1,0 +1,3 @@
+ok - control/direct replacement-first lifecycle/meta locking excludes clearance and inherits recovery until explicit later authorization
+FM_TEST_ONLY= bash tests/fm-control-relaunch.test.sh  7.87s user 17.17s system 70% cpu 35.603 total
+exit=0

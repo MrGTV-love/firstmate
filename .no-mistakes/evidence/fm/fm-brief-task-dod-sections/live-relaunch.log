@@ -1,0 +1,9 @@
+fm-gate-refuse: gate agent lifecycle permitted only against lab home /Users/charlesabrooker/tmp/fm-lab.4IZZvf
+skill selection for rl-live: unavailable - no TypeSafe or OpenRouter key
+calibration: "0 of 5 samples for jev-guard.claude-hook on Mac-Studio.local"
+fallback: "30s existing caller limit"
+calibration: "0 of 5 samples for jev-belay.claude-stop on Mac-Studio.local"
+fallback: "25s existing caller limit"
+warning: claude worker rl-live is stopped on its startup dialog 'workspace trust (Quick safety check)' and has not begun its instructions; send no keys, a person must answer it in window fmses:fm-rl-live
+spawned rl-live harness=claude kind=scout window=fmses:fm-rl-live worktree=/Users/charlesabrooker/tmp/fm-lab.4IZZvf/wt-rl-live
+[exit=0]

@@ -1,0 +1,16 @@
+ that position. Use Bash(mv*/.tac/governance/*) for wildcard matching.
+Permission ask rule (../../../.claude/settings.json): Bash(*>*/.tac/governance/*
+:*) mixes * with the trailing :* prefix syntax, so it is matched as a literal pr
+efix (the * is not expanded) and matches only commands containing a literal * at
+ that position. Use Bash(*>*/.tac/governance/*) for wildcard matching.
+────────────────────────────────────────────────────────────────────────────────
+ Accessing workspace:
+ /Users/charlesabrooker/tmp/fm-lab.4IZZvf/wt-rl-live
+ Quick safety check: Is this a project you created or one you trust? (Like your
+ own code, a well-known open source project, or work from your team). If not,
+ take a moment to review what's in this folder first.
+ Claude Code'll be able to read, edit, and execute files here.
+ Security guide
+ ❯ No, exit
+   Yes, I trust this folder
+ Enter to confirm · Esc to cancel
