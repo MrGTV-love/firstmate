@@ -61,7 +61,9 @@ An `add` of an id that already exists changes nothing, so `tasks-axi` reports it
 The record is written once, after the backlog item is Done: a close is written once for each task, evidence, and `pr` since the task's latest `task.dispatched`, however many of these paths reach it, so a task that is reopened and dispatched again records its next close.
 A refused teardown, a captain-held item that returns to Queued, and a `fm-tasks-axi.sh done` of an item that was already Done write none.
 The close of a captain-held item is written by `bin/fm-captain-hold.sh` when its `answer` or `reconcile close` moves the item to Done, or when its `answer` records an item that was closed outside the script, and not by teardown, which only returns that item to Queued.
-Its `evidence` and `pr` are the deliverable teardown recorded on the item, named the way teardown names them; an item with no recorded deliverable, such as a captain call that no teardown retained, records `none`.
+Its `evidence` and `pr` are the deliverable teardown recorded on the item in its current cycle, named the way teardown names them.
+A reopen or a new dispatch of the item retires the deliverables of earlier cycles, so a reused task id records its own cycle's evidence.
+An item with no recorded deliverable in its current cycle, such as a captain call that no teardown retained, records `none`.
 A repeated answer writes none, and so does the next session start's replay of a kept item's pending record.
 
 `task.answered` members: `via` is `send` when `fm-send.sh --resolve-key` closed a status-log decision, or `hold` when `fm-captain-hold.sh` recorded an answer for a captain-held task; `key` is the decision key (for `hold`, the task id).

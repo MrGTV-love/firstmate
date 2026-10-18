@@ -647,7 +647,7 @@ fm_backlog_new_work_transition() {
     print {$prior} $prior_value;
     close $prior or die $!;
     $value =~ s/^([^\S\n]*)dropped([^\S\n]*)$/${1}Historical captain disposition: dropped${2}/mg;
-    $value =~ s/^([^\S\n]*)Deliverable of the finished work: dropped([^\S\n]*)$/${1}Historical deliverable of the finished work: dropped${2}/mg;
+    $value =~ s/^([^\S\n]*)Deliverable of the finished work:/${1}Historical deliverable of the finished work:/mg;
     utf8::encode($value) if utf8::is_utf8($value);
     open my $next, ">:raw", "$ARGV[0]/next" or die $!;
     print {$next} $value;
@@ -825,13 +825,13 @@ fm_backlog_retain() {  # <data-dir> <id> [flag...]
 
 # The inverse of the deliverable line fm_backlog_retain records: the arguments the
 # retained close handed to `tasks-axi done`, read from the first deliverable on
-# <decoded-body>'s active "Deliverable of the finished work:" line. Sets
+# the latest active "Deliverable of the finished work:" line of <decoded-body>. Sets
 # FM_BACKLOG_RETAINED_CLOSE_ARGS, empty when the body names none.
 fm_backlog_retained_close_args() {  # <decoded-body>
   local line item
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   FM_BACKLOG_RETAINED_CLOSE_ARGS=()
-  line=$(printf '%s\n' "$1" | sed -n 's/^Deliverable of the finished work: //p' | head -1)
+  line=$(printf '%s\n' "$1" | sed -n 's/^Deliverable of the finished work: //p' | tail -1)
   item=${line%%; *}
   case "$item" in
     '') ;;

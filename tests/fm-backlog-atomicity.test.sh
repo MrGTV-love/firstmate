@@ -2206,7 +2206,57 @@ Historical deliverable of the finished work: report data/x/report.md"
     printf "%s" "${#FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}"
   ' _ "$ROOT") || fail "could not read a body with no deliverable"
   assert_equals 0 "$got" "close arguments read from a body whose deliverable is only historical"
+  got=$(bash -c '
+    . "$1/bin/fm-tasks-axi-lib.sh"
+    . "$1/bin/fm-backlog-transition-lib.sh"
+    fm_backlog_retained_close_args "Deliverable of the finished work: PR https://github.com/example/repo/pull/21
+Deliverable of the finished work: PR https://github.com/example/repo/pull/22"
+    printf "%s\n" "${FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}"
+  ' _ "$ROOT") || fail "could not read a body with two active deliverables"
+  assert_equals "$(printf '%s\n' --pr https://github.com/example/repo/pull/22)" "$got" \
+    "close arguments read from a body whose latest active deliverable replaced an earlier one"
   pass "a retained deliverable line reads back as the close arguments it was retained with"
+}
+
+# New work (a start, a reopen, a dispatch) retires every earlier deliverable
+# line, keeping its text, so a reused task id reads only its current cycle's
+# deliverable; retaining and closing never retire one.
+test_new_work_retires_earlier_deliverable_lines() {
+  local case_dir home id body expected
+  case_dir=$(make_home retire-deliverables)
+  home=$(home_of "$case_dir")
+  id=atomic-retire-deliverables
+  lib() { bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; . "$1/bin/fm-backlog-transition-lib.sh"; shift; "$@"' _ "$ROOT" "$@"; }
+  body_of() {
+    local raw
+    raw=$(tasks-axi show "$id" --full --file "$(backlog_of "$case_dir")" | sed -n 's/^  body: //p' | head -1)
+    case "$raw" in \"*) printf '%s' "$raw" | jq -r . ;; *) printf '%s' "$raw" ;; esac
+  }
+  printf '%s\n' 'Body café 航海' 'Deliverable of the finished work: report data/x/report.md' \
+    'Deliverable of the finished work: PR https://github.com/example/repo/pull/21' \
+    'Deliverable of the finished work: dropped' 'Not a Deliverable of the finished work: PR line' \
+    > "$case_dir/body.txt"
+  add_item "$case_dir" "$id"
+  tasks-axi update "$id" --body-file "$case_dir/body.txt" --file "$(backlog_of "$case_dir")" >/dev/null \
+    || fail "could not attach the retained deliverables"
+
+  lib fm_backlog_start "$home/data" "$id" || fail "new work could not start the item"
+  expected=$(printf '%s\n' 'Body café 航海' 'Historical deliverable of the finished work: report data/x/report.md' \
+    'Historical deliverable of the finished work: PR https://github.com/example/repo/pull/21' \
+    'Historical deliverable of the finished work: dropped' 'Not a Deliverable of the finished work: PR line')
+  body=$(body_of)
+  assert_equals "$expected" "$body" "body after new work started the item"
+
+  lib fm_backlog_retain "$home/data" "$id" --pr https://github.com/example/repo/pull/22 \
+    || fail "could not retain the second cycle's deliverable"
+  body=$(body_of)
+  assert_contains "$body" "Historical deliverable of the finished work: PR https://github.com/example/repo/pull/21" \
+    "retaining retired an earlier cycle's line again"
+  assert_contains "$body" $'\nDeliverable of the finished work: PR https://github.com/example/repo/pull/22' \
+    "retaining did not record the current cycle's deliverable"
+  tasks-axi "done" "$id" --file "$(backlog_of "$case_dir")" >/dev/null || fail "could not close the item"
+  assert_equals "$body" "$(body_of)" "closing changed the body"
+  pass "new work retires every earlier deliverable line, and only new work does"
 }
 
 # The opt-in fleet ledger (docs/fleet-ledger.md): a close that session start
@@ -3538,6 +3588,7 @@ test_recovery_replays_a_gerrit_close_with_its_change_url_as_a_note
 test_recovery_backfills_a_recorded_link_on_an_already_done_item
 test_recovery_records_a_replayed_close_in_the_fleet_ledger
 test_retained_deliverable_line_names_the_close_arguments
+test_new_work_retires_earlier_deliverable_lines
 test_recovery_preserves_a_close_when_the_backlog_cannot_be_read
 test_recovery_retry_preserves_incomplete_cleanup_warning
 test_recovery_finishes_a_close_for_the_same_meta_incarnation

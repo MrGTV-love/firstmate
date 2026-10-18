@@ -157,6 +157,7 @@ On 0 only the close changes.
 After cleanup, and still under the task's own lock, teardown does three things:
 
 - It records one `Deliverable of the finished work: ...` line at the end of the task body.
+  A later reopen or new dispatch of the row renames the line to `Historical deliverable of the finished work: ...`, so only the current cycle's line is active.
 - It copies a supported pull request or canonical `data/<id>/report.md` into the row's structured artifact fields.
   A Gerrit change URL is not a pull request tasks-axi accepts, so it appears only in the deliverable line.
 - It runs `tasks-axi reopen`.

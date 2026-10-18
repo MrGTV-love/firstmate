@@ -877,6 +877,65 @@ test_captain_close_of_retained_work_records_task_closed() {
   pass "ledger on: an answer, a reconcile close, or a repair that closes retained work records one task.closed naming its report, and a repeat records none"
 }
 
+fm_tasks_axi_in() {  # <home> <bin/fm-tasks-axi.sh args...>
+  local home=$1
+  shift
+  (cd "$home" && PATH="$home/fakebin:$PATH" FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" \
+    FM_DATA_OVERRIDE="$home/data" FM_CONFIG_OVERRIDE="$home/config" "$ROOT/bin/fm-tasks-axi.sh" "$@")
+}
+
+# One dispatch-to-answer cycle of a held ship, with the steps the fleet's own
+# scripts take: the ledger's dispatch record, a start, the hold, teardown's
+# retention of the deliverable (none when no flag is given), and the answer.
+held_ship_cycle() {  # <home> <id> <hold-stamp> <answer-text> [<retain-flag> <retain-value>]
+  local home=$1 id=$2 stamp=$3 text=$4 flag=${5:-} value=${6:-}
+  FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_CONFIG_OVERRIDE="$home/config" \
+    "$ROOT/bin/fm-fleet-ledger.sh" dispatched "$id" ship sample claude "" || fail "could not record the dispatch of $id"
+  fm_tasks_axi_in "$home" start "$id" >/dev/null || fail "could not start $id"
+  FM_CAPTAIN_HOLD_NOW=$stamp run_captain "$home" hold "$id" --reason "captain must choose $id" >/dev/null \
+    || fail "could not hold $id"
+  bash -c '. "$1/bin/fm-tasks-axi-lib.sh"; . "$1/bin/fm-backlog-transition-lib.sh"; shift; fm_backlog_retain "$@"' \
+    _ "$ROOT" "$home/data" "$id" ${flag:+"$flag" "$value"} || fail "could not retain the deliverable of $id"
+  printf '%s\n' "$text" > "$home/$id.answer.txt"
+  run_captain "$home" answer "$id" --decision-file "$home/$id.answer.txt" >/dev/null || fail "could not answer $id"
+}
+
+held_closed_rows_of() {  # <home> <id>
+  held_closed_rows "$1" | grep -F "[\"$2\"," || true
+}
+
+# A reused task id: each cycle's close names that cycle's own deliverable, and a
+# replayed answer adds nothing.
+test_reused_task_id_records_each_cycles_own_close_evidence() {
+  local home id bare pr21=https://github.com/example/repo/pull/21 pr22=https://github.com/example/repo/pull/22
+  home=$(make_home hold-closed-reuse)
+  : > "$home/config/fleet-ledger"
+  id=sample-reused-ship
+  bare=sample-reused-bare
+  tasks_in "$home" add "$id" "Reused ship" --kind ship --repo sample >/dev/null || fail "could not add $id"
+  tasks_in "$home" add "$bare" "Reused bare" --kind ship --repo sample >/dev/null || fail "could not add $bare"
+
+  held_ship_cycle "$home" "$id" 2026-07-14T12:00:00Z "Go with REST." --pr "$pr21"
+  held_ship_cycle "$home" "$bare" 2026-07-14T12:00:00Z "Go with REST." --pr "$pr21"
+  assert_equals "[\"$id\",\"merged_pr\",\"$pr21\"]" "$(held_closed_rows_of "$home" "$id")" \
+    "a single-cycle task records its own PR"
+
+  fm_tasks_axi_in "$home" reopen "$id" >/dev/null || fail "could not reopen $id"
+  held_ship_cycle "$home" "$id" 2026-07-14T12:00:10Z "Use RPC instead." --pr "$pr22"
+  assert_equals "$(printf '%s\n' "[\"$id\",\"merged_pr\",\"$pr21\"]" "[\"$id\",\"merged_pr\",\"$pr22\"]")" \
+    "$(held_closed_rows_of "$home" "$id")" "a reused task id records the second cycle's PR, not the first's"
+  run_captain "$home" answer "$id" --decision-file "$home/$id.answer.txt" >/dev/null || fail "the replayed answer failed"
+  assert_equals 2 "$(held_closed_rows_of "$home" "$id" | wc -l | tr -d ' ')" "task.closed records after a replayed answer"
+  assert_contains "$(tasks_in "$home" show "$id" --full)" "Historical deliverable of the finished work: PR $pr21" \
+    "the first cycle's deliverable was not retired when the item was reused"
+
+  fm_tasks_axi_in "$home" reopen "$bare" >/dev/null || fail "could not reopen $bare"
+  held_ship_cycle "$home" "$bare" 2026-07-14T12:00:10Z "Use RPC instead."
+  assert_equals "$(printf '%s\n' "[\"$bare\",\"merged_pr\",\"$pr21\"]" "[\"$bare\",\"none\",null]")" \
+    "$(held_closed_rows_of "$home" "$bare")" "a second cycle that retained nothing records no evidence, not the first cycle's PR"
+  pass "ledger on: a reused task id's close records its own cycle's evidence, and a replayed answer records nothing more"
+}
+
 test_captain_close_before_cleanup_replay_records_task_closed_once() {
   local home id repo wt rc bootstrap gerrit_url=https://gerrit.example.com/c/project/+/12345
   home=$(make_home hold-closed-before-replay)
@@ -1978,6 +2037,7 @@ test_answer_before_cleanup_replay_preserves_the_retained_report
 test_answer_before_cleanup_replay_notes_a_retained_gerrit_change
 test_captain_close_of_retained_work_records_task_closed
 test_captain_close_before_cleanup_replay_records_task_closed_once
+test_reused_task_id_records_each_cycles_own_close_evidence
 test_unusable_pending_close_record_names_its_reason
 test_relocated_report_does_not_wedge_an_answer_before_replay
 test_relocated_report_does_not_wedge_released_cleanup_replay
