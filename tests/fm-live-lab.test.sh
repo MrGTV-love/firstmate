@@ -623,20 +623,29 @@ git -C "$UPSRC" -c user.name=t -c user.email=t@example.invalid commit -qm source
 # A worker can have written its first status while still working. That must
 # not hold up the Claude primary; the generated brief must ask it to end its
 # turn on the gate instead of running a foreground polling command.
+# The stand-in brief script is the real scaffold and the stand-in spawn runs the
+# real task Definition of Done check on it, so the lab must fill every
+# placeholder a real spawn refuses.
 WORKSRC="$TMP_ROOT/worker-source"
 cp -R "$UPSRC" "$WORKSRC"
-cat > "$WORKSRC/bin/fm-brief.sh" <<'SH'
+cat > "$WORKSRC/bin/fm-brief.sh" <<SH
 #!/usr/bin/env bash
-mkdir -p "$FM_HOME/data/$1"
-printf '{TASK}\n{FIRSTMATE_SPEC}\n' > "$FM_HOME/data/$1/brief.md"
+exec "$ROOT/bin/fm-brief.sh" "\$@"
 SH
 cat > "$WORKSRC/bin/fm-tasks-axi.sh" <<'SH'
 #!/usr/bin/env bash
 exit 0
 SH
-cat > "$WORKSRC/bin/fm-spawn.sh" <<'SH'
+cat > "$WORKSRC/bin/fm-spawn.sh" <<SH
 #!/usr/bin/env bash
-id=$1
+id=\$1
+. "$ROOT/bin/fm-dod-lib.sh"
+if problem=\$(fm_brief_task_dod_problem "\$FM_HOME/data/\$id/brief.md"); then
+  echo "error: unfinished task Definition of Done: \$problem" >&2
+  exit 1
+fi
+SH
+cat >> "$WORKSRC/bin/fm-spawn.sh" <<'SH'
 tmux new-window -d -t firstmate: -n "fm-$id" -c "$FM_HOME" 'exec sleep 45 >/dev/null 2>&1' || exit 1
 # A missing =name can silently resolve to the current window: verify the name.
 for (( n=0; n<30; n++ )); do
@@ -656,6 +665,7 @@ git -C "$WORKSRC" -c user.name=t -c user.email=t@example.invalid commit -qm stub
 W="$TMP_ROOT/worker-up"
 out=$(SHELL=/bin/sh PATH="$TMP_ROOT/stub-bin:$PATH" "$LIVE_LAB" up --harness claude --worker --source "$WORKSRC" --timeout 0 "$W" 2>&1)
 expect_code 1 "$?" "unanswered probe leaves worker lab for inspection: $out"
+assert_not_contains "$out" "unfinished task Definition of Done" "the lab scaffolded a brief the spawn check refuses"
 assert_contains "$out" "primary: claude" "the unparked worker did not block primary launch"
 assert_contains "$out" "gate: $W/home/data/" "up shows the gate path"
 assert_contains "$out" "then message the worker to resume" "up explains the release message"

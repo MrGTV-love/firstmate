@@ -2059,7 +2059,7 @@ test_promoted_scout_relaunch_receives_the_current_delivery_contract() {
     FM_HOME="$home" "$BRIEF" "$id" firstmate --scout >/dev/null \
       || fail "$mode: could not scaffold the scout brief"
     brief="$home/data/$id/brief.md"
-    sed 's/{TASK}/Fix the promotion relaunch contract./; s/{FIRSTMATE_SPEC}/Preserve the current delivery mode./; s/{DOD_[A-Z_]*}/Filled for the test./' \
+    sed 's/{TASK}/Fix the promotion relaunch contract./; s/{FIRSTMATE_SPEC}/Preserve the current delivery mode./' \
       "$brief" > "$brief.filled"
     mv "$brief.filled" "$brief"
     {
@@ -2112,6 +2112,55 @@ test_promoted_scout_relaunch_receives_the_current_delivery_contract() {
       "$mode: the replacement launch did not receive the actual ship delivery mode"
   done
   pass "fm-promote/fm-spawn --relaunch: the current ship contract supersedes stale scout delivery text"
+}
+
+# The task Definition of Done check belongs to a fresh spawn. A relaunch of a
+# scaffolded brief whose placeholders are still there, whose DoD file has moved,
+# or that predates the section is neither refused nor warned about.
+test_relaunch_never_runs_the_task_definition_of_done_check() {
+  local variant dir id home brief out
+  for variant in placeholders moved-file legacy; do
+    id="rl-dod-$variant"
+    dir=$(new_case "dodrelaunch-$variant" "$id")
+    home="$dir/home"
+    case "$variant" in
+      legacy)
+        add_ship_task "$dir" "$id" claude ;;
+      *)
+        fm_git_worktree "$dir/proj" "$dir/wt" "task-$id"
+        FM_HOME="$home" "$BRIEF" "$id" firstmate --scout >/dev/null \
+          || fail "$variant: could not scaffold the scout brief"
+        brief="$home/data/$id/brief.md"
+        sed 's/{TASK}/Exercise the relaunch./; s/{FIRSTMATE_SPEC}/Keep the task whole./' \
+          "$brief" > "$brief.filled"
+        mv "$brief.filled" "$brief"
+        if [ "$variant" = moved-file ]; then
+          awk -v line="DoD file: $dir/moved-away.md" '{ print } $0 == "## Definition Of Done (task)" { print line }' \
+            "$brief" > "$brief.filled"
+          mv "$brief.filled" "$brief"
+        fi
+        {
+          echo "window=fmses:fm-$id"
+          echo "endpoint_task_id=$id"
+          echo "worktree=$dir/wt"
+          echo "project=$dir/proj"
+          echo "harness=claude"
+          echo "kind=scout"
+          echo "tasktmp=/tmp/fm-$id"
+          echo "model=default"
+          echo "effort=default"
+        } > "$home/state/$id.meta"
+        printf '%s\n' "fm-$id" > "$dir/fake/windows"
+        printf '%s' "$dir/wt" > "$dir/fake/cwd"
+        TASK_TMPS+=("/tmp/fm-$id") ;;
+    esac
+    printf 'zsh' > "$dir/fake/command"
+    out=$(run_spawn "$dir" "$id" --relaunch) \
+      || fail "$variant: the relaunch should succeed: $out"
+    assert_contains "$out" "spawned $id" "$variant: the relaunch did not complete"
+    assert_not_contains "$out" "Definition Of Done" "$variant: the relaunch ran the task Definition of Done check"
+  done
+  pass "fm-spawn --relaunch: the task Definition of Done check and its missing-section warning belong to a fresh spawn only"
 }
 
 # fm-spawn arms per-task wiring on harness PREFIXES, because a task launched
@@ -6631,6 +6680,7 @@ test_ship_relaunch_ignores_the_crew_harness_config
 test_spawn_relaunch_without_a_harness_reuses_the_recorded_one
 test_spawn_relaunch_of_promoted_scout_uses_the_recorded_branch
 test_promoted_scout_relaunch_receives_the_current_delivery_contract
+test_relaunch_never_runs_the_task_definition_of_done_check
 test_prefixed_prior_harness_wiring_is_still_retired
 test_muse_session_binding_is_retired_on_a_harness_switch
 test_cursor_session_binding_is_retired_on_a_harness_switch

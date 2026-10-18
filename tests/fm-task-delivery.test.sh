@@ -84,6 +84,12 @@ fill_dod_placeholder() {  # <file> <token> <text>
   printf '%s\n' "$content" > "$file"
 }
 
+# Inserts a "DoD file:" line directly under the task section title.
+add_dod_file_line() {  # <brief> <path>
+  awk -v line="DoD file: $2" '{ print } $0 == "## Definition Of Done (task)" { print line }' "$1" > "$1.new"
+  mv "$1.new" "$1"
+}
+
 fill_whole_dod() {  # <file>
   local token
   for token in '{DOD_CAPABILITY}' '{DOD_MANDATORY_ITEMS}' '{DOD_SUPPORTING_ITEMS}' '{DOD_HARD_GATES}' '{DOD_HONESTY_RULE}'; do
@@ -95,7 +101,7 @@ fill_whole_dod() {  # <file>
 # naming the section and the placeholder; a filled brief proceeds, and a
 # "DoD file:" line naming a finished criteria file is the one escape.
 test_spawn_requires_a_finished_task_definition_of_done() {
-  local rec home proj fakebin out id brief dod
+  local rec home proj fakebin out id brief
   rec=$(make_home dodgate)
   IFS='|' read -r home proj fakebin <<EOF
 $rec
@@ -118,6 +124,7 @@ EOF
   fill_whole_dod "$brief"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "$refusal" "a fully filled task Definition of Done was refused"
+  assert_not_contains "$out" "has no ## Definition Of Done (task) section" "a brief with the section drew the missing-section warning"
 
   id=dod-scout-unfilled
   FM_HOME="$home" "$BRIEF" "$id" proj --scout >/dev/null 2>&1 || fail "scout brief should scaffold"
@@ -129,18 +136,105 @@ EOF
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --scout)
   assert_not_contains "$out" "$refusal" "a filled scout Definition of Done was refused"
 
-  # Briefs scaffolded before the sections existed carry none and still spawn.
+  # Briefs scaffolded before the sections existed carry none: a fresh spawn
+  # warns once, naming the section and the task, and still goes ahead.
   id=dod-legacy
   write_brief "$home" "$id" direct-PR
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "$refusal" "a brief with no task Definition of Done section was refused"
+  assert_contains "$out" "warning: task $id:" "a brief with no task Definition of Done section drew no warning naming the task"
+  assert_contains "$out" "has no ## Definition Of Done (task) section" "the warning did not name the missing section"
+  [ "$(printf '%s\n' "$out" | grep -c 'has no ## Definition Of Done (task) section')" -eq 1 ] \
+    || fail "the missing-section warning must print exactly once: $out"
+  assert_present "$home/data/$id/launch-brief.md" "a brief with no task Definition of Done section did not get past the check"
   pass "fm-spawn: a leftover task Definition of Done placeholder is refused, a filled one proceeds"
 }
 
-# The escape: a "DoD file:" line naming an existing finished file replaces the
-# brief's own sections; a missing, empty, or unfinished file is still refused.
+# The check reads the whole span from the section title to the grading line, so
+# a heading inside the filled items hides nothing, and it matches a placeholder
+# only where the scaffold puts it, so a finished section may quote one.
+test_dod_placeholder_check_reads_the_whole_section_and_matches_scaffold_positions() {
+  local rec home proj fakebin out id brief criteria refusal="unfinished task Definition of Done" quote
+  rec=$(make_home dodmatch)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  quote="Edge/negative: a brief that still holds {DOD_HARD_GATES} is refused, as is one ending {DOD_CAPABILITY}."
+
+  id=dod-heading
+  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail "ship brief should scaffold"
+  brief="$home/data/$id/brief.md"
+  fill_task_subsections "$brief" "Fix the thing." "Keep it small."
+  fill_dod_placeholder "$brief" '{DOD_CAPABILITY}' "The thing works."
+  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' $'## M1 The thing works\nSource: the intent.\n\n## M2 It stays working\nSource: the intent.'
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" "### Supporting items still holds {DOD_SUPPORTING_ITEMS}" "a ## heading inside the mandatory items hid a later placeholder"
+  fill_dod_placeholder "$brief" '{DOD_SUPPORTING_ITEMS}' "None."
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" "### Hard gates still holds {DOD_HARD_GATES}" "a ## heading inside the mandatory items hid the hard gates placeholder"
+
+  id=dod-quote
+  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail "ship brief should scaffold"
+  brief="$home/data/$id/brief.md"
+  fill_task_subsections "$brief" "Fix the thing." "Keep it small."
+  fill_dod_placeholder "$brief" '{DOD_CAPABILITY}' "The thing works."
+  fill_dod_placeholder "$brief" '{DOD_SUPPORTING_ITEMS}' "None."
+  fill_dod_placeholder "$brief" '{DOD_HARD_GATES}' "None."
+  fill_dod_placeholder "$brief" '{DOD_HONESTY_RULE}' "Report only what ran."
+  fill_dod_placeholder "$brief" '{DOD_MANDATORY_ITEMS}' "$quote"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_not_contains "$out" "$refusal" "a finished section that quotes a placeholder mid-sentence was refused"
+  assert_present "$home/data/$id/launch-brief.md" "a finished section that quotes a placeholder did not get past the check"
+
+  id=dod-file-match
+  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail "ship brief should scaffold"
+  brief="$home/data/$id/brief.md"
+  fill_task_subsections "$brief" "Fix the thing." "Keep it small."
+  criteria="$home/data/$id/criteria.md"
+  add_dod_file_line "$brief" "$criteria"
+  printf '## M1 The thing works\nSource: the intent.\n\n## M2 It stays working\n\n{DOD_HARD_GATES}\n' > "$criteria"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" "$criteria: ### Hard gates still holds {DOD_HARD_GATES}" "a ## heading in a DoD file hid a later placeholder"
+  printf '## M1 The thing works\n%s\n' "$quote" > "$criteria"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_not_contains "$out" "$refusal" "a DoD file that quotes a placeholder mid-sentence was refused"
+  assert_present "$home/data/$id/launch-brief.md" "a DoD file that quotes a placeholder did not get past the check"
+  pass "fm-spawn: the Definition of Done check reads the whole section and matches placeholders only where the scaffold puts them"
+}
+
+# A "DoD file:" line counts only inside the task section; the same line in the
+# intent, in fenced text, or after the grading section is ignored.
+test_dod_file_line_counts_only_inside_the_task_section() {
+  local rec home proj fakebin out id brief criteria
+  rec=$(make_home dodscope)
+  IFS='|' read -r home proj fakebin <<EOF
+$rec
+EOF
+  id=dod-scope
+  criteria="$home/data/$id/criteria.md"
+  FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail "ship brief should scaffold"
+  brief="$home/data/$id/brief.md"
+  printf 'Mandatory: the thing works.\n' > "$criteria"
+  fill_task_subsections "$brief" $'Fix the thing.\nDoD file: '"$criteria" \
+    $'Keep it small.\n```\n## Definition Of Done (task)\nDoD file: '"$criteria"$'\n```'
+  printf '\nDoD file: %s\n' "$criteria" >> "$brief"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_contains "$out" "## Definition Of Done (task) still holds {DOD_CAPABILITY}" "a DoD file line outside the task section acted as the escape"
+
+  fill_whole_dod "$brief"
+  rm -f "$criteria"
+  out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
+  assert_not_contains "$out" "not a readable file" "a DoD file line outside the task section was read"
+  assert_not_contains "$out" "unfinished task Definition of Done" "a finished section was refused"
+  assert_present "$home/data/$id/launch-brief.md" "a finished section did not get past the check"
+  pass "fm-spawn: a DoD file line outside the task Definition of Done section is ignored"
+}
+
+# The escape: a "DoD file:" line inside the task section naming an existing
+# finished file replaces the section's own placeholders; a missing, empty, or
+# unfinished file is still refused.
 test_spawn_accepts_a_dod_file_that_passes_the_same_check() {
-  local rec home proj fakebin out id brief refusal="unfinished task Definition of Done"
+  local rec home proj fakebin out id brief criteria refusal="unfinished task Definition of Done"
   rec=$(make_home dodfile)
   IFS='|' read -r home proj fakebin <<EOF
 $rec
@@ -149,23 +243,25 @@ EOF
   FM_HOME="$home" "$BRIEF" "$id" proj --mode direct-PR >/dev/null 2>&1 || fail "ship brief should scaffold"
   brief="$home/data/$id/brief.md"
   fill_task_subsections "$brief" "Fix the thing." "Keep it small."
+  criteria="$home/data/$id/nope.md"
+  add_dod_file_line "$brief" "$criteria"
 
-  printf 'DoD file: %s\n' "$home/data/$id/nope.md" >> "$brief"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
-  assert_contains "$out" "DoD file $home/data/$id/nope.md is not a readable file" "a missing DoD file was not refused"
+  assert_contains "$out" "DoD file $criteria is not a readable file" "a missing DoD file was not refused"
 
-  printf 'Criteria.\n\n- Mandatory item with {DOD_HARD_GATES} left in.\n' > "$home/data/$id/nope.md"
+  printf 'Criteria.\n\n{DOD_HARD_GATES}\n' > "$criteria"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
-  assert_contains "$out" "$home/data/$id/nope.md: ### Hard gates still holds {DOD_HARD_GATES}" "a DoD file with a placeholder was not refused"
+  assert_contains "$out" "$criteria: ### Hard gates still holds {DOD_HARD_GATES}" "a DoD file with a placeholder was not refused"
 
-  : > "$home/data/$id/nope.md"
+  : > "$criteria"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
-  assert_contains "$out" "DoD file $home/data/$id/nope.md is empty" "an empty DoD file was not refused"
+  assert_contains "$out" "DoD file $criteria is empty" "an empty DoD file was not refused"
 
-  printf 'Mandatory: the thing works.\n' > "$home/data/$id/nope.md"
+  printf 'Mandatory: the thing works.\n' > "$criteria"
   out=$(run_spawn "$home" "$fakebin" "$id" "$proj" claude --mode direct-PR --yolo off)
   assert_not_contains "$out" "$refusal" "a finished DoD file was refused though the brief's own placeholders remain"
-  pass "fm-spawn: a DoD file line naming a finished criteria file is the only Definition of Done escape"
+  assert_present "$home/data/$id/launch-brief.md" "a finished DoD file did not get past the check"
+  pass "fm-spawn: a DoD file line inside the task section naming a finished criteria file is the only Definition of Done escape"
 }
 
 # A ship spawn must stop when its delivery contract was never decided or cannot be
@@ -1815,6 +1911,8 @@ test_promotion_carries_the_forge_binding
 test_forge_forgejo_rides_the_same_binding
 test_spawn_and_promote_require_filled_task_subsections
 test_spawn_requires_a_finished_task_definition_of_done
+test_dod_placeholder_check_reads_the_whole_section_and_matches_scaffold_positions
+test_dod_file_line_counts_only_inside_the_task_section
 test_spawn_accepts_a_dod_file_that_passes_the_same_check
 test_project_mode_resolves_branch_prefix
 echo "# all fm-task-delivery tests passed"

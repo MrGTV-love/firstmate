@@ -21,11 +21,13 @@
 #   guessed posture. A
 #   ship or scout spawn also refuses leftover `{TASK}` / `{FIRSTMATE_SPEC}`
 #   placeholders, an empty Task, an incomplete pair of Task subsections, or a
-#   `## Captain's intent` line opening with a Captain label or address. It also
-#   refuses a leftover `## Definition Of Done (task)` placeholder, naming the
-#   section and the placeholder; a `DoD file: <absolute path>` line naming a
-#   finished criteria file is the only escape, and a secondmate charter never
-#   reaches the check (bin/fm-dod-lib.sh owns both).
+#   `## Captain's intent` line opening with a Captain label or address. A fresh
+#   spawn also refuses a leftover `## Definition Of Done (task)` placeholder,
+#   naming the section and the placeholder; a `DoD file: <absolute path>` line
+#   inside that section naming a finished criteria file is the only escape. A
+#   fresh spawn of a brief with no such section warns once on stderr and
+#   proceeds. A relaunch and a secondmate charter never reach the check
+#   (bin/fm-dod-lib.sh owns it).
 #   Every ship or scout spawn renders `launch-brief.md`; for a no-mistakes ship
 #   it also carries the current `--intent` contract and the extracted captain
 #   intent. A legacy mixed Task is accepted there only under bin/fm-dod-lib.sh's
@@ -4133,9 +4135,13 @@ if [ "$KIND" = ship ] || [ "$KIND" = scout ]; then
     echo "error: $BRIEF still contains {TASK} or {FIRSTMATE_SPEC}; fill ## Captain's intent and ## Firstmate spec before spawn" >&2
     exit 1
   fi
-  if DOD_PROBLEM=$(fm_brief_task_dod_problem "$BRIEF"); then
-    echo "error: $BRIEF has an unfinished task Definition of Done ($DOD_PROBLEM); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line naming a finished criteria file, before spawn (docs/configuration.md \"Task Definition of Done\")" >&2
-    exit 1
+  if [ "$RELAUNCH" -eq 0 ]; then
+    if ! fm_brief_heading_present "$BRIEF" "$FM_TASK_DOD_SECTION_TITLE"; then
+      echo "warning: task $ID: $BRIEF has no $FM_TASK_DOD_SECTION_TITLE section, so nothing grades this task; spawning anyway" >&2
+    elif DOD_PROBLEM=$(fm_brief_task_dod_problem "$BRIEF"); then
+      echo "error: $BRIEF has an unfinished task Definition of Done ($DOD_PROBLEM); fill ## Definition Of Done (task) from the captain's intent, or add a DoD file: <absolute path> line inside that section naming a finished criteria file, before spawn (docs/configuration.md \"Task Definition of Done\")" >&2
+      exit 1
+    fi
   fi
   if ! fm_brief_task_content_valid "$BRIEF"; then
     echo "error: $BRIEF must contain nonempty ## Captain's intent and ## Firstmate spec subsections (or a nonempty legacy # Task body) before spawn" >&2
