@@ -231,26 +231,22 @@ test_sweep_retires_only_finished_board_listeners() {
   pass "the sweep retires finished boards and keeps every board that could still carry an answer"
 }
 
-# The unattended mode the watcher runs (sweep --auto) retires a listener for three findings
-# only: the board file is gone, the Lavish session has ended or is absent with every card
-# closed, or the listener has stayed dead and unlaunchable for FM_BOARD_LISTENER_DEAD_HOURS.
-# A live session with a running or recently launched listener keeps it however idle the
-# board is, and every keep guard of the manual sweep still applies first.
-auto_marker() {  # <home> <source-id> <age-seconds>: a launch-failure episode that began that long ago
-  local marker="$1/state/procevent/.$2.launch-failed"
-  printf '1-2 3\n' > "$marker"
-  perl -e 'my $t = time - $ARGV[1]; utime($t, $t, $ARGV[0]) or die $!' "$marker" "$3"
-}
-
-test_auto_sweep_retires_only_finished_or_dead_listeners() {
-  local home store out log list rc id
-  local gone ended nosession idle dead recent queued_dead owned_dead
-  local gone_id ended_id nosession_id idle_id dead_id recent_id queued_dead_id owned_dead_id
+# The unattended mode the watcher runs (sweep --auto) retires a listener for two findings
+# only: the board file is gone, or the Lavish session has ended or is absent with every card
+# closed. A board with a live session keeps its listener however idle it is and whatever
+# state its listener is in, and every keep guard of the manual sweep still applies first.
+test_auto_sweep_retires_only_finished_listeners() {
+  local home store out log list marker source id
+  local gone ended nosession idle stuck
+  local gone_id ended_id nosession_id idle_id stuck_id
   home=$(make_home auto-sweep)
   fm_test_track_procevent_home "$home" "$home/procevent-claims"
   store="$home/lavish-state"
   fm_fake_exit0 "$home/fakebin" lavish-axi
   log="$home/state/lavish-auto-retire.log"
+  run_captain "$home" hold auto-open-call --title "Choose the open route" \
+    --reason "captain open route pending" --repo sample >/dev/null \
+    || fail "could not hold the call that stays unanswered"
   run_captain "$home" hold auto-closed-call --title "Choose the closed route" \
     --reason "captain closed route pending" --repo sample >/dev/null \
     || fail "could not hold the call that is answered below"
@@ -258,89 +254,73 @@ test_auto_sweep_retires_only_finished_or_dead_listeners() {
   run_captain "$home" answer auto-closed-call --decision-file "$home/answer.txt" >/dev/null \
     || fail "could not answer the call"
 
+  # The captain's board: a live session, an unanswered call, and a registration the runner
+  # refuses to start, so the real reconcile reports the launch failed and leaves its marker.
+  stuck=$(sweep_board "$home" auto-stuck new auto-open-call)
+  stuck_id=$(sweep_register "$home" "$stuck")
+  sweep_session "$store" "$stuck" open 0 -
+  source="$home/state/procevent/$stuck_id.source"
+  sed 's/^argc=.*/argc=99/' "$source" > "$home/damaged.source" \
+    || fail "could not prepare the damaged registration"
+  cat "$home/damaged.source" > "$source"
+  out=$(FM_PROCEVENT_LAUNCH_CONFIRM_SECONDS=2 LAVISH_AXI_STATE_DIR="$store" run_procevent "$home" reconcile 2>&1)
+  assert_contains "$out" "failed=1" "reconcile did not report the unstartable listener as failed: $out"
+  marker="$home/state/procevent/.$stuck_id.launch-failed"
+  assert_present "$marker" "reconcile did not leave a launch-failure marker"
+  touch -t 200001010000 "$marker"
+
   gone=$(sweep_board "$home" auto-gone old)
   ended=$(sweep_board "$home" auto-ended new auto-closed-call)
   nosession=$(sweep_board "$home" auto-nosession new auto-closed-call)
   idle=$(sweep_board "$home" auto-idle old auto-closed-call)
-  dead=$(sweep_board "$home" auto-dead new auto-closed-call)
-  recent=$(sweep_board "$home" auto-recent new auto-closed-call)
-  queued_dead=$(sweep_board "$home" auto-queued-dead new auto-closed-call)
-  owned_dead=$(sweep_board "$home" auto-owned-dead new auto-closed-call)
   gone_id=$(sweep_register "$home" "$gone")
   ended_id=$(sweep_register "$home" "$ended")
   nosession_id=$(sweep_register "$home" "$nosession")
   idle_id=$(sweep_register "$home" "$idle")
-  dead_id=$(sweep_register "$home" "$dead")
-  recent_id=$(sweep_register "$home" "$recent")
-  queued_dead_id=$(sweep_register "$home" "$queued_dead")
-  owned_dead_id=$(run_lavish "$home" source-id "$owned_dead") || fail "could not derive the owned source id"
-  printf 'window=fmtest:fm-auto-owner\nworktree=%s/worktree-auto-owner\nproject=fmtest\n' "$home" \
-    > "$home/state/auto-owner.meta"
-  run_procevent "$home" register-task lavish "$owned_dead_id" auto-owner -- \
-    "$ROOT/bin/fm-procevent-lavish.sh" poll "$owned_dead" >/dev/null \
-    || fail "could not register the worker-owned board"
-
   sweep_session "$store" "$gone" open 0 2000-01-01T00:00:00.000Z
   sweep_session "$store" "$ended" ended 0 -
   sweep_session "$store" "$idle" open 0 2000-01-01T00:00:00.000Z
-  sweep_session "$store" "$dead" open 0 -
-  sweep_session "$store" "$recent" open 0 -
-  sweep_session "$store" "$queued_dead" open 2 -
-  sweep_session "$store" "$owned_dead" open 0 -
   rm -f "$gone"
-  auto_marker "$home" "$dead_id" 90000
-  auto_marker "$home" "$recent_id" 600
-  auto_marker "$home" "$queued_dead_id" 90000
-  auto_marker "$home" "$owned_dead_id" 90000
 
   out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --auto --dry-run) \
     || fail "the dry-run automatic sweep failed: $out"
-  assert_contains "$out" "would-retire: $dead_id" "the dry run missed the dead listener"
+  assert_contains "$out" "would-retire: $gone_id" "the dry run missed a board whose file is gone"
+  assert_contains "$out" "kept: $stuck_id" "the dry run would retire the captain's board"
   [ ! -e "$log" ] || fail "a dry run wrote the retirement record"
   list=$(run_procevent "$home" list)
-  assert_contains "$list" "$dead_id" "a dry run retired a registration"
+  assert_contains "$list" "$gone_id" "a dry run retired a registration"
 
   out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --auto) \
     || fail "the automatic sweep failed: $out"
   assert_contains "$out" "retired: $gone_id" "an automatic sweep kept a board whose file is gone"
   assert_contains "$out" "retired: $ended_id" "an automatic sweep kept the listener of an ended session"
   assert_contains "$out" "retired: $nosession_id" "an automatic sweep kept the listener of a board with no session"
-  assert_contains "$out" "retired: $dead_id" "an automatic sweep kept a listener dead for a day"
-  assert_contains "$out" "dead and unreachable for 25 hours" "the dead-listener reason did not say how long"
-  assert_contains "$out" "kept: $idle_id $idle - the Lavish session is live and its listener is not proved dead" \
+  assert_contains "$out" "kept: $idle_id $idle - the Lavish session is live" \
     "an automatic sweep retired a live idle board; only the manual sweep applies the idle rule"
-  assert_contains "$out" "kept: $recent_id" "a listener whose launches failed only ten minutes ago was retired"
-  assert_contains "$out" "kept: $queued_dead_id" "a dead listener with queued feedback was retired"
-  assert_contains "$out" "kept: $owned_dead_id" "a dead listener owned by a worker task was retired"
-  assert_contains "$out" "sweep: retired=4 kept=4" "the automatic sweep counted the wrong verdicts: $out"
+  assert_contains "$out" "kept: $stuck_id $stuck - the Lavish session is live" \
+    "an automatic sweep retired a live board whose listener cannot start: $out"
+  assert_contains "$out" "sweep: retired=3 kept=2" "the automatic sweep counted the wrong verdicts: $out"
   list=$(run_procevent "$home" list)
-  for id in "$gone_id" "$ended_id" "$nosession_id" "$dead_id"; do
+  for id in "$gone_id" "$ended_id" "$nosession_id"; do
     assert_not_contains "$list" "$id" "a retired listener is still registered"
   done
-  for id in "$idle_id" "$recent_id" "$queued_dead_id" "$owned_dead_id"; do
+  for id in "$idle_id" "$stuck_id"; do
     assert_contains "$list" "$id" "a kept listener lost its registration"
   done
+  assert_present "$marker" "the sweep removed the launch-failure marker of a kept board"
   assert_present "$log" "the automatic sweep did not record why it retired"
-  [ "$(wc -l < "$log" | tr -d ' ')" = 4 ] || fail "the record must hold one line per retirement: $(cat "$log")"
-  assert_contains "$(cat "$log")" "retired $dead_id $dead - the listener has been dead and unreachable" "the record lacks the dead-listener reason"
+  [ "$(wc -l < "$log" | tr -d ' ')" = 3 ] || fail "the record must hold one line per retirement: $(cat "$log")"
   assert_contains "$(cat "$log")" "retired $gone_id $gone - the board file is gone" "the record lacks the gone-file reason"
+  assert_not_contains "$(cat "$log")" "$stuck_id" "the record names a listener that was kept"
   assert_not_contains "$(cat "$log")" "$idle_id" "the record names a listener that was kept"
 
-  # The threshold is configurable, and an unusable value refuses the sweep by name.
-  auto_marker "$home" "$recent_id" 7200
-  out=$(FM_BOARD_LISTENER_DEAD_HOURS=1 LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --auto) \
-    || fail "the one-hour automatic sweep failed: $out"
-  assert_contains "$out" "retired: $recent_id" "a listener dead for two hours kept its registration under a one-hour threshold"
-  set +e
-  out=$(FM_BOARD_LISTENER_DEAD_HOURS=0 LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --auto 2>&1)
-  rc=$?
-  set -e
-  [ "$rc" -ne 0 ] || fail "an unusable dead-listener window was accepted"
-  assert_contains "$out" "FM_BOARD_LISTENER_DEAD_HOURS" "the refusal did not name the setting"
-  # The manual sweep never reads the marker: dead-listener retirement is the unattended mode only.
-  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --dry-run) || fail "the manual sweep failed: $out"
-  assert_not_contains "$out" "dead and unreachable" "the manual sweep applied the dead-listener rule"
-  pass "the automatic sweep retires finished and dead listeners, keeps live ones, and records why"
+  # Once its session ends, the unanswered captain call still keeps the board's listener.
+  sweep_session "$store" "$stuck" ended 0 -
+  out=$(LAVISH_AXI_STATE_DIR="$store" run_lavish "$home" sweep --auto) \
+    || fail "the repeat automatic sweep failed: $out"
+  assert_contains "$out" "kept: $stuck_id" "an ended board with an unanswered captain call lost its listener: $out"
+  assert_contains "$out" "sweep: retired=0 kept=2" "the repeat automatic sweep counted the wrong verdicts: $out"
+  pass "the automatic sweep retires finished boards, never a live or unanswered one whose listener cannot start, and records why"
 }
 
 test_sweep_keeps_recently_handled_boards_in_literal_home_paths() {
@@ -1095,7 +1075,7 @@ SH
 
 tests=(
 test_sweep_retires_only_finished_board_listeners
-test_auto_sweep_retires_only_finished_or_dead_listeners
+test_auto_sweep_retires_only_finished_listeners
 test_sweep_stops_a_live_listener_of_a_finished_board
 test_sweep_preserves_deleted_board_keep_guards
 test_sweep_keeps_boards_with_unsearchable_parents

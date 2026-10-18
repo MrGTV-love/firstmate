@@ -6,7 +6,6 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py limit KEY [--percentile 95|99] [--margin N] [--fallback SECONDS]
        fm-duration.py run KEY -- COMMAND [ARGS...]
        fm-duration.py gate [--log-fd N] [--wait-file PATH] KEY -- COMMAND [ARGS...]
-       fm-duration.py slots KEY
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
        fm-duration.py path
@@ -106,7 +105,6 @@ this Python has no POSIX file locks: it runs without a slot and says so. A comma
 under a slot exports FM_TEST_SLOT_HELD (the keys it holds, tab separated), so the
 same key nested inside it takes no second slot. A malformed FM_TEST_KEY_SLOTS or
 FM_TEST_SLOT_WAIT_SECONDS refuses the command by name (exit 125 from gate).
-slots prints one key's directory, its limit and each holder; it changes nothing.
 docs/configuration.md "Test slots per key" owns the sizing rationale.
 
 A timeout is a real limit that stopped a command, reported by the owner of that
@@ -753,21 +751,6 @@ def gate(key, command, log_fd, wait_file=None):
         release_slot(fd)
 
 
-def show_slots(key):
-    limit = slot_limit()
-    scalar('key', key)
-    scalar('limit', limit)
-    if not key.startswith(SLOT_PREFIX) or limit == 0:
-        scalar('gate', 'off for this key')
-        return
-    directory = slot_directory(key)
-    scalar('directory', str(directory))
-    held = slot_holders(directory, limit)
-    print(f'held[{len(held)}]{{slot,holder}}:')
-    for index, text in held:
-        print(f'  {index},{json.dumps(text)}')
-
-
 def run(key, command, calibration_file):
     if os.name != 'posix':
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
@@ -1033,8 +1016,6 @@ def main():
     runner.add_argument('key'); runner.add_argument('command', nargs=argparse.REMAINDER)
     gater = commands.add_parser('gate')
     gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('command', nargs=argparse.REMAINDER)
-    slots = commands.add_parser('slots')
-    slots.add_argument('key')
     nm = commands.add_parser('import-nm')
     nm.add_argument('database'); nm.add_argument('run_id')
     timeout = commands.add_parser('timeout')
@@ -1083,8 +1064,6 @@ def main():
         if not command:
             parser.error('gate requires -- COMMAND')
         return gate(args.key, command, args.log_fd, args.wait_file)
-    elif args.action == 'slots':
-        show_slots(args.key)
     return 0
 
 

@@ -100,7 +100,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
-- The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` (newest 200 lines kept) and persistent watcher deadline `state/.lavish-auto-retire-next`.
+- The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
@@ -3036,7 +3036,7 @@ Other primary integrations retain their native supervision delivery paths.
 **Retire finished Lavish listeners**
 
 Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
-The watcher also runs `sweep --auto` detached every `FM_LAVISH_AUTO_RETIRE_INTERVAL` seconds (default 900, `0` turns it off): after the same keep guards it retires only a listener whose board file is gone, whose Lavish session has ended or is absent with every card closed, or whose listener has stayed dead and unlaunchable for `FM_BOARD_LISTENER_DEAD_HOURS` (default 6), and it appends each retirement with its reason to `state/lavish-auto-retire.log`.
+The watcher also runs `sweep --auto` detached every `FM_LAVISH_AUTO_RETIRE_INTERVAL` seconds (default 900, `0` turns it off): after the same keep guards it retires only a listener whose board file is gone or whose Lavish session has ended or is absent with every card closed (a board with a live session keeps its listener however idle it is), and it appends each retirement with its reason to `state/lavish-auto-retire.log`.
 A live session whose listener runs or was launched recently is never retired by it, and the adapter header owns the exact rules.
 Use `bin/fm-procevent-lavish.sh orphans` to list leftover poll processes that no listener owns; the same header owns its eligibility proof and the explicit `--kill` flag.
 For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
@@ -3517,7 +3517,6 @@ FM_TYPESAFE_HEALTH_INTERVAL=600   # seconds between the watcher's detached TypeS
 FM_TYPESAFE_HEALTH_UNREACHABLE_PROBES=3   # consecutive failed probes before an unreachable wake; credits and auth failures wake at once; invalid or zero values use 3
 FM_TYPESAFE_HEALTH_BIN=   # test seam: the probe the watcher launches instead of bin/fm-typesafe-health.sh
 FM_LAVISH_AUTO_RETIRE_INTERVAL=900   # seconds between the watcher's detached `bin/fm-procevent-lavish.sh sweep --auto` runs; 0 turns them off; a fresh watcher waits one full interval; invalid values use 900
-FM_BOARD_LISTENER_DEAD_HOURS=6   # whole hours (1..8760) a source's launches must keep failing before `sweep --auto` treats its listener as dead and retires it; an unusable value refuses that sweep by name
 FM_TEST_KEY_SLOTS=2   # concurrent copies of one test.* key allowed host-wide by bin/fm-duration.py run and gate (bin/fm-test-run.sh wraps each script in gate); 0 turns the gate off; whole numbers up to 16 (docs/configuration.md "Test slots per key")
 FM_TEST_SLOT_WAIT_SECONDS=7200   # seconds a waiter queues for a slot before it runs without one and says so; whole number of at least 1
 FM_TEST_SLOT_DIR=   # absolute path of the per-key slot directories; unset means $HOME/.cache/fm-test-slots; tests point it at a fixture directory

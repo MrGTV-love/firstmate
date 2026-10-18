@@ -95,20 +95,14 @@
 #            Lavish session, so the board stays readable and `arm` brings it back.
 #            --auto is the unattended subset the watcher runs on its own
 #            (FM_LAVISH_AUTO_RETIRE_INTERVAL). Every keep guard above still runs
-#            first, and then only three findings retire a listener: the board
-#            file is gone, Lavish holds no session or an ended session and every
-#            card key is closed, or the listener is dead and unreachable. Dead
-#            and unreachable means reconcile has kept failing to launch the
-#            source, with no live runner observed since, for
-#            FM_BOARD_LISTENER_DEAD_HOURS (default 6, whole hours 1..8760; an
-#            unusable value refuses the sweep by name). The failure marker
-#            reconcile writes when a launch fails and removes the moment a live
-#            runner is seen (bin/fm-procevent.sh "Report launch failures") is the
-#            evidence, so a board with a live session and a listener that is
-#            running or was recently launched is never retired. The idle-hours
-#            rule is not applied, so a live idle board keeps its listener.
+#            first, and then only two findings retire a listener: the board
+#            file is gone, or Lavish holds no session or an ended session and
+#            every card key is closed. A board with a live session is kept
+#            however idle it is and whatever state its listener is in, so a
+#            board left open for review never loses its listener; the idle-hours
+#            rule is not applied.
 #            Each retirement is also appended with its reason and epoch to
-#            state/lavish-auto-retire.log, trimmed to the newest 200 lines.
+#            state/lavish-auto-retire.log.
 # poll       The registered listener command `arm` publishes, not a command to
 #            run in a conversational turn. It runs the published blocking poll
 #            and prints its response verbatim, absorbing only the exact
@@ -1722,19 +1716,6 @@ cmd_orphans() {
 BOARD_IDLE_HOURS_DEFAULT=48
 BOARD_IDLE_HOURS_MAX=8760
 
-# How long reconcile may keep failing to launch a source before --auto treats
-# its listener as dead and unreachable.
-BOARD_DEAD_HOURS_DEFAULT=6
-BOARD_DEAD_HOURS_MAX=8760
-
-board_dead_seconds() {
-  local value=${FM_BOARD_LISTENER_DEAD_HOURS-$BOARD_DEAD_HOURS_DEFAULT}
-  case "$value" in ''|*[!0-9]*) return 1 ;; esac
-  value=$((10#$value))
-  [ "$value" -ge 1 ] && [ "$value" -le "$BOARD_DEAD_HOURS_MAX" ] || return 1
-  printf '%s\n' $((value * 3600))
-}
-
 board_idle_seconds() {
   local value=${FM_BOARD_LISTENER_IDLE_HOURS-$BOARD_IDLE_HOURS_DEFAULT}
   case "$value" in ''|*[!0-9]*) return 1 ;; esac
@@ -1879,26 +1860,16 @@ sweep_cards_closed() {
 # One line per automatic retirement, so a board that lost its listener can be
 # traced to the finding that retired it. Best effort: a record that cannot be
 # written never undoes a retirement that already happened.
-AUTO_RETIRE_LOG_KEEP_LINES=200
 auto_retire_record() {  # <state-dir> <source-id> <artifact> <reason>
-  local log="$1/lavish-auto-retire.log" stamp tmp
+  local stamp
   fm_epoch_seconds_to stamp
-  printf '%s retired %s %s - %s\n' "$stamp" "$2" "$3" "$4" >> "$log" 2>/dev/null || return 0
-  if [ "$(wc -l < "$log" 2>/dev/null || echo 0)" -gt $((AUTO_RETIRE_LOG_KEEP_LINES * 2)) ]; then
-    tmp=$(mktemp "$log.XXXXXX" 2>/dev/null) || return 0
-    if tail -n "$AUTO_RETIRE_LOG_KEEP_LINES" "$log" > "$tmp" 2>/dev/null; then
-      mv -f -- "$tmp" "$log" 2>/dev/null || rm -f -- "$tmp"
-    else
-      rm -f -- "$tmp"
-    fi
-  fi
-  return 0
+  printf '%s retired %s %s - %s\n' "$stamp" "$2" "$3" "$4" >> "$1/lavish-auto-retire.log" 2>/dev/null || true
 }
 
 cmd_sweep() {
-  local dry=0 auto=0 idle dead=0 state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
+  local dry=0 auto=0 idle state reg store now rec id adapter kind artifact standing line n in_argv argv_poll
   local facts file_state sessions status queued activity keys captured evidence reason verdict out identity current_identity
-  local retired=0 kept=0 idx marker marker_age
+  local retired=0 kept=0 idx
   local -a ids=() kinds=() identities=()
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -1910,10 +1881,6 @@ cmd_sweep() {
   done
   idle=$(board_idle_seconds) \
     || die "FM_BOARD_LISTENER_IDLE_HOURS must be whole hours from 1 to $BOARD_IDLE_HOURS_MAX"
-  if [ "$auto" = 1 ]; then
-    dead=$(board_dead_seconds) \
-      || die "FM_BOARD_LISTENER_DEAD_HOURS must be whole hours from 1 to $BOARD_DEAD_HOURS_MAX"
-  fi
   state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
   reg=$(fm_procevent_registry_dir "$state")
   store=${LAVISH_AXI_STATE_DIR:-$HOME/.lavish-axi}/state.json
@@ -1986,17 +1953,8 @@ cmd_sweep() {
       reason='owned by a worker task'
     elif [ "$file_state" = missing ]; then
       verdict=retire; reason='the board file is gone'
-    elif [ "$auto" = 1 ] \
-      && marker=$reg/.$id.launch-failed \
-      && [ -f "$marker" ] && [ ! -L "$marker" ] \
-      && marker_age=$(fm_path_age "$marker") \
-      && [ "$marker_age" -ge "$dead" ]; then
-      # reconcile writes the marker when a launch fails and removes it when a
-      # live runner is seen, so an old marker is a listener that stayed dead.
-      verdict=retire
-      reason="the listener has been dead and unreachable for $((marker_age / 3600)) hours"
     elif [ "$auto" = 1 ] && [ "$sessions" != 0 ] && [ "$status" != ended ]; then
-      reason='the Lavish session is live and its listener is not proved dead'
+      reason='the Lavish session is live'
     elif [ "$sessions" != 0 ] && [ "$status" != ended ] && [ $((now - activity)) -lt "$idle" ]; then
       reason="active within the last $((idle / 3600)) hours"
     else
