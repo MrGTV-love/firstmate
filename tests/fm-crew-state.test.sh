@@ -787,6 +787,37 @@ steps[9]{step,status,findings,duration_ms}:
 EOF
 }
 
+# The 2026-10-18 vernant-d3-analytics-b8-pr2-writer shape, as the real CLI prints
+# it: the daemon restarted under the merge poll and marked the run
+# ci_monitor_interrupted (outcome ci-monitor-interrupted), every substantive step
+# completed, the interrupted ci monitor is recorded as a skipped step, and the
+# PR remains open. <lint-status> and <pr> vary the negative cases.
+run_ci_monitor_interrupted() {  # <branch> [lint-status] [pr-url]
+  local lint=${2:-completed} pr=${3-https://github.com/o/r/pull/3434}
+  cat <<EOF
+run:
+  id: "01RUN"
+  branch: $1
+  status: ci_monitor_interrupted
+  head: "${FM_FAKE_RUN_HEAD:-abc1234}"
+  pr: "$pr"
+  findings: none
+  steps[11]{step,status,findings,duration_ms}:
+    intent,completed,0,68
+    rebase,completed,0,2370
+    review,completed,0,4744600
+    gate.review.retain-review,completed,0,1215
+    test,completed,1,939610
+    document,completed,0,199555
+    lint,$lint,0,1126
+    push,completed,0,58450
+    pr,completed,0,84273
+    ci,skipped,0,0
+outcome: ci-monitor-interrupted
+error: ci monitor interrupted by daemon restart; PR remains open
+EOF
+}
+
 run_ci_monitoring() {  # <branch>
   cat <<EOF
 run:
@@ -2075,6 +2106,108 @@ daemon shutting down"
   assert_contains "$out" "state: failed" "a second failed step keeps the run failed"
   assert_not_contains "$out" "state: done" "a second failed step must not reclassify to done"
   pass "a second failed step disqualifies the orphaned-monitor reclassification"
+}
+
+# The interrupted monitor is a finished run, not an unknown live state, when
+# every step completed and the run records its PR - on the bare status surface...
+test_ci_monitor_interrupted_with_all_steps_completed_reads_done() {
+  reset_fakes
+  local d; d=$(new_case ci-interrupted-done)
+  make_repo_on_branch "$d/wt" fm/feat-cimi
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-cimi.meta" "window=fm:fm-feat-cimi" "worktree=$d/wt" "kind=ship"
+  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi)"
+  local out; out=$(run_crew_state "$d" feat-cimi)
+  assert_contains "$out" "state: done" "interrupted ci monitor after every step completed reads done"
+  assert_contains "$out" "source: run-step" "the attributed run is the source"
+  assert_contains "$out" "ci monitor interrupted after all steps completed" "the line says why in plain words"
+  assert_contains "$out" "https://github.com/o/r/pull/3434" "the recorded PR is surfaced"
+  assert_not_contains "$out" "state: unknown" "a finished run must not read unknown"
+  pass "ci_monitor_interrupted with every step completed and a PR reads done"
+}
+
+# ...and through the run inventory the real CLI prints, whose status column
+# carries the same word and whose selected run is re-read by id.
+test_ci_monitor_interrupted_through_the_run_inventory_reads_done() {
+  reset_fakes
+  local d short out; d=$(new_case ci-interrupted-inventory)
+  make_repo_on_branch "$d/wt" fm/feat-cimi2
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-cimi2.meta" "window=fm:fm-feat-cimi2" "worktree=$d/wt" "kind=ship"
+  short=$(git -C "$d/wt" rev-parse --short=8 HEAD)
+  FM_FAKE_AXI_HOME="count: 1 of 1 total
+runs[1]{id,branch,status,head,pr}:
+  \"01RUN\",fm/feat-cimi2,ci_monitor_interrupted,$short,\"https://github.com/o/r/pull/3434\""
+  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi2)"
+  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
+  out=$(run_crew_state "$d" feat-cimi2)
+  assert_contains "$out" "state: done" "the selected interrupted run reads done"
+  assert_contains "$out" "source: run-step" "the selected run is the source"
+  assert_contains "$out" "run: 01RUN" "the selected run id is named"
+  assert_not_contains "$out" "state: unknown" "the inventory status word is recognized"
+  pass "ci_monitor_interrupted through the run inventory reads done"
+}
+
+# Negative: a step that is not completed (or explicitly skipped) never reads
+# finished, and the line is exactly what it was before the status was mapped.
+test_ci_monitor_interrupted_with_an_unfinished_step_stays_unknown() {
+  reset_fakes
+  local d short out; d=$(new_case ci-interrupted-unfinished)
+  make_repo_on_branch "$d/wt" fm/feat-cimi3
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-cimi3.meta" "window=fm:fm-feat-cimi3" "worktree=$d/wt" "kind=ship"
+  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi3 pending)"
+  out=$(run_crew_state "$d" feat-cimi3)
+  assert_equals "state: unknown · source: run-step · outcome: ci-monitor-interrupted" "$out" \
+    "bare surface: an unfinished lint step keeps the pre-change line"
+  short=$(git -C "$d/wt" rev-parse --short=8 HEAD)
+  FM_FAKE_AXI_HOME="count: 1 of 1 total
+runs[1]{id,branch,status,head,pr}:
+  \"01RUN\",fm/feat-cimi3,ci_monitor_interrupted,$short,\"https://github.com/o/r/pull/3434\""
+  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
+  out=$(run_crew_state "$d" feat-cimi3)
+  assert_equals "state: unknown · source: run-step · unrecognized run status; run ids: 01RUN; last reported run id: 01RUN" "$out" \
+    "inventory surface: an unfinished lint step keeps the pre-change line"
+  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi3 failed)"
+  FM_FAKE_AXI_STATUS_RUN=$FM_FAKE_AXI_STATUS
+  out=$(run_crew_state "$d" feat-cimi3)
+  assert_not_contains "$out" "state: done" "a failed step never reads finished"
+  pass "ci_monitor_interrupted with an unfinished step does not read done"
+}
+
+# Negative: no recorded PR means nothing was ready or landed.
+test_ci_monitor_interrupted_without_a_recorded_pr_stays_unknown() {
+  reset_fakes
+  local d out; d=$(new_case ci-interrupted-no-pr)
+  make_repo_on_branch "$d/wt" fm/feat-cimi4
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-cimi4.meta" "window=fm:fm-feat-cimi4" "worktree=$d/wt" "kind=ship"
+  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi4 completed "")"
+  out=$(run_crew_state "$d" feat-cimi4)
+  assert_equals "state: unknown · source: run-step · outcome: ci-monitor-interrupted" "$out" \
+    "a run with no recorded PR keeps the pre-change line"
+  pass "ci_monitor_interrupted with no recorded PR does not read done"
+}
+
+# Precedence: the attributed run outranks the worker's own declarations, however
+# stale or new they are, exactly as for every other terminal run.
+test_ci_monitor_interrupted_outranks_a_stale_worker_declaration() {
+  reset_fakes
+  local d out; d=$(new_case ci-interrupted-precedence)
+  make_repo_on_branch "$d/wt" fm/feat-cimi5
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-cimi5.meta" "window=fm:fm-feat-cimi5" "worktree=$d/wt" "kind=ship"
+  FM_FAKE_AXI_STATUS="$(run_ci_monitor_interrupted fm/feat-cimi5)"
+  printf 'blocked [at=1]: waiting on review answer\n' > "$d/state/feat-cimi5.status"
+  out=$(run_crew_state "$d" feat-cimi5)
+  assert_contains "$out" "state: done" "a stale blocked declaration does not hide the finished run"
+  assert_contains "$out" "status-log superseded (run done)" "the stale declaration is flagged superseded"
+  printf 'blocked [at=1]: waiting on review answer\nworking [at=9999999999]: resumed after the run\n' \
+    > "$d/state/feat-cimi5.status"
+  out=$(run_crew_state "$d" feat-cimi5)
+  assert_contains "$out" "state: done" "a declaration newer than the run does not hide the finished run"
+  assert_contains "$out" "source: run-step" "the run, not the declaration, answers"
+  pass "ci_monitor_interrupted outranks stale and newer worker declarations"
 }
 
 # (e) cross-branch attribution: `axi status` returns ANOTHER branch's run (the
@@ -5813,6 +5946,11 @@ test_terminal_failed_ci_orphan_after_green_reads_done
 test_terminal_failed_ci_orphan_status_only_reads_done
 test_terminal_failed_ci_genuine_red_stays_failed
 test_terminal_failed_ci_orphan_second_failed_step_stays_failed
+test_ci_monitor_interrupted_with_all_steps_completed_reads_done
+test_ci_monitor_interrupted_through_the_run_inventory_reads_done
+test_ci_monitor_interrupted_with_an_unfinished_step_stays_unknown
+test_ci_monitor_interrupted_without_a_recorded_pr_stays_unknown
+test_ci_monitor_interrupted_outranks_a_stale_worker_declaration
 test_cross_branch_attribution_via_runs_list
 test_coarse_socket_refusal_reports_blocked
 test_coarse_failed_ledger_with_daemon_down_reports_unknown

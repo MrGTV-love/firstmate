@@ -142,7 +142,16 @@
 #      forge evidence leaves the original failed or unknown classification.
 #      A monitor whose only remaining job is to observe a merge decision must not
 #      convert the absence of that decision into a failure verdict
-#      (nm_reclassify_failed_run_as_held_green). In the
+#      (nm_reclassify_failed_run_as_held_green). A run whose daemon marked it
+#      ci_monitor_interrupted (outcome ci-monitor-interrupted; the shared daemon
+#      restarted under the merge poll and the PR remains open or landed) reads
+#      done, naming the PR, only when its steps[] table has every step completed
+#      (an explicit skip of intent, rebase or the interrupted ci monitor is
+#      allowed), the pr step completed, and the run records a PR
+#      (nm_interrupted_run_is_finished); it takes precedence over the worker's
+#      own declarations like every attributed run. Any other step state, or no
+#      recorded PR, keeps the reading it had before the status was mapped
+#      (unknown). In the
 #      coarse runs-ledger fallback (no steps table, no ci log), a terminal
 #      FAILED record whose daemon an explicit probe proves down reads unknown,
 #      never failed: an instrument failure must not read as work failure
@@ -879,6 +888,50 @@ nm_reclassify_failed_run_as_held_green() {
   return 0
 }
 
+# 0 when a run the daemon marked ci_monitor_interrupted finished every substantive
+# step and recorded its pull request: the steps[] table has every step completed
+# (an explicit skip of intent, rebase or the ci monitor itself is allowed - the
+# interrupted monitor is always recorded as a skipped ci step), the pr step
+# completed, and the run names a PR. Any other non-completed step, a missing
+# steps table, or no recorded PR leaves the original classification. This is the
+# daemon-restart shape (2026-10-18 vernant-d3-analytics-b8-pr2-writer): the work
+# was ready or already landed when the monitor stopped, so the run is finished,
+# not an unknown live state.
+nm_interrupted_run_is_finished() {
+  local rows row rest step status saw_pr_completed=0
+  rows=$(nm_steps_rows)
+  [ -n "$rows" ] || return 1
+  [ -n "$(strip_quotes "$(nm_field pr)")" ] || return 1
+  while IFS= read -r row; do
+    row=$(trim "$row")
+    step=$(trim "${row%%,*}")
+    rest=${row#*,}
+    status=$(strip_quotes "$(trim "${rest%%,*}")")
+    case "$status" in
+      completed) [ "$step" != pr ] || saw_pr_completed=1 ;;
+      skipped)
+        case "$step" in intent|rebase|ci) ;; *) return 1 ;; esac
+        ;;
+      *) return 1 ;;
+    esac
+  done <<EOF
+$rows
+EOF
+  [ "$saw_pr_completed" = 1 ]
+}
+
+# Apply the finished reading for a ci_monitor_interrupted run. The state line
+# says so in plain words and carries the recorded PR URL.
+nm_reclassify_interrupted_run_as_finished() {
+  nm_interrupted_run_is_finished || return 1
+  local pr_url
+  RUN_STATE="done"
+  RUN_DETAIL="ci monitor interrupted after all steps completed: PR ready or landed"
+  pr_url=$(strip_quotes "$(nm_field pr)")
+  [ -z "$pr_url" ] || RUN_DETAIL="$RUN_DETAIL: $pr_url"
+  return 0
+}
+
 # 0 when an explicit probe proves the shared daemon down: `no-mistakes daemon
 # status` is the canonical down-probe (the same one fm-brief.sh hands crews
 # before a blocked append) and exits non-zero when the daemon is not running.
@@ -1077,16 +1130,16 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
     # CLI is not retried. Older CLI surfaces without the table retain the
     # coarse fallback below, but cannot turn a replacement into a vague live
     # verdict when its identity and gate cannot be read.
+    bare_run_id=''
+    if [ "$(strip_quotes "$(nm_field branch)")" = "$CREW_BRANCH" ]; then
+      bare_run_id=$(strip_quotes "$(nm_field id)")
+    fi
     nm_read_choice
     [ "$run_overview_present" = 1 ] || emit unknown run-step "run inventory unavailable; run id: $(strip_quotes "$(nm_field id)")"
     [ "$overview_ok" = 1 ] || emit unknown run-step "run inventory unreadable; run ids: $(strip_quotes "$(nm_field id)"), ${run_choice##*|}"
     case "$run_choice" in
       unknown\|*)
-        known_run_id=""
-        if [ "$(strip_quotes "$(nm_field branch)")" = "$CREW_BRANCH" ]; then
-          known_run_id=$(strip_quotes "$(nm_field id)")
-        fi
-        emit unknown run-step "${run_choice#*|}${known_run_id:+; last reported run id: $known_run_id}"
+        emit unknown run-step "${run_choice#*|}${bare_run_id:+; last reported run id: $bare_run_id}"
         ;;
       selected\|*)
         IFS='|' read -r _ selected_id selected_status candidate_ids <<< "$run_choice"
@@ -1098,6 +1151,12 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
         fi
         case "$(strip_quotes "$(nm_field status)")" in
           pending|running|fixing|ci|awaiting_approval|fix_review|completed|failed|cancelled) ;;
+          ci_monitor_interrupted)
+            # Recognized only as the finished shape; any other interrupted run
+            # keeps the reading it had before the status was mapped.
+            nm_interrupted_run_is_finished \
+              || emit unknown run-step "unrecognized run status; run ids: $candidate_ids${bare_run_id:+; last reported run id: $bare_run_id}"
+            ;;
           *) emit unknown run-step "selected run status unverified; run ids: $candidate_ids" ;;
         esac
         if fm_nm_run_is_active "$RUN_OUT"; then current_class=live; else current_class=terminal; fi
@@ -1238,6 +1297,10 @@ if [ "$HAVE_RUN" = 1 ]; then
           if nm_reclassify_failed_run_as_held_green; then :; else
             RUN_STATE=unknown; RUN_DETAIL="run cancelled: no verdict"
           fi ;;
+        ci-monitor-interrupted)
+          if nm_reclassify_interrupted_run_as_finished; then :; else
+            RUN_STATE=unknown; RUN_DETAIL="outcome: $outcome"
+          fi ;;
         *)             RUN_STATE=unknown; RUN_DETAIL="outcome: $outcome" ;;
       esac
     elif [ -n "$awaiting" ] || [ "$status" = awaiting_approval ] || [ "$status" = fix_review ] || [ -n "$gate_status" ] || [ "$has_gate" = 1 ]; then
@@ -1270,6 +1333,10 @@ if [ "$HAVE_RUN" = 1 ]; then
         cancelled)
           if nm_reclassify_failed_run_as_held_green; then :; else
             RUN_STATE=unknown; RUN_DETAIL="run cancelled: no verdict"
+          fi ;;
+        ci_monitor_interrupted)
+          if nm_reclassify_interrupted_run_as_finished; then :; else
+            RUN_STATE=working; RUN_DETAIL="run active ($status)"
           fi ;;
         "")             RUN_STATE=working; RUN_DETAIL="run active" ;;
         *)              RUN_STATE=working; RUN_DETAIL="run active ($status)" ;;
