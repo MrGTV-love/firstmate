@@ -42,19 +42,34 @@ def rows():
 # Publication identity and concurrency are exercised through the actual executable.
 event = m.refusal(args[1:])
 workers = []
-for n in range(8):
-    value = dict(event, event_id=f'concurrent-{n}')
-    proc = subprocess.Popen(['python3', str(writer)], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    workers.append((proc, value))
-for proc, value in workers:
-    stdout, stderr = proc.communicate(json.dumps(value))
+barrier_read, barrier_release = os.pipe()
+# The pipe's shared EOF releases every process, only after all JSON inputs are
+# fed and closed. Each child then execs the actual writer with its own stdin.
+launch = 'import os,sys; gate=int(sys.argv[1]); os.read(gate,1); os.close(gate); os.execv(sys.executable,[sys.executable,sys.argv[2]])'
+try:
+    for n in [*range(8), 1, 5, 1]:
+        value = dict(event, event_id=f'concurrent-{n}')
+        proc = subprocess.Popen(['python3', '-c', launch, str(barrier_read), str(writer)],
+                                pass_fds=(barrier_read,), stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        workers.append(proc)
+        proc.stdin.write(json.dumps(value))
+        proc.stdin.close()
+        proc.stdin = None
+    assert not (home / 'state/friction.jsonl').exists(), 'no writer may publish before the shared start barrier'
+finally:
+    os.close(barrier_read)
+    os.close(barrier_release)
+for proc in workers:
+    stdout, stderr = proc.communicate()
     assert proc.returncode == 0 and not stdout and not stderr, stderr
 assert {row['event_id'] for row in rows()} == {f'concurrent-{n}' for n in range(8)}
+assert len(rows()) == 8, 'overlapping duplicate event IDs must publish only once'
 run(dict(event, event_id='concurrent-1'))
 assert len(rows()) == 8
 raw = (home / 'state/friction.jsonl').read_text()
 assert 'path-canary' not in raw and 'task-canary' not in raw
-print('PASS concurrent complete lines, duplicate event id counted once, hashed context')
+print(f'PASS shared-barrier publication: {len(workers)} writers, {len(rows())} unique complete lines; concurrent/replayed IDs counted once; hashed context')
 
 # A complete stdin event validates exact fields/types and rejects raw subjects.
 invalids = [dict(event, command='secret-canary'), dict(event, exit_printed=1),
