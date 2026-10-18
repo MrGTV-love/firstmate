@@ -676,26 +676,49 @@ assert waiter.stdout.readline() == 'started\n', 'a SIGKILLed holder must release
 os.kill(int(victim_pid.read_text()), signal.SIGKILL)
 finish(waiter, waiter_release)
 
-# A bounded wait ends, says so, and runs the command; a record that names a gone pid is flagged.
-stale_holder = subprocess.Popen([sys.executable, '-c', (
-    'import fcntl,json,os,sys,time\n'
-    'sys.path.insert(0, sys.argv[1])\n'
+# A bounded wait ends, says so, and runs the command. The waiter notice flags a holder whose pid is
+# gone, or whose process started after the epoch recorded when the slot was taken (a reused pid),
+# and calls a holder that started before that epoch alive.
+holder_code = (
+    'import fcntl,json,os,subprocess,sys,time\n'
     'import importlib.util as u\n'
-    's = u.spec_from_file_location("d", sys.argv[2]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
-    'directory = d.slot_directory("test.slot.stale")\n'
+    's = u.spec_from_file_location("d", sys.argv[1]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
+    'gone = subprocess.Popen(["true"]); gone.wait()\n'
+    'pid, since = {"gone": (gone.pid, int(time.time())), "reused": (os.getpid(), int(time.time()) - 3600), "live": (os.getpid(), int(time.time()))}[sys.argv[3]]\n'
+    'directory = d.slot_directory(sys.argv[2])\n'
     'fd = os.open(directory / "slot-0.lock", os.O_RDWR | os.O_CREAT, 0o600)\n'
     'fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n'
-    'os.write(fd, json.dumps(dict(pid=999999, start="Thu Jan  1 00:00:00 1970", since=int(time.time()), cwd="/gone")).encode())\n'
+    'os.write(fd, json.dumps(dict(pid=pid, since=since)).encode())\n'
     'print("held", flush=True)\n'
-    'time.sleep(60)'), str(root), str(helper)], env=slot_env, stdout=subprocess.PIPE, text=True)
-assert stale_holder.stdout.readline() == 'held\n'
-bounded = subprocess.run([sys.executable, str(helper), 'run', 'test.slot.stale', '--', sys.executable, '-c', 'print("ran anyway")'],
-                         env=dict(slot_env, FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='3'), cwd=workrepo, capture_output=True, text=True, timeout=60)
-stale_holder.kill()
-stale_holder.communicate()
-assert bounded.returncode == 0 and bounded.stdout == 'ran anyway\n', bounded
-assert 'does not match a live process' in bounded.stderr and 'cwd=/gone' in bounded.stderr, bounded.stderr
-assert 'waited' in bounded.stderr and 'running it without a slot' in bounded.stderr, bounded.stderr
+    'time.sleep(60)')
+for stale_case, flagged in (('gone', True), ('reused', True), ('live', False)):
+    stale_key = f'test.slot.stale-{stale_case}'
+    stale_holder = subprocess.Popen([sys.executable, '-c', holder_code, str(helper), stale_key, stale_case], env=slot_env, stdout=subprocess.PIPE, text=True)
+    assert stale_holder.stdout.readline() == 'held\n'
+    bounded = subprocess.run([sys.executable, str(helper), 'run', stale_key, '--', sys.executable, '-c', 'print("ran anyway")'],
+                             env=dict(slot_env, FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='3'), cwd=workrepo, capture_output=True, text=True, timeout=60)
+    stale_holder.kill()
+    stale_holder.communicate()
+    assert bounded.returncode == 0 and bounded.stdout == 'ran anyway\n', (stale_case, bounded)
+    assert ('does not match a live process' in bounded.stderr) == flagged, (stale_case, bounded.stderr)
+    assert stale_case == 'gone' or f'pid={stale_holder.pid} ' in bounded.stderr, (stale_case, bounded.stderr)
+    assert stale_case != 'live' or f'pid={stale_holder.pid} alive' in bounded.stderr, (stale_case, bounded.stderr)
+    assert 'waited' in bounded.stderr and 'running it without a slot' in bounded.stderr, (stale_case, bounded.stderr)
+
+# Taking a free slot runs no ps; a waiter's notice runs one ps call for each holder it names.
+ps_dir, ps_log = tmp / 'ps-stub', tmp / 'ps.calls'
+ps_dir.mkdir()
+(ps_dir / 'ps').write_text(f'#!/bin/sh\necho "$*" >> "{ps_log}"\nexec "{shutil.which("ps")}" "$@"\n')
+(ps_dir / 'ps').chmod(0o755)
+ps_env = dict(slot_env, PATH=f'{ps_dir}{os.pathsep}{os.environ["PATH"]}', FM_TEST_KEY_SLOTS='1', FM_TEST_SLOT_WAIT_SECONDS='3')
+free_slot = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.ps', '--', 'true'], env=ps_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert free_slot.returncode == 0 and not ps_log.exists(), (free_slot, ps_log.exists() and ps_log.read_text())
+ps_holder = hold_slot('test.slot.ps', 'ps-holder', ps_env, workrepo)
+queued_ps = subprocess.run([sys.executable, str(helper), 'gate', 'test.slot.ps', '--', 'true'], env=ps_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+ps_holder.kill()
+ps_holder.communicate()
+ps_calls = ps_log.read_text().splitlines()
+assert queued_ps.returncode == 0 and 'waiting' in queued_ps.stderr and len(ps_calls) == 1 and f'-p {ps_holder.pid}' in ps_calls[0], (queued_ps.stderr, ps_calls)
 
 # The same key nested inside a held slot takes no second slot, so a limit of one cannot deadlock.
 nested = subprocess.run([sys.executable, str(helper), 'run', 'test.slot.nest', '--', sys.executable, str(helper), 'run', 'test.slot.nest', '--', 'true'],

@@ -970,7 +970,8 @@ The gate shapes throughput and is not a safety boundary: a waiter that gives up,
 
 A slot is an exclusive `flock` held by the wrapper alone, and the kernel releases it when that process exits for any reason, `SIGKILL` included, so a killed run frees its slot at once and no lock directory needs repair.
 The lock is not inherited by the command, so a leftover daemon of a finished test can never hold a slot for good.
-Each holder records its pid, its process start time and its working directory in its slot file, and a waiter's notice flags a record whose pid is gone or whose start time changed, so a reused pid is never taken for the holder.
+Each holder records its pid and the epoch at which it took the slot in its slot file, and a copy that takes a free slot runs no `ps`.
+A waiting copy runs one `ps` call for each holder in its notice and flags a record whose pid is gone, or whose process started after the recorded epoch, as stale.
 
 ## Gate defaults (.no-mistakes.yaml)
 

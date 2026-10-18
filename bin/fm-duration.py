@@ -91,10 +91,11 @@ $HOME/.cache/fm-test-slots, created mode 0700 and owned by the caller. The
 kernel releases a flock on every exit, SIGKILL included, so no lock directory
 needs repair and a killed run frees its slot at once; the lock is held by this
 process alone and never inherited by COMMAND, so a test's own leftover daemon
-can never hold a slot for good. Each holder writes a record of its pid, its
-process start time, its working directory and its start epoch; a waiter's
-notice names the key it waits on and each holder, and flags a record whose pid
-is gone or whose start time changed, so a reused pid is never taken for the
+can never hold a slot for good. Each holder writes a record of its pid and
+the epoch at which it took the slot; taking a free slot runs no ps. A waiter's
+notice names the key it waits on and each holder, with one ps call per holder,
+and flags a record whose pid is gone or whose process started after the
+recorded epoch (the pid was reused), so a reused pid is never taken for the
 holder. A waiter prints
 its first notice after 2 seconds and another every 60, waits at most
 FM_TEST_SLOT_WAIT_SECONDS (default 7200, the longest fm-teardown run measured in
@@ -594,13 +595,6 @@ def slot_directory(key):
     return directory
 
 
-def process_start(pid):
-    """A process's start time as ps prints it, or '' when no such process exists."""
-    result = subprocess.run(['ps', '-o', 'lstart=', '-p', str(pid)], capture_output=True, text=True,
-                            env=dict(os.environ, LC_ALL='C'))
-    return ' '.join(result.stdout.split()) if result.returncode == 0 else ''
-
-
 def slot_holders(directory, limit):
     """(index, record text) for each slot whose lock is held, probed without keeping any."""
     held = []
@@ -624,14 +618,28 @@ def slot_holders(directory, limit):
     return held
 
 
+def holder_is_stale(pid, since):
+    """True when PID is gone, or started after the epoch SINCE and so cannot be the process that took the slot."""
+    try:
+        result = subprocess.run(['ps', '-o', 'lstart=', '-p', str(pid)], capture_output=True, text=True,
+                                env=dict(os.environ, LC_ALL='C'))
+    except OSError:
+        return False
+    if result.returncode != 0 or not result.stdout.strip():
+        return True
+    try:
+        started = time.mktime(time.strptime(' '.join(result.stdout.split()), '%a %b %d %H:%M:%S %Y'))
+    except ValueError:
+        return False
+    return started > since
+
+
 def describe_holder(record):
-    pid = record.get('pid')
-    if not isinstance(pid, int) or not record.get('start'):
+    pid, since = record.get('pid'), record.get('since')
+    if not isinstance(pid, int) or not isinstance(since, int):
         return 'holder unknown'
-    stale = process_start(pid) != record['start']
-    age = max(0, int(time.time() - record.get('since', time.time())))
-    state = 'record does not match a live process (pid gone or reused)' if stale else 'alive'
-    return f'pid={pid} {state} held {age}s cwd={record.get("cwd", "?")}'
+    state = 'record does not match a live process (pid gone or reused)' if holder_is_stale(pid, since) else 'alive'
+    return f'pid={pid} {state} held {max(0, int(time.time() - since))}s'
 
 
 def slot_log(log_fd, message):
@@ -673,7 +681,7 @@ def queue_for_slot(key, directory, limit, wait, log_fd):
                 os.close(fd)
                 continue
             try:
-                record = dict(pid=os.getpid(), start=process_start(os.getpid()), since=int(time.time()), key=key, cwd=os.getcwd())
+                record = dict(pid=os.getpid(), since=int(time.time()))
                 os.ftruncate(fd, 0)
                 os.pwrite(fd, json.dumps(record).encode(), 0)
             except OSError:
