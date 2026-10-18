@@ -12,7 +12,7 @@ TMP_ROOT=$(fm_test_tmproot fm-api-key-guard-lib)
 mkdir -p "$TMP_ROOT/agent"
 
 billing_diagnostics() {
-  HOME="$TMP_ROOT" PI_CODING_AGENT_DIR="$TMP_ROOT/agent" OMP_PROFILE= \
+  HOME="$TMP_ROOT" PI_CODING_AGENT_DIR="$TMP_ROOT/agent" OMP_PROFILE='' \
     fm_omp_api_billing_config_diagnostics
 }
 
