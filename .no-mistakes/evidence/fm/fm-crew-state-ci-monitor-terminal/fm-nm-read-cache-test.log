@@ -1,0 +1,15 @@
+ok - the default whole-read bound cuts only the hung lane, after 40s
+ok - case_finished_run_is_kept_until_the_id_changes: a finished run is cached until a newer run replaces it
+ok - case_finished_run_needs_the_database: an unverifiable finished run is read again, never guessed
+ok - case_live_run_is_read_fresh_every_time: a live run gets a fresh read on every call
+ok - case_failure_is_read_fresh_every_time: a failed or timed-out call is read fresh on every call and never replayed
+ok - case_unknown_inventory_is_read_fresh_every_time: an unknown inventory verdict is never kept
+ok - the daemon probe is read fresh on every call
+ok - a hit prints exactly the bytes of the fresh read, and a failure is never stored
+ok - answers are classified by what they say, and only a settled finished run is kept
+ok - cold, warm and uncached reads classify every run shape the same
+ok - mutation caught: finished-always-valid fails case_finished_run_is_kept_until_the_id_changes
+ok - mutation caught: finished-needs-no-database fails case_finished_run_needs_the_database
+ok - mutation caught: live-run-kept fails case_live_run_is_read_fresh_every_time
+ok - mutation caught: failure-kept fails case_failure_is_read_fresh_every_time
+bash tests/fm-nm-read-cache.test.sh  8.28s user 17.64s system 20% cpu 2:09.21 total

@@ -1,0 +1,114 @@
+### S1 reference run (all steps done, PR merged on the forge), id-addressed/outcome route
+[AFTER] S1 outcome route
+    state: done · source: run-step · ci monitor interrupted after all steps completed: PR merged: https://github.com/MrGTV-love/vernant/pull/3434 · run: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S1 outcome route
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S2 same run, bare status with NO outcome/error line (the incident shape), status-only arm
+[AFTER] S2 status-only route
+    state: done · source: run-step · ci monitor interrupted after all steps completed: PR merged: https://github.com/MrGTV-love/vernant/pull/3434 · run: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S2 status-only route
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S3 PR is really CLOSED unmerged on the forge (vernant#3444)
+[AFTER] S3 closed PR
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S3 closed PR
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S4 PR does not exist on the forge (vernant#99999999)
+[AFTER] S4 missing PR
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S4 missing PR
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S5 forge read skipped (FM_CREW_STATE_NO_FORGE=1)
+[AFTER] S5 forge skipped
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S5 forge skipped
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S6 forge unreadable (gh and gh-axi both fail)
+[AFTER] S6 forge unreadable
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S6 forge unreadable
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S7 REAL stored run with intent skipped (backpass, PR open): must stay unknown
+[AFTER] S7 intent skipped (real run 01M4GQF0NG9NA68WPVKX79PK6C)
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M4GQF0NG9NA68WPVKX79PK6C; last reported run id: 01M4GQF0NG9NA68WPVKX79PK6C
+[BEFORE] S7 intent skipped (real run 01M4GQF0NG9NA68WPVKX79PK6C)
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M4GQF0NG9NA68WPVKX79PK6C; last reported run id: 01M4GQF0NG9NA68WPVKX79PK6C
+
+### S8 steps edited: lint pending / pr step failed / rebase skipped / ci failed
+[AFTER] S8a lint pending
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S8a lint pending
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+[AFTER] S8b pr step failed
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S8b pr step failed
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+[AFTER] S8c rebase skipped
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S8c rebase skipped
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+[AFTER] S8d ci failed
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S8d ci failed
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S9 no PR recorded on the run
+[AFTER] S9 no pr
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S9 no pr
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S10 status-only arm with an unfinished step (before: working, after: unknown)
+[AFTER] S10 status-only + lint pending
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE] S10 status-only + lint pending
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S11 PR open on the forge (real open vernant#3470 substituted into the run's pr field)
+[AFTER]
+    state: done · source: run-step · ci monitor interrupted after all steps completed: PR open: https://github.com/MrGTV-love/vernant/pull/3470 · run: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE]
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S12 precedence: stale worker 'blocked' declaration in the task status log; the finished run must win
+[AFTER]
+    state: done · source: run-step · ci monitor interrupted after all steps completed: PR merged: https://github.com/MrGTV-love/vernant/pull/3434 · status-log superseded (run done) · run: 01M55RW68N1QX2Q95N3FCWBBZJ
+[BEFORE]
+    state: unknown · source: run-step · unrecognized run status; run ids: 01M55RW68N1QX2Q95N3FCWBBZJ; last reported run id: 01M55RW68N1QX2Q95N3FCWBBZJ
+
+### S13 exit code of the reader for the finished run (after)
+exit=0
+### L1 no-runs-table route, OUTCOME arm: finished / merged
+[AFTER]
+    state: done · source: run-step · ci monitor interrupted after all steps completed: PR merged: https://github.com/MrGTV-love/vernant/pull/3434
+[BEFORE]
+    state: unknown · source: run-step · outcome: ci-monitor-interrupted
+### L2 no-runs-table route, STATUS-ONLY arm (no outcome/error line): finished / merged
+[AFTER]
+    state: done · source: run-step · ci monitor interrupted after all steps completed: PR merged: https://github.com/MrGTV-love/vernant/pull/3434
+[BEFORE]
+    state: working · source: run-step · run active (ci_monitor_interrupted)
+### L3 no-runs-table route, STATUS-ONLY arm, lint step pending (not finished)
+[AFTER]
+    state: unknown · source: run-step · status: ci_monitor_interrupted
+[BEFORE]
+    state: working · source: run-step · run active (ci_monitor_interrupted)
+### L4 no-runs-table route, STATUS-ONLY arm, PR really closed (vernant#3444)
+[AFTER]
+    state: unknown · source: run-step · status: ci_monitor_interrupted
+[BEFORE]
+    state: working · source: run-step · run active (ci_monitor_interrupted)
+### L5 no-runs-table route, OUTCOME arm, PR really closed (vernant#3444)
+[AFTER]
+    state: unknown · source: run-step · outcome: ci-monitor-interrupted
+[BEFORE]
+    state: unknown · source: run-step · outcome: ci-monitor-interrupted
