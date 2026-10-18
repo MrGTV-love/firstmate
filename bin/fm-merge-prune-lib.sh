@@ -20,8 +20,10 @@
 #   - every ignored file is scratch (list below), a preserved record, or a
 #     symlink; anything else is unique and keeps the copy;
 #   - no process has its working directory or an open file inside it, except a
-#     system search indexer and the idle shell of the task's own terminal pane
-#     (fm_mp_pane_shell).
+#     system search indexer and the one idle shell of the task's own terminal
+#     pane (fm_mp_pane_shell), which is ended with SIGHUP just before the copy is
+#     destroyed (fm_mp_end_pane_shell) because treehouse refuses a copy that has
+#     a process working inside it.
 # Ignored scratch: virtual environments, node_modules, tool and build caches
 # (.venv, venv, node_modules, __pycache__, .pytest_cache, .ruff_cache,
 # .mypy_cache, .next, graphify-out, .import_linter_cache, *.tsbuildinfo,
@@ -47,6 +49,8 @@ FM_MP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FM_MP_VERDICT=
 # shellcheck disable=SC2034 # Output globals, read by bin/fm-merge-prune.sh.
 FM_MP_REASON=
+# shellcheck disable=SC2034 # Output global, read by bin/fm-merge-prune.sh.
+FM_MP_PANE_SHELL=
 FM_MP_PRESERVE=()
 FM_MP_NESTED=()
 
@@ -221,8 +225,11 @@ fm_mp_classify_entry() {  # <real-copy> <relative-path>
 # lsof is the same probe treehouse-reap-clean uses (minus system search
 # indexers and the task's own idle pane shell, below); a missing probe cannot
 # prove absence and keeps the copy, a probe that times out is retried later.
+# The one idle pane shell that passes is left in FM_MP_PANE_SHELL for the caller
+# to end; a second one keeps the copy.
 fm_mp_prove_unused() {  # <real-copy> [<pane-pid>]
   local copy=$1 pane=${2:-} out rc=0 kept pid
+  FM_MP_PANE_SHELL=
   if ! command -v lsof >/dev/null 2>&1; then
     fm_mp_verdict keep "cannot prove no process uses $copy: lsof is not installed"
     return 1
@@ -236,9 +243,16 @@ fm_mp_prove_unused() {  # <real-copy> [<pane-pid>]
   out=${out% }
   kept=
   for pid in $out; do
-    fm_mp_indexer_pid "$pid" || fm_mp_pane_shell "$pid" "$pane" || kept="${kept:+$kept }$pid"
+    if fm_mp_indexer_pid "$pid"; then
+      :
+    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then
+      FM_MP_PANE_SHELL=$pid
+    else
+      kept="${kept:+$kept }$pid"
+    fi
   done
   if [ -n "$kept" ]; then
+    FM_MP_PANE_SHELL=
     fm_mp_verdict keep "process(es) inside $copy: $kept"
     return 1
   fi
@@ -248,9 +262,9 @@ fm_mp_prove_unused() {  # <real-copy> [<pane-pid>]
 # A system search indexer (macOS Spotlight) holds a recently written tree open
 # for as long as a minute while it reads it. It only reads, deleting the tree
 # under it harms nothing, and counting it would keep nearly every fresh copy on a
-# Mac. It and the task's own pane shell (fm_mp_pane_shell) are the deliberate
-# exceptions to "no process inside" (named in docs/configuration.md); any other
-# process, whatever it does, keeps the copy.
+# Mac. It and the task's own pane shell (fm_mp_pane_shell, which is ended before
+# the destroy) are the deliberate exceptions to "no process inside" (named in
+# docs/configuration.md); any other process, whatever it does, keeps the copy.
 fm_mp_indexer_pid() {  # <pid>
   local comm
   comm=$(ps -o comm= -p "$1" 2>/dev/null) || return 1
@@ -285,15 +299,18 @@ fm_mp_pane_pid() {  # <meta-file>
 
 # Whether <pid> is the task's own pane shell: the idle shell that the pane keeps
 # in the copy after its agent exits (the pane entered the copy with a
-# `treehouse get` subshell). Only a recognized shell with no child process that
-# is the pane's shell (<pane-pid>) or descends from it qualifies. A build, an
-# editor, a test, or a shell running one is not it.
-fm_mp_pane_shell() {  # <pid> <pane-pid>
-  local pid=$1 pane=${2:-} comm
+# `treehouse get` subshell). Only a recognized shell whose working directory is
+# inside <real-copy>, with no child process, that is the pane's shell
+# (<pane-pid>) or descends from it qualifies. A build, an editor, a test, or a
+# shell running one is not it.
+fm_mp_pane_shell() {  # <pid> <pane-pid> <real-copy>
+  local pid=$1 pane=${2:-} copy=$3 comm cwd
   [ -n "$pane" ] || return 1
   comm=$(ps -o comm= -p "$pid" 2>/dev/null) || return 1
   comm=$(printf '%s' "$comm" | tr -d '[:space:]')
   [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1
+  cwd=$(lsof -a -d cwd -p "$pid" -Fn 2>/dev/null </dev/null | sed -n 's/^n//p' | sed -n 1p)
+  case "$cwd" in "$copy"|"$copy"/*) ;; *) return 1 ;; esac
   ps -axo pid=,ppid= 2>/dev/null | awk -v p="$pid" -v pane="$pane" '
     { parent[$1] = $2; if ($2 == p) child = 1 }
     END {
@@ -304,6 +321,23 @@ fm_mp_pane_shell() {  # <pid> <pane-pid>
       }
       exit 1
     }'
+}
+
+# End the pane's idle shell with SIGHUP, the way closing its terminal would, and
+# wait up to <seconds> for it to go. It is proved again right before the signal;
+# a process that is not that shell any more, or a shell that does not go, returns
+# 1 and nothing stronger than SIGHUP is ever sent. The pane itself stays open on
+# its outer shell. The caller has stopped the agent first.
+fm_mp_end_pane_shell() {  # <pid> <pane-pid> <real-copy> <seconds>
+  local pid=$1 waited=0
+  kill -0 "$pid" 2>/dev/null || return 0
+  fm_mp_pane_shell "$1" "$2" "$3" || return 1
+  kill -HUP "$pid" 2>/dev/null || return 1
+  while kill -0 "$pid" 2>/dev/null; do
+    [ "$waited" -lt "$4" ] || return 1
+    sleep 1
+    waited=$((waited + 1))
+  done
 }
 
 # Copy one preserve-list path with checksums. <dest-dir> receives the tree under
