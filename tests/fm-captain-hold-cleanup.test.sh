@@ -936,6 +936,119 @@ test_reused_task_id_records_each_cycles_own_close_evidence() {
   pass "ledger on: a reused task id's close records its own cycle's evidence, and a replayed answer records nothing more"
 }
 
+# Fires one injected backend failure through a stand-in tasks-axi: `done` fails
+# the close itself, `stamp` fails the plain body update that restores the
+# resolution-first ordering after the call has already closed.
+install_backend_fault() {  # <home> <done|stamp>
+  local home=$1 fault=$2
+  rm -f "$home/fault-fired"
+  cat > "$home/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+if [ ! -e "$home/fault-fired" ]; then
+  fire=0
+  case "$fault:\${1:-}" in
+    done:done) fire=1 ;;
+    stamp:update)
+      case " \$* " in
+        *" --body-file "*) case " \$* " in *" --archive-body "*) ;; *) fire=1 ;; esac ;;
+      esac
+      ;;
+  esac
+  if [ "\$fire" = 1 ]; then
+    : > "$home/fault-fired"
+    echo "error: injected backend failure" >&2
+    exit 1
+  fi
+fi
+exec "$TASKS_AXI_BIN" "\$@"
+SH
+  chmod +x "$home/fakebin/tasks-axi"
+}
+
+remove_backend_fault() {  # <home>
+  rm -f "$1/fakebin/tasks-axi" "$1/fault-fired"
+}
+
+held_answered_count() {  # <home> <id>
+  jq -c --arg id "$2" 'select(.event == "task.answered" and .task == $id)' "$1/state/fleet-ledger.jsonl" 2>/dev/null | wc -l | tr -d ' '
+}
+
+# An interrupted captain close still leaves exactly one task.closed and one
+# task.answered: both are written as the call closes, so the retry that finishes
+# the command's later steps, and every replay after it, adds none.
+test_interrupted_captain_close_records_the_ledger_once() {
+  local home id out rc
+  home=$(make_home hold-ledger-interrupted)
+  : > "$home/config/fleet-ledger"
+  printf 'Ship attachments by reference.\n' > "$home/answer.txt"
+  printf 'Nothing is pending. No captain answer was given.\n' > "$home/evidence.txt"
+
+  id=sample-interrupted-answer
+  retained_held_scout "$home" "$id"
+  install_backend_fault "$home" stamp
+  rc=0
+  run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail "the injected failure after the close did not interrupt the answer"
+  assert_present "$home/fault-fired" "the injected failure never fired"
+  assert_equals "[\"$id\",\"report\",null]" "$(held_closed_rows_of "$home" "$id")" \
+    "task.closed after an answer interrupted once the call had closed"
+  assert_equals 1 "$(held_answered_count "$home" "$id")" "task.answered after an answer interrupted once the call had closed"
+  remove_backend_fault "$home"
+  out=$(run_captain "$home" answer "$id" --decision-file "$home/answer.txt") || fail "the retried answer failed"
+  assert_equals "answered: $id" "$out" "retried answer stdout"
+  assert_equals 1 "$(held_closed_rows_of "$home" "$id" | wc -l | tr -d ' ')" "task.closed records after the retried answer"
+  assert_equals 1 "$(held_answered_count "$home" "$id")" "task.answered records after the retried answer"
+
+  id=sample-interrupted-reconcile
+  retained_held_scout "$home" "$id"
+  install_backend_fault "$home" stamp
+  rc=0
+  run_captain "$home" reconcile close "$id" --evidence-file "$home/evidence.txt" --verified-outcome moot >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail "the injected failure after the close did not interrupt the reconcile close"
+  assert_present "$home/fault-fired" "the injected failure never fired for the reconcile close"
+  assert_equals "[\"$id\",\"report\",null]" "$(held_closed_rows_of "$home" "$id")" \
+    "task.closed after a reconcile close interrupted once the call had closed"
+  assert_equals 1 "$(held_answered_count "$home" "$id")" "task.answered after a reconcile close interrupted once the call had closed"
+  remove_backend_fault "$home"
+  out=$(run_captain "$home" reconcile close "$id" --evidence-file "$home/evidence.txt" --verified-outcome moot) \
+    || fail "the retried reconcile close failed"
+  assert_equals "reconciled: $id" "$out" "retried reconcile close stdout"
+  assert_equals 1 "$(held_closed_rows_of "$home" "$id" | wc -l | tr -d ' ')" "task.closed records after the retried reconcile close"
+  assert_equals 1 "$(held_answered_count "$home" "$id")" "task.answered records after the retried reconcile close"
+
+  id=sample-interrupted-repair
+  retained_held_scout "$home" "$id"
+  tasks_in "$home" "done" "$id" >/dev/null || fail "could not close the held row outside the script"
+  install_backend_fault "$home" stamp
+  rc=0
+  run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail "the injected failure after the repair record did not interrupt the repair"
+  assert_present "$home/fault-fired" "the injected failure never fired for the repair"
+  assert_equals "[\"$id\",\"report\",null]" "$(held_closed_rows_of "$home" "$id")" \
+    "task.closed after a repair interrupted once its record was written"
+  assert_equals 1 "$(held_answered_count "$home" "$id")" "task.answered after a repair interrupted once its record was written"
+  remove_backend_fault "$home"
+  run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null || fail "the retried repair failed"
+  assert_equals 1 "$(held_closed_rows_of "$home" "$id" | wc -l | tr -d ' ')" "task.closed records after the retried repair"
+  assert_equals 1 "$(held_answered_count "$home" "$id")" "task.answered records after the retried repair"
+
+  id=sample-interrupted-before-close
+  retained_held_scout "$home" "$id"
+  install_backend_fault "$home" "done"
+  rc=0
+  run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null 2>&1 || rc=$?
+  [ "$rc" -ne 0 ] || fail "the injected failure of the close did not interrupt the answer"
+  assert_present "$home/fault-fired" "the injected failure of the close never fired"
+  assert_equals "" "$(held_closed_rows_of "$home" "$id")" "task.closed after a close that failed"
+  assert_equals 0 "$(held_answered_count "$home" "$id")" "task.answered after a close that failed"
+  remove_backend_fault "$home"
+  out=$(run_captain "$home" answer "$id" --decision-file "$home/answer.txt") || fail "the retried close failed"
+  assert_equals "answered: $id" "$out" "retried close stdout"
+  assert_equals "[\"$id\",\"report\",null]" "$(held_closed_rows_of "$home" "$id")" "task.closed after the retried close"
+  assert_equals 1 "$(held_answered_count "$home" "$id")" "task.answered after the retried close"
+  pass "ledger on: an interrupted answer, reconcile close, or repair leaves one task.closed and one task.answered, and a retry adds none"
+}
+
 test_captain_close_before_cleanup_replay_records_task_closed_once() {
   local home id repo wt rc bootstrap gerrit_url=https://gerrit.example.com/c/project/+/12345
   home=$(make_home hold-closed-before-replay)
@@ -2037,6 +2150,7 @@ test_answer_before_cleanup_replay_preserves_the_retained_report
 test_answer_before_cleanup_replay_notes_a_retained_gerrit_change
 test_captain_close_of_retained_work_records_task_closed
 test_captain_close_before_cleanup_replay_records_task_closed_once
+test_interrupted_captain_close_records_the_ledger_once
 test_reused_task_id_records_each_cycles_own_close_evidence
 test_unusable_pending_close_record_names_its_reason
 test_relocated_report_does_not_wedge_an_answer_before_replay

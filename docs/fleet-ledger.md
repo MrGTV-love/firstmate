@@ -72,6 +72,7 @@ For `send`, it is the role of the home that sent it: `main`, `main-afk` while an
 A `hold` answered directly with `fm-captain-hold.sh answer --decision-file` takes the role of the home that ran the command, and so does one whose recorded source starts `a firstmate answer sent to `.
 A `hold` whose recorded source starts `the captured result ` is `page`.
 Anything else, including any other recorded source, a hold closed by `fm-captain-hold.sh reconcile close` (evidence closed it, so nobody answered), and an unreadable home identity, is the literal `unknown`.
+The `hold` record is written as the call closes or is released, before the command's later checks, so a retry after an interruption adds none.
 A replay of an answer that was already recorded writes none.
 `bin/fm-captain-hold.sh` also writes the time and the answerer into the hold's "Resolution recorded" block as `Resolved at: <ISO 8601 UTC>` and `Answered by: <value>` lines, directly after the `Resolution mode:` line and any `Resolves hold set:` line, whether or not the ledger is on.
 A replayed answer keeps the first block, so it keeps the first time; a reconciliation block carries the time but no `Answered by:` line, because evidence is not an answer.

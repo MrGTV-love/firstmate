@@ -1591,14 +1591,15 @@ live_work_item() {  # <task-id> <backlog-state>
   [ "$2" = in_flight ] || [ -f "$STATE/$1.meta" ]
 }
 
-close_answered() {  # <task-id> <release-0-or-1>
+close_answered() {  # <task-id> <release-0-or-1> [<answer-source>]
   if [ "$2" = 1 ]; then
-    tasks_axi unhold "$1" >/dev/null
+    tasks_axi unhold "$1" >/dev/null || return $?
   else
     apply_pending_retained_artifact "$1" || return 1
     tasks_axi "done" "$1" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null || return $?
     ledger_hold_closed "$1" "${RETAINED_ARTIFACT_ARGS[@]+"${RETAINED_ARTIFACT_ARGS[@]}"}"
   fi
+  ledger_hold_answered "$1" ${3+"$3"}
 }
 
 remove_interrupted_answer_stamp() {  # <task-id>
@@ -1685,14 +1686,14 @@ command_answer() {
     [ "$hold_kind" = captain ] \
       || fail "task $id was never held for the captain; nothing to record an answer on"
     write_resolution_record "$id" repaired "$body"
+    ledger_hold_closed "$id"
+    ledger_hold_answered "$id"
     remove_interrupted_answer_stamp "$id"
     task_show "$id" || fail "task $id disappeared while recording the answer"
     show=$TASK_SHOW_OUTPUT
     [ "$(show_field "$show" state)" = "done" ] || fail "recording the answer reopened closed task $id"
     body_has_resolution_record "$(show_field "$show" body)" \
       || fail "captain-held task $id did not retain its durable resolution record"
-    ledger_hold_closed "$id"
-    ledger_hold_answered "$id"
     publish_parent_resolution_then_retire "$id" "$occurrence" "answered (repaired)"
     printf 'repaired: %s\n' "$id"
     return 0
@@ -1722,7 +1723,6 @@ command_answer() {
         fail "could not close answered captain-held task $id"
       fi
       remove_interrupted_answer_stamp "$id"
-      ledger_hold_answered "$id"
       case "$recorded_mode" in
         released) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) released ;;
         *) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "$outcome" ;;
@@ -1739,7 +1739,6 @@ command_answer() {
     show=$TASK_SHOW_OUTPUT
     body_has_resolution_record "$(show_field "$show" body)" \
       || fail "captain-held task $id did not retain its durable resolution record"
-    ledger_hold_answered "$id"
     publish_parent_resolution_then_retire "$id" "$occurrence" "$outcome"
     printf '%s: %s\n' "$outcome" "$id"
     return 0
@@ -2278,12 +2277,11 @@ reconcile_close() {
     fi
     write_resolution_record "$id" reconciled "$body"
   fi
-  close_answered "$id" 0 || fail "could not close reconciled captain-held task $id"
+  close_answered "$id" 0 reconciled || fail "could not close reconciled captain-held task $id"
   remove_interrupted_answer_stamp "$id"
   task_show_or_fail "$id" "task $id disappeared after closing"
   body_has_resolution_record "$(show_field "$show" body)" \
     || fail "captain-held task $id did not retain its durable resolution record"
-  ledger_hold_answered "$id" reconciled
   publish_parent_hold "$id" "$occurrence" resolved reconciled
   [ "$PARENT_HOLD_PUBLISHED" = 1 ] \
     || fail "could not publish the reconciled captain-held task $id to its parent"
