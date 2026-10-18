@@ -1,0 +1,76 @@
+=== REPORT MODE (no flag), real git/du/lsof/uptime ===
+15:46  up 17:54, 4 users, load averages: 66.48 68.10 63.40
+copy-sweep: mode=report containers=1 copies=7
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+HELD-LIVE-TASK	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/live	task live-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it)
+ORPHAN-NO-RECORD	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/orphan	it is not a readable git worktree root
+HELD-LIVE-TASK	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/proc	process 52476 is running inside it
+REAPABLE-PROVEN	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/reap	clean, no process, no record, HEAD contained in a remote branch
+HELD-UNPUSHED	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote and not in the default branch
+summary: REAPABLE-PROVEN=1
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=1
+budget pool <W>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <W>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+rc=0
+unchanged after report: reap
+unchanged after report: dirty
+unchanged after report: unpushed
+unchanged after report: live
+unchanged after report: orphan
+unchanged after report: locked
+unchanged after report: proc
+registered after report: 7
+state files after report:
+/Users/charlesabrooker/tmp/fm-lab.xUElVk/data:
+
+/Users/charlesabrooker/tmp/fm-lab.xUElVk/state:
+live-task.meta
+
+=== APPLY ===
+copy-sweep: mode=apply containers=1 copies=6
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? untracked.txt
+HELD-LIVE-TASK	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/live	task live-task's active record names it as its worktree
+HELD-LOCKED	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it)
+ORPHAN-NO-RECORD	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/orphan	it is not a readable git worktree root
+HELD-LIVE-TASK	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/proc	process 52476 is running inside it
+HELD-UNPUSHED	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/unpushed	1 commit(s) are on no remote and not in the default branch
+REMOVED	<W>/th/pool1/1/repo/.claude/worktrees/reap	branch fm/reap at 8b9c8a0f3012 (clean, no process, no record, HEAD contained in a remote branch)
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=1
+budget pool <W>/th/pool1: 0.00 GiB of 60 GiB, ok
+budget container <W>/th/pool1/1/repo: 0.00 GiB of 20 GiB, ok
+rc=0
+--- removal log ---
+2026-10-18T20:46:37Z	removed	<W>/th/pool1/1/repo/.claude/worktrees/reap	clone=<W>/th/pool1/1/repo	head=8b9c8a0f301235c054a61801a9d984d867a01453	branch=fm/reap	kib=12	proof=clean, no process, no record, HEAD contained in a remote branch
+--- which copies still exist ---
+GONE: reap
+present: dirty
+present: unpushed
+present: live
+present: orphan
+present: locked
+present: proc
+byte-identical after apply: dirty
+byte-identical after apply: unpushed
+byte-identical after apply: live
+byte-identical after apply: orphan
+byte-identical after apply: locked
+byte-identical after apply: proc
+branch fm/reap exists in clone (branch is kept, only worktree removed): 1
+
+=== APPLY AGAIN (idempotent) ===
+summary: REAPABLE-PROVEN=0
+summary: HELD-LIVE-TASK=2
+summary: HELD-LOCKED=1
+summary: HELD-UNPUSHED=1
+summary: HELD-DIRTY=1
+summary: ORPHAN-NO-RECORD=1

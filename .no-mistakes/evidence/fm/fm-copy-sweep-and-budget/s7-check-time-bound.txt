@@ -1,0 +1,13 @@
+15:51  up 17:58, 4 users, load averages: 69.03 72.06 66.63
+=== hung git status, FM_CHECK_TIMEOUT=20 (bound 15s) ===
+FM_CHECK_TIMEOUT=20 -> rc=0 elapsed=15s
+copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.01 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/c1 0.00 GiB UNCLASSIFIED, <W>/th/pool1/1/repo/.claude/worktrees/c2 0.00 GiB UNCLASSIFIED, <W>/th/pool1/1/repo/.claude/worktrees/c3 0.00 GiB UNCLASSIFIED
+=== zero-padded 008 (bound 3s): must not abort with 'value too great for base' ===
+FM_CHECK_TIMEOUT=008 -> rc=0 elapsed=5s
+copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.01 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/c1 0.00 GiB UNCLASSIFIED, <W>/th/pool1/1/repo/.claude/worktrees/c2 0.00 GiB UNCLASSIFIED, <W>/th/pool1/1/repo/.claude/worktrees/c3 0.00 GiB UNCLASSIFIED
+=== zero-padded 045 ===
+FM_CHECK_TIMEOUT=045 -> rc=0 elapsed=42s
+copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.01 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/c1 0.00 GiB UNCLASSIFIED, <W>/th/pool1/1/repo/.claude/worktrees/c2 0.00 GiB UNCLASSIFIED, <W>/th/pool1/1/repo/.claude/worktrees/c3 0.00 GiB UNCLASSIFIED
+=== non-numeric 'abc' -> 30 default. (skip 120s hang: use no-hang PATH) ===
+rc=0 elapsed=13s
+copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.01 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/c1 0.00 GiB REAPABLE-PROVEN, <W>/th/pool1/1/repo/.claude/worktrees/c2 0.00 GiB REAPABLE-PROVEN, <W>/th/pool1/1/repo/.claude/worktrees/c3 0.00 GiB REAPABLE-PROVEN

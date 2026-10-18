@@ -1,0 +1,21 @@
+=== apply #1 ===
+copy-sweep: wake raised: copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.00 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/held1 0.00 GiB HELD-UNPUSHED, <W>/th/pool1/1/repo/.claude/worktrees/held2 0.00 GiB HELD-UNPUSHED
+HELD-UNPUSHED	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/held1	1 commit(s) are on no remote and not in the default branch
+HELD-UNPUSHED	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/held2	1 commit(s) are on no remote and not in the default branch
+summary: HELD-LIVE-TASK=0
+summary: HELD-LOCKED=0
+summary: HELD-UNPUSHED=2
+summary: HELD-DIRTY=0
+budget pool <W>/th/pool1: 0.00 GiB, no budget (off)
+budget container <W>/th/pool1/1/repo: 0.00 GiB of 0.004 GiB, over
+--- wake queue ---
+.wake-queue
+.wake-queue.seq
+.watcher-down
+copy-sweep.record
+copy-sweep.sizes
+1792356494	1	check	<LAB>/state/copy-sweep.check.sh	check: <LAB>/state/copy-sweep.check.sh: copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.00 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/held1 0.00 GiB HELD-UNPUSHED, <W>/th/pool1/1/repo/.claude/worktrees/held2 0.00 GiB HELD-UNPUSHED
+=== apply #2 (same budget still over: NO second wake) ===
+0
+queue rows: 1
+copies still present: held1 held2 

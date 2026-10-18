@@ -1,0 +1,27 @@
+15:50  up 17:58, 4 users, load averages: 77.57 73.86 67.06
+=== default limit (90): sizing runs at this host's real load ===
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? u.txt
+REAPABLE-PROVEN	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/reap	clean, no process, no record, HEAD contained in a remote branch
+budget pool <W>/th/pool1: 0.00 GiB of 60 GiB, ok
+=== load-limit 1: report prints the skip line, still lists + classifies, no du ===
+copy-sweep: scan skipped: load 76.32 above limit 1
+HELD-DIRTY	? GiB	<W>/th/pool1/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? u.txt
+REAPABLE-PROVEN	? GiB	<W>/th/pool1/1/repo/.claude/worktrees/reap	clean, no process, no record, HEAD contained in a remote branch
+=== check at t0: quiet, but the skip is recorded ===
+[]
+schema	fm-copy-sweep-v1
+last_scan	1792356643
+skip	1792356643	scan skipped: load 76.32 above limit 1
+=== check at t0+5h: still quiet ===
+[]
+=== check at t0+6h10m: ONE wake ===
+copy-sweep: scan skipped: load 76.32 above limit 1 on every run for 6 hours
+=== check at t0+7h: no second wake ===
+[]
+=== apply under skip: removal still runs (classes + apply are not gated) ===
+copy-sweep: scan skipped: load 76.32 above limit 1
+HELD-DIRTY	? GiB	<W>/th/pool1/1/repo/.claude/worktrees/dirty	1 uncommitted or untracked path(s), first: ?? u.txt
+REMOVED	<W>/th/pool1/1/repo/.claude/worktrees/reap	branch fm/reap at 975546c86a66 (clean, no process, no record, HEAD contained in a remote branch)
+=== load back under limit: streak ends; a sized run clears the skip record ===
+schema	fm-copy-sweep-v1
+last_scan	1792356649

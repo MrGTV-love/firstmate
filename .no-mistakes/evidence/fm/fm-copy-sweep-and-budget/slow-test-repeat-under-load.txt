@@ -1,0 +1,6 @@
+run 1: 63.03 69.79 66.64 :: ok - a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time :: total 52s
+run 2: 58.33 67.47 65.96 :: ok - a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time :: total 51s
+run 3: 79.71 72.90 68.20 :: ok - a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time :: total 74s
+run 4: 78.02 73.85 68.87 :: ok - a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time :: total 55s
+run 5: 68.58 71.61 68.32 :: ok - a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time :: total 55s
+run 6: 68.98 71.58 68.61 :: ok - a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time :: total 67s

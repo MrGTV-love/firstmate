@@ -1,0 +1,19 @@
+ok - report mode lists every copy with class and reason, changes nothing, and repeats exactly
+ok - apply removes only the REAPABLE-PROVEN copy; dirty, unpushed, live, orphan, locked and in-use copies stay byte-identical; a rerun is idempotent
+ok - a copy with one untracked file and a copy whose tip is on no remote are both kept
+ok - a copy whose tip is on no remote but whose content already landed is removed by the teardown landed rule
+ok - a project clone under a Firstmate home is enumerated, budgeted as a container, and swept
+ok - a failing git worktree remove leaves the copy, is reported, exits 1, and is attempted once
+ok - apply never forces, cleans, unlocks, recursively deletes or calls treehouse
+ok - a load above the limit skips only the sizing, says so in the report and the record, and listing, classes and apply still run
+ok - a streak of skipped runs raises one wake after 6 hours, none while it stands, and again after a sized run breaks it
+ok - du runs one at a time as nice -n 20 du -sk, with and without a deadline
+ok - sizes are cached by copy path and mtime and expire with cache-max-age
+ok - a copy nested in another copy is subtracted from the enclosing one
+ok - the budget wake names budget, total and the five largest copies with class, fires once, and fires again after a drop and a new overrun
+ok - a pool budget and a container budget that go over together raise one wake
+ok - apply raises the budget wake once through the wake queue
+ok - a scan cut at its time bound wakes only on bytes it measured and records no completed scan
+ok - a registered copy whose directory is gone counts as 0 KiB, so it never latches a budget record
+not ok - check outlived its FM_CHECK_TIMEOUT of 20 seconds: 22
+bash tests/fm-copy-sweep.test.sh  20.32s user 44.06s system 25% cpu 4:15.52 total

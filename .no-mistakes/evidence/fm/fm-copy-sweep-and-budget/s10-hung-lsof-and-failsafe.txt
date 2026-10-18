@@ -1,0 +1,7 @@
+=== lsof hangs (120s); FM_CHECK_TIMEOUT=20 ===
+rc=0 elapsed=16s
+copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.01 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/c1 0.00 GiB UNCLASSIFIED, <W>/th/pool1/1/repo/.claude/worktrees/c2 0.00 GiB UNCLASSIFIED
+=== lsof fails (exit 1): report + apply must hold everything and remove nothing ===
+HELD-LIVE-TASK	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/c1	the process scan failed, so no process is ruled out
+HELD-LIVE-TASK	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/c2	the process scan failed, so no process is ruled out
+copies still present: c1 c2 

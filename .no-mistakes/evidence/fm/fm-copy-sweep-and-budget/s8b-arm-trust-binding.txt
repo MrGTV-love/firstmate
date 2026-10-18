@@ -1,0 +1,6 @@
+armed: state/copy-sweep.check.sh
+armed shim:    registered: yes
+tampered shim: registered: no
+restored shim: registered: yes
+disarmed: state/copy-sweep.check.sh
+after disarm:  registered: no

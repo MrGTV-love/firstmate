@@ -1,0 +1,10 @@
+--- inner copy B has an uncommitted file; git status of A cannot see it: [] ---
+=== report ===
+REAPABLE-PROVEN	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/A	clean, no process, no record, HEAD contained in a remote branch
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/A/.claude/worktrees/B	1 uncommitted or untracked path(s), first: ?? precious.txt
+=== apply ===
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/A/.claude/worktrees/B	1 uncommitted or untracked path(s), first: ?? precious.txt
+REMOVED	<W>/th/pool1/1/repo/.claude/worktrees/A	branch fm/A at 96170e09864a (clean, no process, no record, HEAD contained in a remote branch)
+rc=0
+A GONE
+B/precious.txt LOST

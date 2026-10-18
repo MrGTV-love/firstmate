@@ -1,0 +1,27 @@
+=== arm ===
+armed: state/copy-sweep.check.sh
+-rw------- copy-sweep.check-trust
+-rwx------ copy-sweep.check.sh
+--- shim bytes ---
+#!/usr/bin/env bash
+export FM_HOME=<LAB>
+exec <REPO>/bin/fm-proc-budget.sh -- <REPO>/bin/fm-copy-sweep.sh check
+--- trusted? (watcher's own trust check from bin/fm-check-lib.sh) ---
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M58728MK8Q605TAN6ZCZGFHM/bin/fm-check-lib.sh: line 20: fm_pr_task_id_valid: command not found
+registered: NO
+=== run the shim exactly as the watcher would (FM_CHECK_TIMEOUT=30, no FM_HOME in env) ===
+rc=0
+copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.01 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/c1 0.00 GiB REAPABLE-PROVEN, <W>/th/pool1/1/repo/.claude/worktrees/c2 0.00 GiB REAPABLE-PROVEN
+=== tamper with shim bytes -> no longer registered ===
+/Users/charlesabrooker/.no-mistakes/worktrees/32d18ed9638d/01M58728MK8Q605TAN6ZCZGFHM/bin/fm-check-lib.sh: line 20: fm_pr_task_id_valid: command not found
+registered: no (good)
+=== gone-directory registration: wake once, drop under, then exceed again -> wakes again ===
+registered now: 1  (c2 directory gone)
+under budget -> []
+schema	fm-copy-sweep-v1
+last_scan	1792356819
+over again ->
+copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.01 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/c3 0.00 GiB REAPABLE-PROVEN, <W>/th/pool1/1/repo/.claude
+=== disarm ===
+disarmed: state/copy-sweep.check.sh
+0

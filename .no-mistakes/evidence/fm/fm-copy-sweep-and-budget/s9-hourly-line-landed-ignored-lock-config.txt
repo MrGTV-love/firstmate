@@ -1,0 +1,130 @@
+=== the documented hourly line, exactly: fm-proc-budget.sh -- fm-copy-sweep.sh --apply ===
+HELD-LOCKED	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/locked	worktree lock: vernant-session-active owner=launcher:999999 launcher=999999 (launcher 999999 is gone; only Vernant's closeout driver releases it)
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/secret	it holds ignored files that exist nowhere else: .env
+REMOVED	<W>/th/pool1/1/repo/.claude/worktrees/landed	branch fm/landed at 71f76e086360 (clean, no process, no record, content already in the default branch)
+rc=0
+landed: GONE (content already on origin/main)
+secret/.env kept: TOKEN=abc
+head: illegal line count -- 0
+still locked: <W>/th/pool1/1/repo/.claude/worktrees/locked
+--- removal log ---
+removed	<W>/th/pool1/1/repo/.claude/worktrees/landed	kib=16	proof=clean, no process, no record, content already in the default branch
+=== malformed config is refused with its line named, exit 2 ===
+fm-copy-sweep: config/copy-budget line 2: unknown key 'bogus-key'
+rc=2
+fm-copy-sweep: config/copy-budget line 1: default-pool wants one GiB value or off
+rc=2
+=== bad calls ===
+fm-copy-sweep.sh - find, size and remove provably stale nested task copies, and
+wake once when the bytes they hold pass a budget.
+
+Usage:
+  fm-copy-sweep.sh                report every nested copy; change nothing
+  fm-copy-sweep.sh --apply        also remove the REAPABLE-PROVEN copies
+  fm-copy-sweep.sh check          the watcher's periodic entry (report only)
+  fm-copy-sweep.sh arm            bind `check` to the existing watcher cadence
+  fm-copy-sweep.sh disarm         remove that binding and the budget record
+  fm-copy-sweep.sh --help
+
+Hourly hygiene job, one line (bounded by the process budget, never forced):
+  bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
+
+What it sweeps. A nested copy is a worktree that a pool slot's clone, or a
+project clone under a local Firstmate home (this home and every home
+data/secondmates.md registers locally), has registered strictly inside its own
+directory, such as <clone>/.claude/worktrees/<name>. `git -C <clone> worktree
+list --porcelain` is the only enumeration. Pool slots come from each
+<treehouse root>/<pool>/treehouse-state.json, so the sweep reads the pool and
+never asks Treehouse to change it. The whole-slot reaper (`treehouse prune`)
+works on slots and cannot see these copies; this script does not touch slots.
+
+Classes. Each copy gets the first class that applies, in this order:
+  ORPHAN-NO-RECORD   nothing can explain it or prove it: the directory is gone,
+                     is no worktree root of that clone, or its git or lock state
+                     cannot be read. Never touched; `git worktree prune` and
+                     the owner are the repair.
+  HELD-LOCKED        a worktree lock holds it. Vernant's creation lock is never
+                     released by anything but Vernant's closeout driver, so
+                     this sweep can never remove such a copy and never unlocks.
+  HELD-LIVE-TASK     an active task record in any local home names it (or a
+                     path inside or around it, except a registered secondmate's
+                     own home chain), a process has its working directory
+                     inside it, it holds this home or this process, or the
+                     records or the process table cannot be read. A project
+                     clone under a registered secondmate home is judged as that
+                     home would judge it (FM_HOME set to that home): the lane's
+                     own records apply, its secondmate record in the root home
+                     is its home chain, and a lane whose records cannot be read
+                     holds all of its copies.
+  HELD-DIRTY         git status shows any change or untracked file, an
+                     operation (rebase, merge, cherry-pick, revert, bisect) is
+                     in progress, it holds an ignored file that exists
+                     nowhere else (the teardown library's rule), or another
+                     registered copy with an existing directory is inside it:
+                     a plain `git worktree remove` of the outer copy would
+                     delete that inner copy and whatever it holds, and git
+                     status cannot see it when `.claude/worktrees/` is ignored.
+  HELD-UNPUSHED      its HEAD holds a commit that is on no remote and whose
+                     content is not already in the default branch.
+  REAPABLE-PROVEN    clean, HEAD contained in a remote branch (the whole-slot
+                     reaper's rule) or its content already in the default
+                     branch (bin/fm-task-copy-lib.sh's landed rule, the one
+                     bin/fm-teardown.sh uses), no process inside, no record.
+HELD-LOCKED is the only class beyond the five the task named; a locked copy
+cannot be removed by a plain `git worktree remove`, so calling it live or
+orphaned would mislead.
+
+--apply removes only REAPABLE-PROVEN copies, one at a time, deepest path first,
+each re-proved just before its own removal, by a plain `git worktree remove`
+run from the parent clone. Never a force flag, never a recursive delete, never
+an unlock, never a Treehouse call. A removal that fails leaves the copy and is
+reported, and the run exits 1; it is not retried. Each removal appends one line
+to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
+in the same run is removed by the next run; a second run otherwise finds
+nothing left to remove. Without --apply nothing is changed except that no cache or record is
+written either: report mode reads the size cache and writes nothing.
+Only the landed proof in --apply mode fetches the default branch (as the
+teardown rule does); report and check use the refs already present, which can
+only hold a copy back, never release one.
+
+Sizes. One `nice -n 20 du -sk` runs at a time, never in parallel. Each size is
+cached in state/copy-sweep.sizes by copy path and the copy's mtime and reused
+until that mtime changes or the entry is older than cache-max-age (a copy's
+root mtime does not move when a deep file grows). A copy nested in another copy
+is subtracted from its enclosing copy so no byte is counted twice.
+While the 1-minute load average exceeds load-limit (default 90), or cannot be
+read, no du runs: the listing, the classes and --apply still run, only fresh
+cached sizes are used, and the run prints and records one line, "scan skipped:
+load N above limit M". `check` records it and stays quiet, and raises one wake
+once every run for 6 hours has skipped.
+
+Budgets. config/copy-budget (docs/configuration.md owns the format) holds a
+GiB budget per pool root and per container (a pool slot, or a Firstmate home).
+Built-in defaults apply when the file or a line is absent. A budget is over
+when the measured bytes of its nested copies exceed it. A scan cut short
+(check's time bound) still counts what it measured, so an unmeasured copy can
+only delay a wake, never invent one. The run raises exactly ONE wake for the
+budgets that just went over - budget, total, and the five largest copies with
+their class - and none again while the same budget stays over. A budget that
+drops under and goes over again wakes again. state/copy-sweep.record holds that
+memory; --apply raises the wake itself through the wake queue, `check` prints
+the line and the watcher turns it into the same `check:` wake.
+
+`arm` writes state/copy-sweep.check.sh and binds its bytes with
+fm-check-register.sh, so the existing watcher runs `check` on its normal
+FM_CHECK_INTERVAL cadence, at most once per `interval` seconds of scanning;
+no extra daemon or scheduler is installed. `check` never removes anything. The
+watcher kills a check that outlives FM_CHECK_TIMEOUT and keeps nothing, so
+`check` bounds its whole scan by that timeout minus five seconds: each du runs
+under the time left and is cut when it cannot finish, a cut copy stays
+unmeasured until a later poll, or a direct run, measures it into the cache, and
+`check` classifies only the copies it names in a wake (the rest read
+UNCLASSIFIED). Every git and lsof call of those classifications runs under the
+time left too, so a copy whose classification cannot finish reads UNCLASSIFIED
+and the wake is still printed in time. A first scan of large copies is
+therefore warmed by the hourly `--apply` run, which has no time bound.
+
+Exit status: 0 done, 1 a removal or write failed, 2 bad call or bad config.
+tests/fm-copy-sweep.test.sh is the regression entry point.
+rc=2
+rc=2

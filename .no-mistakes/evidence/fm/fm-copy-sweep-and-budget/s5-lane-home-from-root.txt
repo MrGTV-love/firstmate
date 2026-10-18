@@ -1,0 +1,12 @@
+=== report from the ROOT home ===
+HELD-LIVE-TASK	0.00 GiB	<W>/lane-badmarker/projects/p/.claude/worktrees/only	the active task records of <W>/lane-badmarker cannot be read, so none is ruled out
+HELD-LIVE-TASK	0.00 GiB	<W>/lane-nostate/projects/p/.claude/worktrees/only	task nostate's active record names it as its home
+REAPABLE-PROVEN	0.00 GiB	<W>/lane-open/projects/p/.claude/worktrees/clean	clean, no process, no record, HEAD contained in a remote branch
+HELD-LIVE-TASK	0.00 GiB	<W>/lane-open/projects/p/.claude/worktrees/held	task lane-task's active record names it as its worktree
+=== apply from the ROOT home ===
+REMOVED	<W>/lane-open/projects/p/.claude/worktrees/clean	branch fm/clean at 045d1a59c4c8 (clean, no process, no record, HEAD contained in a remote branch)
+rc=0
+GONE:    open/clean
+present: open/held
+present: badmarker/only
+present: nostate/only

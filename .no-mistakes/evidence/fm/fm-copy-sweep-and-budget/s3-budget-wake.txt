@@ -1,0 +1,33 @@
+budget: container /Users/charlesabrooker/tmp/fm-live-s3.JbPU4E/th/pool1/1/repo 0.004 GiB (~4.1 MiB); real du sizes:
+3084	<W>/th/pool1/1/repo/.claude/worktrees/big1
+2060	<W>/th/pool1/1/repo/.claude/worktrees/big2
+12	<W>/th/pool1/1/repo/.claude/worktrees/small
+
+=== check #1 (should print ONE wake line) ===
+copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.00 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/big1 0.00 GiB REAPABLE-PROVEN, <W>/th/pool1/1/repo/.claude/worktrees/big2 0.00 GiB REAPABLE-PROVEN, <W>/th/pool1/1/repo/.claude/worktrees/small 0.00 GiB REAPABLE-PROVEN
+rc=0
+--- record ---
+schema	fm-copy-sweep-v1
+last_scan	1792356422
+over	container:<W>/th/pool1/1/repo
+
+=== check #2 (still over: must print NOTHING) ===
+[]
+
+=== drop under budget: remove big1 and big2, then check (nothing printed) ===
+[]
+--- record ---
+schema	fm-copy-sweep-v1
+last_scan	1792356434
+
+=== go over again: add big3 (3 MiB) + big4 (3 MiB), check -> wake AGAIN ===
+copy-sweep: container <W>/th/pool1/1/repo is over its budget: 0.01 GiB against 0.004 GiB; largest copies: <W>/th/pool1/1/repo/.claude/worktrees/big3 0.00 GiB REAPABLE-PROVEN, <W>/th/pool1/1/repo/.claude/worktrees/big4 0.00 GiB REAPABLE-PROVEN, <W>/th/pool1/1/repo/.claude/worktrees/small 0.00 GiB REAPABLE-PROVEN
+
+=== --apply path: raises the wake through the wake queue (fresh over after drop) ===
+REMOVED	<W>/th/pool1/1/repo/.claude/worktrees/small	branch fm/small at 924e8c38739f (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<W>/th/pool1/1/repo/.claude/worktrees/big6	branch fm/big6 at ace1fbb54e11 (clean, no process, no record, HEAD contained in a remote branch)
+REMOVED	<W>/th/pool1/1/repo/.claude/worktrees/big5	branch fm/big5 at 1d9bb6b0bc89 (clean, no process, no record, HEAD contained in a remote branch)
+--- wake queue files ---
+  copy-sweep.record
+  copy-sweep.sizes
+<LAB>/state/copy-sweep.record

@@ -1,0 +1,10 @@
+--- inner copy B has an uncommitted file; git status of A cannot see it: [] ---
+=== report ===
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/A	another registered copy is inside it: <W>/th/pool1/1/repo/.claude/worktrees/A/.claude/worktrees/B
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/A/.claude/worktrees/B	1 uncommitted or untracked path(s), first: ?? precious.txt
+=== apply ===
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/A	another registered copy is inside it: <W>/th/pool1/1/repo/.claude/worktrees/A/.claude/worktrees/B
+HELD-DIRTY	0.00 GiB	<W>/th/pool1/1/repo/.claude/worktrees/A/.claude/worktrees/B	1 uncommitted or untracked path(s), first: ?? precious.txt
+rc=0
+A present
+B/precious.txt present: UNSAVED WORK in B
