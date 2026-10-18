@@ -2,6 +2,7 @@
 import json
 import pathlib
 import sys
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 lab = pathlib.Path(sys.argv[1])
@@ -33,13 +34,15 @@ class Handler(BaseHTTPRequestHandler):
             scenario = json.loads((lab / 'scenario.json').read_text())
             if scenario['phase'] == 'provider':
                 return send_json(self, {'error': 'synthetic outage'}, 402)
+            if scenario.get('judge_delay') and 'command' in body['state']:
+                time.sleep(scenario['judge_delay'])
             answers = {}
             for key, question in body['questions'].items():
                 if question['type'] == 'noul':
-                    answers[key] = {'type': 'noul', 'noul': 0.99}
+                    answers[key] = {'type': 'noul', 'noul': 0.0 if scenario.get('benign') else 0.99}
                 else:
                     choices = list(question['criteria'])
-                    pick = 'irreversible' if 'irreversible' in choices else choices[0]
+                    pick = 'irreversible' if 'irreversible' in choices and not scenario.get('benign') else choices[0]
                     answers[key] = {'type': 'choice', 'choice': pick, 'confidence': 1,
                                     'probabilities': {k: int(k == pick) for k in choices}}
             return send_json(self, {'model': 'jev-local', 'answers': answers,
@@ -52,10 +55,11 @@ class Handler(BaseHTTPRequestHandler):
         turn += 1
         scenario = json.loads((lab / 'scenario.json').read_text())
         tools = body.get('tools', [])
-        tool = next((t for t in tools if t.get('name', '').lower() == 'read'), None)
+        wanted = scenario.get('tool', 'read')
+        tool = next((t for t in tools if t.get('name', '').lower() == wanted), None)
         if turn == 1 and not tool:
-            return send_json(self, {'error': {'message': 'native Read tool absent'}}, 400)
-        args = {'path': scenario['path'] + ':raw', 'i': 'Reading synthetic instruction'}
+            return send_json(self, {'error': {'message': f'native {wanted} tool absent'}}, 400)
+        args = scenario.get('args') or {'path': scenario['path'] + ':raw', 'i': 'Reading synthetic instruction'}
         if backend == 'claude':
             args = {'file_path': scenario['path']}
             if turn == 1:

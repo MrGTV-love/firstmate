@@ -41,7 +41,12 @@ if backend == 'claude':
     text = separator + notice
 positive = kind in ('launch', 'inbox')
 requests = (lab / 'jev.jsonl').read_text().splitlines()
-expected_requests = 0 if positive or phase in ('privacy', 'credentials') else 2 if phase == 'provider' else 1
+trusted = kind == 'changed'
+error_type = {
+    'normal': None, 'privacy': 'PrivacyWithheldError', 'credentials': 'CredentialUnavailableError',
+    'provider': 'Error', 'audit': 'AuditUnavailableError',
+}[phase]
+expected_requests = 0 if positive or trusted or phase in ('privacy', 'credentials') else (3 if backend == 'claude' else 2) if phase == 'provider' else 1
 assert len(requests) == expected_requests, f'unexpected Jev egress count: expected {expected_requests}, got {len(requests)}'
 if positive:
     if backend == 'omp':
@@ -51,6 +56,13 @@ if positive:
         assert 'AuditUnavailableError' in text, 'audit-unavailable notice absent from next model context'
     else:
         assert '[jev-guard]' not in text, 'consistent native instruction was screened'
+elif trusted:
+    if backend == 'omp':
+        assert source in text, 'trusted state read disappeared from next model context'
+    if phase == 'audit':
+        assert 'AuditUnavailableError' in text, 'trusted read lost the audit failure notice'
+    else:
+        assert '[jev-guard]' not in text, 'trusted state unnecessarily replaced or annotated'
 else:
     assert '[jev-guard]' in text, 'native review notice absent from next model context'
     if backend == 'omp':
@@ -58,10 +70,6 @@ else:
         assert 'Untrusted output was withheld' in text, 'native replacement did not reach model context'
     else:
         assert 'Advisory only' in text and 'no protection' in text, 'Claude advisory status absent from model context'
-    error_type = {
-        'normal': None, 'privacy': 'PrivacyWithheldError', 'credentials': 'CredentialUnavailableError',
-        'provider': 'Error', 'audit': 'AuditUnavailableError',
-    }[phase]
     assert f'Tool output requires review ({error_type or "flag"}).' in text, 'wrong terminal outcome consumed by native model context'
     assert 'REVIEW_ON_UNAVAILABLE_V1' in text, 'named outage policy absent from native notice'
 if phase != 'audit':
@@ -71,6 +79,8 @@ if phase != 'audit':
     terminal = result[0]
     if positive:
         expected = ('clear', 'supervisor_consistency', None, False, 'result_pass')
+    elif trusted:
+        expected = ('clear', 'trusted_read', None, False, 'result_pass')
     elif phase == 'normal':
         expected = ('flag', 'policy', None, True, 'claude_advisory_only' if backend == 'claude' else 'omp_replace')
     else:

@@ -712,6 +712,9 @@ project_queue_actor() {  # <case-dir> <operation> [release-marker] [hold-secs] [
       i=0
       while [ ! -e "$4" ]; do
         i=$((i + 1)); [ "$i" -lt 4000 ] || exit 1
+        if [ "${FM_TEST_HOLDER_PROGRESS:-0}" = 1 ] && [ $((i % 20)) -eq 0 ]; then
+          touch "$2/actor.lock/role"
+        fi
         sleep 0.05
       done
     fi
@@ -827,6 +830,90 @@ test_project_queue_slow_holder_never_admits_a_later_waiter_first() {
   assert_contains "$(cat "$case_dir/w2.out")" 'fm-project-lock: stall limit reached' "the later waiter did not refuse at the same holder's stall"
   assert_equals holder "$(cat "$case_dir/order")" "a later waiter went ahead of a refused earlier one"
   pass "a stalled holder refuses its waiters together, so a later waiter never goes ahead of an earlier one"
+}
+
+# A waiter ahead of W2 leaving the queue is not progress by the stalled holder:
+# W2 keeps the clock it started when it first saw that holder, whether the holder
+# shows no CPU or role progress (600-second allowance) or no CPU telemetry at all
+# (30-minute uncertainty extreme). Time is scaled so the departure is exact.
+test_project_queue_head_departure_does_not_restart_a_stalled_holders_clock() {
+  local case_dir holder w1 mode result rc elapsed limit i
+  for mode in idle-cpu unknown-telemetry; do
+    case_dir=$(make_case "queue-head-departure-$mode")
+    project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+    holder=$!
+    wait_actor_output "$case_dir/order" holder
+    FM_HOME="$case_dir/home" bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      . "$1/bin/fm-project-lock-lib.sh"
+      fm_project_lock_register "$2/actor.lock" 600 w1 || exit 1
+      printf "%s\n" "$FM_PROJECT_LOCK_TICKET" > "$2/w1.ticket"
+      i=0
+      while [ ! -e "$2/w1.leave" ] && [ "$i" -lt 4000 ]; do i=$((i + 1)); sleep 0.05; done
+      fm_lock_remove_path "$FM_PROJECT_LOCK_TICKET"
+    ' _ "$ROOT" "$case_dir" > "$case_dir/w1.out" 2>&1 &
+    w1=$!
+    i=0
+    while [ ! -s "$case_dir/w1.ticket" ]; do
+      i=$((i + 1)); [ "$i" -lt 1000 ] || fail "the earlier waiter never queued: $(cat "$case_dir/w1.out")"
+      sleep 0.05
+    done
+    result=$(FM_HOME="$case_dir/home" bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      . "$1/bin/fm-project-lock-lib.sh"
+      base=$SECONDS departed=0 dir=$2
+      case "$3" in
+        idle-cpu) fm_project_lock_cpu() { echo 100; }; step=10; leave=30 ;;
+        *) fm_project_lock_cpu() { return 1; }; step=600; leave=1200 ;;
+      esac
+      sleep() {
+        if [ "$departed" = 0 ] && [ "$((SECONDS - base))" -ge "$leave" ]; then
+          : > "$dir/w1.leave"
+          while [ -L "$(cat "$dir/w1.ticket")" ]; do command sleep 0.02; done
+          departed=1
+        fi
+        SECONDS=$((SECONDS + step))
+        command sleep 0.02
+      }
+      FM_PROJECT_LOCK_SERVICE_SECS=40
+      fm_project_lock_acquire "$2/actor.lock" w2 > "$2/w2.out" 2>&1
+      echo "$? $((SECONDS - base))"
+    ' _ "$ROOT" "$case_dir" "$mode")
+    : > "$case_dir/w1.leave"
+    : > "$case_dir/release"
+    wait "$w1" || fail "the earlier waiter could not leave: $(cat "$case_dir/w1.out")"
+    wait "$holder" || fail "the stalled holder could not release: $(cat "$case_dir/holder.out")"
+    rc=${result% *}
+    elapsed=${result#* }
+    limit=60
+    [ "$mode" = idle-cpu ] || limit=2400
+    expect_code 1 "$rc" "$mode: a waiter behind a stalled holder was admitted: $(cat "$case_dir/w2.out")"
+    [ "$elapsed" -lt "$limit" ] \
+      || fail "$mode: the earlier waiter leaving restarted the stalled holder's clock; the later waiter refused only after ${elapsed}s: $(cat "$case_dir/w2.out")"
+    assert_contains "$(cat "$case_dir/w2.out")" 'fm-project-lock: stall limit reached' "$mode: the later waiter did not refuse at the holder's stall"
+    assert_equals holder "$(cat "$case_dir/order")" "$mode: a waiter went ahead of the stalled holder"
+  done
+  pass "an earlier waiter leaving the queue neither restarts a stalled holder's idle clock nor its telemetry-uncertainty extreme"
+}
+
+test_project_queue_does_not_expire_a_productive_holder() {
+  local case_dir holder waiter rc=0
+  case_dir=$(make_case queue-holder-progress)
+  FM_TEST_HOLDER_PROGRESS=1 project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  holder=$!
+  wait_actor_output "$case_dir/order" holder
+  FM_PROJECT_LOCK_SERVICE_SECS=4 FM_PROJECT_LOCK_POLL_SECS=0.1 \
+    project_queue_actor "$case_dir" waiter > "$case_dir/waiter.out" 2>&1 &
+  waiter=$!
+  wait_actor_output "$case_dir/waiter.out" 'fm-project-lock: waiting'
+  sleep 7
+  : > "$case_dir/release"
+  wait "$holder" || fail 'productive holder could not release its lock'
+  wait "$waiter" || rc=$?
+  expect_code 0 "$rc" "a progressing holder was treated as stalled merely because of its age: $(cat "$case_dir/waiter.out")"
+  assert_equals "$(printf 'holder\nwaiter')" "$(cat "$case_dir/order")" "the waiter bypassed its productive holder"
+  assert_equals 0 "$(queued_tickets "$case_dir/actor.lock")" "productive wait left a ticket behind"
+  pass "a holder with ongoing progress can exceed the idle allowance without canceling queued work"
 }
 
 # Each 6-second hold is well inside a 20-second allowance, but the last waiter
@@ -1938,6 +2025,72 @@ SH
   pass 'a fresh same-ID spawn refuses at task admission during a slow teardown, so pool return still progresses'
 }
 
+test_cpu_sampler_portability_and_failure_extreme() {
+  local case_dir holder rc=0 out
+  case_dir=$(make_case sampler-failure)
+  out=$(FM_HOME="$case_dir/home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-project-lock-lib.sh"
+    ps() {
+      case "$1" in -S) return 1 ;; esac
+      printf "42 1 00:02.00\n43 42 00:01.00\n"
+    }
+    fm_project_lock_cpu 42
+  ' _ "$ROOT")
+  assert_equals 300 "$out" "Linux-style ps fallback did not sum live-tree CPU"
+  project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  holder=$!
+  wait_actor_output "$case_dir/order" holder
+  FM_HOME="$case_dir/home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-project-lock-lib.sh"
+    fm_project_lock_cpu() { return 1; }
+    sleep() { SECONDS=$((SECONDS + 600)); command sleep 0.05; }
+    FM_PROJECT_LOCK_SERVICE_SECS=1
+    fm_project_lock_acquire "$2/actor.lock" waiter
+  ' _ "$ROOT" "$case_dir" > "$case_dir/waiter.out" 2>&1 || rc=$?
+  : > "$case_dir/release"
+  wait "$holder" || fail "sampler failure damaged the live holder"
+  expect_code 1 "$rc" "unavailable sampler waited forever"
+  [[ $(cat "$case_dir/waiter.out") =~ idle\ 18[0-9][0-9]s ]] \
+    || fail "sampler failure falsely counted progress or used the idle allowance: $(cat "$case_dir/waiter.out")"
+  assert_contains "$(cat "$case_dir/waiter.out")" 'CPU telemetry unknown' "missing uncertainty refusal"
+  assert_equals holder "$(cat "$case_dir/order")" "uncertainty bypassed the holder"
+  pass "Linux ps fallback sums CPU and unavailable telemetry reaches the absolute extreme without removing the holder"
+}
+
+test_cpu_baseline_follows_a_falling_total() {
+  local case_dir holder rc=0
+  case_dir=$(make_case sampler-falling)
+  project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+  holder=$!
+  wait_actor_output "$case_dir/order" holder
+  FM_HOME="$case_dir/home" bash -c '
+    . "$1/bin/fm-wake-lib.sh"
+    . "$1/bin/fm-project-lock-lib.sh"
+    base=$SECONDS release=$3/release
+    # A live-tree total falls when a child is reaped: 8.2 CPU seconds, then 0.4, then real growth.
+    fm_project_lock_cpu() {
+      local t=$((SECONDS - base))
+      if [ "$t" -lt 5 ]; then echo 820; elif [ "$t" -lt 25 ]; then echo 40; else echo 150; fi
+    }
+    sleep() {
+      SECONDS=$((SECONDS + 1))
+      [ "$((SECONDS - base))" -lt 45 ] || : > "$release"
+      command sleep 0.02
+    }
+    FM_PROJECT_LOCK_SERVICE_SECS=40
+    fm_project_lock_acquire "$2/actor.lock" waiter
+  ' _ "$ROOT" "$case_dir" "$case_dir" > "$case_dir/waiter.out" 2>&1 || rc=$?
+  : > "$case_dir/release"
+  wait "$holder" || fail "falling CPU totals damaged the live holder"
+  expect_code 0 "$rc" "a holder whose CPU total fell and then grew was refused as stalled: $(cat "$case_dir/waiter.out")"
+  assert_not_contains "$(cat "$case_dir/waiter.out")" 'stall limit reached' "growth after a fall was not counted as progress"
+  pass "a falling live-tree CPU total lowers the baseline, so later growth still counts as progress"
+}
+
+test_cpu_sampler_portability_and_failure_extreme
+test_cpu_baseline_follows_a_falling_total
 test_fresh_spawn_fetches_its_base_before_it_queues_for_the_project_lock
 test_locked_base_refresh_needs_no_network_once_the_base_is_fetched
 test_queued_spawn_never_rewinds_newer_shared_origin_refs
@@ -1966,7 +2119,9 @@ test_mixed_operations_keep_fifo_even_with_a_slow_waiter
 test_same_home_spawn_for_another_project_is_not_refused_while_one_waits
 test_project_queue_recovers_dead_waiter_and_holder
 test_project_queue_timeout_preserves_live_holder
+test_project_queue_does_not_expire_a_productive_holder
 test_project_queue_slow_holder_never_admits_a_later_waiter_first
+test_project_queue_head_departure_does_not_restart_a_stalled_holders_clock
 test_project_queue_progress_never_reaches_the_stall_limit
 test_nonwaiting_admission_never_jumps_a_queued_waiter
 test_nonwaiting_admission_separates_contention_from_acquisition_errors

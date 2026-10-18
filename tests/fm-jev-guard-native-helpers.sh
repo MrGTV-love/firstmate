@@ -15,7 +15,7 @@ fm_jev_native_run() {
   version=$("$backend" --version 2>&1) || fail "$backend: version unavailable: $version"
   local subject="$backend ($version)"
   local lab
-  lab=$(mktemp -d "$ROOT/.fm-jev-native.XXXXXX") || fail "$subject: scratch directory unavailable"
+  lab=$(mktemp -d "${TMPDIR:-/tmp}/fm-jev-native.XXXXXX") || fail "$subject: scratch directory unavailable"
   chmod 700 "$lab"
   export FM_JEV_NATIVE_LAB="$lab" FM_JEV_NATIVE_ROOT="$ROOT"
   # shellcheck disable=SC2329 # Registered by the EXIT trap below.
@@ -72,7 +72,7 @@ YML
 tee "$FM_JEV_NATIVE_LAB/native-hook.json" | "$FM_JEV_NATIVE_ROOT/bin/fm-jev-guard-hook.sh" "$FM_JEV_NATIVE_LAB/home" "$FM_JEV_NATIVE_LAB/home/config" "$FM_JEV_NATIVE_LAB/home/state" native "$FM_JEV_NATIVE_LAB/worktree" "$FM_JEV_NATIVE_LAB/home/data" firstmate FIRSTMATE_JEV_GUARD_V1
 SH
   chmod +x "$lab/hook.sh"
-  jq -n --arg command "bash '$lab/hook.sh'" '{hooks:{UserPromptSubmit:[{hooks:[{type:"command",command:$command,timeout:30}]}],PostToolUse:[{matcher:"Read",hooks:[{type:"command",command:$command,timeout:30}]}]}}' > "$lab/settings.json"
+  jq -n --arg command "bash '$lab/hook.sh'" '{hooks:{UserPromptSubmit:[{hooks:[{type:"command",command:$command,timeout:330}]}],PostToolUse:[{matcher:"Read",hooks:[{type:"command",command:$command,timeout:330}]}]}}' > "$lab/settings.json"
   jq -n --arg key synthetic-local-only '{hasCompletedOnboarding:true,customApiKeyResponses:{approved:[$key],rejected:[]}}' > "$lab/claude/.claude.json"
   for phase in normal privacy credentials provider audit; do
     for kind in launch inbox copy changed; do
@@ -124,4 +124,29 @@ SH
       pass "$subject: $evidence"
     done
   done
+  [ "$backend" != omp ] || fm_jev_native_omp_pretool "$subject" "$lab" "$base"
+}
+
+# omp's tool_call handler is refused by the host after 30 seconds unless the worker overlay raises its deadline,
+# so a judgment that answers after 31 seconds must still decide the shell call under that real overlay.
+fm_jev_native_omp_pretool() {  # <subject> <lab> <provider-base>
+  local subject=$1 lab=$2 base=$3 marker="$2/pretool-ran" status
+  rm -rf -- "${lab:?}/home" "${lab:?}/worktree"
+  mkdir -p "$lab/home/config" "$lab/home/state" "$lab/home/data" "$lab/worktree"
+  printf 'TYPESAFE_API_KEY=synthetic-local-only\n' > "$lab/home/.env"
+  jq -n --arg command "echo ran > $marker" '{phase:"normal",tool:"bash",args:{command:$command,i:"Run one shell command"},benign:true,judge_delay:31}' > "$lab/scenario.json"
+  : > "$lab/jev.jsonl"
+  : > "$lab/model.jsonl"
+  curl --max-time 10 -fsS -X POST -d '{}' "$base/reset" > /dev/null || fail "$subject: provider reset failed"
+  (cd "$lab/worktree" && HOME="$lab/os-home" PI_CODING_AGENT_DIR="$lab/agent" OMP_SKIP_SETUP=1 \
+    fm_run_timed 120 omp -p "Run the one shell command, then stop." --model native/gpt-6.1-sol --thinking off --no-session \
+    --no-extensions -e "$lab/extension.ts" --config "$ROOT/.omp/fm-worker-overlay.yml" --no-skills --no-rules --no-title --no-lsp --tools bash \
+    < /dev/null > "$lab/native.out" 2>&1)
+  status=$?
+  [ "$status" -eq 0 ] || fail "$subject: pre-tool native run exited $status: $(cat "$lab/native.out")"
+  [ -e "$marker" ] || fail "$subject: the shell call was refused although the judgment answered: $(cat "$lab/native.out")"
+  jq -se 'map(select(.hook == "tool_call")) | length == 1 and .[0].decision == "allow" and .[0].error_type == null and .[0].request_started == true and .[0].ms >= 31000' \
+    "$lab/home/state/jev-guard.jsonl" > /dev/null || fail "$subject: the 31-second answer was not the pre-tool decision: $(cat "$lab/home/state/jev-guard.jsonl")"
+  ! grep -q 'timed out after' "$lab/native.out" || fail "$subject: the host timed out the pre-tool handler: $(cat "$lab/native.out")"
+  pass "$subject: pre-tool shell judgment answered after 31 seconds decides the call under the worker overlay"
 }

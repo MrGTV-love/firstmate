@@ -2205,9 +2205,16 @@ Questions and numeric policy are code-owned:
 It preserves a launch-record or numeric steering-inbox result only when the host's native user-prompt delivery named that exact file and record name/sequence, and the returned full bytes match the existing publisher's write-time digest.
 The existing [launch publisher](../bin/fm-operational-input.sh) owns the consistency-receipt format, reused by the [numeric inbox publisher](../bin/fm-task-inbox-lib.sh); neither the reader nor a tool-result authority claim creates a receipt.
 omp captures native `before_agent_start` prompts in memory; Claude captures native `UserPromptSubmit` and persists only exact path/doorbell binding hashes in task/session-local context for its separate hook processes.
-Tool results never contribute native delivery bindings, and a marker, path prefix or receipt alone grants no exception.
+Tool results never contribute native delivery bindings, and a marker, path prefix or receipt alone grants no channel-consistency exception.
 The check compares the returned text bytes, not a fresh disk reread substituted for what the host delivered; omp full-file `:raw` reads preserve byte framing that ordinary/ranged rendering can change.
-Missing or mismatched delivery, copied claimed-authority instructions, changed bytes, mixed/partial content and symlink aliases receive ordinary untrusted-result screening.
+Missing or mismatched delivery, copied claimed-authority instructions, changed bytes, mixed/partial content and symlink aliases do not gain channel consistency and still receive ordinary result screening.
+Separately, a native `read` of a regular file is admitted immediately when its real target is under the task's own data directory, its own `state/<task>.<name>` files or inbox, or a git-tracked file in its own worktree, including modified tracked files.
+A task's own state file has a single name segment after `<task>.`; task IDs may contain dots, so a longer name, such as `state/a.b.status` read by task `a`, could belong to task `a.b` and stays judged.
+Other tasks' data and state, untracked worktree files, and symlink targets outside those roots remain judged.
+Native omp source metadata must agree with the actual read argument, including numeric and database selectors; paths claimed inside result text grant nothing.
+Trusted reads bypass the judge entirely, including for oversized content, and record decision `clear`, branch `trusted_read`, result-pass enforcement, no request started and null error type.
+They do not exempt `bash` results or reads of other paths and do not authenticate the producer.
+An audit failure adds a notice beside the original trusted read rather than erasing it.
 Consistent instructions bypass model/privacy/credential outages; an audit failure adds an explicit review notice rather than erasing them.
 On OMP, including the supported 18.1.20 minimum, the result content preserves the original instruction text as its first part and appends a separate sanitized `AuditUnavailableError` notice, retaining the original details and error status.
 Claude keeps its distinct advisory `additionalContext`, containing neither the source text nor its path.
@@ -2217,7 +2224,7 @@ Native launch prompts carry the survivor doorbells separately from Claude's reco
 This is a consistency check with the same trust limit as the role-file receipt, never producer authentication: a same-user process that deliberately forges the recorded digest can pass.
 Synthetic source fixtures prove these bounded comparisons and delivery paths, not publisher identity or deployment protection.
 
-The allowed write roots are the task worktree, the task's `data/<task>` directory in the owning home, and the system temporary directory.
+The allowed write roots are the task worktree, the task's own data directory, and the system temporary directory.
 The root check is lexical, not a filesystem sandbox: it does not resolve the target's symlinks.
 File write and edit paths must use a plain absolute or worktree-relative spelling.
 A plain path begins with `/` or a character in `[A-Za-z0-9_.-]`, has no URL-scheme or drive-letter prefix matching `^[A-Za-z][A-Za-z0-9+.-]*:`, and does not end with `]`.
@@ -2238,7 +2245,8 @@ Device `edit` calls remain blocked, and every path-spelling refusal tells the ag
 omp ship and scout worker processes launch with `PI_EDIT_VARIANT=replace`, whose `path` and `new_string` match the write gate.
 The guard judges only replacement content, so removing a credential from `old_string` does not count as inserting it.
 An edit without a string `path` and `new_string`, including a model-variant override that selects hashline or patch mode, blocks with instructions to report the configuration problem rather than execute an unjudged edit.
-A policy block (shell and write gate verdicts and deterministic refusals) tells the agent the block is final and to report it rather than work around it.
+A policy block (shell and write gate verdicts and deterministic refusals) tells the agent to report the action and reason to Firstmate and request an authorized correction or alternative rather than retry an equivalent action through another tool or encoding.
+Write and edit refusals name the refused path in both the notice and the terminal audit row's `refused_path`.
 An outage denial, where the review itself could not run, instead says the review could not run, that the same call may be run once more, and to report rather than work around it if the call fails the same way.
 On Claude, review notices arrive as added context next to the unchanged output.
 The current [Claude hook reference](https://code.claude.com/docs/en/hooks#posttooluse-decision-control) documents `updatedToolOutput` for built-in tools; this integration intentionally does not use that capability without installed-host verification.
@@ -2255,7 +2263,7 @@ Every request, including its pinned model and questions, must fit the code-owned
 A payload whose request would exceed it is screened as a series of overlapping pieces, each a complete request that fits the ceiling, never as a prefix standing in for the whole.
 Each piece repeats the last 1,024 JSON-escaped bytes of the piece before it, so any span of up to 1,000 JSON-escaped bytes lies whole inside one piece; a longer span can be cut, and each half is still screened.
 A payload that would need more than 16 pieces, about 230 KB of text, still requires review before anything is sent, and the never-send policy checks the whole payload before the first piece leaves.
-The pieces run together under the same 10-second and 25-second budgets and the same thresholds, and a payload passes only when every piece passes.
+The pieces run together under the same per-try and handler budgets described below and the same thresholds; shell/write payloads pass only when every piece passes, while result handling retains the advisory-band and trusted-read exceptions above.
 A piece that blocks a shell command or write blocks the call and names its part, a piece in the flag band flags a result, and a piece that cannot be screened requires review.
 A policy verdict on one piece outranks an outage on another.
 The complete request is checked against the [never-send policy](#typed-dispatch-resolution-env-typesafe_api_key); a matching value or invalid/unreadable policy prevents egress before key lookup.
@@ -2263,16 +2271,27 @@ The complete request is checked against the [never-send policy](#typed-dispatch-
 The service uses the canonical shared Jev client, pinned to the calibrated model, with TypeSafe direct only and no provider fallback.
 It resolves the key through the shared [TypeSafe lookup](#typed-dispatch-resolution-env-typesafe_api_key) when its installation's client is first constructed; no key is exported to the worker environment or placed in configuration, new credential files or command arguments.
 omp reuses that client and key for the installation, while Claude constructs one per hook process; missing credentials do not create a successful client snapshot.
-The client retains its existing retry behavior and has a 10-second total request budget, including retries and response bodies.
-The service adds one bounded retry of the whole request after an outage of a required judgment: a plain provider `Error`, a `TimeoutError` or a network `TypeError`.
-Each try keeps the 10-second budget, and the retry starts only when a full further try fits in the remaining 25-second handler budget.
-It never retries a flagged, ambiguous or policy-blocked answer, a malformed response (`ContractError`), a privacy, credential or oversize refusal, or a handler cancellation.
-Both event handlers have a shared 25-second cancellation budget; the native tool-call deadline remains 30 seconds.
-Claude's host hook envelope uses `fm-duration.py limit` with a 30-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
+The client retains its existing internal retry behavior; service budgets include those retries and response bodies.
+Claude, and omp's pre-tool shell and write judgments, allow up to three 90-second service tries with cancellable one-second then two-second backoff inside a shared 300-second decision budget.
+omp's result screening allows up to two 12-second service tries with 500 ms backoff inside a shared 25-second decision budget.
+Retries follow only a plain provider `Error`, `TimeoutError` or network `TypeError`.
+The 300-second budget reserves a complete further try and backoff before retrying; omp's result second try uses only the time remaining in its strict 25-second handler budget after backoff and local preflight.
+The service never retries a flagged, ambiguous or policy-blocked answer, malformed response (`ContractError`), privacy, credential or oversize refusal, or handler cancellation.
+The 90-second per-try limit protects only against a judge that never answers; it is not derived from answered-call latency, which was far lower (the tracked 99th percentile of 535 ms over 15,640 answered calls under Unreachable threshold in [TypeSafe account health](#typesafe-account-health)), and answered-call measurements are censored by the previous timeout and do not establish the latency of unanswered calls.
+Claude's host hook envelope uses `fm-duration.py limit` with a 330-second fallback; calibrated p99 x 3 may raise, never lower, that envelope without changing the handler budget.
+Installed omp 18.12.0 has a separate nonconfigurable 30-second result-handler deadline that forwards original output if an extension times out.
+Its 25-second result budget must therefore remain below that native deadline; extending `extensionHandlers.toolCallTimeoutMs` cannot protect results.
+That setting is the pre-tool deadline, 30 seconds by default, and omp refuses the call when a `tool_call` handler outlasts it (measured on 18.12.0: the host logged `handler timed out after 30000ms` and returned an extension timeout instead of running the tool).
+[`.omp/fm-worker-overlay.yml`](../.omp/fm-worker-overlay.yml) raises it to 330 seconds, above the 300-second pre-tool budget, for worker launches through the existing per-launch `--config` overlay; no global or user omp setting is changed.
+A raw launch that omits the overlay keeps the 30-second default, so a pre-tool judgment slower than that is refused by the host rather than reviewed; that failure stays closed.
+Each call obtains its own bounded judgment; no outcome of one call is carried to another, so a slow or failed judgment never refuses a later call by itself.
+This is not sustained-outage permission to execute shell commands or write files.
 
 `REVIEW_ON_UNAVAILABLE_V1` is code-owned alongside the guard policy version.
 While active, required pre-tool judgments that fail, are too large to cover within the request bound, are withheld or cannot be recorded deny execution and request review instead of silently allowing the call.
-On omp, flagged, ambiguous or unavailable result judgments replace the untrusted content and details with a review notice and an error result before the receiving model sees the result.
+On omp, answered scores above 0.20 and below 0.80 now pass with an advisory and an audit row, so the effective withholding cut-off for untrusted output moves from above 0.20 to 0.80 and above; Claude retains its existing advisory-only path.
+Clear scores at or below 0.20 pass without an advisory.
+Flags at or above 0.80 and unavailable judgments still replace untrusted content and details with a review notice and error result before the receiving model sees it, except for the bounded trusted reads described above.
 Non-text results that cannot be assessed also require review rather than an unexamined pass.
 Claude receives only the explicit advisory notice, not a quarantine claim.
 Missing runtimes, runtime startup/crash failures and malformed active Claude hook input stop pre-tool execution with a stable error type; post-tool feedback cannot undo the tool's effects.
@@ -2286,14 +2305,16 @@ They perform no guard key lookup or provider request and retain deterministic pa
 Complete successful `SystemOneResult` objects, including raw exchanges and provider metadata, remain in memory through the service and policy evaluation.
 The owning home's private `state/jev-guard.jsonl` receives minimized terminal records with task, policy version, numeric thresholds, named outage/enforcement branch, allowlisted answer fields, usage, models, latency, attempts and cost certainty.
 Every record includes `error_type`, explicitly null for success or intentional inactivity and a stable original/normalized type for failure.
-A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 or 2), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
+A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
 A payload screened in pieces records `chunks` (the piece count; 1 for a single request, 0 when none was sent), the usage and tries of every answered piece added together, and the longest elapsed time, with a failed piece's own tries added to the total.
 When several pieces answered, the cost is their sum and counts as reported only when every one of them reported its cost; otherwise it is unknown.
 A generic provider `Error` stays visible without inventing an HTTP category by parsing its message.
 Reported, estimated, unknown and not-called costs are distinct; unknown charges are not zero.
-Commands, paths, state, questions, raw exchanges, provider extension fields and exception messages are excluded; the guard no longer adds raw session report entries.
+Commands, state, questions, raw exchanges, provider extension fields and exception messages are excluded; paths are excluded except for the refused write/edit target in `refused_path`.
+The guard no longer adds raw session report entries.
 An active durable-record failure requires review with `AuditUnavailableError`; if judgment also failed, its stable error type remains visible in the notice.
+The explicit trusted-read and channel-consistency exceptions retain original read content beside that notice.
 Intentionally inactive scope does not become active merely because its optional record cannot be written.
 [`tests/fm-jev-guard.test.sh`](../tests/fm-jev-guard.test.sh) exercises these boundaries offline, and [the verification record](verification/runtime-backends.md#jev-guard-native-tool-hooks) distinguishes native surface proof, calibration limitations and deployed acceptance.
 
@@ -3644,7 +3665,7 @@ FM_WORKTREE_WRITE_TIMEOUT=10       # wall-clock seconds that one walk may take, 
 FM_WATCH_TRIAGE_LOG_MAX_BYTES=262144   # size cap for the watcher's absorbed-wake debug log
 FM_FLEET_SYNC_BOOTSTRAP_TIMEOUT=     # optional seconds allowed for bootstrap's best-effort clone refresh; unset/blank defaults to max(20, 5 + 3 * origin-backed-project-count)
 FM_FLEET_PRUNE=1        # set to 0 to skip pruning local branches whose upstream is gone
-FM_PROJECT_LOCK_SERVICE_SECS=     # optional measured stall allowance override: seconds one project-lock hold may last before waiters refuse; bin/fm-project-lock-lib.sh owns default sizing and the progress-based stall rule
+FM_PROJECT_LOCK_SERVICE_SECS=     # optional idle-progress allowance override, not holder age; bin/fm-project-lock-lib.sh owns default sizing and the 30-minute telemetry-uncertainty extreme
 FM_PROJECT_LOCK_POLL_SECS=        # optional project-lock sampling cadence override (positive seconds, decimals allowed); bin/fm-project-lock-lib.sh owns the default and holder progress messages
 FM_STALE_WORKTREE_LOCK_AGE_SECS=30       # min mtime age before fm-teardown.sh treats a leftover worktree git index.lock as provably stale
 FM_TREEHOUSE_RETURN_LOCK_RETRIES=3        # retries after a treehouse return fails on the transient git index.lock signature

@@ -5,6 +5,7 @@ import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { setTimeout as sleep } from "node:timers/promises";
 import { ContractError, JevClient, type SystemOneResult } from "../src/core/client.ts";
 import { QuestionValidationError, validateRequest, type Questions, type State } from "../src/core/types.ts";
 import { BASH_THRESHOLDS, SCREEN_THRESHOLDS, WRITE_THRESHOLDS } from "../src/levels/level06/index.ts";
@@ -17,14 +18,21 @@ export const MAX_REQUEST_BYTES = 16_384;
 export const MAX_CHUNKS = 16;
 /** A span up to 1,000 JSON-escaped bytes always lies whole inside one piece; a longer one can be cut, and each half is still screened. */
 export const CHUNK_OVERLAP_BYTES = 1_024;
-/** Outage-only deny text; policy blocks keep the permanent BLOCK_NOTICE. */
+/** Outage-only deny guidance; the worker adapter owns policy-refusal next steps. */
 export const OUTAGE_NOTICE = "The review could not run, so this is not a verdict on the call. You may run the same call once more. "
   + "If it fails the same way, stop and tell the user; do not work around it with another command, tool, path or encoding.";
-const TRY_MS = 10_000;
-const MAX_TRIES = 2;
+
+interface Budget { tryMs: number; tries: number; decisionMs: number; backoffMs: number; reserveWholeTry: boolean }
+// The per-try limit guards only against a judge that never answers; answered calls are far faster
+// (p99 535 ms over 15,640 calls, docs/configuration.md "Unreachable threshold").
+const WIDE_BUDGET: Budget = { tryMs: 90_000, tries: 3, decisionMs: 300_000, backoffMs: 1_000, reserveWholeTry: true };
+// omp 18.12.0 forwards the original output when its nonconfigurable 30-second tool_result deadline passes.
+// Its tool_call deadline (extensionHandlers.toolCallTimeoutMs) is raised past WIDE_BUDGET by .omp/fm-worker-overlay.yml.
+const OMP_RESULT_BUDGET: Budget = { tryMs: 12_000, tries: 2, decisionMs: 25_000, backoffMs: 500, reserveWholeTry: false };
+const budgetFor = (hook: GuardTerminal["hook"], host: "omp" | "claude"): Budget => host === "omp" && hook === "tool_result" ? OMP_RESULT_BUDGET : WIDE_BUDGET;
 const RETRYABLE_FAILURES: ReadonlySet<GuardFailureType> = new Set(["TimeoutError", "TypeError", "Error"]);
 const lib = resolve(dirname(fileURLToPath(import.meta.url)), "../../fm-typesafe-lib.sh");
-const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal }>();
+const budgets = new AsyncLocalStorage<{ until: number; signal: AbortSignal; budget: Budget }>();
 
 export type GuardFailureType = "ContractError" | "QuestionValidationError" | "TimeoutError" | "AbortError"
   | "TypeError" | "Error" | "PrivacyWithheldError" | "CredentialUnavailableError" | "RequestTooLargeError"
@@ -86,7 +94,9 @@ export interface GuardTerminal {
   decision: "allow" | "block" | "clear" | "flag" | "review" | "inactive";
   enforcement: "pretool_allow" | "pretool_deny" | "result_pass" | "omp_replace"
     | "claude_advisory_only" | "inactive_no_protection";
-  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency";
+  branch: "policy" | "deterministic" | "device" | "empty" | "outage" | "inactive" | "supervisor_consistency" | "trusted_read";
+  /** Only refused write/edit paths; never command text or content. */
+  refused_path?: string;
   error_type: GuardFailureType | null;
   request_started: boolean;
   /** Set on failure rows, where no result carries meta. */
@@ -110,21 +120,22 @@ export interface GuardService {
   record(terminal: GuardTerminal): void;
 }
 
-export async function withDecisionBudget<T>(run: () => Promise<T>): Promise<T> {
+export async function withDecisionBudget<T>(run: (remainingMs: () => number) => Promise<T>, hook: GuardTerminal["hook"], host: "omp" | "claude"): Promise<T> {
+  const budget = budgetFor(hook, host);
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), 25_000);
+  const timer = setTimeout(() => controller.abort(new DOMException("Jev handler timed out.", "TimeoutError")), budget.decisionMs);
   try {
-    return await budgets.run({ until: performance.now() + 25_000, signal: controller.signal }, run);
+    return await budgets.run({ until: performance.now() + budget.decisionMs, signal: controller.signal, budget }, run, preflightTimeout);
   } finally {
     clearTimeout(timer);
   }
 }
 
-/** One retry for an outage of a required judgment, only when a whole further try fits the handler budget. */
-function mayRetry(cause: unknown): boolean {
-  const budget = budgets.getStore();
-  if (budget?.signal.aborted) return false;
-  if (budget && budget.until - performance.now() < TRY_MS) return false;
+/** A budget that reserves a whole try keeps room for one; otherwise the next try shares whatever remains before the host deadline. */
+function mayRetry(cause: unknown, backoff: number): boolean {
+  const store = budgets.getStore();
+  if (store?.signal.aborted) return false;
+  if (store && store.until - performance.now() < (store.budget.reserveWholeTry ? store.budget.tryMs : 1) + backoff) return false;
   return RETRYABLE_FAILURES.has(failureType(cause));
 }
 
@@ -158,7 +169,7 @@ export function splitForRoom(text: string, room: number, overlap = CHUNK_OVERLAP
 function preflightTimeout(): number {
   const budget = budgets.getStore();
   budget?.signal.throwIfAborted();
-  const remaining = budget ? Math.ceil(budget.until - performance.now()) : 25_000;
+  const remaining = budget ? Math.ceil(budget.until - performance.now()) : OMP_RESULT_BUDGET.decisionMs;
   if (remaining <= 0) throw new DOMException("Jev handler timed out.", "TimeoutError");
   return remaining;
 }
@@ -166,7 +177,9 @@ function preflightTimeout(): number {
 /** Each installation owns one canonical client; no credential enters its environment or argv. */
 export function createGuardService(context: GuardServiceContext): GuardService {
   const active = context.noHelpers !== true && context.project === "firstmate";
-  let client: JevClient | undefined;
+  const host = context.host ?? "omp";
+  let apiKey: string | undefined;
+  const clients = new Map<number, JevClient>();
   const ledger = resolve(context.state, "jev-guard.jsonl");
 
   function permitted(requestText: string): void {
@@ -194,8 +207,9 @@ export function createGuardService(context: GuardServiceContext): GuardService {
 
   return {
     active,
-    host: context.host ?? "omp",
+    host,
     async decide(state, questions) {
+      const budget = budgets.getStore()?.budget ?? budgetFor("tool_result", host);
       let requestStarted = false;
       let tries = 0;
       let started = 0;
@@ -208,8 +222,13 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         const snapshot: unknown = JSON.parse(requestText);
         validateRequest(snapshot);
         permitted(requestText);
-        client ??= new JevClient({ provider: "typesafe", apiKey: typesafeKey(), model: GUARD_MODEL, timeoutMs: TRY_MS,
-          baseUrl: process.env.FM_TEST_SEAM === "1" ? process.env.FM_JEV_GUARD_BASE_URL || undefined : undefined });
+        apiKey ??= typesafeKey();
+        let client = clients.get(budget.tryMs);
+        if (!client) {
+          client = new JevClient({ provider: "typesafe", apiKey, model: GUARD_MODEL, timeoutMs: budget.tryMs,
+            baseUrl: process.env.FM_TEST_SEAM === "1" ? process.env.FM_JEV_GUARD_BASE_URL || undefined : undefined });
+          clients.set(budget.tryMs, client);
+        }
         requestStarted = true;
         started = performance.now();
         for (;;) {
@@ -217,7 +236,9 @@ export function createGuardService(context: GuardServiceContext): GuardService {
           try {
             return await client.systemOne(snapshot.state, snapshot.questions, { signal: budgets.getStore()?.signal });
           } catch (cause) {
-            if (tries >= MAX_TRIES || !mayRetry(cause)) throw cause;
+            const backoff = budget.backoffMs * tries;
+            if (tries >= budget.tries || !mayRetry(cause, backoff)) throw cause;
+            await sleep(backoff, undefined, { signal: budgets.getStore()?.signal });
           }
         }
       } catch (cause) {
@@ -257,6 +278,8 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         thresholds: { bash: BASH_THRESHOLDS, write: WRITE_THRESHOLDS, injection: SCREEN_THRESHOLDS },
         hook: terminal.hook, tool: terminal.tool, decision: terminal.decision, enforcement: terminal.enforcement, branch: terminal.branch,
         error_type: terminal.error_type, request_started: terminal.request_started,
+        ...((terminal.tool === "write" || terminal.tool === "edit") && terminal.enforcement === "pretool_deny"
+          && terminal.refused_path !== undefined ? { refused_path: terminal.refused_path } : {}),
         provider: result?.meta.provider ?? (terminal.request_started ? "typesafe" : null),
         requested_model: terminal.request_started ? GUARD_MODEL : null, model: result?.model ?? null,
         attempts: answered.length > 0 || terminal.attempts != null ? sum(answered.map((r) => r.meta.attempts)) + (terminal.attempts ?? 0) : null,

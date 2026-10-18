@@ -95,7 +95,7 @@ REC
 }
 
 test_linked_spawning_home_rejects_primary_before_refresh() {
-  local rec id out status returned primary spawning before_reflog
+  local rec id out status returned primary spawning before_reflog clock
   for returned in primary primary-alias spawning scout; do
     id="pool-linked-${returned}-r12"
     rec=$(make_case "linked-$returned" "$id")
@@ -114,9 +114,22 @@ test_linked_spawning_home_rejects_primary_before_refresh() {
     esac
     before_reflog=$(git -C "$primary" reflog)
     # The assertion concerns identity, not how long an unchanged cwd is polled.
+    # The refusal cases must reach the ten-minute no-progress limit, which counts
+    # shell seconds, so they advance that clock a minute per poll. The scout case
+    # must arrive and keeps the real clock.
     fm_test_fake_sleep_noop "$FAKEBIN_DIR"
+    clock=
+    if [ "$returned" != scout ]; then
+      clock="$TMP_ROOT/clock.sh"
+      cat > "$clock" <<'SH'
+sleep() {
+  if [ "${1:-}" = 1 ]; then SECONDS=$((SECONDS + 60)); fi
+  command sleep "$@"
+}
+SH
+    fi
 
-    out=$(run_spawn "$id" --scout)
+    out=$(BASH_ENV="$clock" run_spawn "$id" --scout)
     status=$?
     if [ "${FM_TEST_EVIDENCE:-0}" = 1 ]; then
       printf '# evidence begin: linked-home spawn, returned=%s\n' "$returned"

@@ -62,9 +62,11 @@
 #   that overlay. docs/configuration.md "Worker skill selection" owns selection,
 #   supported brief transports, and recorded outcomes. The picker is bounded
 #   at 30 seconds and never stops a launch.
-#   A fresh spawn's `treehouse get` wait is foreground-aware: docs/agent-control.md
-#   owns its window and ceiling, and docs/verification/runtime-backends.md
-#   "Treehouse get entry wait" records the measurements behind them.
+#   A fresh spawn's `treehouse get` wait is progress-based: it ends after ten
+#   minutes with no new pane path or changed output, or at an absolute
+#   thirty-minute extreme. docs/agent-control.md owns the rule, and
+#   docs/verification/runtime-backends.md "Treehouse get entry wait" records
+#   the earlier acquisition timings and their limits.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only] [--worktree <path>]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
@@ -331,6 +333,8 @@
 #   reports a differing model or an unrecovered run error beside the state.
 #   Crewmates and scouts also layer .omp/fm-worker-overlay.yml to keep Mnemopi
 #   text-only recall without loading a separate embedding model per session.
+#   The same overlay raises omp's pre-tool handler deadline above the Jev guard's
+#   300-second shell and write judgment budget (docs/configuration.md "Jev guard").
 #   Workers also enable eager native account rotation without waiting for usage
 #   resets and receive a task-owned --config overlay permitting only declared
 #   OMP model fallbacks, with an empty default chain so ambient role chains
@@ -5021,11 +5025,20 @@ spawn_current_path() { # <target>
   cmux) fm_backend_cmux_current_path "$1" "$W" ;;
   esac
 }
+spawn_acquisition_output() { # <target>
+  case "$BACKEND" in
+  tmux) fm_backend_tmux_capture "$1" 200 ;;
+  herdr) fm_backend_herdr_capture "$1" 200 ;;
+  zellij) fm_backend_zellij_capture "$1" 200 "$W" ;;
+  cmux) fm_backend_cmux_capture "$1" 200 "$W" ;;
+  esac
+}
 # What the pane's foreground says about the `treehouse get` just typed into it:
 # running (any foreground process is `treehouse get`), idle (only shells), or
 # unknown (the backend cannot say, the read failed, or a non-shell helper is
 # the only thing listed). zellij and cmux expose no foreground process, so they
-# always read unknown and keep the base wait.
+# always read unknown. Only the minute waiting line reads this; path/output
+# progress governs the wait.
 spawn_get_state() { # <target>
   local lines line first shells=0 other=0
   case "$BACKEND" in
@@ -5533,39 +5546,38 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
   # as the transient it is and the wait continues, instead of being adopted and
   # then refused by the guard.
   # A candidate the screen rejects is never adopted, so a host where the pane
-  # never reaches an isolated worktree spends the whole window before refusing.
+  # never reaches an isolated worktree waits out the no-progress limit before refusing.
   # That wait is deliberate - telling a transient apart from a terminal
   # misconfiguration would need machinery this path does not want - so the
   # refusal has to be self-explaining instead: carry the last path seen and the
   # reason it was rejected, and report both at the deadline.
   #
-  # The window is not one fixed length. A start can wait on `treehouse get` for
-  # far longer than the pane read costs: a get begun while a pool-wide
-  # `treehouse status --json` ran reached its worktree about when that status
-  # finished (docs/verification/runtime-backends.md "Treehouse get entry wait"
-  # holds the measurements and what they leave unproven). So the base window is
-  # 60 reads, and while the pane's foreground shows `treehouse get` still
-  # running the wait extends to a 120 second wall-clock ceiling, chosen rather
-  # than measured. A read that cannot tell keeps the window the previous read
-  # chose; a read that shows only shells sets the base window again.
-  acquire_base=60
-  acquire_ceiling=120
+  # A loaded host can keep a live get queued for minutes. Refuse only after
+  # ten minutes with neither a new pane path nor changed output, or after the
+  # absolute runaway bound of thirty minutes. Foreground liveness explains
+  # the wait but is not itself progress: a hung get must still end eventually.
+  # The existing acquisition EXIT cleanup retains ownership of any lease.
+  # Sample output at most every five seconds; print a waiting line each minute.
+  acquire_stall=600
+  acquire_ceiling=1800
+  acquire_notice=60
   acquire_start=$SECONDS
-  acquire_limit=$acquire_base
+  acquire_progress=$SECONDS
+  acquire_next_output=$SECONDS
+  acquire_next_notice=$((SECONDS + acquire_notice))
+  acquire_output=''
+  acquire_stop=''
   candidate=""
   last_seen=""
   last_reason="the pane reported no path"
   tick=0
   while :; do
     tick=$((tick + 1))
-    # Read the foreground before the path. `treehouse get` moves the pane into
-    # the worktree and then hands the foreground to its subshell, so an idle read
-    # taken after a stale path read could come from a get that arrived in
-    # between, and would end the wait on a path that is already out of date.
-    # Read first, an idle foreground means the path read that follows is final.
-    state=$(spawn_get_state "$WT_TARGET")
     p=$(spawn_current_path "$WT_TARGET" || true)
-    [ -z "$p" ] || last_seen="$p"
+    if [ -n "$p" ] && [ "$p" != "$last_seen" ]; then
+      acquire_progress=$SECONDS
+      last_seen="$p"
+    fi
     if [ -n "$p" ] && fm_task_copy_isolated "$p" "$PROJ_ABS"; then
       p_real=$(real_path_or_raw "$p")
       last_reason="it is an isolated worktree, but no second read agreed with it"
@@ -5577,17 +5589,31 @@ elif [ "$KIND" != secondmate ] && [ "$BACKEND" != orca ]; then
     else
       candidate=""
       [ -z "$p" ] || last_reason=$FM_TASK_COPY_REASON
-      case "$state" in
-        running) acquire_limit=$acquire_ceiling ;;
-        idle) acquire_limit=$acquire_base ;;
-      esac
     fi
-    [ "$tick" -lt "$acquire_limit" ] || break
-    [ "$acquire_limit" = "$acquire_base" ] || [ $((SECONDS - acquire_start)) -lt "$acquire_limit" ] || break
+    if [ "$SECONDS" -ge "$acquire_next_output" ]; then
+      if output=$(spawn_acquisition_output "$WT_TARGET" 2>/dev/null) && [ "$output" != "$acquire_output" ]; then
+        acquire_output=$output
+        acquire_progress=$SECONDS
+      fi
+      acquire_next_output=$((SECONDS + 5))
+    fi
+    if [ $((SECONDS - acquire_start)) -ge "$acquire_ceiling" ]; then
+      acquire_stop="absolute extreme ${acquire_ceiling}s reached"
+      break
+    fi
+    if [ $((SECONDS - acquire_progress)) -ge "$acquire_stall" ]; then
+      acquire_stop="no path or output progress for ${acquire_stall}s"
+      break
+    fi
+    if [ "$SECONDS" -ge "$acquire_next_notice" ]; then
+      state=$(spawn_get_state "$WT_TARGET")
+      echo "waiting: treehouse get to enter an isolated worktree; foreground $state; elapsed $((SECONDS - acquire_start))s; no path/output progress for $((SECONDS - acquire_progress))s; last path '${last_seen:-none}' ($last_reason)" >&2
+      acquire_next_notice=$((SECONDS + acquire_notice))
+    fi
     sleep 1
   done
   if [ -z "$WT" ]; then
-    echo "error: treehouse get did not enter an isolated worktree after ${tick} polls (window ${acquire_limit}s) (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); aborting acquisition" >&2
+    echo "error: treehouse get did not enter an isolated worktree after ${tick} polls ($acquire_stop) (last seen '${last_seen:-none}': $last_reason; spawning project '$PROJ_ABS'); aborting acquisition" >&2
     exit 1
   fi
 
@@ -5926,7 +5952,7 @@ BUSY_GEN=
     j_guard=$(json_escape "$(shell_quote "$FM_ROOT/bin/fm-jev-guard-hook.sh") $(shell_quote "$FM_HOME") $(shell_quote "$guard_config") $(shell_quote "$STATE_REAL") $(shell_quote "$ID") $(shell_quote "$WT") $(shell_quote "$guard_data") $(shell_quote "$guard_project") $(shell_quote "$guard_policy")")
       # Resolve host envelopes through the duration owner, retaining the existing
       # fallback above the guard handler's own deadline.
-      j_guard_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-guard.claude-hook --fallback 30 --percentile 99 --margin 3) || exit 1
+      j_guard_limit=$(python3 "$SCRIPT_DIR/fm-duration.py" limit jev-guard.claude-hook --fallback 330 --percentile 99 --margin 3) || exit 1
       guard_entries="\"PreToolUse\":[{\"matcher\":\"^(Bash|Write|Edit)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],\"PostToolUse\":[{\"matcher\":\"^(Bash|Read)$\",\"hooks\":[{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}]}],"
       submit_entries="$submit_entries,{\"type\":\"command\",\"command\":\"$j_guard\",\"timeout\":$j_guard_limit}"
     fi

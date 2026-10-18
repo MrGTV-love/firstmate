@@ -201,10 +201,12 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
 fi
 
 # Each fake poll adds FM_TEST_TICK_SECONDS to the shell clock, so a run can reach
-# a wall-clock bound without waiting for it.
+# a wall-clock bound without waiting for it. The clock holds still until the fake
+# get has started (FM_TEST_TICK_GATE exists), so a slow host cannot spend the
+# no-progress allowance before the get under test has begun.
 cat > "$TMP_ROOT/clock.sh" <<'SH'
 sleep() {
-  if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_TICK_SECONDS:-}" ]; then
+  if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_TICK_SECONDS:-}" ] && [ -e "${FM_TEST_TICK_GATE:-/}" ]; then
     SECONDS=$((SECONDS + FM_TEST_TICK_SECONDS))
   fi
   command sleep "$@"
@@ -228,12 +230,16 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   [ "$MODE" != success ] || DEST=$CLEAN
   [ "$MODE" != late ] || DEST=$LATE
   GET_MODE=$MODE
+  # A get that must arrive keeps the real clock, so a slow host cannot spend its
+  # 600s no-progress allowance in a few polls. Only cases that must reach the limit scale it.
   TICK_SECONDS=
   TTY_STALL=
   case "$MODE" in
-    clock) GET_MODE=slow; TICK_SECONDS=3 ;;
-    gone) GET_MODE=exits; TICK_SECONDS=3 ;;
-    late) TTY_STALL=1.5 ;;
+    slow|spawning|earlyexit) TICK_SECONDS=60 ;;
+    clock) GET_MODE=slow; TICK_SECONDS=180 ;;
+    gone) GET_MODE=exits; TICK_SECONDS=60 ;;
+    late) TICK_SECONDS=3; TTY_STALL=1.5 ;;
+    laterexit) TICK_SECONDS=3 ;;
   esac
   TICKS="$CASE/ticks"
   : > "$TICKS"
@@ -241,7 +247,7 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
     "$GET_MODE" "$LEASE" "$PIDFILE" "$ALLOW" "$ARRIVED" "$DEST" "$TICKS" > "$TMP_ROOT/get-config"
   fm_test_spawn_brief "$FM_HOME" "$ID" 'Refused acquisition must release its process lease.'
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$CASE/claude" PATH="$FAKEBIN:$PATH" \
-    FM_TEST_TICK_FILE="$TICKS" FM_TEST_TICK_SECONDS="$TICK_SECONDS" FM_TEST_TTY_STALL="$TTY_STALL" BASH_ENV="$TMP_ROOT/clock.sh" \
+    FM_TEST_TICK_FILE="$TICKS" FM_TEST_TICK_SECONDS="$TICK_SECONDS" FM_TEST_TICK_GATE="$PIDFILE" FM_TEST_TTY_STALL="$TTY_STALL" BASH_ENV="$TMP_ROOT/clock.sh" \
     bash "$ROOT/bin/fm-spawn.sh" "$ID" "$PROJECT" --backend "$BACKEND" --harness "$HARNESS" --allow-api-key --mode no-mistakes --yolo off 2>&1)
   rc=$?
   if [ "$MODE" = late ]; then
@@ -263,33 +269,12 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
   fi
   [ "$rc" -ne 0 ] || fail "$MODE spawn unexpectedly launched: $out"
   case "$MODE" in
-    slow) assert_contains "$out" 'did not enter an isolated worktree after 120 polls (window 120s)' 'missing ceiling refusal' ;;
-    # Whether or not a read catches the get alive, the loop ends on the 60th poll in the base window.
-    spawning) assert_contains "$out" 'did not enter an isolated worktree after 60 polls (window 60s)' 'missing deadline refusal' ;;
-    earlyexit)
-      # The get is alive for the first poll, then exits with the pane still in the
-      # project: the extension never carries past the get, so the base window ends the wait.
-      assert_contains "$out" 'did not enter an isolated worktree after 60 polls (window 60s)' 'missing deadline refusal'
-      ;;
-    laterexit)
-      # The get ran past the 60-poll window, then exited with the pane still in the
-      # project: the refusal counts the polls waited and names the base window that applied last.
-      [[ $out =~ did\ not\ enter\ an\ isolated\ worktree\ after\ ([0-9]+)\ polls\ \(window\ 60s\) ]] \
-        || fail "missing refusal naming the base window after the get stopped: $out"
-      [ "${BASH_REMATCH[1]}" -ge 75 ] && [ "${BASH_REMATCH[1]}" -lt 120 ] \
-        || fail "a get that ran 75 polls was refused after ${BASH_REMATCH[1]} polls: $out"
-      ;;
-    clock)
-      # 3 s per poll reaches the 120 s wall-clock ceiling near poll 40, well before the 120th.
-      [[ $out =~ did\ not\ enter\ an\ isolated\ worktree\ after\ ([0-9]+)\ polls\ \(window\ 120s\) ]] \
-        || fail "missing ceiling refusal: $out"
-      [ "${BASH_REMATCH[1]}" -ge 30 ] && [ "${BASH_REMATCH[1]}" -lt 60 ] \
-        || fail "wall-clock ceiling ended the extended wait after ${BASH_REMATCH[1]} polls: $out"
-      ;;
-    gone)
-      # The get exited and the pane sits at a shell in the project: the 60-poll base
-      # window runs to its end however long each poll took on the clock.
-      assert_contains "$out" 'did not enter an isolated worktree after 60 polls (window 60s)' 'missing deadline refusal'
+    slow|spawning|earlyexit|laterexit|clock|gone)
+      assert_contains "$out" 'treehouse get did not enter an isolated worktree' 'missing acquisition refusal'
+      assert_contains "$out" 'no path or output progress for 600s' 'the refusal did not name the no-progress limit'
+      assert_not_contains "$out" 'absolute extreme' 'a stalled get was ended by the absolute extreme instead of the no-progress limit'
+      assert_contains "$out" 'aborting acquisition' 'missing explicit acquisition abort'
+      [ ! -e "$FM_HOME/state/$ID.meta" ] || fail 'an unacquired spawn published task metadata'
       ;;
     foreign) assert_contains "$out" 'could not pre-register Claude workspace trust' 'missing foreign-copy refusal' ;;
     dirty) assert_contains "$out" 'not clean' 'missing post-acquisition refusal' ;;
@@ -363,6 +348,7 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
   fm_test_spawn_brief "$FM_HOME" "$A_ID" 'Refused acquisition must wait for the shared presentation lock.'
   FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$A_CASE/claude" PATH="$FAKEBIN:$PATH" \
     FM_TEST_POLL_READY="$A_POLL_READY" FM_TEST_REAL_CLEANUP_SLEEP=1 \
+    FM_TEST_TICK_SECONDS=60 BASH_ENV="$TMP_ROOT/clock.sh" \
     FM_TEST_CLEANUP_WATCH="$A_CLEANUP_WATCH" FM_TEST_CLEANUP_WAIT_STARTED="$A_CLEANUP_WAIT" \
     bash "$ROOT/bin/fm-spawn.sh" "$A_ID" "$PROJECT" --backend herdr --harness codex --allow-api-key --mode no-mistakes --yolo off \
     > "$A_OUT" 2>&1 &
@@ -408,14 +394,7 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = off ]; then
   b_pane=$(fm_backend_herdr_projection_journal_field "$B_JOURNAL" pane_id) || fail 'contention B did not bind a projected pane'
   [ "$(fm_backend_herdr_projection_journal_field "$B_JOURNAL" parent_workspace_id)" = "$B_PARENT" ] \
     || fail 'contention B projected under the wrong exact parent workspace'
-  touch "$A_POLL_READY"
-  for _ in $(seq 1 3000); do
-    grep -Fq 'did not enter an isolated worktree after 120 polls (window 120s)' "$A_OUT" && break
-    kill -0 "$A_SPAWN_PID" 2>/dev/null || break
-    /bin/sleep 0.02
-  done
-  assert_contains "$(cat "$A_OUT")" 'did not enter an isolated worktree after 120 polls (window 120s)' 'contention A missed the isolation refusal'
-  touch "$A_CLEANUP_WATCH"
+  touch "$A_CLEANUP_WATCH" "$A_POLL_READY"
   for _ in $(seq 1 1000); do
     [ ! -e "$A_CLEANUP_WAIT" ] || break
     kill -0 "$A_SPAWN_PID" 2>/dev/null || break

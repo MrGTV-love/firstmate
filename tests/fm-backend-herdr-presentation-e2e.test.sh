@@ -490,6 +490,21 @@ spawn_task() {  # <id> <home> <project> [extra fm-spawn args...]; SPAWN_DEADLINE
     --mode no-mistakes --yolo off --backend herdr "$@"
 }
 
+# The post-create abort fixtures must reach the acquisition's ten-minute
+# no-progress limit, which counts shell seconds. Each one-second sleep advances
+# that clock a minute so the limit arrives in about ten polls, not ten minutes.
+# The project-lock queue polls at half a second, which this clock leaves alone,
+# so the second fixture does not read the first one's short wait as a stall.
+cat > "$TMP_ROOT/clock.sh" <<'SH'
+sleep() {
+  if [ "${1:-}" = 1 ]; then SECONDS=$((SECONDS + 60)); fi
+  command sleep "$@"
+}
+SH
+spawn_abort_task() {  # <id> <home> <project>
+  BASH_ENV="$TMP_ROOT/clock.sh" FM_PROJECT_LOCK_POLL_SECS=0.5 spawn_task "$@"
+}
+
 finish_concurrent_spawn() {  # <id> <status> <stdout> <stderr>
   local id=$1 status=$2 out=$3 err=$4
   [ "$status" -ne 0 ] || return 0
@@ -503,7 +518,7 @@ finish_concurrent_expected_abort() {  # <id> <status> <stdout> <stderr>
   local id=$1 status=$2 out=$3 err=$4
   [ "$status" -ne 0 ] || fail "post-create abort fixture $id unexpectedly succeeded"
   if grep -F "task set is locked" "$err" >/dev/null 2>&1; then
-    if spawn_task "$id" "$HOME_DIR" "$PROJECT_DIR" > "$out" 2> "$err"; then
+    if spawn_abort_task "$id" "$HOME_DIR" "$PROJECT_DIR" > "$out" 2> "$err"; then
       fail "post-create abort fixture $id unexpectedly succeeded after task-set publication completed"
     fi
   fi
@@ -926,9 +941,9 @@ pass "real Herdr lab: forced workspace.move failure leaves a successful worker i
 mkdir -p "$POST_CREATE_ABORT_CONTROL"
 ABORT_START=$(log_line_count)
 ABORT_FOCUS_START=$(focus_audit_line_count)
-spawn_task abort-a "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/abort-a.out" 2> "$TMP_ROOT/abort-a.err" &
+spawn_abort_task abort-a "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/abort-a.out" 2> "$TMP_ROOT/abort-a.err" &
 ABORT_A_PID=$!
-spawn_task abort-b "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/abort-b.out" 2> "$TMP_ROOT/abort-b.err" &
+spawn_abort_task abort-b "$HOME_DIR" "$PROJECT_DIR" > "$TMP_ROOT/abort-b.out" 2> "$TMP_ROOT/abort-b.err" &
 ABORT_B_PID=$!
 if wait "$ABORT_A_PID"; then ABORT_A_STATUS=0; else ABORT_A_STATUS=$?; fi
 if wait "$ABORT_B_PID"; then ABORT_B_STATUS=0; else ABORT_B_STATUS=$?; fi

@@ -25,6 +25,11 @@ const server = createServer((req, res) => {
     appendFileSync(log, JSON.stringify({ path: req.url, auth: req.headers.authorization, body }) + '\n');
     const request = JSON.parse(body);
     const text = JSON.stringify(request.state);
+    if (text.includes('timeout-reset')) {
+      if (!seen.has(text)) { seen.add(text); return; }
+      req.socket.destroy(); return;
+    }
+    if (text.includes('slow502')) { setTimeout(() => { res.statusCode = 502; res.end('{}'); }, 2500); return; }
     if (text.includes('fail500') || text.includes('http402')) { res.statusCode = text.includes('http402') ? 402 : 500; res.end('{}'); return; }
     if (text.includes('flaky-once') && !seen.has(text)) { seen.add(text); res.statusCode = 500; res.end('{}'); return; }
     if (text.includes('stall-direct')) return;
@@ -46,7 +51,9 @@ const server = createServer((req, res) => {
     const usage = { input_tokens: 3, output_tokens: 1, extra: 'provider-private-canary' };
     if (text.includes('reported-cost')) usage.cost = 0.001;
     res.setHeader('content-type', 'application/json');
-    res.end(JSON.stringify({ model: 'jev-fake', answers, usage, extra: 'provider-private-canary' }));
+    const reply = () => res.end(JSON.stringify({ model: 'jev-fake', answers, usage, extra: 'provider-private-canary' }));
+    if (text.includes('late-answer')) setTimeout(reply, 31000);
+    else reply();
   });
 });
 server.listen(0, '127.0.0.1', () => writeFileSync(portFile, String(server.address().port)));
@@ -131,7 +138,7 @@ test_outages_and_scope() {
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"fail500"}')"
   denied "$out" || fail "TypeSafe failure did not require review"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "TypeSafe failure fell back or did not make exactly one bounded retry of HTTP 500"
+  [ "$(requests)" -eq $((before + 3)) ] || fail "TypeSafe failure fell back or did not stop after three tries of HTTP 500"
   jq -se 'all(.[]; .path == "/v1/systemone")' "$REQUESTS" >/dev/null || fail "guard used another provider"
   for project in vernant other ""; do
     before=$(requests)
@@ -162,18 +169,16 @@ test_bounded_retry() {
   [ "$(requests)" -eq $((before + 2)) ] || fail "outage then success did not use exactly two tries"
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"fail500 again"}')"
-  denied "$out" || fail "two outages allowed a required judgment"
-  [ "$(requests)" -eq $((before + 2)) ] || fail "persistent outage did not stop after one retry"
+  denied "$out" || fail "three outages allowed a required judgment"
+  [ "$(requests)" -eq $((before + 3)) ] || fail "persistent outage did not stop after two retries"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   [[ "$reason" == *"could not run"* && "$reason" == *"same call once more"* ]] || fail "outage deny text lost the retry guidance: $reason"
-  [[ "$reason" != *"block is final"* ]] || fail "outage deny text still says the block is final: $reason"
-  jq -se '.[-1] | .error_type == "Error" and .request_started == true and .attempts == 2 and (.ms | type == "number")' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "failure row lost attempts and ms"
+  jq -se '.[-1] | .error_type == "Error" and .request_started == true and .attempts == 3 and (.ms | type == "number")' "$HOME_DIR/state/jev-guard.jsonl" >/dev/null || fail "failure row lost attempts and ms"
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"rm -rf build"}')"
   denied "$out" || fail "policy block was not denied"
   [ "$(requests)" -eq $((before + 1)) ] || fail "policy block was retried"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
-  [[ "$reason" == *"This block is final. Do not try to work around it"* ]] || fail "policy block lost its final text: $reason"
   before=$(requests)
   claude_hook "$(pre Bash '{"command":"invalid-json"}')"
   denied "$out" || fail "malformed response allowed a required judgment"
@@ -186,24 +191,21 @@ test_bounded_retry() {
   denied "$out" || fail "policy block was not denied while the ledger write failed"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
   [[ "$reason" == *"AuditUnavailableError"* ]] || fail "failed ledger write was not named: $reason"
-  [[ "$reason" == *"This block is final. Do not try to work around it"* && "$reason" != *"same call once more"* ]] || fail "policy block lost its final text when the ledger write failed: $reason"
   claude_hook "$(pre Write '{"file_path":"/etc/fm-jev-guard-outside","content":"x"}')"
   denied "$out" || fail "deterministic refusal was not denied while the ledger write failed"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
-  [[ "$reason" == *"This block is final. Do not try to work around it"* && "$reason" != *"same call once more"* ]] || fail "deterministic refusal lost its final text when the ledger write failed: $reason"
   claude_hook "$(pre Bash '{"command":"fail500 ledger"}')"
   denied "$out" || fail "outage was not denied while the ledger write failed"
   reason=$(jq -r '.hookSpecificOutput.permissionDecisionReason' <<<"$out")
-  [[ "$reason" == *"same call once more"* && "$reason" != *"block is final"* ]] || fail "outage lost its retry text when the ledger write failed: $reason"
   rmdir "$ledger"
   mv "$ledger.saved" "$ledger"
   before=$(requests)
   claude_hook "$(post Bash '{"stdout":"probability=0.5 flagged-canary","stderr":""}')"
-  jq -e '.hookSpecificOutput.additionalContext | contains("review")' <<<"$out" >/dev/null || fail "ambiguous result was not reviewed"
+  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory")' <<<"$out" >/dev/null || fail "ambiguous result had no advisory"
   [ "$(requests)" -eq $((before + 1)) ] || fail "ambiguous result was retried"
   claude_hook "$(post Bash '{"stdout":"probability=0.9 flagged-canary","stderr":""}')"
   [ "$(requests)" -eq $((before + 2)) ] || fail "flagged result was retried"
-  pass "one bounded retry: outage then success allows, repeated outage gets retry text, policy and contract results are not retried"
+  pass "bounded outage retries: a later answer allows, repeated outage requests review, policy and contract results are not retried"
 }
 
 test_missing_runtime() {
@@ -363,7 +365,11 @@ for (const [p, expected] of [[0.2, 'clear'], [0.200001, 'review'], [0.799999, 'r
   const before = JSON.stringify(original);
   const patch = await handlers.tool_result(original, ctx);
   if (expected === 'clear') assert.equal(patch, undefined);
-  else {
+  else if (expected === 'review') {
+    assert.equal(patch.isError, undefined);
+    assert.deepEqual(patch.content[0], original.content[0]);
+    assert.equal(patch.content.length, 2);
+  } else {
     assert.equal(patch.isError, true);
     assert.deepEqual(patch.details, {});
     assert.equal(JSON.stringify(patch).includes('private-output-canary'), false);
@@ -510,31 +516,202 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
 const home = process.env.HOME_DIR;
-const handlers = {};
-installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task: 'deadline', worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
-async function beforeHostDeadline(name, event) {
+function install(task, host) {
+  const handlers = {};
+  installJevGuard({ on: (name, fn) => { handlers[name] = fn; } }, { home, config: `${home}/config`, state: `${home}/state`, task, host, worktree: process.env.WT, data: process.env.TASK_DATA, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' });
+  return handlers;
+}
+const claude = install('deadline', 'claude');
+const omp = install('deadline-omp', 'omp');
+// The Claude hook envelope and the raised omp tool_call deadline are 330 seconds; the omp tool_result deadline is 30.
+async function beforeHostDeadline(handlers, name, event, limitMs) {
   let timer;
   try {
-    return await Promise.race([handlers[name](event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('documented 30-second host deadline exceeded')), 30000); })]);
+    return await Promise.race([handlers[name](event, { cwd: process.env.WT }), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${limitMs} ms host deadline exceeded`)), limitMs); })]);
   } finally { clearTimeout(timer); }
 }
-const pre = await beforeHostDeadline('tool_call', { toolName: 'bash', input: { command: 'stall-direct' } });
+const started = performance.now();
+const [slowCall, slowResult, pre, post, ompSlowCall, ompSlowResult, ompPre, ompPost] = await Promise.all([
+  beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'late-answer' } }, 330000),
+  beforeHostDeadline(claude, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer' }] }, 330000),
+  beforeHostDeadline(claude, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
+  beforeHostDeadline(claude, 'tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }, 330000),
+  beforeHostDeadline(omp, 'tool_call', { toolName: 'bash', input: { command: 'late-answer' } }, 330000),
+  beforeHostDeadline(omp, 'tool_result', { toolName: 'read', content: [{ type: 'text', text: 'late-answer private-output-canary' }] }, 30000),
+  beforeHostDeadline(omp, 'tool_call', { toolName: 'bash', input: { command: 'stall-direct' } }, 330000),
+  beforeHostDeadline(omp, 'tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] }, 30000),
+]);
+assert.equal(slowCall, undefined, 'a judge answer arriving after 30 seconds must allow the call');
+assert.equal(slowResult, undefined, 'a clear late answer must preserve the tool output');
 assert.equal(pre.block, true);
 assert.match(pre.reason, /TimeoutError/);
-assert.match(pre.reason, /same call once more/);
-const lastRow = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
-const stalled = lastRow();
-assert.equal(stalled.attempts, 2, 'a stalled request gets one retry');
-assert.ok(stalled.ms >= 19000 && stalled.ms < 25000, `both 10-second tries fit the 25-second handler budget: ${stalled.ms}`);
-const post = await beforeHostDeadline('tool_result', { toolName: 'bash', content: [{ type: 'text', text: 'stall-direct private-output-canary' }] });
+assert.match(pre.reason, /REVIEW_ON_UNAVAILABLE_V1/);
 assert.equal(post.isError, true);
 assert.match(post.content[0].text, /TimeoutError/);
+assert.match(post.content[0].text, /REVIEW_ON_UNAVAILABLE_V1/);
 assert.equal(JSON.stringify(post).includes('private-output-canary'), false);
+const rows = readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').map(JSON.parse);
+const late = rows.filter(row => row.task === 'deadline' && row.branch === 'policy');
+assert.equal(late.length, 2);
+for (const row of late) {
+  assert.equal(row.error_type, null);
+  assert.ok(row.ms >= 30000, `the late answer was actually waited for: ${row.ms}`);
+}
+const stalled = rows.filter(row => row.task === 'deadline' && row.branch === 'outage');
+assert.equal(stalled.length, 2);
+for (const row of stalled) {
+  assert.equal(row.attempts, 3, 'a dead judge receives all three full tries');
+  assert.ok(row.ms >= 270000 && row.ms < 300000, `three 90-second tries and backoff stay inside the decision budget: ${row.ms}`);
+}
+assert.ok(performance.now() - started >= 270000, 'outage cannot be reported at the old latency deadline');
+
+// omp keeps its short budget only where its host forwards the original output after 30 seconds.
+assert.equal(ompSlowCall, undefined, 'omp pre-tool waits for a judge answer arriving after 30 seconds');
+assert.equal(ompPre.block, true);
+assert.match(ompPre.reason, /TimeoutError/);
+assert.equal(ompSlowResult.isError, true, 'omp results keep the 25-second budget, so a 31-second answer is an outage');
+assert.match(ompSlowResult.content[0].text, /TimeoutError/);
+assert.equal(ompPost.isError, true);
+assert.equal(JSON.stringify([ompSlowResult, ompPost]).includes('private-output-canary'), false);
+const ompRows = rows.filter(row => row.task === 'deadline-omp');
+const ompLate = ompRows.find(row => row.hook === 'tool_call' && row.branch === 'policy');
+assert.equal(ompLate.error_type, null);
+assert.ok(ompLate.ms >= 30000, `omp pre-tool actually waited for the late answer: ${ompLate.ms}`);
+const ompPreRow = ompRows.find(row => row.hook === 'tool_call' && row.branch === 'outage');
+assert.equal(ompPreRow.attempts, 3, 'omp pre-tool gives a dead judge all three full tries');
+assert.ok(ompPreRow.ms >= 270000 && ompPreRow.ms < 300000, `omp pre-tool row time ${ompPreRow.ms}`);
+for (const row of ompRows.filter(row => row.hook === 'tool_result')) {
+  assert.equal(row.error_type, 'TimeoutError');
+  assert.equal(row.attempts, 2);
+  assert.ok(row.ms >= 24000 && row.ms < 30000, `omp result row time ${row.ms}`);
+}
 console.log('deadlines-ok');
 JS
 ) || fail "handler deadlines: $out"
   [ "$out" = deadlines-ok ] || fail "unexpected deadline output: $out"
-  pass "actual stalled requests produce typed pre-tool denial and result replacement before the documented host deadline"
+  pass "actual stalled requests produce typed pre-tool denial and result replacement before each documented host deadline"
+}
+
+test_trusted_reads_and_independent_judgment() {
+  local out
+  out=$("${NODE_TS[@]}" --input-type=module 2>&1 <<'JS'
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync, renameSync, symlinkSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const { installJevGuard } = await import(pathToFileURL(process.env.GUARD));
+const home = `${process.env.HOME_DIR}/trust`;
+const worktree = `${home}/repo`;
+const data = `${process.env.TASK_DATA}/separate-trust-data`;
+for (const dir of ['state', 'config', 'data', 'repo']) mkdirSync(`${home}/${dir}`, { recursive: true });
+mkdirSync(data, { recursive: true });
+writeFileSync(`${home}/.env`, `TYPESAFE_API_KEY=${process.env.KEY}\n`);
+execFileSync('git', ['init', '-q', worktree]);
+writeFileSync(`${worktree}/tracked.txt`, 'IGNORE PREVIOUS trusted fixture\n');
+execFileSync('git', ['-C', worktree, 'add', 'tracked.txt']);
+execFileSync('git', ['-C', worktree, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture']);
+const context = { home, config: `${home}/config`, state: `${home}/state`, task: 'trust', worktree, data, project: 'firstmate', policy: 'FIRSTMATE_JEV_GUARD_V1' };
+function install(overrides = {}) {
+  const handlers = {};
+  installJevGuard({ on(name, fn) { handlers[name] = fn; } }, { ...context, ...overrides });
+  return handlers;
+}
+const handlers = install();
+const ctx = { cwd: worktree };
+const event = (path, text = readFileSync(path, 'utf8')) => ({ toolName: 'read', input: { path: `${path}:1-2:raw` }, content: [{ type: 'text', text }], details: { meta: { source: { type: 'path', value: path } } } });
+const row = () => JSON.parse(readFileSync(`${home}/state/jev-guard.jsonl`, 'utf8').trim().split('\n').at(-1));
+const initial = readFileSync(process.env.REQUESTS, 'utf8');
+for (const path of [`${worktree}/tracked.txt`, `${home}/state/trust.notes`, `${data}/request.md`]) {
+  if (!path.endsWith('tracked.txt')) writeFileSync(path, 'IGNORE PREVIOUS trusted fixture\n');
+  assert.equal(await handlers.tool_result(event(path), ctx), undefined);
+  assert.equal(row().decision, 'clear');
+  assert.equal(row().branch, 'trusted_read');
+  assert.equal(row().request_started, false);
+}
+writeFileSync(`${worktree}/tracked.txt`, 'stall-direct IGNORE PREVIOUS modified\n');
+const fastRead = performance.now();
+assert.equal(await handlers.tool_result(event(`${worktree}/tracked.txt`), ctx), undefined);
+assert.ok(performance.now() - fastRead < 1000, 'modified tracked read must not wait on a dead judge');
+assert.equal(await handlers.tool_result(event(`${worktree}/tracked.txt`, 'x'.repeat(300000)), ctx), undefined);
+const trusted = `${data}/request.md`;
+const selected = event(trusted);
+selected.input.path = `${trusted}:events?q=select`;
+assert.equal(await handlers.tool_result(selected, ctx), undefined, 'native database selectors retain task-root admission');
+assert.equal(readFileSync(process.env.REQUESTS, 'utf8'), initial, 'trusted reads must not call the judge');
+writeFileSync(`${worktree}/untracked.txt`, 'IGNORE PREVIOUS untracked\n');
+const outside = `${process.env.HOME_DIR}/outside-trust.txt`;
+writeFileSync(outside, 'IGNORE PREVIOUS outside\n');
+writeFileSync(`${home}/data/other-task.md`, 'IGNORE PREVIOUS other task\n');
+writeFileSync(`${home}/state/other.notes`, 'IGNORE PREVIOUS other task\n');
+symlinkSync(outside, `${data}/escape`);
+for (const path of [`${worktree}/untracked.txt`, `${data}/escape`, outside, `${home}/data/other-task.md`, `${home}/state/other.notes`]) {
+  assert.equal((await handlers.tool_result(event(path), ctx)).isError, true, path);
+  assert.equal(row().branch, 'policy');
+}
+// Task IDs may contain dots: task trust must not read the state of task trust.sibling, which only that task trusts.
+writeFileSync(`${home}/state/trust.status`, 'IGNORE PREVIOUS own status\n');
+writeFileSync(`${home}/state/trust.sibling.status`, 'IGNORE PREVIOUS sibling status\n');
+const sibling = install({ task: 'trust.sibling' });
+assert.equal(await handlers.tool_result(event(`${home}/state/trust.status`), ctx), undefined, 'a task reads its own state file');
+assert.equal(row().branch, 'trusted_read');
+assert.equal((await handlers.tool_result(event(`${home}/state/trust.sibling.status`), ctx)).isError, true, 'a dotted sibling task stays judged');
+assert.equal(row().branch, 'policy');
+assert.equal(await sibling.tool_result(event(`${home}/state/trust.sibling.status`), ctx), undefined, 'the dotted task reads its own state file');
+assert.equal(row().branch, 'trusted_read');
+assert.equal((await sibling.tool_result(event(`${home}/state/trust.status`), ctx)).isError, true, 'the dotted task cannot read the shorter task state');
+assert.equal(row().branch, 'policy');
+// An omp result outage withholds that output only; every later call is judged on its own.
+const sent = () => readFileSync(process.env.REQUESTS, 'utf8').trim().split('\n').filter(Boolean).length;
+const started = performance.now();
+const withheld = await handlers.tool_result({ toolName: 'bash', content: [{ type: 'text', text: 'stall-direct' }] }, ctx);
+assert.equal(withheld.isError, true);
+assert.match(withheld.content[0].text, /TimeoutError/);
+assert.ok(performance.now() - started >= 24000 && performance.now() - started < 30000);
+assert.equal(row().attempts, 2);
+let judged = sent();
+assert.equal(await install().tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined, 'a safe call is judged and admitted right after an outage');
+assert.equal(row().error_type, null);
+assert.equal(row().request_started, true);
+assert.equal(sent(), judged + 1, 'the pre-tool call reached its own judge');
+judged = sent();
+assert.equal(await install({ host: 'claude' }).tool_call({ toolName: 'bash', input: { command: 'ls' } }, ctx), undefined);
+assert.equal(sent(), judged + 1, 'the Claude pre-tool call reached its own judge');
+writeFileSync(`${worktree}/plain.txt`, 'plain notes\n');
+judged = sent();
+assert.equal(await install().tool_result(event(`${worktree}/plain.txt`), ctx), undefined, 'a benign untrusted read passes on its own judgment');
+assert.equal(row().decision, 'clear');
+assert.equal(row().request_started, true);
+assert.equal(sent(), judged + 1);
+const flagged = await install().tool_result(event(`${worktree}/untracked.txt`), ctx);
+assert.equal(flagged.isError, true, 'a flagged untrusted read is withheld by its own verdict');
+assert.equal(row().decision, 'flag');
+assert.equal(row().error_type, null, 'the verdict is a policy answer, not an outage');
+judged = sent();
+assert.equal(await install().tool_result(event(trusted), ctx), undefined);
+assert.equal(row().branch, 'trusted_read');
+assert.equal(row().error_type, null, 'trusted admission is not an unavailable judgment');
+assert.equal(sent(), judged, 'a trusted read never reaches the judge');
+for (const [text, expected] of [['timeout-reset', 'TypeError'], ['slow502', 'Error']]) {
+  const denied = await install().tool_result({ toolName: 'bash', content: [{ type: 'text', text }] }, ctx);
+  assert.equal(denied.isError, true);
+  assert.equal(row().error_type, expected);
+  assert.equal(row().request_started, true);
+}
+const failed = await install().tool_call({ toolName: 'bash', input: { command: 'fail500' } }, ctx);
+assert.equal(failed.block, true);
+assert.equal(row().error_type, 'Error');
+for (const toolName of ['write', 'edit']) {
+  const path = '/etc/guard-refused';
+  const refused = await handlers.tool_call({ toolName, input: { path, content: 'x', new_string: 'x' } }, ctx);
+  assert.equal(refused.block, true);
+  assert.ok(refused.reason.includes(path));
+  assert.equal(row().refused_path, path);
+}
+console.log('trusted-independent-ok');
+JS
+) || fail "trusted reads and independent judgment: $out"
+  [ "$out" = trusted-independent-ok ] || fail "unexpected trusted-read output: $out"
+  pass "task-scoped and modified tracked reads return without a judge; cross-task reads remain judged; every call after an outage is judged on its own and typed failures stay visible"
 }
 
 test_ledger_privacy() {
@@ -559,7 +736,7 @@ test_claude_channel_context() {
   [ "$(requests)" -eq "$before" ] || fail "exact Claude source reached the provider"
   claude_hook "$(jq '.session_id="different-native-session"' <<<"$payload")"
   [ "$(requests)" -eq $((before + 1)) ] || fail "another session inherited source consistency"
-  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "undelivered Claude source was not screened"
+  jq -e '.hookSpecificOutput.additionalContext | contains("Advisory only")' <<<"$out" >/dev/null || fail "foreign-session launch was not screened"
   payload=$(jq '.tool_response.file.content += "changed bytes"' <<<"$payload")
   claude_hook "$payload"
   [ "$(requests)" -eq $((before + 2)) ] || fail "changed Claude bytes inherited source consistency"
@@ -625,7 +802,7 @@ for (const task of ['native', 'fm-jev-guard-rebuild-scout', 'x'.repeat(64)]) {
 }
 let before = count();
 const unseen = await handlers.tool_result(event(launch), ctx);
-assert.equal(unseen.isError, true, 'publisher receipt alone is not host delivery');
+assert.equal(unseen.isError, true, 'unannounced launch outside task paths remains judged');
 assert.equal(count(), before + 1);
 handlers.before_agent_start({ prompt: `${launchBell}\n${inboxBell}` });
 before = count();
@@ -641,8 +818,10 @@ symlinkSync(inbox, alias);
 for (const candidate of [event(copy), changed, badName, mixed, event(alias)]) {
   before = count();
   const result = await handlers.tool_result(candidate, ctx);
-  assert.equal(result.isError, true, 'claimed/copied/changed/aliased source must be screened');
-  assert.equal(count(), before + 1);
+  const trusted = candidate === changed || candidate === mixed || candidate.input.path === `${alias}:raw`;
+  if (trusted) assert.equal(result, undefined, 'own inbox reads remain visible without inference');
+  else assert.equal(result.isError, true, 'untracked copies and mismatched sources remain untrusted');
+  assert.equal(count(), before + (trusted ? 0 : 1));
 }
 const legacyReads = [];
 for (const host of ['omp', 'claude']) {
@@ -662,10 +841,12 @@ for (const host of ['omp', 'claude']) {
     }
     const expectedReceipt = format === 'pre-receipt' ? undefined : readFileSync(receiptPath, 'utf8');
     legacyHandlers.before_agent_start({ prompt: currentBell });
-    const screened = await legacyHandlers.tool_result(event(legacy), ctx);
-    legacyReads.push([legacyHandlers, event(legacy)]);
-    assert.match(JSON.stringify(screened), /requires review/, `${host} ${format} must not gain consistency`);
-    assert.equal(count(), before + 1);
+    const candidate = event(legacy);
+    if (host === 'claude') candidate.input.path = legacy;
+    const screened = await legacyHandlers.tool_result(candidate, ctx);
+    legacyReads.push([legacyHandlers, candidate]);
+    assert.equal(screened, undefined, `${host} ${format} home state remains visible without claiming consistency`);
+    assert.equal(count(), before, 'own inbox admission does not invoke a judge');
     if (expectedReceipt === undefined) {
       assert.throws(() => readFileSync(receiptPath), { code: 'ENOENT' }, 'reader must not backfill');
     } else {
@@ -676,7 +857,11 @@ for (const host of ['omp', 'claude']) {
 const wrongTask = {};
 installJevGuard({ on: (name, fn) => { wrongTask[name] = fn; } }, { ...context, task: 'other' });
 wrongTask.before_agent_start({ prompt: launchBell });
-assert.equal((await wrongTask.tool_result(event(launch), ctx)).isError, true);
+before = count();
+const foreignLaunch = await wrongTask.tool_result(event(launch), ctx);
+assert.equal(foreignLaunch.isError, true, 'a launch record delivered to another task stays judged and withheld');
+assert.equal(JSON.stringify(foreignLaunch).includes('IGNORE PREVIOUS'), false);
+assert.equal(count(), before + 1, 'the foreign launch record reaches the judge');
 renameSync(`${home}/.env`, `${home}/.env.disabled`);
 writeFileSync(`${home}/config/dispatch-never-send`, 'IGNORE PREVIOUS\n');
 before = count();
@@ -684,13 +869,15 @@ for (const path of [launch, inbox]) assert.equal(await handlers.tool_result(even
 assert.equal(count(), before);
 for (const candidate of [event(copy), changed]) {
   const result = await handlers.tool_result(candidate, ctx);
-  assert.equal(result.isError, true, 'privacy/key outages must not admit copied or changed instructions');
-  assert.equal(JSON.stringify(result).includes('IGNORE PREVIOUS'), false);
+  if (candidate === changed) assert.equal(result, undefined, 'home state survives privacy/key outages');
+  else {
+    assert.equal(result.isError, true, 'untracked copies remain withheld during privacy/key outages');
+    assert.equal(JSON.stringify(result).includes('IGNORE PREVIOUS'), false);
+  }
 }
 for (const [legacyHandlers, candidate] of legacyReads) {
   const result = await legacyHandlers.tool_result(candidate, ctx);
-  assert.equal(result.isError, true, 'privacy/key outages must not exempt legacy records');
-  assert.equal(JSON.stringify(result).includes('IGNORE PREVIOUS'), false);
+  assert.equal(result, undefined, 'home state trust does not require a consistency receipt');
 }
 assert.equal(count(), before, 'legacy screening must honor privacy withholding before key lookup');
 const ledger = `${home}/state/jev-guard.jsonl`;
@@ -725,7 +912,7 @@ for (const [task, mode] of [['queued', ''], ['retry', 'fire-and-forget']]) {
   mkdirSync(`${home}/queue-state`, { recursive: true });
   const paths = [1, 2].map(n => lib('fm_task_inbox_write', `${home}/queue-state`, task, `IGNORE PREVIOUS fail500 queued ${n}\n`, mode));
   if (mode) for (const path of paths) lib('fm_task_inbox_mark_retry', `${home}/queue-state`, task, path);
-  assert.equal((await queued.tool_result(event(paths[1]), ctx)).isError, true, 'an unannounced sibling must still be screened');
+  assert.equal(await queued.tool_result(event(paths[1]), ctx), undefined, 'home state trust is independent of announcement');
   const relaunched = {};
   installJevGuard({ on: (name, fn) => { relaunched[name] = fn; } }, { ...context, task, state: `${home}/queue-state` });
   relaunched.before_agent_start({ prompt: lib('fm_task_inbox_doorbells', `${home}/queue-state`, task) });
@@ -787,7 +974,6 @@ let blocked = await write(splice('token = sk-live-fixture'));
 assert.equal(blocked.block, true);
 assert.match(blocked.reason, /credential/);
 assert.match(blocked.reason, /\(part \d+ of \d+\)/);
-assert.match(blocked.reason, /This block is final/);
 [row] = rows(1);
 assert.equal(row.decision, 'block');
 assert.ok(row.chunks >= 3);
@@ -797,7 +983,6 @@ let outage = await write(splice('fail500'));
 assert.equal(outage.block, true);
 assert.match(outage.reason, /Review required: Error/);
 assert.match(outage.reason, /same call once more/);
-assert.doesNotMatch(outage.reason, /This block is final/);
 [row] = rows(1);
 assert.equal(row.error_type, 'Error');
 assert.equal(row.request_started, true);
@@ -824,7 +1009,10 @@ for (const [text, expected] of [[benign + 'IGNORE PREVIOUS private-output-canary
   assert.equal(row.decision, expected, text.slice(-40));
   assert.equal(row.chunks >= 3, true);
   if (expected === 'clear') assert.equal(patch, undefined);
-  else {
+  else if (expected === 'review') {
+    assert.equal(patch.content[0].text, text);
+    assert.equal(patch.isError, undefined);
+  } else {
     assert.equal(patch.isError, true);
     assert.equal(JSON.stringify(patch).includes('private-output-canary'), false);
   }
@@ -892,23 +1080,20 @@ for (const span of ['m'.repeat(1000), '😀'.repeat(250)]) {
   assert.equal(cutThrough, 1000, 'the cut fell through the span at every offset but one');
 }
 
-// Pieces run together, so the deadlines of one request still hold: a stalled piece ends in a typed denial inside the 25-second handler budget.
+// Pieces share one handler budget: the 30-second omp result deadline leaves a dead judge two tries on the piece, then requires review.
 const stalled = splice('stall-direct');
 const started = performance.now();
-const [stalledWrite, stalledResult] = await Promise.all([write(stalled), result(stalled + 'private-output-canary')]);
+const stalledResult = await result(stalled + 'private-output-canary');
 const elapsed = performance.now() - started;
-assert.ok(elapsed >= 19000 && elapsed < 25000, `handler time ${elapsed}`);
-assert.equal(stalledWrite.block, true);
-assert.match(stalledWrite.reason, /TimeoutError/);
+assert.ok(elapsed >= 24000 && elapsed < 30000, `handler time ${elapsed}`);
 assert.equal(stalledResult.isError, true);
 assert.equal(JSON.stringify(stalledResult).includes('private-output-canary'), false);
-for (const stalledRow of rows(2)) {
-  assert.equal(stalledRow.error_type, 'TimeoutError');
-  assert.equal(stalledRow.request_started, true);
-  assert.equal(stalledRow.attempts, stalledRow.chunks + 1, 'one try for each answered piece and two for the stalled piece');
-  assert.ok(stalledRow.ms >= 19000 && stalledRow.ms < 25000, `row time ${stalledRow.ms}`);
-  assert.ok(stalledRow.chunks >= 3);
-}
+const [stalledRow] = rows(1);
+assert.equal(stalledRow.error_type, 'TimeoutError');
+assert.equal(stalledRow.request_started, true);
+assert.equal(stalledRow.attempts, stalledRow.chunks + 1, 'one try for each answered piece and two for the stalled piece');
+assert.ok(stalledRow.ms >= 24000 && stalledRow.ms < 30000, `row time ${stalledRow.ms}`);
+assert.ok(stalledRow.chunks >= 3);
 console.log('oversize-ok');
 JS
 ) || fail "oversize screening: $out"
@@ -948,6 +1133,7 @@ test_claude_channel_context
 test_channel_consistency
 test_omp_permissions
 test_deadlines
+test_trusted_reads_and_independent_judgment
 test_oversize_screening
 test_claude_oversize
 test_ledger_privacy

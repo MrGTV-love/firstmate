@@ -574,9 +574,9 @@ A throwaway public-spawn before/after smoke reproduced the caller-origin contami
 
 ## Treehouse get entry wait
 
-The [control-plane contract](../agent-control.md#reassociating-a-task-with-a-replacement-copy) owns the fresh-spawn `treehouse get` wait: its 60-poll base window and its 120-second ceiling while the pane's foreground still shows the get running.
-The ceiling is a chosen bound.
-These runs are background for it, not a guarantee, so this record keeps their conditions and raw seconds without a rerun command.
+The [control-plane contract](../agent-control.md#reassociating-a-task-with-a-replacement-copy) owns the progress-based fresh-spawn `treehouse get` wait.
+The earlier 60-poll base window and 120-second ceiling were chosen bounds, not measured worst cases, and no longer end an acquisition.
+These historical runs are background, not a guarantee, so this record keeps their conditions and raw seconds without a rerun command.
 
 All runs were on 2026-10-16 on an 18-core host, in a disposable repository of 2000 files with its own scratch pool, tmux 3.5a, and `treehouse` v3.1.2-fm.c704ea2.
 "Get" means `treehouse get` run interactively in a tmux pane, timed until the pane's current path is the new worktree.
@@ -608,7 +608,8 @@ What it leaves unproven:
 - What the starts refused on 2026-10-16 waited on. The longest wait in the table, 34.797 seconds, would have fit inside the 60-poll base window they were refused under.
 - How long a get takes on the Studio's Vernant pool under its real load. No run here used it. Only its `treehouse status --json` was timed there, read-only: 31.2 and 34.3 seconds at load 27 to 36 on a pool of 128 records.
 
-`tests/fm-spawn-acquisition-cleanup.test.sh` pins the wait's windows and refusal wording, and `tests/fm-backend-herdr.test.sh` pins the Herdr foreground read.
+`tests/fm-spawn-acquisition-cleanup.test.sh` exercises late acquisition and abort cleanup with a private terminal and a fake process-leased get.
+`tests/fm-spawn-worktree-settle.test.sh` covers no-progress refusal, ongoing output progress and the absolute extreme with a scaled clock.
 
 ## TeamClaude launcher
 
@@ -702,7 +703,36 @@ The installer changed `PI_DISABLE_LSPMUX` from an inherited `0` to process-local
 The service and remaining task-private compiler children were stopped after the proof; no other process was stopped.
 These guard-only observations establish native device transport and the bounded exception behavior, not current spawn activation, firstmate-scoped provider authorization, arbitrary LSP-server confinement, or freedom from the documented snapshot-to-dispatch race.
 
-### Current offline policy verification
+### 2026-10-17 latency and result-delivery verification
+
+The measurements in this dated subsection preceded the subsequent task-scoped immediate-read rule; home-wide trust and judge-dependent trusted reads are no longer current behavior.
+The [operator contract](../configuration.md#jev-guard) owns the narrower current boundary.
+
+Installed omp 18.12.0 was exercised with the current guard extension, native built-in `read`, a scripted loopback model, and a synthetic judge whose flag arrived after 31 seconds.
+With the proposed shared 300-second budget, the host logged `handler timed out after 30000ms` and delivered the original untrusted output to the next model request; increasing the pre-tool timeout did not protect results.
+With omp's separate 25-second guard budget and two tries capped at 12 seconds, the same 31-second judge scenario returned `TimeoutError` after 24,504 ms of provider time, replaced the output, and completed the native session in 28.205 seconds without a host handler timeout.
+The original canary was absent from the next model request.
+No omp timeout configuration override was needed for result handling.
+
+The pre-tool (`tool_call`) handler has its own deadline, so the result timings above are not evidence for it.
+On the same installed omp 18.12.0, `omp config list` shows `extensionHandlers.toolCallTimeoutMs = 30000` and no key for the result handler.
+A plain extension `tool_call` handler that waited 35 seconds before blocking was cut off at 30,000 ms: the host logged `handler timed out after 30000ms`, handed the model `Extension ... timed out after 30000ms` as the tool result, and the shell command did not run, so the host timeout fails closed.
+The same handler waiting 65 seconds under a `--config` overlay setting `extensionHandlers.toolCallTimeoutMs: 330000` was awaited for 65,004 ms and its block was honored.
+With the real guard extension and a synthetic judge that answered a benign shell command after 31 seconds, the repository's `.omp/fm-worker-overlay.yml` made the pre-tool decision the judge's answer: `allow`, null `error_type`, one try, 31,012 ms, and the command ran.
+The same guard without that overlay was cut off by the host at 30 seconds, wrote no guard row and did not run the command.
+Each case is one run with scripted local providers, so they establish the host mechanism and the overlay's effect, not judge latency or production activation.
+`tests/fm-jev-guard-omp-live-e2e.test.sh` repeats the 31-second overlay case through `fm_jev_native_omp_pretool`.
+
+Two additional native omp sessions consumed an answered 0.50 band result and a 0.99 flag on a real home-data read.
+The band case retained the original text plus an advisory, with a `review` / `policy` / `result_pass` audit row; the trusted case retained the original text with `clear` / `trusted_read` / `result_pass` and the original null error type.
+These sessions completed in 3.763 and 3.416 seconds respectively.
+Claude Code 2.1.302 consumed the delayed flag after 31,037 ms with the 330-second hook envelope, preserved the answered policy judgment rather than an outage, and delivered its advisory alongside the original text in the next model request.
+All providers and credentials in these native measurements were synthetic and local; each proof stopped its own fixture and proxy.
+The [operator contract](../configuration.md#jev-guard) owns the distinct host budgets, advisory band, trusted-read boundary and unchanged pre-tool outage denial.
+These observations establish actual host delivery of controlled judgments, not live-model accuracy or production activation.
+Both maintained native entrypoints also passed their 20-case matrices on these installed versions, covering exact channel consistency, untracked copy withholding/advisory, newly trusted changed home-state reads, privacy, missing credentials, provider outage and audit outage.
+
+### Offline policy verification before trusted-read handling
 
 Verified on 2026-10-15 UTC with Node.js 26.11.1 and Bun 1.3.14:
 
@@ -729,7 +759,7 @@ ok - private terminal audit keeps typed errors and cost certainty without payloa
 ```
 
 These are controlled HTTP-fixture policy and executable-adapter results, not live model accuracy, native Claude replacement or deployed protection.
-The source exception is the [operator contract's Firstmate-channel consistency check](../configuration.md#jev-guard), with the role-file receipt trust limit, not producer authentication; a same-user process deliberately forging the recorded digest can pass.
+At that time, the source exception was the [operator contract's Firstmate-channel consistency check](../configuration.md#jev-guard), with the role-file receipt trust limit, not producer authentication; a same-user process deliberately forging the recorded digest can pass.
 Maintained native refresh commands use this checkout's `ROOT`, synthetic publisher records and local scripted providers:
 
 ```sh
