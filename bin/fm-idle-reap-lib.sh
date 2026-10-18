@@ -12,6 +12,22 @@ FM_IDLE_REAP_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$FM_IDLE_REAP_LIB_DIR/fm-pr-lib.sh"
 
+# bin/fm-merge-prune.sh records each outcome as a `note: merge-prune ...` status
+# line. Those lines report on the cleanup, not on the worker, so the worker's
+# newest event, for eligibility, is the one before them.
+fm_idle_reap_last_event() {  # <status-file> -> newest worker event on stdout
+  local status=$1 line tmp
+  line=$(last_status_line "$status")
+  case "$line" in
+    note*": merge-prune "*) ;;
+    *) printf '%s' "$line"; return 0 ;;
+  esac
+  tmp=$(mktemp "${TMPDIR:-/tmp}/fm-idle-reap-status.XXXXXX") || { printf '%s' "$line"; return 0; }
+  tail -n "${FM_CLASSIFY_EVENT_WINDOW_LINES:-200}" "$status" 2>/dev/null | grep -v '^note[^:]*: merge-prune ' > "$tmp" || true
+  last_status_line "$tmp"
+  rm -f -- "$tmp"
+}
+
 fm_idle_reap_terminal_age() {
   local line=$1 evidence=$2 now=$3 at m newest
   if ! at=$(status_line_at_epoch "$line" 2>/dev/null) || [ -z "$at" ] \
@@ -39,8 +55,17 @@ fm_idle_reap_refusal_stands() {
   IDLE_REAP_DETAIL=$reason
 }
 
+# FM_IDLE_REAP_MERGE_PRUNE=1 is set by bin/fm-merge-prune.sh, which asks about a
+# task the moment its merge is verified: the grace period is waived and an old
+# refusal memo is ignored (the prune keeps its own backoff). Every other gate
+# stands.
 fm_idle_reap_classify() {
   local home=$1 state=$2 data=$3 id=$4 meta="$2/$4.meta" pr remote busy verb note status declared msg evidence open age now hold_rc=0
+  local grace=1800 memo_applies=1
+  if [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ]; then
+    grace=0
+    memo_applies=0
+  fi
   IDLE_REAP_CLASS=active
   IDLE_REAP_KIND=-
   IDLE_REAP_AGE=-
@@ -66,7 +91,7 @@ fm_idle_reap_classify() {
     *) IDLE_REAP_CLASS=parked; IDLE_REAP_DETAIL="not an ordinary ship or scout"; return 0 ;;
   esac
   status="$state/$id.status"
-  IDLE_REAP_LAST=$(last_status_line "$status")
+  IDLE_REAP_LAST=$(fm_idle_reap_last_event "$status")
   # A teardown admitted this task, reserved its slot and was interrupted; it
   # may already have retired the busy state and status read below. Only a
   # worker that reads busy again keeps it from the next sweep.
@@ -77,7 +102,8 @@ fm_idle_reap_classify() {
       return 0
     fi
     fm_epoch_seconds_to now
-    if fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+    if [ "$memo_applies" = 1 ] \
+      && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
       IDLE_REAP_CLASS=refused
       return 0
     fi
@@ -161,12 +187,13 @@ fm_idle_reap_classify() {
   age=$(fm_idle_reap_terminal_age "$IDLE_REAP_LAST" "$evidence" "$now")
   # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
   IDLE_REAP_AGE=$age
-  if [ "$age" -lt 1800 ]; then
+  if [ "$age" -lt "$grace" ]; then
     IDLE_REAP_CLASS=wait-grace
-    IDLE_REAP_DETAIL="finished ${age}s ago; grace is 1800s"
+    IDLE_REAP_DETAIL="finished ${age}s ago; grace is ${grace}s"
     return 0
   fi
-  if fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
+  if [ "$memo_applies" = 1 ] \
+    && fm_idle_reap_refusal_stands "$state/.idle-reap/$id.refused" "$IDLE_REAP_LAST" "$now"; then
     IDLE_REAP_CLASS=refused
     return 0
   fi

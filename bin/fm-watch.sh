@@ -392,6 +392,14 @@ case "$IDLE_REAP_INTERVAL" in
 esac
 IDLE_REAP_BIN=${FM_IDLE_REAP_BIN:-$SCRIPT_DIR/fm-idle-session-reap.sh}
 IDLE_REAP_NEXT=
+# Pruning a merged task's pool copy (bin/fm-merge-prune.sh); 0 stops the sweep.
+MERGE_PRUNE_BIN=${FM_MERGE_PRUNE_BIN:-$SCRIPT_DIR/fm-merge-prune.sh}
+MERGE_PRUNE_INTERVAL=${FM_MERGE_PRUNE_INTERVAL:-60}
+case "$MERGE_PRUNE_INTERVAL" in
+  ''|*[!0-9]*) MERGE_PRUNE_INTERVAL=60 ;;
+  *) MERGE_PRUNE_INTERVAL=$((10#$MERGE_PRUNE_INTERVAL)) ;;
+esac
+MERGE_PRUNE_LAUNCHED=0
 # The TypeSafe account-health probe is one tiny request at this cadence;
 # docs/configuration.md "TypeSafe account health" owns the contract.
 TYPESAFE_HEALTH_INTERVAL=${FM_TYPESAFE_HEALTH_INTERVAL:-600}
@@ -2882,6 +2890,37 @@ idle_reap_tick() {
   IDLE_REAP_PID=$!
 }
 
+# Merged-task copy pruning, detached and single-flight like the sweep above. A
+# record in state/*.merge-prune is armed by the merge paths; the sweep publishes
+# the soonest retry time in state/.merge-prune-next, so a quiet tick costs one
+# glob and one read. The sweep only ever asks bin/fm-teardown.sh (and its proofs
+# in bin/fm-merge-prune-lib.sh), so a skipped or missed tick loses nothing.
+MERGE_PRUNE_PID=
+merge_prune_tick() {
+  local now next=
+  [ "$MERGE_PRUNE_INTERVAL" -gt 0 ] || return 0
+  compgen -G "$STATE/*.merge-prune" >/dev/null || return 0
+  fm_epoch_seconds_to now
+  [ $((now - MERGE_PRUNE_LAUNCHED)) -ge "$MERGE_PRUNE_INTERVAL" ] || return 0
+  if [ -r "$STATE/.merge-prune-next" ]; then
+    IFS= read -r next < "$STATE/.merge-prune-next" || true
+  fi
+  case "$next" in
+    ''|*[!0-9]*) ;;
+    *) [ "$now" -ge "$((10#$next))" ] || return 0 ;;
+  esac
+  if [ -n "$MERGE_PRUNE_PID" ]; then
+    if kill -0 "$MERGE_PRUNE_PID" 2>/dev/null; then
+      return 0
+    fi
+    wait "$MERGE_PRUNE_PID" 2>/dev/null || true
+    MERGE_PRUNE_PID=
+  fi
+  MERGE_PRUNE_LAUNCHED=$now
+  FM_HOME="$FM_HOME" "$MERGE_PRUNE_BIN" sweep </dev/null >/dev/null 2>&1 &
+  MERGE_PRUNE_PID=$!
+}
+
 # The account-health probe is detached and single-flight like the sweeps above: it
 # can wait on the network for its five-second deadline, and a missed tick loses
 # nothing because the helper's state file, not this timer, dedupes the captain's
@@ -3281,6 +3320,7 @@ prelude_phase() {
   fi
   watcher_beat
   idle_reap_tick
+  merge_prune_tick
   typesafe_health_tick
   lavish_auto_retire_tick
 
@@ -3477,6 +3517,10 @@ EOF
           fi
           retire_merged_pr_poll "$id"
           pr_poll_control_release || exit 1
+          # Arm only: this loop just held the task control lock that teardown
+          # takes, so the detached sweep makes the attempt on a later tick.
+          FM_HOME="$FM_HOME" FM_STATE_OVERRIDE="$STATE" \
+            "$MERGE_PRUNE_BIN" arm "$id" </dev/null >/dev/null 2>&1 || true
           if [ "$FM_MERGE_OUTCOME_ALREADY_RECORDED" = true ]; then
             triage_log "absorbed duplicate merged PR poll result for $id"
             continue

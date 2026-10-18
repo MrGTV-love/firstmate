@@ -75,6 +75,12 @@ unset FM_DURATION_HOME
 # suite reads fresh by default; tests/fm-nm-read-cache.test.sh turns it on.
 export FM_CREW_STATE_NM_CACHE=off
 
+# bin/fm-merge-prune.sh arms and starts a pool-copy prune after every verified
+# merge, which would run the real teardown against a fixture home. The suite
+# arms nothing by default; tests/fm-merge-prune.test.sh turns it on against a
+# fake pool and a fake treehouse.
+export FM_MERGE_PRUNE=0
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary
