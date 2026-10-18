@@ -70,6 +70,11 @@ export FM_REVIEW_AGENT_SELECT_BIN
 export FM_DURATION_FILE=off
 unset FM_DURATION_HOME
 
+# bin/fm-nm-read-cache-lib.sh would replay one scenario's fake no-mistakes answer
+# into the next scenario that reuses the same task id and state directory. The
+# suite reads fresh by default; tests/fm-nm-read-cache.test.sh turns it on.
+export FM_CREW_STATE_NM_CACHE=off
+
 # Clear the task-worker marker bin/fm-spawn.sh exports into ship and scout
 # panes. This suite builds git-init fixture repositories whose primary checkout
 # it runs a copied bin/fm-test-run.sh in, and that runner refuses the primary

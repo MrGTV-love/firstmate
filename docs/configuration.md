@@ -3511,6 +3511,7 @@ FM_CODEX_WATCH_CHECKPOINT_AWAY=3600  # requested away checkpoint bound on a home
 FM_CREW_STATE_NM_TIMEOUT=10   # seconds allowed per no-mistakes query inside fm-crew-state.sh, and per state-database run-inventory read behind a capped AXI overview
 FM_TEARDOWN_NM_TIMEOUT=10    # seconds allowed per no-mistakes query or abort inside fm-teardown.sh
 FM_CREW_STATE_RUNS_LIMIT=200  # plain runs-ledger rows scanned for fallback attribution; does not change the CLI's AXI overview window (selection owner: bin/fm-nm-run-lib.sh)
+FM_CREW_STATE_NM_CACHE=on   # off makes every no-mistakes read inside fm-crew-state.sh fresh; on keeps only a finished run's reads until its run id changes and reads everything else fresh every time (contract owner: bin/fm-nm-read-cache-lib.sh)
 FM_TEARDOWN_NM_RUNS_LIMIT=200  # recent no-mistakes run rows scanned to prove an unresolved-head parked run belongs to teardown's task
 FM_TEARDOWN_VERNANT_PYTHON=     # interpreter for Vernant's closeout driver; default <slot>/.venv/bin/python, and the driver step is skipped (and its copy refuses) when it is absent
 FM_CREW_STATE_BIN=bin/fm-crew-state.sh   # test override for the current-state reader used by watcher triage: the working/paused classification, and the wedge timer's parked-gate wait evidence; `fm-control exit` reads it too for the finished-task check on Claude's exit picker

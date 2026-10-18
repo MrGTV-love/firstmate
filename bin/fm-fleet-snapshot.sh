@@ -6,7 +6,9 @@
 # The command does not acquire the session lock, drain wakes, arm watchers,
 # mutate backlog state, or write reports. Its default ledger collector may
 # atomically refresh parent-side cached copies of remote home summaries under
-# state/secondmate-summary-cache; those observational cache writes are its only
+# state/secondmate-summary-cache, and its per-task crew-state reads may keep a
+# finished run's no-mistakes answers under state/.nm-read-cache-<id>/ (owned by
+# bin/fm-nm-read-cache-lib.sh); those two observational cache writes are its only
 # fleet-state mutation.
 #
 # Top-level fields:
@@ -242,7 +244,8 @@ usage: fm-fleet-snapshot.sh --json
 
 Print a structured snapshot of the firstmate fleet.
 JSON is the stable machine-readable output contract. The default snapshot
-refreshes only its parent-side remote-summary cache as an observational side effect.
+refreshes only its parent-side remote-summary cache and the per-task
+finished-run read cache under state/.nm-read-cache-<id>/ as observational side effects.
 
 --contribution-input emits the canonical local backlog/tasks ownership pair only,
 without worker observations or cross-home collection.

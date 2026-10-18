@@ -5838,7 +5838,7 @@ rm -f "$STATE/$ID.turn-ended" "$STATE/$ID.progress" \
 # state/<id>.git-hooks is the spawn-owned commit-msg strip directory, left
 # read-only by its installer.
 chmod u+w "$STATE/$ID.git-hooks" 2>/dev/null || true
-rm -rf "$STATE/$ID.inbox" "$STATE/$ID.git-hooks"
+rm -rf "$STATE/$ID.inbox" "$STATE/$ID.git-hooks" "$STATE/.nm-read-cache-$ID"
 # A presentation journal the close path left behind is orphaned once the
 # recorded pane is proven gone (the Herdr gate above) unless it still names a
 # live projected workspace - a version 2 binding of some other pane, or a

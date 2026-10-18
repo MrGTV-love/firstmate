@@ -238,7 +238,7 @@ CHANGED_DEFAULT_TIMEOUT_SECS=1500
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
-PORTABLE_SERIAL_SHARDS=14
+PORTABLE_SERIAL_SHARDS=15
 
 # Conservative balance hint for a portable-serial script with no measurement.
 # Rounded above the current CI mean, including the capability-skipped scripts.
@@ -882,6 +882,7 @@ tests/fm-model-index.test.sh 100613
 tests/fm-model-picker.test.sh 9000
 tests/fm-muse-harness.test.sh 46548
 tests/fm-muse-signals-live-e2e.test.sh 406
+tests/fm-nm-read-cache.test.sh 22000
 tests/fm-nm-test-contract.test.sh 853
 tests/fm-no-mistakes-required.test.sh 599
 tests/fm-omp-composer-box-live-e2e.test.sh 418

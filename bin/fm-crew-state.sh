@@ -173,7 +173,11 @@
 #      classified by step 4. Backends with no classifier keep reading a failed
 #      capture as gone. The fallback's own comment owns the per-verdict rules.
 #
-# Read-only and side-effect free. Always exits 0 on a successful read regardless
+# Read-only for the task, its worktree and the pipeline. Its one write is the
+# disposable per-task read cache under state/, which keeps the no-mistakes reads
+# of a finished run from being made again; every other read is made fresh (the
+# contract is owned by bin/fm-nm-read-cache-lib.sh; FM_CREW_STATE_NM_CACHE=off
+# reads everything fresh). Always exits 0 on a successful read regardless
 # of state; exit 2 only on a usage error (no id).
 set -u
 
@@ -192,6 +196,8 @@ STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
 . "$SCRIPT_DIR/fm-busy-lib.sh"
 # shellcheck source=bin/fm-nm-run-lib.sh
 . "$SCRIPT_DIR/fm-nm-run-lib.sh"
+# shellcheck source=bin/fm-nm-read-cache-lib.sh
+. "$SCRIPT_DIR/fm-nm-read-cache-lib.sh"
 # shellcheck source=bin/fm-pr-lib.sh
 . "$SCRIPT_DIR/fm-pr-lib.sh"
 # shellcheck source=bin/fm-timeout-lib.sh
@@ -414,6 +420,8 @@ crew_busy_verdict() {  # <target>
 # trim, strip_quotes, the bounded nm_run call, nm_field's TOON parse, and the
 # attribution helpers below are thin wrappers over the ONE owner in
 # bin/fm-nm-run-lib.sh, shared with fm-teardown.sh's pre-teardown run abort.
+# The status, overview, id-addressed run and ci log reads go through
+# bin/fm-nm-read-cache-lib.sh, whose header owns the cache of finished runs.
 
 trim() { fm_nm_trim "$@"; }
 strip_quotes() { fm_nm_strip_quotes "$@"; }
@@ -950,10 +958,12 @@ nm_effective_ci_step_status() {
 # ignores the line the same way, v1.32.2 through v1.79.0). Reading it as
 # not-ready held a green PR at working for as long as main kept advancing.
 nm_ci_checks_state() {
-  local run_id ci_log marker
+  local run_id ci_log marker finished_run
   run_id=$(strip_quotes "$(nm_field id)")
   [ -n "$run_id" ] || { printf 'unknown'; return; }
-  ci_log=$(nm_run axi logs --step ci --run "$run_id" --full) || true
+  # A finished run's ci log cannot change, so only that read is kept for good.
+  fm_nm_run_is_active "$RUN_OUT" && finished_run='' || finished_run=$run_id
+  ci_log=$(fm_nmc_read "ci-$run_id" logs "$finished_run" axi logs --step ci --run "$run_id" --full) || true
   [ -n "$ci_log" ] || { printf 'unknown'; return; }
   marker=$(printf '%s\n' "$ci_log" \
     | grep -E 'CI checks passed|no CI checks reported - still monitoring|no CI checks reported yet|checks failed|issues detected|CI checks running' \
@@ -988,6 +998,32 @@ nm_runs_list() {
   nm_run runs --limit "$FM_CREW_STATE_RUNS_LIMIT"
 }
 
+# The overview and the verdict fm_nm_select_run draws from it, read together so
+# a finished run's verdict is served from the cache. Sets run_overview_present
+# (the overview printed something), overview_ok (the call succeeded) and
+# run_choice, exactly the values the two separate calls produced. Only a
+# finished run's verdict is stored, so a cached one always has both flags set.
+nm_read_choice() {
+  if fm_nmc_lookup choice; then
+    run_choice=$FM_NMC_BODY
+    overview_ok=1
+    run_overview_present=1
+    return 0
+  fi
+  overview_ok=1
+  run_overview=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" axi) || overview_ok=0
+  run_overview_present=1
+  run_choice=''
+  if [ -n "$run_overview" ]; then
+    run_choice=$(fm_nm_select_run "$CREW_BRANCH" "$run_overview" "$WT" "$NM_TIMEOUT")
+  else
+    run_overview_present=0
+  fi
+  if fm_nmc_classify_choice "$run_choice" "$overview_ok" "$run_overview_present"; then
+    fm_nmc_put choice "$FM_NMC_FIN" "$run_choice"
+  fi
+}
+
 # CREW_BRANCH is empty at detached HEAD (a just-spawned crew, or a scout's
 # scratch worktree); with no branch there is no run to attribute to this crew.
 CREW_BRANCH=$(git -C "$WT" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
@@ -1016,7 +1052,8 @@ SELECTED_RUN_ID=""
 # Scouts and secondmates never drive a no-mistakes validation of their own
 # worktree, so skip the lookup for them and read state from pane/log directly.
 if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/null 2>&1; then
-  RUN_OUT=$(nm_run axi status)
+  fm_nmc_init "$STATE" "$ID" "$WT" "$CREW_BRANCH" "$NM_TIMEOUT"
+  fm_nmc_read_to RUN_OUT status status '' axi status || true
   if [ "$(strip_quotes "$(printf '%s\n' "$RUN_OUT" | sed -n 's/^error: //p')")" = "repo not initialized (run 'no-mistakes init' first)" ]; then
     RUN_OUT=""
   fi
@@ -1026,10 +1063,8 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
     # CLI is not retried. Older CLI surfaces without the table retain the
     # coarse fallback below, but cannot turn a replacement into a vague live
     # verdict when its identity and gate cannot be read.
-    overview_ok=1
-    run_overview=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" axi) || overview_ok=0
-    [ -n "$run_overview" ] || emit unknown run-step "run inventory unavailable; run id: $(strip_quotes "$(nm_field id)")"
-    run_choice=$(fm_nm_select_run "$CREW_BRANCH" "$run_overview" "$WT" "$NM_TIMEOUT")
+    nm_read_choice
+    [ "$run_overview_present" = 1 ] || emit unknown run-step "run inventory unavailable; run id: $(strip_quotes "$(nm_field id)")"
     [ "$overview_ok" = 1 ] || emit unknown run-step "run inventory unreadable; run ids: $(strip_quotes "$(nm_field id)"), ${run_choice##*|}"
     case "$run_choice" in
       unknown\|*)
@@ -1041,7 +1076,7 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
         ;;
       selected\|*)
         IFS='|' read -r _ selected_id selected_status candidate_ids <<< "$run_choice"
-        RUN_OUT=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" axi status --run "$selected_id") \
+        fm_nmc_read_to RUN_OUT "run-$selected_id" status-run "$selected_id" axi status --run "$selected_id" \
           || emit unknown run-step "selected run unreadable; run ids: $candidate_ids"
         if [ "$(strip_quotes "$(nm_field id)")" != "$selected_id" ] \
           || [ "$(strip_quotes "$(nm_field branch)")" != "$CREW_BRANCH" ]; then

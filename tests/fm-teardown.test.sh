@@ -1081,8 +1081,12 @@ test_teardown_closes_the_backlog_item_itself() {
   write_meta "$case_dir" no-mistakes ship
   printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$case_dir/state/task-x1.meta"
   seed_backlog_in_flight "$case_dir"
+  mkdir -p "$case_dir/state/.nm-read-cache-task-x1"
+  printf 'entry\n' > "$case_dir/state/.nm-read-cache-task-x1/status"
 
   out=$(run_teardown "$case_dir") || fail "teardown failed with a real backlog"
+  assert_absent "$case_dir/state/.nm-read-cache-task-x1" \
+    "teardown left the task's no-mistakes read cache behind"
   [ "$(backlog_row_state "$case_dir")" = "done" ] \
     || fail "teardown returned success while its backlog item was still open: $(backlog_row_state "$case_dir")"
   assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
