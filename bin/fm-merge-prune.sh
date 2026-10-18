@@ -26,17 +26,26 @@
 # lifecycle action already running. One wake is raised if a task is still not
 # pruned after 24 attempts.
 #
-# Any other teardown refusal (exit 1) may be a false positive: a closeout
-# driver's "exact tree not covered", an orphan nested copy with no task record,
-# ignored scratch files. Only then the fallback of bin/fm-merge-prune-lib.sh
-# runs. It re-proves from the live copy, by the criteria of treehouse-reap-clean,
-# that the copy and every nested copy is a pool copy, has no changed or
-# untracked file, has no commit missing from every remote (or from the merged
-# PR's head), holds only scratch or preserved ignored files, and has no process
-# inside. The finished worker session is stopped first (bin/fm-control.sh exit).
-# That verb keeps the task's terminal pane open, and the pane's idle shell, the
-# one the pane entered the copy with, stays inside the copy. That one process
-# does not keep the copy, but treehouse refuses to destroy a copy with a process
+# A teardown refusal (exit 1) that is one of teardown's known landing refusals
+# may be a false positive: the ship deliverable "not landed" (work not on a
+# remote, a squash merge), a closeout driver's "exact tree not covered", an
+# orphan nested copy with no task record whose HEAD is "not proved landed", or
+# ignored files that "exist nowhere else". Only then the fallback of
+# bin/fm-merge-prune-lib.sh runs; every other refusal, unknown text included
+# (a leaked process, a launch agent still loaded, a process whose ownership is
+# not proven, a live pipeline, a captain call), keeps the copy at once. Every
+# refusal line of the output must be one of the known landing refusals
+# (fallback_allowed names each message).
+#
+# The fallback re-proves from the live copy, by the criteria of
+# treehouse-reap-clean, that the copy and every nested copy is a pool copy, has
+# no changed or untracked file, has no commit missing from every remote (or from
+# the merged PR's head), holds only scratch or preserved ignored files, and has
+# no process inside. The finished worker session is stopped first
+# (bin/fm-control.sh exit). That verb keeps the task's terminal pane open, and
+# the pane's idle shell, the one the pane entered the copy with, stays inside
+# the copy. That one process does not keep the copy, but treehouse refuses to
+# destroy a copy with a process
 # working inside it, so it is ended with SIGHUP just before the destroy: it must
 # be a shell whose working directory is in the copy, with no child process, that
 # is the pane's shell or descends from it (found by the pane's process id; tmux
@@ -198,12 +207,31 @@ transient_refusal() {  # <teardown-output>
   return 1
 }
 
-# A refusal about live work or a captain call is never a scratch false positive.
-fallback_barred() {  # <teardown-output>
-  case "$1" in
-    *"no-mistakes run"*|*"held for the captain"*|*"leaked process"*) return 0 ;;
-  esac
-  return 1
+# The only refusals the fallback may settle are teardown's own landing refusals
+# (bin/fm-teardown.sh validate_worktree_teardown_safety, and
+# bin/fm-teardown-nested-lib.sh for nested copies), and every refusal line of the
+# output must be one of them. Any other text, unknown text included, keeps the
+# copy.
+fallback_allowed() {  # <teardown-output>
+  local line seen=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      REFUSED*|error:*|refused*) ;;
+      *) continue ;;
+    esac
+    case "$line" in
+      "REFUSED: the ship deliverable is not landed; a pushed branch alone is not completion.") seen=1 ;;
+      "REFUSED: foreign copy "*" stays in pool slot "*": its HEAD "*" is not proved landed.") seen=1 ;;
+      "REFUSED: foreign copy "*" stays in pool slot "*": it holds ignored files that exist nowhere else: "*) seen=1 ;;
+      "REFUSED: own nested copy "*" stays in pool slot "*": it holds ignored files that exist nowhere else: "*) seen=1 ;;
+      "REFUSED: Vernant's closeout driver did not release foreign copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;
+      "REFUSED: Vernant's closeout driver did not release own nested copy "*" (exit "*"): "*"exact tree not covered"*) seen=1 ;;
+      *) return 1 ;;
+    esac
+  done <<EOF
+$1
+EOF
+  [ "$seen" = 1 ]
 }
 
 TD_OUT=
@@ -461,7 +489,7 @@ attempt() {
     backoff "$reason"
     return 0
   fi
-  if fallback_barred "$TD_OUT"; then
+  if ! fallback_allowed "$TD_OUT"; then
     retain "$(fm_meta_get "$META" worktree)" "$reason"
     return 0
   fi
