@@ -942,7 +942,7 @@ With no file, a secondmate home (one that carries a genuine `.fm-secondmate-home
 
 The interval changes only how often the watcher looks, never what it can detect: a status line or check written between two looks is noticed at the next look, and a quiet pane, which needs two unchanged looks to read as stale, is noticed at the second.
 Detection latency therefore grows by at most the interval difference for a status line and twice that for a quiet pane.
-The 240-second ceiling keeps `poll + 60` under the 300-second guard-grace floor, so the guard, the arm and the watcher still derive one grace (`fm_poll_derived_grace`, [`turnend-guard.md`](turnend-guard.md) "Guard grace and the poll cadence") although only the watcher reads this file.
+The 240-second ceiling keeps `poll + 60` at or under the 300-second guard-grace floor, so the guard, the arm and the watcher still derive one grace (`fm_poll_derived_grace`, [`turnend-guard.md`](turnend-guard.md) "Guard grace and the poll cadence") although only the watcher reads this file.
 A longer interval needs `FM_POLL` set in the environment of every process that derives the grace.
 `bin/fm-wake-lib.sh`'s `fm_watch_poll_seconds` owns the resolution and [`tests/fm-watch-idle-reap.test.sh`](../tests/fm-watch-idle-reap.test.sh) covers it, including a status change noticed within one longer interval.
 
@@ -966,7 +966,8 @@ The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot
 A day of the host's own timings (`data/command-durations.jsonl`, 2026-10-17) shows `tests/fm-teardown.test.sh` run 6 times for 13,276 seconds in total, with a median of 2,175 seconds and a longest run of 6,884, and three copies alive at once in three worktrees.
 One slot would queue those six runs behind each other for about 3.7 hours of waiting between them; two slots cap the overlap at two copies while the third waits for the first of the two to finish, typically one median run.
 A waiter gives up after 7,200 seconds, a little longer than the longest run seen, so a queued copy outlasts a holder that is merely slow, and a holder that never finishes can delay a copy by at most that long.
-The gate shapes throughput and is not a safety boundary: a waiter that gives up, a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so. A native Windows bash (`uname` MINGW, MSYS or CYGWIN) never calls the gate.
+The gate shapes throughput and is not a safety boundary: a waiter that gives up, a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so.
+A native Windows bash (`uname` MINGW, MSYS or CYGWIN) never calls the gate.
 
 **Release and stale holders**
 
@@ -3041,8 +3042,8 @@ Other primary integrations retain their native supervision delivery paths.
 **Retire finished Lavish listeners**
 
 Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
-The watcher also runs `sweep --auto` detached every `FM_LAVISH_AUTO_RETIRE_INTERVAL` seconds (default 900, `0` turns it off): after the same keep guards it retires only a listener without a live Lavish session, one whose board file is gone or whose session has ended or is absent with every card closed (a board with a live session keeps its listener however idle it is, and even when its file is gone), and it appends each retirement with its reason to `state/lavish-auto-retire.log`.
-A board with a live session is never retired by it, and the adapter header owns the exact rules.
+The watcher also runs `sweep --auto` detached every `FM_LAVISH_AUTO_RETIRE_INTERVAL` seconds (default 900, `0` turns it off): after the same keep guards it retires only a listener without a live Lavish session, one whose board file is gone or whose session has ended or is absent with every card closed, and it appends each retirement with its reason to `state/lavish-auto-retire.log`.
+A board with a live session is never retired by it, however idle it is and even when its board file is gone, and the adapter header owns the exact rules.
 Use `bin/fm-procevent-lavish.sh orphans` to list leftover poll processes that no listener owns; the same header owns its eligibility proof and the explicit `--kill` flag.
 For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
 The [process-event runner header](../bin/fm-procevent.sh) owns conditional retirement's generation checks, inbox revalidation, and capture-race limits.
@@ -3363,7 +3364,7 @@ The group signal reaches the blocking child and everything under it exactly as r
 | Setting | Default | Range | Purpose |
 | --- | --- | --- | --- |
 | `FM_PROCEVENT_OWNER_LEASE_SECONDS` | 600 | 1..86400 | How long a lease-bound runner continues without activity in its owning home; not the lifetime of a standing source. |
-| `FM_PROCEVENT_OWNER_CHECK_SECONDS` | 60 | 1..3600 | Guard detection interval; it reads lifetime authorization and recorded state-root identity twice per interval, half an interval apart, so both debounce reads fit inside one interval. The default was 15 until 2026-10-17; the guard detects exactly what it did, one interval later at most, and the 600-second lease default stays ten intervals. |
+| `FM_PROCEVENT_OWNER_CHECK_SECONDS` | 60 | 1..3600 | Guard detection interval; it reads lifetime authorization and recorded state-root identity twice per interval, half an interval apart, so both debounce reads fit inside one interval; a longer interval means fewer guard wake-ups and detection that is later by at most one interval, and the 600-second lease default is ten intervals. |
 | `FM_PROCEVENT_LAUNCH_FLOOR_SECONDS` | 1 | 1..3600 | Minimum time between consecutive launches of one registration generation's stored command; bounds immediately returning sources during the lease window. |
 
 The generation's first launch is immediate, later launches share its monotonic pacing timestamp, a timestamp from before a reboot is treated as expired, and replacing the registration starts a fresh pacing generation.

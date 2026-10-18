@@ -101,14 +101,14 @@ one-second resolution, hence the slack), so a reused pid is never taken for the
 holder. Only a held lock reads as a busy slot: a flock that fails any other way
 runs the command without a slot, like any unusable slot file. A waiter prints
 its first notice after 2 seconds and another every 60, waits at most
-FM_TEST_SLOT_WAIT_SECONDS (default 7200, the longest fm-teardown run measured in
-the last 24 hours was 6884), and then runs without a slot and says so: the gate
-shapes throughput and is not a safety boundary, so it never blocks a test for
-good and never stops one when the slot directory or a slot file is unusable or
-this Python has no POSIX file locks: it runs without a slot and says so. A command run
-under a slot exports FM_TEST_SLOT_HELD (the keys it holds, tab separated), so the
-same key nested inside it takes no second slot. A malformed FM_TEST_KEY_SLOTS or
-FM_TEST_SLOT_WAIT_SECONDS refuses the command by name (exit 125 from gate).
+FM_TEST_SLOT_WAIT_SECONDS (default 7200), and then runs without a slot and says
+so: the gate shapes throughput and is not a safety boundary, so it never blocks
+a test for good and never stops one when the slot directory or a slot file is
+unusable or this Python has no POSIX file locks: it runs without a slot and says
+so. A command run under a slot exports FM_TEST_SLOT_HELD (the keys it holds, tab
+separated), so the same key nested inside it takes no second slot. A malformed
+FM_TEST_KEY_SLOTS or FM_TEST_SLOT_WAIT_SECONDS refuses the command by name (exit
+125 from gate).
 docs/configuration.md "Test slots per key" owns the sizing rationale.
 
 A timeout is a real limit that stopped a command, reported by the owner of that

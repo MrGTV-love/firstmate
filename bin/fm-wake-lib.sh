@@ -163,9 +163,9 @@ fm_poll_derived_grace() {
 # FM_POLL first). A home's own config/watch-poll file wins when its first line
 # is whole seconds from 1 to 240; an unreadable or out-of-range file is ignored
 # rather than trusted. Otherwise a secondmate home polls every 30 seconds and
-# every other home every 15. The 240 ceiling keeps poll + 60 under the 300-second
-# guard-grace floor, so fm_poll_derived_grace (which cannot see this file) still
-# derives the same grace in the guard, the arm and the watcher.
+# every other home every 15. The 240 ceiling keeps poll + 60 at or under the
+# 300-second guard-grace floor, so fm_poll_derived_grace (which cannot see this
+# file) still derives the same grace in the guard, the arm and the watcher.
 # docs/configuration.md "Watcher poll interval by home role" is the owner.
 FM_WATCH_POLL_PRIMARY=15
 FM_WATCH_POLL_SECONDMATE=30
