@@ -10545,8 +10545,9 @@ dead_launcher_pid() {
 }
 
 # run_foreign_teardown <rc-var> [VAR=value...]: runs the case's teardown with
-# the stub interpreter and the given environment, which may replace it; stdout
-# and stderr land in the case.
+# the stub interpreter and the given environment, which may replace it, and the
+# arguments in FOREIGN_TEARDOWN_ARGS; stdout and stderr land in the case.
+FOREIGN_TEARDOWN_ARGS=()
 run_foreign_teardown() {
   local rc_var=$1 case_dir=$FOREIGN_CASE status=0
   shift
@@ -10554,7 +10555,7 @@ run_foreign_teardown() {
     FM_ROOT_OVERRIDE="$case_dir/code-root" FM_STATE_OVERRIDE="$case_dir/state" \
     FM_DATA_OVERRIDE="$case_dir/data" FM_CONFIG_OVERRIDE="$case_dir/config" \
     NM_HOME="$case_dir/nm" PATH="$case_dir/fakebin:${FM_TEARDOWN_TEST_PATH:-$PATH}" \
-    "$TEARDOWN" task-x1 > "$case_dir/stdout" 2> "$case_dir/stderr" || status=$?
+    "$TEARDOWN" task-x1 ${FOREIGN_TEARDOWN_ARGS[@]+"${FOREIGN_TEARDOWN_ARGS[@]}"} > "$case_dir/stdout" 2> "$case_dir/stderr" || status=$?
   printf -v "$rc_var" '%s' "$status"
 }
 
@@ -10600,23 +10601,6 @@ test_unlocked_landed_foreign_copy_is_removed_without_the_driver() {
   pass "an unlocked landed foreign copy is removed with a plain git worktree remove and the slot is returned"
 }
 
-test_unlanded_foreign_copy_is_refused() {
-  local rc
-  make_foreign_copy_case foreign-unlanded
-  printf 'unlanded\n' > "$FOREIGN_COPY/unlanded.txt"
-  git -C "$FOREIGN_COPY" add unlanded.txt
-  git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unlanded foreign work'
-  run_foreign_teardown rc
-  expect_code 1 "$rc" "foreign-unlanded: an unlanded copy must be refused: $(cat "$FOREIGN_CASE/stderr")"
-  assert_grep "contains registered copy $FOREIGN_COPY that is not one of task task-x1's proven copies" "$FOREIGN_CASE/stderr" \
-    "foreign-unlanded: the refusal changed"
-  assert_grep "is not proved landed" "$FOREIGN_CASE/stderr" "foreign-unlanded: the refusal did not say what was unproven"
-  assert_foreign_copy_untouched foreign-unlanded
-  assert_equals "" "$(git -C "$FOREIGN_CASE/project" for-each-ref 'refs/fm/anchor/*')" \
-    "foreign-unlanded: an anchor was written for a copy that was refused"
-  pass "an unlanded foreign copy is refused with a written reason and nothing changes"
-}
-
 # bin/fm-idle-session-reap.sh keeps only the first output line that names a
 # refusal as the written reason. For a foreign copy that stays, that line must be
 # the copy's own reason, not the generic custody refusal that follows it. The
@@ -10624,39 +10608,320 @@ test_unlanded_foreign_copy_is_refused() {
 test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal() {
   local rc line
   make_foreign_copy_case foreign-reap-reason
-  printf 'unlanded\n' > "$FOREIGN_COPY/unlanded.txt"
-  git -C "$FOREIGN_COPY" add unlanded.txt
-  git -C "$FOREIGN_COPY" -c user.email=t@t -c user.name=t commit -qm 'unlanded foreign work'
+  printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
   run_foreign_teardown rc
-  expect_code 1 "$rc" "reap-reason: an unlanded copy must be refused: $(cat "$FOREIGN_CASE/stderr")"
+  expect_code 1 "$rc" "reap-reason: a dirty copy must be refused: $(cat "$FOREIGN_CASE/stderr")"
   eval "$(sed -n '/^first_refusal_line() {/,/^}/p' "$ROOT/bin/fm-idle-session-reap.sh")"
   line=$(first_refusal_line "$(cat "$FOREIGN_CASE/stdout" "$FOREIGN_CASE/stderr")")
   case "$line" in
-    "REFUSED: foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: its HEAD "*" is not proved landed.") ;;
+    "REFUSED: foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: it "*".") ;;
     *) fail "reap-reason: the reaper would record '$line' instead of the copy's own reason" ;;
   esac
   pass "the reaper's first refusal line for a foreign copy that stays is the copy's own written reason"
 }
 
-test_foreign_copy_with_unsaved_or_unique_files_is_refused() {
-  local rc shape exclude
-  for shape in dirty ignored; do
-    make_foreign_copy_case "foreign-$shape"
-    if [ "$shape" = dirty ]; then
-      printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
-    else
-      exclude=$(git -C "$FOREIGN_COPY" rev-parse --path-format=absolute --git-path info/exclude)
-      printf 'unique.dat\n' >> "$exclude"
-      printf 'only here\n' > "$FOREIGN_COPY/unique.dat"
-    fi
-    run_foreign_teardown rc
-    expect_code 1 "$rc" "foreign-$shape: a copy with files only it holds must be refused: $(cat "$FOREIGN_CASE/stderr")"
-    assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "foreign-$shape: the refusal changed"
-    assert_foreign_copy_untouched "foreign-$shape"
-    assert_present "$FOREIGN_COPY/$([ "$shape" = dirty ] && echo untracked.txt || echo unique.dat)" \
-      "foreign-$shape: the file was lost"
+test_foreign_copy_with_unsaved_files_is_refused() {
+  local rc
+  make_foreign_copy_case foreign-dirty
+  printf 'edit\n' > "$FOREIGN_COPY/untracked.txt"
+  run_foreign_teardown rc
+  expect_code 1 "$rc" "foreign-dirty: a copy with uncommitted files must be refused: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "foreign-dirty: the refusal changed"
+  assert_foreign_copy_untouched foreign-dirty
+  assert_present "$FOREIGN_COPY/untracked.txt" "foreign-dirty: the file was lost"
+  assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "foreign-dirty: a refused close wrote a held-copy record"
+  pass "uncommitted files make a foreign copy refuse the close"
+}
+
+# held_foreign_ignored <copy> [name]: a unique ignored file only <copy> holds.
+held_foreign_ignored() {
+  local copy=$1 name=${2:-unique.dat} exclude
+  exclude=$(git -C "$copy" rev-parse --path-format=absolute --git-path info/exclude)
+  printf '%s\n' "$name" >> "$exclude"
+  printf 'only here\n' > "$copy/$name"
+}
+
+# held_foreign_unlanded <copy> [name]: a commit on no remote and not on main.
+held_foreign_unlanded() {
+  local copy=$1 name=${2:-unlanded.txt}
+  printf 'unlanded\n' > "$copy/$name"
+  git -C "$copy" add "$name"
+  git -C "$copy" -c user.email=t@t -c user.name=t commit -qm 'unlanded foreign work'
+}
+
+# held_fingerprint <copy>: every path under <copy> with its mode, size and
+# modification time, the sha256 of every file, and the copy's git admin files, so
+# any delete, move, rewrite or chmod of the foreign copy shows.
+held_fingerprint() {
+  local copy=$1 admin
+  admin=$(git -C "$copy" rev-parse --absolute-git-dir)
+  (cd "$copy" && LC_ALL=C find . -print0 | LC_ALL=C sort -z | xargs -0 ls -ldn
+    LC_ALL=C find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256)
+  (cd "$admin" && for f in HEAD locked gitdir commondir; do
+    if [ -e "$f" ]; then printf '%s ' "$f"; shasum -a 256 < "$f"; fi
+  done)
+}
+
+# held_snapshot <case>: everything a held close must leave as it found it.
+held_snapshot() {
+  local case_dir=$1 copy
+  shift
+  for copy in "$@"; do
+    held_fingerprint "$copy" > "$case_dir/held-before.$(basename "$copy")"
   done
-  pass "uncommitted and unique ignored files make a foreign copy refuse"
+  cp "$case_dir/pool/treehouse-state.json" "$case_dir/lease-before"
+  cp "$case_dir/pool/1/.fm-slot-owner" "$case_dir/claim-before"
+  git -C "$case_dir/project" worktree list --porcelain > "$case_dir/registrations-before"
+}
+
+# held_assert_untouched <label> <case> <copy>...: the copies are byte-identical
+# and registered, and the slot is still leased, claimed and unreturned.
+held_assert_untouched() {
+  local label=$1 case_dir=$2 copy
+  shift 2
+  for copy in "$@"; do
+    held_fingerprint "$copy" | cmp -s - "$case_dir/held-before.$(basename "$copy")" \
+      || fail "$label: the foreign copy $copy changed"
+  done
+  cmp -s "$case_dir/lease-before" "$case_dir/pool/treehouse-state.json" || fail "$label: the slot's lease changed"
+  cmp -s "$case_dir/claim-before" "$case_dir/pool/1/.fm-slot-owner" || fail "$label: the slot's claim changed"
+  git -C "$case_dir/project" worktree list --porcelain | cmp -s - "$case_dir/registrations-before" \
+    || fail "$label: copy registrations changed"
+  assert_absent "$case_dir/treehouse.log" "$label: the pool slot was returned"
+  assert_absent "$case_dir/closeout.log" "$label: the closeout driver ran"
+}
+
+# held_assert_closed <label>: the task's own closure completed.
+held_assert_closed() {
+  local label=$1 case_dir=$FOREIGN_CASE
+  assert_absent "$case_dir/state/task-x1.meta" "$label: the task record survived"
+  assert_absent "$case_dir/state/task-x1.teardown-return-pending" "$label: a pending-return marker survived"
+  [ "$(backlog_row_state "$case_dir")" = "done" ] \
+    || fail "$label: the backlog item is not done: $(backlog_row_state "$case_dir")"
+  assert_grep 'https://github.com/example/repo/pull/7' "$case_dir/data/backlog.md" \
+    "$label: the closed backlog item does not carry the merged PR"
+  assert_grep "the slot return is deferred" "$case_dir/stdout" "$label: the output did not say the slot return is deferred"
+}
+
+make_held_case() {  # <name>
+  make_foreign_copy_case "$1"
+  printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+  seed_backlog_in_flight "$FOREIGN_CASE"
+}
+
+test_task_closes_beside_a_foreign_copy_with_unique_ignored_files() {
+  local rc
+  make_held_case held-ignored
+  held_foreign_ignored "$FOREIGN_COPY"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-ignored: a landed task must close beside a foreign copy that holds unique ignored files: $(cat "$FOREIGN_CASE/stderr")"
+  held_assert_closed held-ignored
+  held_assert_untouched held-ignored "$FOREIGN_CASE" "$FOREIGN_COPY"
+  assert_present "$FOREIGN_COPY/unique.dat" "held-ignored: the foreign copy's unique file is gone"
+  assert_no_grep "REFUSED" "$FOREIGN_CASE/stderr" "held-ignored: a close that succeeded printed a refusal"
+  assert_grep "held foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: it holds ignored files that exist nowhere else: unique.dat." \
+    "$FOREIGN_CASE/stdout" "held-ignored: the output did not list the held copy and its reason: $(cat "$FOREIGN_CASE/stdout")"
+  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-ignored: the record is not one line"
+  pass "a task whose own copy landed closes beside a foreign copy with unique ignored files, which stays byte-identical, with the slot still leased"
+}
+
+test_task_closes_beside_a_foreign_copy_with_unpushed_commits() {
+  local rc
+  make_held_case held-unlanded
+  held_foreign_unlanded "$FOREIGN_COPY"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-unlanded: a landed task must close beside a foreign copy that holds unpushed commits: $(cat "$FOREIGN_CASE/stderr")"
+  held_assert_closed held-unlanded
+  held_assert_untouched held-unlanded "$FOREIGN_CASE" "$FOREIGN_COPY"
+  git -C "$FOREIGN_CASE/project" rev-parse --verify --quiet refs/heads/fm/task-x1-v2 >/dev/null \
+    || fail "held-unlanded: the foreign copy's branch was deleted"
+  assert_no_grep "REFUSED" "$FOREIGN_CASE/stderr" "held-unlanded: a close that succeeded printed a refusal"
+  assert_grep "held foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: its HEAD " "$FOREIGN_CASE/stdout" \
+    "held-unlanded: the output did not list the held copy and its reason"
+  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-unlanded: the record is not one line"
+  pass "a task whose own copy landed closes beside a foreign copy with commits on no remote, which stays byte-identical, with the slot still leased"
+}
+
+test_held_copy_record_has_one_exact_line_per_copy() {
+  local rc second line record fields
+  make_held_case held-two
+  second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
+  held_foreign_ignored "$FOREIGN_COPY"
+  held_foreign_unlanded "$second"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY" "$second"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-two: a landed task must close beside two held copies: $(cat "$FOREIGN_CASE/stderr")"
+  held_assert_closed held-two
+  held_assert_untouched held-two "$FOREIGN_CASE" "$FOREIGN_COPY" "$second"
+  record=$FOREIGN_CASE/data/held-foreign-copies.log
+  assert_equals 2 "$(wc -l < "$record" | tr -d ' ')" "held-two: two foreign copies must give two lines"
+  while IFS= read -r line; do
+    fields=$(printf '%s\n' "$line" | awk -F'\t' '{ print NF }')
+    assert_equals 5 "$fields" "held-two: a record line is not five tab-separated fields: $line"
+    printf '%s\n' "$line" | awk -F'\t' '$1 !~ /^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$/ { exit 1 }' \
+      || fail "held-two: the first field is not a UTC time: $line"
+    printf '%s\n' "$line" | awk -F'\t' -v s="$FOREIGN_SLOT" '$2 == "task-x1" && $3 == s { ok = 1 } END { exit !ok }' \
+      || fail "held-two: the closing task or slot is wrong: $line"
+  done < "$record"
+  awk -F'\t' -v c="$FOREIGN_COPY" '$4 == c && $5 ~ /^it holds ignored files that exist nowhere else: unique.dat$/ { ok = 1 } END { exit !ok }' "$record" \
+    || fail "held-two: the ignored-file copy's line is missing or its reason is not exact: $(cat "$record")"
+  awk -F'\t' -v c="$second" '$4 == c && $5 ~ /^its HEAD [0-9a-f]{12} is not proved landed$/ { ok = 1 } END { exit !ok }' "$record" \
+    || fail "held-two: the unlanded copy's line is missing or its reason is not exact: $(cat "$record")"
+  pass "each held foreign copy gets one record line with UTC time, closing task, slot, copy and its exact reason"
+}
+
+test_a_held_close_removes_only_the_tasks_own_nested_copy() {
+  local rc shape locked second pid=
+  for shape in enclosing reverse; do
+    for locked in plain locked; do
+      pid=
+      if [ "$locked" = locked ]; then
+        dead_launcher_pid
+        pid=$FOREIGN_DEAD_PID
+      fi
+      make_own_locked_copy_case "held-own-nested-$shape-$locked" "$shape" "$pid"
+      printf '%s\n' 'pr=https://github.com/example/repo/pull/7' >> "$FOREIGN_CASE/state/task-x1.meta"
+      seed_backlog_in_flight "$FOREIGN_CASE"
+      second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+      git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
+      held_foreign_ignored "$second"
+      held_snapshot "$FOREIGN_CASE" "$second"
+      run_foreign_teardown rc
+      expect_code 0 "$rc" "held-own-nested-$shape-$locked: a landed task must close beside a held foreign copy: $(cat "$FOREIGN_CASE/stderr")"
+      held_assert_closed "held-own-nested-$shape-$locked"
+      assert_absent "$FOREIGN_COPY" "held-own-nested-$shape-$locked: the task's own nested copy survived"
+      git -C "$FOREIGN_CASE/project" rev-parse --verify --quiet refs/heads/fm/task-x1-v2 >/dev/null \
+        || fail "held-own-nested-$shape-$locked: the own copy's branch was deleted"
+      assert_absent "$FOREIGN_CASE/treehouse.log" "held-own-nested-$shape-$locked: the pool slot was returned"
+      cmp -s "$FOREIGN_CASE/treehouse-state.before" "$FOREIGN_CASE/pool/treehouse-state.json" \
+        || fail "held-own-nested-$shape-$locked: Treehouse's lease changed"
+      cmp -s "$FOREIGN_CASE/slot-owner.before" "$FOREIGN_CASE/pool/1/.fm-slot-owner" \
+        || fail "held-own-nested-$shape-$locked: the slot claim changed"
+      held_fingerprint "$second" | cmp -s - "$FOREIGN_CASE/held-before.fc-two" \
+        || fail "held-own-nested-$shape-$locked: the foreign copy changed"
+      assert_present "$second/unique.dat" "held-own-nested-$shape-$locked: the foreign copy's unique file is gone"
+      if [ "$locked" = locked ]; then
+        assert_equals "$FOREIGN_SLOT|--cleanup-worktree $FOREIGN_COPY --execute-cleanup" "$(cat "$FOREIGN_CASE/closeout.log")" \
+          "held-own-nested-$shape-$locked: the driver was not run once, for the own copy only"
+      else
+        assert_absent "$FOREIGN_CASE/closeout.log" "held-own-nested-$shape-$locked: the closeout driver ran for an unlocked copy"
+      fi
+    done
+  done
+  pass "a held close removes the task's own nested copy, through the driver when it is locked, and leaves the slot, its lease and claim and the held foreign copy alone"
+}
+
+test_a_second_close_attempt_adds_no_duplicate_held_copy_line() {
+  local rc
+  make_held_case held-again
+  held_foreign_ignored "$FOREIGN_COPY"
+  cp "$FOREIGN_CASE/state/task-x1.meta" "$FOREIGN_CASE/meta.saved"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-again: the first close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-again: the first close did not write one line"
+  # A plain re-run finds no record; a re-run after an interrupted close finds the record again.
+  run_foreign_teardown rc
+  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-again: a re-run without a record added a line"
+  cp "$FOREIGN_CASE/meta.saved" "$FOREIGN_CASE/state/task-x1.meta"
+  seed_backlog_in_flight "$FOREIGN_CASE"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-again: a re-run with the record restored must close again: $(cat "$FOREIGN_CASE/stderr")"
+  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-again: a second close added a duplicate line"
+  held_assert_untouched held-again "$FOREIGN_CASE" "$FOREIGN_COPY"
+  pass "a second close attempt is idempotent and adds no duplicate held-copy line"
+}
+
+test_a_foreign_copy_does_not_excuse_an_own_copy_that_is_not_landed() {
+  local rc shape
+  for shape in dirty unlanded; do
+    make_held_case "held-own-$shape"
+    held_foreign_ignored "$FOREIGN_COPY"
+    case "$shape" in
+      dirty) printf 'edit\n' > "$FOREIGN_SLOT/own-edit.txt" ;;
+      unlanded)
+        printf 'own\n' > "$FOREIGN_SLOT/own.txt"
+        git -C "$FOREIGN_SLOT" add own.txt
+        git -C "$FOREIGN_SLOT" -c user.email=t@t -c user.name=t commit -qm 'unlanded own work'
+        ;;
+    esac
+    held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "held-own-$shape: an own copy that is not landed must refuse beside a foreign copy: $(cat "$FOREIGN_CASE/stderr")"
+    case "$shape" in
+      dirty) assert_grep "uncommitted changes" "$FOREIGN_CASE/stderr" "held-own-dirty: the refusal did not name the own copy's changes" ;;
+      unlanded) assert_grep "the ship deliverable is not landed" "$FOREIGN_CASE/stderr" "held-own-unlanded: the refusal did not name the own copy's commits: $(cat "$FOREIGN_CASE/stderr")" ;;
+    esac
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-own-$shape: the task record was removed"
+    assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-own-$shape: a refused close wrote a held-copy record"
+    held_assert_untouched "held-own-$shape" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  done
+  pass "a dirty or unlanded own copy still refuses exactly as before when a foreign copy would be held, and nothing changes"
+}
+
+test_a_foreign_copy_that_cannot_be_held_still_refuses_the_whole_close() {
+  local rc shape pid
+  for shape in dirty-and-ignored ignored-with-record ignored-with-process; do
+    make_held_case "held-mixed-$shape"
+    held_foreign_ignored "$FOREIGN_COPY"
+    case "$shape" in
+      dirty-and-ignored) printf 'edit\n' > "$FOREIGN_COPY/untracked.txt" ;;
+      ignored-with-record) fm_write_meta "$FOREIGN_CASE/state/other.meta" "kind=ship" "worktree=$FOREIGN_COPY" ;;
+      ignored-with-process)
+        teardown_fixture_start "$FOREIGN_COPY" KILL sleep 300
+        pid=$TEARDOWN_FIXTURE_PID
+        cat > "$FOREIGN_CASE/fakebin/lsof" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *" -d cwd "*) if kill -0 $pid 2>/dev/null; then printf 'p%s\nfcwd\nn%s\n' $pid '$FOREIGN_COPY'; fi; exit 0 ;;
+esac
+exit 1
+SH
+        ;;
+    esac
+    held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+    run_foreign_teardown rc
+    expect_code 1 "$rc" "held-mixed-$shape: a copy that is not only held back by unique work must refuse: $(cat "$FOREIGN_CASE/stderr")"
+    assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "held-mixed-$shape: the refusal changed"
+    assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-mixed-$shape: the task record was removed"
+    assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-mixed-$shape: a refused close wrote a held-copy record"
+    held_assert_untouched "held-mixed-$shape" "$FOREIGN_CASE" "$FOREIGN_COPY"
+  done
+  pass "a foreign copy that is also dirty, named by another record, or running a process still refuses the whole close"
+}
+
+test_a_forced_close_never_holds_a_foreign_copy() {
+  local rc
+  make_held_case held-forced
+  held_foreign_ignored "$FOREIGN_COPY"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  FOREIGN_TEARDOWN_ARGS=(--force --drop-file "$(fm_test_drop_file)")
+  run_foreign_teardown rc
+  FOREIGN_TEARDOWN_ARGS=()
+  expect_code 1 "$rc" "held-forced: --force must not hold a foreign copy: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "contains registered copy $FOREIGN_COPY" "$FOREIGN_CASE/stderr" "held-forced: the refusal is not the custody refusal"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-forced: the task record was removed"
+  assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-forced: a refused close wrote a held-copy record"
+  held_assert_untouched held-forced "$FOREIGN_CASE" "$FOREIGN_COPY"
+  pass "--force waives nothing: it never holds a foreign copy and still refuses"
+}
+
+test_a_slot_with_no_foreign_copy_closes_and_returns_as_before() {
+  local rc
+  make_held_case held-none
+  git -C "$FOREIGN_CASE/project" worktree remove "$FOREIGN_COPY"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-none: an ordinary landed close must succeed: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "return --force $FOREIGN_SLOT" "$FOREIGN_CASE/treehouse.log" "held-none: the slot was not returned"
+  assert_grep "teardown task-x1 complete (window firstmate:fm-task-x1, worktree $FOREIGN_SLOT)" "$FOREIGN_CASE/stdout" \
+    "held-none: the ordinary completion line changed"
+  assert_no_grep "deferred" "$FOREIGN_CASE/stdout" "held-none: an ordinary close mentions a deferred slot return"
+  assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-none: an ordinary close wrote a held-copy record"
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" "held-none: the task record survived"
+  pass "a slot with no foreign copy closes and returns exactly as before and writes no held-copy record"
 }
 
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused() {
@@ -12779,9 +13044,17 @@ test_own_prior_copies_block_only_an_unproven_pool_return
 test_reverse_nested_prior_outside_claude_tears_down
 test_locked_own_copy_is_released_by_the_closeout_driver
 test_unlocked_landed_foreign_copy_is_removed_without_the_driver
-test_unlanded_foreign_copy_is_refused
+test_task_closes_beside_a_foreign_copy_with_unique_ignored_files
+test_task_closes_beside_a_foreign_copy_with_unpushed_commits
+test_held_copy_record_has_one_exact_line_per_copy
+test_a_held_close_removes_only_the_tasks_own_nested_copy
+test_a_second_close_attempt_adds_no_duplicate_held_copy_line
+test_a_foreign_copy_does_not_excuse_an_own_copy_that_is_not_landed
+test_a_foreign_copy_that_cannot_be_held_still_refuses_the_whole_close
+test_a_forced_close_never_holds_a_foreign_copy
+test_a_slot_with_no_foreign_copy_closes_and_returns_as_before
 test_idle_reap_keeps_the_per_copy_reason_of_a_foreign_copy_refusal
-test_foreign_copy_with_unsaved_or_unique_files_is_refused
+test_foreign_copy_with_unsaved_files_is_refused
 test_foreign_copy_named_by_an_alias_in_an_active_record_is_refused
 test_half_removed_foreign_copy_is_refused_as_before
 test_recycled_launcher_pid_does_not_own_a_foreign_copy

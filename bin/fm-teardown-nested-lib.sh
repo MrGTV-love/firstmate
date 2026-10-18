@@ -24,6 +24,14 @@
 #     teardown's own is never signalled and refuses at once, named by its pid;
 #   - its work is landed by the existing landed-work rule (teardown_landed).
 # A copy whose work is not proved landed stays, and teardown names why.
+# One refusal class does not stop the task's own closure. A copy that is clean,
+# owned by no record, process or live launcher, and held back only by ignored
+# files that exist nowhere else or by a HEAD that is not proved landed is HELD:
+# when every refused copy in the slot is of that class and the task's own copy
+# already passed the landed-work proof, bin/fm-teardown.sh closes the task and
+# leaves the slot, its lease and every foreign copy exactly as they were
+# (teardown_held_copies_record writes each one to data/held-foreign-copies.log).
+# Nothing here ever removes or alters a held copy, and --force never holds one.
 # The task's own nested copies (the record's worktree= and prior_worktree= copies
 # inside the slot) were already proved clean and landed or anchored by the
 # caller. One of them that Vernant's creation lock holds is released the same
@@ -66,6 +74,10 @@ TEARDOWN_OWN_CWD=
 TEARDOWN_OWN_SCAN=
 TEARDOWN_OWN_SCANNED=0
 TEARDOWN_FOREIGN_WHY=
+# One "copy<TAB>reason" entry per held foreign copy of the last
+# teardown_foreign_copies_prove, and how many of its refusals were not holdable.
+TEARDOWN_FOREIGN_HELD=()
+TEARDOWN_FOREIGN_REFUSED=0
 TEARDOWN_FOREIGN_LOCK=
 TEARDOWN_FOREIGN_LOCK_FILE=
 TEARDOWN_SLOT_COPIES=()
@@ -269,13 +281,41 @@ teardown_foreign_copy_unowned() {  # <copy>
   esac
 }
 
+# May foreign copy <copy>, refused for TEARDOWN_FOREIGN_WHY, be left standing
+# while the task closes? Only when teardown_foreign_copy_prove found it a clean
+# worktree root and no record, no process outside this teardown and no live
+# launcher owns it, so the one reason it stays is work only it holds. The
+# ownership proof runs again here for the ignored-files case, whose reason is
+# judged before it; a copy any process runs in is never
+# held, so retire never signals a process inside a copy that stays. The reason
+# text is kept, and a path that would break the one-line record is not held.
+teardown_foreign_copy_holdable() {  # <copy>
+  local copy=$1 why=$TEARDOWN_FOREIGN_WHY procs=$TEARDOWN_FOREIGN_PROCS_BASE rc=0
+  case "$FORCE:$KIND" in --force:*|*:secondmate) return 1 ;; esac
+  case "$copy$why$ID$TEARDOWN_RETURN_SLOT" in *$'\t'*|*$'\n'*) return 1 ;; esac
+  teardown_foreign_copy_unowned "$copy" || rc=1
+  TEARDOWN_FOREIGN_WHY=$why
+  if [ "${#TEARDOWN_FOREIGN_PROCS[@]}" -gt "$procs" ]; then
+    TEARDOWN_FOREIGN_PROCS=(${TEARDOWN_FOREIGN_PROCS[@]+"${TEARDOWN_FOREIGN_PROCS[@]:0:$procs}"})
+    return 1
+  fi
+  [ "$rc" = 0 ]
+}
+
 # Proves foreign copy <copy>, or returns 1 with TEARDOWN_FOREIGN_WHY naming what
-# could not be proved. Writes nothing. A half-removed or unreadable copy fails
-# the first check. The landed-work rule gets an empty branch name so it never
-# adopts this copy's PR as the task's recorded one.
+# could not be proved and TEARDOWN_FOREIGN_HOLDABLE set to 1 when the copy may
+# stay held (teardown_foreign_copy_holdable). Writes nothing. A half-removed or
+# unreadable copy fails the first check. The landed-work rule gets an empty branch
+# name so it never adopts this copy's PR as the task's recorded one.
+TEARDOWN_FOREIGN_HOLDABLE=0
+TEARDOWN_FOREIGN_PROCS_BASE=0
+TEARDOWN_FOREIGN_DIAG=
 teardown_foreign_copy_prove() {  # <copy>
-  local copy=$1 rc=0 unique
+  local copy=$1 rc=0 unique diag
   TEARDOWN_FOREIGN_WHY=
+  TEARDOWN_FOREIGN_DIAG=
+  TEARDOWN_FOREIGN_HOLDABLE=0
+  TEARDOWN_FOREIGN_PROCS_BASE=${#TEARDOWN_FOREIGN_PROCS[@]}
   fm_task_copy_preserve "$PROJ" "$ID" "$copy" 0 || rc=$?
   if [ "$rc" = 1 ]; then
     TEARDOWN_FOREIGN_WHY="it $FM_TASK_COPY_REASON"
@@ -284,22 +324,37 @@ teardown_foreign_copy_prove() {  # <copy>
   unique=$(teardown_foreign_unique_ignored "$copy") || unique=
   if [ -n "$unique" ]; then
     TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
+    ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=1
     return 1
   fi
   teardown_foreign_copy_unowned "$copy" || return 1
-  if ! teardown_landed "$copy" HEAD ""; then
+  # The landed-work rule explains its own refusal on stderr. It is kept for the
+  # caller to print with the refusal, so a copy that stays held does not leave a
+  # REFUSED line in the output of a close that succeeds.
+  diag=$(mktemp "${TMPDIR:-/tmp}/fm-teardown-landed.XXXXXX") || diag=
+  if ! teardown_landed "$copy" HEAD "" 2> "${diag:-/dev/null}"; then
+    [ -z "$diag" ] || TEARDOWN_FOREIGN_DIAG=$(cat "$diag")
+    [ -z "$diag" ] || rm -f "$diag"
     TEARDOWN_FOREIGN_WHY="its HEAD ${FM_TASK_COPY_HEAD:0:12} is not proved landed"
+    ! teardown_foreign_copy_holdable "$copy" || TEARDOWN_FOREIGN_HOLDABLE=1
     return 1
   fi
+  [ -z "$diag" ] || { [ ! -s "$diag" ] || cat "$diag" >&2; rm -f "$diag"; }
 }
 
 # Proves every foreign copy in <slot> and records the provable ones in
-# TEARDOWN_FOREIGN_COPIES. An unprovable copy is named here and then refused by
-# the registered-copy check, which does not list it as allowed.
+# TEARDOWN_FOREIGN_COPIES and the held ones in TEARDOWN_FOREIGN_HELD. An
+# unprovable copy is named here and then refused by the registered-copy check,
+# which does not list it as allowed. When every refused copy is held, nothing is
+# refused here: bin/fm-teardown.sh then closes the task and names the held
+# copies, so no REFUSED line is printed for a close that succeeds.
 teardown_foreign_copies_prove() {  # <slot>
-  local slot=$1 copy known allowed
+  local slot=$1 copy known allowed line
+  local -a lines=()
   TEARDOWN_FOREIGN_COPIES=()
   TEARDOWN_FOREIGN_PROCS=()
+  TEARDOWN_FOREIGN_HELD=()
+  TEARDOWN_FOREIGN_REFUSED=0
   teardown_slot_registered_copies "$slot" || return 0
   slot=$(fm_task_copy_canonical_dir "$slot") || return 0
   for copy in ${TEARDOWN_SLOT_COPIES[@]+"${TEARDOWN_SLOT_COPIES[@]}"}; do
@@ -311,9 +366,49 @@ teardown_foreign_copies_prove() {  # <slot>
     if teardown_foreign_copy_prove "$copy"; then
       TEARDOWN_FOREIGN_COPIES+=("$copy")
     else
-      echo "REFUSED: foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY." >&2
+      [ -z "$TEARDOWN_FOREIGN_DIAG" ] || lines+=("$TEARDOWN_FOREIGN_DIAG")
+      lines+=("REFUSED: foreign copy $copy stays in pool slot $slot: $TEARDOWN_FOREIGN_WHY.")
+      if [ "$TEARDOWN_FOREIGN_HOLDABLE" = 1 ]; then
+        TEARDOWN_FOREIGN_HELD+=("$copy"$'\t'"$TEARDOWN_FOREIGN_WHY")
+      else
+        TEARDOWN_FOREIGN_REFUSED=$((TEARDOWN_FOREIGN_REFUSED + 1))
+      fi
     fi
   done
+  [ "$TEARDOWN_FOREIGN_REFUSED" -gt 0 ] || [ "${#TEARDOWN_FOREIGN_HELD[@]}" -eq 0 ] || return 0
+  for line in ${lines[@]+"${lines[@]}"}; do
+    echo "$line" >&2
+  done
+}
+
+# Writes each held foreign copy of the last proof once to the append-only record
+# data/held-foreign-copies.log: UTC time, closing task id, slot path, copy path
+# and the exact reason, tab separated. A line for the same slot, copy and reason
+# is never written twice, so a retry or a second closing task adds nothing. The
+# record is only ever appended to here; a reaper run or the owner's named drop
+# clears the copies, and teardown never does.
+teardown_held_copies_record() {
+  local record="$DATA/held-foreign-copies.log" lock="$DATA/.held-foreign-copies.lock" entry copy why stamp rc=0
+  [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
+  if ! mkdir -p "$DATA" || ! fm_lock_acquire_wait "$lock"; then
+    echo "REFUSED: cannot lock the held-copy record $record; nothing was changed." >&2
+    return 1
+  fi
+  stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
+    copy=${entry%%$'\t'*}
+    why=${entry#*$'\t'}
+    if [ -f "$record" ] && HELD_SLOT="$TEARDOWN_RETURN_SLOT" HELD_COPY="$copy" HELD_WHY="$why" awk -F'\t' \
+        '$3 == ENVIRON["HELD_SLOT"] && $4 == ENVIRON["HELD_COPY"] && $5 == ENVIRON["HELD_WHY"] { found = 1 } END { exit !found }' "$record"; then
+      continue
+    fi
+    printf '%s\t%s\t%s\t%s\t%s\n' "$stamp" "$ID" "$TEARDOWN_RETURN_SLOT" "$copy" "$why" >> "$record" || rc=1
+  done
+  fm_lock_release "$lock" || rc=1
+  if [ "$rc" != 0 ]; then
+    echo "REFUSED: cannot write the held-copy record $record; nothing was changed." >&2
+    return 1
+  fi
 }
 
 # Sends TERM, once and whatever its cwd, to each live lock launcher and each
@@ -433,6 +528,7 @@ teardown_foreign_copies_release() {
   slot=$(fm_task_copy_canonical_dir "$slot") || return 1
   for copy in "${TEARDOWN_FOREIGN_COPIES[@]}"; do
     if ! teardown_foreign_copy_prove "$copy"; then
+      [ -z "$TEARDOWN_FOREIGN_DIAG" ] || echo "$TEARDOWN_FOREIGN_DIAG" >&2
       echo "REFUSED: foreign copy $copy in pool slot $slot is no longer provable: $TEARDOWN_FOREIGN_WHY; nothing was removed." >&2
       return 1
     fi

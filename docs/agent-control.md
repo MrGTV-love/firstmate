@@ -271,7 +271,7 @@ A finished record whose copy is nested in the slot also uses record-only retirem
 Then reassociate the remaining task to its real nested or external copy with `bin/fm-control.sh <remaining-task> reassociate --worktree <copy> --note <why>`.
 The existing component-aware exclusivity proof still requires finished nested scout records to retire first when they overlap the old root, even if their copy is disjoint from the replacement.
 Do not retire an unfinished task to clear custody: it keeps its record and claim until its own delivery proof passes.
-Before any forced Treehouse return of a Git directory, whether or not it is a pool slot, teardown also checks that directory's Git worktree registrations and refuses a nested copy that is not one of the retiring task's proven copies, naming each such copy, unless the foreign-copy proof below releases it; `--force` does not waive that custody proof.
+Before any forced Treehouse return of a Git directory, whether or not it is a pool slot, teardown also checks that directory's Git worktree registrations and refuses a nested copy that is not one of the retiring task's proven copies, naming each such copy, unless the foreign-copy proof below releases it or the held-copy rule below leaves it standing; `--force` does not waive that custody proof.
 A child-worktree removal that hits this refusal stops there, with no `rm -rf` fallback, and a path that cannot be canonicalized is refused the same way.
 The refusal prints the reassociate command with `FM_HOME=/path/to/owning-home`, because the owning task's record may live in a different home than the one running teardown.
 A secondmate home that is a pool slot, and each descendant secondmate home, gets the same check before any endpoint, child, or record is touched.
@@ -289,7 +289,19 @@ The task's own nested copy that Vernant's creation lock holds takes the same dri
 Removal deletes the copy's checkout and the allow-listed ignored files in it (symlinks, virtual environments, `node_modules` and tool caches, `.DS_Store`, Firstmate's hook files, and anything ignored under its `.claude` and `.opencode` trees); it loses no commit, because the work is landed, and no tracked change, because the clean proof refuses one.
 The clean proof skips untracked files under `.claude` only; the ignored-file proof skips ignored files under `.claude` and `.opencode`; plain `git worktree remove` still refuses a copy that holds an untracked file.
 On the pool-slot route the release runs before the final project-lock wait, so the driver never runs while the lock is held, except when teardown keeps project custody through the return.
-A copy it cannot prove, a lock in any other format, a driver refusal, a half-removed copy, or a copy still registered afterwards refuses exactly as above, and `--force` waives none of it.
+A copy it cannot prove, a lock in any other format, a driver refusal, a half-removed copy, or a copy still registered afterwards refuses exactly as above unless the held-copy rule below applies, and `--force` waives none of it.
+
+**Held copies.**
+A foreign copy that cannot be released does not stop the task that is closing from closing.
+This holds when the task's own copy has passed the ordinary landed-work test, and every foreign copy that would stop the slot's return is clean, owned by no record, no process and no live launcher, and held back only by ignored files that exist nowhere else or by a HEAD that is not proved landed.
+Teardown then closes the task: it moves the backlog item to Done with the merged evidence, removes the task's own record and runtime state, and removes only the task's own nested copies that the proof covers.
+It does not return the slot, and it does not touch Treehouse's lease, the slot's claim or any foreign copy; it never deletes, moves, rewrites or changes the mode of anything inside one.
+The output lists each foreign copy it left with its reason, and says in one sentence that the slot return is deferred.
+Each such copy is appended once to `data/held-foreign-copies.log`, one line per copy with five tab-separated fields: the UTC time, the closing task id, the slot path, the copy path and the exact reason text.
+A line for the same slot, copy and reason is never written twice, so a retry adds nothing, and teardown never edits or clears the file.
+A later reaper run or the owner's named drop clears the copies.
+A foreign copy that is also dirty, named by another record, running a process, or locked by anything other than a Vernant creation lock whose launcher is gone still refuses the whole close, and so does an own copy that is dirty or unlanded, or any other refusal of the ordinary close.
+`--force` never holds a foreign copy.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.
 The log test lists the commits of a squash-merged branch whose remote branch was deleted as unpushed, so judge those copies by their merged PR and the closeout driver's landing check, not by that list alone.
 A plain `git worktree remove` refuses a locked copy, and neither `--force` nor unlocking by hand is the supported route.
@@ -364,7 +376,7 @@ The route removes only the retiring task's own current copy, under the same proo
 It reserves, reaps, scans, detaches and returns nothing slot-wide, leaves Treehouse's lease and every other record and copy untouched, and passes the slot claim to the first remaining peer when it was this task's, so the last task out finds the slot its own.
 A claim that already names a peer stays as it is.
 The route works the same when a rerun finds the copy already removed, judged by its `branch=` ref as above.
-A foreign copy in the root is neither judged nor touched by this route, and it is proved again when the last task out returns the root.
+A foreign copy in the root is neither judged nor touched by this route, and it is proved again when the last task out returns the root; a copy held back by unique files or unlanded commits then closes that last task under the held-copy rule above and the root stays.
 A peer that has left the root between the proof and the removal refuses with the record in place, and a re-run takes the ordinary route.
 `--force` skips only the landed-work test on the task's own copy, as always, and waives none of the other proofs.
 `tests/fm-control-reassociate.test.sh` exercises the sequence from the joint reassociation through the last teardown.
