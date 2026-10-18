@@ -263,7 +263,8 @@ Changed-file selection maps the flat omp bordered captures to `fm-composer-lib.t
 
 CI job timeouts follow one three-tier policy, so the workflow reads as a policy rather than as a collection of per-job numbers.
 Every tier is a hang tripwire with headroom above the healthy duration, never a packing estimate or a runtime target.
-A lane that reaches its tier bound needs investigation and a distribution or runtime fix. The bounds sit at true extremes: they were raised (normal 30 to 60 minutes, Herdr backstop 75 to 120) because a cap close to healthy duration cancelled valuable work on a loaded runner, and they are never a target for new work to grow into.
+A lane that reaches its tier bound needs investigation and a distribution or runtime fix.
+The bounds sit at true extremes, far above healthy duration, so a loaded runner slowing a healthy lane does not reach them, and they are never a target for new work to grow into.
 
 | Tier | Jobs | Bound | Rationale |
 |---|---|---|---|

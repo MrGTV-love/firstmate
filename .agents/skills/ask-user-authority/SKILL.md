@@ -53,7 +53,6 @@ Do not relay reviewer labels or gate output as if they settled the decision.
 
 - Fixing a concrete defect that violates an original acceptance criterion is firstmate's to decide, regardless of implementation difficulty.
 - Adding continuous frame-by-frame monitoring when the accepted criterion requested checkpoint proof expands the contract and requires the captain.
-- A review cycle requires the captain only when it has stopped converging: the same finding fingerprint recurs, findings did not reduce over three consecutive rounds, or twelve rounds have run.
-  Same-theme findings that are closing independent defects keep going, and a proven defect is never declined to the PR body.
+- A review cycle that has stopped converging, as defined in step 4 of Decide, requires the captain; same-theme findings that are closing independent defects keep going.
 - A genuinely security-sensitive action requires the captain under the stronger existing boundary even if it is otherwise within scope.
 - Complex architecture explicitly requested by the captain stays within scope and does not escalate merely because it is complex.

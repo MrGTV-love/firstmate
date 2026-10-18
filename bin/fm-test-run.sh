@@ -240,10 +240,9 @@ JOBS_MAX=8
 MAX_WALL_MS=
 PER_SCRIPT_TIMEOUT_SECS=0
 # Plain --changed applies a progress guard instead of a fixed per-script
-# duration. bin/fm-duration.py run owns the rule: a script is stopped only
-# after 15 minutes with no output and no process-tree CPU progress, or at 6
-# hours absolute, so a slow but working suite keeps its time while a genuinely
-# wedged one still fails locally with its output.
+# duration. bin/fm-duration.py run owns the stop rule, so a slow but working
+# suite keeps its time while a genuinely wedged one still fails locally with
+# its output.
 PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
