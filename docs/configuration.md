@@ -950,7 +950,7 @@ A longer interval needs `FM_POLL` set in the environment of every process that d
 
 The same heavy test suite is often started in several worktrees at once, and each copy forks thousands of short-lived processes.
 The CPU pass pool ([`cpu-pass-pool.md`](cpu-pass-pool.md)) bounds how many scripts run in total; this gate bounds how many copies of one `test.<script>` key run, host-wide, so the copies take turns instead of multiplying.
-`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a measured ceiling or a per-script bound.
+`python3 bin/fm-duration.py run test.<script> -- <command>` takes a slot before it starts its clock, and `bin/fm-test-run.sh` takes the same slot around every script it runs through `python3 bin/fm-duration.py gate`, so a wait is never part of a recorded sample, a measured ceiling or a per-script bound: `gate --wait-file` reports the milliseconds it waited and the runner subtracts them from the script's duration (its `FM_TEST_END` line, its timing record and its `test.<script>` sample). `--max-wall-ms` and the run's `FM_TEST_SUMMARY` duration are real elapsed time and still count the wait.
 The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot files, the holder record, the waiter notice, the bounded wait, the nested-run rule and the exit codes.
 
 | Setting | Default | Range | Purpose |
@@ -964,7 +964,7 @@ The [`fm-duration.py` header](../bin/fm-duration.py) owns the protocol: the slot
 A day of the host's own timings (`data/command-durations.jsonl`, 2026-10-17) shows `tests/fm-teardown.test.sh` run 6 times for 13,276 seconds in total, with a median of 2,175 seconds and a longest run of 6,884, and three copies alive at once in three worktrees.
 One slot would queue those six runs behind each other for about 3.7 hours of waiting between them; two slots cap the overlap at two copies while the third waits for the first of the two to finish, typically one median run.
 A waiter gives up after 7,200 seconds, a little longer than the longest run seen, so a queued copy outlasts a holder that is merely slow, and a holder that never finishes can delay a copy by at most that long.
-The gate shapes throughput and is not a safety boundary: a waiter that gives up, or a slot directory that cannot be used, runs the suite without a slot and says so.
+The gate shapes throughput and is not a safety boundary: a waiter that gives up, a slot directory or slot file that cannot be used, or a Python without POSIX file locks, runs the suite without a slot and says so. A native Windows bash (`uname` MINGW, MSYS or CYGWIN) never calls the gate.
 
 **Release and stale holders**
 

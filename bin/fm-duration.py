@@ -5,7 +5,7 @@ Usage: fm-duration.py record KEY MILLISECONDS EXIT [--sample-id ID] [--uncalibra
        fm-duration.py record-batch < KEY<TAB>MS<TAB>EXIT<TAB>CALIBRATION<TAB>LOAD_START<TAB>LOAD_END<TAB>TIMED_OUT lines
        fm-duration.py limit KEY [--percentile 95|99] [--margin N] [--fallback SECONDS]
        fm-duration.py run KEY -- COMMAND [ARGS...]
-       fm-duration.py gate [--log-fd N] KEY -- COMMAND [ARGS...]
+       fm-duration.py gate [--log-fd N] [--wait-file PATH] KEY -- COMMAND [ARGS...]
        fm-duration.py slots KEY
        fm-duration.py import-nm DATABASE RUN_ID
        fm-duration.py timeout KEY MILLISECONDS [--event-id ID]
@@ -82,9 +82,11 @@ Per-key slot gate. A test.* key admits at most FM_TEST_KEY_SLOTS concurrent
 copies (default 2; 0 turns the gate off; whole numbers up to 16) host-wide, so
 the same heavy suite started in several worktrees takes turns instead of
 multiplying its process churn. run takes a slot before it starts its clock, so
-the wait is in neither the recorded sample nor the measured ceiling; gate does
-the same for a caller that does not use run (bin/fm-test-run.sh wraps each
-script in it) and runs COMMAND with this process's stdio. Slots are exclusive
+the wait is in neither the recorded sample nor the measured ceiling; gate is for
+a caller that times COMMAND itself (bin/fm-test-run.sh wraps each script in it):
+it runs COMMAND with this process's stdio and the --log-fd descriptor, and
+writes the milliseconds it waited for the slot to --wait-file before COMMAND
+starts, so that caller can leave the wait out of its sample. Slots are exclusive
 non-blocking flock files in a per-key directory under FM_TEST_SLOT_DIR, else
 $HOME/.cache/fm-test-slots, created mode 0700 and owned by the caller. The
 kernel releases a flock on every exit, SIGKILL included, so no lock directory
@@ -99,7 +101,8 @@ its first notice after 2 seconds and another every 60, waits at most
 FM_TEST_SLOT_WAIT_SECONDS (default 7200, the longest fm-teardown run measured in
 the last 24 hours was 6884), and then runs without a slot and says so: the gate
 shapes throughput and is not a safety boundary, so it never blocks a test for
-good and never stops one when the slot directory is unusable. A command run
+good and never stops one when the slot directory or a slot file is unusable or
+this Python has no POSIX file locks: it runs without a slot and says so. A command run
 under a slot exports FM_TEST_SLOT_HELD (the keys it holds, tab separated), so the
 same key nested inside it takes no second slot. A malformed FM_TEST_KEY_SLOTS or
 FM_TEST_SLOT_WAIT_SECONDS refuses the command by name (exit 125 from gate).
@@ -648,11 +651,17 @@ def acquire_slot(key, log_fd=2):
     wait = slot_wait()
     if limit == 0 or key in os.environ.get(SLOT_HELD_ENV, '').split('\t'):
         return None
+    if fcntl is None or os.name != 'posix':
+        slot_log(log_fd, f'running {key} without a slot: this Python has no POSIX file locks')
+        return None
     try:
-        directory = slot_directory(key)
+        return queue_for_slot(key, slot_directory(key), limit, wait, log_fd)
     except (OSError, ValueError) as error:
         slot_log(log_fd, f'running {key} without a slot: {error}')
         return None
+
+
+def queue_for_slot(key, directory, limit, wait, log_fd):
     started = time.monotonic()
     next_notice = started + SLOT_FIRST_NOTICE
     delay = 0.05
@@ -665,8 +674,8 @@ def acquire_slot(key, log_fd=2):
             except OSError:
                 os.close(fd)
                 continue
-            record = dict(pid=os.getpid(), start=process_start(os.getpid()), since=int(time.time()), key=key, cwd=os.getcwd())
             try:
+                record = dict(pid=os.getpid(), start=process_start(os.getpid()), since=int(time.time()), key=key, cwd=os.getcwd())
                 os.ftruncate(fd, 0)
                 os.pwrite(fd, json.dumps(record).encode(), 0)
             except OSError:
@@ -695,8 +704,16 @@ def release_slot(fd):
         os.close(fd)
 
 
-def gate(key, command, log_fd):
+def gate(key, command, log_fd, wait_file=None):
     """Run COMMAND while holding one of KEY's slots; exit with its status."""
+    kept = ()
+    if log_fd > 2:
+        try:
+            os.fstat(log_fd)
+            kept = (log_fd,)
+        except OSError:
+            log_fd = 2
+    began = time.monotonic()
     try:
         fd = acquire_slot(key, log_fd)
     except ValueError as error:
@@ -704,16 +721,24 @@ def gate(key, command, log_fd):
         return 125
     except KeyboardInterrupt:
         return 130
+    if wait_file:
+        try:
+            Path(wait_file).write_text(f'{round((time.monotonic() - began) * 1000)}\n')
+        except OSError as error:
+            slot_log(log_fd, f'cannot report the slot wait to {wait_file}: {error}')
+    posix = os.name == 'posix'
+    guarded = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP) if posix else ()
     ignored = {}
     def restore_defaults():
-        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        for sig in guarded:
             signal.signal(sig, signal.SIG_DFL)
     try:
         # A group signal reaches COMMAND directly; this process keeps the slot until it exits.
-        for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        for sig in guarded:
             ignored[sig] = signal.signal(sig, signal.SIG_IGN)
+        options = dict(pass_fds=kept, preexec_fn=restore_defaults) if posix else {}
         try:
-            child = subprocess.Popen(command, close_fds=True, preexec_fn=restore_defaults)
+            child = subprocess.Popen(command, close_fds=True, **options)
         except FileNotFoundError:
             slot_log(log_fd, f'command not found: {command[0]}')
             return 127
@@ -1007,7 +1032,7 @@ def main():
     runner = commands.add_parser('run')
     runner.add_argument('key'); runner.add_argument('command', nargs=argparse.REMAINDER)
     gater = commands.add_parser('gate')
-    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('command', nargs=argparse.REMAINDER)
+    gater.add_argument('key'); gater.add_argument('--log-fd', type=nonnegative, default=2); gater.add_argument('--wait-file'); gater.add_argument('command', nargs=argparse.REMAINDER)
     slots = commands.add_parser('slots')
     slots.add_argument('key')
     nm = commands.add_parser('import-nm')
@@ -1057,7 +1082,7 @@ def main():
         command = args.command[1:] if args.command[:1] == ['--'] else args.command
         if not command:
             parser.error('gate requires -- COMMAND')
-        return gate(args.key, command, args.log_fd)
+        return gate(args.key, command, args.log_fd, args.wait_file)
     elif args.action == 'slots':
         show_slots(args.key)
     return 0
