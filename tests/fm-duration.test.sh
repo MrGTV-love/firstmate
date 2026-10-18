@@ -162,6 +162,21 @@ stalled = override_run('stall', ['sleep', '30'], FM_DURATION_NO_PROGRESS_SECS='2
 assert stalled.returncode == 124 and 'no_progress' in stalled.stderr, (stalled.returncode, stalled.stderr)
 assert any(r.get('event') == 'timeout' and r['key'] == 'stall' for r in rows())
 
+# A no-mistakes.<step> drive call waits quietly on the shared daemon, so silence
+# alone never stops it, while the same silence under a test.* key still does. The
+# exemption keeps the absolute wall-clock limit as that key's only extreme.
+quiet_wait = [sys.executable, '-c', 'import time; time.sleep(4)']
+quiet_drive = override_run('no-mistakes.drive', quiet_wait, FM_DURATION_NO_PROGRESS_SECS='1', FM_DURATION_ABSOLUTE_SECS='60')
+assert quiet_drive.returncode == 0 and 'no_progress' not in quiet_drive.stderr, (quiet_drive.returncode, quiet_drive.stderr)
+assert rows()[-1]['key'] == 'no-mistakes.drive' and rows()[-1]['exit'] == 0
+assert not any(r.get('event') == 'timeout' and r['key'] == 'no-mistakes.drive' for r in rows())
+quiet_suite = override_run('test.tests/quiet.test.sh', quiet_wait, FM_DURATION_NO_PROGRESS_SECS='1', FM_DURATION_ABSOLUTE_SECS='60')
+assert quiet_suite.returncode == 124 and 'no_progress' in quiet_suite.stderr, (quiet_suite.returncode, quiet_suite.stderr)
+assert any(r.get('event') == 'timeout' and r['key'] == 'test.tests/quiet.test.sh' for r in rows())
+capped_drive = override_run('no-mistakes.capped', ['sleep', '30'], FM_DURATION_NO_PROGRESS_SECS='1', FM_DURATION_ABSOLUTE_SECS='2')
+assert capped_drive.returncode == 124 and 'absolute_limit' in capped_drive.stderr and 'no_progress' not in capped_drive.stderr, (capped_drive.returncode, capped_drive.stderr)
+assert any(r.get('event') == 'timeout' and r['key'] == 'no-mistakes.capped' for r in rows())
+
 # CPU growth is progress even with no output, so a busy command outlives the stall
 # bound. The bound is several times the one-second CPU-time granularity of Linux
 # ps, so a loaded host that gives the loop under half a core still shows growth.

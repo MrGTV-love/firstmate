@@ -212,8 +212,8 @@ raise "teardown must run under always()" unless steps[teardown]["if"].to_s.strip
 puts steps[index].fetch("timeout-minutes", "none")
 ' "$CI_WORKFLOW" tests-herdr) || fail "could not read the Herdr family-run step"
   case "$step" in ''|*[!0-9]*) fail "the Herdr family-run step needs its own timeout-minutes, got $step" ;; esac
-  [ "$step" = 20 ] \
-    || fail "the Herdr family-run step must be the 20-minute tripwire, got $step"
+  [ "$step" = 60 ] \
+    || fail "the Herdr family-run step must be the 60-minute tripwire, got $step"
   [ "$step" -lt "$heavy" ] \
     || fail "the Herdr step tripwire ($step) must stay below the job backstop ($heavy)"
   pass "Herdr keeps a $step minute step tripwire under a $heavy minute job backstop"

@@ -343,9 +343,10 @@ jobs:
           bin/fm-herdr-ci-cleanup.sh snapshot "$RUNNER_TEMP/fm-herdr/sessions-before.json"
       - name: Run real-Herdr family (serial, required)
         id: run-real-herdr-family
-        # Heavy tier step tripwire: above the healthy 7-10 minute wall and far
-        # below the job backstop, so a hang fails this step and cleanup runs.
-        timeout-minutes: 20
+        # Heavy tier step tripwire: three times the longest healthy run in the
+        # measured history (docs/fm-test-portable-shards.md "Timeouts"), below
+        # the job backstop, so a hang fails this step and cleanup runs.
+        timeout-minutes: 60
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"

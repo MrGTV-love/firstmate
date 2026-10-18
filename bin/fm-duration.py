@@ -64,7 +64,11 @@ The default margin is 3, and run reports p99 x 3 as a "slower than usual"
 advisory line rather than using it to stop healthy slow work. run stops a
 command only at a true extreme: no output and no process-tree CPU progress for
 15 minutes (FM_DURATION_NO_PROGRESS_SECS), or 6 hours wall clock overall
-(FM_DURATION_ABSOLUTE_SECS). Polling cadence is observation, not a failure
+(FM_DURATION_ABSOLUTE_SECS). A no-mistakes.<step> key, a wrapped pipeline drive
+call whose client waits quietly on the shared daemon, is exempt from the
+no-progress stop and keeps only the 6 hour absolute stop; a cleanup that a
+forwarded signal or the absolute stop began still follows the cleanup rule
+below for every key. Polling cadence is observation, not a failure
 deadline, and neither an idle or failed sample nor an elapsed read wait kills
 work. Completion of the command's leader, a forwarded signal, or one of those
 two extremes ends the run; descendants that outlive the leader and still hold
@@ -179,6 +183,7 @@ COMPACT_AT = 200  # sample-count policy: host/key sample rows that trigger compa
 # only extreme that stops a command. Both have environment overrides for tests.
 NO_PROGRESS_LIMIT = 900
 ABSOLUTE_LIMIT = 6 * 3600
+QUIET_WAIT_PREFIX = 'no-mistakes.'  # a wrapped drive call waits quietly on the shared daemon, so silence is not a stall
 PROGRESS_REPORT_AFTER = 60  # seconds between progress heartbeat lines, not a deadline
 EVENTS = ('timeout', 'filed')
 LOCAL_NOTED = []
@@ -878,7 +883,7 @@ def run(key, command, calibration_file):
                     expired = True
                     scalar('absolute_limit', f'{key} reached the {absolute}s absolute limit; stopping', sys.stderr)
                     begin_stop()
-                elif idle >= no_progress:
+                elif idle >= no_progress and not key.startswith(QUIET_WAIT_PREFIX):
                     expired = True
                     scalar('no_progress', f'{key} made no output or CPU progress for {idle:.0f}s; stopping', sys.stderr)
                     begin_stop()

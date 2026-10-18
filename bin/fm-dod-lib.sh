@@ -461,7 +461,7 @@ ${pr_return_line}Whenever a drive call returns without a gate or an outcome - it
   fi
   drive_block="$drive_block
 A drive call's own wait ending, or your harness's command bound passing, never kills the run, proves failure, or permits a final timeout blocker: the measured-command instructions above own long-command limits and progress checks, so judge continued work by output growth and cumulative process-tree CPU time.
-The helper stops a wrapped call only after 15 minutes with no output and no process-tree CPU progress, or after 6 hours overall; its measured p99 x 3 for the wrapped call's own key is only a slower_than_usual report line, not a stop and not a guessed tool wait.
+The helper never stops a wrapped drive call for silence, because the client waits quietly on the shared daemon; only the 6 hour wall clock limit stops one. Its measured p99 x 3 for the wrapped call's own key is only a slower_than_usual report line, not a stop and not a guessed tool wait.
 The per-step durations the helper imports from completed pipeline runs are record-only under \`no-mistakes-step.<step>\` and never set a drive call's ceiling."
   cat <<EOF
 You drive no-mistakes by responding to its gates, not by implementing fixes.
