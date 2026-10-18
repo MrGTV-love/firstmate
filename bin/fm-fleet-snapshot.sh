@@ -158,7 +158,15 @@ esac
 # Cross-home bounds are explicit so one broken or unexpectedly large home cannot
 # hang or explode the parent snapshot.
 FM_SNAPSHOT_SECONDMATES=${FM_SNAPSHOT_SECONDMATES:-20}
-FM_SNAPSHOT_CREW_STATE_TIMEOUT=${FM_SNAPSHOT_CREW_STATE_TIMEOUT:-10}
+# Loaded whole reads reached 16.28s (Case workspace lane, a loaded secondmate home,
+# 2026-10-17, before the 02:52Z reboot; reads after the reboot took 2.0 to 3.3s),
+# so this bound stays above normal latency and cuts only a hung command; it is
+# 20s under the 60s defaults of the callers that wait on this command
+# (fm_open_loops.py, fm-home-summary-refresh.sh). Reads run
+# FM_SNAPSHOT_LOCAL_READ_CONCURRENCY at a time, so more hung reads than that queue
+# another wave, and a shortened caller deadline can still end first.
+# measured: value=40 date=2026-10-17 host=Mac-Studio.local margin=2.46
+FM_SNAPSHOT_CREW_STATE_TIMEOUT=${FM_SNAPSHOT_CREW_STATE_TIMEOUT:-40}
 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=${FM_SNAPSHOT_LOCAL_READ_CONCURRENCY:-8}
 FM_SNAPSHOT_BUDGET=${FM_SNAPSHOT_BUDGET:-5}
 FM_SNAPSHOT_CACHE_DIR=${FM_SNAPSHOT_CACHE_DIR:-$STATE/secondmate-summary-cache}
@@ -275,7 +283,7 @@ home with neither a valid current ledger nor a valid current cached copy is
 reported unreadable with the reason; collection never computes a summary in
 that home.
 Each local per-task current-state read is bounded by FM_SNAPSHOT_CREW_STATE_TIMEOUT
-(default 10 seconds); a read that hits the bound reports state unknown. Local task
+(default 40 seconds); a read that hits the bound reports state unknown. Local task
 observations run concurrently, up to FM_SNAPSHOT_LOCAL_READ_CONCURRENCY (default 8).
 Remote secondmate endpoint liveness is not probed by this command.
 Terminal contradiction evidence uses

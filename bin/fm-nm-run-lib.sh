@@ -227,9 +227,11 @@ fm_nm_run_status_class() {  # <status_word>
 # Prints selected|id|status|candidate-ids, unknown|reason, absent (no row
 # for this branch), or unavailable (CLI has no overview table). Malformed or
 # structurally truncated tables report unknown, retaining every readable
-# same-branch candidate id.
+# same-branch candidate id. An unavailable reader still prints its unknown
+# verdict and returns the reader's own exit status, 124 when its bound cut it.
 fm_nm_select_run() {  # <branch> <axi-overview> <worktree> [timeout_secs]
   local selection inventory available_ids timeout_secs=${4:-10}
+  local reader_rc=0
   case "$timeout_secs" in ''|*[!0-9]*) timeout_secs=10 ;; esac
   selection=$(printf '%s\n' "$2" | awk -v branch="$1" '
     function scalar(s) {
@@ -304,7 +306,7 @@ fm_nm_select_run() {  # <branch> <axi-overview> <worktree> [timeout_secs]
     incomplete\|*) available_ids=${selection#*|} ;;
     *) printf '%s\n' "$selection"; return ;;
   esac
-  if ! inventory=$(fm_nm_bounded "$3" "$timeout_secs" python3 - "$1" "$2" "$available_ids" "$(fm_nm_state_db "$3")" 2>/dev/null <<'PY'
+  inventory=$(fm_nm_bounded "$3" "$timeout_secs" python3 - "$1" "$2" "$available_ids" "$(fm_nm_state_db "$3")" 2>/dev/null <<'PY'
 import json
 import os
 import re
@@ -349,9 +351,10 @@ try:
 except (ValueError, OSError, sqlite3.Error):
     print("unknown|complete same-branch run inventory unreadable; run ids: " + ", ".join(ids))
 PY
-  ); then
+  ) || reader_rc=$?
+  if [ "$reader_rc" -ne 0 ]; then
     printf 'unknown|complete same-branch run inventory reader unavailable; run ids: %s\n' "$available_ids"
-    return
+    return "$reader_rc"
   fi
   case "$inventory" in
     unknown\|*) selection=$inventory ;;
