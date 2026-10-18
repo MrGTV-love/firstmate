@@ -43,8 +43,10 @@
 # A run-attribution lookup cut by its own FM_CREW_STATE_NM_TIMEOUT (every lookup
 # has the full allowance) is never retried and ends the line with `run-store:
 # skipped (read budget exceeded)`. A cut first status read leaves the pane and
-# status-log fallback below to answer; a cut later read reports its unknown
-# run-step verdict.
+# status-log fallback below to answer. A cut overview, inventory, id-addressed
+# status or identity runs-list read reports an unknown run-step verdict. A cut
+# runs-list read after a bound run is skipped and the bare status answer stands;
+# a cut fallback runs-list leaves the pane and status-log fallback to answer.
 #
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
