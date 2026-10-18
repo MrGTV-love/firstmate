@@ -677,21 +677,23 @@ os.kill(int(victim_pid.read_text()), signal.SIGKILL)
 finish(waiter, waiter_release)
 
 # A bounded wait ends, says so, and runs the command. The waiter notice flags a holder whose pid is
-# gone, or whose process started after the epoch recorded when the slot was taken (a reused pid),
-# and calls a holder that started before that epoch alive.
+# gone, or whose process started more than 2 seconds after the epoch recorded when the slot was
+# taken (a reused pid), and calls a holder alive when ps rounds its start up to a second later.
 holder_code = (
     'import fcntl,json,os,subprocess,sys,time\n'
     'import importlib.util as u\n'
     's = u.spec_from_file_location("d", sys.argv[1]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
     'gone = subprocess.Popen(["true"]); gone.wait()\n'
-    'pid, since = {"gone": (gone.pid, int(time.time())), "reused": (os.getpid(), int(time.time()) - 3600), "live": (os.getpid(), int(time.time()))}[sys.argv[3]]\n'
+    'listed = subprocess.run(["ps", "-o", "lstart=", "-p", str(os.getpid())], capture_output=True, text=True, env=dict(os.environ, LC_ALL="C")).stdout\n'
+    'started = int(time.mktime(time.strptime(" ".join(listed.split()), "%a %b %d %H:%M:%S %Y")))\n'
+    'pid, since = {"gone": (gone.pid, int(time.time())), "reused": (os.getpid(), int(time.time()) - 3600), "live": (os.getpid(), int(time.time())), "later1": (os.getpid(), started - 1), "later3": (os.getpid(), started - 3)}[sys.argv[3]]\n'
     'directory = d.slot_directory(sys.argv[2])\n'
     'fd = os.open(directory / "slot-0.lock", os.O_RDWR | os.O_CREAT, 0o600)\n'
     'fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n'
     'os.write(fd, json.dumps(dict(pid=pid, since=since)).encode())\n'
     'print("held", flush=True)\n'
     'time.sleep(60)')
-for stale_case, flagged in (('gone', True), ('reused', True), ('live', False)):
+for stale_case, flagged in (('gone', True), ('reused', True), ('live', False), ('later1', False), ('later3', True)):
     stale_key = f'test.slot.stale-{stale_case}'
     stale_holder = subprocess.Popen([sys.executable, '-c', holder_code, str(helper), stale_key, stale_case], env=slot_env, stdout=subprocess.PIPE, text=True)
     assert stale_holder.stdout.readline() == 'held\n'
@@ -702,8 +704,33 @@ for stale_case, flagged in (('gone', True), ('reused', True), ('live', False)):
     assert bounded.returncode == 0 and bounded.stdout == 'ran anyway\n', (stale_case, bounded)
     assert ('does not match a live process' in bounded.stderr) == flagged, (stale_case, bounded.stderr)
     assert stale_case == 'gone' or f'pid={stale_holder.pid} ' in bounded.stderr, (stale_case, bounded.stderr)
-    assert stale_case != 'live' or f'pid={stale_holder.pid} alive' in bounded.stderr, (stale_case, bounded.stderr)
+    assert flagged or f'pid={stale_holder.pid} alive' in bounded.stderr, (stale_case, bounded.stderr)
     assert 'waited' in bounded.stderr and 'running it without a slot' in bounded.stderr, (stale_case, bounded.stderr)
+
+# A flock that fails for any reason but a held lock is an unusable slot: the command runs at once without
+# a slot and says so, and the holder probe lists no phantom holder.
+flock_driver = (
+    'import errno, sys\n'
+    'import importlib.util as u\n'
+    's = u.spec_from_file_location("d", sys.argv[1]); d = u.module_from_spec(s); s.loader.exec_module(d)\n'
+    'def refuse(*args):\n'
+    '    raise OSError(errno.ENOTSUP, "flock is not supported here")\n'
+    'd.fcntl.flock = refuse\n'
+    'if sys.argv[2] == "probe":\n'
+    '    import pathlib, tempfile\n'
+    '    try:\n'
+    '        print("listed", d.slot_holders(pathlib.Path(tempfile.mkdtemp()), 1))\n'
+    '    except OSError:\n'
+    '        print("raised")\n'
+    '    sys.exit(0)\n'
+    'sys.argv = ["fm-duration.py", "gate", "test.slot.flockfail", "--", "echo", "ran"]\n'
+    'sys.exit(d.main())')
+flock_started = time.monotonic()
+flock_failed = subprocess.run([sys.executable, '-c', flock_driver, str(helper), 'gate'], env=dict(slot_env, FM_TEST_SLOT_WAIT_SECONDS='30'), cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert flock_failed.returncode == 0 and flock_failed.stdout == 'ran\n' and 'running test.slot.flockfail without a slot' in flock_failed.stderr, flock_failed
+assert time.monotonic() - flock_started < 15, 'a flock that cannot work must not make the command wait for a slot'
+flock_probe = subprocess.run([sys.executable, '-c', flock_driver, str(helper), 'probe'], env=slot_env, cwd=workrepo, capture_output=True, text=True, timeout=60)
+assert flock_probe.stdout == 'raised\n', flock_probe
 
 # Taking a free slot runs no ps; a waiter's notice runs one ps call for each holder it names.
 ps_dir, ps_log = tmp / 'ps-stub', tmp / 'ps.calls'

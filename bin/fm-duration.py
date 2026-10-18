@@ -94,9 +94,11 @@ process alone and never inherited by COMMAND, so a test's own leftover daemon
 can never hold a slot for good. Each holder writes a record of its pid and
 the epoch at which it took the slot; taking a free slot runs no ps. A waiter's
 notice names the key it waits on and each holder, with one ps call per holder,
-and flags a record whose pid is gone or whose process started after the
-recorded epoch (the pid was reused), so a reused pid is never taken for the
-holder. A waiter prints
+and flags a record whose pid is gone or whose process started more than 2
+seconds after the recorded epoch (the pid was reused; ps start times have
+one-second resolution, hence the slack), so a reused pid is never taken for the
+holder. Only a held lock reads as a busy slot: a flock that fails any other way
+runs the command without a slot, like any unusable slot file. A waiter prints
 its first notice after 2 seconds and another every 60, waits at most
 FM_TEST_SLOT_WAIT_SECONDS (default 7200, the longest fm-teardown run measured in
 the last 24 hours was 6884), and then runs without a slot and says so: the gate
@@ -554,6 +556,7 @@ SLOT_MAX = 16
 SLOT_WAIT_DEFAULT_SECONDS = 7200
 SLOT_FIRST_NOTICE = 2.0
 SLOT_NOTICE_EVERY = 60.0
+SLOT_START_SLACK = 2  # ps start times have one-second resolution
 SLOT_HELD_ENV = 'FM_TEST_SLOT_HELD'
 
 
@@ -607,7 +610,7 @@ def slot_holders(directory, limit):
         try:
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError:
+            except BlockingIOError:
                 try:
                     record = json.loads(path.read_text() or '{}')
                 except (OSError, ValueError):
@@ -631,7 +634,7 @@ def holder_is_stale(pid, since):
         started = time.mktime(time.strptime(' '.join(result.stdout.split()), '%a %b %d %H:%M:%S %Y'))
     except ValueError:
         return False
-    return started > since
+    return started > since + SLOT_START_SLACK
 
 
 def describe_holder(record):
@@ -677,8 +680,10 @@ def queue_for_slot(key, directory, limit, wait, log_fd):
             fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
             try:
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            except OSError:
+            except OSError as error:
                 os.close(fd)
+                if not isinstance(error, BlockingIOError):
+                    raise
                 continue
             try:
                 record = dict(pid=os.getpid(), since=int(time.time()))
