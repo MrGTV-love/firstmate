@@ -70,12 +70,14 @@ work. Completion of the command's leader, a forwarded signal, or one of those
 two extremes ends the run; descendants that outlive the leader and still hold
 its output streams are neither awaited nor counted as live work.
 An expiry or the first forwarded signal sends SIGTERM to the process group and
-then waits for the leader to exit, with no guessed grace number. SIGKILL goes
-to the group only when the leader has exited and group members remain, on a
-second forwarded signal, or after a further minute passes with the leader still
-alive, so a leader's own TERM cleanup always gets to run. A true no-progress or
-absolute stop still records a timed-out sample, so repeated stops file the same
-repair work as any other real limit.
+then waits for the leader to exit, with no guessed grace number, so a leader's
+own TERM cleanup runs for as long as it keeps making progress. SIGKILL goes to
+the group only when the leader has exited and group members remain, on a second
+forwarded signal, when the cleanup shows no output and no process-tree CPU
+progress for the same no-progress interval (counted from the stop, or from the
+cleanup's last progress), or when the cleanup itself has run for the same
+absolute limit. A true no-progress or absolute stop still records a timed-out
+sample, so repeated stops file the same repair work as any other real limit.
 run exports FM_DURATION_MANAGED_KEY so a self-instrumented command with the same
 key leaves its one complete wall-time sample to the outer runner.
 It also exports a task-local FM_DURATION_CALIBRATION_FILE: self-instrumented
@@ -177,7 +179,6 @@ COMPACT_AT = 200  # sample-count policy: host/key sample rows that trigger compa
 # only extreme that stops a command. Both have environment overrides for tests.
 NO_PROGRESS_LIMIT = 900
 ABSOLUTE_LIMIT = 6 * 3600
-STOP_KILL_AFTER = 60  # a leader ignoring TERM is KILLed this long after the stop begins
 PROGRESS_REPORT_AFTER = 60  # seconds between progress heartbeat lines, not a deadline
 EVENTS = ('timeout', 'filed')
 LOCAL_NOTED = []
@@ -865,7 +866,10 @@ def run(key, command, calibration_file):
                     scalar('progress', f'{key} elapsed={elapsed:.1f}s output_bytes={output_bytes} tree_cpu={cpu:.2f}s', sys.stderr)
                     next_progress_report = now + PROGRESS_REPORT_AFTER
                 previous_cpu, previous_bytes = max(previous_cpu, cpu), output_bytes
-            if not stopping_since and child.poll() is None:
+            if child.poll() is None and stopping_since:
+                if now - stopping_since[0] >= absolute or now - max(last_progress, stopping_since[0]) >= no_progress:
+                    signal_group(child, signal.SIGKILL)  # the cleanup stalled or outlived the absolute limit
+            elif child.poll() is None:
                 idle = now - last_progress
                 if now - started >= absolute:
                     expired = True
@@ -878,8 +882,6 @@ def run(key, command, calibration_file):
                 elif advisory and elapsed >= advisory and not slower_reported:
                     slower_reported = True
                     scalar('slower_than_usual', f'{key} elapsed={elapsed:.1f}s measured_ceiling={advisory}s; still making progress, so this is reported and not stopped', sys.stderr)
-            elif stopping_since and child.poll() is None and now - stopping_since[0] >= STOP_KILL_AFTER:
-                signal_group(child, signal.SIGKILL)  # the leader ignored TERM
         if stopping_since:
             signal_group(child, signal.SIGKILL)  # the leader is gone; sweep any remaining group members
         # The leader's exit is the result. Relay the output buffered by then,

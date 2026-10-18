@@ -176,6 +176,90 @@ absolute = override_run('absolute', ['bash', '-c', 'while true; do echo tick; do
 assert absolute.returncode == 124 and 'absolute_limit' in absolute.stderr, (absolute.returncode, absolute.stderr)
 assert any(r.get('event') == 'timeout' and r['key'] == 'absolute' for r in rows())
 
+# A stop never starts a fixed kill clock. The cleanup a stop asks for runs for as
+# long as it keeps making progress, however long that is; it is killed only when
+# it goes silent for the no-progress interval or has run for the absolute limit.
+# These cases run the helper under a clock that runs 30 times fast, so a cleanup
+# of 90 scaled seconds, longer than any minute-scale kill clock, takes 3 real ones.
+scaled_clock = tmp / 'scaled-clock-run.py'
+scaled_clock.write_text("""import importlib.util, sys, time
+real = time.monotonic
+time.monotonic = lambda: real() * 30
+spec = importlib.util.spec_from_file_location('fm_duration', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+sys.modules['fm_duration'] = module
+spec.loader.exec_module(module)
+sys.argv = sys.argv[1:]
+sys.exit(module.main())
+""")
+
+
+def wait_for(path):
+    deadline = time.monotonic() + 60
+    while not path.exists():
+        assert time.monotonic() < deadline, f'{path} never appeared'
+        time.sleep(0.05)
+
+
+productive_cleanup = """import pathlib, signal, sys, time
+ready, done = map(pathlib.Path, sys.argv[1:3])
+def cleanup(signum, frame):
+    for _ in range(12):
+        print('cleaning', flush=True)
+        time.sleep(0.25)
+    done.touch()
+    sys.exit(0)
+signal.signal(signal.SIGTERM, cleanup)
+ready.touch()
+while True:
+    print('working', flush=True)
+    time.sleep(0.2)
+"""
+ready, done = tmp / 'productive.ready', tmp / 'productive.done'
+job = subprocess.Popen([sys.executable, str(scaled_clock), str(helper), 'run', 'cleanup.productive', '--', sys.executable, '-c', productive_cleanup, str(ready), str(done)],
+                       env=env, cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+wait_for(ready)
+job.terminate()
+out, err = job.communicate(timeout=120)
+assert job.returncode == 143 and done.exists() and out.count('cleaning') == 12, (job.returncode, done.exists(), out, err)
+
+silent_cleanup = """import pathlib, signal, sys, time
+ready, started = map(pathlib.Path, sys.argv[1:3])
+def cleanup(signum, frame):
+    started.touch()
+    time.sleep(60)
+signal.signal(signal.SIGTERM, cleanup)
+ready.touch()
+while True:
+    print('working', flush=True)
+    time.sleep(0.2)
+"""
+ready, started = tmp / 'silent.ready', tmp / 'silent.started'
+job = subprocess.Popen([sys.executable, str(helper), 'run', 'cleanup.silent', '--', sys.executable, '-c', silent_cleanup, str(ready), str(started)],
+                       env=dict(env, FM_DURATION_NO_PROGRESS_SECS='3'), cwd=workrepo, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+wait_for(ready)
+job.terminate()
+signalled = time.monotonic()
+job.communicate(timeout=120)
+waited = time.monotonic() - signalled
+assert job.returncode == 143 and started.exists(), (job.returncode, started.exists())
+assert 2.5 <= waited < 30, f'a cleanup silent for the no-progress interval must be killed after it, not at once or never: {waited:.1f}s'
+
+ignores_term = 'import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\ntime.sleep(60)'
+begun = time.monotonic()
+stuck = override_run('cleanup.ignored', [sys.executable, '-c', ignores_term], FM_DURATION_NO_PROGRESS_SECS='2')
+waited = time.monotonic() - begun
+assert stuck.returncode == 124 and 'no_progress' in stuck.stderr, (stuck.returncode, stuck.stderr)
+assert 3.5 <= waited < 30, f'a leader silent through its own no-progress stop gets one more interval before the kill: {waited:.1f}s'
+assert any(r.get('event') == 'timeout' and r['key'] == 'cleanup.ignored' for r in rows())
+
+ignores_term_loud = 'import signal, time\nsignal.signal(signal.SIGTERM, signal.SIG_IGN)\nwhile True:\n    print("tick", flush=True)\n    time.sleep(0.2)'
+begun = time.monotonic()
+loud = override_run('cleanup.loud', [sys.executable, '-c', ignores_term_loud], FM_DURATION_ABSOLUTE_SECS='3')
+waited = time.monotonic() - begun
+assert loud.returncode == 124 and 'absolute_limit' in loud.stderr, (loud.returncode, loud.stderr)
+assert 5 <= waited < 30, f'output-producing cleanup is killed once it has run for the absolute limit: {waited:.1f}s'
+
 # The leader's exit is the result even while a descendant still holds its
 # streams: no wait for the descendant and no false stop.
 write_rows([sample('orphan', 20000) for _ in range(5)])
