@@ -125,9 +125,9 @@
 # only: a relaunch never runs it. The check reads every line from that title to
 # the "## How You're Graded" line whatever heading levels sit between, and
 # matches a placeholder only where the scaffold puts it (a line holding the
-# token alone, or the end of the "Capability in plain words:" line). A
-# "DoD file: <absolute path>" line inside that same span, naming an existing
-# file that passes the same placeholder check, is the one narrow escape; the
+# token alone, or the end of the "Capability in plain words:" line). An
+# unfenced "DoD file: <absolute path>" line inside that same span, naming an
+# existing file that passes the same placeholder check, is the one narrow escape; the
 # line anywhere else in the brief is ignored. A secondmate charter never reaches
 # the check because it carries no such sections. A brief with no such section at
 # all (scaffolded before it existed) is not refused: a fresh spawn warns once and
@@ -295,7 +295,7 @@ fm_task_dod_block() {
 ## Definition Of Done (task)
 These are the criteria this task is graded against.
 Firstmate fills each placeholder from the Captain's intent above, as observable outcomes with exact literals copied from their sources.
-If the criteria live in a finished file instead, a line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
+If the criteria live in a finished file instead, an unfenced line `DoD file: <absolute path>` inside this section points to it; a fresh spawn checks that file once, and you read it before you start.
 
 Capability in plain words: {DOD_CAPABILITY}
 
@@ -353,7 +353,10 @@ fm_brief_task_dod_problem() {  # <brief>
   [ -f "$brief" ] || return 1
   fm_brief_heading_present "$brief" "$FM_TASK_DOD_SECTION_TITLE" || return 1
   span=$(fm_brief_heading_span "$brief" "$FM_TASK_DOD_SECTION_TITLE" "$FM_TASK_DOD_GRADED_TITLE")
-  dod_file=$(printf '%s\n' "$span" | sed -n 's/^DoD file: \(\/.*\)$/\1/p' | head -n 1)
+  # Keep examples in span for criteria checks, but never activate a fenced
+  # DoD-file directive. The heading reader owns the fence boundaries.
+  dod_file=$(fm_brief_heading_parse "$brief" "$FM_TASK_DOD_SECTION_TITLE" unfenced-body "$FM_TASK_DOD_GRADED_TITLE" \
+    | sed -n 's/^DoD file: \(\/.*\)$/\1/p' | head -n 1)
   if [ -n "$dod_file" ]; then
     if [ ! -f "$dod_file" ] || [ ! -r "$dod_file" ]; then
       printf 'DoD file %s is not a readable file\n' "$dod_file"

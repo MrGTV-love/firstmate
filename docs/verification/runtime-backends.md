@@ -3790,9 +3790,11 @@ Billing-route regression map for the approved bounded scope:
 | Default/vision/tiny roles and fallback keys/targets, with default, directory-override, and named-profile configurations | `tests/fm-bootstrap.test.sh`: `test_omp_api_billing_config_diagnostics` | Lowercase, mixed-case, and uppercase API providers reported locally without model calls, secrets, or config writes; subscription routes remain unflagged |
 | Doctor role and fallback inspection | `tests/fm-remote-doctor.test.sh`: billing diagnostic scenario | Mixed-case API providers produce an actionable gap without exposing secrets or modifying configuration |
 
-This map covers the refused routes and diagnostics exercised by the named regressions, not every API-billed selector representation.
-R7 padded-selector normalization and R8 comma-separated role diagnostics are excluded from this change and deferred to `fm-omp-billing-selector-followup`.
-The pipeline PR body must carry this bounded scope, both exclusions, and the route-to-named-regression mapping above.
+Padded-selector normalization and comma-separated ordered role diagnostics are additionally covered by `tests/fm-api-key-guard-lib.test.sh`.
+Verified 2026-10-18 on macOS arm64 with Bash 3.2.57 and Ruby 2.6.10 using `nice -n 20 bash tests/fm-api-key-guard-lib.test.sh`: `all fm-api-key-guard-lib tests passed`.
+`test_padded_api_selectors_are_refused` checks selector/provider whitespace and subscription admission; `test_padded_config_selectors_are_diagnosed` checks padded roles and fallback keys/targets; `test_ordered_role_patterns_are_all_diagnosed` checks API routes after subscription patterns in default, vision, and tiny roles.
+The diagnostic regressions also prove unchanged configuration and redacted model/credential sentinels, without invoking omp or a provider.
+This map covers only the selector representations exercised by the named regressions; it does not claim a live exhausted-account fallback or an authenticated model response.
 
 ### Process identity and markers
 
