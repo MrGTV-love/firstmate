@@ -201,10 +201,12 @@ if [ "$BACKEND" = herdr ] && [ "${2:-off}" = on ]; then
 fi
 
 # Each fake poll adds FM_TEST_TICK_SECONDS to the shell clock, so a run can reach
-# a wall-clock bound without waiting for it.
+# a wall-clock bound without waiting for it. The clock holds still until the fake
+# get has started (FM_TEST_TICK_GATE exists), so a slow host cannot spend the
+# no-progress allowance before the get under test has begun.
 cat > "$TMP_ROOT/clock.sh" <<'SH'
 sleep() {
-  if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_TICK_SECONDS:-}" ]; then
+  if [ "${1:-}" = 1 ] && [ -n "${FM_TEST_TICK_SECONDS:-}" ] && [ -e "${FM_TEST_TICK_GATE:-/}" ]; then
     SECONDS=$((SECONDS + FM_TEST_TICK_SECONDS))
   fi
   command sleep "$@"
@@ -245,7 +247,7 @@ for MODE in success slow spawning foreign dirty late laterexit earlyexit clock g
     "$GET_MODE" "$LEASE" "$PIDFILE" "$ALLOW" "$ARRIVED" "$DEST" "$TICKS" > "$TMP_ROOT/get-config"
   fm_test_spawn_brief "$FM_HOME" "$ID" 'Refused acquisition must release its process lease.'
   out=$(FM_ROOT_OVERRIDE='' FM_SPAWN_NO_GUARD=1 CLAUDE_CONFIG_DIR="$CASE/claude" PATH="$FAKEBIN:$PATH" \
-    FM_TEST_TICK_FILE="$TICKS" FM_TEST_TICK_SECONDS="$TICK_SECONDS" FM_TEST_TTY_STALL="$TTY_STALL" BASH_ENV="$TMP_ROOT/clock.sh" \
+    FM_TEST_TICK_FILE="$TICKS" FM_TEST_TICK_SECONDS="$TICK_SECONDS" FM_TEST_TICK_GATE="$PIDFILE" FM_TEST_TTY_STALL="$TTY_STALL" BASH_ENV="$TMP_ROOT/clock.sh" \
     bash "$ROOT/bin/fm-spawn.sh" "$ID" "$PROJECT" --backend "$BACKEND" --harness "$HARNESS" --allow-api-key --mode no-mistakes --yolo off 2>&1)
   rc=$?
   if [ "$MODE" = late ]; then
