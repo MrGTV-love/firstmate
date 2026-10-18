@@ -260,6 +260,43 @@ waited = time.monotonic() - begun
 assert loud.returncode == 124 and 'absolute_limit' in loud.stderr, (loud.returncode, loud.stderr)
 assert 5 <= waited < 30, f'output-producing cleanup is killed once it has run for the absolute limit: {waited:.1f}s'
 
+# Darwin answers a repeated killpg on a group that is still exiting with EPERM.
+# The stall kill is therefore sent once and then awaited. This stub holds the
+# first SIGKILL back for 2.5 seconds and answers every SIGKILL sent before it
+# lands with EPERM, as a loaded Mac does while the group exits.
+eperm_clock = tmp / 'eperm-killpg-run.py'
+eperm_clock.write_text("""import importlib.util, os, signal, sys, threading
+real_killpg = os.killpg
+lock = threading.Lock()
+state = {'held': False, 'landed': False}
+def land(pgid):
+    real_killpg(pgid, signal.SIGKILL)
+    with lock:
+        state['landed'] = True
+def killpg(pgid, sig):
+    if sig == signal.SIGKILL:
+        with lock:
+            if state['landed']:
+                return real_killpg(pgid, sig)
+            if state['held']:
+                raise PermissionError(1, 'Operation not permitted')
+            state['held'] = True
+        threading.Timer(2.5, land, (pgid,)).start()
+        return None
+    return real_killpg(pgid, sig)
+os.killpg = killpg
+spec = importlib.util.spec_from_file_location('fm_duration', sys.argv[1])
+module = importlib.util.module_from_spec(spec)
+sys.modules['fm_duration'] = module
+spec.loader.exec_module(module)
+sys.argv = sys.argv[1:]
+sys.exit(module.main())
+""")
+exiting = subprocess.run([sys.executable, str(eperm_clock), str(helper), 'run', 'cleanup.exiting', '--', sys.executable, '-c', ignores_term],
+                         env=dict(env, FM_DURATION_NO_PROGRESS_SECS='1'), cwd=workrepo, capture_output=True, text=True)
+assert exiting.returncode == 124 and 'Operation not permitted' not in exiting.stdout + exiting.stderr, (exiting.returncode, exiting.stdout, exiting.stderr)
+assert any(r.get('event') == 'timeout' and r['key'] == 'cleanup.exiting' for r in rows())
+
 # The leader's exit is the result even while a descendant still holds its
 # streams: no wait for the descendant and no false stop.
 write_rows([sample('orphan', 20000) for _ in range(5)])

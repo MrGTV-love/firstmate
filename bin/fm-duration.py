@@ -845,6 +845,7 @@ def run(key, command, calibration_file):
     last_progress = started
     next_progress_report = started
     slower_reported = False
+    killed = False
     try:
         while child.poll() is None:
             if not streams.get_map():
@@ -867,7 +868,8 @@ def run(key, command, calibration_file):
                     next_progress_report = now + PROGRESS_REPORT_AFTER
                 previous_cpu, previous_bytes = max(previous_cpu, cpu), output_bytes
             if child.poll() is None and stopping_since:
-                if now - stopping_since[0] >= absolute or now - max(last_progress, stopping_since[0]) >= no_progress:
+                if not killed and (now - stopping_since[0] >= absolute or now - max(last_progress, stopping_since[0]) >= no_progress):
+                    killed = True  # once: a repeat on a group that is still exiting is EPERM on Darwin
                     signal_group(child, signal.SIGKILL)  # the cleanup stalled or outlived the absolute limit
             elif child.poll() is None:
                 idle = now - last_progress
