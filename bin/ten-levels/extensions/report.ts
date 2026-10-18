@@ -103,9 +103,10 @@ export interface GuardTerminal {
   attempts?: number | null;
   ms?: number | null;
   result?: SystemOneResult;
-  /** Set only when an oversized payload was screened in pieces: the piece count and every answered piece. */
+  /** Planned pieces, every answered piece, and minimized timing for every unanswered piece. */
   chunks?: number;
   results?: SystemOneResult[];
+  failures?: { chunk: number; error_type: GuardFailureType; request_started: boolean; attempts: number | null; ms: number | null }[];
 }
 
 export interface GuardService {
@@ -262,8 +263,25 @@ export function createGuardService(context: GuardServiceContext): GuardService {
     },
     record(terminal) {
       const result = terminal.result;
-      // Every answered piece counts toward the totals; a failed piece adds its own tries and time.
       const answered = terminal.results ?? (result ? [result] : []);
+      // Settlement keeps all unanswered pieces, even when a policy block wins over an outage.
+      // Before planning/settlement, a handler failure can still carry its single timing here.
+      const failures = terminal.failures ?? (terminal.error_type ? [{ chunk: 1, error_type: terminal.error_type,
+        request_started: terminal.request_started && !result, attempts: terminal.attempts ?? null, ms: terminal.ms ?? null }] : []);
+      const sentFailures = failures.filter((failure) => failure.request_started);
+      const chunks = answered.length + sentFailures.length;
+      const requestStarted = chunks > 0;
+      const plannedChunks = terminal.chunks ?? (requestStarted ? 1 : 0);
+      const attempts = [...answered.map((r) => r.meta.attempts), ...sentFailures.flatMap((failure) => failure.attempts ?? [])];
+      const times = [...answered.map((r) => r.meta.elapsedMs), ...sentFailures.flatMap((failure) => failure.ms ?? [])];
+      const knownCost = totalCost(answered);
+      const incomplete = requestStarted && (answered.length < plannedChunks || attempts.some((count) => count > 1) || knownCost.source !== "reported");
+      const cost = {
+        ...(incomplete ? { amount: null, source: "unknown" } : requestStarted ? knownCost : { amount: null, source: "not_called" }),
+        incomplete,
+        // Keep the known subtotal without presenting it as the charge for the whole payload.
+        reported_amount: sum(answered.flatMap((r) => r.meta.cost.source === "reported" && r.meta.cost.amount !== null ? [r.meta.cost.amount] : [])),
+      };
       // Question IDs and answer fields are allowlisted; provider extensions can contain input text.
       const answers: Record<string, { type: "noul"; noul: number } | { type: "choice"; choice: string; confidence: number }> = {};
       if (result) {
@@ -277,16 +295,17 @@ export function createGuardService(context: GuardServiceContext): GuardService {
         kind: "terminal", at: Date.now(), task: context.task, policy_version: GUARD_POLICY_VERSION, outage_policy: OUTAGE_POLICY,
         thresholds: { bash: BASH_THRESHOLDS, write: WRITE_THRESHOLDS, injection: SCREEN_THRESHOLDS },
         hook: terminal.hook, tool: terminal.tool, decision: terminal.decision, enforcement: terminal.enforcement, branch: terminal.branch,
-        error_type: terminal.error_type, request_started: terminal.request_started,
+        error_type: terminal.error_type, request_started: requestStarted,
         ...((terminal.tool === "write" || terminal.tool === "edit") && terminal.enforcement === "pretool_deny"
           && terminal.refused_path !== undefined ? { refused_path: terminal.refused_path } : {}),
-        provider: result?.meta.provider ?? (terminal.request_started ? "typesafe" : null),
-        requested_model: terminal.request_started ? GUARD_MODEL : null, model: result?.model ?? null,
-        attempts: answered.length > 0 || terminal.attempts != null ? sum(answered.map((r) => r.meta.attempts)) + (terminal.attempts ?? 0) : null,
-        ms: answered.length > 0 || terminal.ms != null ? Math.max(terminal.ms ?? 0, ...answered.map((r) => r.meta.elapsedMs)) : null,
+        provider: result?.meta.provider ?? (requestStarted ? "typesafe" : null),
+        requested_model: requestStarted ? GUARD_MODEL : null, model: result?.model ?? null,
+        attempts: attempts.length > 0 ? sum(attempts) : null,
+        ms: times.length > 0 ? Math.max(...times) : null,
+        failures,
         usage: answered.length > 0 ? { input_tokens: sum(answered.map((r) => r.usage.input_tokens)), output_tokens: sum(answered.map((r) => r.usage.output_tokens)) } : null,
-        cost: answered.length > 1 ? totalCost(answered) : result?.meta.cost ?? { amount: null, source: terminal.request_started ? "unknown" : "not_called" },
-        chunks: terminal.chunks ?? (terminal.request_started ? 1 : 0), answers,
+        cost,
+        chunks, planned_chunks: plannedChunks, answers,
       };
       try {
         appendFileSync(ledger, JSON.stringify(row) + "\n", { mode: 0o600 });

@@ -228,6 +228,43 @@ case_live_run_is_read_fresh_every_time() {  # <crew-state script> <name>
   pass "$2: a live run gets a fresh read on every call"
 }
 
+# The same CI run changes from live green to live pending, then ends red.
+# These reads exercise nm_ci_checks_state through the actual crew-state caller.
+case_ci_logs_follow_live_and_terminal_state() {  # <crew-state script> <name>
+  local d out first
+  d=$(new_case "$2")
+  age_status_log "$d"
+  # Never let the fixture reach the user's forge tools.
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$d/fakebin/gh"
+  printf '#!/usr/bin/env bash\nprintf "pull_request:\\n  number: 1\\n  state: open\\n"\n' > "$d/fakebin/gh-axi"
+  chmod +x "$d/fakebin/gh" "$d/fakebin/gh-axi"
+  printf 'pr=https://github.com/fixture/repo/pull/1\n' >> "$d/state/cached.meta"
+  serve_run "$d" 01CI ci
+  printf 'all CI checks passed - still monitoring until merged or closed\n' > "$d/nmfake/ci-logs"
+  out=$(FM_CREW_STATE_NO_FORGE=0 read_state "$d" "$1")
+  assert_contains "$out" 'state: done' 'live green CI is ready'
+  printf 'CI checks running\n' >> "$d/nmfake/ci-logs"
+  out=$(FM_CREW_STATE_NO_FORGE=0 read_state "$d" "$1")
+  assert_contains "$out" 'state: working' 'the next live read sees pending checks, not cached green'
+  first=$(grep -c '^axi logs --step ci --run 01CI --full$' "$d/nmfake/calls.log")
+  assert_equals 2 "$first" 'each live CI read fetches the log'
+
+  # The terminal read must not inherit the earlier live green log.
+  serve_run "$d" 01CI failed failed
+  printf '  steps[2]{step,status,findings,duration_ms}:\n    review,completed,0,0\n    ci,failed,0,0\n' >> "$d/nmfake/status"
+  cp "$d/nmfake/status" "$d/nmfake/run-01CI"
+  printf 'checks failed\n' > "$d/nmfake/ci-logs"
+  out=$(FM_CREW_STATE_NO_FORGE=0 read_state "$d" "$1")
+  assert_contains "$out" 'state: failed' 'a terminal red log cannot reuse stale live green'
+  assert_equals 3 "$(grep -c '^axi logs --step ci --run 01CI --full$' "$d/nmfake/calls.log")" 'the terminal log is fetched once'
+  # A finished log is immutable; changing the fake proves the next read is a hit.
+  printf 'all CI checks passed - still monitoring until merged or closed\n' > "$d/nmfake/ci-logs"
+  out=$(FM_CREW_STATE_NO_FORGE=0 read_state "$d" "$1")
+  assert_contains "$out" 'state: failed' 'the terminal read reuses its final red log'
+  assert_equals 3 "$(grep -c '^axi logs --step ci --run 01CI --full$' "$d/nmfake/calls.log")" 'the terminal CI log is not fetched again'
+  pass "$2: caller-path live CI logs stay fresh and the final terminal log is cached"
+}
+
 case_failure_is_read_fresh_every_time() {  # <crew-state script> <name>
   local d first out1 out2 out3 rc
   d=$(new_case "$2")
@@ -488,6 +525,7 @@ main() {
     case_finished_run_is_kept_until_the_id_changes \
     case_finished_run_needs_the_database \
     case_live_run_is_read_fresh_every_time \
+    case_ci_logs_follow_live_and_terminal_state \
     case_failure_is_read_fresh_every_time \
     case_unknown_inventory_is_read_fresh_every_time; do
     "$fn" "$CREW_STATE" "$fn"
@@ -501,6 +539,8 @@ main() {
   expect_mutant_caught finished-needs-no-database case_finished_run_needs_the_database 'fm_nmc_fin_valid() { return 0; }'
   expect_mutant_caught live-run-kept case_live_run_is_read_fresh_every_time 'fm_nmc_classify() { FM_NMC_FIN=01RUN; return 0; }'
   expect_mutant_caught failure-kept case_failure_is_read_fresh_every_time 'fm_nmc_classify() { FM_NMC_FIN=01RUN; return 0; }'
+  expect_mutant_caught live-ci-log-kept case_ci_logs_follow_live_and_terminal_state 'fm_nmc_classify() { [ "$1" = logs ] || return 1; FM_NMC_FIN=01CI; return 0; }'
+  expect_mutant_caught terminal-ci-log-not-kept case_ci_logs_follow_live_and_terminal_state 'fm_nmc_classify() { return 1; }'
 }
 
 main
