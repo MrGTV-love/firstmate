@@ -40,8 +40,8 @@
 #
 # fm_project_lock_release <project-lock>
 # Appends "start=<epoch> end=<epoch> seconds=<n> pid=<pid> operation=<label>"
-# to <project-lock>.holds before releasing, so later allowance derivations can
-# use production hold observations.
+# to <project-lock>.holds before releasing, so production hold durations stay
+# observable; the idle allowance below is not derived from them.
 #
 # The default service allowance is 600 seconds without observed progress, not
 # a deadline on one hold. The historical 490-second hold-age bound below

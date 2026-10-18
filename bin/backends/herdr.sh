@@ -3096,9 +3096,10 @@ fm_backend_herdr_current_path() {  # <target>
 # fm_backend_herdr_foreground_args: the command line of every foreground
 # process of <target>'s pane, one per line, from `pane process-info`, or nothing
 # on any error or when the response describes a different pane. fm-spawn.sh's
-# `treehouse get` wait reads it to tell a get that is still running from a pane
-# that is back at a shell prompt; the response shape is the one
-# fm_backend_herdr_pane_process_state_sample parses.
+# `treehouse get` wait reads it only for its once-a-minute waiting line, to
+# tell a get that is still running from a pane that is back at a shell prompt;
+# path and output progress, not this read, decide when the wait ends. The
+# response shape is the one fm_backend_herdr_pane_process_state_sample parses.
 fm_backend_herdr_foreground_args() {  # <target>
   local info
   fm_backend_herdr_target_ready "$1" || return 0
