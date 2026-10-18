@@ -274,8 +274,8 @@ export function createGuardService(context: GuardServiceContext): GuardService {
       const plannedChunks = terminal.chunks ?? (requestStarted ? 1 : 0);
       const attempts = [...answered.map((r) => r.meta.attempts), ...sentFailures.flatMap((failure) => failure.attempts ?? [])];
       const times = [...answered.map((r) => r.meta.elapsedMs), ...sentFailures.flatMap((failure) => failure.ms ?? [])];
-      const knownCost = totalCost(answered);
-      const incomplete = requestStarted && (answered.length < plannedChunks || knownCost.source !== "reported");
+      const knownCost = answered.length === 1 ? answered[0].meta.cost : totalCost(answered);
+      const incomplete = requestStarted && answered.length < plannedChunks;
       const cost = {
         ...(incomplete ? { amount: null, source: "unknown" } : requestStarted ? knownCost : { amount: null, source: "not_called" }),
         incomplete,

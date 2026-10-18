@@ -38,6 +38,30 @@ async function run(values, tool = 'result') {
   return row();
 }
 const failed = (attempts, ms) => new report.GuardUnavailableError('TimeoutError', true, undefined, { attempts, elapsedMs: ms });
+await test('result: a fully answered estimated piece keeps its amount and source', async () => {
+  const estimated = answer();
+  estimated.meta.cost = { amount: 0.001, source: 'estimated' };
+  const r = await run([estimated]);
+  assert.equal(r.cost.amount, 0.001, 'an estimated charge must not be hidden');
+  assert.equal(r.cost.source, 'estimated');
+  assert.equal(r.cost.incomplete, false, 'a fully answered piece is not partial');
+});
+await test('result: a fully answered reported piece keeps its amount and source', async () => {
+  const r = await run([answer()]);
+  assert.equal(r.cost.amount, 0.001);
+  assert.equal(r.cost.source, 'reported');
+  assert.equal(r.cost.incomplete, false);
+  assert.equal(r.cost.reported_amount, 0.001);
+});
+await test('result: an answered piece with an unsent planned piece stays incomplete', async () => {
+  const r = await run([answer(), new report.GuardUnavailableError('CredentialUnavailableError')]);
+  assert.equal(r.planned_chunks, 2);
+  assert.equal(r.chunks, 1);
+  assert.equal(r.cost.amount, null);
+  assert.equal(r.cost.source, 'unknown');
+  assert.equal(r.cost.incomplete, true);
+  assert.equal(r.cost.reported_amount, 0.001, 'the partial reported charge stays visible');
+});
 for (const tool of ['result', 'write']) {
   await test(`${tool}: every failed chunk survives settlement`, async () => {
   const r = await run([answer(), failed(2, 40), failed(3, 90)], tool);
