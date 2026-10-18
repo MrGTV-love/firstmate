@@ -1782,7 +1782,8 @@ It caches each size by copy path and mtime and measures it again after `cache-ma
 While the 1-minute load average is above `load-limit`, or cannot be read, it runs no `du`: the listing, the classes and `--apply` still run, and only fresh cached sizes are used.
 A report or `--apply` run prints one line, `scan skipped: load N above limit M`, or `scan skipped: load cannot be read, limit M` when the load is unreadable.
 `--apply` and `check` also record it, and `check` stays quiet.
-`--apply` and `check` raise one wake once every run for 6 hours has skipped.
+`--apply` and `check` raise one wake once 6 runs in a row have skipped.
+The hourly `--apply` and the `check` that `interval` gates each run about once per `interval`, so 6 runs are about 6 hours at the default.
 When a budget goes over, the run raises exactly one wake, naming each budget that just went over, its total, and its five largest copies with their class.
 It raises no second wake while the same budget stays over, and a budget that drops under and goes over again wakes again.
 A scan that `check` had to cut short counts only what it measured, so an unmeasured copy can delay a wake and never cause one.

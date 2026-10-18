@@ -380,30 +380,33 @@ test_load_guard_skips_only_the_sizing_and_says_so() {
   pass "a load above the limit skips only the sizing, says so in the report and the record, and listing, classes and apply still run"
 }
 
-test_six_hours_of_skipped_runs_wake_once() {
-  local t0=100000
+test_six_skipped_runs_in_a_row_wake_once() {
+  local n
   make_world skipwake
   add_copy a
   printf 'load-limit 40\ninterval 0\n' > "$HOMED/config/copy-budget"
-  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$t0 run_sweep check
+  FAKE_LOAD=99 run_sweep check
   [ -z "$OUT" ] || fail "the first skipped run woke: $OUT"
   assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "scan skipped: load 99 above limit 40" "the record does not hold the skip line"
-  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 5 * 3600 + 3599)) run_sweep check
-  [ -z "$OUT" ] || fail "a streak shorter than 6 hours woke: $OUT"
-  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 6 * 3600)) run_sweep check
-  [ "$(printf '%s\n' "$OUT" | grep -c '^copy-sweep:')" = 1 ] || fail "6 hours of skips should raise exactly one wake: $OUT"
-  assert_contains "$OUT" "scan skipped: load 99 above limit 40 on every run for 6 hours" "the wake did not name the skip and its length"
-  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 7 * 3600)) run_sweep check
+  for n in 2 3 4 5; do
+    FAKE_LOAD=99 run_sweep check
+    [ -z "$OUT" ] || fail "skipped run $n of a streak woke: $OUT"
+  done
+  FAKE_LOAD=99 run_sweep check
+  [ "$(printf '%s\n' "$OUT" | grep -c '^copy-sweep:')" = 1 ] || fail "6 skipped runs in a row should raise exactly one wake: $OUT"
+  assert_contains "$OUT" "scan skipped: load 99 above limit 40 on 6 runs in a row" "the wake did not name the skip and its length"
+  FAKE_LOAD=99 run_sweep check
   [ -z "$OUT" ] || fail "the same streak woke twice: $OUT"
-  FAKE_LOAD=1 FM_COPY_SWEEP_NOW=$((t0 + 8 * 3600)) run_sweep check
+  FAKE_LOAD=1 run_sweep check
   [ -z "$OUT" ] || fail "a run that sized again should not wake: $OUT"
   assert_no_grep "skip" "$HOMED/state/copy-sweep.record" "a sized run left the skip streak in the record"
-  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 9 * 3600)) run_sweep check
-  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 14 * 3600)) run_sweep check
-  [ -z "$OUT" ] || fail "a new streak woke before 6 hours: $OUT"
-  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 15 * 3600)) run_sweep check
-  assert_contains "$OUT" "on every run for 6 hours" "a new 6-hour streak did not wake again"
-  pass "a streak of skipped runs raises one wake after 6 hours, none while it stands, and again after a sized run breaks it"
+  for n in 1 2 3 4 5; do
+    FAKE_LOAD=99 run_sweep check
+    [ -z "$OUT" ] || fail "skipped run $n of a new streak woke: $OUT"
+  done
+  FAKE_LOAD=99 run_sweep check
+  assert_contains "$OUT" "on 6 runs in a row" "a new streak of 6 skipped runs did not wake again"
+  pass "6 skipped runs in a row raise one wake, none while the streak stands, and again after a sized run breaks it"
 }
 
 test_one_du_at_a_time_under_nice() {
@@ -860,7 +863,7 @@ run_case test_lane_home_project_clone_is_swept
 run_case test_failing_remove_leaves_the_copy_and_is_never_forced
 run_case test_nothing_is_forced_deleted_cleaned_or_returned
 run_case test_load_guard_skips_only_the_sizing_and_says_so
-run_case test_six_hours_of_skipped_runs_wake_once
+run_case test_six_skipped_runs_in_a_row_wake_once
 run_case test_one_du_at_a_time_under_nice
 run_case test_sizes_are_cached_by_path_and_mtime
 run_case test_nested_copy_bytes_are_not_counted_twice

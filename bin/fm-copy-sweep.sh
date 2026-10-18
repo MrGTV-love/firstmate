@@ -79,7 +79,7 @@
 # read, no du runs: the listing, the classes and --apply still run, only fresh
 # cached sizes are used, and a report or --apply run prints one line, "scan
 # skipped: load N above limit M". --apply and `check` also record it, `check`
-# stays quiet, and either raises one wake once every run for 6 hours has skipped.
+# stays quiet, and either raises one wake once 6 runs in a row have skipped.
 #
 # Budgets. config/copy-budget (docs/configuration.md owns the format) holds a
 # GiB budget per pool root and per container (a pool slot, or a Firstmate home).
@@ -823,24 +823,25 @@ evaluate_budgets() {
   done
 }
 
-# A run that skipped its sizing keeps the start of its streak of skipped runs.
-# Once the streak is 6 hours old, "skip:load" stands over like a budget does and
-# raises its wake once; the first run that sizes again ends the streak.
-SKIP_WAKE_SECS=21600
-SKIP_SINCE_NOW=
+# A run that skipped its sizing adds one to the count of skipped runs in a row.
+# Once the count reaches SKIP_WAKE_RUNS, "skip:load" stands over like a budget
+# does and raises its wake once; the first run that sizes again ends the streak.
+# The hourly --apply and the gated `check` each run about once per `interval`,
+# so 6 runs in a row are about 6 hours at the default.
+SKIP_WAKE_RUNS=6
+SKIP_RUNS_NOW=
 
-evaluate_skip() {  # <now>
-  local now=$1 since
-  SKIP_SINCE_NOW=
+evaluate_skip() {
+  local runs
+  SKIP_RUNS_NOW=
   [ -n "$SKIP_LINE" ] || return 0
-  since=$REC_SKIP_SINCE
-  case "$since" in ''|*[!0-9]*) since=$now ;; esac
-  [ "$since" -le "$now" ] || since=$now
-  SKIP_SINCE_NOW=$since
-  [ $((now - since)) -ge "$SKIP_WAKE_SECS" ] || return 0
+  runs=$REC_SKIP_RUNS
+  case "$runs" in ''|*[!0-9]*) runs=0 ;; esac
+  SKIP_RUNS_NOW=$((runs + 1))
+  [ "$SKIP_RUNS_NOW" -ge "$SKIP_WAKE_RUNS" ] || return 0
   OVER_NOW="${OVER_NOW}skip:load"$'\n'
   ! printf '%s' "$REC_OVER" | grep -qxF skip:load || return 0
-  WAKE_PARTS="${WAKE_PARTS:+$WAKE_PARTS; }$SKIP_LINE on every run for $(((now - since) / 3600)) hours"
+  WAKE_PARTS="${WAKE_PARTS:+$WAKE_PARTS; }$SKIP_LINE on $SKIP_RUNS_NOW runs in a row"
 }
 
 # --- the record and the cache ------------------------------------------------
@@ -848,7 +849,7 @@ evaluate_skip() {  # <now>
 REC_LAST_SCAN=
 REC_OVER=
 REC_ERROR=
-REC_SKIP_SINCE=
+REC_SKIP_RUNS=
 REC_SKIP_LINE=
 
 record_usable() {
@@ -862,13 +863,13 @@ read_record() {
   REC_LAST_SCAN=
   REC_OVER=
   REC_ERROR=
-  REC_SKIP_SINCE=
+  REC_SKIP_RUNS=
   REC_SKIP_LINE=
   record_usable || return 0
   REC_LAST_SCAN=$(awk -F '\t' '$1 == "last_scan" { print $2; exit }' "$RECORD")
   REC_OVER=$(awk -F '\t' '$1 == "over" { print $2 }' "$RECORD")
   REC_ERROR=$(awk -F '\t' '$1 == "error" { print $2; exit }' "$RECORD")
-  REC_SKIP_SINCE=$(awk -F '\t' '$1 == "skip" { print $2; exit }' "$RECORD")
+  REC_SKIP_RUNS=$(awk -F '\t' '$1 == "skip" { print $2; exit }' "$RECORD")
   REC_SKIP_LINE=$(awk -F '\t' '$1 == "skip" { print $3; exit }' "$RECORD")
 }
 
@@ -896,7 +897,7 @@ write_record() {  # <last-scan> <error>
     [ -n "$key" ] || continue
     printf '%s' "$REC_OVER" | grep -qxF "$key" && content="$content"$'over\t'"$key"$'\n'
   done <<< "$UNKNOWN_NOW"
-  [ -z "$SKIP_SINCE_NOW" ] || content="$content"$'skip\t'"$SKIP_SINCE_NOW"$'\t'"$SKIP_LINE"$'\n'
+  [ -z "$SKIP_RUNS_NOW" ] || content="$content"$'skip\t'"$SKIP_RUNS_NOW"$'\t'"$SKIP_LINE"$'\n'
   [ -z "$2" ] || content="$content"$'error\t'"$2"$'\n'
   write_atomic "$RECORD" "$content"
 }
@@ -1058,7 +1059,7 @@ run_sweep() {  # report|apply|check
         printf 'copy-sweep: %s\n' "$CONFIG_ERROR"
         OVER_NOW=$REC_OVER
         SKIP_LINE=$REC_SKIP_LINE
-        SKIP_SINCE_NOW=$REC_SKIP_SINCE
+        SKIP_RUNS_NOW=$REC_SKIP_RUNS
         write_record "$REC_LAST_SCAN" "$CONFIG_ERROR" || true
       fi
       return 0
@@ -1102,7 +1103,7 @@ run_sweep() {  # report|apply|check
     [ "$FAILED_COUNT" -eq 0 ] || rc=1
   fi
   evaluate_budgets
-  evaluate_skip "$now"
+  evaluate_skip
   if [ "$mode" != report ]; then
     write_cache || { echo "fm-copy-sweep: could not write $SIZE_CACHE" >&2; rc=1; }
     if ! raise_wake "$mode"; then
