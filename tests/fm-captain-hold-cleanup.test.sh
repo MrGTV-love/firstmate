@@ -811,6 +811,131 @@ SH
   pass "cleanup replay closes answered work and preserves the report after direct or keyed answers"
 }
 
+# The opt-in fleet ledger (docs/fleet-ledger.md): teardown only keeps a held
+# item open, so the close that really happens later, through an answer, a
+# reconciliation, or a repair of a row closed outside the script, is the one that
+# records task.closed, with the deliverable teardown retained as its evidence.
+retained_held_scout() {  # <home> <id>: a held scout whose cleanup finished and left it Queued
+  local home=$1 id=$2
+  mkdir -p "$home/data/$id"
+  tasks_in "$home" add "$id" "Investigate $id" --kind scout --repo sample --start >/dev/null \
+    || fail "could not create the retained scout $id"
+  write_origin_meta "$home" "$id"
+  printf 'done: report complete\n' > "$home/state/$id.status"
+  printf '# %s\n\nThe captain must choose.\n' "$id" > "$home/data/$id/report.md"
+  run_captain "$home" hold "$id" --reason "captain must choose $id" >/dev/null \
+    || fail "could not hold the retained scout $id"
+  complete_through_sibling "$home" "$id" >/dev/null \
+    || fail "completion gate failed for the retained scout $id"
+  run_teardown "$home" "$id" > "$home/$id.teardown.out" 2> "$home/$id.teardown.err" \
+    || fail "cleanup of the held scout $id failed: $(cat "$home/$id.teardown.err")"
+  assert_contains "$(tasks_in "$home" show "$id" --full)" "state: queued" "cleanup did not keep $id open"
+}
+
+held_closed_rows() {  # <home>: one compact row per task.closed record
+  [ -f "$1/state/fleet-ledger.jsonl" ] || return 0
+  jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr]' "$1/state/fleet-ledger.jsonl"
+}
+
+test_captain_close_of_retained_work_records_task_closed() {
+  local home id reconciled repaired out
+  home=$(make_home hold-closed-ledger)
+  : > "$home/config/fleet-ledger"
+  printf 'Ship attachments by reference.\n' > "$home/answer.txt"
+  printf 'Nothing is pending. No captain answer was given.\n' > "$home/evidence.txt"
+
+  id=sample-closed-by-answer
+  retained_held_scout "$home" "$id"
+  assert_equals "" "$(held_closed_rows "$home")" "cleanup that kept the held item open wrote a task.closed"
+  out=$(run_captain "$home" answer "$id" --decision-file "$home/answer.txt") || fail "the answer failed"
+  assert_equals "answered: $id" "$out" "answer stdout with the ledger on"
+  assert_equals "[\"$id\",\"report\",null]" "$(held_closed_rows "$home")" \
+    "task.closed after the answer that closed retained work"
+  run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null || fail "the repeated answer failed"
+  assert_equals 1 "$(held_closed_rows "$home" | wc -l | tr -d ' ')" "task.closed records after a repeated answer"
+  assert_equals 1 "$(jq -c --arg id "$id" 'select(.event == "task.answered" and .task == $id)' "$home/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')" \
+    "task.answered records after a repeated answer"
+
+  reconciled=sample-closed-by-reconcile
+  retained_held_scout "$home" "$reconciled"
+  run_captain "$home" reconcile close "$reconciled" --evidence-file "$home/evidence.txt" --verified-outcome moot >/dev/null \
+    || fail "reconcile close failed"
+  run_captain "$home" reconcile close "$reconciled" --evidence-file "$home/evidence.txt" --verified-outcome moot >/dev/null \
+    || fail "the repeated reconcile close failed"
+  assert_equals "$(printf '%s\n' "[\"$id\",\"report\",null]" "[\"$reconciled\",\"report\",null]")" "$(held_closed_rows "$home")" \
+    "task.closed after a reconcile close of retained work, and its repeat"
+
+  repaired=sample-closed-outside
+  retained_held_scout "$home" "$repaired"
+  tasks_in "$home" "done" "$repaired" >/dev/null || fail "could not close the held row outside the script"
+  assert_equals 2 "$(held_closed_rows "$home" | wc -l | tr -d ' ')" "closing the row outside the script wrote a task.closed"
+  out=$(run_captain "$home" answer "$repaired" --decision-file "$home/answer.txt") || fail "the repairing answer failed"
+  assert_equals "repaired: $repaired" "$out" "repair stdout with the ledger on"
+  run_captain "$home" answer "$repaired" --decision-file "$home/answer.txt" >/dev/null || fail "the repeated repair failed"
+  assert_equals "$(printf '%s\n' "[\"$id\",\"report\",null]" "[\"$reconciled\",\"report\",null]" "[\"$repaired\",\"report\",null]")" \
+    "$(held_closed_rows "$home")" "task.closed after repairing a row closed outside the script, and its repeat"
+  pass "ledger on: an answer, a reconcile close, or a repair that closes retained work records one task.closed naming its report, and a repeat records none"
+}
+
+test_captain_close_before_cleanup_replay_records_task_closed_once() {
+  local home id repo wt rc bootstrap gerrit_url=https://gerrit.example.com/c/project/+/12345
+  home=$(make_home hold-closed-before-replay)
+  : > "$home/config/fleet-ledger"
+  id=sample-closed-before-replay
+  repo="$home/projects/sample"
+  wt="$home/projects/$id"
+  fm_git_worktree "$repo" "$wt" fm/closed-before-replay
+  tasks_in "$home" add "$id" "Ship the held Gerrit change" --kind ship --repo sample --start >/dev/null \
+    || fail "could not create the held Gerrit fixture"
+  fm_write_meta "$home/state/$id.meta" \
+    "window=firstmate:fm-$id" "endpoint_task_id=$id" "worktree=$wt" \
+    "project=$repo" "harness=codex" "kind=ship" "mode=no-mistakes" \
+    "pr=$gerrit_url" "spawn_gen=fixture-$id"
+  printf 'done: change landed\n' > "$home/state/$id.status"
+  run_captain "$home" hold "$id" --reason "captain must choose the follow-up" >/dev/null \
+    || fail "could not hold the landed Gerrit task for the captain"
+  cat > "$home/fakebin/tasks-axi" <<SH
+#!/usr/bin/env bash
+previous=
+for arg in "\$@"; do
+  if [ "\$previous" = --pr ] && ! [[ "\$arg" =~ ^https://github\.com/[^/]+/[^/]+/pull/[0-9]+\$ ]]; then
+    echo "error: \"Task pr link must be a canonical pull request URL\""
+    exit 1
+  fi
+  previous=\$arg
+done
+exec "$(command -v tasks-axi)" "\$@"
+SH
+  chmod +x "$home/fakebin/tasks-axi"
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$home/fakebin/treehouse"
+  chmod +x "$home/fakebin/treehouse"
+  rc=0
+  PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_CONFIG_OVERRIDE="$home/config" "$TEARDOWN" "$id" \
+    > "$home/teardown.out" 2> "$home/teardown.err" || rc=$?
+  [ "$rc" -ne 0 ] || fail "cleanup succeeded despite the failed worktree return"
+  assert_present "$home/state/$id.backlog-close" "the interrupted cleanup lost its retained-artifact record"
+  assert_equals "" "$(held_closed_rows "$home")" "the interrupted cleanup wrote a task.closed"
+
+  printf 'Proceed with the landed change.\n' > "$home/answer.txt"
+  run_captain "$home" answer "$id" --decision-file "$home/answer.txt" >/dev/null \
+    || fail "the captain could not answer before cleanup replay"
+  assert_equals "[\"$id\",\"merged_pr\",\"$gerrit_url\"]" "$(held_closed_rows "$home")" \
+    "task.closed from the pending retention's own arguments"
+
+  fm_fake_exit0 "$home/fakebin" treehouse
+  bootstrap=$(PATH="$home/fakebin:$PATH" FM_ROOT_OVERRIDE="$ROOT" FM_HOME="$home" \
+    FM_STATE_OVERRIDE="$home/state" FM_DATA_OVERRIDE="$home/data" \
+    FM_CONFIG_OVERRIDE="$home/config" FM_BOOTSTRAP_NETWORK=skip \
+    "$ROOT/bin/fm-bootstrap.sh" 2>&1) \
+    || fail "session start could not replay cleanup after the answer: $bootstrap"
+  assert_absent "$home/state/$id.backlog-close" "session start left the pending record behind"
+  assert_equals "[\"$id\",\"merged_pr\",\"$gerrit_url\"]" "$(held_closed_rows "$home")" \
+    "task.closed after the session-start replay of an already answered retention"
+  pass "ledger on: an answer before cleanup replay records one task.closed from the pending retention, and the replay adds none"
+}
+
 test_answer_before_cleanup_replay_notes_a_retained_gerrit_change() {
   local home id repo wt rc show real_tasks_axi gerrit_url=https://gerrit.example.com/c/project/+/12345
   home=$(make_home answer-before-replay-gerrit)
@@ -1851,6 +1976,8 @@ test_retained_row_artifacts_survive_captain_answers
 test_interrupted_cleanup_keeps_the_captain_call_recoverable
 test_answer_before_cleanup_replay_preserves_the_retained_report
 test_answer_before_cleanup_replay_notes_a_retained_gerrit_change
+test_captain_close_of_retained_work_records_task_closed
+test_captain_close_before_cleanup_replay_records_task_closed_once
 test_unusable_pending_close_record_names_its_reason
 test_relocated_report_does_not_wedge_an_answer_before_replay
 test_relocated_report_does_not_wedge_released_cleanup_replay

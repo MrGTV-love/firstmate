@@ -823,6 +823,25 @@ fm_backlog_retain() {  # <data-dir> <id> [flag...]
   fm_backlog_mutate "$authorized_data" reopen "$id"
 }
 
+# The inverse of the deliverable line fm_backlog_retain records: the arguments the
+# retained close handed to `tasks-axi done`, read from the first deliverable on
+# <decoded-body>'s active "Deliverable of the finished work:" line. Sets
+# FM_BACKLOG_RETAINED_CLOSE_ARGS, empty when the body names none.
+fm_backlog_retained_close_args() {  # <decoded-body>
+  local line item
+  # shellcheck disable=SC2034 # Output global, read by the sourcing caller.
+  FM_BACKLOG_RETAINED_CLOSE_ARGS=()
+  line=$(printf '%s\n' "$1" | sed -n 's/^Deliverable of the finished work: //p' | head -1)
+  item=${line%%; *}
+  case "$item" in
+    '') ;;
+    'report '*) FM_BACKLOG_RETAINED_CLOSE_ARGS=(--report "${item#report }") ;;
+    'PR '*) FM_BACKLOG_RETAINED_CLOSE_ARGS=(--pr "${item#PR }") ;;
+    'Gerrit change '*) FM_BACKLOG_RETAINED_CLOSE_ARGS=(--pr "${item#Gerrit change }") ;;
+    *) FM_BACKLOG_RETAINED_CLOSE_ARGS=(--note "$item") ;;
+  esac
+}
+
 # The canonical path of an existing path. Bootstrap and every lifecycle script
 # call this several times per task record, and a perl process per call dominated
 # a locked session start. A directory, and a regular file that is not itself a

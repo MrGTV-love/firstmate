@@ -1674,12 +1674,18 @@ test_hold_ledger_records_creation_direct_answer_and_reconcile() {
   rows=$(jq -c '[.event, .task, (.repo // .via), (.kind // .key), .answered_by, .priority, (.at | test("Z$"))]' "$home/state/fleet-ledger.jsonl")
   assert_equals "$(printf '%s\n' \
     '["task.filed","made-call","sample","captain",null,null,true]' \
+    '["task.closed","made-call",null,null,null,null,true]' \
     '["task.answered","made-call","hold","made-call","main",null,true]' \
     '["task.filed","away-call","sample","captain",null,null,true]' \
+    '["task.closed","away-call",null,null,null,null,true]' \
     '["task.answered","away-call","hold","away-call","main-afk",null,true]' \
     '["task.filed","moot-call","sample","captain",null,null,true]' \
+    '["task.closed","moot-call",null,null,null,null,true]' \
     '["task.answered","moot-call","hold","moot-call","unknown",null,true]')" "$rows" \
     "ledger records for a created call, direct answers, and a reconciliation"
+  assert_equals "$(printf '%s\n' '["made-call","none",null]' '["away-call","none",null]' '["moot-call","none",null]')" \
+    "$(jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr]' "$home/state/fleet-ledger.jsonl")" \
+    "a captain call that no teardown retained closes with no recorded evidence"
   pass "ledger on: a created call, a direct answer, and a reconciliation each write one record; an existing item or a replay writes none"
 }
 

@@ -23,6 +23,7 @@
 #   bin/fm-tasks-axi.sh          filed (an `add` that created a new item)
 #   bin/fm-send.sh               answered ... send (a --resolve-key close)
 #   bin/fm-captain-hold.sh       filed (a captain-hold item it created),
+#                                closed (a held item it moved to Done),
 #                                answered ... hold (an answer or a reconciliation)
 #
 # Usage:

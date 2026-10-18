@@ -693,6 +693,25 @@ ledger_hold_answered() {  # <task-id> [<source>]
     "$SCRIPT_DIR/fm-fleet-ledger.sh" answered "$1" hold "$1" "${2-$(decision_source)}" || true
 }
 
+# The same ledger's task.closed record for a captain-held task this command just
+# closed. The evidence is the deliverable teardown retained on the item: the
+# arguments of a retention that was still pending, else the deliverable line the
+# retention wrote on the row. The ledger writes a repeat of a close once, and a
+# failed read or write never changes the result.
+ledger_hold_closed() {  # <task-id> [<retained-done-arg>...]
+  local id=$1 config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config} data out
+  local -a args=("${@:2}")
+  [ -e "$config/fleet-ledger" ] || return 0
+  if [ "${#args[@]}" -eq 0 ] \
+      && data=$(fm_backlog_data_absolute "$DATA") \
+      && out=$(fm_backlog_row_show "$data" "$id" --full 2>/dev/null); then
+    fm_backlog_retained_close_args "$(decode_shown_value "$(show_field "$out" body)")"
+    args=("${FM_BACKLOG_RETAINED_CLOSE_ARGS[@]+"${FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}"}")
+  fi
+  fm_backlog_ledger_closed "$STATE" "$config" "$id" "${args[@]+"${args[@]}"}"
+  return 0
+}
+
 # The same ledger's task.filed record for a captain-hold item this command just
 # created; tasks-axi stores no priority for it.
 ledger_hold_filed() {  # <task-id> <repo>
@@ -1544,12 +1563,14 @@ apply_pending_retained_artifact() {  # <task-id>
   local id=$1 marker
   local -a args=()
   RETAINED_CLOSE_ARGS=()
+  RETAINED_ARTIFACT_ARGS=()
   marker=$(fm_backlog_close_marker_path "$STATE" "$id") || return 1
   [ -e "$marker" ] || [ -L "$marker" ] || return 0
   fm_backlog_close_marker_validate "$marker" "$DATA" "$id" "$STATE" \
     || { report_retained_artifact_failure "$id" "$marker"; return 1; }
   [ "$FM_BACKLOG_CLOSE_VALIDATED_MODE" = retain ] || return 0
   args=("${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]+"${FM_BACKLOG_CLOSE_VALIDATED_ARGS[@]}"}")
+  RETAINED_ARTIFACT_ARGS=("${args[@]+"${args[@]}"}")
   case "${args[0]-}" in
     --pr|--report)
       if [ "${args[0]}" = --pr ] && fm_backlog_pr_is_gerrit_change "${args[1]-}"; then
@@ -1575,7 +1596,8 @@ close_answered() {  # <task-id> <release-0-or-1>
     tasks_axi unhold "$1" >/dev/null
   else
     apply_pending_retained_artifact "$1" || return 1
-    tasks_axi "done" "$1" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null
+    tasks_axi "done" "$1" "${RETAINED_CLOSE_ARGS[@]+"${RETAINED_CLOSE_ARGS[@]}"}" >/dev/null || return $?
+    ledger_hold_closed "$1" "${RETAINED_ARTIFACT_ARGS[@]+"${RETAINED_ARTIFACT_ARGS[@]}"}"
   fi
 }
 
@@ -1669,6 +1691,7 @@ command_answer() {
     [ "$(show_field "$show" state)" = "done" ] || fail "recording the answer reopened closed task $id"
     body_has_resolution_record "$(show_field "$show" body)" \
       || fail "captain-held task $id did not retain its durable resolution record"
+    ledger_hold_closed "$id"
     ledger_hold_answered "$id"
     publish_parent_resolution_then_retire "$id" "$occurrence" "answered (repaired)"
     printf 'repaired: %s\n' "$id"

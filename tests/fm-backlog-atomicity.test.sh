@@ -2170,6 +2170,45 @@ test_recovery_backfills_a_recorded_link_on_an_already_done_item() {
   pass "recovery backfills recorded links onto already Done items"
 }
 
+# fm_backlog_retained_close_args reads back the deliverable line that
+# fm_backlog_retain wrote, so a captain close can name the evidence the retained
+# teardown used; every kind of deliverable must come back as the arguments it
+# was retained with.
+test_retained_deliverable_line_names_the_close_arguments() {
+  local case_dir home id spec flag value got n=0
+  case_dir=$(make_home retained-close-args)
+  home=$(home_of "$case_dir")
+  for spec in "--report|data/ID/report.md" "--pr|https://github.com/example/repo/pull/21" \
+      "--pr|https://gerrit.example.com/c/project/+/12345" "--note|local main" "--note|dropped"; do
+    n=$((n + 1))
+    id=atomic-retained-args-$n
+    flag=${spec%%|*}
+    value=${spec#*|}
+    value=${value//ID/$id}
+    add_item "$case_dir" "$id"
+    start_item "$case_dir" "$id"
+    got=$(bash -c '
+      . "$1/bin/fm-tasks-axi-lib.sh"
+      . "$1/bin/fm-backlog-transition-lib.sh"
+      fm_backlog_retain "$2" "$3" "$4" "$5" || exit 1
+      raw=$(fm_backlog_row_show "$2" "$3" --full | sed -n "s/^  body: //p" | head -1)
+      case "$raw" in \"*) body=$(printf "%s" "$raw" | jq -r .) ;; *) body=$raw ;; esac
+      fm_backlog_retained_close_args "$body"
+      printf "%s\n" "${FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}"
+    ' _ "$ROOT" "$home/data" "$id" "$flag" "$value") || fail "could not retain $flag $value"
+    assert_equals "$(printf '%s\n' "$flag" "$value")" "$got" "close arguments read back for the retained $flag"
+  done
+  got=$(bash -c '
+    . "$1/bin/fm-tasks-axi-lib.sh"
+    . "$1/bin/fm-backlog-transition-lib.sh"
+    fm_backlog_retained_close_args "Captain decision: go
+Historical deliverable of the finished work: report data/x/report.md"
+    printf "%s" "${#FM_BACKLOG_RETAINED_CLOSE_ARGS[@]}"
+  ' _ "$ROOT") || fail "could not read a body with no deliverable"
+  assert_equals 0 "$got" "close arguments read from a body whose deliverable is only historical"
+  pass "a retained deliverable line reads back as the close arguments it was retained with"
+}
+
 # The opt-in fleet ledger (docs/fleet-ledger.md): a close that session start
 # replays is recorded once, whether the row was still open or already Done.
 test_recovery_records_a_replayed_close_in_the_fleet_ledger() {
@@ -2189,7 +2228,7 @@ test_recovery_records_a_replayed_close_in_the_fleet_ledger() {
     "$other" "$home/data" > "$home/state/$other.backlog-close"
 
   out=$(run_bootstrap "$case_dir")
-  [ "$(row_state "$case_dir" "$id")" = done ] || fail "session start left the recorded close open: $out"
+  [ "$(row_state "$case_dir" "$id")" = "done" ] || fail "session start left the recorded close open: $out"
   rows=$(jq -c 'select(.event == "task.closed") | [.task, .evidence, .pr, (.at | test("Z$"))]' "$home/state/fleet-ledger.jsonl")
   assert_equals "$(printf '%s\n' "[\"$id\",\"merged_pr\",\"$pr\",true]" "[\"$other\",\"local_main\",null,true]")" \
     "$(printf '%s\n' "$rows" | sort)" "task.closed records after a replayed close"
@@ -3498,6 +3537,7 @@ test_recovery_replays_a_close_an_interrupted_cleanup_left_open
 test_recovery_replays_a_gerrit_close_with_its_change_url_as_a_note
 test_recovery_backfills_a_recorded_link_on_an_already_done_item
 test_recovery_records_a_replayed_close_in_the_fleet_ledger
+test_retained_deliverable_line_names_the_close_arguments
 test_recovery_preserves_a_close_when_the_backlog_cannot_be_read
 test_recovery_retry_preserves_incomplete_cleanup_warning
 test_recovery_finishes_a_close_for_the_same_meta_incarnation
