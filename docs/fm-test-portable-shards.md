@@ -269,7 +269,7 @@ The bounds sit at true extremes, far above healthy duration, so a loaded runner 
 | Tier | Jobs | Bound | Rationale |
 |---|---|---|---|
 | Fast | coverage guard, repo invariants, timing aggregate | 5 minutes | Seconds-long local work, so the tripwire only catches a hung runner. |
-| Normal | lint partitions, portable parallel shards, portable serial shards, macOS stock Bash | 60 minutes, one value shared by every job in the tier | One shared hang tripwire keeps every ordinary test and lint lane on the same policy instead of allowing per-lane packing estimates or one-off caps to set the bound. A healthy slow lane finishes well inside it; a runner that stops making progress at all is the extreme this catches. |
+| Normal | lint partitions, portable parallel shards, portable serial shards, macOS stock Bash | 60 minutes, one value shared by every job in the tier | One shared hang tripwire keeps every ordinary test and lint lane on the same policy instead of allowing per-lane packing estimates or one-off caps to set the bound. |
 | Heavy | Herdr | family-run step 20 minutes under a 120-minute job-level last-resort backstop | Healthy runs finish in about 7-10 minutes, so the step tripwire fails a wedged suite while the `always()` cleanup and timing upload still run, and the job cap only catches a hang outside that step. |
 
 [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) holds the executable values and names each job's tier beside its `timeout-minutes`.

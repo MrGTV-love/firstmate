@@ -90,7 +90,8 @@
 #                   N milliseconds, including an empty selection. It is
 #                   evaluated after selection and suite execution and cannot
 #                   interrupt a running script; per-script hangs are
-#                   bounded by --per-script-timeout-secs. Pathological output
+#                   bounded by --per-script-timeout-secs, or by the progress
+#                   guard on plain --changed. Pathological output
 #                   sinks that block finalization are explicitly out of scope.
 #   -h, --help      print this header
 #
