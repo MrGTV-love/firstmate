@@ -14,10 +14,13 @@
 # No live holder is removed, including at a refusal.
 #
 # The wait refuses after 600 seconds without observed progress. Progress means
-# the holder or queue head changes, the holder updates its role record, or its
-# process tree consumes another CPU second. A productive holder does not expire.
+# the holder changes, the holder updates its role record, or its process tree
+# consumes another CPU second. A productive holder does not expire. A waiter
+# ahead leaving the queue is not progress by the holder, so every waiter behind
+# one stalled holder counts from when it first saw that holder and refuses with
+# the others; with no readable holder, a change of queue head restarts the wait.
 # Unavailable CPU telemetry is not progress and uses a 30-minute absolute bound
-# for the same holder/queue episode rather than asserting an observed stall.
+# for the same holder episode rather than asserting an observed stall.
 # A dead holder is recovered by the existing identity-bound lock owner.
 #
 # fm_project_lock_try <project-lock> <operation>
@@ -216,7 +219,8 @@ fm_project_lock_acquire() {  # <lock> <operation>
       break
     fi
     holder=$(cat "$lock/pid" 2>/dev/null || true)
-    key="$(readlink "$lock" 2>/dev/null || true):$holder|$head"
+    key="$(readlink "$lock" 2>/dev/null || true):$holder"
+    [ -n "$holder" ] || key="$key|$head"
     if [ "$key" != "$last_key" ]; then
       last_key=$key
       since=$SECONDS

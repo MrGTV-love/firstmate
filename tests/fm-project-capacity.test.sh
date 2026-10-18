@@ -832,6 +832,70 @@ test_project_queue_slow_holder_never_admits_a_later_waiter_first() {
   pass "a stalled holder refuses its waiters together, so a later waiter never goes ahead of an earlier one"
 }
 
+# A waiter ahead of W2 leaving the queue is not progress by the stalled holder:
+# W2 keeps the clock it started when it first saw that holder, whether the holder
+# shows no CPU or role progress (600-second allowance) or no CPU telemetry at all
+# (30-minute uncertainty extreme). Time is scaled so the departure is exact.
+test_project_queue_head_departure_does_not_restart_a_stalled_holders_clock() {
+  local case_dir holder w1 mode result rc elapsed limit i
+  for mode in idle-cpu unknown-telemetry; do
+    case_dir=$(make_case "queue-head-departure-$mode")
+    project_queue_actor "$case_dir" holder "$case_dir/release" > "$case_dir/holder.out" 2>&1 &
+    holder=$!
+    wait_actor_output "$case_dir/order" holder
+    FM_HOME="$case_dir/home" bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      . "$1/bin/fm-project-lock-lib.sh"
+      fm_project_lock_register "$2/actor.lock" 600 w1 || exit 1
+      printf "%s\n" "$FM_PROJECT_LOCK_TICKET" > "$2/w1.ticket"
+      i=0
+      while [ ! -e "$2/w1.leave" ] && [ "$i" -lt 4000 ]; do i=$((i + 1)); sleep 0.05; done
+      fm_lock_remove_path "$FM_PROJECT_LOCK_TICKET"
+    ' _ "$ROOT" "$case_dir" > "$case_dir/w1.out" 2>&1 &
+    w1=$!
+    i=0
+    while [ ! -s "$case_dir/w1.ticket" ]; do
+      i=$((i + 1)); [ "$i" -lt 1000 ] || fail "the earlier waiter never queued: $(cat "$case_dir/w1.out")"
+      sleep 0.05
+    done
+    result=$(FM_HOME="$case_dir/home" bash -c '
+      . "$1/bin/fm-wake-lib.sh"
+      . "$1/bin/fm-project-lock-lib.sh"
+      base=$SECONDS departed=0 dir=$2
+      case "$3" in
+        idle-cpu) fm_project_lock_cpu() { echo 100; }; step=10; leave=30 ;;
+        *) fm_project_lock_cpu() { return 1; }; step=600; leave=1200 ;;
+      esac
+      sleep() {
+        if [ "$departed" = 0 ] && [ "$((SECONDS - base))" -ge "$leave" ]; then
+          : > "$dir/w1.leave"
+          while [ -L "$(cat "$dir/w1.ticket")" ]; do command sleep 0.02; done
+          departed=1
+        fi
+        SECONDS=$((SECONDS + step))
+        command sleep 0.02
+      }
+      FM_PROJECT_LOCK_SERVICE_SECS=40
+      fm_project_lock_acquire "$2/actor.lock" w2 > "$2/w2.out" 2>&1
+      echo "$? $((SECONDS - base))"
+    ' _ "$ROOT" "$case_dir" "$mode")
+    : > "$case_dir/w1.leave"
+    : > "$case_dir/release"
+    wait "$w1" || fail "the earlier waiter could not leave: $(cat "$case_dir/w1.out")"
+    wait "$holder" || fail "the stalled holder could not release: $(cat "$case_dir/holder.out")"
+    rc=${result% *}
+    elapsed=${result#* }
+    limit=60
+    [ "$mode" = idle-cpu ] || limit=2400
+    expect_code 1 "$rc" "$mode: a waiter behind a stalled holder was admitted: $(cat "$case_dir/w2.out")"
+    [ "$elapsed" -lt "$limit" ] \
+      || fail "$mode: the earlier waiter leaving restarted the stalled holder's clock; the later waiter refused only after ${elapsed}s: $(cat "$case_dir/w2.out")"
+    assert_contains "$(cat "$case_dir/w2.out")" 'fm-project-lock: stall limit reached' "$mode: the later waiter did not refuse at the holder's stall"
+    assert_equals holder "$(cat "$case_dir/order")" "$mode: a waiter went ahead of the stalled holder"
+  done
+  pass "an earlier waiter leaving the queue neither restarts a stalled holder's idle clock nor its telemetry-uncertainty extreme"
+}
+
 test_project_queue_does_not_expire_a_productive_holder() {
   local case_dir holder waiter rc=0
   case_dir=$(make_case queue-holder-progress)
@@ -2057,6 +2121,7 @@ test_project_queue_recovers_dead_waiter_and_holder
 test_project_queue_timeout_preserves_live_holder
 test_project_queue_does_not_expire_a_productive_holder
 test_project_queue_slow_holder_never_admits_a_later_waiter_first
+test_project_queue_head_departure_does_not_restart_a_stalled_holders_clock
 test_project_queue_progress_never_reaches_the_stall_limit
 test_nonwaiting_admission_never_jumps_a_queued_waiter
 test_nonwaiting_admission_separates_contention_from_acquisition_errors
