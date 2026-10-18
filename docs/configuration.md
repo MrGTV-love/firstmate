@@ -2308,12 +2308,12 @@ Every record includes `error_type`, explicitly null for success or intentional i
 A failure after a request started where the provider gave no answer also records `attempts`, the guard's own count of tries (1 through 3), and `ms`, the elapsed time from the first try, so a timeout can be told from a provider error.
 A row that holds a provider answer keeps the client's own `attempts` and `ms`, whether the call succeeded or the answer was then rejected as invalid.
 A payload screened in pieces records `planned_chunks`, the pieces that needed a provider answer (a blank piece needs none and is not counted), separately from `chunks`, which counts only pieces whose provider request started, not unsent pieces or retry attempts.
-Its usage totals every answered piece, its attempts include every answered and failed piece, and `ms` is the longest elapsed time because pieces run concurrently.
+Its usage totals every answered piece, its attempts include every answered piece and every unanswered piece whose request started, and `ms` is the longest elapsed time because pieces run concurrently.
 The minimized `failures` array retains each unanswered piece's one-based chunk number, stable error type, request-started flag, attempt count and elapsed milliseconds, including when a policy verdict on another piece determines the outcome.
 Cost is complete and reported only when every planned piece answered with a reported charge; otherwise the total is unknown with `incomplete: true`, while `reported_amount` retains the known reported subtotal rather than hiding it or claiming it covers the whole payload.
 `tests/fm-jev-guard-audit.test.sh` exercises settlement and these accounting boundaries offline, including multiple failures and unsent pieces.
 A generic provider `Error` stays visible without inventing an HTTP category by parsing its message.
-Reported, estimated, unknown and not-called costs are distinct; unknown charges are not zero.
+A record's cost source is `reported`, `unknown` or `not_called`; a client-estimated charge is recorded as unknown, and unknown charges are not zero.
 Commands, state, questions, raw exchanges, provider extension fields and exception messages are excluded; paths are excluded except for the refused write/edit target in `refused_path`.
 The guard no longer adds raw session report entries.
 An active durable-record failure requires review with `AuditUnavailableError`; if judgment also failed, its stable error type remains visible in the notice.
