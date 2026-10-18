@@ -503,7 +503,7 @@ Uncommitted changes in the vanished copy are not recoverable, and the progress n
 **Why the caller prepares the copy.**
 The alternative is for `fm-spawn` to allocate a pool slot and check the branch out itself.
 It cannot check the branch out while git still lists the vanished path as that branch's worktree, so it would have to prune that registration or force the checkout, and both change repository administration that every lane's worktrees share.
-It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a foreground-aware isolation poll and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
+It would also reuse the fresh-spawn acquisition path, a pane-driven `treehouse get` with a progress-based isolation poll (pane path or output) that has an absolute extreme, and abort cleanup that returns slots, and a pool that hands out another clone's slot refuses it after the fact.
 The relocation proof reads the prepared copy and repository administration without allocating a slot, pruning registrations, or forcing a checkout; mutation remains with the existing relaunch transaction and launch owner.
 The caller prepares the copy with `git worktree add -f <path> <branch>`, never after `git worktree prune`: the forced add keeps the vanished copy's registration, whose reflog may be the task's only recorded head.
 If that registration is already gone and no other head survives, the refusal asks for a known commit as evidence: one `pr_head=<sha>` line in the task record for a task with no recorded `pr=`, or the three control journal lines `task=<id>`, `worktree=<vanished path>`, and `worktree_head=<sha>` for a task with one.

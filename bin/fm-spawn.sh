@@ -56,9 +56,11 @@
 #   that overlay. docs/configuration.md "Worker skill selection" owns selection,
 #   supported brief transports, and recorded outcomes. The picker is bounded
 #   at 30 seconds and never stops a launch.
-#   A fresh spawn's `treehouse get` wait is foreground-aware: docs/agent-control.md
-#   owns its window and ceiling, and docs/verification/runtime-backends.md
-#   "Treehouse get entry wait" records the measurements behind them.
+#   A fresh spawn's `treehouse get` wait is progress-based: it ends after ten
+#   minutes with no new pane path or changed output, or at an absolute
+#   thirty-minute extreme. docs/agent-control.md owns the rule, and
+#   docs/verification/runtime-backends.md "Treehouse get entry wait" records
+#   the earlier acquisition timings and their limits.
 #        fm-spawn.sh <task-id> --relaunch [--harness <name>] [--model <name>] [--effort <level>] [--claude-debug] [--reconcile-only] [--worktree <path>]
 #   --claude-debug is off by default and applies to --relaunch only; a fresh ship, scout, secondmate, or batch spawn refuses it. It adds Claude Code's own --debug to a claude launch and sets CLAUDE_CODE_DIAGNOSTICS_FILE to state/<id>.claude-diagnostics.jsonl, where Claude writes the shutdown_signal event that names the signal. It is refused unless the resolved harness is claude.
 #   --reconcile-only applies only to --relaunch; bin/fm-control.sh's header owns
