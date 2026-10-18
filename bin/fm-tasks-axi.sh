@@ -70,6 +70,11 @@
 #     A live task record completes only through bin/fm-teardown.sh, which owns the
 #     landing proof; a local-only merge records itself there too. Other row kinds
 #     close as before, and a help token never reaches this guard.
+# Opt-in fleet activity ledger (docs/fleet-ledger.md): an `add` that created a
+# new item also appends one task.filed record. The command's stdout, stderr, and
+# exit status stay tasks-axi's own; an add that found the id already present
+# (tasks-axi reports `already`) writes nothing, and a failed ledger write costs
+# one stderr line. While config/fleet-ledger is absent the add runs as before.
 # Otherwise the exit status is tasks-axi's own, unless decoding a read fails;
 # in that case the decoder's nonzero status is returned.
 set -u
@@ -340,6 +345,45 @@ case "$TASK_COMMAND" in
         printf 'fm-tasks-axi: %s\n' "$FM_BACKLOG_TRANSITION_ERROR" >&2
       fi
       exit "$result"
+    fi
+    ;;
+esac
+# Append task.filed for the item an `add` just created, read from the add's own
+# output so a minted id and every defaulted field are the ones tasks-axi stored.
+ledger_task_filed() {  # <captured-stdout-file>
+  local out fields id='' repo='' kind='' priority='' key value ledger_state ledger_config
+  out=$(cat -- "$1") || return 0
+  if printf '%s' "$out" | jq -e . >/dev/null 2>&1; then
+    fields=$(printf '%s' "$out" | jq -r 'select(.ok == true and .action == "add" and (.already | not))
+      | .task | "id\t\(.id // "")", "repo\t\(.repo // "")", "kind\t\(.kind // "")", "priority\t\(.priority // "")"' 2>/dev/null) || return 0
+  else
+    fields=$(printf '%s\n' "$out" | awk '
+      /^ok: added / { added = 1; next }
+      added && /^  (id|kind|repo|priority): / {
+        key = $1; sub(/:$/, "", key); value = $0; sub(/^  [a-z]+: /, "", value)
+        gsub(/^"|"$/, "", value); if (value == "-") value = ""
+        printf "%s\t%s\n", key, value
+      }') || return 0
+  fi
+  while IFS=$'\t' read -r key value; do
+    case "$key" in id) id=$value ;; repo) repo=$value ;; kind) kind=$value ;; priority) priority=$value ;; esac
+  done <<< "$fields"
+  [ -n "$id" ] || return 0
+  ledger_state=${FM_STATE_OVERRIDE:-$FM_HOME/state}
+  ledger_config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$ledger_state FM_CONFIG_OVERRIDE=$ledger_config \
+    "$SCRIPT_DIR/fm-fleet-ledger.sh" filed "$id" "$repo" "$kind" "$priority" || true
+}
+
+case "$TASK_COMMAND" in
+  add|create)
+    if [ -e "${FM_CONFIG_OVERRIDE:-$FM_HOME/config}/fleet-ledger" ] && add_out=$(mktemp "${TMPDIR:-/tmp}/fm-tasks-axi-add.XXXXXX" 2>/dev/null); then
+      tasks-axi ${ARGS[@]+"${ARGS[@]}"} > "$add_out"
+      add_status=$?
+      cat -- "$add_out"
+      [ "$add_status" -ne 0 ] || ledger_task_filed "$add_out" || true
+      rm -f -- "$add_out"
+      exit "$add_status"
     fi
     ;;
 esac

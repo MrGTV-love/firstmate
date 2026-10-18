@@ -275,6 +275,96 @@ test_flag_off_writes_nothing() {
   pass "flag off: the whole lifecycle leaves no ledger file, offset, or lock"
 }
 
+# filed, closed, and answered are the lifecycle records the fleet's own scripts
+# write at the moment each event happens; docs/fleet-ledger.md owns the fields.
+test_lifecycle_records_carry_exactly_their_fields() {
+  local commit=0123456789abcdef0123456789abcdef01234567 pr=https://github.com/acme/sample/pull/7 rows out
+  make_case on-lifecycle-records on
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" filed item-1 sample ship 2 || fail "filed was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" filed item-2 "" "" "" || fail "filed with absent fields was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 merged_pr "$pr" "$commit" || fail "closed was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-2 drop_file "" "" || fail "closed without a PR was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" answered item-1 send needs-pick || fail "answered (send) was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" answered item-1 hold item-1 "the Lavish review page" || fail "answered (hold) was not recorded"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" answered item-1 hold item-1 "" || fail "answered (hold, no source) was not recorded"
+  rows=$(ledger_rows 'del(.v, .ts, .at)')
+  assert_equals "$(cat <<EOF
+{"event":"task.filed","task":"item-1","repo":"sample","kind":"ship","priority":2}
+{"event":"task.filed","task":"item-2","repo":null,"kind":null,"priority":null}
+{"event":"task.closed","task":"item-1","evidence":"merged_pr","pr":"$pr","commit":"$commit"}
+{"event":"task.closed","task":"item-2","evidence":"drop_file","pr":null,"commit":null}
+{"event":"task.answered","task":"item-1","via":"send","key":"needs-pick","answered_by":"main"}
+{"event":"task.answered","task":"item-1","via":"hold","key":"item-1","answered_by":"page"}
+{"event":"task.answered","task":"item-1","via":"hold","key":"item-1","answered_by":"unknown"}
+EOF
+)" "$rows" "lifecycle records"
+  jq -e -s 'all(.[]; .v == 1 and (.ts | type) == "number" and .at == (.ts | todate))' \
+    "$HOME_DIR/state/fleet-ledger.jsonl" >/dev/null || fail "ts and at must be the same instant on every record"
+
+  # The writers are strict about their shape and add no required argument elsewhere.
+  expect_ledger_usage_error() {  # <ledger args...>
+    local usage_rc=0
+    in_home "$ROOT/bin/fm-fleet-ledger.sh" "$@" >/dev/null 2>&1 || usage_rc=$?
+    assert_equals 2 "$usage_rc" "usage error for: $*"
+  }
+  expect_ledger_usage_error filed item-1 sample ship
+  expect_ledger_usage_error closed item-1 merged_pr
+  expect_ledger_usage_error closed item-1 "" "" ""
+  expect_ledger_usage_error answered item-1 hold k
+  expect_ledger_usage_error answered item-1 send
+  assert_equals 7 "$(wc -l < "$HOME_DIR/state/fleet-ledger.jsonl" | tr -d ' ')" "records after refused calls"
+  out=$(in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-3 report "" "" 2>&1) || fail "closed with a report failed: $out"
+  pass "flag on: filed, closed, and answered write exactly their fields, one line each, with ts and at the same instant"
+}
+
+test_answered_by_is_derived_from_home_role_and_source() {
+  local by
+  make_case on-answered-by on
+  record() {  # <expected> <ledger args...>
+    local want=$1
+    shift
+    in_home "$ROOT/bin/fm-fleet-ledger.sh" "$@" || fail "answered was not recorded: $*"
+    by=$(jq -r 'select(.event == "task.answered") | .answered_by' "$HOME_DIR/state/fleet-ledger.jsonl" | tail -1)
+    assert_equals "$want" "$by" "answered_by for: $*"
+  }
+  record main answered t send k1
+  : > "$HOME_DIR/state/.afk"
+  record main-afk answered t send k2
+  record main-afk answered t hold k2 "a firstmate answer sent to t"
+  rm -f "$HOME_DIR/state/.afk"
+  record page answered t hold k3 "the Lavish review page"
+  record page answered t hold k3 "a captured result t sequence 1"
+  record chat answered t hold k4 "the captain's chat"
+  record policy answered t hold k5 "a standing policy"
+  record unknown answered t hold k6 "something else entirely"
+  record unknown answered t hold k7 ""
+  printf 'mate-1\n' > "$HOME_DIR/.fm-secondmate-home"
+  record secondmate answered t send k8
+  record secondmate answered t hold k9 "a firstmate answer sent to t"
+  rm -f "$HOME_DIR/.fm-secondmate-home"
+  ln -s /nonexistent "$HOME_DIR/.fm-secondmate-home"
+  record unknown answered t send k10
+  pass "answered_by is derived from the home role and the recorded source, and is unknown when neither says"
+}
+
+test_flag_off_and_unwritable_ledger_for_the_new_records() {
+  local out rc=0 leftovers
+  make_case off-lifecycle-records off
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" filed item-1 sample ship 2 || fail "filed with the flag absent failed"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" closed item-1 report "" "" || fail "closed with the flag absent failed"
+  in_home "$ROOT/bin/fm-fleet-ledger.sh" answered item-1 send k || fail "answered with the flag absent failed"
+  leftovers=$(cd "$HOME_DIR/state" && find . -name '*fleet-ledger*')
+  assert_equals "" "$leftovers" "ledger files with the flag absent"
+
+  : > "$HOME_DIR/config/fleet-ledger"
+  mkdir "$HOME_DIR/state/fleet-ledger.jsonl"
+  out=$(in_home "$ROOT/bin/fm-fleet-ledger.sh" filed item-1 sample ship 2 2>&1) || rc=$?
+  assert_equals 1 "$rc" "filed exit status with an unwritable ledger"
+  assert_equals "fm-fleet-ledger: could not record filed for item-1; the ledger may be missing records" "$out" \
+    "an unwritable ledger must cost exactly one line"
+  pass "flag off writes nothing, and an unwritable ledger fails with one line for the producer to ignore"
+}
+
 test_flag_on_records_the_task_lifecycle
 test_flag_on_records_a_pr_merge_once
 test_flag_on_records_a_pr_registration
@@ -285,3 +375,6 @@ test_worker_status_command_fails_when_the_append_fails
 test_worker_status_line_lands_when_the_ledger_fails
 test_worker_status_line_with_the_flag_absent
 test_flag_off_writes_nothing
+test_lifecycle_records_carry_exactly_their_fields
+test_answered_by_is_derived_from_home_role_and_source
+test_flag_off_and_unwritable_ledger_for_the_new_records

@@ -173,6 +173,8 @@
 # open-decision ledger fm-wake-drain folds lives in this home's own state dir
 # (a remote mate's escalations reach it through the parent-replies ingest);
 # only the answer message crosses the backend or remote transport.
+# With the opt-in fleet ledger on, each closed key also appends one task.answered
+# record whose answered_by the ledger derives (docs/fleet-ledger.md).
 #
 # Answering a decision is the gate-answer path and is main-owned while
 # attended: when any named key is an open needs-decision or a captain-held task
@@ -696,7 +698,7 @@ fi
 # or a worker line the fold read but never listed, leave the watcher's wake
 # path untouched.
 fm_send_close_resolved_keys() { # <answer-text>
-  local note=$1 k close_note append_rc still manual_close_cmd close_lines=() i=0
+  local note=$1 k close_note append_rc still manual_close_cmd close_lines=() i=0 ledger_config
   note=$(printf '%s' "$note" | tr '\n\r\t' '   ' | LC_ALL=C tr -d '\000-\037\177')
   for k in $RESOLVE_STATUS_KEYS; do
     close_note=$(fm_send_resolve_close_note "$k" "$note")
@@ -723,6 +725,17 @@ fm_send_close_resolved_keys() { # <answer-text>
     esac
     i=$((i + 1))
   done
+  # Opt-in fleet activity ledger (docs/fleet-ledger.md): one task.answered record
+  # per closed key, with answered_by derived by the ledger from this home's role.
+  # A captain-held task's record is written by bin/fm-captain-hold.sh instead.
+  # A failed write never changes the send.
+  ledger_config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  if [ -e "$ledger_config/fleet-ledger" ]; then
+    for k in $RESOLVE_STATUS_KEYS; do
+      FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$ledger_config \
+        "$SCRIPT_DIR/fm-fleet-ledger.sh" answered "$RESOLVE_TASK_ID" send "$k" || true
+    done
+  fi
 }
 
 # Feed the answered captain-held tasks to the ONE keyed-answer intake, as keyed

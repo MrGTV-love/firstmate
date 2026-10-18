@@ -326,6 +326,9 @@ DATA="${FM_DATA_OVERRIDE:-$FM_HOME/data}"
 # shellcheck source=bin/fm-lease-lib.sh
 # shellcheck disable=SC1091
 . "$SCRIPT_DIR/fm-lease-lib.sh"
+# shellcheck source=bin/fm-answered-by-lib.sh
+# shellcheck disable=SC1091
+. "$SCRIPT_DIR/fm-answered-by-lib.sh"
 
 PARENT_HOLD_PUBLISHED=0
 publish_parent_hold() {  # <task-id> <occurrence> <verb> <note>
@@ -665,15 +668,43 @@ closed_answer_replay_mode_compatible() {  # <mode> <task-body>
   return 1
 }
 
+# The source the decision file names ("Captain answered this call through
+# <source>."), empty when the file is not a keyed answer.
+decision_source() {
+  local first=${DECISION_TEXT%%$'\n'*}
+  case "$first" in
+    'Captain answered this call through '*.)
+      first=${first#'Captain answered this call through '}
+      printf '%s' "${first%.}"
+      ;;
+  esac
+}
+
+# Opt-in fleet activity ledger (docs/fleet-ledger.md): one task.answered record
+# for a newly recorded answer. A replay never reaches here, and a failed write
+# never changes the answer.
+ledger_hold_answered() {  # <task-id>
+  local config=${FM_CONFIG_OVERRIDE:-$FM_HOME/config}
+  [ -e "$config/fleet-ledger" ] || return 0
+  FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$config \
+    "$SCRIPT_DIR/fm-fleet-ledger.sh" answered "$1" hold "$1" "$(decision_source)" || true
+}
+
 # The record's label is what keeps an evidence-backed reconciliation from
 # reading as the captain's own words. `reconciled` closes a call that went moot
 # and carries verified evidence; every other mode carries what the captain said.
+# Every record states when it was written (UTC) after its optional hold-set
+# line, which the occurrence and hold-set readers above expect directly after
+# the mode line. A captain answer also states who answered it, derived by
+# bin/fm-answered-by-lib.sh; reconciliation is evidence, not an answer.
 resolution_block() {
   local label='Captain decision:'
   [ "$1" != reconciled ] || label='Reconciliation evidence:'
   printf 'Resolution recorded by fm-captain-hold.\nDecision digest: %s\nResolution mode: %s\n' \
     "$DECISION_DIGEST" "$1"
   [ -z "$2" ] || printf 'Resolves hold set: %s\n' "$2"
+  printf 'Resolved at: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  [ "$1" = reconciled ] || printf 'Answered by: %s\n' "$(fm_answered_by "$FM_HOME" "$STATE" hold "$(decision_source)")"
   printf '\n%s\n%s\n' "$label" "$DECISION_TEXT"
 }
 
@@ -1023,7 +1054,9 @@ archive_row_lookup() {  # <resolved-data-dir> <id>
 
 # Whether an archived body's newest resolution record is the captain's recorded
 # answer: the exact record the answer path writes, with every line anchored at
-# its line start and a non-empty answer text under `Captain decision:`. The
+# its line start (the mode line, then optionally the hold-set, `Resolved at:`,
+# and `Answered by:` lines in that order) and a non-empty answer text under
+# `Captain decision:`. The
 # retired fm-decision-hold leader counts only with its own full shape. A record
 # of mode `reconciled` is evidence, never an answer, and prose that merely
 # quotes the marker strings is no record. Returns 0 for an answer, 4 for an
@@ -1062,8 +1095,15 @@ archived_answer_state() {  # <dedented-archived-body>
       verdict("none")
     }
     st == 4 {
-      if (!retired && !holdset && substr($0, 1, 19) == "Resolves hold set: " && length($0) > 19) {
+      if (!retired && !holdset && !resolvedat && !answeredby \
+          && substr($0, 1, 19) == "Resolves hold set: " && length($0) > 19) {
         holdset = 1; next
+      }
+      if (!retired && !resolvedat && !answeredby && substr($0, 1, 13) == "Resolved at: " && length($0) > 13) {
+        resolvedat = 1; next
+      }
+      if (!retired && !answeredby && substr($0, 1, 13) == "Answered by: " && length($0) > 13) {
+        answeredby = 1; next
       }
       if ($0 == "") { st = 5; next }
       verdict("none")
@@ -1616,6 +1656,7 @@ command_answer() {
     [ "$(show_field "$show" state)" = "done" ] || fail "recording the answer reopened closed task $id"
     body_has_resolution_record "$(show_field "$show" body)" \
       || fail "captain-held task $id did not retain its durable resolution record"
+    ledger_hold_answered "$id"
     publish_parent_resolution_then_retire "$id" "$occurrence" "answered (repaired)"
     printf 'repaired: %s\n' "$id"
     return 0
@@ -1645,6 +1686,7 @@ command_answer() {
         fail "could not close answered captain-held task $id"
       fi
       remove_interrupted_answer_stamp "$id"
+      ledger_hold_answered "$id"
       case "$recorded_mode" in
         released) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) released ;;
         *) publish_parent_resolution_then_retire "$id" $((occurrence - 1)) "$outcome" ;;
@@ -1661,6 +1703,7 @@ command_answer() {
     show=$TASK_SHOW_OUTPUT
     body_has_resolution_record "$(show_field "$show" body)" \
       || fail "captain-held task $id did not retain its durable resolution record"
+    ledger_hold_answered "$id"
     publish_parent_resolution_then_retire "$id" "$occurrence" "$outcome"
     printf '%s: %s\n' "$outcome" "$id"
     return 0

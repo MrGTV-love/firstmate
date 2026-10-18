@@ -1524,6 +1524,98 @@ test_internal_retention_preserves_active_drop_provenance() (
   pass "internal retention and read-only admission preserve active captain drop classification"
 )
 
+# The resolution record carries the UTC time it was written and who answered,
+# derived by the script; a replay of the same answer rewrites neither.
+test_resolution_record_states_when_and_who_answered() {
+  local home id show before after at
+  home=$(make_home resolution-time)
+  id=sample-time-call
+  run_captain "$home" hold "$id" --title "Choose the time option" --reason "captain time choice pending" \
+    --repo sample >/dev/null || fail "could not hold the call"
+  printf 'Captain chose option two.\n' > "$home/decision.txt"
+  before=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  run_captain "$home" answer "$id" --decision-file "$home/decision.txt" >/dev/null \
+    || fail "answer could not close the captain-held task"
+  after=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  show=$(tasks_in "$home" show "$id" --full)
+  at=$(printf '%s\n' "$show" | grep -oE 'Resolved at: [0-9T:Z-]+' | head -1 | sed 's/^Resolved at: //')
+  case "$at" in
+    [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]:[0-9][0-9]:[0-9][0-9]Z) ;;
+    *) fail "the record carries no UTC resolution time: $show" ;;
+  esac
+  [[ ! "$at" < "$before" && ! "$at" > "$after" ]] || fail "resolution time $at is outside $before .. $after"
+  assert_contains "$show" "Resolution mode: answered" "the existing mode field changed"
+  assert_contains "$show" "Decision digest: " "the existing digest field changed"
+  assert_contains "$show" "Answered by: unknown" "a direct answer names no source, so who answered it is unknown"
+
+  sleep 1
+  run_captain "$home" answer "$id" --decision-file "$home/decision.txt" >/dev/null \
+    || fail "identical answer retry was not idempotent"
+  assert_equals "$at" "$(tasks_in "$home" show "$id" --full | grep -oE 'Resolved at: [0-9T:Z-]+' | head -1 | sed 's/^Resolved at: //')" \
+    "a replayed answer must keep the first resolution time"
+  assert_equals 1 "$(tasks_in "$home" show "$id" --full | grep -c 'Resolved at: ')" "resolution times after a replay"
+  pass "a captain-hold resolution records its UTC time and an unknown answerer, and a replay changes neither"
+}
+
+# answered_by is read from the recorded source, never typed: a page, the chat,
+# a policy, or this home's role for a firstmate send; anything else is unknown.
+test_answered_by_is_derived_from_the_recorded_source() {
+  local home id source want
+  home=$(make_home answered-by)
+  while IFS='|' read -r id source want; do
+    run_captain "$home" hold "$id" --title "Call $id" --reason "captain choice pending" --repo sample >/dev/null \
+      || fail "could not hold $id"
+    printf '%s\tyes\t\n' "$id" | run_captain "$home" answers --any-origin --source "$source" >/dev/null \
+      || fail "the keyed answer for $id was not accepted"
+    assert_contains "$(tasks_in "$home" show "$id" --full)" "Answered by: $want" \
+      "source '$source' should record answered_by $want"
+  done <<'SOURCES'
+call-page|the captain's Lavish review page|page
+call-board|a bearings board card|page
+call-chat|the captain's chat message|chat
+call-policy|a standing policy|policy
+call-send-main|a firstmate answer sent to some-task|main
+call-other|a carrier pigeon|unknown
+SOURCES
+  : > "$home/state/.afk"
+  run_captain "$home" hold call-send-afk --title "Call afk" --reason "captain choice pending" --repo sample >/dev/null
+  printf 'call-send-afk\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null
+  assert_contains "$(tasks_in "$home" show call-send-afk --full)" "Answered by: main-afk" "the away posture was not recorded"
+  rm -f "$home/state/.afk"
+  printf 'secondmate-id\n' > "$home/.fm-secondmate-home"
+  run_captain "$home" hold call-send-mate --title "Call mate" --reason "captain choice pending" --repo sample >/dev/null 2>&1
+  printf 'call-send-mate\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null 2>&1
+  assert_contains "$(tasks_in "$home" show call-send-mate --full)" "Answered by: secondmate" "a secondmate home was not recorded"
+  pass "answered_by comes from the recorded source or this home's role, and is unknown otherwise"
+}
+
+# Opt-in fleet ledger: a recorded answer appends one task.answered; a replay
+# appends none; an unwritable ledger never changes the answer.
+test_hold_answer_records_task_answered_in_the_ledger() {
+  local home id rows rc=0
+  home=$(make_home answer-ledger)
+  id=sample-ledger-call
+  : > "$home/config/fleet-ledger"
+  run_captain "$home" hold "$id" --title "Ledger call" --reason "captain choice pending" --repo sample >/dev/null
+  printf '%s\tyes\t\n' "$id" | run_captain "$home" answers --any-origin --source "the captain's Lavish review page" >/dev/null \
+    || fail "keyed answer failed with the ledger on"
+  printf '%s\tyes\t\n' "$id" | run_captain "$home" answers --any-origin --source "the captain's Lavish review page" >/dev/null \
+    || fail "keyed answer replay failed with the ledger on"
+  rows=$(jq -c 'select(.event == "task.answered") | [.task, .via, .key, .answered_by, (.at | test("Z$"))]' "$home/state/fleet-ledger.jsonl")
+  assert_equals "[\"$id\",\"hold\",\"$id\",\"page\",true]" "$rows" "task.answered records after an answer and its replay"
+
+  run_captain "$home" hold sample-failing-call --title "Failing ledger call" --reason "captain choice pending" --repo sample >/dev/null
+  printf 'Captain chose.\n' > "$home/failing.txt"
+  rm -f "$home/state/fleet-ledger.jsonl"
+  mkdir "$home/state/fleet-ledger.jsonl"
+  run_captain "$home" answer sample-failing-call --decision-file "$home/failing.txt" > "$home/failing.out" 2> "$home/failing.err" || rc=$?
+  assert_equals 0 "$rc" "answer exit status with an unwritable ledger"
+  assert_equals "answered: sample-failing-call" "$(cat "$home/failing.out")" "answer stdout with an unwritable ledger"
+  assert_equals 1 "$(grep -c 'fm-fleet-ledger: could not record answered' "$home/failing.err")" "ledger failure lines on stderr"
+  assert_contains "$(tasks_in "$home" show sample-failing-call --full)" "state: done" "the answer was not recorded when the ledger failed"
+  pass "ledger on: a recorded answer appends one task.answered, a replay none, and an unwritable ledger costs one stderr line"
+}
+
 tests=(
 test_hold_reason_round_trips_awkward_characters
 test_hold_origins_precede_backend_holds
@@ -1548,5 +1640,8 @@ test_terminal_single_owner_status_decision_does_not_block_empty_inventory
 test_secondmate_hold_stays_in_authoritative_home
 test_secondmate_home_publishes_holds_and_answers
 test_secondmate_reconcile_publishes_before_request_retirement
+test_resolution_record_states_when_and_who_answered
+test_answered_by_is_derived_from_the_recorded_source
+test_hold_answer_records_task_answered_in_the_ledger
 )
 captain_hold_run_tests "$@"
