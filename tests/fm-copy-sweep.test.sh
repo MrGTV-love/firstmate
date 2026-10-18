@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Behavioral coverage for bin/fm-copy-sweep.sh: the proof matrix, the report-only
-# default, the one-wake byte budget, the load and du limits, and the refusal to
-# force anything. Every world is a throwaway directory under a temp root with
+# default, the one-wake byte budget, the load guard and du limits, the lane-home
+# view, and the refusal to force anything. Every world is a throwaway directory under a temp root with
 # real `git worktree add` copies; no real pool, home, state file or backlog is
 # read or written. FM_COPY_SWEEP_BIN points the suite at a mutant of the script
 # to prove each assertion can fail.
@@ -39,6 +39,7 @@ make_world() {  # <name>
 install_fakes() {
   cat > "$FAKEBIN/lsof" <<'EOF'
 #!/usr/bin/env bash
+[ -z "${FAKE_LSOF_SLEEP:-}" ] || sleep "$FAKE_LSOF_SLEEP"
 [ -n "${FAKE_LSOF_CWD:-}" ] || exit 0
 printf 'p4242\nfcwd\nn%s\n' "$FAKE_LSOF_CWD"
 EOF
@@ -78,6 +79,9 @@ case " $* " in
       echo "fatal: injected failure" >&2
       exit 1
     fi
+    ;;
+  *" status "*)
+    [ -z "${FAKE_GIT_SLEEP_STATUS:-}" ] || sleep "$FAKE_GIT_SLEEP_STATUS"
     ;;
 esac
 exec "$FAKE_REAL_GIT" "$@"
@@ -335,26 +339,71 @@ test_nothing_is_forced_deleted_cleaned_or_returned() {
   pass "apply never forces, cleans, unlocks, recursively deletes or calls treehouse"
 }
 
-test_load_guard_blocks_a_scan() {
+test_load_guard_skips_only_the_sizing_and_says_so() {
   make_world load
   add_copy reap
-  printf 'load-limit 40\n' > "$HOMED/config/copy-budget"
-  FAKE_LOAD=40.01 run_sweep --apply
-  [ "$RC" = 75 ] || fail "a load above the limit should exit 75, got $RC: $OUT"
-  assert_contains "$OUT" "load average 40.01 is above the limit 40" "the guard did not name the load"
-  [ -d "$(copy_path reap)" ] || fail "apply removed a copy while the load guard held"
+  add_copy keep
+  printf 'x\n' > "$(copy_path keep)/untracked.txt"
+  printf 'load-limit 40\ninterval 0\n' > "$HOMED/config/copy-budget"
+  FAKE_LOAD=40.01 run_sweep
+  [ "$RC" = 0 ] || fail "a report above the load limit should still finish, got $RC: $OUT"
+  assert_contains "$OUT" "scan skipped: load 40.01 above limit 40" "the skipped sizing was not said"
+  assert_class reap REAPABLE-PROVEN
+  assert_class keep HELD-DIRTY
+  assert_contains "$OUT" "? GiB" "an unsized copy should read ? GiB"
   [ ! -f "$W/du.log" ] || fail "du ran while the load guard held"
-  FAKE_UPTIME_STYLE=linux FAKE_LOAD=40.01 run_sweep --apply
-  [ "$RC" = 75 ] || fail "a Linux-style load line was not read, got $RC: $OUT"
+  FAKE_UPTIME_STYLE=linux FAKE_LOAD=40.01 run_sweep
+  assert_contains "$OUT" "scan skipped: load 40.01 above limit 40" "a Linux-style load line was not read"
   FAKE_LOAD=40.00 run_sweep
   [ "$RC" = 0 ] || fail "a load equal to the limit should scan, got $RC: $OUT"
-  FAKE_LOAD=99 run_sweep check
-  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "check must stay silent under load: $RC $OUT"
-  [ ! -f "$HOMED/state/copy-sweep.record" ] || fail "check wrote a record while the guard held"
-  printf 'load-limit 100000\n' > "$HOMED/config/copy-budget"
-  run_sweep
-  [ "$RC" = 0 ] || fail "the host's own uptime output was not understood ($RC): $OUT"
-  pass "the load guard stops a scan above the limit, reads both uptime formats, and the host's real uptime parses"
+  assert_not_contains "$OUT" "scan skipped" "a load equal to the limit was skipped"
+  [ "$(du_calls)" = 2 ] || fail "a load equal to the limit should size both copies, got $(du_calls) du calls"
+  : > "$W/du.log"
+  FAKE_LOAD=95 run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply above the load limit should finish, got $RC: $OUT"
+  assert_contains "$OUT" "scan skipped: load 95 above limit 40" "apply did not say the sizing was skipped"
+  [ ! -s "$W/du.log" ] || fail "apply ran du while the load guard held"
+  [ ! -e "$(copy_path reap)" ] || fail "apply should still remove a proven copy while sizing is skipped"
+  [ -d "$(copy_path keep)" ] || fail "apply removed a held copy"
+  assert_present "$HOMED/state/copy-sweep.record" "apply did not record the skipped scan"
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "scan skipped: load 95 above limit 40" "the record does not hold the skip line"
+  FAKE_LOAD=95 run_sweep check
+  [ "$RC" = 0 ] && [ -z "$OUT" ] || fail "check must not wake on its first skipped run: $RC $OUT"
+  if command -v uptime >/dev/null 2>&1; then
+    mkdir -p "$W/fakebin-real-uptime"
+    cp "$FAKEBIN/lsof" "$FAKEBIN/nice" "$FAKEBIN/du" "$FAKEBIN/git" "$FAKEBIN/rm" "$W/fakebin-real-uptime/"
+    printf 'load-limit 100000\n' > "$HOMED/config/copy-budget"
+    FAKEBIN="$W/fakebin-real-uptime" run_sweep
+    [ "$RC" = 0 ] || fail "report with the host's own uptime failed ($RC): $OUT"
+    assert_not_contains "$OUT" "scan skipped" "the host's own uptime output was not understood"
+  fi
+  pass "a load above the limit skips only the sizing, says so in the report and the record, and listing, classes and apply still run"
+}
+
+test_six_hours_of_skipped_runs_wake_once() {
+  local t0=100000
+  make_world skipwake
+  add_copy a
+  printf 'load-limit 40\ninterval 0\n' > "$HOMED/config/copy-budget"
+  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$t0 run_sweep check
+  [ -z "$OUT" ] || fail "the first skipped run woke: $OUT"
+  assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "scan skipped: load 99 above limit 40" "the record does not hold the skip line"
+  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 5 * 3600 + 3599)) run_sweep check
+  [ -z "$OUT" ] || fail "a streak shorter than 6 hours woke: $OUT"
+  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 6 * 3600)) run_sweep check
+  [ "$(printf '%s\n' "$OUT" | grep -c '^copy-sweep:')" = 1 ] || fail "6 hours of skips should raise exactly one wake: $OUT"
+  assert_contains "$OUT" "scan skipped: load 99 above limit 40 on every run for 6 hours" "the wake did not name the skip and its length"
+  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 7 * 3600)) run_sweep check
+  [ -z "$OUT" ] || fail "the same streak woke twice: $OUT"
+  FAKE_LOAD=1 FM_COPY_SWEEP_NOW=$((t0 + 8 * 3600)) run_sweep check
+  [ -z "$OUT" ] || fail "a run that sized again should not wake: $OUT"
+  assert_no_grep "skip" "$HOMED/state/copy-sweep.record" "a sized run left the skip streak in the record"
+  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 9 * 3600)) run_sweep check
+  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 14 * 3600)) run_sweep check
+  [ -z "$OUT" ] || fail "a new streak woke before 6 hours: $OUT"
+  FAKE_LOAD=99 FM_COPY_SWEEP_NOW=$((t0 + 15 * 3600)) run_sweep check
+  assert_contains "$OUT" "on every run for 6 hours" "a new 6-hour streak did not wake again"
+  pass "a streak of skipped runs raises one wake after 6 hours, none while it stands, and again after a sized run breaks it"
 }
 
 test_one_du_at_a_time_under_nice() {
@@ -493,7 +542,7 @@ test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
   make_budget_world cut 10 10 10
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
   # The first du finishes inside the bound; the second is cut by it; the third never starts.
-  FAKE_DU_SLEEP=1.6 FM_COPY_SWEEP_BUDGET_SECS=3 run_sweep check
+  FAKE_DU_SLEEP=1.6 FM_CHECK_TIMEOUT=8 run_sweep check
   [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
   assert_contains "$OUT" "is over its budget: 10.00 GiB against 5 GiB" "a lower bound already over the budget should wake"
   assert_contains "$OUT" "2 copies unmeasured" "the wake did not disclose the unmeasured copies"
@@ -501,9 +550,118 @@ test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one() {
   [ "$(du_calls)" = 1 ] || fail "a du that could not finish inside the bound was counted, or one ran past it: $(du_calls) completed"
   make_budget_world cutquiet 1 1 1
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
-  FAKE_DU_SLEEP=1.6 FM_COPY_SWEEP_BUDGET_SECS=3 run_sweep check
+  FAKE_DU_SLEEP=1.6 FM_CHECK_TIMEOUT=8 run_sweep check
   [ -z "$OUT" ] || fail "a cut scan that proved nothing over still woke: $OUT"
   pass "a scan cut at its time bound wakes only on bytes it measured and records no completed scan"
+}
+
+test_a_registered_copy_whose_directory_is_gone_does_not_latch_the_record() {
+  make_budget_world gone 4 4 4
+  add_copy vanished
+  rm -rf "$(copy_path vanished)"
+  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  run_sweep
+  assert_class vanished ORPHAN-NO-RECORD
+  assert_contains "$OUT" "ORPHAN-NO-RECORD"$'\t'"0.00 GiB"$'\t'"$(copy_path vanished)" "a copy whose directory is gone should read 0.00 GiB"
+  assert_not_contains "$OUT" "unmeasured" "a copy whose directory is gone was reported as unmeasured"
+  run_sweep check
+  assert_contains "$OUT" "container $SLOT is over its budget: 12.00 GiB against 5 GiB" "the first overrun did not wake"
+  assert_not_contains "$OUT" "unmeasured" "the wake called a gone copy unmeasured"
+  set_sizes 1 1 1
+  run_sweep check
+  [ -z "$OUT" ] || fail "dropping under the budget should not wake: $OUT"
+  assert_no_grep "over" "$HOMED/state/copy-sweep.record" "a gone copy kept a budget that is back under in the record"
+  set_sizes 2 2 2
+  run_sweep check
+  assert_contains "$OUT" "container $SLOT is over its budget: 6.00 GiB against 5 GiB" "exceeding again with a gone copy registered did not wake again"
+  pass "a registered copy whose directory is gone counts as 0 KiB, so it never latches a budget record"
+}
+
+test_a_slow_classification_cannot_starve_the_wake() {
+  local started elapsed
+  make_budget_world slowgit 10 10 10
+  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  started=$(date +%s)
+  FAKE_GIT_SLEEP_STATUS=90 FM_CHECK_TIMEOUT=20 run_sweep check
+  elapsed=$(( $(date +%s) - started ))
+  [ "$RC" = 0 ] || fail "check failed ($RC): $OUT"
+  [ "$elapsed" -lt 20 ] || fail "check outlived its FM_CHECK_TIMEOUT of 20 seconds: $elapsed"
+  assert_contains "$OUT" "container $SLOT is over its budget: 30.00 GiB against 5 GiB" "the wake was lost to a slow classification"
+  assert_contains "$OUT" "$(copy_path c1) 10.00 GiB UNCLASSIFIED" "a copy whose classification was cut should read UNCLASSIFIED"
+  assert_not_contains "$OUT" "HELD-" "a cut classification still named a class"
+  make_budget_world slowlsof 10 10 10
+  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  started=$(date +%s)
+  FAKE_LSOF_SLEEP=90 FM_CHECK_TIMEOUT=20 run_sweep check
+  elapsed=$(( $(date +%s) - started ))
+  [ "$elapsed" -lt 20 ] || fail "check outlived its FM_CHECK_TIMEOUT behind a slow lsof: $elapsed"
+  assert_contains "$OUT" "container $SLOT is over its budget: 30.00 GiB against 5 GiB" "the wake was lost to a slow process scan"
+  assert_not_contains "$OUT" "HELD-" "a cut process scan still named a class"
+  pass "a git or lsof call that cannot finish inside check's time leaves the copy UNCLASSIFIED and the wake is still printed in time"
+}
+
+# A registered local secondmate home under the world's root home: its parent
+# marker, its registry entry, the root home's own secondmate record for it, and
+# one project clone with a local bare origin.
+make_lane() {  # <id>
+  local id=$1 lane="$W/lane-$1" proj="$W/lane-$1/projects/p"
+  mkdir -p "$lane/state" "$lane/data" "$lane/config"
+  printf 'schema=fm-secondmate-parent.v1\nroute=local\nparent_home=%s\n' "$HOMED" > "$lane/.fm-secondmate-parent"
+  printf -- '- %s - %s (home: %s; scope: fixture; projects: p; added 2026-10-18)\n' "$id" "$id" "$lane" >> "$HOMED/data/secondmates.md"
+  fm_write_meta "$HOMED/state/$id.meta" "kind=secondmate" "home=$lane"
+  fm_git_init_commit "$proj"
+  fm_git_add_origin "$proj" "$W/$id-origin.git"
+  git -C "$proj" fetch -q origin
+}
+
+# lane_copy <id> <name>: a clean copy of the lane's project, pushed to its origin.
+lane_copy() {
+  local proj="$W/lane-$1/projects/p" copy="$W/lane-$1/projects/p/.claude/worktrees/$2"
+  git -C "$proj" worktree add -q -b "fm/$2" "$copy"
+  printf '%s\n' "$2" > "$copy/$2.txt"
+  git -C "$copy" add "$2.txt"
+  git -C "$copy" commit -qm "$2"
+  git -C "$copy" push -q origin "fm/$2"
+}
+
+lane_class() {  # <id> <name> -> class in $OUT
+  printf '%s\n' "$OUT" | awk -F '\t' -v p="$W/lane-$1/projects/p/.claude/worktrees/$2" '$3 == p { print $1 }'
+}
+
+assert_lane_class() {  # <id> <name> <class>
+  local got
+  got=$(lane_class "$1" "$2")
+  [ "$got" = "$3" ] || fail "lane $1 copy $2 should be $3, got '${got:-none}': $OUT"
+}
+
+test_a_lane_home_is_judged_as_that_home_would_judge_it() {
+  local lane
+  make_world lanes
+  make_lane open
+  lane_copy open clean
+  lane_copy open held
+  fm_write_meta "$W/lane-open/state/lane-task.meta" "worktree=$W/lane-open/projects/p/.claude/worktrees/held" "kind=ship"
+  make_lane badmarker
+  lane_copy badmarker only
+  printf 'garbage\n' > "$W/lane-badmarker/.fm-secondmate-parent"
+  make_lane nostate
+  lane_copy nostate only
+  rm -rf "$W/lane-nostate/state"
+  run_sweep
+  [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  assert_lane_class open clean REAPABLE-PROVEN
+  assert_lane_class open held HELD-LIVE-TASK
+  assert_contains "$OUT" "task lane-task's active record names it as its worktree" "the lane's own record was not named"
+  assert_lane_class badmarker only HELD-LIVE-TASK
+  assert_contains "$OUT" "the active task records of $W/lane-badmarker cannot be read" "an unreadable lane was not named in the report"
+  assert_lane_class nostate only HELD-LIVE-TASK
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  [ ! -e "$W/lane-open/projects/p/.claude/worktrees/clean" ] || fail "the lane's proven copy was not removed from the root home"
+  for lane in "open/held" "badmarker/only" "nostate/only"; do
+    [ -d "$W/lane-${lane%%/*}/projects/p/.claude/worktrees/${lane##*/}" ] || fail "apply removed lane copy $lane, which must be held"
+  done
+  pass "run from the root home, a lane's proven copy is reaped, its own live record holds a copy, and an unreadable lane holds every copy"
 }
 
 test_check_classifies_only_the_copies_it_names() {
@@ -624,7 +782,8 @@ run_case test_landed_content_without_a_pushed_tip_is_reaped_by_apply
 run_case test_lane_home_project_clone_is_swept
 run_case test_failing_remove_leaves_the_copy_and_is_never_forced
 run_case test_nothing_is_forced_deleted_cleaned_or_returned
-run_case test_load_guard_blocks_a_scan
+run_case test_load_guard_skips_only_the_sizing_and_says_so
+run_case test_six_hours_of_skipped_runs_wake_once
 run_case test_one_du_at_a_time_under_nice
 run_case test_sizes_are_cached_by_path_and_mtime
 run_case test_nested_copy_bytes_are_not_counted_twice
@@ -632,6 +791,9 @@ run_case test_budget_wake_names_budget_total_and_five_largest_and_fires_once
 run_case test_pool_budget_and_two_budgets_share_one_wake
 run_case test_apply_raises_the_wake_through_the_queue_once
 run_case test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one
+run_case test_a_registered_copy_whose_directory_is_gone_does_not_latch_the_record
+run_case test_a_slow_classification_cannot_starve_the_wake
+run_case test_a_lane_home_is_judged_as_that_home_would_judge_it
 run_case test_check_classifies_only_the_copies_it_names
 run_case test_check_respects_its_interval
 run_case test_check_never_removes

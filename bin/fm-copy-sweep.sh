@@ -34,7 +34,12 @@
 #                      path inside or around it, except a registered secondmate's
 #                      own home chain), a process has its working directory
 #                      inside it, it holds this home or this process, or the
-#                      records or the process table cannot be read.
+#                      records or the process table cannot be read. A project
+#                      clone under a registered secondmate home is judged as that
+#                      home would judge it (FM_HOME set to that home): the lane's
+#                      own records apply, its secondmate record in the root home
+#                      is its home chain, and a lane whose records cannot be read
+#                      holds all of its copies.
 #   HELD-DIRTY         git status shows any change or untracked file, an
 #                      operation (rebase, merge, cherry-pick, revert, bisect) is
 #                      in progress, or it holds an ignored file that exists
@@ -66,8 +71,11 @@
 # until that mtime changes or the entry is older than cache-max-age (a copy's
 # root mtime does not move when a deep file grows). A copy nested in another copy
 # is subtracted from its enclosing copy so no byte is counted twice.
-# Nothing runs while the 1-minute load average exceeds load-limit (default 40):
-# the run exits 75 (silently exits 0 for `check`).
+# While the 1-minute load average exceeds load-limit (default 90), or cannot be
+# read, no du runs: the listing, the classes and --apply still run, only fresh
+# cached sizes are used, and the run prints and records one line, "scan skipped:
+# load N above limit M". `check` records it and stays quiet, and raises one wake
+# once every run for 6 hours has skipped.
 #
 # Budgets. config/copy-budget (docs/configuration.md owns the format) holds a
 # GiB budget per pool root and per container (a pool slot, or a Firstmate home).
@@ -86,16 +94,16 @@
 # FM_CHECK_INTERVAL cadence, at most once per `interval` seconds of scanning;
 # no extra daemon or scheduler is installed. `check` never removes anything. The
 # watcher kills a check that outlives FM_CHECK_TIMEOUT and keeps nothing, so
-# `check` bounds its whole scan by that timeout minus five seconds
-# (FM_COPY_SWEEP_BUDGET_SECS may only lower it): each du runs under the time
-# left and is cut when it cannot finish, a cut copy stays unmeasured until a
-# later poll, or a direct run, measures it into the cache, and `check` classifies
-# only the copies it names in a wake (the rest read UNCLASSIFIED). A first scan
-# of large copies is therefore warmed by the hourly `--apply` run, which has no
-# time bound.
+# `check` bounds its whole scan by that timeout minus five seconds: each du runs
+# under the time left and is cut when it cannot finish, a cut copy stays
+# unmeasured until a later poll, or a direct run, measures it into the cache, and
+# `check` classifies only the copies it names in a wake (the rest read
+# UNCLASSIFIED). Every git and lsof call of those classifications runs under the
+# time left too, so a copy whose classification cannot finish reads UNCLASSIFIED
+# and the wake is still printed in time. A first scan of large copies is
+# therefore warmed by the hourly `--apply` run, which has no time bound.
 #
-# Exit status: 0 done, 1 a removal or write failed, 2 bad call or bad config,
-# 75 the load guard stopped the run.
+# Exit status: 0 done, 1 a removal or write failed, 2 bad call or bad config.
 # tests/fm-copy-sweep.test.sh is the regression entry point.
 set -u
 export LC_ALL=C
@@ -172,7 +180,7 @@ kib_to_gib() {  # <KiB>
 
 # --- configuration -----------------------------------------------------------
 
-LOAD_LIMIT=40
+LOAD_LIMIT=90
 DEFAULT_POOL_GIB=60
 DEFAULT_CONTAINER_GIB=20
 SCAN_INTERVAL=3600
@@ -271,17 +279,17 @@ load_average() {
   printf '%s\n' "$v"
 }
 
-# Returns 0 when it is safe to scan; 1 with LOAD_WHY set when it is not.
-LOAD_WHY=
-load_allows_scan() {
+# Returns 0 when du may run; 1 with SKIP_LINE set when it may not.
+SKIP_LINE=
+load_allows_sizing() {
   local load
-  LOAD_WHY=
+  SKIP_LINE=
   if ! load=$(load_average); then
-    LOAD_WHY="the 1-minute load average cannot be read"
+    SKIP_LINE="scan skipped: load cannot be read, limit $LOAD_LIMIT"
     return 1
   fi
   if awk -v l="$load" -v m="$LOAD_LIMIT" 'BEGIN { exit !(l > m) }'; then
-    LOAD_WHY="the 1-minute load average $load is above the limit $LOAD_LIMIT"
+    SKIP_LINE="scan skipped: load $load above limit $LOAD_LIMIT"
     return 1
   fi
 }
@@ -352,6 +360,36 @@ list_nested() {  # <clone>
   done < <(git -C "$clone" worktree list --porcelain -z 2>/dev/null)
 }
 
+# --- bounded commands --------------------------------------------------------
+
+SCAN_DEADLINE=0
+CLASSIFY_BOUNDED=0
+
+# Runs an external command under the time check's scan has left: status 124 when
+# that time is spent or runs out. A plain call when the run has no deadline.
+run_before_deadline() {  # <command> [args...]
+  local remaining bin
+  if [ "$SCAN_DEADLINE" -le 0 ]; then
+    command "$@"
+    return
+  fi
+  remaining=$((SCAN_DEADLINE - $(date +%s)))
+  [ "$remaining" -ge 1 ] || return 124
+  bin=$(type -P "$1") || return 127
+  shift
+  fm_run_timed "$remaining" "$bin" "$@"
+}
+
+# While check classifies, every git and lsof call, including the ones the sourced
+# libraries make, runs under the time left.
+git() {
+  if [ "$CLASSIFY_BOUNDED" = 1 ]; then run_before_deadline git "$@"; else command git "$@"; fi
+}
+
+lsof() {
+  if [ "$CLASSIFY_BOUNDED" = 1 ]; then run_before_deadline lsof "$@"; else command lsof "$@"; fi
+}
+
 # --- process table -----------------------------------------------------------
 
 PROC_TABLE=
@@ -405,11 +443,18 @@ content_in_default() {  # <copy> <clone>
   [ "${merged_tree%%$'\n'*}" = "$default_tree" ]
 }
 
-# Sets CLASS and REASON for <copy>, registered by <clone>.
-classify() {  # <copy> <clone>
-  local copy=$1 clone=$2 top rc admin status count name pid unique pending
+# Sets CLASS and REASON for <copy>, registered by <clone> of <pool> and
+# <container>. A clone under a Firstmate home other than this one is judged as
+# that home would judge it.
+classify() {  # <copy> <clone> <pool> <container>
+  local copy=$1 clone=$2 pool=$3 container=$4 top rc admin status count name pid unique pending
+  local home=$FM_HOME state=$STATE
   CLASS=
   REASON=
+  if [ "$pool" = - ] && ! [ "$container/state" -ef "$STATE" ]; then
+    home=$container
+    state=$container/state
+  fi
   if [ ! -d "$copy" ]; then
     CLASS=ORPHAN-NO-RECORD
     REASON="its directory is gone; git worktree prune is the repair"
@@ -461,7 +506,7 @@ classify() {  # <copy> <clone>
     esac
   done
   rc=0
-  fm_task_copy_other_record "" "$STATE" "$copy" >/dev/null 2>&1 || rc=$?
+  FM_HOME=$home fm_task_copy_other_record "" "$state" "$copy" >/dev/null 2>&1 || rc=$?
   case "$rc" in
     0)
       CLASS=HELD-LIVE-TASK
@@ -471,7 +516,7 @@ classify() {  # <copy> <clone>
     1) ;;
     *)
       CLASS=HELD-LIVE-TASK
-      REASON="the active task records cannot be read, so none is ruled out"
+      REASON="the active task records of $home cannot be read, so none is ruled out"
       return 0
       ;;
   esac
@@ -530,8 +575,8 @@ classify() {  # <copy> <clone>
 
 # --- sizes -------------------------------------------------------------------
 
-SCAN_DEADLINE=0
 SCAN_CUT=0
+SIZING=1
 CACHE_NOW=
 SIZE_KIB=
 CACHE_NEW=
@@ -546,9 +591,12 @@ cache_lookup() {  # <copy> <mtime> -> "<measured-at><TAB><KiB>" when fresh
 # Sets SIZE_KIB to the copy's size in KiB, or empty when it was not measured.
 # One du at a time; a deadline stops new measurements, never one in flight.
 measure_copy() {  # <copy>
-  local copy=$1 mtime out kib hit rc remaining measured=$CACHE_NOW
+  local copy=$1 mtime out kib hit rc measured=$CACHE_NOW
   SIZE_KIB=
-  [ -d "$copy" ] || return 0
+  if [ ! -d "$copy" ]; then
+    SIZE_KIB=0
+    return 0
+  fi
   mtime=$(file_mtime "$copy") || mtime=
   case "$mtime" in ''|*[!0-9]*) return 0 ;; esac
   if hit=$(cache_lookup "$copy" "$mtime"); then
@@ -558,22 +606,14 @@ measure_copy() {  # <copy>
     CACHE_NEW="$CACHE_NEW$copy"$'\t'"$mtime"$'\t'"${hit%%$'\t'*}"$'\t'"$SIZE_KIB"$'\n'
     return 0
   fi
-  if [ "$SCAN_DEADLINE" -gt 0 ]; then
-    remaining=$((SCAN_DEADLINE - $(date +%s)))
-    if [ "$remaining" -lt 1 ]; then
-      SCAN_CUT=1
-      return 0
-    fi
-    # The watcher kills a check that outlives its bound and keeps nothing, so a
-    # measurement that cannot finish inside the time left is cut, not awaited.
-    rc=0
-    out=$(fm_run_timed "$remaining" nice -n 20 du -sk -- "$copy" 2>/dev/null) || rc=$?
-    if fm_timed_out "$rc"; then
-      SCAN_CUT=1
-      return 0
-    fi
-  else
-    out=$(nice -n 20 du -sk -- "$copy" 2>/dev/null) || true
+  [ "$SIZING" = 1 ] || return 0
+  # The watcher kills a check that outlives its bound and keeps nothing, so a
+  # measurement that cannot finish inside the time left is cut, not awaited.
+  rc=0
+  out=$(run_before_deadline nice -n 20 du -sk -- "$copy" 2>/dev/null) || rc=$?
+  if fm_timed_out "$rc"; then
+    SCAN_CUT=1
+    return 0
   fi
   kib=${out%%[[:space:]]*}
   case "$kib" in ''|*[!0-9]*) return 0 ;; esac
@@ -631,7 +671,7 @@ scan() {  # <mode>
         CLASS=UNCLASSIFIED
         REASON="check does not classify; run bin/fm-copy-sweep.sh for the class"
       else
-        classify "$copy" "$clone"
+        classify "$copy" "$clone" "$pool" "$container"
       fi
       measure_copy "$copy"
       rows="$rows$container"$'\t'"$pool"$'\t'"$clone"$'\t'"$copy"$'\t'"$CLASS"$'\t'"${SIZE_KIB:--}"$'\t'"$(printf '%s' "$REASON" | tr '\t\n' '  ')"$'\n'
@@ -665,7 +705,7 @@ apply_removals() {
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy _ kib _ <<< "$line"
     scan_processes
-    classify "$copy" "$clone"
+    classify "$copy" "$clone" "$pool" "$container"
     if [ "$CLASS" != REAPABLE-PROVEN ]; then
       REMOVAL_REPORT="${REMOVAL_REPORT}SKIPPED"$'\t'"$copy"$'\t'"no longer proven: $CLASS, $REASON"$'\n'
       continue
@@ -703,15 +743,18 @@ WAKE_PARTS=
 # The five largest measured copies of a budget, "path size GiB CLASS", comma
 # joined. check classifies these few copies here, while time remains.
 largest_five() {  # <field> <key>
-  local rows clone copy class kib out='' scanned=0
+  local rows container pool clone copy class kib out='' scanned=0
   rows=$(printf '%s\n' "$COPIES" | awk -F '\t' -v f="$1" -v k="$2" '$f == k && $6 != "-" { print }' \
     | LC_ALL=C sort -t "$(printf '\t')" -k6,6nr -k4,4 | head -5)
-  while IFS=$'\t' read -r _ _ clone copy class kib _; do
+  while IFS=$'\t' read -r container pool clone copy class kib _; do
     [ -n "$copy" ] || continue
     if [ "$class" = UNCLASSIFIED ] && [ "$SCAN_DEADLINE" -gt 0 ] && [ "$(date +%s)" -lt "$SCAN_DEADLINE" ]; then
+      CLASSIFY_BOUNDED=1
       [ "$scanned" = 1 ] || { scan_processes; scanned=1; }
-      classify "$copy" "$clone"
+      classify "$copy" "$clone" "$pool" "$container"
+      CLASSIFY_BOUNDED=0
       class=$CLASS
+      [ "$(date +%s)" -lt "$SCAN_DEADLINE" ] || class=UNCLASSIFIED
     fi
     out="$out${out:+, }$copy $(awk -v k="$kib" 'BEGIN { printf "%.2f", k / 1048576 }') GiB $class"
   done <<< "$rows"
@@ -769,11 +812,33 @@ evaluate_budgets() {
   done
 }
 
+# A run that skipped its sizing keeps the start of its streak of skipped runs.
+# Once the streak is 6 hours old, "skip:load" stands over like a budget does and
+# raises its wake once; the first run that sizes again ends the streak.
+SKIP_WAKE_SECS=21600
+SKIP_SINCE_NOW=
+
+evaluate_skip() {  # <now>
+  local now=$1 since
+  SKIP_SINCE_NOW=
+  [ -n "$SKIP_LINE" ] || return 0
+  since=$REC_SKIP_SINCE
+  case "$since" in ''|*[!0-9]*) since=$now ;; esac
+  [ "$since" -le "$now" ] || since=$now
+  SKIP_SINCE_NOW=$since
+  [ $((now - since)) -ge "$SKIP_WAKE_SECS" ] || return 0
+  OVER_NOW="${OVER_NOW}skip:load"$'\n'
+  ! printf '%s' "$REC_OVER" | grep -qxF skip:load || return 0
+  WAKE_PARTS="${WAKE_PARTS:+$WAKE_PARTS; }$SKIP_LINE on every run for $(((now - since) / 3600)) hours"
+}
+
 # --- the record and the cache ------------------------------------------------
 
 REC_LAST_SCAN=
 REC_OVER=
 REC_ERROR=
+REC_SKIP_SINCE=
+REC_SKIP_LINE=
 
 record_usable() {
   local line
@@ -786,10 +851,14 @@ read_record() {
   REC_LAST_SCAN=
   REC_OVER=
   REC_ERROR=
+  REC_SKIP_SINCE=
+  REC_SKIP_LINE=
   record_usable || return 0
   REC_LAST_SCAN=$(awk -F '\t' '$1 == "last_scan" { print $2; exit }' "$RECORD")
   REC_OVER=$(awk -F '\t' '$1 == "over" { print $2 }' "$RECORD")
   REC_ERROR=$(awk -F '\t' '$1 == "error" { print $2; exit }' "$RECORD")
+  REC_SKIP_SINCE=$(awk -F '\t' '$1 == "skip" { print $2; exit }' "$RECORD")
+  REC_SKIP_LINE=$(awk -F '\t' '$1 == "skip" { print $3; exit }' "$RECORD")
 }
 
 write_atomic() {  # <destination> <content>
@@ -816,6 +885,7 @@ write_record() {  # <last-scan> <error>
     [ -n "$key" ] || continue
     printf '%s' "$REC_OVER" | grep -qxF "$key" && content="$content"$'over\t'"$key"$'\n'
   done <<< "$UNKNOWN_NOW"
+  [ -z "$SKIP_SINCE_NOW" ] || content="$content"$'skip\t'"$SKIP_SINCE_NOW"$'\t'"$SKIP_LINE"$'\n'
   [ -z "$2" ] || content="$content"$'error\t'"$2"$'\n'
   write_atomic "$RECORD" "$content"
 }
@@ -846,6 +916,7 @@ print_report() {  # <mode>
   printf 'copy-sweep: mode=%s containers=%s copies=%s\n' "$1" \
     "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { c[$1] = 1 } END { n = 0; for (k in c) n++; print n }')" \
     "$(printf '%s\n' "$COPIES" | awk -F '\t' 'NF { n++ } END { print n + 0 }')"
+  [ -z "$SKIP_LINE" ] || printf 'copy-sweep: %s\n' "$SKIP_LINE"
   while IFS= read -r line; do
     [ -n "$line" ] || continue
     IFS=$'\t' read -r container pool clone copy class kib reason <<< "$line"
@@ -968,13 +1039,15 @@ release_lock() {
 }
 
 run_sweep() {  # report|apply|check
-  local mode=$1 budget_secs cap now rc=0
+  local mode=$1 cap now rc=0
   if ! load_config; then
     if [ "$mode" = check ]; then
       read_record
       if [ "$REC_ERROR" != "$CONFIG_ERROR" ]; then
         printf 'copy-sweep: %s\n' "$CONFIG_ERROR"
         OVER_NOW=$REC_OVER
+        SKIP_LINE=$REC_SKIP_LINE
+        SKIP_SINCE_NOW=$REC_SKIP_SINCE
         write_record "$REC_LAST_SCAN" "$CONFIG_ERROR" || true
       fi
       return 0
@@ -998,20 +1071,14 @@ run_sweep() {  # report|apply|check
       *) [ $((now - REC_LAST_SCAN)) -ge "$SCAN_INTERVAL" ] || [ $((now - REC_LAST_SCAN)) -lt 0 ] || return 0 ;;
     esac
   fi
-  if ! load_allows_scan; then
-    [ "$mode" = check ] && return 0
-    printf 'copy-sweep: skipped: %s\n' "$LOAD_WHY"
-    return 75
-  fi
+  SIZING=1
+  load_allows_sizing || SIZING=0
   SCAN_DEADLINE=0
   if [ "$mode" = check ]; then
     # The watcher runs a check under FM_CHECK_TIMEOUT; stay clear of it.
     cap=$(( ${FM_CHECK_TIMEOUT:-30} - 5 ))
     [ "$cap" -ge 1 ] || cap=1
-    budget_secs=${FM_COPY_SWEEP_BUDGET_SECS:-$cap}
-    case "$budget_secs" in ''|*[!0-9]*|0) budget_secs=$cap ;; esac
-    [ "$budget_secs" -le "$cap" ] || budget_secs=$cap
-    SCAN_DEADLINE=$(( $(date +%s) + budget_secs ))
+    SCAN_DEADLINE=$(( $(date +%s) + cap ))
   fi
   APPLY=0
   [ "$mode" != apply ] || APPLY=1
@@ -1022,6 +1089,7 @@ run_sweep() {  # report|apply|check
     [ "$FAILED_COUNT" -eq 0 ] || rc=1
   fi
   evaluate_budgets
+  evaluate_skip "$now"
   if [ "$mode" != report ]; then
     write_cache || { echo "fm-copy-sweep: could not write $SIZE_CACHE" >&2; rc=1; }
     if ! raise_wake "$mode"; then

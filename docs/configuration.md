@@ -1719,6 +1719,8 @@ Its header owns the classes, the proofs, the size cache, and the wake record.
 ### What it removes and what it never does
 
 The sweep reads every pool slot's clone, from each `<treehouse root>/<pool>/treehouse-state.json`, and every project clone under this home and each locally registered secondmate home.
+It judges a project clone under a secondmate home as that home would, so the lane's own task records apply and its secondmate record in the root home counts as its home chain, not as a live task.
+A lane whose records cannot be read holds all of its copies, and the report names the lane.
 It never calls Treehouse.
 Each copy gets one class:
 
@@ -1748,6 +1750,7 @@ bin/fm-proc-budget.sh -- bin/fm-copy-sweep.sh --apply
 
 `bin/fm-copy-sweep.sh arm` also binds a report-only `check` to the watcher's existing slow-check cadence, so a home without the hourly job still gets the budget wake.
 `check` scans at most once per `interval` and stays inside the watcher's per-check timeout: it cuts a size measurement it cannot finish, resumes from its size cache on the next poll, and classifies only the copies its wake names.
+A classification it cannot finish in time leaves that copy `UNCLASSIFIED`, so the wake is always printed.
 The hourly `--apply` run has no such bound and warms the cache for large copies.
 `bin/fm-copy-sweep.sh disarm` removes the binding.
 
@@ -1761,7 +1764,7 @@ default-pool 60
 default-container 20
 pool pool-name 80
 container /absolute/path/to/slot-or-home 10
-load-limit 40
+load-limit 90
 interval 3600
 cache-max-age 86400
 ```
@@ -1775,12 +1778,15 @@ A malformed file refuses the run and names its line.
 
 The sweep measures one copy at a time with `nice -n 20 du -sk`.
 It caches each size by copy path and mtime and measures it again after `cache-max-age` seconds, because a copy's root mtime does not move when a file deep inside grows.
-It scans nothing while the 1-minute load average is above `load-limit`: a direct run exits 75 and `check` stays silent.
+While the 1-minute load average is above `load-limit`, or cannot be read, it runs no `du`: the listing, the classes and `--apply` still run, and only fresh cached sizes are used.
+Such a run prints and records one line, `scan skipped: load N above limit M`.
+`check` records it and stays quiet, and raises one wake once every run for 6 hours has skipped.
 When a budget goes over, the run raises exactly one wake, naming each budget that just went over, its total, and its five largest copies with their class.
 It raises no second wake while the same budget stays over, and a budget that drops under and goes over again wakes again.
 A scan that `check` had to cut short counts only what it measured, so an unmeasured copy can delay a wake and never cause one.
 
-`FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) and `FM_COPY_SWEEP_BUDGET_SECS` (default and ceiling: the watcher's per-check timeout minus five seconds) are the only operator environment settings.
+`FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) is the only operator environment setting.
+The `check` time bound is the watcher's per-check timeout `FM_CHECK_TIMEOUT` minus five seconds.
 [`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)
@@ -3666,7 +3672,6 @@ FM_MAIL_POLL_MAX_WAKES=20   # per-poll wake cap for a mail poll; valid 1..200, k
 FM_MAIL_TIMEOUT=20   # mail-plane IMAP/SMTP socket timeout in seconds; invalid or non-positive values become 20
 FM_TOOL_UPDATE_INTERVAL=900   # seconds between watched-tool probe sweeps; 0 probes on every run, other values must be 60..86400
 FM_COPY_SWEEP_TREEHOUSE_ROOT=   # Treehouse root the nested-copy sweep reads pool state from; unset means ~/.treehouse (see "Nested task copy sweep")
-FM_COPY_SWEEP_BUDGET_SECS=   # seconds bounding one `bin/fm-copy-sweep.sh check` scan; unset means, and the ceiling is, FM_CHECK_TIMEOUT minus five
 FM_TOOL_UPDATE_PROBE_SECS=5   # 1..30 seconds allowed for one version or git probe
 FM_TOOL_UPDATE_BUDGET_SECS=20   # 1..120 seconds allowed for a whole watched-tool sweep; cut to fit FM_CHECK_TIMEOUT, and the cut is reported
 FM_TOOL_UPDATE_NOW=     # test override for the watched-tool sweep clock; the sweep budget still uses real time
