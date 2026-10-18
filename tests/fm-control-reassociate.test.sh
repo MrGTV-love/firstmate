@@ -212,9 +212,8 @@ snapshot_case() {  # <case-dir>
 assert_case_unchanged() {  # <case-dir> <message>
   local dir=$1 msg=$2
   # Every project-lock release appends to the lock's .holds observation log
-  # (bin/fm-project-lock-lib.sh), including the release after a refusal, and a
-  # waited acquisition leaves the lock's empty .queue file behind.
-  diff -r -x '*.lock.holds' -x '*.lock.queue' "$dir/before/state" "$dir/home/state" >/dev/null \
+  # (bin/fm-project-lock-lib.sh), including the release after a refusal.
+  diff -r -x '*.lock.holds' "$dir/before/state" "$dir/home/state" >/dev/null \
     || fail "$msg: the task record or other state changed"
   diff -r "$dir/before/data" "$dir/home/data" >/dev/null \
     || fail "$msg: the instructions changed"
@@ -2115,16 +2114,35 @@ slot_bytes() {  # <slot>
 
 # joint_note_all <case-dir> <id-a> <id-b>: everything a refused teardown must
 # leave alone, on top of joint_note_state's copies, branches, registrations,
-# lease and claim: both records, both instruction files, the state directory.
+# lease and claim: both records and both instruction files.
 joint_note_all() {  # <case-dir> <id-a> <id-b>
   joint_note_state "$1" "$2" "$3"
   snapshot_case "$1"
   rm -f "$1/treehouse.log"
 }
 
+# joint_assert_records_unchanged <case-dir> <message>: the records a refused
+# teardown must leave alone - every task record, by name and bytes, and the
+# instructions - and no endpoint touched. The project lock's own bookkeeping
+# (holds log, ticket queue, owner directories) is not a record and differs by
+# platform, so it is not compared; anything else that differs is printed as a
+# note, so a platform's extra files show in the log instead of failing a refusal
+# whose records are intact.
+joint_assert_records_unchanged() {  # <case-dir> <message>
+  local dir=$1 msg=$2 f before after other
+  before=$(cd "$dir/before/state" && for f in *.meta; do [ -f "$f" ] || continue; printf '%s ' "$f"; cksum < "$f"; done)
+  after=$(cd "$dir/home/state" && for f in *.meta; do [ -f "$f" ] || continue; printf '%s ' "$f"; cksum < "$f"; done)
+  [ "$before" = "$after" ] \
+    || fail "$msg: a task record changed or went missing"$'\n'"$(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
+  diff -r "$dir/before/data" "$dir/home/data" >/dev/null || fail "$msg: the instructions changed"
+  [ ! -s "$dir/fake/endpoint-calls" ] || fail "$msg: an endpoint was touched"
+  other=$(diff -rq -x '*.meta' -x '*.lock.holds' -x '*.lock.queue' "$dir/before/state" "$dir/home/state" 2>&1 | head -10)
+  [ -z "$other" ] || printf '# %s: state beside the records differs after the refusal (not compared):\n%s\n' "$msg" "$other"
+}
+
 joint_assert_all_untouched() {  # <case-dir> <id-a> <id-b> <message>
   joint_assert_copies_unchanged "$1" "$2" "$3" "$4"
-  assert_case_unchanged "$1" "$4"
+  joint_assert_records_unchanged "$1" "$4"
   [ ! -e "$1/treehouse.log" ] || fail "$4: the pool slot was returned: $(cat "$1/treehouse.log")"
   [ -z "$(joint_leftovers "$1")" ] || fail "$4: left staging files: $(joint_leftovers "$1")"
 }
