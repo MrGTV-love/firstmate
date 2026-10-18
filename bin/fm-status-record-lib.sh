@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Shared emission-time metadata and retry identity for status records.
 # Sourcing this library only defines functions; it does not initialize globals.
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-cap-lib.sh"
 
 # Match a status line against a regex one byte at a time, leaving the captures
 # in BASH_REMATCH. A line can hold a byte run that is not valid in the caller's
@@ -148,12 +150,22 @@ _fm_status_unstamped() {  # <status-line> <out-var> -> line with its stamp remov
 # its cursor) appends nothing. A caller that owns evidence of a new episode
 # decides that itself, as bin/fm-pending-reply-lib.sh's escalation does.
 status_event_recorded() {  # <status-file> <new-status-line>
-  local wanted line untimed
+  local wanted line untimed window lines size skip=0
   [ -f "$1" ] || return 1
   _fm_status_untimed "$2" wanted
+  # Bounded like every status reader (bin/fm-status-cap-lib.sh): a log longer than
+  # the reader window is checked over its last window, so an event older than that
+  # is not found and is recorded again - the safe direction for a retry.
+  fm_status_window_bytes window
+  fm_status_window_lines lines
+  size=$(LC_ALL=C wc -c < "$1" 2>/dev/null) || return 1
+  size=${size//[[:space:]]/}
+  case "$size" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$size" -le "$window" ] || skip=1
   while IFS= read -r line || [ -n "$line" ]; do
+    if [ "$skip" -eq 1 ]; then skip=0; continue; fi
     _fm_status_untimed "$line" untimed
     [ "$untimed" != "$wanted" ] || return 0
-  done < "$1"
+  done < <(tail -c "$window" "$1" 2>/dev/null | tail -n "$lines")
   return 1
 }
