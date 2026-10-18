@@ -1,0 +1,9 @@
+### test_changed_progress_guard_keeps_delayed_gate_skip_and_calibration_hygiene (load: 52.94 46.04 47.21)
+ok - the changed progress guard keeps a delayed gate skip a gate skip and out of calibration
+rc=
+### test_changed_parallel_guard_counts_low_cpu_script_output_as_progress (load: 58.57 48.28 47.97)
+ok - the concurrent changed progress guard treats a low-CPU script's output as progress
+rc=
+### test_changed_runs_unguarded_on_native_windows_bash (load: 58.88 49.63 48.47)
+ok - plain --changed runs unguarded on native Windows bash and stays guarded on POSIX
+rc=

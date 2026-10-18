@@ -1,0 +1,30 @@
+### S1 BASE (old runner, 30b4d720): progressing command, measured ceiling 3s
+measured: "test.live-slow host=Mac-Studio.local p99=1000ms margin=3 samples=6 measured=3s bound=0s"
+tick 1
+progress: "test.live-slow elapsed=0.1s output_bytes=7 tree_cpu=0.00s"
+tick 2
+progress: "test.live-slow elapsed=1.2s output_bytes=14 tree_cpu=0.00s"
+tick 3
+progress: "test.live-slow elapsed=2.3s output_bytes=21 tree_cpu=0.00s"
+progress: "test.live-slow elapsed=3.3s output_bytes=21 tree_cpu=0.01s"
+tick 4
+progress: "test.live-slow elapsed=3.3s output_bytes=28 tree_cpu=0.01s"
+python3 "$S/fm-duration-base.py" run test.live-slow -- bash -c "$CMD"  0.11s user 0.18s system 3% cpu 9.173 total
+exit=124
+
+### S1 TARGET (new runner): same command, same ledger
+measured: "test.live-slow host=Mac-Studio.local p99=1000ms margin=3 samples=6 measured=3s bound=0s"
+tick 1
+progress: "test.live-slow elapsed=0.0s output_bytes=7 tree_cpu=0.00s"
+tick 2
+tick 3
+slower_than_usual: "test.live-slow elapsed=3.2s measured_ceiling=3s; still making progress, so this is reported and not stopped"
+tick 4
+tick 5
+tick 6
+tick 7
+tick 8
+tick 9
+finished
+python3 bin/fm-duration.py run test.live-slow -- bash -c "$CMD"  0.17s user 0.41s system 5% cpu 10.306 total
+exit=0

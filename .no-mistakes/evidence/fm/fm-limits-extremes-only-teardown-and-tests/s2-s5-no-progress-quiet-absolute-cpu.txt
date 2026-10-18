@@ -1,0 +1,27 @@
+### S2 silent idle test.* key, FM_DURATION_NO_PROGRESS_SECS=3 -> must be stopped (exit 124) near 3s, not run the full 30s
+calibration: "0 of 5 samples for test.live-silent on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.live-silent elapsed=1.0s output_bytes=0 tree_cpu=0.00s"
+no_progress: "test.live-silent made no output or CPU progress for 6s; stopping"
+exit=124 wall=8s
+
+### S3 silent idle no-mistakes.* key, same 3s bound -> must survive (exit 0, no no_progress line)
+calibration: "0 of 5 samples for no-mistakes.live-quiet on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "no-mistakes.live-quiet elapsed=1.1s output_bytes=0 tree_cpu=0.00s"
+done
+exit=0 wall=11s
+
+### S4 silent idle no-mistakes.* key with FM_DURATION_ABSOLUTE_SECS=4 -> absolute extreme still stops it (exit 124)
+calibration: "0 of 5 samples for no-mistakes.live-abs on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "no-mistakes.live-abs elapsed=1.0s output_bytes=0 tree_cpu=0.00s"
+absolute_limit: "no-mistakes.live-abs reached the 4s absolute limit; stopping"
+exit=124 wall=8s
+
+### S5 silent but CPU-busy test.* key (no output, spins ~9s), 3s no-progress bound -> CPU progress keeps it alive (exit 0)
+calibration: "0 of 5 samples for test.live-cpu on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.live-cpu elapsed=1.0s output_bytes=0 tree_cpu=0.24s"
+spun
+exit=0 wall=10s

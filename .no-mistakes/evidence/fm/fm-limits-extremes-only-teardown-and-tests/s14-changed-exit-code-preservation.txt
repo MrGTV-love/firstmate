@@ -1,0 +1,33 @@
+--- mode=parallel runner rc=1
+FM_TEST_END 2026-10-18T19:12:35Z tests/fm-task-inbox.test.sh exit=0 duration_ms=637 gate_skip=false
+boom from daemon
+FM_TEST_END 2026-10-18T19:12:35Z tests/fm-daemon.test.sh exit=7 duration_ms=650 gate_skip=false
+FM_TEST_END 2026-10-18T19:12:35Z tests/fm-wake-queue.test.sh exit=0 duration_ms=824 gate_skip=false
+fine from watcher
+FM_TEST_END 2026-10-18T19:12:35Z tests/fm-pi-watch-extension.test.sh exit=0 duration_ms=869 gate_skip=false
+FM_TEST_END 2026-10-18T19:12:37Z tests/fm-supervision-events.test.sh exit=0 duration_ms=1455 gate_skip=false
+FM_TEST_END 2026-10-18T19:12:41Z tests/fm-backend-herdr-smoke.test.sh exit=0 duration_ms=4196 gate_skip=false
+FM_TEST_SUMMARY total=6 failed=1 skipped_gate=0 duration_ms=8502
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=4196 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=5 duration_ms=4435 failed=1
+   ledger: test.tests/fm-task-inbox.test.sh exit= 0 timed_out= False
+   ledger: test.tests/fm-daemon.test.sh exit= 7 timed_out= False
+   ledger: test.tests/fm-wake-queue.test.sh exit= 0 timed_out= False
+   ledger: test.tests/fm-pi-watch-extension.test.sh exit= 0 timed_out= False
+   ledger: test.tests/fm-supervision-events.test.sh exit= 0 timed_out= False
+   ledger: test.tests/fm-backend-herdr-smoke.test.sh exit= 0 timed_out= False
+--- mode=serial runner rc=1
+boom from daemon
+FM_TEST_END 2026-10-18T19:12:44Z tests/fm-daemon.test.sh exit=7 duration_ms=378 gate_skip=false
+fine from watcher
+FM_TEST_END 2026-10-18T19:12:44Z tests/fm-pi-watch-extension.test.sh exit=0 duration_ms=249 gate_skip=false
+FM_TEST_END 2026-10-18T19:12:45Z tests/fm-supervision-events.test.sh exit=0 duration_ms=504 gate_skip=false
+FM_TEST_END 2026-10-18T19:12:46Z tests/fm-task-inbox.test.sh exit=0 duration_ms=681 gate_skip=false
+FM_TEST_END 2026-10-18T19:12:46Z tests/fm-wake-queue.test.sh exit=0 duration_ms=309 gate_skip=false
+FM_TEST_END 2026-10-18T19:12:47Z tests/fm-backend-herdr-smoke.test.sh exit=0 duration_ms=398 gate_skip=false
+FM_TEST_SUMMARY total=6 failed=1 skipped_gate=0 duration_ms=4392
+FM_TEST_SUMMARY_FAMILY family=real-herdr-gated count=1 duration_ms=398 failed=0
+FM_TEST_SUMMARY_FAMILY family=watcher-wake-lock count=5 duration_ms=2121 failed=1
+Traceback (most recent call last):
+  File "<stdin>", line 2, in <module>
+FileNotFoundError: [Errno 2] No such file or directory: '/Users/charlesabrooker/tmp/fm-live-exit.iqPfpj/durations.jsonl'

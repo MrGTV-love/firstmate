@@ -1,0 +1,30 @@
+== case 1: preservable list (expect: .tac/loop-state, notes, secret space.dat; NOT .next, *.tsbuildinfo, .venv, .tac/tmp, symlink)
+.tac/loop-state
+notes
+secret space.dat
+list rc=0
+== case 2: preserve, then verify manifest against copies
+teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-live.YW4xRH/copy-adv2 in /Users/charlesabrooker/tmp/fm-live.YW4xRH/data-adv2/task-adv/nested-copy-preserved/62abd134626d7b7269b59dc9d1d8d0a092afcca1e400e7fd9f42d0726e808597
+preserve rc=0
+data-adv2/task-adv/nested-copy-preserved/62abd134626d7b7269b59dc9d1d8d0a092afcca1e400e7fd9f42d0726e808597/.tac/loop-state/cursor
+data-adv2/task-adv/nested-copy-preserved/62abd134626d7b7269b59dc9d1d8d0a092afcca1e400e7fd9f42d0726e808597/SHA256SUMS
+data-adv2/task-adv/nested-copy-preserved/62abd134626d7b7269b59dc9d1d8d0a092afcca1e400e7fd9f42d0726e808597/copy-path
+data-adv2/task-adv/nested-copy-preserved/62abd134626d7b7269b59dc9d1d8d0a092afcca1e400e7fd9f42d0726e808597/notes/deep/a.txt
+data-adv2/task-adv/nested-copy-preserved/62abd134626d7b7269b59dc9d1d8d0a092afcca1e400e7fd9f42d0726e808597/secret space.dat
+-- SHA256SUMS:
+<sha256>  secret space.dat
+<sha256>  .tac/loop-state/cursor
+<sha256>  notes/deep/a.txt
+-- shasum -c:
+secret space.dat: OK
+.tac/loop-state/cursor: OK
+notes/deep/a.txt: OK
+== case 3: add a newline-named ignored file -> preserve must fail closed (rc!=0) and leave any earlier preserve intact
+cp: /Users/charlesabrooker/tmp/fm-live.YW4xRH/copy-adv2/bad: No such file or directory
+preserve rc=1
+.staging-<hash>
+<hash>
+-- earlier preserve still verifies:
+secret space.dat: OK
+.tac/loop-state/cursor: OK
+notes/deep/a.txt: OK

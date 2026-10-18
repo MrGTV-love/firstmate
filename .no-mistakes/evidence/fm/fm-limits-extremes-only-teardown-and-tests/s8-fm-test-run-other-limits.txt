@@ -1,0 +1,12 @@
+### test_changed_progress_guard_gives_slow_watcher_suites_headroom (load: 52.49 49.05 48.31)
+ok - the automatic --changed progress guard lets a slow suite that keeps producing output finish
+rc=0
+### test_per_script_timeout_bounds_a_hang (load: 59.38 51.31 49.18)
+ok - --per-script-timeout-secs turns a hung script into a bounded failure
+rc=0
+### test_herdr_ci_family_run_has_a_step_timeout (load: 55.44 50.90 49.07)
+ok - Herdr CI family-run step times out at 60 min under a 120 min job backstop
+rc=0
+### test_changed_uses_bounded_automatic_concurrency (load: 46.82 49.23 48.52)
+ok - changed defaults to bounded automatic scheduling with serial override
+rc=0

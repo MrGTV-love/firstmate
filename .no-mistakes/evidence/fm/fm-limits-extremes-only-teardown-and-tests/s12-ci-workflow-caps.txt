@@ -1,0 +1,33 @@
+### bash tests/fm-ci-workflow.test.sh
+ok - CI matrices cover every executable serial lane and canonical lint root exactly once
+ok - a newer push to one PR supersedes that PR's in-flight CI
+ok - distinct PRs get distinct concurrency groups
+ok - every main push keeps its own group and is never cancelled
+ok - every ci.yml job carries a finite timeout
+ok - every ci.yml job belongs to one of the three timeout tiers
+ok - fast tier jobs share one 5 minute tripwire
+ok - normal tier jobs share one 60 minute budget
+ok - Herdr keeps a 60 minute step tripwire under a 120 minute job backstop
+rc=
+
+### parsed ci.yml: job timeouts, base vs target
+-- 30b4d720abfa134addc52f7ce3844f2bf2e31d26
+  lint                               job=30m 
+  test-coverage                      job=5m 
+  tests-portable-parallel-1          job=30m 
+  tests-portable-parallel-2          job=30m 
+  tests-portable-serial              job=30m 
+  tests-herdr                        job=75m Run real-Herdr family (serial, required)=20m
+  tests-timing-aggregate             job=5m 
+  macos-stock-bash                   job=30m 
+  invariants                         job=5m 
+-- e68c93b899f6e8a8ae2b77456c8b4a1edb7f3cd4
+  lint                               job=60m 
+  test-coverage                      job=5m 
+  tests-portable-parallel-1          job=60m 
+  tests-portable-parallel-2          job=60m 
+  tests-portable-serial              job=60m 
+  tests-herdr                        job=120m Run real-Herdr family (serial, required)=60m
+  tests-timing-aggregate             job=5m 
+  macos-stock-bash                   job=60m 
+  invariants                         job=5m 

@@ -1,0 +1,6 @@
+{'key': 'test.live-silent', 'duration_ms': 7879, 'exit': 124, 'timed_out': True, 'event': None, 'calibration': True}
+{'key': 'test.live-silent', 'duration_ms': 7879, 'exit': None, 'timed_out': None, 'event': 'timeout', 'calibration': None}
+{'key': 'no-mistakes.live-quiet', 'duration_ms': 8092, 'exit': 0, 'timed_out': False, 'event': None, 'calibration': True}
+{'key': 'no-mistakes.live-abs', 'duration_ms': 7023, 'exit': 124, 'timed_out': True, 'event': None, 'calibration': True}
+{'key': 'no-mistakes.live-abs', 'duration_ms': 7023, 'exit': None, 'timed_out': None, 'event': 'timeout', 'calibration': None}
+{'key': 'test.live-cpu', 'duration_ms': 9034, 'exit': 0, 'timed_out': False, 'event': None, 'calibration': True}

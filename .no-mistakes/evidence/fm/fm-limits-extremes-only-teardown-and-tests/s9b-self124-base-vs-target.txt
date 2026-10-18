@@ -1,0 +1,16 @@
+== base (load 64.03 54.10 50.40) self124 rows (duration_ms, timed_out):
+   2584 False
+   1915 False
+   8176 False
+== target (load 57.76 53.51 50.30) self124 rows (duration_ms, timed_out):
+   2164 False
+   897 False
+   1429 False
+== base (load 73.00 60.10 53.27) self124 rows (duration_ms, timed_out):
+   882 False
+   7588 False
+   4525 False
+== target (load 76.20 66.13 56.56) self124 rows (duration_ms, timed_out):
+   13142 False
+   19139 True
+   1443 False

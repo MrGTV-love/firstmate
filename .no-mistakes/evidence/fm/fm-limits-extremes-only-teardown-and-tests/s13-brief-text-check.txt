@@ -1,0 +1,6 @@
+### generated brief: lines about helper stop rules, drive calls, and ceilings
+59:   The helper stops a command only at a true extreme: 15 minutes with no output and no process-tree CPU progress, or 6 hours wall clock overall; a `no-mistakes.<step>` key is exempt from the no-progress stop, because its client waits quietly on the shared daemon, and keeps only the 6 hour stop. Measured p99 x 3 (once the helper holds five samples for that key on this host) is only a slower_than_usual report line a
+152:The helper never stops a wrapped drive call for silence, because the client waits quietly on the shared daemon; only the 6 hour wall clock limit stops one. Its measured p99 x 3 for the wrapped call's own key is only a slower_than_usual report line, not a stop and not a guessed tool wait.
+
+### stale phrases that must be gone (expect no output):
+(grep rc=1  1 = absent)

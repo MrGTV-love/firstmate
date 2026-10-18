@@ -1,0 +1,24 @@
+### S6a stopped command's TERM cleanup keeps printing for ~8s (> 3s no-progress bound) -> cleanup must be allowed to finish, not KILLed
+calibration: "0 of 5 samples for test.live-cleanup-ok on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+progress: "test.live-cleanup-ok elapsed=1.0s output_bytes=0 tree_cpu=0.00s"
+no_progress: "test.live-cleanup-ok made no output or CPU progress for 3s; stopping"
+Terminated: 15
+cleanup-step 1
+cleanup-step 2
+cleanup-step 3
+cleanup-step 4
+cleanup-step 5
+cleanup-step 6
+cleanup-step 7
+cleanup-step 8
+cleanup-complete
+exit=124 wall=15s
+
+### S6b stopped command ignores TERM and goes silent -> after a further no-progress interval the group gets KILL
+calibration: "0 of 5 samples for test.live-cleanup-stall on Mac-Studio.local"
+fallback: "no destructive deadline; collect samples"
+started
+progress: "test.live-cleanup-stall elapsed=0.0s output_bytes=8 tree_cpu=0.01s"
+no_progress: "test.live-cleanup-stall made no output or CPU progress for 4s; stopping"
+exit=124 wall=12s
