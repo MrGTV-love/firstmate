@@ -3219,6 +3219,7 @@ SH
   toolbin=$(make_no_timeout_toolbin "$d")
   fm_write_meta "$d/state/feat-timeout.meta" "window=fm:fm-feat-timeout" "worktree=$d/wt" "kind=ship" \
     "harness=claude"
+  printf 'blocked [at=1] [key=credential]: missing review credential\n' > "$d/state/feat-timeout.status"
   FM_FAKE_BUSY=1
   local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-timeout)
   "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-timeout busy --gen "$gen" \
@@ -3234,8 +3235,9 @@ SH
   done
   ! fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" \
     || fail "the timed-out no-mistakes call was left running after the bound"
-  assert_contains "$out" "state: working" "timed-out no-mistakes falls back to pane"
-  assert_contains "$out" "source: pane" "timed-out no-mistakes -> pane source"
+  assert_contains "$out" "state: blocked" "a timed-out store preserves the recorded blocker, not the busy pane"
+  assert_contains "$out" "source: status-log" "a timed-out store uses the resolved status declaration"
+  assert_contains "$out" "run-store: skipped" "the timed-out store is disclosed as a partial read"
   [ "$elapsed" -lt 5 ] || fail "perl timeout did not bound no-mistakes calls (elapsed ${elapsed}s)"
   calls=$(awk 'END { print NR + 0 }' "$calls_file" 2>/dev/null || echo 0)
   [ "$calls" -eq 1 ] || fail "empty no-mistakes status triggered extra lookups ($calls calls)"
@@ -4187,10 +4189,9 @@ PY
   pass 'no run for this branch beside a live run elsewhere reads absent, not unreadable'
 }
 
-# The capped-overview sqlite reader runs inside the same per-read budget as
-# every other no-mistakes state read, so a contended database cannot stall a
-# crew poll: a reader that never returns must be killed and fall through to the
-# reader-unavailable verdict.
+# The capped-overview sqlite reader shares the optional run-store budget, so
+# a contended database cannot stall a crew poll. Without a status declaration,
+# an exhausted budget leaves an explicitly partial unknown, never a guessed run.
 test_capped_inventory_reader_is_time_bounded() {
   make_capped_runs_case capped-slow-reader running pending hidden
   local d=$TMP_ROOT/capped-slow-reader out started elapsed
@@ -4207,7 +4208,6 @@ SH
   unset FM_CREW_STATE_NM_TIMEOUT
   [ "$elapsed" -lt 10 ] || fail "the capped inventory reader ran unbounded for ${elapsed}s"
   assert_contains "$out" 'state: unknown' 'an unreachable inventory reader cannot establish a verdict'
-  assert_contains "$out" 'reader unavailable' 'a killed reader reports the same unavailable reader path'
   pass 'the capped inventory reader is bounded by the crew read budget'
 }
 

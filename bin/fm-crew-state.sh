@@ -40,6 +40,12 @@
 #       same family was in its catalog (bin/fm-model-freshness.sh owns the rule).
 # Absence of either component is not evidence of health: a session that has not
 # published a record (not omp, not yet started, or remote) adds nothing.
+# When the optional run-store phase exhausts FM_CREW_STATE_NM_TIMEOUT (10s
+# total by default, shared across queries and finished-cache validation), it is
+# skipped for this read. The reconciled status declaration answers instead,
+# with a trailing `run-store: skipped (read budget exceeded)` component. No
+# partially read run can override that declaration, and a missing declaration
+# remains unknown. Snapshot/ledger readers preserve this partial-read marker.
 #
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
@@ -214,6 +220,11 @@ META=${FM_CREW_STATE_META_OVERRIDE:-"$STATE/$ID.meta"}
 LOG=${FM_CREW_STATE_STATUS_OVERRIDE:-"$STATE/$ID.status"}
 NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-10}
 case "$NM_TIMEOUT" in ''|*[!0-9]*) NM_TIMEOUT=10 ;; esac
+# One budget covers the entire optional run-store phase, not a fresh allowance
+# for each historical query. The shared bounded runner honors this shell-local
+# deadline in subshells too; it is never exported to unrelated commands.
+unset FM_NM_READ_DEADLINE
+NM_READ_PARTIAL=0
 # How many of the most recent `no-mistakes runs` rows each ledger read
 # (fm_nm_runs_status_for_worktree in bin/fm-nm-run-lib.sh) scans for the legacy
 # fallback or an unfetched-head continuation (docs/configuration.md owns the
@@ -228,8 +239,29 @@ SEP=' · '
 # set once the task's metadata is resolved below.
 LIVE_NOTE=''
 
+# A skipped optional instrument is not a failed task read. Keep the same
+# decision fold and ship-done proof as the ordinary status fallback, without
+# consulting a pane or retrying the exhausted store. The recursion guard lets
+# emit_ship_status_done use emit while retaining the deadline for custody reads.
+nm_budget_fallback_if_expired() {
+  [ -n "${FM_NM_READ_DEADLINE:-}" ] && [ "$SECONDS" -ge "$FM_NM_READ_DEADLINE" ] \
+    && [ "$NM_READ_PARTIAL" = 0 ] || return 0
+  NM_READ_PARTIAL=1
+  LIVE_NOTE="${LIVE_NOTE}${SEP}run-store: skipped (read budget exceeded)"
+  if [ "$LOG_VERB" = done ]; then
+    emit_ship_status_done
+  fi
+  local state
+  state=$(map_log_state "$LOG_LINE")
+  if [ "$state" != unknown ]; then
+    emit "$state" status-log "$(status_line_note "$LOG_LINE")"
+  fi
+  emit unknown none "run-store skipped; no status declaration available"
+}
+
 # Emit the one canonical line and exit 0. Detail is optional.
 emit() {  # <state> <source> [detail]
+  nm_budget_fallback_if_expired
   local line="state: $1${SEP}source: $2"
   [ -n "${3:-}" ] && line="$line${SEP}$3"
   [ -z "$LIVE_NOTE" ] || line="$line$LIVE_NOTE"
@@ -1052,6 +1084,7 @@ SELECTED_RUN_ID=""
 # Scouts and secondmates never drive a no-mistakes validation of their own
 # worktree, so skip the lookup for them and read state from pane/log directly.
 if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/null 2>&1; then
+  FM_NM_READ_DEADLINE=$((SECONDS + NM_TIMEOUT))
   fm_nmc_init "$STATE" "$ID" "$WT" "$CREW_BRANCH" "$NM_TIMEOUT"
   fm_nmc_read_to RUN_OUT status status '' axi status || true
   if [ "$(strip_quotes "$(printf '%s\n' "$RUN_OUT" | sed -n 's/^error: //p')")" = "repo not initialized (run 'no-mistakes init' first)" ]; then
@@ -1163,6 +1196,11 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
     fi
   fi
 fi
+
+# An empty/timed-out store must not lead into a backend probe and erase a
+# declaration that was already readable when the optional lookup started.
+nm_budget_fallback_if_expired
+[ "$HAVE_RUN" = 1 ] || unset FM_NM_READ_DEADLINE
 
 # --- run-step authoritative path -------------------------------------------
 

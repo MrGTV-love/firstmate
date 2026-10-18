@@ -25,13 +25,21 @@
 # import diagnostics do not replace the query's result.
 # The Perl fallback's process-group, signal, and owner-death contract is owned
 # by fm_timeout_perl_bound in fm-timeout-lib.sh's header.
+# Crew-state may set the shell-local FM_NM_READ_DEADLINE (Bash SECONDS) to
+# share its optional run-store budget across queries, cache validation and
+# capped-inventory reads. Other callers leave it unset and keep their own bound.
 if ! declare -F fm_timeout_perl_bound >/dev/null 2>&1; then
   # shellcheck source=bin/fm-timeout-lib.sh
   . "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-timeout-lib.sh"
 fi
 fm_nm_bounded() {  # <dir> <timeout_secs> <command> <args...>
-  local dir=$1 timeout_secs=$2 have_timeout=none
+  local dir=$1 timeout_secs=$2 have_timeout=none remaining
   shift 2
+  if [ -n "${FM_NM_READ_DEADLINE:-}" ]; then
+    remaining=$((FM_NM_READ_DEADLINE - SECONDS))
+    [ "$remaining" -gt 0 ] || return 124
+    [ "$timeout_secs" -le "$remaining" ] || timeout_secs=$remaining
+  fi
   if command -v timeout >/dev/null 2>&1; then have_timeout=timeout
   elif command -v gtimeout >/dev/null 2>&1; then have_timeout=gtimeout
   elif command -v perl >/dev/null 2>&1; then have_timeout=perl

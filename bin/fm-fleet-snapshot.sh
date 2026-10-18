@@ -54,7 +54,9 @@
 #     but mutable current-state, status, report, and endpoint evidence is discarded
 #     rather than attributed to the replacement generation.
 #     Local current_state is parsed from bin/fm-crew-state.sh <id> and preserves
-#     state, source, detail, and raw line separately. Remote secondmate rows use
+#     state, source, detail, and raw line separately; partial is true when only
+#     the optional run-store phase was skipped, never when the whole read failed.
+#     Remote secondmate rows use
 #     an explicit unknown value because their endpoint liveness belongs to
 #     supervision rather than this snapshot path.
 #     paths.status_log.last_event is historical wake-event data only, never
@@ -158,7 +160,9 @@ esac
 # Cross-home bounds are explicit so one broken or unexpectedly large home cannot
 # hang or explode the parent snapshot.
 FM_SNAPSHOT_SECONDMATES=${FM_SNAPSHOT_SECONDMATES:-20}
-FM_SNAPSHOT_CREW_STATE_TIMEOUT=${FM_SNAPSHOT_CREW_STATE_TIMEOUT:-10}
+# Loaded reads reached 16.28s. This backstop protects hangs, not normal latency.
+# measured: value=180 date=2026-10-18 host=Mac-Studio.local margin=11.05
+FM_SNAPSHOT_CREW_STATE_TIMEOUT=${FM_SNAPSHOT_CREW_STATE_TIMEOUT:-180}
 FM_SNAPSHOT_LOCAL_READ_CONCURRENCY=${FM_SNAPSHOT_LOCAL_READ_CONCURRENCY:-8}
 FM_SNAPSHOT_BUDGET=${FM_SNAPSHOT_BUDGET:-5}
 FM_SNAPSHOT_CACHE_DIR=${FM_SNAPSHOT_CACHE_DIR:-$STATE/secondmate-summary-cache}
@@ -377,7 +381,7 @@ last_nonempty_line_to() {  # <file> <out-var>
 # snapshot without limit. Remote secondmate endpoint liveness is never read here.
 # A local read that hits the bound folds to state unknown.
 crew_state_json() {  # <id> [<captured-meta>] [<captured-status>]
-  local id=$1 captured_meta=${2:-} captured_status=${3:-} raw rest state source detail sep rc=0
+  local id=$1 captured_meta=${2:-} captured_status=${3:-} raw rest state source detail sep rc=0 partial=false
   raw=$(
     fm_run_timed "$FM_SNAPSHOT_CREW_STATE_TIMEOUT" \
       env FM_ROOT_OVERRIDE="$FM_ROOT" \
@@ -404,15 +408,20 @@ crew_state_json() {  # <id> [<captured-meta>] [<captured-status>]
         *"$sep"*) source=${rest%%"$sep"*}; detail=${rest#*"$sep"} ;;
         *) source=$rest ;;
       esac
+      case "$sep$rest$sep" in
+        *"${sep}run-store: skipped (read budget exceeded)${sep}"*) partial=true ;;
+      esac
       ;;
   esac
   if [ "$rc" != 0 ]; then
     state=unknown
     source=none
     detail="current-state command failed (exit $rc)"
+    partial=false
   fi
   jq -n --arg raw "$raw" --arg state "$state" --arg source "$source" --arg detail "$detail" \
-    '{state:$state,source:$source,detail:$detail,raw:$raw}'
+    --argjson partial "$partial" \
+    '{state:$state,source:$source,detail:$detail,raw:$raw,partial:$partial}'
 }
 
 status_event_json() {  # <observed-status-log> [<contract-path>]

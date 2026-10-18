@@ -71,7 +71,10 @@ case "${1:-}" in
 esac
 exit 0
 SH
-  chmod +x "$fb/no-mistakes"
+  # Snapshot composition may probe the fixture endpoint. Never query a real
+  # user's tmux server for this deliberately nonexistent task.
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$fb/tmux"
+  chmod +x "$fb/no-mistakes" "$fb/tmux"
   printf '%s\n' "$fb"
 }
 
@@ -390,6 +393,89 @@ case_answers_are_classified_by_what_they_say() {
   pass 'answers are classified by what they say, and only a settled finished run is kept'
 }
 
+# Snapshot bounds and the run-store budget are distinct: an optional store read
+# may be skipped, but a slow task read must not erase the status declaration.
+snapshot_state() {  # <case-dir> [snapshot-script]
+  local d=$1
+  FM_FAKE_NM_DIR="$d/nmfake" NM_HOME="$d/nm" PATH="$d/fakebin:$PATH" \
+    FM_HOME="$d" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$d/state" \
+    FM_DATA_OVERRIDE="$d/data" FM_CONFIG_OVERRIDE="$d/config" FM_PROJECTS_OVERRIDE="$d/projects" \
+    "${2:-$ROOT/bin/fm-fleet-snapshot.sh}" --home-input 2>"$d/snapshot.err" \
+    | jq -ce '.tasks[] | select(.id == "cached") | .current_state'
+}
+
+case_slow_run_store_returns_partial() {
+  local d out
+  d=$(new_case slow-store)
+  mkdir -p "$d/data" "$d/config" "$d/projects"
+  printf '## In flight\n' > "$d/data/backlog.md"
+  printf 'needs-decision [at=1] [key=engine]: choose the engine\n' > "$d/state/cached.status"
+  cat > "$d/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${FM_FAKE_NM_DIR:?}/calls.log"
+# This lookup would outlive the old whole-read limit; it never gets to
+# substitute its eventual answer for the already-readable status declaration.
+sleep 11
+printf 'run:\n  branch: fm/cached\n  status: running\n'
+SH
+  out=$(snapshot_state "$d") || fail "slow store lost the task snapshot: $(cat "$d/snapshot.err")"
+  assert_equals parked "$(printf '%s\n' "$out" | jq -r '.state')" 'a slow store keeps the open decision readable'
+  assert_equals status-log "$(printf '%s\n' "$out" | jq -r '.source')" 'a slow store falls back to the reconciled status log'
+  assert_equals true "$(printf '%s\n' "$out" | jq -r '.partial')" 'the snapshot discloses a partial read'
+  assert_contains "$out" 'run-store: skipped' 'the plain state line discloses the skipped store'
+  assert_contains "$out" 'choose the engine' 'the open decision is not replaced with a guessed run state'
+  assert_equals 1 "$(calls "$d")" 'an exhausted store budget is not retried'
+  pass 'a run-store lookup beyond the old whole-read bound returns a marked partial state'
+}
+
+case_store_budget_is_shared() {
+  local d out
+  d=$(new_case shared-budget)
+  serve_run "$d" 01RUN completed passed
+  printf 'working [at=1]: implementing\n' > "$d/state/cached.status"
+  # Each lookup alone fits; together they do not. The overview must not
+  # silently grant the selected-run read another full budget.
+  mv "$d/fakebin/no-mistakes" "$d/fakebin/nm-response"
+  cat > "$d/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+sleep 2
+exec "$(dirname "$0")/nm-response" "$@"
+SH
+  chmod +x "$d/fakebin/no-mistakes"
+  out=$(FM_CREW_STATE_NM_TIMEOUT=3 read_state "$d" "$CREW_STATE")
+  assert_contains "$out" 'state: working · source: status-log' 'the shared budget falls back to real status'
+  assert_contains "$out" 'run-store: skipped' 'the shared budget discloses a partial read'
+  pass 'individually responsive lookups share one run-store budget'
+}
+
+case_snapshot_allows_slow_reads_and_cuts_hangs() {
+  local d out real_git
+  d=$(new_case slow-task)
+  serve_run "$d" 01RUN completed passed
+  mkdir -p "$d/data" "$d/config" "$d/projects"
+  printf '## In flight\n' > "$d/data/backlog.md"
+  real_git=$(command -v git)
+  cat > "$d/fakebin/git" <<SH
+#!/usr/bin/env bash
+case " \$* " in
+  *' symbolic-ref '*) sleep "\${FM_FAKE_GIT_DELAY:-11}" ;;
+esac
+exec "$real_git" "\$@"
+SH
+  chmod +x "$d/fakebin/git"
+  out=$(snapshot_state "$d") || fail 'slow task lost the snapshot row'
+  assert_equals done "$(printf '%s\n' "$out" | jq -r '.state')" 'a read slower than ten seconds still reports its finished run'
+  assert_equals run-step "$(printf '%s\n' "$out" | jq -r '.source')" 'the slower read keeps its authoritative source'
+  # The same real whole-command watchdog is accelerated through its supported
+  # override, not replaced with a double that merely echoes the expected bound.
+  out=$(FM_FAKE_GIT_DELAY=600 FM_SNAPSHOT_CREW_STATE_TIMEOUT=2 snapshot_state "$d") \
+    || fail 'a hung read lost the snapshot row'
+  assert_equals unknown "$(printf '%s\n' "$out" | jq -r '.state')" 'a genuinely hung task is unknown'
+  assert_contains "$out" 'current-state command failed (exit 124)' 'the extreme watchdog cuts the hung read'
+  assert_equals false "$(printf '%s\n' "$out" | jq -r '.partial // false')" 'a hung whole read is not accepted as partial'
+  pass 'slow task reads survive the default bound and truly hung reads hit the configured extreme'
+}
+
 # --- (d) mutation checks ----------------------------------------------------------------
 
 # A copy of bin/ whose cache library ends with <override>: a later definition
@@ -421,6 +507,9 @@ expect_mutant_caught() {  # <label> <case-function> <override>
 
 main() {
   local fn
+  case_slow_run_store_returns_partial
+  case_store_budget_is_shared
+  case_snapshot_allows_slow_reads_and_cuts_hangs
   for fn in \
     case_finished_run_is_kept_until_the_id_changes \
     case_finished_run_needs_the_database \

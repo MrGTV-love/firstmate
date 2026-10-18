@@ -714,6 +714,28 @@ for alive in ('alive', 'dead', 'missing', 'unreadable'):
     assert ('unknown-state' in rows(observed, 'missing_worker')) == (alive in ('dead', 'missing')), observed
 print('PASS: unknown current state degrades independently of live verdict', flush=True)
 
+# Skipping only the optional run store preserves a readable status declaration.
+# It does not excuse an unreadable endpoint or a failed whole command.
+for state in ('working', 'blocked', 'parked', 'unknown'):
+    partial = task('partial-store', fresh, state=state)
+    partial['current_state'].update(source='status-log', partial=True,
+                                   detail='run-store: skipped (read budget exceeded)')
+    fixture([partial])
+    observed = ledger()
+    assert observed['complete'], observed
+    assert 'ledger degraded' not in rows(observed, 'coverage'), observed
+partial['current_state']['source'] = 'none'
+partial['current_state']['detail'] = 'current-state command failed (exit 124)'
+fixture([partial])
+observed = ledger()
+assert not observed['complete'] and 'ledger degraded' in rows(observed, 'coverage'), observed
+partial['current_state'].update(state='working', source='status-log')
+partial['endpoint']['agent_alive'] = 'unreadable'
+fixture([partial])
+observed = ledger()
+assert not observed['complete'] and 'worker liveness partial-store' in rows(observed, 'coverage')['ledger degraded']['evidence'], observed
+print('PASS: partial status reads stay readable; failed reads and liveness remain degraded', flush=True)
+
 future = task_copy('future-progress', commit_age=-2)
 future_task = task('future-progress', future)
 future_status = home / 'state/future-progress.status'
