@@ -150,6 +150,16 @@ read_state() {  # <case-dir> <crew-state-script>
     FM_STATE_OVERRIDE="$1/state" "$2" cached 2>/dev/null
 }
 
+# The full home snapshot at its defaults, with the case's fakes.
+snapshot_json() {  # <case-dir>
+  local d=$1
+  env -u FM_SNAPSHOT_CREW_STATE_TIMEOUT \
+    FM_FAKE_NM_DIR="$d/nmfake" NM_HOME="$d/nm" PATH="$d/fakebin:$PATH" \
+    FM_HOME="$d" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$d/state" \
+    FM_DATA_OVERRIDE="$d/data" FM_CONFIG_OVERRIDE="$d/config" FM_PROJECTS_OVERRIDE="$d/projects" \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --home-input 2>"$d/snapshot.err"
+}
+
 # A quiet worker status log, as a task that finished its last turn leaves it.
 age_status_log() {  # <case-dir>
   printf 'working [at=1]: start\n' > "$1/state/cached.status"
@@ -391,16 +401,6 @@ case_answers_are_classified_by_what_they_say() {
     expect none 'a runs listing' runs 0 'count: 1 of 1 total'
   ) || fail 'an answer was classified into the wrong class'
   pass 'answers are classified by what they say, and only a settled finished run is kept'
-}
-
-# The full home snapshot at its defaults, with the case's fakes.
-snapshot_json() {  # <case-dir>
-  local d=$1
-  env -u FM_SNAPSHOT_CREW_STATE_TIMEOUT \
-    FM_FAKE_NM_DIR="$d/nmfake" NM_HOME="$d/nm" PATH="$d/fakebin:$PATH" \
-    FM_HOME="$d" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$d/state" \
-    FM_DATA_OVERRIDE="$d/data" FM_CONFIG_OVERRIDE="$d/config" FM_PROJECTS_OVERRIDE="$d/projects" \
-    "$ROOT/bin/fm-fleet-snapshot.sh" --home-input 2>"$d/snapshot.err"
 }
 
 # The snapshot bound protects against a hang, not against a loaded read. One
