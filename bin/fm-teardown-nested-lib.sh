@@ -50,7 +50,7 @@
 #
 # Requires bin/fm-task-copy-lib.sh and bin/fm-lock-lib.sh to be sourced first,
 # and runs inside bin/fm-teardown.sh, whose globals (PROJ, ID, META, STATE, WT,
-# TASK_TMP, TEARDOWN_NESTED_COPIES, TEARDOWN_RETURN_SLOT) and functions
+# TASK_TMP, TEARDOWN_NESTED_COPIES, TEARDOWN_RETURN_SLOT, TEARDOWN_PEER_SLOT) and functions
 # (teardown_landed, pids_with_cwd_under, task_process_identity,
 # task_process_identity_matches, task_record_process_signal) it uses.
 
@@ -468,11 +468,15 @@ teardown_own_locked_copies_prove() {
       if [ -n "$unique" ]; then
         TEARDOWN_FOREIGN_WHY="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
       else
+        # A peer reassociated off this slot into its own copy is not another
+        # record naming the copy through the root it left.
+        FM_TASK_COPY_RELEASED_PRIOR_RETIRING=$META
         teardown_foreign_copy_unowned "$copy" || true
+        FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
       fi
     fi
     if [ -n "$TEARDOWN_FOREIGN_WHY" ]; then
-      echo "REFUSED: own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-}: $TEARDOWN_FOREIGN_WHY." >&2
+      echo "REFUSED: own nested copy $copy stays in pool slot ${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}}: $TEARDOWN_FOREIGN_WHY." >&2
       return 1
     fi
   done
@@ -506,7 +510,7 @@ teardown_own_copy_dispose() {  # <slot> <copy>
 # copy that is not locked is left to the plain removal in bin/fm-teardown.sh.
 # Like the foreign copies, it runs before the final project-lock wait.
 teardown_own_locked_copies_release() {
-  local slot=$TEARDOWN_RETURN_SLOT copy rc
+  local slot=${TEARDOWN_RETURN_SLOT:-${TEARDOWN_PEER_SLOT:-}} copy rc
   local -a ordered=()
   [ -n "$slot" ] && [ "${#TEARDOWN_NESTED_COPIES[@]}" -gt 0 ] || return 0
   slot=$(fm_task_copy_canonical_dir "$slot") || return 1

@@ -315,8 +315,14 @@ fm_task_copy_ancestor_current() {
 # resolved state dir (e.g. a symlinked $FM_HOME) is still <record-meta>. A
 # differently named hardlink is another task's record, so the name must match
 # too.
+#
+# A caller that sets FM_TASK_COPY_RELEASED_PRIOR_RETIRING to the retiring task's
+# own record meta also passes over an overlap that is only another record's
+# released root (fm_task_copy_prior_root_released); every other caller, and every
+# other overlap, still counts.
 FM_TASK_COPY_OTHER_ID=
 FM_TASK_COPY_OTHER_FIELD=
+FM_TASK_COPY_RELEASED_PRIOR_RETIRING=
 fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta>...]
   local record_meta=$1 record_state=$2 path=$3
   local target state_dir other_meta line field other_path other_real skip
@@ -342,6 +348,11 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
         other_real=$(fm_task_copy_canonical_dir "$other_path") || continue
         fm_task_copy_paths_overlap "$other_real" "$target" || continue
         fm_task_copy_ancestor_current "$other_meta" "$record_state" "$field" "$other_real" "$target" && continue
+        if [ "$field" = prior_worktree ] && [ -n "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" ] \
+           && fm_task_copy_prior_root_released "$other_meta" "$other_real" "$target" \
+             "$FM_TASK_COPY_RELEASED_PRIOR_RETIRING" "${FM_LOCAL_FIRSTMATE_STATES[@]}"; then
+          continue
+        fi
         FM_TASK_COPY_OTHER_ID=$(basename "$other_meta" .meta)
         FM_TASK_COPY_OTHER_FIELD=$field
         return 0
@@ -349,6 +360,61 @@ fm_task_copy_other_record() {  # <record-meta> <record-state> <path> [<skip-meta
     done
   done
   return 1
+}
+
+# Whether the prior_worktree= <root> of record <other-meta> is a pool slot root
+# that task has left, so that it does not keep <target>, a copy of the retiring
+# task strictly inside <root>, from being cleaned up. bin/fm-control.sh
+# reassociate leaves two live records in this shape when it re-points them
+# together off one slot root: each now works in its own copy nested in the root,
+# and each names the root as prior_worktree=. All of these must hold, and any
+# other shape keeps the overlap:
+#   - <other-meta> is a ship or scout record, not an Orca task, and <root> is a
+#     Treehouse pool slot of its project;
+#   - its current copy (worktree=) lies strictly inside <root> and neither
+#     contains, equals, nor lies inside <target>, so the record has been
+#     re-pointed away from the root and its own copy is untouched;
+#   - the retiring task is itself re-pointed off the root: <retiring-meta> names
+#     <root> as a prior_worktree= of its own;
+#   - no other record, apart from <other-meta> and the retiring task's
+#     <retiring-meta>, still names <root> or a directory enclosing it as worktree=
+#     or home=; a copy of some record inside <root> belongs to that record.
+# <state-dir>... are the local Firstmate state directories to scan, as
+# fm_local_firstmate_state_dirs produced them. <root> and <target> are canonical.
+fm_task_copy_prior_root_released() {  # <other-meta> <root> <target> <retiring-meta> <state-dir>...
+  local other=$1 root=$2 target=$3 retiring=$4 kind project wt state_dir meta field path real line named
+  shift 4
+  case "$target" in "$root"/*) ;; *) return 1 ;; esac
+  kind=$(fm_meta_get "$other" kind)
+  case "${kind:-ship}" in ship|scout) ;; *) return 1 ;; esac
+  [ -z "$(fm_meta_get "$other" orca_worktree_id)" ] || return 1
+  project=$(fm_meta_get "$other" project)
+  [ -n "$project" ] && fm_treehouse_pool_slot "$project" "$root" || return 1
+  wt=$(fm_task_copy_canonical_dir "$(fm_meta_get "$other" worktree)") || return 1
+  case "$wt" in "$root"/*) ;; *) return 1 ;; esac
+  ! fm_task_copy_paths_overlap "$wt" "$target" || return 1
+  named=0
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in prior_worktree=?*) ;; *) continue ;; esac
+    [ "$(fm_task_copy_canonical_dir "${line#prior_worktree=}" 2>/dev/null)" != "$root" ] || named=1
+  done < "$retiring"
+  [ "$named" = 1 ] || return 1
+  for state_dir in "$@"; do
+    for meta in "$state_dir"/*.meta; do
+      [ -f "$meta" ] && [ ! -L "$meta" ] || continue
+      [ "${meta##*/}" = "${other##*/}" ] && [ "$meta" -ef "$other" ] && continue
+      [ "${meta##*/}" = "${retiring##*/}" ] && [ "$meta" -ef "$retiring" ] && continue
+      for field in worktree home; do
+        path=$(fm_meta_get "$meta" "$field")
+        [ -n "$path" ] || continue
+        real=$(fm_task_copy_canonical_dir "$path") || continue
+        fm_task_copy_paths_overlap "$real" "$root" || continue
+        case "$real" in "$root"/*) continue ;; esac
+        return 1
+      done
+    done
+  done
+  return 0
 }
 
 # The pool slot of <project> that strictly contains <canonical-path>, or a

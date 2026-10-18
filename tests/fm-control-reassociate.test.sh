@@ -34,6 +34,13 @@
 #      nested in it, are re-pointed together by one --also call, each proved
 #      against its own copy; a missing proof, a foreign copy or claim, or a
 #      failed write changes neither record.
+#  11. After that joint call, the real teardown of either task removes only
+#      its own proven copy and leaves the root, its lease and the other task
+#      alone; the claim passes to the task still in the root, and the last task
+#      out returns the root. Unlanded work, dirt, a third live holder of the
+#      root and a foreign copy at the return still refuse, a refusal changes no
+#      record, lease or claim, and a Vernant-locked copy goes through the
+#      closeout driver.
 set -u
 
 # shellcheck source=tests/fixtures.sh disable=SC1091
@@ -2070,6 +2077,379 @@ EOF
   pass "a joint reassociation holds every named record's lock while it proves and anchors the copies, and releases each one"
 }
 
+# --- teardown after a joint reassociation ------------------------------------
+#
+# Each task now works in its own copy nested in the shared root and still names
+# the root as prior_worktree=. Teardown of one task removes only its own proven
+# copy and leaves the root, its lease and the other task alone; the last task
+# out returns the root by the ordinary route. Throwaway repositories only.
+
+# joint_land <copy>: land a nested copy's work on origin's main. A copy built
+# after main moved first merges it, keeping its own tree.
+joint_land() {  # <copy>
+  git -C "$1" fetch -q origin
+  git -C "$1" merge -q -s ours --no-edit origin/main >/dev/null 2>&1 || true
+  git -C "$1" push -q origin HEAD:main
+}
+
+# new_reassociated_joint_case <name> <id-a> <id-b> <claim: absent|a|b> -> case
+# dir: the joint fixture after its joint reassociation, with the teardown tools
+# and watcher beat already built so a later snapshot sees nothing created.
+new_reassociated_joint_case() {  # <name> <id-a> <id-b> <claim>
+  local dir slot
+  dir=$(new_joint_case "$1" "$2" "$3" "${4:-absent}")
+  slot=$(joint_slot "$dir")
+  run_control "$dir" "$2" reassociate --worktree "$slot/.claude/worktrees/$2" \
+    --also "$3=$slot/.claude/worktrees/$3" --note "Both leave the root." >/dev/null \
+    || fail "$1: the joint reassociation failed"
+  run_case_teardown "$dir" no-such-task >/dev/null 2>&1 || true
+  printf '%s\n' "$dir"
+}
+
+# slot_bytes <slot>: the slot root's own bytes, apart from the copies nested in
+# it and their status entries.
+slot_bytes() {  # <slot>
+  copy_fingerprint "$1" | grep -v -e '^\./\.claude/worktrees/' -e '^?? \.claude/worktrees/'
+}
+
+# joint_note_all <case-dir> <id-a> <id-b>: everything a refused teardown must
+# leave alone, on top of joint_note_state's copies, branches, registrations,
+# lease and claim: both records and both instruction files.
+joint_note_all() {  # <case-dir> <id-a> <id-b>
+  joint_note_state "$1" "$2" "$3"
+  snapshot_case "$1"
+  rm -f "$1/treehouse.log"
+}
+
+# joint_assert_records_unchanged <case-dir> <message>: the records a refused
+# teardown must leave alone - every task record, by name and bytes, and the
+# instructions - and no endpoint touched. The project lock's own bookkeeping
+# (holds log, ticket queue, owner directories) is not a record and differs by
+# platform, so it is not compared; anything else that differs is printed as a
+# note, so a platform's extra files show in the log instead of failing a refusal
+# whose records are intact.
+joint_assert_records_unchanged() {  # <case-dir> <message>
+  local dir=$1 msg=$2 f before after other
+  before=$(cd "$dir/before/state" && for f in *.meta; do [ -f "$f" ] || continue; printf '%s ' "$f"; cksum < "$f"; done)
+  after=$(cd "$dir/home/state" && for f in *.meta; do [ -f "$f" ] || continue; printf '%s ' "$f"; cksum < "$f"; done)
+  [ "$before" = "$after" ] \
+    || fail "$msg: a task record changed or went missing"$'\n'"$(diff <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
+  diff -r "$dir/before/data" "$dir/home/data" >/dev/null || fail "$msg: the instructions changed"
+  [ ! -s "$dir/fake/endpoint-calls" ] || fail "$msg: an endpoint was touched"
+  other=$(diff -rq -x '*.meta' -x '*.lock.holds' -x '*.lock.queue' "$dir/before/state" "$dir/home/state" 2>&1 | head -10)
+  [ -z "$other" ] || printf '# %s: state beside the records differs after the refusal (not compared):\n%s\n' "$msg" "$other"
+}
+
+joint_assert_all_untouched() {  # <case-dir> <id-a> <id-b> <message>
+  joint_assert_copies_unchanged "$1" "$2" "$3" "$4"
+  joint_assert_records_unchanged "$1" "$4"
+  [ ! -e "$1/treehouse.log" ] || fail "$4: the pool slot was returned: $(cat "$1/treehouse.log")"
+  [ -z "$(joint_leftovers "$1")" ] || fail "$4: left staging files: $(joint_leftovers "$1")"
+}
+
+test_teardown_after_a_joint_reassociation_removes_only_the_tasks_own_copy() {
+  local claimant order tag ida idb dir slot na nb first second nf ns holder out rc
+  for claimant in a b; do
+    for order in ab ba; do
+      tag="$claimant-$order"
+      ida="peer-a-$tag"
+      idb="peer-b-$tag"
+      dir=$(new_reassociated_joint_case "peer-$tag" "$ida" "$idb" "$claimant")
+      slot=$(joint_slot "$dir")
+      na="$slot/.claude/worktrees/$ida"
+      nb="$slot/.claude/worktrees/$idb"
+      first=$ida second=$idb nf=$na ns=$nb
+      if [ "$order" = ba ]; then first=$idb second=$ida nf=$nb ns=$na; fi
+      holder=$ida
+      [ "$claimant" = a ] || holder=$idb
+
+      # (1) The first task's teardown removes its own proven copy and nothing else.
+      joint_land "$nf"
+      joint_note_state "$dir" "$ida" "$idb"
+      cp "$dir/home/state/$second.meta" "$dir/second-meta-before"
+      cp "$dir/home/data/$second/brief.md" "$dir/second-brief-before"
+      copy_fingerprint "$ns" > "$dir/second-copy-before"
+      slot_bytes "$slot" > "$dir/slot-bytes-before"
+      git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ refs/fm/anchor/ > "$dir/refs-before"
+      rc=0
+      out=$(run_case_teardown "$dir" "$first") || rc=$?
+      expect_code 0 "$rc" "$tag: the first task's teardown must remove its own copy"$'\n'"$out"
+      assert_contains "$out" "nested reassociated worktree $nf removed; pool slot $slot left in place, since task $second still works in it" \
+        "$tag: the completion line did not say the slot stayed with the other task"
+      [ ! -e "$dir/home/state/$first.meta" ] || fail "$tag: the first task's record survived"
+      [ ! -e "$nf" ] || fail "$tag: the first task's copy survived"
+      ! git -C "$dir/proj" worktree list --porcelain | grep -Fxq "worktree $nf" || fail "$tag: the removed copy is still registered"
+      git -C "$dir/proj" worktree list --porcelain | grep -Fxq "worktree $ns" || fail "$tag: the other task's copy lost its registration"
+      git -C "$dir/proj" worktree list --porcelain | grep -Fxq "worktree $slot" || fail "$tag: the shared root lost its registration"
+      git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ refs/fm/anchor/ | cmp -s - "$dir/refs-before" \
+        || fail "$tag: a branch or preservation anchor changed"
+      cmp -s "$dir/second-meta-before" "$dir/home/state/$second.meta" || fail "$tag: the other task's record changed"
+      cmp -s "$dir/second-brief-before" "$dir/home/data/$second/brief.md" || fail "$tag: the other task's instructions changed"
+      copy_fingerprint "$ns" | cmp -s - "$dir/second-copy-before" || fail "$tag: the other task's copy changed"
+      slot_bytes "$slot" | cmp -s - "$dir/slot-bytes-before" || fail "$tag: the shared root changed"
+      cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$tag: Treehouse's lease changed"
+      [ ! -e "$dir/treehouse.log" ] || fail "$tag: the shared root was returned: $(cat "$dir/treehouse.log")"
+      [ -z "$(joint_leftovers "$dir")" ] || fail "$tag: the call left staging files: $(joint_leftovers "$dir")"
+      if [ "$holder" = "$first" ]; then
+        assert_line "task=$second" "$dir/pool/139/.fm-slot-owner" "$tag: the claim did not pass to the task still in the root"
+        assert_line "home=$dir/home" "$dir/pool/139/.fm-slot-owner" "$tag: the passed claim lost its home"
+      else
+        cmp -s "$dir/claim-before" "$dir/pool/139/.fm-slot-owner" || fail "$tag: the other task's claim changed"
+      fi
+
+      # (2) Then the second task's teardown succeeds and returns the root.
+      joint_land "$ns"
+      rc=0
+      out=$(run_case_teardown "$dir" "$second") || rc=$?
+      expect_code 0 "$rc" "$tag: the second task's teardown must succeed"$'\n'"$out"
+      assert_contains "$out" "nested reassociated worktree $ns removed and its pool slot $slot returned" \
+        "$tag: the second task's completion line did not say it returned the root"
+      assert_line "return --force $slot" "$dir/treehouse.log" "$tag: the last task out did not return the root"
+      [ ! -e "$dir/home/state/$second.meta" ] || fail "$tag: the second task's record survived"
+      [ ! -e "$ns" ] || fail "$tag: the second task's copy survived"
+      [ ! -e "$dir/pool/139/.fm-slot-owner" ] || fail "$tag: the returned root is still claimed"
+    done
+  done
+  pass "after a joint reassociation each task's teardown removes only its own proven copy, the claim passes on, and the last task out returns the root"
+}
+
+test_teardown_after_a_joint_reassociation_refuses_what_it_cannot_prove() {
+  local shape ida idb dir slot na nb out rc want third who
+  for shape in unlanded unpushed-commit dirty-copy third-on-root third-prior-elsewhere retiring-not-reassociated foreign-copy-at-return; do
+    ida="refuse-a-$shape"
+    idb="refuse-b-$shape"
+    dir=$(new_reassociated_joint_case "teardown-refuse-$shape" "$ida" "$idb" a)
+    slot=$(joint_slot "$dir")
+    na="$slot/.claude/worktrees/$ida"
+    nb="$slot/.claude/worktrees/$idb"
+    who=$ida
+    case "$shape" in
+      unlanded)
+        want="the ship deliverable is not landed"
+        ;;
+      unpushed-commit)
+        joint_land "$na"
+        printf 'late\n' > "$na/late.txt"
+        git -C "$na" add late.txt
+        git -C "$na" commit -qm "late unpushed commit"
+        want="unpushed commits"
+        ;;
+      dirty-copy)
+        joint_land "$na"
+        printf 'scratch\n' > "$na/scratch.txt"
+        want="worktree $na has uncommitted changes"
+        ;;
+      third-on-root)
+        joint_land "$na"
+        fm_write_meta "$dir/home/state/third.meta" "window=fmses:fm-third" "worktree=$slot" "project=$dir/proj" "kind=ship"
+        want="preserved prior_worktree custody overlaps it"
+        ;;
+      third-prior-elsewhere)
+        joint_land "$na"
+        add_copy "$dir" "$dir/third-copy" fm/third
+        fm_write_meta "$dir/home/state/third.meta" "window=fmses:fm-third" "worktree=$dir/third-copy" \
+          "prior_worktree=$slot" "project=$dir/proj" "kind=ship"
+        want="is also task third's recorded prior_worktree ($slot)"
+        ;;
+      retiring-not-reassociated)
+        # A task that never left the root has no claim to its prior custody
+        # being passed over: the other task's prior_worktree= still overlaps.
+        joint_land "$na"
+        sed -i.bak '/^prior_worktree=/d' "$dir/home/state/$ida.meta"
+        rm -f "$dir/home/state/$ida.meta.bak"
+        want="is also task $idb's recorded prior_worktree ($slot)"
+        ;;
+      foreign-copy-at-return)
+        # The first task leaves cleanly; an unrecorded copy then appears in the
+        # root, and the last task out must not return the root over it.
+        joint_land "$na"
+        out=$(run_case_teardown "$dir" "$ida") || fail "$shape: the first task's teardown failed: $out"
+        add_copy "$dir" "$slot/.claude/worktrees/foreign" fm/foreign-copy
+        printf 'unlanded foreign work\n' > "$slot/.claude/worktrees/foreign/foreign.txt"
+        git -C "$slot/.claude/worktrees/foreign" add foreign.txt
+        git -C "$slot/.claude/worktrees/foreign" commit -qm "unlanded foreign commit"
+        joint_land "$nb"
+        who=$idb
+        want="foreign copy $slot/.claude/worktrees/foreign stays in pool slot $slot"
+        ;;
+    esac
+    # The copies and records a refusal must leave alone, as they stand now.
+    if [ "$shape" = foreign-copy-at-return ]; then
+      third="$slot/.claude/worktrees/foreign"
+      copy_fingerprint "$third" > "$dir/foreign-before"
+      slot_bytes "$slot" > "$dir/slot-bytes-before"
+      copy_fingerprint "$nb" > "$dir/nested-b-before"
+      cp "$dir/pool/treehouse-state.json" "$dir/lease-before"
+      cp "$dir/pool/139/.fm-slot-owner" "$dir/claim-before"
+      git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ > "$dir/branches-before"
+      git -C "$dir/proj" worktree list --porcelain > "$dir/registrations-before"
+      # The first task's teardown refreshes the home summary in the background,
+      # so only the refused task's own records are compared, not the whole state.
+      cp "$dir/home/state/$idb.meta" "$dir/refused-meta-before"
+      cp "$dir/home/data/$idb/brief.md" "$dir/refused-brief-before"
+      rm -f "$dir/treehouse.log"
+    else
+      joint_note_all "$dir" "$ida" "$idb"
+    fi
+    rc=0
+    out=$(run_case_teardown "$dir" "$who") || rc=$?
+    expect_code 1 "$rc" "$shape: the teardown must refuse"$'\n'"$out"
+    assert_contains "$out" "$want" "$shape: the refusal did not name the missing proof"
+    case "$shape" in
+      third-*|retiring-not-reassociated) ;;
+      *)
+        # Only a record that still holds the root may keep the prior-custody
+        # overlap; any other refusal must name its own missing proof instead.
+        assert_not_contains "$out" "preserved prior_worktree custody overlaps it" \
+          "$shape: the refusal is the old prior-custody overlap, not the missing proof"
+        ;;
+    esac
+    if [ "$shape" = foreign-copy-at-return ]; then
+      cmp -s "$dir/refused-meta-before" "$dir/home/state/$idb.meta" || fail "$shape: the refused task's record changed"
+      cmp -s "$dir/refused-brief-before" "$dir/home/data/$idb/brief.md" || fail "$shape: the refused task's instructions changed"
+      copy_fingerprint "$third" | cmp -s - "$dir/foreign-before" || fail "$shape: the foreign copy changed"
+      slot_bytes "$slot" | cmp -s - "$dir/slot-bytes-before" || fail "$shape: the shared root changed"
+      copy_fingerprint "$nb" | cmp -s - "$dir/nested-b-before" || fail "$shape: the refused task's copy changed"
+      cmp -s "$dir/lease-before" "$dir/pool/treehouse-state.json" || fail "$shape: Treehouse's lease changed"
+      cmp -s "$dir/claim-before" "$dir/pool/139/.fm-slot-owner" || fail "$shape: the claim changed"
+      git -C "$dir/proj" for-each-ref --format='%(refname) %(objectname)' refs/heads/ | cmp -s - "$dir/branches-before" \
+        || fail "$shape: a branch changed"
+      git -C "$dir/proj" worktree list --porcelain | cmp -s - "$dir/registrations-before" \
+        || fail "$shape: copy registrations changed"
+      [ ! -e "$dir/treehouse.log" ] || fail "$shape: the pool slot was returned: $(cat "$dir/treehouse.log")"
+    else
+      joint_assert_all_untouched "$dir" "$ida" "$idb" "$shape"
+    fi
+  done
+  pass "a joint-reassociated task's teardown still refuses unlanded work, dirt, a third live holder of the root and a foreign copy, and a refusal changes no record, lease, claim or copy"
+}
+
+test_teardown_after_a_joint_reassociation_releases_a_vernant_locked_copy_through_the_driver() {
+  local shape id ida idb dir slot na nb out rc pid head
+  for shape in released refused; do
+    ida="locked-a-$shape"
+    idb="locked-b-$shape"
+    dir=$(new_reassociated_joint_case "teardown-locked-$shape" "$ida" "$idb" a)
+    slot=$(joint_slot "$dir")
+    na="$slot/.claude/worktrees/$ida"
+    nb="$slot/.claude/worktrees/$idb"
+    joint_land "$na"
+    sleep 0.1 &
+    pid=$!
+    wait "$pid" 2>/dev/null || true
+    git -C "$dir/proj" worktree lock --reason "vernant-session-active owner=launcher:$pid launcher=$pid" "$na"
+    git -C "$slot" rev-parse --path-format=absolute --git-path info/exclude \
+      | { IFS= read -r exclude; printf '%s\n' scripts/ >> "$exclude"; }
+    mkdir -p "$slot/scripts/git-stability"
+    cat > "$slot/scripts/git-stability/closeout_pr.py" <<SH
+printf '%s|%s\n' "\$PWD" "\$*" >> "$dir/closeout.log"
+if [ "\${FM_STUB_CLOSEOUT:-ok}" != ok ]; then
+  echo '{"allowed": false, "reason": "stub_refusal"}'
+  exit 3
+fi
+git worktree unlock "\$2" && git worktree remove "\$2"
+SH
+    printf '#!/usr/bin/env bash\nexec bash "$@"\n' > "$dir/vernant-python"
+    chmod +x "$dir/vernant-python"
+    head=$(git -C "$na" rev-parse HEAD)
+    joint_note_all "$dir" "$ida" "$idb"
+    rc=0
+    if [ "$shape" = released ]; then
+      out=$(FM_TEARDOWN_VERNANT_PYTHON="$dir/vernant-python" run_case_teardown "$dir" "$ida") || rc=$?
+      expect_code 0 "$rc" "$shape: a landed locked copy must be released"$'\n'"$out"
+      assert_equals "$slot|--cleanup-worktree $na --execute-cleanup" "$(cat "$dir/closeout.log")" \
+        "$shape: the driver was not run once from the root with the copy and the execute flag"
+      [ ! -e "$na" ] || fail "$shape: the locked copy survived"
+      [ ! -e "$dir/home/state/$ida.meta" ] || fail "$shape: the task record survived"
+      assert_equals "$head" "$(git -C "$dir/proj" rev-parse "refs/heads/fm/$ida-v2")" "$shape: the copy's branch moved"
+      copy_fingerprint "$nb" | cmp -s - "$dir/nested-b-before" || fail "$shape: the other task's copy changed"
+      [ ! -e "$dir/treehouse.log" ] || fail "$shape: the shared root was returned"
+    else
+      out=$(FM_STUB_CLOSEOUT=refuse FM_TEARDOWN_VERNANT_PYTHON="$dir/vernant-python" run_case_teardown "$dir" "$ida") || rc=$?
+      expect_code 1 "$rc" "$shape: a driver refusal must stop the teardown"$'\n'"$out"
+      assert_contains "$out" "Vernant's closeout driver did not release own nested copy $na" "$shape: the refusal did not name the driver"
+      assert_equals "$slot|--cleanup-worktree $na --execute-cleanup" "$(cat "$dir/closeout.log")" "$shape: the driver did not run once"
+      rm -f "$dir/closeout.log"
+      # A refusal after cleanup began keeps both records and marks this one
+      # for a retry; the copies, the lease and the claim stay as they were.
+      [ -f "$dir/home/state/$ida.teardown-return-pending" ] || fail "$shape: the refusal left no retry marker"
+      for id in "$ida" "$idb"; do
+        cmp -s "$dir/before/state/$id.meta" "$dir/home/state/$id.meta" || fail "$shape: task $id's record changed"
+        cmp -s "$dir/before/data/$id/brief.md" "$dir/home/data/$id/brief.md" || fail "$shape: task $id's instructions changed"
+      done
+      joint_assert_copies_unchanged "$dir" "$ida" "$idb" "$shape"
+      [ ! -e "$dir/treehouse.log" ] || fail "$shape: the pool slot was returned: $(cat "$dir/treehouse.log")"
+    fi
+  done
+  pass "a joint-reassociated task's Vernant-locked copy is released through the closeout driver, and a driver refusal keeps both records, copies, the lease and the claim"
+}
+
+test_teardown_after_a_joint_reassociation_finishes_a_removed_copy_and_leaves_a_reassigned_slot() {
+  local shape ida idb dir slot na nb out rc
+  for shape in copy-already-removed removed-and-unlanded stranger-claim; do
+    ida="edge-a-$shape"
+    idb="edge-b-$shape"
+    dir=$(new_reassociated_joint_case "teardown-edge-$shape" "$ida" "$idb" a)
+    slot=$(joint_slot "$dir")
+    na="$slot/.claude/worktrees/$ida"
+    nb="$slot/.claude/worktrees/$idb"
+    case "$shape" in
+      copy-already-removed)
+        # An earlier teardown removed the copy and stopped before its record went.
+        joint_land "$na"
+        git -C "$dir/proj" worktree remove --force "$na"
+        ;;
+      removed-and-unlanded)
+        git -C "$dir/proj" worktree remove --force "$na"
+        ;;
+      stranger-claim)
+        # A claim naming a task that works in no copy here is a reassigned slot,
+        # not a shared one: the task's copy is left in place, as for any claim
+        # that is not this task's.
+        joint_land "$na"
+        printf 'task=stranger\nhome=%s\n' "$dir/home" > "$dir/pool/139/.fm-slot-owner"
+        ;;
+    esac
+    # The fingerprint of an already removed copy is empty, and its tools complain.
+    joint_note_all "$dir" "$ida" "$idb" 2>/dev/null
+    cp "$dir/home/state/$idb.meta" "$dir/other-meta-before"
+    copy_fingerprint "$nb" > "$dir/other-copy-before"
+    rc=0
+    out=$(run_case_teardown "$dir" "$ida") || rc=$?
+    case "$shape" in
+      copy-already-removed)
+        expect_code 0 "$rc" "$shape: a rerun must finish"$'\n'"$out"
+        assert_contains "$out" "nested reassociated worktree $na removed; pool slot $slot left in place, since task $idb still works in it" \
+          "$shape: the rerun did not finish by the peer route"
+        [ ! -e "$dir/home/state/$ida.meta" ] || fail "$shape: the record survived the rerun"
+        assert_line "task=$idb" "$dir/pool/139/.fm-slot-owner" "$shape: the claim did not pass to the task still in the root"
+        cmp -s "$dir/other-meta-before" "$dir/home/state/$idb.meta" || fail "$shape: the other task's record changed"
+        copy_fingerprint "$nb" | cmp -s - "$dir/other-copy-before" || fail "$shape: the other task's copy changed"
+        [ ! -e "$dir/treehouse.log" ] || fail "$shape: the shared root was returned"
+        ;;
+      removed-and-unlanded)
+        expect_code 1 "$rc" "$shape: an unlanded removed copy must refuse"$'\n'"$out"
+        assert_contains "$out" "is already removed and its branch is not landed" "$shape: the refusal did not name the missing proof"
+        [ -f "$dir/home/state/$ida.meta" ] || fail "$shape: the refusal removed the record"
+        cmp -s "$dir/other-meta-before" "$dir/home/state/$idb.meta" || fail "$shape: the other task's record changed"
+        copy_fingerprint "$nb" | cmp -s - "$dir/other-copy-before" || fail "$shape: the other task's copy changed"
+        [ ! -e "$dir/treehouse.log" ] || fail "$shape: the shared root was returned"
+        ;;
+      stranger-claim)
+        expect_code 0 "$rc" "$shape: a reassigned slot retires only the record"$'\n'"$out"
+        assert_contains "$out" "reassociated worktree $na left in place" "$shape: the copy was not left in place"
+        [ ! -e "$dir/home/state/$ida.meta" ] || fail "$shape: the record survived"
+        [ -d "$na" ] || fail "$shape: the copy of a task that does not hold the slot was removed"
+        assert_line "task=stranger" "$dir/pool/139/.fm-slot-owner" "$shape: the stranger's claim changed"
+        cmp -s "$dir/other-meta-before" "$dir/home/state/$idb.meta" || fail "$shape: the other task's record changed"
+        copy_fingerprint "$nb" | cmp -s - "$dir/other-copy-before" || fail "$shape: the other task's copy changed"
+        [ ! -e "$dir/treehouse.log" ] || fail "$shape: the shared root was returned"
+        ;;
+    esac
+  done
+  pass "a rerun finishes a teardown whose copy is already removed, refuses an unlanded one, and a slot reassigned to a stranger keeps its copies"
+}
+
 test_shared_root_without_pr_proves_its_own_branch
 test_non_github_pr_reassociation_refuses
 test_recovered_shared_slot_has_no_nonforcing_lease_remedy
@@ -2110,3 +2490,7 @@ test_joint_reassociation_refuses_on_a_missing_proof_and_changes_nothing
 test_joint_options_are_checked_before_anything_is_read
 test_joint_failure_rolls_both_records_back
 test_joint_reassociation_holds_every_records_meta_lock
+test_teardown_after_a_joint_reassociation_removes_only_the_tasks_own_copy
+test_teardown_after_a_joint_reassociation_refuses_what_it_cannot_prove
+test_teardown_after_a_joint_reassociation_releases_a_vernant_locked_copy_through_the_driver
+test_teardown_after_a_joint_reassociation_finishes_a_removed_copy_and_leaves_a_reassigned_slot

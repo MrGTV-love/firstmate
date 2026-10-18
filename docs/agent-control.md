@@ -249,7 +249,7 @@ Each head is anchored under that task's own id, and only after every named recor
 A named task whose replacement copy lies inside the root keeps its slot claim, and one whose replacement copy lies outside releases it, as in a single reassociation; a root left without a claim is claimed for the first named task whose replacement copy lies inside it.
 The claims, the instructions files, and then the records are published together, and a failed write restores every record, instructions file, and claim already published, so no named task is left half moved; the anchors stay.
 A task whose replacement copy is nested in the root ends as an ordinary nested record that names the root as `prior_worktree=`, exactly as a single reassociation leaves it; a task that moved outside the root names it as `released_worktree=`.
-Because each nested record then names the root as preserved custody, ordinary `bin/fm-teardown.sh` of one of them refuses while another still does, since that custody overlaps the cleanup target; teardown has no route for a group of nested records and this reassociation does not add one.
+Each nested record then names the root as preserved custody, but a record that has left the root for its own copy nested in it no longer owns the root, so ordinary `bin/fm-teardown.sh` of one of them takes the peer-slot route in the nested-copy rule below, which removes only that task's own proven copy.
 
 When finished and parked ordinary tasks both record the same pool slot root, reassociation cannot go first: the other root record overlaps the replacement copy and may still claim the slot.
 Before retiring a record that still holds the slot's Firstmate claim, or any record when the slot carries no claim, Treehouse's state must durably lease the slot under the existing [`fm_task_copy_pool_slot_held`](../bin/fm-task-copy-lib.sh) proof.
@@ -321,12 +321,12 @@ Own enclosing-to-nested and nested-to-enclosing moves are supported; the enclosi
 Teardown retires both shapes: see the nested-copy rule below.
 
 After it, every reader of `worktree=` follows the replacement copy, so `fm-crew-state` reports that copy's real run.
-A prior copy stays the task's preserved custody: its bytes are untouched, and [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh)'s record scan counts enclosing and nested custody as well as exact matches, so another task's cleanup cannot reach it.
+A prior copy stays the task's preserved custody: its bytes are untouched, and [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh)'s record scan counts enclosing and nested custody as well as exact matches, so another task's cleanup cannot reach it, except for the peer-slot route in the nested-copy rule below.
 A released pool slot is not custody: `released_worktree=` records only where the task was, and the slot's commits survive through the preservation anchor.
 A reassociation leaves the endpoint's shell in the copy the task left, so a later `relaunch` that finds the shell in one of the task's `prior_worktree=` or `released_worktree=` copies sends it into the recorded copy before it launches; [`bin/fm-spawn.sh`](../bin/fm-spawn.sh)'s `spawn_path_is_prior_copy` owns that test, and a shell found anywhere else is treated as for any other relaunch.
 Reassociation, the allocation gate below, and teardown use the same local-home traversal: the current home, the local root, and recursively registered local descendants. Remote entries are excluded; for reassociation and teardown an unsafe registry or unavailable registered local home refuses the scan. The one exception is teardown's custody scan while retiring a secondmate whose own registered home is already gone: that entry alone is skipped, since nothing there can be lost, and every other unavailable registered home still refuses. A validated owning ancestor's enclosing current home/worktree is not competing custody for a subordinate copy; its prior copies and Git common-directory storage remain protected.
 [`bin/fm-teardown.sh`](../bin/fm-teardown.sh) checks worktrees, tasktmp and launch-namespace roots, secondmate homes, and recursive child cleanup against copy custody before process or endpoint cleanup, including forced cleanup.
-Both containment directions count, across this record and all local homes: temporary cleanup roots cannot overlap any current, home, or prior copy, and copy/home removal cannot overlap preserved priors or records outside the admitted cleanup.
+Both containment directions count, across this record and all local homes: temporary cleanup roots cannot overlap any current, home, or prior copy, and copy/home removal cannot overlap preserved priors or records outside the admitted cleanup, except for the peer-slot route in the nested-copy rule below.
 A destructive pool slot return is the one narrower case: against another ordinary task's current `worktree=` it refuses only on an exact path match, because the return resets that one slot, while `home=`, `prior_worktree=`, and a secondmate's `worktree=` keep the overlap rule.
 The finished shared-root recovery route above returns nothing, so it does not require exclusive slot custody.
 These checks also protect the shared Git common directory of preserved copies, including their objects and preservation anchors.
@@ -354,7 +354,20 @@ The same function covers the reverse shape, where the current copy is the pool s
 A refusal after the nested copy is gone leaves the record and the slot claim in place. A plain re-run, with no `--force` and no captain words, finds the slot through the task's own `prior_worktree=`, proves it again under the same rule, and returns it; a landed ship is recorded as landed, never as dropped.
 The stale-lock proof covers the slot only: nested copies teardown already removed are not proved again.
 If a later step fails after the slot was returned and its claim released, the re-run still judges the removed copy by its `branch=` ref, so the ship is again recorded as landed. The slot is no longer this task's, so it is neither returned a second time nor named in the prior-copy notice, and the completion line says the copy was already removed.
-A nested current copy whose enclosing slot the task does not claim is left in place like any other reassociated non-pool copy.
+A nested current copy whose enclosing slot the task does not claim is left in place like any other reassociated non-pool copy, unless the claim names a peer that works in the slot, which takes the peer-slot route below.
+
+When other live ordinary records have each left the same slot root for their own copies nested in it and name the root as `prior_worktree=`, which is the shape a joint reassociation leaves, `teardown_nested_slot` takes the peer-slot route in place of returning the slot.
+[`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh)'s `fm_task_copy_prior_root_released` is the one owner of when such a record's prior custody no longer holds the root.
+It requires that the retiring task itself names the root as `prior_worktree=`, and that the other record is a ship or scout of the same project, not an Orca task, whose current copy lies inside the root and apart from the retiring task's copy, while no other record still names the root or a directory enclosing it as `worktree=` or `home=`.
+Any other overlap keeps the prior-custody refusal.
+The route removes only the retiring task's own current copy, under the same proofs as above: the ordinary dirty and landed-work test, the process and launcher proofs, and for a copy that Vernant's creation lock holds the closeout driver run from the root.
+It reserves, reaps, scans, detaches and returns nothing slot-wide, leaves Treehouse's lease and every other record and copy untouched, and passes the slot claim to the first remaining peer when it was this task's, so the last task out finds the slot its own.
+A claim that already names a peer stays as it is.
+The route works the same when a rerun finds the copy already removed, judged by its `branch=` ref as above.
+A foreign copy in the root is neither judged nor touched by this route, and it is proved again when the last task out returns the root.
+A peer that has left the root between the proof and the removal refuses with the record in place, and a re-run takes the ordinary route.
+`--force` skips only the landed-work test on the task's own copy, as always, and waives none of the other proofs.
+`tests/fm-control-reassociate.test.sh` exercises the sequence from the joint reassociation through the last teardown.
 
 Before a fresh spawn sends `treehouse get`, and before secondmate home seeding sends `treehouse get --lease`, each under the shared project lock used for allocation and return, [`bin/fm-task-copy-lib.sh`](../bin/fm-task-copy-lib.sh) checks whether a pool slot of the project strictly contains a task record's current copy (`worktree=`) in this home or any locally registered home.
 `treehouse get` resets and hands out only a slot its pool state file records as not leased, so such a slot (the nested replacement-copy case) refuses the allocation unless Treehouse's state durably holds it.
