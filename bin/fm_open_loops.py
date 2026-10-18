@@ -803,7 +803,7 @@ class Collector:
                 raise ValueError("review lane status must not be a symbolic link")
             events = self.bash('. "$1"; while IFS= read -r line || [ -n "$line" ]; do '
                                'if _fm_status_line_is_event "$line" "$FM_CLASSIFY_CAPTAIN_RE_DEFAULT"; '
-                               'then printf "%s\\n" "$line"; fi; done < "$2"',
+                               'then printf "%s\\n" "$line"; fi; done < <(fm_status_window_cat "$2")',
                                BIN / "fm-status-event-lib.sh", path)
             # Exact URL tokens, not prefix matches on PR numbers.
             lines = [line for line in events.splitlines()
@@ -952,7 +952,7 @@ class Collector:
             if status.is_symlink():
                 continue
             try:
-                out = self.bash('cat "$2" >/dev/null || exit 1; '
+                out = self.bash('[ -r "$2" ] || exit 1; '
                                 '. "$1/fm-status-decision-lib.sh"; status_open_decisions_dated "$2"', BIN, status)
             except SOURCE_ERRORS as error:
                 self.degraded.append(f"questions {status.name}: {str(error)[:120]}")

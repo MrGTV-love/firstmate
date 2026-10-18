@@ -146,6 +146,8 @@ Checkpoint validation and status classification retain the caller's parsing loca
 A turn-ended-only queue row omits its historical status annotation when that status file exactly matches the same seen marker.
 Any direct or remaining historical annotation prints every status line unread at the presentation cursor instead of replaying only the latest line.
 The owned-append ledger only decides whether growth wakes this home; it never removes a line from presentation, so both that annotation and the UNREAD STATUS section still print this home's own bookkeeping closes.
+On a `check: status-log-over-cap` wake, a status log or sidecar passed the size cap; the wake names the file, size, growth and writer, and an omp writer is already stopped.
+Route the lane to its owner and clear the cause; [`configuration.md`](configuration.md#status-log-size-bounds-fm_status_cap_bytes) owns the bounds, the containment limits, and what the guard never touches.
 On a `check: open-loop-ledger` wake or heartbeat review, read the dated ledger and route each overdue row to its named owner.
 For `silent_report`, use the reconciler's check-in action rather than interrupting the worker or repeatedly sending a plain steer; its header owns the command, and the [ledger contract](configuration.md#open-work-ledger-configopen-loopsjson) owns clocks, exclusions, and repeat suppression.
 Reconcile the returned progress report, resolve blockers and cross-workstream dependencies with their owners, and confirm routed instructions have been acted on by the next heartbeat through acknowledgement or correlated reply evidence, never transport success.

@@ -76,6 +76,8 @@ set -u
 export LC_ALL=C
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 FM_ROOT="${FM_ROOT_OVERRIDE:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 FM_HOME="${FM_HOME:-${FM_ROOT_OVERRIDE:-$FM_ROOT}}"
 STATE="${FM_STATE_OVERRIDE:-$FM_HOME/state}"
@@ -214,7 +216,7 @@ append_status() { # <task> <status-line>
 }
 
 capture_task() { # <task>; caller holds the lock
-  local task=$1 log offset data complete tail line saved
+  local task=$1 log offset data complete tail line saved window window_lines skipped clamped=0 head lines drop
   log="$STATE/$task.status"
   saved=$(offset_path "$task")
   [ -f "$log" ] && [ ! -L "$log" ] || return 0
@@ -223,12 +225,44 @@ capture_task() { # <task>; caller holds the lock
   data=${data//[[:space:]]/}
   [ "$data" -ge "$offset" ] || offset=0
   [ "$data" -gt "$offset" ] || return 0
+  # Bounded like every status reader (bin/fm-status-cap-lib.sh): a log that grew by
+  # more than one reader window since the saved offset is captured from its last
+  # window of whole lines, and the ledger says how much it skipped, so a runaway
+  # writer cannot make this read the whole log into memory or start thousands of jq
+  # processes. The saved offset still advances to the end of what was read.
+  fm_status_window_bytes window
+  fm_status_window_lines window_lines
+  skipped=0
+  if [ $((data - offset)) -gt "$window" ]; then
+    skipped=$((data - window - offset))
+    offset=$((data - window))
+    clamped=1
+  fi
   # The trailing x keeps a final newline that command substitution would strip.
   data=$(tail -c "+$((offset + 1))" "$log"; printf x) || return 1
   data=${data%x}
+  if [ "$clamped" = 1 ]; then
+    # The window starts mid-line unless the byte before it ended one: drop the partial line.
+    case "$data" in
+      *$'\n'*) head=${data%%$'\n'*}; data=${data#*$'\n'}; skipped=$((skipped + ${#head} + 1)); offset=$((offset + ${#head} + 1)) ;;
+      *) skipped=$((skipped + ${#data})); offset=$((offset + ${#data})); data='' ;;
+    esac
+  fi
   tail=${data##*$'\n'}
   complete=${data%"$tail"}
   [ -n "$complete" ] || return 0
+  lines=$(printf '%s' "$complete" | grep -c '')
+  if [ "$lines" -gt "$window_lines" ]; then
+    head=$(printf '%s' "$complete" | head -n $((lines - window_lines)))
+    drop=$(( ${#head} + 1 ))
+    complete=${complete:$drop}
+    skipped=$((skipped + drop))
+    offset=$((offset + drop))
+  fi
+  if [ "$skipped" -gt 0 ]; then
+    # shellcheck disable=SC2016 # $bytes is a jq variable, not a shell one.
+    append task.status.skipped "$task" '{bytes: ($bytes | tonumber)}' --arg bytes "$skipped" || return 1
+  fi
   while IFS= read -r line; do
     [ -n "${line//[[:space:]]/}" ] || continue
     append_status "$task" "$line" || return 1

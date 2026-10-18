@@ -724,6 +724,36 @@ snapshot_task_generation_is_current() {  # <captured-meta> <id>
   fi
 }
 
+# Copy a task's status log into the snapshot, bounded like every status reader
+# (bin/fm-status-cap-lib.sh). A log within the reader window is copied whole with
+# its mtime, exactly as before. A longer one is captured as its last window of
+# whole lines, with the source's mtime, and the caller must not carry a fold
+# checkpoint onto it: that checkpoint's offset names bytes of the full log.
+# Sets SNAPSHOT_STATUS_TRUNCATED to 1 for that case.
+SNAPSHOT_STATUS_TRUNCATED=0
+snapshot_capture_status() {  # <source> <destination>
+  local source=$1 destination=$2 size window
+  SNAPSHOT_STATUS_TRUNCATED=0
+  [ -f "$source" ] || return 0
+  if size=$(_fm_status_file_size "$source" 2>/dev/null); then
+    size=${size//[[:space:]]/}
+    fm_status_window_bytes window
+    case "$size" in ''|*[!0-9]*) ;; *)
+      if [ "$size" -gt "$window" ]; then
+        SNAPSHOT_STATUS_TRUNCATED=1
+        if fm_status_window_cat "$source" > "$destination" 2>/dev/null; then
+          touch -r "$source" "$destination" 2>/dev/null || true
+          return 0
+        fi
+        rm -f -- "$destination"
+        [ -e "$source" ] || return 0
+        return 1
+      fi
+    ;; esac
+  fi
+  snapshot_capture_optional "$source" "$destination"
+}
+
 prefetch_task_observations() {  # <meta> <id>
   local meta=$1 id=$2 remote_host current_file endpoint_file current_pid='' current_rc=0
   local status_log status_capture status_ident report_path report_capture
@@ -739,8 +769,9 @@ prefetch_task_observations() {  # <meta> <id>
   snapshot_task_generation_is_current "$meta" "$id" || generation_current=0
   if [ "$generation_current" = 1 ]; then
     status_ident=$(_fm_open_decisions_file_ident "$status_log" 2>/dev/null) || status_ident=''
-    snapshot_capture_optional "$status_log" "$status_capture" || current_rc=1
-    status_open_decisions_checkpoint_carry "$status_log" "$status_capture" "$status_ident"
+    snapshot_capture_status "$status_log" "$status_capture" || current_rc=1
+    [ "$SNAPSHOT_STATUS_TRUNCATED" -eq 1 ] \
+      || status_open_decisions_checkpoint_carry "$status_log" "$status_capture" "$status_ident"
     snapshot_mark_optional_present "$report_path" "$report_capture" || current_rc=1
   fi
 

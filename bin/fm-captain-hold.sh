@@ -2305,7 +2305,7 @@ key_opening_line() {  # <status-file> <key>
         _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open "$n"
         ;;
     esac
-  done < "$f"
+  done < <(fm_status_window_bytes_cat "$f" 2>/dev/null)
   while IFS= read -r row; do
     case "$row" in
       "$key$tab"*) row=${row#*"$tab"}; printf '%s' "${row#*"$tab"}"; return 0 ;;

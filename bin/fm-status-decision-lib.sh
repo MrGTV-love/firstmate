@@ -439,6 +439,32 @@ _fm_decision_fold_line() {  # <open-set> <status-line> <resolve-verb> <held-verb
 # whole-file fold would have read whole.
 # A failed tail read also falls back to byte 0; no pure read repairs the checkpoint.
 # Regression coverage: tests/fm-wake-drain-open-decisions-cursor.test.sh.
+# The lines of a status span that can move the open-decision fold, read from stdin:
+# one grep keeps every line whose leading word could be a fold verb (the same
+# over-inclusive pre-select as status_key_closing_verb in bin/fm-classify-lib.sh,
+# so the fold below still decides which of them really move the set), then the last
+# reader-window of those lines is kept. The fold's cost is then its transitions, not
+# its history: a log of tens of thousands of routine lines folds as cheaply as one
+# of tens, and a flood of fold verbs is bounded by the line window.
+fm_status_transition_lines() {
+  local resolve held lines
+  resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
+  held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
+  fm_status_window_lines lines
+  LC_ALL=C grep -a -E "^[[:space:]]*(needs-decision|blocked|done|failed|$resolve|$held)[[:space:]:[]" \
+    | tail -n "$lines"
+}
+
+# A whole-log fold input: the log's last byte window, reduced to its transitions.
+fm_status_fold_cat() {  # <status-file>
+  local f=$1 __fm_fc_size
+  _fm_status_file_size "$f" __fm_fc_size || return 1
+  __fm_fc_size=${__fm_fc_size//[[:space:]]/}
+  case "$__fm_fc_size" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$__fm_fc_size" -gt 0 ] || return 0
+  _fm_status_read_span_file "$f" 0 "$__fm_fc_size" 0 | fm_status_transition_lines
+}
+
 status_open_decisions() {  # <status-file> [<kind>]
   local f=$1 kind=${2:-} line resolve held open='' verb offset=0 span seeded=0
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
@@ -452,7 +478,8 @@ status_open_decisions() {  # <status-file> [<kind>]
   fi
   if [ "$seeded" -eq 1 ]; then
     [ "$offset" -lt "$_FM_ODC_SIZE" ] || { printf '%s' "$open"; return 0; }
-    if span=$(_fm_status_read_span "$f" "$offset" "$((_FM_ODC_SIZE - offset))" 2>/dev/null); then
+    if span=$(_fm_status_read_span "$f" "$offset" "$((_FM_ODC_SIZE - offset))" 0 2>/dev/null); then
+      span=$(printf '%s\n' "$span" | fm_status_transition_lines)
       while IFS= read -r line || [ -n "$line" ]; do
         status_line_verb "$line" verb
         case "$verb" in
@@ -468,6 +495,8 @@ EOF
     fi
     open=''
   fi
+  # A whole-log fold reads at most one reader window (bin/fm-status-cap-lib.sh):
+  # a log past it folds its last window, and fm_status_window_cat says so on stderr.
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" verb
     case "$verb" in
@@ -475,7 +504,7 @@ EOF
         _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open
         ;;
     esac
-  done < "$f"
+  done < <(fm_status_fold_cat "$f" 2>/dev/null)
   printf '%s' "$open"
 }
 
@@ -526,7 +555,7 @@ status_open_decisions_dated() {  # <status-file> [<kind>]
     opened[index]=$line
     summaries[index]=$summary
     index=$((index + 1))
-  done < "$f"
+  done < <(fm_status_fold_cat "$f" 2>/dev/null)
   while IFS=$'\t' read -r key verb index; do
     [ -n "$verb" ] || continue
     _fm_status_at_epoch "${opened[index]}" epoch || epoch=
@@ -570,6 +599,7 @@ _fm_open_decisions_checkpoint_parse() {  # <checkpoint-file>
   local cf=$1 data first rest line
   _FM_ODC_VERSION='' _FM_ODC_OFFSET=0 _FM_ODC_IDENT='' _FM_ODC_OPEN=''
   [ -f "$cf" ] && [ -r "$cf" ] && [ ! -L "$cf" ] || return 1
+  _fm_status_sidecar_fits "$cf" || return 1
   data=$(LC_ALL=C command cat "$cf" 2>/dev/null) || return 1
   first=${data%%$'\n'*}
   case "$first" in version=?*) _FM_ODC_VERSION=${first#version=} ;; *) return 1 ;; esac

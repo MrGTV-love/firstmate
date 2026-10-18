@@ -467,8 +467,8 @@ normalize_payload() { # <source> <destination>
 # instead, because delivery state can change between replays.
 # Returns 0 appended, 1 already present, 2 the write itself failed.
 append_status_once() { # <status-file> <line>
-  grep -Fqx -- "$2" "$1" 2>/dev/null && return 1
-  printf '%s\n' "$2" >> "$1" || return 2
+  fm_status_window_cat "$1" 2>/dev/null | grep -Fx -- "$2" >/dev/null && return 1
+  fm_status_append_line "$1" "$2" >/dev/null 2>&1 || return 2
   return 0
 }
 
@@ -478,10 +478,17 @@ append_status_once() { # <status-file> <line>
 # The record lives outside cursor state and survives adapter retirement because
 # the parent status stream it describes survives that retirement too.
 stage_mirror_lines() { # <source> <rewritten> <source-record> <status> <status-additions> <source-additions>
+  local bounded rc=0
+  # The "already present" set is built from the status stream's last reader window
+  # (bin/fm-status-cap-lib.sh), never the whole stream: awk keeps every line it
+  # reads in memory. A mirrored line older than the window is still recognised by
+  # the source record, which is the authoritative duplicate check.
+  bounded=$(mktemp "${TMPDIR:-/tmp}/fm-mirror-window.XXXXXX") || return 1
+  fm_status_window_bytes_cat "$4" > "$bounded" 2>/dev/null || : > "$bounded"
   LC_ALL=C awk \
     -v rewritten_file="$2" \
     -v source_record="$3" \
-    -v status_file="$4" \
+    -v status_file="$bounded" \
     -v status_additions="$5" \
     -v source_additions="$6" '
     BEGIN {
@@ -514,7 +521,9 @@ stage_mirror_lines() { # <source> <rewritten> <source-record> <status> <status-a
       if (close(source_additions) != 0) failed = 1
       if (failed) exit 1
     }
-  ' "$1"
+  ' "$1" || rc=$?
+  rm -f -- "$bounded"
+  return "$rc"
 }
 
 cmd_ingest() {

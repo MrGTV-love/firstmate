@@ -954,6 +954,8 @@ fi
 . "$SCRIPT_DIR/fm-ff-lib.sh"
 # shellcheck source=bin/fm-wake-lib.sh
 . "$SCRIPT_DIR/fm-wake-lib.sh"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 # shellcheck source=bin/fm-project-lock-lib.sh
 . "$SCRIPT_DIR/fm-project-lock-lib.sh"
 # shellcheck source=bin/fm-task-copy-lib.sh
@@ -5439,7 +5441,7 @@ kimi_wait_for_delivery() {
 
 kimi_spawn_fail() { # <detail>
   SPAWN_BRIEF_FAILURE_REASON=$1
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  fm_status_append_line "$STATE/$ID.status" "$(status_stamp_line "failed: $1")" >/dev/null 2>&1 || :
   echo "error: $1; inspect window $T" >&2
 }
 
@@ -5508,7 +5510,7 @@ rovo_wait_for_delivery() {
 
 rovo_spawn_fail() { # <detail>
   SPAWN_BRIEF_FAILURE_REASON=$1
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  fm_status_append_line "$STATE/$ID.status" "$(status_stamp_line "failed: $1")" >/dev/null 2>&1 || :
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
 }
@@ -5581,7 +5583,7 @@ agy_wait_for_working() {
 }
 
 agy_spawn_fail() {  # <detail>
-  printf '%s\n' "$(status_stamp_line "failed: $1")" >>"$STATE/$ID.status"
+  fm_status_append_line "$STATE/$ID.status" "$(status_stamp_line "failed: $1")" >/dev/null 2>&1 || :
   echo "error: $1; inspect window $T" >&2
   rovo_endpoint_cleanup
 }
@@ -5620,7 +5622,7 @@ claude_confirm_start() {
   done
   [ "$parked" -ge 2 ] || return 0
   dialog=$(printf '%s' "$pane" | fm_busy_claude_launch_prompt_name)
-  printf '%s\n' "$(status_stamp_line "blocked: claude is stopped on its startup dialog '${dialog:-unrecognized}' and has not begun its instructions; a person must answer it in window $T")" >>"$STATE/$ID.status"
+  fm_status_append_line "$STATE/$ID.status" "$(status_stamp_line "blocked: claude is stopped on its startup dialog '${dialog:-unrecognized}' and has not begun its instructions; a person must answer it in window $T")" >/dev/null 2>&1 || :
   echo "warning: claude worker $ID is stopped on its startup dialog '${dialog:-unrecognized}' and has not begun its instructions; send no keys, a person must answer it in window $T" >&2
   return 0
 }
@@ -7407,7 +7409,7 @@ SPAWN_ACCOUNT=
 # Opt-in fleet activity ledger (docs/fleet-ledger.md); off costs one file test.
 [ ! -e "$CONFIG/fleet-ledger" ] || [ "$RELAUNCH" -eq 1 ] || FM_HOME=$FM_HOME FM_STATE_OVERRIDE=$STATE FM_CONFIG_OVERRIDE=$CONFIG "$SCRIPT_DIR/fm-fleet-ledger.sh" dispatched "$ID" "$KIND" "${PROJ_ABS##*/}" "$HARNESS" "$MODEL" || true
 if [ "$DISPATCH_SWITCHED" = true ]; then
-  printf 'working [at=%s]: model-matrix fallback launched %s %s for %s\n' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+  fm_status_append_line "$STATE/$ID.status" "$(printf 'working [at=%s]: model-matrix fallback launched %s %s for %s' "$(date +%s)" "$HARNESS" "$MODEL" "${DISPATCH_RULE:-matching profiles}")" >/dev/null 2>&1 || :
 fi
 # Shadow model picker (observe only): the launch is already delivered, so this can
 # only append routing evidence to the picker's private store. It runs detached with

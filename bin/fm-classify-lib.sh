@@ -166,9 +166,9 @@ status_key_closing_verb() {  # <status-file> <key>
   kind=$(_fm_status_kind "$f")
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
-  candidates=$(grep -a -E \
-    "^[[:space:]]*(needs-decision|blocked|done|failed|$resolve|$held)[[:space:]:[]" \
-    "$f") || [ "$?" -eq 1 ] || candidates=$(cat "$f")
+  candidates=$(fm_status_window_bytes_cat "$f" 2>/dev/null | grep -a -E \
+    "^[[:space:]]*(needs-decision|blocked|done|failed|$resolve|$held)[[:space:]:[]") \
+    || [ "$?" -eq 1 ] || candidates=$(fm_status_window_cat "$f" 2>/dev/null)
   while IFS= read -r line || [ -n "$line" ]; do
     status_line_verb "$line" event
     case "$event:$kind" in
@@ -292,7 +292,7 @@ EOF
 
 status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   local f=$1 captured_end=${2:-} cf offset ident open='' trusted_open=''
-  local version='' size actual_size cur_ident resolve held chunk_file chunk_size line cursor_dirty=0
+  local version='' size actual_size cur_ident resolve held chunk chunk_size line cursor_dirty=0
   local target_cursor kind fold_version boundary_rc verb
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
   _fm_status_kind "$f" '' kind
@@ -343,15 +343,14 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
   fi
 
   if [ "$offset" -lt "$size" ]; then
-    chunk_file="$cf.read.$$"
-    _fm_status_read_span "$f" "$offset" "$((size - offset))" > "$chunk_file" 2>/dev/null \
-      || { rm -f "$chunk_file"; printf '%s' "$trusted_open"; return 0; }
-    chunk_size=$(LC_ALL=C wc -c < "$chunk_file" 2>/dev/null) \
-      || { rm -f "$chunk_file"; printf '%s' "$trusted_open"; return 0; }
-    chunk_size=${chunk_size//[[:space:]]/}
-    case "$chunk_size" in
-      ''|*[!0-9]*) rm -f "$chunk_file"; printf '%s' "$trusted_open"; return 0 ;;
-    esac
+    # In memory rather than a scratch file beside the cursor, so a drain killed
+    # mid-fold leaves nothing behind; the trailing sentinel keeps the exact byte
+    # count that a command substitution would otherwise trim.
+    chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 0 2>/dev/null && printf x) \
+      || { printf '%s' "$trusted_open"; return 0; }
+    chunk=${chunk%x}
+    chunk_size=$(LC_ALL=C; printf '%s' "${#chunk}")
+    chunk=$(printf '%s' "$chunk" | fm_status_transition_lines)
     # Test-only observability seam (off by default, no production behavior
     # change): when set, records exactly how many bytes THIS call folded, so a
     # test can assert the incremental path stays bounded by new appends rather
@@ -367,8 +366,9 @@ status_open_decisions_incremental() {  # <status-file> [<captured-end-offset>]
           _fm_decision_fold_line_into "$open" "$line" "$resolve" "$held" "$kind" open
           ;;
       esac
-    done < "$chunk_file"
-    rm -f "$chunk_file"
+    done <<STATUS_FOLD_CHUNK
+$chunk
+STATUS_FOLD_CHUNK
     offset=$size
     cursor_dirty=1
   fi
@@ -803,7 +803,7 @@ status_open_activities() {  # <status-file-or-dash>
     return 0
   fi
   [ -f "$f" ] || return 0
-  _fm_status_open_activities_stream < "$f"
+  _fm_status_open_activities_stream < <(fm_status_window_cat "$f" 2>/dev/null)
 }
 
 # task id from a recorded window target, falling back to the tmux-shaped

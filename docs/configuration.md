@@ -11,7 +11,7 @@ Start with the directory layout, then use the setting reference for the behavior
 | Task windows and worker tools | [Runtime backend](#runtime-backend-configbackend--fm_backend) and [harness support](#harness-support) |
 | Worker permissions, accounts, or environment | [Claude permission mode](#claude-permission-mode-configclaude-permission-mode), [Claude launcher](#claude-launcher-configclaude-launcher), [worker account pin](#worker-account-pin-configclaude-account-configpi-account), [worker tool exclusions](#worker-tool-exclusions-configcrew-exclude-tools), and [worker launch environment](#worker-launch-environment-configlaunch-env-allowlist) |
 | Backlog, preferences, and memory | [Backlog backend](#backlog-backend-taskstoml--configbacklog-backend), [captain preferences](#captain-preferences-datacaptainmd--datacaptain-sharedmd), and [startup memory budget](#startup-memory-budget-configstartup-memory-budget) |
-| Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
+| Supervision and presentation | [Open-work ledger](#open-work-ledger-configopen-loopsjson), [status log size bounds](#status-log-size-bounds-fm_status_cap_bytes), [Pi supervision branch](#pi-supervision-branch), [supervision host](#supervision-host-configsupervision-host), [out-of-session watchdog](#out-of-session-watchdog-configwatchdog-resume), and [Calm preference](#calm-preference-configcalm) |
 | Disk held by nested task copies | [Nested task copy sweep](#nested-task-copy-sweep-configcopy-budget) |
 | Review-agent model choice | [Review-agent selection](#review-agent-selection-binfm-review-agent-selectsh) |
 | Model-picker benchmark data | [Model-picker benchmark data](#model-picker-benchmark-data-fm_model_picker_data) |
@@ -1092,6 +1092,63 @@ Detection latency therefore grows by at most the interval difference for a statu
 The 240-second ceiling keeps `poll + 60` at or under the 300-second guard-grace floor, so the guard, the arm and the watcher still derive one grace (`fm_poll_derived_grace`, [`turnend-guard.md`](turnend-guard.md) "Guard grace and the poll cadence") although only the watcher reads this file.
 A longer interval needs `FM_POLL` set in the environment of every process that derives the grace.
 `bin/fm-wake-lib.sh`'s `fm_watch_poll_seconds` owns the resolution and [`tests/fm-watch-idle-reap.test.sh`](../tests/fm-watch-idle-reap.test.sh) covers it, including a status change noticed within one longer interval.
+
+## Status log size bounds (FM_STATUS_CAP_BYTES)
+
+A status log (`state/<task>.status`) is an append-only record that every supervision reader walks: the watcher, the wake drain, the open-decisions fold, the fleet snapshot, and the status-event library.
+On 2026-10-18 a loop inside an agent harness appended to three of them until they held 140 GB, 265 GB and 122 GB, the disk filled, and each reader multiplied the damage by reading the whole file.
+Three bounds keep one runaway writer from doing that again.
+[`bin/fm-status-cap-lib.sh`](../bin/fm-status-cap-lib.sh) owns all of them.
+The environment can override each for a test or a deliberate site choice, and a value that is not a positive integer falls back to the default.
+
+| Variable | Default | What it bounds |
+| --- | --- | --- |
+| `FM_STATUS_CAP_BYTES` | `33554432` (32 MiB) | The size a status log may reach through the sanctioned writer, and the size at which the watcher raises its over-cap wake for any status log or per-task sidecar. |
+| `FM_STATUS_CAP_RESERVE_BYTES` | `1048576` (1 MiB) | Headroom above the cap that only a decision or terminal line may use. |
+| `FM_STATUS_READ_WINDOW_BYTES` | `4194304` (4 MiB) | The most bytes any reader takes from a status log in one pass. |
+| `FM_STATUS_READ_WINDOW_LINES` | `4096` | The most lines a line-by-line reader takes in one pass, for a log of tiny lines; the open-decisions fold applies it to its transition lines only. |
+
+The cap is chosen from measurement, not from a formula.
+The largest status log in a healthy fleet on 2026-10-18 was 3,230,479 bytes (`state/vernant-d7-steward.status`, 5,338 lines).
+The cap is about ten times that, so no healthy log reaches it and any runaway does.
+The window is 1.3 times that log in bytes, so a healthy log is read whole.
+The line bound comes from a measured cost of about 2.7 ms per line in the watcher's span classifier and 1.2 ms per fold-verb line in the open-decisions fold, which makes 4096 lines about 11 s of shell work in the worst case instead of minutes.
+The fold skips routine lines with one `grep` before its shell loop, so a log with tens of thousands of routine lines still folds in milliseconds.
+The reserve is a judgement: enough for the `done:` or `blocked:` a worker must always be able to send.
+
+### Writing
+
+Every worker's instructions tell it to append with [`bin/fm-status-append.sh`](../bin/fm-status-append.sh) instead of a bare `>>`.
+An exact consecutive repeat of the last event, compared without its `[at=<epoch>]` stamp, is not written again.
+It is counted in one `note:` line that follows the event, whose fixed-width number is rewritten in place, so a loop of any length adds one line and no further bytes and the count stays exact.
+A line that would pass the cap is refused loudly with exit status 75, and nothing is written.
+Only a line whose verb is not `working` or `note` may use the reserve, so a worker at the cap can still report `done:` or `blocked:`.
+A burst of distinct events is never dropped below the cap.
+The writer never deletes, truncates or rewrites an event line.
+The writers inside Firstmate (spawn failures, model-fallback notes, pending-reply escalations, the parent channel, the secondmate report helper, and the guarded self-announced appends) use the same append.
+
+### Foreign writers
+
+A process that opens the log itself is not bound by the helper, so the watcher checks for it.
+Each poll costs one stat over every `state/*.status` and the per-task cursor, ledger and presentation sidecars.
+When one passes the cap, `bin/fm-status-cap-guard.sh` investigates it once and the watcher raises one `check: status-log-over-cap` wake per file episode, within one poll interval (15 s by default, so a writer as fast as the 2026-10-18 loops, 0.2 to 0.7 GB/s, can add several GB before the wake).
+The wake names the file, its size, its growth rate and the writer process found by `lsof`.
+An omp writer is stopped with `SIGSTOP`, which `kill -CONT <pid>` undoes; the guard first checks that the process is still the one `lsof` named, is not itself or one of its ancestors, and signals exactly the listed writers that are omp.
+Any other writer, and a log with no writer found, is named and left alone.
+`FM_STATUS_CAP_STOP=0` makes the guard observe only.
+The guard never deletes or rewrites a file.
+[`bin/fm-control.sh`](../bin/fm-control.sh) is addressed by task id and drives an endpoint, and has no verb for one process, so the one-process stop lives in the guard.
+The episode is marked in `state/.status-cap-alerted.<name>` and clears when the file is replaced or falls under the cap.
+
+### Reading
+
+Every reader takes at most one window from a log.
+A longer span is read from its last whole lines, and a line on stderr says how much was not read; the fleet ledger records a `task.status.skipped` event for the same case.
+This covers the watcher's span classifier, the wake drain's unread-status and open-decisions folds, the status-event library, the retry check `status_event_recorded`, the pending-reply scans, the fleet snapshot copy, the fleet ledger capture, the session-start tail, and the remote-reply mirror check.
+The drain holds its spans in memory rather than in scratch files beside the cursor, so a drain killed mid-read leaves nothing behind.
+A fold cursor, ledger or presentation manifest larger than one window is treated as absent and rebuilt from the bounded read.
+A log read from its tail can miss a decision opened earlier than the window when no saved fold position exists; the saved position avoids that for every log the drain has folded before.
+`tests/fm-status-runaway-guard.test.sh` is the regression entry point.
 
 ## Test slots per key (FM_TEST_KEY_SLOTS)
 
@@ -3929,6 +3986,7 @@ FM_TASKS_AXI_COMPATIBLE=   # internal one-hop handoff of an already-computed tas
 FM_GUARD_READ_ONLY=0    # internal/read-only guard mode: keep alarms but suppress drain, supervision repair, and checkout repair commands
 FM_GUARD_CONTINUE_LINE='This is a supervision warning only; the guarded operation WILL still run.'   # banner continuation line; fm-send.sh overrides it to name the requested message specifically
 FM_POLL=15              # seconds between watcher poll cycles; unset means config/watch-poll, else 30 in a secondmate home and 15 elsewhere (docs/configuration.md "Watcher poll interval by home role")
+FM_STATUS_CAP_BYTES=33554432   # size a status log may reach through the sanctioned writer and the size at which the watcher raises its over-cap wake (docs/configuration.md "Status log size bounds"); FM_STATUS_CAP_RESERVE_BYTES, FM_STATUS_READ_WINDOW_BYTES, FM_STATUS_READ_WINDOW_LINES and FM_STATUS_CAP_STOP are described there
 FM_HOME_SUMMARY_INTERVAL=300   # seconds before a live watcher refreshes this home's state/home-summary.json even without a status signal; invalid or zero values use 300
 FM_OPEN_LOOPS_INTERVAL=600   # seconds between the watcher's detached open-work ledger refreshes; invalid or zero values use 600
 FM_OPEN_LOOPS_RESURFACE=21600   # seconds before an unchanged set of overdue ledger rows wakes firstmate again; invalid or zero values use 21600

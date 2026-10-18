@@ -22,6 +22,13 @@ case $- in *u*) _fm_classify_nounset=on ;; *) _fm_classify_nounset=off ;; esac
 [ "$_fm_classify_nounset" = on ] || set +u
 unset _fm_classify_nounset
 
+# The reader window (bin/fm-status-cap-lib.sh owns the bound and its reason) is
+# applied once, inside _fm_status_read_span below, so every caller that takes bytes
+# from a status log inherits it.
+# shellcheck source=bin/fm-status-cap-lib.sh
+# shellcheck disable=SC1091
+. "$(d=${BASH_SOURCE[0]%/*}; [ "$d" != "${BASH_SOURCE[0]}" ] || d=.; cd "${d:-/}" && pwd)/fm-status-cap-lib.sh"
+
 # Parameter expansion rather than dirname and basename: every presentation scan
 # asks for the cursor path of every task, and two child processes per call were
 # the largest process count in a wake drain.
@@ -169,6 +176,9 @@ _fm_read_file_into() {  # <file> <out-var>
   local __fm_rf_data='' __fm_rf_size LC_ALL=C
   _fm_status_stat_raw "$1" '' __fm_rf_size '' || return 1
   case "$__fm_rf_size" in ''|*[!0-9]*) return 1 ;; esac
+  # The presentation manifest is one small row per task; one past the reader
+  # window is abnormal and is refused, not read.
+  [ "$__fm_rf_size" -le "$(fm_status_window_bytes)" ] || return 1
   { [ "$__fm_rf_size" -eq 0 ] || IFS= read -r -d '' -n "$__fm_rf_size" __fm_rf_data; } 2>/dev/null < "$1" || return 1
   [ "${#__fm_rf_data}" -eq "$__fm_rf_size" ] || return 1
   printf -v "$2" '%s' "$__fm_rf_data"
@@ -190,25 +200,130 @@ _fm_status_span_scratch() {  # <status-file>
   printf '%s.span.%s' "$__fm_ss_cursor" "$$"
 }
 
-_fm_status_read_span() {  # <status-file> <start-offset> <byte-length>
-  local f=$1 start=$2 length=$3
+# Take <byte-length> bytes of a status log from <start-offset>, never more than the
+# reader window (bin/fm-status-cap-lib.sh): at most its byte bound and its line
+# bound. A longer span is read from its tail and aligned to the next line start, so
+# the reader gets whole lines only, and one line on stderr names what was skipped;
+# no reader loses events without that notice. FM_STATUS_SPAN_SKIPPED holds the bytes
+# the byte bound cut, for a caller that runs in the current shell (a command
+# substitution cannot return it).
+FM_STATUS_SPAN_SKIPPED=0
+# An optional fourth argument replaces the line bound: 0 asks for the byte bound
+# alone, for a reader that filters the span down to a few lines before looping over
+# it (the open-decisions fold, fm_status_fold_cat in bin/fm-status-decision-lib.sh).
+_fm_status_read_span() {  # <status-file> <start-offset> <byte-length> [<max-lines>]
   if [ -n "${FM_STATUS_SPAN_READER:-}" ]; then
-    "$FM_STATUS_SPAN_READER" "$f" "$start" "$length"
+    FM_STATUS_SPAN_SKIPPED=0
+    "$FM_STATUS_SPAN_READER" "$1" "$2" "$3"
     return
   fi
-  perl -MFcntl=:DEFAULT -e '
-    my ($path, $start, $length) = @ARGV;
-    sysopen(my $file, $path, O_RDONLY | O_NOFOLLOW) or exit 1;
-    sysseek($file, $start, 0) == $start or exit 1;
-    while ($length > 0) {
-      my $want = $length > 65536 ? 65536 : $length;
-      my $read = sysread($file, my $chunk, $want);
-      defined($read) && $read > 0 or exit 1;
-      print $chunk or exit 1;
-      $length -= $read;
-    }
-  ' "$f" "$start" "$length"
+  _fm_status_read_span_file "$1" "$2" "$3" "${4-}"
 }
+
+# The reader itself, with no test seam: whole-file readers (fm_status_window_cat)
+# call this directly, because they stand for a plain read of the file.
+_fm_status_read_span_file() {  # <status-file> <start-offset> <byte-length> [<max-lines>]
+  local f=$1 start=$2 length=$3 window lines align=0
+  FM_STATUS_SPAN_SKIPPED=0
+  fm_status_window_bytes window
+  case "${4-}" in
+    0) lines=2147483647 ;;
+    ''|*[!0-9]*) fm_status_window_lines lines ;;
+    *) lines=$4 ;;
+  esac
+  if [ "$length" -gt "$window" ]; then
+    FM_STATUS_SPAN_SKIPPED=$((length - window))
+    start=$((start + FM_STATUS_SPAN_SKIPPED))
+    length=$window
+    align=1
+  fi
+  perl -MFcntl=:DEFAULT -e '
+    my ($path, $start, $length, $align, $max_lines, $name) = @ARGV;
+    sysopen(my $file, $path, O_RDONLY | O_NOFOLLOW) or exit 1;
+    my $seek = ($align && $start > 0) ? $start - 1 : $start;
+    sysseek($file, $seek, 0) == $seek or exit 1;
+    my $want = $length + $start - $seek;
+    my $data = "";
+    while ($want > 0) {
+      my $read = sysread($file, my $chunk, $want > 65536 ? 65536 : $want);
+      defined($read) && $read > 0 or exit 1;
+      $want -= $read;
+      $data .= $chunk;
+    }
+    my $skipped = 0;
+    if ($align && $start > 0) {
+      my $nl = index($data, "\n");
+      if ($nl < 0) { $skipped = length($data); $data = ""; }
+      else { $skipped = $nl; $data = substr($data, $nl + 1); }
+    }
+    my $count = ($data =~ tr/\n//);
+    if ($count > $max_lines) {
+      my $drop = $count - $max_lines;
+      my $pos = 0;
+      for (1 .. $drop) { $pos = index($data, "\n", $pos) + 1; }
+      $data = substr($data, $pos);
+      $skipped += $pos;
+    }
+    if ($skipped > 0 || $align) {
+      print STDERR "fm-status: read window: $name read from its last " . length($data) . " bytes; earlier lines were not read\n";
+    }
+    print $data or exit 1;
+  ' "$f" "$start" "$length" "$align" "$lines" "${f##*/}"
+}
+
+# Whole-file readers use this instead of redirecting a status log: it prints the
+# log, or its last window of whole lines when the log is longer, through the same
+# bound as every span read above. Callers loop over it with process substitution.
+fm_status_window_cat() {  # <status-file>
+  local f=$1 __fm_wc_size
+  _fm_status_file_size "$f" __fm_wc_size || return 1
+  __fm_wc_size=${__fm_wc_size//[[:space:]]/}
+  case "$__fm_wc_size" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$__fm_wc_size" -gt 0 ] || return 0
+  _fm_status_read_span_file "$f" 0 "$__fm_wc_size"
+}
+# The same bounded read without the line bound, for a reader that filters in a
+# single process (grep, awk) and so pays nothing per line: its input is the log, or
+# its last window of bytes, and the filter keeps the tail small.
+fm_status_window_bytes_cat() {  # <status-file>
+  local f=$1 __fm_wc_size __fm_wc_window
+  _fm_status_file_size "$f" __fm_wc_size || return 1
+  __fm_wc_size=${__fm_wc_size//[[:space:]]/}
+  case "$__fm_wc_size" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$__fm_wc_size" -gt 0 ] || return 0
+  fm_status_window_bytes __fm_wc_window
+  if [ "$__fm_wc_size" -le "$__fm_wc_window" ]; then
+    LC_ALL=C command cat -- "$f"
+  else
+    # A clamped read starts mid-line; drop the partial first line.
+    LC_ALL=C tail -c "$__fm_wc_window" -- "$f" | sed '1d'
+  fi
+}
+
+# 0 when a status sidecar (a fold cursor, the presentation manifest, the
+# home-appends ledger) is small enough to read whole: no larger than one reader
+# window. A sidecar past that is abnormal, so its reader treats it as absent and
+# rebuilds it from the bounded log read; the watcher guard
+# (bin/fm-status-cap-guard.sh) raises the alarm for it.
+_fm_status_sidecar_fits() {  # <file>
+  local __fm_sf_size __fm_sf_window
+  _fm_status_file_size "$1" __fm_sf_size 2>/dev/null || return 1
+  __fm_sf_size=${__fm_sf_size//[[:space:]]/}
+  case "$__fm_sf_size" in ''|*[!0-9]*) return 1 ;; esac
+  fm_status_window_bytes __fm_sf_window
+  [ "$__fm_sf_size" -le "$__fm_sf_window" ]
+}
+
+# The last <lines> lines of a status log, read from at most its last window of
+# bytes: tail -n alone scans backwards for newlines, so a log that holds one
+# newline-free run of gigabytes would still be read whole. A partial first line
+# of a clamped read is the caller's tolerance, exactly as with tail -n.
+fm_status_tail_lines() {  # <status-file> <lines>
+  local window
+  fm_status_window_bytes window
+  tail -c "$window" "$1" 2>/dev/null | tail -n "$2"
+}
+
 FM_STATUS_SNAPSHOT_EVENT_LINE=
 FM_STATUS_SNAPSHOT_EVENT_MTIME=
 FM_STATUS_SNAPSHOT_EVENT_ENDPOINT=

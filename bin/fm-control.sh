@@ -245,6 +245,8 @@ esac
 
 # shellcheck source=bin/fm-gate-refuse-lib.sh
 . "$SCRIPT_DIR/fm-gate-refuse-lib.sh"
+# shellcheck source=bin/fm-status-cap-lib.sh
+. "$SCRIPT_DIR/fm-status-cap-lib.sh"
 # Fail closed before any fleet mutation: a no-mistakes gate agent must never
 # drive a crewmate's lifecycle (see bin/fm-gate-refuse-lib.sh).
 fm_refuse_if_gate_agent
@@ -2650,7 +2652,7 @@ do_relaunch() {
   journal_write complete "$note_line" "exit_result=$exit_result"
   RELAUNCH_ACTIVE=0
   if [ "$TARGET_DISPATCH_SWITCHED" = true ]; then
-    printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s\n' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}" >> "$STATE/$ID.status"
+    fm_status_append_line "$STATE/$ID.status" "$(printf 'working [at=%s]: model-matrix fallback relaunched %s %s for %s' "$(date +%s)" "$TARGET_HARNESS" "$TARGET_MODEL" "${TARGET_DISPATCH_RULE:-matching profiles}")" >/dev/null 2>&1 || :
   fi
   echo "relaunched $ID harness=$TARGET_HARNESS from=$PRIOR_RECORDED_HARNESS model=$TARGET_MODEL effort=$TARGET_EFFORT backend=$BACKEND endpoint=$T worktree=$WT"
 }

@@ -206,6 +206,7 @@ status_open_decisions_cursor_offset() {  # <status-file>
   cf=$(_fm_open_decisions_cursor_path "$f")
   if [ -e "$cf" ] || [ -L "$cf" ]; then
     [ -f "$cf" ] && [ -r "$cf" ] && [ ! -L "$cf" ] || return 1
+    _fm_status_sidecar_fits "$cf" || return 1
     if cursor_data=$(LC_ALL=C command cat "$cf" 2>/dev/null); then
       first=${cursor_data%%$'\n'*}
       case "$first" in
@@ -277,11 +278,9 @@ status_open_decisions_cursor_offset() {  # <status-file>
 # print nothing. With <out-var>, the lines are assigned to it instead of
 # printed, so a per-task scan takes them without forking a substitution.
 status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>] [<out-var>]
-  local f=$1 captured_end=${2:-} __fm_nl_out=${3-} __fm_nl_acc='' cf offset size actual_size chunk_file line rc=0
+  local f=$1 captured_end=${2:-} __fm_nl_out=${3-} __fm_nl_acc='' offset size actual_size chunk line rc=0
   [ -z "$__fm_nl_out" ] || printf -v "$__fm_nl_out" '%s' ''
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 0
-  _fm_open_decisions_cursor_path "$f" cf
-  chunk_file="$cf.unread.$$"
   status_presentation_cursor_offset "$f" offset || return 1
   case "$offset" in ''|*[!0-9]*) return 1 ;; esac
   _fm_status_file_size "$f" actual_size || return 1
@@ -295,8 +294,10 @@ status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>] [<out
     size=$actual_size
   fi
   [ "$offset" -lt "$size" ] || return 0
-  _fm_status_read_span "$f" "$offset" "$((size - offset))" > "$chunk_file" 2>/dev/null \
-    || { rm -f "$chunk_file"; return 1; }
+  # The span is held in memory, not in a scratch file beside the cursor: a drain
+  # killed mid-read (SIGKILL cannot be trapped) must leave nothing behind, and the
+  # reader window (bin/fm-status-cap-lib.sh) bounds what it holds.
+  chunk=$(_fm_status_read_span "$f" "$offset" "$((size - offset))" 2>/dev/null) || return 1
   while IFS= read -r line || [ -n "$line" ]; do
     case "$line" in
       *[![:space:]]*)
@@ -307,8 +308,9 @@ status_new_lines_since_cursor() {  # <status-file> [<captured-end-offset>] [<out
         fi
         ;;
     esac
-  done < "$chunk_file"
-  rm -f "$chunk_file"
+  done <<STATUS_UNREAD_SPAN
+$chunk
+STATUS_UNREAD_SPAN
   # Matches the stripped-newline text a command substitution would have given.
   [ -z "$__fm_nl_out" ] || printf -v "$__fm_nl_out" '%s' "${__fm_nl_acc%$'\n'}"
   return "$rc"
@@ -387,6 +389,7 @@ status_home_appends_ranges() {  # <status-file> -> start<TAB>end lines
   path=$(status_home_appends_path "$f")
   [ -f "$path" ] && [ -r "$path" ] && [ ! -L "$path" ] || return 0
   ident=$(_fm_open_decisions_file_ident "$f") || return 0
+  _fm_status_sidecar_fits "$path" || return 0
   data=$(LC_ALL=C command cat "$path" 2>/dev/null) || return 0
   first=${data%%$'\n'*}
   [ "$first" = v1 ] || return 0
@@ -504,10 +507,10 @@ $1
 EOF
 }
 
-_fm_status_open_decision_origins() {  # <status-file> [<kind>]
-  local f=$1 line open='' after='' key verb note number=0 origins=''
+_fm_status_open_decision_origins() {  # <status-text> <status-file> [<kind>]
+  local text=$1 f=$2 line open='' after='' key verb note number=0 origins=''
   local resolve held kind
-  kind=$(_fm_status_kind "$f" "${2:-}")
+  kind=$(_fm_status_kind "$f" "${3:-}")
   resolve=${FM_CLASSIFY_RESOLVE_VERB:-$FM_CLASSIFY_RESOLVE_VERB_DEFAULT}
   held=${FM_CLASSIFY_CAPTAIN_HELD_VERB:-$FM_CLASSIFY_CAPTAIN_HELD_VERB_DEFAULT}
   while IFS= read -r line || [ -n "$line" ]; do
@@ -535,12 +538,14 @@ _fm_status_open_decision_origins() {  # <status-file> [<kind>]
         ;;
     esac
     open=$after
-  done < "$f"
+  done <<STATUS_ORIGIN_SPAN
+$text
+STATUS_ORIGIN_SPAN
   printf '%s' "$origins"
 }
 
 status_span_first_actionable_record() {  # <status-file> <start-offset> [record-var] [needs-decision-var]
-  local f=$1 start=${2:-0} output_var=${3-} needs_var=${4-} size ident cur_ident scratch chunk_file result
+  local f=$1 start=${2:-0} output_var=${3-} needs_var=${4-} size ident cur_ident chunk result
   local line verb key origins='' folded=0 rc=1 failed=0 line_number=0 live_line='' events='' _line _key _fm_span_needs_decision=0
   [ -e "$f" ] || { [ -L "$f" ] && return 2; return 1; }
   [ -f "$f" ] && [ -r "$f" ] && [ ! -L "$f" ] || return 2
@@ -560,15 +565,12 @@ status_span_first_actionable_record() {  # <status-file> <start-offset> [record-
     fi
     return 1
   fi
-  scratch=$(_fm_status_span_scratch "$f") || return 2
-  chunk_file="${scratch}.span"
-  _fm_status_read_span "$f" "$start" "$((size - start))" > "$chunk_file" 2>/dev/null \
-    || { rm -f "$chunk_file"; return 2; }
-  cur_ident=$(_fm_open_decisions_file_ident "$f") || {
-    rm -f "$chunk_file"; return 2;
-  }
-  [ "$cur_ident" = "$ident" ] || { rm -f "$chunk_file"; return 2; }
-  # shellcheck disable=SC2094 # The loop and the origin fold below only read the span scratch.
+  # The span stays in memory, never in a scratch file beside the cursor: a reader
+  # killed mid-read must leave nothing behind, and the reader window
+  # (bin/fm-status-cap-lib.sh) bounds what is held.
+  chunk=$(_fm_status_read_span "$f" "$start" "$((size - start))" 2>/dev/null) || return 2
+  cur_ident=$(_fm_open_decisions_file_ident "$f") || return 2
+  [ "$cur_ident" = "$ident" ] || return 2
   while IFS= read -r line || [ -n "$line" ]; do
     line_number=$((line_number + 1))
     case "$line" in *[![:space:]]*) ;; *) continue ;; esac
@@ -598,7 +600,7 @@ status_span_first_actionable_record() {  # <status-file> <start-offset> [record-
           continue
         }
         if [ "$folded" -eq 0 ]; then
-          origins=$(_fm_status_open_decision_origins "$chunk_file" "$(_fm_status_kind "$f")") || { failed=1; break; }
+          origins=$(_fm_status_open_decision_origins "$chunk" "$f" "$(_fm_status_kind "$f")") || { failed=1; break; }
           folded=1
         fi
         live_line=$(while IFS=$'\t' read -r _key _line; do
@@ -622,8 +624,9 @@ EOF
         rc=0
         ;;
     esac
-  done < "$chunk_file"
-  rm -f "$chunk_file"
+  done <<STATUS_SPAN_CHUNK
+$chunk
+STATUS_SPAN_CHUNK
   [ "$failed" -eq 0 ] || return 2
   if [ "$rc" -eq 0 ]; then result="${size}"$'\t'"${ident}"$'\t'"${events}"; else result="${size}"$'\t'"${ident}"; fi
   if [ -n "$output_var" ]; then

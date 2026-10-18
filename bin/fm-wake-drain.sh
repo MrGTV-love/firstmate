@@ -450,22 +450,37 @@ EOF
 # this section presents. Runs even on an empty-queue drain so buried answers
 # cannot be swallowed; prints nothing when the prepared row set is empty.
 print_unread_status_section() {
-  local unread=$1 task line shown=0
+  local unread=$1 task line shown=0 previous='' repeats=0
   [ -n "$unread" ] || return 0
 
   while IFS=$'\t' read -r task line; do
     [ -n "$task" ] || continue
     [ -n "$line" ] || continue
     line="$task $line"
+    # An exact consecutive repeat is counted, not printed again: a runaway writer
+    # would otherwise fill the supervisor's context with one line
+    # (bin/fm-status-cap-lib.sh). The count is stated, so nothing is hidden.
+    if [ "$shown" -gt 0 ] && [ "$line" = "$previous" ]; then
+      repeats=$((repeats + 1))
+      continue
+    fi
+    if [ "$repeats" -gt 0 ]; then
+      printf '  (the line above repeated %d more times)\n' "$repeats" || return 1
+      repeats=0
+    fi
     if [ "$shown" -eq 0 ]; then
       printf 'UNREAD STATUS (new since last drain, not re-printed after this presentation):\n' || return 1
     fi
     printf '%s\n' "$line" || return 1
+    previous=$line
     shown=$((shown + 1))
   done <<EOF
 $unread
 EOF
 
+  if [ "$repeats" -gt 0 ]; then
+    printf '  (the line above repeated %d more times)\n' "$repeats" || return 1
+  fi
   [ "$shown" -gt 0 ] || return 0
 }
 
