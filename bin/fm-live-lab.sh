@@ -441,6 +441,15 @@ import os, sys
 path = sys.argv[1]
 text = open(path, encoding="utf-8").read()
 text = text.replace("{TASK}", os.environ["TASK_TEXT"], 1).replace("{FIRSTMATE_SPEC}", os.environ["SPEC_TEXT"], 1)
+dod = {
+    "{DOD_CAPABILITY}": "notes/__init__.py gains count_notes(), which returns how many notes are stored.",
+    "{DOD_MANDATORY_ITEMS}": "M1. Source: the task text. Expected: count_notes() returns the stored note count. Verify: python3 -m unittest discover -s tests passes. Edge/negative: an empty store returns 0. Evidence place: tests/test_notes.py and the unittest output. Authority: gate.",
+    "{DOD_SUPPORTING_ITEMS}": "None.",
+    "{DOD_HARD_GATES}": "Do not implement before the gate file exists.",
+    "{DOD_HONESTY_RULE}": "Report an unrun test as unrun; never claim a pass without the unittest output.",
+}
+for token, fill in dod.items():
+    text = text.replace(token, fill, 1)
 open(path, "w", encoding="utf-8").write(text)
 PY
   (cd "$LAB" && lab_run FM_HOME="$LAB" "$LAB/bin/fm-tasks-axi.sh" add "$WORKER_ID" "lab gated worker" --kind ship --repo notes) >/dev/null || return 1

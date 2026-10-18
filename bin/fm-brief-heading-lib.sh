@@ -8,16 +8,17 @@
 # is owned by docs/configuration.md "Never-send list".
 
 # Parse an exact ATX heading outside fenced blocks. Body mode prints through
-# the next unfenced heading at the same or a higher level; present mode reports
-# whether the heading exists.
-fm_brief_heading_parse() {  # <file|-> <heading> <body|present>
-  local file=$1 heading=$2 mode=$3 input=$1
+# the next unfenced heading at the same or a higher level, or through the next
+# unfenced line equal to the optional end line whatever heading levels sit
+# between; present mode reports whether the heading exists.
+fm_brief_heading_parse() {  # <file|-> <heading> <body|present> [<end-line>]
+  local file=$1 heading=$2 mode=$3 end_line=${4:-} input=$1
   if [ "$file" = - ]; then
     input=/dev/stdin
   else
     [ -f "$file" ] || { [ "$mode" = body ]; return; }
   fi
-  awk -v heading="$heading" -v mode="$mode" '
+  awk -v heading="$heading" -v mode="$mode" -v end_line="$end_line" '
     BEGIN {
       target_level = 0
       while (substr(heading, target_level + 1, 1) == "#") target_level++
@@ -61,9 +62,10 @@ fm_brief_heading_parse() {  # <file|-> <heading> <body|present>
         next
       }
 
+      if (end_line != "" && line == end_line) exit
       level = 0
       while (substr(scan, level + 1, 1) == "#") level++
-      if (level > 0 && level <= target_level && substr(scan, level + 1, 1) ~ /^[[:space:]]?$/) exit
+      if (end_line == "" && level > 0 && level <= target_level && substr(scan, level + 1, 1) ~ /^[[:space:]]?$/) exit
       print line
     }
     END {
@@ -74,6 +76,10 @@ fm_brief_heading_parse() {  # <file|-> <heading> <body|present>
 
 fm_brief_heading_body() {  # <file> <heading>
   fm_brief_heading_parse "$1" "$2" body
+}
+
+fm_brief_heading_span() {  # <file> <heading> <end-line>
+  fm_brief_heading_parse "$1" "$2" body "$3"
 }
 
 fm_brief_heading_present() {  # <file> <heading>

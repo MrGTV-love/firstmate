@@ -1356,6 +1356,23 @@ When the file is absent, worker launches do not add a board address and retain t
 Malformed or unreadable values refuse the launch before the worker starts.
 The address selects the existing shared server; it does not authorize starting or stopping the server, and the Lavish startup crash remains a vendor-tool concern.
 
+## Task Definition of Done (ship and scout briefs)
+
+Every ship and scout brief that `bin/fm-brief.sh` scaffolds ends its delivery contract with two more sections: `## Definition Of Done (task)` and the fixed `## How You're Graded`.
+Firstmate fills the five placeholders of the first from the captain's intent: the capability in plain words, mandatory items (each with Source, Expected, Verify, Edge/negative, Evidence place, and Authority of agent, gate, or grader), supporting items, hard gates, and the honesty rule.
+The grading section says a session that did not build the work grades it, that mandatory items are pass or fail while supporting items never offset a failed mandatory one, and that a `done:` status line only starts the checking.
+A fresh `bin/fm-spawn.sh` of a ship or scout refuses a brief whose section still holds one of those placeholders, naming the section and the placeholder.
+The check reads every line from the `## Definition Of Done (task)` title to the `## How You're Graded` line, whatever heading levels sit between.
+A placeholder counts only where the scaffold puts it: a line holding the placeholder alone, or the end of the `Capability in plain words:` line.
+A filled section may quote a placeholder inside a sentence.
+The one escape is a `DoD file: <absolute path>` line inside that section naming an existing, non-empty file with no placeholder left.
+A `DoD file:` line anywhere else in the brief is ignored.
+A relaunch (`bin/fm-spawn.sh --relaunch`) never runs the check, so a criteria file that moves later cannot block it.
+Secondmate charters carry neither section and are never checked.
+A fresh spawn of a brief with no such section at all is not refused: it prints one warning line on stderr that names the missing section and the task id, and carries on.
+The supervision sweep reads a `DoD file:` line as the criteria and reports a missing or placeholder section instead of inventing criteria.
+`bin/fm-dod-lib.sh` owns the scaffold text and the check.
+
 ## Home brief include (config/brief-include.md)
 
 The optional local, gitignored `config/brief-include.md` adds standing worker instructions to every ship and scout brief.

@@ -58,12 +58,22 @@ import sys
 
 brief = Path(sys.argv[1])
 status = sys.argv[2]
-brief.write_text(brief.read_text().replace("{TASK}", f'''Run a cmux communication probe.
+text = brief.read_text().replace("{TASK}", f'''Run a cmux communication probe.
 
 Immediately append `working [at=<epoch>]: cmux composer probe ready` to `{status}`, substituting `<epoch>` as rule 4 instructs.
 Then append exactly `needs-decision [at=<epoch>] [key=probe-decision]: awaiting codeword` to that file and stop to wait for a firstmate message.
 When you receive a firstmate message containing `ALBATROSS`, append `done [at=<epoch>]: received ALBATROSS` to that status file and stop.
-Do not change project files or make a commit.'''))
+Do not change project files or make a commit.''')
+text = text.replace("{FIRSTMATE_SPEC}", "Report only through the status file; the probe changes nothing else.")
+for token, fill in {
+    "{DOD_CAPABILITY}": "The worker answers the codeword through its status file.",
+    "{DOD_MANDATORY_ITEMS}": "M1. Source: the task text. Expected: after the ALBATROSS message the status file ends with a done line naming ALBATROSS. Verify: read the status file. Edge/negative: no project file changes and no commit. Evidence place: the status file. Authority: agent.",
+    "{DOD_SUPPORTING_ITEMS}": "None.",
+    "{DOD_HARD_GATES}": "Do not change project files or make a commit.",
+    "{DOD_HONESTY_RULE}": "Report only what the status file shows.",
+}.items():
+    text = text.replace(token, fill)
+brief.write_text(text)
 PY
 
 FM_HOME="$LAB" "$ROOT/bin/fm-spawn.sh" "$TASK" "$LAB/projects/comms" --scout --harness claude --model haiku --backend cmux \

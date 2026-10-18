@@ -304,6 +304,20 @@ test_pi_snippet_uses_effective_extension_path() {
   pass "pi supervision snippet renders the effective extension path"
 }
 
+# The sweep names the task grading sections, says a missing or placeholder one
+# is reported, and says a DoD file line in the section holds the criteria, on
+# every harness.
+test_completion_check_names_the_task_grading_sections() {
+  local harness out
+  for harness in claude codex opencode pi grok cursor omp unknown; do
+    out=$("$RENDER" --harness "$harness")
+    assert_contains "$out" '"## Definition Of Done (task)" and "## How You'"'"'re Graded"' "$harness instructions omit the task grading section titles"
+    assert_contains "$out" "Report a missing or placeholder section, never invent criteria" "$harness instructions omit the missing-section rule"
+    assert_contains "$out" 'carries a "DoD file: <absolute path>" line, that file holds the criteria: read it as the criteria and do not report the section'"'"'s placeholders' "$harness instructions omit the DoD file escape"
+  done
+  pass "supervision instructions: every harness names the task grading sections, the DoD file escape, and the missing-section rule"
+}
+
 test_supervision_host_protocol_on_a_claude_home_unless_off
 test_supervision_host_protocol_on_every_arm_owner
 test_selected_harness_block_only
@@ -316,3 +330,4 @@ test_pi_signed_preserves_identity_with_pi_supervision_protocol
 test_grok_is_background_notify
 test_grok_command_sources_effective_config
 test_pi_snippet_uses_effective_extension_path
+test_completion_check_names_the_task_grading_sections
