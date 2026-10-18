@@ -3219,7 +3219,6 @@ SH
   toolbin=$(make_no_timeout_toolbin "$d")
   fm_write_meta "$d/state/feat-timeout.meta" "window=fm:fm-feat-timeout" "worktree=$d/wt" "kind=ship" \
     "harness=claude"
-  printf 'blocked [at=1] [key=credential]: missing review credential\n' > "$d/state/feat-timeout.status"
   FM_FAKE_BUSY=1
   local gen; gen=$("$ROOT/bin/fm-busy-event.sh" arm "$d/state" feat-timeout)
   "$ROOT/bin/fm-busy-event.sh" apply "$d/state" feat-timeout busy --gen "$gen" \
@@ -3235,13 +3234,66 @@ SH
   done
   ! fm_test_process_alive "$pidfile" "$d/fakebin/no-mistakes" \
     || fail "the timed-out no-mistakes call was left running after the bound"
-  assert_contains "$out" "state: blocked" "a timed-out store preserves the recorded blocker, not the busy pane"
-  assert_contains "$out" "source: status-log" "a timed-out store uses the resolved status declaration"
-  assert_contains "$out" "run-store: skipped" "the timed-out store is disclosed as a partial read"
+  assert_contains "$out" "state: working" "timed-out no-mistakes falls back to pane"
+  assert_contains "$out" "source: pane" "timed-out no-mistakes -> pane source"
+  assert_contains "$out" "run-store: skipped (read budget exceeded)" "the cut lookup is disclosed, not hidden"
   [ "$elapsed" -lt 5 ] || fail "perl timeout did not bound no-mistakes calls (elapsed ${elapsed}s)"
   calls=$(awk 'END { print NR + 0 }' "$calls_file" 2>/dev/null || echo 0)
   [ "$calls" -eq 1 ] || fail "empty no-mistakes status triggered extra lookups ($calls calls)"
   pass "no timeout command uses perl bound"
+}
+
+# A cut run-store lookup is skipped, so the pane still decides liveness: a dead
+# worker's old `working:` declaration must not read as working.
+test_cut_store_does_not_revive_dead_worker_from_old_status() {
+  reset_fakes
+  local d out calls
+  d=$(new_case cut-store-dead-worker)
+  make_repo_on_branch "$d/wt" fm/feat-cut-dead
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-cut-dead.meta" "window=fm:fm-feat-cut-dead" "worktree=$d/wt" "kind=ship" \
+    "harness=claude"
+  printf 'working [at=1]: implementing\n' > "$d/state/feat-cut-dead.status"
+  cat > "$d/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "${0%/*}/no-mistakes.calls"
+exec sleep 30
+SH
+  chmod +x "$d/fakebin/no-mistakes"
+  FM_FAKE_TMUX_MISSING=1
+  out=$(FM_CREW_STATE_NM_TIMEOUT=2 run_crew_state "$d" feat-cut-dead)
+  [ -s "$d/fakebin/no-mistakes.calls" ] || fail "the run-store lookup never ran, so the cut proved nothing"
+  calls=$(awk 'END { print NR + 0 }' "$d/fakebin/no-mistakes.calls")
+  [ "$calls" -eq 1 ] || fail "a cut lookup was retried ($calls calls)"
+  assert_not_contains "$out" "state: working" "an old working declaration cannot revive a dead worker"
+  assert_contains "$out" "state: unknown" "a gone worker with a cut store reads unknown"
+  assert_contains "$out" "backend target gone" "the pane still decides liveness after a cut lookup"
+  assert_contains "$out" "run-store: skipped (read budget exceeded)" "the cut lookup is disclosed"
+  pass "a cut run-store lookup keeps pane liveness: old working status does not revive a dead worker"
+}
+
+# A lookup that answers inside its own allowance is never marked skipped, even
+# when the lookups together outlast that allowance.
+test_responsive_lookups_are_not_pooled() {
+  reset_fakes
+  local d out
+  d=$(new_case responsive-lookups)
+  make_repo_on_branch "$d/wt" fm/feat-responsive
+  make_fakebin "$d" >/dev/null
+  fm_write_meta "$d/state/feat-responsive.meta" "window=fm:fm-feat-responsive" "worktree=$d/wt" "kind=ship"
+  FM_FAKE_AXI_STATUS="$(run_passed fm/feat-responsive)"
+  mv "$d/fakebin/no-mistakes" "$d/fakebin/nm-response"
+  cat > "$d/fakebin/no-mistakes" <<'SH'
+#!/usr/bin/env bash
+sleep 2
+exec "${0%/*}/nm-response" "$@"
+SH
+  chmod +x "$d/fakebin/no-mistakes"
+  out=$(FM_CREW_STATE_NM_TIMEOUT=3 run_crew_state "$d" feat-responsive)
+  assert_contains "$out" "state: done" "slow but responsive lookups keep the run-step answer"
+  assert_contains "$out" "source: run-step" "the store evidence is used, not replaced by a fallback"
+  assert_not_contains "$out" "run-store: skipped" "no lookup was cut, so nothing is marked skipped"
+  pass "responsive lookups each keep their own allowance"
 }
 
 # (i) kind=scout skips the run lookup entirely (its deliverable is a report).
@@ -4189,18 +4241,20 @@ PY
   pass 'no run for this branch beside a live run elsewhere reads absent, not unreadable'
 }
 
-# The capped-overview sqlite reader shares the optional run-store budget, so
-# a contended database cannot stall a crew poll. Without a status declaration,
-# an exhausted budget leaves an explicitly partial unknown, never a guessed run.
+# The capped-overview sqlite reader runs inside the same per-read budget as
+# every other no-mistakes state read, so a contended database cannot stall a
+# crew poll: a reader that never returns must be killed and fall through to the
+# reader-unavailable verdict, disclosed as a skipped run-store lookup.
 test_capped_inventory_reader_is_time_bounded() {
   make_capped_runs_case capped-slow-reader running pending hidden
   local d=$TMP_ROOT/capped-slow-reader out started elapsed
   cat > "$d/fakebin/python3" <<'SH'
 #!/usr/bin/env bash
-sleep 30
+printf 'invoked\n' >> "${0%/*}/python3.calls"
+exec sleep 30
 SH
   chmod +x "$d/fakebin/python3"
-  FM_CREW_STATE_NM_TIMEOUT=1
+  FM_CREW_STATE_NM_TIMEOUT=2
   export FM_CREW_STATE_NM_TIMEOUT
   started=$SECONDS
   out=$(run_crew_state "$d" competing)
@@ -4208,6 +4262,9 @@ SH
   unset FM_CREW_STATE_NM_TIMEOUT
   [ "$elapsed" -lt 10 ] || fail "the capped inventory reader ran unbounded for ${elapsed}s"
   assert_contains "$out" 'state: unknown' 'an unreachable inventory reader cannot establish a verdict'
+  assert_contains "$out" 'reader unavailable' 'a killed reader reports the same unavailable reader path'
+  [ -s "$d/fakebin/python3.calls" ] || fail 'the inventory reader never ran, so the bound proved nothing'
+  assert_contains "$out" 'run-store: skipped (read budget exceeded)' 'the killed reader is disclosed as a skipped lookup'
   pass 'the capped inventory reader is bounded by the crew read budget'
 }
 
@@ -5792,6 +5849,8 @@ test_no_run_tmux_unreadable_reads_unreachable_not_gone
 test_dead_window_still_reports_terminal_run_step
 test_dead_window_still_reports_active_run_step
 test_no_timeout_uses_perl_bound
+test_cut_store_does_not_revive_dead_worker_from_old_status
+test_responsive_lookups_are_not_pooled
 test_scout_skips_run_lookup
 test_torn_down_worktree
 test_remote_alive_with_log_uses_status_log

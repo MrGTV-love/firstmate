@@ -483,11 +483,7 @@ class Collector:
                 alive = self.source("worker liveness " + task["id"], self.liveness, task)
             # Silence tracking shares this observation rather than probing again or counting a dead worker as live.
             task["endpoint"]["agent_alive"] = alive
-            # A marked status-log fallback is readable even when the optional
-            # run store was skipped. Whole-command failures carry no such proof.
-            partial_status = (task["current_state"].get("partial") is True
-                              and task["current_state"].get("source") == "status-log")
-            if (task["current_state"].get("state") == "unknown" and not stopped and not partial_status
+            if (task["current_state"].get("state") == "unknown" and not stopped
                     and not (alive in ("dead", "missing")
                              and task["current_state"].get("detail", "").startswith("backend target gone:"))):
                 self.degraded.append("worker current state " + task["id"] + ": "

@@ -393,7 +393,19 @@ case_answers_are_classified_by_what_they_say() {
   pass 'answers are classified by what they say, and only a settled finished run is kept'
 }
 
-case_slow_forge_cannot_exhaust_finished_store_budget() {
+# The full home snapshot at its defaults, with the case's fakes.
+snapshot_json() {  # <case-dir>
+  local d=$1
+  env -u FM_SNAPSHOT_CREW_STATE_TIMEOUT \
+    FM_FAKE_NM_DIR="$d/nmfake" NM_HOME="$d/nm" PATH="$d/fakebin:$PATH" \
+    FM_HOME="$d" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$d/state" \
+    FM_DATA_OVERRIDE="$d/data" FM_CONFIG_OVERRIDE="$d/config" FM_PROJECTS_OVERRIDE="$d/projects" \
+    "$ROOT/bin/fm-fleet-snapshot.sh" --home-input 2>"$d/snapshot.err"
+}
+
+# Store reads that finish are kept as run-step evidence, so a slow forge read
+# after them cannot mark the read skipped or revive an obsolete decision.
+case_slow_forge_leaves_finished_store_read_unmarked() {
   local d out
   d=$(new_case slow-forge)
   FM_FAKE_PR_URL=https://github.com/test/project/pull/7 serve_run "$d" 01RUN completed passed
@@ -410,92 +422,58 @@ SH
   out=$(FM_CREW_STATE_NO_FORGE=0 FM_CREW_STATE_NM_TIMEOUT=3 read_state "$d" "$CREW_STATE")
   assert_contains "$out" 'state: done · source: run-step' 'slow forge enrichment cannot replace a confirmed pass with an old decision'
   assert_contains "$out" 'run passed: PR open' 'the separately bounded slow forge read was actually consumed'
-  assert_not_contains "$out" 'run-store: skipped' 'successful store reads must not be falsely marked skipped'
-  pass 'a fast store and slow forge retain the confirmed run state without a partial marker'
+  assert_not_contains "$out" 'run-store: skipped' 'successful store reads must not be marked skipped'
+  pass 'a fast store and slow forge retain the confirmed run state without a skipped marker'
 }
 
-# Snapshot bounds and the run-store budget are distinct: an optional store read
-# may be skipped, but a slow task read must not erase the status declaration.
-snapshot_state() {  # <case-dir> [snapshot-script]
-  local d=$1
-  FM_FAKE_NM_DIR="$d/nmfake" NM_HOME="$d/nm" PATH="$d/fakebin:$PATH" \
-    FM_HOME="$d" FM_ROOT_OVERRIDE="$ROOT" FM_STATE_OVERRIDE="$d/state" \
-    FM_DATA_OVERRIDE="$d/data" FM_CONFIG_OVERRIDE="$d/config" FM_PROJECTS_OVERRIDE="$d/projects" \
-    "${2:-$ROOT/bin/fm-fleet-snapshot.sh}" --home-input 2>"$d/snapshot.err" \
-    | jq -ce '.tasks[] | select(.id == "cached") | .current_state'
-}
-
-case_slow_run_store_returns_partial() {
-  local d out
-  d=$(new_case slow-store)
+# The snapshot bound protects against a hang, not against a loaded read. One
+# snapshot at its default holds a lane whose responsive store lookups together
+# outlast the old 10-second bound, a quick lane, and a lane whose git read never
+# returns: the slow and quick lanes answer, the hung lane is cut at the default
+# 40 seconds, and the whole snapshot returns inside the callers' 60-second
+# default deadlines (bin/fm_open_loops.py, bin/fm-home-summary-refresh.sh).
+case_snapshot_default_cuts_only_the_hung_lane() {
+  local d lane real_git out start elapsed state
+  d=$(new_case hung-lane)
+  serve_run "$d" 01RUN completed passed
   mkdir -p "$d/data" "$d/config" "$d/projects"
   printf '## In flight\n' > "$d/data/backlog.md"
-  printf 'needs-decision [at=1] [key=engine]: choose the engine\n' > "$d/state/cached.status"
-  cat > "$d/fakebin/no-mistakes" <<'SH'
-#!/usr/bin/env bash
-printf '%s\n' "$*" >> "${FM_FAKE_NM_DIR:?}/calls.log"
-# This lookup would outlive the old whole-read limit; it never gets to
-# substitute its eventual answer for the already-readable status declaration.
-sleep 11
-printf 'run:\n  branch: fm/cached\n  status: running\n'
-SH
-  out=$(snapshot_state "$d") || fail "slow store lost the task snapshot: $(cat "$d/snapshot.err")"
-  assert_equals parked "$(printf '%s\n' "$out" | jq -r '.state')" 'a slow store keeps the open decision readable'
-  assert_equals status-log "$(printf '%s\n' "$out" | jq -r '.source')" 'a slow store falls back to the reconciled status log'
-  assert_equals true "$(printf '%s\n' "$out" | jq -r '.partial')" 'the snapshot discloses a partial read'
-  assert_contains "$out" 'run-store: skipped' 'the plain state line discloses the skipped store'
-  assert_contains "$out" 'choose the engine' 'the open decision is not replaced with a guessed run state'
-  assert_equals 1 "$(calls "$d")" 'an exhausted store budget is not retried'
-  pass 'a run-store lookup beyond the old whole-read bound returns a marked partial state'
-}
-
-case_store_budget_is_shared() {
-  local d out
-  d=$(new_case shared-budget)
-  serve_run "$d" 01RUN completed passed
-  printf 'working [at=1]: implementing\n' > "$d/state/cached.status"
-  # Each lookup alone fits; together they do not. The overview must not
-  # silently grant the selected-run read another full budget.
+  for lane in quick hung; do
+    git clone -q -b "$BRANCH" "$d/wt" "$d/wt-$lane" || fail "could not clone the $lane lane"
+    fm_write_meta "$d/state/$lane.meta" "window=fm:fm-$lane" "worktree=$d/wt-$lane" "kind=ship"
+  done
   mv "$d/fakebin/no-mistakes" "$d/fakebin/nm-response"
   cat > "$d/fakebin/no-mistakes" <<'SH'
 #!/usr/bin/env bash
-sleep 2
-exec "$(dirname "$0")/nm-response" "$@"
+case "$PWD" in */wt) sleep 4 ;; esac
+exec "${0%/*}/nm-response" "$@"
 SH
-  chmod +x "$d/fakebin/no-mistakes"
-  out=$(FM_CREW_STATE_NM_TIMEOUT=3 read_state "$d" "$CREW_STATE")
-  assert_contains "$out" 'state: working · source: status-log' 'the shared budget falls back to real status'
-  assert_contains "$out" 'run-store: skipped' 'the shared budget discloses a partial read'
-  pass 'individually responsive lookups share one run-store budget'
-}
-
-case_snapshot_allows_slow_reads_and_cuts_hangs() {
-  local d out real_git
-  d=$(new_case slow-task)
-  serve_run "$d" 01RUN completed passed
-  mkdir -p "$d/data" "$d/config" "$d/projects"
-  printf '## In flight\n' > "$d/data/backlog.md"
   real_git=$(command -v git)
   cat > "$d/fakebin/git" <<SH
 #!/usr/bin/env bash
 case " \$* " in
-  *' symbolic-ref '*) sleep "\${FM_FAKE_GIT_DELAY:-11}" ;;
+  *'/wt-hung symbolic-ref '*) exec sleep 600 ;;
 esac
 exec "$real_git" "\$@"
 SH
-  chmod +x "$d/fakebin/git"
-  out=$(snapshot_state "$d") || fail 'slow task lost the snapshot row'
-  assert_equals done "$(printf '%s\n' "$out" | jq -r '.state')" 'a read slower than ten seconds still reports its finished run'
-  assert_equals run-step "$(printf '%s\n' "$out" | jq -r '.source')" 'the slower read keeps its authoritative source'
-  # The same real whole-command watchdog is accelerated through its supported
-  # override, not replaced with a double that merely echoes the expected bound.
-  out=$(FM_FAKE_GIT_DELAY=600 FM_SNAPSHOT_CREW_STATE_TIMEOUT=2 snapshot_state "$d") \
-    || fail 'a hung read lost the snapshot row'
-  assert_equals unknown "$(printf '%s\n' "$out" | jq -r '.state')" 'a genuinely hung task is unknown'
-  assert_contains "$out" 'current-state command failed (exit 124)' 'the extreme watchdog cuts the hung read'
-  assert_equals false "$(printf '%s\n' "$out" | jq -r '.partial // false')" 'a hung whole read is not accepted as partial'
-  pass 'slow task reads survive the default bound and truly hung reads hit the configured extreme'
+  chmod +x "$d/fakebin/no-mistakes" "$d/fakebin/git"
+  start=$SECONDS
+  out=$(snapshot_json "$d") || fail "the hung lane lost the snapshot: $(cat "$d/snapshot.err")"
+  elapsed=$((SECONDS - start))
+  assert_equals 3 "$(printf '%s\n' "$out" | jq '.tasks | length')" 'every lane is in the snapshot'
+  for lane in cached quick; do
+    state=$(printf '%s\n' "$out" | jq -c --arg id "$lane" '.tasks[] | select(.id == $id) | .current_state')
+    assert_equals 'done' "$(printf '%s\n' "$state" | jq -r '.state')" "the $lane lane still reports its finished run"
+    assert_equals run-step "$(printf '%s\n' "$state" | jq -r '.source')" "the $lane lane keeps its authoritative source"
+  done
+  state=$(printf '%s\n' "$out" | jq -c '.tasks[] | select(.id == "hung") | .current_state')
+  assert_equals unknown "$(printf '%s\n' "$state" | jq -r '.state')" 'the hung lane is unknown'
+  assert_contains "$state" 'current-state command failed (exit 124)' 'the hung lane is cut by the whole-read bound'
+  [ "$elapsed" -ge 39 ] || fail "the hung lane was cut after ${elapsed}s, before the 40-second default"
+  [ "$elapsed" -lt 60 ] || fail "the snapshot took ${elapsed}s, past the callers' 60-second deadlines"
+  pass "the default whole-read bound cuts only the hung lane, after ${elapsed}s"
 }
+
 
 # --- (d) mutation checks ----------------------------------------------------------------
 
@@ -528,10 +506,8 @@ expect_mutant_caught() {  # <label> <case-function> <override>
 
 main() {
   local fn
-  case_slow_forge_cannot_exhaust_finished_store_budget
-  case_slow_run_store_returns_partial
-  case_store_budget_is_shared
-  case_snapshot_allows_slow_reads_and_cuts_hangs
+  case_slow_forge_leaves_finished_store_read_unmarked
+  case_snapshot_default_cuts_only_the_hung_lane
   for fn in \
     case_finished_run_is_kept_until_the_id_changes \
     case_finished_run_needs_the_database \

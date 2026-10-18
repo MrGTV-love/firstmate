@@ -40,13 +40,11 @@
 #       same family was in its catalog (bin/fm-model-freshness.sh owns the rule).
 # Absence of either component is not evidence of health: a session that has not
 # published a record (not omp, not yet started, or remote) adds nothing.
-# When the optional run-store phase exhausts FM_CREW_STATE_NM_TIMEOUT (10s
-# total by default, shared across queries and finished-cache validation), it is
-# skipped for this read. The reconciled status declaration answers instead,
-# with a trailing `run-store: skipped (read budget exceeded)` component. No
-# partially read run can override that declaration, and a missing declaration
-# remains unknown. Snapshot/ledger readers preserve this partial-read marker.
-# The run-store budget ends before separately bounded forge-only enrichment.
+# A run-attribution lookup cut by its own FM_CREW_STATE_NM_TIMEOUT (every lookup
+# has the full allowance) is never retried and ends the line with `run-store:
+# skipped (read budget exceeded)`. A cut first status read leaves the pane and
+# status-log fallback below to answer; a cut later read reports its unknown
+# run-step verdict.
 #
 # Logic, in order:
 #   1. Resolve worktree + backend target + kind from state/<id>.meta. A meta
@@ -221,11 +219,6 @@ META=${FM_CREW_STATE_META_OVERRIDE:-"$STATE/$ID.meta"}
 LOG=${FM_CREW_STATE_STATUS_OVERRIDE:-"$STATE/$ID.status"}
 NM_TIMEOUT=${FM_CREW_STATE_NM_TIMEOUT:-10}
 case "$NM_TIMEOUT" in ''|*[!0-9]*) NM_TIMEOUT=10 ;; esac
-# One budget covers the entire optional run-store phase, not a fresh allowance
-# for each historical query. The shared bounded runner honors this shell-local
-# deadline in subshells too; it is never exported to unrelated commands.
-unset FM_NM_READ_DEADLINE
-NM_READ_PARTIAL=0
 # How many of the most recent `no-mistakes runs` rows each ledger read
 # (fm_nm_runs_status_for_worktree in bin/fm-nm-run-lib.sh) scans for the legacy
 # fallback or an unfetched-head continuation (docs/configuration.md owns the
@@ -240,37 +233,15 @@ SEP=' · '
 # set once the task's metadata is resolved below.
 LIVE_NOTE=''
 
-# A skipped optional instrument is not a failed task read. Keep the same
-# decision fold and ship-done proof as the ordinary status fallback, without
-# consulting a pane or retrying the exhausted store. The recursion guard lets
-# emit_ship_status_done use emit while retaining the deadline for custody reads.
-nm_budget_fallback_if_expired() {
-  [ -n "${FM_NM_READ_DEADLINE:-}" ] && [ "$SECONDS" -ge "$FM_NM_READ_DEADLINE" ] \
-    && [ "$NM_READ_PARTIAL" = 0 ] || return 0
-  NM_READ_PARTIAL=1
+# Disclose a lookup the bounded runner cut (exit 124), once per read.
+nm_note_cut() {  # <exit-status>
+  [ "$1" = 124 ] || return 0
+  case "$LIVE_NOTE" in *"${SEP}run-store: skipped"*) return 0 ;; esac
   LIVE_NOTE="${LIVE_NOTE}${SEP}run-store: skipped (read budget exceeded)"
-  if [ "$LOG_VERB" = done ]; then
-    emit_ship_status_done
-  fi
-  local state
-  state=$(map_log_state "$LOG_LINE")
-  if [ "$state" != unknown ]; then
-    emit "$state" status-log "$(status_line_note "$LOG_LINE")"
-  fi
-  emit unknown none "run-store skipped; no status declaration available"
-}
-
-# Call in the parent shell after the last store lookup, before forge-only
-# enrichment or other independently bounded evidence. Clearing it inside a
-# command substitution would leave emit's parent deadline armed.
-nm_finish_store_read() {
-  nm_budget_fallback_if_expired
-  unset FM_NM_READ_DEADLINE
 }
 
 # Emit the one canonical line and exit 0. Detail is optional.
 emit() {  # <state> <source> [detail]
-  nm_budget_fallback_if_expired
   local line="state: $1${SEP}source: $2"
   [ -n "${3:-}" ] && line="$line${SEP}$3"
   [ -z "$LIVE_NOTE" ] || line="$line$LIVE_NOTE"
@@ -458,7 +429,7 @@ crew_busy_verdict() {  # <target>
 }
 
 # --- no-mistakes run lookup (authoritative when a run matches this branch) --
-# trim, strip_quotes, the bounded nm_run call, nm_field's TOON parse, and the
+# trim, strip_quotes, nm_field's TOON parse, and the
 # attribution helpers below are thin wrappers over the ONE owner in
 # bin/fm-nm-run-lib.sh, shared with fm-teardown.sh's pre-teardown run abort.
 # The status, overview, id-addressed run and ci log reads go through
@@ -466,9 +437,6 @@ crew_busy_verdict() {  # <target>
 
 trim() { fm_nm_trim "$@"; }
 strip_quotes() { fm_nm_strip_quotes "$@"; }
-nm_run() {  # <args...>
-  fm_nm_run "$WT" "$NM_TIMEOUT" "$@"
-}
 
 # Scalar value of a TOON key in the captured run output ($RUN_OUT).
 RUN_OUT=""
@@ -896,7 +864,6 @@ EOF
 # prove current PR disposition: a subsequent close can itself end the monitor.
 nm_reclassify_failed_run_as_held_green() {
   nm_failed_run_is_green_held_ci || return 1
-  nm_finish_store_read
   local disposition pr_url
   disposition=$(passed_pr_detail)
   case "$disposition" in
@@ -1036,8 +1003,11 @@ nm_ci_checks_state() {
 # answer as current), so both attribution routes share one rule.
 # The same reader checks for conflicting run records when the AXI overview
 # cannot identify this branch's run.
-nm_runs_list() {
-  nm_run runs --limit "$FM_CREW_STATE_RUNS_LIMIT"
+nm_runs_list_to() {  # <out-var>
+  local _nm_out _nm_rc=0
+  _nm_out=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" runs --limit "$FM_CREW_STATE_RUNS_LIMIT") || _nm_rc=$?
+  printf -v "$1" '%s' "$_nm_out"
+  nm_note_cut "$_nm_rc"
 }
 
 # The overview and the verdict fm_nm_select_run draws from it, read together so
@@ -1053,11 +1023,11 @@ nm_read_choice() {
     return 0
   fi
   overview_ok=1
-  run_overview=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" axi) || overview_ok=0
+  run_overview=$(fm_nm_run_checked "$WT" "$NM_TIMEOUT" axi) || { nm_note_cut $?; overview_ok=0; }
   run_overview_present=1
   run_choice=''
   if [ -n "$run_overview" ]; then
-    run_choice=$(fm_nm_select_run "$CREW_BRANCH" "$run_overview" "$WT" "$NM_TIMEOUT")
+    run_choice=$(fm_nm_select_run "$CREW_BRANCH" "$run_overview" "$WT" "$NM_TIMEOUT") || nm_note_cut $?
   else
     run_overview_present=0
   fi
@@ -1094,9 +1064,8 @@ SELECTED_RUN_ID=""
 # Scouts and secondmates never drive a no-mistakes validation of their own
 # worktree, so skip the lookup for them and read state from pane/log directly.
 if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/null 2>&1; then
-  FM_NM_READ_DEADLINE=$((SECONDS + NM_TIMEOUT))
   fm_nmc_init "$STATE" "$ID" "$WT" "$CREW_BRANCH" "$NM_TIMEOUT"
-  fm_nmc_read_to RUN_OUT status status '' axi status || true
+  fm_nmc_read_to RUN_OUT status status '' axi status || nm_note_cut $?
   if [ "$(strip_quotes "$(printf '%s\n' "$RUN_OUT" | sed -n 's/^error: //p')")" = "repo not initialized (run 'no-mistakes init' first)" ]; then
     RUN_OUT=""
   fi
@@ -1120,7 +1089,7 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
       selected\|*)
         IFS='|' read -r _ selected_id selected_status candidate_ids <<< "$run_choice"
         fm_nmc_read_to RUN_OUT "run-$selected_id" status-run "$selected_id" axi status --run "$selected_id" \
-          || emit unknown run-step "selected run unreadable; run ids: $candidate_ids"
+          || { nm_note_cut $?; emit unknown run-step "selected run unreadable; run ids: $candidate_ids"; }
         if [ "$(strip_quotes "$(nm_field id)")" != "$selected_id" ] \
           || [ "$(strip_quotes "$(nm_field branch)")" != "$CREW_BRANCH" ]; then
           emit unknown run-step "selected run unavailable or mismatched; run ids: $candidate_ids"
@@ -1137,8 +1106,8 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
           || { fm_nm_run_is_executing "$RUN_OUT" && ! nm_daemon_answered_down; }; then
           HAVE_RUN=1
         elif [ -z "$(fm_nm_resolve_commit "$WT" "$(strip_quotes "$(nm_field head)")")" ]; then
-          if fm_nm_run_is_active "$RUN_OUT" \
-            && [ "$(fm_nm_runs_status_for_worktree "$WT" "$CREW_BRANCH" "$(nm_runs_list)" "$(strip_quotes "$(nm_field head)")")" = running ]; then
+          if fm_nm_run_is_active "$RUN_OUT" && nm_runs_list_to RUNS_LIST \
+            && [ "$(fm_nm_runs_status_for_worktree "$WT" "$CREW_BRANCH" "$RUNS_LIST" "$(strip_quotes "$(nm_field head)")")" = running ]; then
             # The anchor PROVED code identity; only liveness can still fail, so
             # a dead daemon is reported as such rather than as an identity
             # failure, and a parked run keeps its gate and findings.
@@ -1170,7 +1139,8 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
         # Without run ids, contradictory liveness cannot prove precedence.
         # A live replacement also needs an id-addressed status read: a bare
         # "running" row cannot tell working from waiting at a gate.
-        ledger_status=$(fm_nm_runs_status_for_worktree "$WT" "$CREW_BRANCH" "$(nm_runs_list)")
+        nm_runs_list_to RUNS_LIST
+        ledger_status=$(fm_nm_runs_status_for_worktree "$WT" "$CREW_BRANCH" "$RUNS_LIST")
         if fm_nm_run_is_active "$RUN_OUT"; then
           if [ "$(fm_nm_run_status_class "$ledger_status")" = terminal ]; then
             emit unknown run-step "run records disagree; run ids: $(strip_quotes "$(nm_field id)"), competing identity unavailable"
@@ -1192,7 +1162,8 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
         # `[ -n "$RUN_OUT" ]`: an empty/timed-out primary call means the CLI
         # itself did not respond, so retrying it immediately with a second
         # bounded call would just double the wait for no better answer.
-        COARSE_STATUS=$(fm_nm_runs_status_for_worktree "$WT" "$CREW_BRANCH" "$(nm_runs_list)")
+        nm_runs_list_to RUNS_LIST
+        COARSE_STATUS=$(fm_nm_runs_status_for_worktree "$WT" "$CREW_BRANCH" "$RUNS_LIST")
         if [ -n "$COARSE_STATUS" ]; then
           HAVE_RUN=1
           # A branch-matching answer the strict rule rejected is this branch's
@@ -1206,11 +1177,6 @@ if [ "$KIND" = ship ] && [ -n "$CREW_BRANCH" ] && command -v no-mistakes >/dev/n
     fi
   fi
 fi
-
-# An empty/timed-out store must not lead into a backend probe and erase a
-# declaration that was already readable when the optional lookup started.
-nm_budget_fallback_if_expired
-[ "$HAVE_RUN" = 1 ] || unset FM_NM_READ_DEADLINE
 
 # --- run-step authoritative path -------------------------------------------
 
@@ -1259,12 +1225,8 @@ if [ "$HAVE_RUN" = 1 ]; then
 
     if [ -n "$outcome" ]; then
       case "$outcome" in
-        passed|passed-with-override|passed-with-skips)
-          nm_finish_store_read
-          RUN_STATE="done"
-          RUN_DETAIL=$(passed_pr_detail)
-          [ "$outcome" != passed-with-skips ] || RUN_DETAIL="$RUN_DETAIL (publication/CI verification skipped)"
-          ;;
+        passed|passed-with-override) RUN_STATE="done"; RUN_DETAIL=$(passed_pr_detail) ;;
+        passed-with-skips) RUN_STATE="done"; RUN_DETAIL="$(passed_pr_detail) (publication/CI verification skipped)" ;;
         checks-passed) RUN_STATE="done"; RUN_DETAIL="checks green: PR ready for review" ;;
         failed)
           if nm_reclassify_failed_run_as_held_green; then :; else
@@ -1334,7 +1296,6 @@ if [ "$HAVE_RUN" = 1 ]; then
 
   if [ "$RUN_STATE" = working ] && log_reports_ci_ready; then
     if [ "$RUN_SOURCE" = coarse ]; then
-      nm_finish_store_read
       emit_ship_status_done "run still monitoring PR"
     fi
     [ -n "$CI_STEP_STATUS" ] || CI_STEP_STATUS=$(nm_effective_ci_step_status)
@@ -1346,12 +1307,9 @@ if [ "$HAVE_RUN" = 1 ]; then
       CI_LOG_STATE=not-ready
     fi
     if [ "$CI_LOG_STATE" != not-ready ]; then
-      nm_finish_store_read
       emit_ship_status_done "run still monitoring PR"
     fi
   fi
-
-  nm_finish_store_read
 
   # Reconcile the status log. A needs-decision/blocked log line that the run-step
   # has moved past (anything but a genuinely parked run) is deterministically
