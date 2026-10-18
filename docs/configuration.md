@@ -100,6 +100,7 @@ Each effective `FM_HOME` contains private operational directories.
 - The review-agent selector's dry-run evidence log `state/review-agent-select.jsonl`, appended by `bin/fm-review-agent-select.sh --log`.
 - The conditional-read ETag cache `state/gh-rest-cache/` and the last-seen GitHub quota buckets `state/gh-ratelimit.<resource>.json`, both owned by `bin/fm-gh-rest.sh`.
 - The finished-session sweep's report `state/idle-sessions.report`, teardown-refusal memos under `state/.idle-reap/`, and persistent watcher deadline `state/.idle-reap-next`.
+- The automatic Lavish listener sweep's retirement record `state/lavish-auto-retire.log` (newest 200 lines kept) and persistent watcher deadline `state/.lavish-auto-retire-next`.
 - The [TypeSafe account-health](#typesafe-account-health) record `state/.typesafe-health` with its lock, and persistent watcher probe deadline `state/.typesafe-health-next`.
 - Parent-owned secondmate pending-reply records under `state/pending-replies/` (`bin/fm-pending-reply-lib.sh`).
 
@@ -939,7 +940,8 @@ The watcher (`bin/fm-watch.sh`) looks at its home once per poll interval.
 Otherwise the optional local, gitignored `config/watch-poll` file sets the interval for this home alone: its first line must be whole seconds from `1` to `240`, and a missing, unreadable, symlinked, malformed or out-of-range file is ignored.
 With no file, a secondmate home (one that carries a genuine `.fm-secondmate-home` marker) polls every `30` seconds and every other home polls every `15`.
 
-The interval changes only how often the watcher looks, never what it can detect: a status line, stale pane or check written between two looks is noticed at the next look, so detection latency grows by at most the interval difference.
+The interval changes only how often the watcher looks, never what it can detect: a status line or check written between two looks is noticed at the next look, and a quiet pane, which needs two unchanged looks to read as stale, is noticed at the second.
+Detection latency therefore grows by at most the interval difference for a status line and twice that for a quiet pane.
 The 240-second ceiling keeps `poll + 60` under the 300-second guard-grace floor, so the guard, the arm and the watcher still derive one grace (`fm_poll_derived_grace`, [`turnend-guard.md`](turnend-guard.md) "Guard grace and the poll cadence") although only the watcher reads this file.
 A longer interval needs `FM_POLL` set in the environment of every process that derives the grace.
 `bin/fm-wake-lib.sh`'s `fm_watch_poll_seconds` owns the resolution and [`tests/fm-watch-idle-reap.test.sh`](../tests/fm-watch-idle-reap.test.sh) covers it, including a status change noticed within one longer interval.
