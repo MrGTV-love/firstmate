@@ -338,6 +338,36 @@ test_closed_is_recorded_once_per_task_evidence_and_pr() {
   pass "closed: a repeat of the same task, evidence, and PR writes nothing; any difference writes a record"
 }
 
+# A reopened task that is dispatched again starts a new incarnation: its next
+# close is recorded even with the same evidence and PR, while a replay of a close
+# inside one incarnation, and another task's dispatch, change nothing.
+test_closed_is_recorded_again_after_a_new_dispatch() {
+  local pr=https://github.com/acme/sample/pull/7 spec evidence prarg task events
+  make_case on-closed-incarnation on
+  ledger() { in_home "$ROOT/bin/fm-fleet-ledger.sh" "$@" || fail "ledger call failed: $*"; }
+  for spec in "merged_pr|$pr" "local_main|" "drop_file|" "none|" "report|"; do
+    evidence=${spec%%|*}
+    prarg=${spec#*|}
+    task=item-$evidence
+    ledger dispatched "$task" ship sample claude ""
+    ledger closed "$task" "$evidence" "$prarg"
+    ledger closed "$task" "$evidence" "$prarg"
+    ledger dispatched other-task ship sample claude ""
+    ledger closed "$task" "$evidence" "$prarg"
+    events=$(jq -r --arg t "$task" 'select(.task == $t) | .event' "$HOME_DIR/state/fleet-ledger.jsonl" | tr '\n' ' ')
+    assert_equals "task.dispatched task.closed " "$events" "$evidence: records before the task is reopened"
+    ledger dispatched "$task" ship sample claude ""
+    ledger closed "$task" "$evidence" "$prarg"
+    ledger closed "$task" "$evidence" "$prarg"
+    events=$(jq -r --arg t "$task" 'select(.task == $t) | .event' "$HOME_DIR/state/fleet-ledger.jsonl" | tr '\n' ' ')
+    assert_equals "task.dispatched task.closed task.dispatched task.closed " "$events" \
+      "$evidence: the close after a new dispatch is recorded once more, and its replay is not"
+    assert_equals 2 "$(jq -c --arg t "$task" 'select(.task == $t and .event == "task.closed" and .evidence == "'"$evidence"'")' \
+      "$HOME_DIR/state/fleet-ledger.jsonl" | wc -l | tr -d ' ')" "$evidence: closed records for one task across two incarnations"
+  done
+  pass "closed: a replay inside one incarnation writes nothing, and the same close after a new dispatch is recorded again, for every evidence"
+}
+
 test_answered_by_is_derived_from_home_role_and_source() {
   local by
   make_case on-answered-by on
@@ -410,5 +440,6 @@ test_worker_status_line_with_the_flag_absent
 test_flag_off_writes_nothing
 test_lifecycle_records_carry_exactly_their_fields
 test_closed_is_recorded_once_per_task_evidence_and_pr
+test_closed_is_recorded_again_after_a_new_dispatch
 test_answered_by_is_derived_from_home_role_and_source
 test_flag_off_and_unwritable_ledger_for_the_new_records

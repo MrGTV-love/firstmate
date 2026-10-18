@@ -60,8 +60,9 @@
 # instant as `ts`, as ISO 8601 UTC) and capture nothing. `answered` derives its
 # answered_by value itself (bin/fm-answered-by-lib.sh) from this home's role
 # and, for a hold, the recorded <source> text; no caller types it. closed writes
-# nothing when the ledger already holds a task.closed for the same task,
-# evidence, and pr, so a close that more than one path reaches is recorded once.
+# nothing when the task's current incarnation (after its latest task.dispatched)
+# already holds a task.closed with the same evidence and pr, so a close that more
+# than one path reaches is recorded once and a reopened task records its next close.
 # Every write holds state/.fleet-ledger.lock.
 #
 # Environment: FM_HOME, FM_STATE_OVERRIDE, and FM_CONFIG_OVERRIDE resolve the
@@ -184,13 +185,18 @@ append() {
   printf '%s\n' "$line" 2>/dev/null >> "$LEDGER"
 }
 
-# Whether the ledger already holds this close; the caller holds the lock.
+# Whether the task's current incarnation already has this close: a task.closed
+# for the same evidence and pr that follows the task's latest task.dispatched.
+# The caller holds the lock.
 closed_recorded() { # <task> <evidence> <pr>
   [ -f "$LEDGER" ] || return 1
-  # shellcheck disable=SC2016 # $task, $evidence, and $pr here are jq variables.
+  # shellcheck disable=SC2016 # $task, $evidence, $pr, and $e here are jq variables.
   jq -en --arg task "$1" --arg evidence "$2" --arg pr "$3" \
-    'any(inputs; .event == "task.closed" and .task == $task and .evidence == $evidence
-      and .pr == (if $pr == "" then null else $pr end))' "$LEDGER" >/dev/null 2>&1
+    'reduce (inputs | select(.task == $task)) as $e (false;
+      if $e.event == "task.dispatched" then false
+      elif $e.event == "task.closed" and $e.evidence == $evidence
+        and $e.pr == (if $pr == "" then null else $pr end) then true
+      else . end)' "$LEDGER" >/dev/null 2>&1
 }
 
 # The status-line grammar belongs to bin/fm-status-decision-lib.sh; this only projects it.

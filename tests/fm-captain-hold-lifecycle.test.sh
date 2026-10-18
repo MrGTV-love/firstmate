@@ -1524,6 +1524,12 @@ test_internal_retention_preserves_active_drop_provenance() (
   pass "internal retention and read-only admission preserve active captain drop classification"
 )
 
+# The whole "Answered by:" value a closed call's record carries; asserting it
+# with equality keeps `main` from passing for `main-afk`.
+answered_by_line() {  # <home> <id>
+  tasks_in "$1" show "$2" --full | grep -oE 'Answered by: [a-z-]+' | head -1
+}
+
 # The resolution record carries the UTC time it was written and who answered,
 # derived by the script; a replay of the same answer rewrites neither.
 test_resolution_record_states_when_and_who_answered() {
@@ -1546,7 +1552,7 @@ test_resolution_record_states_when_and_who_answered() {
   [[ ! "$at" < "$before" && ! "$at" > "$after" ]] || fail "resolution time $at is outside $before .. $after"
   assert_contains "$show" "Resolution mode: answered" "the existing mode field changed"
   assert_contains "$show" "Decision digest: " "the existing digest field changed"
-  assert_contains "$show" "Answered by: main" "a direct answer names no source, so the sending home's role answered it"
+  assert_equals "Answered by: main" "$(answered_by_line "$home" "$id")" "a direct answer names no source, so the sending home's role answered it"
 
   sleep 1
   run_captain "$home" answer "$id" --decision-file "$home/decision.txt" >/dev/null \
@@ -1568,7 +1574,7 @@ test_answered_by_is_derived_from_the_recorded_source() {
       || fail "could not hold $id"
     printf '%s\tyes\t\n' "$id" | run_captain "$home" answers --any-origin --source "$source" >/dev/null \
       || fail "the keyed answer for $id was not accepted"
-    assert_contains "$(tasks_in "$home" show "$id" --full)" "Answered by: $want" \
+    assert_equals "Answered by: $want" "$(answered_by_line "$home" "$id")" \
       "source '$source' should record answered_by $want"
   done <<'SOURCES'
 call-page|the captured result some-task sequence 3|page
@@ -1583,29 +1589,29 @@ SOURCES
   run_captain "$home" hold call-direct --title "Call direct" --reason "captain choice pending" --repo sample >/dev/null
   printf 'Captain chose.\n' > "$home/direct.txt"
   run_captain "$home" answer call-direct --decision-file "$home/direct.txt" >/dev/null
-  assert_contains "$(tasks_in "$home" show call-direct --full)" "Answered by: main" "a direct answer should take the home's role"
+  assert_equals "Answered by: main" "$(answered_by_line "$home" call-direct)" "a direct answer should take the home's role"
   : > "$home/state/.afk"
   run_captain "$home" hold call-flag-only --title "Call flag" --reason "captain choice pending" --repo sample >/dev/null
   printf 'call-flag-only\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null
-  assert_contains "$(tasks_in "$home" show call-flag-only --full)" "Answered by: main" "the away daemon's flag file is not the away record"
+  assert_equals "Answered by: main" "$(answered_by_line "$home" call-flag-only)" "the away daemon's flag file is not the away record"
   rm -f "$home/state/.afk"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "away entry failed"
   run_captain "$home" hold call-send-afk --title "Call afk" --reason "captain choice pending" --repo sample >/dev/null
   printf 'call-send-afk\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null
-  assert_contains "$(tasks_in "$home" show call-send-afk --full)" "Answered by: main-afk" "the away posture was not recorded"
+  assert_equals "Answered by: main-afk" "$(answered_by_line "$home" call-send-afk)" "the away posture was not recorded"
   run_captain "$home" hold call-direct-afk --title "Call direct afk" --reason "captain choice pending" --repo sample >/dev/null
   run_captain "$home" answer call-direct-afk --decision-file "$home/direct.txt" >/dev/null
-  assert_contains "$(tasks_in "$home" show call-direct-afk --full)" "Answered by: main-afk" "a direct answer should take the away role"
+  assert_equals "Answered by: main-afk" "$(answered_by_line "$home" call-direct-afk)" "a direct answer should take the away role"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "away archive failed"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" FM_AFK_MODE=quiet "$ROOT/bin/fm-afk-contract.sh" enter >/dev/null || fail "quiet entry failed"
   run_captain "$home" hold call-send-quiet --title "Call quiet" --reason "captain choice pending" --repo sample >/dev/null
   printf 'call-send-quiet\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null
-  assert_contains "$(tasks_in "$home" show call-send-quiet --full)" "Answered by: main" "a quiet record is a present captain, not away"
+  assert_equals "Answered by: main" "$(answered_by_line "$home" call-send-quiet)" "a quiet record is a present captain, not away"
   FM_HOME="$home" FM_STATE_OVERRIDE="$home/state" "$ROOT/bin/fm-afk-contract.sh" archive >/dev/null || fail "quiet archive failed"
   printf 'secondmate-id\n' > "$home/.fm-secondmate-home"
   run_captain "$home" hold call-send-mate --title "Call mate" --reason "captain choice pending" --repo sample >/dev/null 2>&1
   printf 'call-send-mate\tyes\t\n' | run_captain "$home" answers --any-origin --source "a firstmate answer sent to some-task" >/dev/null 2>&1
-  assert_contains "$(tasks_in "$home" show call-send-mate --full)" "Answered by: secondmate" "a secondmate home was not recorded"
+  assert_equals "Answered by: secondmate" "$(answered_by_line "$home" call-send-mate)" "a secondmate home was not recorded"
   pass "answered_by comes from two exact source prefixes or this home's role, and is unknown otherwise"
 }
 

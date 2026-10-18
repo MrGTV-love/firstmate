@@ -58,7 +58,7 @@ An `add` of an id that already exists changes nothing, so `tasks-axi` reports it
 
 `task.closed` members: `evidence` is what the close used, one of `merged_pr` (the recorded PR), `local_main` (a local-only landing), `report` (a scout's report), `drop_file` (the captain's recorded drop), or `none`.
 `pr` is the merged PR URL when `evidence` is `merged_pr`, and `null` otherwise.
-The record is written once, after the backlog item is Done: a close is written once for each task, evidence, and `pr`, however many of the three paths reach it.
+The record is written once, after the backlog item is Done: a close is written once for each task, evidence, and `pr` since the task's latest `task.dispatched`, however many of the three paths reach it, so a task that is reopened and dispatched again records its next close.
 A refused teardown, a captain-held item that returns to Queued, and a `fm-tasks-axi.sh done` of an item that was already Done write none.
 
 `task.answered` members: `via` is `send` when `fm-send.sh --resolve-key` closed a status-log decision, or `hold` when `fm-captain-hold.sh` recorded an answer for a captain-held task; `key` is the decision key (for `hold`, the task id).
