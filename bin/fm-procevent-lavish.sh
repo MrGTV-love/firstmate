@@ -95,12 +95,13 @@
 #            Lavish session, so the board stays readable and `arm` brings it back.
 #            --auto is the unattended subset the watcher runs on its own
 #            (FM_LAVISH_AUTO_RETIRE_INTERVAL). Every keep guard above still runs
-#            first, and then only two findings retire a listener: the board
-#            file is gone, or Lavish holds no session or an ended session and
-#            every card key is closed. A board with a live session is kept
-#            however idle it is and whatever state its listener is in, so a
-#            board left open for review never loses its listener; the idle-hours
-#            rule is not applied.
+#            first, and then only two findings retire a listener, and only for a
+#            board with no live session: the board file is gone, or Lavish holds
+#            no session or an ended session and every card key is closed. A board
+#            with a live session is kept however idle it is, whether its file is
+#            present or gone, and whatever state its listener is in, so a board
+#            left open for review never loses its listener; the idle-hours rule
+#            is not applied.
 #            Each retirement is also appended with its reason and epoch to
 #            state/lavish-auto-retire.log.
 # poll       The registered listener command `arm` publishes, not a command to
@@ -1951,10 +1952,10 @@ cmd_sweep() {
       reason='Lavish holds queued feedback for the board'
     elif [ "$kind" = task-owned ]; then
       reason='owned by a worker task'
-    elif [ "$file_state" = missing ]; then
-      verdict=retire; reason='the board file is gone'
     elif [ "$auto" = 1 ] && [ "$sessions" != 0 ] && [ "$status" != ended ]; then
       reason='the Lavish session is live'
+    elif [ "$file_state" = missing ]; then
+      verdict=retire; reason='the board file is gone'
     elif [ "$sessions" != 0 ] && [ "$status" != ended ] && [ $((now - activity)) -lt "$idle" ]; then
       reason="active within the last $((idle / 3600)) hours"
     else
