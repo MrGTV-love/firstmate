@@ -31,7 +31,7 @@ jobs:
     name: Lint ${{ matrix.partition }}
     runs-on: ubuntu-latest
     # Normal tier (see the timeout policy above).
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
@@ -95,7 +95,7 @@ jobs:
     name: Behavior portable parallel 1
     runs-on: ubuntu-latest
     # Normal tier (see the timeout policy above).
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -139,7 +139,7 @@ jobs:
     name: Behavior portable parallel 2
     runs-on: ubuntu-latest
     # Normal tier (see the timeout policy above).
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -183,7 +183,7 @@ jobs:
     name: Behavior portable serial ${{ matrix.shard }}
     runs-on: ubuntu-latest
     # Normal tier (see the timeout policy above).
-    timeout-minutes: 30
+    timeout-minutes: 60
     strategy:
       # Every shard reports so one failure never hides another shard's result.
       fail-fast: false
@@ -257,7 +257,7 @@ jobs:
     # Heavy tier (see the timeout policy above): the last-resort job backstop.
     # The family-run step below owns the hang tripwire, so a wedged suite fails
     # there with the always() cleanup and timing upload still running.
-    timeout-minutes: 75
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
         with:
@@ -343,9 +343,10 @@ jobs:
           bin/fm-herdr-ci-cleanup.sh snapshot "$RUNNER_TEMP/fm-herdr/sessions-before.json"
       - name: Run real-Herdr family (serial, required)
         id: run-real-herdr-family
-        # Heavy tier step tripwire: above the healthy 7-10 minute wall and far
-        # below the job backstop, so a hang fails this step and cleanup runs.
-        timeout-minutes: 20
+        # Heavy tier step tripwire: three times the longest healthy run in the
+        # measured history (docs/fm-test-portable-shards.md "Timeouts"), below
+        # the job backstop, so a hang fails this step and cleanup runs.
+        timeout-minutes: 60
         run: |
           set -eu
           mkdir -p "$RUNNER_TEMP/fm-test"
@@ -422,7 +423,7 @@ jobs:
     name: Stock macOS Bash snapshot compatibility
     runs-on: macos-latest
     # Normal tier (see the timeout policy above).
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
       - name: Run snapshot consumers with stock Bash

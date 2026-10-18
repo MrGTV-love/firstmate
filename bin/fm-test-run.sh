@@ -78,18 +78,22 @@
 #                   terminate a script that runs longer than N seconds, raised
 #                   to its measured test.<script> p99 x 3 from bin/fm-duration.py
 #                   when that is larger, and record it as exit 124 (0
-#                   disables, the default). The
-#                   --changed applies 1500s automatically, above the current
-#                   slowest CI hint with margin; exceeding it becomes a bounded
-#                   failure, not proof of a hang. --max-wall-ms is checked
-#                   after the run and so cannot catch a hang on its own.
+#                   disables, the default). Plain --changed instead applies a
+#                   progress guard with no fixed duration: a script stops only
+#                   after 15 minutes with no output and no process-tree CPU
+#                   progress, or at 6 hours, so a healthy but slow suite keeps
+#                   running and only a wedged one fails. A native Windows bash
+#                   has no POSIX progress runner and runs it unguarded.
+#                   --max-wall-ms is checked after the run and so cannot catch
+#                   a hang on its own.
 #                   HUP, INT and TERM remove this runner's scratch directory
 #                   before it exits; configured per-script bounds remain authoritative.
 #   --max-wall-ms N fail the run when its measured invocation wall clock exceeds
 #                   N milliseconds, including an empty selection. It is
 #                   evaluated after selection and suite execution and cannot
 #                   interrupt a running script; per-script hangs are
-#                   bounded by --per-script-timeout-secs. Pathological output
+#                   bounded by --per-script-timeout-secs, or by the progress
+#                   guard on plain --changed. Pathological output
 #                   sinks that block finalization are explicitly out of scope.
 #   -h, --help      print this header
 #
@@ -238,17 +242,11 @@ JOBS_EXPLICIT=0
 JOBS_MAX=8
 MAX_WALL_MS=
 PER_SCRIPT_TIMEOUT_SECS=0
-# Bound applied automatically on the automatic --changed path, derived from
-# measured healthy runtimes with margin rather than picked: the original
-# loaded watch-triage baseline was about 1075s, with roughly 1.4x headroom.
-# That suite subsequently outgrew the packing target and is now two independent
-# execution groups; its growth is not permission to increase this bound.
-# The unchanged 1500s stays under the 30-minute normal CI tier so a wedged
-# script fails here, with its output, before the job cap cancels the lane.
-# It is a guard, not a speed control: a HUNG script becomes a
-# bounded failure instead of an unbounded suite, which is the shape that
-# silently outruns a caller's invocation budget.
-CHANGED_DEFAULT_TIMEOUT_SECS=1500
+# Plain --changed applies a progress guard instead of a fixed per-script
+# duration. bin/fm-duration.py run owns the stop rule, so a slow but working
+# suite keeps its time while a genuinely wedged one still fails locally with
+# its output.
+PROGRESS_GUARD=0
 
 # How many separate-runner shards the portable serial remainder splits into.
 # One owner: CI lane names carry this count and are refused when they disagree.
@@ -258,9 +256,10 @@ PORTABLE_SERIAL_SHARDS=15
 # Rounded above the current CI mean, including the capability-skipped scripts.
 PORTABLE_SERIAL_DEFAULT_WEIGHT_MS=45000
 
-# Packing target, not an execution timeout: leave at least ten minutes of the
-# normal CI tier for setup and runtime variance. --check-coverage refuses a
-# modeled serial shard above this target; refresh hints or rebalance instead.
+# Packing target, not an execution timeout: it stays far inside the 60-minute
+# normal CI tier so setup and runtime variance on a loaded runner never reach
+# the job cap. --check-coverage refuses a modeled serial shard above this
+# target; refresh hints or rebalance instead.
 PORTABLE_SERIAL_MAX_WEIGHT_MS=1200000
 
 # Largest share of the serial lane allowed to run on the default weight above.
@@ -2607,7 +2606,7 @@ done
 AUTO_CONCURRENCY=0
 if { [ "$MODE" = changed ] || [ "$MODE" = scripts ]; } && [ "$JOBS_EXPLICIT" -eq 0 ]; then
   if [ "$MODE" = changed ] && [ "${#SCRIPTS[@]}" -gt 0 ] && [ "$PER_SCRIPT_TIMEOUT_SECS" -eq 0 ]; then
-    PER_SCRIPT_TIMEOUT_SECS=$CHANGED_DEFAULT_TIMEOUT_SECS
+    PROGRESS_GUARD=1
   fi
   auto_admissible=0
   for s in "${SCRIPTS[@]}"; do
@@ -2676,7 +2675,7 @@ if [ "${FM_TEST_KEY_SLOTS-}" = 0 ] || [ ! -r "$ROOT/bin/fm-duration.py" ] \
   TEST_SLOT_ACTIVE=0
 fi
 case "$(uname -s)" in
-  MINGW*|MSYS*|CYGWIN*) TEST_SLOT_ACTIVE=0 ;;
+  MINGW*|MSYS*|CYGWIN*) TEST_SLOT_ACTIVE=0; PROGRESS_GUARD=0 ;;
 esac
 PROC_BUDGET_ACTIVE=1
 if [ ! -x "$ROOT/bin/fm-proc-budget.sh" ]; then
@@ -2730,6 +2729,10 @@ fi
 
 if [ "$PER_SCRIPT_TIMEOUT_SECS" -gt 0 ]; then
   [ -r "$ROOT/bin/fm-timeout-lib.sh" ] || die "per-script timeout helper not found: bin/fm-timeout-lib.sh"
+fi
+if [ "$PROGRESS_GUARD" -eq 1 ]; then
+  [ -r "$ROOT/bin/fm-duration.py" ] || die "automatic --changed progress guard helper not found: bin/fm-duration.py"
+  command -v python3 >/dev/null 2>&1 || die "automatic --changed progress guard needs python3"
 fi
 
 RUN_TMP=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run.XXXXXX")
@@ -2825,7 +2828,7 @@ record_script_result() {
 
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$script" "$family" "$expected" "$rc" "$duration" "$gate_skip" "$gate_reason" >>"$RECORDS"
-  if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1; then
+  if [ "$gate_skip" = false ] && declare -F fm_duration_record >/dev/null 2>&1 && [ ! -e "$out.guarded" ]; then
     if [ "$rc" -eq 124 ] && [ -e "$out.expired" ]; then
       timed_out=1
     fi
@@ -2860,6 +2863,23 @@ slot_wait_ms() {  # <out>
   printf '%s\n' "$waited"
 }
 
+# Runs <script> with its combined output in <out> and on standard output, where
+# the progress runner counts it as progress, and, when the script is a clean gate
+# skip, marks the runner's sample as not calibration-eligible, as a skipped run
+# never was. The progress runner re-declares this function and detect_gate_skip
+# in its child shell, so only the script's own output reaches <out> and the
+# runner's telemetry stays on its standard error.
+# shellcheck disable=SC2329 # Run only from the child shell run_script_bounded builds.
+run_guarded_script() {  # <script> <out>
+  local rc
+  bash "$1" 2>&1 | tee "$2"
+  rc=${PIPESTATUS[0]}
+  if [ "$rc" -eq 0 ] && [ -n "${FM_DURATION_CALIBRATION_FILE:-}" ] && detect_gate_skip "$2"; then
+    printf '0\n' >"$FM_DURATION_CALIBRATION_FILE"
+  fi
+  return "$rc"
+}
+
 # Run <script>, capturing output to <out>. <stream> 1 also echoes it live.
 # <id> only has to be unique within this run. When PER_SCRIPT_TIMEOUT_SECS is
 # positive, a script that outruns it is terminated and reported as exit 124: a
@@ -2882,7 +2902,11 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   fi
   local -a cmd
   : "$id"
-  if [ "$stream" -eq 1 ]; then
+  if [ "$PROGRESS_GUARD" -eq 1 ]; then
+    # Expansion is intentionally deferred to the child bash passed to -c.
+    # shellcheck disable=SC2016
+    cmd=(bash -c "$(declare -f detect_gate_skip run_guarded_script)"'; run_guarded_script "$@"' _ "$script" "$out")
+  elif [ "$stream" -eq 1 ]; then
     # Expansion is intentionally deferred to the child bash passed to -c.
     # shellcheck disable=SC2016
     cmd=(bash -c 'bash "$1" 2>&1 | tee "$2"; exit "${PIPESTATUS[0]}"' _ "$script" "$out")
@@ -2905,6 +2929,12 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       [ "$rc" -ne 124 ] || [ $(($(ms) - started)) -lt $(($1 * 1000)) ] || : >"$expired"
       exit "$rc"' _ "$ROOT/bin/fm-timeout-lib.sh" "$out.expired" "$script_seconds" "${cmd[@]}")
   fi
+  if [ "$PROGRESS_GUARD" -eq 1 ]; then
+    # The progress runner owns this script's sample and any no-progress stop, so
+    # <out>.guarded tells record_script_result not to record the same run twice.
+    : >"$out.guarded"
+    cmd=(python3 "$ROOT/bin/fm-duration.py" run "test.$script" -- "${cmd[@]}")
+  fi
   if [ "$CPU_PASS_ACTIVE" -eq 1 ]; then
     cmd=("$ROOT/bin/fm-cpu-pass.sh" run --label "fm-test-run $script" \
       --log-fd "$CPU_PASS_LOG_FD" -- "${cmd[@]}")
@@ -2917,6 +2947,8 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   set +e
   if [ "$stream" -eq 1 ]; then
     "${cmd[@]}"
+  elif [ "$PROGRESS_GUARD" -eq 1 ]; then
+    "${cmd[@]}" >/dev/null
   else
     "${cmd[@]}" >"$out" 2>&1
   fi

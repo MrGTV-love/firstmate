@@ -60,17 +60,28 @@ applies a measured kill. Retention policy: compaction keeps the newest
 KEEP_SAMPLES samples per host, repository and key once any of them exceeds
 COMPACT_AT sample rows; timeout and filed rows are always kept.
 
-The default margin is 3; run uses p99 x 3 for its outer ceiling. Polling cadence
-is observation, not a failure deadline. Output growth and cumulative process-tree
-CPU time report progress; neither an idle or failed sample nor an elapsed read
-wait kills work. Completion of the command's leader, signal, or the measured
-outer ceiling ends the run; descendants that outlive the leader and still hold
+The default margin is 3, and run reports p99 x 3 as a "slower than usual"
+advisory line rather than using it to stop healthy slow work. run stops a
+command only at a true extreme: no output and no process-tree CPU progress for
+15 minutes (FM_DURATION_NO_PROGRESS_SECS), or 6 hours wall clock overall
+(FM_DURATION_ABSOLUTE_SECS). A no-mistakes.<step> key, a wrapped pipeline drive
+call whose client waits quietly on the shared daemon, is exempt from the
+no-progress stop and keeps only the 6 hour absolute stop; a cleanup that a
+forwarded signal or the absolute stop began still follows the cleanup rule
+below for every key. Polling cadence is observation, not a failure
+deadline, and neither an idle or failed sample nor an elapsed read wait kills
+work. Completion of the command's leader, a forwarded signal, or one of those
+two extremes ends the run; descendants that outlive the leader and still hold
 its output streams are neither awaited nor counted as live work.
-A ceiling expiry or the first forwarded signal sends SIGTERM to the process group
-and then waits for the leader to exit, with no guessed grace number. SIGKILL goes
-to the group only when the leader has exited and group members remain, on a
-second forwarded signal, or when a further full measured ceiling passes with the
-leader still alive, so a leader's own TERM cleanup always gets to run.
+An expiry or the first forwarded signal sends SIGTERM to the process group and
+then waits for the leader to exit, with no guessed grace number, so a leader's
+own TERM cleanup runs for as long as it keeps making progress. SIGKILL goes to
+the group only when the leader has exited and group members remain, on a second
+forwarded signal, when the cleanup shows no output and no process-tree CPU
+progress for the same no-progress interval (counted from the stop, or from the
+cleanup's last progress), or when the cleanup itself has run for the same
+absolute limit. A true no-progress or absolute stop still records a timed-out
+sample, so repeated stops file the same repair work as any other real limit.
 run exports FM_DURATION_MANAGED_KEY so a self-instrumented command with the same
 key leaves its one complete wall-time sample to the outer runner.
 It also exports a task-local FM_DURATION_CALIBRATION_FILE: self-instrumented
@@ -81,7 +92,7 @@ Per-key slot gate. A test.* key admits at most FM_TEST_KEY_SLOTS concurrent
 copies (default 2; 0 turns the gate off; whole numbers up to 16) host-wide, so
 the same heavy suite started in several worktrees takes turns instead of
 multiplying its process churn. run takes a slot before it starts its clock, so
-the wait is in neither the recorded sample nor the measured ceiling; gate is for
+the wait is in neither the recorded sample nor run's stop and report clocks; gate is for
 a caller that times COMMAND itself (bin/fm-test-run.sh wraps each script in it):
 it runs COMMAND with this process's stdio and the --log-fd descriptor, and
 writes the milliseconds it queued behind busy slots to --wait-file before COMMAND
@@ -112,8 +123,8 @@ FM_TEST_KEY_SLOTS or FM_TEST_SLOT_WAIT_SECONDS refuses the command by name (exit
 docs/configuration.md "Test slots per key" owns the sizing rationale.
 
 A timeout is a real limit that stopped a command, reported by the owner of that
-limit (run's ceiling, fm_run_timed, the lint root bound, the per-script bound,
-or record --timed-out); an exit code of 124 or 137 alone never counts. The second timeout for a
+limit (run's no-progress or absolute stop, fm_run_timed, the lint root bound, the
+per-script bound, or record --timed-out); an exit code of 124 or 137 alone never counts. The second timeout for a
 host/key files a deterministic ship item through the owning home's
 fm-tasks-axi.sh (FM_HOME set to FM_DURATION_HOME when present) with the observed
 lower bounds, for the project registered in that home's data/projects.md under the
@@ -167,6 +178,13 @@ HOST = platform.node()
 MIN_SAMPLES = 5  # sample-count policy: eligible samples before a measured limit applies
 KEEP_SAMPLES = 100  # sample-count policy: newest samples kept per host and key
 COMPACT_AT = 200  # sample-count policy: host/key sample rows that trigger compaction
+# run's lifetime is a progress rule, not a duration target: silence for this
+# long with no process-tree CPU growth, or this much wall clock overall, is the
+# only extreme that stops a command. Both have environment overrides for tests.
+NO_PROGRESS_LIMIT = 900
+ABSOLUTE_LIMIT = 6 * 3600
+QUIET_WAIT_PREFIX = 'no-mistakes.'  # a wrapped drive call waits quietly on the shared daemon, so silence is not a stall
+PROGRESS_REPORT_AFTER = 60  # seconds between progress heartbeat lines, not a deadline
 EVENTS = ('timeout', 'filed')
 LOCAL_NOTED = []
 REFUSED = []
@@ -364,6 +382,15 @@ def optional_load(value):
     return float(value) if value else None
 
 
+def positive_override(name, default):
+    """An environment override that must be a positive integer, else <default>."""
+    try:
+        value = int(os.environ.get(name, ''))
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
 def record_batch(lines):
     entries = []
     for line in lines:
@@ -522,9 +549,10 @@ def signal_group(child, sig):
     except ProcessLookupError:
         pass  # The owned group has already gone.
     except PermissionError:
-        # A repeated cleanup signal returned EPERM after cancellation on
-        # Darwin. Accept completion only after the leader is reaped AND the
-        # kernel inventory proves that no live group member remains.
+        # Darwin answers a signal to a group whose members are all exiting
+        # with EPERM. Accept completion only after the leader is reaped AND
+        # the kernel inventory proves that every remaining group member is a
+        # zombie or is exiting (flag E); neither can run again.
         if child.poll() is None:
             raise
         inventory = subprocess.run(['ps', '-axo', 'pgid=,stat='], capture_output=True, text=True)
@@ -534,7 +562,7 @@ def signal_group(child, sig):
             fields = line.split()
             if len(fields) != 2:
                 raise ValueError('cannot verify completed process group')
-            if fields[0] == str(child.pid) and not fields[1].startswith(('Z', 'X')):
+            if fields[0] == str(child.pid) and not (fields[1].startswith(('Z', 'X')) or 'E' in fields[1]):
                 raise
 
 
@@ -777,10 +805,12 @@ def run(key, command, calibration_file):
         raise RuntimeError('progress runner requires the Firstmate POSIX shell and POSIX Python process groups')
     import termios
     try:
-        ceiling = limit(key, 99, 3, 0)
+        advisory = limit(key, 99, 3, 0)
     except (OSError, ValueError) as error:
-        scalar('calibration_error', f'{error}; running {key} with no deadline', sys.stderr)
-        ceiling = 0
+        scalar('calibration_error', f'{error}; running {key} with no measured advisory', sys.stderr)
+        advisory = 0
+    no_progress = positive_override('FM_DURATION_NO_PROGRESS_SECS', NO_PROGRESS_LIMIT)
+    absolute = positive_override('FM_DURATION_ABSOLUTE_SECS', ABSOLUTE_LIMIT)
     started = time.monotonic()
     load_start = load_now()
     child_env = dict(os.environ, FM_DURATION_MANAGED_KEY=key)
@@ -818,6 +848,10 @@ def run(key, command, calibration_file):
     observed_cpu = {}
     occurrence_id = str(uuid.uuid4())
     expired = False
+    last_progress = started
+    next_progress_report = started
+    slower_reported = False
+    killed = False
     try:
         while child.poll() is None:
             if not streams.get_map():
@@ -832,19 +866,35 @@ def run(key, command, calibration_file):
                 sample = tree_cpu(child.pid, observed_cpu)
                 cpu = cpu if sample is None else sample
                 next_cpu_sample = time.monotonic() + 1  # observation cadence, not a deadline
+            now = time.monotonic()
             if cpu > previous_cpu or output_bytes > previous_bytes:
-                scalar('progress', f'{key} elapsed={elapsed:.1f}s output_bytes={output_bytes} tree_cpu={cpu:.2f}s', sys.stderr)
+                last_progress = now
+                if now >= next_progress_report:
+                    scalar('progress', f'{key} elapsed={elapsed:.1f}s output_bytes={output_bytes} tree_cpu={cpu:.2f}s', sys.stderr)
+                    next_progress_report = now + PROGRESS_REPORT_AFTER
                 previous_cpu, previous_bytes = max(previous_cpu, cpu), output_bytes
-            if ceiling and elapsed >= ceiling and not stopping_since and child.poll() is None:
-                expired = True
-                begin_stop()
-            elif stopping_since and ceiling and time.monotonic() - stopping_since[0] >= ceiling:
-                signal_group(child, signal.SIGKILL)  # a second full measured ceiling with the leader alive
+            if child.poll() is None and stopping_since:
+                if not killed and (now - stopping_since[0] >= absolute or now - max(last_progress, stopping_since[0]) >= no_progress):
+                    killed = True  # once: a repeat on a group that is still exiting is EPERM on Darwin
+                    signal_group(child, signal.SIGKILL)  # the cleanup stalled or outlived the absolute limit
+            elif child.poll() is None:
+                idle = now - last_progress
+                if now - started >= absolute:
+                    expired = True
+                    scalar('absolute_limit', f'{key} reached the {absolute}s absolute limit; stopping', sys.stderr)
+                    begin_stop()
+                elif idle >= no_progress and not key.startswith(QUIET_WAIT_PREFIX):
+                    expired = True
+                    scalar('no_progress', f'{key} made no output or CPU progress for {idle:.0f}s; stopping', sys.stderr)
+                    begin_stop()
+                elif advisory and elapsed >= advisory and not slower_reported:
+                    slower_reported = True
+                    scalar('slower_than_usual', f'{key} elapsed={elapsed:.1f}s measured_ceiling={advisory}s; still making progress, so this is reported and not stopped', sys.stderr)
         if stopping_since:
             signal_group(child, signal.SIGKILL)  # the leader is gone; sweep any remaining group members
         # The leader's exit is the result. Relay the output buffered by then,
         # but do not wait for descendants that outlive the leader and still
-        # hold its streams; they are not live work under the ceiling.
+        # hold its streams; they are not live work under the progress rule.
         for stream, sink in ((child.stdout, sys.stdout.buffer), (child.stderr, sys.stderr.buffer)):
             remaining = struct.unpack('i', fcntl.ioctl(stream.fileno(), termios.FIONREAD, bytes(4)))[0]
             while remaining > 0:
