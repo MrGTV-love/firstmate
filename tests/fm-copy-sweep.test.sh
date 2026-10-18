@@ -664,6 +664,83 @@ test_a_lane_home_is_judged_as_that_home_would_judge_it() {
   pass "run from the root home, a lane's proven copy is reaped, its own live record holds a copy, and an unreadable lane holds every copy"
 }
 
+# The clone ignores .claude/worktrees/, so git status in an outer copy cannot see
+# a copy registered inside it and a plain git worktree remove would delete both.
+ignore_worktrees_dir() {
+  printf '.claude/worktrees/\n' >> "$(git -C "$SLOT" rev-parse --path-format=absolute --git-path info/exclude)"
+}
+
+add_inner_copy() {  # <outer-name> <inner-name>: a registered copy inside <outer-name>
+  git -C "$(copy_path "$1")" worktree add -q -b "fm/$2" "$(copy_path "$1")/.claude/worktrees/$2"
+}
+
+inner_path() { printf '%s/.claude/worktrees/%s\n' "$(copy_path "$1")" "$2"; }
+
+test_an_outer_copy_holding_a_dirty_inner_copy_is_kept() {
+  local inner
+  make_world innerdirty
+  ignore_worktrees_dir
+  add_copy outer
+  add_inner_copy outer inner
+  inner=$(inner_path outer inner)
+  printf 'unsaved\n' > "$inner/work.txt"
+  [ -z "$(git -C "$(copy_path outer)" status --porcelain --untracked-files=all)" ] \
+    || fail "the fixture is wrong: git status in the outer copy should not see the inner copy"
+  take_snapshots before outer
+  run_sweep
+  [ "$RC" = 0 ] || fail "report failed ($RC): $OUT"
+  assert_class outer HELD-DIRTY
+  assert_contains "$OUT" "another registered copy is inside it: $inner" "the report did not name the inner copy"
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  [ -f "$inner/work.txt" ] || fail "apply deleted the inner copy's unsaved file"
+  take_snapshots after outer
+  assert_untouched outer
+  git -C "$SLOT" worktree list --porcelain | grep -qxF "worktree $inner" || fail "the inner copy is no longer registered"
+  assert_absent "$HOMED/data/copy-sweep.log" "apply logged a removal it should not have made"
+  pass "an outer copy that holds a dirty inner copy is held and apply keeps both, even when git status cannot see the inner copy"
+}
+
+test_an_outer_copy_is_reaped_after_its_inner_copy_is_gone() {
+  local inner
+  make_world innerclean
+  ignore_worktrees_dir
+  add_copy outer
+  add_inner_copy outer inner
+  inner=$(inner_path outer inner)
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$inner" "the proven inner copy was not removed first"
+  [ -d "$(copy_path outer)" ] || fail "the outer copy was removed in the same run as the inner copy it held"
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "second apply failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path outer)" "the outer copy was not removed once its inner copy was gone"
+  [ ! -e "$(copy_path outer)" ] || fail "the outer copy is still on disk"
+  make_world innergone
+  ignore_worktrees_dir
+  add_copy outer
+  add_inner_copy outer inner
+  rm -rf "$(inner_path outer inner)"
+  run_sweep --apply
+  [ "$RC" = 0 ] || fail "apply failed ($RC): $OUT"
+  assert_contains "$OUT" "REMOVED"$'\t'"$(copy_path outer)" "a registration whose directory is gone held its outer copy"
+  pass "an outer copy is held while an inner copy exists, reaped by the next run once it is removed, and not held by a registration whose directory is gone"
+}
+
+test_a_zero_padded_or_odd_check_timeout_is_normalized() {
+  local value
+  make_budget_world padded 4 4 4
+  printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
+  for value in 090 abc; do
+    rm -f "$HOMED/state/copy-sweep.record"
+    FM_CHECK_TIMEOUT=$value run_sweep check
+    [ "$RC" = 0 ] || fail "check with FM_CHECK_TIMEOUT=$value failed ($RC): $OUT"
+    assert_contains "$OUT" "container $SLOT is over its budget: 12.00 GiB against 5 GiB" "check with FM_CHECK_TIMEOUT=$value did not scan"
+    assert_contains "$(cat "$HOMED/state/copy-sweep.record")" "last_scan" "check with FM_CHECK_TIMEOUT=$value recorded no scan"
+  done
+  pass "a zero-padded or non-numeric FM_CHECK_TIMEOUT no longer aborts the check"
+}
+
 test_check_classifies_only_the_copies_it_names() {
   make_budget_world lazy 9 8 1 1 1 1 1
   printf 'default-pool off\ncontainer %s 5\ninterval 0\ncache-max-age 0\n' "$SLOT" > "$HOMED/config/copy-budget"
@@ -794,6 +871,9 @@ run_case test_a_cut_scan_wakes_on_what_it_measured_and_never_invents_one
 run_case test_a_registered_copy_whose_directory_is_gone_does_not_latch_the_record
 run_case test_a_slow_classification_cannot_starve_the_wake
 run_case test_a_lane_home_is_judged_as_that_home_would_judge_it
+run_case test_an_outer_copy_holding_a_dirty_inner_copy_is_kept
+run_case test_an_outer_copy_is_reaped_after_its_inner_copy_is_gone
+run_case test_a_zero_padded_or_odd_check_timeout_is_normalized
 run_case test_check_classifies_only_the_copies_it_names
 run_case test_check_respects_its_interval
 run_case test_check_never_removes

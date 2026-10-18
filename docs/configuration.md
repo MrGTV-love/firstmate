@@ -1729,7 +1729,7 @@ Each copy gets one class:
 | `REAPABLE-PROVEN` | Clean, no untracked file, HEAD contained in a remote branch or its content already in the default branch, no process inside, no active task record | Yes |
 | `HELD-LIVE-TASK` | An active task record, a process, or this home's own files are inside, or the records or process table cannot be read | No |
 | `HELD-UNPUSHED` | A commit is on no remote and not in the default branch | No |
-| `HELD-DIRTY` | Any change, untracked file, git operation in progress, or ignored file that exists nowhere else | No |
+| `HELD-DIRTY` | Any change, untracked file, git operation in progress, ignored file that exists nowhere else, or another registered copy inside it | No |
 | `HELD-LOCKED` | A worktree lock holds it | No |
 | `ORPHAN-NO-RECORD` | Its directory is gone, or its git or lock state cannot be read | No |
 
@@ -1738,6 +1738,7 @@ It never forces, deletes recursively, unlocks, or cleans.
 A removal git refuses leaves the copy, is reported, and exits 1.
 Each removal appends one line to `data/copy-sweep.log`.
 A copy under Vernant's creation lock (`HELD-LOCKED`) is released only by Vernant's own closeout driver, so the sweep can never remove one.
+A copy that holds another registered copy is held until that inner copy is gone, because removing the outer copy would delete the inner one.
 The first run on a home is `bin/fm-copy-sweep.sh` with no flag: it changes nothing and lists every copy with its class and reason.
 
 ### Hourly command and watcher check
@@ -1786,7 +1787,7 @@ It raises no second wake while the same budget stays over, and a budget that dro
 A scan that `check` had to cut short counts only what it measured, so an unmeasured copy can delay a wake and never cause one.
 
 `FM_COPY_SWEEP_TREEHOUSE_ROOT` (default `~/.treehouse`) is the only operator environment setting.
-The `check` time bound is the watcher's per-check timeout `FM_CHECK_TIMEOUT` minus five seconds.
+The `check` time bound is the watcher's per-check timeout `FM_CHECK_TIMEOUT` minus five seconds, read as whole digits with leading zeros allowed and as 30 when it is anything else.
 [`tests/fm-copy-sweep.test.sh`](../tests/fm-copy-sweep.test.sh) is the regression entry point.
 
 ## Crew dispatch profiles (config/crew-dispatch.json)

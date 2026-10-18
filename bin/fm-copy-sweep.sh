@@ -42,8 +42,12 @@
 #                      holds all of its copies.
 #   HELD-DIRTY         git status shows any change or untracked file, an
 #                      operation (rebase, merge, cherry-pick, revert, bisect) is
-#                      in progress, or it holds an ignored file that exists
-#                      nowhere else (the teardown library's rule).
+#                      in progress, it holds an ignored file that exists
+#                      nowhere else (the teardown library's rule), or another
+#                      registered copy with an existing directory is inside it:
+#                      a plain `git worktree remove` of the outer copy would
+#                      delete that inner copy and whatever it holds, and git
+#                      status cannot see it when `.claude/worktrees/` is ignored.
 #   HELD-UNPUSHED      its HEAD holds a commit that is on no remote and whose
 #                      content is not already in the default branch.
 #   REAPABLE-PROVEN    clean, HEAD contained in a remote branch (the whole-slot
@@ -59,8 +63,9 @@
 # run from the parent clone. Never a force flag, never a recursive delete, never
 # an unlock, never a Treehouse call. A removal that fails leaves the copy and is
 # reported, and the run exits 1; it is not retried. Each removal appends one line
-# to data/copy-sweep.log (append-only). A second run finds nothing left to
-# remove. Without --apply nothing is changed except that no cache or record is
+# to data/copy-sweep.log (append-only). An outer copy whose inner copy was removed
+# in the same run is removed by the next run; a second run otherwise finds
+# nothing left to remove. Without --apply nothing is changed except that no cache or record is
 # written either: report mode reads the size cache and writes nothing.
 # Only the landed proof in --apply mode fetches the default branch (as the
 # teardown rule does); report and check use the refs already present, which can
@@ -447,7 +452,7 @@ content_in_default() {  # <copy> <clone>
 # <container>. A clone under a Firstmate home other than this one is judged as
 # that home would judge it.
 classify() {  # <copy> <clone> <pool> <container>
-  local copy=$1 clone=$2 pool=$3 container=$4 top rc admin status count name pid unique pending
+  local copy=$1 clone=$2 pool=$3 container=$4 top rc admin status count name pid unique pending inner
   local home=$FM_HOME state=$STATE
   CLASS=
   REASON=
@@ -556,6 +561,13 @@ classify() {  # <copy> <clone> <pool> <container>
     REASON="it holds ignored files that exist nowhere else: $(printf '%s' "$unique" | tr '\n' ' ')"
     return 0
   fi
+  while IFS= read -r inner; do
+    case "$inner" in "$copy"/*) ;; *) continue ;; esac
+    [ -d "$inner" ] || continue
+    CLASS=HELD-DIRTY
+    REASON="another registered copy is inside it: $inner"
+    return 0
+  done < <(list_nested "$clone")
   if ! count=$(git -C "$copy" rev-list --count HEAD --not --remotes 2>/dev/null); then
     CLASS=HELD-UNPUSHED
     REASON="its HEAD cannot be compared with the remotes"
@@ -1076,7 +1088,9 @@ run_sweep() {  # report|apply|check
   SCAN_DEADLINE=0
   if [ "$mode" = check ]; then
     # The watcher runs a check under FM_CHECK_TIMEOUT; stay clear of it.
-    cap=$(( ${FM_CHECK_TIMEOUT:-30} - 5 ))
+    cap=${FM_CHECK_TIMEOUT:-30}
+    case "$cap" in *[!0-9]*) cap=30 ;; esac
+    cap=$(( 10#$cap - 5 ))
     [ "$cap" -ge 1 ] || cap=1
     SCAN_DEADLINE=$(( $(date +%s) + cap ))
   fi
