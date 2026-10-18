@@ -1032,6 +1032,47 @@ PY
   pass "the changed progress guard keeps a delayed gate skip a gate skip and out of calibration"
 }
 
+# Output is progress as well as CPU time, in the concurrent path too. A script
+# that prints steadily while it waits on something slow spends almost no CPU, and
+# ps reports CPU time in whole seconds on Linux, so output is the only signal that
+# keeps it alive. tests/fm-daemon.test.sh runs in the concurrent phase of this
+# fixture beside other admissible scripts.
+test_changed_parallel_guard_counts_low_cpu_script_output_as_progress() {
+  local tmp repo rc shape
+  tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-guard-talker.XXXXXX")
+  repo="$tmp/repo"
+  init_changed_fixture_repo "$repo"
+  cat >"$repo/tests/fm-daemon.test.sh" <<'SH'
+#!/usr/bin/env bash
+python3 -c 'import time
+for tick in range(40):
+    print("tick", tick, flush=True)
+    time.sleep(0.25)'
+echo "ok - patient low-CPU script"
+SH
+  git -C "$repo" add .
+  git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm fixtures
+  printf '\n' >>"$repo/bin/shared-probe-lib.sh"
+
+  set +e
+  (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=4 FM_DURATION_FILE="$tmp/durations.jsonl" \
+    bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
+  rc=$?
+  set -e
+  shape=$(grep -E '^FM_TEST_(BEGIN|END)' "$tmp/out" | head -n 2 | awk '{print $1}' | paste -sd, -)
+  [ "$shape" = FM_TEST_BEGIN,FM_TEST_BEGIN ] \
+    || fail "the fixture did not take the concurrent path: $shape"
+  [ "$rc" -eq 0 ] || fail "a script whose output keeps coming must not be stopped, got $rc: $(cat "$tmp/err")"
+  grep -Eq '^FM_TEST_END .+ tests/fm-daemon\.test\.sh exit=0 ' "$tmp/out" \
+    || fail "the patient low-CPU script did not finish green: $(cat "$tmp/out")"
+  assert_contains "$(cat "$tmp/out")" "ok - patient low-CPU script" "the script's output was not replayed"
+  if grep -q 'no_progress' "$tmp/err"; then
+    fail "the progress guard stopped a script that was printing: $(cat "$tmp/err")"
+  fi
+  rm -rf "$tmp"
+  pass "the concurrent changed progress guard treats a low-CPU script's output as progress"
+}
+
 test_windows_posix_mode_emulation_does_not_fail_parallel_runs() {
   local tmp repo fakebin real_stat out rc
   tmp=$(mktemp -d "${TMPDIR:-/tmp}/fm-test-run-windows-modes.XXXXXX")
@@ -2524,7 +2565,7 @@ SH
   git -C "$repo" -c user.name=test -c user.email=test@example.invalid commit -qm baseline
   printf '\n' >>"$repo/$script"
   set +e
-  (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=2 FM_DURATION_FILE="$tmp/durations.jsonl" \
+  (cd "$repo" && FM_DURATION_NO_PROGRESS_SECS=5 FM_DURATION_FILE="$tmp/durations.jsonl" \
     bin/fm-test-run.sh --changed --base HEAD) >"$tmp/out" 2>"$tmp/err"
   rc=$?
   set -e
@@ -2831,6 +2872,7 @@ test_changed_status_owners_select_all_consuming_tests
 test_changed_bin_reference_selects_per_script_not_per_family
 test_changed_uses_bounded_automatic_concurrency
 test_changed_progress_guard_keeps_delayed_gate_skip_and_calibration_hygiene
+test_changed_parallel_guard_counts_low_cpu_script_output_as_progress
 test_windows_posix_mode_emulation_does_not_fail_parallel_runs
 test_script_list_uses_bounded_automatic_concurrency
 test_family_proofs_run_in_separate_concurrent_phases

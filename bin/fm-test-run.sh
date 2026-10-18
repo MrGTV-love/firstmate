@@ -2861,21 +2861,17 @@ slot_wait_ms() {  # <out>
   printf '%s\n' "$waited"
 }
 
-# Runs <script> with its combined output in <out> (<stream> 1 also echoes it
-# live) and, when the script is a clean gate skip, marks the progress runner's
-# sample as not calibration-eligible, as a skipped run never was. The progress
-# runner re-declares this function and detect_gate_skip in its child shell, so
-# the script alone writes <out> and the runner's own telemetry stays out of it.
+# Runs <script> with its combined output in <out> and on standard output, where
+# the progress runner counts it as progress, and, when the script is a clean gate
+# skip, marks the runner's sample as not calibration-eligible, as a skipped run
+# never was. The progress runner re-declares this function and detect_gate_skip
+# in its child shell, so only the script's own output reaches <out> and the
+# runner's telemetry stays on its standard error.
 # shellcheck disable=SC2329 # Run only from the child shell run_script_bounded builds.
-run_guarded_script() {  # <script> <out> <stream>
+run_guarded_script() {  # <script> <out>
   local rc
-  if [ "$3" -eq 1 ]; then
-    bash "$1" 2>&1 | tee "$2"
-    rc=${PIPESTATUS[0]}
-  else
-    bash "$1" >"$2" 2>&1
-    rc=$?
-  fi
+  bash "$1" 2>&1 | tee "$2"
+  rc=${PIPESTATUS[0]}
   if [ "$rc" -eq 0 ] && [ -n "${FM_DURATION_CALIBRATION_FILE:-}" ] && detect_gate_skip "$2"; then
     printf '0\n' >"$FM_DURATION_CALIBRATION_FILE"
   fi
@@ -2907,7 +2903,7 @@ run_script_bounded() {  # <script> <out> <stream> <id>
   if [ "$PROGRESS_GUARD" -eq 1 ]; then
     # Expansion is intentionally deferred to the child bash passed to -c.
     # shellcheck disable=SC2016
-    cmd=(bash -c "$(declare -f detect_gate_skip run_guarded_script)"'; run_guarded_script "$@"' _ "$script" "$out" "$stream")
+    cmd=(bash -c "$(declare -f detect_gate_skip run_guarded_script)"'; run_guarded_script "$@"' _ "$script" "$out")
   elif [ "$stream" -eq 1 ]; then
     # Expansion is intentionally deferred to the child bash passed to -c.
     # shellcheck disable=SC2016
@@ -2947,8 +2943,10 @@ run_script_bounded() {  # <script> <out> <stream> <id>
       --wait-file "$out.slotwait" "test.$script" -- "${cmd[@]}")
   fi
   set +e
-  if [ "$stream" -eq 1 ] || [ "$PROGRESS_GUARD" -eq 1 ]; then
+  if [ "$stream" -eq 1 ]; then
     "${cmd[@]}"
+  elif [ "$PROGRESS_GUARD" -eq 1 ]; then
+    "${cmd[@]}" >/dev/null
   else
     "${cmd[@]}" >"$out" 2>&1
   fi
