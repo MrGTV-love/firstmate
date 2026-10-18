@@ -10814,25 +10814,96 @@ test_a_held_close_removes_only_the_tasks_own_nested_copy() {
   pass "a held close removes the task's own nested copy, through the driver when it is locked, and leaves the slot, its lease and claim and the held foreign copy alone"
 }
 
-test_a_second_close_attempt_adds_no_duplicate_held_copy_line() {
-  local rc
-  make_held_case held-again
+test_the_held_close_notice_promises_no_cleanup_that_does_not_exist() {
+  local rc second
+  make_held_case held-notice
+  second=$FOREIGN_SLOT/.claude/worktrees/fc-two
+  git -C "$FOREIGN_CASE/project" worktree add -q -b fm/other-lane "$second" main
   held_foreign_ignored "$FOREIGN_COPY"
-  cp "$FOREIGN_CASE/state/task-x1.meta" "$FOREIGN_CASE/meta.saved"
+  held_foreign_unlanded "$second"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY" "$second"
+  run_foreign_teardown rc
+  expect_code 0 "$rc" "held-notice: a landed task must close beside two held copies: $(cat "$FOREIGN_CASE/stderr")"
+  held_assert_closed held-notice
+  held_assert_untouched held-notice "$FOREIGN_CASE" "$FOREIGN_COPY" "$second"
+  assert_grep "held foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: " "$FOREIGN_CASE/stdout" \
+    "held-notice: the output did not list the first held copy"
+  assert_grep "held foreign copy $second stays in pool slot $FOREIGN_SLOT: " "$FOREIGN_CASE/stdout" \
+    "held-notice: the output did not list the second held copy"
+  assert_grep "pool slot $FOREIGN_SLOT stays leased and claimed, and nothing returns it automatically" "$FOREIGN_CASE/stdout" \
+    "held-notice: the output did not say the slot stays leased and claimed with no automatic return"
+  assert_grep "a held copy is removed only on the owner's word naming it, so ask the supervisor" "$FOREIGN_CASE/stdout" \
+    "held-notice: the output did not say how a held copy is removed"
+  assert_grep "each held copy is also listed in $FOREIGN_CASE/data/held-foreign-copies.log" "$FOREIGN_CASE/stdout" \
+    "held-notice: the output did not name the held-copy record"
+  assert_no_grep "reaper" "$FOREIGN_CASE/stdout" "held-notice: the output promises a reaper run"
+  assert_no_grep "named drop" "$FOREIGN_CASE/stdout" "held-notice: the output promises a named drop"
+  assert_no_grep "reaper" "$FOREIGN_CASE/stderr" "held-notice: the error output promises a reaper run"
+  pass "a held close lists every held copy, says the slot stays leased and claimed, and promises no cleanup that does not exist"
+}
+
+test_a_held_close_that_a_later_step_refuses_writes_no_record_line() {
+  local rc
+  make_held_case held-late-refusal
+  held_foreign_ignored "$FOREIGN_COPY"
+  stuck_endpoint_tmux "$FOREIGN_CASE"
+  : > "$FOREIGN_CASE/endpoint-stuck"
   held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
   run_foreign_teardown rc
-  expect_code 0 "$rc" "held-again: the first close must succeed: $(cat "$FOREIGN_CASE/stderr")"
-  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-again: the first close did not write one line"
-  # A plain re-run finds no record; a re-run after an interrupted close finds the record again.
+  expect_code 1 "$rc" "held-late-refusal: a stuck endpoint must refuse the close: $(cat "$FOREIGN_CASE/stderr")"
+  assert_present "$FOREIGN_CASE/state/task-x1.meta" "held-late-refusal: the task record was removed by a refused close"
+  assert_absent "$FOREIGN_CASE/data/held-foreign-copies.log" "held-late-refusal: a refused close wrote a held-copy record"
+  assert_no_grep "held foreign copy" "$FOREIGN_CASE/stdout" "held-late-refusal: a refused close reported held copies"
+  held_assert_untouched held-late-refusal "$FOREIGN_CASE" "$FOREIGN_COPY"
+  rm -f "$FOREIGN_CASE/endpoint-stuck"
   run_foreign_teardown rc
-  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-again: a re-run without a record added a line"
-  cp "$FOREIGN_CASE/meta.saved" "$FOREIGN_CASE/state/task-x1.meta"
-  seed_backlog_in_flight "$FOREIGN_CASE"
+  expect_code 0 "$rc" "held-late-refusal: the rerun must close once the endpoint closes: $(cat "$FOREIGN_CASE/stderr")"
+  held_assert_closed held-late-refusal
+  held_assert_untouched held-late-refusal "$FOREIGN_CASE" "$FOREIGN_COPY"
+  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" \
+    "held-late-refusal: the close that completed did not write exactly one record line"
+  pass "a held close refused by a later step writes no record line, and the close that completes writes one"
+}
+
+test_a_held_copy_record_that_cannot_be_written_warns_and_the_close_completes() {
+  local rc
+  make_held_case held-unwritable
+  held_foreign_ignored "$FOREIGN_COPY"
+  mkdir "$FOREIGN_CASE/data/held-foreign-copies.log"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
   run_foreign_teardown rc
-  expect_code 0 "$rc" "held-again: a re-run with the record restored must close again: $(cat "$FOREIGN_CASE/stderr")"
-  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-again: a second close added a duplicate line"
-  held_assert_untouched held-again "$FOREIGN_CASE" "$FOREIGN_COPY"
-  pass "a second close attempt is idempotent and adds no duplicate held-copy line"
+  expect_code 0 "$rc" "held-unwritable: an unwritable record must not refuse a safe close: $(cat "$FOREIGN_CASE/stderr")"
+  held_assert_closed held-unwritable
+  held_assert_untouched held-unwritable "$FOREIGN_CASE" "$FOREIGN_COPY"
+  assert_present "$FOREIGN_COPY/unique.dat" "held-unwritable: the foreign copy's unique file is gone"
+  assert_grep "warning: could not write the held-copy record $FOREIGN_CASE/data/held-foreign-copies.log" "$FOREIGN_CASE/stdout" \
+    "held-unwritable: the output did not warn about the record"
+  assert_grep "held foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: " "$FOREIGN_CASE/stdout" \
+    "held-unwritable: the output did not list the held copy"
+  assert_no_grep "each held copy is also listed in" "$FOREIGN_CASE/stdout" \
+    "held-unwritable: the output claims a record that was not written"
+  pass "a held-copy record that cannot be written prints a warning on stdout and the close still completes with the foreign copy untouched"
+}
+
+test_a_legacy_record_held_close_still_names_the_held_copies() {
+  local rc
+  make_held_case held-legacy
+  grep -v '^spawn_gen=' "$FOREIGN_CASE/state/task-x1.meta" > "$FOREIGN_CASE/meta.legacy"
+  cp "$FOREIGN_CASE/meta.legacy" "$FOREIGN_CASE/state/task-x1.meta"
+  held_foreign_ignored "$FOREIGN_COPY"
+  held_snapshot "$FOREIGN_CASE" "$FOREIGN_COPY"
+  FOREIGN_TEARDOWN_ARGS=(--legacy-record)
+  run_foreign_teardown rc
+  FOREIGN_TEARDOWN_ARGS=()
+  expect_code 0 "$rc" "held-legacy: a landed legacy record must close beside a held copy: $(cat "$FOREIGN_CASE/stderr")"
+  assert_grep "legacy record accepted without spawn_gen" "$FOREIGN_CASE/stdout" "held-legacy: the close did not take the legacy completion line"
+  assert_absent "$FOREIGN_CASE/state/task-x1.meta" "held-legacy: the task record survived"
+  held_assert_untouched held-legacy "$FOREIGN_CASE" "$FOREIGN_COPY"
+  assert_grep "the slot return is deferred" "$FOREIGN_CASE/stdout" "held-legacy: the legacy close did not say the slot return is deferred"
+  assert_grep "held foreign copy $FOREIGN_COPY stays in pool slot $FOREIGN_SLOT: it holds ignored files that exist nowhere else: unique.dat." \
+    "$FOREIGN_CASE/stdout" "held-legacy: the legacy close did not list the held copy: $(cat "$FOREIGN_CASE/stdout")"
+  assert_equals 1 "$(wc -l < "$FOREIGN_CASE/data/held-foreign-copies.log" | tr -d ' ')" "held-legacy: the record is not one line"
+  pass "a --legacy-record close beside a held foreign copy still lists the held copy and says the slot return is deferred"
 }
 
 test_a_foreign_copy_does_not_excuse_an_own_copy_that_is_not_landed() {
@@ -13048,7 +13119,10 @@ test_task_closes_beside_a_foreign_copy_with_unique_ignored_files
 test_task_closes_beside_a_foreign_copy_with_unpushed_commits
 test_held_copy_record_has_one_exact_line_per_copy
 test_a_held_close_removes_only_the_tasks_own_nested_copy
-test_a_second_close_attempt_adds_no_duplicate_held_copy_line
+test_the_held_close_notice_promises_no_cleanup_that_does_not_exist
+test_a_held_close_that_a_later_step_refuses_writes_no_record_line
+test_a_held_copy_record_that_cannot_be_written_warns_and_the_close_completes
+test_a_legacy_record_held_close_still_names_the_held_copies
 test_a_foreign_copy_does_not_excuse_an_own_copy_that_is_not_landed
 test_a_foreign_copy_that_cannot_be_held_still_refuses_the_whole_close
 test_a_forced_close_never_holds_a_foreign_copy

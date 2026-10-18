@@ -296,10 +296,12 @@ A foreign copy that cannot be released does not stop the task that is closing fr
 This holds when the task's own copy has passed the ordinary landed-work test, and every foreign copy that would stop the slot's return is clean, owned by no record, no process and no live launcher, and held back only by ignored files that exist nowhere else or by a HEAD that is not proved landed.
 Teardown then closes the task: it moves the backlog item to Done with the merged evidence, removes the task's own record and runtime state, and removes only the task's own nested copies that the proof covers.
 It does not return the slot, and it does not touch Treehouse's lease, the slot's claim or any foreign copy; it never deletes, moves, rewrites or changes the mode of anything inside one.
-The output lists each foreign copy it left with its reason, and says in one sentence that the slot return is deferred.
-Each such copy is appended once to `data/held-foreign-copies.log`, one line per copy with five tab-separated fields: the UTC time, the closing task id, the slot path, the copy path and the exact reason text.
-A line for the same slot, copy and reason is never written twice, so a retry adds nothing, and teardown never edits or clears the file.
-A later reaper run or the owner's named drop clears the copies.
+The output lists each foreign copy it left with its reason, says that the slot return is deferred, and says that the slot stays leased and claimed.
+Nothing returns the slot automatically, and nothing removes a held copy: a held copy goes only on the owner's word naming it, so ask the supervisor.
+Only once the close is final, with the task record gone, teardown appends each such copy to `data/held-foreign-copies.log`, one line per copy with five tab-separated fields: the UTC time, the closing task id, the slot path, the copy path and the exact reason text.
+A close that a later step refuses writes no line, and teardown never edits or clears the file.
+A record that cannot be written prints a warning on stdout and does not refuse the close; the output then lists the held copies as their only trace.
+These notices follow whichever completion line the close prints, including the line of a `--legacy-record` close.
 A foreign copy that is also dirty, named by another record, running a process, or locked by anything other than a Vernant creation lock whose launcher is gone still refuses the whole close, and so does an own copy that is dirty or unlanded, or any other refusal of the ordinary close.
 `--force` never holds a foreign copy.
 To handle a refused copy by hand, inspect it with `git -C <copy> status --untracked-files=all` and `git -C <copy> log --oneline HEAD --not --remotes`, confirm nothing there is unlanded, then remove it with a plain `git -C <slot> worktree remove <copy>`, or for a Vernant-locked copy with the closeout command above, and rerun teardown.

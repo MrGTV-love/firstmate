@@ -30,7 +30,8 @@
 # when every refused copy in the slot is of that class and the task's own copy
 # already passed the landed-work proof, bin/fm-teardown.sh closes the task and
 # leaves the slot, its lease and every foreign copy exactly as they were
-# (teardown_held_copies_record writes each one to data/held-foreign-copies.log).
+# (teardown_held_copies_record appends each one to data/held-foreign-copies.log
+# once the close is final).
 # Nothing here ever removes or alters a held copy, and --force never holds one.
 # The task's own nested copies (the record's worktree= and prior_worktree= copies
 # inside the slot) were already proved clean and landed or anchored by the
@@ -381,34 +382,25 @@ teardown_foreign_copies_prove() {  # <slot>
   done
 }
 
-# Writes each held foreign copy of the last proof once to the append-only record
+# Appends each held foreign copy of the last proof to the record
 # data/held-foreign-copies.log: UTC time, closing task id, slot path, copy path
-# and the exact reason, tab separated. A line for the same slot, copy and reason
-# is never written twice, so a retry or a second closing task adds nothing. The
-# record is only ever appended to here; a reaper run or the owner's named drop
-# clears the copies, and teardown never does.
+# and the exact reason, tab separated. bin/fm-teardown.sh calls it only once the
+# close is final, so the record never names a task that did not close. A record
+# that cannot be written returns 1 and refuses nothing: the caller warns and the
+# close stands. The record is only ever appended to here; nothing returns the slot
+# or removes a held copy on its own, and a held copy goes only on the owner's word
+# naming it.
 teardown_held_copies_record() {
-  local record="$DATA/held-foreign-copies.log" lock="$DATA/.held-foreign-copies.lock" entry copy why stamp rc=0
+  local record="$DATA/held-foreign-copies.log" entry copy why stamp rc=0
   [ "${#TEARDOWN_FOREIGN_HELD[@]}" -gt 0 ] || return 0
-  if ! mkdir -p "$DATA" || ! fm_lock_acquire_wait "$lock"; then
-    echo "REFUSED: cannot lock the held-copy record $record; nothing was changed." >&2
-    return 1
-  fi
   stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  mkdir -p "$DATA" 2>/dev/null || return 1
   for entry in "${TEARDOWN_FOREIGN_HELD[@]}"; do
     copy=${entry%%$'\t'*}
     why=${entry#*$'\t'}
-    if [ -f "$record" ] && HELD_SLOT="$TEARDOWN_RETURN_SLOT" HELD_COPY="$copy" HELD_WHY="$why" awk -F'\t' \
-        '$3 == ENVIRON["HELD_SLOT"] && $4 == ENVIRON["HELD_COPY"] && $5 == ENVIRON["HELD_WHY"] { found = 1 } END { exit !found }' "$record"; then
-      continue
-    fi
-    printf '%s\t%s\t%s\t%s\t%s\n' "$stamp" "$ID" "$TEARDOWN_RETURN_SLOT" "$copy" "$why" >> "$record" || rc=1
+    { printf '%s\t%s\t%s\t%s\t%s\n' "$stamp" "$ID" "$TEARDOWN_HELD_SLOT" "$copy" "$why" >> "$record"; } 2>/dev/null || rc=1
   done
-  fm_lock_release "$lock" || rc=1
-  if [ "$rc" != 0 ]; then
-    echo "REFUSED: cannot write the held-copy record $record; nothing was changed." >&2
-    return 1
-  fi
+  return "$rc"
 }
 
 # Sends TERM, once and whatever its cwd, to each live lock launcher and each
