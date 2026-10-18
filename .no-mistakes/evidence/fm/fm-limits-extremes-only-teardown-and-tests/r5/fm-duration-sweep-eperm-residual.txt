@@ -1,0 +1,39 @@
+Residual EPERM exit 1 in bin/fm-duration.py at HEAD 47dd04ac (stalled-cleanup stress)
+
+Scenario: leader traps TERM and sleeps 60s silently (so its cleanup stalls); runner gets one TERM; FM_DURATION_NO_PROGRESS_SECS=3.
+Expected: runner exit 143 every time (stop, then SIGKILL after one no-progress interval). Host: 18-CPU Mac, busy-loop processes + parallel workers, host load average 60-140.
+
+HEAD results (bin/fm-duration.py identical to HEAD except a traceback/diagnostic print on the error path):
+  untraced HEAD, 6 workers x 12 runs             1 of 72 exit 1 (w6-n10)
+  traced HEAD round 1, 6x12                       1 rc=1; 71 rc=143;
+  traced HEAD round 2, 6x12                       72 rc=143;
+  traced HEAD round 3, 6x12                       1 rc=1; 71 rc=143;
+  traced HEAD, 30 leader children, 6x12           72 rc=143;
+  diagnostic HEAD round 1, 6x12                   72 rc=143;
+  diagnostic HEAD round 2, 6x12                   72 rc=143;
+  diagnostic HEAD round 3, 6x12                   72 rc=143;
+  diagnostic HEAD round 4, 6x12                   72 rc=143;
+  diagnostic HEAD heavy round 1, 12x8, 36 busy    96 rc=143;
+  diagnostic HEAD heavy round 2, 12x8, 36 busy    96 rc=143;
+  diagnostic HEAD heavy round 3, 12x8, 36 busy    1 rc=1; 95 rc=143;
+
+Every failure: stdout 'error: "[Errno 1] Operation not permitted"', runner exit 1, no timeout sample recorded, no leaked process.
+Traceback (all captured failures identical):
+  main -> run (bin/fm-duration.py:630: signal_group(child, SIGKILL)  # the leader is gone; sweep any remaining group members)
+       -> signal_group (bin/fm-duration.py:507 os.killpg) -> PermissionError, re-raised by the except PermissionError handler
+Group state at failure (diagnostic copy):
+  DIAG live group member after leader reaped: '87375 ?E   87518 (sleep)'
+  = the SIGKILLed 'sleep' of the leader's TERM trap is still in ps state '?E' (exiting). The handler only accepts Z or X as gone,
+    so it re-raises, and main() turns it into exit 1.
+
+Root cause: the previous fix (f700e9f9) sends the stop-branch SIGKILL once, but the post-loop sweep (line 630) still signals a group whose
+member is mid-exit. Darwin killpg returns EPERM for that group; the inventory check treats '?E' as live, and raises.
+
+Candidate fix checked in a scratch copy only (worktree untouched): on EPERM with the leader reaped, wait for the group inventory to drain
+(re-send the kill, 50 ms steps, bounded) instead of raising at once. Same stress, 5 rounds of 6x12:
+  candidate round 1:  72 rc=143;
+  candidate round 2:  72 rc=143;
+  candidate round 3:  72 rc=143;
+  candidate round 4:  72 rc=143;
+  candidate round 5:  72 rc=143;
+  (0 of 360 exit 1; HEAD showed 4 of 936. The counts alone are not statistically conclusive; the captured traceback and group state are the evidence.)

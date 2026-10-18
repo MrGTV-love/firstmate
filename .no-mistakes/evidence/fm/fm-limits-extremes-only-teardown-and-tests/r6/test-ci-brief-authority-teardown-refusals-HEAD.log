@@ -1,0 +1,19 @@
+### bash tests/fm-ci-workflow.test.sh
+ok - every ci.yml job belongs to one of the three timeout tiers
+ok - fast tier jobs share one 5 minute tripwire
+ok - normal tier jobs share one 60 minute budget
+ok - Herdr keeps a 20 minute step tripwire under a 120 minute job backstop
+exit=0 wall=13s
+### bash tests/fm-ask-user-authority.test.sh
+ok - primary workers and secondmates receive the authority rule through generated instructions
+exit=0 wall=3s
+### bash tests/fm-brief.test.sh
+ok - fm-brief.sh: ref-format-valid shell metacharacters stay literal in generated branch commands
+ok - fm-brief.sh: every crewmate scaffold forbids administering the shared worktree pool
+ok - fm-brief.sh: ship and scout scaffolds require stopping private services and naming them in the status line
+ok - fm-brief.sh: every crewmate scaffold teaches the Docker task marker and the secondmate charter does not
+exit=0 wall=62s
+### teardown: uncommitted files still refuse
+exit=0
+ok - an unlanded foreign copy is refused with a written reason and nothing changes
+ok - uncommitted files make a foreign copy refuse

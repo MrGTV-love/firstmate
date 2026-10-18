@@ -1,0 +1,8 @@
+Stalled-cleanup stress: leader traps TERM and sleeps silently; the runner gets one TERM; no-progress bound 3s; expected runner exit 143 each time.
+Host: 18-CPU Mac, load average 65-128 (busy-loop processes plus parallel workers). Same driver for both runners.
+
+HEAD c982b117 (the change): 744 runs, 0 not exit 143
+PRE-FIX 47dd04ac (before the last fix): 600 runs, 3 not exit 143
+    w11-n6 rc=1 wall=4s leaked=0 exit143_rows=0 err=error: "[Errno 1] Operation not permitted"
+    w8-n8 rc=1 wall=4s leaked=0 exit143_rows=0 err=error: "[Errno 1] Operation not permitted"
+    w11-n1 rc=1 wall=4s leaked=0 exit143_rows=0 err=error: "[Errno 1] Operation not permitted"

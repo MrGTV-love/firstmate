@@ -1,0 +1,3 @@
+runner=base measured p99 x 3 = 3s; healthy command that prints every second for 8s -> exit=124 wall=4s last stdout=step 4
+runner=HEAD measured p99 x 3 = 3s; healthy command that prints every second for 8s -> exit=0 wall=8s last stdout=step 8
+    stderr: slower_than_usual: "adv elapsed=3.0s measured_ceiling=3s; still making progress, so this is reported and not stopped"

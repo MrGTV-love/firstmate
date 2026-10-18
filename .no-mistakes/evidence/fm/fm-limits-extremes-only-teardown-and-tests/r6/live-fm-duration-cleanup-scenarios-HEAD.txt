@@ -1,0 +1,8 @@
+################ runner=HEAD (/Users/charlesabrooker/tmp/fm-r6-stress.KKtdG1/fm-duration.HEAD.py)
+=== S5: silent cleanup after one TERM (leader traps TERM, sleeps 60s), no-progress 3s -> SIGKILL after ~3s, not 60s: exit 143
+  exit=143 killed_after=4s  live group members left: 0
+=== S7: second signal kills at once even while cleanup is printing (no-progress default 900s)
+  4s after first TERM: runner alive=yes cleaning lines=4
+  after SECOND TERM: exit=143 after 1s  live group members left: 0
+=== S6: productive cleanup after one TERM runs 75s (longer than the old 60s clock) with default no-progress 900s -> NOT killed; leader finishes, runner exits 143
+  runner exit=143 cleanup_wall=77s cleaning_lines=75 done_marker=1 (expect 75 lines, marker 1)  live group members left: 0

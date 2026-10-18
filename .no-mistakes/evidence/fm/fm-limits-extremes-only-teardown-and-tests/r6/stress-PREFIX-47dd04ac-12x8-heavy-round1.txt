@@ -1,0 +1,9 @@
+== summary (workers=12 runs/worker=8, 36 busy loops, 18 CPUs, load avg at end: { 111.81 76.20 76.55 })
+total runs: 96
+   2 rc=1
+  94 rc=143
+runs with leaked live group members: 0
+runs with no exit-143 sample recorded: 2
+runs with error text:
+w11-n6 rc=1 wall=4s leaked=0 exit143_rows=0 err=error: "[Errno 1] Operation not permitted"
+w8-n8 rc=1 wall=4s leaked=0 exit143_rows=0 err=error: "[Errno 1] Operation not permitted"

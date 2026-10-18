@@ -1,0 +1,26 @@
+=== S1: runs past measured p99 x 3 (3s) but keeps printing -> finishes, reported, not stopped
+  measured: measured: "adv host=Mac-Studio.local p99=1000ms margin=3.0 samples=5 measured=3s bound=0s"
+  measured: 3
+  [exit=0 wall=9s] timeout rows for adv: 0
+  slower_than_usual: "adv elapsed=3.0s measured_ceiling=3s; still making progress, so this is reported and not stopped"
+  last stdout: step 7
+=== S2: silent stall -> no-progress stop (2s override): exit 124 + one timeout row
+  [exit=124 wall=3s] timeout rows for stall: 2
+  no_progress: "stall made no output or CPU progress for 2s; stopping"
+=== S3: low-CPU command prints steadily for 12s, outlives a 3s no-progress bound -> finishes
+  [exit=0 wall=12s] timeout rows for talk: 0
+  last stdout: tick 12
+=== S4: absolute limit (2s override) stops a command that keeps printing
+  [exit=124 wall=3s] timeout rows for abs: 2
+  absolute_limit: "abs reached the 2s absolute limit; stopping"
+=== S4b: bad override values (0, abc, -5) fall back to defaults and never stop the command
+  [exit=0 wall=4s] timeout rows for bad11233: 0
+  [exit=0 wall=4s] timeout rows for bad15822: 0
+  [exit=0 wall=3s] timeout rows for bad660: 0
+=== S5: silent cleanup after one TERM (leader traps TERM, sleeps 60s) -> killed after one no-progress interval (3s), not 60s+
+  exit=143 killed_after=3s (expect exit 143, ~3-6s)
+  no leaked leader
+=== S7: second signal kills at once even while cleanup is producing output
+  after first TERM +4s: runner alive? yes (cleanup is printing); cleaning lines: 4
+  after SECOND TERM: exit=143 after 0s
+  no leaked leader

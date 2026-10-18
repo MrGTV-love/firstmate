@@ -1,0 +1,40 @@
+################ base: bin/fm-teardown.sh from 8b1cfe5a
+BEFORE: ignored entries in the foreign copy:
+    .next/
+    big blob.dat
+    cache-keep/
+    my notes/
+    "unicode-\303\251.txt"
+teardown exit=1
+stderr (refusal / preserve lines):
+    REFUSED: foreign copy /Users/charlesabrooker/tmp/fm-teardown-tests.KuHzeU/live-awkward/pool/1/project/.claude/worktrees/fc-one stays in pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.KuHzeU/live-awkward/pool/1/project: it 
+    REFUSED: pool slot /Users/charlesabrooker/tmp/fm-teardown-tests.KuHzeU/live-awkward/pool/1/project contains registered copy /Users/charlesabrooker/tmp/fm-teardown-tests.KuHzeU/live-awkward/pool/1/project/.claude/worktrees/fc-one t
+copy still exists? yes
+slot returned?  treehouse return call(s)
+no preserved dir
+################ HEAD: bin/fm-teardown.sh from HEAD c982b117
+BEFORE: ignored entries in the foreign copy:
+    .next/
+    big blob.dat
+    cache-keep/
+    my notes/
+    "unicode-\303\251.txt"
+teardown exit=0
+stderr (refusal / preserve lines):
+    teardown: preserved ignored files from /Users/charlesabrooker/tmp/fm-teardown-tests.FyDsDz/live-awkward/pool/1/project/.claude/worktrees/fc-one in /Users/charlesabrooker/tmp/fm-teardown-tests.FyDsDz/live-awkward/data/task-x1/neste
+copy still exists? no
+slot returned? 1 treehouse return call(s)
+preserved tree:
+    ./SHA256SUMS
+    ./big blob.dat
+    ./cache-keep/link-out
+    ./copy-path
+    ./my notes/deep dir/a file with spaces.txt
+    ./unicode-é.txt
+shasum -c SHA256SUMS:
+    unicode-é.txt: OK
+    my notes/deep dir/a file with spaces.txt: OK
+    big blob.dat: OK
+big blob matches the original hash? yes
+regenerable .next preserved? 0 files (expect 0)
+mode of preserved big blob: 600 (expect 600)

@@ -1,0 +1,3 @@
+=== S6: productive cleanup after one TERM runs 75s (longer than the old 60s clock) and is NOT killed
+  runner exit=143 cleanup_wall=76s cleaning_lines=75 done_marker=yes
+  no leaked leader

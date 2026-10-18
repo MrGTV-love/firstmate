@@ -1,0 +1,6 @@
+== summary (workers=12 runs/worker=8, 36 busy loops, 18 CPUs, load avg at end: { 116.82 95.25 85.85 })
+total runs: 96
+  96 rc=143
+runs with leaked live group members: 0
+runs with no exit-143 sample recorded: 0
+runs with error text:

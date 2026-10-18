@@ -1,0 +1,10 @@
+ok - an unlanded foreign copy is refused with a written reason and nothing changes
+ok - uncommitted files make a foreign copy refuse
+ok - a foreign copy's unique ignored file is preserved with its SHA-256 and the copy is retired
+ok - regenerable ignored caches are allow-listed and need no preservation or refusal
+ok - durable .tac state is preserved with the copy retired, while .tac/tmp stays regenerable
+ok - a foreign copy whose ignored files cannot be listed is refused, not treated as having nothing to preserve
+ok - an earlier preserved copy survives a failed replacement and is replaced only by a verified one
+ok - a locked own copy's unique ignored file is preserved with its SHA-256 and the copy is released
+bash tests/fm-teardown.test.sh test_foreign_copy_with_unsaved_files_is_refuse  13.59s user 26.20s system 40% cpu 1:38.89 total
+exit=0

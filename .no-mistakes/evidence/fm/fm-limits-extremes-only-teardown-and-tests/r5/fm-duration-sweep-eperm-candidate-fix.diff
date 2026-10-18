@@ -1,0 +1,43 @@
+--- /tmp/fm-r5-scratch/trace/bin/fm-duration.py	2026-10-18 04:43:57
++++ /tmp/fm-r5-scratch/cand/bin/fm-duration.py	2026-10-18 04:49:13
+@@ -508,20 +508,29 @@
+     except ProcessLookupError:
+         pass  # The owned group has already gone.
+     except PermissionError:
+-        # A repeated cleanup signal returned EPERM after cancellation on
+-        # Darwin. Accept completion only after the leader is reaped AND the
+-        # kernel inventory proves that no live group member remains.
++        # CANDIDATE: a group whose members are still exiting returns EPERM on Darwin.
++        # Once the leader is reaped, wait for the group to drain, re-sending the kill.
+         if child.poll() is None:
+             raise
+-        inventory = subprocess.run(['ps', '-axo', 'pgid=,stat='], capture_output=True, text=True)
+-        if inventory.returncode:
+-            raise
+-        for line in inventory.stdout.splitlines():
+-            fields = line.split()
+-            if len(fields) != 2:
+-                raise ValueError('cannot verify completed process group')
+-            if fields[0] == str(child.pid) and not fields[1].startswith(('Z', 'X')):
++        deadline = time.monotonic() + 5
++        while True:
++            inventory = subprocess.run(['ps', '-axo', 'pgid=,stat='], capture_output=True, text=True)
++            if inventory.returncode:
+                 raise
++            live = [f for f in (l.split() for l in inventory.stdout.splitlines())
++                    if len(f) == 2 and f[0] == str(child.pid) and not f[1].startswith(('Z', 'X'))]
++            if not live:
++                return
++            if time.monotonic() >= deadline:
++                raise
++            time.sleep(0.05)
++            try:
++                os.killpg(child.pid, sig)
++                return
++            except ProcessLookupError:
++                return
++            except PermissionError:
++                pass
+ 
+ 
+ @contextlib.contextmanager

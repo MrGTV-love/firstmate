@@ -1,0 +1,4 @@
+runner=prefix member-stat-after-EPERM=?E  -> runner exit=1  stdout/stderr=calibration: "0 of 5 samples for sweep.prefix on Mac-Studio.local" fallback: "no destructive deadline; collect samples" progress: "sweep.prefix elapsed=1.0s out
+runner=prefix member-stat-after-EPERM=S   -> runner exit=1  stdout/stderr=calibration: "0 of 5 samples for sweep.prefix on Mac-Studio.local" fallback: "no destructive deadline; collect samples" progress: "sweep.prefix elapsed=1.0s out
+runner=HEAD   member-stat-after-EPERM=?E  -> runner exit=124  stdout/stderr=calibration: "0 of 5 samples for sweep.HEAD on Mac-Studio.local" fallback: "no destructive deadline; collect samples" progress: "sweep.HEAD elapsed=1.0s output_
+runner=HEAD   member-stat-after-EPERM=S   -> runner exit=1  stdout/stderr=calibration: "0 of 5 samples for sweep.HEAD on Mac-Studio.local" fallback: "no destructive deadline; collect samples" progress: "sweep.HEAD elapsed=1.0s output_

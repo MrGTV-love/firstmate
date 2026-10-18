@@ -1,0 +1,10 @@
+parsed with PyYAML (semantic parse, not text match); every job's timeout-minutes at base 8b1cfe5a vs HEAD
+  lint                                          base=   30  head=   60  CHANGED
+  test-coverage                                 base=    5  head=    5  
+  tests-portable-parallel-1                     base=   30  head=   60  CHANGED
+  tests-portable-parallel-2                     base=   30  head=   60  CHANGED
+  tests-portable-serial                         base=   30  head=   60  CHANGED
+  tests-herdr                                   base=   75  head=  120  CHANGED
+  tests-timing-aggregate                        base=    5  head=    5  
+  macos-stock-bash                              base=   30  head=   60  CHANGED
+  invariants                                    base=    5  head=    5  

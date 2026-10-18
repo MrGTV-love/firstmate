@@ -1,0 +1,19 @@
+NOTE: S5 and S7 were removed from this transcript. In this script they signalled a shell wrapper instead of the runner (test-harness error, not a product result). They are re-driven correctly in live-fm-duration-cleanup-scenarios-HEAD.txt.
+################ runner=HEAD (/Users/charlesabrooker/tmp/fm-r6-stress.KKtdG1/fm-duration.HEAD.py)
+=== S1: command passes measured p99 x 3 (3s) but keeps printing -> must finish (exit 0)
+  exit=0 wall=9s timeout-rows=0  last stdout: step 8
+  stderr: slower_than_usual: "adv elapsed=3.0s measured_ceiling=3s; still making progress, so this is reported and not stopped"
+=== S2: silent stall, no-progress bound 2s -> stop: exit 124 + timeout recorded
+  exit=124 wall=4s timeout-rows=2
+  stderr: no_progress: "stall made no output or CPU progress for 2s; stopping"
+=== S3: low-CPU command prints each second for 12s, no-progress bound 5s -> finishes (exit 0)
+  exit=0 wall=12s timeout-rows=0 last stdout: tick 12
+=== S4: absolute limit 2s stops a command that keeps printing: exit 124
+  exit=124 wall=3s timeout-rows=2
+  stderr: absolute_limit: "abs reached the 2s absolute limit; stopping"
+=== S4b: bad override values (0, abc, -5) fall back to the defaults and never stop a 3s silent command
+  override=0 exit=0 wall=3s timeout-rows=0
+  override=abc exit=0 wall=3s timeout-rows=0
+  override=-5 exit=0 wall=3s timeout-rows=0
+=== S8: leader exits while a descendant still holds its streams -> runner returns at once with the leader's exit (7)
+  exit=7 wall=1s stdout: leader-done

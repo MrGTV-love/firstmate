@@ -1,0 +1,9 @@
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.RwDwBk/data/t-no-mistakes/brief.md (ship, mode=no-mistakes; repl
+### generated no-mistakes brief: duration lines
+59:   The helper stops a command only at a true extreme: 15 minutes with no output and no process-tree CPU progress, or 6 hours wall clock overall. Measured p99 x 3 (once the helper holds five samples for that key on this host) is only a slower_than_usual report line and never stops work that keeps making progress; an explicit bound you set yourself stays authoritative.
+152:The helper stops a wrapped call only after 15 minutes with no output and no process-tree CPU progress, or after 6 hours overall; its measured p99 x 3 for the wrapped call's own key is only a slower_than_usual report line, not a stop and not a guessed tool wait.
+stale ceiling wording still present? 0 (expect 0)
+scaffolded: /Users/charlesabrooker/tmp/fm-lab.RwDwBk/data/t-direct-PR/brief.md (ship, mode=direct-PR; replace 
+### generated direct-PR brief: duration lines
+58:   The helper stops a command only at a true extreme: 15 minutes with no output and no process-tree CPU progress, or 6 hours wall clock overall. Measured p99 x 3 (once the helper holds five samples for that key on this host) is only a slower_than_usual report line and never stops work that keeps making progress; an explicit bound you set yourself stays authoritative.
+stale ceiling wording still present? 0 (expect 0)

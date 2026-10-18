@@ -1,0 +1,45 @@
+--- run: bin/fm-test-run.sh --changed --base HEAD  (FM_DURATION_NO_PROGRESS_SECS=4; fm-daemon is silent for 120s; fm-pi-watch-extension prints once a second for 14s)
+runner exit=1 wall=16s (expect 1: one script stopped + one real failure)
+--- FM_TEST_BEGIN/END/SUMMARY lines:
+FM_TEST_BEGIN tests/fm-wake-queue.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN tests/fm-pi-watch-extension.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN tests/fm-task-inbox.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_BEGIN tests/fm-daemon.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_END tests/fm-task-inbox.test.sh exit=3 duration_ms=766 gate_skip=false
+FM_TEST_BEGIN tests/fm-supervision-events.test.sh family=watcher-wake-lock expected_gate_skip=none
+FM_TEST_END tests/fm-wake-queue.test.sh exit=0 duration_ms=856 gate_skip=false
+FM_TEST_END tests/fm-supervision-events.test.sh exit=0 duration_ms=3548 gate_skip=true
+FM_TEST_END tests/fm-daemon.test.sh exit=124 duration_ms=4940 gate_skip=false
+FM_TEST_END tests/fm-pi-watch-extension.test.sh exit=0 duration_ms=14761 gate_skip=false
+FM_TEST_SUMMARY total=5 failed=2 skipped_gate=1 duration_ms=15941
+--- script output replayed in the runner's stdout:
+not ok - a real assertion failure
+ok - ordinary pass
+skip: herdr not found
+wedged suite starts, then goes silent
+tick 0
+tick 1
+tick 2
+tick 3
+tick 4
+tick 5
+tick 6
+tick 7
+tick 8
+tick 9
+tick 10
+tick 11
+tick 12
+tick 13
+ok - patient low-CPU script finished
+--- guard telemetry leaked into stdout? 0 lines (expect 0)
+--- stderr no_progress / gate-skip lines:
+no_progress: "test.tests/fm-daemon.test.sh made no output or CPU progress for 4s; stopping"
+fm-test-run: gate skip: tests/fm-supervision-events.test.sh: herdr not found
+--- ledger:
+   {'key': 'test.tests/fm-task-inbox.test.sh', 'exit': 3, 'timed_out': False, 'event': None, 'calibration': True}
+   {'key': 'test.tests/fm-wake-queue.test.sh', 'exit': 0, 'timed_out': False, 'event': None, 'calibration': True}
+   {'key': 'test.tests/fm-supervision-events.test.sh', 'exit': 0, 'timed_out': False, 'event': None, 'calibration': False}
+   {'key': 'test.tests/fm-daemon.test.sh', 'exit': 124, 'timed_out': True, 'event': None, 'calibration': True}
+   {'key': 'test.tests/fm-daemon.test.sh', 'exit': None, 'timed_out': None, 'event': 'timeout', 'calibration': None}
+   {'key': 'test.tests/fm-pi-watch-extension.test.sh', 'exit': 0, 'timed_out': False, 'event': None, 'calibration': True}
