@@ -3037,7 +3037,7 @@ Other primary integrations retain their native supervision delivery paths.
 
 Use `bin/fm-procevent-lavish.sh sweep` for manual listener retirement; the [adapter header and help](../bin/fm-procevent-lavish.sh) own dry runs, eligibility and keep guards, activity accounting, `FM_BOARD_LISTENER_IDLE_HOURS`, and re-arming.
 The watcher also runs `sweep --auto` detached every `FM_LAVISH_AUTO_RETIRE_INTERVAL` seconds (default 900, `0` turns it off): after the same keep guards it retires only a listener whose board file is gone or whose Lavish session has ended or is absent with every card closed (a board with a live session keeps its listener however idle it is), and it appends each retirement with its reason to `state/lavish-auto-retire.log`.
-A live session whose listener runs or was launched recently is never retired by it, and the adapter header owns the exact rules.
+A board with a live session is never retired by it, and the adapter header owns the exact rules.
 Use `bin/fm-procevent-lavish.sh orphans` to list leftover poll processes that no listener owns; the same header owns its eligibility proof and the explicit `--kill` flag.
 For automatic sweeping after a successful Bearings build, see the [builder's listener-hygiene contract](../bin/fm-bearings-board.sh).
 The [process-event runner header](../bin/fm-procevent.sh) owns conditional retirement's generation checks, inbox revalidation, and capture-race limits.

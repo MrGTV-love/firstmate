@@ -384,7 +384,7 @@ case "$TYPESAFE_HEALTH_INTERVAL" in
 esac
 TYPESAFE_HEALTH_BIN=${FM_TYPESAFE_HEALTH_BIN:-$SCRIPT_DIR/fm-typesafe-health.sh}
 TYPESAFE_HEALTH_NEXT=
-# Automatic retirement of finished or dead Lavish listeners (the --auto mode of
+# Automatic retirement of finished Lavish listeners (the --auto mode of
 # bin/fm-procevent-lavish.sh sweep, which owns the rules and the record of why);
 # docs/configuration.md "Process-to-event sources" owns the cadence.
 LAVISH_AUTO_RETIRE_INTERVAL=${FM_LAVISH_AUTO_RETIRE_INTERVAL:-900}
