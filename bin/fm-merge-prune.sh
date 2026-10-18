@@ -36,17 +36,24 @@
 # inside. The finished worker session is stopped first (bin/fm-control.sh exit).
 # That verb keeps the task's terminal pane open, and the pane's idle shell, the
 # one the pane entered the copy with, stays inside the copy. That one process
-# does not keep the copy: it is a shell with no child process that is the
-# pane's shell or descends from it, found by the pane's process id (tmux and
-# herdr; any other backend exempts nothing). Any other process, such as a build,
-# an editor or a test started in the pane, keeps the copy, and the pane is never
-# closed. The Treehouse project lock is held from the worker stop to the
-# destroy, the slot-owner claim is read again right before the destroy, and a
-# slot claimed by another task is left alone. The preserve-list files are copied
-# to data/<id>/merge-prune-preserved/ with SHA-256 checksums, then
+# does not keep the copy, but treehouse refuses to destroy a copy with a process
+# working inside it, so it is ended with SIGHUP just before the destroy: it must
+# be a shell whose working directory is in the copy, with no child process, that
+# is the pane's shell or descends from it (found by the pane's process id; tmux
+# and herdr, any other backend exempts nothing), and the exit verb must have
+# stopped the agent. SIGKILL is never sent, the pane stays open on its outer
+# shell, and a shell that does not go keeps the copy. Any other process, such as
+# a build, an editor or a test started in the pane, keeps the copy. The
+# Treehouse project lock is held from the worker stop to the destroy, the
+# slot-owner claim is read again right before the signal, and a slot claimed by
+# another task is left alone. The preserve-list files are copied to
+# data/<id>/merge-prune-preserved/ with SHA-256 checksums, then
 # `treehouse destroy <copy> --include-leased --yes` removes the copy (the same
 # call the reaper makes; --include-unlanded, --include-in-use and --force are
-# never used), and teardown runs again to finish the task's records.
+# never used), and teardown runs again to finish the task's records. In this
+# mode the admission check of that second teardown (bin/fm-idle-reap-lib.sh)
+# accepts the worker the exit verb stopped: its busy record is gone,
+# state/<id>.control-exit is present and its last status event is `done`.
 #
 # Anything else stays, is never forced or discarded, and raises exactly ONE wake
 # naming the copy and the reason. A retained copy is retried silently every six
@@ -58,7 +65,8 @@
 #
 # FM_MERGE_PRUNE=0 turns arming off. Test seams: FM_MERGE_PRUNE_TEARDOWN_BIN and
 # FM_MERGE_PRUNE_CONTROL_BIN replace bin/fm-teardown.sh and bin/fm-control.sh;
-# FM_MERGE_PRUNE_EXIT_WAIT bounds the seconds to wait for the stopped worker.
+# FM_MERGE_PRUNE_EXIT_WAIT bounds the seconds to wait for the stopped worker and
+# for the pane's idle shell to exit on SIGHUP.
 # docs/configuration.md owns the settings; regression coverage:
 # tests/fm-merge-prune.test.sh.
 set -u
@@ -301,7 +309,7 @@ fallback() {
 # Stop the finished worker, prove the copy once more, preserve, and destroy it.
 # The project lock is held by the caller.
 fallback_remove() {  # <real-copy> <pr-number>
-  local real=$1 pr_number=$2 n label copies=() tags=() i dest waited=0 out rc=0 head pane
+  local real=$1 pr_number=$2 n label copies=() tags=() i dest waited=0 out rc=0 head pane reason
   stop_worker
   # The control lock keeps a teardown, relaunch or spawn from racing the removal.
   if ! fm_lock_try_acquire "$LOCK_CONTROL"; then
@@ -313,7 +321,8 @@ fallback_remove() {  # <real-copy> <pr-number>
     return 1
   fi
   # The stopped worker may need a moment to leave; any other process keeps the
-  # copy, except the idle shell of the task's own pane.
+  # copy, except the one idle shell of the task's own pane, which is ended with
+  # SIGHUP below, just before the destroy.
   pane=$(fm_mp_pane_pid "$META")
   until fm_mp_prove_unused "$real" "$pane"; do
     case "$FM_MP_REASON" in
@@ -363,6 +372,19 @@ fallback_remove() {  # <real-copy> <pr-number>
       return 1
       ;;
   esac
+  if [ -n "$FM_MP_PANE_SHELL" ]; then
+    reason=
+    if [ "$WORKER_STOPPED" != 1 ]; then
+      reason="the worker session is not confirmed stopped, so the idle shell $FM_MP_PANE_SHELL of its terminal pane stays"
+    elif ! fm_mp_end_pane_shell "$FM_MP_PANE_SHELL" "$pane" "$real" "$EXIT_WAIT"; then
+      reason="the idle shell $FM_MP_PANE_SHELL of the task's terminal pane did not exit on SIGHUP"
+    fi
+    if [ -n "$reason" ]; then
+      fm_lock_release "$LOCK_CONTROL" || true
+      retain "$real" "$reason"
+      return 1
+    fi
+  fi
   head=$(git -C "$real" rev-parse --short HEAD 2>/dev/null || true)
   out=$(fm_run_timed "$(fm_mp_limit merge-prune.destroy 300)" treehouse destroy "$real" --include-leased --yes </dev/null 2>&1) || rc=$?
   fm_lock_release "$LOCK_CONTROL" || true
@@ -404,8 +426,10 @@ record_verdict() {  # <root-copy>
 
 # The finished worker's own session is a process inside the copy; stop it the
 # way teardown would. It is idle and its work has landed (classified reap).
+WORKER_STOPPED=0
 stop_worker() {
-  FM_HOME="$FM_HOME" fm_run_timed "$(fm_mp_limit merge-prune.control-exit 120)" "$CONTROL_BIN" "$ID" exit </dev/null >/dev/null 2>&1 || true
+  WORKER_STOPPED=0
+  FM_HOME="$FM_HOME" fm_run_timed "$(fm_mp_limit merge-prune.control-exit 120)" "$CONTROL_BIN" "$ID" exit </dev/null >/dev/null 2>&1 && WORKER_STOPPED=1
 }
 
 attempt() {

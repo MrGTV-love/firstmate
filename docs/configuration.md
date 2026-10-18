@@ -710,7 +710,7 @@ The copy and every nested copy inside it, each checked one by one, must pass all
 - Git reports no changed or untracked file and the copy holds no stash entry.
 - No commit on HEAD or any local branch is missing from every remote after a fetch, except that the task's own copy may also rely on the merged pull request's head.
 - Every ignored file is scratch, a symlink, or on the preserve list.
-- No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the idle shell of the task's own terminal pane (below).
+- No process has its working directory or an open file inside it, apart from a macOS search indexer, which only reads, and the one idle shell of the task's own terminal pane, which is ended before the destroy (below).
 
 Scratch means environments and caches (`.venv`, `venv`, `node_modules`, `__pycache__`, tool caches, `.next`, `graphify-out`, `*.tsbuildinfo`, `.tac/tmp`, `.tac/uv-cache`), `.DS_Store`, Firstmate's turn-end hook files, and anything ignored under `.claude` or `.opencode`.
 The preserve list is `.claude/bug-evidence` (slot-specific closeout records) and `.claude/channel-outbox` (rate files).
@@ -718,11 +718,15 @@ Those are copied to `data/<id>/merge-prune-preserved/<time>/` with SHA-256 check
 An ignored file that is neither scratch nor preserved is unique work, so the copy stays.
 The finished worker's own session is stopped first with `bin/fm-control.sh <id> exit`.
 That verb keeps the task's terminal pane open, and the pane keeps the idle shell it entered the copy with, so that shell is inside the copy.
-That one process does not keep the copy: the fallback ignores a recognized shell with no child process that is the pane's own shell or descends from it, found by the pane's process id on the tmux and herdr backends.
+That one shell does not keep the copy, but `treehouse destroy` refuses a copy that has a process working inside it, so the fallback ends it with SIGHUP just before the destroy.
+It must be a recognized shell whose working directory is inside the copy, with no child process, that is the pane's own shell or descends from it, found by the pane's process id on the tmux and herdr backends, and the exit verb must have confirmed that the agent stopped.
 On any other backend nothing is ignored.
-Any other process inside the copy keeps it, a build, an editor, or a test started in the pane included, and the pane is never closed.
-The task's Treehouse project lock is held from the worker stop to the destroy, and the slot's owner claim is read again right before the destroy: a slot that another task has claimed, or whose claim cannot be read, stays untouched.
+The fallback never sends SIGKILL, never closes the pane (it stays open on its outer shell), and waits up to `FM_MERGE_PRUNE_EXIT_WAIT` seconds for the shell to go; a shell that does not go keeps the copy.
+Any other process inside the copy keeps it, a build, an editor, or a test started in the pane included.
+The task's Treehouse project lock is held from the worker stop to the destroy, and the slot's owner claim is read again right before the signal: a slot that another task has claimed, or whose claim cannot be read, stays untouched.
 When every proof holds, the fallback runs `treehouse destroy <copy> --include-leased --yes`, the call the reaper makes, and then runs teardown again so it can finish the task's records.
+That second teardown asks the same automatic-reap admission check, which in this mode accepts the worker that the exit verb stopped: its busy record is gone, `state/<id>.control-exit` is present, and its last status event is `done`.
+The ordinary finished-session sweep keeps its classification unchanged.
 It never uses `--force`, `--include-unlanded`, or `--include-in-use`.
 
 Anything else stays: an unpushed commit, a changed or untracked file, unique ignored files, a live process, a copy outside the pool, a pool slot that another task has claimed, a refusal about a live pipeline or a captain call, or a destroy that fails.
@@ -4165,7 +4169,7 @@ FM_IDLE_REAP_BIN=   # test seam: the sweep the watcher launches instead of bin/f
 FM_IDLE_REAP_TEARDOWN_BIN=   # test seam: the teardown the sweep runs instead of bin/fm-teardown.sh
 FM_MERGE_PRUNE=1   # 0 stops bin/fm-merge-prune.sh from arming a pool-copy prune after a verified merge (see "Pool-copy prune after a merge"); anything else leaves it on
 FM_MERGE_PRUNE_INTERVAL=60   # seconds between the watcher's detached pool-copy prune sweeps while a prune record exists; 0 turns the sweep off; invalid values use 60
-FM_MERGE_PRUNE_EXIT_WAIT=10   # seconds the fallback waits for the stopped worker's session to leave the copy before it keeps the copy; invalid values use 10
+FM_MERGE_PRUNE_EXIT_WAIT=10   # seconds the fallback waits for the stopped worker's session to leave the copy, and for the pane's idle shell to exit on SIGHUP, before it keeps the copy; invalid values use 10
 TREEHOUSE_ROOT=   # the pool root the fallback accepts copies under (<root>/<pool>/<slot>/<repo>); unset means $HOME/.treehouse
 FM_MERGE_PRUNE_BIN=   # test seam: the sweep the watcher launches instead of bin/fm-merge-prune.sh
 FM_MERGE_PRUNE_TEARDOWN_BIN=   # test seam: the teardown the prune runs instead of bin/fm-teardown.sh

@@ -93,7 +93,10 @@ install_stubs() {
   cat > "$W/bin/treehouse" <<'SH'
 #!/usr/bin/env bash
 # Stand-in for treehouse. It accepts exactly the call the reaper makes and
-# removes the fake directory; every other call is logged and refused.
+# removes the fake directory; every other call is logged and refused. Like the
+# real tool it refuses a copy that has a process with its working directory
+# inside it (the system lsof, not a fixture's); a process that only has a file
+# open there does not block it.
 printf '%s\n' "$*" >> "$TH_LOG"
 if [ "${1:-}" = destroy ] && [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ "$4" = --yes ]; then
   case "$2" in
@@ -101,6 +104,12 @@ if [ "${1:-}" = destroy ] && [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ 
     *) echo "stub treehouse: $2 is outside the fake pool" >&2; exit 3 ;;
   esac
   [ ! -s "$TH_FAIL" ] || { echo "stub treehouse: destroy refused" >&2; exit 4; }
+  inuse=$(command -p lsof -a -d cwd +D "$2" -t 2>/dev/null | sort -u | tr '\n' ' ')
+  if [ -n "${inuse// /}" ]; then
+    echo "Skipped 1 worktree: [in-use:${inuse%% *}] $2" >&2
+    echo "did not destroy 1 (in-use); re-run with --include-in-use" >&2
+    exit 1
+  fi
   rm -rf "$2"
   exit 0
 fi
@@ -141,13 +150,20 @@ esac
 SH
   cat > "$W/bin/control-stub" <<'SH'
 #!/usr/bin/env bash
-# Stand-in for bin/fm-control.sh: stops the finished worker's session. Like the
-# real verb it leaves the terminal pane open. When STEAL_FILE names a task, a
-# launch for that task takes the slot the stopped worker freed.
+# Stand-in for bin/fm-control.sh exit: stops the finished worker's session. Like
+# the real verb it leaves the terminal pane open, records the deliberate exit in
+# state/<id>.control-exit and retires the busy record (the real retire). When
+# STOP_FAIL_FILE has content the agent is reported as not stopped and nothing
+# changes. When STEAL_FILE names a task, a launch for that task takes the slot
+# the stopped worker freed.
 printf '%s\n' "$*" >> "$CONTROL_LOG"
+[ ! -s "$STOP_FAIL_FILE" ] || exit 1
 if [ -s "$WORKER_PID_FILE" ]; then
   kill "$(cat "$WORKER_PID_FILE")" 2>/dev/null || true
 fi
+gen=$(cat "$FM_STATE_OVERRIDE/$1.busy-gen" 2>/dev/null || true)
+printf 'gen=%s\n' "${gen:--}" > "$FM_STATE_OVERRIDE/$1.control-exit"
+[ -z "$gen" ] || "$BUSY_EVENT_BIN" retire "$FM_STATE_OVERRIDE" "$1" --gen "$gen" >/dev/null 2>&1
 if [ -s "$STEAL_FILE" ]; then
   printf 'task=%s\nhome=/elsewhere\n' "$(cat "$STEAL_FILE")" > "$SLOT_MARKER"
 fi
@@ -177,6 +193,19 @@ SH
 # An idle shell: blocked opening a FIFO nobody writes, so it has no child process.
 read -r _ < "$1"
 SH
+  cat > "$W/bin/pane-stubborn" <<'SH'
+#!/usr/bin/env bash
+# An idle shell that ignores SIGHUP.
+trap '' HUP
+read -r _ < "$1"
+SH
+  cat > "$W/bin/pane-holder" <<'SH'
+#!/usr/bin/env bash
+# An idle shell that works elsewhere but holds a file of the copy open.
+cd "$2" || exit 1
+exec 3< "$1"
+read -r _ < "$3"
+SH
   cat > "$W/bin/pane-busy" <<'SH'
 #!/usr/bin/env bash
 # A shell running a job that works elsewhere: the job is its child process.
@@ -184,7 +213,7 @@ SH
 wait
 SH
   chmod +x "$W/bin/treehouse" "$W/bin/teardown-stub" "$W/bin/control-stub" "$W/bin/tmux" "$W/bin/herdr" \
-    "$W/bin/pane-idle" "$W/bin/pane-busy"
+    "$W/bin/pane-idle" "$W/bin/pane-busy" "$W/bin/pane-stubborn" "$W/bin/pane-holder"
   mkfifo "$W/hold"
   : > "$W/th.log"; : > "$W/stub.log"; : > "$W/control.log"; : > "$W/th.fail"
   printf 'false-positive\n' > "$W/stub.mode"
@@ -210,6 +239,7 @@ prune() {
     TH_LOG="$W/th.log" TH_FAIL="$W/th.fail" STUB_LOG="$W/stub.log" STUB_MODE="$W/stub.mode" \
     STUB_COUNT="$W/stub.count" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" \
     PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal" SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" \
+    STOP_FAIL_FILE="$W/stop-fail" BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh" \
     FM_MERGE_PRUNE_TEARDOWN_BIN="$W/bin/teardown-stub" FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" \
     FM_MERGE_PRUNE_EXIT_WAIT="${EXIT_WAIT:-0}" \
     "$BIN_DIR/fm-merge-prune.sh" "$@"
@@ -245,24 +275,28 @@ start_inside() {  # <dir> <pidfile-or-empty>
 
 # A stand-in terminal pane whose agent has exited: the pane process starts
 # <command...> with <dir> as its working directory, as the pane started the
-# `treehouse get` subshell, and the command is its child. The pane process id is
-# what tmux and herdr report as the pane's shell.
+# `treehouse get` subshell, and the command is its child (PANE_CHILD). The pane
+# process id is what tmux and herdr report as the pane's shell, and the pane
+# stays open when its child ends.
+PANE_CHILD=
 start_pane() {  # <dir> <command...>
   local dir=$1 pid
   shift
-  bash -c '(cd "$1" && shift && exec "$@") & wait' _ "$dir" "$@" &
+  bash -c '(cd "$1" && shift && exec "$@") & wait; exec sleep 300' _ "$dir" "$@" 2>/dev/null &
   pid=$!
   WORKER_PIDS+=("$pid")
   printf '%s\n' "$pid" > "$W/pane.pid"
+  fm_test_wait_until 10 sh -c '[ -n "$(pgrep -P "$1")" ]' _ "$pid" || true
+  PANE_CHILD=$(pgrep -P "$pid" | sed -n 1p)
   wait_inside "$dir"
 }
 
-# An idle shell inside <dir> that no pane started.
+# An idle shell inside <dir> that no pane started (STRAY_SHELL).
+STRAY_SHELL=
 start_stray_shell() {  # <dir>
-  local pid
   (cd "$1" && exec bash "$W/bin/pane-idle" "$W/hold") &
-  pid=$!
-  WORKER_PIDS+=("$pid")
+  STRAY_SHELL=$!
+  WORKER_PIDS+=("$STRAY_SHELL")
   wait_inside "$1"
 }
 
@@ -503,9 +537,11 @@ scn_long_reason_is_logged_once() {
 }
 
 # The finished worker's session ends but its terminal pane stays open with the
-# idle shell it entered the copy with. That shell alone does not keep the copy,
-# on either backend that reports a pane pid, and the pane is not closed.
-scn_lingering_pane_shell_is_ignored() {  # <tmux|herdr>
+# idle shell it entered the copy with. The fake treehouse refuses a copy that has
+# a process working inside it, as the real one does, so the copy goes only
+# because that one shell is ended with SIGHUP first, on either backend that
+# reports a pane pid; the pane itself stays open.
+scn_lingering_pane_shell_is_ended() {  # <tmux|herdr>
   make_world
   use_pane_backend "$1"
   start_inside "$COPY" "$W/worker.pid"
@@ -514,35 +550,74 @@ scn_lingering_pane_shell_is_ignored() {  # <tmux|herdr>
   EXIT_WAIT=3 go
   [ ! -e "$COPY" ] && [ "$(destroy_calls)" = 1 ] || why "the task's own idle pane shell kept the copy: $(rec_field t1 reason)" || return 1
   [ "$(wake_count)" = 0 ] || why "an idle pane shell raised a wake" || return 1
+  ! kill -0 "$PANE_CHILD" 2>/dev/null || why "the idle pane shell was not ended" || return 1
   kill -0 "$(cat "$W/pane.pid")" 2>/dev/null || why "the pane process was closed" || return 1
   return 0
 }
 
-# Only that one process is ignored: a build, an editor or a test in the pane, a
-# shell that is running something, or an idle shell no pane started keeps it.
-scn_other_process_in_the_pane_keeps_the_copy() {  # <build|busy-shell|stray-shell>
+# Only that one process is ended: a build, an editor or a test in the pane, a
+# shell that is running something, an idle shell no pane started, or a pane
+# shell that works elsewhere keeps the copy and is left alone.
+scn_other_process_in_the_pane_keeps_the_copy() {  # <build|busy-shell|stray-shell|holder>
+  local alive
   make_world
   use_pane_backend tmux
+  alive=
   case "$1" in
     build) start_pane "$COPY" sleep 300 ;;
     busy-shell) start_pane "$COPY" bash "$W/bin/pane-busy" ;;
     stray-shell)
       start_pane "$W" sleep 300
       start_stray_shell "$COPY"
+      alive=$STRAY_SHELL
+      ;;
+    holder)
+      start_pane "$W" bash "$W/bin/pane-holder" "$COPY/README.md" "$W" "$W/hold"
+      fm_test_wait_until 10 sh -c '[ -n "$(lsof -t "$1" 2>/dev/null)" ]' _ "$COPY/README.md" || true
       ;;
   esac
+  [ -n "$alive" ] || alive=$PANE_CHILD
   go
   [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "$1 inside the copy did not keep it" || return 1
   [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
   grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'process(es) inside' || why "the wake does not name the copy and the process" || return 1
+  kill -0 "$alive" 2>/dev/null || why "$1 was ended although it is not the pane's idle shell" || return 1
   return 0
 }
 
-scn_lingering_pane_shell_on_tmux() { scn_lingering_pane_shell_is_ignored tmux; }
-scn_lingering_pane_shell_on_herdr() { scn_lingering_pane_shell_is_ignored herdr; }
+# A shell that ignores SIGHUP is not forced: the copy and the shell stay, with
+# one wake.
+scn_stubborn_pane_shell_keeps_the_copy() {
+  make_world
+  use_pane_backend tmux
+  start_pane "$COPY" bash "$W/bin/pane-stubborn" "$W/hold"
+  EXIT_WAIT=1 go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy went although its pane shell did not exit" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  grep -F "$COPY" "$STATE/.wake-queue" | grep -q 'did not exit on SIGHUP' || why "the wake does not say the shell stayed" || return 1
+  kill -0 "$PANE_CHILD" 2>/dev/null || why "the shell that ignored SIGHUP was ended by something stronger" || return 1
+  return 0
+}
+
+# The pane's shell is ended only after the exit verb has stopped the agent.
+scn_unconfirmed_stop_leaves_the_pane_shell() {
+  make_world
+  use_pane_backend tmux
+  printf 'fail\n' > "$W/stop-fail"
+  start_pane "$COPY" bash "$W/bin/pane-idle" "$W/hold"
+  EXIT_WAIT=1 go
+  [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "the copy went although the agent was not confirmed stopped" || return 1
+  [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  kill -0 "$PANE_CHILD" 2>/dev/null || why "the pane shell was ended before the agent was confirmed stopped" || return 1
+  return 0
+}
+
+scn_lingering_pane_shell_on_tmux() { scn_lingering_pane_shell_is_ended tmux; }
+scn_lingering_pane_shell_on_herdr() { scn_lingering_pane_shell_is_ended herdr; }
 scn_pane_build_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy build; }
 scn_pane_busy_shell_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy busy-shell; }
 scn_stray_shell_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy stray-shell; }
+scn_pane_shell_working_elsewhere_keeps_the_copy() { scn_other_process_in_the_pane_keeps_the_copy holder; }
 
 # A pane that cannot be read exempts nothing.
 scn_unreadable_pane_exempts_nothing() {
@@ -553,6 +628,7 @@ scn_unreadable_pane_exempts_nothing() {
   go
   [ -e "$COPY" ] && [ "$(destroy_calls)" = 0 ] || why "a shell was ignored although the pane could not be read" || return 1
   [ "$(wake_count)" = 1 ] || why "want exactly one wake, got $(wake_count)" || return 1
+  kill -0 "$PANE_CHILD" 2>/dev/null || why "a shell was ended although the pane could not be read" || return 1
   return 0
 }
 
@@ -609,6 +685,35 @@ scn_empty_preserve_paths_do_not_keep_the_copy() {
   return 0
 }
 
+# `fm-control.sh exit` retires the busy record and leaves state/<id>.control-exit.
+# Only the merge prune reads such a worker, whose last event is still `done`, as
+# stopped; the ordinary finished-session sweep classifies it as before.
+scan_reap() {  # [VAR=value ...]: 0 when the scan lists t1 as reapable
+  env HOME="$W/fakehome" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
+    PATH="$W/bin:$PATH" "$@" "$BIN_DIR/fm-idle-session-reap.sh" scan 2>/dev/null | grep -q "^reap	t1	"
+}
+
+scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune() {
+  make_world
+  scan_reap || why "the world's finished idle worker is not reapable at all" || return 1
+  FM_STATE_OVERRIDE="$STATE" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" STEAL_FILE="$W/steal" \
+    STOP_FAIL_FILE="$W/stop-fail" BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh" SLOT_MARKER=/dev/null \
+    "$W/bin/control-stub" t1 exit || why "the stand-in exit verb failed" || return 1
+  [ ! -e "$STATE/t1.busy-state" ] && [ -f "$STATE/t1.control-exit" ] || why "the exit verb did not retire the busy record and mark the exit" || return 1
+  ! scan_reap || why "the ordinary sweep accepted a worker with no busy record" || return 1
+  scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune did not accept the worker that its exit verb stopped" || return 1
+  mv "$STATE/t1.control-exit" "$W/control-exit.kept"
+  ! scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune accepted a worker with no record of a deliberate exit" || return 1
+  mv "$W/control-exit.kept" "$STATE/t1.control-exit"
+  printf 'working [at=%s]: more to do\n' "$NOW" >> "$STATE/t1.status"
+  ! scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune accepted a worker whose last event is not done" || return 1
+  printf 'done [at=%s]: PR %s checks green\n' "$NOW" "$PR" >> "$STATE/t1.status"
+  printf 'g2.1.1\n' > "$STATE/t1.busy-gen"
+  printf 'v1 gen=g2.1.1 seq=2 state=busy source=claude-hook event=UserPromptSubmit ts=%s\n' "$NOW" > "$STATE/t1.busy-state"
+  ! scan_reap FM_IDLE_REAP_MERGE_PRUNE=1 || why "the prune accepted a worker that reads busy again" || return 1
+  return 0
+}
+
 run_scenario() {  # <name>
   SCN_WHY=
   cleanup_workers
@@ -626,7 +731,7 @@ scn_search_indexer_does_not_keep_the_copy() {
   local real_ps pid
   make_world
   real_ps=$(command -v ps)
-  start_inside "$COPY" ""
+  start_inside "$W" ""
   pid=${WORKER_PIDS[$((${#WORKER_PIDS[@]} - 1))]}
   # The copy reports a Spotlight worker, named as macOS names it, as its only
   # process; ps answers for that pid the way macOS does.
@@ -820,10 +925,14 @@ test_fallback_never_overrides_a_live_pipeline_refusal() { assert_scenario scn_pi
 test_fallback_destroy_failure_keeps_the_copy() { assert_scenario scn_destroy_failure_keeps_the_copy_with_one_wake "a destroy the tool refuses keeps the copy with one wake"; }
 test_retained_copy_is_reaped_quietly_when_the_cause_clears() { assert_scenario scn_retained_copy_is_reaped_when_the_cause_clears "a retained copy is reaped on the quiet retry once its cause clears"; }
 test_long_retained_reason_is_logged_once() { assert_scenario scn_long_reason_is_logged_once "a retained reason longer than the saved 300 characters is logged and woken once, not at every retry"; }
-test_fallback_ignores_the_tasks_idle_pane_shell_on_tmux() { assert_scenario scn_lingering_pane_shell_on_tmux "the idle shell the task's tmux pane keeps in the copy does not keep it, and the pane stays open"; }
-test_fallback_ignores_the_tasks_idle_pane_shell_on_herdr() { assert_scenario scn_lingering_pane_shell_on_herdr "the idle shell the task's herdr pane keeps in the copy does not keep it, and the pane stays open"; }
+test_fallback_ends_the_tasks_idle_pane_shell_on_tmux() { assert_scenario scn_lingering_pane_shell_on_tmux "the idle shell the task's tmux pane keeps in the copy is ended with SIGHUP and the copy then goes, with the pane left open"; }
+test_fallback_ends_the_tasks_idle_pane_shell_on_herdr() { assert_scenario scn_lingering_pane_shell_on_herdr "the idle shell the task's herdr pane keeps in the copy is ended with SIGHUP and the copy then goes, with the pane left open"; }
 test_fallback_keeps_a_non_shell_process_in_the_pane() { assert_scenario scn_pane_build_keeps_the_copy "a build, editor or test started in the pane keeps the copy with exactly one wake"; }
 test_fallback_keeps_a_pane_shell_that_runs_something() { assert_scenario scn_pane_busy_shell_keeps_the_copy "a pane shell with a child process keeps the copy with exactly one wake"; }
+test_fallback_keeps_a_pane_shell_that_works_elsewhere() { assert_scenario scn_pane_shell_working_elsewhere_keeps_the_copy "a pane shell with a file of the copy open but its working directory elsewhere keeps the copy and is left alone"; }
+test_fallback_keeps_the_copy_when_the_pane_shell_ignores_sighup() { assert_scenario scn_stubborn_pane_shell_keeps_the_copy "a pane shell that ignores SIGHUP keeps the copy with one wake and is never forced"; }
+test_fallback_leaves_the_pane_shell_until_the_agent_is_confirmed_stopped() { assert_scenario scn_unconfirmed_stop_leaves_the_pane_shell "an exit verb that does not confirm the agent stopped leaves the pane shell alone and keeps the copy"; }
+test_deliberately_exited_worker_reads_as_stopped_only_for_the_prune() { assert_scenario scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "a worker stopped by fm-control.sh exit reads as reapable for the prune only when the busy record is gone, the exit marker is present and its last event is done"; }
 test_fallback_keeps_a_shell_no_pane_started() { assert_scenario scn_stray_shell_keeps_the_copy "an idle shell that is not the task's pane shell keeps the copy with exactly one wake"; }
 test_fallback_exempts_nothing_when_the_pane_is_unreadable() { assert_scenario scn_unreadable_pane_exempts_nothing "a pane that cannot be read exempts no shell"; }
 test_fallback_never_destroys_a_reassigned_slot() { assert_scenario scn_reassigned_slot_is_never_destroyed "a slot another task claimed after the worker stopped, or whose claim cannot be read, is never destroyed"; }
@@ -867,7 +976,7 @@ expect_caught() {  # <name> <file> <old> <new> <scenario> <what the mutation bre
 }
 
 test_unsafe_mutations_are_caught() {
-  local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh
+  local lib=fm-merge-prune-lib.sh orch=fm-merge-prune.sh reap=fm-idle-reap-lib.sh
   expect_caught no-dirty-check $lib '  if [ -n "$dirty" ]; then' '  if false; then' scn_changed_file_is_kept "changed-file proof"
   expect_caught no-untracked-check $lib '  if [ -n "$dirty" ]; then' '  if false; then' scn_untracked_file_is_kept "untracked-file proof"
   expect_caught no-unpushed-check $lib '  if [ "$unpushed" != 0 ]; then' '  if false; then' scn_unpushed_commit_is_kept "unpushed-commit proof"
@@ -881,6 +990,12 @@ test_unsafe_mutations_are_caught() {
   expect_caught pane-exempts-any-process $lib '  [ "$(fm_agent_process_classify_name "$comm")" = shell ] || return 1' '  :' scn_pane_build_keeps_the_copy "shell-only pane exemption"
   expect_caught pane-exempts-busy-shell $lib '      if (child) exit 1' '      if (0) exit 1' scn_pane_busy_shell_keeps_the_copy "idle-shell-only pane exemption"
   expect_caught pane-exempts-any-shell $lib '        if (p == pane) exit 0' '        if (1) exit 0' scn_stray_shell_keeps_the_copy "pane-ancestry pane exemption"
+  expect_caught pane-shell-cwd-not-required $lib '  case "$cwd" in "$copy"|"$copy"/*) ;; *) return 1 ;; esac' '  :' scn_pane_shell_working_elsewhere_keeps_the_copy "pane-shell working-directory proof"
+  expect_caught sigkill-instead-of-sighup $lib '  kill -HUP "$pid" 2>/dev/null || return 1' '  kill -KILL "$pid" 2>/dev/null || return 1' scn_stubborn_pane_shell_keeps_the_copy "SIGHUP-only rule"
+  expect_caught no-stop-confirmation $orch '    if [ "$WORKER_STOPPED" != 1 ]; then' '    if false; then' scn_unconfirmed_stop_leaves_the_pane_shell "agent-stopped proof"
+  expect_caught exit-accepted-outside-the-prune $reap '  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1' '  :' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "merge-prune-only rule"
+  expect_caught exit-accepted-without-marker $reap '  [ -f "$1/$2.control-exit" ] && [ ! -L "$1/$2.control-exit" ]' '  :' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "deliberate-exit marker rule"
+  expect_caught exit-accepted-with-a-busy-record $reap '  [ "$(fm_busy_record_read "$1" "$2")" = missing ] || return 1' '  :' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "retired-busy-record rule"
   expect_caught no-slot-owner-check $orch '    mine|absent) ;;' '    mine|absent|other) ;;' scn_reassigned_slot_is_never_destroyed "slot-owner re-read"
   expect_caught no-project-lock $orch '  fm_project_lock_try "$plock" "merge-prune $ID" >/dev/null 2>&1 || rc=$?' '  :' scn_project_lock_busy_backs_off "project lock"
   expect_caught wake-every-time $orch '  if [ "$R_WAKE" = 0 ]; then' '  if true; then' scn_changed_file_is_kept "one-wake rule"
@@ -888,16 +1003,18 @@ test_unsafe_mutations_are_caught() {
 }
 
 test_over_strict_mutations_are_caught() {
-  local lib=fm-merge-prune-lib.sh
+  local lib=fm-merge-prune-lib.sh reap=fm-idle-reap-lib.sh
   expect_caught no-scratch-names $lib '  if fm_mp_scratch_name "$name"; then' '  if false; then' scn_scratch_copy_is_removed "scratch patterns"
   expect_caught no-claude-scratch $lib '    .claude/*|.opencode|.opencode/*) return 0 ;;' '    .opencode|.opencode/*) return 0 ;;' scn_scratch_copy_is_removed ".claude scratch rule"
   expect_caught no-tac-scratch $lib '    .tac/tmp|.tac/tmp/*|.tac/uv-cache|.tac/uv-cache/*) return 0 ;;' '    .tac/NEVER) return 0 ;;' scn_scratch_copy_is_removed ".tac scratch rule"
   expect_caught no-preserve-list $lib '    .claude/bug-evidence|.claude/bug-evidence/*|.claude/channel-outbox|.claude/channel-outbox/*)' '    .claude/NEVER-MATCHES)' scn_scratch_copy_is_removed "preserve list"
-  expect_caught pane-shell-not-exempt $lib '    fm_mp_indexer_pid "$pid" || fm_mp_pane_shell "$pid" "$pane" || kept="${kept:+$kept }$pid"' '    fm_mp_indexer_pid "$pid" || kept="${kept:+$kept }$pid"' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
+  expect_caught pane-shell-not-exempt $lib '    elif [ -z "$FM_MP_PANE_SHELL" ] && fm_mp_pane_shell "$pid" "$pane" "$copy"; then' '    elif false; then' scn_lingering_pane_shell_on_tmux "pane-shell exemption"
+  expect_caught pane-shell-never-signaled $lib '  kill -HUP "$pid" 2>/dev/null || return 1' '  :' scn_lingering_pane_shell_on_herdr "SIGHUP step"
+  expect_caught exit-never-accepted $reap '  [ "${FM_IDLE_REAP_MERGE_PRUNE:-0}" = 1 ] || return 1' '  return 1' scn_deliberately_exited_worker_reads_as_stopped_only_for_the_prune "stopped-worker acceptance"
   expect_caught empty-checksums-fail $lib '  [ ! -s "$dest/SHA256SUMS" ] || (cd "$dest"' '  (cd "$dest"' scn_empty_preserve_paths_do_not_keep_the_copy "empty-manifest rule"
   expect_caught long-reason-relogs fm-merge-prune.sh '  [ "$R_STATE" = retained ] && [ "$R_REASON" = "$(clean_detail "$reason")" ] && changed=0' '  [ "$R_STATE" = retained ] && [ "$R_REASON" = "$reason" ] && changed=0' scn_long_reason_is_logged_once "saved-reason comparison"
   expect_caught no-checksums $lib '      shasum -a 256 -- "$file" || exit 1' '      :' scn_scratch_copy_is_removed "checksum manifest"
-  expect_caught indexer-counts-as-use $lib '    fm_mp_indexer_pid "$pid" || fm_mp_pane_shell "$pid" "$pane" || kept="${kept:+$kept }$pid"' '    fm_mp_pane_shell "$pid" "$pane" || kept="${kept:+$kept }$pid"' scn_search_indexer_does_not_keep_the_copy "search-indexer exemption"
+  expect_caught indexer-counts-as-use $lib '    if fm_mp_indexer_pid "$pid"; then' '    if false; then' scn_search_indexer_does_not_keep_the_copy "search-indexer exemption"
   expect_caught pr-head-ignored $lib '  [ -z "$prsha" ] || extra=("$prsha")' '  extra=()' scn_pr_head_proves_a_squash_merged_commit "merged-PR-head proof"
   expect_caught nested-never-passes fm-merge-prune.sh '    fm_mp_prove_git "$n" "" || { record_verdict "$real"; return 1; }' '    false || { record_verdict "$real"; return 1; }' scn_clean_nested_copy_goes_with_the_slot "nested-copy removal"
   pass "mutation proof (over-strict direction): tightening any permission makes its removal case fail"
@@ -926,6 +1043,12 @@ case "${1:-}" in
   destroy)
     [ "$#" -eq 4 ] && [ "$3" = --include-leased ] && [ "$4" = --yes ] || { echo "stub treehouse: unexpected arguments: $*" >&2; exit 9; }
     case "$2" in "$TREEHOUSE_ROOT"/*/*/*) ;; *) echo "stub treehouse: outside the fake pool" >&2; exit 3 ;; esac
+    inuse=$(command -p lsof -a -d cwd +D "$2" -t 2>/dev/null | sort -u | tr '\n' ' ')
+    if [ -n "${inuse// /}" ]; then
+      echo "Skipped 1 worktree: [in-use:${inuse%% *}] $2" >&2
+      echo "did not destroy 1 (in-use); re-run with --include-in-use" >&2
+      exit 1
+    fi
     rm -rf "$2"; exit 0 ;;
 esac
 exit 0
@@ -981,10 +1104,11 @@ SH
 prune_real() {
   HOME="$W/fakehome" FM_HOME="$HOME_DIR" FM_STATE_OVERRIDE="$STATE" FM_DATA_OVERRIDE="$DATA" \
     FM_CONFIG_OVERRIDE="$HOME_DIR/config" FM_ROOT_OVERRIDE="$W/code-root" NM_HOME="$W/nm" \
-    TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" TH_LOG="$W/th.log" FM_MERGE_PRUNE_EXIT_WAIT=0 \
+    TREEHOUSE_ROOT="$POOL" PATH="$W/bin:$PATH" TH_LOG="$W/th.log" FM_MERGE_PRUNE_EXIT_WAIT="${FM_MERGE_PRUNE_EXIT_WAIT:-0}" \
     FM_TEARDOWN_GUARD_DONE=1 ROOT="$ROOT" STUB_LOG="$W/stub.log" FM_MERGE_PRUNE_TEARDOWN_BIN="$W/bin/teardown-real" REFUSE_FLAG="$W/refuse" \
     FM_MERGE_PRUNE_CONTROL_BIN="$W/bin/control-stub" CONTROL_LOG="$W/control.log" WORKER_PID_FILE="$W/worker.pid" \
     PANE_PID_FILE="$W/pane.pid" STEAL_FILE="$W/steal" SLOT_MARKER="$POOL/pool1/1/.fm-slot-owner" \
+    STOP_FAIL_FILE="$W/stop-fail" BUSY_EVENT_BIN="$BIN_DIR/fm-busy-event.sh" \
     "$BIN_DIR/fm-merge-prune.sh" "$@"
 }
 
@@ -1146,11 +1270,15 @@ ALL_TESTS=(
   test_fallback_destroy_failure_keeps_the_copy
   test_retained_copy_is_reaped_quietly_when_the_cause_clears
   test_long_retained_reason_is_logged_once
-  test_fallback_ignores_the_tasks_idle_pane_shell_on_tmux
-  test_fallback_ignores_the_tasks_idle_pane_shell_on_herdr
+  test_fallback_ends_the_tasks_idle_pane_shell_on_tmux
+  test_fallback_ends_the_tasks_idle_pane_shell_on_herdr
   test_fallback_keeps_a_non_shell_process_in_the_pane
   test_fallback_keeps_a_pane_shell_that_runs_something
   test_fallback_keeps_a_shell_no_pane_started
+  test_fallback_keeps_a_pane_shell_that_works_elsewhere
+  test_fallback_keeps_the_copy_when_the_pane_shell_ignores_sighup
+  test_fallback_leaves_the_pane_shell_until_the_agent_is_confirmed_stopped
+  test_deliberately_exited_worker_reads_as_stopped_only_for_the_prune
   test_fallback_exempts_nothing_when_the_pane_is_unreadable
   test_fallback_never_destroys_a_reassigned_slot
   test_fallback_backs_off_while_the_project_lock_is_held
